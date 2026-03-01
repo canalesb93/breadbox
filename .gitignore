@@ -1,0 +1,25 @@
+# Binary
+/breadbox
+breadbox.exe
+
+# Environment files
+.local.env
+.docker.env
+
+# Go
+vendor/
+
+# sqlc generated files
+internal/db/db.go
+internal/db/models.go
+internal/db/querier.go
+internal/db/*.sql.go
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store

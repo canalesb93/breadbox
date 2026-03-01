@@ -1,0 +1,47 @@
+package app
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+
+	"breadbox/internal/config"
+	"breadbox/internal/db"
+	"breadbox/internal/provider"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// App is the single dependency container for the process. It is constructed
+// once at startup and passed to every handler and worker.
+type App struct {
+	DB        *pgxpool.Pool
+	Queries   *db.Queries
+	Config    *config.Config
+	Logger    *slog.Logger
+	Providers map[string]provider.Provider
+}
+
+// New creates a new App. It connects to the database, creates a Queries
+// instance, and initializes the providers map.
+func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, error) {
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("connect to database: %w", err)
+	}
+
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping database: %w", err)
+	}
+
+	queries := db.New(pool)
+
+	return &App{
+		DB:        pool,
+		Queries:   queries,
+		Config:    cfg,
+		Logger:    logger,
+		Providers: make(map[string]provider.Provider),
+	}, nil
+}
