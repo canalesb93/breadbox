@@ -8,77 +8,64 @@ confirm everything works before moving on.
 
 ---
 
-## Phase 1: Foundation
+## Phase 1: Foundation ✅
 
 Set up the project skeleton, database, and core infrastructure that everything else depends on.
 
-### 1.1 Project Scaffold
+**Status:** Complete. Committed as `f493ce3` + `50e8c52`. Checkpoint 1 verified.
 
-- Initialize Go module (`breadbox`), set up directory layout per `architecture.md` Section 2
-- Configure `breadbox serve`, `breadbox migrate`, `breadbox version` subcommands (`architecture.md` Section 1.1)
-- Set up structured logging with `slog` (`architecture.md` Section 8)
-- Create `Makefile` with targets: `build`, `test`, `migrate`, `generate`, `lint` (`architecture.md` Section 8)
-- Create `.env.example` with all required environment variables
-- **Ref:** `architecture.md` Sections 1–2, 8
+### 1.1 Project Scaffold ✅
 
-### 1.2 Configuration System
+- [x] Initialize Go module (`breadbox`), set up directory layout per `architecture.md` Section 2
+- [x] Configure `breadbox serve`, `breadbox migrate`, `breadbox version` subcommands (`architecture.md` Section 1.1)
+- [x] Set up structured logging with `slog` (`architecture.md` Section 8)
+- [x] Create `Makefile` with targets: `dev`, `build`, `test`, `lint`, `migrate-up`, `migrate-down`, `migrate-create`, `sqlc`, `seed`, `docker-up`, `docker-down`
+- [x] Create `.env.example` with all required environment variables
+- [x] Create `.gitignore`, `Dockerfile` (multi-stage Alpine), `docker-compose.yml` (app + db)
 
-- Implement config loading: environment variables override `app_config` DB table override defaults (`architecture.md` Section 4.2)
-- Define all config keys: `plaid_client_id`, `plaid_secret`, `plaid_env`, `sync_interval_hours`, `webhook_url`, `setup_complete` (`data-model.md` Section 2.8)
-- AES-256-GCM encryption key loading from `BREADBOX_ENCRYPTION_KEY` env var (`architecture.md` Section 5.1)
-- **Ref:** `architecture.md` Section 4, `data-model.md` Section 2.8
+### 1.2 Configuration System ✅
 
-### 1.3 Database Schema & Migrations
+- [x] Implement config loading: environment variables override `app_config` DB table override defaults
+- [x] Define all config keys: `plaid_client_id`, `plaid_secret`, `plaid_env`, `sync_interval_hours`, `webhook_url`, `setup_complete`
+- [x] AES-256-GCM encryption key loading from `ENCRYPTION_KEY` env var (64-char hex → 32 bytes)
 
-Follow the migration ordering from `data-model.md` Section 6:
+### 1.3 Database Schema & Migrations ✅
 
-- Migration 00001: Extensions (`pgcrypto` for `gen_random_uuid()`, `pg_trgm` for text search)
-- Migration 00002: Enum types (`provider_type`, `connection_status`, `sync_trigger`, `sync_status`)
-- Migration 00003: `users` table (`data-model.md` Section 2.1)
-- Migration 00004: `admin_accounts` table (`data-model.md` Section 2.2)
-- Migration 00005: `bank_connections` table (`data-model.md` Section 2.3)
-- Migration 00006: `accounts` table with SET NULL FK (`data-model.md` Section 2.4)
-- Migration 00007: `transactions` table with SET NULL FK, soft-delete support (`data-model.md` Section 2.5)
-- Migration 00008: `sync_logs` table with CASCADE FK (`data-model.md` Section 2.6)
-- Migration 00009: `api_keys` table with `revoked_at` column (`data-model.md` Section 2.7)
-- Migration 00010: `app_config` key-value table (`data-model.md` Section 2.8)
-- Migration 00011: Seed `app_config` with default keys (`data-model.md` Section 6.6)
-- Create all indexes per `data-model.md` Section 3
-- **Ref:** `data-model.md` Sections 2–3, 6
+- [x] All 11 migrations applied in correct order (00001–00011)
+- [x] 8 tables: users, admin_accounts, bank_connections, accounts, transactions, sync_logs, api_keys, app_config
+- [x] 4 enum types: provider_type, connection_status, sync_trigger, sync_status
+- [x] All indexes per `data-model.md` Section 5 (including partial index, GIN trigram)
+- [x] 6 seed config rows with ON CONFLICT DO NOTHING
 
-### 1.4 sqlc Setup
+### 1.4 sqlc Setup ✅
 
-- Configure `sqlc.yml` with pgx/v5 backend
-- Write initial queries for health check and config access
-- **Ref:** `architecture.md` Section 2 (project structure)
+- [x] `sqlc.yml` configured with pgx/v5 backend
+- [x] Initial queries: HealthCheck, GetAppConfig, ListAppConfig, SetAppConfig
 
-### 1.5 Provider Interface
+### 1.5 Provider Interface ✅
 
-- Define the `Provider` Go interface with all method signatures (`architecture.md` Section 3.1):
-  - `CreateLinkSession`, `ExchangeToken`, `SyncTransactions`, `GetBalances`
-  - `HandleWebhook`, `CreateReauthSession`, `RemoveConnection`, `ProviderName`
-- Define shared types: `Connection`, `Account`, `AccountBalance`, `Transaction`, `SyncResult`, `LinkSession`, `WebhookPayload`, `WebhookEvent` (`architecture.md` Section 3.2)
-- Set up provider registry (`map[string]Provider`) (`plaid-integration.md` Section 8.3)
-- **Ref:** `architecture.md` Section 3, `plaid-integration.md` Section 8
+- [x] `Provider` interface with 7 methods (CreateLinkSession, ExchangeToken, SyncTransactions, GetBalances, HandleWebhook, CreateReauthSession, RemoveConnection)
+- [x] All shared types defined with `shopspring/decimal` for monetary amounts
+- [x] Provider registry (`map[string]Provider`) in App struct
+- [x] AES-256-GCM encrypt/decrypt in `internal/provider/plaid/encrypt.go`
 
-### 1.6 Health Endpoint & HTTP Server
+### 1.6 Health Endpoint & HTTP Server ✅
 
-- Set up chi router with standard middleware (RequestID, RealIP, Logger, Recoverer)
-- Implement `GET /health` endpoint (unauthenticated) (`rest-api.md` Section 2)
-- Wire up graceful shutdown
-- **Ref:** `rest-api.md` Section 2, `architecture.md` Section 1
+- [x] chi/v5 router with middleware: RequestID, RealIP, slog Logger, Recoverer
+- [x] `GET /health` → `{"status":"ok","version":"..."}`
+- [x] Graceful shutdown on SIGINT/SIGTERM with 30s deadline
 
-### Checkpoint 1
+### Checkpoint 1 ✅
 
-Verify the project builds, runs, connects to PostgreSQL, and responds to health checks.
+All 7 checks passed:
 
-1. `go build ./cmd/breadbox/` compiles with no errors
-2. Start PostgreSQL: `docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=breadbox -e POSTGRES_DB=breadbox postgres:16`
-3. `breadbox migrate` — all 11 migrations apply. Verify with `psql`: `\dt` shows 8 tables, `\dT+` shows 4 enum types, `SELECT * FROM app_config;` shows 6 seed rows
-4. `breadbox version` prints a version string
-5. `breadbox serve` starts and logs the listening port
-6. `curl http://localhost:8080/health` returns `200 OK`
-7. `sqlc generate` succeeds and produces generated Go files
+1. ✅ `go build ./cmd/breadbox/` compiles with no errors
+2. ✅ PostgreSQL started
+3. ✅ `breadbox migrate` — 11 migrations applied (8 tables, 4 enums, 6 seed rows)
+4. ✅ `breadbox version` prints "dev"
+5. ✅ `breadbox serve` starts and logs `addr=:8080`
+6. ✅ `curl http://localhost:8080/health` returns `200 OK` with `{"status":"ok","version":"dev"}`
+7. ✅ `sqlc generate` succeeds and produces generated Go files
 
 ---
 
