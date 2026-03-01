@@ -40,7 +40,7 @@ Detailed specs live in `docs/`. The canonical source for schema and enums is `do
 
 ### How We Work (Orchestrator → Ricardo)
 
-- **Follow `docs/ROADMAP.md`** phase by phase. Don't skip ahead.
+- If it makes sense for the current task **follow `docs/ROADMAP.md`** phase by phase. Don't skip ahead.
 - **Checkpoint before moving on.** At the end of each phase, pause and let Ricardo verify the checkpoint steps before starting the next phase.
 - **Commit after each completed phase.** One clean commit per phase, not mid-phase.
 - **No surprises.** If a task is ambiguous or a design decision comes up that isn't covered in the specs, ask Ricardo rather than guessing.
@@ -58,3 +58,13 @@ Detailed specs live in `docs/`. The canonical source for schema and enums is `do
 - Each teammate should have 3-6 tasks to stay productive.
 - Tasks should be self-contained: one package, one endpoint group, one dashboard page, etc.
 - Include spec references in every task description so teammates have full context.
+
+### Keeping Docs Current
+
+After completing a phase or making a significant decision:
+
+- **`docs/ROADMAP.md`**: Mark completed tasks/phases so progress is visible across sessions.
+- **`CLAUDE.md`** (this file): Update if a design decision changes, a new convention is established, or the tech stack evolves. Keep it concise.
+- **Spec docs** (`docs/*.md`): Update if implementation reveals the spec was wrong or incomplete. Specs should reflect reality, not aspirations.
+
+It's critical to also keep this CLAUDE.md up to date. If you are the orchestrator agent include in your plans to come back to this at the end and make updates it necessary.
