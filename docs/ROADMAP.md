@@ -1,0 +1,448 @@
+# Implementation Roadmap
+
+Sequential build order for Breadbox MVP. Each phase builds on the previous one.
+No dates or cost estimates — just ordered tasks with spec references.
+
+Each phase ends with a **Checkpoint** — a hands-on verification you can run to
+confirm everything works before moving on.
+
+---
+
+## Phase 1: Foundation
+
+Set up the project skeleton, database, and core infrastructure that everything else depends on.
+
+### 1.1 Project Scaffold
+
+- Initialize Go module (`breadbox`), set up directory layout per `architecture.md` Section 2
+- Configure `breadbox serve`, `breadbox migrate`, `breadbox version` subcommands (`architecture.md` Section 1.1)
+- Set up structured logging with `slog` (`architecture.md` Section 8)
+- Create `Makefile` with targets: `build`, `test`, `migrate`, `generate`, `lint` (`architecture.md` Section 8)
+- Create `.env.example` with all required environment variables
+- **Ref:** `architecture.md` Sections 1–2, 8
+
+### 1.2 Configuration System
+
+- Implement config loading: environment variables override `app_config` DB table override defaults (`architecture.md` Section 4.2)
+- Define all config keys: `plaid_client_id`, `plaid_secret`, `plaid_env`, `sync_interval_hours`, `webhook_url`, `setup_complete` (`data-model.md` Section 2.8)
+- AES-256-GCM encryption key loading from `BREADBOX_ENCRYPTION_KEY` env var (`architecture.md` Section 5.1)
+- **Ref:** `architecture.md` Section 4, `data-model.md` Section 2.8
+
+### 1.3 Database Schema & Migrations
+
+Follow the migration ordering from `data-model.md` Section 6:
+
+- Migration 00001: Extensions (`pgcrypto` for `gen_random_uuid()`, `pg_trgm` for text search)
+- Migration 00002: Enum types (`provider_type`, `connection_status`, `sync_trigger`, `sync_status`)
+- Migration 00003: `users` table (`data-model.md` Section 2.1)
+- Migration 00004: `admin_accounts` table (`data-model.md` Section 2.2)
+- Migration 00005: `bank_connections` table (`data-model.md` Section 2.3)
+- Migration 00006: `accounts` table with SET NULL FK (`data-model.md` Section 2.4)
+- Migration 00007: `transactions` table with SET NULL FK, soft-delete support (`data-model.md` Section 2.5)
+- Migration 00008: `sync_logs` table with CASCADE FK (`data-model.md` Section 2.6)
+- Migration 00009: `api_keys` table with `revoked_at` column (`data-model.md` Section 2.7)
+- Migration 00010: `app_config` key-value table (`data-model.md` Section 2.8)
+- Migration 00011: Seed `app_config` with default keys (`data-model.md` Section 6.6)
+- Create all indexes per `data-model.md` Section 3
+- **Ref:** `data-model.md` Sections 2–3, 6
+
+### 1.4 sqlc Setup
+
+- Configure `sqlc.yml` with pgx/v5 backend
+- Write initial queries for health check and config access
+- **Ref:** `architecture.md` Section 2 (project structure)
+
+### 1.5 Provider Interface
+
+- Define the `Provider` Go interface with all method signatures (`architecture.md` Section 3.1):
+  - `CreateLinkSession`, `ExchangeToken`, `SyncTransactions`, `GetBalances`
+  - `HandleWebhook`, `CreateReauthSession`, `RemoveConnection`, `ProviderName`
+- Define shared types: `Connection`, `Account`, `AccountBalance`, `Transaction`, `SyncResult`, `LinkSession`, `WebhookPayload`, `WebhookEvent` (`architecture.md` Section 3.2)
+- Set up provider registry (`map[string]Provider`) (`plaid-integration.md` Section 8.3)
+- **Ref:** `architecture.md` Section 3, `plaid-integration.md` Section 8
+
+### 1.6 Health Endpoint & HTTP Server
+
+- Set up chi router with standard middleware (RequestID, RealIP, Logger, Recoverer)
+- Implement `GET /health` endpoint (unauthenticated) (`rest-api.md` Section 2)
+- Wire up graceful shutdown
+- **Ref:** `rest-api.md` Section 2, `architecture.md` Section 1
+
+### Checkpoint 1
+
+Verify the project builds, runs, connects to PostgreSQL, and responds to health checks.
+
+1. `go build ./cmd/breadbox/` compiles with no errors
+2. Start PostgreSQL: `docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=breadbox -e POSTGRES_DB=breadbox postgres:16`
+3. `breadbox migrate` — all 11 migrations apply. Verify with `psql`: `\dt` shows 8 tables, `\dT+` shows 4 enum types, `SELECT * FROM app_config;` shows 6 seed rows
+4. `breadbox version` prints a version string
+5. `breadbox serve` starts and logs the listening port
+6. `curl http://localhost:8080/health` returns `200 OK`
+7. `sqlc generate` succeeds and produces generated Go files
+
+---
+
+## Phase 2: Plaid Integration + Admin Auth
+
+Connect to Plaid, implement the admin dashboard authentication, and build the setup wizard.
+
+### 2.1 Plaid Client Initialization
+
+- Initialize Plaid Go SDK client from config (client ID, secret, environment)
+- Implement access token encryption/decryption (AES-256-GCM) (`plaid-integration.md` Section 7)
+- **Ref:** `plaid-integration.md` Sections 1, 7
+
+### 2.2 Plaid Provider Implementation — Link Flow
+
+- Implement `CreateLinkSession`: call Plaid `/link/token/create` with products, webhook URL, user ID (`plaid-integration.md` Section 2.1)
+- Implement `ExchangeToken`: call `/item/public_token/exchange`, return Connection + Accounts (`plaid-integration.md` Section 2.2)
+- Implement `CreateReauthSession`: call `/link/token/create` in update mode with `access_token` (`plaid-integration.md` Section 2.3)
+- Implement `RemoveConnection`: call `/item/remove` (`plaid-integration.md` Section 6.4)
+- **Ref:** `plaid-integration.md` Sections 2, 6
+
+### 2.3 Admin Authentication
+
+- Implement admin account creation (bcrypt hashed passwords, min 8 chars) (`admin-dashboard.md` Section 2)
+- Set up session management with `alexedwards/scs` + `pgxstore` (`architecture.md` Section 5.2)
+- Implement login/logout routes (`admin-dashboard.md` Section 3)
+- Session cookies: `HttpOnly; SameSite=Lax; Secure` (`admin-dashboard.md` Section 3.1)
+- CSRF protection middleware for admin POST routes (`architecture.md` Section 1.4)
+- Setup detection middleware: redirect to wizard if `setup_complete` is not `true` (`admin-dashboard.md` Section 2.1)
+- `GET /admin/api/setup/status` — unauthenticated setup check endpoint (`rest-api.md` Section 8)
+- **Ref:** `admin-dashboard.md` Sections 2–3, `architecture.md` Sections 1.4, 5.2
+
+### 2.4 Setup Wizard
+
+- Step 1: Create admin account (`admin-dashboard.md` Section 2.2)
+- Step 2: Enter Plaid credentials + validate with test API call (`admin-dashboard.md` Section 2.3–2.4)
+- Step 3: Configure sync interval (`admin-dashboard.md` Section 2.4)
+- Step 4: Optional webhook URL (`admin-dashboard.md` Section 2.5)
+- Step 5: Confirmation + set `setup_complete = true` (`admin-dashboard.md` Section 2.6)
+- Programmatic setup endpoint: `POST /admin/api/setup` (`rest-api.md` Section 6.11)
+- **Ref:** `admin-dashboard.md` Section 2, `rest-api.md` Section 6.11
+
+### 2.5 Dashboard — Template System & Shared Components
+
+- Template system with Go `html/template` + Pico CSS, embedded via `go:embed` (`admin-dashboard.md` Section 14)
+- Navigation sidebar (`admin-dashboard.md` Section 13)
+- Flash message system stored in sessions (`admin-dashboard.md` Section 14.4)
+- Error pages (404, 500) and empty states (`admin-dashboard.md` Section 18)
+- **Ref:** `admin-dashboard.md` Sections 13–14, 18
+
+### 2.6 Dashboard — Connection Management Pages
+
+- Dashboard home page (`admin-dashboard.md` Section 4)
+- Connections list page with sync/remove form actions (`admin-dashboard.md` Section 5)
+- New connection page with Plaid Link JS integration (`admin-dashboard.md` Section 6)
+  - `POST /admin/api/link-token` (`rest-api.md` Section 6.7)
+  - `POST /admin/api/exchange-token` (`rest-api.md` Section 6.8)
+- Connection detail page (`admin-dashboard.md` Section 7)
+- Re-authentication page — update mode, NO token exchange (`admin-dashboard.md` Section 8)
+  - `POST /admin/api/connections/:id/reauth` (link token for update mode)
+  - `POST /admin/api/connections/:id/reauth-complete` (status update only, no exchange)
+- **Ref:** `admin-dashboard.md` Sections 4–8
+
+### 2.7 Dashboard — Family Members Page
+
+- Family members list, create, edit (`admin-dashboard.md` Section 9)
+- `POST /admin/api/users` and `PUT /admin/api/users/:id` admin endpoints (`rest-api.md` Section 8)
+- No delete in MVP (`admin-dashboard.md` Section 9)
+- **Ref:** `admin-dashboard.md` Section 9, `rest-api.md` Section 8
+
+### Checkpoint 2
+
+Complete the setup wizard, log in, connect a sandbox bank, and see it on the dashboard.
+
+1. Start `breadbox serve` with `BREADBOX_ENCRYPTION_KEY` set
+2. Open `http://localhost:8080/admin/` — redirects to `/admin/setup/step/1`
+3. Complete all 5 wizard steps with Plaid sandbox credentials (environment = sandbox)
+4. Log in with the admin credentials you created
+5. Dashboard home page loads showing 0 accounts, 0 transactions
+6. Navigate to Connections → "Connect New Bank" → select a family member
+7. In Plaid Link, use sandbox credentials (`user_good` / `pass_good`) → complete link
+8. Connection detail page shows the sandbox institution with status "Active"
+9. Family Members page shows the member you created
+10. Log out → confirm redirect to login page, `/admin/` is inaccessible
+
+---
+
+## Phase 3: Transaction Sync Engine
+
+Build the core sync loop that fetches and stores bank data.
+
+### 3.1 Service Layer
+
+- Build the shared service layer that both REST handlers and MCP tools will call (`mcp-server.md` Section 7)
+- Service functions: `QueryTransactions`, `CountTransactions`, `ListAccounts`, `GetAccount`, `ListUsers`, `ListConnections`, `GetConnectionStatus`, `TriggerSync`
+- Business logic lives here: filter validation, currency handling, soft-delete exclusion, pending→posted linking
+- **Ref:** `mcp-server.md` Section 7, `architecture.md` Section 2
+
+### 3.2 Cursor-Based Sync Implementation
+
+- Implement `SyncTransactions` for Plaid provider: call `/transactions/sync` with cursor (`plaid-integration.md` Section 3)
+- Handle pagination: loop while `has_more` is true (`plaid-integration.md` Section 3.3)
+- Handle `TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION`: reset cursor and retry (`plaid-integration.md` Section 3.4)
+- Per-connection sync locking (mutex or DB lock) to prevent concurrent syncs on the same connection (`plaid-integration.md` Section 3.3)
+- Map Plaid fields to Breadbox schema (`plaid-integration.md` Section 3.2, `data-model.md` Section 3)
+- **Ref:** `plaid-integration.md` Section 3, `data-model.md` Section 3
+
+### 3.3 Transaction Processing
+
+- Insert new transactions (`added` array)
+- Update existing transactions (`modified` array) — match by `external_transaction_id`
+- Soft-delete removed transactions (`removed` array) — set `deleted_at`, don't hard-delete
+- Handle pending→posted transition: link via `pending_transaction_id`, soft-delete the pending version (`plaid-integration.md` Section 3.5, `data-model.md` Section 4.2)
+- **Ref:** `plaid-integration.md` Section 3.5, `data-model.md` Section 4.2
+
+### 3.4 Balance Refresh
+
+- Implement `GetBalances`: call Plaid `/accounts/get` after each sync (`plaid-integration.md` Section 4)
+- Update `balance_current`, `balance_available`, `balance_limit`, `last_balance_update` on accounts (`data-model.md` Section 2.4)
+- **Ref:** `plaid-integration.md` Section 4, `data-model.md` Section 2.4
+
+### 3.5 Sync Orchestration & Logging
+
+- Build sync orchestrator: coordinates provider calls, cursor management, error handling
+- Create `sync_logs` entries: track trigger type (`cron`, `webhook`, `manual`, `initial`), counts (added/modified/removed), status, errors (`data-model.md` Section 2.6)
+- Update `bank_connections.last_synced_at` on success
+- Update connection status on errors (`active` → `error` or `pending_reauth` based on error code) (`plaid-integration.md` Section 6)
+- Trigger initial sync after new connection is created (trigger type `initial`)
+- **Ref:** `plaid-integration.md` Sections 3, 6, `data-model.md` Sections 2.3, 2.6
+
+### 3.6 Seed Command
+
+- Implement `breadbox seed` subcommand for sandbox test data (`architecture.md` Section 1.1)
+- Useful for development and testing without live Plaid credentials
+- **Ref:** `architecture.md` Section 1.1
+
+### Checkpoint 3
+
+Trigger a sync and verify transactions appear in the database.
+
+1. From the connection detail page, click "Sync Now" — see flash message "Sync triggered"
+2. Refresh after a few seconds — Sync History shows a new entry with `status = success` and non-zero `added_count`
+3. In `psql`: `SELECT COUNT(*) FROM transactions;` returns a positive number
+4. `SELECT name, balance_current, balance_available FROM accounts;` shows non-null values
+5. Trigger a second sync — sync log shows `added_count = 0` (incremental cursor working)
+6. `breadbox seed` inserts test data without errors
+
+---
+
+## Phase 4: REST API
+
+Expose all financial data through authenticated JSON endpoints.
+
+### 4.1 API Key Authentication Middleware
+
+- Implement API key auth: `X-API-Key: bb_xxxxx` header (`rest-api.md` Section 1)
+- Hash presented key with SHA-256, compare to stored `key_hash` where `revoked_at IS NULL` (`rest-api.md` Section 1.1, `data-model.md` Section 2.7)
+- Update `last_used_at` on successful auth
+- Error codes: `MISSING_API_KEY`, `INVALID_API_KEY`, `REVOKED_API_KEY` (`rest-api.md` Section 1.2)
+- **Ref:** `rest-api.md` Section 1, `data-model.md` Section 2.7
+
+### 4.2 Error Response Format
+
+- Standardized error envelope: `{ "error": { "code": "UPPER_SNAKE_CASE", "message": "..." } }` (`rest-api.md` Section 7, `architecture.md` Section 9.3)
+- Implement early so all endpoints use it consistently
+- **Ref:** `rest-api.md` Section 7, `architecture.md` Section 9
+
+### 4.3 Accounts Endpoints
+
+- `GET /api/v1/accounts` — list accounts, filter by `user_id` (`rest-api.md` Section 5.1)
+- `GET /api/v1/accounts/:id` — single account with balance (`rest-api.md` Section 5.2)
+- **Ref:** `rest-api.md` Section 5.1–5.2
+
+### 4.4 Transactions Endpoints
+
+- `GET /api/v1/transactions` — list with cursor pagination, all filters (date range, account_id, user_id, category, amount range, pending, text search) (`rest-api.md` Section 5.3)
+- `GET /api/v1/transactions/count` — count matching transactions with same filters (`rest-api.md` Section 5.4)
+- `GET /api/v1/transactions/:id` — single transaction (`rest-api.md` Section 5.5)
+- Implement `sqlc.narg` dynamic filter pattern for optional query params
+- Exclude soft-deleted transactions (`deleted_at IS NULL`) by default
+- **Ref:** `rest-api.md` Sections 5.3–5.5, `data-model.md` Section 4.1
+
+### 4.5 Users Endpoint
+
+- `GET /api/v1/users` — list family members (`rest-api.md` Section 5.6)
+- **Ref:** `rest-api.md` Section 5.6
+
+### 4.6 Connections Endpoints
+
+- `GET /api/v1/connections` — list connections with status, filter by `user_id` (`rest-api.md` Section 5.7)
+- `GET /api/v1/connections/:id/status` — connection health + last sync info (`rest-api.md` Section 5.8)
+- **Ref:** `rest-api.md` Sections 5.7–5.8
+
+### 4.7 Sync Trigger Endpoint
+
+- `POST /api/v1/sync` — trigger sync for all or specific connection, return 202 (`rest-api.md` Section 5.9)
+- **Ref:** `rest-api.md` Section 5.9
+
+### 4.8 Admin API Endpoints
+
+- `POST /admin/api/api-keys` — create API key, return plaintext once (`rest-api.md` Section 6.1)
+- `GET /admin/api/api-keys` — list keys (prefix only, never full key) (`rest-api.md` Section 6.2)
+- `DELETE /admin/api/api-keys/:id` — revoke key (set `revoked_at`) (`rest-api.md` Section 6.3)
+- `GET /admin/api/sync-logs` — paginated sync history (offset-based, not cursor) (`rest-api.md` Section 6.4)
+- `DELETE /admin/api/connections/:id` — disconnect (soft-delete, preserve data) (`rest-api.md` Section 6.9)
+- **Ref:** `rest-api.md` Section 6
+
+### Checkpoint 4
+
+Create an API key and use it to query all REST endpoints with curl.
+
+1. Navigate to API Keys page → "Create API Key" → copy the key
+2. `curl -H 'X-API-Key: bb_...' http://localhost:8080/api/v1/accounts` — JSON array with accounts and balances
+3. `curl -H 'X-API-Key: bb_...' 'http://localhost:8080/api/v1/transactions?limit=5'` — paginated transactions
+4. `curl -H 'X-API-Key: bb_...' 'http://localhost:8080/api/v1/transactions/count'` — `{"count": N}`
+5. `curl -H 'X-API-Key: bb_...' 'http://localhost:8080/api/v1/transactions?search=coffee'` — filtered results
+6. `curl -H 'X-API-Key: bb_...' http://localhost:8080/api/v1/users` — family member list
+7. `curl -H 'X-API-Key: bb_...' http://localhost:8080/api/v1/connections` — connection with status and `last_synced_at`
+8. `curl -X POST -H 'X-API-Key: bb_...' http://localhost:8080/api/v1/sync` — `202 Accepted`
+9. Test auth errors: no key → `401 MISSING_API_KEY`; bad key → `401 INVALID_API_KEY`
+10. Test pagination: `?limit=2` returns `next_cursor` and `has_more: true`; follow cursor for next page
+
+---
+
+## Phase 5: MCP Server
+
+Wrap the REST API layer as MCP tools for AI agent access.
+
+### 5.1 MCP Server Setup
+
+- Integrate `github.com/modelcontextprotocol/go-sdk` (v1.4.0+)
+- Configure Streamable HTTP transport on the same chi router (`mcp-server.md` Section 2)
+- Implement API key authentication for MCP sessions (`mcp-server.md` Section 2)
+- **Ref:** `mcp-server.md` Sections 1–2
+
+### 5.2 MCP Tools
+
+- `list_accounts` — wraps `GET /api/v1/accounts` (`mcp-server.md` Section 3)
+- `query_transactions` — wraps `GET /api/v1/transactions` with all filters (`mcp-server.md` Section 3)
+- `count_transactions` — wraps `GET /api/v1/transactions/count` (`mcp-server.md` Section 3)
+- `list_users` — wraps `GET /api/v1/users` (`mcp-server.md` Section 3)
+- `get_sync_status` — wraps `GET /api/v1/connections` (`mcp-server.md` Section 3)
+- `trigger_sync` — wraps `POST /api/v1/sync` (`mcp-server.md` Section 3)
+- All tools call the service layer directly (not HTTP round-trip) (`mcp-server.md` Section 7)
+- **Ref:** `mcp-server.md` Sections 3, 7
+
+### 5.3 Stdio Convenience Mode
+
+- Implement `breadbox mcp-stdio` subcommand for local development (`mcp-server.md` Section 2, `architecture.md` Section 1.1)
+- No authentication required in stdio mode
+- **Ref:** `mcp-server.md` Section 2, `architecture.md` Section 1.1
+
+### 5.4 Dashboard — API Keys Page
+
+- API keys management page: create, view (prefix only), revoke (`admin-dashboard.md` Section 10)
+- Display client config examples for Claude Desktop / Claude Code (`mcp-server.md` Sections 2.1–2.2)
+- **Ref:** `admin-dashboard.md` Section 10, `mcp-server.md` Sections 2.1–2.2
+
+### Checkpoint 5
+
+Connect Claude Desktop or Claude Code to Breadbox and run a query.
+
+1. Test MCP endpoint directly:
+   ```
+   curl -X POST -H 'X-API-Key: bb_...' -H 'Content-Type: application/json' \
+     -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}' \
+     http://localhost:8080/mcp
+   ```
+   Verify JSON-RPC response with server capabilities
+2. Test stdio: `echo '<same JSON>' | breadbox mcp-stdio` — response on stdout
+3. Configure Claude Desktop with the HTTP config from `mcp-server.md` Section 2.1 — verify Breadbox tools appear
+4. Ask Claude: "How many accounts do I have in Breadbox?" — verify it calls `list_accounts`
+5. Ask Claude: "Show me my recent transactions" — verify `query_transactions` returns data
+6. Check API Keys page — "Last Used" timestamp updated
+
+---
+
+## Phase 6: Automated Sync + Webhooks
+
+Make sync automatic and handle Plaid callbacks.
+
+### 6.1 Cron Scheduling
+
+- Integrate `robfig/cron/v3` for periodic sync (`architecture.md` Section 2)
+- Read interval from `sync_interval_hours` config (default 12h) (`data-model.md` Section 2.8)
+- Sync all active connections on each cron tick
+- Startup sync: on server start, sync any connections whose `last_synced_at` is older than the configured interval (`plaid-integration.md` Section 7.4)
+- **Ref:** `plaid-integration.md` Sections 5.2, 7.4, `architecture.md` Section 2
+
+### 6.2 Webhook Handler
+
+- Implement `POST /webhooks/:provider` route (`architecture.md` Section 2)
+- Verify Plaid webhook signatures (JWT/ES256 with JWKS, in-memory JWK cache keyed by `kid`) (`plaid-integration.md` Sections 5.1–5.2)
+- Handle webhook types (`plaid-integration.md` Section 5.3):
+  - `SYNC_UPDATES_AVAILABLE` → trigger sync for the connection
+  - `ITEM_ERROR` / `PENDING_EXPIRATION` → update connection status
+  - `NEW_ACCOUNTS_AVAILABLE` → set flag on connection
+  - Unknown types → log and ignore
+- **Ref:** `plaid-integration.md` Section 5, `architecture.md` Section 2
+
+### 6.3 Connection Health Monitoring
+
+- Update connection status based on sync errors and webhooks (`plaid-integration.md` Section 6)
+- Status transitions: `active` ↔ `error`, `active` → `pending_reauth`, `* → disconnected` (`plaid-integration.md` Section 6.1)
+- **Ref:** `plaid-integration.md` Section 6
+
+### 6.4 Dashboard — Remaining Pages
+
+- Sync logs page with offset-based pagination (`admin-dashboard.md` Section 11)
+- Settings page — update sync interval and webhook URL (`admin-dashboard.md` Section 12)
+- **Ref:** `admin-dashboard.md` Sections 11–12
+
+### 6.5 Graceful Shutdown
+
+- Clean shutdown of cron scheduler, in-flight syncs, HTTP server
+- Context cancellation propagation
+- **Ref:** `architecture.md` Section 1
+
+### Checkpoint 6
+
+Verify cron syncs fire automatically and the remaining dashboard pages work.
+
+1. Set `sync_interval_hours` to a short interval for testing. Restart `breadbox serve`
+2. Wait for cron tick — Sync Logs page (`/admin/sync-logs`) shows a new entry with `trigger = cron`
+3. Navigate to Settings page → change sync interval → save → flash message "Settings saved"
+4. Test graceful shutdown: `Ctrl+C` during a sync — process exits cleanly within 30 seconds
+5. (Webhook testing requires a publicly accessible URL or Plaid sandbox webhook endpoints)
+
+---
+
+## Phase 7: Docker Deployment
+
+Package everything for single-command self-hosted deployment.
+
+### 7.1 Dockerfile
+
+- Multi-stage build: Go builder → minimal runtime image (`architecture.md` Section 7)
+- Single binary output
+- **Ref:** `architecture.md` Section 7
+
+### 7.2 Docker Compose
+
+- `docker-compose.yml` with two services: `breadbox` + `postgres` (`architecture.md` Section 7)
+- Named volume for PostgreSQL data persistence
+- Auto-run migrations on startup
+- Environment variable configuration
+- **Ref:** `architecture.md` Section 7
+
+### 7.3 Production Polish
+
+- Startup banner with version, port, config summary
+- Connection pool tuning for PostgreSQL
+- Request timeout configuration
+- Verify all endpoints work end-to-end in Docker
+- **Ref:** `architecture.md` Sections 1, 7, 8
+
+### Checkpoint 7 (Final)
+
+Run `docker compose up` from scratch and verify the entire system works end-to-end.
+
+1. `docker compose up -d` from project root
+2. `docker compose logs breadbox` — startup banner shows version, port, migration output
+3. `curl http://localhost:8080/health` — `200 OK`
+4. Open `http://localhost:8080/admin/` — redirects to setup wizard (fresh DB)
+5. Complete full flow: setup wizard → connect sandbox bank → trigger sync → create API key → query REST API → connect Claude via MCP
+6. `docker compose down && docker compose up -d` — verify data persists across restarts (named volume)
+7. Verify migrations ran automatically: `docker compose logs breadbox | grep migrat`
