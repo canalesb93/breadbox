@@ -21,5 +21,11 @@ internal/db/*.sql.go
 *.swp
 *.swo
 
+# Certificates
+*.pem
+*.key
+*.cert
+*.crt
+
 # OS
 .DS_Store
