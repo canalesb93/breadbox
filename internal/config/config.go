@@ -17,4 +17,14 @@ type Config struct {
 	SyncIntervalMinutes int
 	WebhookURL          string
 	SetupComplete       bool
+
+	// Connection pool tuning (env vars only)
+	DBMaxConns         int32 // DB_MAX_CONNS, default 25
+	DBMinConns         int32 // DB_MIN_CONNS, default 2
+	DBMaxConnLifetimeM int   // DB_MAX_CONN_LIFETIME_MINUTES, default 60
+
+	// HTTP server timeouts (env vars only)
+	ReadTimeoutS  int // HTTP_READ_TIMEOUT_SECONDS, default 30
+	WriteTimeoutS int // HTTP_WRITE_TIMEOUT_SECONDS, default 60
+	IdleTimeoutS  int // HTTP_IDLE_TIMEOUT_SECONDS, default 120
 }

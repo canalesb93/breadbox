@@ -1,12 +1,15 @@
 # Stage 1: Build
 FROM golang:1.24-alpine AS builder
 
+ARG VERSION=dev
+
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
+    -ldflags="-s -w -X main.version=${VERSION}" \
     -o /breadbox ./cmd/breadbox
 
 # Stage 2: Runtime
@@ -20,4 +23,5 @@ WORKDIR /app
 COPY --from=builder /breadbox /app/breadbox
 
 EXPOSE 8080
-ENTRYPOINT ["/app/breadbox"]
+ENTRYPOINT []
+CMD ["/app/breadbox", "serve"]

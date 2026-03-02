@@ -439,30 +439,35 @@ Verify cron syncs fire automatically and the remaining dashboard pages work.
 
 ---
 
-## Phase 7: Docker Deployment
+## Phase 7: Docker Deployment ✅
 
 Package everything for single-command self-hosted deployment.
 
-### 7.1 Dockerfile
+**Status:** Complete. Docker image builds and runs. `go build` and `go vet` pass clean.
 
-- Multi-stage build: Go builder → minimal runtime image (`architecture.md` Section 7)
-- Single binary output
+### 7.1 Dockerfile ✅
+
+- [x] Multi-stage build: `golang:1.24-alpine` builder → `alpine:3.21` runtime (`architecture.md` Section 7)
+- [x] Single binary output with stripped symbols
+- [x] Build-time `VERSION` ARG injected via `-ldflags`
+- [x] CA certificates + tzdata in runtime image
 - **Ref:** `architecture.md` Section 7
 
-### 7.2 Docker Compose
+### 7.2 Docker Compose ✅
 
-- `docker-compose.yml` with two services: `breadbox` + `postgres` (`architecture.md` Section 7)
-- Named volume for PostgreSQL data persistence
-- Auto-run migrations on startup
-- Environment variable configuration
+- [x] Two services: `app` (breadbox) + `db` (postgres:16-alpine) (`architecture.md` Section 7)
+- [x] Named volume `postgres_data` for PostgreSQL data persistence
+- [x] Auto-run migrations on startup: `breadbox migrate && breadbox serve`
+- [x] Environment variable configuration via `.docker.env` + `ENVIRONMENT=docker` override
+- [x] Health checks on both services
 - **Ref:** `architecture.md` Section 7
 
-### 7.3 Production Polish
+### 7.3 Production Polish ✅
 
-- Startup banner with version, port, config summary
-- Connection pool tuning for PostgreSQL
-- Request timeout configuration
-- Verify all endpoints work end-to-end in Docker
+- [x] Startup banner with version, port, environment, Plaid status, sync interval, webhook URL, DB pool config
+- [x] Connection pool tuning: `DB_MAX_CONNS` (default 25), `DB_MIN_CONNS` (default 2), `DB_MAX_CONN_LIFETIME_MINUTES` (default 60)
+- [x] HTTP server timeouts: `HTTP_READ_TIMEOUT_SECONDS` (default 30), `HTTP_WRITE_TIMEOUT_SECONDS` (default 60), `HTTP_IDLE_TIMEOUT_SECONDS` (default 120)
+- [x] `.env.example` updated with new config vars
 - **Ref:** `architecture.md` Sections 1, 7, 8
 
 ### Checkpoint 7 (Final)

@@ -67,6 +67,16 @@ func Load() (*Config, error) {
 	cfg.PlaidSecret = os.Getenv("PLAID_SECRET")
 	cfg.PlaidEnv = os.Getenv("PLAID_ENV")
 
+	// Connection pool tuning.
+	cfg.DBMaxConns = int32(getEnvInt("DB_MAX_CONNS", 25))
+	cfg.DBMinConns = int32(getEnvInt("DB_MIN_CONNS", 2))
+	cfg.DBMaxConnLifetimeM = getEnvInt("DB_MAX_CONN_LIFETIME_MINUTES", 60)
+
+	// HTTP server timeouts.
+	cfg.ReadTimeoutS = getEnvInt("HTTP_READ_TIMEOUT_SECONDS", 30)
+	cfg.WriteTimeoutS = getEnvInt("HTTP_WRITE_TIMEOUT_SECONDS", 60)
+	cfg.IdleTimeoutS = getEnvInt("HTTP_IDLE_TIMEOUT_SECONDS", 120)
+
 	return cfg, nil
 }
 
@@ -137,6 +147,15 @@ func LoadWithDB(ctx context.Context, cfg *Config, pool *pgxpool.Pool) error {
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
 	}
 	return fallback
 }

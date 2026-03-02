@@ -113,8 +113,11 @@ func runServe() error {
 	router := api.NewRouter(a, version)
 
 	srv := &http.Server{
-		Addr:    ":" + cfg.ServerPort,
-		Handler: router,
+		Addr:         ":" + cfg.ServerPort,
+		Handler:      router,
+		ReadTimeout:  time.Duration(cfg.ReadTimeoutS) * time.Second,
+		WriteTimeout: time.Duration(cfg.WriteTimeoutS) * time.Second,
+		IdleTimeout:  time.Duration(cfg.IdleTimeoutS) * time.Second,
 	}
 
 	// Graceful shutdown on SIGINT/SIGTERM.
@@ -135,7 +138,24 @@ func runServe() error {
 		cancel()
 	}()
 
-	logger.Info("starting server", "addr", srv.Addr, "version", version)
+	// Startup banner.
+	webhookStatus := "disabled"
+	if cfg.WebhookURL != "" {
+		webhookStatus = cfg.WebhookURL
+	}
+	plaidStatus := "not configured"
+	if cfg.PlaidClientID != "" {
+		plaidStatus = cfg.PlaidEnv
+	}
+	logger.Info("breadbox starting",
+		"version", version,
+		"addr", srv.Addr,
+		"environment", cfg.Environment,
+		"plaid", plaidStatus,
+		"sync_interval", fmt.Sprintf("%dm", cfg.SyncIntervalMinutes),
+		"webhook", webhookStatus,
+		"db_pool", fmt.Sprintf("max=%d min=%d lifetime=%dm", cfg.DBMaxConns, cfg.DBMinConns, cfg.DBMaxConnLifetimeM),
+	)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("http server: %w", err)
 	}

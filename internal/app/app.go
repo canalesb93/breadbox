@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"breadbox/internal/config"
 	"breadbox/internal/db"
@@ -31,7 +32,15 @@ type App struct {
 // New creates a new App. It connects to the database, creates a Queries
 // instance, and initializes the providers map.
 func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, error) {
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse database url: %w", err)
+	}
+	poolCfg.MaxConns = cfg.DBMaxConns
+	poolCfg.MinConns = cfg.DBMinConns
+	poolCfg.MaxConnLifetime = time.Duration(cfg.DBMaxConnLifetimeM) * time.Minute
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return nil, fmt.Errorf("connect to database: %w", err)
 	}
