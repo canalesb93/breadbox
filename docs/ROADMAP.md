@@ -1140,3 +1140,236 @@ Transaction list, account detail, and cross-linking throughout the admin UI.
 7. Account detail: transaction table is pre-filtered to that account
 8. Connection detail: account names are now clickable links
 9. Dashboard: transaction count is accurate, "View All" links to transaction list
+
+---
+
+## Phase 13A: Bug Fixes & Dashboard UX
+
+Fix confirmed bugs in the setup wizard, improve dashboard navigation, and polish the onboarding experience.
+
+**Depends on:** None (can be done immediately on the current codebase, independent of Phases 10–12)
+
+### 13A.1 Bug Fix: setup_complete Written on GET
+
+- [ ] Move `setup_complete = true` from `SetupStep5Handler` GET to a dedicated POST handler
+- [ ] Step 5 GET only renders the summary page; a "Confirm & Finish" button POSTs to finalize
+- [ ] Prevents accidental wizard completion from page reloads or direct URL navigation
+- **Bug location:** `setup.go` lines 312–321 — unconditionally writes on every GET request
+- **Files:** `internal/admin/setup.go`
+
+### 13A.2 Bug Fix: Programmatic Setup Skips Plaid Validation
+
+- [ ] Add `plaidprovider.ValidateCredentials(ctx, clientID, secret, environment)` call in `ProgrammaticSetupHandler` when both Plaid creds are provided
+- [ ] Match the validation behavior of the interactive `SetupStep2Handler` (which already validates)
+- [ ] Return validation error in the API response if credentials fail
+- **Bug location:** `setup.go` lines 437–450 — saves credentials without testing them
+- **Files:** `internal/admin/setup.go`
+
+### 13A.3 Bug Fix: Broken "Re-run Setup Wizard" Link
+
+- [ ] Remove `<a href="/admin/setup/step/1">Re-run Setup Wizard</a>` from settings page
+- [ ] Replace with "Change Admin Password" link (target implemented in 13B.3)
+- [ ] Until 13B.3 is done, replace with explanatory text: "To reconfigure providers, update settings below"
+- **Bug location:** `settings.html` line 76 links to step 1, but `SetupStep1Handler` (setup.go lines 22–27) redirects away if any admin account exists
+- **Files:** `internal/templates/pages/settings.html`
+
+### 13A.4 Fix: Sync Interval Unit Mismatch
+
+- [ ] Update wizard step 3 to write `sync_interval_minutes` instead of `sync_interval_hours`
+- [ ] Offer the same option set as the settings page: 15m, 30m, 1h, 4h, 8h, 12h, 24h
+- [ ] Keep legacy `sync_interval_hours` fallback in config loader (`load.go` lines 137–154) for backwards compatibility
+- [ ] Update step 3 template to show minute-based options
+- **Bug location:** `setup.go` lines 225–243 writes `sync_interval_hours`; `settings.go` lines 47–68 writes `sync_interval_minutes`
+- **Files:** `internal/admin/setup.go`, `internal/templates/pages/setup_step3.html`
+
+### 13A.5 Dashboard: Clickable Stats & Alert Banner
+
+- [ ] Wrap "Needs Attention" stat card in `<a href="/admin/connections">` when count > 0
+- [ ] Add broken-connections alert banner (`<div role="alert">`) above stat cards when any connection is in `error` or `pending_reauth` status
+- [ ] Banner text: "{N} connection(s) need attention" with link to connections page
+- [ ] Pass `BrokenCount` from dashboard handler to template
+- **Files:** `internal/templates/pages/dashboard.html`, `internal/admin/dashboard.go`
+
+### 13A.6 Dashboard: Institution Name Links in Sync Activity
+
+- [ ] Make institution names in the Recent Sync Activity table link to `/admin/connections/{id}`
+- [ ] Add `ConnectionID` field to the recent logs struct/query result
+- [ ] Template: wrap `{{.InstitutionName}}` in `<a href="/admin/connections/{{.ConnectionID}}">`
+- **Current state:** `dashboard.html` line 42 — `{{.InstitutionName}}` is plain text
+- **Files:** `internal/admin/dashboard.go`, `internal/templates/pages/dashboard.html`, query/service layer for sync logs
+
+### 13A.7 Human-Readable Error Messages
+
+- [ ] Add `errorMessage(code string) string` template function in `templates.go`
+- [ ] Map known error codes to user-friendly messages:
+  - `ITEM_LOGIN_REQUIRED` → "Your bank login has changed. Please re-authenticate."
+  - `INSUFFICIENT_CREDENTIALS` → "Additional credentials are needed. Please re-authenticate."
+  - `INVALID_CREDENTIALS` → "Your bank credentials are incorrect. Please re-authenticate."
+  - `MFA_NOT_SUPPORTED` → "This connection requires MFA which is not supported. Please reconnect."
+  - `NO_ACCOUNTS` → "No accounts found for this connection."
+  - `enrollment.disconnected` (Teller) → "This bank connection has been disconnected."
+  - Unknown codes → show raw message as fallback
+- [ ] Use in connection detail error display (lines 7, 105)
+- **Files:** `internal/admin/templates.go`, `internal/templates/pages/connection_detail.html`
+
+### 13A.8 Connection Detail: Breadcrumb Navigation
+
+- [ ] Replace `← Connections` back-link with semantic breadcrumb: `Connections / {institution name}`
+- [ ] Use `<nav aria-label="breadcrumb">` with two-element structure
+- [ ] Apply same pattern to reauth page: `Connections / {institution name} / Re-authenticate`
+- [ ] Phase 12B can extend to three levels: `Connections / {institution} / {account name}`
+- **Current state:** `connection_detail.html` line 2 — `<a href="/admin/connections">← Connections</a>`
+- **Files:** `internal/templates/pages/connection_detail.html`, `internal/templates/pages/connection_reauth.html`
+
+### 13A.9 Wizard Step 5: Provider Status & CTA
+
+- [ ] Add provider configuration status to step 5 summary:
+  - "Plaid: Configured ✓" / "Plaid: Not configured"
+  - "Teller: Configured ✓" / "Teller: Not configured (set env vars)"
+  - "CSV Import: Always available"
+- [ ] Add prominent CTA button: "Connect Your First Bank →" linking to `/admin/connections/new`
+- [ ] If no providers are configured, show warning: "No bank data provider configured. Go to Settings to add one."
+- [ ] Pass provider availability from `app.Providers` map to template data
+- **Files:** `internal/admin/setup.go` (step 5 data), `internal/templates/pages/setup_step5.html`
+
+### 13A.10 Wizard Step 4: Reframe Webhook as Optional
+
+- [ ] Lead with: "Webhooks are optional. Without them, Breadbox will sync on its configured schedule."
+- [ ] Two clear paths: "I have a public URL" (shows the URL form) vs "Skip — I'll set this up later"
+- [ ] Make Cloudflare Tunnel documentation link more prominent for the local/self-hosted case
+- [ ] Clarify that the URL entered here is what Breadbox listens at — the user must also configure it in their Plaid/Teller dashboard
+- **Files:** `internal/templates/pages/setup_step4.html`
+
+### Task Dependencies (13A)
+
+```
+13A.1 (setup_complete bug) — independent, do first
+13A.2 (programmatic validation bug) — independent, do first
+13A.3 (re-run wizard bug) — independent, do first
+13A.4 (interval mismatch) — independent, do first
+
+13A.5 (dashboard stats) ─┐
+13A.6 (dashboard links)  ┘ dashboard group
+
+13A.7 (error messages)  ─┐
+13A.8 (breadcrumbs)      ┘ connection detail group
+
+13A.9 (step 5 CTA)     ─┐
+13A.10 (step 4 reframe)  ┘ wizard polish group
+```
+
+### Checkpoint 13A
+
+1. Navigate to `/admin/setup/step/5` directly via URL bar — setup is NOT marked complete (GET no longer writes the flag)
+2. Complete the wizard normally through "Confirm & Finish" button — setup IS marked complete
+3. `POST /admin/api/setup` with invalid Plaid credentials → returns validation error (not silent save)
+4. Settings page: no "Re-run Setup Wizard" link; shows "Change Password" or replacement text
+5. Wizard step 3 shows minute-based intervals (15m, 30m, 1h, etc.); saved value matches settings page
+6. Dashboard: "Needs Attention" stat is a clickable link when count > 0; alert banner appears for broken connections
+7. Dashboard: institution names in Recent Sync Activity are links to connection detail
+8. Connection detail: error shows "Your bank login has changed" instead of `ITEM_LOGIN_REQUIRED`
+9. Connection detail: breadcrumb shows `Connections / Chase Checking`
+10. Wizard step 5: shows provider status and "Connect Your First Bank →" CTA
+11. Wizard step 4: leads with "Webhooks are optional" and has clear skip path
+
+---
+
+## Phase 13B: Setup & Settings Overhaul
+
+Restructure the wizard for multi-provider onboarding, add missing settings features, and improve the family members page.
+
+**Depends on:** Phase 13A (bug fixes land first). Some tasks benefit from Phase 12A (Alpine.js for confirmation dialogs) but can use vanilla JS fallback.
+
+### 13B.1 Wizard Step 2: Multi-Provider Selection
+
+- [ ] Rename step 2 from "Configure Plaid" to "Configure Bank Providers"
+- [ ] Add provider selection: Plaid / Teller / Both / Skip All
+- [ ] Based on selection: show Plaid credential form, Teller env-var guidance card, or both
+- [ ] Teller section is informational (cert/key are env-var-only) with copy-ready env var snippet
+- [ ] "Skip All" goes directly to step 3 with a note that providers can be configured later in Settings
+- **Files:** `internal/admin/setup.go` (step 2 handler), `internal/templates/pages/setup_step2.html`
+
+### 13B.2 Wizard: Optional Family Member Step
+
+- [ ] Add new step between current step 3 (sync interval) and step 4 (webhook)
+- [ ] Collects: name (required), email (optional) — same fields as `/admin/users/new`
+- [ ] "Skip — I'll add members later" button proceeds without creating a member
+- [ ] Renumber subsequent steps (or insert as step 3b to avoid renumbering)
+- [ ] Prevents the empty family-member dropdown dead-end when connecting the first bank
+- **Files:** `internal/admin/setup.go` (new step handler), `internal/templates/pages/setup_step_member.html` (new)
+
+### 13B.3 Settings: Change Admin Password
+
+- [ ] Add "Security" section to settings page with current-password / new-password / confirm-new-password form
+- [ ] New sqlc query: `UpdateAdminPassword(ctx, id, new_hashed_password)`
+- [ ] Validate current password before accepting change
+- [ ] Minimum 8 characters (same as initial setup)
+- [ ] Flash: "Password updated successfully"
+- [ ] This is the target for the "Change Password" link added in 13A.3
+- **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`, `internal/db/queries/admin_accounts.sql`
+
+### 13B.4 Settings: System Information Section
+
+- [ ] Add collapsible "System" section at bottom of settings page
+- [ ] Display: Breadbox version (from build-time `-ldflags -X`), Go runtime version (`runtime.Version()`), PostgreSQL version (`SELECT version()`), server uptime (`time.Since(startTime)`), configured providers count
+- [ ] Read-only, informational — primarily for operator debugging
+- [ ] Requires passing `startTime` from app init to the settings handler
+- **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`
+
+### 13B.5 Settings: Config Source Badges
+
+- [ ] Add `ConfigSources map[string]string` (key → "env" / "db" / "default") populated during `LoadWithDB`
+- [ ] Pass to settings template alongside `Config` values
+- [ ] Render muted badge next to each setting: "(from env)", "(from database)", "(default)"
+- [ ] Makes the config precedence model (env → DB → default) visible and debuggable
+- **Files:** `internal/config/config.go`, `internal/config/load.go`, `internal/admin/settings.go`, `internal/templates/pages/settings.html`
+
+### 13B.6 Settings: Teller Configuration Guidance
+
+- [ ] "Not configured" state: add `<details>` block with copy-ready env var snippet and Docker Compose example
+- [ ] When `teller_app_id` and `teller_env` are NOT set via env vars, make them editable in the settings form (they already have DB fallback paths in `LoadWithDB`)
+- [ ] Cert/key paths remain read-only (env-var-only, file paths on host)
+- [ ] Show current Teller status clearly: "Active (env vars)" / "Partially configured (app_id from DB, certs from env)" / "Not configured"
+- **Files:** `internal/templates/pages/settings.html`, `internal/admin/settings.go`
+
+### 13B.7 Settings: Safety & Status Indicators
+
+- [ ] Confirmation dialog when changing `plaid_env` value (warn about breaking live connections)
+- [ ] Encryption key status line: "Encryption: Configured" or "Encryption: NOT SET — access tokens cannot be stored" (never show the key itself)
+- [ ] Use Alpine.js `x-on:submit` for the confirmation if available, vanilla `confirm()` as fallback
+- **Files:** `internal/templates/pages/settings.html`
+
+### 13B.8 Family Members: Connection Count & Post-Create CTA
+
+- [ ] Add "Connections" column to members list table showing count of active connections per member
+- [ ] New sqlc query: `CountConnectionsByUserID(ctx)` or use `LEFT JOIN` + `COUNT` in existing list query
+- [ ] Zero-connection members show "0" (not blank) — makes it obvious who has no banks connected
+- [ ] After creating a new member, flash message includes: "Connect a bank for {name} →" with link to `/admin/connections/new`
+- **Files:** `internal/admin/members.go`, `internal/templates/pages/users.html`, `internal/db/queries/bank_connections.sql`
+
+### Task Dependencies (13B)
+
+```
+13B.1 (multi-provider wizard) ─┐
+13B.2 (family member step)     ┘ wizard group (independent of settings)
+
+13B.3 (password change)     ─┐
+13B.4 (system info)          │
+13B.5 (config sources)       ├─ settings group (all independent of each other)
+13B.6 (Teller guidance)      │
+13B.7 (safety indicators)   ─┘
+
+13B.8 (members connection count) — independent
+```
+
+### Checkpoint 13B
+
+1. Wizard step 2 shows "Configure Bank Providers" with provider selection options
+2. Select "Teller" → shows env-var guidance card (not Plaid form); select "Skip All" → proceeds to next step
+3. New family member step appears after sync interval; skip works; created member appears in dropdown on connection page
+4. Settings: "Change Password" section visible; change succeeds with correct current password; fails with wrong current password
+5. Settings: "System" section shows version, Go version, PostgreSQL version, uptime
+6. Settings: each setting shows "(from env)" or "(from database)" or "(default)" badge
+7. Settings: Teller "not configured" has copy-ready env var snippet; `teller_app_id` is editable when not from env
+8. Settings: changing Plaid environment triggers confirmation dialog; encryption key shows "Configured" status
+9. Family Members: "Connections" column shows correct counts; new member flash has "Connect a bank →" link

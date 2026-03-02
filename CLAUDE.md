@@ -41,6 +41,10 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Alpine.js v3 for admin UI interactivity (CDN, no build step). Replaces `alert()`/`confirm()` with inline patterns.
 - Dark mode: Pico CSS `prefers-color-scheme` auto-switch (no hardcoded `data-theme`). Badge/flash colors use CSS custom properties.
 - Badge rendering: `statusBadge()` and `syncBadge()` template functions replace copy-pasted if-chains.
+- Setup wizard: `setup_complete` written via POST confirmation, not on step 5 page load (Phase 13A fix)
+- Wizard step 2: provider-agnostic "Configure Bank Providers" with conditional Plaid/Teller forms (Phase 13B)
+- Config source tracking: `ConfigSources map[string]string` passed to settings templates — shows "(from env)" / "(from database)" / "(default)" per setting
+- Human-readable error messages: `errorMessage()` template function maps provider error codes to user-friendly strings
 
 ## Canonical Enums
 
