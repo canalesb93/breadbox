@@ -5,6 +5,7 @@ import (
 
 	"breadbox/internal/admin"
 	"breadbox/internal/app"
+	breadboxmcp "breadbox/internal/mcp"
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 
@@ -36,6 +37,15 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/connections", ListConnectionsHandler(svc))
 		r.Get("/connections/{id}/status", GetConnectionStatusHandler(svc))
 		r.Post("/sync", TriggerSyncHandler(svc))
+	})
+
+	// MCP server — API key authenticated.
+	mcpServer := breadboxmcp.NewMCPServer(svc, version)
+	mcpHandler := breadboxmcp.NewHTTPHandler(mcpServer)
+	r.Group(func(r chi.Router) {
+		r.Use(mw.APIKeyAuth(svc))
+		r.Handle("/mcp", mcpHandler)
+		r.Handle("/mcp/*", mcpHandler)
 	})
 
 	// Admin dashboard: session manager + template renderer + admin router.

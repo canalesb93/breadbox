@@ -22,7 +22,8 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - API key auth: `X-API-Key: bb_xxxxx` header, SHA-256 hashed, `revoked_at` for soft-revoke
 - Admin sessions: `alexedwards/scs` + `pgxstore`, cookies `HttpOnly; SameSite=Lax; Secure`
 - Error codes: `UPPER_SNAKE_CASE` in JSON envelope `{ "error": { "code": "...", "message": "..." } }`
-- Service layer (`internal/service/`): shared between REST API handlers and future MCP tools. Converts `pgtype.*` → Go primitives for clean JSON. Takes `*db.Queries` + `*pgxpool.Pool` (for dynamic queries).
+- Service layer (`internal/service/`): shared between REST API handlers and MCP tools. Converts `pgtype.*` → Go primitives for clean JSON. Takes `*db.Queries` + `*pgxpool.Pool` (for dynamic queries).
+- MCP server (`internal/mcp/`): wraps service layer as 6 MCP tools. Streamable HTTP at `/mcp` (API key auth), stdio via `breadbox mcp-stdio` (no auth). Uses `github.com/modelcontextprotocol/go-sdk` v1.4.0. Tool handlers use typed input structs with `jsonschema` tags. Errors: `IsError: true` with `{"error": "..."}` text content.
 - Transaction queries use dynamic SQL with positional `$N` params (not sqlc) for composable filters + cursor pagination
 - API key format: `bb_` + base62 body (32 random bytes). Stored as SHA-256 hex hash. Prefix stored for display.
 

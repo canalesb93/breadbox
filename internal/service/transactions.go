@@ -222,6 +222,89 @@ func (s *Service) CountTransactions(ctx context.Context) (int64, error) {
 	return s.Queries.CountTransactions(ctx)
 }
 
+func (s *Service) CountTransactionsFiltered(ctx context.Context, params TransactionCountParams) (int64, error) {
+	query := "SELECT COUNT(*) FROM transactions t"
+
+	var args []any
+	argN := 1
+
+	needsUserJoin := params.UserID != nil
+	if needsUserJoin {
+		query += " JOIN accounts a ON t.account_id = a.id JOIN bank_connections bc ON a.connection_id = bc.id"
+	}
+
+	query += " WHERE t.deleted_at IS NULL"
+
+	if needsUserJoin {
+		uid, err := parseUUID(*params.UserID)
+		if err != nil {
+			return 0, fmt.Errorf("invalid user id: %w", err)
+		}
+		query += fmt.Sprintf(" AND bc.user_id = $%d", argN)
+		args = append(args, uid)
+		argN++
+	}
+
+	if params.AccountID != nil {
+		aid, err := parseUUID(*params.AccountID)
+		if err != nil {
+			return 0, fmt.Errorf("invalid account id: %w", err)
+		}
+		query += fmt.Sprintf(" AND t.account_id = $%d", argN)
+		args = append(args, aid)
+		argN++
+	}
+
+	if params.StartDate != nil {
+		query += fmt.Sprintf(" AND t.date >= $%d", argN)
+		args = append(args, pgtype.Date{Time: *params.StartDate, Valid: true})
+		argN++
+	}
+
+	if params.EndDate != nil {
+		query += fmt.Sprintf(" AND t.date < $%d", argN)
+		args = append(args, pgtype.Date{Time: *params.EndDate, Valid: true})
+		argN++
+	}
+
+	if params.Category != nil {
+		query += fmt.Sprintf(" AND t.category_primary = $%d", argN)
+		args = append(args, pgtype.Text{String: *params.Category, Valid: true})
+		argN++
+	}
+
+	if params.MinAmount != nil {
+		query += fmt.Sprintf(" AND t.amount >= $%d", argN)
+		args = append(args, *params.MinAmount)
+		argN++
+	}
+
+	if params.MaxAmount != nil {
+		query += fmt.Sprintf(" AND t.amount <= $%d", argN)
+		args = append(args, *params.MaxAmount)
+		argN++
+	}
+
+	if params.Pending != nil {
+		query += fmt.Sprintf(" AND t.pending = $%d", argN)
+		args = append(args, *params.Pending)
+		argN++
+	}
+
+	if params.Search != nil {
+		query += fmt.Sprintf(" AND (t.name ILIKE '%%' || $%d || '%%' OR t.merchant_name ILIKE '%%' || $%d || '%%')", argN, argN)
+		args = append(args, *params.Search)
+		argN++
+	}
+
+	var count int64
+	err := s.Pool.QueryRow(ctx, query, args...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count transactions: %w", err)
+	}
+	return count, nil
+}
+
 func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionResponse, error) {
 	uid, err := parseUUID(id)
 	if err != nil {

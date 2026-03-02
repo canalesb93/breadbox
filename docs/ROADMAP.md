@@ -307,39 +307,52 @@ Create an API key and use it to query all REST endpoints with curl.
 
 ---
 
-## Phase 5: MCP Server
+## Phase 5: MCP Server ✅
 
 Wrap the REST API layer as MCP tools for AI agent access.
 
-### 5.1 MCP Server Setup
+**Status:** Complete. `go build` and `go vet` pass clean.
 
-- Integrate `github.com/modelcontextprotocol/go-sdk` (v1.4.0+)
-- Configure Streamable HTTP transport on the same chi router (`mcp-server.md` Section 2)
-- Implement API key authentication for MCP sessions (`mcp-server.md` Section 2)
+### 5.1 MCP Server Setup ✅
+
+- [x] Integrated `github.com/modelcontextprotocol/go-sdk` v1.4.0
+- [x] Configured Streamable HTTP transport at `/mcp` on the same chi router (`mcp-server.md` Section 2)
+- [x] API key authentication via `X-API-Key` middleware applied to MCP routes (`mcp-server.md` Section 2)
+- [x] MCP server package: `internal/mcp/` with `server.go` (setup) and `tools.go` (handlers)
 - **Ref:** `mcp-server.md` Sections 1–2
 
-### 5.2 MCP Tools
+### 5.2 MCP Tools ✅
 
-- `list_accounts` — wraps `GET /api/v1/accounts` (`mcp-server.md` Section 3)
-- `query_transactions` — wraps `GET /api/v1/transactions` with all filters (`mcp-server.md` Section 3)
-- `count_transactions` — wraps `GET /api/v1/transactions/count` (`mcp-server.md` Section 3)
-- `list_users` — wraps `GET /api/v1/users` (`mcp-server.md` Section 3)
-- `get_sync_status` — wraps `GET /api/v1/connections` (`mcp-server.md` Section 3)
-- `trigger_sync` — wraps `POST /api/v1/sync` (`mcp-server.md` Section 3)
-- All tools call the service layer directly (not HTTP round-trip) (`mcp-server.md` Section 7)
+- [x] `list_accounts` — optional `user_id` filter, calls `svc.ListAccounts` (`mcp-server.md` Section 3)
+- [x] `query_transactions` — all 10 filters + cursor pagination, calls `svc.ListTransactions` (`mcp-server.md` Section 3)
+- [x] `count_transactions` — same filters minus limit/cursor, calls `svc.CountTransactionsFiltered` (`mcp-server.md` Section 3)
+- [x] `list_users` — calls `svc.ListUsers` (`mcp-server.md` Section 3)
+- [x] `get_sync_status` — calls `svc.ListConnections` (`mcp-server.md` Section 3)
+- [x] `trigger_sync` — optional `connection_id` for single-connection sync, calls `svc.TriggerSync` (`mcp-server.md` Section 3)
+- [x] All tools call the service layer directly (no HTTP round-trip) (`mcp-server.md` Section 7)
+- [x] Error pattern: `IsError: true` with JSON `{"error": "message"}` text content
+- [x] Typed input structs with `jsonschema` tags for auto-generated tool schemas
 - **Ref:** `mcp-server.md` Sections 3, 7
 
-### 5.3 Stdio Convenience Mode
+### 5.3 Stdio Convenience Mode ✅
 
-- Implement `breadbox mcp-stdio` subcommand for local development (`mcp-server.md` Section 2, `architecture.md` Section 1.1)
-- No authentication required in stdio mode
+- [x] `breadbox mcp-stdio` subcommand: loads config, creates App, runs MCP over stdin/stdout
+- [x] Logs to stderr (stdout reserved for MCP JSON-RPC)
+- [x] No authentication in stdio mode (trusted local process)
+- [x] SIGINT/SIGTERM graceful shutdown
 - **Ref:** `mcp-server.md` Section 2, `architecture.md` Section 1.1
 
 ### 5.4 Dashboard — API Keys Page ✅ (Completed in Phase 4)
 
 - [x] API keys management page: create, view (prefix only), revoke (`admin-dashboard.md` Section 10)
-- Display client config examples for Claude Desktop / Claude Code (`mcp-server.md` Sections 2.1–2.2)
+- [x] Display client config examples for Claude Desktop / Claude Code (`mcp-server.md` Sections 2.1–2.2)
 - **Ref:** `admin-dashboard.md` Section 10, `mcp-server.md` Sections 2.1–2.2
+
+### 5.5 Service Layer Enhancements ✅
+
+- [x] `CountTransactionsFiltered(ctx, params)` — dynamic `COUNT(*)` with same filter logic as `ListTransactions`
+- [x] `TriggerSync(ctx, connectionID *string)` — optional single-connection sync support
+- [x] REST handlers updated: `CountTransactionsHandler` accepts filter params, `TriggerSyncHandler` accepts optional `connection_id` body
 
 ### Checkpoint 5
 

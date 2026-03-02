@@ -62,6 +62,18 @@ type TransactionListParams struct {
 	Search    *string
 }
 
+type TransactionCountParams struct {
+	StartDate *time.Time
+	EndDate   *time.Time
+	AccountID *string
+	UserID    *string
+	Category  *string
+	MinAmount *float64
+	MaxAmount *float64
+	Pending   *bool
+	Search    *string
+}
+
 type UserResponse struct {
 	ID        string  `json:"id"`
 	Name      string  `json:"name"`
