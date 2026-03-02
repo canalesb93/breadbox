@@ -10,6 +10,7 @@ import (
 	"breadbox/internal/db"
 	"breadbox/internal/provider"
 	plaidprovider "breadbox/internal/provider/plaid"
+	tellerprovider "breadbox/internal/provider/teller"
 	"breadbox/internal/service"
 	"breadbox/internal/sync"
 
@@ -61,8 +62,16 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 		logger.Info("plaid provider initialized", "env", cfg.PlaidEnv)
 	}
 
-	if cfg.TellerAppID != "" {
-		logger.Info("teller credentials detected", "app_id", cfg.TellerAppID, "env", cfg.TellerEnv)
+	if cfg.TellerAppID != "" && cfg.TellerCertPath != "" && cfg.TellerKeyPath != "" {
+		tellerClient, err := tellerprovider.NewClient(cfg.TellerCertPath, cfg.TellerKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("create teller client: %w", err)
+		}
+		tellerProv := tellerprovider.NewProvider(tellerClient, cfg.TellerAppID, cfg.TellerEnv, cfg.TellerWebhookSecret, cfg.EncryptionKey, logger)
+		providers["teller"] = tellerProv
+		logger.Info("teller provider initialized", "env", cfg.TellerEnv)
+	} else if cfg.TellerAppID != "" {
+		logger.Warn("teller app ID set but certificate/key paths missing, teller provider not initialized")
 	}
 
 	syncEngine := sync.NewEngine(queries, pool, providers, logger)
