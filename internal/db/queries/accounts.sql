@@ -18,3 +18,11 @@ SELECT * FROM accounts WHERE connection_id = $1 ORDER BY name;
 
 -- name: CountAccounts :one
 SELECT COUNT(*) FROM accounts;
+
+-- name: UpdateAccountBalances :exec
+UPDATE accounts
+SET balance_current = $2, balance_available = $3, balance_limit = $4, iso_currency_code = $5, last_balance_update = NOW(), updated_at = NOW()
+WHERE external_account_id = $1;
+
+-- name: GetAccountIDByExternalAccountID :one
+SELECT id FROM accounts WHERE external_account_id = $1;

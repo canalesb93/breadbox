@@ -32,6 +32,9 @@
   {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
   <a href="/admin/connections/{{.ConnID}}/reauth" role="button" class="outline">Re-authenticate</a>
   {{end}}
+  {{if eq (printf "%s" .Connection.Status) "active"}}
+  <button class="outline" onclick="syncConnection()" id="sync-btn">Sync Now</button>
+  {{end}}
   <button class="secondary outline" onclick="removeConnection()" id="remove-btn">Remove Connection</button>
 </div>
 
@@ -113,6 +116,32 @@
 {{end}}
 
 <script>
+function syncConnection() {
+  var btn = document.getElementById('sync-btn');
+  btn.disabled = true;
+  btn.textContent = 'Syncing...';
+  fetch("/admin/api/connections/{{.ConnID}}/sync", {
+    method: "POST"
+  })
+  .then(function(res) {
+    if (res.ok) {
+      btn.textContent = 'Sync Triggered!';
+      setTimeout(function() { window.location.reload(); }, 3000);
+    } else {
+      return res.json().then(function(data) {
+        alert(data.error || "Failed to trigger sync.");
+        btn.disabled = false;
+        btn.textContent = 'Sync Now';
+      });
+    }
+  })
+  .catch(function() {
+    alert("Network error. Please try again.");
+    btn.disabled = false;
+    btn.textContent = 'Sync Now';
+  });
+}
+
 function removeConnection() {
   if (!confirm("Remove this connection? All transaction data will be kept but marked as disconnected. This cannot be undone.")) {
     return;

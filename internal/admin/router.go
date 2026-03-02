@@ -70,6 +70,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) ch
 		r.Post("/exchange-token", ExchangeTokenHandler(a))
 		r.Post("/connections/{id}/reauth", ConnectionReauthAPIHandler(a))
 		r.Post("/connections/{id}/reauth-complete", ConnectionReauthCompleteHandler(a))
+		r.Post("/connections/{id}/sync", SyncConnectionHandler(a))
 		r.Delete("/connections/{id}", DeleteConnectionHandler(a))
 		r.Post("/users", CreateUserHandler(a))
 		r.Put("/users/{id}", UpdateUserHandler(a))

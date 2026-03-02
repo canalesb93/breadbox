@@ -20,3 +20,8 @@ SELECT * FROM sync_logs
 WHERE connection_id = $1
 ORDER BY started_at DESC
 LIMIT $2 OFFSET $3;
+
+-- name: UpdateSyncLog :exec
+UPDATE sync_logs
+SET status = $2, completed_at = $3, added_count = $4, modified_count = $5, removed_count = $6, error_message = $7
+WHERE id = $1;

@@ -71,19 +71,22 @@ type SyncResult struct {
 }
 
 type Transaction struct {
-	ExternalID        string
-	PendingExternalID *string // set when this transaction posts a pending one
-	AccountExternalID string
-	Amount            decimal.Decimal // positive = debit, negative = credit
-	Date              time.Time
-	AuthorizedDate    *time.Time
-	Name              string
-	MerchantName      *string
-	CategoryPrimary   *string
-	CategoryDetailed  *string
-	PaymentChannel    string // online, in store, other
-	Pending           bool
-	ISOCurrencyCode   string
+	ExternalID         string
+	PendingExternalID  *string // set when this transaction posts a pending one
+	AccountExternalID  string
+	Amount             decimal.Decimal // positive = debit, negative = credit
+	Date               time.Time
+	AuthorizedDate     *time.Time
+	Datetime           *time.Time
+	AuthorizedDatetime *time.Time
+	Name               string
+	MerchantName       *string
+	CategoryPrimary    *string
+	CategoryDetailed   *string
+	CategoryConfidence *string
+	PaymentChannel     string // online, in store, other
+	Pending            bool
+	ISOCurrencyCode    string
 }
 
 type WebhookPayload struct {

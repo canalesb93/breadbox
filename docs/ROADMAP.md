@@ -156,53 +156,57 @@ Complete the setup wizard, log in, connect a sandbox bank, and see it on the das
 
 ---
 
-## Phase 3: Transaction Sync Engine
+## Phase 3: Transaction Sync Engine ✅
 
 Build the core sync loop that fetches and stores bank data.
 
-### 3.1 Service Layer
+**Status:** Complete. Checkpoint 3 ready for verification.
 
-- Build the shared service layer that both REST handlers and MCP tools will call (`mcp-server.md` Section 7)
-- Service functions: `QueryTransactions`, `CountTransactions`, `ListAccounts`, `GetAccount`, `ListUsers`, `ListConnections`, `GetConnectionStatus`, `TriggerSync`
-- Business logic lives here: filter validation, currency handling, soft-delete exclusion, pending→posted linking
-- **Ref:** `mcp-server.md` Section 7, `architecture.md` Section 2
+### 3.1 Service Layer (Deferred to Phase 4)
 
-### 3.2 Cursor-Based Sync Implementation
+- Service layer will be built alongside its REST API consumers in Phase 4
+- Phase 3 provides the sync engine which Phase 4's service layer will wrap
 
-- Implement `SyncTransactions` for Plaid provider: call `/transactions/sync` with cursor (`plaid-integration.md` Section 3)
-- Handle pagination: loop while `has_more` is true (`plaid-integration.md` Section 3.3)
-- Handle `TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION`: reset cursor and retry (`plaid-integration.md` Section 3.4)
-- Per-connection sync locking (mutex or DB lock) to prevent concurrent syncs on the same connection (`plaid-integration.md` Section 3.3)
-- Map Plaid fields to Breadbox schema (`plaid-integration.md` Section 3.2, `data-model.md` Section 3)
+### 3.2 Cursor-Based Sync Implementation ✅
+
+- [x] Implement `SyncTransactions` for Plaid provider: call `/transactions/sync` with cursor (`plaid-integration.md` Section 3)
+- [x] Handle pagination: loop while `has_more` is true (`plaid-integration.md` Section 3.3)
+- [x] Handle `TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION`: reset cursor, discard buffered writes, retry (`plaid-integration.md` Section 3.4)
+- [x] Per-connection sync locking (`sync.Map` of mutexes, `TryLock` skips if busy) (`plaid-integration.md` Section 3.3)
+- [x] Map all Plaid fields to Breadbox schema including datetime, categories, confidence (`plaid-integration.md` Section 3.2, `data-model.md` Section 3)
+- [x] Rate limiting: exponential backoff on 429 (2s→4s→8s→16s→32s, cap 60s, max 5 retries)
+- [x] Typed errors: `ErrMutationDuringPagination`, `ErrItemReauthRequired`
 - **Ref:** `plaid-integration.md` Section 3, `data-model.md` Section 3
 
-### 3.3 Transaction Processing
+### 3.3 Transaction Processing ✅
 
-- Insert new transactions (`added` array)
-- Update existing transactions (`modified` array) — match by `external_transaction_id`
-- Soft-delete removed transactions (`removed` array) — set `deleted_at`, don't hard-delete
-- Handle pending→posted transition: link via `pending_transaction_id`, soft-delete the pending version (`plaid-integration.md` Section 3.5, `data-model.md` Section 4.2)
+- [x] Buffered writes: all results collected in memory during pagination, flushed to DB only after `HasMore=false`
+- [x] Process removed FIRST (soft-delete), then added (upsert), then modified (upsert)
+- [x] `UpsertTransaction` with ON CONFLICT DO UPDATE — clears `deleted_at` on re-add
+- [x] `SoftDeleteTransactionByExternalID` — sets `deleted_at=NOW()` where null
+- [x] Account ID resolution with in-memory cache to avoid repeated lookups
 - **Ref:** `plaid-integration.md` Section 3.5, `data-model.md` Section 4.2
 
-### 3.4 Balance Refresh
+### 3.4 Balance Refresh ✅
 
-- Implement `GetBalances`: call Plaid `/accounts/get` after each sync (`plaid-integration.md` Section 4)
-- Update `balance_current`, `balance_available`, `balance_limit`, `last_balance_update` on accounts (`data-model.md` Section 2.4)
+- [x] Implement `GetBalances`: call Plaid `/accounts/get` after each sync
+- [x] `UpdateAccountBalances` query: update current, available, limit, currency, last_balance_update
 - **Ref:** `plaid-integration.md` Section 4, `data-model.md` Section 2.4
 
-### 3.5 Sync Orchestration & Logging
+### 3.5 Sync Orchestration & Logging ✅
 
-- Build sync orchestrator: coordinates provider calls, cursor management, error handling
-- Create `sync_logs` entries: track trigger type (`cron`, `webhook`, `manual`, `initial`), counts (added/modified/removed), status, errors (`data-model.md` Section 2.6)
-- Update `bank_connections.last_synced_at` on success
-- Update connection status on errors (`active` → `error` or `pending_reauth` based on error code) (`plaid-integration.md` Section 6)
-- Trigger initial sync after new connection is created (trigger type `initial`)
+- [x] Sync engine (`internal/sync/engine.go`): `Sync` (single connection) and `SyncAll` (bounded concurrency, max 5 workers)
+- [x] `CreateSyncLog` + `UpdateSyncLog` queries for tracking trigger, counts, status, errors
+- [x] Cursor committed only after `HasMore=false`
+- [x] Connection status updated on errors (`pending_reauth` for auth errors, clear errors on success)
+- [x] Admin "Sync Now" handler: `POST /admin/api/connections/{id}/sync` → async sync, returns 202
+- [x] "Sync Now" button on connection detail page (only when status=active)
 - **Ref:** `plaid-integration.md` Sections 3, 6, `data-model.md` Sections 2.3, 2.6
 
-### 3.6 Seed Command
+### 3.6 Seed Command ✅
 
-- Implement `breadbox seed` subcommand for sandbox test data (`architecture.md` Section 1.1)
-- Useful for development and testing without live Plaid credentials
+- [x] `breadbox seed` subcommand inserts test data (2 users, 2 connections, 4 accounts, 50 transactions, 2 sync logs)
+- [x] Idempotent: all inserts use ON CONFLICT DO NOTHING with fixed UUIDs
 - **Ref:** `architecture.md` Section 1.1
 
 ### Checkpoint 3

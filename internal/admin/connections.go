@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -386,6 +387,33 @@ func DeleteConnectionHandler(a *app.App) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// SyncConnectionHandler serves POST /admin/api/connections/{id}/sync.
+func SyncConnectionHandler(a *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "id")
+
+		var connID pgtype.UUID
+		if err := connID.Scan(idStr); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid connection ID"})
+			return
+		}
+
+		if a.SyncEngine == nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Sync engine not initialized"})
+			return
+		}
+
+		go func() {
+			ctx := context.Background()
+			if err := a.SyncEngine.Sync(ctx, connID, db.SyncTriggerManual); err != nil {
+				a.Logger.Error("manual sync failed", "connection_id", idStr, "error", err)
+			}
+		}()
+
+		writeJSON(w, http.StatusAccepted, map[string]string{"status": "sync_triggered"})
 	}
 }
 

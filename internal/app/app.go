@@ -9,6 +9,7 @@ import (
 	"breadbox/internal/db"
 	"breadbox/internal/provider"
 	plaidprovider "breadbox/internal/provider/plaid"
+	"breadbox/internal/sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -16,11 +17,12 @@ import (
 // App is the single dependency container for the process. It is constructed
 // once at startup and passed to every handler and worker.
 type App struct {
-	DB        *pgxpool.Pool
-	Queries   *db.Queries
-	Config    *config.Config
-	Logger    *slog.Logger
-	Providers map[string]provider.Provider
+	DB         *pgxpool.Pool
+	Queries    *db.Queries
+	Config     *config.Config
+	Logger     *slog.Logger
+	Providers  map[string]provider.Provider
+	SyncEngine *sync.Engine
 }
 
 // New creates a new App. It connects to the database, creates a Queries
@@ -47,11 +49,14 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 		logger.Info("plaid provider initialized", "env", cfg.PlaidEnv)
 	}
 
+	syncEngine := sync.NewEngine(queries, pool, providers, logger)
+
 	return &App{
-		DB:        pool,
-		Queries:   queries,
-		Config:    cfg,
-		Logger:    logger,
-		Providers: providers,
+		DB:         pool,
+		Queries:    queries,
+		Config:     cfg,
+		Logger:     logger,
+		Providers:  providers,
+		SyncEngine: syncEngine,
 	}, nil
 }

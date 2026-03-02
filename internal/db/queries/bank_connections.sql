@@ -36,3 +36,9 @@ SELECT * FROM bank_connections WHERE plaid_item_id = $1;
 
 -- name: CountConnectionsNeedingAttention :one
 SELECT COUNT(*) FROM bank_connections WHERE status IN ('error', 'pending_reauth');
+
+-- name: ListActiveConnections :many
+SELECT * FROM bank_connections WHERE status = 'active';
+
+-- name: GetBankConnectionForSync :one
+SELECT id, provider, plaid_item_id, plaid_access_token, sync_cursor, user_id FROM bank_connections WHERE id = $1 AND status != 'disconnected';

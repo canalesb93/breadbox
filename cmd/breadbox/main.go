@@ -14,7 +14,9 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/config"
 	"breadbox/internal/db"
+	"breadbox/internal/seed"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 )
@@ -25,7 +27,7 @@ var version = "dev"
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: breadbox <command>")
-		fmt.Fprintln(os.Stderr, "commands: serve, migrate, version")
+		fmt.Fprintln(os.Stderr, "commands: serve, migrate, seed, version")
 		os.Exit(1)
 	}
 
@@ -37,6 +39,11 @@ func main() {
 		}
 	case "migrate":
 		if err := runMigrate(); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+	case "seed":
+		if err := runSeed(); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
@@ -142,4 +149,22 @@ func runMigrate() error {
 
 	logger.Info("migrations applied successfully")
 	return nil
+}
+
+func runSeed() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	logger := newLogger(cfg.Environment)
+
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("connect to database: %w", err)
+	}
+	defer pool.Close()
+
+	return seed.Run(ctx, pool, logger)
 }
