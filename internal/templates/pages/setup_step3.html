@@ -1,0 +1,26 @@
+{{define "content"}}
+<article>
+  <header>Set Sync Interval</header>
+
+  <p>Breadbox syncs your bank data on a schedule. More frequent syncs mean faster updates but higher API costs if you are on a paid Plaid plan. If you configure a webhook URL (next step), Plaid will also push sync notifications, reducing the need for frequent polling.</p>
+
+  {{if .Error}}
+  <div role="alert" data-flash="error">{{.Error}}</div>
+  {{end}}
+
+  <form method="POST" action="/admin/setup/step/3">
+    {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+
+    <label for="sync_interval_hours">Sync Interval</label>
+    <select id="sync_interval_hours" name="sync_interval_hours" required>
+      <option value="4"{{if eq .SyncInterval "4"}} selected{{end}}>Every 4 hours</option>
+      <option value="8"{{if eq .SyncInterval "8"}} selected{{end}}>Every 8 hours</option>
+      <option value="12"{{if or (eq .SyncInterval "12") (eq .SyncInterval "")}} selected{{end}}>Every 12 hours (recommended)</option>
+      <option value="24"{{if eq .SyncInterval "24"}} selected{{end}}>Every 24 hours</option>
+    </select>
+    <small>API cost note: Each sync call counts toward your Plaid usage. Sandbox is free. Development is limited by your development key quota. Production is billed per item per month regardless of sync frequency, so more frequent syncs have no additional cost per item.</small>
+
+    <button type="submit">Save and Continue</button>
+  </form>
+</article>
+{{end}}

@@ -1,0 +1,89 @@
+{{define "content"}}
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+<p><a href="/admin/connections/{{.ConnID}}">&larr; Back to {{.Connection.InstitutionName.String}}</a></p>
+
+<h1>Re-authenticate {{.Connection.InstitutionName.String}}</h1>
+
+<article>
+  <p>Re-connecting for: <strong>{{.Connection.UserName}}</strong></p>
+  <p id="link-status">Opening re-authentication dialog...</p>
+  <button id="retry-btn" style="display:none">Retry</button>
+</article>
+
+<script>
+(function () {
+  var connId = "{{.ConnID}}";
+  var linkStatus = document.getElementById("link-status");
+  var retryBtn = document.getElementById("retry-btn");
+
+  function showError(msg) {
+    linkStatus.textContent = msg;
+    linkStatus.style.color = "var(--pico-color-red-500)";
+    retryBtn.style.display = "inline-block";
+  }
+
+  function showMessage(msg) {
+    linkStatus.textContent = msg;
+    linkStatus.style.color = "";
+  }
+
+  function startReauth() {
+    linkStatus.textContent = "Opening re-authentication dialog...";
+    linkStatus.style.color = "";
+    retryBtn.style.display = "none";
+
+    fetch("/admin/api/connections/" + connId + "/reauth", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"}
+    })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (data.link_token) {
+        initLink(data.link_token);
+      } else {
+        showError(data.error || "Failed to initialize re-authentication.");
+      }
+    })
+    .catch(function () {
+      showError("Network error. Please try again.");
+    });
+  }
+
+  function initLink(token) {
+    var handler = Plaid.create({
+      token: token,
+      onSuccess: function (publicToken, metadata) {
+        showMessage("Completing re-authentication...");
+        fetch("/admin/api/connections/" + connId + "/reauth-complete", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({public_token: publicToken})
+        })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.status === "active") {
+            window.location.href = "/admin/connections/" + connId;
+          } else {
+            showError(data.error || "Re-authentication failed.");
+          }
+        })
+        .catch(function () {
+          showError("Network error. Please try again.");
+        });
+      },
+      onExit: function (err) {
+        if (err) {
+          showError("Re-authentication exited with an error: " + (err.display_message || err.error_message || "Unknown error"));
+        } else {
+          showMessage("Re-authentication cancelled.");
+        }
+      }
+    });
+    handler.open();
+  }
+
+  retryBtn.addEventListener("click", startReauth);
+  startReauth();
+})();
+</script>
+{{end}}

@@ -1,0 +1,137 @@
+{{define "content"}}
+<p><a href="/admin/connections">&larr; Connections</a></p>
+
+{{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
+<div role="alert" data-flash="error" style="margin-bottom: 1.5rem;">
+  <strong>This connection requires re-authentication.</strong> The bank may have changed its login requirements, or your session may have expired.
+  {{if .Connection.ErrorMessage.Valid}}<br><small>Error: {{.Connection.ErrorMessage.String}}</small>{{end}}
+  <br><a href="/admin/connections/{{.ConnID}}/reauth" style="color: inherit; font-weight: 600;">Re-authenticate &rarr;</a>
+</div>
+{{end}}
+
+<h1>{{.Connection.InstitutionName.String}}</h1>
+
+<dl>
+  <dt>Family Member</dt>
+  <dd>{{.Connection.UserName}}</dd>
+  <dt>Status</dt>
+  <dd>
+    {{if eq (printf "%s" .Connection.Status) "active"}}<span class="bb-badge bb-badge--success">Active</span>
+    {{else if eq (printf "%s" .Connection.Status) "pending_reauth"}}<span class="bb-badge bb-badge--warning">Re-auth Needed</span>
+    {{else if eq (printf "%s" .Connection.Status) "error"}}<span class="bb-badge bb-badge--error">Error</span>
+    {{else}}<span class="bb-badge bb-badge--muted">Disconnected</span>
+    {{end}}
+  </dd>
+  <dt>Connected</dt>
+  <dd>{{if .Connection.CreatedAt.Valid}}{{.Connection.CreatedAt.Time.Format "January 2, 2006"}}{{end}}</dd>
+  <dt>Provider</dt>
+  <dd>{{.Connection.Provider}}</dd>
+</dl>
+
+<div style="display: flex; gap: 0.5rem; margin-bottom: 2rem;">
+  {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
+  <a href="/admin/connections/{{.ConnID}}/reauth" role="button" class="outline">Re-authenticate</a>
+  {{end}}
+  <button class="secondary outline" onclick="removeConnection()" id="remove-btn">Remove Connection</button>
+</div>
+
+<h2>Accounts</h2>
+{{if .Accounts}}
+<div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Account Name</th>
+        <th>Mask</th>
+        <th>Type</th>
+        <th>Current Balance</th>
+        <th>Available Balance</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Accounts}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{if .Mask.Valid}}&bull;&bull;&bull;&bull;{{.Mask.String}}{{end}}</td>
+        <td>{{.Type}}{{if .Subtype.Valid}} / {{.Subtype.String}}{{end}}</td>
+        <td>{{if .BalanceCurrent.Valid}}{{formatNumeric .BalanceCurrent}}{{if .IsoCurrencyCode.Valid}} {{.IsoCurrencyCode.String}}{{end}}{{else}}&mdash;{{end}}</td>
+        <td>{{if .BalanceAvailable.Valid}}{{formatNumeric .BalanceAvailable}}{{if .IsoCurrencyCode.Valid}} {{.IsoCurrencyCode.String}}{{end}}{{else}}&mdash;{{end}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{else}}
+<p>No accounts found for this connection.</p>
+{{end}}
+
+<h2>Sync History (last 10)</h2>
+{{if .SyncLogs}}
+<div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Trigger</th>
+        <th>Status</th>
+        <th>+Add</th>
+        <th>~Mod</th>
+        <th>-Rem</th>
+        <th>Started</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .SyncLogs}}
+      <tr>
+        <td>{{.Trigger}}</td>
+        <td>
+          {{if eq (printf "%s" .Status) "success"}}<span class="bb-badge bb-badge--success">success</span>
+          {{else if eq (printf "%s" .Status) "error"}}<span class="bb-badge bb-badge--error">error</span>
+          {{else}}<span class="bb-badge bb-badge--muted">{{.Status}}</span>
+          {{end}}
+        </td>
+        <td>{{.AddedCount}}</td>
+        <td>{{.ModifiedCount}}</td>
+        <td>{{.RemovedCount}}</td>
+        <td>{{relativeTime .StartedAt}}</td>
+      </tr>
+      {{if and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid}}
+      <tr>
+        <td colspan="6">
+          <details>
+            <summary>Error details</summary>
+            <p>{{.ErrorMessage.String}}</p>
+          </details>
+        </td>
+      </tr>
+      {{end}}
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{else}}
+<p>No sync history yet.</p>
+{{end}}
+
+<script>
+function removeConnection() {
+  if (!confirm("Remove this connection? All transaction data will be kept but marked as disconnected. This cannot be undone.")) {
+    return;
+  }
+  fetch("/admin/api/connections/{{.ConnID}}", {
+    method: "DELETE"
+  })
+  .then(function (res) {
+    if (res.ok) {
+      window.location.href = "/admin/connections";
+    } else {
+      return res.json().then(function (data) {
+        alert(data.error || "Failed to remove connection.");
+      });
+    }
+  })
+  .catch(function () {
+    alert("Network error. Please try again.");
+  });
+}
+</script>
+{{end}}

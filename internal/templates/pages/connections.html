@@ -1,0 +1,51 @@
+{{define "content"}}
+<div class="bb-page-header">
+  <h1>Bank Connections</h1>
+  <a href="/admin/connections/new" role="button">Connect New Bank</a>
+</div>
+
+{{if .Connections}}
+<div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Institution</th>
+        <th>Family Member</th>
+        <th>Accounts</th>
+        <th>Status</th>
+        <th>Last Synced</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Connections}}
+      <tr>
+        <td>{{.InstitutionName}}</td>
+        <td>{{.UserName}}</td>
+        <td>{{.AccountCount}}</td>
+        <td>
+          {{if eq (printf "%s" .Status) "active"}}<span class="bb-badge bb-badge--success">Active</span>
+          {{else if eq (printf "%s" .Status) "pending_reauth"}}<span class="bb-badge bb-badge--warning">Re-auth Needed</span>
+          {{else if eq (printf "%s" .Status) "error"}}<span class="bb-badge bb-badge--error">Error</span>
+          {{else}}<span class="bb-badge bb-badge--muted">Disconnected</span>
+          {{end}}
+        </td>
+        <td>{{if .LastSyncedAt.Valid}}{{relativeTime .LastSyncedAt.Time}}{{else}}Never{{end}}</td>
+        <td>
+          <a href="/admin/connections/{{formatUUID .ID}}">View</a>
+          {{if or (eq (printf "%s" .Status) "error") (eq (printf "%s" .Status) "pending_reauth")}}
+            <a href="/admin/connections/{{formatUUID .ID}}/reauth">Re-auth</a>
+          {{end}}
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{else}}
+<div class="bb-empty">
+  <p>No bank connections yet. Connect your first bank to get started.</p>
+  <a href="/admin/connections/new" role="button">Connect New Bank</a>
+</div>
+{{end}}
+{{end}}

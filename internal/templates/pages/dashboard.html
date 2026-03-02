@@ -1,0 +1,66 @@
+{{define "content"}}
+<h1>Dashboard</h1>
+
+<div class="bb-stats">
+  <div class="bb-stat">
+    <div class="bb-stat-label">Accounts Connected</div>
+    <div class="bb-stat-value">{{.AccountCount}}</div>
+  </div>
+  <div class="bb-stat">
+    <div class="bb-stat-label">Transactions Synced</div>
+    <div class="bb-stat-value">{{.TxCount}}</div>
+  </div>
+  <div class="bb-stat">
+    <div class="bb-stat-label">Last Sync</div>
+    <div class="bb-stat-value">{{.LastSync}}</div>
+  </div>
+  <div class="bb-stat{{if gt .NeedsAttention 0}} bb-stat--warn{{end}}">
+    <div class="bb-stat-label">Needs Attention</div>
+    <div class="bb-stat-value">{{.NeedsAttention}}</div>
+  </div>
+</div>
+
+<h2>Recent Sync Activity</h2>
+
+{{if .RecentLogs}}
+<div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Institution</th>
+        <th>Trigger</th>
+        <th>Status</th>
+        <th>+Add</th>
+        <th>~Mod</th>
+        <th>-Rem</th>
+        <th>When</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .RecentLogs}}
+      <tr>
+        <td>{{.InstitutionName}}</td>
+        <td>{{.Trigger}}</td>
+        <td>
+          {{if eq (printf "%s" .Status) "success"}}<span class="bb-badge bb-badge--success">success</span>
+          {{else if eq (printf "%s" .Status) "error"}}<span class="bb-badge bb-badge--error">error</span>
+          {{else}}<span class="bb-badge bb-badge--muted">{{.Status}}</span>
+          {{end}}
+        </td>
+        <td>{{.AddedCount}}</td>
+        <td>{{.ModifiedCount}}</td>
+        <td>{{.RemovedCount}}</td>
+        <td>{{relativeTime .StartedAt}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{else}}
+<p>No sync activity yet. Connect a bank to get started.</p>
+{{end}}
+
+<p>
+  <a href="/admin/connections/new" role="button">Connect New Bank</a>
+</p>
+{{end}}

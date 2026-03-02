@@ -1,0 +1,38 @@
+{{define "content"}}
+<div class="bb-page-header">
+  <h1>Family Members</h1>
+  <a href="/admin/users/new" role="button">Add Family Member</a>
+</div>
+
+{{if .Users}}
+<div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Created</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Users}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{if .Email.Valid}}{{.Email.String}}{{else}}&mdash;{{end}}</td>
+        <td>{{if .CreatedAt.Valid}}{{.CreatedAt.Time.Format "Jan 2, 2006"}}{{end}}</td>
+        <td>
+          <a href="/admin/users/{{formatUUID .ID}}/edit">Edit</a>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{else}}
+<div class="bb-empty">
+  <p>No family members yet.</p>
+  <a href="/admin/users/new" role="button">Add your first family member</a>
+</div>
+{{end}}
+{{end}}

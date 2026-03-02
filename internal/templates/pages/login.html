@@ -1,0 +1,28 @@
+{{define "content"}}
+<hgroup>
+  <h1>Sign In to Breadbox</h1>
+  <p>Enter your credentials to access the dashboard.</p>
+</hgroup>
+
+{{if .SetupComplete}}
+<div role="alert" data-flash="info">Setup complete. Sign in to access the dashboard.</div>
+{{end}}
+
+{{if .Error}}
+<div role="alert" data-flash="error">{{.Error}}</div>
+{{end}}
+
+<article>
+  <form method="POST" action="/login">
+    {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" value="{{.Username}}" required autocomplete="username">
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" required autocomplete="current-password">
+
+    <button type="submit">Sign In</button>
+  </form>
+</article>
+{{end}}

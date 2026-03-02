@@ -1,0 +1,190 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.PageTitle}} — Breadbox</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css">
+  <style>
+    /* Reset classless body styling — we handle our own layout. */
+    body { margin: 0; padding: 0; max-width: none; }
+
+    .bb-layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ---- Sidebar ---- */
+    .bb-sidebar {
+      width: 230px;
+      flex-shrink: 0;
+      background: var(--pico-card-background-color);
+      border-right: 1px solid var(--pico-muted-border-color);
+      padding: 1.25rem 1rem;
+      display: flex;
+      flex-direction: column;
+    }
+    .bb-sidebar .bb-brand {
+      font-size: 1.15rem;
+      font-weight: 700;
+      text-decoration: none;
+      color: var(--pico-color);
+      display: block;
+      padding: 0.25rem 0.75rem 1rem;
+    }
+    .bb-sidebar .bb-nav {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .bb-sidebar .bb-nav li { margin: 0; }
+    .bb-sidebar .bb-nav a {
+      display: block;
+      padding: 0.45rem 0.75rem;
+      border-radius: 6px;
+      text-decoration: none;
+      color: var(--pico-color);
+      font-size: 0.95rem;
+      transition: background 0.15s;
+    }
+    .bb-sidebar .bb-nav a:hover {
+      background: var(--pico-muted-border-color);
+    }
+    .bb-sidebar .bb-nav a[aria-current="page"] {
+      background: var(--pico-primary-background);
+      color: var(--pico-primary-inverse);
+    }
+    .bb-sidebar .bb-bottom {
+      margin-top: auto;
+      padding-top: 1rem;
+    }
+    .bb-sidebar .bb-bottom button {
+      width: 100%;
+      margin: 0;
+    }
+
+    /* ---- Main content ---- */
+    .bb-main {
+      flex: 1;
+      padding: 2rem 2.5rem;
+      max-width: 980px;
+      overflow-y: auto;
+    }
+
+    /* ---- Page header row (title + action button) ---- */
+    .bb-page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      gap: 1rem;
+    }
+    .bb-page-header h1 { margin: 0; }
+    .bb-page-header a[role="button"] { white-space: nowrap; margin: 0; }
+
+    /* ---- Stat cards (dashboard) ---- */
+    .bb-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .bb-stat {
+      background: var(--pico-card-background-color);
+      border: 1px solid var(--pico-muted-border-color);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+    .bb-stat .bb-stat-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--pico-muted-color);
+      margin-bottom: 0.35rem;
+    }
+    .bb-stat .bb-stat-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .bb-stat--warn { border-left: 4px solid #e67e22; }
+
+    /* ---- Status badges ---- */
+    .bb-badge {
+      display: inline-block;
+      padding: 0.15rem 0.55rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+    .bb-badge--success { background: #d4edda; color: #155724; }
+    .bb-badge--error   { background: #f8d7da; color: #721c24; }
+    .bb-badge--warning { background: #fff3cd; color: #856404; }
+    .bb-badge--muted   { background: #e2e3e5; color: #383d41; }
+
+    /* ---- Flash messages ---- */
+    [data-flash="success"] {
+      background: #d4edda; color: #155724;
+      padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
+    }
+    [data-flash="error"] {
+      background: #f8d7da; color: #721c24;
+      padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
+    }
+    [data-flash="info"] {
+      background: #d1ecf1; color: #0c5460;
+      padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
+    }
+
+    /* ---- Empty state ---- */
+    .bb-empty {
+      text-align: center;
+      padding: 3rem 1rem;
+      border: 2px dashed var(--pico-muted-border-color);
+      border-radius: 8px;
+    }
+    .bb-empty p { color: var(--pico-muted-color); margin-bottom: 1rem; }
+
+    /* ---- Tables ---- */
+    table { width: 100%; }
+    td a + a { margin-left: 0.75rem; }
+
+    /* ---- Responsive ---- */
+    @media (max-width: 768px) {
+      .bb-layout { flex-direction: column; }
+      .bb-sidebar {
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        gap: 1rem;
+      }
+      .bb-sidebar .bb-brand { padding: 0; }
+      .bb-sidebar .bb-nav { display: flex; gap: 0.25rem; }
+      .bb-sidebar .bb-bottom { margin-top: 0; padding-top: 0; margin-left: auto; }
+      .bb-main { padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bb-layout">
+    <div class="bb-sidebar">
+      <a href="/admin/" class="bb-brand">Breadbox</a>
+      {{template "nav" .}}
+      <div class="bb-bottom">
+        <form method="POST" action="/logout">
+          {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+          <button type="submit" class="secondary outline">Sign Out</button>
+        </form>
+      </div>
+    </div>
+    <main class="bb-main">
+      {{template "flash" .}}
+      {{block "content" .}}{{end}}
+    </main>
+  </div>
+</body>
+</html>
+{{end}}

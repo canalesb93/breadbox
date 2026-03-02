@@ -1,0 +1,33 @@
+{{define "content"}}
+<article>
+  <header>Create Admin Account</header>
+
+  <p>Set up your dashboard login.</p>
+
+  {{if .Error}}
+  <div role="alert" data-flash="error">{{.Error}}</div>
+  {{end}}
+
+  <form method="POST" action="/admin/setup/step/1">
+    {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" value="{{.Username}}" required autocomplete="username"
+           {{if .Errors.Username}}aria-invalid="true"{{end}}>
+    {{if .Errors.Username}}<small>{{.Errors.Username}}</small>{{end}}
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" required autocomplete="new-password" minlength="8"
+           {{if .Errors.Password}}aria-invalid="true"{{end}}>
+    <small>Minimum 8 characters</small>
+    {{if .Errors.Password}}<small>{{.Errors.Password}}</small>{{end}}
+
+    <label for="confirm_password">Confirm Password</label>
+    <input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password"
+           {{if .Errors.ConfirmPassword}}aria-invalid="true"{{end}}>
+    {{if .Errors.ConfirmPassword}}<small>{{.Errors.ConfirmPassword}}</small>{{end}}
+
+    <button type="submit">Create Account and Continue</button>
+  </form>
+</article>
+{{end}}

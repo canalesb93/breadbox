@@ -1,0 +1,36 @@
+{{define "content"}}
+<article>
+  <header>Configure Plaid</header>
+
+  <p>Breadbox uses Plaid to connect to your banks. You'll need a Plaid developer account. Your credentials are stored encrypted in the database and are never exposed via the API.</p>
+  <p><a href="https://plaid.com/docs" target="_blank" rel="noopener">Create a Plaid account at plaid.com/docs</a></p>
+
+  {{if .Error}}
+  <div role="alert" data-flash="error">{{.Error}}</div>
+  {{end}}
+
+  <form method="POST" action="/admin/setup/step/2">
+    {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+
+    <label for="client_id">Client ID</label>
+    <input type="text" id="client_id" name="client_id" value="{{.ClientID}}" required spellcheck="false"
+           {{if .Errors.ClientID}}aria-invalid="true"{{end}}>
+    {{if .Errors.ClientID}}<small>{{.Errors.ClientID}}</small>{{end}}
+
+    <label for="secret">Secret</label>
+    <input type="password" id="secret" name="secret" required spellcheck="false"
+           {{if .Errors.Secret}}aria-invalid="true"{{end}}>
+    {{if .Errors.Secret}}<small>{{.Errors.Secret}}</small>{{end}}
+
+    <label for="environment">Environment</label>
+    <select id="environment" name="environment" required>
+      <option value="sandbox"{{if eq .Environment "sandbox"}} selected{{end}}>Sandbox (free testing, simulated data)</option>
+      <option value="development"{{if or (eq .Environment "development") (eq .Environment "")}} selected{{end}}>Development (real banks, limited connections)</option>
+      <option value="production"{{if eq .Environment "production"}} selected{{end}}>Production (real banks, paid)</option>
+    </select>
+    <small>Sandbox uses Plaid's simulated bank data. Development and Production access real bank accounts. Production requires Plaid approval and incurs costs (~$1.50/item/month).</small>
+
+    <button type="submit">Validate and Continue</button>
+  </form>
+</article>
+{{end}}

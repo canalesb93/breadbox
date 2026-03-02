@@ -8,6 +8,7 @@ import (
 	"breadbox/internal/config"
 	"breadbox/internal/db"
 	"breadbox/internal/provider"
+	plaidprovider "breadbox/internal/provider/plaid"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -37,11 +38,20 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 
 	queries := db.New(pool)
 
+	providers := make(map[string]provider.Provider)
+
+	if cfg.PlaidClientID != "" && cfg.PlaidSecret != "" {
+		plaidClient := plaidprovider.NewPlaidClient(cfg.PlaidClientID, cfg.PlaidSecret, cfg.PlaidEnv)
+		plaidProv := plaidprovider.NewProvider(plaidClient, cfg.EncryptionKey, cfg.WebhookURL, logger)
+		providers["plaid"] = plaidProv
+		logger.Info("plaid provider initialized", "env", cfg.PlaidEnv)
+	}
+
 	return &App{
 		DB:        pool,
 		Queries:   queries,
 		Config:    cfg,
 		Logger:    logger,
-		Providers: make(map[string]provider.Provider),
+		Providers: providers,
 	}, nil
 }

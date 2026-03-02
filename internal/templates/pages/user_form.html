@@ -1,0 +1,81 @@
+{{define "content"}}
+<p><a href="/admin/users">&larr; Back to Family Members</a></p>
+
+<h1>{{if .IsEdit}}Edit {{.User.Name}}{{else}}Add Family Member{{end}}</h1>
+
+<article>
+  <form id="user-form">
+    <label for="name">Name <span style="color: var(--pico-color-red-500);">*</span></label>
+    <input type="text" id="name" name="name" required maxlength="128"
+      value="{{if .IsEdit}}{{.User.Name}}{{end}}"
+      placeholder="e.g., Alex Canales">
+
+    <label for="email">Email <small>(optional)</small></label>
+    <input type="email" id="email" name="email"
+      value="{{if and .IsEdit .User.Email.Valid}}{{.User.Email.String}}{{end}}"
+      placeholder="e.g., alex@example.com">
+
+    <div id="form-error" role="alert" style="display:none; color: var(--pico-color-red-500); margin-bottom: 1rem;"></div>
+
+    <button type="submit">{{if .IsEdit}}Save Changes{{else}}Create Member{{end}}</button>
+    <a href="/admin/users" role="button" class="secondary outline" style="margin-left: 0.5rem;">Cancel</a>
+  </form>
+</article>
+
+<script>
+(function () {
+  var form = document.getElementById("user-form");
+  var formError = document.getElementById("form-error");
+  var isEdit = {{if .IsEdit}}true{{else}}false{{end}};
+  var userId = "{{if .IsEdit}}{{.UserID}}{{end}}";
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    formError.style.display = "none";
+
+    var name = document.getElementById("name").value.trim();
+    var email = document.getElementById("email").value.trim();
+
+    if (!name) {
+      formError.textContent = "Name is required.";
+      formError.style.display = "block";
+      return;
+    }
+
+    var body = {name: name};
+    if (email) {
+      body.email = email;
+    }
+
+    var url = isEdit ? "/admin/api/users/" + userId : "/admin/api/users";
+    var method = isEdit ? "PUT" : "POST";
+
+    fetch(url, {
+      method: method,
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body)
+    })
+    .then(function (res) {
+      if (res.ok) {
+        window.location.href = "/admin/users";
+      } else {
+        return res.json().then(function (data) {
+          var msg = "An error occurred.";
+          if (data.error && typeof data.error === "object" && data.error.message) {
+            msg = data.error.message;
+          } else if (data.error && typeof data.error === "string") {
+            msg = data.error;
+          }
+          formError.textContent = msg;
+          formError.style.display = "block";
+        });
+      }
+    })
+    .catch(function () {
+      formError.textContent = "Network error. Please try again.";
+      formError.style.display = "block";
+    });
+  });
+})();
+</script>
+{{end}}

@@ -1,0 +1,29 @@
+{{define "content"}}
+<article>
+  <header>Webhook URL (Optional)</header>
+
+  <p>Plaid can send webhook notifications when new transactions are available, which allows near-real-time syncing without polling. This requires Breadbox to be reachable at a public URL.</p>
+
+  <p>If you are running Breadbox at home or behind a firewall, <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/" target="_blank" rel="noopener">Cloudflare Tunnel</a> is a free option that exposes your local server securely.</p>
+
+  <p>The webhook endpoint Plaid should be configured to call is: <code>{base_url}/webhooks/plaid</code></p>
+
+  <p>You can skip this step and add a webhook URL later in Settings.</p>
+
+  {{if .Error}}
+  <div role="alert" data-flash="error">{{.Error}}</div>
+  {{end}}
+
+  <form method="POST" action="/admin/setup/step/4">
+    {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+
+    <label for="webhook_url">Webhook Base URL</label>
+    <input type="url" id="webhook_url" name="webhook_url" value="{{.WebhookURL}}" placeholder="https://breadbox.example.com">
+
+    <div style="display: flex; gap: 0.5rem;">
+      <button type="submit">Save and Continue</button>
+      <button type="submit" name="skip" value="true" class="secondary outline">Skip for Now</button>
+    </div>
+  </form>
+</article>
+{{end}}

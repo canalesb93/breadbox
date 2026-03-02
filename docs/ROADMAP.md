@@ -69,87 +69,90 @@ All 7 checks passed:
 
 ---
 
-## Phase 2: Plaid Integration + Admin Auth
+## Phase 2: Plaid Integration + Admin Auth ✅
 
 Connect to Plaid, implement the admin dashboard authentication, and build the setup wizard.
 
-### 2.1 Plaid Client Initialization
+**Status:** Complete. Checkpoint 2 verified.
 
-- Initialize Plaid Go SDK client from config (client ID, secret, environment)
-- Implement access token encryption/decryption (AES-256-GCM) (`plaid-integration.md` Section 7)
+### 2.1 Plaid Client Initialization ✅
+
+- [x] Initialize Plaid Go SDK client from config (client ID, secret, environment)
+- [x] Implement access token encryption/decryption (AES-256-GCM) (`plaid-integration.md` Section 7)
 - **Ref:** `plaid-integration.md` Sections 1, 7
 
-### 2.2 Plaid Provider Implementation — Link Flow
+### 2.2 Plaid Provider Implementation — Link Flow ✅
 
-- Implement `CreateLinkSession`: call Plaid `/link/token/create` with products, webhook URL, user ID (`plaid-integration.md` Section 2.1)
-- Implement `ExchangeToken`: call `/item/public_token/exchange`, return Connection + Accounts (`plaid-integration.md` Section 2.2)
-- Implement `CreateReauthSession`: call `/link/token/create` in update mode with `access_token` (`plaid-integration.md` Section 2.3)
-- Implement `RemoveConnection`: call `/item/remove` (`plaid-integration.md` Section 6.4)
+- [x] Implement `CreateLinkSession`: call Plaid `/link/token/create` with products, webhook URL, user ID (`plaid-integration.md` Section 2.1)
+- [x] Implement `ExchangeToken`: call `/item/public_token/exchange`, return Connection + Accounts (`plaid-integration.md` Section 2.2)
+- [x] Implement `CreateReauthSession`: call `/link/token/create` in update mode with `access_token` (`plaid-integration.md` Section 2.3)
+- [x] Implement `RemoveConnection`: call `/item/remove` (`plaid-integration.md` Section 6.4)
 - **Ref:** `plaid-integration.md` Sections 2, 6
+- **Note:** Plaid Go SDK v29 only exposes `Sandbox` and `Production` environments (no `Development` constant). The "development" environment maps to Sandbox.
 
-### 2.3 Admin Authentication
+### 2.3 Admin Authentication ✅
 
-- Implement admin account creation (bcrypt hashed passwords, min 8 chars) (`admin-dashboard.md` Section 2)
-- Set up session management with `alexedwards/scs` + `pgxstore` (`architecture.md` Section 5.2)
-- Implement login/logout routes (`admin-dashboard.md` Section 3)
-- Session cookies: `HttpOnly; SameSite=Lax; Secure` (`admin-dashboard.md` Section 3.1)
-- CSRF protection middleware for admin POST routes (`architecture.md` Section 1.4)
-- Setup detection middleware: redirect to wizard if `setup_complete` is not `true` (`admin-dashboard.md` Section 2.1)
-- `GET /admin/api/setup/status` — unauthenticated setup check endpoint (`rest-api.md` Section 8)
+- [x] Implement admin account creation (bcrypt hashed passwords, min 8 chars) (`admin-dashboard.md` Section 2)
+- [x] Set up session management with `alexedwards/scs` + `pgxstore` (`architecture.md` Section 5.2)
+- [x] Implement login/logout routes (`admin-dashboard.md` Section 3)
+- [x] Session cookies: `HttpOnly; SameSite=Lax; Secure` (`admin-dashboard.md` Section 3.1)
+- [x] CSRF protection middleware for admin POST routes (`architecture.md` Section 1.4)
+- [x] Setup detection middleware: redirect to wizard if `setup_complete` is not `true` (`admin-dashboard.md` Section 2.1)
+- [x] `GET /admin/api/setup/status` — unauthenticated setup check endpoint (`rest-api.md` Section 8)
 - **Ref:** `admin-dashboard.md` Sections 2–3, `architecture.md` Sections 1.4, 5.2
 
-### 2.4 Setup Wizard
+### 2.4 Setup Wizard ✅
 
-- Step 1: Create admin account (`admin-dashboard.md` Section 2.2)
-- Step 2: Enter Plaid credentials + validate with test API call (`admin-dashboard.md` Section 2.3–2.4)
-- Step 3: Configure sync interval (`admin-dashboard.md` Section 2.4)
-- Step 4: Optional webhook URL (`admin-dashboard.md` Section 2.5)
-- Step 5: Confirmation + set `setup_complete = true` (`admin-dashboard.md` Section 2.6)
-- Programmatic setup endpoint: `POST /admin/api/setup` (`rest-api.md` Section 6.11)
+- [x] Step 1: Create admin account (`admin-dashboard.md` Section 2.2)
+- [x] Step 2: Enter Plaid credentials + validate with test API call (`admin-dashboard.md` Section 2.3–2.4)
+- [x] Step 3: Configure sync interval (`admin-dashboard.md` Section 2.4)
+- [x] Step 4: Optional webhook URL (`admin-dashboard.md` Section 2.5)
+- [x] Step 5: Confirmation + set `setup_complete = true` (`admin-dashboard.md` Section 2.6)
+- [x] Programmatic setup endpoint: `POST /admin/api/setup` (`rest-api.md` Section 6.11)
 - **Ref:** `admin-dashboard.md` Section 2, `rest-api.md` Section 6.11
 
-### 2.5 Dashboard — Template System & Shared Components
+### 2.5 Dashboard — Template System & Shared Components ✅
 
-- Template system with Go `html/template` + Pico CSS, embedded via `go:embed` (`admin-dashboard.md` Section 14)
-- Navigation sidebar (`admin-dashboard.md` Section 13)
-- Flash message system stored in sessions (`admin-dashboard.md` Section 14.4)
-- Error pages (404, 500) and empty states (`admin-dashboard.md` Section 18)
+- [x] Template system with Go `html/template` + Pico CSS, embedded via `go:embed` (`admin-dashboard.md` Section 14)
+- [x] Navigation sidebar (`admin-dashboard.md` Section 13)
+- [x] Flash message system stored in sessions (`admin-dashboard.md` Section 14.4)
+- [x] Error pages (404, 500) and empty states (`admin-dashboard.md` Section 18)
 - **Ref:** `admin-dashboard.md` Sections 13–14, 18
 
-### 2.6 Dashboard — Connection Management Pages
+### 2.6 Dashboard — Connection Management Pages ✅
 
-- Dashboard home page (`admin-dashboard.md` Section 4)
-- Connections list page with sync/remove form actions (`admin-dashboard.md` Section 5)
-- New connection page with Plaid Link JS integration (`admin-dashboard.md` Section 6)
+- [x] Dashboard home page (`admin-dashboard.md` Section 4)
+- [x] Connections list page with sync/remove form actions (`admin-dashboard.md` Section 5)
+- [x] New connection page with Plaid Link JS integration (`admin-dashboard.md` Section 6)
   - `POST /admin/api/link-token` (`rest-api.md` Section 6.7)
   - `POST /admin/api/exchange-token` (`rest-api.md` Section 6.8)
-- Connection detail page (`admin-dashboard.md` Section 7)
-- Re-authentication page — update mode, NO token exchange (`admin-dashboard.md` Section 8)
+- [x] Connection detail page (`admin-dashboard.md` Section 7)
+- [x] Re-authentication page — update mode, NO token exchange (`admin-dashboard.md` Section 8)
   - `POST /admin/api/connections/:id/reauth` (link token for update mode)
   - `POST /admin/api/connections/:id/reauth-complete` (status update only, no exchange)
 - **Ref:** `admin-dashboard.md` Sections 4–8
 
-### 2.7 Dashboard — Family Members Page
+### 2.7 Dashboard — Family Members Page ✅
 
-- Family members list, create, edit (`admin-dashboard.md` Section 9)
-- `POST /admin/api/users` and `PUT /admin/api/users/:id` admin endpoints (`rest-api.md` Section 8)
-- No delete in MVP (`admin-dashboard.md` Section 9)
+- [x] Family members list, create, edit (`admin-dashboard.md` Section 9)
+- [x] `POST /admin/api/users` and `PUT /admin/api/users/:id` admin endpoints (`rest-api.md` Section 8)
+- [x] No delete in MVP (`admin-dashboard.md` Section 9)
 - **Ref:** `admin-dashboard.md` Section 9, `rest-api.md` Section 8
 
-### Checkpoint 2
+### Checkpoint 2 ✅
 
 Complete the setup wizard, log in, connect a sandbox bank, and see it on the dashboard.
 
-1. Start `breadbox serve` with `BREADBOX_ENCRYPTION_KEY` set
-2. Open `http://localhost:8080/admin/` — redirects to `/admin/setup/step/1`
-3. Complete all 5 wizard steps with Plaid sandbox credentials (environment = sandbox)
-4. Log in with the admin credentials you created
-5. Dashboard home page loads showing 0 accounts, 0 transactions
-6. Navigate to Connections → "Connect New Bank" → select a family member
-7. In Plaid Link, use sandbox credentials (`user_good` / `pass_good`) → complete link
-8. Connection detail page shows the sandbox institution with status "Active"
-9. Family Members page shows the member you created
-10. Log out → confirm redirect to login page, `/admin/` is inaccessible
+1. ✅ Start `breadbox serve` with `BREADBOX_ENCRYPTION_KEY` set
+2. ✅ Open `http://localhost:8080/admin/` — redirects to `/admin/setup/step/1`
+3. ✅ Complete all 5 wizard steps with Plaid sandbox credentials (environment = sandbox)
+4. ✅ Log in with the admin credentials you created
+5. ✅ Dashboard home page loads showing 0 accounts, 0 transactions
+6. ✅ Navigate to Connections → "Connect New Bank" → select a family member
+7. ✅ In Plaid Link, use sandbox credentials (`user_good` / `pass_good`) → complete link
+8. ✅ Connection detail page shows the sandbox institution with status "Active"
+9. ✅ Family Members page shows the member you created
+10. ✅ Log out → confirm redirect to login page, `/admin/` is inaccessible
 
 ---
 

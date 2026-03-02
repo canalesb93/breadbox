@@ -1,0 +1,140 @@
+{{define "content"}}
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+<h1>Connect New Bank</h1>
+
+<div id="step-select" {{if .ShowLink}}style="display:none"{{end}}>
+  <article>
+    <header>Select Family Member</header>
+    <p>Choose which family member this bank connection belongs to.</p>
+    <form id="member-form">
+      <label for="user_id">Family Member</label>
+      <select id="user_id" name="user_id" required>
+        <option value="" disabled selected>Select a member...</option>
+        {{range .Users}}
+        <option value="{{formatUUID .ID}}">{{.Name}}</option>
+        {{end}}
+      </select>
+      <button type="submit">Continue to Bank Selection</button>
+    </form>
+  </article>
+  <p><a href="/admin/connections">&larr; Back to Connections</a></p>
+</div>
+
+<div id="step-link" style="display:none">
+  <article>
+    <header>Connect Bank</header>
+    <p>Connecting for: <strong id="member-name"></strong></p>
+    <p id="link-status">Opening bank connection dialog...</p>
+    <button id="retry-btn" style="display:none">Retry</button>
+  </article>
+  <p><a href="#" id="back-btn">&larr; Back to member selection</a></p>
+</div>
+
+<script>
+(function () {
+  var memberForm = document.getElementById("member-form");
+  var stepSelect = document.getElementById("step-select");
+  var stepLink = document.getElementById("step-link");
+  var memberNameEl = document.getElementById("member-name");
+  var linkStatus = document.getElementById("link-status");
+  var retryBtn = document.getElementById("retry-btn");
+  var backBtn = document.getElementById("back-btn");
+  var selectedUserId = "";
+
+  memberForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var select = document.getElementById("user_id");
+    selectedUserId = select.value;
+    if (!selectedUserId) return;
+    memberNameEl.textContent = select.options[select.selectedIndex].text;
+    stepSelect.style.display = "none";
+    stepLink.style.display = "block";
+    startLink();
+  });
+
+  backBtn.addEventListener("click", function (e) {
+    e.preventDefault();
+    stepLink.style.display = "none";
+    stepSelect.style.display = "block";
+    linkStatus.textContent = "Opening bank connection dialog...";
+    linkStatus.className = "";
+    retryBtn.style.display = "none";
+  });
+
+  function showError(msg) {
+    linkStatus.textContent = msg;
+    linkStatus.style.color = "var(--pico-color-red-500)";
+    retryBtn.style.display = "inline-block";
+  }
+
+  function showMessage(msg) {
+    linkStatus.textContent = msg;
+    linkStatus.style.color = "";
+  }
+
+  function startLink() {
+    linkStatus.textContent = "Opening bank connection dialog...";
+    linkStatus.style.color = "";
+    retryBtn.style.display = "none";
+
+    fetch("/admin/api/link-token", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({user_id: selectedUserId})
+    })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (data.link_token) {
+        initLink(data.link_token);
+      } else {
+        showError(data.error || "Failed to initialize bank connection.");
+      }
+    })
+    .catch(function () {
+      showError("Network error starting Plaid Link. Please try again.");
+    });
+  }
+
+  function initLink(token) {
+    var handler = Plaid.create({
+      token: token,
+      onSuccess: function (publicToken, metadata) {
+        showMessage("Saving connection...");
+        fetch("/admin/api/exchange-token", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            public_token: publicToken,
+            user_id: selectedUserId,
+            institution_id: metadata.institution.institution_id,
+            institution_name: metadata.institution.name,
+            accounts: metadata.accounts
+          })
+        })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.connection_id) {
+            window.location.href = "/admin/connections/" + data.connection_id;
+          } else {
+            showError(data.error || "An unknown error occurred.");
+          }
+        })
+        .catch(function () {
+          showError("Network error. Please try again.");
+        });
+      },
+      onExit: function (err) {
+        if (err) {
+          showError("Plaid Link exited with an error: " + (err.display_message || err.error_message || "Unknown error"));
+        } else {
+          showMessage("Bank connection cancelled.");
+        }
+      }
+    });
+    handler.open();
+  }
+
+  retryBtn.addEventListener("click", startLink);
+})();
+</script>
+{{end}}

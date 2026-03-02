@@ -1,0 +1,32 @@
+{{define "content"}}
+<article>
+  <header>Setup Complete</header>
+
+  <p>Your Breadbox instance is configured and ready to use.</p>
+
+  <table>
+    <tbody>
+      <tr>
+        <th>Admin Username</th>
+        <td>{{.AdminUsername}}</td>
+      </tr>
+      <tr>
+        <th>Plaid Environment</th>
+        <td>{{.PlaidEnv}}</td>
+      </tr>
+      <tr>
+        <th>Sync Interval</th>
+        <td>Every {{.SyncInterval}} hours</td>
+      </tr>
+      <tr>
+        <th>Webhook URL</th>
+        <td>{{if .WebhookURL}}{{.WebhookURL}}{{else}}Not configured{{end}}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <small>You can change these settings at any time from the Settings page.</small>
+
+  <a href="/login?setup=complete" role="button" style="margin-top: 1rem; display: inline-block;">Go to Dashboard</a>
+</article>
+{{end}}

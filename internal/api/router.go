@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"breadbox/internal/admin"
 	"breadbox/internal/app"
 	mw "breadbox/internal/middleware"
 
@@ -20,6 +21,17 @@ func NewRouter(a *app.App, version string) http.Handler {
 	r.Use(middleware.Recoverer)
 
 	r.Get("/health", HealthHandler(version))
+
+	// Admin dashboard: session manager + template renderer + admin router.
+	isSecure := a.Config.Environment == "production" || a.Config.Environment == "docker"
+	sm := admin.NewSessionManager(a.DB, isSecure)
+	tr, err := admin.NewTemplateRenderer()
+	if err != nil {
+		a.Logger.Error("failed to initialize template renderer", "error", err)
+	} else {
+		adminRouter := admin.NewAdminRouter(a, sm, tr)
+		r.Mount("/", adminRouter)
+	}
 
 	return r
 }
