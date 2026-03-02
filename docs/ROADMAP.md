@@ -481,3 +481,286 @@ Run `docker compose up` from scratch and verify the entire system works end-to-e
 5. Complete full flow: setup wizard → connect sandbox bank → trigger sync → create API key → query REST API → connect Claude via MCP
 6. `docker compose down && docker compose up -d` — verify data persists across restarts (named volume)
 7. Verify migrations ran automatically: `docker compose logs breadbox | grep migrat`
+
+---
+
+## Phase 8: Multi-Provider Refactoring
+
+Decouple the codebase from Plaid-specific assumptions to support multiple bank data providers.
+All existing Plaid functionality must continue working identically after this phase.
+
+### 8.1 Database Schema Migration
+
+- [ ] Add `external_id TEXT NULL` and `encrypted_credentials BYTEA NULL` columns to `bank_connections`
+- [ ] Migrate data: copy `plaid_item_id` → `external_id`, `plaid_access_token` → `encrypted_credentials`
+- [ ] Drop `plaid_item_id` and `plaid_access_token` columns
+- [ ] Add `UNIQUE(provider, external_id)` constraint; drop old `plaid_item_id` index
+- **Ref:** `data-model.md` Section 2.3, `teller-integration.md` Section 1
+- **Files:** `internal/db/migrations/00013_generic_connection_columns.sql`
+
+### 8.2 Update sqlc Queries
+
+- [ ] Rewrite all `bank_connections` queries for generic column names
+- [ ] Rename `GetBankConnectionByPlaidItemID` → `GetBankConnectionByExternalID(provider, external_id)`
+- [ ] Update `GetBankConnectionForSync`, `CreateBankConnection`, `DeleteBankConnection`
+- [ ] Run `sqlc generate` to regenerate Go types
+- **Files:** `internal/db/queries/bank_connections.sql`, `internal/db/*.sql.go` (generated)
+
+### 8.3 Move Encryption to Shared Package
+
+- [ ] Create `internal/crypto/encrypt.go` with `Encrypt()` and `Decrypt()` (moved from `internal/provider/plaid/encrypt.go`)
+- [ ] Update all callers: Plaid sync, exchange, balances, admin connections
+- [ ] Delete `internal/provider/plaid/encrypt.go`
+- **Files:** `internal/crypto/encrypt.go` (new), `internal/provider/plaid/*.go`, `internal/admin/connections.go`
+
+### 8.4 Provider-Level Error Sentinels
+
+- [ ] Create `internal/provider/errors.go` with `ErrReauthRequired` and `ErrSyncRetryable`
+- [ ] Update `internal/provider/plaid/errors.go` to wrap shared errors
+- [ ] Remove Plaid-specific error imports from sync engine
+- **Files:** `internal/provider/errors.go` (new), `internal/provider/plaid/errors.go`, `internal/sync/engine.go`
+
+### 8.5 Refactor Sync Engine
+
+- [ ] Use `conn.ExternalID` and `conn.EncryptedCredentials` (from updated sqlc types)
+- [ ] Check `provider.ErrSyncRetryable` and `provider.ErrReauthRequired` instead of Plaid-specific errors
+- [ ] Remove `plaidprovider` import entirely
+- **Files:** `internal/sync/engine.go`
+
+### 8.6 Refactor Webhook Handler
+
+- [ ] Extract all HTTP headers generically (not just `Plaid-Verification`)
+- [ ] Use `GetBankConnectionByExternalID(provider, externalID)` for connection lookup
+- [ ] Add `NeedsReauth bool` to `WebhookEvent`; remove `reauthErrorCodes` map from handler
+- [ ] Update Plaid webhook implementation to set `NeedsReauth` based on error codes
+- **Files:** `internal/provider/provider.go`, `internal/provider/plaid/webhook.go`, `internal/webhook/handler.go`
+
+### 8.7 Refactor Admin Connection Handlers
+
+- [ ] Accept `provider` field in link-token and exchange-token requests
+- [ ] Change `CreateReauthSession(ctx, connectionID)` → `CreateReauthSession(ctx, Connection)`
+- [ ] Change `RemoveConnection(ctx, connectionID)` → `RemoveConnection(ctx, Connection)`
+- [ ] Remove all `plaidprovider` type assertions and direct `Decrypt()` calls
+- [ ] Update Plaid provider implementations for new signatures
+- **Ref:** `architecture.md` Section 3 (Provider Interface)
+- **Files:** `internal/provider/provider.go`, `internal/provider/plaid/reauth.go`, `internal/provider/plaid/remove.go`, `internal/admin/connections.go`
+
+### 8.8 Settings and Setup for Multi-Provider
+
+- [ ] Settings page: add Teller section (placeholder, shows "Not configured" until Phase 9)
+- [ ] Setup wizard step 2: make Plaid credentials optional (allow Teller-only setup later)
+- [ ] Programmatic setup endpoint: accept optional Teller fields
+- **Files:** `internal/admin/setup.go`, `internal/admin/settings.go`, `internal/templates/pages/settings.html`, `internal/templates/pages/setup_step2.html`
+
+### 8.9 Config System: Teller Keys
+
+- [ ] Add `TellerAppID`, `TellerCertPath`, `TellerKeyPath`, `TellerEnv`, `TellerWebhookSecret` to Config struct
+- [ ] Load from env vars in `Load()`, from `app_config` in `LoadWithDB()` where appropriate
+- [ ] Cert/key paths and webhook secret are env-var-only (not stored in app_config)
+- **Files:** `internal/config/config.go`, `internal/config/load.go`
+
+### 8.10 Admin UI Multi-Provider Templates
+
+- [ ] `connection_new.html`: add provider selector dropdown, conditionally load Plaid/Teller JS
+- [ ] `connection_reauth.html`: detect provider from connection, load correct JS SDK
+- [ ] `connection_detail.html`: show provider name in connection info
+- [ ] Only show configured providers in selector (check `a.Providers` map)
+- **Files:** `internal/templates/pages/connection_new.html`, `internal/templates/pages/connection_reauth.html`, `internal/templates/pages/connection_detail.html`, `internal/admin/connections.go`
+
+### 8.11 App Initialization: Multi-Provider Skeleton
+
+- [ ] Add Teller provider credential detection in `app.New()` (log presence, no init yet)
+- **Files:** `internal/app/app.go`
+
+### 8.12 Update Seed Data
+
+- [ ] Change `plaid_item_id` → `external_id`, `plaid_access_token` → `encrypted_credentials` in seed SQL
+- **Files:** `internal/seed/seed.go`
+
+### 8.13 Update .env.example
+
+- [ ] Add Teller environment variables: `TELLER_APP_ID`, `TELLER_CERT_PATH`, `TELLER_KEY_PATH`, `TELLER_ENV`, `TELLER_WEBHOOK_SECRET`
+- **Files:** `.env.example`
+
+### Task Dependencies
+
+```
+8.1 (DB migration) ──> 8.2 (sqlc queries) ──> 8.5 (sync engine)
+                                           ──> 8.6 (webhook handler)
+                                           ──> 8.7 (admin connections)
+                                           ──> 8.12 (seed data)
+
+8.3 (crypto package) ──> 8.7 (admin connections)
+
+8.4 (shared errors)  ──> 8.5 (sync engine)
+
+8.9 (config)         ──> 8.8 (settings/setup)
+                     ──> 8.11 (app init)
+```
+
+### Checkpoint 8
+
+Verify all existing Plaid functionality works identically after refactoring:
+
+1. `go build ./cmd/breadbox/` compiles cleanly
+2. `go vet ./...` passes
+3. `breadbox migrate` applies migration 00013 without errors
+4. `breadbox seed` inserts test data with new column names
+5. Start `breadbox serve` with Plaid credentials configured
+6. Connect a Plaid sandbox bank — full flow works: link token, exchange, accounts appear
+7. Trigger "Sync Now" — sync completes, transactions appear
+8. Settings page shows both Plaid and Teller sections
+9. "Connect New Bank" page shows provider selector (only Plaid if Teller not configured)
+10. `psql`: `bank_connections` has `external_id`/`encrypted_credentials`, NOT `plaid_item_id`/`plaid_access_token`
+
+---
+
+## Phase 9: Teller Provider Implementation
+
+Implement the Teller bank data provider alongside Plaid, making Breadbox a true multi-provider system.
+
+### 9.1 Teller HTTP Client
+
+- [ ] Create mTLS-configured HTTP client from cert + key file paths
+- [ ] Base URL: `https://api.teller.io` (all environments)
+- [ ] HTTP Basic Auth helper (access_token as username, empty password)
+- [ ] 30s request timeout, exponential backoff on 429
+- **Ref:** `teller-integration.md` Section 1
+- **Files:** `internal/provider/teller/client.go`
+
+### 9.2 Teller Provider Struct
+
+- [ ] `TellerProvider` struct implementing `provider.Provider`
+- [ ] Compile-time interface check: `var _ provider.Provider = (*TellerProvider)(nil)`
+- [ ] Constructor: `NewProvider(httpClient, appID, env, webhookSecret, encryptionKey, logger)`
+- **Ref:** `teller-integration.md` Section 1
+- **Files:** `internal/provider/teller/provider.go`
+
+### 9.3 Teller Link Flow
+
+- [ ] `CreateLinkSession`: return app ID as token (no server-side creation needed)
+- [ ] `ExchangeToken`: parse `{access_token, enrollment_id, institution_name}`, encrypt token, call `GET /accounts`, return Connection + Accounts
+- [ ] Admin API handles Teller's `onSuccess` payload format
+- **Ref:** `teller-integration.md` Section 2
+- **Files:** `internal/provider/teller/link.go`
+
+### 9.4 Teller Transaction Sync
+
+- [ ] Date-range polling: fetch from `(last_synced_at - 10 days)` to today
+- [ ] Paginate via `from_id` parameter (last transaction ID from previous page)
+- [ ] Map fields: negate amount sign, parse signed string to decimal
+- [ ] Return all transactions as `Added`; sync engine handles stale pending cleanup
+- [ ] Category mapping via `categories.go` mapping table
+- **Ref:** `teller-integration.md` Sections 3, 7
+- **Files:** `internal/provider/teller/sync.go`
+
+### 9.5 Teller Balance Refresh
+
+- [ ] Per-account balance fetch: `GET /accounts/{id}/balances`
+- [ ] Map: `ledger` → `Current`, `available` → `Available`, `Limit` = nil
+- [ ] Currency from account record (not balance response)
+- **Ref:** `teller-integration.md` Section 4
+- **Files:** `internal/provider/teller/balances.go`
+
+### 9.6 Teller Webhook Handler
+
+- [ ] HMAC-SHA256 signature verification from `Teller-Signature` header
+- [ ] Replay protection: reject events older than 5 minutes
+- [ ] Map events: `enrollment.disconnected` → `connection_error` (NeedsReauth=true), `transactions.processed` → `sync_available`
+- **Ref:** `teller-integration.md` Section 5
+- **Files:** `internal/provider/teller/webhook.go`
+
+### 9.7 Teller Reconnection
+
+- [ ] `CreateReauthSession`: return enrollment ID as token (client-side reconnection via Teller Connect)
+- [ ] On success: update connection status to `active` (no token exchange needed)
+- **Ref:** `teller-integration.md` Section 6
+- **Files:** `internal/provider/teller/reauth.go`
+
+### 9.8 Teller Connection Removal
+
+- [ ] `RemoveConnection`: decrypt access token, call `DELETE /enrollments/{enrollment_id}`
+- [ ] Idempotent: log and continue if token already invalid
+- **Ref:** `teller-integration.md` Section 6
+- **Files:** `internal/provider/teller/remove.go`
+
+### 9.9 App Initialization
+
+- [ ] Wire Teller provider in `app.New()` when `TellerAppID + TellerCertPath + TellerKeyPath` are configured
+- [ ] Load mTLS certificate, create HTTP client, register `providers["teller"]`
+- [ ] Log "teller provider initialized" with environment
+- **Files:** `internal/app/app.go`
+
+### 9.10 Admin UI: Teller Connect
+
+- [ ] `connection_new.html`: Teller Connect JS integration — `TellerConnect.setup({applicationId, onSuccess})`, POST enrollment data to `/admin/api/exchange-token`
+- [ ] `connection_reauth.html`: Teller Connect reconnection — `TellerConnect.setup({enrollmentId})`, POST to `/admin/api/connections/{id}/reauth-complete`
+- **Ref:** `teller-integration.md` Section 2
+- **Files:** `internal/templates/pages/connection_new.html`, `internal/templates/pages/connection_reauth.html`
+
+### 9.11 Category Mapping
+
+- [ ] Map ~27 Teller categories to Plaid-compatible primary categories
+- [ ] Default unmapped categories to `GENERAL_MERCHANDISE`
+- **Ref:** `teller-integration.md` Section 7
+- **Files:** `internal/provider/teller/categories.go`
+
+### 9.12 Teller Seed Data
+
+- [ ] Add Teller test connection, accounts, and transactions to seed command
+- [ ] Provider = `'teller'`, fake enrollment IDs and encrypted tokens
+- **Files:** `internal/seed/seed.go`
+
+### 9.13 Settings & Setup: Teller Validation
+
+- [ ] Teller credential validation (attempt mTLS handshake to verify cert/key)
+- [ ] Settings page: editable `teller_app_id`, `teller_env`; display cert/key paths (read-only, env-var-only)
+- [ ] Setup wizard: optional Teller configuration alongside Plaid
+- **Files:** `internal/provider/teller/validate.go`, `internal/admin/settings.go`, `internal/admin/setup.go`, `internal/templates/pages/settings.html`
+
+### Sync Engine: Stale Pending Cleanup
+
+- [ ] After Teller sync completes, soft-delete pending transactions in the date window not returned by the API
+- [ ] Only pending transactions — posted transactions are never auto-deleted
+- [ ] Conditioned on `provider = 'teller'` (Plaid handles removals via its own cursor signals)
+- **Ref:** `teller-integration.md` Section 3.5
+- **Files:** `internal/sync/engine.go`
+
+### Task Dependencies
+
+```
+9.1 (HTTP client) ──> 9.2 (provider struct) ──> 9.3 (link flow)
+                                             ──> 9.4 (sync)
+                                             ──> 9.5 (balances)
+                                             ──> 9.6 (webhook)
+                                             ──> 9.7 (reauth)
+                                             ──> 9.8 (remove)
+
+9.9 (app init) depends on 9.2
+
+9.10 (UI) depends on 9.3 and 9.7
+
+9.11 (categories) independent, used by 9.4
+
+9.12 (seed) independent
+
+9.13 (settings) depends on 9.1 (for validation)
+```
+
+### Checkpoint 9
+
+Verify Teller works end-to-end alongside Plaid:
+
+1. `go build ./cmd/breadbox/` compiles cleanly
+2. `go vet ./...` passes
+3. Configure Teller sandbox credentials in `.local.env`, start server — log shows both providers initialized
+4. "Connect New Bank" page shows provider selector with Plaid and Teller options
+5. Select Teller, choose a family member — Teller Connect opens
+6. Complete Teller sandbox enrollment (`username`/`password`) — connection appears with provider "teller"
+7. Trigger "Sync Now" — Teller transactions sync into database
+8. Verify categories: Teller categories mapped to primary categories (e.g., `dining` → `FOOD_AND_DRINK`)
+9. REST API: `GET /api/v1/transactions` returns transactions from both Plaid and Teller connections
+10. Trigger a second Teller sync — no duplicate transactions (upsert working)
+11. Test Teller reconnection: set connection to `pending_reauth`, complete Teller Connect reauth
+12. Settings page shows functional Teller configuration section
+13. `breadbox seed` inserts both Plaid and Teller test data

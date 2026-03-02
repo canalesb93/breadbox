@@ -1,10 +1,10 @@
 # Breadbox
 
-Self-hosted financial data aggregation for families. Syncs bank data via Plaid, stores it in PostgreSQL, exposes it to AI agents via MCP and REST API.
+Self-hosted financial data aggregation for families. Syncs bank data via Plaid and Teller, stores it in PostgreSQL, exposes it to AI agents via MCP and REST API.
 
 ## Tech Stack
 
-Go 1.24+ single binary. PostgreSQL, chi/v5 router, pgx/v5 + sqlc, goose migrations, robfig/cron. Admin UI: Go html/template + Pico CSS. MCP: github.com/modelcontextprotocol/go-sdk (Streamable HTTP). Plaid: github.com/plaid/plaid-go.
+Go 1.24+ single binary. PostgreSQL, chi/v5 router, pgx/v5 + sqlc, goose migrations, robfig/cron. Admin UI: Go html/template + Pico CSS. MCP: github.com/modelcontextprotocol/go-sdk (Streamable HTTP). Plaid: github.com/plaid/plaid-go. Teller: hand-written HTTP client with mTLS (no SDK).
 
 ## Architecture
 
@@ -26,6 +26,13 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - MCP server (`internal/mcp/`): wraps service layer as 6 MCP tools. Streamable HTTP at `/mcp` (API key auth), stdio via `breadbox mcp-stdio` (no auth). Uses `github.com/modelcontextprotocol/go-sdk` v1.4.0. Tool handlers use typed input structs with `jsonschema` tags. Errors: `IsError: true` with `{"error": "..."}` text content.
 - Transaction queries use dynamic SQL with positional `$N` params (not sqlc) for composable filters + cursor pagination
 - API key format: `bb_` + base62 body (32 random bytes). Stored as SHA-256 hex hash. Prefix stored for display.
+- Multi-provider DB columns: `bank_connections` uses generic `external_id` + `encrypted_credentials` (not provider-specific column names). Unique constraint on `(provider, external_id)`.
+- Shared crypto: `internal/crypto/encrypt.go` — AES-256-GCM encrypt/decrypt used by all providers
+- Provider errors: `provider.ErrReauthRequired`, `provider.ErrSyncRetryable` — provider-agnostic sentinels in `internal/provider/errors.go`. Each provider wraps these.
+- Provider interface: `CreateReauthSession` and `RemoveConnection` accept a `Connection` struct (not a string ID) so providers can decrypt credentials internally.
+- Teller auth: mTLS (app-level cert/key files) + per-connection access token via HTTP Basic Auth. Config: `TELLER_APP_ID`, `TELLER_CERT_PATH`, `TELLER_KEY_PATH`, `TELLER_ENV`, `TELLER_WEBHOOK_SECRET`.
+- Teller sync: date-range polling with 10-day overlap (no cursor). After sync, auto soft-delete stale *pending* transactions not returned by the API. Posted transactions are never auto-deleted.
+- Teller amounts: sign is opposite to Plaid. Teller negative=debit, Plaid positive=debit. Provider negates amounts before returning.
 
 ## Canonical Enums
 
@@ -36,7 +43,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 
 ## Spec Documents
 
-Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Implementation order is in `docs/ROADMAP.md`.
+Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Teller-specific details are in `docs/teller-integration.md`. Implementation order is in `docs/ROADMAP.md`.
 
 ## Workflow Rules
 
