@@ -188,6 +188,12 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		}
 		modified = len(pendingModified)
 
+		// Clean up stale pending transactions for Teller connections.
+		if string(conn.Provider) == "teller" {
+			staleCount := e.cleanStalePending(ctx, connectionID, pendingAdded, previousCursor, logger)
+			removed += staleCount
+		}
+
 		// Commit cursor.
 		if err := e.db.UpdateBankConnectionCursor(ctx, db.UpdateBankConnectionCursorParams{
 			ID:         connectionID,
@@ -264,6 +270,66 @@ func (e *Engine) updateBalances(ctx context.Context, prov provider.Provider, con
 		}
 	}
 	return nil
+}
+
+// cleanStalePending soft-deletes pending transactions that were not returned by
+// the Teller API during this sync window. This handles the case where a pending
+// transaction disappears without posting (e.g., holds that expire).
+func (e *Engine) cleanStalePending(ctx context.Context, connectionID pgtype.UUID, addedTxns []provider.Transaction, previousCursor string, logger *slog.Logger) int {
+	// Calculate date window.
+	toDate := time.Now()
+	var fromDate time.Time
+	if previousCursor != "" {
+		t, err := time.Parse(time.RFC3339, previousCursor)
+		if err != nil {
+			logger.Error("parse previous cursor for stale cleanup", "cursor", previousCursor, "error", err)
+			return 0
+		}
+		fromDate = t.AddDate(0, 0, -10)
+	} else {
+		// Initial sync: look back 2 years.
+		fromDate = toDate.AddDate(-2, 0, 0)
+	}
+
+	// Collect ALL external_transaction_ids returned by the API (both pending and posted).
+	// Any transaction that was returned still exists and should not be deleted.
+	returnedIDs := make([]string, 0, len(addedTxns))
+	for _, txn := range addedTxns {
+		returnedIDs = append(returnedIDs, txn.ExternalID)
+	}
+
+	query := `
+		UPDATE transactions SET deleted_at = NOW()
+		WHERE account_id IN (SELECT id FROM accounts WHERE connection_id = $1)
+		  AND date >= $2
+		  AND date <= $3
+		  AND pending = true
+		  AND deleted_at IS NULL
+		  AND external_transaction_id != ALL($4)
+		RETURNING external_transaction_id`
+
+	rows, err := e.pool.Query(ctx, query, connectionID, fromDate, toDate, returnedIDs)
+	if err != nil {
+		logger.Error("clean stale pending transactions", "error", err)
+		return 0
+	}
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+		var externalID string
+		if err := rows.Scan(&externalID); err != nil {
+			logger.Error("scan stale pending transaction", "error", err)
+			continue
+		}
+		logger.Info("soft-deleted stale pending transaction", "external_transaction_id", externalID)
+		count++
+	}
+	if rows.Err() != nil {
+		logger.Error("iterate stale pending rows", "error", rows.Err())
+	}
+
+	return count
 }
 
 // resolveAccountID looks up or caches the internal account UUID for an external account ID.

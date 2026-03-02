@@ -6,7 +6,12 @@
     <header>Select Family Member</header>
     <p>Choose which family member this bank connection belongs to.</p>
     <form id="member-form">
-      <input type="hidden" id="provider" name="provider" value="plaid">
+      <label for="provider">Bank Provider</label>
+      <select id="provider" name="provider" required>
+        {{if .HasPlaid}}<option value="plaid">Plaid</option>{{end}}
+        {{if .HasTeller}}<option value="teller">Teller</option>{{end}}
+      </select>
+
       <label for="user_id">Family Member</label>
       <select id="user_id" name="user_id" required>
         <option value="" disabled selected>Select a member...</option>
@@ -60,6 +65,11 @@
       script.src = "https://cdn.plaid.com/link/v2/stable/link-initialize.js";
       script.onload = callback;
       document.head.appendChild(script);
+    } else if (provider === "teller" && typeof TellerConnect === "undefined") {
+      var script = document.createElement("script");
+      script.src = "https://cdn.teller.io/connect/connect.js";
+      script.onload = callback;
+      document.head.appendChild(script);
     } else {
       callback();
     }
@@ -98,17 +108,21 @@
     .then(function (res) { return res.json(); })
     .then(function (data) {
       if (data.link_token) {
-        initLink(data.link_token);
+        if (selectedProvider === "teller") {
+          initTellerConnect(data.link_token);
+        } else {
+          initPlaidLink(data.link_token);
+        }
       } else {
         showError(data.error || "Failed to initialize bank connection.");
       }
     })
     .catch(function () {
-      showError("Network error starting Plaid Link. Please try again.");
+      showError("Network error starting bank connection. Please try again.");
     });
   }
 
-  function initLink(token) {
+  function initPlaidLink(token) {
     var handler = Plaid.create({
       token: token,
       onSuccess: function (publicToken, metadata) {
@@ -122,7 +136,7 @@
             institution_id: metadata.institution.institution_id,
             institution_name: metadata.institution.name,
             accounts: metadata.accounts,
-            provider: selectedProvider
+            provider: "plaid"
           })
         })
         .then(function (res) { return res.json(); })
@@ -146,6 +160,49 @@
       }
     });
     handler.open();
+  }
+
+  function initTellerConnect(appId) {
+    var tellerConnect = TellerConnect.setup({
+      applicationId: appId,
+      environment: "{{.TellerEnv}}",
+      products: ["transactions", "balance"],
+      onSuccess: function(enrollment) {
+        showMessage("Saving connection...");
+        var publicToken = JSON.stringify({
+          access_token: enrollment.accessToken,
+          enrollment_id: enrollment.enrollment.id,
+          institution_name: enrollment.enrollment.institution.name
+        });
+        fetch("/admin/api/exchange-token", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            public_token: publicToken,
+            user_id: selectedUserId,
+            institution_id: enrollment.enrollment.institution.name,
+            institution_name: enrollment.enrollment.institution.name,
+            provider: "teller"
+          })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data.connection_id) {
+            window.location.href = "/admin/connections/" + data.connection_id;
+          } else {
+            showError(data.error || "An unknown error occurred.");
+          }
+        })
+        .catch(function() { showError("Network error. Please try again."); });
+      },
+      onExit: function() {
+        showMessage("Bank connection cancelled.");
+      },
+      onFailure: function(failure) {
+        showError("Teller Connect error: " + (failure.message || "Unknown error"));
+      }
+    });
+    tellerConnect.open();
   }
 
   retryBtn.addEventListener("click", startLink);

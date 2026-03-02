@@ -49,6 +49,30 @@ func Run(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 	}
 	logger.Info("seeded sync logs")
 
+	// 6. Teller bank connection
+	if _, err := tx.Exec(ctx, tellerConnectionSQL); err != nil {
+		return fmt.Errorf("seed teller connection: %w", err)
+	}
+	logger.Info("seeded teller connection")
+
+	// 7. Teller accounts
+	if _, err := tx.Exec(ctx, tellerAccountsSQL); err != nil {
+		return fmt.Errorf("seed teller accounts: %w", err)
+	}
+	logger.Info("seeded teller accounts")
+
+	// 8. Teller transactions
+	if _, err := tx.Exec(ctx, tellerTransactionsSQL); err != nil {
+		return fmt.Errorf("seed teller transactions: %w", err)
+	}
+	logger.Info("seeded teller transactions")
+
+	// 9. Teller sync log
+	if _, err := tx.Exec(ctx, tellerSyncLogSQL); err != nil {
+		return fmt.Errorf("seed teller sync log: %w", err)
+	}
+	logger.Info("seeded teller sync log")
+
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit transaction: %w", err)
 	}
@@ -150,5 +174,38 @@ const syncLogsSQL = `
 INSERT INTO sync_logs (id, connection_id, "trigger", status, added_count, modified_count, removed_count, started_at, completed_at) VALUES
   ('00000000-0000-0000-0000-000000000031', '00000000-0000-0000-0000-000000000011', 'initial', 'success', 19, 0, 0, NOW() - INTERVAL '1 hour', NOW() - INTERVAL '59 minutes'),
   ('00000000-0000-0000-0000-000000000032', '00000000-0000-0000-0000-000000000012', 'initial', 'success', 17, 0, 0, NOW() - INTERVAL '1 hour', NOW() - INTERVAL '58 minutes')
+ON CONFLICT (id) DO NOTHING;
+`
+
+const tellerConnectionSQL = `
+INSERT INTO bank_connections (id, user_id, provider, institution_name, external_id, encrypted_credentials, status, sync_cursor) VALUES
+  ('00000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000001', 'teller', 'Wells Fargo', 'enr_seed_teller_1', 'seed_encrypted_teller_token_1', 'active', TO_CHAR(NOW(), 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
+ON CONFLICT (id) DO NOTHING;
+`
+
+const tellerAccountsSQL = `
+INSERT INTO accounts (id, connection_id, external_account_id, name, type, subtype, mask, balance_current, balance_available, balance_limit, iso_currency_code) VALUES
+  ('00000000-0000-0000-0000-000000000025', '00000000-0000-0000-0000-000000000013', 'seed_acct_t1', 'Wells Fargo Checking', 'depository', 'checking', '5678', 7500.00, 7200.00, NULL, 'USD'),
+  ('00000000-0000-0000-0000-000000000026', '00000000-0000-0000-0000-000000000013', 'seed_acct_t2', 'Wells Fargo Savings',  'depository', 'savings',  '9012', 22000.00, 22000.00, NULL, 'USD')
+ON CONFLICT (id) DO NOTHING;
+`
+
+const tellerTransactionsSQL = `
+INSERT INTO transactions (account_id, external_transaction_id, amount, iso_currency_code, date, name, merchant_name, category_primary, category_detailed, payment_channel, pending) VALUES
+  -- Alice / Wells Fargo Checking (seed_acct_t1)
+  ('00000000-0000-0000-0000-000000000025', 'seed_txn_t01', 12.50,   'USD', CURRENT_DATE - INTERVAL '1 day',  'Taco Bell',              'Taco Bell',      'FOOD_AND_DRINK',  NULL, 'other', false),
+  ('00000000-0000-0000-0000-000000000025', 'seed_txn_t02', 45.00,   'USD', CURRENT_DATE - INTERVAL '3 days', 'Chevron Gas',            'Chevron',        'TRANSPORTATION',  NULL, 'other', false),
+  ('00000000-0000-0000-0000-000000000025', 'seed_txn_t03', -2500.00,'USD', CURRENT_DATE - INTERVAL '5 days', 'Payroll Direct Deposit', NULL,             'INCOME',          NULL, 'other', false),
+  ('00000000-0000-0000-0000-000000000025', 'seed_txn_t04', 8.75,    'USD', CURRENT_DATE,                     'Panda Express',          'Panda Express',  'FOOD_AND_DRINK',  NULL, 'other', true),
+
+  -- Alice / Wells Fargo Savings (seed_acct_t2)
+  ('00000000-0000-0000-0000-000000000026', 'seed_txn_t05', -300.00, 'USD', CURRENT_DATE - INTERVAL '2 days', 'Transfer from Checking', NULL,             'TRANSFER_IN',     NULL, 'other', false),
+  ('00000000-0000-0000-0000-000000000026', 'seed_txn_t06', 0.18,    'USD', CURRENT_DATE - INTERVAL '30 days','Interest Payment',       NULL,             'INCOME',          NULL, 'other', false)
+ON CONFLICT (external_transaction_id) DO NOTHING;
+`
+
+const tellerSyncLogSQL = `
+INSERT INTO sync_logs (id, connection_id, "trigger", status, added_count, modified_count, removed_count, started_at, completed_at) VALUES
+  ('00000000-0000-0000-0000-000000000033', '00000000-0000-0000-0000-000000000013', 'initial', 'success', 6, 0, 0, NOW() - INTERVAL '30 minutes', NOW() - INTERVAL '29 minutes')
 ON CONFLICT (id) DO NOTHING;
 `

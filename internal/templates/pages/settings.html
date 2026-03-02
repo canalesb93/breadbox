@@ -63,6 +63,10 @@
       <dd><code>{{.TellerAppID}}</code></dd>
       <dt>Environment</dt>
       <dd>{{.TellerEnv}}</dd>
+      <dt>Certificate</dt>
+      <dd>{{if .TellerCertConfigured}}Configured{{else}}Not configured{{end}}</dd>
+      <dt>Webhook Secret</dt>
+      <dd>{{if .TellerWebhookConfigured}}Configured{{else}}Not configured{{end}}</dd>
     </dl>
     {{else}}
     <p>Teller not configured. Set <code>TELLER_APP_ID</code>, <code>TELLER_CERT_PATH</code>, <code>TELLER_KEY_PATH</code> environment variables to enable.</p>

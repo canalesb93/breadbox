@@ -1,5 +1,9 @@
 {{define "content"}}
+{{if eq (printf "%s" .Connection.Provider) "plaid"}}
 <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+{{else if eq (printf "%s" .Connection.Provider) "teller"}}
+<script src="https://cdn.teller.io/connect/connect.js"></script>
+{{end}}
 <p><a href="/admin/connections/{{.ConnID}}">&larr; Back to {{.Connection.InstitutionName.String}}</a></p>
 
 <h1>Re-authenticate {{.Connection.InstitutionName.String}}</h1>
@@ -13,6 +17,7 @@
 <script>
 (function () {
   var connId = "{{.ConnID}}";
+  var provider = "{{printf "%s" .Connection.Provider}}";
   var linkStatus = document.getElementById("link-status");
   var retryBtn = document.getElementById("retry-btn");
 
@@ -39,7 +44,11 @@
     .then(function (res) { return res.json(); })
     .then(function (data) {
       if (data.link_token) {
-        initLink(data.link_token);
+        if (provider === "teller") {
+          initTellerReauth(data.link_token);
+        } else {
+          initPlaidReauth(data.link_token);
+        }
       } else {
         showError(data.error || "Failed to initialize re-authentication.");
       }
@@ -49,7 +58,7 @@
     });
   }
 
-  function initLink(token) {
+  function initPlaidReauth(token) {
     var handler = Plaid.create({
       token: token,
       onSuccess: function (publicToken, metadata) {
@@ -80,6 +89,34 @@
       }
     });
     handler.open();
+  }
+
+  function initTellerReauth(enrollmentId) {
+    var tellerConnect = TellerConnect.setup({
+      applicationId: "{{.TellerAppID}}",
+      enrollmentId: enrollmentId,
+      environment: "{{.TellerEnv}}",
+      onSuccess: function(enrollment) {
+        showMessage("Completing re-authentication...");
+        fetch("/admin/api/connections/" + connId + "/reauth-complete", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"}
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data.status === "active") {
+            window.location.href = "/admin/connections/" + connId;
+          } else {
+            showError(data.error || "Re-authentication failed.");
+          }
+        })
+        .catch(function() { showError("Network error. Please try again."); });
+      },
+      onExit: function() {
+        showMessage("Re-authentication cancelled.");
+      }
+    });
+    tellerConnect.open();
   }
 
   retryBtn.addEventListener("click", startReauth);

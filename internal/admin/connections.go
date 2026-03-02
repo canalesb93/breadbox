@@ -53,6 +53,9 @@ func NewConnectionHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			"CurrentPage": "connections",
 			"Users":       users,
 			"CSRFToken":   GetCSRFToken(r),
+			"HasPlaid":    a.Providers["plaid"] != nil,
+			"HasTeller":   a.Providers["teller"] != nil,
+			"TellerEnv":   a.Config.TellerEnv,
 		}
 		tr.Render(w, r, "connection_new.html", data)
 	}
@@ -286,6 +289,8 @@ func ConnectionReauthHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 			"Connection":  conn,
 			"ConnID":      idStr,
 			"CSRFToken":   GetCSRFToken(r),
+			"TellerAppID": a.Config.TellerAppID,
+			"TellerEnv":   a.Config.TellerEnv,
 		}
 		tr.Render(w, r, "connection_reauth.html", data)
 	}
