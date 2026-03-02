@@ -26,3 +26,18 @@ WHERE external_account_id = $1;
 
 -- name: GetAccountIDByExternalAccountID :one
 SELECT id FROM accounts WHERE external_account_id = $1;
+
+-- name: ListAccounts :many
+SELECT a.*, bc.institution_name, bc.user_id
+FROM accounts a LEFT JOIN bank_connections bc ON a.connection_id = bc.id
+ORDER BY bc.institution_name, a.name;
+
+-- name: ListAccountsByUser :many
+SELECT a.*, bc.institution_name, bc.user_id
+FROM accounts a JOIN bank_connections bc ON a.connection_id = bc.id
+WHERE bc.user_id = $1 ORDER BY bc.institution_name, a.name;
+
+-- name: GetAccount :one
+SELECT a.*, bc.institution_name, bc.user_id
+FROM accounts a LEFT JOIN bank_connections bc ON a.connection_id = bc.id
+WHERE a.id = $1;

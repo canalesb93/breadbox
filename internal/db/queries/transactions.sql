@@ -33,3 +33,6 @@ RETURNING *;
 
 -- name: SoftDeleteTransactionByExternalID :exec
 UPDATE transactions SET deleted_at = NOW() WHERE external_transaction_id = $1 AND deleted_at IS NULL;
+
+-- name: GetTransaction :one
+SELECT * FROM transactions WHERE id = $1 AND deleted_at IS NULL;

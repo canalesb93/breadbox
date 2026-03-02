@@ -1,0 +1,119 @@
+package service
+
+import "time"
+
+type AccountResponse struct {
+	ID                string   `json:"id"`
+	ConnectionID      *string  `json:"connection_id"`
+	UserID            *string  `json:"user_id"`
+	InstitutionName   *string  `json:"institution_name"`
+	Name              string   `json:"name"`
+	OfficialName      *string  `json:"official_name"`
+	Type              string   `json:"type"`
+	Subtype           *string  `json:"subtype"`
+	Mask              *string  `json:"mask"`
+	BalanceCurrent    *float64 `json:"balance_current"`
+	BalanceAvailable  *float64 `json:"balance_available"`
+	BalanceLimit      *float64 `json:"balance_limit"`
+	IsoCurrencyCode   *string  `json:"iso_currency_code"`
+	LastBalanceUpdate *string  `json:"last_balance_update"`
+	CreatedAt         string   `json:"created_at"`
+	UpdatedAt         string   `json:"updated_at"`
+}
+
+type TransactionResponse struct {
+	ID                 string   `json:"id"`
+	AccountID          *string  `json:"account_id"`
+	Amount             float64  `json:"amount"`
+	IsoCurrencyCode    *string  `json:"iso_currency_code"`
+	Date               string   `json:"date"`
+	AuthorizedDate     *string  `json:"authorized_date"`
+	Datetime           *string  `json:"datetime"`
+	AuthorizedDatetime *string  `json:"authorized_datetime"`
+	Name               string   `json:"name"`
+	MerchantName       *string  `json:"merchant_name"`
+	CategoryPrimary    *string  `json:"category_primary"`
+	CategoryDetailed   *string  `json:"category_detailed"`
+	CategoryConfidence *string  `json:"category_confidence"`
+	PaymentChannel     *string  `json:"payment_channel"`
+	Pending            bool     `json:"pending"`
+	CreatedAt          string   `json:"created_at"`
+	UpdatedAt          string   `json:"updated_at"`
+}
+
+type TransactionListResult struct {
+	Transactions []TransactionResponse `json:"transactions"`
+	NextCursor   string                `json:"next_cursor,omitempty"`
+	HasMore      bool                  `json:"has_more"`
+	Limit        int                   `json:"limit"`
+}
+
+type TransactionListParams struct {
+	Cursor    string
+	Limit     int
+	StartDate *time.Time
+	EndDate   *time.Time
+	AccountID *string
+	UserID    *string
+	Category  *string
+	MinAmount *float64
+	MaxAmount *float64
+	Pending   *bool
+	Search    *string
+}
+
+type UserResponse struct {
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	Email     *string `json:"email"`
+	CreatedAt string  `json:"created_at"`
+	UpdatedAt string  `json:"updated_at"`
+}
+
+type ConnectionResponse struct {
+	ID              string  `json:"id"`
+	UserID          *string `json:"user_id"`
+	UserName        *string `json:"user_name"`
+	Provider        string  `json:"provider"`
+	InstitutionID   *string `json:"institution_id"`
+	InstitutionName *string `json:"institution_name"`
+	Status          string  `json:"status"`
+	ErrorCode       *string `json:"error_code"`
+	ErrorMessage    *string `json:"error_message"`
+	LastSyncedAt    *string `json:"last_synced_at"`
+	CreatedAt       string  `json:"created_at"`
+	UpdatedAt       string  `json:"updated_at"`
+}
+
+type ConnectionStatusResponse struct {
+	ConnectionResponse
+	LastAttemptedSyncAt *string          `json:"last_attempted_sync_at"`
+	LastSyncLog         *SyncLogResponse `json:"last_sync_log"`
+}
+
+type SyncLogResponse struct {
+	ID            string  `json:"id"`
+	ConnectionID  string  `json:"connection_id"`
+	Trigger       string  `json:"trigger"`
+	Status        string  `json:"status"`
+	AddedCount    int32   `json:"added_count"`
+	ModifiedCount int32   `json:"modified_count"`
+	RemovedCount  int32   `json:"removed_count"`
+	ErrorMessage  *string `json:"error_message"`
+	StartedAt     *string `json:"started_at"`
+	CompletedAt   *string `json:"completed_at"`
+}
+
+type APIKeyResponse struct {
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	KeyPrefix  string  `json:"key_prefix"`
+	LastUsedAt *string `json:"last_used_at"`
+	RevokedAt  *string `json:"revoked_at"`
+	CreatedAt  string  `json:"created_at"`
+}
+
+type CreateAPIKeyResult struct {
+	APIKeyResponse
+	PlaintextKey string `json:"plaintext_key"`
+}

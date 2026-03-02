@@ -2,6 +2,7 @@ package admin
 
 import (
 	"breadbox/internal/app"
+	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -10,7 +11,7 @@ import (
 // NewAdminRouter creates the chi.Router for all admin dashboard routes.
 // It includes unauthenticated routes (login, setup) and authenticated routes
 // (dashboard, connections, users, admin API).
-func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) chi.Router {
+func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) chi.Router {
 	r := chi.NewRouter()
 
 	// Session middleware wraps everything so session data is available.
@@ -60,6 +61,14 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) ch
 			r.Get("/new", NewUserHandler(a, tr))
 			r.Get("/{id}/edit", EditUserHandler(a, tr))
 		})
+
+		r.Route("/api-keys", func(r chi.Router) {
+			r.Get("/", APIKeysListPageHandler(svc, sm, tr))
+			r.Get("/new", APIKeyNewPageHandler(tr))
+			r.Post("/new", APIKeyCreatePageHandler(svc, sm, tr))
+			r.Get("/{id}/created", APIKeyCreatedPageHandler(sm, tr))
+			r.Post("/{id}/revoke", APIKeyRevokePageHandler(svc, sm))
+		})
 	})
 
 	// Admin API (authenticated, JSON responses).
@@ -74,6 +83,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) ch
 		r.Delete("/connections/{id}", DeleteConnectionHandler(a))
 		r.Post("/users", CreateUserHandler(a))
 		r.Put("/users/{id}", UpdateUserHandler(a))
+
+		r.Get("/api-keys", ListAPIKeysHandler(svc))
+		r.Post("/api-keys", CreateAPIKeyHandler(svc))
+		r.Delete("/api-keys/{id}", RevokeAPIKeyHandler(svc))
 	})
 
 	return r

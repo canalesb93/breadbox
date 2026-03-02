@@ -9,6 +9,7 @@ import (
 	"breadbox/internal/db"
 	"breadbox/internal/provider"
 	plaidprovider "breadbox/internal/provider/plaid"
+	"breadbox/internal/service"
 	"breadbox/internal/sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,6 +24,7 @@ type App struct {
 	Logger     *slog.Logger
 	Providers  map[string]provider.Provider
 	SyncEngine *sync.Engine
+	Service    *service.Service
 }
 
 // New creates a new App. It connects to the database, creates a Queries
@@ -50,6 +52,7 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 	}
 
 	syncEngine := sync.NewEngine(queries, pool, providers, logger)
+	svc := service.New(queries, pool, syncEngine, logger)
 
 	return &App{
 		DB:         pool,
@@ -58,5 +61,6 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 		Logger:     logger,
 		Providers:  providers,
 		SyncEngine: syncEngine,
+		Service:    svc,
 	}, nil
 }

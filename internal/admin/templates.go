@@ -100,6 +100,9 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/connection_reauth.html",
 		"pages/users.html",
 		"pages/user_form.html",
+		"pages/api_keys.html",
+		"pages/api_key_new.html",
+		"pages/api_key_created.html",
 	}
 
 	// Pages using the wizard layout (setup wizard + login).

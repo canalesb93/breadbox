@@ -1,0 +1,15 @@
+{{define "content"}}
+<h1>Create API Key</h1>
+<form method="POST" action="/admin/api-keys/new">
+  <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+  <label>
+    Name
+    <input type="text" name="name" placeholder="e.g., Claude MCP, Dashboard" required autofocus>
+  </label>
+  <small>A descriptive name to identify this API key.</small>
+  <div style="margin-top: 1.5rem;">
+    <button type="submit">Create API Key</button>
+    <a href="/admin/api-keys" role="button" class="secondary outline" style="margin-left: 0.5rem;">Cancel</a>
+  </div>
+</form>
+{{end}}

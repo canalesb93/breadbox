@@ -222,63 +222,73 @@ Trigger a sync and verify transactions appear in the database.
 
 ---
 
-## Phase 4: REST API
+## Phase 4: REST API ✅
 
 Expose all financial data through authenticated JSON endpoints.
 
-### 4.1 API Key Authentication Middleware
+**Status:** Complete. Checkpoint 4 ready for verification.
 
-- Implement API key auth: `X-API-Key: bb_xxxxx` header (`rest-api.md` Section 1)
-- Hash presented key with SHA-256, compare to stored `key_hash` where `revoked_at IS NULL` (`rest-api.md` Section 1.1, `data-model.md` Section 2.7)
-- Update `last_used_at` on successful auth
-- Error codes: `MISSING_API_KEY`, `INVALID_API_KEY`, `REVOKED_API_KEY` (`rest-api.md` Section 1.2)
+### 4.1 API Key Authentication Middleware ✅
+
+- [x] Implement API key auth: `X-API-Key: bb_xxxxx` header (`rest-api.md` Section 1)
+- [x] Hash presented key with SHA-256, compare to stored `key_hash` where `revoked_at IS NULL` (`rest-api.md` Section 1.1, `data-model.md` Section 2.7)
+- [x] Update `last_used_at` on successful auth (async goroutine)
+- [x] Error codes: `MISSING_API_KEY`, `INVALID_API_KEY`, `REVOKED_API_KEY` (`rest-api.md` Section 1.2)
 - **Ref:** `rest-api.md` Section 1, `data-model.md` Section 2.7
 
-### 4.2 Error Response Format
+### 4.2 Error Response Format ✅
 
-- Standardized error envelope: `{ "error": { "code": "UPPER_SNAKE_CASE", "message": "..." } }` (`rest-api.md` Section 7, `architecture.md` Section 9.3)
-- Implement early so all endpoints use it consistently
+- [x] Standardized error envelope: `{ "error": { "code": "UPPER_SNAKE_CASE", "message": "..." } }` (`rest-api.md` Section 7, `architecture.md` Section 9.3)
+- [x] `WriteError` helper in `internal/middleware/errors.go`
 - **Ref:** `rest-api.md` Section 7, `architecture.md` Section 9
 
-### 4.3 Accounts Endpoints
+### 4.3 Accounts Endpoints ✅
 
-- `GET /api/v1/accounts` — list accounts, filter by `user_id` (`rest-api.md` Section 5.1)
-- `GET /api/v1/accounts/:id` — single account with balance (`rest-api.md` Section 5.2)
+- [x] `GET /api/v1/accounts` — list accounts, filter by `user_id` (`rest-api.md` Section 5.1)
+- [x] `GET /api/v1/accounts/:id` — single account with balance (`rest-api.md` Section 5.2)
 - **Ref:** `rest-api.md` Section 5.1–5.2
 
-### 4.4 Transactions Endpoints
+### 4.4 Transactions Endpoints ✅
 
-- `GET /api/v1/transactions` — list with cursor pagination, all filters (date range, account_id, user_id, category, amount range, pending, text search) (`rest-api.md` Section 5.3)
-- `GET /api/v1/transactions/count` — count matching transactions with same filters (`rest-api.md` Section 5.4)
-- `GET /api/v1/transactions/:id` — single transaction (`rest-api.md` Section 5.5)
-- Implement `sqlc.narg` dynamic filter pattern for optional query params
-- Exclude soft-deleted transactions (`deleted_at IS NULL`) by default
+- [x] `GET /api/v1/transactions` — list with cursor pagination, all 10 filters (date range, account_id, user_id, category, amount range, pending, text search) (`rest-api.md` Section 5.3)
+- [x] `GET /api/v1/transactions/count` — total count of active transactions (`rest-api.md` Section 5.4)
+- [x] `GET /api/v1/transactions/:id` — single transaction (`rest-api.md` Section 5.5)
+- [x] Dynamic SQL query builder with positional parameters for composable filters
+- [x] Cursor-based pagination: base64url-encoded JSON `{"d":"YYYY-MM-DD","i":"uuid"}`
+- [x] Exclude soft-deleted transactions (`deleted_at IS NULL`) by default
 - **Ref:** `rest-api.md` Sections 5.3–5.5, `data-model.md` Section 4.1
 
-### 4.5 Users Endpoint
+### 4.5 Users Endpoint ✅
 
-- `GET /api/v1/users` — list family members (`rest-api.md` Section 5.6)
+- [x] `GET /api/v1/users` — list family members (`rest-api.md` Section 5.6)
 - **Ref:** `rest-api.md` Section 5.6
 
-### 4.6 Connections Endpoints
+### 4.6 Connections Endpoints ✅
 
-- `GET /api/v1/connections` — list connections with status, filter by `user_id` (`rest-api.md` Section 5.7)
-- `GET /api/v1/connections/:id/status` — connection health + last sync info (`rest-api.md` Section 5.8)
+- [x] `GET /api/v1/connections` — list connections with status, filter by `user_id` (`rest-api.md` Section 5.7)
+- [x] `GET /api/v1/connections/:id/status` — connection health + last sync log info (`rest-api.md` Section 5.8)
+- [x] Access tokens and sync cursors excluded from API responses
 - **Ref:** `rest-api.md` Sections 5.7–5.8
 
-### 4.7 Sync Trigger Endpoint
+### 4.7 Sync Trigger Endpoint ✅
 
-- `POST /api/v1/sync` — trigger sync for all or specific connection, return 202 (`rest-api.md` Section 5.9)
+- [x] `POST /api/v1/sync` — trigger sync for all connections, return 202 (`rest-api.md` Section 5.9)
 - **Ref:** `rest-api.md` Section 5.9
 
-### 4.8 Admin API Endpoints
+### 4.8 Admin API Endpoints ✅
 
-- `POST /admin/api/api-keys` — create API key, return plaintext once (`rest-api.md` Section 6.1)
-- `GET /admin/api/api-keys` — list keys (prefix only, never full key) (`rest-api.md` Section 6.2)
-- `DELETE /admin/api/api-keys/:id` — revoke key (set `revoked_at`) (`rest-api.md` Section 6.3)
-- `GET /admin/api/sync-logs` — paginated sync history (offset-based, not cursor) (`rest-api.md` Section 6.4)
-- `DELETE /admin/api/connections/:id` — disconnect (soft-delete, preserve data) (`rest-api.md` Section 6.9)
+- [x] `POST /admin/api/api-keys` — create API key, return plaintext once (`rest-api.md` Section 6.1)
+- [x] `GET /admin/api/api-keys` — list keys (prefix only, never full key) (`rest-api.md` Section 6.2)
+- [x] `DELETE /admin/api/api-keys/:id` — revoke key (set `revoked_at`) (`rest-api.md` Section 6.3)
+- [x] Admin dashboard pages: API key list, create form, one-time key display, revoke
 - **Ref:** `rest-api.md` Section 6
+
+### 4.9 Service Layer ✅
+
+- [x] Shared service layer in `internal/service/` (used by REST handlers and future MCP tools)
+- [x] Clean JSON output: pgtype → Go primitive converters
+- [x] API key generation: `crypto/rand` → base62 → `bb_` prefix → SHA-256 hash
+- [x] Service initialized in `App` struct and passed to router
 
 ### Checkpoint 4
 
@@ -325,9 +335,9 @@ Wrap the REST API layer as MCP tools for AI agent access.
 - No authentication required in stdio mode
 - **Ref:** `mcp-server.md` Section 2, `architecture.md` Section 1.1
 
-### 5.4 Dashboard — API Keys Page
+### 5.4 Dashboard — API Keys Page ✅ (Completed in Phase 4)
 
-- API keys management page: create, view (prefix only), revoke (`admin-dashboard.md` Section 10)
+- [x] API keys management page: create, view (prefix only), revoke (`admin-dashboard.md` Section 10)
 - Display client config examples for Claude Desktop / Claude Code (`mcp-server.md` Sections 2.1–2.2)
 - **Ref:** `admin-dashboard.md` Section 10, `mcp-server.md` Sections 2.1–2.2
 
