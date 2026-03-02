@@ -95,7 +95,9 @@ type WebhookPayload struct {
 }
 
 type WebhookEvent struct {
-	Type         string // "sync_available", "connection_error", "connection_removed", "unknown"
-	ConnectionID string
-	ErrorCode    *string
+	Type                  string // "sync_available", "connection_error", "pending_expiration", "new_accounts", "unknown"
+	ConnectionID          string
+	ErrorCode             *string
+	ErrorMessage          *string
+	ConsentExpirationTime *string
 }

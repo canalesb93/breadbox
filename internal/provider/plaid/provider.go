@@ -2,8 +2,8 @@ package plaid
 
 import (
 	"context"
-	"errors"
 	"log/slog"
+	"sync"
 
 	"breadbox/internal/provider"
 
@@ -19,6 +19,7 @@ type PlaidProvider struct {
 	encryptionKey []byte
 	webhookURL    string
 	logger        *slog.Logger
+	jwkCache      sync.Map // kid -> *ecdsa.PublicKey
 }
 
 // NewProvider creates a new PlaidProvider.
@@ -31,7 +32,7 @@ func NewProvider(client *plaidgo.APIClient, encryptionKey []byte, webhookURL str
 	}
 }
 
-// HandleWebhook is not yet implemented (Phase 6).
-func (p *PlaidProvider) HandleWebhook(_ context.Context, _ provider.WebhookPayload) (provider.WebhookEvent, error) {
-	return provider.WebhookEvent{}, errors.New("HandleWebhook not implemented")
+// HandleWebhook verifies and parses an inbound Plaid webhook.
+func (p *PlaidProvider) HandleWebhook(ctx context.Context, payload provider.WebhookPayload) (provider.WebhookEvent, error) {
+	return p.handleWebhook(ctx, payload)
 }

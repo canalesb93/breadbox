@@ -129,3 +129,33 @@ type CreateAPIKeyResult struct {
 	APIKeyResponse
 	PlaintextKey string `json:"plaintext_key"`
 }
+
+type SyncLogListParams struct {
+	Page         int
+	PageSize     int
+	ConnectionID *string
+	Status       *string
+}
+
+type SyncLogListResult struct {
+	Logs       []SyncLogRow
+	Total      int64
+	Page       int
+	PageSize   int
+	TotalPages int
+}
+
+type SyncLogRow struct {
+	ID              string
+	ConnectionID    string
+	InstitutionName string
+	Trigger         string
+	Status          string
+	AddedCount      int32
+	ModifiedCount   int32
+	RemovedCount    int32
+	ErrorMessage    *string
+	StartedAt       *string
+	CompletedAt     *string
+	Duration        *string
+}

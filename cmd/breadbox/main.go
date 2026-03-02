@@ -17,6 +17,7 @@ import (
 	breadboxmcp "breadbox/internal/mcp"
 	"breadbox/internal/seed"
 	"breadbox/internal/service"
+	"breadbox/internal/sync"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -101,6 +102,14 @@ func runServe() error {
 		logger.Warn("failed to load app_config", "error", err)
 	}
 
+	// Create and start the cron scheduler.
+	scheduler := sync.NewScheduler(a.SyncEngine, logger)
+	scheduler.Start(cfg.SyncIntervalMinutes)
+	a.Scheduler = scheduler
+
+	// Run startup sync for stale connections in background.
+	go scheduler.RunStartupSync(ctx, a.Queries, cfg.SyncIntervalMinutes)
+
 	router := api.NewRouter(a, version)
 
 	srv := &http.Server{
@@ -122,6 +131,7 @@ func runServe() error {
 		if err := srv.Shutdown(shutdownCtx); err != nil {
 			logger.Error("http server shutdown error", "error", err)
 		}
+		scheduler.Stop()
 		cancel()
 	}()
 

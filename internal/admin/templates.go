@@ -103,6 +103,8 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/api_keys.html",
 		"pages/api_key_new.html",
 		"pages/api_key_created.html",
+		"pages/sync_logs.html",
+		"pages/settings.html",
 	}
 
 	// Pages using the wizard layout (setup wizard + login).

@@ -63,3 +63,9 @@ SELECT bc.id, bc.user_id, bc.provider, bc.institution_id, bc.institution_name,
        bc.created_at, bc.updated_at, u.name as user_name
 FROM bank_connections bc LEFT JOIN users u ON bc.user_id = u.id
 WHERE bc.id = $1;
+
+-- name: UpdateConnectionNewAccounts :exec
+UPDATE bank_connections SET new_accounts_available = $2, updated_at = NOW() WHERE id = $1;
+
+-- name: UpdateConnectionConsentExpiration :exec
+UPDATE bank_connections SET consent_expiration_time = $2, status = 'pending_reauth', updated_at = NOW() WHERE id = $1;

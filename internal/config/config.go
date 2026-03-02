@@ -14,7 +14,7 @@ type Config struct {
 	PlaidEnv      string // "sandbox" | "development" | "production"
 
 	// From app_config table only
-	SyncIntervalHours int
-	WebhookURL        string
-	SetupComplete     bool
+	SyncIntervalMinutes int
+	WebhookURL          string
+	SetupComplete       bool
 }

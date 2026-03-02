@@ -25,6 +25,7 @@ type App struct {
 	Providers  map[string]provider.Provider
 	SyncEngine *sync.Engine
 	Service    *service.Service
+	Scheduler  *sync.Scheduler
 }
 
 // New creates a new App. It connects to the database, creates a Queries

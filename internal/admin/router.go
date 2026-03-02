@@ -69,6 +69,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Get("/{id}/created", APIKeyCreatedPageHandler(sm, tr))
 			r.Post("/{id}/revoke", APIKeyRevokePageHandler(svc, sm))
 		})
+
+		r.Get("/sync-logs", SyncLogsHandler(a, sm, tr, svc))
+		r.Get("/settings", SettingsGetHandler(a, sm, tr))
+		r.Post("/settings", SettingsPostHandler(a, sm, tr, svc))
 	})
 
 	// Admin API (authenticated, JSON responses).

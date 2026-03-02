@@ -1,0 +1,61 @@
+{{define "content"}}
+<h1>Settings</h1>
+
+<form method="POST" action="/admin/settings">
+  <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+
+  <article>
+    <header><strong>Sync Settings</strong></header>
+
+    <label for="sync_interval_minutes">Sync Interval</label>
+    <select id="sync_interval_minutes" name="sync_interval_minutes">
+      <option value="15"{{if eq .SyncIntervalMinutes 15}} selected{{end}}>Every 15 minutes</option>
+      <option value="30"{{if eq .SyncIntervalMinutes 30}} selected{{end}}>Every 30 minutes</option>
+      <option value="60"{{if eq .SyncIntervalMinutes 60}} selected{{end}}>Every hour</option>
+      <option value="240"{{if eq .SyncIntervalMinutes 240}} selected{{end}}>Every 4 hours</option>
+      <option value="480"{{if eq .SyncIntervalMinutes 480}} selected{{end}}>Every 8 hours</option>
+      <option value="720"{{if eq .SyncIntervalMinutes 720}} selected{{end}}>Every 12 hours</option>
+      <option value="1440"{{if eq .SyncIntervalMinutes 1440}} selected{{end}}>Every 24 hours</option>
+    </select>
+
+    <label for="webhook_url">Webhook URL</label>
+    <input type="url" id="webhook_url" name="webhook_url" value="{{.WebhookURL}}" placeholder="https://example.com/webhooks/plaid">
+    <small>Plaid will send transaction updates to this URL. Must use HTTPS. Leave empty to disable.</small>
+  </article>
+
+  <article>
+    <header><strong>Plaid Credentials</strong></header>
+
+    {{if .PlaidFromEnv}}
+    <p>Plaid credentials are configured via environment variables and cannot be changed here.</p>
+    <dl>
+      <dt>Environment</dt>
+      <dd>{{.PlaidEnv}}</dd>
+      <dt>Client ID</dt>
+      <dd><code>{{.PlaidClientID}}</code></dd>
+      <dt>Secret</dt>
+      <dd><code>********</code></dd>
+    </dl>
+    {{else}}
+    <label for="plaid_client_id">Client ID</label>
+    <input type="text" id="plaid_client_id" name="plaid_client_id" value="{{.PlaidClientID}}" placeholder="Plaid Client ID">
+
+    <label for="plaid_secret">Secret</label>
+    <input type="password" id="plaid_secret" name="plaid_secret" value="{{.PlaidSecret}}" placeholder="Plaid Secret">
+
+    <label for="plaid_env">Environment</label>
+    <select id="plaid_env" name="plaid_env">
+      <option value="sandbox"{{if eq .PlaidEnv "sandbox"}} selected{{end}}>Sandbox</option>
+      <option value="development"{{if eq .PlaidEnv "development"}} selected{{end}}>Development</option>
+      <option value="production"{{if eq .PlaidEnv "production"}} selected{{end}}>Production</option>
+    </select>
+    <small>Credentials will be validated before saving.</small>
+    {{end}}
+  </article>
+
+  <button type="submit">Save Settings</button>
+</form>
+
+<hr>
+<p><a href="/admin/setup/step/1">Re-run Setup Wizard</a></p>
+{{end}}

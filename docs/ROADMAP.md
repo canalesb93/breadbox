@@ -373,45 +373,58 @@ Connect Claude Desktop or Claude Code to Breadbox and run a query.
 
 ---
 
-## Phase 6: Automated Sync + Webhooks
+## Phase 6: Automated Sync + Webhooks ✅
 
 Make sync automatic and handle Plaid callbacks.
 
-### 6.1 Cron Scheduling
+**Status:** Complete. `go build` and `go vet` pass clean.
 
-- Integrate `robfig/cron/v3` for periodic sync (`architecture.md` Section 2)
-- Read interval from `sync_interval_hours` config (default 12h) (`data-model.md` Section 2.8)
-- Sync all active connections on each cron tick
-- Startup sync: on server start, sync any connections whose `last_synced_at` is older than the configured interval (`plaid-integration.md` Section 7.4)
+### 6.1 Cron Scheduling ✅
+
+- [x] Integrated `robfig/cron/v3` for periodic sync (`architecture.md` Section 2)
+- [x] Reads interval from `sync_interval_hours` config (default 12h) (`data-model.md` Section 2.8)
+- [x] Syncs all active connections on each cron tick via `SyncAll` with `SyncTriggerCron`
+- [x] Startup sync: on server start, syncs any connections whose `last_synced_at` is older than the configured interval (`plaid-integration.md` Section 7.4)
+- [x] Scheduler struct in `internal/sync/scheduler.go` with `Start`, `Stop`, `RunStartupSync` methods
 - **Ref:** `plaid-integration.md` Sections 5.2, 7.4, `architecture.md` Section 2
 
-### 6.2 Webhook Handler
+### 6.2 Webhook Handler ✅
 
-- Implement `POST /webhooks/:provider` route (`architecture.md` Section 2)
-- Verify Plaid webhook signatures (JWT/ES256 with JWKS, in-memory JWK cache keyed by `kid`) (`plaid-integration.md` Sections 5.1–5.2)
-- Handle webhook types (`plaid-integration.md` Section 5.3):
-  - `SYNC_UPDATES_AVAILABLE` → trigger sync for the connection
-  - `ITEM_ERROR` / `PENDING_EXPIRATION` → update connection status
-  - `NEW_ACCOUNTS_AVAILABLE` → set flag on connection
-  - Unknown types → log and ignore
+- [x] Implemented `POST /webhooks/{provider}` route (`architecture.md` Section 2)
+- [x] Plaid webhook JWT/ES256 verification with JWKS (in-memory cache by `kid`) in `internal/provider/plaid/webhook.go` (`plaid-integration.md` Sections 5.1–5.2)
+- [x] Verification: JWT header parsing, ES256 algorithm check, Plaid API JWK fetch, signature verification, `iat` freshness (5 min), SHA-256 body hash (constant-time compare)
+- [x] HTTP handler in `internal/webhook/handler.go` dispatches events:
+  - `SYNC_UPDATES_AVAILABLE` → fire-and-forget `engine.Sync` with `SyncTriggerWebhook`
+  - `ITEM/ERROR` → `UpdateBankConnectionStatus` with `pending_reauth` for re-auth error codes, `error` otherwise
+  - `ITEM/PENDING_EXPIRATION` → `UpdateConnectionConsentExpiration`
+  - `ITEM/NEW_ACCOUNTS_AVAILABLE` → `UpdateConnectionNewAccounts`
+  - Unknown types → log and acknowledge with 200
+- [x] Re-auth error codes: `ITEM_LOGIN_REQUIRED`, `INSUFFICIENT_CREDENTIALS`, `INVALID_CREDENTIALS`, `MFA_NOT_SUPPORTED`, `NO_ACCOUNTS`, `USER_SETUP_REQUIRED`
+- [x] Added `golang-jwt/jwt/v5` dependency
 - **Ref:** `plaid-integration.md` Section 5, `architecture.md` Section 2
 
-### 6.3 Connection Health Monitoring
+### 6.3 Connection Health Monitoring ✅
 
-- Update connection status based on sync errors and webhooks (`plaid-integration.md` Section 6)
-- Status transitions: `active` ↔ `error`, `active` → `pending_reauth`, `* → disconnected` (`plaid-integration.md` Section 6.1)
+- [x] Sync engine sets `pending_reauth` on auth errors and clears errors on success (Phase 3)
+- [x] Webhook handler updates connection status on `ITEM_ERROR` / `PENDING_EXPIRATION` events
+- [x] New queries: `UpdateConnectionNewAccounts`, `UpdateConnectionConsentExpiration`
+- [x] Status transitions: `active` ↔ `error`, `active` → `pending_reauth`, `* → disconnected` (`plaid-integration.md` Section 6.1)
 - **Ref:** `plaid-integration.md` Section 6
 
-### 6.4 Dashboard — Remaining Pages
+### 6.4 Dashboard — Remaining Pages ✅
 
-- Sync logs page with offset-based pagination (`admin-dashboard.md` Section 11)
-- Settings page — update sync interval and webhook URL (`admin-dashboard.md` Section 12)
+- [x] Sync Logs page (`/admin/sync-logs`) with offset-based pagination (25 rows/page), filter by connection and status (`admin-dashboard.md` Section 11)
+- [x] Settings page (`/admin/settings`) — sync interval (4/8/12/24h), webhook URL (HTTPS validation), Plaid creds (env-aware: read-only if from env, editable with API validation if from app_config), "Re-run Setup Wizard" link (`admin-dashboard.md` Section 12)
+- [x] Service layer: `ListSyncLogsPaginated`, `CountSyncLogsFiltered` dynamic SQL with optional filters
+- [x] Navigation updated: 6 items (Dashboard, Connections, Family Members, API Keys, Sync Logs, Settings)
 - **Ref:** `admin-dashboard.md` Sections 11–12
 
-### 6.5 Graceful Shutdown
+### 6.5 Graceful Shutdown ✅
 
-- Clean shutdown of cron scheduler, in-flight syncs, HTTP server
-- Context cancellation propagation
+- [x] HTTP server shutdown (30s timeout) — existing
+- [x] Cron scheduler `Stop()` — waits for running jobs
+- [x] Context cancellation propagates to sync goroutines
+- [x] Ordered sequence: HTTP shutdown → scheduler stop → context cancel → DB close
 - **Ref:** `architecture.md` Section 1
 
 ### Checkpoint 6

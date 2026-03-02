@@ -1,0 +1,100 @@
+{{define "content"}}
+<h1>Sync Logs</h1>
+
+<form method="GET" action="/admin/sync-logs" style="display:flex; gap:1rem; align-items:end; margin-bottom:1.5rem; flex-wrap:wrap;">
+  <label style="margin:0;">
+    Connection
+    <select name="connection_id" style="margin:0;">
+      <option value="">All connections</option>
+      {{range .Connections}}
+      <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.FilterConnID}} selected{{end}}>{{.InstitutionName.String}}</option>
+      {{end}}
+    </select>
+  </label>
+  <label style="margin:0;">
+    Status
+    <select name="status" style="margin:0;">
+      <option value="">All statuses</option>
+      <option value="success"{{if eq .FilterStatus "success"}} selected{{end}}>Success</option>
+      <option value="error"{{if eq .FilterStatus "error"}} selected{{end}}>Error</option>
+      <option value="in_progress"{{if eq .FilterStatus "in_progress"}} selected{{end}}>In Progress</option>
+    </select>
+  </label>
+  <button type="submit" style="margin:0;">Filter</button>
+  {{if or .FilterConnID .FilterStatus}}
+  <a href="/admin/sync-logs" role="button" class="secondary outline" style="margin:0;">Clear</a>
+  {{end}}
+</form>
+
+{{if .Logs}}
+<div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Connection</th>
+        <th>Trigger</th>
+        <th>Status</th>
+        <th>+Add</th>
+        <th>~Mod</th>
+        <th>-Rem</th>
+        <th>Duration</th>
+        <th>Started</th>
+        <th>Error</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Logs}}
+      <tr>
+        <td>{{.InstitutionName}}</td>
+        <td>{{.Trigger}}</td>
+        <td>
+          {{if eq .Status "success"}}<span class="bb-badge bb-badge--success">success</span>
+          {{else if eq .Status "error"}}<span class="bb-badge bb-badge--error">error</span>
+          {{else if eq .Status "in_progress"}}<span class="bb-badge bb-badge--warning">in progress</span>
+          {{else}}<span class="bb-badge bb-badge--muted">{{.Status}}</span>
+          {{end}}
+        </td>
+        <td>{{.AddedCount}}</td>
+        <td>{{.ModifiedCount}}</td>
+        <td>{{.RemovedCount}}</td>
+        <td>{{if .Duration}}{{.Duration}}{{else}}&mdash;{{end}}</td>
+        <td>{{if .StartedAt}}{{.StartedAt}}{{else}}&mdash;{{end}}</td>
+        <td>
+          {{if .ErrorMessage}}
+          <details>
+            <summary>View</summary>
+            <small>{{.ErrorMessage}}</small>
+          </details>
+          {{else}}&mdash;{{end}}
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+
+{{if gt .TotalPages 1}}
+<nav style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem;">
+  <div>
+    {{if gt .Page 1}}
+    <a href="/admin/sync-logs?page={{sub .Page 1}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterStatus}}&status={{$.FilterStatus}}{{end}}" role="button" class="secondary outline" style="margin:0;">&laquo; Previous</a>
+    {{end}}
+  </div>
+  <small>Page {{.Page}} of {{.TotalPages}} ({{.Total}} total)</small>
+  <div>
+    {{if lt .Page .TotalPages}}
+    <a href="/admin/sync-logs?page={{add .Page 1}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterStatus}}&status={{$.FilterStatus}}{{end}}" role="button" class="secondary outline" style="margin:0;">Next &raquo;</a>
+    {{end}}
+  </div>
+</nav>
+{{end}}
+
+{{else}}
+<div class="bb-empty">
+  <p>No sync logs found.</p>
+  {{if or .FilterConnID .FilterStatus}}
+  <a href="/admin/sync-logs" role="button" class="secondary outline">Clear filters</a>
+  {{end}}
+</div>
+{{end}}
+{{end}}

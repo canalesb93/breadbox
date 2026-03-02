@@ -106,14 +106,23 @@ func LoadWithDB(ctx context.Context, cfg *Config, pool *pgxpool.Pool) error {
 		}
 	}
 
-	if v, ok := appCfg["sync_interval_hours"]; ok {
+	// Prefer sync_interval_minutes; fall back to sync_interval_hours (legacy).
+	if v, ok := appCfg["sync_interval_minutes"]; ok {
 		n, err := strconv.Atoi(v)
-		if err == nil {
-			cfg.SyncIntervalHours = n
+		if err == nil && n > 0 {
+			cfg.SyncIntervalMinutes = n
 		}
 	}
-	if cfg.SyncIntervalHours == 0 {
-		cfg.SyncIntervalHours = 12
+	if cfg.SyncIntervalMinutes == 0 {
+		if v, ok := appCfg["sync_interval_hours"]; ok {
+			n, err := strconv.Atoi(v)
+			if err == nil && n > 0 {
+				cfg.SyncIntervalMinutes = n * 60
+			}
+		}
+	}
+	if cfg.SyncIntervalMinutes == 0 {
+		cfg.SyncIntervalMinutes = 12 * 60 // default 12h
 	}
 
 	cfg.WebhookURL = appCfg["webhook_url"]

@@ -8,6 +8,7 @@ import (
 	breadboxmcp "breadbox/internal/mcp"
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
+	"breadbox/internal/webhook"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -47,6 +48,9 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Handle("/mcp", mcpHandler)
 		r.Handle("/mcp/*", mcpHandler)
 	})
+
+	// Webhook handler — no auth (verified via JWT in provider).
+	r.Post("/webhooks/{provider}", webhook.NewHandler(a.Providers, a.SyncEngine, a.Queries, a.Logger))
 
 	// Admin dashboard: session manager + template renderer + admin router.
 	isSecure := a.Config.Environment == "production" || a.Config.Environment == "docker"
