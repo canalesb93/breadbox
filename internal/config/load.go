@@ -82,11 +82,14 @@ func LoadWithDB(ctx context.Context, cfg *Config, pool *pgxpool.Pool) error {
 
 	appCfg := make(map[string]string)
 	for rows.Next() {
-		var k, v string
+		var k string
+		var v *string
 		if err := rows.Scan(&k, &v); err != nil {
 			return fmt.Errorf("scan app_config row: %w", err)
 		}
-		appCfg[k] = v
+		if v != nil {
+			appCfg[k] = *v
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("iterate app_config: %w", err)
