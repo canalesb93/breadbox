@@ -484,119 +484,105 @@ Run `docker compose up` from scratch and verify the entire system works end-to-e
 
 ---
 
-## Phase 8: Multi-Provider Refactoring
+## Phase 8: Multi-Provider Refactoring ✅
 
 Decouple the codebase from Plaid-specific assumptions to support multiple bank data providers.
 All existing Plaid functionality must continue working identically after this phase.
 
-### 8.1 Database Schema Migration
+**Status:** Complete. `go build` and `go vet` pass clean.
 
-- [ ] Add `external_id TEXT NULL` and `encrypted_credentials BYTEA NULL` columns to `bank_connections`
-- [ ] Migrate data: copy `plaid_item_id` → `external_id`, `plaid_access_token` → `encrypted_credentials`
-- [ ] Drop `plaid_item_id` and `plaid_access_token` columns
-- [ ] Add `UNIQUE(provider, external_id)` constraint; drop old `plaid_item_id` index
+### 8.1 Database Schema Migration ✅
+
+- [x] Add `external_id TEXT NULL` and `encrypted_credentials BYTEA NULL` columns to `bank_connections`
+- [x] Migrate data: copy `plaid_item_id` → `external_id`, `plaid_access_token` → `encrypted_credentials`
+- [x] Drop `plaid_item_id` and `plaid_access_token` columns
+- [x] Add `UNIQUE(provider, external_id)` constraint; drop old `plaid_item_id` index
 - **Ref:** `data-model.md` Section 2.3, `teller-integration.md` Section 1
 - **Files:** `internal/db/migrations/00013_generic_connection_columns.sql`
 
-### 8.2 Update sqlc Queries
+### 8.2 Update sqlc Queries ✅
 
-- [ ] Rewrite all `bank_connections` queries for generic column names
-- [ ] Rename `GetBankConnectionByPlaidItemID` → `GetBankConnectionByExternalID(provider, external_id)`
-- [ ] Update `GetBankConnectionForSync`, `CreateBankConnection`, `DeleteBankConnection`
-- [ ] Run `sqlc generate` to regenerate Go types
+- [x] Rewrite all `bank_connections` queries for generic column names
+- [x] Rename `GetBankConnectionByPlaidItemID` → `GetBankConnectionByExternalID(provider, external_id)`
+- [x] Update `GetBankConnectionForSync`, `CreateBankConnection`, `DeleteBankConnection`
+- [x] Run `sqlc generate` to regenerate Go types
 - **Files:** `internal/db/queries/bank_connections.sql`, `internal/db/*.sql.go` (generated)
 
-### 8.3 Move Encryption to Shared Package
+### 8.3 Move Encryption to Shared Package ✅
 
-- [ ] Create `internal/crypto/encrypt.go` with `Encrypt()` and `Decrypt()` (moved from `internal/provider/plaid/encrypt.go`)
-- [ ] Update all callers: Plaid sync, exchange, balances, admin connections
-- [ ] Delete `internal/provider/plaid/encrypt.go`
+- [x] Create `internal/crypto/encrypt.go` with `Encrypt()` and `Decrypt()` (moved from `internal/provider/plaid/encrypt.go`)
+- [x] Update all callers: Plaid sync, exchange, balances, admin connections
+- [x] Delete `internal/provider/plaid/encrypt.go`
 - **Files:** `internal/crypto/encrypt.go` (new), `internal/provider/plaid/*.go`, `internal/admin/connections.go`
 
-### 8.4 Provider-Level Error Sentinels
+### 8.4 Provider-Level Error Sentinels ✅
 
-- [ ] Create `internal/provider/errors.go` with `ErrReauthRequired` and `ErrSyncRetryable`
-- [ ] Update `internal/provider/plaid/errors.go` to wrap shared errors
-- [ ] Remove Plaid-specific error imports from sync engine
+- [x] Create `internal/provider/errors.go` with `ErrReauthRequired` and `ErrSyncRetryable`
+- [x] Update `internal/provider/plaid/errors.go` to wrap shared errors
+- [x] Remove Plaid-specific error imports from sync engine
 - **Files:** `internal/provider/errors.go` (new), `internal/provider/plaid/errors.go`, `internal/sync/engine.go`
 
-### 8.5 Refactor Sync Engine
+### 8.5 Refactor Sync Engine ✅
 
-- [ ] Use `conn.ExternalID` and `conn.EncryptedCredentials` (from updated sqlc types)
-- [ ] Check `provider.ErrSyncRetryable` and `provider.ErrReauthRequired` instead of Plaid-specific errors
-- [ ] Remove `plaidprovider` import entirely
+- [x] Use `conn.ExternalID` and `conn.EncryptedCredentials` (from updated sqlc types)
+- [x] Check `provider.ErrSyncRetryable` and `provider.ErrReauthRequired` instead of Plaid-specific errors
+- [x] Remove `plaidprovider` import entirely
 - **Files:** `internal/sync/engine.go`
 
-### 8.6 Refactor Webhook Handler
+### 8.6 Refactor Webhook Handler ✅
 
-- [ ] Extract all HTTP headers generically (not just `Plaid-Verification`)
-- [ ] Use `GetBankConnectionByExternalID(provider, externalID)` for connection lookup
-- [ ] Add `NeedsReauth bool` to `WebhookEvent`; remove `reauthErrorCodes` map from handler
-- [ ] Update Plaid webhook implementation to set `NeedsReauth` based on error codes
+- [x] Extract all HTTP headers generically (not just `Plaid-Verification`)
+- [x] Use `GetBankConnectionByExternalID(provider, externalID)` for connection lookup
+- [x] Add `NeedsReauth bool` to `WebhookEvent`; remove `reauthErrorCodes` map from handler
+- [x] Update Plaid webhook implementation to set `NeedsReauth` based on error codes
 - **Files:** `internal/provider/provider.go`, `internal/provider/plaid/webhook.go`, `internal/webhook/handler.go`
 
-### 8.7 Refactor Admin Connection Handlers
+### 8.7 Refactor Admin Connection Handlers ✅
 
-- [ ] Accept `provider` field in link-token and exchange-token requests
-- [ ] Change `CreateReauthSession(ctx, connectionID)` → `CreateReauthSession(ctx, Connection)`
-- [ ] Change `RemoveConnection(ctx, connectionID)` → `RemoveConnection(ctx, Connection)`
-- [ ] Remove all `plaidprovider` type assertions and direct `Decrypt()` calls
-- [ ] Update Plaid provider implementations for new signatures
+- [x] Accept `provider` field in link-token and exchange-token requests
+- [x] Change `CreateReauthSession(ctx, connectionID)` → `CreateReauthSession(ctx, Connection)`
+- [x] Change `RemoveConnection(ctx, connectionID)` → `RemoveConnection(ctx, Connection)`
+- [x] Remove all `plaidprovider` type assertions and direct `Decrypt()` calls
+- [x] Update Plaid provider implementations for new signatures
 - **Ref:** `architecture.md` Section 3 (Provider Interface)
 - **Files:** `internal/provider/provider.go`, `internal/provider/plaid/reauth.go`, `internal/provider/plaid/remove.go`, `internal/admin/connections.go`
 
-### 8.8 Settings and Setup for Multi-Provider
+### 8.8 Settings and Setup for Multi-Provider ✅
 
-- [ ] Settings page: add Teller section (placeholder, shows "Not configured" until Phase 9)
-- [ ] Setup wizard step 2: make Plaid credentials optional (allow Teller-only setup later)
-- [ ] Programmatic setup endpoint: accept optional Teller fields
+- [x] Settings page: add Teller section (placeholder, shows "Not configured" until Phase 9)
+- [x] Setup wizard step 2: make Plaid credentials optional (allow Teller-only setup later)
+- [x] Programmatic setup endpoint: accept optional Teller fields
 - **Files:** `internal/admin/setup.go`, `internal/admin/settings.go`, `internal/templates/pages/settings.html`, `internal/templates/pages/setup_step2.html`
 
-### 8.9 Config System: Teller Keys
+### 8.9 Config System: Teller Keys ✅
 
-- [ ] Add `TellerAppID`, `TellerCertPath`, `TellerKeyPath`, `TellerEnv`, `TellerWebhookSecret` to Config struct
-- [ ] Load from env vars in `Load()`, from `app_config` in `LoadWithDB()` where appropriate
-- [ ] Cert/key paths and webhook secret are env-var-only (not stored in app_config)
+- [x] Add `TellerAppID`, `TellerCertPath`, `TellerKeyPath`, `TellerEnv`, `TellerWebhookSecret` to Config struct
+- [x] Load from env vars in `Load()`, from `app_config` in `LoadWithDB()` where appropriate
+- [x] Cert/key paths and webhook secret are env-var-only (not stored in app_config)
 - **Files:** `internal/config/config.go`, `internal/config/load.go`
 
-### 8.10 Admin UI Multi-Provider Templates
+### 8.10 Admin UI Multi-Provider Templates ✅
 
-- [ ] `connection_new.html`: add provider selector dropdown, conditionally load Plaid/Teller JS
-- [ ] `connection_reauth.html`: detect provider from connection, load correct JS SDK
-- [ ] `connection_detail.html`: show provider name in connection info
-- [ ] Only show configured providers in selector (check `a.Providers` map)
+- [x] `connection_new.html`: add provider selector dropdown, conditionally load Plaid/Teller JS
+- [x] `connection_reauth.html`: detect provider from connection, load correct JS SDK
+- [x] `connection_detail.html`: show provider name in connection info
+- [x] Only show configured providers in selector (check `a.Providers` map)
 - **Files:** `internal/templates/pages/connection_new.html`, `internal/templates/pages/connection_reauth.html`, `internal/templates/pages/connection_detail.html`, `internal/admin/connections.go`
 
-### 8.11 App Initialization: Multi-Provider Skeleton
+### 8.11 App Initialization: Multi-Provider Skeleton ✅
 
-- [ ] Add Teller provider credential detection in `app.New()` (log presence, no init yet)
+- [x] Add Teller provider credential detection in `app.New()` (log presence, no init yet)
 - **Files:** `internal/app/app.go`
 
-### 8.12 Update Seed Data
+### 8.12 Update Seed Data ✅
 
-- [ ] Change `plaid_item_id` → `external_id`, `plaid_access_token` → `encrypted_credentials` in seed SQL
+- [x] Change `plaid_item_id` → `external_id`, `plaid_access_token` → `encrypted_credentials` in seed SQL
 - **Files:** `internal/seed/seed.go`
 
-### 8.13 Update .env.example
+### 8.13 Update .env.example ✅
 
-- [ ] Add Teller environment variables: `TELLER_APP_ID`, `TELLER_CERT_PATH`, `TELLER_KEY_PATH`, `TELLER_ENV`, `TELLER_WEBHOOK_SECRET`
+- [x] Add Teller environment variables: `TELLER_APP_ID`, `TELLER_CERT_PATH`, `TELLER_KEY_PATH`, `TELLER_ENV`, `TELLER_WEBHOOK_SECRET`
 - **Files:** `.env.example`
-
-### Task Dependencies
-
-```
-8.1 (DB migration) ──> 8.2 (sqlc queries) ──> 8.5 (sync engine)
-                                           ──> 8.6 (webhook handler)
-                                           ──> 8.7 (admin connections)
-                                           ──> 8.12 (seed data)
-
-8.3 (crypto package) ──> 8.7 (admin connections)
-
-8.4 (shared errors)  ──> 8.5 (sync engine)
-
-8.9 (config)         ──> 8.8 (settings/setup)
-                     ──> 8.11 (app init)
-```
 
 ### Checkpoint 8
 

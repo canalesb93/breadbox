@@ -128,6 +128,13 @@ func SetupStep2Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 
 		// POST: validate and store Plaid credentials.
 		ctx := r.Context()
+
+		// Allow skipping Plaid configuration.
+		if r.FormValue("skip") == "true" {
+			http.Redirect(w, r, "/admin/setup/step/3", http.StatusSeeOther)
+			return
+		}
+
 		clientID := strings.TrimSpace(r.FormValue("client_id"))
 		secret := r.FormValue("secret")
 		environment := r.FormValue("environment")
@@ -427,15 +434,18 @@ func ProgrammaticSetupHandler(queries *db.Queries, sm *scs.SessionManager) http.
 		if len(req.Password) < 8 {
 			validationErrors = append(validationErrors, "password must be at least 8 characters")
 		}
-		if req.PlaidClientID == "" {
-			validationErrors = append(validationErrors, "plaid_client_id is required")
-		}
-		if req.PlaidSecret == "" {
-			validationErrors = append(validationErrors, "plaid_secret is required")
+		if req.PlaidClientID != "" || req.PlaidSecret != "" {
+			// If either is provided, both are required.
+			if req.PlaidClientID == "" {
+				validationErrors = append(validationErrors, "plaid_client_id is required when plaid_secret is provided")
+			}
+			if req.PlaidSecret == "" {
+				validationErrors = append(validationErrors, "plaid_secret is required when plaid_client_id is provided")
+			}
 		}
 
 		validEnvs := map[string]bool{"sandbox": true, "development": true, "production": true}
-		if !validEnvs[req.PlaidEnv] {
+		if req.PlaidEnv != "" && !validEnvs[req.PlaidEnv] {
 			validationErrors = append(validationErrors, "plaid_env must be one of: sandbox, development, production")
 		}
 
@@ -481,12 +491,20 @@ func ProgrammaticSetupHandler(queries *db.Queries, sm *scs.SessionManager) http.
 
 		// Store all config values.
 		configEntries := []db.SetAppConfigParams{
-			{Key: "plaid_client_id", Value: pgtype.Text{String: req.PlaidClientID, Valid: true}},
-			{Key: "plaid_secret", Value: pgtype.Text{String: req.PlaidSecret, Valid: true}},
-			{Key: "plaid_env", Value: pgtype.Text{String: req.PlaidEnv, Valid: true}},
 			{Key: "sync_interval_hours", Value: pgtype.Text{String: req.SyncIntervalHours, Valid: true}},
 			{Key: "webhook_url", Value: pgtype.Text{String: req.WebhookURL, Valid: true}},
 			{Key: "setup_complete", Value: pgtype.Text{String: "true", Valid: true}},
+		}
+		if req.PlaidClientID != "" {
+			plaidEnv := req.PlaidEnv
+			if plaidEnv == "" {
+				plaidEnv = "sandbox"
+			}
+			configEntries = append(configEntries,
+				db.SetAppConfigParams{Key: "plaid_client_id", Value: pgtype.Text{String: req.PlaidClientID, Valid: true}},
+				db.SetAppConfigParams{Key: "plaid_secret", Value: pgtype.Text{String: req.PlaidSecret, Valid: true}},
+				db.SetAppConfigParams{Key: "plaid_env", Value: pgtype.Text{String: plaidEnv, Valid: true}},
+			)
 		}
 
 		for _, entry := range configEntries {

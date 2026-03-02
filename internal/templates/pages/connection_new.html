@@ -1,5 +1,4 @@
 {{define "content"}}
-<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 <h1>Connect New Bank</h1>
 
 <div id="step-select" {{if .ShowLink}}style="display:none"{{end}}>
@@ -7,6 +6,7 @@
     <header>Select Family Member</header>
     <p>Choose which family member this bank connection belongs to.</p>
     <form id="member-form">
+      <input type="hidden" id="provider" name="provider" value="plaid">
       <label for="user_id">Family Member</label>
       <select id="user_id" name="user_id" required>
         <option value="" disabled selected>Select a member...</option>
@@ -40,17 +40,30 @@
   var retryBtn = document.getElementById("retry-btn");
   var backBtn = document.getElementById("back-btn");
   var selectedUserId = "";
+  var selectedProvider = "plaid";
 
   memberForm.addEventListener("submit", function (e) {
     e.preventDefault();
     var select = document.getElementById("user_id");
     selectedUserId = select.value;
+    selectedProvider = document.getElementById("provider").value || "plaid";
     if (!selectedUserId) return;
     memberNameEl.textContent = select.options[select.selectedIndex].text;
     stepSelect.style.display = "none";
     stepLink.style.display = "block";
-    startLink();
+    loadProviderSDK(selectedProvider, startLink);
   });
+
+  function loadProviderSDK(provider, callback) {
+    if (provider === "plaid" && typeof Plaid === "undefined") {
+      var script = document.createElement("script");
+      script.src = "https://cdn.plaid.com/link/v2/stable/link-initialize.js";
+      script.onload = callback;
+      document.head.appendChild(script);
+    } else {
+      callback();
+    }
+  }
 
   backBtn.addEventListener("click", function (e) {
     e.preventDefault();
@@ -80,7 +93,7 @@
     fetch("/admin/api/link-token", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({user_id: selectedUserId})
+      body: JSON.stringify({user_id: selectedUserId, provider: selectedProvider})
     })
     .then(function (res) { return res.json(); })
     .then(function (data) {
@@ -108,7 +121,8 @@
             user_id: selectedUserId,
             institution_id: metadata.institution.institution_id,
             institution_name: metadata.institution.name,
-            accounts: metadata.accounts
+            accounts: metadata.accounts,
+            provider: selectedProvider
           })
         })
         .then(function (res) { return res.json(); })

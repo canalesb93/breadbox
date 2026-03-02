@@ -8,7 +8,7 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
-	plaidprovider "breadbox/internal/provider/plaid"
+	"breadbox/internal/provider"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -60,7 +60,8 @@ func NewConnectionHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 
 // linkTokenRequest is the JSON body for POST /admin/api/link-token.
 type linkTokenRequest struct {
-	UserID string `json:"user_id"`
+	UserID   string `json:"user_id"`
+	Provider string `json:"provider"`
 }
 
 // linkTokenResponse is the JSON response for POST /admin/api/link-token.
@@ -83,13 +84,18 @@ func LinkTokenHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		plaidProvider, ok := a.Providers["plaid"]
+		providerName := req.Provider
+		if providerName == "" {
+			providerName = "plaid"
+		}
+
+		prov, ok := a.Providers[providerName]
 		if !ok {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Plaid provider not configured"})
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": providerName + " provider not configured"})
 			return
 		}
 
-		session, err := plaidProvider.CreateLinkSession(r.Context(), req.UserID)
+		session, err := prov.CreateLinkSession(r.Context(), req.UserID)
 		if err != nil {
 			a.Logger.Error("create link session", "error", err)
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "Failed to create link token: " + err.Error()})
@@ -110,6 +116,7 @@ type exchangeTokenRequest struct {
 	InstitutionID   string            `json:"institution_id"`
 	InstitutionName string            `json:"institution_name"`
 	Accounts        []accountMetadata `json:"accounts"`
+	Provider        string            `json:"provider"`
 }
 
 type accountMetadata struct {
@@ -141,13 +148,18 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		plaidProvider, ok := a.Providers["plaid"]
+		providerName := req.Provider
+		if providerName == "" {
+			providerName = "plaid"
+		}
+
+		prov, ok := a.Providers[providerName]
 		if !ok {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Plaid provider not configured"})
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": providerName + " provider not configured"})
 			return
 		}
 
-		conn, accounts, err := plaidProvider.ExchangeToken(r.Context(), req.PublicToken)
+		conn, accounts, err := prov.ExchangeToken(r.Context(), req.PublicToken)
 		if err != nil {
 			a.Logger.Error("exchange token", "error", err)
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "Failed to exchange token: " + err.Error()})
@@ -164,11 +176,11 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 		// Create the bank connection record.
 		bankConn, err := a.Queries.CreateBankConnection(r.Context(), db.CreateBankConnectionParams{
 			UserID:           userID,
-			Provider:         db.ProviderTypePlaid,
+			Provider:         db.ProviderType(providerName),
 			InstitutionID:    pgtype.Text{String: req.InstitutionID, Valid: true},
 			InstitutionName:  pgtype.Text{String: req.InstitutionName, Valid: true},
-			PlaidItemID:      pgtype.Text{String: conn.ExternalID, Valid: true},
-			PlaidAccessToken: conn.EncryptedCredentials,
+			ExternalID:           pgtype.Text{String: conn.ExternalID, Valid: true},
+			EncryptedCredentials: conn.EncryptedCredentials,
 			Status:           db.ConnectionStatusActive,
 		})
 		if err != nil {
@@ -291,29 +303,29 @@ func ConnectionReauthAPIHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		plaidProv, ok := a.Providers["plaid"].(*plaidprovider.PlaidProvider)
-		if !ok {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Plaid provider not configured"})
-			return
-		}
-
-		// Load the connection and decrypt access token.
+		// Load the connection.
 		conn, err := a.Queries.GetBankConnection(ctx, connID)
 		if err != nil {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "Connection not found"})
 			return
 		}
 
-		accessToken, err := plaidprovider.Decrypt(conn.PlaidAccessToken, a.Config.EncryptionKey)
-		if err != nil {
-			a.Logger.Error("decrypt access token for reauth", "error", err)
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to decrypt access token"})
+		prov, ok := a.Providers[string(conn.Provider)]
+		if !ok {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": string(conn.Provider) + " provider not configured"})
 			return
 		}
 
-		session, err := plaidProv.CreateReauthLinkToken(ctx, string(accessToken), formatUUID(conn.UserID))
+		provConn := provider.Connection{
+			ProviderName:         string(conn.Provider),
+			ExternalID:           conn.ExternalID.String,
+			EncryptedCredentials: conn.EncryptedCredentials,
+			UserID:               formatUUID(conn.UserID),
+		}
+
+		session, err := prov.CreateReauthSession(ctx, provConn)
 		if err != nil {
-			a.Logger.Error("create reauth link token", "error", err)
+			a.Logger.Error("create reauth session", "error", err)
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "Failed to create reauth link token"})
 			return
 		}
@@ -365,21 +377,24 @@ func DeleteConnectionHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		// Load connection and call Plaid to revoke access token.
-		if plaidProv, ok := a.Providers["plaid"].(*plaidprovider.PlaidProvider); ok {
-			conn, err := a.Queries.GetBankConnection(ctx, connID)
-			if err == nil && conn.PlaidAccessToken != nil {
-				accessToken, decErr := plaidprovider.Decrypt(conn.PlaidAccessToken, a.Config.EncryptionKey)
-				if decErr == nil {
-					_ = plaidProv.RemoveItem(ctx, string(accessToken))
-				} else {
-					a.Logger.Error("decrypt access token for removal", "error", decErr)
+		// Load connection and call provider to revoke access.
+		conn, err := a.Queries.GetBankConnection(ctx, connID)
+		if err == nil {
+			if prov, ok := a.Providers[string(conn.Provider)]; ok {
+				provConn := provider.Connection{
+					ProviderName:         string(conn.Provider),
+					ExternalID:           conn.ExternalID.String,
+					EncryptedCredentials: conn.EncryptedCredentials,
+					UserID:               formatUUID(conn.UserID),
+				}
+				if removeErr := prov.RemoveConnection(ctx, provConn); removeErr != nil {
+					a.Logger.Error("remove connection from provider", "error", removeErr)
 				}
 			}
 		}
 
 		// Soft-delete the connection locally.
-		err := a.Queries.DeleteBankConnection(ctx, connID)
+		err = a.Queries.DeleteBankConnection(ctx, connID)
 		if err != nil {
 			a.Logger.Error("delete bank connection", "error", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete connection"})

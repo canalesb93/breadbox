@@ -26,10 +26,10 @@ type Provider interface {
 	HandleWebhook(ctx context.Context, payload WebhookPayload) (WebhookEvent, error)
 
 	// CreateReauthSession starts a re-authentication flow for a broken connection.
-	CreateReauthSession(ctx context.Context, connectionID string) (LinkSession, error)
+	CreateReauthSession(ctx context.Context, conn Connection) (LinkSession, error)
 
 	// RemoveConnection revokes the provider's access and marks the connection removed.
-	RemoveConnection(ctx context.Context, connectionID string) error
+	RemoveConnection(ctx context.Context, conn Connection) error
 }
 
 type LinkSession struct {
@@ -42,6 +42,7 @@ type Connection struct {
 	ExternalID           string
 	EncryptedCredentials []byte
 	InstitutionName      string
+	UserID               string // for provider flows that need user identity
 }
 
 type Account struct {
@@ -100,4 +101,5 @@ type WebhookEvent struct {
 	ErrorCode             *string
 	ErrorMessage          *string
 	ConsentExpirationTime *string
+	NeedsReauth           bool // provider determines if reauth needed
 }

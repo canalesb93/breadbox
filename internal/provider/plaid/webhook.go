@@ -150,6 +150,17 @@ func jwkToECDSAPublicKey(jwk plaidgo.JWKPublicKey) (*ecdsa.PublicKey, error) {
 	}, nil
 }
 
+// reauthErrorCodes contains Plaid error codes that indicate the user needs to
+// re-authenticate with their financial institution.
+var reauthErrorCodes = map[string]bool{
+	"ITEM_LOGIN_REQUIRED":      true,
+	"INSUFFICIENT_CREDENTIALS": true,
+	"INVALID_CREDENTIALS":      true,
+	"MFA_NOT_SUPPORTED":        true,
+	"NO_ACCOUNTS":              true,
+	"USER_SETUP_REQUIRED":      true,
+}
+
 // webhookBody represents the JSON structure of a Plaid webhook body.
 type webhookBody struct {
 	WebhookType           string          `json:"webhook_type"`
@@ -185,6 +196,9 @@ func (p *PlaidProvider) parseWebhookBody(body []byte) (provider.WebhookEvent, er
 		if wb.Error != nil {
 			event.ErrorCode = &wb.Error.ErrorCode
 			event.ErrorMessage = &wb.Error.ErrorMessage
+			if reauthErrorCodes[wb.Error.ErrorCode] {
+				event.NeedsReauth = true
+			}
 		}
 
 	case wb.WebhookType == "ITEM" && wb.WebhookCode == "PENDING_EXPIRATION":

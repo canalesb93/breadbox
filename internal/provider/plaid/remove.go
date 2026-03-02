@@ -4,14 +4,20 @@ import (
 	"context"
 	"fmt"
 
+	"breadbox/internal/crypto"
+	"breadbox/internal/provider"
+
 	plaidgo "github.com/plaid/plaid-go/v29/plaid"
 )
 
-// RemoveConnection is the interface method. Since the Provider interface
-// receives only a connectionID string, the caller must load the connection
-// from the DB, decrypt the access token, and call RemoveItem directly.
-func (p *PlaidProvider) RemoveConnection(_ context.Context, _ string) error {
-	return fmt.Errorf("RemoveConnection requires connection lookup — use RemoveItem helper")
+// RemoveConnection decrypts the connection's credentials and calls Plaid
+// /item/remove to revoke access.
+func (p *PlaidProvider) RemoveConnection(ctx context.Context, conn provider.Connection) error {
+	accessToken, err := crypto.Decrypt(conn.EncryptedCredentials, p.encryptionKey)
+	if err != nil {
+		return fmt.Errorf("decrypt access token for removal: %w", err)
+	}
+	return p.RemoveItem(ctx, string(accessToken))
 }
 
 // RemoveItem calls Plaid /item/remove with the decrypted access token.

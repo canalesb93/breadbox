@@ -16,16 +16,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// reauthErrorCodes are Plaid error codes that indicate re-authentication is needed.
-var reauthErrorCodes = map[string]bool{
-	"ITEM_LOGIN_REQUIRED":      true,
-	"INSUFFICIENT_CREDENTIALS": true,
-	"INVALID_CREDENTIALS":      true,
-	"MFA_NOT_SUPPORTED":        true,
-	"NO_ACCOUNTS":              true,
-	"USER_SETUP_REQUIRED":      true,
-}
-
 // NewHandler returns an http.HandlerFunc that processes inbound provider webhooks.
 func NewHandler(providers map[string]provider.Provider, engine *sync.Engine, queries *db.Queries, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -46,8 +36,11 @@ func NewHandler(providers map[string]provider.Provider, engine *sync.Engine, que
 			return
 		}
 
-		headers := map[string]string{
-			"Plaid-Verification": r.Header.Get("Plaid-Verification"),
+		headers := make(map[string]string)
+		for key, vals := range r.Header {
+			if len(vals) > 0 {
+				headers[key] = vals[0]
+			}
 		}
 
 		event, err := prov.HandleWebhook(r.Context(), provider.WebhookPayload{
@@ -62,10 +55,10 @@ func NewHandler(providers map[string]provider.Provider, engine *sync.Engine, que
 
 		logger = logger.With("event_type", event.Type, "item_id", event.ConnectionID)
 
-		// Look up the internal connection by Plaid item ID.
-		conn, err := queries.GetBankConnectionByPlaidItemID(r.Context(), pgtype.Text{
-			String: event.ConnectionID,
-			Valid:  true,
+		// Look up the internal connection by provider + external ID.
+		conn, err := queries.GetBankConnectionByExternalID(r.Context(), db.GetBankConnectionByExternalIDParams{
+			Provider:   db.ProviderType(providerName),
+			ExternalID: pgtype.Text{String: event.ConnectionID, Valid: true},
 		})
 		if err != nil {
 			logger.Error("failed to look up connection", "error", err)
@@ -83,7 +76,7 @@ func NewHandler(providers map[string]provider.Provider, engine *sync.Engine, que
 
 		case "connection_error":
 			status := db.ConnectionStatusError
-			if event.ErrorCode != nil && reauthErrorCodes[*event.ErrorCode] {
+			if event.NeedsReauth {
 				status = db.ConnectionStatusPendingReauth
 			}
 			var errCode, errMsg pgtype.Text

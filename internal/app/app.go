@@ -61,6 +61,10 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 		logger.Info("plaid provider initialized", "env", cfg.PlaidEnv)
 	}
 
+	if cfg.TellerAppID != "" {
+		logger.Info("teller credentials detected", "app_id", cfg.TellerAppID, "env", cfg.TellerEnv)
+	}
+
 	syncEngine := sync.NewEngine(queries, pool, providers, logger)
 	svc := service.New(queries, pool, syncEngine, logger)
 

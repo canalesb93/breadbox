@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"breadbox/internal/crypto"
 	"breadbox/internal/provider"
 
 	plaidgo "github.com/plaid/plaid-go/v29/plaid"
@@ -26,7 +27,7 @@ func (p *PlaidProvider) ExchangeToken(ctx context.Context, publicToken string) (
 	itemID := exchangeResp.GetItemId()
 
 	// Encrypt the access token for storage.
-	encrypted, err := Encrypt([]byte(accessToken), p.encryptionKey)
+	encrypted, err := crypto.Encrypt([]byte(accessToken), p.encryptionKey)
 	if err != nil {
 		return provider.Connection{}, nil, fmt.Errorf("encrypt access token: %w", err)
 	}

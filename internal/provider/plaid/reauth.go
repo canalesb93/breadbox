@@ -4,17 +4,21 @@ import (
 	"context"
 	"fmt"
 
+	"breadbox/internal/crypto"
 	"breadbox/internal/provider"
 
 	plaidgo "github.com/plaid/plaid-go/v29/plaid"
 )
 
-// CreateReauthSession is the interface method. Since the Provider interface
-// receives only a connectionID string, the caller must load the connection
-// from the DB, decrypt the access token, and call CreateReauthLinkToken
-// directly. This method returns an error directing callers to the helper.
-func (p *PlaidProvider) CreateReauthSession(_ context.Context, _ string) (provider.LinkSession, error) {
-	return provider.LinkSession{}, fmt.Errorf("CreateReauthSession requires connection lookup — use CreateReauthLinkToken helper")
+// CreateReauthSession creates a Plaid Link token in update mode for
+// re-authenticating an existing connection. It decrypts the connection's
+// credentials and delegates to CreateReauthLinkToken.
+func (p *PlaidProvider) CreateReauthSession(ctx context.Context, conn provider.Connection) (provider.LinkSession, error) {
+	accessToken, err := crypto.Decrypt(conn.EncryptedCredentials, p.encryptionKey)
+	if err != nil {
+		return provider.LinkSession{}, fmt.Errorf("decrypt access token for reauth: %w", err)
+	}
+	return p.CreateReauthLinkToken(ctx, string(accessToken), conn.UserID)
 }
 
 // CreateReauthLinkToken creates a Plaid Link token in update mode for

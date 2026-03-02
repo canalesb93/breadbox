@@ -65,7 +65,7 @@ ON CONFLICT (id) DO NOTHING;
 `
 
 const bankConnectionsSQL = `
-INSERT INTO bank_connections (id, user_id, provider, institution_id, institution_name, plaid_item_id, plaid_access_token, status, sync_cursor) VALUES
+INSERT INTO bank_connections (id, user_id, provider, institution_id, institution_name, external_id, encrypted_credentials, status, sync_cursor) VALUES
   ('00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'plaid', 'ins_1', 'Chase', 'seed_item_1', 'seed_encrypted_token_1', 'active', 'seed_cursor_1'),
   ('00000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000002', 'plaid', 'ins_2', 'Bank of America', 'seed_item_2', 'seed_encrypted_token_2', 'active', 'seed_cursor_2')
 ON CONFLICT (id) DO NOTHING;

@@ -13,6 +13,13 @@ type Config struct {
 	PlaidSecret   string
 	PlaidEnv      string // "sandbox" | "development" | "production"
 
+	// Teller — may come from env (overrides app_config) or app_config table
+	TellerAppID        string
+	TellerCertPath     string
+	TellerKeyPath      string
+	TellerEnv          string // "sandbox" | "production"
+	TellerWebhookSecret string
+
 	// From app_config table only
 	SyncIntervalMinutes int
 	WebhookURL          string

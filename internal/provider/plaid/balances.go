@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"breadbox/internal/crypto"
 	"breadbox/internal/provider"
 
 	plaidgo "github.com/plaid/plaid-go/v29/plaid"
@@ -12,7 +13,7 @@ import (
 
 // GetBalances fetches current account balances from Plaid using /accounts/get.
 func (p *PlaidProvider) GetBalances(ctx context.Context, conn provider.Connection) ([]provider.AccountBalance, error) {
-	accessToken, err := Decrypt(conn.EncryptedCredentials, p.encryptionKey)
+	accessToken, err := crypto.Decrypt(conn.EncryptedCredentials, p.encryptionKey)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt access token: %w", err)
 	}

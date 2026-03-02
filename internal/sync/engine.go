@@ -10,7 +10,6 @@ import (
 
 	"breadbox/internal/db"
 	"breadbox/internal/provider"
-	plaidprovider "breadbox/internal/provider/plaid"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -109,8 +108,9 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 	// Build provider.Connection from DB row.
 	provConn := provider.Connection{
 		ProviderName:         string(conn.Provider),
-		ExternalID:           conn.PlaidItemID.String,
-		EncryptedCredentials: conn.PlaidAccessToken,
+		ExternalID:           conn.ExternalID.String,
+		EncryptedCredentials: conn.EncryptedCredentials,
+		UserID:               formatUUID(conn.UserID),
 	}
 
 	// Track cursors for pagination.
@@ -132,7 +132,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 	for {
 		result, syncErr := prov.SyncTransactions(ctx, provConn, cursor)
 		if syncErr != nil {
-			if errors.Is(syncErr, plaidprovider.ErrMutationDuringPagination) {
+			if errors.Is(syncErr, provider.ErrSyncRetryable) {
 				logger.Warn("mutation during pagination, resetting cursor")
 				cursor = previousCursor
 				pendingRemovals = nil
@@ -140,7 +140,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				pendingModified = nil
 				continue
 			}
-			if errors.Is(syncErr, plaidprovider.ErrItemReauthRequired) {
+			if errors.Is(syncErr, provider.ErrReauthRequired) {
 				// Mark connection as needing re-auth.
 				_ = e.db.UpdateBankConnectionStatus(ctx, db.UpdateBankConnectionStatusParams{
 					ID:           connectionID,

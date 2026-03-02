@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"breadbox/internal/crypto"
 	"breadbox/internal/provider"
 
 	plaidgo "github.com/plaid/plaid-go/v29/plaid"
@@ -16,7 +17,7 @@ import (
 // /transactions/sync endpoint. The cursor tracks pagination state; pass an
 // empty string on the first call.
 func (p *PlaidProvider) SyncTransactions(ctx context.Context, conn provider.Connection, cursor string) (provider.SyncResult, error) {
-	accessToken, err := Decrypt(conn.EncryptedCredentials, p.encryptionKey)
+	accessToken, err := crypto.Decrypt(conn.EncryptedCredentials, p.encryptionKey)
 	if err != nil {
 		return provider.SyncResult{}, fmt.Errorf("decrypt access token: %w", err)
 	}

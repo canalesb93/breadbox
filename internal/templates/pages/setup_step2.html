@@ -32,5 +32,11 @@
 
     <button type="submit">Validate and Continue</button>
   </form>
+
+  <form method="POST" action="/admin/setup/step/2" style="margin-top: 1rem; text-align: center;">
+    {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+    <input type="hidden" name="skip" value="true">
+    <button type="submit" class="secondary outline">Skip for now</button>
+  </form>
 </article>
 {{end}}

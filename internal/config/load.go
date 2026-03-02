@@ -67,6 +67,13 @@ func Load() (*Config, error) {
 	cfg.PlaidSecret = os.Getenv("PLAID_SECRET")
 	cfg.PlaidEnv = os.Getenv("PLAID_ENV")
 
+	// Teller env vars.
+	cfg.TellerAppID = os.Getenv("TELLER_APP_ID")
+	cfg.TellerCertPath = os.Getenv("TELLER_CERT_PATH")
+	cfg.TellerKeyPath = os.Getenv("TELLER_KEY_PATH")
+	cfg.TellerEnv = getEnv("TELLER_ENV", "sandbox")
+	cfg.TellerWebhookSecret = os.Getenv("TELLER_WEBHOOK_SECRET")
+
 	// Connection pool tuning.
 	cfg.DBMaxConns = int32(getEnvInt("DB_MAX_CONNS", 25))
 	cfg.DBMinConns = int32(getEnvInt("DB_MIN_CONNS", 2))
@@ -117,6 +124,14 @@ func LoadWithDB(ctx context.Context, cfg *Config, pool *pgxpool.Pool) error {
 		if cfg.PlaidEnv == "" {
 			cfg.PlaidEnv = "sandbox"
 		}
+	}
+
+	// Teller app_config fallbacks (cert/key paths and webhook secret are env-only).
+	if cfg.TellerAppID == "" {
+		cfg.TellerAppID = appCfg["teller_app_id"]
+	}
+	if cfg.TellerEnv == "sandbox" && appCfg["teller_env"] != "" {
+		cfg.TellerEnv = appCfg["teller_env"]
 	}
 
 	// Prefer sync_interval_minutes; fall back to sync_interval_hours (legacy).

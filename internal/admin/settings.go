@@ -30,6 +30,9 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 			"PlaidSecret":       a.Config.PlaidSecret,
 			"PlaidEnv":          a.Config.PlaidEnv,
 			"PlaidFromEnv":      os.Getenv("PLAID_CLIENT_ID") != "",
+			"TellerAppID":       a.Config.TellerAppID,
+			"TellerEnv":         a.Config.TellerEnv,
+			"TellerFromEnv":     os.Getenv("TELLER_APP_ID") != "",
 		}
 		tr.Render(w, r, "settings.html", data)
 	}

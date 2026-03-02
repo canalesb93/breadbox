@@ -53,6 +53,22 @@
     {{end}}
   </article>
 
+  <article>
+    <header><strong>Teller</strong></header>
+
+    {{if .TellerFromEnv}}
+    <p>Teller is configured via environment variables.</p>
+    <dl>
+      <dt>App ID</dt>
+      <dd><code>{{.TellerAppID}}</code></dd>
+      <dt>Environment</dt>
+      <dd>{{.TellerEnv}}</dd>
+    </dl>
+    {{else}}
+    <p>Teller not configured. Set <code>TELLER_APP_ID</code>, <code>TELLER_CERT_PATH</code>, <code>TELLER_KEY_PATH</code> environment variables to enable.</p>
+    {{end}}
+  </article>
+
   <button type="submit">Save Settings</button>
 </form>
 
