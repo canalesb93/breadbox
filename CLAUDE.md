@@ -33,6 +33,14 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Teller auth: mTLS (app-level cert/key files) + per-connection access token via HTTP Basic Auth. Config: `TELLER_APP_ID`, `TELLER_CERT_PATH`, `TELLER_KEY_PATH`, `TELLER_ENV`, `TELLER_WEBHOOK_SECRET`.
 - Teller sync: date-range polling with 10-day overlap (no cursor). After sync, auto soft-delete stale *pending* transactions not returned by the API. Posted transactions are never auto-deleted.
 - Teller amounts: sign is opposite to Plaid. Teller negative=debit, Plaid positive=debit. Provider negates amounts before returning.
+- CSV provider: import-only, stub `Provider` interface (`ErrNotSupported` for sync/webhook/reauth, nil for `RemoveConnection`). Bypasses provider interface for actual import — uses service layer directly.
+- CSV dedup: `external_transaction_id = SHA-256(account_id|date|amount|description)` per account. Standard `UpsertTransaction` ON CONFLICT handles it.
+- Account settings: `display_name TEXT NULL` (template uses `COALESCE(display_name, name)`), `excluded BOOLEAN DEFAULT FALSE` (skips transaction upsert only, balances still refresh)
+- Connection pause: `paused BOOLEAN DEFAULT FALSE` orthogonal to `status`. Only cron respects pause; manual "Sync Now" bypasses it.
+- Per-connection sync interval: `sync_interval_override_minutes INTEGER NULL`. Cron fires at minimum interval, checks each connection's staleness individually.
+- Alpine.js v3 for admin UI interactivity (CDN, no build step). Replaces `alert()`/`confirm()` with inline patterns.
+- Dark mode: Pico CSS `prefers-color-scheme` auto-switch (no hardcoded `data-theme`). Badge/flash colors use CSS custom properties.
+- Badge rendering: `statusBadge()` and `syncBadge()` template functions replace copy-pasted if-chains.
 
 ## Canonical Enums
 
@@ -43,7 +51,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 
 ## Spec Documents
 
-Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Teller-specific details are in `docs/teller-integration.md`. Implementation order is in `docs/ROADMAP.md`.
+Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Teller-specific details are in `docs/teller-integration.md`. CSV import details are in `docs/csv-import.md`. Implementation order is in `docs/ROADMAP.md`.
 
 ## Workflow Rules
 

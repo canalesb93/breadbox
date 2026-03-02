@@ -750,3 +750,393 @@ Verify Teller works end-to-end alongside Plaid:
 11. Test Teller reconnection: set connection to `pending_reauth`, complete Teller Connect reauth
 12. Settings page shows functional Teller configuration section
 13. `breadbox seed` inserts both Plaid and Teller test data
+
+---
+
+## Phase 10: Enhanced Settings & Connection Management
+
+Per-account controls, connection pausing, per-connection sync intervals, and provider credential testing.
+
+**Depends on:** Phases 8–9 (generic columns, both providers functional)
+
+### 10.1 Migration: Account Settings
+
+- [ ] Add `display_name TEXT NULL` and `excluded BOOLEAN NOT NULL DEFAULT FALSE` to `accounts`
+- [ ] `display_name NULL` means "use bank name" — templates use `COALESCE(display_name, name)`
+- [ ] `excluded` only affects transaction upserts (balances still refresh for reporting)
+- **Ref:** `data-model.md` Section 2.4
+- **Files:** `internal/db/migrations/00014_account_settings.sql`
+
+### 10.2 Migration: Connection Pause & Interval
+
+- [ ] Add `paused BOOLEAN NOT NULL DEFAULT FALSE` to `bank_connections`
+- [ ] Add `sync_interval_override_minutes INTEGER NULL` to `bank_connections`
+- [ ] `paused` is orthogonal to `status` — a connection can be `error` + `paused`
+- [ ] Manual "Sync Now" bypasses pause (only cron respects it)
+- **Ref:** `data-model.md` Section 2.3
+- **Files:** `internal/db/migrations/00015_connection_pause.sql`
+
+### 10.3 sqlc Queries
+
+- [ ] `UpdateAccountDisplayName(ctx, id, display_name)` — nullable text
+- [ ] `UpdateAccountExcluded(ctx, id, excluded)` — boolean
+- [ ] `ListExcludedAccountIDsByConnection(ctx, connection_id)` — returns UUIDs
+- [ ] `UpdateConnectionPaused(ctx, id, paused)` — boolean
+- [ ] `UpdateConnectionSyncInterval(ctx, id, override_minutes)` — nullable int
+- [ ] `ListActiveUnpausedConnections(ctx)` — WHERE status='active' AND paused=false
+- [ ] Update existing account/connection queries to include new columns in SELECT
+- **Files:** `internal/db/queries/accounts.sql`, `internal/db/queries/bank_connections.sql`
+
+### 10.4 Sync Engine: Excluded Account Filtering
+
+- [ ] Before upserting transactions, fetch excluded account IDs for the connection
+- [ ] Skip transactions whose account is in the excluded set
+- [ ] Log skipped count at debug level
+- **Ref:** `architecture.md` Section 3
+- **Files:** `internal/sync/engine.go`
+
+### 10.5 Scheduler: Pause & Per-Connection Intervals
+
+- [ ] Replace `ListActiveConnections` with `ListActiveUnpausedConnections` for cron
+- [ ] Cron fires at the minimum interval (e.g., every 15 minutes)
+- [ ] For each connection: compute effective interval = `COALESCE(sync_interval_override_minutes, global_interval)`
+- [ ] Skip if `last_synced_at + effective_interval > now`
+- [ ] Startup sync also respects pause and per-connection intervals
+- **Files:** `internal/sync/scheduler.go`
+
+### 10.6 Admin Handlers: Account Settings
+
+- [ ] `POST /admin/api/accounts/{id}/excluded` — toggle `excluded` (JSON body: `{"excluded": true}`)
+- [ ] `POST /admin/api/accounts/{id}/display-name` — set display name (JSON body: `{"display_name": "My Checking"}`)
+- [ ] Both return updated account as JSON
+- **Files:** `internal/admin/connections.go`
+
+### 10.7 Admin Handlers: Connection Pause & Interval
+
+- [ ] `POST /admin/api/connections/{id}/paused` — toggle pause (JSON body: `{"paused": true}`)
+- [ ] `POST /admin/api/connections/{id}/sync-interval` — set override (JSON body: `{"minutes": 30}`, null to clear)
+- [ ] Both return updated connection as JSON
+- **Files:** `internal/admin/connections.go`
+
+### 10.8 Templates: Account & Connection Controls
+
+- [ ] Connection detail page: account rows with exclude toggle and display name inline edit
+- [ ] Connection detail page: pause/resume button, per-connection interval dropdown (15m, 30m, 1h, 2h, 4h, 12h, 24h, "Use global")
+- [ ] Connections list: "Paused" badge next to connection name when paused
+- [ ] All controls use `fetch()` POST calls (no full page reload)
+- **Files:** `internal/templates/pages/connection_detail.html`, `internal/templates/pages/connections.html`
+
+### 10.9 Settings: Test Connection Button
+
+- [ ] "Test Connection" button per configured provider on settings page
+- [ ] Plaid: call existing `ValidateCredentials` (API handshake)
+- [ ] Teller: attempt mTLS handshake to `https://api.teller.io/health` (or similar)
+- [ ] Display result inline: "Connection successful" or error message
+- **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`
+
+### Task Dependencies
+
+```
+10.1 (account migration) ─┐
+                           ├──> 10.3 (queries) ──> 10.4 (sync engine)
+10.2 (connection migration)┘                   ──> 10.5 (scheduler)
+                                               ──> 10.6 (account handlers)
+                                               ──> 10.7 (connection handlers)
+                                                        │
+                                                        v
+                                                   10.8 (templates)
+
+10.9 (test connection) — independent
+```
+
+### Checkpoint 10
+
+1. `breadbox migrate` applies migrations 00014 and 00015 cleanly
+2. `psql`: `\d accounts` shows `display_name` and `excluded` columns; `\d bank_connections` shows `paused` and `sync_interval_override_minutes`
+3. Connection detail page: toggle "Exclude" on an account → excluded accounts show strike-through or "Excluded" badge
+4. Trigger sync → excluded account's transactions are skipped (check sync log counts)
+5. Set display name on an account → name appears in connection detail and API responses
+6. Pause a connection → "Paused" badge appears; cron skips it (check sync logs after a cron tick)
+7. Click "Sync Now" on a paused connection → sync runs anyway (manual bypasses pause)
+8. Set per-connection interval to 15 minutes → that connection syncs more frequently than global interval
+9. Settings page: "Test Connection" for Plaid shows success with valid credentials
+
+---
+
+## Phase 11: CSV Import Provider
+
+Upload bank CSV exports, map columns, and import transactions with hash-based deduplication.
+
+**Depends on:** Phase 8 (generic columns, `csv` in provider_type enum)
+
+### 11.1 CSV Parser
+
+- [ ] Read file into memory (max 10MB)
+- [ ] Auto-detect delimiter: try comma, tab, semicolon, pipe — pick the one that produces consistent column counts
+- [ ] Strip BOM (UTF-8 `\xEF\xBB\xBF`, UTF-16 LE/BE)
+- [ ] Return headers (first row) and data rows
+- [ ] Reject files with < 2 rows or > 50,000 rows
+- [ ] 10,000 row limit for preview (return first 10 rows to UI, full data for import)
+- **Ref:** `csv-import.md` Sections 2, 3
+- **Files:** `internal/provider/csv/parser.go` (new)
+
+### 11.2 Column Mapping & Templates
+
+- [ ] Pre-built templates: Chase (credit + checking), Bank of America, Wells Fargo, Capital One, Amex
+- [ ] Each template: header patterns, column mappings, sign convention, date format hint
+- [ ] Auto-detect: compare parsed headers against all templates, return best match
+- [ ] Sign convention toggle: "Positive = debit" (default) vs "Positive = credit"
+- **Ref:** `csv-import.md` Sections 3, 4
+- **Files:** `internal/provider/csv/templates.go` (new)
+
+### 11.3 Import Logic
+
+- [ ] Apply column mapping to each row → (date, amount, description, category?, merchant?)
+- [ ] Parse dates using auto-detection strategy (try formats against first 20 values, pick best)
+- [ ] Parse amounts: strip currency symbols, handle commas, parenthetical negatives, split debit/credit columns
+- [ ] Normalize sign per selected convention (positive = debit in storage)
+- [ ] Generate `external_transaction_id = SHA-256(account_id|date|amount|description)`
+- [ ] Return list of parsed transactions + list of skipped rows with reasons
+- **Ref:** `csv-import.md` Sections 5, 6, 7
+- **Files:** `internal/provider/csv/import.go` (new)
+
+### 11.4 CSV Provider Stub
+
+- [ ] Implement `Provider` interface — all methods return `provider.ErrNotSupported` except `RemoveConnection` (returns nil)
+- [ ] Add `var _ provider.Provider = (*CSVProvider)(nil)` compile-time check
+- [ ] Constructor: `NewProvider(logger)` (no config needed)
+- **Ref:** `csv-import.md` Section 9
+- **Files:** `internal/provider/csv/provider.go` (new)
+
+### 11.5 Import Service
+
+- [ ] `ImportCSV(ctx, params)` — orchestrates the full import flow
+- [ ] Create or reuse CSV connection + account for the selected member
+- [ ] Call import logic to parse rows
+- [ ] Upsert transactions via existing `UpsertTransaction` (reuses ON CONFLICT)
+- [ ] Create `sync_logs` entry with `trigger = manual`, `provider = csv`
+- [ ] Return import result: total, inserted, updated, skipped counts
+- **Ref:** `csv-import.md` Sections 7, 8
+- **Files:** `internal/service/csv.go` (new)
+
+### 11.6 Admin Handlers
+
+- [ ] `GET /admin/connections/import-csv` — render import wizard page
+- [ ] `POST /admin/api/csv/upload` — multipart upload (10MB limit), parse file, return headers + preview rows + auto-detected template
+- [ ] `POST /admin/api/csv/preview` — apply column mapping to uploaded data, return first 10 parsed rows with validation
+- [ ] `POST /admin/api/csv/import` — execute full import with confirmed mapping, return results
+- [ ] Upload stored in memory (not on disk) for the duration of the wizard session
+- **Files:** `internal/admin/csv_import.go` (new)
+
+### 11.7 Template: Import Wizard
+
+- [ ] Multi-step wizard UI (fetch-driven, no full page reloads):
+  - Step 1: Select family member + file upload
+  - Step 2: Column mapping dropdowns + sign toggle + template auto-select + preview table
+  - Step 3: Confirm summary (row count, date range, account name)
+  - Step 4: Results (counts + link to connection detail)
+- [ ] Use wizard layout consistent with setup wizard
+- **Ref:** `csv-import.md` Section 2
+- **Files:** `internal/templates/pages/csv_import.html` (new)
+
+### 11.8 Re-Import: Connection Detail Integration
+
+- [ ] CSV connections show "Import More" button on connection detail page
+- [ ] Button links to `/admin/connections/import-csv?connection_id={id}`
+- [ ] Wizard pre-fills member and account name from existing connection
+- **Ref:** `csv-import.md` Section 8
+- **Files:** `internal/templates/pages/connection_detail.html`
+
+### 11.9 App Init & Spec Doc
+
+- [ ] Register CSV provider in `app.New()` — always available (no config/credentials needed)
+- [ ] Log "csv provider registered" at startup
+- [ ] Verify `docs/csv-import.md` spec is complete and consistent with implementation
+- **Files:** `internal/app/app.go`, `docs/csv-import.md`
+
+### Task Dependencies
+
+```
+11.1 (parser) ──┐
+                 ├──> 11.3 (import logic) ──> 11.5 (service) ──> 11.6 (handlers) ──> 11.7 (wizard template)
+11.2 (templates)┘                                                                ──> 11.8 (re-import)
+
+11.4 (provider stub) ──> 11.9 (app init) — independent of import flow
+```
+
+### Checkpoint 11
+
+1. `go build ./cmd/breadbox/` compiles cleanly
+2. Start server — log shows "csv provider registered"
+3. Navigate to "Import CSV" page (linked from connections page or nav)
+4. Upload a Chase credit card CSV → template auto-detected, columns pre-mapped
+5. Preview shows correct dates, amounts (negative = charges), descriptions
+6. Confirm import → "Imported N transactions" result page
+7. Connection detail shows CSV connection with "Import More" button
+8. Upload the same CSV again → all transactions count as "updated" (dedup working)
+9. Upload a Bank of America CSV for a different member → separate connection created
+10. REST API: `GET /api/v1/transactions?user_id={id}` includes CSV-imported transactions
+11. Try uploading a malformed CSV (wrong encoding, < 2 rows) → clear error messages
+
+---
+
+## Phase 12A: Admin UI Foundation
+
+Modernize the admin template system, add Alpine.js interactivity, and prepare for new pages.
+
+**Depends on:** None (independent of all other phases, can be done in parallel)
+
+### 12A.1 Pico CSS: Classless → Class-Based
+
+- [ ] Switch from `pico.classless.min.css` to `pico.min.css` (class-based variant)
+- [ ] Add required Pico classes to elements: `<table class="striped">`, `<button class="secondary">`, `<article>`, etc.
+- [ ] Update both `base.html` and `wizard.html` layouts
+- [ ] Verify all existing pages render correctly after switch
+- **Files:** `internal/templates/layout/base.html`, `internal/templates/layout/wizard.html`
+
+### 12A.2 Add Alpine.js
+
+- [ ] Add Alpine.js v3 via CDN `<script>` tag in base layout
+- [ ] Replace all `alert()` / `confirm()` calls with inline Alpine patterns (e.g., `x-data="{ confirming: false }"`)
+- [ ] Target: connection delete confirm, API key revoke confirm, sync trigger confirm
+- **Files:** `internal/templates/layout/base.html`, `internal/templates/pages/connection_detail.html`, `internal/templates/pages/api_keys.html`
+
+### 12A.3 Dark Mode
+
+- [ ] Remove `data-theme="light"` from `<html>` tag (lets Pico respect `prefers-color-scheme`)
+- [ ] Replace all hardcoded hex colors in badge/flash styles with Pico CSS custom properties (`--pico-color-green-500`, `--pico-color-red-500`, etc.)
+- [ ] Test both light and dark themes render correctly
+- **Depends on:** 12A.1 (needs class-based Pico)
+- **Files:** `internal/templates/layout/base.html`, `internal/templates/layout/wizard.html`
+
+### 12A.4 Badge Template Functions
+
+- [ ] Add `statusBadge(status string)` template function — returns HTML for connection status badges (`active`=green, `error`=red, `pending_reauth`=yellow, `disconnected`=gray)
+- [ ] Add `syncBadge(status string)` template function — returns HTML for sync status badges (`success`=green, `error`=red, `in_progress`=blue)
+- [ ] Replace 4+ copy-pasted if-chains across templates with function calls
+- [ ] Badge colors use CSS custom properties (dark-mode compatible)
+- **Files:** `internal/admin/templates.go`, all pages with badges
+
+### 12A.5 Common Template Data Helper
+
+- [ ] Create `BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage string)` helper
+- [ ] Auto-injects: `CSRFToken`, `Flash` messages, `CurrentPage` (for nav highlighting), `PageTitle`
+- [ ] Reduce boilerplate in every handler (currently each handler manually assembles these fields)
+- **Files:** `internal/admin/templates.go`
+
+### 12A.6 Navigation Restructure
+
+- [ ] Group nav items into two sections:
+  - **Data:** Dashboard, Connections, Members, Transactions
+  - **System:** API Keys, Sync Logs, Settings
+- [ ] Add visual divider between sections
+- [ ] Alpine-powered hamburger menu for mobile (collapses on small screens)
+- [ ] Current page highlighting via `CurrentPage` from 12A.5
+- **Depends on:** 12A.2 (needs Alpine.js for hamburger)
+- **Files:** `internal/templates/partials/nav.html`
+
+### 12A.7 CSS Spacing Tokens
+
+- [ ] Define custom properties: `--bb-gap-xs` (0.25rem), `--bb-gap-sm` (0.5rem), `--bb-gap-md` (1rem), `--bb-gap-lg` (1.5rem), `--bb-gap-xl` (2rem)
+- [ ] Replace inline `style="margin-top: 1rem"` etc. with utility classes or token references
+- [ ] Add to base layout `<style>` block
+- **Files:** `internal/templates/layout/base.html`
+
+### Task Dependencies (12A)
+
+```
+12A.1 (class-based Pico) ──> 12A.3 (dark mode)
+12A.2 (Alpine.js) ──> 12A.6 (nav restructure)
+12A.4 (badge functions) — independent
+12A.5 (template data helper) — independent
+12A.7 (spacing tokens) — independent
+```
+
+### Checkpoint 12A
+
+1. All existing pages render correctly with class-based Pico CSS
+2. Dark mode: toggle OS/browser dark mode → admin UI switches theme automatically
+3. Badge colors are visible in both light and dark themes
+4. Confirm dialogs use inline Alpine patterns (no browser `alert()`/`confirm()`)
+5. Nav shows grouped sections with divider; hamburger collapses on narrow viewport
+6. No inline `style` attributes remain for spacing (replaced with tokens/classes)
+
+---
+
+## Phase 12B: Admin Transaction Pages
+
+Transaction list, account detail, and cross-linking throughout the admin UI.
+
+**Depends on:** Phase 12A (UI foundation), existing service layer
+
+### 12B.1 Service: Admin Transaction List
+
+- [ ] `ListTransactionsPagedAdmin(ctx, params)` — offset-based pagination (consistent with sync logs page)
+- [ ] JOIN account name, connection institution name, user name for display
+- [ ] Support all 10 filters: date range, account_id, user_id, category, amount min/max, pending, text search, connection_id, sort order
+- [ ] Return total count for pagination controls
+- **Ref:** `rest-api.md` Section 5.3 (filter spec), `admin-dashboard.md` Section 11 (pagination pattern)
+- **Files:** `internal/service/transactions.go`
+
+### 12B.2 Handler: Transaction List Page
+
+- [ ] `GET /admin/transactions` — parse filter query params from URL
+- [ ] Load dropdown data: accounts (with connection/user context), users, distinct categories
+- [ ] Render page with filters applied, preserve filter state in form
+- **Files:** `internal/admin/transactions.go` (new)
+
+### 12B.3 Template: Transaction List
+
+- [ ] Filter form: date range (start/end date inputs), account dropdown, user dropdown, category dropdown, amount range (min/max), pending toggle, text search input
+- [ ] Table columns: Date, Description, Amount, Account, Category, Status (pending/posted)
+- [ ] Alpine expandable row: click row to see full transaction detail (merchant, external ID, timestamps)
+- [ ] Offset-based pagination (page numbers, prev/next) consistent with sync logs
+- [ ] Amount formatting: color-coded (green for credits, default for debits), currency symbol
+- **Files:** `internal/templates/pages/transactions.html` (new)
+
+### 12B.4 Service: Account Detail
+
+- [ ] `GetAccountDetail(ctx, id)` — extends `AccountResponse` with connection institution name, provider, user name
+- [ ] Returns account info + pre-filtered transaction params for the template
+- **Files:** `internal/service/accounts.go`
+
+### 12B.5 Handler: Account Detail Page
+
+- [ ] `GET /admin/accounts/{id}` — load account detail + filtered transaction list
+- [ ] Reuses transaction list logic from 12B.1 with `account_id` pre-set
+- **Files:** `internal/admin/transactions.go`
+
+### 12B.6 Template: Account Detail
+
+- [ ] Info card: account name (display_name or bank name), type, subtype, mask, current/available balance, last balance update, connection link, user name
+- [ ] Transaction table: pre-filtered by account, same columns/pagination as 12B.3
+- [ ] "Edit" controls for display name and excluded status (from Phase 10, if available)
+- **Files:** `internal/templates/pages/account_detail.html` (new)
+
+### 12B.7 Routes & Cross-Links
+
+- [ ] Register routes: `GET /admin/transactions`, `GET /admin/accounts/{id}`
+- [ ] Add "Transactions" link to nav (Data section, after Connections)
+- [ ] Connection detail: account names link to `/admin/accounts/{id}`
+- [ ] Transaction list: account names link to account detail
+- [ ] Dashboard: add transaction count and "View All" link
+- **Files:** `internal/admin/router.go`, `internal/templates/pages/connection_detail.html`, `internal/templates/partials/nav.html`
+
+### Task Dependencies (12B)
+
+```
+12B.1 (service) ──> 12B.2 (handler) ──> 12B.3 (template) ──> 12B.7 (routes + cross-links)
+12B.4 (service) ──> 12B.5 (handler) ──> 12B.6 (template) ──> 12B.7 (routes + cross-links)
+```
+
+### Checkpoint 12B
+
+1. Navigate to Transactions page from nav → transaction list loads with all synced transactions
+2. Apply filters: date range → table updates; search "coffee" → filtered results; select an account → scoped list
+3. Pagination: click through pages, verify correct counts
+4. Click a transaction row → expands to show full detail (merchant, external ID, timestamps)
+5. Click an account name in the transaction list → navigates to account detail page
+6. Account detail: info card shows correct balances, type, connection link
+7. Account detail: transaction table is pre-filtered to that account
+8. Connection detail: account names are now clickable links
+9. Dashboard: transaction count is accurate, "View All" links to transaction list
