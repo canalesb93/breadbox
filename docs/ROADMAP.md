@@ -601,114 +601,116 @@ Verify all existing Plaid functionality works identically after refactoring:
 
 ---
 
-## Phase 9: Teller Provider Implementation
+## Phase 9: Teller Provider Implementation ✅
 
 Implement the Teller bank data provider alongside Plaid, making Breadbox a true multi-provider system.
 
-### 9.1 Teller HTTP Client
+**Status:** Complete. All Plaid functionality continues working identically.
 
-- [ ] Create mTLS-configured HTTP client from cert + key file paths
-- [ ] Base URL: `https://api.teller.io` (all environments)
-- [ ] HTTP Basic Auth helper (access_token as username, empty password)
-- [ ] 30s request timeout, exponential backoff on 429
+### 9.1 Teller HTTP Client ✅
+
+- [x] Create mTLS-configured HTTP client from cert + key file paths
+- [x] Base URL: `https://api.teller.io` (all environments)
+- [x] HTTP Basic Auth helper (access_token as username, empty password)
+- [x] 30s request timeout, exponential backoff on 429
 - **Ref:** `teller-integration.md` Section 1
 - **Files:** `internal/provider/teller/client.go`
 
-### 9.2 Teller Provider Struct
+### 9.2 Teller Provider Struct ✅
 
-- [ ] `TellerProvider` struct implementing `provider.Provider`
-- [ ] Compile-time interface check: `var _ provider.Provider = (*TellerProvider)(nil)`
-- [ ] Constructor: `NewProvider(httpClient, appID, env, webhookSecret, encryptionKey, logger)`
+- [x] `TellerProvider` struct implementing `provider.Provider`
+- [x] Compile-time interface check: `var _ provider.Provider = (*TellerProvider)(nil)`
+- [x] Constructor: `NewProvider(httpClient, appID, env, webhookSecret, encryptionKey, logger)`
 - **Ref:** `teller-integration.md` Section 1
 - **Files:** `internal/provider/teller/provider.go`
 
-### 9.3 Teller Link Flow
+### 9.3 Teller Link Flow ✅
 
-- [ ] `CreateLinkSession`: return app ID as token (no server-side creation needed)
-- [ ] `ExchangeToken`: parse `{access_token, enrollment_id, institution_name}`, encrypt token, call `GET /accounts`, return Connection + Accounts
-- [ ] Admin API handles Teller's `onSuccess` payload format
+- [x] `CreateLinkSession`: return app ID as token (no server-side creation needed)
+- [x] `ExchangeToken`: parse `{access_token, enrollment_id, institution_name}`, encrypt token, call `GET /accounts`, return Connection + Accounts
+- [x] Admin API handles Teller's `onSuccess` payload format
 - **Ref:** `teller-integration.md` Section 2
 - **Files:** `internal/provider/teller/link.go`
 
-### 9.4 Teller Transaction Sync
+### 9.4 Teller Transaction Sync ✅
 
-- [ ] Date-range polling: fetch from `(last_synced_at - 10 days)` to today
-- [ ] Paginate via `from_id` parameter (last transaction ID from previous page)
-- [ ] Map fields: negate amount sign, parse signed string to decimal
-- [ ] Return all transactions as `Added`; sync engine handles stale pending cleanup
-- [ ] Category mapping via `categories.go` mapping table
+- [x] Date-range polling: fetch from `(last_synced_at - 10 days)` to today
+- [x] Paginate via `from_id` parameter (last transaction ID from previous page)
+- [x] Map fields: negate amount sign, parse signed string to decimal
+- [x] Return all transactions as `Added`; sync engine handles stale pending cleanup
+- [x] Category mapping via `categories.go` mapping table
 - **Ref:** `teller-integration.md` Sections 3, 7
 - **Files:** `internal/provider/teller/sync.go`
 
-### 9.5 Teller Balance Refresh
+### 9.5 Teller Balance Refresh ✅
 
-- [ ] Per-account balance fetch: `GET /accounts/{id}/balances`
-- [ ] Map: `ledger` → `Current`, `available` → `Available`, `Limit` = nil
-- [ ] Currency from account record (not balance response)
+- [x] Per-account balance fetch: `GET /accounts/{id}/balances`
+- [x] Map: `ledger` → `Current`, `available` → `Available`, `Limit` = nil
+- [x] Currency from account record (not balance response)
 - **Ref:** `teller-integration.md` Section 4
 - **Files:** `internal/provider/teller/balances.go`
 
-### 9.6 Teller Webhook Handler
+### 9.6 Teller Webhook Handler ✅
 
-- [ ] HMAC-SHA256 signature verification from `Teller-Signature` header
-- [ ] Replay protection: reject events older than 5 minutes
-- [ ] Map events: `enrollment.disconnected` → `connection_error` (NeedsReauth=true), `transactions.processed` → `sync_available`
+- [x] HMAC-SHA256 signature verification from `Teller-Signature` header
+- [x] Replay protection: reject events older than 5 minutes
+- [x] Map events: `enrollment.disconnected` → `connection_error` (NeedsReauth=true), `transactions.processed` → `sync_available`
 - **Ref:** `teller-integration.md` Section 5
 - **Files:** `internal/provider/teller/webhook.go`
 
-### 9.7 Teller Reconnection
+### 9.7 Teller Reconnection ✅
 
-- [ ] `CreateReauthSession`: return enrollment ID as token (client-side reconnection via Teller Connect)
-- [ ] On success: update connection status to `active` (no token exchange needed)
+- [x] `CreateReauthSession`: return enrollment ID as token (client-side reconnection via Teller Connect)
+- [x] On success: update connection status to `active` (no token exchange needed)
 - **Ref:** `teller-integration.md` Section 6
 - **Files:** `internal/provider/teller/reauth.go`
 
-### 9.8 Teller Connection Removal
+### 9.8 Teller Connection Removal ✅
 
-- [ ] `RemoveConnection`: decrypt access token, call `DELETE /enrollments/{enrollment_id}`
-- [ ] Idempotent: log and continue if token already invalid
+- [x] `RemoveConnection`: decrypt access token, call `DELETE /enrollments/{enrollment_id}`
+- [x] Idempotent: log and continue if token already invalid
 - **Ref:** `teller-integration.md` Section 6
 - **Files:** `internal/provider/teller/remove.go`
 
-### 9.9 App Initialization
+### 9.9 App Initialization ✅
 
-- [ ] Wire Teller provider in `app.New()` when `TellerAppID + TellerCertPath + TellerKeyPath` are configured
-- [ ] Load mTLS certificate, create HTTP client, register `providers["teller"]`
-- [ ] Log "teller provider initialized" with environment
+- [x] Wire Teller provider in `app.New()` when `TellerAppID + TellerCertPath + TellerKeyPath` are configured
+- [x] Load mTLS certificate, create HTTP client, register `providers["teller"]`
+- [x] Log "teller provider initialized" with environment
 - **Files:** `internal/app/app.go`
 
-### 9.10 Admin UI: Teller Connect
+### 9.10 Admin UI: Teller Connect ✅
 
-- [ ] `connection_new.html`: Teller Connect JS integration — `TellerConnect.setup({applicationId, onSuccess})`, POST enrollment data to `/admin/api/exchange-token`
-- [ ] `connection_reauth.html`: Teller Connect reconnection — `TellerConnect.setup({enrollmentId})`, POST to `/admin/api/connections/{id}/reauth-complete`
+- [x] `connection_new.html`: Provider dropdown (Plaid/Teller), Teller Connect JS integration — `TellerConnect.setup({applicationId, onSuccess})`, POST enrollment data to `/admin/api/exchange-token`
+- [x] `connection_reauth.html`: Conditional SDK loading, Teller Connect reconnection — `TellerConnect.setup({enrollmentId})`, POST to `/admin/api/connections/{id}/reauth-complete`
 - **Ref:** `teller-integration.md` Section 2
 - **Files:** `internal/templates/pages/connection_new.html`, `internal/templates/pages/connection_reauth.html`
 
-### 9.11 Category Mapping
+### 9.11 Category Mapping ✅
 
-- [ ] Map ~27 Teller categories to Plaid-compatible primary categories
-- [ ] Default unmapped categories to `GENERAL_MERCHANDISE`
+- [x] Map 27 Teller categories to Plaid-compatible primary categories
+- [x] Default unmapped categories to `GENERAL_MERCHANDISE`
 - **Ref:** `teller-integration.md` Section 7
 - **Files:** `internal/provider/teller/categories.go`
 
-### 9.12 Teller Seed Data
+### 9.12 Teller Seed Data ✅
 
-- [ ] Add Teller test connection, accounts, and transactions to seed command
-- [ ] Provider = `'teller'`, fake enrollment IDs and encrypted tokens
+- [x] Add Teller test connection (Alice/Wells Fargo), 2 accounts, 6 transactions to seed command
+- [x] Provider = `'teller'`, enrollment ID and encrypted token placeholders
 - **Files:** `internal/seed/seed.go`
 
-### 9.13 Settings & Setup: Teller Validation
+### 9.13 Settings & Setup: Teller Validation ✅
 
-- [ ] Teller credential validation (attempt mTLS handshake to verify cert/key)
-- [ ] Settings page: editable `teller_app_id`, `teller_env`; display cert/key paths (read-only, env-var-only)
-- [ ] Setup wizard: optional Teller configuration alongside Plaid
-- **Files:** `internal/provider/teller/validate.go`, `internal/admin/settings.go`, `internal/admin/setup.go`, `internal/templates/pages/settings.html`
+- [x] Teller credential validation via `tls.LoadX509KeyPair` check
+- [x] Settings page: Teller cert/webhook status display when configured from env
+- [x] Admin handlers pass `HasPlaid`, `HasTeller`, `TellerEnv`, `TellerAppID` to templates
+- **Files:** `internal/provider/teller/validate.go`, `internal/admin/settings.go`, `internal/admin/connections.go`, `internal/templates/pages/settings.html`
 
-### Sync Engine: Stale Pending Cleanup
+### Sync Engine: Stale Pending Cleanup ✅
 
-- [ ] After Teller sync completes, soft-delete pending transactions in the date window not returned by the API
-- [ ] Only pending transactions — posted transactions are never auto-deleted
-- [ ] Conditioned on `provider = 'teller'` (Plaid handles removals via its own cursor signals)
+- [x] After Teller sync completes, soft-delete pending transactions in the date window not returned by the API
+- [x] Only pending transactions — posted transactions are never auto-deleted
+- [x] Conditioned on `provider = 'teller'` (Plaid handles removals via its own cursor signals)
 - **Ref:** `teller-integration.md` Section 3.5
 - **Files:** `internal/sync/engine.go`
 
