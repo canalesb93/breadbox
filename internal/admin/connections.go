@@ -437,6 +437,148 @@ func SyncConnectionHandler(a *app.App) http.HandlerFunc {
 	}
 }
 
+// UpdateAccountExcludedHandler serves POST /admin/api/accounts/{id}/excluded.
+func UpdateAccountExcludedHandler(a *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "id")
+
+		var accountID pgtype.UUID
+		if err := accountID.Scan(idStr); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid account ID"})
+			return
+		}
+
+		var req struct {
+			Excluded bool `json:"excluded"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+			return
+		}
+
+		account, err := a.Queries.UpdateAccountExcluded(r.Context(), db.UpdateAccountExcludedParams{
+			ID:       accountID,
+			Excluded: req.Excluded,
+		})
+		if err != nil {
+			a.Logger.Error("update account excluded", "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update account"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, account)
+	}
+}
+
+// UpdateAccountDisplayNameHandler serves POST /admin/api/accounts/{id}/display-name.
+func UpdateAccountDisplayNameHandler(a *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "id")
+
+		var accountID pgtype.UUID
+		if err := accountID.Scan(idStr); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid account ID"})
+			return
+		}
+
+		var req struct {
+			DisplayName *string `json:"display_name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+			return
+		}
+
+		var displayName pgtype.Text
+		if req.DisplayName != nil && *req.DisplayName != "" {
+			displayName = pgtype.Text{String: *req.DisplayName, Valid: true}
+		}
+
+		account, err := a.Queries.UpdateAccountDisplayName(r.Context(), db.UpdateAccountDisplayNameParams{
+			ID:          accountID,
+			DisplayName: displayName,
+		})
+		if err != nil {
+			a.Logger.Error("update account display name", "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update account"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, account)
+	}
+}
+
+// UpdateConnectionPausedHandler serves POST /admin/api/connections/{id}/paused.
+func UpdateConnectionPausedHandler(a *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "id")
+
+		var connID pgtype.UUID
+		if err := connID.Scan(idStr); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid connection ID"})
+			return
+		}
+
+		var req struct {
+			Paused bool `json:"paused"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+			return
+		}
+
+		conn, err := a.Queries.UpdateConnectionPaused(r.Context(), db.UpdateConnectionPausedParams{
+			ID:     connID,
+			Paused: req.Paused,
+		})
+		if err != nil {
+			a.Logger.Error("update connection paused", "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update connection"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, conn)
+	}
+}
+
+// UpdateConnectionSyncIntervalHandler serves POST /admin/api/connections/{id}/sync-interval.
+func UpdateConnectionSyncIntervalHandler(a *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "id")
+
+		var connID pgtype.UUID
+		if err := connID.Scan(idStr); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid connection ID"})
+			return
+		}
+
+		var req struct {
+			Minutes *int32 `json:"minutes"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+			return
+		}
+
+		var interval pgtype.Int4
+		if req.Minutes != nil {
+			interval = pgtype.Int4{Int32: *req.Minutes, Valid: true}
+		}
+
+		conn, err := a.Queries.UpdateConnectionSyncInterval(r.Context(), db.UpdateConnectionSyncIntervalParams{
+			ID:                          connID,
+			SyncIntervalOverrideMinutes: interval,
+		})
+		if err != nil {
+			a.Logger.Error("update connection sync interval", "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update connection"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, conn)
+	}
+}
+
 // writeJSON writes a JSON response with the given status code.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")

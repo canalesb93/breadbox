@@ -29,6 +29,7 @@
           {{else if eq (printf "%s" .Status) "error"}}<span class="bb-badge bb-badge--error">Error</span>
           {{else}}<span class="bb-badge bb-badge--muted">Disconnected</span>
           {{end}}
+          {{if .Paused}}<span class="bb-badge bb-badge--muted">Paused</span>{{end}}
         </td>
         <td>{{if .LastSyncedAt.Valid}}{{relativeTime .LastSyncedAt.Time}}{{else}}Never{{end}}</td>
         <td>

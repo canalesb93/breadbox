@@ -1,3 +1,6 @@
+-include .local.env
+export
+
 .PHONY: dev build test lint migrate-up migrate-down migrate-create sqlc seed docker-up docker-down
 
 dev:

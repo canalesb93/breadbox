@@ -69,3 +69,14 @@ UPDATE bank_connections SET new_accounts_available = $2, updated_at = NOW() WHER
 
 -- name: UpdateConnectionConsentExpiration :exec
 UPDATE bank_connections SET consent_expiration_time = $2, status = 'pending_reauth', updated_at = NOW() WHERE id = $1;
+
+-- name: UpdateConnectionPaused :one
+UPDATE bank_connections SET paused = $2, updated_at = NOW()
+WHERE id = $1 RETURNING *;
+
+-- name: UpdateConnectionSyncInterval :one
+UPDATE bank_connections SET sync_interval_override_minutes = $2, updated_at = NOW()
+WHERE id = $1 RETURNING *;
+
+-- name: ListActiveUnpausedConnections :many
+SELECT * FROM bank_connections WHERE status = 'active' AND paused = false;

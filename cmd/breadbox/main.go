@@ -103,12 +103,12 @@ func runServe() error {
 	}
 
 	// Create and start the cron scheduler.
-	scheduler := sync.NewScheduler(a.SyncEngine, logger)
+	scheduler := sync.NewScheduler(a.SyncEngine, a.Queries, logger)
 	scheduler.Start(cfg.SyncIntervalMinutes)
 	a.Scheduler = scheduler
 
 	// Run startup sync for stale connections in background.
-	go scheduler.RunStartupSync(ctx, a.Queries, cfg.SyncIntervalMinutes)
+	go scheduler.RunStartupSync(ctx, cfg.SyncIntervalMinutes)
 
 	router := api.NewRouter(a, version)
 

@@ -41,3 +41,14 @@ WHERE bc.user_id = $1 ORDER BY bc.institution_name, a.name;
 SELECT a.*, bc.institution_name, bc.user_id
 FROM accounts a LEFT JOIN bank_connections bc ON a.connection_id = bc.id
 WHERE a.id = $1;
+
+-- name: UpdateAccountDisplayName :one
+UPDATE accounts SET display_name = $2, updated_at = NOW()
+WHERE id = $1 RETURNING *;
+
+-- name: UpdateAccountExcluded :one
+UPDATE accounts SET excluded = $2, updated_at = NOW()
+WHERE id = $1 RETURNING *;
+
+-- name: ListExcludedAccountIDsByConnection :many
+SELECT id FROM accounts WHERE connection_id = $1 AND excluded = true;

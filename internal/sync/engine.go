@@ -105,6 +105,16 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		return 0, 0, 0, fmt.Errorf("unknown provider: %s", conn.Provider)
 	}
 
+	// Fetch excluded account IDs for this connection.
+	excludedIDs, err := e.db.ListExcludedAccountIDsByConnection(ctx, connectionID)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("list excluded accounts: %w", err)
+	}
+	excludedSet := make(map[pgtype.UUID]bool, len(excludedIDs))
+	for _, id := range excludedIDs {
+		excludedSet[id] = true
+	}
+
 	// Build provider.Connection from DB row.
 	provConn := provider.Connection{
 		ProviderName:         string(conn.Provider),
@@ -172,21 +182,44 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		}
 		removed = len(pendingRemovals)
 
-		// Process added transactions.
+		// Process added transactions (skip excluded accounts).
+		var skipped int
 		for i := range pendingAdded {
+			accountID, err := e.resolveAccountID(ctx, pendingAdded[i].AccountExternalID, accountIDCache)
+			if err != nil {
+				logger.Error("resolve account for added txn", "external_id", pendingAdded[i].ExternalID, "error", err)
+				continue
+			}
+			if excludedSet[accountID] {
+				skipped++
+				continue
+			}
 			if err := e.upsertTransaction(ctx, &pendingAdded[i], accountIDCache, logger); err != nil {
 				logger.Error("upsert added transaction", "external_id", pendingAdded[i].ExternalID, "error", err)
 			}
+			added++
 		}
-		added = len(pendingAdded)
 
-		// Process modified transactions (same upsert logic).
+		// Process modified transactions (skip excluded accounts).
 		for i := range pendingModified {
+			accountID, err := e.resolveAccountID(ctx, pendingModified[i].AccountExternalID, accountIDCache)
+			if err != nil {
+				logger.Error("resolve account for modified txn", "external_id", pendingModified[i].ExternalID, "error", err)
+				continue
+			}
+			if excludedSet[accountID] {
+				skipped++
+				continue
+			}
 			if err := e.upsertTransaction(ctx, &pendingModified[i], accountIDCache, logger); err != nil {
 				logger.Error("upsert modified transaction", "external_id", pendingModified[i].ExternalID, "error", err)
 			}
+			modified++
 		}
-		modified = len(pendingModified)
+
+		if skipped > 0 {
+			logger.Debug("skipped transactions for excluded accounts", "skipped", skipped)
+		}
 
 		// Clean up stale pending transactions for Teller connections.
 		if string(conn.Provider) == "teller" {

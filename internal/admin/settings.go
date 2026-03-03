@@ -10,9 +10,11 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/db"
 	plaidprovider "breadbox/internal/provider/plaid"
+	tellerprovider "breadbox/internal/provider/teller"
 	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -122,6 +124,48 @@ func SettingsPostHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRendere
 
 		SetFlash(ctx, sm, "success", "Settings saved.")
 		http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+	}
+}
+
+// TestProviderHandler serves POST /admin/api/test-provider/{provider}.
+func TestProviderHandler(a *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		providerName := chi.URLParam(r, "provider")
+
+		type testResult struct {
+			Provider string `json:"provider"`
+			Success  bool   `json:"success"`
+			Message  string `json:"message"`
+		}
+
+		switch providerName {
+		case "plaid":
+			if a.Config.PlaidClientID == "" || a.Config.PlaidSecret == "" {
+				writeJSON(w, http.StatusOK, testResult{Provider: "plaid", Success: false, Message: "Plaid credentials not configured"})
+				return
+			}
+			err := plaidprovider.ValidateCredentials(r.Context(), a.Config.PlaidClientID, a.Config.PlaidSecret, a.Config.PlaidEnv)
+			if err != nil {
+				writeJSON(w, http.StatusOK, testResult{Provider: "plaid", Success: false, Message: err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusOK, testResult{Provider: "plaid", Success: true, Message: "Connection successful"})
+
+		case "teller":
+			if a.Config.TellerCertPath == "" || a.Config.TellerKeyPath == "" {
+				writeJSON(w, http.StatusOK, testResult{Provider: "teller", Success: false, Message: "Teller certificate not configured"})
+				return
+			}
+			err := tellerprovider.ValidateCredentials(a.Config.TellerCertPath, a.Config.TellerKeyPath)
+			if err != nil {
+				writeJSON(w, http.StatusOK, testResult{Provider: "teller", Success: false, Message: err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusOK, testResult{Provider: "teller", Success: true, Message: "Certificate valid"})
+
+		default:
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Unknown provider: " + providerName})
+		}
 	}
 }
 

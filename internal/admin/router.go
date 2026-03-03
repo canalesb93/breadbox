@@ -84,7 +84,12 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/connections/{id}/reauth", ConnectionReauthAPIHandler(a))
 		r.Post("/connections/{id}/reauth-complete", ConnectionReauthCompleteHandler(a))
 		r.Post("/connections/{id}/sync", SyncConnectionHandler(a))
+		r.Post("/connections/{id}/paused", UpdateConnectionPausedHandler(a))
+		r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(a))
 		r.Delete("/connections/{id}", DeleteConnectionHandler(a))
+		r.Post("/accounts/{id}/excluded", UpdateAccountExcludedHandler(a))
+		r.Post("/accounts/{id}/display-name", UpdateAccountDisplayNameHandler(a))
+		r.Post("/test-provider/{provider}", TestProviderHandler(a))
 		r.Post("/users", CreateUserHandler(a))
 		r.Put("/users/{id}", UpdateUserHandler(a))
 

@@ -51,6 +51,13 @@
     </select>
     <small>Credentials will be validated before saving.</small>
     {{end}}
+
+    {{if or .PlaidFromEnv (ne .PlaidClientID "")}}
+    <div style="margin-top: 0.5rem;">
+      <button type="button" class="outline" onclick="testProvider('plaid')" id="test-plaid-btn">Test Plaid Connection</button>
+      <span id="test-plaid-result" style="margin-left: 0.5rem;"></span>
+    </div>
+    {{end}}
   </article>
 
   <article>
@@ -71,6 +78,13 @@
     {{else}}
     <p>Teller not configured. Set <code>TELLER_APP_ID</code>, <code>TELLER_CERT_PATH</code>, <code>TELLER_KEY_PATH</code> environment variables to enable.</p>
     {{end}}
+
+    {{if .TellerCertConfigured}}
+    <div style="margin-top: 0.5rem;">
+      <button type="button" class="outline" onclick="testProvider('teller')" id="test-teller-btn">Test Teller Connection</button>
+      <span id="test-teller-result" style="margin-left: 0.5rem;"></span>
+    </div>
+    {{end}}
   </article>
 
   <button type="submit">Save Settings</button>
@@ -78,4 +92,33 @@
 
 <hr>
 <p><a href="/admin/setup/step/1">Re-run Setup Wizard</a></p>
+
+<script>
+function testProvider(name) {
+  var btn = document.getElementById('test-' + name + '-btn');
+  var result = document.getElementById('test-' + name + '-result');
+  btn.disabled = true;
+  result.textContent = 'Testing...';
+  result.style.color = '';
+  fetch("/admin/api/test-provider/" + name, {
+    method: "POST"
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    btn.disabled = false;
+    if (data.success) {
+      result.textContent = data.message;
+      result.style.color = 'green';
+    } else {
+      result.textContent = data.message || data.error;
+      result.style.color = 'red';
+    }
+  })
+  .catch(function() {
+    btn.disabled = false;
+    result.textContent = 'Network error';
+    result.style.color = 'red';
+  });
+}
+</script>
 {{end}}

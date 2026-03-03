@@ -21,6 +21,7 @@
     {{else if eq (printf "%s" .Connection.Status) "error"}}<span class="bb-badge bb-badge--error">Error</span>
     {{else}}<span class="bb-badge bb-badge--muted">Disconnected</span>
     {{end}}
+    {{if .Connection.Paused}}<span class="bb-badge bb-badge--muted">Paused</span>{{end}}
   </dd>
   <dt>Connected</dt>
   <dd>{{if .Connection.CreatedAt.Valid}}{{.Connection.CreatedAt.Time.Format "January 2, 2006"}}{{end}}</dd>
@@ -28,14 +29,30 @@
   <dd>{{.Connection.Provider}}</dd>
 </dl>
 
-<div style="display: flex; gap: 0.5rem; margin-bottom: 2rem;">
+<div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
   {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
   <a href="/admin/connections/{{.ConnID}}/reauth" role="button" class="outline">Re-authenticate</a>
   {{end}}
   {{if eq (printf "%s" .Connection.Status) "active"}}
   <button class="outline" onclick="syncConnection()" id="sync-btn">Sync Now</button>
   {{end}}
+  <button class="outline" onclick="togglePause()" id="pause-btn">{{if .Connection.Paused}}Resume{{else}}Pause{{end}}</button>
   <button class="secondary outline" onclick="removeConnection()" id="remove-btn">Remove Connection</button>
+</div>
+
+<div style="margin-bottom: 2rem;">
+  <label for="sync-interval" style="display: inline; margin-right: 0.5rem;">Sync Interval:</label>
+  <select id="sync-interval" onchange="updateSyncInterval(this.value)" style="display: inline-block; width: auto;">
+    <option value=""{{if not .Connection.SyncIntervalOverrideMinutes.Valid}} selected{{end}}>Use global</option>
+    <option value="15"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 15)}} selected{{end}}>Every 15 min</option>
+    <option value="30"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 30)}} selected{{end}}>Every 30 min</option>
+    <option value="60"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 60)}} selected{{end}}>Every 1 hour</option>
+    <option value="120"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 120)}} selected{{end}}>Every 2 hours</option>
+    <option value="240"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 240)}} selected{{end}}>Every 4 hours</option>
+    <option value="720"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 720)}} selected{{end}}>Every 12 hours</option>
+    <option value="1440"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 1440)}} selected{{end}}>Every 24 hours</option>
+  </select>
+  <span id="interval-status" style="margin-left: 0.5rem;"></span>
 </div>
 
 <h2>Accounts</h2>
@@ -45,20 +62,32 @@
     <thead>
       <tr>
         <th>Account Name</th>
+        <th>Display Name</th>
         <th>Mask</th>
         <th>Type</th>
         <th>Current Balance</th>
         <th>Available Balance</th>
+        <th>Excluded</th>
       </tr>
     </thead>
     <tbody>
       {{range .Accounts}}
-      <tr>
+      <tr{{if .Excluded}} style="opacity: 0.6;"{{end}}>
         <td>{{.Name}}</td>
+        <td>
+          <input type="text" value="{{.DisplayName.String}}" placeholder="{{.Name}}"
+            onchange="updateDisplayName('{{formatUUID .ID}}', this.value)"
+            style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.875rem;">
+        </td>
         <td>{{if .Mask.Valid}}&bull;&bull;&bull;&bull;{{.Mask.String}}{{end}}</td>
         <td>{{.Type}}{{if .Subtype.Valid}} / {{.Subtype.String}}{{end}}</td>
         <td>{{if .BalanceCurrent.Valid}}{{formatNumeric .BalanceCurrent}}{{if .IsoCurrencyCode.Valid}} {{.IsoCurrencyCode.String}}{{end}}{{else}}&mdash;{{end}}</td>
         <td>{{if .BalanceAvailable.Valid}}{{formatNumeric .BalanceAvailable}}{{if .IsoCurrencyCode.Valid}} {{.IsoCurrencyCode.String}}{{end}}{{else}}&mdash;{{end}}</td>
+        <td>
+          <input type="checkbox" {{if .Excluded}}checked{{end}}
+            onchange="toggleExcluded('{{formatUUID .ID}}', this.checked)"
+            style="margin: 0;">
+        </td>
       </tr>
       {{end}}
     </tbody>
@@ -159,6 +188,95 @@ function removeConnection() {
     }
   })
   .catch(function () {
+    alert("Network error. Please try again.");
+  });
+}
+
+function togglePause() {
+  var btn = document.getElementById('pause-btn');
+  var isPaused = btn.textContent.trim() === 'Resume';
+  var newPaused = !isPaused;
+  btn.disabled = true;
+  fetch("/admin/api/connections/{{.ConnID}}/paused", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({paused: newPaused})
+  })
+  .then(function(res) {
+    if (res.ok) {
+      window.location.reload();
+    } else {
+      return res.json().then(function(data) {
+        alert(data.error || "Failed to update pause state.");
+        btn.disabled = false;
+      });
+    }
+  })
+  .catch(function() {
+    alert("Network error. Please try again.");
+    btn.disabled = false;
+  });
+}
+
+function updateSyncInterval(val) {
+  var body = val === "" ? {minutes: null} : {minutes: parseInt(val, 10)};
+  var status = document.getElementById('interval-status');
+  status.textContent = 'Saving...';
+  fetch("/admin/api/connections/{{.ConnID}}/sync-interval", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(body)
+  })
+  .then(function(res) {
+    if (res.ok) {
+      status.textContent = 'Saved';
+      setTimeout(function() { status.textContent = ''; }, 2000);
+    } else {
+      return res.json().then(function(data) {
+        status.textContent = data.error || 'Failed';
+      });
+    }
+  })
+  .catch(function() {
+    status.textContent = 'Network error';
+  });
+}
+
+function updateDisplayName(accountId, val) {
+  var body = val === "" ? {display_name: null} : {display_name: val};
+  fetch("/admin/api/accounts/" + accountId + "/display-name", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(body)
+  })
+  .then(function(res) {
+    if (!res.ok) {
+      return res.json().then(function(data) {
+        alert(data.error || "Failed to update display name.");
+      });
+    }
+  })
+  .catch(function() {
+    alert("Network error. Please try again.");
+  });
+}
+
+function toggleExcluded(accountId, checked) {
+  fetch("/admin/api/accounts/" + accountId + "/excluded", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({excluded: checked})
+  })
+  .then(function(res) {
+    if (res.ok) {
+      window.location.reload();
+    } else {
+      return res.json().then(function(data) {
+        alert(data.error || "Failed to update excluded state.");
+      });
+    }
+  })
+  .catch(function() {
     alert("Network error. Please try again.");
   });
 }

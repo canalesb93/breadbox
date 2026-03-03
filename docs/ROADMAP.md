@@ -755,85 +755,87 @@ Verify Teller works end-to-end alongside Plaid:
 
 ---
 
-## Phase 10: Enhanced Settings & Connection Management
+## Phase 10: Enhanced Settings & Connection Management ✅
 
 Per-account controls, connection pausing, per-connection sync intervals, and provider credential testing.
 
 **Depends on:** Phases 8–9 (generic columns, both providers functional)
 
-### 10.1 Migration: Account Settings
+**Status:** Complete. Checkpoint 10 ready for verification.
 
-- [ ] Add `display_name TEXT NULL` and `excluded BOOLEAN NOT NULL DEFAULT FALSE` to `accounts`
-- [ ] `display_name NULL` means "use bank name" — templates use `COALESCE(display_name, name)`
-- [ ] `excluded` only affects transaction upserts (balances still refresh for reporting)
+### 10.1 Migration: Account Settings ✅
+
+- [x] Add `display_name TEXT NULL` and `excluded BOOLEAN NOT NULL DEFAULT FALSE` to `accounts`
+- [x] `display_name NULL` means "use bank name" — templates use `COALESCE(display_name, name)`
+- [x] `excluded` only affects transaction upserts (balances still refresh for reporting)
 - **Ref:** `data-model.md` Section 2.4
 - **Files:** `internal/db/migrations/00014_account_settings.sql`
 
-### 10.2 Migration: Connection Pause & Interval
+### 10.2 Migration: Connection Pause & Interval ✅
 
-- [ ] Add `paused BOOLEAN NOT NULL DEFAULT FALSE` to `bank_connections`
-- [ ] Add `sync_interval_override_minutes INTEGER NULL` to `bank_connections`
-- [ ] `paused` is orthogonal to `status` — a connection can be `error` + `paused`
-- [ ] Manual "Sync Now" bypasses pause (only cron respects it)
+- [x] Add `paused BOOLEAN NOT NULL DEFAULT FALSE` to `bank_connections`
+- [x] Add `sync_interval_override_minutes INTEGER NULL` to `bank_connections`
+- [x] `paused` is orthogonal to `status` — a connection can be `error` + `paused`
+- [x] Manual "Sync Now" bypasses pause (only cron respects it)
 - **Ref:** `data-model.md` Section 2.3
 - **Files:** `internal/db/migrations/00015_connection_pause.sql`
 
-### 10.3 sqlc Queries
+### 10.3 sqlc Queries ✅
 
-- [ ] `UpdateAccountDisplayName(ctx, id, display_name)` — nullable text
-- [ ] `UpdateAccountExcluded(ctx, id, excluded)` — boolean
-- [ ] `ListExcludedAccountIDsByConnection(ctx, connection_id)` — returns UUIDs
-- [ ] `UpdateConnectionPaused(ctx, id, paused)` — boolean
-- [ ] `UpdateConnectionSyncInterval(ctx, id, override_minutes)` — nullable int
-- [ ] `ListActiveUnpausedConnections(ctx)` — WHERE status='active' AND paused=false
-- [ ] Update existing account/connection queries to include new columns in SELECT
+- [x] `UpdateAccountDisplayName(ctx, id, display_name)` — nullable text
+- [x] `UpdateAccountExcluded(ctx, id, excluded)` — boolean
+- [x] `ListExcludedAccountIDsByConnection(ctx, connection_id)` — returns UUIDs
+- [x] `UpdateConnectionPaused(ctx, id, paused)` — boolean
+- [x] `UpdateConnectionSyncInterval(ctx, id, override_minutes)` — nullable int
+- [x] `ListActiveUnpausedConnections(ctx)` — WHERE status='active' AND paused=false
+- [x] Update existing account/connection queries to include new columns in SELECT
 - **Files:** `internal/db/queries/accounts.sql`, `internal/db/queries/bank_connections.sql`
 
-### 10.4 Sync Engine: Excluded Account Filtering
+### 10.4 Sync Engine: Excluded Account Filtering ✅
 
-- [ ] Before upserting transactions, fetch excluded account IDs for the connection
-- [ ] Skip transactions whose account is in the excluded set
-- [ ] Log skipped count at debug level
+- [x] Before upserting transactions, fetch excluded account IDs for the connection
+- [x] Skip transactions whose account is in the excluded set
+- [x] Log skipped count at debug level
 - **Ref:** `architecture.md` Section 3
 - **Files:** `internal/sync/engine.go`
 
-### 10.5 Scheduler: Pause & Per-Connection Intervals
+### 10.5 Scheduler: Pause & Per-Connection Intervals ✅
 
-- [ ] Replace `ListActiveConnections` with `ListActiveUnpausedConnections` for cron
-- [ ] Cron fires at the minimum interval (e.g., every 15 minutes)
-- [ ] For each connection: compute effective interval = `COALESCE(sync_interval_override_minutes, global_interval)`
-- [ ] Skip if `last_synced_at + effective_interval > now`
-- [ ] Startup sync also respects pause and per-connection intervals
+- [x] Replace `ListActiveConnections` with `ListActiveUnpausedConnections` for cron
+- [x] Cron fires at the minimum interval (e.g., every 15 minutes)
+- [x] For each connection: compute effective interval = `COALESCE(sync_interval_override_minutes, global_interval)`
+- [x] Skip if `last_synced_at + effective_interval > now`
+- [x] Startup sync also respects pause and per-connection intervals
 - **Files:** `internal/sync/scheduler.go`
 
-### 10.6 Admin Handlers: Account Settings
+### 10.6 Admin Handlers: Account Settings ✅
 
-- [ ] `POST /admin/api/accounts/{id}/excluded` — toggle `excluded` (JSON body: `{"excluded": true}`)
-- [ ] `POST /admin/api/accounts/{id}/display-name` — set display name (JSON body: `{"display_name": "My Checking"}`)
-- [ ] Both return updated account as JSON
+- [x] `POST /admin/api/accounts/{id}/excluded` — toggle `excluded` (JSON body: `{"excluded": true}`)
+- [x] `POST /admin/api/accounts/{id}/display-name` — set display name (JSON body: `{"display_name": "My Checking"}`)
+- [x] Both return updated account as JSON
 - **Files:** `internal/admin/connections.go`
 
-### 10.7 Admin Handlers: Connection Pause & Interval
+### 10.7 Admin Handlers: Connection Pause & Interval ✅
 
-- [ ] `POST /admin/api/connections/{id}/paused` — toggle pause (JSON body: `{"paused": true}`)
-- [ ] `POST /admin/api/connections/{id}/sync-interval` — set override (JSON body: `{"minutes": 30}`, null to clear)
-- [ ] Both return updated connection as JSON
+- [x] `POST /admin/api/connections/{id}/paused` — toggle pause (JSON body: `{"paused": true}`)
+- [x] `POST /admin/api/connections/{id}/sync-interval` — set override (JSON body: `{"minutes": 30}`, null to clear)
+- [x] Both return updated connection as JSON
 - **Files:** `internal/admin/connections.go`
 
-### 10.8 Templates: Account & Connection Controls
+### 10.8 Templates: Account & Connection Controls ✅
 
-- [ ] Connection detail page: account rows with exclude toggle and display name inline edit
-- [ ] Connection detail page: pause/resume button, per-connection interval dropdown (15m, 30m, 1h, 2h, 4h, 12h, 24h, "Use global")
-- [ ] Connections list: "Paused" badge next to connection name when paused
-- [ ] All controls use `fetch()` POST calls (no full page reload)
+- [x] Connection detail page: account rows with exclude toggle and display name inline edit
+- [x] Connection detail page: pause/resume button, per-connection interval dropdown (15m, 30m, 1h, 2h, 4h, 12h, 24h, "Use global")
+- [x] Connections list: "Paused" badge next to connection name when paused
+- [x] All controls use `fetch()` POST calls (no full page reload)
 - **Files:** `internal/templates/pages/connection_detail.html`, `internal/templates/pages/connections.html`
 
-### 10.9 Settings: Test Connection Button
+### 10.9 Settings: Test Connection Button ✅
 
-- [ ] "Test Connection" button per configured provider on settings page
-- [ ] Plaid: call existing `ValidateCredentials` (API handshake)
-- [ ] Teller: attempt mTLS handshake to `https://api.teller.io/health` (or similar)
-- [ ] Display result inline: "Connection successful" or error message
+- [x] "Test Connection" button per configured provider on settings page
+- [x] Plaid: call existing `ValidateCredentials` (API handshake)
+- [x] Teller: validate mTLS certificate key pair
+- [x] Display result inline: "Connection successful" or error message
 - **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`
 
 ### Task Dependencies
