@@ -1370,3 +1370,284 @@ Restructure the wizard for multi-provider onboarding, add missing settings featu
 7. Settings: Teller "not configured" has copy-ready env var snippet; `teller_app_id` is editable when not from env
 8. Settings: changing Plaid environment triggers confirmation dialog; encryption key shows "Configured" status
 9. Family Members: "Connections" column shows correct counts; new member flash has "Connect a bank →" link
+
+---
+
+## Phase 14: Deployment Readiness & Reliability
+
+Independent of Phases 10-13. Addresses confirmed deployment blockers and data pipeline reliability gaps identified by PM audit.
+
+### 14.1 README & Installation Guide
+
+- [ ] Create `README.md` at project root (none currently exists)
+- [ ] Project overview: what Breadbox does, who it's for, tech stack summary
+- [ ] Prerequisites: Go 1.24+, PostgreSQL 16+, Docker (optional)
+- [ ] Docker quickstart: `docker compose up` → setup wizard → first bank connection (5-minute path)
+- [ ] Manual install: build from source, configure PostgreSQL, set env vars, run migrations, start server
+- [ ] Configuration reference: all env vars with descriptions, defaults, and required/optional status
+- [ ] First-run walkthrough: setup wizard steps, adding a family member, connecting a bank
+- [ ] Link to `docs/` for detailed architecture and specs
+- **Ref:** No existing README — `docs/architecture.md` sections 7-8 have some deployment info to consolidate
+- **Files:** `README.md` (new)
+
+### 14.2 ENCRYPTION_KEY Startup Validation
+
+- [ ] Fail fast on `breadbox serve` if `ENCRYPTION_KEY` is empty/unset and Plaid or Teller providers are configured
+- [ ] Currently: app starts successfully but crashes at runtime when `crypto.Encrypt` is called with nil key (e.g., when storing a Plaid access token after link)
+- [ ] Check: if `cfg.EncryptionKey == nil` AND (`cfg.PlaidClientID != ""` OR `cfg.TellerAppID != ""`), return startup error
+- [ ] Allow startup without key if only CSV provider is used (CSV doesn't encrypt anything)
+- [ ] Clear error message: "ENCRYPTION_KEY is required when Plaid or Teller providers are configured. Generate one with: openssl rand -hex 32"
+- **Ref:** `internal/config/load.go` lines 53-63 (validation exists for format but not presence)
+- **Files:** `internal/config/load.go`, `cmd/breadbox/main.go`
+
+### 14.3 Docker Compose Hardening
+
+- [ ] Change `ports: "5432:5432"` to `expose: ["5432"]` so PostgreSQL is only reachable from other containers, not the host network
+- [ ] Add warning comment in `.env.example` above `POSTGRES_PASSWORD`: "# IMPORTANT: Change this in production! Generate with: openssl rand -base64 32"
+- [ ] Add `.env.example` comment about `sslmode=disable` being appropriate only for Docker internal networking
+- [ ] Keep `ports` mapping for the app container (8080) since that needs host access
+- **Ref:** `docker-compose.yml` line 26, `.env.example` lines 55-57
+- **Files:** `docker-compose.yml`, `.env.example`
+
+### 14.4 Deep Health Check
+
+- [ ] Split into two endpoints: `GET /health/live` (basic, current behavior) and `GET /health/ready` (deep)
+- [ ] `/health/live`: returns `{"status":"ok","version":"..."}` — same as current `/health`
+- [ ] `/health/ready`: verifies DB connectivity (`pool.Ping`), checks scheduler is running, returns structured JSON: `{"status":"ok","db":"ok","scheduler":"running","version":"..."}`
+- [ ] If DB ping fails: `{"status":"degraded","db":"error","db_error":"..."}`
+- [ ] Keep `/health` as alias for `/health/live` (backwards compatible)
+- [ ] Response time target: <100ms for `/health/ready`
+- [ ] Docker Compose healthcheck should switch to `/health/ready`
+- **Ref:** `internal/api/health.go` lines 14-22 (current basic check)
+- **Files:** `internal/api/health.go`, `internal/api/router.go`, `docker-compose.yml`
+
+### 14.5 Transactional Sync Writes
+
+- [ ] Wrap the flush sequence in `engine.go` in a single DB transaction using `pool.Begin(ctx)`
+- [ ] Current behavior: soft-deletes (lines 178-182), added transaction upserts (lines 187-201), and modified transaction upserts (lines 204-218) are individual SQL statements
+- [ ] Risk: if upsert #50 of 100 fails, the first 49 are already committed — inconsistent state
+- [ ] Use `pgx.Tx` to get a `*db.Queries` scoped to the transaction: `tx.Begin()` → `db.New(tx)` → flush all → `tx.Commit()`
+- [ ] On error: `tx.Rollback()`, mark sync log as error
+- [ ] Balance updates (if any) should also be inside the same transaction
+- **Ref:** `internal/sync/engine.go` lines 176-218
+- **Files:** `internal/sync/engine.go`
+
+### 14.6 Orphaned Sync Log Cleanup
+
+- [ ] On app startup (before scheduler starts), query for any sync logs with `status = 'in_progress'`
+- [ ] Mark them as `status = 'error'` with `error_message = 'interrupted by server restart'` and `completed_at = NOW()`
+- [ ] New sqlc query: `CleanupOrphanedSyncLogs(ctx)` — `UPDATE sync_logs SET status='error', error_message='...', completed_at=NOW() WHERE status='in_progress'`
+- [ ] Log count of cleaned-up logs at INFO level on startup
+- [ ] Currently: orphaned `in_progress` logs remain forever after a crash
+- **Ref:** `internal/sync/engine.go` lines 52-60 (sync log creation)
+- **Files:** `internal/sync/engine.go` or `internal/app/app.go`, `internal/db/queries/sync_logs.sql`
+
+### 14.7 Per-Sync Timeout
+
+- [ ] Add `SYNC_TIMEOUT_SECONDS` config (default: 300 = 5 minutes)
+- [ ] Replace `context.Background()` in scheduler with `context.WithTimeout(ctx, syncTimeout)`
+- [ ] Currently: `context.Background()` with no deadline — a hung provider API call blocks the goroutine indefinitely
+- [ ] On timeout: sync engine marks sync log as error with "sync timed out after X seconds"
+- [ ] Timeout applies per-connection (each connection sync gets its own deadline)
+- **Ref:** `internal/sync/scheduler.go` lines 34-35
+- **Files:** `internal/sync/scheduler.go`, `internal/sync/engine.go`, `internal/config/config.go`
+
+### 14.8 Admin Password Reset CLI
+
+- [ ] Add `breadbox reset-password` cobra subcommand
+- [ ] Prompts for new password interactively (with confirmation), or accepts `--password` flag for scripted use
+- [ ] Connects directly to DB (uses `DATABASE_URL` env var), updates the admin account's password hash
+- [ ] Validates minimum 8 characters (same rule as setup wizard)
+- [ ] Currently: only way to reset is direct SQL or deleting admin accounts and re-running setup
+- [ ] Prints success message with admin username
+- **Ref:** `cmd/breadbox/main.go` lines 33-71 (existing cobra commands)
+- **Files:** `cmd/breadbox/main.go`, new file `cmd/breadbox/reset_password.go`
+
+### 14.9 Configurable Log Level
+
+- [ ] Add `LOG_LEVEL` env var: `debug`, `info`, `warn`, `error` (case-insensitive)
+- [ ] Default: `info` for docker environment, `debug` for local/development
+- [ ] `LOG_LEVEL` takes precedence over environment-based defaults when set
+- [ ] Currently: log level is hardcoded — docker=info, everything else=debug (lines 73-81)
+- [ ] Parse and validate on startup; warn if invalid value provided (fall back to default)
+- **Ref:** `cmd/breadbox/main.go` lines 73-81
+- **Files:** `cmd/breadbox/main.go`, `internal/config/config.go`
+
+### 14.10 Startup Validation Summary
+
+- [ ] Extend the existing boot banner (lines 141-158) to include:
+  - Teller provider status: "configured (sandbox)" / "not configured"
+  - ENCRYPTION_KEY: "configured" / "NOT SET"
+  - Admin account: "exists" / "none (setup wizard will run)"
+  - Setup status: "complete" / "pending"
+- [ ] Warn (log at WARN level, don't fail) for non-critical gaps: missing Teller config, no admin account
+- [ ] Fail (log at ERROR and exit) for critical gaps: missing ENCRYPTION_KEY when providers need it (see 14.2)
+- [ ] Helps operators verify configuration at a glance after deployment
+- **Ref:** `cmd/breadbox/main.go` lines 141-158 (existing banner)
+- **Files:** `cmd/breadbox/main.go`
+
+### 14.11 Backup & Restore Documentation
+
+- [ ] Create `docs/backup.md` with:
+  - `pg_dump` / `pg_restore` command examples for the Breadbox database
+  - Docker volume backup approach (for Docker Compose deployments)
+  - Cron-based automated backup script example
+  - Restore verification steps (check row counts, test login, verify sync status)
+  - Note about ENCRYPTION_KEY: must be preserved — without it, encrypted access tokens are unrecoverable
+- [ ] Link from README (14.1)
+- **Files:** `docs/backup.md` (new)
+
+### Task Dependencies (Phase 14)
+
+```
+14.1 (README)          — independent, do first
+14.2 (encryption key)  — independent
+14.3 (docker hardening)— independent
+14.4 (health check)    — independent
+14.5 (tx sync writes)  ─┐
+14.6 (orphaned logs)    ├─ sync engine group (14.5 first, provides tx pattern for 14.6)
+14.7 (sync timeout)    ─┘
+14.8 (password reset)  — independent
+14.9 (log level)       — independent
+14.10 (startup banner) — after 14.2 (uses same validation logic)
+14.11 (backup docs)    — independent
+```
+
+### Checkpoint 14
+
+1. `README.md` exists with Docker quickstart that works end-to-end
+2. App refuses to start with `ENCRYPTION_KEY` unset when Plaid creds are configured
+3. `docker-compose.yml` no longer exposes port 5432 to host
+4. `GET /health/ready` returns DB and scheduler status; `GET /health/live` returns basic 200
+5. Kill server mid-sync → restart → orphaned sync logs marked as error
+6. Sync with a mock slow provider → times out after configured duration
+7. `breadbox reset-password` successfully changes admin password
+8. `LOG_LEVEL=warn` suppresses info/debug output
+9. Startup banner shows Teller status and encryption key status
+10. `docs/backup.md` has working pg_dump/pg_restore examples
+
+---
+
+## Phase 15: Agent-Optimized API
+
+Benefits from Phase 14 reliability fixes but not blocked by them. Improves the REST API and MCP tools for AI agent consumption.
+
+### 15.1 Account Name + User Name on Transactions
+
+- [ ] Add `account_name` and `user_name` fields to `TransactionResponse` struct
+- [ ] Currently only `account_id` is returned — agents must make separate `list_accounts` and `list_users` calls to resolve names
+- [ ] Modify the dynamic SQL query builder to JOIN `accounts` and `users` tables
+- [ ] `account_name`: `COALESCE(a.display_name, a.name)` (respects display_name override from Phase 10)
+- [ ] `user_name`: `u.name` from `users` table via `accounts.user_id`
+- [ ] Update both REST API response and MCP tool response (both use `TransactionResponse`)
+- **Ref:** `internal/service/types.go` lines 24-42, `internal/service/transactions.go`
+- **Files:** `internal/service/types.go`, `internal/service/transactions.go`
+
+### 15.2 Category_Detailed Filter
+
+- [ ] Add `CategoryDetailed *string` to `TransactionListParams`
+- [ ] Wire into dynamic SQL WHERE clause: `AND t.personal_finance_category_detailed = $N`
+- [ ] Currently only `category_primary` is filterable (lines 65-69)
+- [ ] Add to both REST API query params and MCP `query_transactions` input struct
+- [ ] Also add to `count_transactions` filter for consistency
+- **Ref:** `internal/service/transactions.go` lines 65-69, `internal/mcp/tools.go`
+- **Files:** `internal/service/transactions.go`, `internal/api/transactions.go`, `internal/mcp/tools.go`
+
+### 15.3 List Categories Endpoint
+
+- [ ] New endpoint: `GET /api/v1/categories` returning distinct `(category_primary, category_detailed)` pairs from transactions table
+- [ ] Query: `SELECT DISTINCT personal_finance_category_primary, personal_finance_category_detailed FROM transactions WHERE deleted_at IS NULL ORDER BY 1, 2`
+- [ ] Response: `{"categories": [{"primary": "FOOD_AND_DRINK", "detailed": "RESTAURANTS"}, ...]}`
+- [ ] New MCP tool: `list_categories` — returns same data, helps agents discover valid filter values
+- [ ] Useful for agents to know what categories exist before filtering
+- **Ref:** `internal/api/router.go` lines 30-41 (no category endpoint exists)
+- **Files:** `internal/api/router.go`, new handler in `internal/api/categories.go`, `internal/service/transactions.go`, `internal/mcp/tools.go`
+
+### 15.4 Enrich MCP Tool Descriptions
+
+- [ ] Rewrite all 6 MCP tool descriptions with domain-specific context
+- [ ] Current descriptions are generic (e.g., "List all bank accounts. Optionally filter by user_id.")
+- [ ] New descriptions should explain:
+  - What the data represents (bank accounts synced from Plaid/Teller/CSV)
+  - Available filters and their formats (dates: YYYY-MM-DD, amounts: positive=debit)
+  - Pagination behavior (cursor-based, default limit)
+  - Amount sign convention (positive = money out / debit, negative = money in / credit)
+- [ ] Keep descriptions concise but informative — agents read these to decide which tool to use
+- **Ref:** `internal/mcp/tools.go` lines 17-42
+- **Files:** `internal/mcp/tools.go`
+
+### 15.5 Fix Min/Max Amount Zero-Value Bug
+
+- [ ] Change `MinAmount` and `MaxAmount` in MCP `queryTransactionsInput` from `float64` to `*float64`
+- [ ] Replace `if input.MinAmount != 0` with `if input.MinAmount != nil` (nil-check)
+- [ ] Currently: passing `min_amount: 0` is silently ignored (treated as "not set") because `float64` zero-value is 0.0
+- [ ] REST API handler already does this correctly with `*float64` — match that pattern
+- [ ] Same fix for `countTransactionsInput`
+- **Ref:** `internal/mcp/tools.go` lines 58-59 (struct), lines 129-133 (handler)
+- **Files:** `internal/mcp/tools.go`
+
+### 15.6 Teller Category_Detailed Mapping
+
+- [ ] Map Teller's `Details.Category` to both `CategoryPrimary` (existing) and `CategoryDetailed`
+- [ ] Currently: `CategoryDetailed` is always nil for Teller transactions (only primary is mapped, lines 180-183)
+- [ ] Teller categories are single-level (e.g., "accommodation", "advertising", "food_and_drink")
+- [ ] Strategy: map to Plaid-compatible primary categories; for detailed, use Teller category as-is when it provides sub-level granularity, or leave null when it doesn't
+- [ ] Document the mapping table in code comments
+- **Ref:** `internal/provider/teller/sync.go` lines 154-192 (`mapTellerTransaction`)
+- **Files:** `internal/provider/teller/sync.go`
+
+### 15.7 Transaction Sort Options
+
+- [ ] Add `sort_by` param: `date` (default), `amount`, `name`
+- [ ] Add `sort_order` param: `desc` (default), `asc`
+- [ ] Currently hardcoded: `ORDER BY t.date DESC, t.id DESC` (line 109)
+- [ ] Validate `sort_by` against allowlist to prevent SQL injection
+- [ ] Wire into both REST API query params and MCP tool input struct
+- [ ] Keep `t.id` as tiebreaker for stable cursor pagination
+- **Ref:** `internal/service/transactions.go` line 109
+- **Files:** `internal/service/transactions.go`, `internal/api/transactions.go`, `internal/mcp/tools.go`
+
+### 15.8 Enrich MCP Server Instructions
+
+- [ ] Replace generic instructions string with domain-rich overview
+- [ ] Current: "Breadbox is a financial data aggregation server. Use the available tools to query accounts, transactions, users, and sync status."
+- [ ] New: explain Breadbox data model (connections → accounts → transactions), available tools summary, amount convention (positive=debit), recommended query patterns (list accounts first, then filter transactions)
+- [ ] Instructions are shown to AI agents when they connect — this is the "onboarding" text
+- **Ref:** `internal/mcp/server.go` line 25
+- **Files:** `internal/mcp/server.go`
+
+### 15.9 MCP Overview Resource
+
+- [ ] Add a static MCP resource at URI `breadbox://overview`
+- [ ] Returns: data model summary, number of accounts/connections/users, date range of transactions, list of available categories
+- [ ] Gives agents useful context before they start querying — reduces round-trips
+- [ ] Uses service layer to fetch live stats (account count, transaction date range, etc.)
+- [ ] Register via `server.AddResource` in MCP server setup
+- **Ref:** `internal/mcp/server.go` (no resources currently registered)
+- **Files:** `internal/mcp/server.go`, `internal/mcp/resources.go` (new)
+
+### Task Dependencies (Phase 15)
+
+```
+15.1 (account/user names) — independent, high-impact, do first
+15.2 (category_detailed)  ─┐
+15.3 (list categories)     ├─ category group
+15.6 (Teller mapping)     ─┘
+15.4 (tool descriptions)  ─┐
+15.5 (min/max bug fix)     ├─ MCP quality group
+15.8 (MCP instructions)    │
+15.9 (MCP overview)       ─┘
+15.7 (sort options)        — independent
+```
+
+### Checkpoint 15
+
+1. `GET /api/v1/transactions` responses include `account_name` and `user_name` fields
+2. MCP `query_transactions` tool accepts `category_detailed` filter and returns results
+3. `GET /api/v1/categories` returns distinct category pairs; `list_categories` MCP tool works
+4. MCP tool descriptions explain domain concepts, filters, and conventions
+5. MCP `query_transactions` with `min_amount: 0` correctly filters (not ignored)
+6. Teller transactions have `category_detailed` populated where possible
+7. `sort_by=amount&sort_order=asc` returns transactions sorted by amount ascending
+8. MCP `Instructions` field provides useful onboarding context for AI agents
+9. `breadbox://overview` resource returns data model summary with live stats

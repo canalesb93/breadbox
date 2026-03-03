@@ -47,6 +47,14 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Wizard step 2: provider-agnostic "Configure Bank Providers" with conditional Plaid/Teller forms (Phase 13B)
 - Config source tracking: `ConfigSources map[string]string` passed to settings templates — shows "(from env)" / "(from database)" / "(default)" per setting
 - Human-readable error messages: `errorMessage()` template function maps provider error codes to user-friendly strings
+- Health check split: `/health/live` (basic HTTP 200) vs `/health/ready` (DB + scheduler verification)
+- Sync writes wrapped in a single DB transaction for atomicity (Phase 14)
+- Orphaned sync logs: on startup, mark stale `in_progress` logs as `error` with "interrupted by server restart"
+- Per-sync timeout: configurable context deadline per connection sync (default 5 minutes)
+- ENCRYPTION_KEY required at startup when Plaid or Teller providers are configured (fail fast, not runtime crash)
+- LOG_LEVEL env var: debug/info/warn/error, overrides environment-based defaults
+- Transaction responses include denormalized `account_name` and `user_name` (JOIN in dynamic query builder)
+- MCP tool descriptions: domain-rich with amount conventions, filter docs, pagination behavior (not generic)
 
 ## Canonical Enums
 
