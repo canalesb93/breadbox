@@ -33,6 +33,9 @@
   {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
   <a href="/admin/connections/{{.ConnID}}/reauth" role="button" class="outline">Re-authenticate</a>
   {{end}}
+  {{if eq (printf "%s" .Connection.Provider) "csv"}}
+  <a href="/admin/connections/import-csv?connection_id={{.ConnID}}" role="button" class="outline">Import More</a>
+  {{end}}
   {{if eq (printf "%s" .Connection.Status) "active"}}
   <button class="outline" onclick="syncConnection()" id="sync-btn">Sync Now</button>
   {{end}}

@@ -9,6 +9,7 @@ import (
 	"breadbox/internal/config"
 	"breadbox/internal/db"
 	"breadbox/internal/provider"
+	csvprovider "breadbox/internal/provider/csv"
 	plaidprovider "breadbox/internal/provider/plaid"
 	tellerprovider "breadbox/internal/provider/teller"
 	"breadbox/internal/service"
@@ -73,6 +74,10 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 	} else if cfg.TellerAppID != "" {
 		logger.Warn("teller app ID set but certificate/key paths missing, teller provider not initialized")
 	}
+
+	csvProv := csvprovider.NewProvider()
+	providers["csv"] = csvProv
+	logger.Info("csv provider registered")
 
 	syncEngine := sync.NewEngine(queries, pool, providers, logger)
 	svc := service.New(queries, pool, syncEngine, logger)

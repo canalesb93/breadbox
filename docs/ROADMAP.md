@@ -867,106 +867,99 @@ Per-account controls, connection pausing, per-connection sync intervals, and pro
 
 ---
 
-## Phase 11: CSV Import Provider
+## Phase 11: CSV Import Provider ✅
 
 Upload bank CSV exports, map columns, and import transactions with hash-based deduplication.
 
+**Status:** Complete. Checkpoint 11 verified.
+
 **Depends on:** Phase 8 (generic columns, `csv` in provider_type enum)
 
-### 11.1 CSV Parser
+### 11.1 CSV Parser ✅
 
-- [ ] Read file into memory (max 10MB)
-- [ ] Auto-detect delimiter: try comma, tab, semicolon, pipe — pick the one that produces consistent column counts
-- [ ] Strip BOM (UTF-8 `\xEF\xBB\xBF`, UTF-16 LE/BE)
-- [ ] Return headers (first row) and data rows
-- [ ] Reject files with < 2 rows or > 50,000 rows
-- [ ] 10,000 row limit for preview (return first 10 rows to UI, full data for import)
+- [x] Read file into memory (max 10MB)
+- [x] Auto-detect delimiter: try comma, tab, semicolon, pipe — pick the one that produces consistent column counts
+- [x] Strip BOM (UTF-8 `\xEF\xBB\xBF`, UTF-16 LE/BE)
+- [x] Return headers (first row) and data rows
+- [x] Reject files with < 2 rows or > 50,000 rows
+- [x] 10,000 row limit for preview (return first 10 rows to UI, full data for import)
 - **Ref:** `csv-import.md` Sections 2, 3
 - **Files:** `internal/provider/csv/parser.go` (new)
 
-### 11.2 Column Mapping & Templates
+### 11.2 Column Mapping & Templates ✅
 
-- [ ] Pre-built templates: Chase (credit + checking), Bank of America, Wells Fargo, Capital One, Amex
-- [ ] Each template: header patterns, column mappings, sign convention, date format hint
-- [ ] Auto-detect: compare parsed headers against all templates, return best match
-- [ ] Sign convention toggle: "Positive = debit" (default) vs "Positive = credit"
+- [x] Pre-built templates: Chase (credit + checking), Bank of America, Wells Fargo, Capital One, Amex
+- [x] Each template: header patterns, column mappings, sign convention, date format hint
+- [x] Auto-detect: compare parsed headers against all templates, return best match
+- [x] Sign convention toggle: "Positive = debit" (default) vs "Positive = credit"
 - **Ref:** `csv-import.md` Sections 3, 4
 - **Files:** `internal/provider/csv/templates.go` (new)
 
-### 11.3 Import Logic
+### 11.3 Import Logic ✅
 
-- [ ] Apply column mapping to each row → (date, amount, description, category?, merchant?)
-- [ ] Parse dates using auto-detection strategy (try formats against first 20 values, pick best)
-- [ ] Parse amounts: strip currency symbols, handle commas, parenthetical negatives, split debit/credit columns
-- [ ] Normalize sign per selected convention (positive = debit in storage)
-- [ ] Generate `external_transaction_id = SHA-256(account_id|date|amount|description)`
-- [ ] Return list of parsed transactions + list of skipped rows with reasons
+- [x] Apply column mapping to each row → (date, amount, description, category?, merchant?)
+- [x] Parse dates using auto-detection strategy (try formats against first 20 values, pick best)
+- [x] Parse amounts: strip currency symbols, handle commas, parenthetical negatives, split debit/credit columns
+- [x] Normalize sign per selected convention (positive = debit in storage)
+- [x] Generate `external_transaction_id = SHA-256(account_id|date|amount|description)`
+- [x] Return list of parsed transactions + list of skipped rows with reasons
 - **Ref:** `csv-import.md` Sections 5, 6, 7
-- **Files:** `internal/provider/csv/import.go` (new)
+- **Files:** `internal/provider/csv/dateparser.go`, `internal/provider/csv/amount.go`, `internal/provider/csv/dedup.go` (new)
 
-### 11.4 CSV Provider Stub
+### 11.4 CSV Provider Stub ✅
 
-- [ ] Implement `Provider` interface — all methods return `provider.ErrNotSupported` except `RemoveConnection` (returns nil)
-- [ ] Add `var _ provider.Provider = (*CSVProvider)(nil)` compile-time check
-- [ ] Constructor: `NewProvider(logger)` (no config needed)
+- [x] Implement `Provider` interface — all methods return `provider.ErrNotSupported` except `RemoveConnection` (returns nil)
+- [x] Add `var _ provider.Provider = (*CSVProvider)(nil)` compile-time check
+- [x] Constructor: `NewProvider()` (no config needed)
 - **Ref:** `csv-import.md` Section 9
 - **Files:** `internal/provider/csv/provider.go` (new)
 
-### 11.5 Import Service
+### 11.5 Import Service ✅
 
-- [ ] `ImportCSV(ctx, params)` — orchestrates the full import flow
-- [ ] Create or reuse CSV connection + account for the selected member
-- [ ] Call import logic to parse rows
-- [ ] Upsert transactions via existing `UpsertTransaction` (reuses ON CONFLICT)
-- [ ] Create `sync_logs` entry with `trigger = manual`, `provider = csv`
-- [ ] Return import result: total, inserted, updated, skipped counts
+- [x] `ImportCSV(ctx, params)` — orchestrates the full import flow
+- [x] Create or reuse CSV connection + account for the selected member
+- [x] Call import logic to parse rows
+- [x] Upsert transactions via existing `UpsertTransaction` (reuses ON CONFLICT)
+- [x] Create `sync_logs` entry with `trigger = manual`, `provider = csv`
+- [x] Return import result: total, inserted, updated, skipped counts
 - **Ref:** `csv-import.md` Sections 7, 8
-- **Files:** `internal/service/csv.go` (new)
+- **Files:** `internal/service/csv_import.go` (new)
 
-### 11.6 Admin Handlers
+### 11.6 Admin Handlers ✅
 
-- [ ] `GET /admin/connections/import-csv` — render import wizard page
-- [ ] `POST /admin/api/csv/upload` — multipart upload (10MB limit), parse file, return headers + preview rows + auto-detected template
-- [ ] `POST /admin/api/csv/preview` — apply column mapping to uploaded data, return first 10 parsed rows with validation
-- [ ] `POST /admin/api/csv/import` — execute full import with confirmed mapping, return results
-- [ ] Upload stored in memory (not on disk) for the duration of the wizard session
+- [x] `GET /admin/connections/import-csv` — render import wizard page
+- [x] `POST /admin/api/csv/upload` — multipart upload (10MB limit), parse file, return headers + preview rows + auto-detected template
+- [x] `POST /admin/api/csv/preview` — apply column mapping to uploaded data, return first 10 parsed rows with validation
+- [x] `POST /admin/api/csv/import` — execute full import with confirmed mapping, return results
+- [x] Upload stored in memory (not on disk) for the duration of the wizard session
 - **Files:** `internal/admin/csv_import.go` (new)
 
-### 11.7 Template: Import Wizard
+### 11.7 Template: Import Wizard ✅
 
-- [ ] Multi-step wizard UI (fetch-driven, no full page reloads):
+- [x] Multi-step wizard UI (fetch-driven, no full page reloads):
   - Step 1: Select family member + file upload
   - Step 2: Column mapping dropdowns + sign toggle + template auto-select + preview table
   - Step 3: Confirm summary (row count, date range, account name)
   - Step 4: Results (counts + link to connection detail)
-- [ ] Use wizard layout consistent with setup wizard
+- [x] Uses base layout consistent with admin dashboard
 - **Ref:** `csv-import.md` Section 2
 - **Files:** `internal/templates/pages/csv_import.html` (new)
 
-### 11.8 Re-Import: Connection Detail Integration
+### 11.8 Re-Import: Connection Detail Integration ✅
 
-- [ ] CSV connections show "Import More" button on connection detail page
-- [ ] Button links to `/admin/connections/import-csv?connection_id={id}`
-- [ ] Wizard pre-fills member and account name from existing connection
+- [x] CSV connections show "Import More" button on connection detail page
+- [x] Button links to `/admin/connections/import-csv?connection_id={id}`
+- [x] Wizard pre-fills member and account name from existing connection
 - **Ref:** `csv-import.md` Section 8
 - **Files:** `internal/templates/pages/connection_detail.html`
 
-### 11.9 App Init & Spec Doc
+### 11.9 App Init & Spec Doc ✅
 
-- [ ] Register CSV provider in `app.New()` — always available (no config/credentials needed)
-- [ ] Log "csv provider registered" at startup
-- [ ] Verify `docs/csv-import.md` spec is complete and consistent with implementation
-- **Files:** `internal/app/app.go`, `docs/csv-import.md`
-
-### Task Dependencies
-
-```
-11.1 (parser) ──┐
-                 ├──> 11.3 (import logic) ──> 11.5 (service) ──> 11.6 (handlers) ──> 11.7 (wizard template)
-11.2 (templates)┘                                                                ──> 11.8 (re-import)
-
-11.4 (provider stub) ──> 11.9 (app init) — independent of import flow
-```
+- [x] Register CSV provider in `app.New()` — always available (no config/credentials needed)
+- [x] Log "csv provider registered" at startup
+- [x] `docs/csv-import.md` spec is consistent with implementation
+- [x] CSV option added to connection_new.html provider dropdown
+- **Files:** `internal/app/app.go`, `internal/templates/pages/connection_new.html`
 
 ### Checkpoint 11
 

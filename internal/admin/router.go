@@ -52,6 +52,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Route("/connections", func(r chi.Router) {
 			r.Get("/", ConnectionsListHandler(a, tr))
 			r.Get("/new", NewConnectionHandler(a, tr))
+			r.Get("/import-csv", CSVImportPageHandler(a, tr))
 			r.Get("/{id}", ConnectionDetailHandler(a, tr))
 			r.Get("/{id}/reauth", ConnectionReauthHandler(a, tr))
 		})
@@ -92,6 +93,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/test-provider/{provider}", TestProviderHandler(a))
 		r.Post("/users", CreateUserHandler(a))
 		r.Put("/users/{id}", UpdateUserHandler(a))
+
+		r.Post("/csv/upload", CSVUploadHandler(a, sm))
+		r.Post("/csv/preview", CSVPreviewHandler(a, sm))
+		r.Post("/csv/import", CSVImportHandler(a, sm, svc))
 
 		r.Get("/api-keys", ListAPIKeysHandler(svc))
 		r.Post("/api-keys", CreateAPIKeyHandler(svc))

@@ -10,6 +10,7 @@
       <select id="provider" name="provider" required>
         {{if .HasPlaid}}<option value="plaid">Plaid</option>{{end}}
         {{if .HasTeller}}<option value="teller">Teller</option>{{end}}
+        <option value="csv">CSV Import</option>
       </select>
 
       <label for="user_id">Family Member</label>
@@ -53,6 +54,10 @@
     selectedUserId = select.value;
     selectedProvider = document.getElementById("provider").value || "plaid";
     if (!selectedUserId) return;
+    if (selectedProvider === "csv") {
+      window.location.href = "/admin/connections/import-csv";
+      return;
+    }
     memberNameEl.textContent = select.options[select.selectedIndex].text;
     stepSelect.style.display = "none";
     stepLink.style.display = "block";

@@ -1,0 +1,465 @@
+{{define "content"}}
+<p><a href="/admin/connections">&larr; Connections</a></p>
+<h1>Import CSV</h1>
+
+<div id="step-1" {{if .ConnectionID}}style="display:none"{{end}}>
+  <article>
+    <header>Step 1: Upload File</header>
+    {{if .ConnectionID}}
+    <p>Re-importing to: <strong>{{.ExistingConnectionName}}</strong> ({{.ExistingUserName}})</p>
+    {{else}}
+    <label for="csv-user-id">Family Member</label>
+    <select id="csv-user-id" required>
+      <option value="" disabled selected>Select a member...</option>
+      {{range .Users}}
+      <option value="{{formatUUID .ID}}">{{.Name}}</option>
+      {{end}}
+    </select>
+    {{end}}
+
+    <label for="csv-file">CSV File</label>
+    <input type="file" id="csv-file" accept=".csv,.tsv,.txt">
+    <small>Supported: CSV, TSV, TXT files up to 10MB. Max 50,000 rows.</small>
+
+    <button type="button" id="upload-btn" onclick="uploadFile()">Upload &amp; Parse</button>
+    <p id="upload-status"></p>
+  </article>
+</div>
+
+<div id="step-2" style="display:none">
+  <article>
+    <header>Step 2: Map Columns</header>
+    <p id="template-detected"></p>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+      <div>
+        <label for="map-date">Date Column <small>(required)</small></label>
+        <select id="map-date"></select>
+      </div>
+      <div>
+        <label for="map-amount">Amount Column <small>(required)</small></label>
+        <select id="map-amount"></select>
+      </div>
+      <div>
+        <label for="map-description">Description Column <small>(required)</small></label>
+        <select id="map-description"></select>
+      </div>
+      <div>
+        <label for="map-category">Category Column <small>(optional)</small></label>
+        <select id="map-category"></select>
+      </div>
+      <div>
+        <label for="map-merchant">Merchant Column <small>(optional)</small></label>
+        <select id="map-merchant"></select>
+      </div>
+    </div>
+
+    <div id="debit-credit-section" style="display:none; margin-top: 1rem;">
+      <fieldset>
+        <legend>Split Debit/Credit Columns</legend>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div>
+            <label for="map-debit">Debit Column</label>
+            <select id="map-debit"></select>
+          </div>
+          <div>
+            <label for="map-credit">Credit Column</label>
+            <select id="map-credit"></select>
+          </div>
+        </div>
+      </fieldset>
+    </div>
+
+    <fieldset style="margin-top: 1rem;">
+      <legend>Sign Convention</legend>
+      <label>
+        <input type="radio" name="sign-convention" value="debit" checked>
+        Positive = Debit (charges, money out)
+      </label>
+      <label>
+        <input type="radio" name="sign-convention" value="credit">
+        Positive = Credit (payments, money in)
+      </label>
+    </fieldset>
+
+    <label>
+      <input type="checkbox" id="has-debit-credit" onchange="toggleDebitCredit()">
+      Separate debit/credit columns (e.g., Capital One)
+    </label>
+
+    {{if not .ConnectionID}}
+    <label for="account-name">Account Name</label>
+    <input type="text" id="account-name" value="CSV Import" placeholder="e.g., Chase Checking CSV">
+    {{end}}
+
+    <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+      <button type="button" class="outline" onclick="previewData()">Preview</button>
+      <button type="button" id="continue-btn" onclick="goToStep3()" style="display:none">Continue to Import</button>
+    </div>
+    <p id="preview-status"></p>
+  </article>
+
+  <div id="preview-table-container" style="display:none; margin-top: 1rem;">
+    <article>
+      <header>Preview (first 10 rows)</header>
+      <div style="overflow-x: auto;">
+        <table id="preview-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Amount</th>
+              <th>Description</th>
+              <th>Category</th>
+              <th>Merchant</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="preview-body"></tbody>
+        </table>
+      </div>
+    </article>
+  </div>
+</div>
+
+<div id="step-3" style="display:none">
+  <article>
+    <header>Step 3: Confirm Import</header>
+    <dl>
+      <dt>Total Rows</dt>
+      <dd id="summary-rows"></dd>
+      <dt>Account Name</dt>
+      <dd id="summary-account"></dd>
+      <dt>Family Member</dt>
+      <dd id="summary-member"></dd>
+    </dl>
+    <div style="display: flex; gap: 0.5rem;">
+      <button type="button" class="outline" onclick="goToStep(2)">&larr; Back</button>
+      <button type="button" id="import-btn" onclick="doImport()">Import Transactions</button>
+    </div>
+    <p id="import-status"></p>
+  </article>
+</div>
+
+<div id="step-4" style="display:none">
+  <article>
+    <header>Import Complete</header>
+    <dl>
+      <dt>Total Rows</dt>
+      <dd id="result-total"></dd>
+      <dt>New Transactions</dt>
+      <dd id="result-new"></dd>
+      <dt>Updated Transactions</dt>
+      <dd id="result-updated"></dd>
+      <dt>Skipped</dt>
+      <dd id="result-skipped"></dd>
+    </dl>
+    <div id="skip-reasons" style="display:none;">
+      <details>
+        <summary>Skipped Row Details</summary>
+        <ul id="skip-reasons-list"></ul>
+      </details>
+    </div>
+    <a id="result-link" href="#" role="button">View Connection &rarr;</a>
+  </article>
+</div>
+
+<script>
+(function() {
+  var csrfToken = "{{.CSRFToken}}";
+  var connectionID = "{{.ConnectionID}}";
+  var existingUserID = "{{.ExistingUserID}}";
+  var uploadData = null;
+  var detectedDateFormat = "";
+  var totalRows = 0;
+
+  window.uploadFile = function() {
+    var fileInput = document.getElementById("csv-file");
+    var status = document.getElementById("upload-status");
+    var btn = document.getElementById("upload-btn");
+
+    if (!fileInput.files.length) {
+      status.textContent = "Please select a file.";
+      return;
+    }
+
+    {{if not .ConnectionID}}
+    var userSelect = document.getElementById("csv-user-id");
+    if (!userSelect.value) {
+      status.textContent = "Please select a family member.";
+      return;
+    }
+    {{end}}
+
+    btn.disabled = true;
+    btn.setAttribute("aria-busy", "true");
+    status.textContent = "Uploading...";
+
+    var formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    fetch("/admin/api/csv/upload", {
+      method: "POST",
+      headers: {"X-CSRF-Token": csrfToken},
+      body: formData
+    })
+    .then(function(res) { return res.json().then(function(d) { return {ok: res.ok, data: d}; }); })
+    .then(function(res) {
+      btn.disabled = false;
+      btn.removeAttribute("aria-busy");
+      if (!res.ok) {
+        status.textContent = res.data.error || "Upload failed.";
+        return;
+      }
+      uploadData = res.data;
+      totalRows = res.data.total_rows;
+      status.textContent = "";
+      setupStep2(res.data);
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.removeAttribute("aria-busy");
+      status.textContent = "Network error.";
+    });
+  };
+
+  function setupStep2(data) {
+    var headers = data.headers;
+    var selects = ["map-date", "map-amount", "map-description", "map-category", "map-merchant", "map-debit", "map-credit"];
+    var optionalSelects = ["map-category", "map-merchant", "map-debit", "map-credit"];
+
+    selects.forEach(function(id) {
+      var sel = document.getElementById(id);
+      sel.innerHTML = "";
+      if (optionalSelects.indexOf(id) !== -1) {
+        var opt = document.createElement("option");
+        opt.value = "-1";
+        opt.textContent = "— None —";
+        sel.appendChild(opt);
+      }
+      headers.forEach(function(h, i) {
+        var opt = document.createElement("option");
+        opt.value = i;
+        opt.textContent = h;
+        sel.appendChild(opt);
+      });
+    });
+
+    // Apply detected columns.
+    var dc = data.detected_columns || {};
+    if (dc.date !== undefined) document.getElementById("map-date").value = dc.date;
+    if (dc.amount !== undefined) document.getElementById("map-amount").value = dc.amount;
+    if (dc.description !== undefined) document.getElementById("map-description").value = dc.description;
+    if (dc.category !== undefined) document.getElementById("map-category").value = dc.category;
+    if (dc.merchant_name !== undefined) document.getElementById("map-merchant").value = dc.merchant_name;
+    if (dc.debit !== undefined) document.getElementById("map-debit").value = dc.debit;
+    if (dc.credit !== undefined) document.getElementById("map-credit").value = dc.credit;
+
+    if (data.template_name) {
+      document.getElementById("template-detected").textContent = "Detected template: " + data.template_name;
+    } else {
+      document.getElementById("template-detected").textContent = "No template detected — please map columns manually.";
+    }
+
+    if (data.has_debit_credit) {
+      document.getElementById("has-debit-credit").checked = true;
+      toggleDebitCredit();
+    }
+
+    if (data.positive_is_debit !== undefined) {
+      var radios = document.getElementsByName("sign-convention");
+      radios[0].checked = data.positive_is_debit;
+      radios[1].checked = !data.positive_is_debit;
+    }
+
+    if (data.date_format) {
+      detectedDateFormat = data.date_format;
+    }
+
+    goToStep(2);
+  }
+
+  window.toggleDebitCredit = function() {
+    var checked = document.getElementById("has-debit-credit").checked;
+    document.getElementById("debit-credit-section").style.display = checked ? "block" : "none";
+  };
+
+  window.previewData = function() {
+    var status = document.getElementById("preview-status");
+    status.textContent = "Loading preview...";
+
+    var mapping = getColumnMapping();
+    var positiveIsDebit = document.querySelector('input[name="sign-convention"]:checked').value === "debit";
+    var hasDebitCredit = document.getElementById("has-debit-credit").checked;
+
+    fetch("/admin/api/csv/preview", {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "X-CSRF-Token": csrfToken},
+      body: JSON.stringify({
+        column_mapping: mapping,
+        positive_is_debit: positiveIsDebit,
+        date_format: detectedDateFormat,
+        has_debit_credit: hasDebitCredit
+      })
+    })
+    .then(function(res) { return res.json().then(function(d) { return {ok: res.ok, data: d}; }); })
+    .then(function(res) {
+      if (!res.ok) {
+        status.textContent = res.data.error || "Preview failed.";
+        return;
+      }
+      status.textContent = "";
+      if (res.data.date_format) {
+        detectedDateFormat = res.data.date_format;
+      }
+      renderPreview(res.data.rows);
+      document.getElementById("continue-btn").style.display = "inline-block";
+    })
+    .catch(function() {
+      status.textContent = "Network error.";
+    });
+  };
+
+  function renderPreview(rows) {
+    var tbody = document.getElementById("preview-body");
+    tbody.innerHTML = "";
+    rows.forEach(function(row) {
+      var tr = document.createElement("tr");
+      if (row.error) tr.style.backgroundColor = "var(--pico-form-element-invalid-border-color, #f8d7da)";
+      tr.innerHTML = "<td>" + esc(row.date) + "</td>" +
+        "<td>" + esc(row.amount) + "</td>" +
+        "<td>" + esc(row.description) + "</td>" +
+        "<td>" + esc(row.category) + "</td>" +
+        "<td>" + esc(row.merchant) + "</td>" +
+        "<td>" + (row.error ? "<span class='bb-badge bb-badge--error'>" + esc(row.error) + "</span>" : "<span class='bb-badge bb-badge--success'>OK</span>") + "</td>";
+      tbody.appendChild(tr);
+    });
+    document.getElementById("preview-table-container").style.display = "block";
+  }
+
+  function getColumnMapping() {
+    var mapping = {};
+    mapping.date = parseInt(document.getElementById("map-date").value, 10);
+    mapping.description = parseInt(document.getElementById("map-description").value, 10);
+
+    var hasDebitCredit = document.getElementById("has-debit-credit").checked;
+    if (hasDebitCredit) {
+      mapping.debit = parseInt(document.getElementById("map-debit").value, 10);
+      mapping.credit = parseInt(document.getElementById("map-credit").value, 10);
+    } else {
+      mapping.amount = parseInt(document.getElementById("map-amount").value, 10);
+    }
+
+    var catVal = parseInt(document.getElementById("map-category").value, 10);
+    if (catVal >= 0) mapping.category = catVal;
+
+    var merchVal = parseInt(document.getElementById("map-merchant").value, 10);
+    if (merchVal >= 0) mapping.merchant_name = merchVal;
+
+    return mapping;
+  }
+
+  window.goToStep3 = function() {
+    document.getElementById("summary-rows").textContent = totalRows;
+
+    {{if .ConnectionID}}
+    document.getElementById("summary-account").textContent = "{{.ExistingConnectionName}}";
+    document.getElementById("summary-member").textContent = "{{.ExistingUserName}}";
+    {{else}}
+    var accountName = document.getElementById("account-name").value || "CSV Import";
+    document.getElementById("summary-account").textContent = accountName;
+    var userSelect = document.getElementById("csv-user-id");
+    document.getElementById("summary-member").textContent = userSelect.options[userSelect.selectedIndex].text;
+    {{end}}
+
+    goToStep(3);
+  };
+
+  window.goToStep = function(n) {
+    for (var i = 1; i <= 4; i++) {
+      document.getElementById("step-" + i).style.display = (i === n) ? "block" : "none";
+    }
+  };
+
+  window.doImport = function() {
+    var btn = document.getElementById("import-btn");
+    var status = document.getElementById("import-status");
+    btn.disabled = true;
+    btn.setAttribute("aria-busy", "true");
+    status.textContent = "Importing...";
+
+    var mapping = getColumnMapping();
+    var positiveIsDebit = document.querySelector('input[name="sign-convention"]:checked').value === "debit";
+    var hasDebitCredit = document.getElementById("has-debit-credit").checked;
+
+    var body = {
+      column_mapping: mapping,
+      positive_is_debit: positiveIsDebit,
+      date_format: detectedDateFormat,
+      has_debit_credit: hasDebitCredit
+    };
+
+    if (connectionID) {
+      body.connection_id = connectionID;
+    } else {
+      body.user_id = document.getElementById("csv-user-id").value;
+      body.account_name = document.getElementById("account-name").value || "CSV Import";
+    }
+
+    fetch("/admin/api/csv/import", {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "X-CSRF-Token": csrfToken},
+      body: JSON.stringify(body)
+    })
+    .then(function(res) { return res.json().then(function(d) { return {ok: res.ok, data: d}; }); })
+    .then(function(res) {
+      btn.disabled = false;
+      btn.removeAttribute("aria-busy");
+      if (!res.ok) {
+        status.textContent = res.data.error || "Import failed.";
+        return;
+      }
+      status.textContent = "";
+      showResults(res.data);
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.removeAttribute("aria-busy");
+      status.textContent = "Network error.";
+    });
+  };
+
+  function showResults(data) {
+    document.getElementById("result-total").textContent = data.TotalRows;
+    document.getElementById("result-new").textContent = data.NewCount;
+    document.getElementById("result-updated").textContent = data.UpdatedCount;
+    document.getElementById("result-skipped").textContent = data.SkippedCount;
+
+    if (data.SkipReasons && data.SkipReasons.length > 0) {
+      var list = document.getElementById("skip-reasons-list");
+      list.innerHTML = "";
+      data.SkipReasons.forEach(function(reason) {
+        var li = document.createElement("li");
+        li.textContent = reason;
+        list.appendChild(li);
+      });
+      document.getElementById("skip-reasons").style.display = "block";
+    }
+
+    document.getElementById("result-link").href = "/admin/connections/" + data.ConnectionID;
+    goToStep(4);
+  }
+
+  function esc(s) {
+    if (!s) return "";
+    var div = document.createElement("div");
+    div.appendChild(document.createTextNode(s));
+    return div.innerHTML;
+  }
+
+  // If re-importing, auto-show step 1 (which will redirect to upload).
+  if (connectionID) {
+    goToStep(1);
+  }
+})();
+</script>
+{{end}}
