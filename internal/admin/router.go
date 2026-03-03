@@ -71,6 +71,8 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/{id}/revoke", APIKeyRevokePageHandler(svc, sm))
 		})
 
+		r.Get("/transactions", TransactionListHandler(a, sm, tr, svc))
+		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
 		r.Get("/sync-logs", SyncLogsHandler(a, sm, tr, svc))
 		r.Get("/settings", SettingsGetHandler(a, sm, tr))
 		r.Post("/settings", SettingsPostHandler(a, sm, tr, svc))

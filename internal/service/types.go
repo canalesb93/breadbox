@@ -159,3 +159,54 @@ type SyncLogRow struct {
 	CompletedAt     *string
 	Duration        *string
 }
+
+type AdminTransactionListParams struct {
+	Page         int
+	PageSize     int
+	StartDate    *time.Time
+	EndDate      *time.Time
+	AccountID    *string
+	UserID       *string
+	ConnectionID *string
+	Category     *string
+	MinAmount    *float64
+	MaxAmount    *float64
+	Pending      *bool
+	Search       *string
+	SortOrder    string // "desc" (default) or "asc"
+}
+
+type AdminTransactionRow struct {
+	ID              string
+	AccountID       string
+	AccountName     string
+	InstitutionName string
+	UserName        string
+	Date            string
+	Name            string
+	MerchantName    *string
+	Amount          float64
+	IsoCurrencyCode *string
+	CategoryPrimary *string
+	Pending         bool
+	CreatedAt       string
+	UpdatedAt       string
+}
+
+type AdminTransactionListResult struct {
+	Transactions []AdminTransactionRow
+	Total        int64
+	Page         int
+	PageSize     int
+	TotalPages   int
+}
+
+type AdminAccountDetail struct {
+	AccountResponse
+	DisplayName     *string
+	Excluded        bool
+	InstitutionName string
+	Provider        string
+	UserName        string
+	ConnectionID    string
+}

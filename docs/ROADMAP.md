@@ -1057,64 +1057,67 @@ Modernize the admin template system, add Alpine.js interactivity, and prepare fo
 
 ---
 
-## Phase 12B: Admin Transaction Pages
+## Phase 12B: Admin Transaction Pages ✅
 
 Transaction list, account detail, and cross-linking throughout the admin UI.
 
+**Status:** Complete. Checkpoint 12B verified.
+
 **Depends on:** Phase 12A (UI foundation), existing service layer
 
-### 12B.1 Service: Admin Transaction List
+### 12B.1 Service: Admin Transaction List ✅
 
-- [ ] `ListTransactionsPagedAdmin(ctx, params)` — offset-based pagination (consistent with sync logs page)
-- [ ] JOIN account name, connection institution name, user name for display
-- [ ] Support all 10 filters: date range, account_id, user_id, category, amount min/max, pending, text search, connection_id, sort order
-- [ ] Return total count for pagination controls
+- [x] `ListTransactionsAdmin(ctx, params)` — offset-based pagination (consistent with sync logs page)
+- [x] JOIN account name, connection institution name, user name for display
+- [x] Support all 10 filters: date range, account_id, user_id, category, amount min/max, pending, text search, connection_id, sort order
+- [x] Return total count for pagination controls
+- [x] `ListDistinctCategories(ctx)` — for category filter dropdown
 - **Ref:** `rest-api.md` Section 5.3 (filter spec), `admin-dashboard.md` Section 11 (pagination pattern)
-- **Files:** `internal/service/transactions.go`
+- **Files:** `internal/service/transactions.go`, `internal/service/types.go`
 
-### 12B.2 Handler: Transaction List Page
+### 12B.2 Handler: Transaction List Page ✅
 
-- [ ] `GET /admin/transactions` — parse filter query params from URL
-- [ ] Load dropdown data: accounts (with connection/user context), users, distinct categories
-- [ ] Render page with filters applied, preserve filter state in form
+- [x] `GET /admin/transactions` — parse filter query params from URL
+- [x] Load dropdown data: accounts (with connection/user context), users, distinct categories
+- [x] Render page with filters applied, preserve filter state in form
 - **Files:** `internal/admin/transactions.go` (new)
 
-### 12B.3 Template: Transaction List
+### 12B.3 Template: Transaction List ✅
 
-- [ ] Filter form: date range (start/end date inputs), account dropdown, user dropdown, category dropdown, amount range (min/max), pending toggle, text search input
-- [ ] Table columns: Date, Description, Amount, Account, Category, Status (pending/posted)
-- [ ] Alpine expandable row: click row to see full transaction detail (merchant, external ID, timestamps)
-- [ ] Offset-based pagination (page numbers, prev/next) consistent with sync logs
-- [ ] Amount formatting: color-coded (green for credits, default for debits), currency symbol
+- [x] Filter form: date range (start/end date inputs), account dropdown, user dropdown, category dropdown, amount range (min/max), pending toggle, text search input
+- [x] Table columns: Date, Description, Amount, Account, Category, Status (pending/posted)
+- [x] Alpine expandable row: click row to see full transaction detail (merchant, external ID, timestamps)
+- [x] Offset-based pagination (page numbers, prev/next) consistent with sync logs
+- [x] Amount formatting: color-coded (red for negative amounts), currency code
 - **Files:** `internal/templates/pages/transactions.html` (new)
 
-### 12B.4 Service: Account Detail
+### 12B.4 Service: Account Detail ✅
 
-- [ ] `GetAccountDetail(ctx, id)` — extends `AccountResponse` with connection institution name, provider, user name
-- [ ] Returns account info + pre-filtered transaction params for the template
-- **Files:** `internal/service/accounts.go`
+- [x] `GetAccountDetail(ctx, id)` — extends `AccountResponse` with connection institution name, provider, user name
+- [x] Uses GetAccount + GetBankConnection for provider and user name (option 2 from plan)
+- **Files:** `internal/service/accounts.go`, `internal/service/types.go`
 
-### 12B.5 Handler: Account Detail Page
+### 12B.5 Handler: Account Detail Page ✅
 
-- [ ] `GET /admin/accounts/{id}` — load account detail + filtered transaction list
-- [ ] Reuses transaction list logic from 12B.1 with `account_id` pre-set
+- [x] `GET /admin/accounts/{id}` — load account detail + filtered transaction list
+- [x] Reuses transaction list logic from 12B.1 with `account_id` pre-set
 - **Files:** `internal/admin/transactions.go`
 
-### 12B.6 Template: Account Detail
+### 12B.6 Template: Account Detail ✅
 
-- [ ] Info card: account name (display_name or bank name), type, subtype, mask, current/available balance, last balance update, connection link, user name
-- [ ] Transaction table: pre-filtered by account, same columns/pagination as 12B.3
-- [ ] "Edit" controls for display name and excluded status (from Phase 10, if available)
+- [x] Info card: account name (display_name or bank name), type, subtype, mask, current/available balance, connection link, user name, provider
+- [x] Transaction table: pre-filtered by account, same columns/pagination as 12B.3
+- [x] Edit controls for display name and excluded status with toast feedback
 - **Files:** `internal/templates/pages/account_detail.html` (new)
 
-### 12B.7 Routes & Cross-Links
+### 12B.7 Routes & Cross-Links ✅
 
-- [ ] Register routes: `GET /admin/transactions`, `GET /admin/accounts/{id}`
-- [ ] Add "Transactions" link to nav (Data section, after Connections)
-- [ ] Connection detail: account names link to `/admin/accounts/{id}`
-- [ ] Transaction list: account names link to account detail
-- [ ] Dashboard: add transaction count and "View All" link
-- **Files:** `internal/admin/router.go`, `internal/templates/pages/connection_detail.html`, `internal/templates/partials/nav.html`
+- [x] Register routes: `GET /admin/transactions`, `GET /admin/accounts/{id}`
+- [x] Add "Transactions" link to nav (Data section, after Connections)
+- [x] Connection detail: account names link to `/admin/accounts/{id}`
+- [x] Transaction list: account names link to account detail
+- [x] Dashboard: transaction count links to transaction list, "View All Sync Logs" button
+- **Files:** `internal/admin/router.go`, `internal/templates/pages/connection_detail.html`, `internal/templates/partials/nav.html`, `internal/templates/pages/dashboard.html`
 
 ### Task Dependencies (12B)
 

@@ -55,6 +55,46 @@ func (s *Service) GetAccount(ctx context.Context, id string) (*AccountResponse, 
 	return &resp, nil
 }
 
+func (s *Service) GetAccountDetail(ctx context.Context, id string) (*AdminAccountDetail, error) {
+	uid, err := parseUUID(id)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	row, err := s.Queries.GetAccount(ctx, uid)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get account: %w", err)
+	}
+
+	acct := accountFromGetRow(row)
+	detail := &AdminAccountDetail{
+		AccountResponse: acct,
+		DisplayName:     textPtr(row.DisplayName),
+		Excluded:        row.Excluded,
+	}
+
+	if acct.ConnectionID != nil {
+		detail.ConnectionID = *acct.ConnectionID
+		connID, err := parseUUID(*acct.ConnectionID)
+		if err == nil {
+			conn, err := s.Queries.GetBankConnection(ctx, connID)
+			if err == nil {
+				detail.Provider = string(conn.Provider)
+				if conn.InstitutionName.Valid {
+					detail.InstitutionName = conn.InstitutionName.String
+				}
+				if conn.UserName.Valid {
+					detail.UserName = conn.UserName.String
+				}
+			}
+		}
+	}
+
+	return detail, nil
+}
+
 func accountFromAllRow(r db.ListAccountsRow) AccountResponse {
 	return AccountResponse{
 		ID:                formatUUID(r.ID),

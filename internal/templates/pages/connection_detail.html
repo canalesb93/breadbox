@@ -77,7 +77,7 @@
     <tbody>
       {{range .Accounts}}
       <tr{{if .Excluded}} style="opacity: 0.6;"{{end}}>
-        <td>{{.Name}}</td>
+        <td><a href="/admin/accounts/{{formatUUID .ID}}">{{.Name}}</a></td>
         <td>
           <input type="text" value="{{.DisplayName.String}}" placeholder="{{.Name}}"
             onchange="updateDisplayName('{{formatUUID .ID}}', this.value)"

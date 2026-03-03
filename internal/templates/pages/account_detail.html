@@ -1,0 +1,200 @@
+{{define "content"}}
+<p><a href="/admin/connections/{{.Account.ConnectionID}}">&larr; {{.Account.InstitutionName}}</a></p>
+
+<h1>{{if .Account.DisplayName}}{{.Account.DisplayName}}{{else}}{{.Account.Name}}{{end}}</h1>
+
+<dl>
+  <dt>Account Name</dt>
+  <dd>{{.Account.Name}}{{if .Account.OfficialName}} ({{.Account.OfficialName}}){{end}}</dd>
+  <dt>Type</dt>
+  <dd>{{.Account.Type}}{{if .Account.Subtype}} / {{.Account.Subtype}}{{end}}</dd>
+  {{if .Account.Mask}}
+  <dt>Mask</dt>
+  <dd>&bull;&bull;&bull;&bull;{{.Account.Mask}}</dd>
+  {{end}}
+  <dt>Current Balance</dt>
+  <dd>{{if .Account.BalanceCurrent}}{{printf "%.2f" .Account.BalanceCurrent}}{{if .Account.IsoCurrencyCode}} {{.Account.IsoCurrencyCode}}{{end}}{{else}}&mdash;{{end}}</dd>
+  <dt>Available Balance</dt>
+  <dd>{{if .Account.BalanceAvailable}}{{printf "%.2f" .Account.BalanceAvailable}}{{if .Account.IsoCurrencyCode}} {{.Account.IsoCurrencyCode}}{{end}}{{else}}&mdash;{{end}}</dd>
+  {{if .Account.BalanceLimit}}
+  <dt>Credit Limit</dt>
+  <dd>{{printf "%.2f" .Account.BalanceLimit}} {{.Account.IsoCurrencyCode}}</dd>
+  {{end}}
+  <dt>Connection</dt>
+  <dd><a href="/admin/connections/{{.Account.ConnectionID}}">{{.Account.InstitutionName}}</a></dd>
+  <dt>Family Member</dt>
+  <dd>{{if .Account.UserName}}{{.Account.UserName}}{{else}}&mdash;{{end}}</dd>
+  <dt>Provider</dt>
+  <dd>{{if .Account.Provider}}{{.Account.Provider}}{{else}}&mdash;{{end}}</dd>
+</dl>
+
+<div style="display:flex; gap:var(--bb-gap-md); align-items:end; margin-bottom:var(--bb-gap-lg); flex-wrap:wrap;">
+  <label style="margin:0;">
+    Display Name
+    <input type="text" value="{{if .Account.DisplayName}}{{.Account.DisplayName}}{{end}}" placeholder="{{.Account.Name}}"
+      onchange="updateDisplayName('{{.AccountID}}', this.value)"
+      style="margin:0; width:16rem;">
+  </label>
+  <label style="margin:0; display:flex; align-items:center; gap:var(--bb-gap-sm);">
+    <input type="checkbox" {{if .Account.Excluded}}checked{{end}}
+      onchange="toggleExcluded('{{.AccountID}}', this.checked)"
+      style="margin:0;">
+    Excluded from sync
+  </label>
+</div>
+
+<h2>Transactions</h2>
+
+<form method="GET" action="/admin/accounts/{{.AccountID}}" style="display:flex; gap:var(--bb-gap-md); align-items:end; margin-bottom:var(--bb-gap-lg); flex-wrap:wrap;">
+  <label style="margin:0;">
+    Start Date
+    <input type="date" name="start_date" value="{{.FilterStartDate}}" style="margin:0;">
+  </label>
+  <label style="margin:0;">
+    End Date
+    <input type="date" name="end_date" value="{{.FilterEndDate}}" style="margin:0;">
+  </label>
+  <label style="margin:0;">
+    Category
+    <select name="category" style="margin:0;">
+      <option value="">All categories</option>
+      {{range .Categories}}
+      <option value="{{.}}"{{if eq . $.FilterCategory}} selected{{end}}>{{.}}</option>
+      {{end}}
+    </select>
+  </label>
+  <label style="margin:0;">
+    Pending
+    <select name="pending" style="margin:0;">
+      <option value="">All</option>
+      <option value="true"{{if eq .FilterPending "true"}} selected{{end}}>Yes</option>
+      <option value="false"{{if eq .FilterPending "false"}} selected{{end}}>No</option>
+    </select>
+  </label>
+  <label style="margin:0;">
+    Search
+    <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Name or merchant" style="margin:0;">
+  </label>
+  <button type="submit" style="margin:0;">Filter</button>
+  {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
+  <a href="/admin/accounts/{{.AccountID}}" role="button" class="secondary outline" style="margin:0;">Clear</a>
+  {{end}}
+</form>
+
+{{if .Transactions}}
+<div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Description</th>
+        <th style="text-align:right;">Amount</th>
+        <th>Category</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    {{range .Transactions}}
+    <tbody x-data="{ expanded: false }">
+      <tr @click="expanded = !expanded" style="cursor:pointer;">
+        <td>{{.Date}}</td>
+        <td>
+          {{.Name}}
+          {{if .MerchantName}}<small style="color:var(--pico-muted-color);"> ({{.MerchantName}})</small>{{end}}
+        </td>
+        <td style="text-align:right; font-variant-numeric:tabular-nums;{{if lt .Amount 0.0}} color:var(--pico-color-red-550);{{end}}">
+          {{printf "%.2f" .Amount}}{{if .IsoCurrencyCode}} {{.IsoCurrencyCode}}{{end}}
+        </td>
+        <td>{{if .CategoryPrimary}}{{.CategoryPrimary}}{{else}}&mdash;{{end}}</td>
+        <td>{{if .Pending}}<span class="bb-badge bb-badge--warning">Pending</span>{{end}}</td>
+      </tr>
+      <tr x-show="expanded" x-cloak>
+        <td colspan="5" style="padding:0.5rem 1rem; background:var(--pico-card-background-color);">
+          <dl style="display:grid; grid-template-columns:auto 1fr; gap:0.25rem 1rem; margin:0; font-size:0.875rem;">
+            {{if .MerchantName}}<dt>Merchant</dt><dd>{{.MerchantName}}</dd>{{end}}
+            <dt>Transaction ID</dt><dd><code style="font-size:0.8rem;">{{.ID}}</code></dd>
+            <dt>Created</dt><dd>{{.CreatedAt}}</dd>
+            <dt>Updated</dt><dd>{{.UpdatedAt}}</dd>
+          </dl>
+        </td>
+      </tr>
+    </tbody>
+    {{end}}
+  </table>
+</div>
+
+{{if gt .TotalPages 1}}
+<nav style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem;">
+  <div>
+    {{if gt .Page 1}}
+    <a href="/admin/accounts/{{$.AccountID}}?page={{sub .Page 1}}{{if $.FilterStartDate}}&start_date={{$.FilterStartDate}}{{end}}{{if $.FilterEndDate}}&end_date={{$.FilterEndDate}}{{end}}{{if $.FilterCategory}}&category={{$.FilterCategory}}{{end}}{{if $.FilterPending}}&pending={{$.FilterPending}}{{end}}{{if $.FilterSearch}}&search={{$.FilterSearch}}{{end}}" role="button" class="secondary outline" style="margin:0;">&laquo; Previous</a>
+    {{end}}
+  </div>
+  <small>Page {{.Page}} of {{.TotalPages}} ({{.Total}} total)</small>
+  <div>
+    {{if lt .Page .TotalPages}}
+    <a href="/admin/accounts/{{$.AccountID}}?page={{add .Page 1}}{{if $.FilterStartDate}}&start_date={{$.FilterStartDate}}{{end}}{{if $.FilterEndDate}}&end_date={{$.FilterEndDate}}{{end}}{{if $.FilterCategory}}&category={{$.FilterCategory}}{{end}}{{if $.FilterPending}}&pending={{$.FilterPending}}{{end}}{{if $.FilterSearch}}&search={{$.FilterSearch}}{{end}}" role="button" class="secondary outline" style="margin:0;">Next &raquo;</a>
+    {{end}}
+  </div>
+</nav>
+{{end}}
+
+{{else}}
+<div class="bb-empty">
+  <p>No transactions found for this account.</p>
+  {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
+  <a href="/admin/accounts/{{.AccountID}}" role="button" class="secondary outline">Clear filters</a>
+  {{end}}
+</div>
+{{end}}
+
+<div x-data="{ toast: '', toastType: 'error' }" @bb-toast.window="toast = $event.detail.message; toastType = $event.detail.type || 'error'; setTimeout(() => toast = '', 5000)">
+  <div x-show="toast" x-cloak x-transition :data-flash="toastType" style="position: fixed; bottom: 1.5rem; right: 1.5rem; max-width: 400px; z-index: 100;" x-text="toast"></div>
+</div>
+
+<script>
+function showToast(message, type) {
+  window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type || 'error' } }));
+}
+
+function updateDisplayName(accountId, val) {
+  var body = val === "" ? {display_name: null} : {display_name: val};
+  fetch("/admin/api/accounts/" + accountId + "/display-name", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(body)
+  })
+  .then(function(res) {
+    if (res.ok) {
+      showToast("Display name updated.", "success");
+    } else {
+      return res.json().then(function(data) {
+        showToast(data.error || "Failed to update display name.");
+      });
+    }
+  })
+  .catch(function() {
+    showToast("Network error. Please try again.");
+  });
+}
+
+function toggleExcluded(accountId, checked) {
+  fetch("/admin/api/accounts/" + accountId + "/excluded", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({excluded: checked})
+  })
+  .then(function(res) {
+    if (res.ok) {
+      showToast(checked ? "Account excluded." : "Account included.", "success");
+    } else {
+      return res.json().then(function(data) {
+        showToast(data.error || "Failed to update excluded state.");
+      });
+    }
+  })
+  .catch(function() {
+    showToast("Network error. Please try again.");
+  });
+}
+</script>
+{{end}}

@@ -131,6 +131,8 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/sync_logs.html",
 		"pages/settings.html",
 		"pages/csv_import.html",
+		"pages/transactions.html",
+		"pages/account_detail.html",
 	}
 
 	// Pages using the wizard layout (setup wizard + login).

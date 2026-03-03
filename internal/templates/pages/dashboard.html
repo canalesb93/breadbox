@@ -6,10 +6,10 @@
     <div class="bb-stat-label">Accounts Connected</div>
     <div class="bb-stat-value">{{.AccountCount}}</div>
   </div>
-  <div class="bb-stat">
+  <a href="/admin/transactions" class="bb-stat" style="text-decoration:none; color:inherit;">
     <div class="bb-stat-label">Transactions Synced</div>
     <div class="bb-stat-value">{{.TxCount}}</div>
-  </div>
+  </a>
   <div class="bb-stat">
     <div class="bb-stat-label">Last Sync</div>
     <div class="bb-stat-value">{{.LastSync}}</div>
@@ -55,7 +55,8 @@
 <p>No sync activity yet. Connect a bank to get started.</p>
 {{end}}
 
-<p>
+<p style="display:flex; gap:var(--bb-gap-md);">
   <a href="/admin/connections/new" role="button">Connect New Bank</a>
+  <a href="/admin/sync-logs" role="button" class="secondary outline">View All Sync Logs</a>
 </p>
 {{end}}
