@@ -16,6 +16,18 @@
       --bb-gap-md: 1rem;
       --bb-gap-lg: 1.5rem;
       --bb-gap-xl: 2rem;
+      --bb-color-success: #2e7d32;
+      --bb-color-error: #c62828;
+      --bb-color-warning: #e65100;
+      --bb-color-cyan: #00838f;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bb-color-success: #66bb6a;
+        --bb-color-error: #ef5350;
+        --bb-color-warning: #ffa726;
+        --bb-color-cyan: #4dd0e1;
+      }
     }
 
     .bb-layout {
@@ -80,7 +92,7 @@
     .bb-main {
       flex: 1;
       padding: 2rem 2.5rem;
-      max-width: 980px;
+      min-width: 0;
       overflow-y: auto;
     }
 
@@ -120,7 +132,7 @@
       font-weight: 700;
       line-height: 1.2;
     }
-    .bb-stat--warn { border-left: 4px solid var(--pico-color-amber-550); }
+    .bb-stat--warn { border-left: 4px solid var(--bb-color-warning); }
 
     /* ---- Status badges ---- */
     .bb-badge {
@@ -131,25 +143,25 @@
       font-weight: 600;
       line-height: 1.5;
     }
-    .bb-badge--success { background: color-mix(in srgb, var(--pico-color-green-550) 20%, transparent); color: var(--pico-color-green-550); }
-    .bb-badge--error   { background: color-mix(in srgb, var(--pico-color-red-550) 20%, transparent); color: var(--pico-color-red-550); }
-    .bb-badge--warning { background: color-mix(in srgb, var(--pico-color-amber-550) 20%, transparent); color: var(--pico-color-amber-700); }
+    .bb-badge--success { background: color-mix(in srgb, var(--bb-color-success) 20%, transparent); color: var(--bb-color-success); }
+    .bb-badge--error   { background: color-mix(in srgb, var(--bb-color-error) 20%, transparent); color: var(--bb-color-error); }
+    .bb-badge--warning { background: color-mix(in srgb, var(--bb-color-warning) 20%, transparent); color: var(--bb-color-warning); }
     .bb-badge--muted   { background: var(--pico-muted-border-color); color: var(--pico-muted-color); }
 
     /* ---- Flash messages ---- */
     [data-flash="success"] {
-      background: color-mix(in srgb, var(--pico-color-green-550) 20%, transparent);
-      color: var(--pico-color-green-550);
+      background: color-mix(in srgb, var(--bb-color-success) 20%, transparent);
+      color: var(--bb-color-success);
       padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
     }
     [data-flash="error"] {
-      background: color-mix(in srgb, var(--pico-color-red-550) 20%, transparent);
-      color: var(--pico-color-red-550);
+      background: color-mix(in srgb, var(--bb-color-error) 20%, transparent);
+      color: var(--bb-color-error);
       padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
     }
     [data-flash="info"] {
-      background: color-mix(in srgb, var(--pico-color-cyan-550) 20%, transparent);
-      color: var(--pico-color-cyan-550);
+      background: color-mix(in srgb, var(--bb-color-cyan) 20%, transparent);
+      color: var(--bb-color-cyan);
       padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
     }
 

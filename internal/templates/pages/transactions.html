@@ -93,7 +93,7 @@
           {{.Name}}
           {{if .MerchantName}}<small style="color:var(--pico-muted-color);"> ({{.MerchantName}})</small>{{end}}
         </td>
-        <td style="text-align:right; font-variant-numeric:tabular-nums;{{if lt .Amount 0.0}} color:var(--pico-color-red-550);{{end}}">
+        <td style="text-align:right; font-variant-numeric:tabular-nums;{{if lt .Amount 0.0}} color:var(--bb-color-error);{{end}}">
           {{printf "%.2f" .Amount}}{{if .IsoCurrencyCode}} {{.IsoCurrencyCode}}{{end}}
         </td>
         <td><a href="/admin/accounts/{{.AccountID}}" @click.stop>{{.AccountName}}</a></td>

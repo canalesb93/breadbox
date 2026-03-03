@@ -5,7 +5,7 @@
 
 <article>
   <form id="user-form">
-    <label for="name">Name <span style="color: var(--pico-color-red-500);">*</span></label>
+    <label for="name">Name <span style="color: var(--bb-color-error);">*</span></label>
     <input type="text" id="name" name="name" required maxlength="128"
       value="{{if .IsEdit}}{{.User.Name}}{{end}}"
       placeholder="e.g., Alex Canales">
@@ -15,7 +15,7 @@
       value="{{if and .IsEdit .User.Email.Valid}}{{.User.Email.String}}{{end}}"
       placeholder="e.g., alex@example.com">
 
-    <div id="form-error" role="alert" style="display:none; color: var(--pico-color-red-500); margin-bottom: 1rem;"></div>
+    <div id="form-error" role="alert" style="display:none; color: var(--bb-color-error); margin-bottom: 1rem;"></div>
 
     <button type="submit">{{if .IsEdit}}Save Changes{{else}}Create Member{{end}}</button>
     <a href="/admin/users" role="button" class="secondary outline" style="margin-left: 0.5rem;">Cancel</a>
