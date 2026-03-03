@@ -11,12 +11,15 @@
   <form method="POST" action="/admin/setup/step/3">
     {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
 
-    <label for="sync_interval_hours">Sync Interval</label>
-    <select id="sync_interval_hours" name="sync_interval_hours" required>
-      <option value="4"{{if eq .SyncInterval "4"}} selected{{end}}>Every 4 hours</option>
-      <option value="8"{{if eq .SyncInterval "8"}} selected{{end}}>Every 8 hours</option>
-      <option value="12"{{if or (eq .SyncInterval "12") (eq .SyncInterval "")}} selected{{end}}>Every 12 hours (recommended)</option>
-      <option value="24"{{if eq .SyncInterval "24"}} selected{{end}}>Every 24 hours</option>
+    <label for="sync_interval_minutes">Sync Interval</label>
+    <select id="sync_interval_minutes" name="sync_interval_minutes" required>
+      <option value="15"{{if eq .SyncInterval "15"}} selected{{end}}>Every 15 minutes</option>
+      <option value="30"{{if eq .SyncInterval "30"}} selected{{end}}>Every 30 minutes</option>
+      <option value="60"{{if eq .SyncInterval "60"}} selected{{end}}>Every 1 hour</option>
+      <option value="240"{{if eq .SyncInterval "240"}} selected{{end}}>Every 4 hours</option>
+      <option value="480"{{if eq .SyncInterval "480"}} selected{{end}}>Every 8 hours</option>
+      <option value="720"{{if or (eq .SyncInterval "720") (eq .SyncInterval "")}} selected{{end}}>Every 12 hours (recommended)</option>
+      <option value="1440"{{if eq .SyncInterval "1440"}} selected{{end}}>Every 24 hours</option>
     </select>
     <small>API cost note: Each sync call counts toward your Plaid usage. Sandbox is free. Development is limited by your development key quota. Production is billed per item per month regardless of sync frequency, so more frequent syncs have no additional cost per item.</small>
 

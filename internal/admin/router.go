@@ -36,6 +36,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/step/4", SetupStep4Handler(a.Queries, tr))
 		r.Post("/step/4", SetupStep4Handler(a.Queries, tr))
 		r.Get("/step/5", SetupStep5Handler(a.Queries, tr))
+		r.Post("/step/5", SetupStep5Handler(a.Queries, tr))
 	})
 
 	// Setup API (unauthenticated).

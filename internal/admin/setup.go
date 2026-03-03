@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 
 	"breadbox/internal/db"
@@ -213,38 +215,37 @@ func SetupStep3Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 			data := map[string]any{
 				"StepNumber":   3,
 				"CSRFToken":    "",
-				"SyncInterval": "12",
+				"SyncInterval": "720",
 				"Error":        "",
 			}
 			tr.Render(w, r, "setup_step3.html", data)
 			return
 		}
 
-		// POST: validate and store sync interval.
+		// POST: validate and store sync interval in minutes.
 		ctx := r.Context()
-		interval := r.FormValue("sync_interval_hours")
-
-		validIntervals := map[string]bool{"4": true, "8": true, "12": true, "24": true}
-		if !validIntervals[interval] {
+		intervalStr := r.FormValue("sync_interval_minutes")
+		interval, err := strconv.Atoi(intervalStr)
+		if err != nil || !isValidSyncInterval(interval) {
 			data := map[string]any{
 				"StepNumber":   3,
 				"CSRFToken":    "",
-				"SyncInterval": interval,
+				"SyncInterval": intervalStr,
 				"Error":        "Please select a valid sync interval",
 			}
 			tr.Render(w, r, "setup_step3.html", data)
 			return
 		}
 
-		err := queries.SetAppConfig(ctx, db.SetAppConfigParams{
-			Key:   "sync_interval_hours",
-			Value: pgtype.Text{String: interval, Valid: true},
+		err = queries.SetAppConfig(ctx, db.SetAppConfigParams{
+			Key:   "sync_interval_minutes",
+			Value: pgtype.Text{String: intervalStr, Valid: true},
 		})
 		if err != nil {
 			data := map[string]any{
 				"StepNumber":   3,
 				"CSRFToken":    "",
-				"SyncInterval": interval,
+				"SyncInterval": intervalStr,
 				"Error":        "Failed to save configuration",
 			}
 			tr.Render(w, r, "setup_step3.html", data)
@@ -309,60 +310,80 @@ func SetupStep4Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 	}
 }
 
-// SetupStep5Handler handles GET /admin/setup/step/5 — Done.
+// SetupStep5Handler handles GET/POST /admin/setup/step/5 — Review & Confirm.
+// GET: renders the summary (no side effects).
+// POST: marks setup as complete and redirects to login.
 func SetupStep5Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// Mark setup as complete.
-		_ = queries.SetAppConfig(ctx, db.SetAppConfigParams{
-			Key:   "setup_complete",
-			Value: pgtype.Text{String: "true", Valid: true},
-		})
-
-		// Build summary data from app_config.
-		adminUsername := ""
-		// Get the first admin account username.
-		count, _ := queries.CountAdminAccounts(ctx)
-		if count > 0 {
-			// We know at least one admin exists from step 1.
-			// List all config to build summary.
-			configs, _ := queries.ListAppConfig(ctx)
-			configMap := make(map[string]string)
-			for _, c := range configs {
-				if c.Value.Valid {
-					configMap[c.Key] = c.Value.String
-				}
-			}
-
-			// Try to get admin username from the first admin created.
-			// Since we don't have a ListAdminAccounts query, we'll leave it
-			// empty or try to get it from config. For now we'll use a simple approach.
-			adminUsername = configMap["admin_username"]
-			if adminUsername == "" {
-				adminUsername = "(admin)"
-			}
-
-			data := map[string]any{
-				"StepNumber":    5,
-				"AdminUsername": adminUsername,
-				"PlaidEnv":      configMap["plaid_env"],
-				"SyncInterval":  configMap["sync_interval_hours"],
-				"WebhookURL":    configMap["webhook_url"],
-			}
-			tr.Render(w, r, "setup_step5.html", data)
+		if r.Method == http.MethodPost {
+			// Mark setup as complete.
+			_ = queries.SetAppConfig(ctx, db.SetAppConfigParams{
+				Key:   "setup_complete",
+				Value: pgtype.Text{String: "true", Valid: true},
+			})
+			http.Redirect(w, r, "/login?setup=complete", http.StatusSeeOther)
 			return
 		}
 
-		// Fallback: shouldn't happen but render anyway.
+		// GET: Build summary data from app_config.
+		configs, _ := queries.ListAppConfig(ctx)
+		configMap := make(map[string]string)
+		for _, c := range configs {
+			if c.Value.Valid {
+				configMap[c.Key] = c.Value.String
+			}
+		}
+
+		adminUsername := configMap["admin_username"]
+		if adminUsername == "" {
+			adminUsername = "(admin)"
+		}
+
+		// Format sync interval for display.
+		syncInterval := configMap["sync_interval_minutes"]
+		syncDisplay := formatSyncInterval(syncInterval)
+
+		// Check provider status.
+		hasPlaid := configMap["plaid_client_id"] != ""
+		hasTeller := os.Getenv("TELLER_APP_ID") != ""
+
 		data := map[string]any{
 			"StepNumber":    5,
-			"AdminUsername": "",
-			"PlaidEnv":      "",
-			"SyncInterval":  "",
-			"WebhookURL":    "",
+			"AdminUsername": adminUsername,
+			"PlaidEnv":      configMap["plaid_env"],
+			"SyncInterval":  syncDisplay,
+			"WebhookURL":    configMap["webhook_url"],
+			"HasPlaid":      hasPlaid,
+			"HasTeller":     hasTeller,
 		}
 		tr.Render(w, r, "setup_step5.html", data)
+	}
+}
+
+// formatSyncInterval converts a minutes string to a human-readable interval.
+func formatSyncInterval(minutes string) string {
+	switch minutes {
+	case "15":
+		return "Every 15 minutes"
+	case "30":
+		return "Every 30 minutes"
+	case "60":
+		return "Every 1 hour"
+	case "240":
+		return "Every 4 hours"
+	case "480":
+		return "Every 8 hours"
+	case "720":
+		return "Every 12 hours"
+	case "1440":
+		return "Every 24 hours"
+	default:
+		if minutes != "" {
+			return "Every " + minutes + " minutes"
+		}
+		return "Not configured"
 	}
 }
 
@@ -384,13 +405,13 @@ func SetupStatusHandler(queries *db.Queries) http.HandlerFunc {
 
 // programmaticSetupRequest is the JSON body for POST /admin/api/setup.
 type programmaticSetupRequest struct {
-	Username          string `json:"username"`
-	Password          string `json:"password"`
-	PlaidClientID     string `json:"plaid_client_id"`
-	PlaidSecret       string `json:"plaid_secret"`
-	PlaidEnv          string `json:"plaid_env"`
-	SyncIntervalHours string `json:"sync_interval_hours"`
-	WebhookURL        string `json:"webhook_url"`
+	Username            string `json:"username"`
+	Password            string `json:"password"`
+	PlaidClientID       string `json:"plaid_client_id"`
+	PlaidSecret         string `json:"plaid_secret"`
+	PlaidEnv            string `json:"plaid_env"`
+	SyncIntervalMinutes string `json:"sync_interval_minutes"`
+	WebhookURL          string `json:"webhook_url"`
 }
 
 // ProgrammaticSetupHandler handles POST /admin/api/setup — all-in-one setup.
@@ -449,12 +470,12 @@ func ProgrammaticSetupHandler(queries *db.Queries, sm *scs.SessionManager) http.
 			validationErrors = append(validationErrors, "plaid_env must be one of: sandbox, development, production")
 		}
 
-		validIntervals := map[string]bool{"4": true, "8": true, "12": true, "24": true}
-		if req.SyncIntervalHours == "" {
-			req.SyncIntervalHours = "12"
+		if req.SyncIntervalMinutes == "" {
+			req.SyncIntervalMinutes = "720"
 		}
-		if !validIntervals[req.SyncIntervalHours] {
-			validationErrors = append(validationErrors, "sync_interval_hours must be one of: 4, 8, 12, 24")
+		syncMin, convErr := strconv.Atoi(req.SyncIntervalMinutes)
+		if convErr != nil || !isValidSyncInterval(syncMin) {
+			validationErrors = append(validationErrors, "sync_interval_minutes must be one of: 15, 30, 60, 240, 480, 720, 1440")
 		}
 
 		if req.WebhookURL != "" && !strings.HasPrefix(req.WebhookURL, "https://") {
@@ -467,6 +488,21 @@ func ProgrammaticSetupHandler(queries *db.Queries, sm *scs.SessionManager) http.
 				"errors": validationErrors,
 			})
 			return
+		}
+
+		// Validate Plaid credentials against the API if provided.
+		if req.PlaidClientID != "" && req.PlaidSecret != "" {
+			plaidEnv := req.PlaidEnv
+			if plaidEnv == "" {
+				plaidEnv = "sandbox"
+			}
+			if err := plaidprovider.ValidateCredentials(ctx, req.PlaidClientID, req.PlaidSecret, plaidEnv); err != nil {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+					"error":  "Plaid credential validation failed",
+					"errors": []string{fmt.Sprintf("Could not validate Plaid credentials for the %s environment: %v", plaidEnv, err)},
+				})
+				return
+			}
 		}
 
 		// Create admin account.
@@ -491,7 +527,7 @@ func ProgrammaticSetupHandler(queries *db.Queries, sm *scs.SessionManager) http.
 
 		// Store all config values.
 		configEntries := []db.SetAppConfigParams{
-			{Key: "sync_interval_hours", Value: pgtype.Text{String: req.SyncIntervalHours, Valid: true}},
+			{Key: "sync_interval_minutes", Value: pgtype.Text{String: req.SyncIntervalMinutes, Valid: true}},
 			{Key: "webhook_url", Value: pgtype.Text{String: req.WebhookURL, Valid: true}},
 			{Key: "setup_complete", Value: pgtype.Text{String: "true", Valid: true}},
 		}

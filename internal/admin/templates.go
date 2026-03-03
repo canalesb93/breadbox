@@ -89,6 +89,20 @@ func NewTemplateRenderer() (*TemplateRenderer, error) {
 					return template.HTML(`<span class="bb-badge bb-badge--muted">` + template.HTMLEscapeString(status) + `</span>`)
 				}
 			},
+			"errorMessage": func(code string) string {
+				messages := map[string]string{
+					"ITEM_LOGIN_REQUIRED":      "Your bank login has changed. Please re-authenticate.",
+					"INSUFFICIENT_CREDENTIALS": "Additional credentials are needed. Please re-authenticate.",
+					"INVALID_CREDENTIALS":      "Your bank credentials are incorrect. Please re-authenticate.",
+					"MFA_NOT_SUPPORTED":        "This connection requires MFA which is not supported. Please reconnect.",
+					"NO_ACCOUNTS":              "No accounts found for this connection.",
+					"enrollment.disconnected":  "This bank connection has been disconnected.",
+				}
+				if msg, ok := messages[code]; ok {
+					return msg
+				}
+				return code
+			},
 			"formatNumeric": func(n pgtype.Numeric) string {
 				if !n.Valid {
 					return ""

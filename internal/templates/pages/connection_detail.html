@@ -1,10 +1,15 @@
 {{define "content"}}
-<p><a href="/admin/connections">&larr; Connections</a></p>
+<nav aria-label="breadcrumb">
+  <ul>
+    <li><a href="/admin/connections">Connections</a></li>
+    <li>{{.Connection.InstitutionName.String}}</li>
+  </ul>
+</nav>
 
 {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
 <div role="alert" data-flash="error" style="margin-bottom: var(--bb-gap-lg);">
   <strong>This connection requires re-authentication.</strong> The bank may have changed its login requirements, or your session may have expired.
-  {{if .Connection.ErrorMessage.Valid}}<br><small>Error: {{.Connection.ErrorMessage.String}}</small>{{end}}
+  {{if .Connection.ErrorCode.Valid}}<br><small>{{errorMessage .Connection.ErrorCode.String}}</small>{{else if .Connection.ErrorMessage.Valid}}<br><small>{{.Connection.ErrorMessage.String}}</small>{{end}}
   <br><a href="/admin/connections/{{.ConnID}}/reauth" style="color: inherit; font-weight: 600;">Re-authenticate &rarr;</a>
 </div>
 {{end}}

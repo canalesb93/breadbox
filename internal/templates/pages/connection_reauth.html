@@ -4,7 +4,13 @@
 {{else if eq (printf "%s" .Connection.Provider) "teller"}}
 <script src="https://cdn.teller.io/connect/connect.js"></script>
 {{end}}
-<p><a href="/admin/connections/{{.ConnID}}">&larr; Back to {{.Connection.InstitutionName.String}}</a></p>
+<nav aria-label="breadcrumb">
+  <ul>
+    <li><a href="/admin/connections">Connections</a></li>
+    <li><a href="/admin/connections/{{.ConnID}}">{{.Connection.InstitutionName.String}}</a></li>
+    <li>Re-authenticate</li>
+  </ul>
+</nav>
 
 <h1>Re-authenticate {{.Connection.InstitutionName.String}}</h1>
 

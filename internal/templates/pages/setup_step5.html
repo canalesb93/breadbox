@@ -1,8 +1,8 @@
 {{define "content"}}
 <article>
-  <header>Setup Complete</header>
+  <header>Review &amp; Confirm</header>
 
-  <p>Your Breadbox instance is configured and ready to use.</p>
+  <p>Your Breadbox instance is ready. Review your settings below, then confirm to complete setup.</p>
 
   <table>
     <tbody>
@@ -12,11 +12,11 @@
       </tr>
       <tr>
         <th>Plaid Environment</th>
-        <td>{{.PlaidEnv}}</td>
+        <td>{{if .PlaidEnv}}{{.PlaidEnv}}{{else}}Not configured{{end}}</td>
       </tr>
       <tr>
         <th>Sync Interval</th>
-        <td>Every {{.SyncInterval}} hours</td>
+        <td>{{.SyncInterval}}</td>
       </tr>
       <tr>
         <th>Webhook URL</th>
@@ -25,8 +25,27 @@
     </tbody>
   </table>
 
+  <h4>Provider Status</h4>
+  <ul>
+    <li>Plaid: {{if .HasPlaid}}Configured{{else}}Not configured{{end}}</li>
+    <li>Teller: {{if .HasTeller}}Configured{{else}}Not configured{{end}}</li>
+    <li>CSV Import: Always available</li>
+  </ul>
+
+  {{if not (or .HasPlaid .HasTeller)}}
+  <div role="alert" data-flash="info">
+    No bank providers are configured. You can still import data via CSV, or configure Plaid/Teller in Settings after setup.
+  </div>
+  {{end}}
+
   <small>You can change these settings at any time from the Settings page.</small>
 
-  <a href="/login?setup=complete" role="button" style="margin-top: 1rem; display: inline-block;">Go to Dashboard</a>
+  <form method="POST" action="/admin/setup/step/5" style="margin-top: 1rem;">
+    <button type="submit">Confirm &amp; Finish</button>
+  </form>
+
+  {{if or .HasPlaid .HasTeller}}
+  <a href="/admin/connections/new" role="button" class="secondary outline" style="margin-top: var(--bb-gap-sm);">Connect Your First Bank &rarr;</a>
+  {{end}}
 </article>
 {{end}}

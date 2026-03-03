@@ -1,6 +1,13 @@
 {{define "content"}}
 <h1>Dashboard</h1>
 
+{{if gt .NeedsAttention 0}}
+<div role="alert" data-flash="error">
+  <strong>{{.NeedsAttention}} connection(s) need attention.</strong>
+  <a href="/admin/connections">View connections &rarr;</a>
+</div>
+{{end}}
+
 <div class="bb-stats">
   <div class="bb-stat">
     <div class="bb-stat-label">Accounts Connected</div>
@@ -14,10 +21,17 @@
     <div class="bb-stat-label">Last Sync</div>
     <div class="bb-stat-value">{{.LastSync}}</div>
   </div>
-  <div class="bb-stat{{if gt .NeedsAttention 0}} bb-stat--warn{{end}}">
+  {{if gt .NeedsAttention 0}}
+  <a href="/admin/connections" class="bb-stat bb-stat--warn" style="text-decoration:none; color:inherit;">
+    <div class="bb-stat-label">Needs Attention</div>
+    <div class="bb-stat-value">{{.NeedsAttention}}</div>
+  </a>
+  {{else}}
+  <div class="bb-stat">
     <div class="bb-stat-label">Needs Attention</div>
     <div class="bb-stat-value">{{.NeedsAttention}}</div>
   </div>
+  {{end}}
 </div>
 
 <h2>Recent Sync Activity</h2>
@@ -39,7 +53,7 @@
     <tbody>
       {{range .RecentLogs}}
       <tr>
-        <td>{{.InstitutionName}}</td>
+        <td><a href="/admin/connections/{{formatUUID .ConnectionID}}">{{.InstitutionName}}</a></td>
         <td>{{.Trigger}}</td>
         <td>{{syncBadge (printf "%s" .Status)}}</td>
         <td>{{.AddedCount}}</td>

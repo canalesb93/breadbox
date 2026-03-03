@@ -1146,96 +1146,66 @@ Fix confirmed bugs in the setup wizard, improve dashboard navigation, and polish
 
 **Depends on:** None (can be done immediately on the current codebase, independent of Phases 10–12)
 
-### 13A.1 Bug Fix: setup_complete Written on GET
+### 13A.1 Bug Fix: setup_complete Written on GET ✅
 
-- [ ] Move `setup_complete = true` from `SetupStep5Handler` GET to a dedicated POST handler
-- [ ] Step 5 GET only renders the summary page; a "Confirm & Finish" button POSTs to finalize
-- [ ] Prevents accidental wizard completion from page reloads or direct URL navigation
-- **Bug location:** `setup.go` lines 312–321 — unconditionally writes on every GET request
-- **Files:** `internal/admin/setup.go`
+- [x] Move `setup_complete = true` from `SetupStep5Handler` GET to a dedicated POST handler
+- [x] Step 5 GET only renders the summary page; a "Confirm & Finish" button POSTs to finalize
+- [x] Prevents accidental wizard completion from page reloads or direct URL navigation
 
-### 13A.2 Bug Fix: Programmatic Setup Skips Plaid Validation
+### 13A.2 Bug Fix: Programmatic Setup Skips Plaid Validation ✅
 
-- [ ] Add `plaidprovider.ValidateCredentials(ctx, clientID, secret, environment)` call in `ProgrammaticSetupHandler` when both Plaid creds are provided
-- [ ] Match the validation behavior of the interactive `SetupStep2Handler` (which already validates)
-- [ ] Return validation error in the API response if credentials fail
-- **Bug location:** `setup.go` lines 437–450 — saves credentials without testing them
-- **Files:** `internal/admin/setup.go`
+- [x] Add `plaidprovider.ValidateCredentials(ctx, clientID, secret, environment)` call in `ProgrammaticSetupHandler` when both Plaid creds are provided
+- [x] Match the validation behavior of the interactive `SetupStep2Handler` (which already validates)
+- [x] Return validation error in the API response if credentials fail
 
-### 13A.3 Bug Fix: Broken "Re-run Setup Wizard" Link
+### 13A.3 Bug Fix: Broken "Re-run Setup Wizard" Link ✅
 
-- [ ] Remove `<a href="/admin/setup/step/1">Re-run Setup Wizard</a>` from settings page
-- [ ] Replace with "Change Admin Password" link (target implemented in 13B.3)
-- [ ] Until 13B.3 is done, replace with explanatory text: "To reconfigure providers, update settings below"
-- **Bug location:** `settings.html` line 76 links to step 1, but `SetupStep1Handler` (setup.go lines 22–27) redirects away if any admin account exists
-- **Files:** `internal/templates/pages/settings.html`
+- [x] Remove `<a href="/admin/setup/step/1">Re-run Setup Wizard</a>` from settings page
+- [x] Replace with explanatory text: "To reconfigure providers, update the settings above."
 
-### 13A.4 Fix: Sync Interval Unit Mismatch
+### 13A.4 Fix: Sync Interval Unit Mismatch ✅
 
-- [ ] Update wizard step 3 to write `sync_interval_minutes` instead of `sync_interval_hours`
-- [ ] Offer the same option set as the settings page: 15m, 30m, 1h, 4h, 8h, 12h, 24h
-- [ ] Keep legacy `sync_interval_hours` fallback in config loader (`load.go` lines 137–154) for backwards compatibility
-- [ ] Update step 3 template to show minute-based options
-- **Bug location:** `setup.go` lines 225–243 writes `sync_interval_hours`; `settings.go` lines 47–68 writes `sync_interval_minutes`
-- **Files:** `internal/admin/setup.go`, `internal/templates/pages/setup_step3.html`
+- [x] Update wizard step 3 to write `sync_interval_minutes` instead of `sync_interval_hours`
+- [x] Offer the same option set as the settings page: 15m, 30m, 1h, 4h, 8h, 12h, 24h
+- [x] Update step 3 template to show minute-based options
+- [x] Update step 5 to display human-readable interval from minutes
+- [x] Update programmatic handler: field renamed to `SyncIntervalMinutes`, config key to `sync_interval_minutes`
 
-### 13A.5 Dashboard: Clickable Stats & Alert Banner
+### 13A.5 Dashboard: Clickable Stats & Alert Banner ✅
 
-- [ ] Wrap "Needs Attention" stat card in `<a href="/admin/connections">` when count > 0
-- [ ] Add broken-connections alert banner (`<div role="alert">`) above stat cards when any connection is in `error` or `pending_reauth` status
-- [ ] Banner text: "{N} connection(s) need attention" with link to connections page
-- [ ] Pass `BrokenCount` from dashboard handler to template
-- **Files:** `internal/templates/pages/dashboard.html`, `internal/admin/dashboard.go`
+- [x] Wrap "Needs Attention" stat card in `<a href="/admin/connections">` when count > 0
+- [x] Add broken-connections alert banner (`<div role="alert">`) above stat cards when any connection needs attention
+- [x] Banner text: "{N} connection(s) need attention" with link to connections page
 
-### 13A.6 Dashboard: Institution Name Links in Sync Activity
+### 13A.6 Dashboard: Institution Name Links in Sync Activity ✅
 
-- [ ] Make institution names in the Recent Sync Activity table link to `/admin/connections/{id}`
-- [ ] Add `ConnectionID` field to the recent logs struct/query result
-- [ ] Template: wrap `{{.InstitutionName}}` in `<a href="/admin/connections/{{.ConnectionID}}">`
-- **Current state:** `dashboard.html` line 42 — `{{.InstitutionName}}` is plain text
-- **Files:** `internal/admin/dashboard.go`, `internal/templates/pages/dashboard.html`, query/service layer for sync logs
+- [x] Make institution names in the Recent Sync Activity table link to `/admin/connections/{id}`
+- [x] `ConnectionID` field already present in `ListRecentSyncLogsRow` — no query changes needed
 
-### 13A.7 Human-Readable Error Messages
+### 13A.7 Human-Readable Error Messages ✅
 
-- [ ] Add `errorMessage(code string) string` template function in `templates.go`
-- [ ] Map known error codes to user-friendly messages:
-  - `ITEM_LOGIN_REQUIRED` → "Your bank login has changed. Please re-authenticate."
-  - `INSUFFICIENT_CREDENTIALS` → "Additional credentials are needed. Please re-authenticate."
-  - `INVALID_CREDENTIALS` → "Your bank credentials are incorrect. Please re-authenticate."
-  - `MFA_NOT_SUPPORTED` → "This connection requires MFA which is not supported. Please reconnect."
-  - `NO_ACCOUNTS` → "No accounts found for this connection."
-  - `enrollment.disconnected` (Teller) → "This bank connection has been disconnected."
-  - Unknown codes → show raw message as fallback
-- [ ] Use in connection detail error display (lines 7, 105)
-- **Files:** `internal/admin/templates.go`, `internal/templates/pages/connection_detail.html`
+- [x] Add `errorMessage(code string) string` template function in `templates.go`
+- [x] Map known error codes (ITEM_LOGIN_REQUIRED, INSUFFICIENT_CREDENTIALS, INVALID_CREDENTIALS, MFA_NOT_SUPPORTED, NO_ACCOUNTS, enrollment.disconnected) to user-friendly messages
+- [x] Use `ErrorCode` field (not `ErrorMessage`) for lookup in connection detail error display
 
-### 13A.8 Connection Detail: Breadcrumb Navigation
+### 13A.8 Connection Detail: Breadcrumb Navigation ✅
 
-- [ ] Replace `← Connections` back-link with semantic breadcrumb: `Connections / {institution name}`
-- [ ] Use `<nav aria-label="breadcrumb">` with two-element structure
-- [ ] Apply same pattern to reauth page: `Connections / {institution name} / Re-authenticate`
-- [ ] Phase 12B can extend to three levels: `Connections / {institution} / {account name}`
-- **Current state:** `connection_detail.html` line 2 — `<a href="/admin/connections">← Connections</a>`
-- **Files:** `internal/templates/pages/connection_detail.html`, `internal/templates/pages/connection_reauth.html`
+- [x] Replace `← Connections` back-link with semantic breadcrumb using `<nav aria-label="breadcrumb">`
+- [x] Connection detail: `Connections / {institution name}`
+- [x] Reauth page: `Connections / {institution name} / Re-authenticate`
 
-### 13A.9 Wizard Step 5: Provider Status & CTA
+### 13A.9 Wizard Step 5: Provider Status & CTA ✅
 
-- [ ] Add provider configuration status to step 5 summary:
-  - "Plaid: Configured ✓" / "Plaid: Not configured"
-  - "Teller: Configured ✓" / "Teller: Not configured (set env vars)"
-  - "CSV Import: Always available"
-- [ ] Add prominent CTA button: "Connect Your First Bank →" linking to `/admin/connections/new`
-- [ ] If no providers are configured, show warning: "No bank data provider configured. Go to Settings to add one."
-- [ ] Pass provider availability from `app.Providers` map to template data
-- **Files:** `internal/admin/setup.go` (step 5 data), `internal/templates/pages/setup_step5.html`
+- [x] Add provider configuration status: Plaid (from app_config), Teller (from env var), CSV (always available)
+- [x] Add "Connect Your First Bank →" CTA button when providers are configured
+- [x] Show warning when no providers are configured
 
-### 13A.10 Wizard Step 4: Reframe Webhook as Optional
+### 13A.10 Wizard Step 4: Reframe Webhook as Optional ✅
 
-- [ ] Lead with: "Webhooks are optional. Without them, Breadbox will sync on its configured schedule."
-- [ ] Two clear paths: "I have a public URL" (shows the URL form) vs "Skip — I'll set this up later"
-- [ ] Make Cloudflare Tunnel documentation link more prominent for the local/self-hosted case
-- [ ] Clarify that the URL entered here is what Breadbox listens at — the user must also configure it in their Plaid/Teller dashboard
-- **Files:** `internal/templates/pages/setup_step4.html`
+- [x] Lead with "Webhooks are optional" framing
+- [x] Cloudflare Tunnel link in collapsible details section
+- [x] Skip button more prominent: "Skip — I'll Sync on a Schedule"
+- [x] Clarified that URL is the base URL where Breadbox is hosted
 
 ### Task Dependencies (13A)
 
