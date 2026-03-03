@@ -1,7 +1,7 @@
 {{define "content"}}
 <h1>Sync Logs</h1>
 
-<form method="GET" action="/admin/sync-logs" style="display:flex; gap:1rem; align-items:end; margin-bottom:1.5rem; flex-wrap:wrap;">
+<form method="GET" action="/admin/sync-logs" style="display:flex; gap:var(--bb-gap-md); align-items:end; margin-bottom:var(--bb-gap-lg); flex-wrap:wrap;">
   <label style="margin:0;">
     Connection
     <select name="connection_id" style="margin:0;">
@@ -47,13 +47,7 @@
       <tr>
         <td>{{.InstitutionName}}</td>
         <td>{{.Trigger}}</td>
-        <td>
-          {{if eq .Status "success"}}<span class="bb-badge bb-badge--success">success</span>
-          {{else if eq .Status "error"}}<span class="bb-badge bb-badge--error">error</span>
-          {{else if eq .Status "in_progress"}}<span class="bb-badge bb-badge--warning">in progress</span>
-          {{else}}<span class="bb-badge bb-badge--muted">{{.Status}}</span>
-          {{end}}
-        </td>
+        <td>{{syncBadge .Status}}</td>
         <td>{{.AddedCount}}</td>
         <td>{{.ModifiedCount}}</td>
         <td>{{.RemovedCount}}</td>

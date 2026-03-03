@@ -33,9 +33,13 @@
         <td>{{.CreatedAt}}</td>
         <td>
           {{if not .RevokedAt}}
-          <form method="POST" action="/admin/api-keys/{{.ID}}/revoke" style="display:inline;">
+          <form method="POST" action="/admin/api-keys/{{.ID}}/revoke" style="display:inline;" x-data="{ confirming: false }">
             <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
-            <button type="submit" class="secondary outline" style="margin:0;padding:0.25rem 0.5rem;font-size:0.85rem;" onclick="return confirm('Are you sure you want to revoke this API key?')">Revoke</button>
+            <button type="button" class="secondary outline" style="margin:0;padding:0.25rem 0.5rem;font-size:0.85rem;" x-show="!confirming" @click="confirming = true">Revoke</button>
+            <span x-show="confirming" x-cloak>
+              <button type="submit" class="secondary" style="margin:0;padding:0.25rem 0.5rem;font-size:0.85rem;">Confirm</button>
+              <button type="button" class="outline" style="margin:0;padding:0.25rem 0.5rem;font-size:0.85rem;" @click="confirming = false">Cancel</button>
+            </span>
           </form>
           {{end}}
         </td>

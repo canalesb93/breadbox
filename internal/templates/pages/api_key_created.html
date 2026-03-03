@@ -1,6 +1,6 @@
 {{define "content"}}
 <h1>API Key Created</h1>
-<div style="background: #d4edda; color: #155724; padding: 1rem 1.25rem; border-radius: 6px; margin-bottom: 1.5rem;">
+<div data-flash="success" style="padding: var(--bb-gap-md) 1.25rem; margin-bottom: var(--bb-gap-lg);">
   <strong>Your API key has been created.</strong> Copy it now — you won't be able to see it again.
 </div>
 <label>
@@ -11,11 +11,14 @@
   API Key
   <input type="text" value="{{.PlaintextKey}}" readonly id="api-key-value" style="font-family: monospace;">
 </label>
-<div style="margin-top: 1rem;">
-  <button onclick="navigator.clipboard.writeText(document.getElementById('api-key-value').value).then(function(){alert('Copied!')})">Copy to Clipboard</button>
+<div style="margin-top: var(--bb-gap-md);" x-data="{ copied: false }">
+  <button @click="navigator.clipboard.writeText(document.getElementById('api-key-value').value).then(function(){ $data.copied = true; setTimeout(function(){ $data.copied = false; }, 2000); })">
+    <span x-show="!copied">Copy to Clipboard</span>
+    <span x-show="copied" x-cloak>Copied!</span>
+  </button>
   <a href="/admin/api-keys" role="button" class="secondary outline" style="margin-left: 0.5rem;">Done</a>
 </div>
-<p style="margin-top: 1.5rem; color: var(--pico-muted-color); font-size: 0.9rem;">
+<p style="margin-top: var(--bb-gap-lg); color: var(--pico-muted-color); font-size: 0.9rem;">
   Use this key in the <code>X-API-Key</code> header when making API requests.
 </p>
 {{end}}

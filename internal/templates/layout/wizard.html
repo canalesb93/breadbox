@@ -1,36 +1,41 @@
 {{define "layout"}}
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{if .PageTitle}}{{.PageTitle}} — Breadbox{{else}}Breadbox Setup{{end}}</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <style>
-    body { max-width: 480px; margin: 3rem auto; padding: 0 1rem; }
     [data-flash="success"] {
-      background: #d4edda; color: #155724;
+      background: color-mix(in srgb, var(--pico-color-green-550) 20%, transparent);
+      color: var(--pico-color-green-550);
       padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
     }
     [data-flash="error"] {
-      background: #f8d7da; color: #721c24;
+      background: color-mix(in srgb, var(--pico-color-red-550) 20%, transparent);
+      color: var(--pico-color-red-550);
       padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
     }
     [data-flash="info"] {
-      background: #d1ecf1; color: #0c5460;
+      background: color-mix(in srgb, var(--pico-color-cyan-550) 20%, transparent);
+      color: var(--pico-color-cyan-550);
       padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
     }
+      .bb-wizard { max-width: 480px; margin: 3rem auto; padding: 0 1rem; }
   </style>
 </head>
 <body>
-  {{if .StepNumber}}
-  <hgroup>
-    <h1>Breadbox Setup</h1>
-    <p>Step {{.StepNumber}} of 5</p>
-  </hgroup>
-  {{end}}
-  {{template "flash" .}}
-  {{block "content" .}}{{end}}
+  <main class="bb-wizard">
+    {{if .StepNumber}}
+    <hgroup>
+      <h1>Breadbox Setup</h1>
+      <p>Step {{.StepNumber}} of 5</p>
+    </hgroup>
+    {{end}}
+    {{template "flash" .}}
+    {{block "content" .}}{{end}}
+  </main>
 </body>
 </html>
 {{end}}

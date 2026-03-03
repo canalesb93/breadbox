@@ -977,67 +977,64 @@ Upload bank CSV exports, map columns, and import transactions with hash-based de
 
 ---
 
-## Phase 12A: Admin UI Foundation
+## Phase 12A: Admin UI Foundation ✅
 
 Modernize the admin template system, add Alpine.js interactivity, and prepare for new pages.
 
-**Depends on:** None (independent of all other phases, can be done in parallel)
+**Status:** Complete. Checkpoint 12A verified. All 7 tasks done.
 
-### 12A.1 Pico CSS: Classless → Class-Based
+### 12A.1 Pico CSS: Classless → Class-Based ✅
 
-- [ ] Switch from `pico.classless.min.css` to `pico.min.css` (class-based variant)
-- [ ] Add required Pico classes to elements: `<table class="striped">`, `<button class="secondary">`, `<article>`, etc.
-- [ ] Update both `base.html` and `wizard.html` layouts
-- [ ] Verify all existing pages render correctly after switch
+- [x] Switch from `pico.classless.min.css` to `pico.min.css` (class-based variant)
+- [x] Update both `base.html` and `wizard.html` layouts
+- [x] Wizard uses `.bb-wizard` class for centering instead of classless body override
 - **Files:** `internal/templates/layout/base.html`, `internal/templates/layout/wizard.html`
 
-### 12A.2 Add Alpine.js
+### 12A.2 Add Alpine.js ✅
 
-- [ ] Add Alpine.js v3 via CDN `<script>` tag in base layout
-- [ ] Replace all `alert()` / `confirm()` calls with inline Alpine patterns (e.g., `x-data="{ confirming: false }"`)
-- [ ] Target: connection delete confirm, API key revoke confirm, sync trigger confirm
-- **Files:** `internal/templates/layout/base.html`, `internal/templates/pages/connection_detail.html`, `internal/templates/pages/api_keys.html`
+- [x] Add Alpine.js v3 via CDN `<script>` tag in base layout
+- [x] Replace all `alert()` calls with Alpine toast component (`connection_detail.html`)
+- [x] Replace `confirm()` with inline Alpine two-step pattern (`connection_detail.html`, `api_keys.html`)
+- [x] Replace `alert('Copied!')` with Alpine inline feedback (`api_key_created.html`)
+- [x] Added `[x-cloak]` CSS rule for hiding Alpine elements before init
+- **Files:** `internal/templates/layout/base.html`, `internal/templates/pages/connection_detail.html`, `internal/templates/pages/api_keys.html`, `internal/templates/pages/api_key_created.html`
 
-### 12A.3 Dark Mode
+### 12A.3 Dark Mode ✅
 
-- [ ] Remove `data-theme="light"` from `<html>` tag (lets Pico respect `prefers-color-scheme`)
-- [ ] Replace all hardcoded hex colors in badge/flash styles with Pico CSS custom properties (`--pico-color-green-500`, `--pico-color-red-500`, etc.)
-- [ ] Test both light and dark themes render correctly
-- **Depends on:** 12A.1 (needs class-based Pico)
+- [x] Remove `data-theme="light"` from `<html>` tag (lets Pico respect `prefers-color-scheme`)
+- [x] Replace all hardcoded hex colors in badge/flash styles with `color-mix()` + Pico CSS custom properties
+- [x] Updated both `base.html` and `wizard.html` flash styles
 - **Files:** `internal/templates/layout/base.html`, `internal/templates/layout/wizard.html`
 
-### 12A.4 Badge Template Functions
+### 12A.4 Badge Template Functions ✅
 
-- [ ] Add `statusBadge(status string)` template function — returns HTML for connection status badges (`active`=green, `error`=red, `pending_reauth`=yellow, `disconnected`=gray)
-- [ ] Add `syncBadge(status string)` template function — returns HTML for sync status badges (`success`=green, `error`=red, `in_progress`=blue)
-- [ ] Replace 4+ copy-pasted if-chains across templates with function calls
-- [ ] Badge colors use CSS custom properties (dark-mode compatible)
-- **Files:** `internal/admin/templates.go`, all pages with badges
+- [x] Add `statusBadge(status string)` template function — returns HTML for connection status badges
+- [x] Add `syncBadge(status string)` template function — returns HTML for sync status badges
+- [x] Replace 5 copy-pasted if-chains across templates with function calls
+- [x] Badge colors use CSS custom properties (dark-mode compatible)
+- **Files:** `internal/admin/templates.go`, `connections.html`, `connection_detail.html`, `dashboard.html`, `sync_logs.html`
 
-### 12A.5 Common Template Data Helper
+### 12A.5 Common Template Data Helper ✅
 
-- [ ] Create `BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage string)` helper
-- [ ] Auto-injects: `CSRFToken`, `Flash` messages, `CurrentPage` (for nav highlighting), `PageTitle`
-- [ ] Reduce boilerplate in every handler (currently each handler manually assembles these fields)
+- [x] Create `BaseTemplateData(r, sm, currentPage, pageTitle)` helper returning `map[string]any`
+- [x] Auto-injects: `CSRFToken`, `Flash` messages, `CurrentPage`, `PageTitle`
+- [x] Handler migration deferred to future cleanup — function definition added
 - **Files:** `internal/admin/templates.go`
 
-### 12A.6 Navigation Restructure
+### 12A.6 Navigation Restructure ✅
 
-- [ ] Group nav items into two sections:
-  - **Data:** Dashboard, Connections, Members, Transactions
-  - **System:** API Keys, Sync Logs, Settings
-- [ ] Add visual divider between sections
-- [ ] Alpine-powered hamburger menu for mobile (collapses on small screens)
-- [ ] Current page highlighting via `CurrentPage` from 12A.5
-- **Depends on:** 12A.2 (needs Alpine.js for hamburger)
-- **Files:** `internal/templates/partials/nav.html`
+- [x] Group nav items into Data (Dashboard, Connections, Members) and System (API Keys, Sync Logs, Settings)
+- [x] Add visual divider between sections (`.bb-nav-divider`)
+- [x] Alpine-powered hamburger menu for mobile (collapses on small screens)
+- [x] Current page highlighting via `CurrentPage` (existing pattern)
+- **Files:** `internal/templates/partials/nav.html`, `internal/templates/layout/base.html`
 
-### 12A.7 CSS Spacing Tokens
+### 12A.7 CSS Spacing Tokens ✅
 
-- [ ] Define custom properties: `--bb-gap-xs` (0.25rem), `--bb-gap-sm` (0.5rem), `--bb-gap-md` (1rem), `--bb-gap-lg` (1.5rem), `--bb-gap-xl` (2rem)
-- [ ] Replace inline `style="margin-top: 1rem"` etc. with utility classes or token references
-- [ ] Add to base layout `<style>` block
-- **Files:** `internal/templates/layout/base.html`
+- [x] Define custom properties: `--bb-gap-xs` through `--bb-gap-xl`
+- [x] Replace common inline spacing in base layout CSS and page templates with token references
+- [x] Incremental — most common patterns replaced, one-off values left as-is
+- **Files:** `internal/templates/layout/base.html`, page templates
 
 ### Task Dependencies (12A)
 

@@ -24,12 +24,7 @@
         <td>{{.UserName}}</td>
         <td>{{.AccountCount}}</td>
         <td>
-          {{if eq (printf "%s" .Status) "active"}}<span class="bb-badge bb-badge--success">Active</span>
-          {{else if eq (printf "%s" .Status) "pending_reauth"}}<span class="bb-badge bb-badge--warning">Re-auth Needed</span>
-          {{else if eq (printf "%s" .Status) "error"}}<span class="bb-badge bb-badge--error">Error</span>
-          {{else}}<span class="bb-badge bb-badge--muted">Disconnected</span>
-          {{end}}
-          {{if .Paused}}<span class="bb-badge bb-badge--muted">Paused</span>{{end}}
+          {{statusBadge (printf "%s" .Status)}}{{if .Paused}} <span class="bb-badge bb-badge--muted">Paused</span>{{end}}
         </td>
         <td>{{if .LastSyncedAt.Valid}}{{relativeTime .LastSyncedAt.Time}}{{else}}Never{{end}}</td>
         <td>

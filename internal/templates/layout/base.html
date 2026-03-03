@@ -1,14 +1,22 @@
 {{define "layout"}}
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.PageTitle}} — Breadbox</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
   <style>
-    /* Reset classless body styling — we handle our own layout. */
-    body { margin: 0; padding: 0; max-width: none; }
+    [x-cloak] { display: none !important; }
+
+    :root {
+      --bb-gap-xs: 0.25rem;
+      --bb-gap-sm: 0.5rem;
+      --bb-gap-md: 1rem;
+      --bb-gap-lg: 1.5rem;
+      --bb-gap-xl: 2rem;
+    }
 
     .bb-layout {
       display: flex;
@@ -24,6 +32,10 @@
       padding: 1.25rem 1rem;
       display: flex;
       flex-direction: column;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
     }
     .bb-sidebar .bb-brand {
       font-size: 1.15rem;
@@ -77,8 +89,8 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 1.5rem;
-      gap: 1rem;
+      margin-bottom: var(--bb-gap-lg);
+      gap: var(--bb-gap-md);
     }
     .bb-page-header h1 { margin: 0; }
     .bb-page-header a[role="button"] { white-space: nowrap; margin: 0; }
@@ -87,8 +99,8 @@
     .bb-stats {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 1rem;
-      margin-bottom: 2rem;
+      gap: var(--bb-gap-md);
+      margin-bottom: var(--bb-gap-xl);
     }
     .bb-stat {
       background: var(--pico-card-background-color);
@@ -108,7 +120,7 @@
       font-weight: 700;
       line-height: 1.2;
     }
-    .bb-stat--warn { border-left: 4px solid #e67e22; }
+    .bb-stat--warn { border-left: 4px solid var(--pico-color-amber-550); }
 
     /* ---- Status badges ---- */
     .bb-badge {
@@ -119,22 +131,25 @@
       font-weight: 600;
       line-height: 1.5;
     }
-    .bb-badge--success { background: #d4edda; color: #155724; }
-    .bb-badge--error   { background: #f8d7da; color: #721c24; }
-    .bb-badge--warning { background: #fff3cd; color: #856404; }
-    .bb-badge--muted   { background: #e2e3e5; color: #383d41; }
+    .bb-badge--success { background: color-mix(in srgb, var(--pico-color-green-550) 20%, transparent); color: var(--pico-color-green-550); }
+    .bb-badge--error   { background: color-mix(in srgb, var(--pico-color-red-550) 20%, transparent); color: var(--pico-color-red-550); }
+    .bb-badge--warning { background: color-mix(in srgb, var(--pico-color-amber-550) 20%, transparent); color: var(--pico-color-amber-700); }
+    .bb-badge--muted   { background: var(--pico-muted-border-color); color: var(--pico-muted-color); }
 
     /* ---- Flash messages ---- */
     [data-flash="success"] {
-      background: #d4edda; color: #155724;
+      background: color-mix(in srgb, var(--pico-color-green-550) 20%, transparent);
+      color: var(--pico-color-green-550);
       padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
     }
     [data-flash="error"] {
-      background: #f8d7da; color: #721c24;
+      background: color-mix(in srgb, var(--pico-color-red-550) 20%, transparent);
+      color: var(--pico-color-red-550);
       padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
     }
     [data-flash="info"] {
-      background: #d1ecf1; color: #0c5460;
+      background: color-mix(in srgb, var(--pico-color-cyan-550) 20%, transparent);
+      color: var(--pico-color-cyan-550);
       padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
     }
 
@@ -151,29 +166,64 @@
     table { width: 100%; }
     td a + a { margin-left: 0.75rem; }
 
+    /* ---- Nav divider & hamburger ---- */
+    .bb-nav-divider {
+      border-top: 1px solid var(--pico-muted-border-color);
+      margin: var(--bb-gap-sm) 0;
+      list-style: none;
+    }
+    .bb-hamburger {
+      display: none;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--pico-color);
+      padding: var(--bb-gap-xs);
+      margin: 0;
+    }
+
     /* ---- Responsive ---- */
     @media (max-width: 768px) {
       .bb-layout { flex-direction: column; }
       .bb-sidebar {
         width: 100%;
         flex-direction: row;
+        flex-wrap: wrap;
         align-items: center;
-        padding: 0.5rem 1rem;
-        gap: 1rem;
+        padding: var(--bb-gap-sm) var(--bb-gap-md);
+        position: sticky;
+        top: 0;
+        height: auto;
+        overflow-y: visible;
+        z-index: 10;
+        border-right: none;
+        border-bottom: 1px solid var(--pico-muted-border-color);
       }
-      .bb-sidebar .bb-brand { padding: 0; }
-      .bb-sidebar .bb-nav { display: flex; gap: 0.25rem; }
-      .bb-sidebar .bb-bottom { margin-top: 0; padding-top: 0; margin-left: auto; }
-      .bb-main { padding: 1.5rem; }
+      .bb-sidebar .bb-brand { padding: 0; flex: 1; }
+      .bb-hamburger { display: block; }
+      .bb-sidebar .bb-nav,
+      .bb-sidebar .bb-bottom {
+        display: none;
+        width: 100%;
+        margin-top: 0;
+        padding-top: 0;
+      }
+      .bb-sidebar .bb-nav { flex-direction: column; }
+      .bb-sidebar .bb-nav.bb-nav--open,
+      .bb-sidebar .bb-bottom.bb-nav--open { display: flex; }
+      .bb-sidebar .bb-bottom.bb-nav--open { padding-top: var(--bb-gap-sm); }
+      .bb-main { padding: var(--bb-gap-lg); }
     }
   </style>
 </head>
 <body>
   <div class="bb-layout">
-    <div class="bb-sidebar">
+    <div class="bb-sidebar" x-data="{ open: false }">
       <a href="/admin/" class="bb-brand">Breadbox</a>
+      <button class="bb-hamburger" @click="open = !open" aria-label="Menu">&#9776;</button>
       {{template "nav" .}}
-      <div class="bb-bottom">
+      <div class="bb-bottom" :class="{ 'bb-nav--open': open }">
         <form method="POST" action="/logout">
           {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
           <button type="submit" class="secondary outline">Sign Out</button>

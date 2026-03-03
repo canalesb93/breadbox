@@ -1,8 +1,11 @@
 {{define "nav"}}
-<ul class="bb-nav">
+<ul class="bb-nav" :class="{ 'bb-nav--open': open }">
+  <!-- Data -->
   <li><a href="/admin/"{{if eq .CurrentPage "dashboard"}} aria-current="page"{{end}}>Dashboard</a></li>
   <li><a href="/admin/connections"{{if eq .CurrentPage "connections"}} aria-current="page"{{end}}>Connections</a></li>
   <li><a href="/admin/users"{{if eq .CurrentPage "users"}} aria-current="page"{{end}}>Family Members</a></li>
+  <!-- System -->
+  <li class="bb-nav-divider" aria-hidden="true"></li>
   <li><a href="/admin/api-keys"{{if eq .CurrentPage "api-keys"}} aria-current="page"{{end}}>API Keys</a></li>
   <li><a href="/admin/sync-logs"{{if eq .CurrentPage "sync-logs"}} aria-current="page"{{end}}>Sync Logs</a></li>
   <li><a href="/admin/settings"{{if eq .CurrentPage "settings"}} aria-current="page"{{end}}>Settings</a></li>

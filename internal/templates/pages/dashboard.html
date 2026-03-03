@@ -41,12 +41,7 @@
       <tr>
         <td>{{.InstitutionName}}</td>
         <td>{{.Trigger}}</td>
-        <td>
-          {{if eq (printf "%s" .Status) "success"}}<span class="bb-badge bb-badge--success">success</span>
-          {{else if eq (printf "%s" .Status) "error"}}<span class="bb-badge bb-badge--error">error</span>
-          {{else}}<span class="bb-badge bb-badge--muted">{{.Status}}</span>
-          {{end}}
-        </td>
+        <td>{{syncBadge (printf "%s" .Status)}}</td>
         <td>{{.AddedCount}}</td>
         <td>{{.ModifiedCount}}</td>
         <td>{{.RemovedCount}}</td>

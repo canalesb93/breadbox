@@ -4,7 +4,7 @@ Self-hosted financial data aggregation for families. Syncs bank data via Plaid a
 
 ## Tech Stack
 
-Go 1.24+ single binary. PostgreSQL, chi/v5 router, pgx/v5 + sqlc, goose migrations, robfig/cron. Admin UI: Go html/template + Pico CSS. MCP: github.com/modelcontextprotocol/go-sdk (Streamable HTTP). Plaid: github.com/plaid/plaid-go. Teller: hand-written HTTP client with mTLS (no SDK).
+Go 1.24+ single binary. PostgreSQL, chi/v5 router, pgx/v5 + sqlc, goose migrations, robfig/cron. Admin UI: Go html/template + Pico CSS (class-based) + Alpine.js v3. MCP: github.com/modelcontextprotocol/go-sdk (Streamable HTTP). Plaid: github.com/plaid/plaid-go. Teller: hand-written HTTP client with mTLS (no SDK).
 
 ## Architecture
 
@@ -41,6 +41,8 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Alpine.js v3 for admin UI interactivity (CDN, no build step). Replaces `alert()`/`confirm()` with inline patterns.
 - Dark mode: Pico CSS `prefers-color-scheme` auto-switch (no hardcoded `data-theme`). Badge/flash colors use CSS custom properties.
 - Badge rendering: `statusBadge()` and `syncBadge()` template functions replace copy-pasted if-chains.
+- CSS spacing tokens: `--bb-gap-xs` (0.25rem) through `--bb-gap-xl` (2rem) in `:root`. Use these instead of hardcoded spacing values.
+- Template data helper: `BaseTemplateData(r, sm, currentPage, pageTitle)` returns `map[string]any` with common fields. Handlers can extend the returned map.
 - Setup wizard: `setup_complete` written via POST confirmation, not on step 5 page load (Phase 13A fix)
 - Wizard step 2: provider-agnostic "Configure Bank Providers" with conditional Plaid/Teller forms (Phase 13B)
 - Config source tracking: `ConfigSources map[string]string` passed to settings templates — shows "(from env)" / "(from database)" / "(default)" per setting

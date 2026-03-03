@@ -2,7 +2,7 @@
 <p><a href="/admin/connections">&larr; Connections</a></p>
 
 {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
-<div role="alert" data-flash="error" style="margin-bottom: 1.5rem;">
+<div role="alert" data-flash="error" style="margin-bottom: var(--bb-gap-lg);">
   <strong>This connection requires re-authentication.</strong> The bank may have changed its login requirements, or your session may have expired.
   {{if .Connection.ErrorMessage.Valid}}<br><small>Error: {{.Connection.ErrorMessage.String}}</small>{{end}}
   <br><a href="/admin/connections/{{.ConnID}}/reauth" style="color: inherit; font-weight: 600;">Re-authenticate &rarr;</a>
@@ -16,12 +16,7 @@
   <dd>{{.Connection.UserName}}</dd>
   <dt>Status</dt>
   <dd>
-    {{if eq (printf "%s" .Connection.Status) "active"}}<span class="bb-badge bb-badge--success">Active</span>
-    {{else if eq (printf "%s" .Connection.Status) "pending_reauth"}}<span class="bb-badge bb-badge--warning">Re-auth Needed</span>
-    {{else if eq (printf "%s" .Connection.Status) "error"}}<span class="bb-badge bb-badge--error">Error</span>
-    {{else}}<span class="bb-badge bb-badge--muted">Disconnected</span>
-    {{end}}
-    {{if .Connection.Paused}}<span class="bb-badge bb-badge--muted">Paused</span>{{end}}
+    {{statusBadge (printf "%s" .Connection.Status)}}{{if .Connection.Paused}} <span class="bb-badge bb-badge--muted">Paused</span>{{end}}
   </dd>
   <dt>Connected</dt>
   <dd>{{if .Connection.CreatedAt.Valid}}{{.Connection.CreatedAt.Time.Format "January 2, 2006"}}{{end}}</dd>
@@ -29,7 +24,7 @@
   <dd>{{.Connection.Provider}}</dd>
 </dl>
 
-<div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
+<div style="display: flex; gap: var(--bb-gap-sm); align-items: center; margin-bottom: var(--bb-gap-md);">
   {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
   <a href="/admin/connections/{{.ConnID}}/reauth" role="button" class="outline">Re-authenticate</a>
   {{end}}
@@ -40,10 +35,16 @@
   <button class="outline" onclick="syncConnection()" id="sync-btn">Sync Now</button>
   {{end}}
   <button class="outline" onclick="togglePause()" id="pause-btn">{{if .Connection.Paused}}Resume{{else}}Pause{{end}}</button>
-  <button class="secondary outline" onclick="removeConnection()" id="remove-btn">Remove Connection</button>
+  <span x-data="{ confirming: false }">
+    <button class="secondary outline" x-show="!confirming" @click="confirming = true" id="remove-btn">Remove Connection</button>
+    <span x-show="confirming" x-cloak>
+      <button class="secondary" @click="removeConnection()">Yes, Remove</button>
+      <button class="outline" @click="confirming = false">Cancel</button>
+    </span>
+  </span>
 </div>
 
-<div style="margin-bottom: 2rem;">
+<div style="margin-bottom: var(--bb-gap-xl);">
   <label for="sync-interval" style="display: inline; margin-right: 0.5rem;">Sync Interval:</label>
   <select id="sync-interval" onchange="updateSyncInterval(this.value)" style="display: inline-block; width: auto;">
     <option value=""{{if not .Connection.SyncIntervalOverrideMinutes.Valid}} selected{{end}}>Use global</option>
@@ -118,12 +119,7 @@
       {{range .SyncLogs}}
       <tr>
         <td>{{.Trigger}}</td>
-        <td>
-          {{if eq (printf "%s" .Status) "success"}}<span class="bb-badge bb-badge--success">success</span>
-          {{else if eq (printf "%s" .Status) "error"}}<span class="bb-badge bb-badge--error">error</span>
-          {{else}}<span class="bb-badge bb-badge--muted">{{.Status}}</span>
-          {{end}}
-        </td>
+        <td>{{syncBadge (printf "%s" .Status)}}</td>
         <td>{{.AddedCount}}</td>
         <td>{{.ModifiedCount}}</td>
         <td>{{.RemovedCount}}</td>
@@ -147,7 +143,15 @@
 <p>No sync history yet.</p>
 {{end}}
 
+<div x-data="{ toast: '', toastType: 'error' }" @bb-toast.window="toast = $event.detail.message; toastType = $event.detail.type || 'error'; setTimeout(() => toast = '', 5000)">
+  <div x-show="toast" x-cloak x-transition :data-flash="toastType" style="position: fixed; bottom: 1.5rem; right: 1.5rem; max-width: 400px; z-index: 100;" x-text="toast"></div>
+</div>
+
 <script>
+function showToast(message, type) {
+  window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type || 'error' } }));
+}
+
 function syncConnection() {
   var btn = document.getElementById('sync-btn');
   btn.disabled = true;
@@ -161,23 +165,20 @@ function syncConnection() {
       setTimeout(function() { window.location.reload(); }, 3000);
     } else {
       return res.json().then(function(data) {
-        alert(data.error || "Failed to trigger sync.");
+        showToast(data.error || "Failed to trigger sync.");
         btn.disabled = false;
         btn.textContent = 'Sync Now';
       });
     }
   })
   .catch(function() {
-    alert("Network error. Please try again.");
+    showToast("Network error. Please try again.");
     btn.disabled = false;
     btn.textContent = 'Sync Now';
   });
 }
 
 function removeConnection() {
-  if (!confirm("Remove this connection? All transaction data will be kept but marked as disconnected. This cannot be undone.")) {
-    return;
-  }
   fetch("/admin/api/connections/{{.ConnID}}", {
     method: "DELETE"
   })
@@ -186,12 +187,12 @@ function removeConnection() {
       window.location.href = "/admin/connections";
     } else {
       return res.json().then(function (data) {
-        alert(data.error || "Failed to remove connection.");
+        showToast(data.error || "Failed to remove connection.");
       });
     }
   })
   .catch(function () {
-    alert("Network error. Please try again.");
+    showToast("Network error. Please try again.");
   });
 }
 
@@ -210,13 +211,13 @@ function togglePause() {
       window.location.reload();
     } else {
       return res.json().then(function(data) {
-        alert(data.error || "Failed to update pause state.");
+        showToast(data.error || "Failed to update pause state.");
         btn.disabled = false;
       });
     }
   })
   .catch(function() {
-    alert("Network error. Please try again.");
+    showToast("Network error. Please try again.");
     btn.disabled = false;
   });
 }
@@ -255,12 +256,12 @@ function updateDisplayName(accountId, val) {
   .then(function(res) {
     if (!res.ok) {
       return res.json().then(function(data) {
-        alert(data.error || "Failed to update display name.");
+        showToast(data.error || "Failed to update display name.");
       });
     }
   })
   .catch(function() {
-    alert("Network error. Please try again.");
+    showToast("Network error. Please try again.");
   });
 }
 
@@ -275,12 +276,12 @@ function toggleExcluded(accountId, checked) {
       window.location.reload();
     } else {
       return res.json().then(function(data) {
-        alert(data.error || "Failed to update excluded state.");
+        showToast(data.error || "Failed to update excluded state.");
       });
     }
   })
   .catch(function() {
-    alert("Network error. Please try again.");
+    showToast("Network error. Please try again.");
   });
 }
 </script>

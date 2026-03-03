@@ -11,6 +11,7 @@ import (
 
 	"breadbox/internal/templates"
 
+	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -63,6 +64,30 @@ func NewTemplateRenderer() (*TemplateRenderer, error) {
 			},
 			"formatUUID": func(u pgtype.UUID) string {
 				return formatUUID(u)
+			},
+			"statusBadge": func(status string) template.HTML {
+				switch status {
+				case "active":
+					return `<span class="bb-badge bb-badge--success">Active</span>`
+				case "pending_reauth":
+					return `<span class="bb-badge bb-badge--warning">Re-auth Needed</span>`
+				case "error":
+					return `<span class="bb-badge bb-badge--error">Error</span>`
+				default:
+					return `<span class="bb-badge bb-badge--muted">Disconnected</span>`
+				}
+			},
+			"syncBadge": func(status string) template.HTML {
+				switch status {
+				case "success":
+					return `<span class="bb-badge bb-badge--success">success</span>`
+				case "error":
+					return `<span class="bb-badge bb-badge--error">error</span>`
+				case "in_progress":
+					return `<span class="bb-badge bb-badge--warning">in progress</span>`
+				default:
+					return template.HTML(`<span class="bb-badge bb-badge--muted">` + template.HTMLEscapeString(status) + `</span>`)
+				}
 			},
 			"formatNumeric": func(n pgtype.Numeric) string {
 				if !n.Valid {
@@ -188,6 +213,17 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
 		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// BaseTemplateData returns the common fields needed by every template as a map.
+// Handlers can add page-specific fields to the returned map before rendering.
+func BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage, pageTitle string) map[string]any {
+	return map[string]any{
+		"PageTitle":   pageTitle,
+		"CurrentPage": currentPage,
+		"Flash":       GetFlash(r.Context(), sm),
+		"CSRFToken":   GetCSRFToken(r),
 	}
 }
 
