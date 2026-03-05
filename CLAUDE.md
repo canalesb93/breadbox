@@ -43,9 +43,14 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Badge rendering: `statusBadge()` and `syncBadge()` template functions replace copy-pasted if-chains.
 - CSS spacing tokens: `--bb-gap-xs` (0.25rem) through `--bb-gap-xl` (2rem) in `:root`. Use these instead of hardcoded spacing values.
 - Template data helper: `BaseTemplateData(r, sm, currentPage, pageTitle)` returns `map[string]any` with common fields. Handlers can extend the returned map.
-- Setup wizard: `setup_complete` written via POST confirmation, not on step 5 page load (Phase 13A fix)
-- Wizard step 2: provider-agnostic "Configure Bank Providers" with conditional Plaid/Teller forms (Phase 13B)
-- Config source tracking: `ConfigSources map[string]string` passed to settings templates — shows "(from env)" / "(from database)" / "(default)" per setting
+- Setup wizard: `setup_complete` written via POST confirmation, not on step 6 page load (Phase 13A fix)
+- Wizard is 6 steps: admin → providers → member → interval → webhook → review. Template filenames kept as-is; `StepNumber` set in handler data maps.
+- Wizard step 2: provider-agnostic "Configure Bank Providers" with radio group (Plaid/Teller/Both/Skip). Uses plain JS (wizard layout has no Alpine.js).
+- Wizard step 3: optional family member creation (name + email). Prevents empty member dropdown dead-end.
+- Config source tracking: `ConfigSources map[string]string` populated in `Load()` (env) and `LoadWithDB()` (db/default). `configSource` template function renders badges.
+- Settings password change: POST `/admin/settings/password`, validates current password via bcrypt, minimum 8 chars for new password
+- Settings system info: `Version` and `StartTime` on `Config` struct, set in `main.go`. PostgreSQL version via inline `SELECT version()` query.
+- Teller settings: `teller_app_id` and `teller_env` editable in settings when not from env. Cert/key remain env-only.
 - Human-readable error messages: `errorMessage()` template function maps provider error codes to user-friendly strings
 - Health check split: `/health/live` (basic HTTP 200) vs `/health/ready` (DB + scheduler verification)
 - Sync writes wrapped in a single DB transaction for atomicity (Phase 14)

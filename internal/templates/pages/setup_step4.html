@@ -15,7 +15,7 @@
   <div role="alert" data-flash="error">{{.Error}}</div>
   {{end}}
 
-  <form method="POST" action="/admin/setup/step/4">
+  <form method="POST" action="/admin/setup/step/5">
     {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
 
     <label for="webhook_url">Webhook Base URL</label>

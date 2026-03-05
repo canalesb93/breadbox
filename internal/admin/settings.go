@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
@@ -16,16 +18,23 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // SettingsGetHandler serves GET /admin/settings.
 func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// System info.
+		var pgVersion string
+		_ = a.DB.QueryRow(ctx, "SELECT version()").Scan(&pgVersion)
+
 		data := map[string]any{
 			"PageTitle":         "Settings",
 			"CurrentPage":       "settings",
 			"CSRFToken":         GetCSRFToken(r),
-			"Flash":             GetFlash(r.Context(), sm),
+			"Flash":             GetFlash(ctx, sm),
 			"SyncIntervalMinutes": a.Config.SyncIntervalMinutes,
 			"WebhookURL":        a.Config.WebhookURL,
 			"PlaidClientID":     a.Config.PlaidClientID,
@@ -37,6 +46,16 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 			"TellerFromEnv":          os.Getenv("TELLER_APP_ID") != "",
 			"TellerCertConfigured":   a.Config.TellerCertPath != "" && a.Config.TellerKeyPath != "",
 			"TellerWebhookConfigured": a.Config.TellerWebhookSecret != "",
+			// System info (13B.4)
+			"Version":         a.Config.Version,
+			"GoVersion":       runtime.Version(),
+			"PostgresVersion": pgVersion,
+			"Uptime":          formatUptime(time.Since(a.Config.StartTime)),
+			"ProviderCount":   len(a.Providers),
+			// Config sources (13B.5)
+			"ConfigSources":   a.Config.ConfigSources,
+			// Safety indicators (13B.7)
+			"HasEncryptionKey": len(a.Config.EncryptionKey) > 0,
 		}
 		tr.Render(w, r, "settings.html", data)
 	}
@@ -122,6 +141,36 @@ func SettingsPostHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRendere
 			}
 		}
 
+		// Handle Teller credentials if not set from environment (13B.6).
+		if os.Getenv("TELLER_APP_ID") == "" {
+			tellerAppID := strings.TrimSpace(r.FormValue("teller_app_id"))
+			tellerEnv := strings.TrimSpace(r.FormValue("teller_env"))
+
+			if tellerAppID != "" {
+				if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
+					Key:   "teller_app_id",
+					Value: pgtype.Text{String: tellerAppID, Valid: true},
+				}); err != nil {
+					a.Logger.Error("save teller app id", "error", err)
+				} else {
+					a.Config.TellerAppID = tellerAppID
+				}
+			}
+			if tellerEnv != "" {
+				validTellerEnvs := map[string]bool{"sandbox": true, "production": true}
+				if validTellerEnvs[tellerEnv] {
+					if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
+						Key:   "teller_env",
+						Value: pgtype.Text{String: tellerEnv, Valid: true},
+					}); err != nil {
+						a.Logger.Error("save teller env", "error", err)
+					} else {
+						a.Config.TellerEnv = tellerEnv
+					}
+				}
+			}
+		}
+
 		SetFlash(ctx, sm, "success", "Settings saved.")
 		http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
 	}
@@ -169,6 +218,75 @@ func TestProviderHandler(a *app.App) http.HandlerFunc {
 	}
 }
 
+// ChangePasswordHandler serves POST /admin/settings/password.
+func ChangePasswordHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		adminIDStr := sm.GetString(ctx, sessionKeyAdminID)
+		if adminIDStr == "" {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+
+		var adminID pgtype.UUID
+		if err := adminID.Scan(adminIDStr); err != nil {
+			SetFlash(ctx, sm, "error", "Invalid session.")
+			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			return
+		}
+
+		admin, err := a.Queries.GetAdminAccountByID(ctx, adminID)
+		if err != nil {
+			SetFlash(ctx, sm, "error", "Account not found.")
+			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			return
+		}
+
+		currentPassword := r.FormValue("current_password")
+		newPassword := r.FormValue("new_password")
+		confirmPassword := r.FormValue("confirm_password")
+
+		if err := bcrypt.CompareHashAndPassword(admin.HashedPassword, []byte(currentPassword)); err != nil {
+			SetFlash(ctx, sm, "error", "Current password is incorrect.")
+			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			return
+		}
+
+		if len(newPassword) < 8 {
+			SetFlash(ctx, sm, "error", "New password must be at least 8 characters.")
+			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			return
+		}
+
+		if newPassword != confirmPassword {
+			SetFlash(ctx, sm, "error", "New passwords do not match.")
+			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			return
+		}
+
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), 12)
+		if err != nil {
+			SetFlash(ctx, sm, "error", "Failed to hash password.")
+			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			return
+		}
+
+		if err := a.Queries.UpdateAdminPassword(ctx, db.UpdateAdminPasswordParams{
+			ID:             adminID,
+			HashedPassword: hashedPassword,
+		}); err != nil {
+			a.Logger.Error("update admin password", "error", err)
+			SetFlash(ctx, sm, "error", "Failed to update password.")
+			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			return
+		}
+
+		SetFlash(ctx, sm, "success", "Password updated successfully.")
+		http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+	}
+}
+
 func isValidSyncInterval(minutes int) bool {
 	valid := map[int]bool{
 		15: true, 30: true, 60: true, // sub-hour
@@ -176,3 +294,18 @@ func isValidSyncInterval(minutes int) bool {
 	}
 	return valid[minutes]
 }
+
+// formatUptime formats a duration into a human-readable string.
+func formatUptime(d time.Duration) string {
+	days := int(d.Hours()) / 24
+	hours := int(d.Hours()) % 24
+	minutes := int(d.Minutes()) % 60
+	if days > 0 {
+		return fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
+	}
+	if hours > 0 {
+		return fmt.Sprintf("%dh %dm", hours, minutes)
+	}
+	return fmt.Sprintf("%dm", minutes)
+}
+

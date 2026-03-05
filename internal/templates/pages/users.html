@@ -4,6 +4,10 @@
   <a href="/admin/users/new" role="button">Add Family Member</a>
 </div>
 
+{{if .Created}}
+<div role="alert" data-flash="success">Member created. <a href="/admin/connections/new">Connect a bank for them &rarr;</a></div>
+{{end}}
+
 {{if .Users}}
 <div style="overflow-x: auto;">
   <table>
@@ -11,6 +15,7 @@
       <tr>
         <th>Name</th>
         <th>Email</th>
+        <th>Connections</th>
         <th>Created</th>
         <th>Actions</th>
       </tr>
@@ -20,6 +25,7 @@
       <tr>
         <td>{{.Name}}</td>
         <td>{{if .Email.Valid}}{{.Email.String}}{{else}}&mdash;{{end}}</td>
+        <td>{{index $.ConnectionCounts (formatUUID .ID)}}</td>
         <td>{{if .CreatedAt.Valid}}{{.CreatedAt.Time.Format "Jan 2, 2006"}}{{end}}</td>
         <td>
           <a href="/admin/users/{{formatUUID .ID}}/edit">Edit</a>

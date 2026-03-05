@@ -1,13 +1,19 @@
 {{define "content"}}
 <h1>Settings</h1>
 
+{{if .HasEncryptionKey}}
+<div data-flash="success" style="margin-bottom: 1rem;">Encryption: Configured</div>
+{{else}}
+<div data-flash="error" style="margin-bottom: 1rem;">Encryption: NOT SET &mdash; access tokens cannot be stored</div>
+{{end}}
+
 <form method="POST" action="/admin/settings">
   <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
   <article>
     <header><strong>Sync Settings</strong></header>
 
-    <label for="sync_interval_minutes">Sync Interval</label>
+    <label for="sync_interval_minutes">Sync Interval {{configSource .ConfigSources "sync_interval_minutes"}}</label>
     <select id="sync_interval_minutes" name="sync_interval_minutes">
       <option value="15"{{if eq .SyncIntervalMinutes 15}} selected{{end}}>Every 15 minutes</option>
       <option value="30"{{if eq .SyncIntervalMinutes 30}} selected{{end}}>Every 30 minutes</option>
@@ -18,7 +24,7 @@
       <option value="1440"{{if eq .SyncIntervalMinutes 1440}} selected{{end}}>Every 24 hours</option>
     </select>
 
-    <label for="webhook_url">Webhook URL</label>
+    <label for="webhook_url">Webhook URL {{configSource .ConfigSources "webhook_url"}}</label>
     <input type="url" id="webhook_url" name="webhook_url" value="{{.WebhookURL}}" placeholder="https://example.com/webhooks/plaid">
     <small>Plaid will send transaction updates to this URL. Must use HTTPS. Leave empty to disable.</small>
   </article>
@@ -29,22 +35,22 @@
     {{if .PlaidFromEnv}}
     <p>Plaid credentials are configured via environment variables and cannot be changed here.</p>
     <dl>
-      <dt>Environment</dt>
+      <dt>Environment {{configSource .ConfigSources "plaid_env"}}</dt>
       <dd>{{.PlaidEnv}}</dd>
-      <dt>Client ID</dt>
+      <dt>Client ID {{configSource .ConfigSources "plaid_client_id"}}</dt>
       <dd><code>{{.PlaidClientID}}</code></dd>
       <dt>Secret</dt>
       <dd><code>********</code></dd>
     </dl>
     {{else}}
-    <label for="plaid_client_id">Client ID</label>
+    <label for="plaid_client_id">Client ID {{configSource .ConfigSources "plaid_client_id"}}</label>
     <input type="text" id="plaid_client_id" name="plaid_client_id" value="{{.PlaidClientID}}" placeholder="Plaid Client ID">
 
-    <label for="plaid_secret">Secret</label>
+    <label for="plaid_secret">Secret {{configSource .ConfigSources "plaid_secret"}}</label>
     <input type="password" id="plaid_secret" name="plaid_secret" value="{{.PlaidSecret}}" placeholder="Plaid Secret">
 
-    <label for="plaid_env">Environment</label>
-    <select id="plaid_env" name="plaid_env">
+    <label for="plaid_env">Environment {{configSource .ConfigSources "plaid_env"}}</label>
+    <select id="plaid_env" name="plaid_env" onchange="confirmPlaidEnvChange(this)">
       <option value="sandbox"{{if eq .PlaidEnv "sandbox"}} selected{{end}}>Sandbox</option>
       <option value="development"{{if eq .PlaidEnv "development"}} selected{{end}}>Development</option>
       <option value="production"{{if eq .PlaidEnv "production"}} selected{{end}}>Production</option>
@@ -66,17 +72,52 @@
     {{if .TellerFromEnv}}
     <p>Teller is configured via environment variables.</p>
     <dl>
-      <dt>App ID</dt>
+      <dt>App ID {{configSource .ConfigSources "teller_app_id"}}</dt>
       <dd><code>{{.TellerAppID}}</code></dd>
-      <dt>Environment</dt>
+      <dt>Environment {{configSource .ConfigSources "teller_env"}}</dt>
       <dd>{{.TellerEnv}}</dd>
       <dt>Certificate</dt>
       <dd>{{if .TellerCertConfigured}}Configured{{else}}Not configured{{end}}</dd>
       <dt>Webhook Secret</dt>
       <dd>{{if .TellerWebhookConfigured}}Configured{{else}}Not configured{{end}}</dd>
     </dl>
+    {{else if ne .TellerAppID ""}}
+    <p>Teller App ID is configured via database. Certificate and key paths must be set via environment variables.</p>
+    <label for="teller_app_id">App ID {{configSource .ConfigSources "teller_app_id"}}</label>
+    <input type="text" id="teller_app_id" name="teller_app_id" value="{{.TellerAppID}}">
+    <label for="teller_env">Environment {{configSource .ConfigSources "teller_env"}}</label>
+    <select id="teller_env" name="teller_env">
+      <option value="sandbox"{{if eq .TellerEnv "sandbox"}} selected{{end}}>Sandbox</option>
+      <option value="production"{{if eq .TellerEnv "production"}} selected{{end}}>Production</option>
+    </select>
     {{else}}
-    <p>Teller not configured. Set <code>TELLER_APP_ID</code>, <code>TELLER_CERT_PATH</code>, <code>TELLER_KEY_PATH</code> environment variables to enable.</p>
+    <p>Teller is not configured. Set the following environment variables to enable:</p>
+    <details>
+      <summary>Environment variable setup</summary>
+      <pre><code>TELLER_APP_ID=your-app-id
+TELLER_CERT_PATH=/path/to/certificate.pem
+TELLER_KEY_PATH=/path/to/private_key.pem
+TELLER_ENV=sandbox
+TELLER_WEBHOOK_SECRET=your-webhook-secret</code></pre>
+      <p><small>For Docker Compose, add to your <code>.env</code> file and mount certificate files:</small></p>
+      <pre><code>services:
+  breadbox:
+    environment:
+      - TELLER_APP_ID=${TELLER_APP_ID}
+      - TELLER_CERT_PATH=/certs/teller/certificate.pem
+      - TELLER_KEY_PATH=/certs/teller/private_key.pem
+      - TELLER_ENV=${TELLER_ENV:-sandbox}
+    volumes:
+      - ./certs/teller:/certs/teller:ro</code></pre>
+      <p><small>Alternatively, set <code>teller_app_id</code> via the database and only configure cert/key paths via env vars.</small></p>
+      <label for="teller_app_id">App ID (optional, saves to database)</label>
+      <input type="text" id="teller_app_id" name="teller_app_id" value="" placeholder="Teller App ID">
+      <label for="teller_env">Environment</label>
+      <select id="teller_env" name="teller_env">
+        <option value="sandbox" selected>Sandbox</option>
+        <option value="production">Production</option>
+      </select>
+    </details>
     {{end}}
 
     {{if .TellerCertConfigured}}
@@ -90,8 +131,30 @@
   <button type="submit">Save Settings</button>
 </form>
 
-<hr>
-<p><small>To reconfigure providers, update the settings above.</small></p>
+<article>
+  <header><strong>Security</strong></header>
+  <form method="POST" action="/admin/settings/password">
+    <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+    <label for="current_password">Current Password</label>
+    <input type="password" id="current_password" name="current_password" required>
+    <label for="new_password">New Password</label>
+    <input type="password" id="new_password" name="new_password" required minlength="8">
+    <label for="confirm_password">Confirm New Password</label>
+    <input type="password" id="confirm_password" name="confirm_password" required>
+    <button type="submit">Change Password</button>
+  </form>
+</article>
+
+<article>
+  <header><strong>System</strong></header>
+  <dl>
+    <dt>Breadbox Version</dt><dd>{{.Version}}</dd>
+    <dt>Go Runtime</dt><dd>{{.GoVersion}}</dd>
+    <dt>PostgreSQL</dt><dd>{{.PostgresVersion}}</dd>
+    <dt>Uptime</dt><dd>{{.Uptime}}</dd>
+    <dt>Providers</dt><dd>{{.ProviderCount}} configured</dd>
+  </dl>
+</article>
 
 <script>
 function testProvider(name) {
@@ -120,5 +183,19 @@ function testProvider(name) {
     result.style.color = 'red';
   });
 }
+
+(function() {
+  var plaidEnvSelect = document.getElementById('plaid_env');
+  if (plaidEnvSelect) {
+    var originalPlaidEnv = plaidEnvSelect.value;
+    window.confirmPlaidEnvChange = function(el) {
+      if (el.value !== originalPlaidEnv && originalPlaidEnv !== 'sandbox') {
+        if (!confirm('Changing Plaid environment may break existing connections. Continue?')) {
+          el.value = originalPlaidEnv;
+        }
+      }
+    };
+  }
+})();
 </script>
 {{end}}

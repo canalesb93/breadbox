@@ -80,3 +80,9 @@ WHERE id = $1 RETURNING *;
 
 -- name: ListActiveUnpausedConnections :many
 SELECT * FROM bank_connections WHERE status = 'active' AND paused = false;
+
+-- name: CountConnectionsByUserID :many
+SELECT user_id, COUNT(*) as connection_count
+FROM bank_connections
+WHERE status != 'disconnected'
+GROUP BY user_id;

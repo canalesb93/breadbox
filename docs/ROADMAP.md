@@ -1249,70 +1249,69 @@ Restructure the wizard for multi-provider onboarding, add missing settings featu
 
 ### 13B.1 Wizard Step 2: Multi-Provider Selection
 
-- [ ] Rename step 2 from "Configure Plaid" to "Configure Bank Providers"
-- [ ] Add provider selection: Plaid / Teller / Both / Skip All
-- [ ] Based on selection: show Plaid credential form, Teller env-var guidance card, or both
-- [ ] Teller section is informational (cert/key are env-var-only) with copy-ready env var snippet
-- [ ] "Skip All" goes directly to step 3 with a note that providers can be configured later in Settings
+- [x] Rename step 2 from "Configure Plaid" to "Configure Bank Providers"
+- [x] Add provider selection: Plaid / Teller / Both / Skip All
+- [x] Based on selection: show Plaid credential form, Teller env-var guidance card, or both
+- [x] Teller section is informational (cert/key are env-var-only) with copy-ready env var snippet
+- [x] "Skip All" goes directly to step 3 with a note that providers can be configured later in Settings
 - **Files:** `internal/admin/setup.go` (step 2 handler), `internal/templates/pages/setup_step2.html`
 
 ### 13B.2 Wizard: Optional Family Member Step
 
-- [ ] Add new step between current step 3 (sync interval) and step 4 (webhook)
-- [ ] Collects: name (required), email (optional) — same fields as `/admin/users/new`
-- [ ] "Skip — I'll add members later" button proceeds without creating a member
-- [ ] Renumber subsequent steps (or insert as step 3b to avoid renumbering)
-- [ ] Prevents the empty family-member dropdown dead-end when connecting the first bank
-- **Files:** `internal/admin/setup.go` (new step handler), `internal/templates/pages/setup_step_member.html` (new)
+- [x] Add new step between providers and sync interval (step 3)
+- [x] Collects: name (required), email (optional) — same fields as `/admin/users/new`
+- [x] "Skip — I'll add members later" button proceeds without creating a member
+- [x] Renumber subsequent steps: wizard is now 6 steps (admin → providers → member → interval → webhook → review)
+- [x] Prevents the empty family-member dropdown dead-end when connecting the first bank
+- **Files:** `internal/admin/setup.go`, `internal/admin/router.go`, `internal/templates/pages/setup_step_member.html` (new), `internal/templates/layout/wizard.html`
 
 ### 13B.3 Settings: Change Admin Password
 
-- [ ] Add "Security" section to settings page with current-password / new-password / confirm-new-password form
-- [ ] New sqlc query: `UpdateAdminPassword(ctx, id, new_hashed_password)`
-- [ ] Validate current password before accepting change
-- [ ] Minimum 8 characters (same as initial setup)
-- [ ] Flash: "Password updated successfully"
-- [ ] This is the target for the "Change Password" link added in 13A.3
-- **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`, `internal/db/queries/admin_accounts.sql`
+- [x] Add "Security" section to settings page with current-password / new-password / confirm-new-password form
+- [x] New sqlc queries: `GetAdminAccountByID`, `UpdateAdminPassword`
+- [x] Validate current password before accepting change
+- [x] Minimum 8 characters (same as initial setup)
+- [x] Flash: "Password updated successfully"
+- [x] Route: POST `/admin/settings/password`
+- **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`, `internal/db/queries/admin_accounts.sql`, `internal/admin/router.go`
 
 ### 13B.4 Settings: System Information Section
 
-- [ ] Add collapsible "System" section at bottom of settings page
-- [ ] Display: Breadbox version (from build-time `-ldflags -X`), Go runtime version (`runtime.Version()`), PostgreSQL version (`SELECT version()`), server uptime (`time.Since(startTime)`), configured providers count
-- [ ] Read-only, informational — primarily for operator debugging
-- [ ] Requires passing `startTime` from app init to the settings handler
-- **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`
+- [x] Add "System" section at bottom of settings page
+- [x] Display: Breadbox version, Go runtime version, PostgreSQL version, server uptime, configured providers count
+- [x] Added `Version` and `StartTime` fields to `Config` struct, set in `main.go`
+- **Files:** `internal/config/config.go`, `cmd/breadbox/main.go`, `internal/admin/settings.go`, `internal/templates/pages/settings.html`
 
 ### 13B.5 Settings: Config Source Badges
 
-- [ ] Add `ConfigSources map[string]string` (key → "env" / "db" / "default") populated during `LoadWithDB`
-- [ ] Pass to settings template alongside `Config` values
-- [ ] Render muted badge next to each setting: "(from env)", "(from database)", "(default)"
-- [ ] Makes the config precedence model (env → DB → default) visible and debuggable
-- **Files:** `internal/config/config.go`, `internal/config/load.go`, `internal/admin/settings.go`, `internal/templates/pages/settings.html`
+- [x] Add `ConfigSources map[string]string` (key → "env" / "db" / "default") populated during `Load()` and `LoadWithDB()`
+- [x] Pass to settings template alongside `Config` values
+- [x] Render muted badge next to each setting: "from env", "from database", "default"
+- [x] Added `configSource` template function
+- **Files:** `internal/config/config.go`, `internal/config/load.go`, `internal/admin/settings.go`, `internal/admin/templates.go`, `internal/templates/pages/settings.html`
 
 ### 13B.6 Settings: Teller Configuration Guidance
 
-- [ ] "Not configured" state: add `<details>` block with copy-ready env var snippet and Docker Compose example
-- [ ] When `teller_app_id` and `teller_env` are NOT set via env vars, make them editable in the settings form (they already have DB fallback paths in `LoadWithDB`)
-- [ ] Cert/key paths remain read-only (env-var-only, file paths on host)
-- [ ] Show current Teller status clearly: "Active (env vars)" / "Partially configured (app_id from DB, certs from env)" / "Not configured"
+- [x] "Not configured" state: `<details>` block with copy-ready env var snippet and Docker Compose example
+- [x] When `teller_app_id` and `teller_env` are NOT set via env vars, make them editable in the settings form
+- [x] `SettingsPostHandler` saves `teller_app_id` and `teller_env` to `app_config` when not from env
+- [x] Cert/key paths remain read-only (env-var-only, file paths on host)
 - **Files:** `internal/templates/pages/settings.html`, `internal/admin/settings.go`
 
 ### 13B.7 Settings: Safety & Status Indicators
 
-- [ ] Confirmation dialog when changing `plaid_env` value (warn about breaking live connections)
-- [ ] Encryption key status line: "Encryption: Configured" or "Encryption: NOT SET — access tokens cannot be stored" (never show the key itself)
-- [ ] Use Alpine.js `x-on:submit` for the confirmation if available, vanilla `confirm()` as fallback
-- **Files:** `internal/templates/pages/settings.html`
+- [x] Confirmation dialog when changing `plaid_env` value (warn about breaking live connections)
+- [x] Encryption key status line: "Encryption: Configured" or "Encryption: NOT SET — access tokens cannot be stored"
+- [x] Uses vanilla JS `confirm()` for Plaid env change confirmation
+- **Files:** `internal/templates/pages/settings.html`, `internal/admin/settings.go`
 
 ### 13B.8 Family Members: Connection Count & Post-Create CTA
 
-- [ ] Add "Connections" column to members list table showing count of active connections per member
-- [ ] New sqlc query: `CountConnectionsByUserID(ctx)` or use `LEFT JOIN` + `COUNT` in existing list query
-- [ ] Zero-connection members show "0" (not blank) — makes it obvious who has no banks connected
-- [ ] After creating a new member, flash message includes: "Connect a bank for {name} →" with link to `/admin/connections/new`
-- **Files:** `internal/admin/members.go`, `internal/templates/pages/users.html`, `internal/db/queries/bank_connections.sql`
+- [x] Add "Connections" column to members list table showing count of active connections per member
+- [x] New sqlc query: `CountConnectionsByUserID` groups by `user_id`
+- [x] Zero-connection members show "0" (not blank)
+- [x] After creating a new member (via `?created=1` query param), banner shows "Connect a bank for them →" link
+- **Files:** `internal/admin/users.go`, `internal/templates/pages/users.html`, `internal/db/queries/bank_connections.sql`
 
 ### Task Dependencies (13B)
 

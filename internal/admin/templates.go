@@ -103,6 +103,17 @@ func NewTemplateRenderer() (*TemplateRenderer, error) {
 				}
 				return code
 			},
+			"configSource": func(sources map[string]string, key string) template.HTML {
+				source := sources[key]
+				switch source {
+				case "env":
+					return `<span class="bb-badge bb-badge--muted">from env</span>`
+				case "db":
+					return `<span class="bb-badge bb-badge--muted">from database</span>`
+				default:
+					return `<span class="bb-badge bb-badge--muted">default</span>`
+				}
+			},
 			"formatNumeric": func(n pgtype.Numeric) string {
 				if !n.Valid {
 					return ""
@@ -154,6 +165,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/login.html",
 		"pages/setup_step1.html",
 		"pages/setup_step2.html",
+		"pages/setup_step_member.html",
 		"pages/setup_step3.html",
 		"pages/setup_step4.html",
 		"pages/setup_step5.html",

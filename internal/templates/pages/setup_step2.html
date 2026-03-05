@@ -1,42 +1,80 @@
 {{define "content"}}
 <article>
-  <header>Configure Plaid</header>
+  <header>Configure Bank Providers</header>
 
-  <p>Breadbox uses Plaid to connect to your banks. You'll need a Plaid developer account. Your credentials are stored encrypted in the database and are never exposed via the API.</p>
-  <p><a href="https://plaid.com/docs" target="_blank" rel="noopener">Create a Plaid account at plaid.com/docs</a></p>
+  <p>Breadbox connects to banks via Plaid and/or Teller. Configure at least one provider, or skip and set them up later in Settings.</p>
 
   {{if .Error}}
   <div role="alert" data-flash="error">{{.Error}}</div>
   {{end}}
 
-  <form method="POST" action="/admin/setup/step/2">
+  <form method="POST" action="/admin/setup/step/2" id="provider-form">
     {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+    <input type="hidden" name="provider_choice" id="provider_choice" value="plaid">
 
-    <label for="client_id">Client ID</label>
-    <input type="text" id="client_id" name="client_id" value="{{.ClientID}}" required spellcheck="false"
-           {{if .Errors.ClientID}}aria-invalid="true"{{end}}>
-    {{if .Errors.ClientID}}<small>{{.Errors.ClientID}}</small>{{end}}
+    <fieldset>
+      <legend>Which providers do you want to configure?</legend>
+      <label><input type="radio" name="provider_radio" value="plaid" checked onchange="updateProvider(this.value)"> Plaid only</label>
+      <label><input type="radio" name="provider_radio" value="teller" onchange="updateProvider(this.value)"> Teller only</label>
+      <label><input type="radio" name="provider_radio" value="both" onchange="updateProvider(this.value)"> Both Plaid and Teller</label>
+      <label><input type="radio" name="provider_radio" value="skip" onchange="updateProvider(this.value)"> Skip &mdash; I'll configure providers later</label>
+    </fieldset>
 
-    <label for="secret">Secret</label>
-    <input type="password" id="secret" name="secret" required spellcheck="false"
-           {{if .Errors.Secret}}aria-invalid="true"{{end}}>
-    {{if .Errors.Secret}}<small>{{.Errors.Secret}}</small>{{end}}
+    <div id="plaid-section">
+      <h4>Plaid Credentials</h4>
+      <p><a href="https://plaid.com/docs" target="_blank" rel="noopener">Create a Plaid account at plaid.com/docs</a></p>
 
-    <label for="environment">Environment</label>
-    <select id="environment" name="environment" required>
-      <option value="sandbox"{{if eq .Environment "sandbox"}} selected{{end}}>Sandbox (free testing, simulated data)</option>
-      <option value="development"{{if or (eq .Environment "development") (eq .Environment "")}} selected{{end}}>Development (real banks, limited connections)</option>
-      <option value="production"{{if eq .Environment "production"}} selected{{end}}>Production (real banks, paid)</option>
-    </select>
-    <small>Sandbox uses Plaid's simulated bank data. Development and Production access real bank accounts. Production requires Plaid approval and incurs costs (~$1.50/item/month).</small>
+      <label for="client_id">Client ID</label>
+      <input type="text" id="client_id" name="client_id" value="{{.ClientID}}" spellcheck="false"
+             {{if .Errors.ClientID}}aria-invalid="true"{{end}}>
+      {{if .Errors.ClientID}}<small>{{.Errors.ClientID}}</small>{{end}}
 
-    <button type="submit">Validate and Continue</button>
-  </form>
+      <label for="secret">Secret</label>
+      <input type="password" id="secret" name="secret" spellcheck="false"
+             {{if .Errors.Secret}}aria-invalid="true"{{end}}>
+      {{if .Errors.Secret}}<small>{{.Errors.Secret}}</small>{{end}}
 
-  <form method="POST" action="/admin/setup/step/2" style="margin-top: 1rem; text-align: center;">
-    {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
-    <input type="hidden" name="skip" value="true">
-    <button type="submit" class="secondary outline">Skip for now</button>
+      <label for="environment">Environment</label>
+      <select id="environment" name="environment">
+        <option value="sandbox"{{if eq .Environment "sandbox"}} selected{{end}}>Sandbox (free testing, simulated data)</option>
+        <option value="development"{{if or (eq .Environment "development") (eq .Environment "")}} selected{{end}}>Development (real banks, limited connections)</option>
+        <option value="production"{{if eq .Environment "production"}} selected{{end}}>Production (real banks, paid)</option>
+      </select>
+      <small>Sandbox uses simulated data. Development and Production access real bank accounts.</small>
+    </div>
+
+    <div id="teller-section" style="display: none;">
+      <h4>Teller Configuration</h4>
+      <p>Teller requires mTLS certificates that must be configured via environment variables. Set the following before starting Breadbox:</p>
+      <pre><code>TELLER_APP_ID=your-app-id
+TELLER_CERT_PATH=/path/to/certificate.pem
+TELLER_KEY_PATH=/path/to/private_key.pem
+TELLER_ENV=sandbox</code></pre>
+      <p><small>For Docker Compose, add these to your <code>.env</code> file and mount the certificate files as volumes.</small></p>
+    </div>
+
+    <div id="submit-section">
+      <button type="submit">Validate and Continue</button>
+    </div>
+
+    <div id="skip-section" style="display: none; text-align: center;">
+      <button type="submit" class="secondary outline">Skip All Providers</button>
+    </div>
   </form>
 </article>
+
+<script>
+function updateProvider(value) {
+  document.getElementById('provider_choice').value = value;
+  var plaid = document.getElementById('plaid-section');
+  var teller = document.getElementById('teller-section');
+  var submit = document.getElementById('submit-section');
+  var skip = document.getElementById('skip-section');
+
+  plaid.style.display = (value === 'plaid' || value === 'both') ? '' : 'none';
+  teller.style.display = (value === 'teller' || value === 'both') ? '' : 'none';
+  submit.style.display = (value !== 'skip') ? '' : 'none';
+  skip.style.display = (value === 'skip') ? '' : 'none';
+}
+</script>
 {{end}}

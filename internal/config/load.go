@@ -29,8 +29,9 @@ func Load() (*Config, error) {
 	_ = godotenv.Load(envFile)
 
 	cfg := &Config{
-		Environment: env,
-		ServerPort:  getEnv("SERVER_PORT", "8080"),
+		Environment:   env,
+		ServerPort:    getEnv("SERVER_PORT", "8080"),
+		ConfigSources: make(map[string]string),
 	}
 
 	// Database URL: prefer DATABASE_URL, fall back to individual vars.
@@ -66,6 +67,11 @@ func Load() (*Config, error) {
 	cfg.PlaidClientID = os.Getenv("PLAID_CLIENT_ID")
 	cfg.PlaidSecret = os.Getenv("PLAID_SECRET")
 	cfg.PlaidEnv = os.Getenv("PLAID_ENV")
+	if cfg.PlaidClientID != "" {
+		cfg.ConfigSources["plaid_client_id"] = "env"
+		cfg.ConfigSources["plaid_secret"] = "env"
+		cfg.ConfigSources["plaid_env"] = "env"
+	}
 
 	// Teller env vars.
 	cfg.TellerAppID = os.Getenv("TELLER_APP_ID")
@@ -73,6 +79,10 @@ func Load() (*Config, error) {
 	cfg.TellerKeyPath = os.Getenv("TELLER_KEY_PATH")
 	cfg.TellerEnv = getEnv("TELLER_ENV", "sandbox")
 	cfg.TellerWebhookSecret = os.Getenv("TELLER_WEBHOOK_SECRET")
+	if cfg.TellerAppID != "" {
+		cfg.ConfigSources["teller_app_id"] = "env"
+		cfg.ConfigSources["teller_env"] = "env"
+	}
 
 	// Connection pool tuning.
 	cfg.DBMaxConns = int32(getEnvInt("DB_MAX_CONNS", 25))
@@ -112,9 +122,19 @@ func LoadWithDB(ctx context.Context, cfg *Config, pool *pgxpool.Pool) error {
 		return fmt.Errorf("iterate app_config: %w", err)
 	}
 
+	// Initialize ConfigSources if nil (in case Load() wasn't called first).
+	if cfg.ConfigSources == nil {
+		cfg.ConfigSources = make(map[string]string)
+	}
+
 	// Only set values that are not already provided by environment variables.
 	if cfg.PlaidClientID == "" {
 		cfg.PlaidClientID = appCfg["plaid_client_id"]
+		if cfg.PlaidClientID != "" {
+			cfg.ConfigSources["plaid_client_id"] = "db"
+			cfg.ConfigSources["plaid_secret"] = "db"
+			cfg.ConfigSources["plaid_env"] = "db"
+		}
 	}
 	if cfg.PlaidSecret == "" {
 		cfg.PlaidSecret = appCfg["plaid_secret"]
@@ -129,9 +149,15 @@ func LoadWithDB(ctx context.Context, cfg *Config, pool *pgxpool.Pool) error {
 	// Teller app_config fallbacks (cert/key paths and webhook secret are env-only).
 	if cfg.TellerAppID == "" {
 		cfg.TellerAppID = appCfg["teller_app_id"]
+		if cfg.TellerAppID != "" {
+			cfg.ConfigSources["teller_app_id"] = "db"
+		}
 	}
 	if cfg.TellerEnv == "sandbox" && appCfg["teller_env"] != "" {
 		cfg.TellerEnv = appCfg["teller_env"]
+		if cfg.ConfigSources["teller_env"] == "" {
+			cfg.ConfigSources["teller_env"] = "db"
+		}
 	}
 
 	// Prefer sync_interval_minutes; fall back to sync_interval_hours (legacy).
@@ -139,6 +165,7 @@ func LoadWithDB(ctx context.Context, cfg *Config, pool *pgxpool.Pool) error {
 		n, err := strconv.Atoi(v)
 		if err == nil && n > 0 {
 			cfg.SyncIntervalMinutes = n
+			cfg.ConfigSources["sync_interval_minutes"] = "db"
 		}
 	}
 	if cfg.SyncIntervalMinutes == 0 {
@@ -146,15 +173,29 @@ func LoadWithDB(ctx context.Context, cfg *Config, pool *pgxpool.Pool) error {
 			n, err := strconv.Atoi(v)
 			if err == nil && n > 0 {
 				cfg.SyncIntervalMinutes = n * 60
+				cfg.ConfigSources["sync_interval_minutes"] = "db"
 			}
 		}
 	}
 	if cfg.SyncIntervalMinutes == 0 {
 		cfg.SyncIntervalMinutes = 12 * 60 // default 12h
+		cfg.ConfigSources["sync_interval_minutes"] = "default"
 	}
 
 	cfg.WebhookURL = appCfg["webhook_url"]
+	if cfg.WebhookURL != "" {
+		cfg.ConfigSources["webhook_url"] = "db"
+	} else {
+		cfg.ConfigSources["webhook_url"] = "default"
+	}
 	cfg.SetupComplete = appCfg["setup_complete"] == "true"
+
+	// Set defaults for any untracked config sources.
+	for _, key := range []string{"plaid_client_id", "plaid_secret", "plaid_env", "teller_app_id", "teller_env"} {
+		if cfg.ConfigSources[key] == "" {
+			cfg.ConfigSources[key] = "default"
+		}
+	}
 
 	return nil
 }

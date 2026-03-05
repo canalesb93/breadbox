@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/mail"
 	"os"
 	"strconv"
 	"strings"
@@ -112,7 +113,7 @@ func SetupStep1Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 	}
 }
 
-// SetupStep2Handler handles GET/POST /admin/setup/step/2 — Configure Plaid.
+// SetupStep2Handler handles GET/POST /admin/setup/step/2 — Configure Bank Providers.
 func SetupStep2Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -128,15 +129,23 @@ func SetupStep2Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 			return
 		}
 
-		// POST: validate and store Plaid credentials.
+		// POST: handle provider choice.
 		ctx := r.Context()
+		choice := r.FormValue("provider_choice")
 
-		// Allow skipping Plaid configuration.
-		if r.FormValue("skip") == "true" {
+		// Skip all providers.
+		if choice == "skip" {
 			http.Redirect(w, r, "/admin/setup/step/3", http.StatusSeeOther)
 			return
 		}
 
+		// Teller-only: no form processing needed (env-var config), just continue.
+		if choice == "teller" {
+			http.Redirect(w, r, "/admin/setup/step/3", http.StatusSeeOther)
+			return
+		}
+
+		// Plaid or Both: validate and save Plaid credentials.
 		clientID := strings.TrimSpace(r.FormValue("client_id"))
 		secret := r.FormValue("secret")
 		environment := r.FormValue("environment")
@@ -208,12 +217,88 @@ func SetupStep2Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 	}
 }
 
-// SetupStep3Handler handles GET/POST /admin/setup/step/3 — Set Sync Interval.
+// SetupStep3Handler handles GET/POST /admin/setup/step/3 — Add Family Member (optional).
 func SetupStep3Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			data := map[string]any{
-				"StepNumber":   3,
+				"StepNumber": 3,
+				"CSRFToken":  "",
+				"Name":       "",
+				"Email":      "",
+				"Error":      "",
+				"Errors":     map[string]string{},
+			}
+			tr.Render(w, r, "setup_step_member.html", data)
+			return
+		}
+
+		// POST: skip or create member.
+		ctx := r.Context()
+
+		if r.FormValue("skip") == "true" {
+			http.Redirect(w, r, "/admin/setup/step/4", http.StatusSeeOther)
+			return
+		}
+
+		name := strings.TrimSpace(r.FormValue("name"))
+		email := strings.TrimSpace(r.FormValue("email"))
+		errors := map[string]string{}
+
+		if name == "" {
+			errors["Name"] = "Name is required"
+		}
+		if email != "" {
+			if _, err := mail.ParseAddress(email); err != nil {
+				errors["Email"] = "Invalid email address"
+			}
+		}
+
+		if len(errors) > 0 {
+			data := map[string]any{
+				"StepNumber": 3,
+				"CSRFToken":  "",
+				"Name":       name,
+				"Email":      email,
+				"Error":      "",
+				"Errors":     errors,
+			}
+			tr.Render(w, r, "setup_step_member.html", data)
+			return
+		}
+
+		var emailText pgtype.Text
+		if email != "" {
+			emailText = pgtype.Text{String: email, Valid: true}
+		}
+
+		_, err := queries.CreateUser(ctx, db.CreateUserParams{
+			Name:  name,
+			Email: emailText,
+		})
+		if err != nil {
+			data := map[string]any{
+				"StepNumber": 3,
+				"CSRFToken":  "",
+				"Name":       name,
+				"Email":      email,
+				"Error":      "Failed to create family member",
+				"Errors":     map[string]string{},
+			}
+			tr.Render(w, r, "setup_step_member.html", data)
+			return
+		}
+
+		http.Redirect(w, r, "/admin/setup/step/4", http.StatusSeeOther)
+	}
+}
+
+// SetupStep4Handler handles GET/POST /admin/setup/step/4 — Set Sync Interval.
+func SetupStep4Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			data := map[string]any{
+				"StepNumber":   4,
 				"CSRFToken":    "",
 				"SyncInterval": "720",
 				"Error":        "",
@@ -228,7 +313,7 @@ func SetupStep3Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 		interval, err := strconv.Atoi(intervalStr)
 		if err != nil || !isValidSyncInterval(interval) {
 			data := map[string]any{
-				"StepNumber":   3,
+				"StepNumber":   4,
 				"CSRFToken":    "",
 				"SyncInterval": intervalStr,
 				"Error":        "Please select a valid sync interval",
@@ -243,7 +328,7 @@ func SetupStep3Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 		})
 		if err != nil {
 			data := map[string]any{
-				"StepNumber":   3,
+				"StepNumber":   4,
 				"CSRFToken":    "",
 				"SyncInterval": intervalStr,
 				"Error":        "Failed to save configuration",
@@ -252,16 +337,16 @@ func SetupStep3Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 			return
 		}
 
-		http.Redirect(w, r, "/admin/setup/step/4", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/setup/step/5", http.StatusSeeOther)
 	}
 }
 
-// SetupStep4Handler handles GET/POST /admin/setup/step/4 — Webhook URL (Optional).
-func SetupStep4Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
+// SetupStep5Handler handles GET/POST /admin/setup/step/5 — Webhook URL (Optional).
+func SetupStep5Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			data := map[string]any{
-				"StepNumber": 4,
+				"StepNumber": 5,
 				"CSRFToken":  "",
 				"WebhookURL": "",
 				"Error":      "",
@@ -282,7 +367,7 @@ func SetupStep4Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 		// Validate: if provided, must start with https://
 		if webhookURL != "" && !strings.HasPrefix(webhookURL, "https://") {
 			data := map[string]any{
-				"StepNumber": 4,
+				"StepNumber": 5,
 				"CSRFToken":  "",
 				"WebhookURL": webhookURL,
 				"Error":      "Webhook URL must start with https://",
@@ -297,7 +382,7 @@ func SetupStep4Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 		})
 		if err != nil {
 			data := map[string]any{
-				"StepNumber": 4,
+				"StepNumber": 5,
 				"CSRFToken":  "",
 				"WebhookURL": webhookURL,
 				"Error":      "Failed to save configuration",
@@ -306,14 +391,14 @@ func SetupStep4Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 			return
 		}
 
-		http.Redirect(w, r, "/admin/setup/step/5", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/setup/step/6", http.StatusSeeOther)
 	}
 }
 
-// SetupStep5Handler handles GET/POST /admin/setup/step/5 — Review & Confirm.
+// SetupStep6Handler handles GET/POST /admin/setup/step/6 — Review & Confirm.
 // GET: renders the summary (no side effects).
 // POST: marks setup as complete and redirects to login.
-func SetupStep5Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
+func SetupStep6Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -350,7 +435,7 @@ func SetupStep5Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 		hasTeller := os.Getenv("TELLER_APP_ID") != ""
 
 		data := map[string]any{
-			"StepNumber":    5,
+			"StepNumber":    6,
 			"AdminUsername": adminUsername,
 			"PlaidEnv":      configMap["plaid_env"],
 			"SyncInterval":  syncDisplay,

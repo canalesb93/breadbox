@@ -85,6 +85,8 @@ func runServe() error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+	cfg.Version = version
+	cfg.StartTime = time.Now()
 
 	logger := newLogger(cfg.Environment)
 

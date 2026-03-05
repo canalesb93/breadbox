@@ -25,11 +25,22 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			return
 		}
 
+		// Build connection count map keyed by formatted UUID.
+		connectionCounts := make(map[string]int64)
+		counts, err := a.Queries.CountConnectionsByUserID(ctx)
+		if err == nil {
+			for _, c := range counts {
+				connectionCounts[formatUUID(c.UserID)] = c.ConnectionCount
+			}
+		}
+
 		data := map[string]any{
-			"PageTitle":   "Family Members",
-			"CurrentPage": "users",
-			"Users":       users,
-			"CSRFToken":   GetCSRFToken(r),
+			"PageTitle":        "Family Members",
+			"CurrentPage":      "users",
+			"Users":            users,
+			"ConnectionCounts": connectionCounts,
+			"CSRFToken":        GetCSRFToken(r),
+			"Created":          r.URL.Query().Get("created") == "1",
 		}
 		tr.Render(w, r, "users.html", data)
 	}

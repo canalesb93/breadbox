@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 // Config holds all application configuration.
 type Config struct {
 	// Derived from environment
@@ -34,4 +36,11 @@ type Config struct {
 	ReadTimeoutS  int // HTTP_READ_TIMEOUT_SECONDS, default 30
 	WriteTimeoutS int // HTTP_WRITE_TIMEOUT_SECONDS, default 60
 	IdleTimeoutS  int // HTTP_IDLE_TIMEOUT_SECONDS, default 120
+
+	// Runtime metadata (set at startup)
+	Version   string
+	StartTime time.Time
+
+	// Config source tracking: key → "env" | "db" | "default"
+	ConfigSources map[string]string
 }
