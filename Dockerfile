@@ -9,8 +9,10 @@ RUN go mod download
 
 COPY . .
 
-# Build CSS: download tailwindcss-extra and compile input.css
-RUN curl -sLo tailwindcss-extra https://github.com/dobicinaitis/tailwind-cli-extra/releases/latest/download/tailwindcss-extra-linux-x64 \
+# Build CSS: download tailwindcss-extra (musl variant for Alpine) and compile input.css
+RUN apk add --no-cache libstdc++ libgcc \
+    && ARCH=$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/') \
+    && wget -qO tailwindcss-extra "https://github.com/dobicinaitis/tailwind-cli-extra/releases/latest/download/tailwindcss-extra-linux-${ARCH}-musl" \
     && chmod +x tailwindcss-extra \
     && ./tailwindcss-extra -i input.css -o static/css/styles.css --minify
 
