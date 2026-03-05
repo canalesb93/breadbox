@@ -330,7 +330,7 @@
         "<td>" + esc(row.description) + "</td>" +
         "<td>" + esc(row.category) + "</td>" +
         "<td>" + esc(row.merchant) + "</td>" +
-        "<td>" + (row.error ? "<span class='bb-badge bb-badge--error'>" + esc(row.error) + "</span>" : "<span class='bb-badge bb-badge--success'>OK</span>") + "</td>";
+        "<td>" + (row.error ? "<span class='badge badge-error badge-sm'>" + esc(row.error) + "</span>" : "<span class='badge badge-success badge-sm'>OK</span>") + "</td>";
       tbody.appendChild(tr);
     });
     document.getElementById("preview-table-container").style.display = "block";

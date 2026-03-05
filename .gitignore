@@ -2,6 +2,9 @@
 /breadbox
 breadbox.exe
 
+# Tailwind CSS standalone binary
+tailwindcss-extra
+
 # Environment files
 .local.env
 .docker.env

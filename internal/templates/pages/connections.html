@@ -5,8 +5,8 @@
 </div>
 
 {{if .Connections}}
-<div style="overflow-x: auto;">
-  <table>
+<div class="overflow-x-auto">
+  <table class="table table-zebra table-sm">
     <thead>
       <tr>
         <th>Institution</th>
@@ -19,12 +19,12 @@
     </thead>
     <tbody>
       {{range .Connections}}
-      <tr>
+      <tr class="hover:bg-base-200">
         <td>{{.InstitutionName}}</td>
         <td>{{.UserName}}</td>
         <td>{{.AccountCount}}</td>
         <td>
-          {{statusBadge (printf "%s" .Status)}}{{if .Paused}} <span class="bb-badge bb-badge--muted">Paused</span>{{end}}
+          {{statusBadge (printf "%s" .Status)}}{{if .Paused}} <span class="badge badge-ghost badge-sm">Paused</span>{{end}}
         </td>
         <td>{{if .LastSyncedAt.Valid}}{{relativeTime .LastSyncedAt.Time}}{{else}}Never{{end}}</td>
         <td>

@@ -1,28 +1,35 @@
 {{define "content"}}
-<hgroup>
-  <h1>Sign In to Breadbox</h1>
-  <p>Enter your credentials to access the dashboard.</p>
-</hgroup>
+<div class="text-center mb-6">
+  <i data-lucide="package" class="w-10 h-10 mx-auto mb-2"></i>
+  <h1 class="text-2xl font-bold">Sign In to Breadbox</h1>
+  <p class="text-sm text-base-content/60">Enter your credentials to access the dashboard.</p>
+</div>
 
 {{if .SetupComplete}}
-<div role="alert" data-flash="info">Setup complete. Sign in to access the dashboard.</div>
+<div role="alert" class="alert alert-info mb-4">
+  <span>Setup complete. Sign in to access the dashboard.</span>
+</div>
 {{end}}
 
 {{if .Error}}
-<div role="alert" data-flash="error">{{.Error}}</div>
+<div role="alert" class="alert alert-error mb-4">
+  <span>{{.Error}}</span>
+</div>
 {{end}}
 
-<article>
-  <form method="POST" action="/login">
-    {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+<form method="POST" action="/login">
+  {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
 
-    <label for="username">Username</label>
-    <input type="text" id="username" name="username" value="{{.Username}}" required autocomplete="username">
+  <fieldset class="fieldset">
+    <label class="fieldset-label" for="username">Username</label>
+    <input type="text" id="username" name="username" value="{{.Username}}" required autocomplete="username" class="input w-full">
+  </fieldset>
 
-    <label for="password">Password</label>
-    <input type="password" id="password" name="password" required autocomplete="current-password">
+  <fieldset class="fieldset">
+    <label class="fieldset-label" for="password">Password</label>
+    <input type="password" id="password" name="password" required autocomplete="current-password" class="input w-full">
+  </fieldset>
 
-    <button type="submit">Sign In</button>
-  </form>
-</article>
+  <button type="submit" class="btn btn-primary w-full mt-4">Sign In</button>
+</form>
 {{end}}

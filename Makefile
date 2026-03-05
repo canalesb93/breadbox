@@ -1,7 +1,9 @@
 -include .local.env
 export
 
-.PHONY: dev build test lint migrate-up migrate-down migrate-create sqlc seed docker-up docker-down
+TAILWIND_BIN := ./tailwindcss-extra
+
+.PHONY: dev build test lint migrate-up migrate-down migrate-create sqlc seed docker-up docker-down css css-watch css-install
 
 dev:
 	go run ./cmd/breadbox serve
@@ -35,3 +37,16 @@ docker-up:
 
 docker-down:
 	docker compose down
+
+css-install:
+	@if [ ! -f $(TAILWIND_BIN) ]; then \
+		echo "Downloading tailwindcss-extra..."; \
+		curl -sLo $(TAILWIND_BIN) https://github.com/dobicinaitis/tailwind-cli-extra/releases/latest/download/tailwindcss-extra-$$(uname -s | tr '[:upper:]' '[:lower:]')-$$(uname -m | sed 's/x86_64/x64/' | sed 's/aarch64/arm64/'); \
+		chmod +x $(TAILWIND_BIN); \
+	fi
+
+css: css-install
+	$(TAILWIND_BIN) -i input.css -o static/css/styles.css --minify
+
+css-watch: css-install
+	$(TAILWIND_BIN) -i input.css -o static/css/styles.css --watch

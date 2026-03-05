@@ -37,8 +37,8 @@
 <h2>Recent Sync Activity</h2>
 
 {{if .RecentLogs}}
-<div style="overflow-x: auto;">
-  <table>
+<div class="overflow-x-auto">
+  <table class="table table-zebra table-sm">
     <thead>
       <tr>
         <th>Institution</th>
@@ -52,7 +52,7 @@
     </thead>
     <tbody>
       {{range .RecentLogs}}
-      <tr>
+      <tr class="hover:bg-base-200">
         <td><a href="/admin/connections/{{formatUUID .ConnectionID}}">{{.InstitutionName}}</a></td>
         <td>{{.Trigger}}</td>
         <td>{{syncBadge (printf "%s" .Status)}}</td>

@@ -73,13 +73,13 @@
 </form>
 
 {{if .Transactions}}
-<div style="overflow-x: auto;">
-  <table>
+<div class="overflow-x-auto max-h-[70vh]">
+  <table class="table table-zebra table-sm table-pin-rows">
     <thead>
       <tr>
         <th>Date</th>
         <th>Description</th>
-        <th style="text-align:right;">Amount</th>
+        <th class="text-right">Amount</th>
         <th>Account</th>
         <th>Category</th>
         <th>Status</th>
@@ -87,24 +87,24 @@
     </thead>
     {{range .Transactions}}
     <tbody x-data="{ expanded: false }">
-      <tr @click="expanded = !expanded" style="cursor:pointer;">
+      <tr @click="expanded = !expanded" class="cursor-pointer hover:bg-base-200">
         <td>{{.Date}}</td>
         <td>
           {{.Name}}
-          {{if .MerchantName}}<small style="color:var(--pico-muted-color);"> ({{.MerchantName}})</small>{{end}}
+          {{if .MerchantName}}<small class="text-base-content/60"> ({{.MerchantName}})</small>{{end}}
         </td>
-        <td style="text-align:right; font-variant-numeric:tabular-nums;{{if lt .Amount 0.0}} color:var(--bb-color-error);{{end}}">
+        <td class="bb-amount{{if lt .Amount 0.0}} text-error{{end}}">
           {{printf "%.2f" .Amount}}{{if .IsoCurrencyCode}} {{.IsoCurrencyCode}}{{end}}
         </td>
         <td><a href="/admin/accounts/{{.AccountID}}" @click.stop>{{.AccountName}}</a></td>
         <td>{{if .CategoryPrimary}}{{.CategoryPrimary}}{{else}}&mdash;{{end}}</td>
-        <td>{{if .Pending}}<span class="bb-badge bb-badge--warning">Pending</span>{{end}}</td>
+        <td>{{if .Pending}}<span class="badge badge-warning badge-sm">Pending</span>{{end}}</td>
       </tr>
       <tr x-show="expanded" x-cloak>
-        <td colspan="6" style="padding:0.5rem 1rem; background:var(--pico-card-background-color);">
-          <dl style="display:grid; grid-template-columns:auto 1fr; gap:0.25rem 1rem; margin:0; font-size:0.875rem;">
+        <td colspan="6" class="bg-base-200 px-4 py-2">
+          <dl class="bb-info-grid">
             {{if .MerchantName}}<dt>Merchant</dt><dd>{{.MerchantName}}</dd>{{end}}
-            <dt>Transaction ID</dt><dd><code style="font-size:0.8rem;">{{.ID}}</code></dd>
+            <dt>Transaction ID</dt><dd><code class="font-mono text-xs">{{.ID}}</code></dd>
             <dt>Account</dt><dd>{{.AccountName}} ({{.InstitutionName}})</dd>
             <dt>Family Member</dt><dd>{{if .UserName}}{{.UserName}}{{else}}&mdash;{{end}}</dd>
             <dt>Created</dt><dd>{{.CreatedAt}}</dd>

@@ -1,0 +1,58 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: corporate --default, business --prefersdark;
+}
+
+/* Utility: hide Alpine.js elements until initialized */
+[x-cloak] { display: none !important; }
+
+/* App-specific component classes */
+@layer components {
+  .bb-filter-bar {
+    @apply flex flex-wrap items-end gap-4 mb-6;
+  }
+
+  .bb-filter-bar label {
+    @apply flex flex-col gap-1 text-sm;
+  }
+
+  .bb-filter-bar select {
+    @apply select select-sm w-auto min-w-[8rem];
+  }
+
+  .bb-filter-bar input {
+    @apply input input-sm w-auto min-w-[8rem];
+  }
+
+  .bb-pagination {
+    @apply flex items-center justify-between mt-4;
+  }
+
+  .bb-action-bar {
+    @apply flex items-center gap-2 mb-4;
+  }
+
+  .bb-amount {
+    @apply text-right tabular-nums;
+  }
+
+  .bb-amount--debit {
+    @apply text-right tabular-nums;
+  }
+
+  .bb-amount--credit {
+    @apply text-right tabular-nums text-success;
+  }
+
+  .bb-info-grid {
+    @apply grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm;
+  }
+
+  .bb-info-grid dt {
+    @apply font-medium text-base-content/70;
+  }
+
+  .bb-info-grid dd {
+    @apply text-base-content;
+  }
+}

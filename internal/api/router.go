@@ -1,6 +1,7 @@
 package api
 
 import (
+	"io/fs"
 	"net/http"
 
 	"breadbox/internal/admin"
@@ -9,6 +10,7 @@ import (
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 	"breadbox/internal/webhook"
+	"breadbox/static"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -22,6 +24,10 @@ func NewRouter(a *app.App, version string) http.Handler {
 	r.Use(middleware.RealIP)
 	r.Use(mw.Logging(a.Logger))
 	r.Use(middleware.Recoverer)
+
+	// Static files (CSS, favicon) — embedded, no auth needed.
+	staticFS, _ := fs.Sub(static.FS, ".")
+	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
 	r.Get("/health", HealthLiveHandler(version))
 	r.Get("/health/live", HealthLiveHandler(version))

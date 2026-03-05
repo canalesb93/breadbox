@@ -5,248 +5,70 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.PageTitle}} — Breadbox</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/css/styles.css">
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
-  <style>
-    [x-cloak] { display: none !important; }
-
-    :root {
-      --bb-gap-xs: 0.25rem;
-      --bb-gap-sm: 0.5rem;
-      --bb-gap-md: 1rem;
-      --bb-gap-lg: 1.5rem;
-      --bb-gap-xl: 2rem;
-      --bb-color-success: #2e7d32;
-      --bb-color-error: #c62828;
-      --bb-color-warning: #e65100;
-      --bb-color-cyan: #00838f;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bb-color-success: #66bb6a;
-        --bb-color-error: #ef5350;
-        --bb-color-warning: #ffa726;
-        --bb-color-cyan: #4dd0e1;
-      }
-    }
-
-    .bb-layout {
-      display: flex;
-      min-height: 100vh;
-    }
-
-    /* ---- Sidebar ---- */
-    .bb-sidebar {
-      width: 230px;
-      flex-shrink: 0;
-      background: var(--pico-card-background-color);
-      border-right: 1px solid var(--pico-muted-border-color);
-      padding: 1.25rem 1rem;
-      display: flex;
-      flex-direction: column;
-      position: sticky;
-      top: 0;
-      height: 100vh;
-      overflow-y: auto;
-    }
-    .bb-sidebar .bb-brand {
-      font-size: 1.15rem;
-      font-weight: 700;
-      text-decoration: none;
-      color: var(--pico-color);
-      display: block;
-      padding: 0.25rem 0.75rem 1rem;
-    }
-    .bb-sidebar .bb-nav {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .bb-sidebar .bb-nav li { margin: 0; }
-    .bb-sidebar .bb-nav a {
-      display: block;
-      padding: 0.45rem 0.75rem;
-      border-radius: 6px;
-      text-decoration: none;
-      color: var(--pico-color);
-      font-size: 0.95rem;
-      transition: background 0.15s;
-    }
-    .bb-sidebar .bb-nav a:hover {
-      background: var(--pico-muted-border-color);
-    }
-    .bb-sidebar .bb-nav a[aria-current="page"] {
-      background: var(--pico-primary-background);
-      color: var(--pico-primary-inverse);
-    }
-    .bb-sidebar .bb-bottom {
-      margin-top: auto;
-      padding-top: 1rem;
-    }
-    .bb-sidebar .bb-bottom button {
-      width: 100%;
-      margin: 0;
-    }
-
-    /* ---- Main content ---- */
-    .bb-main {
-      flex: 1;
-      padding: 2rem 2.5rem;
-      min-width: 0;
-      overflow-y: auto;
-    }
-
-    /* ---- Page header row (title + action button) ---- */
-    .bb-page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: var(--bb-gap-lg);
-      gap: var(--bb-gap-md);
-    }
-    .bb-page-header h1 { margin: 0; }
-    .bb-page-header a[role="button"] { white-space: nowrap; margin: 0; }
-
-    /* ---- Stat cards (dashboard) ---- */
-    .bb-stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: var(--bb-gap-md);
-      margin-bottom: var(--bb-gap-xl);
-    }
-    .bb-stat {
-      background: var(--pico-card-background-color);
-      border: 1px solid var(--pico-muted-border-color);
-      border-radius: 8px;
-      padding: 1.25rem;
-    }
-    .bb-stat .bb-stat-label {
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--pico-muted-color);
-      margin-bottom: 0.35rem;
-    }
-    .bb-stat .bb-stat-value {
-      font-size: 1.75rem;
-      font-weight: 700;
-      line-height: 1.2;
-    }
-    .bb-stat--warn { border-left: 4px solid var(--bb-color-warning); }
-
-    /* ---- Status badges ---- */
-    .bb-badge {
-      display: inline-block;
-      padding: 0.15rem 0.55rem;
-      border-radius: 4px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      line-height: 1.5;
-    }
-    .bb-badge--success { background: color-mix(in srgb, var(--bb-color-success) 20%, transparent); color: var(--bb-color-success); }
-    .bb-badge--error   { background: color-mix(in srgb, var(--bb-color-error) 20%, transparent); color: var(--bb-color-error); }
-    .bb-badge--warning { background: color-mix(in srgb, var(--bb-color-warning) 20%, transparent); color: var(--bb-color-warning); }
-    .bb-badge--muted   { background: var(--pico-muted-border-color); color: var(--pico-muted-color); }
-
-    /* ---- Flash messages ---- */
-    [data-flash="success"] {
-      background: color-mix(in srgb, var(--bb-color-success) 20%, transparent);
-      color: var(--bb-color-success);
-      padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
-    }
-    [data-flash="error"] {
-      background: color-mix(in srgb, var(--bb-color-error) 20%, transparent);
-      color: var(--bb-color-error);
-      padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
-    }
-    [data-flash="info"] {
-      background: color-mix(in srgb, var(--bb-color-cyan) 20%, transparent);
-      color: var(--bb-color-cyan);
-      padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
-    }
-
-    /* ---- Empty state ---- */
-    .bb-empty {
-      text-align: center;
-      padding: 3rem 1rem;
-      border: 2px dashed var(--pico-muted-border-color);
-      border-radius: 8px;
-    }
-    .bb-empty p { color: var(--pico-muted-color); margin-bottom: 1rem; }
-
-    /* ---- Tables ---- */
-    table { width: 100%; }
-    td a + a { margin-left: 0.75rem; }
-
-    /* ---- Nav divider & hamburger ---- */
-    .bb-nav-divider {
-      border-top: 1px solid var(--pico-muted-border-color);
-      margin: var(--bb-gap-sm) 0;
-      list-style: none;
-    }
-    .bb-hamburger {
-      display: none;
-      background: none;
-      border: none;
-      font-size: 1.5rem;
-      cursor: pointer;
-      color: var(--pico-color);
-      padding: var(--bb-gap-xs);
-      margin: 0;
-    }
-
-    /* ---- Responsive ---- */
-    @media (max-width: 768px) {
-      .bb-layout { flex-direction: column; }
-      .bb-sidebar {
-        width: 100%;
-        flex-direction: row;
-        flex-wrap: wrap;
-        align-items: center;
-        padding: var(--bb-gap-sm) var(--bb-gap-md);
-        position: sticky;
-        top: 0;
-        height: auto;
-        overflow-y: visible;
-        z-index: 10;
-        border-right: none;
-        border-bottom: 1px solid var(--pico-muted-border-color);
-      }
-      .bb-sidebar .bb-brand { padding: 0; flex: 1; }
-      .bb-hamburger { display: block; }
-      .bb-sidebar .bb-nav,
-      .bb-sidebar .bb-bottom {
-        display: none;
-        width: 100%;
-        margin-top: 0;
-        padding-top: 0;
-      }
-      .bb-sidebar .bb-nav { flex-direction: column; }
-      .bb-sidebar .bb-nav.bb-nav--open,
-      .bb-sidebar .bb-bottom.bb-nav--open { display: flex; }
-      .bb-sidebar .bb-bottom.bb-nav--open { padding-top: var(--bb-gap-sm); }
-      .bb-main { padding: var(--bb-gap-lg); }
-    }
-  </style>
 </head>
 <body>
-  <div class="bb-layout">
-    <div class="bb-sidebar" x-data="{ open: false }">
-      <a href="/admin/" class="bb-brand">Breadbox</a>
-      <button class="bb-hamburger" @click="open = !open" aria-label="Menu">&#9776;</button>
-      {{template "nav" .}}
-      <div class="bb-bottom" :class="{ 'bb-nav--open': open }">
-        <form method="POST" action="/logout">
-          {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
-          <button type="submit" class="secondary outline">Sign Out</button>
-        </form>
+  <div class="drawer lg:drawer-open">
+    <input id="bb-drawer" type="checkbox" class="drawer-toggle" />
+
+    <!-- Main content -->
+    <div class="drawer-content">
+      <!-- Mobile navbar -->
+      <div class="navbar bg-base-100 lg:hidden border-b border-base-300">
+        <div class="flex-none">
+          <label for="bb-drawer" class="btn btn-square btn-ghost">
+            <i data-lucide="menu" class="w-5 h-5"></i>
+          </label>
+        </div>
+        <div class="flex-1">
+          <span class="text-lg font-bold">Breadbox</span>
+        </div>
       </div>
+      <!-- Page content -->
+      <main class="p-6 max-w-5xl">
+        {{template "flash" .}}
+        {{block "content" .}}{{end}}
+      </main>
     </div>
-    <main class="bb-main">
-      {{template "flash" .}}
-      {{block "content" .}}{{end}}
-    </main>
+
+    <!-- Sidebar -->
+    <div class="drawer-side">
+      <label for="bb-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
+      <aside class="bg-base-200 min-h-full w-60 p-4 flex flex-col">
+        <!-- Brand -->
+        <a href="/admin/" class="text-xl font-bold px-4 py-2 mb-4 no-underline text-base-content">
+          <i data-lucide="package" class="w-5 h-5 inline-block mr-1"></i>
+          Breadbox
+        </a>
+        {{template "nav" .}}
+      </aside>
+    </div>
   </div>
+
+  <!-- Global toast -->
+  <div class="toast toast-end toast-bottom z-50"
+       x-data="{ toasts: [] }"
+       @bb-toast.window="
+         toasts.push({ message: $event.detail.message, type: $event.detail.type || 'info', id: Date.now() });
+         setTimeout(() => toasts.shift(), 4000)
+       ">
+    <template x-for="t in toasts" :key="t.id">
+      <div class="alert shadow-lg"
+           :class="{
+             'alert-success': t.type === 'success',
+             'alert-error': t.type === 'error',
+             'alert-warning': t.type === 'warning',
+             'alert-info': t.type === 'info'
+           }">
+        <span x-text="t.message"></span>
+      </div>
+    </template>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script>lucide.createIcons();</script>
 </body>
 </html>
 {{end}}

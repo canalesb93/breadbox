@@ -5,8 +5,8 @@
 </div>
 
 {{if .Keys}}
-<div style="overflow-x: auto;">
-  <table>
+<div class="overflow-x-auto">
+  <table class="table table-zebra table-sm">
     <thead>
       <tr>
         <th>Name</th>
@@ -19,26 +19,26 @@
     </thead>
     <tbody>
       {{range .Keys}}
-      <tr>
+      <tr class="hover:bg-base-200">
         <td>{{.Name}}</td>
-        <td><code>{{.KeyPrefix}}...</code></td>
+        <td><code class="font-mono text-sm">{{.KeyPrefix}}...</code></td>
         <td>{{if .LastUsedAt}}{{.LastUsedAt}}{{else}}&mdash;{{end}}</td>
         <td>
           {{if .RevokedAt}}
-            <span class="bb-badge bb-badge--error">Revoked</span>
+            <span class="badge badge-error badge-sm">Revoked</span>
           {{else}}
-            <span class="bb-badge bb-badge--success">Active</span>
+            <span class="badge badge-success badge-sm">Active</span>
           {{end}}
         </td>
         <td>{{.CreatedAt}}</td>
         <td>
           {{if not .RevokedAt}}
-          <form method="POST" action="/admin/api-keys/{{.ID}}/revoke" style="display:inline;" x-data="{ confirming: false }">
+          <form method="POST" action="/admin/api-keys/{{.ID}}/revoke" class="inline" x-data="{ confirming: false }">
             <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
-            <button type="button" class="secondary outline" style="margin:0;padding:0.25rem 0.5rem;font-size:0.85rem;" x-show="!confirming" @click="confirming = true">Revoke</button>
+            <button type="button" class="btn btn-ghost btn-xs" x-show="!confirming" @click="confirming = true">Revoke</button>
             <span x-show="confirming" x-cloak>
-              <button type="submit" class="secondary" style="margin:0;padding:0.25rem 0.5rem;font-size:0.85rem;">Confirm</button>
-              <button type="button" class="outline" style="margin:0;padding:0.25rem 0.5rem;font-size:0.85rem;" @click="confirming = false">Cancel</button>
+              <button type="submit" class="btn btn-error btn-xs">Confirm</button>
+              <button type="button" class="btn btn-ghost btn-xs" @click="confirming = false">Cancel</button>
             </span>
           </form>
           {{end}}

@@ -1,14 +1,20 @@
 {{define "nav"}}
-<ul class="bb-nav" :class="{ 'bb-nav--open': open }">
-  <!-- Data -->
-  <li><a href="/admin/"{{if eq .CurrentPage "dashboard"}} aria-current="page"{{end}}>Dashboard</a></li>
-  <li><a href="/admin/connections"{{if eq .CurrentPage "connections"}} aria-current="page"{{end}}>Connections</a></li>
-  <li><a href="/admin/transactions"{{if eq .CurrentPage "transactions"}} aria-current="page"{{end}}>Transactions</a></li>
-  <li><a href="/admin/users"{{if eq .CurrentPage "users"}} aria-current="page"{{end}}>Family Members</a></li>
-  <!-- System -->
-  <li class="bb-nav-divider" aria-hidden="true"></li>
-  <li><a href="/admin/api-keys"{{if eq .CurrentPage "api-keys"}} aria-current="page"{{end}}>API Keys</a></li>
-  <li><a href="/admin/sync-logs"{{if eq .CurrentPage "sync-logs"}} aria-current="page"{{end}}>Sync Logs</a></li>
-  <li><a href="/admin/settings"{{if eq .CurrentPage "settings"}} aria-current="page"{{end}}>Settings</a></li>
+<ul class="menu menu-md flex-1">
+  <li class="menu-title">Data</li>
+  <li><a href="/admin/"{{if eq .CurrentPage "dashboard"}} class="menu-active"{{end}}><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard</a></li>
+  <li><a href="/admin/connections"{{if eq .CurrentPage "connections"}} class="menu-active"{{end}}><i data-lucide="link" class="w-4 h-4"></i> Connections</a></li>
+  <li><a href="/admin/transactions"{{if eq .CurrentPage "transactions"}} class="menu-active"{{end}}><i data-lucide="receipt" class="w-4 h-4"></i> Transactions</a></li>
+  <li><a href="/admin/users"{{if eq .CurrentPage "users"}} class="menu-active"{{end}}><i data-lucide="users" class="w-4 h-4"></i> Family Members</a></li>
+  <li class="menu-title">System</li>
+  <li><a href="/admin/api-keys"{{if eq .CurrentPage "api-keys"}} class="menu-active"{{end}}><i data-lucide="key" class="w-4 h-4"></i> API Keys</a></li>
+  <li><a href="/admin/sync-logs"{{if eq .CurrentPage "sync-logs"}} class="menu-active"{{end}}><i data-lucide="refresh-cw" class="w-4 h-4"></i> Sync Logs</a></li>
+  <li><a href="/admin/settings"{{if eq .CurrentPage "settings"}} class="menu-active"{{end}}><i data-lucide="settings" class="w-4 h-4"></i> Settings</a></li>
 </ul>
+<!-- Sign out -->
+<form method="POST" action="/logout" class="mt-auto px-2">
+  {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+  <button type="submit" class="btn btn-ghost btn-sm w-full justify-start">
+    <i data-lucide="log-out" class="w-4 h-4"></i> Sign Out
+  </button>
+</form>
 {{end}}

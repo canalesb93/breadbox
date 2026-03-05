@@ -82,36 +82,36 @@
 </form>
 
 {{if .Transactions}}
-<div style="overflow-x: auto;">
-  <table>
+<div class="overflow-x-auto max-h-[70vh]">
+  <table class="table table-zebra table-sm table-pin-rows">
     <thead>
       <tr>
         <th>Date</th>
         <th>Description</th>
-        <th style="text-align:right;">Amount</th>
+        <th class="text-right">Amount</th>
         <th>Category</th>
         <th>Status</th>
       </tr>
     </thead>
     {{range .Transactions}}
     <tbody x-data="{ expanded: false }">
-      <tr @click="expanded = !expanded" style="cursor:pointer;">
+      <tr @click="expanded = !expanded" class="cursor-pointer hover:bg-base-200">
         <td>{{.Date}}</td>
         <td>
           {{.Name}}
-          {{if .MerchantName}}<small style="color:var(--pico-muted-color);"> ({{.MerchantName}})</small>{{end}}
+          {{if .MerchantName}}<small class="text-base-content/60"> ({{.MerchantName}})</small>{{end}}
         </td>
-        <td style="text-align:right; font-variant-numeric:tabular-nums;{{if lt .Amount 0.0}} color:var(--bb-color-error);{{end}}">
+        <td class="bb-amount{{if lt .Amount 0.0}} text-error{{end}}">
           {{printf "%.2f" .Amount}}{{if .IsoCurrencyCode}} {{.IsoCurrencyCode}}{{end}}
         </td>
         <td>{{if .CategoryPrimary}}{{.CategoryPrimary}}{{else}}&mdash;{{end}}</td>
-        <td>{{if .Pending}}<span class="bb-badge bb-badge--warning">Pending</span>{{end}}</td>
+        <td>{{if .Pending}}<span class="badge badge-warning badge-sm">Pending</span>{{end}}</td>
       </tr>
       <tr x-show="expanded" x-cloak>
-        <td colspan="5" style="padding:0.5rem 1rem; background:var(--pico-card-background-color);">
-          <dl style="display:grid; grid-template-columns:auto 1fr; gap:0.25rem 1rem; margin:0; font-size:0.875rem;">
+        <td colspan="5" class="bg-base-200 px-4 py-2">
+          <dl class="bb-info-grid">
             {{if .MerchantName}}<dt>Merchant</dt><dd>{{.MerchantName}}</dd>{{end}}
-            <dt>Transaction ID</dt><dd><code style="font-size:0.8rem;">{{.ID}}</code></dd>
+            <dt>Transaction ID</dt><dd><code class="font-mono text-xs">{{.ID}}</code></dd>
             <dt>Created</dt><dd>{{.CreatedAt}}</dd>
             <dt>Updated</dt><dd>{{.UpdatedAt}}</dd>
           </dl>
@@ -146,10 +146,6 @@
   {{end}}
 </div>
 {{end}}
-
-<div x-data="{ toast: '', toastType: 'error' }" @bb-toast.window="toast = $event.detail.message; toastType = $event.detail.type || 'error'; setTimeout(() => toast = '', 5000)">
-  <div x-show="toast" x-cloak x-transition :data-flash="toastType" style="position: fixed; bottom: 1.5rem; right: 1.5rem; max-width: 400px; z-index: 100;" x-text="toast"></div>
-</div>
 
 <script>
 function showToast(message, type) {

@@ -8,6 +8,12 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+
+# Build CSS: download tailwindcss-extra and compile input.css
+RUN curl -sLo tailwindcss-extra https://github.com/dobicinaitis/tailwind-cli-extra/releases/latest/download/tailwindcss-extra-linux-x64 \
+    && chmod +x tailwindcss-extra \
+    && ./tailwindcss-extra -i input.css -o static/css/styles.css --minify
+
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
     -ldflags="-s -w -X main.version=${VERSION}" \
     -o /breadbox ./cmd/breadbox

@@ -68,25 +68,25 @@ func NewTemplateRenderer() (*TemplateRenderer, error) {
 			"statusBadge": func(status string) template.HTML {
 				switch status {
 				case "active":
-					return `<span class="bb-badge bb-badge--success">Active</span>`
+					return `<span class="badge badge-success badge-sm">Active</span>`
 				case "pending_reauth":
-					return `<span class="bb-badge bb-badge--warning">Re-auth Needed</span>`
+					return `<span class="badge badge-warning badge-sm">Re-auth Needed</span>`
 				case "error":
-					return `<span class="bb-badge bb-badge--error">Error</span>`
+					return `<span class="badge badge-error badge-sm">Error</span>`
 				default:
-					return `<span class="bb-badge bb-badge--muted">Disconnected</span>`
+					return `<span class="badge badge-ghost badge-sm">Disconnected</span>`
 				}
 			},
 			"syncBadge": func(status string) template.HTML {
 				switch status {
 				case "success":
-					return `<span class="bb-badge bb-badge--success">success</span>`
+					return `<span class="badge badge-success badge-sm">success</span>`
 				case "error":
-					return `<span class="bb-badge bb-badge--error">error</span>`
+					return `<span class="badge badge-error badge-sm">error</span>`
 				case "in_progress":
-					return `<span class="bb-badge bb-badge--warning">in progress</span>`
+					return `<span class="badge badge-warning badge-sm">in progress</span>`
 				default:
-					return template.HTML(`<span class="bb-badge bb-badge--muted">` + template.HTMLEscapeString(status) + `</span>`)
+					return template.HTML(`<span class="badge badge-ghost badge-sm">` + template.HTMLEscapeString(status) + `</span>`)
 				}
 			},
 			"errorMessage": func(code string) string {
@@ -107,11 +107,11 @@ func NewTemplateRenderer() (*TemplateRenderer, error) {
 				source := sources[key]
 				switch source {
 				case "env":
-					return `<span class="bb-badge bb-badge--muted">from env</span>`
+					return `<span class="badge badge-ghost badge-sm">from env</span>`
 				case "db":
-					return `<span class="bb-badge bb-badge--muted">from database</span>`
+					return `<span class="badge badge-ghost badge-sm">from database</span>`
 				default:
-					return `<span class="bb-badge bb-badge--muted">default</span>`
+					return `<span class="badge badge-ghost badge-sm">default</span>`
 				}
 			},
 			"formatNumeric": func(n pgtype.Numeric) string {

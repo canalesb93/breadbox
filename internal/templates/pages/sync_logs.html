@@ -27,8 +27,8 @@
 </form>
 
 {{if .Logs}}
-<div style="overflow-x: auto;">
-  <table>
+<div class="overflow-x-auto max-h-[70vh]">
+  <table class="table table-zebra table-sm table-pin-rows">
     <thead>
       <tr>
         <th>Connection</th>
@@ -44,7 +44,7 @@
     </thead>
     <tbody>
       {{range .Logs}}
-      <tr>
+      <tr class="hover:bg-base-200">
         <td>{{.InstitutionName}}</td>
         <td>{{.Trigger}}</td>
         <td>{{syncBadge .Status}}</td>

@@ -1,5 +1,7 @@
 {{define "flash"}}
 {{if .Flash}}
-<div role="alert" data-flash="{{.Flash.Type}}">{{.Flash.Message}}</div>
+<div role="alert" class="alert {{if eq .Flash.Type "success"}}alert-success{{else if eq .Flash.Type "error"}}alert-error{{else}}alert-info{{end}} mb-4">
+  <span>{{.Flash.Message}}</span>
+</div>
 {{end}}
 {{end}}

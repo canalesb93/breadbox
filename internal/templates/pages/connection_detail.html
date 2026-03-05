@@ -21,7 +21,7 @@
   <dd>{{.Connection.UserName}}</dd>
   <dt>Status</dt>
   <dd>
-    {{statusBadge (printf "%s" .Connection.Status)}}{{if .Connection.Paused}} <span class="bb-badge bb-badge--muted">Paused</span>{{end}}
+    {{statusBadge (printf "%s" .Connection.Status)}}{{if .Connection.Paused}} <span class="badge badge-ghost badge-sm">Paused</span>{{end}}
   </dd>
   <dt>Connected</dt>
   <dd>{{if .Connection.CreatedAt.Valid}}{{.Connection.CreatedAt.Time.Format "January 2, 2006"}}{{end}}</dd>
@@ -66,8 +66,8 @@
 
 <h2>Accounts</h2>
 {{if .Accounts}}
-<div style="overflow-x: auto;">
-  <table>
+<div class="overflow-x-auto">
+  <table class="table table-zebra table-xs">
     <thead>
       <tr>
         <th>Account Name</th>
@@ -81,21 +81,20 @@
     </thead>
     <tbody>
       {{range .Accounts}}
-      <tr{{if .Excluded}} style="opacity: 0.6;"{{end}}>
+      <tr class="hover:bg-base-200{{if .Excluded}} opacity-60{{end}}">
         <td><a href="/admin/accounts/{{formatUUID .ID}}">{{.Name}}</a></td>
         <td>
           <input type="text" value="{{.DisplayName.String}}" placeholder="{{.Name}}"
             onchange="updateDisplayName('{{formatUUID .ID}}', this.value)"
-            style="margin: 0; padding: 0.25rem 0.5rem; font-size: 0.875rem;">
+            class="input input-xs w-40">
         </td>
         <td>{{if .Mask.Valid}}&bull;&bull;&bull;&bull;{{.Mask.String}}{{end}}</td>
         <td>{{.Type}}{{if .Subtype.Valid}} / {{.Subtype.String}}{{end}}</td>
-        <td>{{if .BalanceCurrent.Valid}}{{formatNumeric .BalanceCurrent}}{{if .IsoCurrencyCode.Valid}} {{.IsoCurrencyCode.String}}{{end}}{{else}}&mdash;{{end}}</td>
-        <td>{{if .BalanceAvailable.Valid}}{{formatNumeric .BalanceAvailable}}{{if .IsoCurrencyCode.Valid}} {{.IsoCurrencyCode.String}}{{end}}{{else}}&mdash;{{end}}</td>
+        <td class="bb-amount">{{if .BalanceCurrent.Valid}}{{formatNumeric .BalanceCurrent}}{{if .IsoCurrencyCode.Valid}} {{.IsoCurrencyCode.String}}{{end}}{{else}}&mdash;{{end}}</td>
+        <td class="bb-amount">{{if .BalanceAvailable.Valid}}{{formatNumeric .BalanceAvailable}}{{if .IsoCurrencyCode.Valid}} {{.IsoCurrencyCode.String}}{{end}}{{else}}&mdash;{{end}}</td>
         <td>
-          <input type="checkbox" {{if .Excluded}}checked{{end}}
-            onchange="toggleExcluded('{{formatUUID .ID}}', this.checked)"
-            style="margin: 0;">
+          <input type="checkbox" class="checkbox checkbox-xs" {{if .Excluded}}checked{{end}}
+            onchange="toggleExcluded('{{formatUUID .ID}}', this.checked)">
         </td>
       </tr>
       {{end}}
@@ -108,8 +107,8 @@
 
 <h2>Sync History (last 10)</h2>
 {{if .SyncLogs}}
-<div style="overflow-x: auto;">
-  <table>
+<div class="overflow-x-auto">
+  <table class="table table-zebra table-sm">
     <thead>
       <tr>
         <th>Trigger</th>
@@ -122,7 +121,7 @@
     </thead>
     <tbody>
       {{range .SyncLogs}}
-      <tr>
+      <tr class="hover:bg-base-200">
         <td>{{.Trigger}}</td>
         <td>{{syncBadge (printf "%s" .Status)}}</td>
         <td>{{.AddedCount}}</td>
@@ -134,8 +133,8 @@
       <tr>
         <td colspan="6">
           <details>
-            <summary>Error details</summary>
-            <p>{{.ErrorMessage.String}}</p>
+            <summary class="cursor-pointer text-sm text-error">Error details</summary>
+            <p class="text-sm mt-1">{{.ErrorMessage.String}}</p>
           </details>
         </td>
       </tr>
@@ -147,10 +146,6 @@
 {{else}}
 <p>No sync history yet.</p>
 {{end}}
-
-<div x-data="{ toast: '', toastType: 'error' }" @bb-toast.window="toast = $event.detail.message; toastType = $event.detail.type || 'error'; setTimeout(() => toast = '', 5000)">
-  <div x-show="toast" x-cloak x-transition :data-flash="toastType" style="position: fixed; bottom: 1.5rem; right: 1.5rem; max-width: 400px; z-index: 100;" x-text="toast"></div>
-</div>
 
 <script>
 function showToast(message, type) {
