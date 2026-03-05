@@ -36,6 +36,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/transactions", ListTransactionsHandler(svc))
 		r.Get("/transactions/count", CountTransactionsHandler(svc))
 		r.Get("/transactions/{id}", GetTransactionHandler(svc))
+		r.Get("/categories", ListCategoriesHandler(svc))
 		r.Get("/users", ListUsersHandler(svc))
 		r.Get("/connections", ListConnectionsHandler(svc))
 		r.Get("/connections/{id}/status", GetConnectionStatusHandler(svc))

@@ -24,6 +24,8 @@ type AccountResponse struct {
 type TransactionResponse struct {
 	ID                 string   `json:"id"`
 	AccountID          *string  `json:"account_id"`
+	AccountName        *string  `json:"account_name"`
+	UserName           *string  `json:"user_name"`
 	Amount             float64  `json:"amount"`
 	IsoCurrencyCode    *string  `json:"iso_currency_code"`
 	Date               string   `json:"date"`
@@ -49,29 +51,38 @@ type TransactionListResult struct {
 }
 
 type TransactionListParams struct {
-	Cursor    string
-	Limit     int
-	StartDate *time.Time
-	EndDate   *time.Time
-	AccountID *string
-	UserID    *string
-	Category  *string
-	MinAmount *float64
-	MaxAmount *float64
-	Pending   *bool
-	Search    *string
+	Cursor           string
+	Limit            int
+	StartDate        *time.Time
+	EndDate          *time.Time
+	AccountID        *string
+	UserID           *string
+	Category         *string
+	CategoryDetailed *string
+	MinAmount        *float64
+	MaxAmount        *float64
+	Pending          *bool
+	Search           *string
+	SortBy           *string
+	SortOrder        *string
 }
 
 type TransactionCountParams struct {
-	StartDate *time.Time
-	EndDate   *time.Time
-	AccountID *string
-	UserID    *string
-	Category  *string
-	MinAmount *float64
-	MaxAmount *float64
-	Pending   *bool
-	Search    *string
+	StartDate        *time.Time
+	EndDate          *time.Time
+	AccountID        *string
+	UserID           *string
+	Category         *string
+	CategoryDetailed *string
+	MinAmount        *float64
+	MaxAmount        *float64
+	Pending          *bool
+	Search           *string
+}
+
+type CategoryPair struct {
+	Primary  string  `json:"primary"`
+	Detailed *string `json:"detailed,omitempty"`
 }
 
 type UserResponse struct {

@@ -17,21 +17,20 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		"t.amount, t.iso_currency_code, t.unofficial_currency_code, t.date, t.authorized_date, " +
 		"t.datetime, t.authorized_datetime, t.name, t.merchant_name, " +
 		"t.category_primary, t.category_detailed, t.category_confidence, " +
-		"t.payment_channel, t.pending, t.deleted_at, t.created_at, t.updated_at " +
-		"FROM transactions t"
+		"t.payment_channel, t.pending, t.deleted_at, t.created_at, t.updated_at, " +
+		"COALESCE(a.display_name, a.name) AS account_name, " +
+		"u.name AS user_name " +
+		"FROM transactions t " +
+		"JOIN accounts a ON t.account_id = a.id " +
+		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
+		"LEFT JOIN users u ON bc.user_id = u.id"
 
 	var args []any
 	argN := 1
 
-	// Track if we need joins
-	needsUserJoin := params.UserID != nil
-	if needsUserJoin {
-		query += " JOIN accounts a ON t.account_id = a.id JOIN bank_connections bc ON a.connection_id = bc.id"
-	}
-
 	query += " WHERE t.deleted_at IS NULL"
 
-	if needsUserJoin {
+	if params.UserID != nil {
 		uid, err := parseUUID(*params.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid user id: %w", err)
@@ -66,6 +65,12 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	if params.Category != nil {
 		query += fmt.Sprintf(" AND t.category_primary = $%d", argN)
 		args = append(args, pgtype.Text{String: *params.Category, Valid: true})
+		argN++
+	}
+
+	if params.CategoryDetailed != nil {
+		query += fmt.Sprintf(" AND t.category_detailed = $%d", argN)
+		args = append(args, pgtype.Text{String: *params.CategoryDetailed, Valid: true})
 		argN++
 	}
 
@@ -107,7 +112,25 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		argN += 2
 	}
 
-	query += " ORDER BY t.date DESC, t.id DESC"
+	// Determine sort column
+	sortCol := "t.date"
+	if params.SortBy != nil {
+		switch *params.SortBy {
+		case "amount":
+			sortCol = "t.amount"
+		case "name":
+			sortCol = "t.name"
+		case "date":
+			sortCol = "t.date"
+		}
+	}
+
+	sortDir := "DESC"
+	if params.SortOrder != nil && *params.SortOrder == "asc" {
+		sortDir = "ASC"
+	}
+
+	query += fmt.Sprintf(" ORDER BY %s %s, t.id DESC", sortCol, sortDir)
 
 	limit := params.Limit
 	if limit <= 0 {
@@ -151,6 +174,8 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			deletedAt              pgtype.Timestamptz
 			createdAt              pgtype.Timestamptz
 			updatedAt              pgtype.Timestamptz
+			accountName            string
+			userName               pgtype.Text
 		)
 
 		if err := rows.Scan(
@@ -160,6 +185,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			&name, &merchantName, &categoryPrimary, &categoryDetailed,
 			&categoryConfidence, &paymentChannel, &pending,
 			&deletedAt, &createdAt, &updatedAt,
+			&accountName, &userName,
 		); err != nil {
 			return nil, fmt.Errorf("scan transaction: %w", err)
 		}
@@ -178,6 +204,8 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		transactions = append(transactions, TransactionResponse{
 			ID:                 formatUUID(id),
 			AccountID:          uuidPtr(accountID),
+			AccountName:        &accountName,
+			UserName:           textPtr(userName),
 			Amount:             amountVal,
 			IsoCurrencyCode:    textPtr(isoCurrencyCode),
 			Date:               dateVal,
@@ -205,7 +233,8 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	}
 
 	var nextCursor string
-	if hasMore && len(transactions) > 0 {
+	isDefaultSort := params.SortBy == nil || *params.SortBy == "date"
+	if hasMore && len(transactions) > 0 && isDefaultSort {
 		last := transactions[len(transactions)-1]
 		lastDate, _ := time.Parse("2006-01-02", last.Date)
 		nextCursor = EncodeCursor(lastDate, last.ID)
@@ -224,19 +253,17 @@ func (s *Service) CountTransactions(ctx context.Context) (int64, error) {
 }
 
 func (s *Service) CountTransactionsFiltered(ctx context.Context, params TransactionCountParams) (int64, error) {
-	query := "SELECT COUNT(*) FROM transactions t"
+	query := "SELECT COUNT(*) FROM transactions t " +
+		"JOIN accounts a ON t.account_id = a.id " +
+		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
+		"LEFT JOIN users u ON bc.user_id = u.id"
 
 	var args []any
 	argN := 1
 
-	needsUserJoin := params.UserID != nil
-	if needsUserJoin {
-		query += " JOIN accounts a ON t.account_id = a.id JOIN bank_connections bc ON a.connection_id = bc.id"
-	}
-
 	query += " WHERE t.deleted_at IS NULL"
 
-	if needsUserJoin {
+	if params.UserID != nil {
 		uid, err := parseUUID(*params.UserID)
 		if err != nil {
 			return 0, fmt.Errorf("invalid user id: %w", err)
@@ -271,6 +298,12 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 	if params.Category != nil {
 		query += fmt.Sprintf(" AND t.category_primary = $%d", argN)
 		args = append(args, pgtype.Text{String: *params.Category, Valid: true})
+		argN++
+	}
+
+	if params.CategoryDetailed != nil {
+		query += fmt.Sprintf(" AND t.category_detailed = $%d", argN)
+		args = append(args, pgtype.Text{String: *params.CategoryDetailed, Valid: true})
 		argN++
 	}
 
@@ -509,22 +542,25 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	}, nil
 }
 
-func (s *Service) ListDistinctCategories(ctx context.Context) ([]string, error) {
+func (s *Service) ListDistinctCategories(ctx context.Context) ([]CategoryPair, error) {
 	rows, err := s.Pool.Query(ctx,
-		"SELECT DISTINCT category_primary FROM transactions WHERE deleted_at IS NULL AND category_primary IS NOT NULL ORDER BY category_primary")
+		"SELECT DISTINCT category_primary, category_detailed FROM transactions WHERE deleted_at IS NULL AND category_primary IS NOT NULL ORDER BY category_primary, category_detailed")
 	if err != nil {
 		return nil, fmt.Errorf("list distinct categories: %w", err)
 	}
 	defer rows.Close()
 
-	var categories []string
+	var categories []CategoryPair
 	for rows.Next() {
-		var cat pgtype.Text
-		if err := rows.Scan(&cat); err != nil {
+		var primary, detailed pgtype.Text
+		if err := rows.Scan(&primary, &detailed); err != nil {
 			return nil, fmt.Errorf("scan category: %w", err)
 		}
-		if cat.Valid {
-			categories = append(categories, cat.String)
+		if primary.Valid {
+			categories = append(categories, CategoryPair{
+				Primary:  primary.String,
+				Detailed: textPtr(detailed),
+			})
 		}
 	}
 	return categories, rows.Err()

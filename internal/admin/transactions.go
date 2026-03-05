@@ -91,9 +91,17 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			a.Logger.Error("list users for transaction filters", "error", err)
 		}
 
-		categories, err := svc.ListDistinctCategories(ctx)
+		categoryPairs, err := svc.ListDistinctCategories(ctx)
 		if err != nil {
 			a.Logger.Error("list categories for transaction filters", "error", err)
+		}
+		seen := make(map[string]bool)
+		var categories []string
+		for _, cp := range categoryPairs {
+			if !seen[cp.Primary] {
+				seen[cp.Primary] = true
+				categories = append(categories, cp.Primary)
+			}
 		}
 
 		connections, err := a.Queries.ListBankConnections(ctx)
@@ -188,9 +196,17 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			a.Logger.Error("list transactions for account detail", "error", err)
 		}
 
-		categories, err := svc.ListDistinctCategories(ctx)
+		categoryPairs2, err := svc.ListDistinctCategories(ctx)
 		if err != nil {
 			a.Logger.Error("list categories for account detail", "error", err)
+		}
+		seen2 := make(map[string]bool)
+		var categories []string
+		for _, cp := range categoryPairs2 {
+			if !seen2[cp.Primary] {
+				seen2[cp.Primary] = true
+				categories = append(categories, cp.Primary)
+			}
 		}
 
 		data := map[string]any{

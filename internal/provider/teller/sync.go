@@ -178,8 +178,9 @@ func mapTellerTransaction(txn tellerTransaction, currencyMap map[string]string) 
 
 	// Category.
 	if txn.Details.Category != "" {
-		cat := mapCategory(txn.Details.Category)
-		t.CategoryPrimary = &cat
+		primary, detailed := mapCategory(txn.Details.Category)
+		t.CategoryPrimary = &primary
+		t.CategoryDetailed = detailed
 	}
 
 	// Merchant name (counterparty).

@@ -23,7 +23,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Admin sessions: `alexedwards/scs` + `pgxstore`, cookies `HttpOnly; SameSite=Lax; Secure`
 - Error codes: `UPPER_SNAKE_CASE` in JSON envelope `{ "error": { "code": "...", "message": "..." } }`
 - Service layer (`internal/service/`): shared between REST API handlers and MCP tools. Converts `pgtype.*` → Go primitives for clean JSON. Takes `*db.Queries` + `*pgxpool.Pool` (for dynamic queries).
-- MCP server (`internal/mcp/`): wraps service layer as 6 MCP tools. Streamable HTTP at `/mcp` (API key auth), stdio via `breadbox mcp-stdio` (no auth). Uses `github.com/modelcontextprotocol/go-sdk` v1.4.0. Tool handlers use typed input structs with `jsonschema` tags. Errors: `IsError: true` with `{"error": "..."}` text content.
+- MCP server (`internal/mcp/`): wraps service layer as 7 MCP tools + 1 resource. Streamable HTTP at `/mcp` (API key auth), stdio via `breadbox mcp-stdio` (no auth). Uses `github.com/modelcontextprotocol/go-sdk` v1.4.0. Tool handlers use typed input structs with `jsonschema` tags. Errors: `IsError: true` with `{"error": "..."}` text content. Resource: `breadbox://overview` returns live stats.
 - Transaction queries use dynamic SQL with positional `$N` params (not sqlc) for composable filters + cursor pagination
 - API key format: `bb_` + base62 body (32 random bytes). Stored as SHA-256 hex hash. Prefix stored for display.
 - Multi-provider DB columns: `bank_connections` uses generic `external_id` + `encrypted_credentials` (not provider-specific column names). Unique constraint on `(provider, external_id)`.
@@ -60,6 +60,11 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - LOG_LEVEL env var: debug/info/warn/error, overrides environment-based defaults
 - Transaction responses include denormalized `account_name` and `user_name` (JOIN in dynamic query builder)
 - MCP tool descriptions: domain-rich with amount conventions, filter docs, pagination behavior (not generic)
+- MCP server instructions: domain-rich onboarding text (data model, amount convention, category system, recommended query patterns)
+- Teller category mapping: `mapCategory()` returns `(primary, detailed)` pair. All Teller categories map to both primary and detailed Plaid-compatible categories.
+- Transaction sort options: `sort_by` (date/amount/name) + `sort_order` (asc/desc). Cursor pagination only works with date sort.
+- `ListDistinctCategories` returns `[]CategoryPair{Primary, Detailed}` (not `[]string`). Used by REST `/api/v1/categories`, MCP `list_categories`, and admin dashboard.
+- MCP `min_amount`/`max_amount` use `*float64` (not `float64`) to allow filtering by zero values
 - CSS framework: DaisyUI 5 + Tailwind CSS v4 via `tailwindcss-extra` standalone CLI binary. No Node.js. Replaces Pico CSS.
 - CSS build: `make css` compiles `input.css` → `static/css/styles.css`. `make css-watch` for dev. Dockerfile runs `make css` in build stage.
 - DaisyUI theme: `corporate` (light) + `business` (dark) auto-switch via `prefers-color-scheme`

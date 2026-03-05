@@ -77,6 +77,12 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			category = &v
 		}
 
+		// Parse category_detailed.
+		var categoryDetailed *string
+		if v := q.Get("category_detailed"); v != "" {
+			categoryDetailed = &v
+		}
+
 		// Parse min_amount.
 		var minAmount *float64
 		if v := q.Get("min_amount"); v != "" {
@@ -131,18 +137,45 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			search = &v
 		}
 
+		// Parse sort_by.
+		var sortBy *string
+		if v := q.Get("sort_by"); v != "" {
+			switch v {
+			case "date", "amount", "name":
+				sortBy = &v
+			default:
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "sort_by must be one of: date, amount, name")
+				return
+			}
+		}
+
+		// Parse sort_order.
+		var sortOrder *string
+		if v := q.Get("sort_order"); v != "" {
+			switch v {
+			case "asc", "desc":
+				sortOrder = &v
+			default:
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "sort_order must be asc or desc")
+				return
+			}
+		}
+
 		params := service.TransactionListParams{
-			Cursor:    cursor,
-			Limit:     limit,
-			StartDate: startDate,
-			EndDate:   endDate,
-			AccountID: accountID,
-			UserID:    userID,
-			Category:  category,
-			MinAmount: minAmount,
-			MaxAmount: maxAmount,
-			Pending:   pending,
-			Search:    search,
+			Cursor:           cursor,
+			Limit:            limit,
+			StartDate:        startDate,
+			EndDate:          endDate,
+			AccountID:        accountID,
+			UserID:           userID,
+			Category:         category,
+			CategoryDetailed: categoryDetailed,
+			MinAmount:        minAmount,
+			MaxAmount:        maxAmount,
+			Pending:          pending,
+			Search:           search,
+			SortBy:           sortBy,
+			SortOrder:        sortOrder,
 		}
 
 		result, err := svc.ListTransactions(r.Context(), params)
@@ -204,6 +237,11 @@ func CountTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			category = &v
 		}
 
+		var categoryDetailed *string
+		if v := q.Get("category_detailed"); v != "" {
+			categoryDetailed = &v
+		}
+
 		var minAmount *float64
 		if v := q.Get("min_amount"); v != "" {
 			f, err := strconv.ParseFloat(v, 64)
@@ -254,15 +292,16 @@ func CountTransactionsHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		params := service.TransactionCountParams{
-			StartDate: startDate,
-			EndDate:   endDate,
-			AccountID: accountID,
-			UserID:    userID,
-			Category:  category,
-			MinAmount: minAmount,
-			MaxAmount: maxAmount,
-			Pending:   pending,
-			Search:    search,
+			StartDate:        startDate,
+			EndDate:          endDate,
+			AccountID:        accountID,
+			UserID:           userID,
+			Category:         category,
+			CategoryDetailed: categoryDetailed,
+			MinAmount:        minAmount,
+			MaxAmount:        maxAmount,
+			Pending:          pending,
+			Search:           search,
 		}
 
 		count, err := svc.CountTransactionsFiltered(r.Context(), params)

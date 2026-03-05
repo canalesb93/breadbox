@@ -1503,99 +1503,58 @@ Independent of Phases 10-13. Addresses confirmed deployment blockers and data pi
 
 Benefits from Phase 14 reliability fixes but not blocked by them. Improves the REST API and MCP tools for AI agent consumption.
 
-### 15.1 Account Name + User Name on Transactions
+### 15.1 Account Name + User Name on Transactions ✅
 
-- [ ] Add `account_name` and `user_name` fields to `TransactionResponse` struct
-- [ ] Currently only `account_id` is returned — agents must make separate `list_accounts` and `list_users` calls to resolve names
-- [ ] Modify the dynamic SQL query builder to JOIN `accounts` and `users` tables
-- [ ] `account_name`: `COALESCE(a.display_name, a.name)` (respects display_name override from Phase 10)
-- [ ] `user_name`: `u.name` from `users` table via `accounts.user_id`
-- [ ] Update both REST API response and MCP tool response (both use `TransactionResponse`)
-- **Ref:** `internal/service/types.go` lines 24-42, `internal/service/transactions.go`
-- **Files:** `internal/service/types.go`, `internal/service/transactions.go`
+- [x] Add `account_name` and `user_name` fields to `TransactionResponse` struct
+- [x] Modify the dynamic SQL query builder to always JOIN `accounts` and LEFT JOIN `users`
+- [x] `account_name`: `COALESCE(a.display_name, a.name)`
+- [x] `user_name`: `u.name` from `users` table via `bank_connections.user_id`
+- [x] Applied same JOIN changes to `CountTransactionsFiltered`
 
-### 15.2 Category_Detailed Filter
+### 15.2 Category_Detailed Filter ✅
 
-- [ ] Add `CategoryDetailed *string` to `TransactionListParams`
-- [ ] Wire into dynamic SQL WHERE clause: `AND t.personal_finance_category_detailed = $N`
-- [ ] Currently only `category_primary` is filterable (lines 65-69)
-- [ ] Add to both REST API query params and MCP `query_transactions` input struct
-- [ ] Also add to `count_transactions` filter for consistency
-- **Ref:** `internal/service/transactions.go` lines 65-69, `internal/mcp/tools.go`
-- **Files:** `internal/service/transactions.go`, `internal/api/transactions.go`, `internal/mcp/tools.go`
+- [x] Add `CategoryDetailed *string` to `TransactionListParams` and `TransactionCountParams`
+- [x] Wire into dynamic SQL WHERE clause: `AND t.category_detailed = $N`
+- [x] Add to REST API query params and MCP `query_transactions` / `count_transactions` input structs
 
-### 15.3 List Categories Endpoint
+### 15.3 List Categories Endpoint ✅
 
-- [ ] New endpoint: `GET /api/v1/categories` returning distinct `(category_primary, category_detailed)` pairs from transactions table
-- [ ] Query: `SELECT DISTINCT personal_finance_category_primary, personal_finance_category_detailed FROM transactions WHERE deleted_at IS NULL ORDER BY 1, 2`
-- [ ] Response: `{"categories": [{"primary": "FOOD_AND_DRINK", "detailed": "RESTAURANTS"}, ...]}`
-- [ ] New MCP tool: `list_categories` — returns same data, helps agents discover valid filter values
-- [ ] Useful for agents to know what categories exist before filtering
-- **Ref:** `internal/api/router.go` lines 30-41 (no category endpoint exists)
-- **Files:** `internal/api/router.go`, new handler in `internal/api/categories.go`, `internal/service/transactions.go`, `internal/mcp/tools.go`
+- [x] `ListDistinctCategories` returns `[]CategoryPair` (primary + detailed)
+- [x] New `GET /api/v1/categories` endpoint in `internal/api/categories.go`
+- [x] New `list_categories` MCP tool
+- [x] Updated admin callers to handle new return type
 
-### 15.4 Enrich MCP Tool Descriptions
+### 15.4 Enrich MCP Tool Descriptions ✅
 
-- [ ] Rewrite all 6 MCP tool descriptions with domain-specific context
-- [ ] Current descriptions are generic (e.g., "List all bank accounts. Optionally filter by user_id.")
-- [ ] New descriptions should explain:
-  - What the data represents (bank accounts synced from Plaid/Teller/CSV)
-  - Available filters and their formats (dates: YYYY-MM-DD, amounts: positive=debit)
-  - Pagination behavior (cursor-based, default limit)
-  - Amount sign convention (positive = money out / debit, negative = money in / credit)
-- [ ] Keep descriptions concise but informative — agents read these to decide which tool to use
-- **Ref:** `internal/mcp/tools.go` lines 17-42
-- **Files:** `internal/mcp/tools.go`
+- [x] All 7 MCP tool descriptions rewritten with domain context (amount conventions, filter docs, pagination behavior)
 
-### 15.5 Fix Min/Max Amount Zero-Value Bug
+### 15.5 Fix Min/Max Amount Zero-Value Bug ✅
 
-- [ ] Change `MinAmount` and `MaxAmount` in MCP `queryTransactionsInput` from `float64` to `*float64`
-- [ ] Replace `if input.MinAmount != 0` with `if input.MinAmount != nil` (nil-check)
-- [ ] Currently: passing `min_amount: 0` is silently ignored (treated as "not set") because `float64` zero-value is 0.0
-- [ ] REST API handler already does this correctly with `*float64` — match that pattern
-- [ ] Same fix for `countTransactionsInput`
-- **Ref:** `internal/mcp/tools.go` lines 58-59 (struct), lines 129-133 (handler)
-- **Files:** `internal/mcp/tools.go`
+- [x] Changed `MinAmount`/`MaxAmount` from `float64` to `*float64` in MCP input structs
+- [x] Changed `!= 0` checks to `!= nil` checks
 
-### 15.6 Teller Category_Detailed Mapping
+### 15.6 Teller Category_Detailed Mapping ✅
 
-- [ ] Map Teller's `Details.Category` to both `CategoryPrimary` (existing) and `CategoryDetailed`
-- [ ] Currently: `CategoryDetailed` is always nil for Teller transactions (only primary is mapped, lines 180-183)
-- [ ] Teller categories are single-level (e.g., "accommodation", "advertising", "food_and_drink")
-- [ ] Strategy: map to Plaid-compatible primary categories; for detailed, use Teller category as-is when it provides sub-level granularity, or leave null when it doesn't
-- [ ] Document the mapping table in code comments
-- **Ref:** `internal/provider/teller/sync.go` lines 154-192 (`mapTellerTransaction`)
-- **Files:** `internal/provider/teller/sync.go`
+- [x] `tellerCategories` map returns `categoryMapping{primary, detailed}` struct
+- [x] `mapCategory` returns `(primary string, detailed *string)`
+- [x] `mapTellerTransaction` sets both `CategoryPrimary` and `CategoryDetailed`
 
-### 15.7 Transaction Sort Options
+### 15.7 Transaction Sort Options ✅
 
-- [ ] Add `sort_by` param: `date` (default), `amount`, `name`
-- [ ] Add `sort_order` param: `desc` (default), `asc`
-- [ ] Currently hardcoded: `ORDER BY t.date DESC, t.id DESC` (line 109)
-- [ ] Validate `sort_by` against allowlist to prevent SQL injection
-- [ ] Wire into both REST API query params and MCP tool input struct
-- [ ] Keep `t.id` as tiebreaker for stable cursor pagination
-- **Ref:** `internal/service/transactions.go` line 109
-- **Files:** `internal/service/transactions.go`, `internal/api/transactions.go`, `internal/mcp/tools.go`
+- [x] `sort_by` param: `date` (default), `amount`, `name` — validated against allowlist
+- [x] `sort_order` param: `desc` (default), `asc`
+- [x] Dynamic ORDER BY with `t.id DESC` tiebreaker
+- [x] Cursor pagination disabled for non-date sorts
 
-### 15.8 Enrich MCP Server Instructions
+### 15.8 Enrich MCP Server Instructions ✅
 
-- [ ] Replace generic instructions string with domain-rich overview
-- [ ] Current: "Breadbox is a financial data aggregation server. Use the available tools to query accounts, transactions, users, and sync status."
-- [ ] New: explain Breadbox data model (connections → accounts → transactions), available tools summary, amount convention (positive=debit), recommended query patterns (list accounts first, then filter transactions)
-- [ ] Instructions are shown to AI agents when they connect — this is the "onboarding" text
-- **Ref:** `internal/mcp/server.go` line 25
-- **Files:** `internal/mcp/server.go`
+- [x] Replaced generic instructions with domain-rich overview (data model, amount convention, category system, recommended query patterns)
 
-### 15.9 MCP Overview Resource
+### 15.9 MCP Overview Resource ✅
 
-- [ ] Add a static MCP resource at URI `breadbox://overview`
-- [ ] Returns: data model summary, number of accounts/connections/users, date range of transactions, list of available categories
-- [ ] Gives agents useful context before they start querying — reduces round-trips
-- [ ] Uses service layer to fetch live stats (account count, transaction date range, etc.)
-- [ ] Register via `server.AddResource` in MCP server setup
-- **Ref:** `internal/mcp/server.go` (no resources currently registered)
-- **Files:** `internal/mcp/server.go`, `internal/mcp/resources.go` (new)
+- [x] `GetOverviewStats` in `internal/service/overview.go` returns counts + date range
+- [x] `breadbox://overview` MCP resource in `internal/mcp/resources.go`
+- [x] Registered via `s.registerResources()` in server setup
 
 ### Task Dependencies (Phase 15)
 
