@@ -23,8 +23,8 @@
     <tbody>
       {{range .Connections}}
       <tr class="hover:bg-base-200">
-        <td>{{.InstitutionName}}</td>
-        <td>{{.UserName}}</td>
+        <td>{{.InstitutionName.String}}</td>
+        <td>{{.UserName.String}}</td>
         <td>{{.AccountCount}}</td>
         <td>
           {{statusBadge (printf "%s" .Status)}}{{if .Paused}} <span class="badge badge-ghost badge-sm">Paused</span>{{end}}

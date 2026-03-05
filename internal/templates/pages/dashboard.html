@@ -71,7 +71,7 @@
     <tbody>
       {{range .RecentLogs}}
       <tr class="hover:bg-base-200">
-        <td><a href="/admin/connections/{{formatUUID .ConnectionID}}">{{.InstitutionName}}</a></td>
+        <td><a href="/admin/connections/{{formatUUID .ConnectionID}}">{{.InstitutionName.String}}</a></td>
         <td>{{.Trigger}}</td>
         <td>{{syncBadge (printf "%s" .Status)}}</td>
         <td>{{.AddedCount}}</td>
