@@ -1247,7 +1247,9 @@ Restructure the wizard for multi-provider onboarding, add missing settings featu
 
 **Depends on:** Phase 13A (bug fixes land first). Some tasks benefit from Phase 12A (Alpine.js for confirmation dialogs) but can use vanilla JS fallback.
 
-### 13B.1 Wizard Step 2: Multi-Provider Selection
+### 13B.1 Wizard Step 2: Multi-Provider Selection ✅ — SUPERSEDED by Phase 17B
+
+> Implemented in Phase 13B, but wizard is being deprecated in Phase 17B. Provider configuration moves entirely to the settings page.
 
 - [x] Rename step 2 from "Configure Plaid" to "Configure Bank Providers"
 - [x] Add provider selection: Plaid / Teller / Both / Skip All
@@ -1256,7 +1258,9 @@ Restructure the wizard for multi-provider onboarding, add missing settings featu
 - [x] "Skip All" goes directly to step 3 with a note that providers can be configured later in Settings
 - **Files:** `internal/admin/setup.go` (step 2 handler), `internal/templates/pages/setup_step2.html`
 
-### 13B.2 Wizard: Optional Family Member Step
+### 13B.2 Wizard: Optional Family Member Step ✅ — SUPERSEDED by Phase 17B
+
+> Implemented in Phase 13B, but wizard is being deprecated in Phase 17B. The onboarding checklist (17B.2) guides users to add family members via the existing `/admin/users/new` page.
 
 - [x] Add new step between providers and sync interval (step 3)
 - [x] Collects: name (required), email (optional) — same fields as `/admin/users/new`
@@ -1823,3 +1827,198 @@ Within 16B, all tasks are independent and can be parallelized.
 8. Empty states have icons and contextual CTAs; 404/500 pages are styled
 9. All pages render correctly on mobile (375px width) — no horizontal overflow except tables
 10. All pages render correctly in dark mode — no hardcoded colors or contrast issues
+
+---
+
+## Phase 17A: Settings Consolidation
+
+Enhances the settings page to be the single surface for all app configuration. Absorbs the settings tasks from Phase 13B (13B.3-13B.7) and adds provider configuration that previously lived in the wizard. The settings page becomes a single page with collapsible card sections.
+
+**Depends on:** Phase 13A (bug fixes). Benefits from Phase 16A (DaisyUI card/collapse components) but can use `<details>` or `<article>` as fallback.
+
+**Note:** Phase 13B tasks 13B.1 and 13B.2 (wizard enhancements) are superseded by Phase 17B. Tasks 13B.3-13B.7 are absorbed here. 13B.8 (family members connection count) remains independent.
+
+### 17A.1 Settings Page Restructure
+
+- [ ] Reorganize the settings page into distinct card sections (DaisyUI `card` or `<article>` with clear headers):
+  - **Providers** — Plaid config, Teller config, CSV status
+  - **Sync & Scheduling** — sync interval, webhook URL
+  - **Security** — admin password change, encryption key status
+  - **System** — app version, Go version, PostgreSQL version, uptime, provider count
+- [ ] Each section is a collapsible card (DaisyUI `collapse` or `<details>`) — all expanded by default
+- [ ] Each section has its own form/save button (independent saves, not one giant form)
+- [ ] Remove the "Re-run Setup Wizard" link from settings footer
+- **Absorbs:** 13B.4 (system info section structure), 13B.7 (safety indicators structure)
+- **Ref:** `internal/admin/settings.go` (lines 22-128), `internal/templates/pages/settings.html`
+- **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`
+
+### 17A.2 Provider Configuration Section
+
+- [ ] **Plaid** (existing, enhanced): Client ID, Secret, Environment fields — editable when not from env vars. "Test Connection" button. Show "(from env)" badges when values come from environment.
+- [ ] **Teller** (new editability): Make `teller_app_id` and `teller_env` editable in the form when NOT set via env vars (they already have DB fallback paths in `config.LoadWithDB`). Cert/key paths remain read-only (file system paths, env-var-only). Show clear status: "Active (from env)" / "Partially configured" / "Not configured". Include copy-ready env var snippet in expandable `<details>` for the cert/key setup.
+- [ ] **CSV**: Read-only status line: "CSV Import: Always available" with link to `/admin/connections/import-csv` (Phase 11)
+- [ ] Provider test buttons: "Test Plaid" and "Test Teller" with inline result display
+- **Absorbs:** 13B.6 (Teller configuration guidance)
+- **Ref:** `internal/admin/settings.go` (lines 22-43 for GET data, lines 46-128 for POST), `internal/config/load.go` (Teller DB fallback)
+- **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`
+
+### 17A.3 Sync & Scheduling Section
+
+- [ ] Sync interval: dropdown with options (15m, 30m, 1h, 4h, 8h, 12h, 24h) — same as current settings, stored as `sync_interval_minutes`
+- [ ] Webhook URL: text input with HTTPS validation — same as current settings
+- [ ] Add brief explanatory text: "Breadbox automatically syncs bank data on this schedule. Webhooks provide real-time updates when supported by the provider."
+- [ ] Show next scheduled sync time if possible (from cron scheduler state)
+- **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`
+
+### 17A.4 Security Section
+
+- [ ] **Change Admin Password**: current password + new password + confirm new password form
+- [ ] New sqlc query: `UpdateAdminPassword(ctx, id, hashed_password)` — or `UpdateAdminPasswordByUsername`
+- [ ] Validate current password before accepting change. Minimum 8 characters (same as setup)
+- [ ] Flash: "Password updated successfully"
+- [ ] **Encryption Key Status**: Read-only indicator — "Configured" (green badge) or "NOT SET — access tokens cannot be stored" (red badge). Never show the actual key.
+- [ ] **Plaid Environment Change Warning**: if Plaid env is being changed from current value, show confirmation dialog warning about breaking live connections
+- **Absorbs:** 13B.3 (change admin password), 13B.7 (safety indicators)
+- **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`, `internal/db/queries/admin_accounts.sql`
+
+### 17A.5 System Information Section
+
+- [ ] Read-only, informational — primarily for operator debugging
+- [ ] Display: Breadbox version (from build-time `-ldflags -X`), Go runtime version (`runtime.Version()`), PostgreSQL version (`SELECT version()`), server uptime (`time.Since(startTime)`), configured providers count
+- [ ] Requires passing `startTime` from app init to the settings handler (or a global)
+- [ ] Collapsible by default (less important than other sections)
+- **Absorbs:** 13B.4 (system information section)
+- **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`
+
+### 17A.6 Config Source Badges
+
+- [ ] Add `ConfigSources map[string]string` (key → "env" / "db" / "default") populated during `config.LoadWithDB`
+- [ ] Pass to settings template alongside config values
+- [ ] Render muted badge next to each setting value: "(from env)", "(from database)", "(default)"
+- [ ] Makes the config precedence model (env → DB → default) visible and debuggable
+- [ ] Values from env are shown as read-only (cannot override env vars via the UI)
+- **Absorbs:** 13B.5 (config source badges)
+- **Files:** `internal/config/config.go`, `internal/config/load.go`, `internal/admin/settings.go`, `internal/templates/pages/settings.html`
+
+### Task Dependencies (Phase 17A)
+
+```
+17A.1 (restructure)        — do first, establishes the section layout
+17A.2 (providers)         ─┐
+17A.3 (sync/scheduling)    ├─ section contents (all independent of each other)
+17A.4 (security)           │
+17A.5 (system info)       ─┘
+17A.6 (config sources)     — after 17A.1 (needs the restructured template)
+```
+
+### Checkpoint 17A
+
+1. Settings page shows 4 distinct card sections: Providers, Sync & Scheduling, Security, System
+2. Plaid credentials are editable (when not from env) with test button and "(from env)" badges
+3. Teller `app_id` and `env` are editable when not from env vars; cert/key paths shown as read-only
+4. Sync interval saves correctly; webhook URL validates HTTPS
+5. Admin password change works: requires correct current password, validates minimum length
+6. Encryption key status shows "Configured" or "NOT SET" badge
+7. System section shows app version, Go version, PostgreSQL version, uptime
+8. Config source badges appear next to every setting: "(from env)" / "(from database)" / "(default)"
+9. "Re-run Setup Wizard" link is removed from settings
+
+---
+
+## Phase 17B: Wizard Deprecation & Onboarding
+
+Replaces the 5-step setup wizard with a minimal first-run admin creation page and a dashboard onboarding checklist. After this phase, all configuration happens through the settings page (17A).
+
+**Depends on:** Phase 17A (settings must be fully capable before removing the wizard).
+
+### 17B.1 Minimal First-Run Admin Creation
+
+- [ ] Replace the 5-step wizard with a single-page "Create Admin Account" form
+- [ ] Shows only when `CountAdminAccounts == 0` (same guard as current `SetupDetection` middleware)
+- [ ] Form: username, password, confirm password — same validation as current Step 1
+- [ ] After successful creation: redirect to `/admin/login` with flash "Admin account created. Sign in to get started."
+- [ ] Use the wizard layout (centered, narrow) but no step indicator — it's just one page
+- [ ] Guard: if admin accounts already exist, redirect to `/admin/` (same as current Step 1 guard)
+- **Ref:** `internal/admin/setup.go` (Step 1 handler, lines 18-111), `internal/admin/middleware.go` (SetupDetection, lines 26-50)
+- **Files:** `internal/admin/setup.go` (simplify to single handler), `internal/templates/pages/setup_create_admin.html` (new, replaces step1-5)
+
+### 17B.2 Dashboard Onboarding Checklist
+
+- [ ] Add "Getting Started" card to dashboard, shown when onboarding is incomplete
+- [ ] Checklist items with status (done/pending) and links:
+  - ✓ Admin account created — always done (you're logged in)
+  - ○/✓ Configure a bank provider → links to Settings > Providers section
+  - ○/✓ Add a family member → links to `/admin/users/new`
+  - ○/✓ Connect your first bank → links to `/admin/connections/new`
+- [ ] Status detection: check if any providers configured, any users exist, any connections exist
+- [ ] "Dismiss" button: stores `onboarding_dismissed=true` in `app_config` — checklist hidden permanently
+- [ ] Positioned above the stat cards on dashboard
+- [ ] If all items are complete, show a brief "All set!" message with dismiss option (or auto-dismiss)
+- **Ref:** `internal/admin/dashboard.go`, `internal/templates/pages/dashboard.html`
+- **Files:** `internal/admin/dashboard.go`, `internal/templates/pages/dashboard.html`
+
+### 17B.3 Remove Wizard Steps 2-5
+
+- [ ] Delete wizard step handlers: `SetupStep2Handler` through `SetupStep5Handler` in `setup.go`
+- [ ] Delete wizard step templates: `setup_step2.html` through `setup_step5.html`
+- [ ] Remove wizard step routes from `router.go`
+- [ ] Keep only the first-run handler (17B.1) and the programmatic setup API
+- [ ] Clean up any step-related logic in `setup.go` (step number validation, redirect chains)
+- **Files:** `internal/admin/setup.go`, `internal/admin/router.go`, `internal/templates/pages/setup_step2.html` through `setup_step5.html` (delete)
+
+### 17B.4 Update Programmatic Setup API
+
+- [ ] Simplify `POST /admin/api/setup` to only create admin account + set config values
+- [ ] Remove step-related logic — it's now a single atomic operation
+- [ ] Keep the guard: only works when `CountAdminAccounts == 0`
+- [ ] Accept same JSON fields: `username`, `password`, plus optional `plaid_client_id`, `plaid_secret`, `plaid_env`, `sync_interval_minutes`, `webhook_url`
+- [ ] Response: return JSON with created admin info + config summary
+- [ ] This API remains useful for Docker/automation headless setup
+- **Ref:** `internal/admin/setup.go` (ProgrammaticSetupHandler, lines 396-523)
+- **Files:** `internal/admin/setup.go`
+
+### 17B.5 CLI Admin Management
+
+- [ ] Add `breadbox create-admin` cobra command
+- [ ] Interactive: prompts for username and password (with confirmation), or accepts `--username` and `--password` flags
+- [ ] Connects directly to DB via `DATABASE_URL` env var
+- [ ] Validates: username not empty, password >= 8 chars, no existing admin with same username
+- [ ] Useful for: Docker init containers, scripted deployments, password-less first-run scenarios
+- [ ] Also add `breadbox reset-password` (from Phase 14.8) here if not already implemented
+- **Ref:** `cmd/breadbox/main.go` (existing cobra commands, lines 33-71)
+- **Files:** `cmd/breadbox/main.go`, `cmd/breadbox/admin.go` (new)
+
+### 17B.6 Clean Up Tech Debt
+
+- [ ] Remove `setup_complete` flag from `app_config` — replace all checks with `CountAdminAccounts > 0`
+- [ ] Remove `admin_username` from `app_config` (was only used for Step 5 summary display)
+- [ ] Remove `sync_interval_hours` from `app_config` and the fallback path in `config.LoadWithDB` — standardize on `sync_interval_minutes` only
+- [ ] Remove `Config.SetupComplete` field from config struct
+- [ ] Update `SetupDetection` middleware to only check admin account count (it already does this, but verify no other code paths rely on `setup_complete`)
+- [ ] Remove the "Re-run Setup Wizard" link target from settings (already removed in 17A.1, clean up any remaining references)
+- **Ref:** `internal/config/load.go` (lines 137-154 for sync_interval fallback, line 157 for SetupComplete), `internal/config/config.go` (Config struct)
+- **Files:** `internal/config/config.go`, `internal/config/load.go`, `internal/admin/middleware.go`, `internal/admin/setup.go`
+
+### Task Dependencies (Phase 17B)
+
+```
+17B.1 (first-run page)      — independent, do first
+17B.2 (onboarding checklist) — independent of 17B.1 (different page)
+17B.3 (remove wizard steps)  — after 17B.1 (replacement must exist before removing old code)
+17B.4 (update API)           — after 17B.3 (simplify alongside wizard removal)
+17B.5 (CLI admin mgmt)       — independent
+17B.6 (tech debt cleanup)    — after 17B.3 and 17B.4 (remove references last)
+```
+
+### Checkpoint 17B
+
+1. With no admin account: visiting `/admin/` shows the "Create Admin Account" single-page form (not a 5-step wizard)
+2. After creating admin and logging in: dashboard shows "Getting Started" checklist with correct status for each item
+3. Configure a provider in settings → checklist updates to show it as done
+4. Add a family member → checklist updates. Connect a bank → checklist updates
+5. "Dismiss" hides the checklist permanently
+6. `POST /admin/api/setup` still works for headless setup (creates admin + sets config)
+7. `breadbox create-admin` CLI command works: creates admin account from terminal
+8. No references to `setup_complete`, `sync_interval_hours`, or `admin_username` in `app_config`
+9. Wizard step templates (step2-step5) are deleted
+10. No broken links or routes referencing removed wizard steps
