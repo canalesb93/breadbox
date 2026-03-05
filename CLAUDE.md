@@ -60,6 +60,12 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - LOG_LEVEL env var: debug/info/warn/error, overrides environment-based defaults
 - Transaction responses include denormalized `account_name` and `user_name` (JOIN in dynamic query builder)
 - MCP tool descriptions: domain-rich with amount conventions, filter docs, pagination behavior (not generic)
+- CSS framework: DaisyUI 5 + Tailwind CSS v4 via `tailwindcss-extra` standalone CLI binary. No Node.js. Replaces Pico CSS.
+- CSS build: `make css` compiles `input.css` → `static/css/styles.css`. `make css-watch` for dev. Dockerfile runs `make css` in build stage.
+- DaisyUI theme: `corporate` (light) + `business` (dark) auto-switch via `prefers-color-scheme`
+- Icons: Lucide via CDN, `data-lucide` attributes replaced with inline SVG by `lucide.createIcons()`
+- DaisyUI components replace `bb-*` classes: `drawer` (sidebar), `stat` (metric cards), `table` (data tables), `badge` (status), `menu` (nav), `card` (sections), `modal` (dialogs), `toast`+`alert` (notifications), `steps` (wizard progress), `collapse` (accordions)
+- Custom `@apply` classes in `input.css` for app-specific patterns: `.bb-filter-bar`, `.bb-pagination`, `.bb-action-bar`, `.bb-amount`, `.bb-info-grid`
 
 ## Canonical Enums
 
@@ -70,7 +76,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 
 ## Spec Documents
 
-Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Teller-specific details are in `docs/teller-integration.md`. CSV import details are in `docs/csv-import.md`. Implementation order is in `docs/ROADMAP.md`.
+Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Teller-specific details are in `docs/teller-integration.md`. CSV import details are in `docs/csv-import.md`. Design system (CSS framework, components, icons) is in `docs/design-system.md`. Implementation order is in `docs/ROADMAP.md`.
 
 ## Workflow Rules
 

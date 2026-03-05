@@ -1622,3 +1622,245 @@ Benefits from Phase 14 reliability fixes but not blocked by them. Improves the R
 7. `sort_by=amount&sort_order=asc` returns transactions sorted by amount ascending
 8. MCP `Instructions` field provides useful onboarding context for AI agents
 9. `breadbox://overview` resource returns data model summary with live stats
+
+---
+
+## Phase 16A: Design System Foundation
+
+Migrates from Pico CSS to DaisyUI 5 + Tailwind CSS v4 via standalone CLI. Establishes the design system, base layout, icon system, and reusable component classes. All Phase 16B page redesigns depend on this.
+
+**Spec:** `docs/design-system.md` — framework setup, component mapping, theme config, icon inventory, migration guide.
+
+### 16A.1 Tailwind + DaisyUI Build Setup
+
+- [ ] Download `tailwindcss-extra` binary (bundles Tailwind v4 + DaisyUI v5, no Node.js)
+- [ ] Create `input.css` at project root with `@import "tailwindcss"` and `@plugin "daisyui"` with theme config
+- [ ] Add `make css` target (minified production build) and `make css-watch` (development watcher)
+- [ ] Output to `static/css/styles.css` — commit generated CSS to avoid CI complexity
+- [ ] Update Dockerfile multi-stage build to run `make css` (download binary + compile)
+- [ ] Add `tailwindcss-extra` binary to `.gitignore`
+- [ ] Configure DaisyUI theme: `corporate --default, business --prefersdark` (auto dark mode)
+- **Ref:** `docs/design-system.md` Section 2 (Build Setup)
+- **Files:** `Makefile`, `input.css` (new), `static/css/styles.css` (generated), `Dockerfile`, `.gitignore`
+
+### 16A.2 Replace Pico CSS with DaisyUI in Layouts
+
+- [ ] Remove Pico CSS CDN link from `base.html` and `wizard.html`
+- [ ] Link generated stylesheet: `<link rel="stylesheet" href="/static/css/styles.css">`
+- [ ] Remove all custom CSS from `<style>` blocks in both layouts (~170 lines in base, ~14 lines in wizard)
+- [ ] Remove `data-theme="light"` hardcoding if still present
+- [ ] Keep Alpine.js CDN script and `[x-cloak]` rule
+- [ ] Verify dark mode auto-switches based on `prefers-color-scheme`
+- **Ref:** `docs/design-system.md` Section 3 (Theme)
+- **Files:** `internal/templates/layout/base.html`, `internal/templates/layout/wizard.html`
+
+### 16A.3 Base Layout: Drawer Sidebar
+
+- [ ] Replace custom `.bb-layout` / `.bb-sidebar` / `.bb-main` with DaisyUI `drawer lg:drawer-open` pattern
+- [ ] Desktop: sidebar always visible (`lg:drawer-open`). Mobile: hidden drawer toggled via checkbox + hamburger
+- [ ] Mobile top navbar: DaisyUI `navbar` with hamburger button (`<label for="bb-drawer">`) and "Breadbox" text
+- [ ] Sidebar: `drawer-side` with `menu menu-md bg-base-200` for navigation
+- [ ] Replace `.bb-nav` with DaisyUI `menu` component — add `menu-title` dividers for "Data" and "System" groups
+- [ ] Active nav item: use `menu-active` class (set via Go template based on `CurrentPage`)
+- [ ] Sign out button: `btn btn-ghost btn-sm` at bottom of sidebar via `mt-auto`
+- [ ] Drawer overlay for mobile: `drawer-overlay` label closes sidebar on tap outside
+- **Ref:** `docs/design-system.md` Section 5 (Layout Patterns)
+- **Files:** `internal/templates/layout/base.html`, `internal/templates/partials/nav.html`
+
+### 16A.4 Icon System Setup
+
+- [ ] Add Lucide icons CDN: `<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js">` in base layout
+- [ ] Call `lucide.createIcons()` after DOM load
+- [ ] Add icons to all sidebar nav items (see icon inventory in `docs/design-system.md` Section 8)
+- [ ] Add icons to action buttons: Add (`plus`), Edit (`pencil`), Delete (`trash-2`), Sync (`refresh-cw`)
+- [ ] Add brand icon next to "Breadbox" text in sidebar (`package` icon)
+- [ ] For Alpine.js dynamic content: call `lucide.createIcons()` via `$nextTick` after DOM changes
+- **Ref:** `docs/design-system.md` Section 8 (Icon System)
+- **Files:** `internal/templates/layout/base.html`, `internal/templates/partials/nav.html`
+
+### 16A.5 Extract Reusable Component Classes
+
+- [ ] Define `@apply` component classes in `input.css` `@layer components` block:
+  - `.bb-filter-bar` — flex filter form layout (replaces inline styles on transactions, sync logs, account detail)
+  - `.bb-pagination` — prev/next pagination nav (replaces inline styles on 4 pages)
+  - `.bb-action-bar` — button group row (replaces inline styles on connection detail, account detail)
+  - `.bb-amount` / `.bb-amount--credit` — right-aligned tabular-nums with optional color (replaces inline styles on transaction tables)
+  - `.bb-info-grid` — definition list grid layout (replaces inline `<dl>` styles on connection detail, account detail)
+- [ ] Replace all corresponding inline `style` attributes across templates with these classes
+- [ ] Target: eliminate 80%+ of the ~50 inline style attributes in the codebase
+- **Ref:** `docs/design-system.md` Section 2 (Input CSS), Section 7 (Form Patterns)
+- **Files:** `input.css`, all page templates with inline styles
+
+### 16A.6 Global Toast Component
+
+- [ ] Move toast component from individual page templates to `base.html` (available on every page)
+- [ ] Use DaisyUI `toast toast-end toast-bottom` positioning with `alert` variants for content
+- [ ] Alpine.js `x-data` with toast array, listens to `@bb-toast.window` custom event
+- [ ] Auto-dismiss after 4 seconds with Alpine `setTimeout`
+- [ ] Remove duplicate toast implementations from `connection_detail.html` and `account_detail.html`
+- [ ] All pages dispatch toasts via: `$dispatch('bb-toast', { message: '...', type: 'success' })`
+- **Ref:** `docs/design-system.md` Section 9 (Toast Pattern)
+- **Files:** `internal/templates/layout/base.html`, `internal/templates/pages/connection_detail.html`, `internal/templates/pages/account_detail.html`
+
+### 16A.7 Table Component Standardization
+
+- [ ] Apply DaisyUI table classes to all 7 page templates with tables:
+  - `table table-zebra table-sm` as baseline (connections, API keys, sync logs, users, dashboard)
+  - `table table-zebra table-sm table-pin-rows` for long scrollable tables (transactions, sync logs)
+  - `table table-zebra table-xs` for embedded tables (accounts within connection detail)
+- [ ] Add `hover:bg-base-200` to `<tr>` elements for row hover highlight (DaisyUI 5 removed built-in hover)
+- [ ] Wrap tables in `<div class="overflow-x-auto">` (consistent pattern)
+- [ ] Apply `.bb-amount` class to all amount columns
+- [ ] Update badge sizes in tables to `badge-sm` for compact density
+- **Ref:** `docs/design-system.md` Section 6 (Table Guidelines)
+- **Files:** `internal/templates/pages/dashboard.html`, `connections.html`, `connection_detail.html`, `transactions.html`, `account_detail.html`, `api_keys.html`, `sync_logs.html`, `users.html`
+
+### 16A.8 Brand Identity
+
+- [ ] Create simple favicon (breadbox/package icon as SVG, convert to .ico and .png)
+- [ ] Add `<link rel="icon">` to both layout templates
+- [ ] Style sidebar brand: icon + "Breadbox" text with `text-xl font-bold`
+- [ ] Restyle login page: centered DaisyUI `card` with brand mark, clean form, subtle `bg-base-200` background
+- [ ] Add `<meta name="theme-color">` for mobile browser chrome color
+- **Files:** `static/favicon.ico` (new), `static/favicon.svg` (new), `internal/templates/layout/base.html`, `internal/templates/layout/wizard.html`, `internal/templates/pages/login.html`
+
+### Task Dependencies (Phase 16A)
+
+```
+16A.1 (build setup)      ─┐
+16A.2 (replace Pico CSS)  ├─ must be sequential (1 → 2 → 3)
+16A.3 (drawer sidebar)   ─┘
+16A.4 (icons)            — after 16A.2 (needs base layout updated)
+16A.5 (component classes) — after 16A.1 (needs input.css)
+16A.6 (global toast)     — after 16A.2 (needs DaisyUI alert classes)
+16A.7 (tables)           — after 16A.2 (needs DaisyUI table classes)
+16A.8 (brand)            — after 16A.3 (needs drawer layout)
+```
+
+### Checkpoint 16A
+
+1. `make css` compiles successfully; `static/css/styles.css` is generated
+2. `make css-watch` starts watcher; CSS regenerates on template changes
+3. Dashboard loads with DaisyUI styling — no Pico CSS remnants
+4. Sidebar uses DaisyUI drawer: visible on desktop, hidden behind hamburger on mobile
+5. All sidebar nav items have Lucide icons
+6. Dark mode auto-switches when OS preference changes
+7. Toast notification appears globally when dispatching `bb-toast` event
+8. All tables have zebra striping and row hover
+9. Login page has centered card with brand mark and favicon shows in browser tab
+10. `docker build` succeeds and serves the new CSS
+
+---
+
+## Phase 16B: Page Redesign
+
+Per-page visual upgrades using the DaisyUI foundation from 16A. Each task is independent and can be parallelized.
+
+### 16B.1 Dashboard Redesign
+
+- [ ] Replace `bb-stats` / `bb-stat` with DaisyUI `stats stats-vertical lg:stats-horizontal` container
+- [ ] Each stat uses `stat` with `stat-figure` (Lucide icon), `stat-title`, `stat-value`, `stat-desc`
+- [ ] Icons: `building-2` (Accounts), `trending-up` (Transactions), `clock` (Last Sync), `alert-triangle` (Needs Attention)
+- [ ] Clickable stats: wrap in `<a>` linking to relevant pages (already done in 13A.5, ensure it carries forward)
+- [ ] "Needs Attention" stat: `border-l-4 border-warning` accent (replacing `bb-stat--warn`)
+- [ ] Recent Sync Activity: DaisyUI `table table-zebra table-sm` with institution name links
+- [ ] Section headers: `text-lg font-semibold mb-4`
+- [ ] Add "View all" links for each section
+- **Files:** `internal/templates/pages/dashboard.html`
+
+### 16B.2 Connections List + Detail
+
+- [ ] **Connections list**: DaisyUI table with `badge badge-sm` status badges. Provider column with icon. "Add Connection" as `btn btn-primary btn-sm`
+- [ ] **Connection detail**: Reorganize into DaisyUI `card` sections:
+  - Info card: connection metadata in `.bb-info-grid`
+  - Accounts card: table with inline edit controls
+  - Actions card: sync, pause, remove buttons in `.bb-action-bar`
+  - Sync History card: table with expandable error rows via DaisyUI `collapse`
+- [ ] Breadcrumbs: DaisyUI `breadcrumbs` component (`Connections / {institution name}`)
+- [ ] Reauth page: same card-based layout
+- **Files:** `internal/templates/pages/connections.html`, `internal/templates/pages/connection_detail.html`, `internal/templates/pages/connection_reauth.html`
+
+### 16B.3 Transaction List + Account Detail
+
+- [ ] **Transaction list**: `.bb-filter-bar` for all 10 filters. DaisyUI table with `table-pin-rows` for sticky headers
+- [ ] Amount column: `.bb-amount` class, negative amounts in `text-success` (credits)
+- [ ] Expandable detail rows: Alpine.js toggle with DaisyUI styling
+- [ ] Pagination: `.bb-pagination` with DaisyUI `join` button group for prev/next
+- [ ] **Account detail**: Info section in DaisyUI `card` with `.bb-info-grid`. Inline display-name edit. Embedded transaction table
+- **Files:** `internal/templates/pages/transactions.html`, `internal/templates/pages/account_detail.html`
+
+### 16B.4 Settings Page Redesign
+
+- [ ] Group settings into DaisyUI `card` sections: Sync Configuration, Plaid Provider, Teller Provider, Security (13B.3)
+- [ ] Each section: `card bg-base-100 shadow-sm` with `card-body` and `card-title`
+- [ ] Config source badges: `badge badge-ghost badge-sm` showing "(from env)" / "(from database)" / "(default)"
+- [ ] Test connection buttons: `btn btn-outline btn-sm` with loading spinner (`loading loading-spinner loading-xs`)
+- [ ] Teller "not configured" section: `alert alert-info` with `<details>` for env var snippet
+- [ ] Plaid environment change: DaisyUI `modal` confirmation dialog
+- **Files:** `internal/templates/pages/settings.html`
+
+### 16B.5 Setup Wizard Redesign
+
+- [ ] Add DaisyUI `steps steps-horizontal` progress indicator at top of wizard layout
+- [ ] Highlight completed steps with `step-primary`, current step as active, future steps unstyled
+- [ ] Each step content in centered `card bg-base-100 shadow-xl` (already in wizard layout from 16A)
+- [ ] Step 2 (provider selection): card-based picker — one `card` per provider (Plaid, Teller, Skip) with description and icon
+- [ ] Add back navigation: `btn btn-ghost` "← Back" on steps 2-5
+- [ ] Step 5 summary: `card` with check-marked list of completed configurations + "Go to Dashboard" CTA as `btn btn-primary`
+- **Files:** `internal/templates/pages/setup_step1.html` through `setup_step5.html`, `internal/templates/layout/wizard.html`
+
+### 16B.6 Family Members + API Keys
+
+- [ ] **Family Members**: DaisyUI table. Connection count column with `badge badge-ghost badge-sm`. Add member button as `btn btn-primary btn-sm`
+- [ ] **Member form**: DaisyUI form controls with `label`, `input input-bordered`, validation via `input-error`
+- [ ] **API Keys list**: DaisyUI table. Revoke: DaisyUI `modal` confirmation (replace Alpine two-step). Created date column
+- [ ] **API Key created**: `alert alert-success` with key display in `font-mono bg-base-200 p-2 rounded` and copy button
+- **Files:** `internal/templates/pages/users.html`, `internal/templates/pages/user_form.html`, `internal/templates/pages/api_keys.html`, `internal/templates/pages/api_key_new.html`, `internal/templates/pages/api_key_created.html`
+
+### 16B.7 Sync Logs Page
+
+- [ ] Filter form: `.bb-filter-bar` with connection and status dropdowns
+- [ ] DaisyUI table with `table-zebra table-sm table-pin-rows`
+- [ ] Status badges: `badge badge-sm` via `syncBadge` template function
+- [ ] Error details: DaisyUI `collapse collapse-arrow` for expandable error messages
+- [ ] Pagination: `.bb-pagination` with `join` button group
+- [ ] Trigger column: `badge badge-ghost badge-sm` for cron/webhook/manual/initial
+- **Files:** `internal/templates/pages/sync_logs.html`
+
+### 16B.8 Empty States + Error Pages
+
+- [ ] Redesign empty state pattern: centered layout with Lucide icon (`inbox`), heading, description text, and CTA `btn btn-primary`
+- [ ] Apply to all pages using `.bb-empty` (connections, API keys, sync logs, family members)
+- [ ] Dashboard empty state: use same pattern (currently uses plain `<p>`)
+- [ ] 404 page: centered `card` with `alert-triangle` icon, "Page Not Found" heading, link to dashboard
+- [ ] 500 page: centered `card` with `x-circle` icon, "Something Went Wrong" heading, retry suggestion
+- **Files:** `internal/templates/pages/connections.html`, `api_keys.html`, `sync_logs.html`, `users.html`, `dashboard.html`, `404.html`, `500.html`
+
+### Task Dependencies (Phase 16B)
+
+```
+All 16B tasks depend on 16A being complete.
+Within 16B, all tasks are independent and can be parallelized.
+
+16B.1 (dashboard)      — independent
+16B.2 (connections)    — independent
+16B.3 (transactions)   — independent
+16B.4 (settings)       — independent
+16B.5 (wizard)         — independent
+16B.6 (members/keys)   — independent
+16B.7 (sync logs)      — independent
+16B.8 (empty/error)    — independent
+```
+
+### Checkpoint 16B
+
+1. Dashboard stat cards have icons and link to relevant pages; dark mode renders correctly
+2. Connection detail is organized into card sections; breadcrumbs work
+3. Transaction list filter bar is clean and responsive; amounts are right-aligned with tabular-nums
+4. Settings page sections are in collapsible cards; config source badges show correctly
+5. Setup wizard has step progress indicator; back navigation works on all steps
+6. API key revoke uses modal dialog instead of inline confirm
+7. Sync logs table has sticky headers and expandable error details
+8. Empty states have icons and contextual CTAs; 404/500 pages are styled
+9. All pages render correctly on mobile (375px width) — no horizontal overflow except tables
+10. All pages render correctly in dark mode — no hardcoded colors or contrast issues
