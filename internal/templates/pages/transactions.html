@@ -1,74 +1,74 @@
 {{define "content"}}
-<h1>Transactions</h1>
+<h1 class="text-2xl font-bold mb-6">Transactions</h1>
 
-<form method="GET" action="/admin/transactions" style="display:flex; gap:var(--bb-gap-md); align-items:end; margin-bottom:var(--bb-gap-lg); flex-wrap:wrap;">
-  <label style="margin:0;">
+<form method="GET" action="/admin/transactions" class="bb-filter-bar">
+  <label>
     Start Date
-    <input type="date" name="start_date" value="{{.FilterStartDate}}" style="margin:0;">
+    <input type="date" name="start_date" value="{{.FilterStartDate}}">
   </label>
-  <label style="margin:0;">
+  <label>
     End Date
-    <input type="date" name="end_date" value="{{.FilterEndDate}}" style="margin:0;">
+    <input type="date" name="end_date" value="{{.FilterEndDate}}">
   </label>
-  <label style="margin:0;">
+  <label>
     Connection
-    <select name="connection_id" style="margin:0;">
+    <select name="connection_id">
       <option value="">All connections</option>
       {{range .Connections}}
       <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.FilterConnID}} selected{{end}}>{{.InstitutionName.String}}</option>
       {{end}}
     </select>
   </label>
-  <label style="margin:0;">
+  <label>
     Account
-    <select name="account_id" style="margin:0;">
+    <select name="account_id">
       <option value="">All accounts</option>
       {{range .Accounts}}
       <option value="{{.ID}}"{{if eq .ID $.FilterAccountID}} selected{{end}}>{{.Name}}</option>
       {{end}}
     </select>
   </label>
-  <label style="margin:0;">
+  <label>
     Family Member
-    <select name="user_id" style="margin:0;">
+    <select name="user_id">
       <option value="">All members</option>
       {{range .Users}}
       <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.FilterUserID}} selected{{end}}>{{.Name}}</option>
       {{end}}
     </select>
   </label>
-  <label style="margin:0;">
+  <label>
     Category
-    <select name="category" style="margin:0;">
+    <select name="category">
       <option value="">All categories</option>
       {{range .Categories}}
       <option value="{{.}}"{{if eq . $.FilterCategory}} selected{{end}}>{{.}}</option>
       {{end}}
     </select>
   </label>
-  <label style="margin:0;">
+  <label>
     Min Amount
-    <input type="number" name="min_amount" step="0.01" value="{{.FilterMinAmount}}" placeholder="0.00" style="margin:0; width:7rem;">
+    <input type="number" name="min_amount" step="0.01" value="{{.FilterMinAmount}}" placeholder="0.00" class="w-28">
   </label>
-  <label style="margin:0;">
+  <label>
     Max Amount
-    <input type="number" name="max_amount" step="0.01" value="{{.FilterMaxAmount}}" placeholder="0.00" style="margin:0; width:7rem;">
+    <input type="number" name="max_amount" step="0.01" value="{{.FilterMaxAmount}}" placeholder="0.00" class="w-28">
   </label>
-  <label style="margin:0;">
+  <label>
     Pending
-    <select name="pending" style="margin:0;">
+    <select name="pending">
       <option value="">All</option>
       <option value="true"{{if eq .FilterPending "true"}} selected{{end}}>Yes</option>
       <option value="false"{{if eq .FilterPending "false"}} selected{{end}}>No</option>
     </select>
   </label>
-  <label style="margin:0;">
+  <label>
     Search
-    <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Name or merchant" style="margin:0;">
+    <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Name or merchant">
   </label>
-  <button type="submit" style="margin:0;">Filter</button>
+  <button type="submit" class="btn btn-sm btn-primary self-end">Filter</button>
   {{if or .FilterStartDate .FilterEndDate .FilterAccountID .FilterUserID .FilterConnID .FilterCategory .FilterMinAmount .FilterMaxAmount .FilterPending .FilterSearch}}
-  <a href="/admin/transactions" role="button" class="secondary outline" style="margin:0;">Clear</a>
+  <a href="/admin/transactions" class="btn btn-sm btn-ghost self-end">Clear</a>
   {{end}}
 </form>
 
@@ -118,26 +118,30 @@
 </div>
 
 {{if gt .TotalPages 1}}
-<nav style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem;">
+<nav class="bb-pagination">
   <div>
     {{if gt .Page 1}}
-    <a href="/admin/transactions?page={{sub .Page 1}}{{if $.FilterStartDate}}&start_date={{$.FilterStartDate}}{{end}}{{if $.FilterEndDate}}&end_date={{$.FilterEndDate}}{{end}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterAccountID}}&account_id={{$.FilterAccountID}}{{end}}{{if $.FilterUserID}}&user_id={{$.FilterUserID}}{{end}}{{if $.FilterCategory}}&category={{$.FilterCategory}}{{end}}{{if $.FilterMinAmount}}&min_amount={{$.FilterMinAmount}}{{end}}{{if $.FilterMaxAmount}}&max_amount={{$.FilterMaxAmount}}{{end}}{{if $.FilterPending}}&pending={{$.FilterPending}}{{end}}{{if $.FilterSearch}}&search={{$.FilterSearch}}{{end}}{{if $.FilterSort}}&sort={{$.FilterSort}}{{end}}" role="button" class="secondary outline" style="margin:0;">&laquo; Previous</a>
+    <div class="join">
+      <a href="/admin/transactions?page={{sub .Page 1}}{{if $.FilterStartDate}}&start_date={{$.FilterStartDate}}{{end}}{{if $.FilterEndDate}}&end_date={{$.FilterEndDate}}{{end}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterAccountID}}&account_id={{$.FilterAccountID}}{{end}}{{if $.FilterUserID}}&user_id={{$.FilterUserID}}{{end}}{{if $.FilterCategory}}&category={{$.FilterCategory}}{{end}}{{if $.FilterMinAmount}}&min_amount={{$.FilterMinAmount}}{{end}}{{if $.FilterMaxAmount}}&max_amount={{$.FilterMaxAmount}}{{end}}{{if $.FilterPending}}&pending={{$.FilterPending}}{{end}}{{if $.FilterSearch}}&search={{$.FilterSearch}}{{end}}{{if $.FilterSort}}&sort={{$.FilterSort}}{{end}}" class="join-item btn btn-sm">&laquo; Previous</a>
+    </div>
     {{end}}
   </div>
-  <small>Page {{.Page}} of {{.TotalPages}} ({{.Total}} total)</small>
+  <span class="text-sm text-base-content/70">Page {{.Page}} of {{.TotalPages}} ({{.Total}} total)</span>
   <div>
     {{if lt .Page .TotalPages}}
-    <a href="/admin/transactions?page={{add .Page 1}}{{if $.FilterStartDate}}&start_date={{$.FilterStartDate}}{{end}}{{if $.FilterEndDate}}&end_date={{$.FilterEndDate}}{{end}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterAccountID}}&account_id={{$.FilterAccountID}}{{end}}{{if $.FilterUserID}}&user_id={{$.FilterUserID}}{{end}}{{if $.FilterCategory}}&category={{$.FilterCategory}}{{end}}{{if $.FilterMinAmount}}&min_amount={{$.FilterMinAmount}}{{end}}{{if $.FilterMaxAmount}}&max_amount={{$.FilterMaxAmount}}{{end}}{{if $.FilterPending}}&pending={{$.FilterPending}}{{end}}{{if $.FilterSearch}}&search={{$.FilterSearch}}{{end}}{{if $.FilterSort}}&sort={{$.FilterSort}}{{end}}" role="button" class="secondary outline" style="margin:0;">Next &raquo;</a>
+    <div class="join">
+      <a href="/admin/transactions?page={{add .Page 1}}{{if $.FilterStartDate}}&start_date={{$.FilterStartDate}}{{end}}{{if $.FilterEndDate}}&end_date={{$.FilterEndDate}}{{end}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterAccountID}}&account_id={{$.FilterAccountID}}{{end}}{{if $.FilterUserID}}&user_id={{$.FilterUserID}}{{end}}{{if $.FilterCategory}}&category={{$.FilterCategory}}{{end}}{{if $.FilterMinAmount}}&min_amount={{$.FilterMinAmount}}{{end}}{{if $.FilterMaxAmount}}&max_amount={{$.FilterMaxAmount}}{{end}}{{if $.FilterPending}}&pending={{$.FilterPending}}{{end}}{{if $.FilterSearch}}&search={{$.FilterSearch}}{{end}}{{if $.FilterSort}}&sort={{$.FilterSort}}{{end}}" class="join-item btn btn-sm">Next &raquo;</a>
+    </div>
     {{end}}
   </div>
 </nav>
 {{end}}
 
 {{else}}
-<div class="bb-empty">
+<div class="card bg-base-200 text-center p-8">
   <p>No transactions found.</p>
   {{if or .FilterStartDate .FilterEndDate .FilterAccountID .FilterUserID .FilterConnID .FilterCategory .FilterMinAmount .FilterMaxAmount .FilterPending .FilterSearch}}
-  <a href="/admin/transactions" role="button" class="secondary outline">Clear filters</a>
+  <a href="/admin/transactions" class="btn btn-sm btn-ghost mt-4">Clear filters</a>
   {{end}}
 </div>
 {{end}}

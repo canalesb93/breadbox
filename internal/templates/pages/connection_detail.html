@@ -1,22 +1,25 @@
 {{define "content"}}
-<nav aria-label="breadcrumb">
+<div class="breadcrumbs text-sm mb-4">
   <ul>
     <li><a href="/admin/connections">Connections</a></li>
     <li>{{.Connection.InstitutionName.String}}</li>
   </ul>
-</nav>
+</div>
 
 {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
-<div role="alert" data-flash="error" style="margin-bottom: var(--bb-gap-lg);">
-  <strong>This connection requires re-authentication.</strong> The bank may have changed its login requirements, or your session may have expired.
-  {{if .Connection.ErrorCode.Valid}}<br><small>{{errorMessage .Connection.ErrorCode.String}}</small>{{else if .Connection.ErrorMessage.Valid}}<br><small>{{.Connection.ErrorMessage.String}}</small>{{end}}
-  <br><a href="/admin/connections/{{.ConnID}}/reauth" style="color: inherit; font-weight: 600;">Re-authenticate &rarr;</a>
+<div class="alert alert-error mb-4">
+  <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+  <div>
+    <strong>This connection requires re-authentication.</strong> The bank may have changed its login requirements, or your session may have expired.
+    {{if .Connection.ErrorCode.Valid}}<br><small>{{errorMessage .Connection.ErrorCode.String}}</small>{{else if .Connection.ErrorMessage.Valid}}<br><small>{{.Connection.ErrorMessage.String}}</small>{{end}}
+    <br><a href="/admin/connections/{{.ConnID}}/reauth" class="link font-semibold">Re-authenticate &rarr;</a>
+  </div>
 </div>
 {{end}}
 
-<h1>{{.Connection.InstitutionName.String}}</h1>
+<h1 class="text-2xl font-bold mb-4">{{.Connection.InstitutionName.String}}</h1>
 
-<dl>
+<dl class="bb-info-grid mb-6">
   <dt>Family Member</dt>
   <dd>{{.Connection.UserName}}</dd>
   <dt>Status</dt>
@@ -29,29 +32,35 @@
   <dd>{{.Connection.Provider}}</dd>
 </dl>
 
-<div style="display: flex; gap: var(--bb-gap-sm); align-items: center; margin-bottom: var(--bb-gap-md);">
+<div class="bb-action-bar">
   {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
-  <a href="/admin/connections/{{.ConnID}}/reauth" role="button" class="outline">Re-authenticate</a>
+  <a href="/admin/connections/{{.ConnID}}/reauth" class="btn btn-outline btn-sm">Re-authenticate</a>
   {{end}}
   {{if eq (printf "%s" .Connection.Provider) "csv"}}
-  <a href="/admin/connections/import-csv?connection_id={{.ConnID}}" role="button" class="outline">Import More</a>
+  <a href="/admin/connections/import-csv?connection_id={{.ConnID}}" class="btn btn-outline btn-sm">Import More</a>
   {{end}}
   {{if eq (printf "%s" .Connection.Status) "active"}}
-  <button class="outline" onclick="syncConnection()" id="sync-btn">Sync Now</button>
+  <button class="btn btn-outline btn-sm" onclick="syncConnection()" id="sync-btn">
+    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+    Sync Now
+  </button>
   {{end}}
-  <button class="outline" onclick="togglePause()" id="pause-btn">{{if .Connection.Paused}}Resume{{else}}Pause{{end}}</button>
+  <button class="btn btn-outline btn-sm" onclick="togglePause()" id="pause-btn">{{if .Connection.Paused}}Resume{{else}}Pause{{end}}</button>
   <span x-data="{ confirming: false }">
-    <button class="secondary outline" x-show="!confirming" @click="confirming = true" id="remove-btn">Remove Connection</button>
-    <span x-show="confirming" x-cloak>
-      <button class="secondary" @click="removeConnection()">Yes, Remove</button>
-      <button class="outline" @click="confirming = false">Cancel</button>
+    <button class="btn btn-outline btn-error btn-sm" x-show="!confirming" @click="confirming = true" id="remove-btn">
+      <i data-lucide="trash-2" class="w-4 h-4"></i>
+      Remove
+    </button>
+    <span x-show="confirming" x-cloak class="inline-flex gap-2">
+      <button class="btn btn-error btn-sm" @click="removeConnection()">Yes, Remove</button>
+      <button class="btn btn-ghost btn-sm" @click="confirming = false">Cancel</button>
     </span>
   </span>
 </div>
 
-<div style="margin-bottom: var(--bb-gap-xl);">
-  <label for="sync-interval" style="display: inline; margin-right: 0.5rem;">Sync Interval:</label>
-  <select id="sync-interval" onchange="updateSyncInterval(this.value)" style="display: inline-block; width: auto;">
+<div class="flex items-center gap-2 mb-8">
+  <label for="sync-interval" class="text-sm font-medium">Sync Interval:</label>
+  <select id="sync-interval" onchange="updateSyncInterval(this.value)" class="select select-sm w-auto">
     <option value=""{{if not .Connection.SyncIntervalOverrideMinutes.Valid}} selected{{end}}>Use global</option>
     <option value="15"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 15)}} selected{{end}}>Every 15 min</option>
     <option value="30"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 30)}} selected{{end}}>Every 30 min</option>
@@ -61,10 +70,10 @@
     <option value="720"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 720)}} selected{{end}}>Every 12 hours</option>
     <option value="1440"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 1440)}} selected{{end}}>Every 24 hours</option>
   </select>
-  <span id="interval-status" style="margin-left: 0.5rem;"></span>
+  <span id="interval-status" class="text-sm text-base-content/70"></span>
 </div>
 
-<h2>Accounts</h2>
+<h2 class="text-lg font-semibold mb-4">Accounts</h2>
 {{if .Accounts}}
 <div class="overflow-x-auto">
   <table class="table table-zebra table-xs">
@@ -102,10 +111,10 @@
   </table>
 </div>
 {{else}}
-<p>No accounts found for this connection.</p>
+<p class="text-base-content/70">No accounts found for this connection.</p>
 {{end}}
 
-<h2>Sync History (last 10)</h2>
+<h2 class="text-lg font-semibold mt-8 mb-4">Sync History (last 10)</h2>
 {{if .SyncLogs}}
 <div class="overflow-x-auto">
   <table class="table table-zebra table-sm">
@@ -144,7 +153,7 @@
   </table>
 </div>
 {{else}}
-<p>No sync history yet.</p>
+<p class="text-base-content/70">No sync history yet.</p>
 {{end}}
 
 <script>

@@ -1,166 +1,186 @@
 {{define "content"}}
-<p><a href="/admin/connections">&larr; Connections</a></p>
-<h1>Import CSV</h1>
+<p class="mb-4"><a href="/admin/connections" class="link">&larr; Connections</a></p>
+<h1 class="text-2xl font-bold mb-6">Import CSV</h1>
 
-<div id="step-1" {{if .ConnectionID}}style="display:none"{{end}}>
-  <article>
-    <header>Step 1: Upload File</header>
-    {{if .ConnectionID}}
-    <p>Re-importing to: <strong>{{.ExistingConnectionName}}</strong> ({{.ExistingUserName}})</p>
-    {{else}}
-    <label for="csv-user-id">Family Member</label>
-    <select id="csv-user-id" required>
-      <option value="" disabled selected>Select a member...</option>
-      {{range .Users}}
-      <option value="{{formatUUID .ID}}">{{.Name}}</option>
-      {{end}}
-    </select>
-    {{end}}
-
-    <label for="csv-file">CSV File</label>
-    <input type="file" id="csv-file" accept=".csv,.tsv,.txt">
-    <small>Supported: CSV, TSV, TXT files up to 10MB. Max 50,000 rows.</small>
-
-    <button type="button" id="upload-btn" onclick="uploadFile()">Upload &amp; Parse</button>
-    <p id="upload-status"></p>
-  </article>
-</div>
-
-<div id="step-2" style="display:none">
-  <article>
-    <header>Step 2: Map Columns</header>
-    <p id="template-detected"></p>
-
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-      <div>
-        <label for="map-date">Date Column <small>(required)</small></label>
-        <select id="map-date"></select>
-      </div>
-      <div>
-        <label for="map-amount">Amount Column <small>(required)</small></label>
-        <select id="map-amount"></select>
-      </div>
-      <div>
-        <label for="map-description">Description Column <small>(required)</small></label>
-        <select id="map-description"></select>
-      </div>
-      <div>
-        <label for="map-category">Category Column <small>(optional)</small></label>
-        <select id="map-category"></select>
-      </div>
-      <div>
-        <label for="map-merchant">Merchant Column <small>(optional)</small></label>
-        <select id="map-merchant"></select>
-      </div>
-    </div>
-
-    <div id="debit-credit-section" style="display:none; margin-top: 1rem;">
-      <fieldset>
-        <legend>Split Debit/Credit Columns</legend>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-          <div>
-            <label for="map-debit">Debit Column</label>
-            <select id="map-debit"></select>
-          </div>
-          <div>
-            <label for="map-credit">Credit Column</label>
-            <select id="map-credit"></select>
-          </div>
-        </div>
+<div id="step-1" {{if .ConnectionID}}class="hidden"{{end}}>
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">Step 1: Upload File</h2>
+      {{if .ConnectionID}}
+      <p>Re-importing to: <strong>{{.ExistingConnectionName}}</strong> ({{.ExistingUserName}})</p>
+      {{else}}
+      <fieldset class="fieldset">
+        <label class="fieldset-label" for="csv-user-id">Family Member</label>
+        <select id="csv-user-id" class="select w-full" required>
+          <option value="" disabled selected>Select a member...</option>
+          {{range .Users}}
+          <option value="{{formatUUID .ID}}">{{.Name}}</option>
+          {{end}}
+        </select>
       </fieldset>
-    </div>
+      {{end}}
 
-    <fieldset style="margin-top: 1rem;">
-      <legend>Sign Convention</legend>
-      <label>
-        <input type="radio" name="sign-convention" value="debit" checked>
-        Positive = Debit (charges, money out)
-      </label>
-      <label>
-        <input type="radio" name="sign-convention" value="credit">
-        Positive = Credit (payments, money in)
-      </label>
-    </fieldset>
+      <fieldset class="fieldset">
+        <label class="fieldset-label" for="csv-file">CSV File</label>
+        <input type="file" id="csv-file" accept=".csv,.tsv,.txt" class="file-input w-full">
+        <p class="text-sm text-base-content/60 mt-1">Supported: CSV, TSV, TXT files up to 10MB. Max 50,000 rows.</p>
+      </fieldset>
 
-    <label>
-      <input type="checkbox" id="has-debit-credit" onchange="toggleDebitCredit()">
-      Separate debit/credit columns (e.g., Capital One)
-    </label>
-
-    {{if not .ConnectionID}}
-    <label for="account-name">Account Name</label>
-    <input type="text" id="account-name" value="CSV Import" placeholder="e.g., Chase Checking CSV">
-    {{end}}
-
-    <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-      <button type="button" class="outline" onclick="previewData()">Preview</button>
-      <button type="button" id="continue-btn" onclick="goToStep3()" style="display:none">Continue to Import</button>
-    </div>
-    <p id="preview-status"></p>
-  </article>
-
-  <div id="preview-table-container" style="display:none; margin-top: 1rem;">
-    <article>
-      <header>Preview (first 10 rows)</header>
-      <div style="overflow-x: auto;">
-        <table id="preview-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Amount</th>
-              <th>Description</th>
-              <th>Category</th>
-              <th>Merchant</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="preview-body"></tbody>
-        </table>
+      <div class="mt-4">
+        <button type="button" id="upload-btn" class="btn btn-primary" onclick="uploadFile()">Upload &amp; Parse</button>
       </div>
-    </article>
+      <p id="upload-status" class="text-sm text-error mt-2"></p>
+    </div>
   </div>
 </div>
 
-<div id="step-3" style="display:none">
-  <article>
-    <header>Step 3: Confirm Import</header>
-    <dl>
-      <dt>Total Rows</dt>
-      <dd id="summary-rows"></dd>
-      <dt>Account Name</dt>
-      <dd id="summary-account"></dd>
-      <dt>Family Member</dt>
-      <dd id="summary-member"></dd>
-    </dl>
-    <div style="display: flex; gap: 0.5rem;">
-      <button type="button" class="outline" onclick="goToStep(2)">&larr; Back</button>
-      <button type="button" id="import-btn" onclick="doImport()">Import Transactions</button>
+<div id="step-2" class="hidden">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">Step 2: Map Columns</h2>
+      <p id="template-detected" class="text-sm text-base-content/70"></p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+        <fieldset class="fieldset">
+          <label class="fieldset-label" for="map-date">Date Column <span class="text-xs text-base-content/50">(required)</span></label>
+          <select id="map-date" class="select w-full"></select>
+        </fieldset>
+        <fieldset class="fieldset">
+          <label class="fieldset-label" for="map-amount">Amount Column <span class="text-xs text-base-content/50">(required)</span></label>
+          <select id="map-amount" class="select w-full"></select>
+        </fieldset>
+        <fieldset class="fieldset">
+          <label class="fieldset-label" for="map-description">Description Column <span class="text-xs text-base-content/50">(required)</span></label>
+          <select id="map-description" class="select w-full"></select>
+        </fieldset>
+        <fieldset class="fieldset">
+          <label class="fieldset-label" for="map-category">Category Column <span class="text-xs text-base-content/50">(optional)</span></label>
+          <select id="map-category" class="select w-full"></select>
+        </fieldset>
+        <fieldset class="fieldset">
+          <label class="fieldset-label" for="map-merchant">Merchant Column <span class="text-xs text-base-content/50">(optional)</span></label>
+          <select id="map-merchant" class="select w-full"></select>
+        </fieldset>
+      </div>
+
+      <div id="debit-credit-section" class="hidden mt-4">
+        <fieldset class="fieldset border border-base-300 rounded-lg p-4">
+          <legend class="fieldset-label px-2">Split Debit/Credit Columns</legend>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <fieldset class="fieldset">
+              <label class="fieldset-label" for="map-debit">Debit Column</label>
+              <select id="map-debit" class="select w-full"></select>
+            </fieldset>
+            <fieldset class="fieldset">
+              <label class="fieldset-label" for="map-credit">Credit Column</label>
+              <select id="map-credit" class="select w-full"></select>
+            </fieldset>
+          </div>
+        </fieldset>
+      </div>
+
+      <fieldset class="fieldset border border-base-300 rounded-lg p-4 mt-4">
+        <legend class="fieldset-label px-2">Sign Convention</legend>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="radio" name="sign-convention" value="debit" checked class="radio radio-sm">
+          <span class="text-sm">Positive = Debit (charges, money out)</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer mt-2">
+          <input type="radio" name="sign-convention" value="credit" class="radio radio-sm">
+          <span class="text-sm">Positive = Credit (payments, money in)</span>
+        </label>
+      </fieldset>
+
+      <label class="flex items-center gap-2 cursor-pointer mt-4">
+        <input type="checkbox" id="has-debit-credit" class="checkbox checkbox-sm" onchange="toggleDebitCredit()">
+        <span class="text-sm">Separate debit/credit columns (e.g., Capital One)</span>
+      </label>
+
+      {{if not .ConnectionID}}
+      <fieldset class="fieldset mt-4">
+        <label class="fieldset-label" for="account-name">Account Name</label>
+        <input type="text" id="account-name" class="input w-full" value="CSV Import" placeholder="e.g., Chase Checking CSV">
+      </fieldset>
+      {{end}}
+
+      <div class="flex gap-2 mt-4">
+        <button type="button" class="btn btn-ghost" onclick="previewData()">Preview</button>
+        <button type="button" id="continue-btn" class="btn btn-primary hidden" onclick="goToStep3()">Continue to Import</button>
+      </div>
+      <p id="preview-status" class="text-sm text-error mt-2"></p>
     </div>
-    <p id="import-status"></p>
-  </article>
+  </div>
+
+  <div id="preview-table-container" class="hidden mt-4">
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body">
+        <h2 class="card-title">Preview (first 10 rows)</h2>
+        <div class="overflow-x-auto">
+          <table id="preview-table" class="table table-zebra table-sm">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>Merchant</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="preview-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<div id="step-4" style="display:none">
-  <article>
-    <header>Import Complete</header>
-    <dl>
-      <dt>Total Rows</dt>
-      <dd id="result-total"></dd>
-      <dt>New Transactions</dt>
-      <dd id="result-new"></dd>
-      <dt>Updated Transactions</dt>
-      <dd id="result-updated"></dd>
-      <dt>Skipped</dt>
-      <dd id="result-skipped"></dd>
-    </dl>
-    <div id="skip-reasons" style="display:none;">
-      <details>
-        <summary>Skipped Row Details</summary>
-        <ul id="skip-reasons-list"></ul>
-      </details>
+<div id="step-3" class="hidden">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">Step 3: Confirm Import</h2>
+      <dl class="bb-info-grid my-4">
+        <dt>Total Rows</dt>
+        <dd id="summary-rows"></dd>
+        <dt>Account Name</dt>
+        <dd id="summary-account"></dd>
+        <dt>Family Member</dt>
+        <dd id="summary-member"></dd>
+      </dl>
+      <div class="flex gap-2">
+        <button type="button" class="btn btn-ghost" onclick="goToStep(2)">&larr; Back</button>
+        <button type="button" id="import-btn" class="btn btn-primary" onclick="doImport()">Import Transactions</button>
+      </div>
+      <p id="import-status" class="text-sm text-error mt-2"></p>
     </div>
-    <a id="result-link" href="#" role="button">View Connection &rarr;</a>
-  </article>
+  </div>
+</div>
+
+<div id="step-4" class="hidden">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">Import Complete</h2>
+      <dl class="bb-info-grid my-4">
+        <dt>Total Rows</dt>
+        <dd id="result-total"></dd>
+        <dt>New Transactions</dt>
+        <dd id="result-new"></dd>
+        <dt>Updated Transactions</dt>
+        <dd id="result-updated"></dd>
+        <dt>Skipped</dt>
+        <dd id="result-skipped"></dd>
+      </dl>
+      <div id="skip-reasons" class="hidden">
+        <details class="collapse collapse-arrow bg-base-200 mb-4">
+          <summary class="collapse-title text-sm font-medium">Skipped Row Details</summary>
+          <div class="collapse-content">
+            <ul id="skip-reasons-list" class="list-disc list-inside text-sm"></ul>
+          </div>
+        </details>
+      </div>
+      <a id="result-link" href="#" class="btn btn-primary">View Connection &rarr;</a>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -191,7 +211,7 @@
     {{end}}
 
     btn.disabled = true;
-    btn.setAttribute("aria-busy", "true");
+    btn.classList.add("btn-disabled");
     status.textContent = "Uploading...";
 
     var formData = new FormData();
@@ -205,7 +225,7 @@
     .then(function(res) { return res.json().then(function(d) { return {ok: res.ok, data: d}; }); })
     .then(function(res) {
       btn.disabled = false;
-      btn.removeAttribute("aria-busy");
+      btn.classList.remove("btn-disabled");
       if (!res.ok) {
         status.textContent = res.data.error || "Upload failed.";
         return;
@@ -217,7 +237,7 @@
     })
     .catch(function() {
       btn.disabled = false;
-      btn.removeAttribute("aria-busy");
+      btn.classList.remove("btn-disabled");
       status.textContent = "Network error.";
     });
   };
@@ -233,7 +253,7 @@
       if (optionalSelects.indexOf(id) !== -1) {
         var opt = document.createElement("option");
         opt.value = "-1";
-        opt.textContent = "— None —";
+        opt.textContent = "\u2014 None \u2014";
         sel.appendChild(opt);
       }
       headers.forEach(function(h, i) {
@@ -257,7 +277,7 @@
     if (data.template_name) {
       document.getElementById("template-detected").textContent = "Detected template: " + data.template_name;
     } else {
-      document.getElementById("template-detected").textContent = "No template detected — please map columns manually.";
+      document.getElementById("template-detected").textContent = "No template detected \u2014 please map columns manually.";
     }
 
     if (data.has_debit_credit) {
@@ -280,7 +300,12 @@
 
   window.toggleDebitCredit = function() {
     var checked = document.getElementById("has-debit-credit").checked;
-    document.getElementById("debit-credit-section").style.display = checked ? "block" : "none";
+    var section = document.getElementById("debit-credit-section");
+    if (checked) {
+      section.classList.remove("hidden");
+    } else {
+      section.classList.add("hidden");
+    }
   };
 
   window.previewData = function() {
@@ -312,7 +337,7 @@
         detectedDateFormat = res.data.date_format;
       }
       renderPreview(res.data.rows);
-      document.getElementById("continue-btn").style.display = "inline-block";
+      document.getElementById("continue-btn").classList.remove("hidden");
     })
     .catch(function() {
       status.textContent = "Network error.";
@@ -324,7 +349,7 @@
     tbody.innerHTML = "";
     rows.forEach(function(row) {
       var tr = document.createElement("tr");
-      if (row.error) tr.style.backgroundColor = "var(--pico-form-element-invalid-border-color, #f8d7da)";
+      if (row.error) tr.classList.add("bg-error/10");
       tr.innerHTML = "<td>" + esc(row.date) + "</td>" +
         "<td>" + esc(row.amount) + "</td>" +
         "<td>" + esc(row.description) + "</td>" +
@@ -333,7 +358,7 @@
         "<td>" + (row.error ? "<span class='badge badge-error badge-sm'>" + esc(row.error) + "</span>" : "<span class='badge badge-success badge-sm'>OK</span>") + "</td>";
       tbody.appendChild(tr);
     });
-    document.getElementById("preview-table-container").style.display = "block";
+    document.getElementById("preview-table-container").classList.remove("hidden");
   }
 
   function getColumnMapping() {
@@ -376,7 +401,12 @@
 
   window.goToStep = function(n) {
     for (var i = 1; i <= 4; i++) {
-      document.getElementById("step-" + i).style.display = (i === n) ? "block" : "none";
+      var el = document.getElementById("step-" + i);
+      if (i === n) {
+        el.classList.remove("hidden");
+      } else {
+        el.classList.add("hidden");
+      }
     }
   };
 
@@ -384,7 +414,7 @@
     var btn = document.getElementById("import-btn");
     var status = document.getElementById("import-status");
     btn.disabled = true;
-    btn.setAttribute("aria-busy", "true");
+    btn.classList.add("btn-disabled");
     status.textContent = "Importing...";
 
     var mapping = getColumnMapping();
@@ -413,7 +443,7 @@
     .then(function(res) { return res.json().then(function(d) { return {ok: res.ok, data: d}; }); })
     .then(function(res) {
       btn.disabled = false;
-      btn.removeAttribute("aria-busy");
+      btn.classList.remove("btn-disabled");
       if (!res.ok) {
         status.textContent = res.data.error || "Import failed.";
         return;
@@ -423,7 +453,7 @@
     })
     .catch(function() {
       btn.disabled = false;
-      btn.removeAttribute("aria-busy");
+      btn.classList.remove("btn-disabled");
       status.textContent = "Network error.";
     });
   };
@@ -442,7 +472,7 @@
         li.textContent = reason;
         list.appendChild(li);
       });
-      document.getElementById("skip-reasons").style.display = "block";
+      document.getElementById("skip-reasons").classList.remove("hidden");
     }
 
     document.getElementById("result-link").href = "/admin/connections/" + data.ConnectionID;

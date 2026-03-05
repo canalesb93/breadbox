@@ -4,21 +4,24 @@
 {{else if eq (printf "%s" .Connection.Provider) "teller"}}
 <script src="https://cdn.teller.io/connect/connect.js"></script>
 {{end}}
-<nav aria-label="breadcrumb">
+
+<div class="breadcrumbs text-sm mb-4">
   <ul>
     <li><a href="/admin/connections">Connections</a></li>
     <li><a href="/admin/connections/{{.ConnID}}">{{.Connection.InstitutionName.String}}</a></li>
     <li>Re-authenticate</li>
   </ul>
-</nav>
+</div>
 
-<h1>Re-authenticate {{.Connection.InstitutionName.String}}</h1>
+<h1 class="text-2xl font-bold mb-6">Re-authenticate {{.Connection.InstitutionName.String}}</h1>
 
-<article>
-  <p>Re-connecting for: <strong>{{.Connection.UserName}}</strong></p>
-  <p id="link-status">Opening re-authentication dialog...</p>
-  <button id="retry-btn" style="display:none">Retry</button>
-</article>
+<div class="card bg-base-100 shadow-sm">
+  <div class="card-body">
+    <p>Re-connecting for: <strong>{{.Connection.UserName}}</strong></p>
+    <p id="link-status" class="text-base-content/70">Opening re-authentication dialog...</p>
+    <button id="retry-btn" class="btn btn-primary btn-sm hidden">Retry</button>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -29,19 +32,22 @@
 
   function showError(msg) {
     linkStatus.textContent = msg;
-    linkStatus.style.color = "var(--bb-color-error)";
-    retryBtn.style.display = "inline-block";
+    linkStatus.classList.add("text-error");
+    linkStatus.classList.remove("text-base-content/70");
+    retryBtn.classList.remove("hidden");
   }
 
   function showMessage(msg) {
     linkStatus.textContent = msg;
-    linkStatus.style.color = "";
+    linkStatus.classList.remove("text-error");
+    linkStatus.classList.add("text-base-content/70");
   }
 
   function startReauth() {
     linkStatus.textContent = "Opening re-authentication dialog...";
-    linkStatus.style.color = "";
-    retryBtn.style.display = "none";
+    linkStatus.classList.remove("text-error");
+    linkStatus.classList.add("text-base-content/70");
+    retryBtn.classList.add("hidden");
 
     fetch("/admin/api/connections/" + connId + "/reauth", {
       method: "POST",

@@ -1,26 +1,34 @@
 {{define "content"}}
-<p><a href="/admin/users">&larr; Back to Family Members</a></p>
+<p class="mb-4"><a href="/admin/users" class="link">&larr; Back to Family Members</a></p>
 
-<h1>{{if .IsEdit}}Edit {{.User.Name}}{{else}}Add Family Member{{end}}</h1>
+<h1 class="text-2xl font-bold mb-6">{{if .IsEdit}}Edit {{.User.Name}}{{else}}Add Family Member{{end}}</h1>
 
-<article>
-  <form id="user-form">
-    <label for="name">Name <span style="color: var(--bb-color-error);">*</span></label>
-    <input type="text" id="name" name="name" required maxlength="128"
-      value="{{if .IsEdit}}{{.User.Name}}{{end}}"
-      placeholder="e.g., Alex Canales">
+<div class="card bg-base-100 shadow-sm max-w-lg">
+  <div class="card-body">
+    <form id="user-form">
+      <fieldset class="fieldset">
+        <label class="fieldset-label" for="name">Name <span class="text-error">*</span></label>
+        <input type="text" id="name" name="name" class="input w-full" required maxlength="128"
+          value="{{if .IsEdit}}{{.User.Name}}{{end}}"
+          placeholder="e.g., Alex Canales">
+      </fieldset>
 
-    <label for="email">Email <small>(optional)</small></label>
-    <input type="email" id="email" name="email"
-      value="{{if and .IsEdit .User.Email.Valid}}{{.User.Email.String}}{{end}}"
-      placeholder="e.g., alex@example.com">
+      <fieldset class="fieldset">
+        <label class="fieldset-label" for="email">Email <span class="text-base-content/50 text-xs">(optional)</span></label>
+        <input type="email" id="email" name="email" class="input w-full"
+          value="{{if and .IsEdit .User.Email.Valid}}{{.User.Email.String}}{{end}}"
+          placeholder="e.g., alex@example.com">
+      </fieldset>
 
-    <div id="form-error" role="alert" style="display:none; color: var(--bb-color-error); margin-bottom: 1rem;"></div>
+      <div id="form-error" class="alert alert-error mb-4 hidden"></div>
 
-    <button type="submit">{{if .IsEdit}}Save Changes{{else}}Create Member{{end}}</button>
-    <a href="/admin/users" role="button" class="secondary outline" style="margin-left: 0.5rem;">Cancel</a>
-  </form>
-</article>
+      <div class="flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary">{{if .IsEdit}}Save Changes{{else}}Create Member{{end}}</button>
+        <a href="/admin/users" class="btn btn-ghost">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -31,14 +39,14 @@
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
-    formError.style.display = "none";
+    formError.classList.add("hidden");
 
     var name = document.getElementById("name").value.trim();
     var email = document.getElementById("email").value.trim();
 
     if (!name) {
       formError.textContent = "Name is required.";
-      formError.style.display = "block";
+      formError.classList.remove("hidden");
       return;
     }
 
@@ -67,13 +75,13 @@
             msg = data.error;
           }
           formError.textContent = msg;
-          formError.style.display = "block";
+          formError.classList.remove("hidden");
         });
       }
     })
     .catch(function () {
       formError.textContent = "Network error. Please try again.";
-      formError.style.display = "block";
+      formError.classList.remove("hidden");
     });
   });
 })();

@@ -1,106 +1,127 @@
 {{define "content"}}
-<h1>Settings</h1>
+<h1 class="text-2xl font-bold mb-6">Settings</h1>
 
 {{if .HasEncryptionKey}}
-<div data-flash="success" style="margin-bottom: 1rem;">Encryption: Configured</div>
+<div class="alert alert-success mb-6">Encryption: Configured</div>
 {{else}}
-<div data-flash="error" style="margin-bottom: 1rem;">Encryption: NOT SET &mdash; access tokens cannot be stored</div>
+<div class="alert alert-error mb-6">Encryption: NOT SET &mdash; access tokens cannot be stored</div>
 {{end}}
 
 <form method="POST" action="/admin/settings">
   <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
-  <article>
-    <header><strong>Sync Settings</strong></header>
+  <div class="card bg-base-100 shadow-sm mb-6">
+    <div class="card-body">
+      <h2 class="card-title">Sync Settings</h2>
 
-    <label for="sync_interval_minutes">Sync Interval {{configSource .ConfigSources "sync_interval_minutes"}}</label>
-    <select id="sync_interval_minutes" name="sync_interval_minutes">
-      <option value="15"{{if eq .SyncIntervalMinutes 15}} selected{{end}}>Every 15 minutes</option>
-      <option value="30"{{if eq .SyncIntervalMinutes 30}} selected{{end}}>Every 30 minutes</option>
-      <option value="60"{{if eq .SyncIntervalMinutes 60}} selected{{end}}>Every hour</option>
-      <option value="240"{{if eq .SyncIntervalMinutes 240}} selected{{end}}>Every 4 hours</option>
-      <option value="480"{{if eq .SyncIntervalMinutes 480}} selected{{end}}>Every 8 hours</option>
-      <option value="720"{{if eq .SyncIntervalMinutes 720}} selected{{end}}>Every 12 hours</option>
-      <option value="1440"{{if eq .SyncIntervalMinutes 1440}} selected{{end}}>Every 24 hours</option>
-    </select>
+      <label class="flex flex-col gap-1 text-sm" for="sync_interval_minutes">
+        Sync Interval {{configSource .ConfigSources "sync_interval_minutes"}}
+      </label>
+      <select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm w-full max-w-xs">
+        <option value="15"{{if eq .SyncIntervalMinutes 15}} selected{{end}}>Every 15 minutes</option>
+        <option value="30"{{if eq .SyncIntervalMinutes 30}} selected{{end}}>Every 30 minutes</option>
+        <option value="60"{{if eq .SyncIntervalMinutes 60}} selected{{end}}>Every hour</option>
+        <option value="240"{{if eq .SyncIntervalMinutes 240}} selected{{end}}>Every 4 hours</option>
+        <option value="480"{{if eq .SyncIntervalMinutes 480}} selected{{end}}>Every 8 hours</option>
+        <option value="720"{{if eq .SyncIntervalMinutes 720}} selected{{end}}>Every 12 hours</option>
+        <option value="1440"{{if eq .SyncIntervalMinutes 1440}} selected{{end}}>Every 24 hours</option>
+      </select>
 
-    <label for="webhook_url">Webhook URL {{configSource .ConfigSources "webhook_url"}}</label>
-    <input type="url" id="webhook_url" name="webhook_url" value="{{.WebhookURL}}" placeholder="https://example.com/webhooks/plaid">
-    <small>Plaid will send transaction updates to this URL. Must use HTTPS. Leave empty to disable.</small>
-  </article>
-
-  <article>
-    <header><strong>Plaid Credentials</strong></header>
-
-    {{if .PlaidFromEnv}}
-    <p>Plaid credentials are configured via environment variables and cannot be changed here.</p>
-    <dl>
-      <dt>Environment {{configSource .ConfigSources "plaid_env"}}</dt>
-      <dd>{{.PlaidEnv}}</dd>
-      <dt>Client ID {{configSource .ConfigSources "plaid_client_id"}}</dt>
-      <dd><code>{{.PlaidClientID}}</code></dd>
-      <dt>Secret</dt>
-      <dd><code>********</code></dd>
-    </dl>
-    {{else}}
-    <label for="plaid_client_id">Client ID {{configSource .ConfigSources "plaid_client_id"}}</label>
-    <input type="text" id="plaid_client_id" name="plaid_client_id" value="{{.PlaidClientID}}" placeholder="Plaid Client ID">
-
-    <label for="plaid_secret">Secret {{configSource .ConfigSources "plaid_secret"}}</label>
-    <input type="password" id="plaid_secret" name="plaid_secret" value="{{.PlaidSecret}}" placeholder="Plaid Secret">
-
-    <label for="plaid_env">Environment {{configSource .ConfigSources "plaid_env"}}</label>
-    <select id="plaid_env" name="plaid_env" onchange="confirmPlaidEnvChange(this)">
-      <option value="sandbox"{{if eq .PlaidEnv "sandbox"}} selected{{end}}>Sandbox</option>
-      <option value="development"{{if eq .PlaidEnv "development"}} selected{{end}}>Development</option>
-      <option value="production"{{if eq .PlaidEnv "production"}} selected{{end}}>Production</option>
-    </select>
-    <small>Credentials will be validated before saving.</small>
-    {{end}}
-
-    {{if or .PlaidFromEnv (ne .PlaidClientID "")}}
-    <div style="margin-top: 0.5rem;">
-      <button type="button" class="outline" onclick="testProvider('plaid')" id="test-plaid-btn">Test Plaid Connection</button>
-      <span id="test-plaid-result" style="margin-left: 0.5rem;"></span>
+      <label class="flex flex-col gap-1 text-sm mt-4" for="webhook_url">
+        Webhook URL {{configSource .ConfigSources "webhook_url"}}
+      </label>
+      <input type="url" id="webhook_url" name="webhook_url" value="{{.WebhookURL}}" placeholder="https://example.com/webhooks/plaid" class="input input-sm w-full max-w-md">
+      <p class="text-xs text-base-content/60 mt-1">Plaid will send transaction updates to this URL. Must use HTTPS. Leave empty to disable.</p>
     </div>
-    {{end}}
-  </article>
+  </div>
 
-  <article>
-    <header><strong>Teller</strong></header>
+  <div class="card bg-base-100 shadow-sm mb-6">
+    <div class="card-body">
+      <h2 class="card-title">Plaid Credentials</h2>
 
-    {{if .TellerFromEnv}}
-    <p>Teller is configured via environment variables.</p>
-    <dl>
-      <dt>App ID {{configSource .ConfigSources "teller_app_id"}}</dt>
-      <dd><code>{{.TellerAppID}}</code></dd>
-      <dt>Environment {{configSource .ConfigSources "teller_env"}}</dt>
-      <dd>{{.TellerEnv}}</dd>
-      <dt>Certificate</dt>
-      <dd>{{if .TellerCertConfigured}}Configured{{else}}Not configured{{end}}</dd>
-      <dt>Webhook Secret</dt>
-      <dd>{{if .TellerWebhookConfigured}}Configured{{else}}Not configured{{end}}</dd>
-    </dl>
-    {{else if ne .TellerAppID ""}}
-    <p>Teller App ID is configured via database. Certificate and key paths must be set via environment variables.</p>
-    <label for="teller_app_id">App ID {{configSource .ConfigSources "teller_app_id"}}</label>
-    <input type="text" id="teller_app_id" name="teller_app_id" value="{{.TellerAppID}}">
-    <label for="teller_env">Environment {{configSource .ConfigSources "teller_env"}}</label>
-    <select id="teller_env" name="teller_env">
-      <option value="sandbox"{{if eq .TellerEnv "sandbox"}} selected{{end}}>Sandbox</option>
-      <option value="production"{{if eq .TellerEnv "production"}} selected{{end}}>Production</option>
-    </select>
-    {{else}}
-    <p>Teller is not configured. Set the following environment variables to enable:</p>
-    <details>
-      <summary>Environment variable setup</summary>
-      <pre><code>TELLER_APP_ID=your-app-id
+      {{if .PlaidFromEnv}}
+      <p class="text-sm">Plaid credentials are configured via environment variables and cannot be changed here.</p>
+      <dl class="bb-info-grid mt-2">
+        <dt>Environment {{configSource .ConfigSources "plaid_env"}}</dt>
+        <dd>{{.PlaidEnv}}</dd>
+        <dt>Client ID {{configSource .ConfigSources "plaid_client_id"}}</dt>
+        <dd><code class="font-mono text-xs">{{.PlaidClientID}}</code></dd>
+        <dt>Secret</dt>
+        <dd><code class="font-mono text-xs">********</code></dd>
+      </dl>
+      {{else}}
+      <label class="flex flex-col gap-1 text-sm" for="plaid_client_id">
+        Client ID {{configSource .ConfigSources "plaid_client_id"}}
+      </label>
+      <input type="text" id="plaid_client_id" name="plaid_client_id" value="{{.PlaidClientID}}" placeholder="Plaid Client ID" class="input input-sm w-full max-w-md">
+
+      <label class="flex flex-col gap-1 text-sm mt-4" for="plaid_secret">
+        Secret {{configSource .ConfigSources "plaid_secret"}}
+      </label>
+      <input type="password" id="plaid_secret" name="plaid_secret" value="{{.PlaidSecret}}" placeholder="Plaid Secret" class="input input-sm w-full max-w-md">
+
+      <label class="flex flex-col gap-1 text-sm mt-4" for="plaid_env">
+        Environment {{configSource .ConfigSources "plaid_env"}}
+      </label>
+      <select id="plaid_env" name="plaid_env" onchange="confirmPlaidEnvChange(this)" class="select select-sm w-full max-w-xs">
+        <option value="sandbox"{{if eq .PlaidEnv "sandbox"}} selected{{end}}>Sandbox</option>
+        <option value="development"{{if eq .PlaidEnv "development"}} selected{{end}}>Development</option>
+        <option value="production"{{if eq .PlaidEnv "production"}} selected{{end}}>Production</option>
+      </select>
+      <p class="text-xs text-base-content/60 mt-1">Credentials will be validated before saving.</p>
+      {{end}}
+
+      {{if or .PlaidFromEnv (ne .PlaidClientID "")}}
+      <div class="mt-4 flex items-center gap-3">
+        <button type="button" class="btn btn-sm btn-ghost" onclick="testProvider('plaid')" id="test-plaid-btn">Test Plaid Connection</button>
+        <span id="test-plaid-result" class="text-sm"></span>
+      </div>
+      {{end}}
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-sm mb-6">
+    <div class="card-body">
+      <h2 class="card-title">Teller</h2>
+
+      {{if .TellerFromEnv}}
+      <p class="text-sm">Teller is configured via environment variables.</p>
+      <dl class="bb-info-grid mt-2">
+        <dt>App ID {{configSource .ConfigSources "teller_app_id"}}</dt>
+        <dd><code class="font-mono text-xs">{{.TellerAppID}}</code></dd>
+        <dt>Environment {{configSource .ConfigSources "teller_env"}}</dt>
+        <dd>{{.TellerEnv}}</dd>
+        <dt>Certificate</dt>
+        <dd>{{if .TellerCertConfigured}}Configured{{else}}Not configured{{end}}</dd>
+        <dt>Webhook Secret</dt>
+        <dd>{{if .TellerWebhookConfigured}}Configured{{else}}Not configured{{end}}</dd>
+      </dl>
+      {{else if ne .TellerAppID ""}}
+      <p class="text-sm">Teller App ID is configured via database. Certificate and key paths must be set via environment variables.</p>
+      <label class="flex flex-col gap-1 text-sm mt-2" for="teller_app_id">
+        App ID {{configSource .ConfigSources "teller_app_id"}}
+      </label>
+      <input type="text" id="teller_app_id" name="teller_app_id" value="{{.TellerAppID}}" class="input input-sm w-full max-w-md">
+      <label class="flex flex-col gap-1 text-sm mt-4" for="teller_env">
+        Environment {{configSource .ConfigSources "teller_env"}}
+      </label>
+      <select id="teller_env" name="teller_env" class="select select-sm w-full max-w-xs">
+        <option value="sandbox"{{if eq .TellerEnv "sandbox"}} selected{{end}}>Sandbox</option>
+        <option value="production"{{if eq .TellerEnv "production"}} selected{{end}}>Production</option>
+      </select>
+      {{else}}
+      <p class="text-sm">Teller is not configured. Set the following environment variables to enable:</p>
+      <div class="collapse collapse-arrow bg-base-200 mt-2">
+        <input type="checkbox" />
+        <div class="collapse-title text-sm font-medium">Environment variable setup</div>
+        <div class="collapse-content">
+          <pre class="bg-base-300 rounded p-3 text-xs overflow-x-auto"><code>TELLER_APP_ID=your-app-id
 TELLER_CERT_PATH=/path/to/certificate.pem
 TELLER_KEY_PATH=/path/to/private_key.pem
 TELLER_ENV=sandbox
 TELLER_WEBHOOK_SECRET=your-webhook-secret</code></pre>
-      <p><small>For Docker Compose, add to your <code>.env</code> file and mount certificate files:</small></p>
-      <pre><code>services:
+          <p class="text-xs text-base-content/60 mt-2">For Docker Compose, add to your <code>.env</code> file and mount certificate files:</p>
+          <pre class="bg-base-300 rounded p-3 text-xs overflow-x-auto mt-2"><code>services:
   breadbox:
     environment:
       - TELLER_APP_ID=${TELLER_APP_ID}
@@ -109,60 +130,68 @@ TELLER_WEBHOOK_SECRET=your-webhook-secret</code></pre>
       - TELLER_ENV=${TELLER_ENV:-sandbox}
     volumes:
       - ./certs/teller:/certs/teller:ro</code></pre>
-      <p><small>Alternatively, set <code>teller_app_id</code> via the database and only configure cert/key paths via env vars.</small></p>
-      <label for="teller_app_id">App ID (optional, saves to database)</label>
-      <input type="text" id="teller_app_id" name="teller_app_id" value="" placeholder="Teller App ID">
-      <label for="teller_env">Environment</label>
-      <select id="teller_env" name="teller_env">
-        <option value="sandbox" selected>Sandbox</option>
-        <option value="production">Production</option>
-      </select>
-    </details>
-    {{end}}
+          <p class="text-xs text-base-content/60 mt-2">Alternatively, set <code>teller_app_id</code> via the database and only configure cert/key paths via env vars.</p>
+          <label class="flex flex-col gap-1 text-sm mt-4" for="teller_app_id">App ID (optional, saves to database)</label>
+          <input type="text" id="teller_app_id" name="teller_app_id" value="" placeholder="Teller App ID" class="input input-sm w-full max-w-md">
+          <label class="flex flex-col gap-1 text-sm mt-4" for="teller_env">Environment</label>
+          <select id="teller_env" name="teller_env" class="select select-sm w-full max-w-xs">
+            <option value="sandbox" selected>Sandbox</option>
+            <option value="production">Production</option>
+          </select>
+        </div>
+      </div>
+      {{end}}
 
-    {{if .TellerCertConfigured}}
-    <div style="margin-top: 0.5rem;">
-      <button type="button" class="outline" onclick="testProvider('teller')" id="test-teller-btn">Test Teller Connection</button>
-      <span id="test-teller-result" style="margin-left: 0.5rem;"></span>
+      {{if .TellerCertConfigured}}
+      <div class="mt-4 flex items-center gap-3">
+        <button type="button" class="btn btn-sm btn-ghost" onclick="testProvider('teller')" id="test-teller-btn">Test Teller Connection</button>
+        <span id="test-teller-result" class="text-sm"></span>
+      </div>
+      {{end}}
     </div>
-    {{end}}
-  </article>
+  </div>
 
-  <button type="submit">Save Settings</button>
+  <button type="submit" class="btn btn-primary">Save Settings</button>
 </form>
 
-<article>
-  <header><strong>Security</strong></header>
-  <form method="POST" action="/admin/settings/password">
-    <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-    <label for="current_password">Current Password</label>
-    <input type="password" id="current_password" name="current_password" required>
-    <label for="new_password">New Password</label>
-    <input type="password" id="new_password" name="new_password" required minlength="8">
-    <label for="confirm_password">Confirm New Password</label>
-    <input type="password" id="confirm_password" name="confirm_password" required>
-    <button type="submit">Change Password</button>
-  </form>
-</article>
+<div class="card bg-base-100 shadow-sm mb-6 mt-6">
+  <div class="card-body">
+    <h2 class="card-title">Security</h2>
+    <form method="POST" action="/admin/settings/password">
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+      <label class="flex flex-col gap-1 text-sm" for="current_password">Current Password</label>
+      <input type="password" id="current_password" name="current_password" required class="input input-sm w-full max-w-md">
+      <label class="flex flex-col gap-1 text-sm mt-4" for="new_password">New Password</label>
+      <input type="password" id="new_password" name="new_password" required minlength="8" class="input input-sm w-full max-w-md">
+      <label class="flex flex-col gap-1 text-sm mt-4" for="confirm_password">Confirm New Password</label>
+      <input type="password" id="confirm_password" name="confirm_password" required class="input input-sm w-full max-w-md">
+      <div class="mt-4">
+        <button type="submit" class="btn btn-primary btn-sm">Change Password</button>
+      </div>
+    </form>
+  </div>
+</div>
 
-<article>
-  <header><strong>System</strong></header>
-  <dl>
-    <dt>Breadbox Version</dt><dd>{{.Version}}</dd>
-    <dt>Go Runtime</dt><dd>{{.GoVersion}}</dd>
-    <dt>PostgreSQL</dt><dd>{{.PostgresVersion}}</dd>
-    <dt>Uptime</dt><dd>{{.Uptime}}</dd>
-    <dt>Providers</dt><dd>{{.ProviderCount}} configured</dd>
-  </dl>
-</article>
+<div class="card bg-base-100 shadow-sm mb-6">
+  <div class="card-body">
+    <h2 class="card-title">System</h2>
+    <dl class="bb-info-grid">
+      <dt>Breadbox Version</dt><dd>{{.Version}}</dd>
+      <dt>Go Runtime</dt><dd>{{.GoVersion}}</dd>
+      <dt>PostgreSQL</dt><dd>{{.PostgresVersion}}</dd>
+      <dt>Uptime</dt><dd>{{.Uptime}}</dd>
+      <dt>Providers</dt><dd>{{.ProviderCount}} configured</dd>
+    </dl>
+  </div>
+</div>
 
 <script>
 function testProvider(name) {
   var btn = document.getElementById('test-' + name + '-btn');
   var result = document.getElementById('test-' + name + '-result');
   btn.disabled = true;
-  result.textContent = 'Testing...';
-  result.style.color = '';
+  result.textContent = '';
+  result.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Testing...';
   fetch("/admin/api/test-provider/" + name, {
     method: "POST"
   })
@@ -170,17 +199,14 @@ function testProvider(name) {
   .then(function(data) {
     btn.disabled = false;
     if (data.success) {
-      result.textContent = data.message;
-      result.style.color = 'green';
+      result.innerHTML = '<span class="text-success">' + data.message + '</span>';
     } else {
-      result.textContent = data.message || data.error;
-      result.style.color = 'red';
+      result.innerHTML = '<span class="text-error">' + (data.message || data.error) + '</span>';
     }
   })
   .catch(function() {
     btn.disabled = false;
-    result.textContent = 'Network error';
-    result.style.color = 'red';
+    result.innerHTML = '<span class="text-error">Network error</span>';
   });
 }
 

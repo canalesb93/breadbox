@@ -1,40 +1,58 @@
 {{define "content"}}
-<h1>Dashboard</h1>
+<h1 class="text-2xl font-bold mb-6">Dashboard</h1>
 
 {{if gt .NeedsAttention 0}}
-<div role="alert" data-flash="error">
-  <strong>{{.NeedsAttention}} connection(s) need attention.</strong>
-  <a href="/admin/connections">View connections &rarr;</a>
+<div class="alert alert-warning mb-6">
+  <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+  <div>
+    <strong>{{.NeedsAttention}} connection(s) need attention.</strong>
+    <a href="/admin/connections" class="link ml-1">View connections &rarr;</a>
+  </div>
 </div>
 {{end}}
 
-<div class="bb-stats">
-  <div class="bb-stat">
-    <div class="bb-stat-label">Accounts Connected</div>
-    <div class="bb-stat-value">{{.AccountCount}}</div>
+<div class="stats stats-vertical lg:stats-horizontal shadow mb-8 w-full">
+  <div class="stat">
+    <div class="stat-figure text-base-content/50">
+      <i data-lucide="building-2" class="w-8 h-8"></i>
+    </div>
+    <div class="stat-title">Accounts Connected</div>
+    <div class="stat-value">{{.AccountCount}}</div>
   </div>
-  <a href="/admin/transactions" class="bb-stat" style="text-decoration:none; color:inherit;">
-    <div class="bb-stat-label">Transactions Synced</div>
-    <div class="bb-stat-value">{{.TxCount}}</div>
+  <a href="/admin/transactions" class="stat hover:bg-base-200 no-underline">
+    <div class="stat-figure text-base-content/50">
+      <i data-lucide="trending-up" class="w-8 h-8"></i>
+    </div>
+    <div class="stat-title">Transactions Synced</div>
+    <div class="stat-value">{{.TxCount}}</div>
   </a>
-  <div class="bb-stat">
-    <div class="bb-stat-label">Last Sync</div>
-    <div class="bb-stat-value">{{.LastSync}}</div>
+  <div class="stat">
+    <div class="stat-figure text-base-content/50">
+      <i data-lucide="clock" class="w-8 h-8"></i>
+    </div>
+    <div class="stat-title">Last Sync</div>
+    <div class="stat-value text-lg">{{.LastSync}}</div>
   </div>
   {{if gt .NeedsAttention 0}}
-  <a href="/admin/connections" class="bb-stat bb-stat--warn" style="text-decoration:none; color:inherit;">
-    <div class="bb-stat-label">Needs Attention</div>
-    <div class="bb-stat-value">{{.NeedsAttention}}</div>
+  <a href="/admin/connections" class="stat border-l-4 border-warning hover:bg-base-200 no-underline">
+    <div class="stat-figure text-warning">
+      <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+    </div>
+    <div class="stat-title">Needs Attention</div>
+    <div class="stat-value text-warning">{{.NeedsAttention}}</div>
   </a>
   {{else}}
-  <div class="bb-stat">
-    <div class="bb-stat-label">Needs Attention</div>
-    <div class="bb-stat-value">{{.NeedsAttention}}</div>
+  <div class="stat">
+    <div class="stat-figure text-base-content/50">
+      <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+    </div>
+    <div class="stat-title">Needs Attention</div>
+    <div class="stat-value">{{.NeedsAttention}}</div>
   </div>
   {{end}}
 </div>
 
-<h2>Recent Sync Activity</h2>
+<h2 class="text-lg font-semibold mb-4">Recent Sync Activity</h2>
 
 {{if .RecentLogs}}
 <div class="overflow-x-auto">
@@ -66,11 +84,14 @@
   </table>
 </div>
 {{else}}
-<p>No sync activity yet. Connect a bank to get started.</p>
+<p class="text-base-content/70">No sync activity yet. Connect a bank to get started.</p>
 {{end}}
 
-<p style="display:flex; gap:var(--bb-gap-md);">
-  <a href="/admin/connections/new" role="button">Connect New Bank</a>
-  <a href="/admin/sync-logs" role="button" class="secondary outline">View All Sync Logs</a>
-</p>
+<div class="flex gap-3 mt-6">
+  <a href="/admin/connections/new" class="btn btn-primary">
+    <i data-lucide="plus" class="w-4 h-4"></i>
+    Connect New Bank
+  </a>
+  <a href="/admin/sync-logs" class="btn btn-ghost">View All Sync Logs</a>
+</div>
 {{end}}

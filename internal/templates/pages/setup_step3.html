@@ -1,29 +1,27 @@
 {{define "content"}}
-<article>
-  <header>Set Sync Interval</header>
+<h2 class="text-lg font-semibold mb-2">Set Sync Interval</h2>
 
-  <p>Breadbox syncs your bank data on a schedule. More frequent syncs mean faster updates but higher API costs if you are on a paid Plaid plan. If you configure a webhook URL (next step), Plaid will also push sync notifications, reducing the need for frequent polling.</p>
+<p class="text-sm text-base-content/70 mb-4">Breadbox syncs your bank data on a schedule. More frequent syncs mean faster updates but higher API costs if you are on a paid Plaid plan. If you configure a webhook URL (next step), Plaid will also push sync notifications, reducing the need for frequent polling.</p>
 
-  {{if .Error}}
-  <div role="alert" data-flash="error">{{.Error}}</div>
-  {{end}}
+{{if .Error}}
+<div role="alert" class="alert alert-error mb-4">{{.Error}}</div>
+{{end}}
 
-  <form method="POST" action="/admin/setup/step/4">
-    {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+<form method="POST" action="/admin/setup/step/4">
+  {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
 
-    <label for="sync_interval_minutes">Sync Interval</label>
-    <select id="sync_interval_minutes" name="sync_interval_minutes" required>
-      <option value="15"{{if eq .SyncInterval "15"}} selected{{end}}>Every 15 minutes</option>
-      <option value="30"{{if eq .SyncInterval "30"}} selected{{end}}>Every 30 minutes</option>
-      <option value="60"{{if eq .SyncInterval "60"}} selected{{end}}>Every 1 hour</option>
-      <option value="240"{{if eq .SyncInterval "240"}} selected{{end}}>Every 4 hours</option>
-      <option value="480"{{if eq .SyncInterval "480"}} selected{{end}}>Every 8 hours</option>
-      <option value="720"{{if or (eq .SyncInterval "720") (eq .SyncInterval "")}} selected{{end}}>Every 12 hours (recommended)</option>
-      <option value="1440"{{if eq .SyncInterval "1440"}} selected{{end}}>Every 24 hours</option>
-    </select>
-    <small>API cost note: Each sync call counts toward your Plaid usage. Sandbox is free. Development is limited by your development key quota. Production is billed per item per month regardless of sync frequency, so more frequent syncs have no additional cost per item.</small>
+  <label class="flex flex-col gap-1 text-sm mb-4" for="sync_interval_minutes">Sync Interval</label>
+  <select id="sync_interval_minutes" name="sync_interval_minutes" required class="select w-full">
+    <option value="15"{{if eq .SyncInterval "15"}} selected{{end}}>Every 15 minutes</option>
+    <option value="30"{{if eq .SyncInterval "30"}} selected{{end}}>Every 30 minutes</option>
+    <option value="60"{{if eq .SyncInterval "60"}} selected{{end}}>Every 1 hour</option>
+    <option value="240"{{if eq .SyncInterval "240"}} selected{{end}}>Every 4 hours</option>
+    <option value="480"{{if eq .SyncInterval "480"}} selected{{end}}>Every 8 hours</option>
+    <option value="720"{{if or (eq .SyncInterval "720") (eq .SyncInterval "")}} selected{{end}}>Every 12 hours (recommended)</option>
+    <option value="1440"{{if eq .SyncInterval "1440"}} selected{{end}}>Every 24 hours</option>
+  </select>
+  <p class="text-xs text-base-content/60 mt-1">API cost note: Each sync call counts toward your Plaid usage. Sandbox is free. Development is limited by your development key quota. Production is billed per item per month regardless of sync frequency, so more frequent syncs have no additional cost per item.</p>
 
-    <button type="submit">Save and Continue</button>
-  </form>
-</article>
+  <button type="submit" class="btn btn-primary w-full mt-6">Save and Continue</button>
+</form>
 {{end}}

@@ -1,67 +1,79 @@
 {{define "content"}}
-<article>
-  <header>Configure Bank Providers</header>
+<h2 class="text-lg font-semibold mb-2">Configure Bank Providers</h2>
 
-  <p>Breadbox connects to banks via Plaid and/or Teller. Configure at least one provider, or skip and set them up later in Settings.</p>
+<p class="text-sm text-base-content/70 mb-4">Breadbox connects to banks via Plaid and/or Teller. Configure at least one provider, or skip and set them up later in Settings.</p>
 
-  {{if .Error}}
-  <div role="alert" data-flash="error">{{.Error}}</div>
-  {{end}}
+{{if .Error}}
+<div role="alert" class="alert alert-error mb-4">{{.Error}}</div>
+{{end}}
 
-  <form method="POST" action="/admin/setup/step/2" id="provider-form">
-    {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
-    <input type="hidden" name="provider_choice" id="provider_choice" value="plaid">
+<form method="POST" action="/admin/setup/step/2" id="provider-form">
+  {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+  <input type="hidden" name="provider_choice" id="provider_choice" value="plaid">
 
-    <fieldset>
-      <legend>Which providers do you want to configure?</legend>
-      <label><input type="radio" name="provider_radio" value="plaid" checked onchange="updateProvider(this.value)"> Plaid only</label>
-      <label><input type="radio" name="provider_radio" value="teller" onchange="updateProvider(this.value)"> Teller only</label>
-      <label><input type="radio" name="provider_radio" value="both" onchange="updateProvider(this.value)"> Both Plaid and Teller</label>
-      <label><input type="radio" name="provider_radio" value="skip" onchange="updateProvider(this.value)"> Skip &mdash; I'll configure providers later</label>
-    </fieldset>
-
-    <div id="plaid-section">
-      <h4>Plaid Credentials</h4>
-      <p><a href="https://plaid.com/docs" target="_blank" rel="noopener">Create a Plaid account at plaid.com/docs</a></p>
-
-      <label for="client_id">Client ID</label>
-      <input type="text" id="client_id" name="client_id" value="{{.ClientID}}" spellcheck="false"
-             {{if .Errors.ClientID}}aria-invalid="true"{{end}}>
-      {{if .Errors.ClientID}}<small>{{.Errors.ClientID}}</small>{{end}}
-
-      <label for="secret">Secret</label>
-      <input type="password" id="secret" name="secret" spellcheck="false"
-             {{if .Errors.Secret}}aria-invalid="true"{{end}}>
-      {{if .Errors.Secret}}<small>{{.Errors.Secret}}</small>{{end}}
-
-      <label for="environment">Environment</label>
-      <select id="environment" name="environment">
-        <option value="sandbox"{{if eq .Environment "sandbox"}} selected{{end}}>Sandbox (free testing, simulated data)</option>
-        <option value="development"{{if or (eq .Environment "development") (eq .Environment "")}} selected{{end}}>Development (real banks, limited connections)</option>
-        <option value="production"{{if eq .Environment "production"}} selected{{end}}>Production (real banks, paid)</option>
-      </select>
-      <small>Sandbox uses simulated data. Development and Production access real bank accounts.</small>
+  <fieldset class="fieldset mb-4">
+    <legend class="fieldset-label">Which providers do you want to configure?</legend>
+    <div class="flex flex-col gap-2 mt-2">
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="radio" name="provider_radio" value="plaid" checked onchange="updateProvider(this.value)" class="radio radio-sm">
+        Plaid only
+      </label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="radio" name="provider_radio" value="teller" onchange="updateProvider(this.value)" class="radio radio-sm">
+        Teller only
+      </label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="radio" name="provider_radio" value="both" onchange="updateProvider(this.value)" class="radio radio-sm">
+        Both Plaid and Teller
+      </label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="radio" name="provider_radio" value="skip" onchange="updateProvider(this.value)" class="radio radio-sm">
+        Skip &mdash; I'll configure providers later
+      </label>
     </div>
+  </fieldset>
 
-    <div id="teller-section" style="display: none;">
-      <h4>Teller Configuration</h4>
-      <p>Teller requires mTLS certificates that must be configured via environment variables. Set the following before starting Breadbox:</p>
-      <pre><code>TELLER_APP_ID=your-app-id
+  <div id="plaid-section">
+    <h3 class="text-base font-semibold mb-2">Plaid Credentials</h3>
+    <p class="text-sm text-base-content/70 mb-3"><a href="https://plaid.com/docs" target="_blank" rel="noopener" class="link">Create a Plaid account at plaid.com/docs</a></p>
+
+    <label class="flex flex-col gap-1 text-sm mb-3" for="client_id">Client ID</label>
+    <input type="text" id="client_id" name="client_id" value="{{.ClientID}}" spellcheck="false"
+           class="input w-full{{if .Errors.ClientID}} input-error{{end}}">
+    {{if .Errors.ClientID}}<p class="text-xs text-error mt-1">{{.Errors.ClientID}}</p>{{end}}
+
+    <label class="flex flex-col gap-1 text-sm mb-3 mt-3" for="secret">Secret</label>
+    <input type="password" id="secret" name="secret" spellcheck="false"
+           class="input w-full{{if .Errors.Secret}} input-error{{end}}">
+    {{if .Errors.Secret}}<p class="text-xs text-error mt-1">{{.Errors.Secret}}</p>{{end}}
+
+    <label class="flex flex-col gap-1 text-sm mb-3 mt-3" for="environment">Environment</label>
+    <select id="environment" name="environment" class="select w-full">
+      <option value="sandbox"{{if eq .Environment "sandbox"}} selected{{end}}>Sandbox (free testing, simulated data)</option>
+      <option value="development"{{if or (eq .Environment "development") (eq .Environment "")}} selected{{end}}>Development (real banks, limited connections)</option>
+      <option value="production"{{if eq .Environment "production"}} selected{{end}}>Production (real banks, paid)</option>
+    </select>
+    <p class="text-xs text-base-content/60 mt-1">Sandbox uses simulated data. Development and Production access real bank accounts.</p>
+  </div>
+
+  <div id="teller-section" class="hidden">
+    <h3 class="text-base font-semibold mb-2">Teller Configuration</h3>
+    <p class="text-sm text-base-content/70 mb-3">Teller requires mTLS certificates that must be configured via environment variables. Set the following before starting Breadbox:</p>
+    <pre class="bg-base-200 rounded p-3 text-xs overflow-x-auto"><code>TELLER_APP_ID=your-app-id
 TELLER_CERT_PATH=/path/to/certificate.pem
 TELLER_KEY_PATH=/path/to/private_key.pem
 TELLER_ENV=sandbox</code></pre>
-      <p><small>For Docker Compose, add these to your <code>.env</code> file and mount the certificate files as volumes.</small></p>
-    </div>
+    <p class="text-xs text-base-content/60 mt-2">For Docker Compose, add these to your <code>.env</code> file and mount the certificate files as volumes.</p>
+  </div>
 
-    <div id="submit-section">
-      <button type="submit">Validate and Continue</button>
-    </div>
+  <div id="submit-section" class="mt-6">
+    <button type="submit" class="btn btn-primary w-full">Validate and Continue</button>
+  </div>
 
-    <div id="skip-section" style="display: none; text-align: center;">
-      <button type="submit" class="secondary outline">Skip All Providers</button>
-    </div>
-  </form>
-</article>
+  <div id="skip-section" class="hidden mt-6 text-center">
+    <button type="submit" class="btn btn-ghost w-full">Skip All Providers</button>
+  </div>
+</form>
 
 <script>
 function updateProvider(value) {
@@ -71,10 +83,10 @@ function updateProvider(value) {
   var submit = document.getElementById('submit-section');
   var skip = document.getElementById('skip-section');
 
-  plaid.style.display = (value === 'plaid' || value === 'both') ? '' : 'none';
-  teller.style.display = (value === 'teller' || value === 'both') ? '' : 'none';
-  submit.style.display = (value !== 'skip') ? '' : 'none';
-  skip.style.display = (value === 'skip') ? '' : 'none';
+  plaid.classList.toggle('hidden', !(value === 'plaid' || value === 'both'));
+  teller.classList.toggle('hidden', !(value === 'teller' || value === 'both'));
+  submit.classList.toggle('hidden', value === 'skip');
+  skip.classList.toggle('hidden', value !== 'skip');
 }
 </script>
 {{end}}

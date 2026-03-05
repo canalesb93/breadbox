@@ -1,39 +1,52 @@
 {{define "content"}}
-<h1>Connect New Bank</h1>
+<h1 class="text-2xl font-bold mb-6">Connect New Bank</h1>
 
-<div id="step-select" {{if .ShowLink}}style="display:none"{{end}}>
-  <article>
-    <header>Select Family Member</header>
-    <p>Choose which family member this bank connection belongs to.</p>
-    <form id="member-form">
-      <label for="provider">Bank Provider</label>
-      <select id="provider" name="provider" required>
-        {{if .HasPlaid}}<option value="plaid">Plaid</option>{{end}}
-        {{if .HasTeller}}<option value="teller">Teller</option>{{end}}
-        <option value="csv">CSV Import</option>
-      </select>
+<div id="step-select" {{if .ShowLink}}class="hidden"{{end}}>
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">Select Family Member</h2>
+      <p class="text-base-content/70">Choose which family member this bank connection belongs to.</p>
+      <form id="member-form" class="flex flex-col gap-4 mt-2">
+        <label class="form-control w-full max-w-xs">
+          <div class="label"><span class="label-text">Bank Provider</span></div>
+          <select id="provider" name="provider" required class="select select-sm w-full max-w-xs">
+            {{if .HasPlaid}}<option value="plaid">Plaid</option>{{end}}
+            {{if .HasTeller}}<option value="teller">Teller</option>{{end}}
+            <option value="csv">CSV Import</option>
+          </select>
+        </label>
 
-      <label for="user_id">Family Member</label>
-      <select id="user_id" name="user_id" required>
-        <option value="" disabled selected>Select a member...</option>
-        {{range .Users}}
-        <option value="{{formatUUID .ID}}">{{.Name}}</option>
-        {{end}}
-      </select>
-      <button type="submit">Continue to Bank Selection</button>
-    </form>
-  </article>
-  <p><a href="/admin/connections">&larr; Back to Connections</a></p>
+        <label class="form-control w-full max-w-xs">
+          <div class="label"><span class="label-text">Family Member</span></div>
+          <select id="user_id" name="user_id" required class="select select-sm w-full max-w-xs">
+            <option value="" disabled selected>Select a member...</option>
+            {{range .Users}}
+            <option value="{{formatUUID .ID}}">{{.Name}}</option>
+            {{end}}
+          </select>
+        </label>
+
+        <div>
+          <button type="submit" class="btn btn-primary btn-sm">Continue to Bank Selection</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <p class="mt-4"><a href="/admin/connections" class="link">&larr; Back to Connections</a></p>
 </div>
 
-<div id="step-link" style="display:none">
-  <article>
-    <header>Connect Bank</header>
-    <p>Connecting for: <strong id="member-name"></strong></p>
-    <p id="link-status">Opening bank connection dialog...</p>
-    <button id="retry-btn" style="display:none">Retry</button>
-  </article>
-  <p><a href="#" id="back-btn">&larr; Back to member selection</a></p>
+<div id="step-link" class="hidden">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">Connect Bank</h2>
+      <p>Connecting for: <strong id="member-name"></strong></p>
+      <p id="link-status" class="text-base-content/70">Opening bank connection dialog...</p>
+      <div>
+        <button id="retry-btn" class="btn btn-primary btn-sm hidden">Retry</button>
+      </div>
+    </div>
+  </div>
+  <p class="mt-4"><a href="#" id="back-btn" class="link">&larr; Back to member selection</a></p>
 </div>
 
 <script>
@@ -59,8 +72,8 @@
       return;
     }
     memberNameEl.textContent = select.options[select.selectedIndex].text;
-    stepSelect.style.display = "none";
-    stepLink.style.display = "block";
+    stepSelect.classList.add("hidden");
+    stepLink.classList.remove("hidden");
     loadProviderSDK(selectedProvider, startLink);
   });
 
@@ -82,28 +95,32 @@
 
   backBtn.addEventListener("click", function (e) {
     e.preventDefault();
-    stepLink.style.display = "none";
-    stepSelect.style.display = "block";
+    stepLink.classList.add("hidden");
+    stepSelect.classList.remove("hidden");
     linkStatus.textContent = "Opening bank connection dialog...";
-    linkStatus.className = "";
-    retryBtn.style.display = "none";
+    linkStatus.classList.remove("text-error");
+    linkStatus.classList.add("text-base-content/70");
+    retryBtn.classList.add("hidden");
   });
 
   function showError(msg) {
     linkStatus.textContent = msg;
-    linkStatus.style.color = "var(--bb-color-error)";
-    retryBtn.style.display = "inline-block";
+    linkStatus.classList.add("text-error");
+    linkStatus.classList.remove("text-base-content/70");
+    retryBtn.classList.remove("hidden");
   }
 
   function showMessage(msg) {
     linkStatus.textContent = msg;
-    linkStatus.style.color = "";
+    linkStatus.classList.remove("text-error");
+    linkStatus.classList.add("text-base-content/70");
   }
 
   function startLink() {
     linkStatus.textContent = "Opening bank connection dialog...";
-    linkStatus.style.color = "";
-    retryBtn.style.display = "none";
+    linkStatus.classList.remove("text-error");
+    linkStatus.classList.add("text-base-content/70");
+    retryBtn.classList.add("hidden");
 
     fetch("/admin/api/link-token", {
       method: "POST",

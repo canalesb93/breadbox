@@ -1,33 +1,31 @@
 {{define "content"}}
-<article>
-  <header>Add a Family Member</header>
+<h2 class="text-lg font-semibold mb-2">Add a Family Member</h2>
 
-  <p>Each bank connection is assigned to a family member. Add at least one now, or skip and add members later.</p>
+<p class="text-sm text-base-content/70 mb-4">Each bank connection is assigned to a family member. Add at least one now, or skip and add members later.</p>
 
-  {{if .Error}}
-  <div role="alert" data-flash="error">{{.Error}}</div>
-  {{end}}
+{{if .Error}}
+<div role="alert" class="alert alert-error mb-4">{{.Error}}</div>
+{{end}}
 
-  <form method="POST" action="/admin/setup/step/3">
-    {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+<form method="POST" action="/admin/setup/step/3">
+  {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
 
-    <label for="name">Name</label>
-    <input type="text" id="name" name="name" value="{{.Name}}" required
-           {{if .Errors.Name}}aria-invalid="true"{{end}}>
-    {{if .Errors.Name}}<small>{{.Errors.Name}}</small>{{end}}
+  <label class="flex flex-col gap-1 text-sm mb-4" for="name">Name</label>
+  <input type="text" id="name" name="name" value="{{.Name}}" required
+         class="input w-full{{if .Errors.Name}} input-error{{end}}">
+  {{if .Errors.Name}}<p class="text-xs text-error mt-1">{{.Errors.Name}}</p>{{end}}
 
-    <label for="email">Email (optional)</label>
-    <input type="email" id="email" name="email" value="{{.Email}}"
-           {{if .Errors.Email}}aria-invalid="true"{{end}}>
-    {{if .Errors.Email}}<small>{{.Errors.Email}}</small>{{end}}
+  <label class="flex flex-col gap-1 text-sm mb-4 mt-4" for="email">Email (optional)</label>
+  <input type="email" id="email" name="email" value="{{.Email}}"
+         class="input w-full{{if .Errors.Email}} input-error{{end}}">
+  {{if .Errors.Email}}<p class="text-xs text-error mt-1">{{.Errors.Email}}</p>{{end}}
 
-    <button type="submit">Save and Continue</button>
-  </form>
+  <button type="submit" class="btn btn-primary w-full mt-6">Save and Continue</button>
+</form>
 
-  <form method="POST" action="/admin/setup/step/3" style="margin-top: 1rem; text-align: center;">
-    {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
-    <input type="hidden" name="skip" value="true">
-    <button type="submit" class="secondary outline">Skip &mdash; I'll add members later</button>
-  </form>
-</article>
+<form method="POST" action="/admin/setup/step/3" class="mt-4 text-center">
+  {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+  <input type="hidden" name="skip" value="true">
+  <button type="submit" class="btn btn-ghost w-full">Skip &mdash; I'll add members later</button>
+</form>
 {{end}}

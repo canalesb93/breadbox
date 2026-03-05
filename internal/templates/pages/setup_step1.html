@@ -1,33 +1,31 @@
 {{define "content"}}
-<article>
-  <header>Create Admin Account</header>
+<h2 class="text-lg font-semibold mb-2">Create Admin Account</h2>
 
-  <p>Set up your dashboard login.</p>
+<p class="text-sm text-base-content/70 mb-4">Set up your dashboard login.</p>
 
-  {{if .Error}}
-  <div role="alert" data-flash="error">{{.Error}}</div>
-  {{end}}
+{{if .Error}}
+<div role="alert" class="alert alert-error mb-4">{{.Error}}</div>
+{{end}}
 
-  <form method="POST" action="/admin/setup/step/1">
-    {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+<form method="POST" action="/admin/setup/step/1">
+  {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
 
-    <label for="username">Username</label>
-    <input type="text" id="username" name="username" value="{{.Username}}" required autocomplete="username"
-           {{if .Errors.Username}}aria-invalid="true"{{end}}>
-    {{if .Errors.Username}}<small>{{.Errors.Username}}</small>{{end}}
+  <label class="flex flex-col gap-1 text-sm mb-4" for="username">Username</label>
+  <input type="text" id="username" name="username" value="{{.Username}}" required autocomplete="username"
+         class="input w-full{{if .Errors.Username}} input-error{{end}}">
+  {{if .Errors.Username}}<p class="text-xs text-error mt-1">{{.Errors.Username}}</p>{{end}}
 
-    <label for="password">Password</label>
-    <input type="password" id="password" name="password" required autocomplete="new-password" minlength="8"
-           {{if .Errors.Password}}aria-invalid="true"{{end}}>
-    <small>Minimum 8 characters</small>
-    {{if .Errors.Password}}<small>{{.Errors.Password}}</small>{{end}}
+  <label class="flex flex-col gap-1 text-sm mb-4 mt-4" for="password">Password</label>
+  <input type="password" id="password" name="password" required autocomplete="new-password" minlength="8"
+         class="input w-full{{if .Errors.Password}} input-error{{end}}">
+  <p class="text-xs text-base-content/60 mt-1">Minimum 8 characters</p>
+  {{if .Errors.Password}}<p class="text-xs text-error mt-1">{{.Errors.Password}}</p>{{end}}
 
-    <label for="confirm_password">Confirm Password</label>
-    <input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password"
-           {{if .Errors.ConfirmPassword}}aria-invalid="true"{{end}}>
-    {{if .Errors.ConfirmPassword}}<small>{{.Errors.ConfirmPassword}}</small>{{end}}
+  <label class="flex flex-col gap-1 text-sm mb-4 mt-4" for="confirm_password">Confirm Password</label>
+  <input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password"
+         class="input w-full{{if .Errors.ConfirmPassword}} input-error{{end}}">
+  {{if .Errors.ConfirmPassword}}<p class="text-xs text-error mt-1">{{.Errors.ConfirmPassword}}</p>{{end}}
 
-    <button type="submit">Create Account and Continue</button>
-  </form>
-</article>
+  <button type="submit" class="btn btn-primary w-full mt-6">Create Account and Continue</button>
+</form>
 {{end}}

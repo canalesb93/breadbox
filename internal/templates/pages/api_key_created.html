@@ -1,24 +1,35 @@
 {{define "content"}}
-<h1>API Key Created</h1>
-<div data-flash="success" style="padding: var(--bb-gap-md) 1.25rem; margin-bottom: var(--bb-gap-lg);">
-  <strong>Your API key has been created.</strong> Copy it now — you won't be able to see it again.
+<h1 class="text-2xl font-bold mb-6">API Key Created</h1>
+
+<div class="alert alert-success mb-6">
+  <i data-lucide="check-circle" class="w-5 h-5"></i>
+  <span><strong>Your API key has been created.</strong> Copy it now — you won't be able to see it again.</span>
 </div>
-<label>
-  API Key Name
-  <input type="text" value="{{.KeyName}}" readonly>
-</label>
-<label>
-  API Key
-  <input type="text" value="{{.PlaintextKey}}" readonly id="api-key-value" style="font-family: monospace;">
-</label>
-<div style="margin-top: var(--bb-gap-md);" x-data="{ copied: false }">
-  <button @click="navigator.clipboard.writeText(document.getElementById('api-key-value').value).then(function(){ $data.copied = true; setTimeout(function(){ $data.copied = false; }, 2000); })">
-    <span x-show="!copied">Copy to Clipboard</span>
-    <span x-show="copied" x-cloak>Copied!</span>
-  </button>
-  <a href="/admin/api-keys" role="button" class="secondary outline" style="margin-left: 0.5rem;">Done</a>
+
+<div class="card bg-base-100 shadow-sm max-w-lg">
+  <div class="card-body">
+    <fieldset class="fieldset">
+      <label class="fieldset-label">API Key Name</label>
+      <input type="text" value="{{.KeyName}}" readonly class="input w-full">
+    </fieldset>
+
+    <fieldset class="fieldset">
+      <label class="fieldset-label">API Key</label>
+      <input type="text" value="{{.PlaintextKey}}" readonly id="api-key-value" class="input input-sm font-mono w-full">
+    </fieldset>
+
+    <div class="flex gap-2 mt-4" x-data="{ copied: false }">
+      <button class="btn btn-primary" @click="navigator.clipboard.writeText(document.getElementById('api-key-value').value).then(function(){ $data.copied = true; setTimeout(function(){ $data.copied = false; }, 2000); })">
+        <i data-lucide="clipboard" class="w-4 h-4"></i>
+        <span x-show="!copied">Copy to Clipboard</span>
+        <span x-show="copied" x-cloak>Copied!</span>
+      </button>
+      <a href="/admin/api-keys" class="btn btn-ghost">Done</a>
+    </div>
+  </div>
 </div>
+
 <p class="mt-6 text-sm text-base-content/60">
-  Use this key in the <code>X-API-Key</code> header when making API requests.
+  Use this key in the <code class="font-mono">X-API-Key</code> header when making API requests.
 </p>
 {{end}}
