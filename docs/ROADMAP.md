@@ -1342,128 +1342,130 @@ Restructure the wizard for multi-provider onboarding, add missing settings featu
 
 ---
 
-## Phase 14: Deployment Readiness & Reliability
+## Phase 14: Deployment Readiness & Reliability ✅
 
 Independent of Phases 10-13. Addresses confirmed deployment blockers and data pipeline reliability gaps identified by PM audit.
 
+**Status:** Complete. All 11 tasks implemented. `go build` and `go vet` pass clean.
+
 ### 14.1 README & Installation Guide
 
-- [ ] Create `README.md` at project root (none currently exists)
-- [ ] Project overview: what Breadbox does, who it's for, tech stack summary
-- [ ] Prerequisites: Go 1.24+, PostgreSQL 16+, Docker (optional)
-- [ ] Docker quickstart: `docker compose up` → setup wizard → first bank connection (5-minute path)
-- [ ] Manual install: build from source, configure PostgreSQL, set env vars, run migrations, start server
-- [ ] Configuration reference: all env vars with descriptions, defaults, and required/optional status
-- [ ] First-run walkthrough: setup wizard steps, adding a family member, connecting a bank
-- [ ] Link to `docs/` for detailed architecture and specs
+- [x] Create `README.md` at project root (none currently exists)
+- [x] Project overview: what Breadbox does, who it's for, tech stack summary
+- [x] Prerequisites: Go 1.24+, PostgreSQL 16+, Docker (optional)
+- [x] Docker quickstart: `docker compose up` → setup wizard → first bank connection (5-minute path)
+- [x] Manual install: build from source, configure PostgreSQL, set env vars, run migrations, start server
+- [x] Configuration reference: all env vars with descriptions, defaults, and required/optional status
+- [x] First-run walkthrough: setup wizard steps, adding a family member, connecting a bank
+- [x] Link to `docs/` for detailed architecture and specs
 - **Ref:** No existing README — `docs/architecture.md` sections 7-8 have some deployment info to consolidate
 - **Files:** `README.md` (new)
 
 ### 14.2 ENCRYPTION_KEY Startup Validation
 
-- [ ] Fail fast on `breadbox serve` if `ENCRYPTION_KEY` is empty/unset and Plaid or Teller providers are configured
-- [ ] Currently: app starts successfully but crashes at runtime when `crypto.Encrypt` is called with nil key (e.g., when storing a Plaid access token after link)
-- [ ] Check: if `cfg.EncryptionKey == nil` AND (`cfg.PlaidClientID != ""` OR `cfg.TellerAppID != ""`), return startup error
-- [ ] Allow startup without key if only CSV provider is used (CSV doesn't encrypt anything)
-- [ ] Clear error message: "ENCRYPTION_KEY is required when Plaid or Teller providers are configured. Generate one with: openssl rand -hex 32"
+- [x] Fail fast on `breadbox serve` if `ENCRYPTION_KEY` is empty/unset and Plaid or Teller providers are configured
+- [x] Currently: app starts successfully but crashes at runtime when `crypto.Encrypt` is called with nil key (e.g., when storing a Plaid access token after link)
+- [x] Check: if `cfg.EncryptionKey == nil` AND (`cfg.PlaidClientID != ""` OR `cfg.TellerAppID != ""`), return startup error
+- [x] Allow startup without key if only CSV provider is used (CSV doesn't encrypt anything)
+- [x] Clear error message: "ENCRYPTION_KEY is required when Plaid or Teller providers are configured. Generate one with: openssl rand -hex 32"
 - **Ref:** `internal/config/load.go` lines 53-63 (validation exists for format but not presence)
 - **Files:** `internal/config/load.go`, `cmd/breadbox/main.go`
 
 ### 14.3 Docker Compose Hardening
 
-- [ ] Change `ports: "5432:5432"` to `expose: ["5432"]` so PostgreSQL is only reachable from other containers, not the host network
-- [ ] Add warning comment in `.env.example` above `POSTGRES_PASSWORD`: "# IMPORTANT: Change this in production! Generate with: openssl rand -base64 32"
-- [ ] Add `.env.example` comment about `sslmode=disable` being appropriate only for Docker internal networking
-- [ ] Keep `ports` mapping for the app container (8080) since that needs host access
+- [x] Change `ports: "5432:5432"` to `expose: ["5432"]` so PostgreSQL is only reachable from other containers, not the host network
+- [x] Add warning comment in `.env.example` above `POSTGRES_PASSWORD`: "# IMPORTANT: Change this in production! Generate with: openssl rand -base64 32"
+- [x] Add `.env.example` comment about `sslmode=disable` being appropriate only for Docker internal networking
+- [x] Keep `ports` mapping for the app container (8080) since that needs host access
 - **Ref:** `docker-compose.yml` line 26, `.env.example` lines 55-57
 - **Files:** `docker-compose.yml`, `.env.example`
 
 ### 14.4 Deep Health Check
 
-- [ ] Split into two endpoints: `GET /health/live` (basic, current behavior) and `GET /health/ready` (deep)
-- [ ] `/health/live`: returns `{"status":"ok","version":"..."}` — same as current `/health`
-- [ ] `/health/ready`: verifies DB connectivity (`pool.Ping`), checks scheduler is running, returns structured JSON: `{"status":"ok","db":"ok","scheduler":"running","version":"..."}`
-- [ ] If DB ping fails: `{"status":"degraded","db":"error","db_error":"..."}`
-- [ ] Keep `/health` as alias for `/health/live` (backwards compatible)
-- [ ] Response time target: <100ms for `/health/ready`
-- [ ] Docker Compose healthcheck should switch to `/health/ready`
+- [x] Split into two endpoints: `GET /health/live` (basic, current behavior) and `GET /health/ready` (deep)
+- [x] `/health/live`: returns `{"status":"ok","version":"..."}` — same as current `/health`
+- [x] `/health/ready`: verifies DB connectivity (`pool.Ping`), checks scheduler is running, returns structured JSON: `{"status":"ok","db":"ok","scheduler":"running","version":"..."}`
+- [x] If DB ping fails: `{"status":"degraded","db":"error","db_error":"..."}`
+- [x] Keep `/health` as alias for `/health/live` (backwards compatible)
+- [x] Response time target: <100ms for `/health/ready`
+- [x] Docker Compose healthcheck should switch to `/health/ready`
 - **Ref:** `internal/api/health.go` lines 14-22 (current basic check)
 - **Files:** `internal/api/health.go`, `internal/api/router.go`, `docker-compose.yml`
 
 ### 14.5 Transactional Sync Writes
 
-- [ ] Wrap the flush sequence in `engine.go` in a single DB transaction using `pool.Begin(ctx)`
-- [ ] Current behavior: soft-deletes (lines 178-182), added transaction upserts (lines 187-201), and modified transaction upserts (lines 204-218) are individual SQL statements
-- [ ] Risk: if upsert #50 of 100 fails, the first 49 are already committed — inconsistent state
-- [ ] Use `pgx.Tx` to get a `*db.Queries` scoped to the transaction: `tx.Begin()` → `db.New(tx)` → flush all → `tx.Commit()`
-- [ ] On error: `tx.Rollback()`, mark sync log as error
-- [ ] Balance updates (if any) should also be inside the same transaction
+- [x] Wrap the flush sequence in `engine.go` in a single DB transaction using `pool.Begin(ctx)`
+- [x] Current behavior: soft-deletes (lines 178-182), added transaction upserts (lines 187-201), and modified transaction upserts (lines 204-218) are individual SQL statements
+- [x] Risk: if upsert #50 of 100 fails, the first 49 are already committed — inconsistent state
+- [x] Use `pgx.Tx` to get a `*db.Queries` scoped to the transaction: `tx.Begin()` → `db.New(tx)` → flush all → `tx.Commit()`
+- [x] On error: `tx.Rollback()`, mark sync log as error
+- [x] Balance updates (if any) should also be inside the same transaction
 - **Ref:** `internal/sync/engine.go` lines 176-218
 - **Files:** `internal/sync/engine.go`
 
 ### 14.6 Orphaned Sync Log Cleanup
 
-- [ ] On app startup (before scheduler starts), query for any sync logs with `status = 'in_progress'`
-- [ ] Mark them as `status = 'error'` with `error_message = 'interrupted by server restart'` and `completed_at = NOW()`
-- [ ] New sqlc query: `CleanupOrphanedSyncLogs(ctx)` — `UPDATE sync_logs SET status='error', error_message='...', completed_at=NOW() WHERE status='in_progress'`
-- [ ] Log count of cleaned-up logs at INFO level on startup
-- [ ] Currently: orphaned `in_progress` logs remain forever after a crash
+- [x] On app startup (before scheduler starts), query for any sync logs with `status = 'in_progress'`
+- [x] Mark them as `status = 'error'` with `error_message = 'interrupted by server restart'` and `completed_at = NOW()`
+- [x] New sqlc query: `CleanupOrphanedSyncLogs(ctx)` — `UPDATE sync_logs SET status='error', error_message='...', completed_at=NOW() WHERE status='in_progress'`
+- [x] Log count of cleaned-up logs at INFO level on startup
+- [x] Currently: orphaned `in_progress` logs remain forever after a crash
 - **Ref:** `internal/sync/engine.go` lines 52-60 (sync log creation)
 - **Files:** `internal/sync/engine.go` or `internal/app/app.go`, `internal/db/queries/sync_logs.sql`
 
 ### 14.7 Per-Sync Timeout
 
-- [ ] Add `SYNC_TIMEOUT_SECONDS` config (default: 300 = 5 minutes)
-- [ ] Replace `context.Background()` in scheduler with `context.WithTimeout(ctx, syncTimeout)`
-- [ ] Currently: `context.Background()` with no deadline — a hung provider API call blocks the goroutine indefinitely
-- [ ] On timeout: sync engine marks sync log as error with "sync timed out after X seconds"
-- [ ] Timeout applies per-connection (each connection sync gets its own deadline)
+- [x] Add `SYNC_TIMEOUT_SECONDS` config (default: 300 = 5 minutes)
+- [x] Replace `context.Background()` in scheduler with `context.WithTimeout(ctx, syncTimeout)`
+- [x] Currently: `context.Background()` with no deadline — a hung provider API call blocks the goroutine indefinitely
+- [x] On timeout: sync engine marks sync log as error with "sync timed out after X seconds"
+- [x] Timeout applies per-connection (each connection sync gets its own deadline)
 - **Ref:** `internal/sync/scheduler.go` lines 34-35
 - **Files:** `internal/sync/scheduler.go`, `internal/sync/engine.go`, `internal/config/config.go`
 
 ### 14.8 Admin Password Reset CLI
 
-- [ ] Add `breadbox reset-password` cobra subcommand
-- [ ] Prompts for new password interactively (with confirmation), or accepts `--password` flag for scripted use
-- [ ] Connects directly to DB (uses `DATABASE_URL` env var), updates the admin account's password hash
-- [ ] Validates minimum 8 characters (same rule as setup wizard)
-- [ ] Currently: only way to reset is direct SQL or deleting admin accounts and re-running setup
-- [ ] Prints success message with admin username
+- [x] Add `breadbox reset-password` cobra subcommand
+- [x] Prompts for new password interactively (with confirmation), or accepts `--password` flag for scripted use
+- [x] Connects directly to DB (uses `DATABASE_URL` env var), updates the admin account's password hash
+- [x] Validates minimum 8 characters (same rule as setup wizard)
+- [x] Currently: only way to reset is direct SQL or deleting admin accounts and re-running setup
+- [x] Prints success message with admin username
 - **Ref:** `cmd/breadbox/main.go` lines 33-71 (existing cobra commands)
 - **Files:** `cmd/breadbox/main.go`, new file `cmd/breadbox/reset_password.go`
 
 ### 14.9 Configurable Log Level
 
-- [ ] Add `LOG_LEVEL` env var: `debug`, `info`, `warn`, `error` (case-insensitive)
-- [ ] Default: `info` for docker environment, `debug` for local/development
-- [ ] `LOG_LEVEL` takes precedence over environment-based defaults when set
-- [ ] Currently: log level is hardcoded — docker=info, everything else=debug (lines 73-81)
-- [ ] Parse and validate on startup; warn if invalid value provided (fall back to default)
+- [x] Add `LOG_LEVEL` env var: `debug`, `info`, `warn`, `error` (case-insensitive)
+- [x] Default: `info` for docker environment, `debug` for local/development
+- [x] `LOG_LEVEL` takes precedence over environment-based defaults when set
+- [x] Currently: log level is hardcoded — docker=info, everything else=debug (lines 73-81)
+- [x] Parse and validate on startup; warn if invalid value provided (fall back to default)
 - **Ref:** `cmd/breadbox/main.go` lines 73-81
 - **Files:** `cmd/breadbox/main.go`, `internal/config/config.go`
 
 ### 14.10 Startup Validation Summary
 
-- [ ] Extend the existing boot banner (lines 141-158) to include:
+- [x] Extend the existing boot banner (lines 141-158) to include:
   - Teller provider status: "configured (sandbox)" / "not configured"
   - ENCRYPTION_KEY: "configured" / "NOT SET"
   - Admin account: "exists" / "none (setup wizard will run)"
   - Setup status: "complete" / "pending"
-- [ ] Warn (log at WARN level, don't fail) for non-critical gaps: missing Teller config, no admin account
-- [ ] Fail (log at ERROR and exit) for critical gaps: missing ENCRYPTION_KEY when providers need it (see 14.2)
-- [ ] Helps operators verify configuration at a glance after deployment
+- [x] Warn (log at WARN level, don't fail) for non-critical gaps: missing Teller config, no admin account
+- [x] Fail (log at ERROR and exit) for critical gaps: missing ENCRYPTION_KEY when providers need it (see 14.2)
+- [x] Helps operators verify configuration at a glance after deployment
 - **Ref:** `cmd/breadbox/main.go` lines 141-158 (existing banner)
 - **Files:** `cmd/breadbox/main.go`
 
 ### 14.11 Backup & Restore Documentation
 
-- [ ] Create `docs/backup.md` with:
+- [x] Create `docs/backup.md` with:
   - `pg_dump` / `pg_restore` command examples for the Breadbox database
   - Docker volume backup approach (for Docker Compose deployments)
   - Cron-based automated backup script example
   - Restore verification steps (check row counts, test login, verify sync status)
   - Note about ENCRYPTION_KEY: must be preserved — without it, encrypted access tokens are unrecoverable
-- [ ] Link from README (14.1)
+- [x] Link from README (14.1)
 - **Files:** `docs/backup.md` (new)
 
 ### Task Dependencies (Phase 14)

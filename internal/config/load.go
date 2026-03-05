@@ -31,6 +31,7 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		Environment:   env,
 		ServerPort:    getEnv("SERVER_PORT", "8080"),
+		LogLevel:      os.Getenv("LOG_LEVEL"),
 		ConfigSources: make(map[string]string),
 	}
 
@@ -93,6 +94,9 @@ func Load() (*Config, error) {
 	cfg.ReadTimeoutS = getEnvInt("HTTP_READ_TIMEOUT_SECONDS", 30)
 	cfg.WriteTimeoutS = getEnvInt("HTTP_WRITE_TIMEOUT_SECONDS", 60)
 	cfg.IdleTimeoutS = getEnvInt("HTTP_IDLE_TIMEOUT_SECONDS", 120)
+
+	// Sync timeout.
+	cfg.SyncTimeoutSeconds = getEnvInt("SYNC_TIMEOUT_SECONDS", 300)
 
 	return cfg, nil
 }

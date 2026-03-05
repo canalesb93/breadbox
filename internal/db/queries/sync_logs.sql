@@ -28,3 +28,7 @@ WHERE id = $1;
 
 -- name: GetMostRecentSyncLog :one
 SELECT * FROM sync_logs WHERE connection_id = $1 ORDER BY started_at DESC LIMIT 1;
+
+-- name: CleanupOrphanedSyncLogs :execresult
+UPDATE sync_logs SET status = 'error', error_message = 'interrupted by server restart', completed_at = NOW()
+WHERE status = 'in_progress';

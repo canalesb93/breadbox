@@ -13,7 +13,7 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health/ready"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -22,8 +22,8 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
     env_file:
       - .docker.env
     volumes:

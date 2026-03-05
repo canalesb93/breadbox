@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,9 +22,11 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // version is set at build time via -ldflags "-X main.version=...".
@@ -32,7 +35,7 @@ var version = "dev"
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: breadbox <command>")
-		fmt.Fprintln(os.Stderr, "commands: serve, migrate, seed, mcp-stdio, api-keys, version")
+		fmt.Fprintln(os.Stderr, "commands: serve, migrate, seed, mcp-stdio, api-keys, reset-password, version")
 		os.Exit(1)
 	}
 
@@ -62,6 +65,11 @@ func main() {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
+	case "reset-password":
+		if err := runResetPassword(); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
 	case "version":
 		fmt.Println(version)
 	default:
@@ -70,14 +78,44 @@ func main() {
 	}
 }
 
-func newLogger(env string) *slog.Logger {
-	var handler slog.Handler
-	if env == "docker" {
-		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
-	} else {
-		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
+func newLogger(cfg *config.Config) *slog.Logger {
+	level := slog.LevelInfo
+	if cfg.Environment != "docker" {
+		level = slog.LevelDebug
 	}
-	return slog.New(handler)
+
+	// LOG_LEVEL overrides environment-based default
+	if cfg.LogLevel != "" {
+		switch strings.ToLower(cfg.LogLevel) {
+		case "debug":
+			level = slog.LevelDebug
+		case "info":
+			level = slog.LevelInfo
+		case "warn":
+			level = slog.LevelWarn
+		case "error":
+			level = slog.LevelError
+		default:
+			// Will log warning after logger is created
+		}
+	}
+
+	var handler slog.Handler
+	if cfg.Environment == "docker" {
+		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+	} else {
+		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+	}
+	logger := slog.New(handler)
+
+	if cfg.LogLevel != "" {
+		valid := map[string]bool{"debug": true, "info": true, "warn": true, "error": true}
+		if !valid[strings.ToLower(cfg.LogLevel)] {
+			logger.Warn("invalid LOG_LEVEL value, using default", "log_level", cfg.LogLevel, "default", level.String())
+		}
+	}
+
+	return logger
 }
 
 func runServe() error {
@@ -88,7 +126,7 @@ func runServe() error {
 	cfg.Version = version
 	cfg.StartTime = time.Now()
 
-	logger := newLogger(cfg.Environment)
+	logger := newLogger(cfg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -104,8 +142,22 @@ func runServe() error {
 		logger.Warn("failed to load app_config", "error", err)
 	}
 
+	// Validate ENCRYPTION_KEY when bank providers are configured.
+	if cfg.EncryptionKey == nil && (cfg.PlaidClientID != "" || cfg.TellerAppID != "") {
+		return fmt.Errorf("ENCRYPTION_KEY is required when Plaid or Teller providers are configured. Generate one with: openssl rand -hex 32")
+	}
+
+	// Clean up orphaned sync logs from previous crashes.
+	result, err := a.Queries.CleanupOrphanedSyncLogs(ctx)
+	if err != nil {
+		logger.Warn("failed to clean up orphaned sync logs", "error", err)
+	} else if n := result.RowsAffected(); n > 0 {
+		logger.Info("cleaned up orphaned sync logs", "count", n)
+	}
+
 	// Create and start the cron scheduler.
-	scheduler := sync.NewScheduler(a.SyncEngine, a.Queries, logger)
+	syncTimeout := time.Duration(cfg.SyncTimeoutSeconds) * time.Second
+	scheduler := sync.NewScheduler(a.SyncEngine, a.Queries, logger, syncTimeout)
 	scheduler.Start(cfg.SyncIntervalMinutes)
 	a.Scheduler = scheduler
 
@@ -149,15 +201,44 @@ func runServe() error {
 	if cfg.PlaidClientID != "" {
 		plaidStatus = cfg.PlaidEnv
 	}
+	tellerStatus := "not configured"
+	if cfg.TellerAppID != "" {
+		tellerStatus = fmt.Sprintf("configured (%s)", cfg.TellerEnv)
+	}
+	encryptionStatus := "configured"
+	if cfg.EncryptionKey == nil {
+		encryptionStatus = "NOT SET"
+	}
+	adminStatus := "none (setup wizard)"
+	adminCount, err := a.Queries.CountAdminAccounts(ctx)
+	if err != nil {
+		logger.Warn("failed to check admin accounts", "error", err)
+	} else if adminCount > 0 {
+		adminStatus = "exists"
+	}
+	setupStatus := "pending"
+	if cfg.SetupComplete {
+		setupStatus = "complete"
+	}
 	logger.Info("breadbox starting",
 		"version", version,
 		"addr", srv.Addr,
 		"environment", cfg.Environment,
 		"plaid", plaidStatus,
+		"teller", tellerStatus,
+		"encryption_key", encryptionStatus,
+		"admin", adminStatus,
+		"setup", setupStatus,
 		"sync_interval", fmt.Sprintf("%dm", cfg.SyncIntervalMinutes),
 		"webhook", webhookStatus,
 		"db_pool", fmt.Sprintf("max=%d min=%d lifetime=%dm", cfg.DBMaxConns, cfg.DBMinConns, cfg.DBMaxConnLifetimeM),
 	)
+	if cfg.EncryptionKey == nil {
+		logger.Warn("ENCRYPTION_KEY not set — encrypted provider credentials will not work")
+	}
+	if adminCount == 0 {
+		logger.Warn("no admin account — setup wizard will run on first visit")
+	}
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("http server: %w", err)
 	}
@@ -171,7 +252,7 @@ func runMigrate() error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logger := newLogger(cfg.Environment)
+	logger := newLogger(cfg)
 
 	if cfg.DatabaseURL == "" {
 		return fmt.Errorf("DATABASE_URL is required for migrations")
@@ -294,13 +375,86 @@ func runAPIKeys() error {
 	return nil
 }
 
+func runResetPassword() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("connect to database: %w", err)
+	}
+	defer pool.Close()
+
+	queries := db.New(pool)
+
+	// Check if any admin account exists.
+	count, err := queries.CountAdminAccounts(ctx)
+	if err != nil {
+		return fmt.Errorf("check admin accounts: %w", err)
+	}
+	if count == 0 {
+		return fmt.Errorf("no admin account found — run the setup wizard first")
+	}
+
+	// Get the first admin account.
+	var adminID pgtype.UUID
+	var adminUsername string
+	row := pool.QueryRow(ctx, "SELECT id, username FROM admin_accounts ORDER BY created_at LIMIT 1")
+	if err := row.Scan(&adminID, &adminUsername); err != nil {
+		return fmt.Errorf("get admin account: %w", err)
+	}
+
+	// Get password from --password flag or prompt.
+	var password string
+	if len(os.Args) > 2 && os.Args[2] == "--password" && len(os.Args) > 3 {
+		password = os.Args[3]
+	} else {
+		fmt.Printf("Resetting password for admin: %s\n", adminUsername)
+		fmt.Print("New password (min 8 characters): ")
+		var input string
+		fmt.Scanln(&input)
+		password = input
+
+		fmt.Print("Confirm password: ")
+		var confirm string
+		fmt.Scanln(&confirm)
+		if password != confirm {
+			return fmt.Errorf("passwords do not match")
+		}
+	}
+
+	if len(password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
+	}
+
+	// Hash password with bcrypt.
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+
+	// Update password.
+	if err := queries.UpdateAdminPassword(ctx, db.UpdateAdminPasswordParams{
+		ID:             adminID,
+		HashedPassword: hashedPassword,
+	}); err != nil {
+		return fmt.Errorf("update password: %w", err)
+	}
+
+	fmt.Printf("Password updated successfully for admin: %s\n", adminUsername)
+	return nil
+}
+
 func runSeed() error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logger := newLogger(cfg.Environment)
+	logger := newLogger(cfg)
 
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)

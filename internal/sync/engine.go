@@ -11,6 +11,7 @@ import (
 	"breadbox/internal/db"
 	"breadbox/internal/provider"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
@@ -174,9 +175,19 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		}
 
 		// Pagination complete. Flush all buffered writes to DB.
+
+		// Start transaction for all data writes.
+		tx, err := e.pool.Begin(ctx)
+		if err != nil {
+			return 0, 0, 0, fmt.Errorf("begin transaction: %w", err)
+		}
+		defer tx.Rollback(ctx)
+
+		txQueries := e.db.WithTx(tx)
+
 		// Process removed FIRST.
 		for _, externalID := range pendingRemovals {
-			if err := e.db.SoftDeleteTransactionByExternalID(ctx, externalID); err != nil {
+			if err := txQueries.SoftDeleteTransactionByExternalID(ctx, externalID); err != nil {
 				logger.Error("soft delete transaction", "external_id", externalID, "error", err)
 			}
 		}
@@ -194,7 +205,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				skipped++
 				continue
 			}
-			if err := e.upsertTransaction(ctx, &pendingAdded[i], accountIDCache, logger); err != nil {
+			if err := e.upsertTransaction(ctx, txQueries, &pendingAdded[i], accountIDCache, logger); err != nil {
 				logger.Error("upsert added transaction", "external_id", pendingAdded[i].ExternalID, "error", err)
 			}
 			added++
@@ -211,7 +222,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				skipped++
 				continue
 			}
-			if err := e.upsertTransaction(ctx, &pendingModified[i], accountIDCache, logger); err != nil {
+			if err := e.upsertTransaction(ctx, txQueries, &pendingModified[i], accountIDCache, logger); err != nil {
 				logger.Error("upsert modified transaction", "external_id", pendingModified[i].ExternalID, "error", err)
 			}
 			modified++
@@ -223,12 +234,12 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 
 		// Clean up stale pending transactions for Teller connections.
 		if string(conn.Provider) == "teller" {
-			staleCount := e.cleanStalePending(ctx, connectionID, pendingAdded, previousCursor, logger)
+			staleCount := e.cleanStalePending(ctx, tx, connectionID, pendingAdded, previousCursor, logger)
 			removed += staleCount
 		}
 
 		// Commit cursor.
-		if err := e.db.UpdateBankConnectionCursor(ctx, db.UpdateBankConnectionCursorParams{
+		if err := txQueries.UpdateBankConnectionCursor(ctx, db.UpdateBankConnectionCursorParams{
 			ID:         connectionID,
 			SyncCursor: pgtype.Text{String: result.Cursor, Valid: true},
 		}); err != nil {
@@ -236,12 +247,17 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		}
 
 		// Fetch and update balances.
-		if err := e.updateBalances(ctx, prov, provConn, logger); err != nil {
+		if err := e.updateBalances(ctx, txQueries, prov, provConn, logger); err != nil {
 			logger.Error("update balances failed", "error", err)
 			// Non-fatal: balances are best-effort.
 		}
 
+		if err := tx.Commit(ctx); err != nil {
+			return 0, 0, 0, fmt.Errorf("commit transaction: %w", err)
+		}
+
 		// Update connection status to active (clear any previous errors).
+		// Kept outside the transaction as an independent status update.
 		_ = e.db.UpdateBankConnectionStatus(ctx, db.UpdateBankConnectionStatusParams{
 			ID:     connectionID,
 			Status: db.ConnectionStatusActive,
@@ -254,7 +270,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 }
 
 // upsertTransaction resolves the account ID and upserts a single transaction.
-func (e *Engine) upsertTransaction(ctx context.Context, txn *provider.Transaction, cache map[string]pgtype.UUID, logger *slog.Logger) error {
+func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *provider.Transaction, cache map[string]pgtype.UUID, logger *slog.Logger) error {
 	accountID, err := e.resolveAccountID(ctx, txn.AccountExternalID, cache)
 	if err != nil {
 		return fmt.Errorf("resolve account %s: %w", txn.AccountExternalID, err)
@@ -279,12 +295,12 @@ func (e *Engine) upsertTransaction(ctx context.Context, txn *provider.Transactio
 		Pending:               txn.Pending,
 	}
 
-	_, err = e.db.UpsertTransaction(ctx, params)
+	_, err = q.UpsertTransaction(ctx, params)
 	return err
 }
 
 // updateBalances fetches current balances from the provider and updates the DB.
-func (e *Engine) updateBalances(ctx context.Context, prov provider.Provider, conn provider.Connection, logger *slog.Logger) error {
+func (e *Engine) updateBalances(ctx context.Context, q *db.Queries, prov provider.Provider, conn provider.Connection, logger *slog.Logger) error {
 	balances, err := prov.GetBalances(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("get balances: %w", err)
@@ -298,7 +314,7 @@ func (e *Engine) updateBalances(ctx context.Context, prov provider.Provider, con
 			BalanceLimit:      optionalDecimalToNumeric(bal.Limit),
 			IsoCurrencyCode:   pgtype.Text{String: bal.ISOCurrencyCode, Valid: bal.ISOCurrencyCode != ""},
 		}
-		if err := e.db.UpdateAccountBalances(ctx, params); err != nil {
+		if err := q.UpdateAccountBalances(ctx, params); err != nil {
 			logger.Error("update account balance", "account", bal.AccountExternalID, "error", err)
 		}
 	}
@@ -308,7 +324,7 @@ func (e *Engine) updateBalances(ctx context.Context, prov provider.Provider, con
 // cleanStalePending soft-deletes pending transactions that were not returned by
 // the Teller API during this sync window. This handles the case where a pending
 // transaction disappears without posting (e.g., holds that expire).
-func (e *Engine) cleanStalePending(ctx context.Context, connectionID pgtype.UUID, addedTxns []provider.Transaction, previousCursor string, logger *slog.Logger) int {
+func (e *Engine) cleanStalePending(ctx context.Context, tx pgx.Tx, connectionID pgtype.UUID, addedTxns []provider.Transaction, previousCursor string, logger *slog.Logger) int {
 	// Calculate date window.
 	toDate := time.Now()
 	var fromDate time.Time
@@ -341,7 +357,7 @@ func (e *Engine) cleanStalePending(ctx context.Context, connectionID pgtype.UUID
 		  AND external_transaction_id != ALL($4)
 		RETURNING external_transaction_id`
 
-	rows, err := e.pool.Query(ctx, query, connectionID, fromDate, toDate, returnedIDs)
+	rows, err := tx.Query(ctx, query, connectionID, fromDate, toDate, returnedIDs)
 	if err != nil {
 		logger.Error("clean stale pending transactions", "error", err)
 		return 0

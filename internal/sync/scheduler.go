@@ -12,19 +12,21 @@ import (
 
 // Scheduler runs periodic transaction syncs using cron.
 type Scheduler struct {
-	cron    *cron.Cron
-	engine  *Engine
-	queries *db.Queries
-	logger  *slog.Logger
+	cron        *cron.Cron
+	engine      *Engine
+	queries     *db.Queries
+	logger      *slog.Logger
+	syncTimeout time.Duration
 }
 
 // NewScheduler creates a new Scheduler.
-func NewScheduler(engine *Engine, queries *db.Queries, logger *slog.Logger) *Scheduler {
+func NewScheduler(engine *Engine, queries *db.Queries, logger *slog.Logger, syncTimeout time.Duration) *Scheduler {
 	return &Scheduler{
-		cron:    cron.New(),
-		engine:  engine,
-		queries: queries,
-		logger:  logger,
+		cron:        cron.New(),
+		engine:      engine,
+		queries:     queries,
+		logger:      logger,
+		syncTimeout: syncTimeout,
 	}
 }
 
@@ -43,6 +45,11 @@ func (s *Scheduler) Start(globalIntervalMinutes int) {
 	}
 	s.cron.Start()
 	s.logger.Info("scheduler started", "check_interval", "15m", "global_sync_interval_minutes", globalIntervalMinutes)
+}
+
+// IsRunning returns true if the scheduler has any active cron entries.
+func (s *Scheduler) IsRunning() bool {
+	return len(s.cron.Entries()) > 0
 }
 
 // Stop gracefully stops the scheduler, waiting for any running jobs to finish.
@@ -98,7 +105,9 @@ func (s *Scheduler) syncAllScheduled(ctx context.Context, globalIntervalMinutes 
 				done <- result{}
 			}()
 
-			if err := s.engine.Sync(ctx, connID, db.SyncTriggerCron); err != nil {
+			syncCtx, cancel := context.WithTimeout(ctx, s.syncTimeout)
+			defer cancel()
+			if err := s.engine.Sync(syncCtx, connID, db.SyncTriggerCron); err != nil {
 				s.logger.Error("scheduled sync failed", "connection_id", formatUUID(connID), "error", err)
 			}
 		}()
@@ -139,12 +148,14 @@ func (s *Scheduler) RunStartupSync(ctx context.Context, globalIntervalMinutes in
 		threshold := now.Add(-time.Duration(effectiveMinutes) * time.Minute)
 		if !conn.LastSyncedAt.Valid || conn.LastSyncedAt.Time.Before(threshold) {
 			staleCount++
-			if err := s.engine.Sync(ctx, conn.ID, db.SyncTriggerCron); err != nil {
+			syncCtx, cancel := context.WithTimeout(ctx, s.syncTimeout)
+			if err := s.engine.Sync(syncCtx, conn.ID, db.SyncTriggerCron); err != nil {
 				s.logger.Error("startup sync: connection failed",
 					"connection_id", formatUUID(conn.ID),
 					"error", err,
 				)
 			}
+			cancel()
 		}
 	}
 

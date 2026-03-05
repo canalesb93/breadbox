@@ -23,7 +23,9 @@ func NewRouter(a *app.App, version string) http.Handler {
 	r.Use(mw.Logging(a.Logger))
 	r.Use(middleware.Recoverer)
 
-	r.Get("/health", HealthHandler(version))
+	r.Get("/health", HealthLiveHandler(version))
+	r.Get("/health/live", HealthLiveHandler(version))
+	r.Get("/health/ready", HealthReadyHandler(a, version))
 
 	// REST API v1 — API key authenticated.
 	svc := service.New(a.Queries, a.DB, a.SyncEngine, a.Logger)

@@ -9,6 +9,7 @@ type Config struct {
 	EncryptionKey []byte // 32 bytes, decoded from hex
 	ServerPort    string
 	Environment   string
+	LogLevel      string // LOG_LEVEL: debug, info, warn, error
 
 	// May come from env (overrides app_config) or app_config table
 	PlaidClientID string
@@ -36,6 +37,9 @@ type Config struct {
 	ReadTimeoutS  int // HTTP_READ_TIMEOUT_SECONDS, default 30
 	WriteTimeoutS int // HTTP_WRITE_TIMEOUT_SECONDS, default 60
 	IdleTimeoutS  int // HTTP_IDLE_TIMEOUT_SECONDS, default 120
+
+	// Sync timeout (env vars only)
+	SyncTimeoutSeconds int // SYNC_TIMEOUT_SECONDS, default 300
 
 	// Runtime metadata (set at startup)
 	Version   string
