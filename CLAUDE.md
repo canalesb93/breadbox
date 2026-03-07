@@ -76,7 +76,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Version checker: `internal/version/checker.go` — in-memory cached (1hr TTL) GitHub Releases API check. Shared by REST `GET /api/v1/version` (no auth) and dashboard handler.
 - Docker socket detection: `os.Stat("/var/run/docker.sock")` at startup → `App.DockerSocketAvailable`. Used by update handler to pull images via Docker Engine API (`net/http` with Unix socket transport, no Docker SDK dependency).
 - Update flow: dashboard banner shows when GitHub release is newer than current. Pull via Docker socket if available, then user runs `docker compose up -d`. Dismiss stores `update_dismissed_version` in `app_config`.
-- Dev VM: `breadbox.exe.xyz`. Auto-deploy from GitHub Actions on main merge. Secrets: `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`.
+- Dev VM: `breadbox.exe.xyz` hosted on exe.dev. exe.dev handles TLS termination and HTTP proxying automatically (no Caddy needed on dev). Breadbox listens on a local port and exe.dev proxies `https://breadbox.exe.xyz` to it. Auto-deploy from GitHub Actions on main merge via SSH (`appleboy/ssh-action`). Secrets: `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`.
 
 ## Canonical Enums
 
