@@ -315,10 +315,13 @@ Calls `GET /api/v1/accounts` with the optional `user_id` query parameter. Return
 | `account_id` | string | No | Filter to a specific account. |
 | `user_id` | string | No | Filter to accounts owned by this family member. |
 | `category` | string | No | Filter by primary category (e.g., `FOOD_AND_DRINK`, `TRANSPORTATION`). Case-insensitive. |
-| `min_amount` | number | No | Minimum transaction amount (absolute value, USD). |
-| `max_amount` | number | No | Maximum transaction amount (absolute value, USD). |
+| `category_detailed` | string | No | Filter by detailed subcategory (e.g., `FOOD_AND_DRINK_GROCERIES`). Case-sensitive. |
+| `min_amount` | number \| null | No | Minimum transaction amount (absolute value, USD). Uses `*float64` internally — zero is a valid filter value. |
+| `max_amount` | number \| null | No | Maximum transaction amount (absolute value, USD). Uses `*float64` internally — zero is a valid filter value. |
 | `pending` | boolean | No | `true` returns only pending transactions. `false` returns only posted. Omit to return both. |
 | `search` | string | No | Full-text search over merchant name and description. |
+| `sort_by` | string | No | Sort field: `date` (default), `amount`, or `name`. Cursor pagination only works with `date` sort. |
+| `sort_order` | string | No | Sort direction: `desc` (default) or `asc`. |
 | `limit` | integer | No | Number of results per page. Default: 100. Maximum: 500. |
 | `cursor` | string | No | Pagination cursor returned by a previous call. Omit for the first page. |
 
@@ -422,8 +425,9 @@ Same as `query_transactions` **minus** `cursor` and `limit`. All parameters are 
 | `account_id` | string | No | Filter to a specific account. |
 | `user_id` | string | No | Filter to accounts owned by this family member. |
 | `category` | string | No | Filter by primary category. |
-| `min_amount` | number | No | Minimum transaction amount. |
-| `max_amount` | number | No | Maximum transaction amount. |
+| `category_detailed` | string | No | Filter by detailed subcategory. |
+| `min_amount` | number \| null | No | Minimum transaction amount. Zero is a valid filter value. |
+| `max_amount` | number \| null | No | Maximum transaction amount. Zero is a valid filter value. |
 | `pending` | boolean | No | Filter by pending status. |
 | `search` | string | No | Full-text search over merchant name and description. |
 
@@ -615,20 +619,53 @@ Calls `POST /api/v1/sync` with an optional `connection_id` body parameter. The R
 
 ---
 
+### Tool: `list_categories`
+
+**Description (shown to LLM):** List all distinct transaction category pairs (primary + detailed) that exist in the database. Useful for understanding the category taxonomy before filtering transactions.
+
+#### Input Schema
+
+No parameters required.
+
+#### Output Format
+
+```json
+{
+  "data": [
+    { "primary": "FOOD_AND_DRINK", "detailed": "FOOD_AND_DRINK_GROCERIES" },
+    { "primary": "FOOD_AND_DRINK", "detailed": "FOOD_AND_DRINK_RESTAURANTS" },
+    { "primary": "TRANSPORTATION", "detailed": "TRANSPORTATION_GAS" }
+  ]
+}
+```
+
+#### Mapping to REST API
+
+Calls `GET /api/v1/categories`. Returns the same `[]CategoryPair` response.
+
+---
+
 ## 4. MCP Resources
 
-MCP resources differ from tools: they are passive context documents the LLM can read, similar to files. They do not execute queries at call time in the same on-demand way tools do.
+MCP resources are passive context documents the LLM can read, similar to files. They do not execute queries at call time in the same on-demand way tools do.
 
-**MVP decision: no resources exposed.** All data access is through tools.
+### Resource: `breadbox://overview`
 
-Rationale:
-- Tools with filters are more flexible than static resource URIs for financial data.
-- Resources are better suited for relatively static reference data. Transaction history is neither small nor static.
-- Adding resources later (v2) is non-breaking — existing tool-using agents continue to work.
+Returns a lightweight summary of the household's financial data — total accounts, total transactions, date range of available data, and provider summary. This gives an LLM ambient context about the financial state without a round-trip tool call.
 
-**Potential v2 resource: `breadbox://overview`**
+Registered via `s.registerResources()` in server setup. Implementation in `internal/mcp/resources.go`, backed by `service.GetOverviewStats()`.
 
-A resource that returns a lightweight summary — total accounts, total balance by currency, last sync times, and a count of transactions in the current month. This would give an LLM ambient context about the household's financial state without a round-trip tool call. Implementation is deferred until there is demonstrated need.
+```json
+{
+  "total_accounts": 5,
+  "total_transactions": 2847,
+  "date_range": {
+    "earliest": "2024-06-15",
+    "latest": "2026-03-07"
+  },
+  "providers": ["plaid", "teller"]
+}
+```
 
 ---
 
@@ -774,6 +811,7 @@ Both paths call the same `service.QueryTransactions` function. The MCP tool hand
 | `list_users` | `GET /api/v1/users` |
 | `get_sync_status` | `GET /api/v1/connections` |
 | `trigger_sync` | `POST /api/v1/sync` |
+| `list_categories` | `GET /api/v1/categories` |
 
 ### No MCP-Specific Data Access
 

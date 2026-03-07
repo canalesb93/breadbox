@@ -234,13 +234,11 @@ All errors return a consistent JSON body with an HTTP status code in the 4xx or 
 
 ### 5.1 Health
 
-#### `GET /health`
+Three health check endpoints are available. All are **unauthenticated**.
 
-Returns the operational status of the service. This endpoint is **unauthenticated** — no API key is required. It is suitable for use as a liveness or readiness probe in Docker or other orchestration environments.
+#### `GET /health` (alias: `GET /health/live`)
 
-**Request**
-
-No parameters, no body.
+Basic liveness probe. Returns 200 if the HTTP server is running.
 
 **Response — 200 OK**
 
@@ -251,36 +249,42 @@ No parameters, no body.
 }
 ```
 
-| Field | Type | Description |
-|---|---|---|
-| `status` | string | Always `"ok"` when the server is running and the database is reachable. |
-| `version` | string | Semver string of the running Breadbox binary. |
+#### `GET /health/ready`
 
-**Response — 503 Service Unavailable**
+Deep readiness probe. Verifies DB connectivity and scheduler status. Suitable for Docker/Kubernetes readiness checks.
 
-If the database is not reachable, the server returns `503` with:
-
-```json
-{
-  "status": "degraded",
-  "version": "0.1.0",
-  "error": "database connection failed"
-}
-```
-
-**Example**
-
-```
-GET /health HTTP/1.1
-Host: breadbox.local:8080
-```
+**Response — 200 OK**
 
 ```json
 {
   "status": "ok",
+  "db": "ok",
+  "scheduler": "running",
   "version": "0.1.0"
 }
 ```
+
+**Response — 503 Service Unavailable**
+
+If the database is not reachable or scheduler is not running:
+
+```json
+{
+  "status": "degraded",
+  "db": "error",
+  "db_error": "connection refused",
+  "scheduler": "running",
+  "version": "0.1.0"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `status` | string | `"ok"` when all checks pass, `"degraded"` otherwise. |
+| `db` | string | `"ok"` or `"error"`. Only on `/health/ready`. |
+| `db_error` | string | Error details when `db` is `"error"`. Only on `/health/ready`. |
+| `scheduler` | string | `"running"` or `"stopped"`. Only on `/health/ready`. |
+| `version` | string | Semver string of the running Breadbox binary. |
 
 ---
 
@@ -413,7 +417,7 @@ X-API-Key: bb_4xK9mZ2nQpR7sT1vW3yA5bC8dE6fG0hJqLnPuVw
 
 #### `GET /api/v1/transactions`
 
-Returns a paginated list of transactions, sorted by `date` descending, then by `id` descending (for stable ordering of same-day transactions). Supports rich filtering.
+Returns a paginated list of transactions. Default sort: `date` descending, then by `id` descending (for stable ordering of same-day transactions). Supports rich filtering and configurable sort order.
 
 Soft-deleted transactions (where `deleted_at` is non-null) are excluded from all results.
 
@@ -430,10 +434,13 @@ Soft-deleted transactions (where `deleted_at` is non-null) are excluded from all
 | `account_id` | UUID | No | — | Filter to a single account. |
 | `user_id` | UUID | No | — | Filter to all accounts belonging to a specific family member. |
 | `category` | string | No | — | Exact match on `category_primary` (e.g., `"FOOD_AND_DRINK"`, `"TRANSPORTATION"`). Case-sensitive. |
+| `category_detailed` | string | No | — | Exact match on `category_detailed` (e.g., `"FOOD_AND_DRINK_GROCERIES"`). Case-sensitive. |
 | `min_amount` | number | No | — | Inclusive lower bound on `amount`. Uses Plaid sign convention (positive = debit). |
 | `max_amount` | number | No | — | Inclusive upper bound on `amount`. |
 | `pending` | boolean | No | — | If `true`, return only pending transactions. If `false`, return only posted transactions. If omitted, return both. |
 | `search` | string | No | — | Text search applied to `name` and `merchant_name`. Case-insensitive. Uses PostgreSQL `pg_trgm` similarity or `ILIKE`. Min length: 2 characters. |
+| `sort_by` | string | No | `date` | Sort field. Valid values: `date`, `amount`, `name`. |
+| `sort_order` | string | No | `desc` | Sort direction. Valid values: `asc`, `desc`. Cursor pagination only works with `date` sort. |
 
 All filters are combined with `AND` logic. See [Section 6](#6-filtering-and-search) for detailed filter semantics.
 
@@ -899,6 +906,46 @@ Content-Type: application/json
   "connection_id": "c9d8e7f6-a5b4-3210-fedc-ba0987654321"
 }
 ```
+
+---
+
+### 5.7 Categories
+
+#### `GET /api/v1/categories`
+
+Returns a list of distinct category pairs (primary + detailed) across all transactions. Useful for populating filter dropdowns and for AI agents to understand the available category taxonomy.
+
+**Authentication:** `X-API-Key` required.
+
+**Request**
+
+No parameters.
+
+**Response — 200 OK**
+
+```json
+{
+  "data": [
+    {
+      "primary": "FOOD_AND_DRINK",
+      "detailed": "FOOD_AND_DRINK_GROCERIES"
+    },
+    {
+      "primary": "FOOD_AND_DRINK",
+      "detailed": "FOOD_AND_DRINK_RESTAURANTS"
+    },
+    {
+      "primary": "TRANSPORTATION",
+      "detailed": "TRANSPORTATION_GAS"
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `primary` | string | Primary Plaid category (e.g., `"FOOD_AND_DRINK"`). |
+| `detailed` | string \| null | Detailed Plaid subcategory (e.g., `"FOOD_AND_DRINK_GROCERIES"`). May be `null`. |
 
 ---
 
