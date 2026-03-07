@@ -164,21 +164,12 @@ func LoadWithDB(ctx context.Context, cfg *Config, pool *pgxpool.Pool) error {
 		}
 	}
 
-	// Prefer sync_interval_minutes; fall back to sync_interval_hours (legacy).
+	// Sync interval from app_config.
 	if v, ok := appCfg["sync_interval_minutes"]; ok {
 		n, err := strconv.Atoi(v)
 		if err == nil && n > 0 {
 			cfg.SyncIntervalMinutes = n
 			cfg.ConfigSources["sync_interval_minutes"] = "db"
-		}
-	}
-	if cfg.SyncIntervalMinutes == 0 {
-		if v, ok := appCfg["sync_interval_hours"]; ok {
-			n, err := strconv.Atoi(v)
-			if err == nil && n > 0 {
-				cfg.SyncIntervalMinutes = n * 60
-				cfg.ConfigSources["sync_interval_minutes"] = "db"
-			}
 		}
 	}
 	if cfg.SyncIntervalMinutes == 0 {
@@ -192,7 +183,6 @@ func LoadWithDB(ctx context.Context, cfg *Config, pool *pgxpool.Pool) error {
 	} else {
 		cfg.ConfigSources["webhook_url"] = "default"
 	}
-	cfg.SetupComplete = appCfg["setup_complete"] == "true"
 
 	// Set defaults for any untracked config sources.
 	for _, key := range []string{"plaid_client_id", "plaid_secret", "plaid_env", "teller_app_id", "teller_env"} {

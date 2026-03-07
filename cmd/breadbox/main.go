@@ -214,16 +214,12 @@ func runServe() error {
 	if cfg.EncryptionKey == nil {
 		encryptionStatus = "NOT SET"
 	}
-	adminStatus := "none (setup wizard)"
+	adminStatus := "none"
 	adminCount, err := a.Queries.CountAdminAccounts(ctx)
 	if err != nil {
 		logger.Warn("failed to check admin accounts", "error", err)
 	} else if adminCount > 0 {
 		adminStatus = "exists"
-	}
-	setupStatus := "pending"
-	if cfg.SetupComplete {
-		setupStatus = "complete"
 	}
 	logger.Info("breadbox starting",
 		"version", version,
@@ -233,7 +229,6 @@ func runServe() error {
 		"teller", tellerStatus,
 		"encryption_key", encryptionStatus,
 		"admin", adminStatus,
-		"setup", setupStatus,
 		"sync_interval", fmt.Sprintf("%dm", cfg.SyncIntervalMinutes),
 		"webhook", webhookStatus,
 		"db_pool", fmt.Sprintf("max=%d min=%d lifetime=%dm", cfg.DBMaxConns, cfg.DBMinConns, cfg.DBMaxConnLifetimeM),
@@ -242,7 +237,7 @@ func runServe() error {
 		logger.Warn("ENCRYPTION_KEY not set — encrypted provider credentials will not work")
 	}
 	if adminCount == 0 {
-		logger.Warn("no admin account — setup wizard will run on first visit")
+		logger.Warn("no admin account — create one at /admin/setup or via 'breadbox create-admin'")
 	}
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("http server: %w", err)

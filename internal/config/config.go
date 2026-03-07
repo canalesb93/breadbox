@@ -26,7 +26,6 @@ type Config struct {
 	// From app_config table only
 	SyncIntervalMinutes int
 	WebhookURL          string
-	SetupComplete       bool
 
 	// Connection pool tuning (env vars only)
 	DBMaxConns         int32 // DB_MAX_CONNS, default 25

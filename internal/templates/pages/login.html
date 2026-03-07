@@ -5,12 +5,6 @@
   <p class="text-sm text-base-content/60">Enter your credentials to access the dashboard.</p>
 </div>
 
-{{if .SetupComplete}}
-<div role="alert" class="alert alert-info mb-4">
-  <span>Setup complete. Sign in to access the dashboard.</span>
-</div>
-{{end}}
-
 {{if .Error}}
 <div role="alert" class="alert alert-error mb-4">
   <span>{{.Error}}</span>

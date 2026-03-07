@@ -102,8 +102,6 @@ func CreateAdminHandler(queries *db.Queries, sm *scs.SessionManager, tr *Templat
 			return
 		}
 
-		// Do NOT store admin_username or setup_complete — those are being removed.
-
 		// Set flash and redirect to login.
 		SetFlash(ctx, sm, "success", "Admin account created. Sign in to get started.")
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
