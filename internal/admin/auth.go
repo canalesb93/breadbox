@@ -16,11 +16,11 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRende
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			data := map[string]any{
-				"PageTitle":     "Sign In",
-				"CSRFToken":     GenerateCSRFToken(r.Context(), sm),
-				"SetupComplete": r.URL.Query().Get("setup") == "complete",
-				"Username":      "",
-				"Error":         "",
+				"PageTitle": "Sign In",
+				"CSRFToken": GenerateCSRFToken(r.Context(), sm),
+				"Flash":     GetFlash(r.Context(), sm),
+				"Username":  "",
+				"Error":     "",
 			}
 			tr.Render(w, r, "login.html", data)
 			return

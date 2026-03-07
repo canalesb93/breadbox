@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/mail"
-	"os"
 	"strconv"
 	"strings"
 
@@ -17,8 +15,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// SetupStep1Handler handles GET/POST /admin/setup/step/1 — Create Admin Account.
-func SetupStep1Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
+// CreateAdminHandler handles GET/POST /admin/setup — Create Admin Account.
+// This is the minimal first-run page that replaces the multi-step wizard.
+func CreateAdminHandler(queries *db.Queries, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -31,13 +30,13 @@ func SetupStep1Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 
 		if r.Method == http.MethodGet {
 			data := map[string]any{
-				"StepNumber": 1,
-				"CSRFToken":  "",
-				"Username":   "",
-				"Error":      "",
-				"Errors":     map[string]string{},
+				"PageTitle": "Create Admin Account",
+				"CSRFToken": "",
+				"Username":  "",
+				"Error":     "",
+				"Errors":    map[string]string{},
 			}
-			tr.Render(w, r, "setup_step1.html", data)
+			tr.Render(w, r, "setup_create_admin.html", data)
 			return
 		}
 
@@ -64,26 +63,26 @@ func SetupStep1Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 
 		if len(errors) > 0 {
 			data := map[string]any{
-				"StepNumber": 1,
-				"CSRFToken":  "",
-				"Username":   username,
-				"Error":      "",
-				"Errors":     errors,
+				"PageTitle": "Create Admin Account",
+				"CSRFToken": "",
+				"Username":  username,
+				"Error":     "",
+				"Errors":    errors,
 			}
-			tr.Render(w, r, "setup_step1.html", data)
+			tr.Render(w, r, "setup_create_admin.html", data)
 			return
 		}
 
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 		if err != nil {
 			data := map[string]any{
-				"StepNumber": 1,
-				"CSRFToken":  "",
-				"Username":   username,
-				"Error":      "Failed to hash password",
-				"Errors":     map[string]string{},
+				"PageTitle": "Create Admin Account",
+				"CSRFToken": "",
+				"Username":  username,
+				"Error":     "Failed to hash password",
+				"Errors":    map[string]string{},
 			}
-			tr.Render(w, r, "setup_step1.html", data)
+			tr.Render(w, r, "setup_create_admin.html", data)
 			return
 		}
 
@@ -93,398 +92,19 @@ func SetupStep1Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFu
 		})
 		if err != nil {
 			data := map[string]any{
-				"StepNumber": 1,
-				"CSRFToken":  "",
-				"Username":   username,
-				"Error":      "Failed to create admin account",
-				"Errors":     map[string]string{},
+				"PageTitle": "Create Admin Account",
+				"CSRFToken": "",
+				"Username":  username,
+				"Error":     "Failed to create admin account",
+				"Errors":    map[string]string{},
 			}
-			tr.Render(w, r, "setup_step1.html", data)
+			tr.Render(w, r, "setup_create_admin.html", data)
 			return
 		}
 
-		// Store admin username in app_config so Step 5 summary can display it.
-		_ = queries.SetAppConfig(ctx, db.SetAppConfigParams{
-			Key:   "admin_username",
-			Value: pgtype.Text{String: username, Valid: true},
-		})
-
-		http.Redirect(w, r, "/admin/setup/step/2", http.StatusSeeOther)
-	}
-}
-
-// SetupStep2Handler handles GET/POST /admin/setup/step/2 — Configure Bank Providers.
-func SetupStep2Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			data := map[string]any{
-				"StepNumber":  2,
-				"CSRFToken":   "",
-				"ClientID":    "",
-				"Environment": "development",
-				"Error":       "",
-				"Errors":      map[string]string{},
-			}
-			tr.Render(w, r, "setup_step2.html", data)
-			return
-		}
-
-		// POST: handle provider choice.
-		ctx := r.Context()
-		choice := r.FormValue("provider_choice")
-
-		// Skip all providers.
-		if choice == "skip" {
-			http.Redirect(w, r, "/admin/setup/step/3", http.StatusSeeOther)
-			return
-		}
-
-		// Teller-only: no form processing needed (env-var config), just continue.
-		if choice == "teller" {
-			http.Redirect(w, r, "/admin/setup/step/3", http.StatusSeeOther)
-			return
-		}
-
-		// Plaid or Both: validate and save Plaid credentials.
-		clientID := strings.TrimSpace(r.FormValue("client_id"))
-		secret := r.FormValue("secret")
-		environment := r.FormValue("environment")
-
-		errors := map[string]string{}
-
-		if clientID == "" {
-			errors["ClientID"] = "Client ID is required"
-		}
-		if secret == "" {
-			errors["Secret"] = "Secret is required"
-		}
-
-		validEnvs := map[string]bool{"sandbox": true, "development": true, "production": true}
-		if !validEnvs[environment] {
-			environment = "development"
-		}
-
-		if len(errors) > 0 {
-			data := map[string]any{
-				"StepNumber":  2,
-				"CSRFToken":   "",
-				"ClientID":    clientID,
-				"Environment": environment,
-				"Error":       "",
-				"Errors":      errors,
-			}
-			tr.Render(w, r, "setup_step2.html", data)
-			return
-		}
-
-		// Validate credentials with a test API call to Plaid.
-		if err := plaidprovider.ValidateCredentials(ctx, clientID, secret, environment); err != nil {
-			data := map[string]any{
-				"StepNumber":  2,
-				"CSRFToken":   "",
-				"ClientID":    clientID,
-				"Environment": environment,
-				"Error":       fmt.Sprintf("Could not validate Plaid credentials. Please check your Client ID and Secret for the %s environment. %v", environment, err),
-				"Errors":      map[string]string{},
-			}
-			tr.Render(w, r, "setup_step2.html", data)
-			return
-		}
-
-		// Store Plaid credentials in app_config.
-		configEntries := []db.SetAppConfigParams{
-			{Key: "plaid_client_id", Value: pgtype.Text{String: clientID, Valid: true}},
-			{Key: "plaid_secret", Value: pgtype.Text{String: secret, Valid: true}},
-			{Key: "plaid_env", Value: pgtype.Text{String: environment, Valid: true}},
-		}
-
-		for _, entry := range configEntries {
-			if err := queries.SetAppConfig(ctx, entry); err != nil {
-				data := map[string]any{
-					"StepNumber":  2,
-					"CSRFToken":   "",
-					"ClientID":    clientID,
-					"Environment": environment,
-					"Error":       "Failed to save configuration",
-					"Errors":      map[string]string{},
-				}
-				tr.Render(w, r, "setup_step2.html", data)
-				return
-			}
-		}
-
-		http.Redirect(w, r, "/admin/setup/step/3", http.StatusSeeOther)
-	}
-}
-
-// SetupStep3Handler handles GET/POST /admin/setup/step/3 — Add Family Member (optional).
-func SetupStep3Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			data := map[string]any{
-				"StepNumber": 3,
-				"CSRFToken":  "",
-				"Name":       "",
-				"Email":      "",
-				"Error":      "",
-				"Errors":     map[string]string{},
-			}
-			tr.Render(w, r, "setup_step_member.html", data)
-			return
-		}
-
-		// POST: skip or create member.
-		ctx := r.Context()
-
-		if r.FormValue("skip") == "true" {
-			http.Redirect(w, r, "/admin/setup/step/4", http.StatusSeeOther)
-			return
-		}
-
-		name := strings.TrimSpace(r.FormValue("name"))
-		email := strings.TrimSpace(r.FormValue("email"))
-		errors := map[string]string{}
-
-		if name == "" {
-			errors["Name"] = "Name is required"
-		}
-		if email != "" {
-			if _, err := mail.ParseAddress(email); err != nil {
-				errors["Email"] = "Invalid email address"
-			}
-		}
-
-		if len(errors) > 0 {
-			data := map[string]any{
-				"StepNumber": 3,
-				"CSRFToken":  "",
-				"Name":       name,
-				"Email":      email,
-				"Error":      "",
-				"Errors":     errors,
-			}
-			tr.Render(w, r, "setup_step_member.html", data)
-			return
-		}
-
-		var emailText pgtype.Text
-		if email != "" {
-			emailText = pgtype.Text{String: email, Valid: true}
-		}
-
-		_, err := queries.CreateUser(ctx, db.CreateUserParams{
-			Name:  name,
-			Email: emailText,
-		})
-		if err != nil {
-			data := map[string]any{
-				"StepNumber": 3,
-				"CSRFToken":  "",
-				"Name":       name,
-				"Email":      email,
-				"Error":      "Failed to create family member",
-				"Errors":     map[string]string{},
-			}
-			tr.Render(w, r, "setup_step_member.html", data)
-			return
-		}
-
-		http.Redirect(w, r, "/admin/setup/step/4", http.StatusSeeOther)
-	}
-}
-
-// SetupStep4Handler handles GET/POST /admin/setup/step/4 — Set Sync Interval.
-func SetupStep4Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			data := map[string]any{
-				"StepNumber":   4,
-				"CSRFToken":    "",
-				"SyncInterval": "720",
-				"Error":        "",
-			}
-			tr.Render(w, r, "setup_step3.html", data)
-			return
-		}
-
-		// POST: validate and store sync interval in minutes.
-		ctx := r.Context()
-		intervalStr := r.FormValue("sync_interval_minutes")
-		interval, err := strconv.Atoi(intervalStr)
-		if err != nil || !isValidSyncInterval(interval) {
-			data := map[string]any{
-				"StepNumber":   4,
-				"CSRFToken":    "",
-				"SyncInterval": intervalStr,
-				"Error":        "Please select a valid sync interval",
-			}
-			tr.Render(w, r, "setup_step3.html", data)
-			return
-		}
-
-		err = queries.SetAppConfig(ctx, db.SetAppConfigParams{
-			Key:   "sync_interval_minutes",
-			Value: pgtype.Text{String: intervalStr, Valid: true},
-		})
-		if err != nil {
-			data := map[string]any{
-				"StepNumber":   4,
-				"CSRFToken":    "",
-				"SyncInterval": intervalStr,
-				"Error":        "Failed to save configuration",
-			}
-			tr.Render(w, r, "setup_step3.html", data)
-			return
-		}
-
-		http.Redirect(w, r, "/admin/setup/step/5", http.StatusSeeOther)
-	}
-}
-
-// SetupStep5Handler handles GET/POST /admin/setup/step/5 — Webhook URL (Optional).
-func SetupStep5Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			data := map[string]any{
-				"StepNumber": 5,
-				"CSRFToken":  "",
-				"WebhookURL": "",
-				"Error":      "",
-			}
-			tr.Render(w, r, "setup_step4.html", data)
-			return
-		}
-
-		// POST: validate and store webhook URL.
-		ctx := r.Context()
-		webhookURL := strings.TrimSpace(r.FormValue("webhook_url"))
-		skip := r.FormValue("skip")
-
-		if skip == "true" {
-			webhookURL = ""
-		}
-
-		// Validate: if provided, must start with https://
-		if webhookURL != "" && !strings.HasPrefix(webhookURL, "https://") {
-			data := map[string]any{
-				"StepNumber": 5,
-				"CSRFToken":  "",
-				"WebhookURL": webhookURL,
-				"Error":      "Webhook URL must start with https://",
-			}
-			tr.Render(w, r, "setup_step4.html", data)
-			return
-		}
-
-		err := queries.SetAppConfig(ctx, db.SetAppConfigParams{
-			Key:   "webhook_url",
-			Value: pgtype.Text{String: webhookURL, Valid: true},
-		})
-		if err != nil {
-			data := map[string]any{
-				"StepNumber": 5,
-				"CSRFToken":  "",
-				"WebhookURL": webhookURL,
-				"Error":      "Failed to save configuration",
-			}
-			tr.Render(w, r, "setup_step4.html", data)
-			return
-		}
-
-		http.Redirect(w, r, "/admin/setup/step/6", http.StatusSeeOther)
-	}
-}
-
-// SetupStep6Handler handles GET/POST /admin/setup/step/6 — Review & Confirm.
-// GET: renders the summary (no side effects).
-// POST: marks setup as complete and redirects to login.
-func SetupStep6Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		if r.Method == http.MethodPost {
-			// Mark setup as complete.
-			_ = queries.SetAppConfig(ctx, db.SetAppConfigParams{
-				Key:   "setup_complete",
-				Value: pgtype.Text{String: "true", Valid: true},
-			})
-			http.Redirect(w, r, "/login?setup=complete", http.StatusSeeOther)
-			return
-		}
-
-		// GET: Build summary data from app_config.
-		configs, _ := queries.ListAppConfig(ctx)
-		configMap := make(map[string]string)
-		for _, c := range configs {
-			if c.Value.Valid {
-				configMap[c.Key] = c.Value.String
-			}
-		}
-
-		adminUsername := configMap["admin_username"]
-		if adminUsername == "" {
-			adminUsername = "(admin)"
-		}
-
-		// Format sync interval for display.
-		syncInterval := configMap["sync_interval_minutes"]
-		syncDisplay := formatSyncInterval(syncInterval)
-
-		// Check provider status.
-		hasPlaid := configMap["plaid_client_id"] != ""
-		hasTeller := os.Getenv("TELLER_APP_ID") != ""
-
-		data := map[string]any{
-			"StepNumber":    6,
-			"AdminUsername": adminUsername,
-			"PlaidEnv":      configMap["plaid_env"],
-			"SyncInterval":  syncDisplay,
-			"WebhookURL":    configMap["webhook_url"],
-			"HasPlaid":      hasPlaid,
-			"HasTeller":     hasTeller,
-		}
-		tr.Render(w, r, "setup_step5.html", data)
-	}
-}
-
-// formatSyncInterval converts a minutes string to a human-readable interval.
-func formatSyncInterval(minutes string) string {
-	switch minutes {
-	case "15":
-		return "Every 15 minutes"
-	case "30":
-		return "Every 30 minutes"
-	case "60":
-		return "Every 1 hour"
-	case "240":
-		return "Every 4 hours"
-	case "480":
-		return "Every 8 hours"
-	case "720":
-		return "Every 12 hours"
-	case "1440":
-		return "Every 24 hours"
-	default:
-		if minutes != "" {
-			return "Every " + minutes + " minutes"
-		}
-		return "Not configured"
-	}
-}
-
-// SetupStatusHandler handles GET /admin/api/setup/status — unauthenticated.
-// Returns JSON {"setup_complete": bool}.
-func SetupStatusHandler(queries *db.Queries) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		cfg, err := queries.GetAppConfig(ctx, "setup_complete")
-		setupComplete := err == nil && cfg.Value.Valid && cfg.Value.String == "true"
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]bool{
-			"setup_complete": setupComplete,
-		})
+		// Set flash and redirect to login.
+		SetFlash(ctx, sm, "success", "Admin account created. Sign in to get started.")
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	}
 }
 
@@ -500,25 +120,16 @@ type programmaticSetupRequest struct {
 }
 
 // ProgrammaticSetupHandler handles POST /admin/api/setup — all-in-one setup.
-// Only works if setup is not already complete (returns 409 if complete).
+// Only works if no admin accounts exist (returns 409 otherwise).
 func ProgrammaticSetupHandler(queries *db.Queries, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// Check if setup is already complete.
-		cfg, err := queries.GetAppConfig(ctx, "setup_complete")
-		if err == nil && cfg.Value.Valid && cfg.Value.String == "true" {
-			writeJSON(w, http.StatusConflict, map[string]string{
-				"error": "Setup is already complete",
-			})
-			return
-		}
-
-		// Also check if admin accounts already exist.
+		// Guard: only works when no admin accounts exist.
 		count, _ := queries.CountAdminAccounts(ctx)
 		if count > 0 {
 			writeJSON(w, http.StatusConflict, map[string]string{
-				"error": "Setup is already complete",
+				"error": "Admin account already exists",
 			})
 			return
 		}
@@ -614,7 +225,6 @@ func ProgrammaticSetupHandler(queries *db.Queries, sm *scs.SessionManager) http.
 		configEntries := []db.SetAppConfigParams{
 			{Key: "sync_interval_minutes", Value: pgtype.Text{String: req.SyncIntervalMinutes, Valid: true}},
 			{Key: "webhook_url", Value: pgtype.Text{String: req.WebhookURL, Valid: true}},
-			{Key: "setup_complete", Value: pgtype.Text{String: "true", Valid: true}},
 		}
 		if req.PlaidClientID != "" {
 			plaidEnv := req.PlaidEnv

@@ -1935,103 +1935,46 @@ Enhances the settings page to be the single surface for all app configuration. A
 
 ---
 
-## Phase 17B: Wizard Deprecation & Onboarding
+## Phase 17B: Wizard Deprecation & Onboarding ✅
 
-Replaces the 5-step setup wizard with a minimal first-run admin creation page and a dashboard onboarding checklist. After this phase, all configuration happens through the settings page (17A).
+**Status:** Complete. Setup wizard replaced with minimal first-run admin creation page and dashboard onboarding checklist.
 
 **Depends on:** Phase 17A (settings must be fully capable before removing the wizard).
 
-### 17B.1 Minimal First-Run Admin Creation
+### 17B.1 Minimal First-Run Admin Creation ✅
 
-- [ ] Replace the 5-step wizard with a single-page "Create Admin Account" form
-- [ ] Shows only when `CountAdminAccounts == 0` (same guard as current `SetupDetection` middleware)
-- [ ] Form: username, password, confirm password — same validation as current Step 1
-- [ ] After successful creation: redirect to `/admin/login` with flash "Admin account created. Sign in to get started."
-- [ ] Use the wizard layout (centered, narrow) but no step indicator — it's just one page
-- [ ] Guard: if admin accounts already exist, redirect to `/admin/` (same as current Step 1 guard)
-- **Ref:** `internal/admin/setup.go` (Step 1 handler, lines 18-111), `internal/admin/middleware.go` (SetupDetection, lines 26-50)
-- **Files:** `internal/admin/setup.go` (simplify to single handler), `internal/templates/pages/setup_create_admin.html` (new, replaces step1-5)
+- [x] Single-page "Create Admin Account" form at `/admin/setup` using wizard layout (no step indicator)
+- [x] Shows only when `CountAdminAccounts == 0`, redirects to `/admin/` otherwise
+- [x] After creation: flash message + redirect to `/login`
 
-### 17B.2 Dashboard Onboarding Checklist
+### 17B.2 Dashboard Onboarding Checklist ✅
 
-- [ ] Add "Getting Started" card to dashboard, shown when onboarding is incomplete
-- [ ] Checklist items with status (done/pending) and links:
-  - ✓ Admin account created — always done (you're logged in)
-  - ○/✓ Configure a bank provider → links to Settings > Providers section
-  - ○/✓ Add a family member → links to `/admin/users/new`
-  - ○/✓ Connect your first bank → links to `/admin/connections/new`
-- [ ] Status detection: check if any providers configured, any users exist, any connections exist
-- [ ] "Dismiss" button: stores `onboarding_dismissed=true` in `app_config` — checklist hidden permanently
-- [ ] Positioned above the stat cards on dashboard
-- [ ] If all items are complete, show a brief "All set!" message with dismiss option (or auto-dismiss)
-- **Ref:** `internal/admin/dashboard.go`, `internal/templates/pages/dashboard.html`
-- **Files:** `internal/admin/dashboard.go`, `internal/templates/pages/dashboard.html`
+- [x] "Getting Started" card on dashboard with DaisyUI `steps` component
+- [x] Checklist: admin account, provider, family member, bank connection
+- [x] "Dismiss" stores `onboarding_dismissed=true` in `app_config`
 
-### 17B.3 Remove Wizard Steps 2-5
+### 17B.3 Remove Wizard Steps 2-6 ✅
 
-- [ ] Delete wizard step handlers: `SetupStep2Handler` through `SetupStep5Handler` in `setup.go`
-- [ ] Delete wizard step templates: `setup_step2.html` through `setup_step5.html`
-- [ ] Remove wizard step routes from `router.go`
-- [ ] Keep only the first-run handler (17B.1) and the programmatic setup API
-- [ ] Clean up any step-related logic in `setup.go` (step number validation, redirect chains)
-- **Files:** `internal/admin/setup.go`, `internal/admin/router.go`, `internal/templates/pages/setup_step2.html` through `setup_step5.html` (delete)
+- [x] Deleted all wizard step handlers (1-6), SetupStatusHandler, formatSyncInterval
+- [x] Deleted wizard step templates and routes
 
-### 17B.4 Update Programmatic Setup API
+### 17B.4 Update Programmatic Setup API ✅
 
-- [ ] Simplify `POST /admin/api/setup` to only create admin account + set config values
-- [ ] Remove step-related logic — it's now a single atomic operation
-- [ ] Keep the guard: only works when `CountAdminAccounts == 0`
-- [ ] Accept same JSON fields: `username`, `password`, plus optional `plaid_client_id`, `plaid_secret`, `plaid_env`, `sync_interval_minutes`, `webhook_url`
-- [ ] Response: return JSON with created admin info + config summary
-- [ ] This API remains useful for Docker/automation headless setup
-- **Ref:** `internal/admin/setup.go` (ProgrammaticSetupHandler, lines 396-523)
-- **Files:** `internal/admin/setup.go`
+- [x] Guard on `CountAdminAccounts == 0` only (removed `setup_complete` check)
+- [x] Removed `setup_complete` storage
 
-### 17B.5 CLI Admin Management
+### 17B.5 CLI Admin Management ✅
 
-- [ ] Add `breadbox create-admin` cobra command
-- [ ] Interactive: prompts for username and password (with confirmation), or accepts `--username` and `--password` flags
-- [ ] Connects directly to DB via `DATABASE_URL` env var
-- [ ] Validates: username not empty, password >= 8 chars, no existing admin with same username
-- [ ] Useful for: Docker init containers, scripted deployments, password-less first-run scenarios
-- [ ] Also add `breadbox reset-password` (from Phase 14.8) here if not already implemented
-- **Ref:** `cmd/breadbox/main.go` (existing cobra commands, lines 33-71)
-- **Files:** `cmd/breadbox/main.go`, `cmd/breadbox/admin.go` (new)
+- [x] `breadbox create-admin` with `--username`/`--password` flags or interactive prompts
+- [x] Validates username uniqueness, password >= 8 chars
 
-### 17B.6 Clean Up Tech Debt
+### 17B.6 Clean Up Tech Debt ✅
 
-- [ ] Remove `setup_complete` flag from `app_config` — replace all checks with `CountAdminAccounts > 0`
-- [ ] Remove `admin_username` from `app_config` (was only used for Step 5 summary display)
-- [ ] Remove `sync_interval_hours` from `app_config` and the fallback path in `config.LoadWithDB` — standardize on `sync_interval_minutes` only
-- [ ] Remove `Config.SetupComplete` field from config struct
-- [ ] Update `SetupDetection` middleware to only check admin account count (it already does this, but verify no other code paths rely on `setup_complete`)
-- [ ] Remove the "Re-run Setup Wizard" link target from settings (already removed in 17A.1, clean up any remaining references)
-- **Ref:** `internal/config/load.go` (lines 137-154 for sync_interval fallback, line 157 for SetupComplete), `internal/config/config.go` (Config struct)
-- **Files:** `internal/config/config.go`, `internal/config/load.go`, `internal/admin/middleware.go`, `internal/admin/setup.go`
-
-### Task Dependencies (Phase 17B)
-
-```
-17B.1 (first-run page)      — independent, do first
-17B.2 (onboarding checklist) — independent of 17B.1 (different page)
-17B.3 (remove wizard steps)  — after 17B.1 (replacement must exist before removing old code)
-17B.4 (update API)           — after 17B.3 (simplify alongside wizard removal)
-17B.5 (CLI admin mgmt)       — independent
-17B.6 (tech debt cleanup)    — after 17B.3 and 17B.4 (remove references last)
-```
-
-### Checkpoint 17B
-
-1. With no admin account: visiting `/admin/` shows the "Create Admin Account" single-page form (not a 5-step wizard)
-2. After creating admin and logging in: dashboard shows "Getting Started" checklist with correct status for each item
-3. Configure a provider in settings → checklist updates to show it as done
-4. Add a family member → checklist updates. Connect a bank → checklist updates
-5. "Dismiss" hides the checklist permanently
-6. `POST /admin/api/setup` still works for headless setup (creates admin + sets config)
-7. `breadbox create-admin` CLI command works: creates admin account from terminal
-8. No references to `setup_complete`, `sync_interval_hours`, or `admin_username` in `app_config`
-9. Wizard step templates (step2-step5) are deleted
-10. No broken links or routes referencing removed wizard steps
+- [x] Removed `SetupComplete` from Config struct and load.go
+- [x] Removed `sync_interval_hours` legacy fallback
+- [x] Removed `SetupComplete` from login template/handler
+- [x] Simplified `isSetupRoute` middleware
+- [x] Migration 00016 deletes `setup_complete`, `admin_username`, `sync_interval_hours` from app_config
 
 ---
 

@@ -160,15 +160,10 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/account_detail.html",
 	}
 
-	// Pages using the wizard layout (setup wizard + login).
+	// Pages using the wizard layout (login + first-run admin creation).
 	wizardPages := []string{
 		"pages/login.html",
-		"pages/setup_step1.html",
-		"pages/setup_step2.html",
-		"pages/setup_step_member.html",
-		"pages/setup_step3.html",
-		"pages/setup_step4.html",
-		"pages/setup_step5.html",
+		"pages/setup_create_admin.html",
 	}
 
 	for _, page := range basePages {

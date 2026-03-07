@@ -35,7 +35,7 @@ var version = "dev"
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: breadbox <command>")
-		fmt.Fprintln(os.Stderr, "commands: serve, migrate, seed, mcp-stdio, api-keys, reset-password, version")
+		fmt.Fprintln(os.Stderr, "commands: serve, migrate, seed, mcp-stdio, api-keys, create-admin, reset-password, version")
 		os.Exit(1)
 	}
 
@@ -62,6 +62,11 @@ func main() {
 		}
 	case "api-keys":
 		if err := runAPIKeys(); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+	case "create-admin":
+		if err := runCreateAdmin(); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
@@ -209,16 +214,12 @@ func runServe() error {
 	if cfg.EncryptionKey == nil {
 		encryptionStatus = "NOT SET"
 	}
-	adminStatus := "none (setup wizard)"
+	adminStatus := "none"
 	adminCount, err := a.Queries.CountAdminAccounts(ctx)
 	if err != nil {
 		logger.Warn("failed to check admin accounts", "error", err)
 	} else if adminCount > 0 {
 		adminStatus = "exists"
-	}
-	setupStatus := "pending"
-	if cfg.SetupComplete {
-		setupStatus = "complete"
 	}
 	logger.Info("breadbox starting",
 		"version", version,
@@ -228,7 +229,6 @@ func runServe() error {
 		"teller", tellerStatus,
 		"encryption_key", encryptionStatus,
 		"admin", adminStatus,
-		"setup", setupStatus,
 		"sync_interval", fmt.Sprintf("%dm", cfg.SyncIntervalMinutes),
 		"webhook", webhookStatus,
 		"db_pool", fmt.Sprintf("max=%d min=%d lifetime=%dm", cfg.DBMaxConns, cfg.DBMinConns, cfg.DBMaxConnLifetimeM),
@@ -237,7 +237,7 @@ func runServe() error {
 		logger.Warn("ENCRYPTION_KEY not set — encrypted provider credentials will not work")
 	}
 	if adminCount == 0 {
-		logger.Warn("no admin account — setup wizard will run on first visit")
+		logger.Warn("no admin account — create one at /admin/setup or via 'breadbox create-admin'")
 	}
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("http server: %w", err)

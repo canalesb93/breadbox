@@ -23,7 +23,7 @@ func RequireAuth(sm *scs.SessionManager) func(http.Handler) http.Handler {
 	}
 }
 
-// SetupDetection is chi middleware that redirects to the setup wizard
+// SetupDetection is chi middleware that redirects to the admin creation page
 // if no admin accounts exist in the database.
 func SetupDetection(queries *db.Queries) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -40,7 +40,7 @@ func SetupDetection(queries *db.Queries) func(http.Handler) http.Handler {
 					next.ServeHTTP(w, r)
 					return
 				}
-				http.Redirect(w, r, "/admin/setup/step/1", http.StatusSeeOther)
+				http.Redirect(w, r, "/admin/setup", http.StatusSeeOther)
 				return
 			}
 
@@ -49,13 +49,7 @@ func SetupDetection(queries *db.Queries) func(http.Handler) http.Handler {
 	}
 }
 
-// isSetupRoute checks whether the path is a setup wizard or setup API route.
+// isSetupRoute checks whether the path is a setup or setup API route.
 func isSetupRoute(path string) bool {
-	if len(path) >= 18 && path[:18] == "/admin/setup/step/" {
-		return true
-	}
-	if path == "/admin/api/setup/status" || path == "/admin/api/setup" {
-		return true
-	}
-	return false
+	return path == "/admin/setup" || path == "/admin/api/setup"
 }

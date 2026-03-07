@@ -1,6 +1,38 @@
 {{define "content"}}
 <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
 
+{{if .ShowOnboarding}}
+<div class="card bg-base-100 shadow-lg border border-primary/20 mb-6">
+  <div class="card-body">
+    <h2 class="card-title">
+      <i data-lucide="rocket" class="w-5 h-5 text-primary"></i>
+      Getting Started
+    </h2>
+    <p class="text-sm text-base-content/70 mb-2">Complete these steps to set up Breadbox.</p>
+    <ul class="steps steps-vertical text-sm">
+      <li class="step step-primary">
+        <span class="text-left">Create admin account</span>
+      </li>
+      <li class="step{{if .HasProvider}} step-primary{{end}}">
+        <span class="text-left">{{if .HasProvider}}Bank provider configured{{else}}<a href="/admin/settings" class="link">Configure a bank provider</a>{{end}}</span>
+      </li>
+      <li class="step{{if .HasMember}} step-primary{{end}}">
+        <span class="text-left">{{if .HasMember}}Family member added{{else}}<a href="/admin/users/new" class="link">Add a family member</a>{{end}}</span>
+      </li>
+      <li class="step{{if .HasConnection}} step-primary{{end}}">
+        <span class="text-left">{{if .HasConnection}}Bank connected{{else}}<a href="/admin/connections/new" class="link">Connect your first bank</a>{{end}}</span>
+      </li>
+    </ul>
+    <div class="card-actions justify-end mt-2">
+      <form method="POST" action="/admin/onboarding/dismiss">
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+        <button type="submit" class="btn btn-ghost btn-sm">Dismiss</button>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}
+
 {{if gt .NeedsAttention 0}}
 <div class="alert alert-warning mb-6">
   <i data-lucide="alert-triangle" class="w-5 h-5"></i>

@@ -32,3 +32,6 @@ internal/db/*.sql.go
 
 # OS
 .DS_Store
+
+# Claude Code worktrees
+.claude/worktrees/

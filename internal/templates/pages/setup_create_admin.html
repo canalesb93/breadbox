@@ -1,0 +1,39 @@
+{{define "content"}}
+<div class="text-center mb-6">
+  <i data-lucide="package" class="w-10 h-10 mx-auto mb-2"></i>
+  <h1 class="text-2xl font-bold">Welcome to Breadbox</h1>
+  <p class="text-sm text-base-content/60">Create your admin account to get started.</p>
+</div>
+
+{{if .Error}}
+<div role="alert" class="alert alert-error mb-4">{{.Error}}</div>
+{{end}}
+
+<form method="POST" action="/admin/setup">
+  {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+
+  <fieldset class="fieldset">
+    <label class="fieldset-label" for="username">Username</label>
+    <input type="text" id="username" name="username" value="{{.Username}}" required autocomplete="username"
+           class="input w-full{{if .Errors.Username}} input-error{{end}}">
+    {{if .Errors.Username}}<p class="text-xs text-error mt-1">{{.Errors.Username}}</p>{{end}}
+  </fieldset>
+
+  <fieldset class="fieldset">
+    <label class="fieldset-label" for="password">Password</label>
+    <input type="password" id="password" name="password" required autocomplete="new-password" minlength="8"
+           class="input w-full{{if .Errors.Password}} input-error{{end}}">
+    <p class="text-xs text-base-content/60 mt-1">Minimum 8 characters</p>
+    {{if .Errors.Password}}<p class="text-xs text-error mt-1">{{.Errors.Password}}</p>{{end}}
+  </fieldset>
+
+  <fieldset class="fieldset">
+    <label class="fieldset-label" for="confirm_password">Confirm Password</label>
+    <input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password"
+           class="input w-full{{if .Errors.ConfirmPassword}} input-error{{end}}">
+    {{if .Errors.ConfirmPassword}}<p class="text-xs text-error mt-1">{{.Errors.ConfirmPassword}}</p>{{end}}
+  </fieldset>
+
+  <button type="submit" class="btn btn-primary w-full mt-6">Create Account</button>
+</form>
+{{end}}
