@@ -40,7 +40,7 @@ func SetupDetection(queries *db.Queries) func(http.Handler) http.Handler {
 					next.ServeHTTP(w, r)
 					return
 				}
-				http.Redirect(w, r, "/admin/setup/step/1", http.StatusSeeOther)
+				http.Redirect(w, r, "/admin/setup", http.StatusSeeOther)
 				return
 			}
 
@@ -51,6 +51,9 @@ func SetupDetection(queries *db.Queries) func(http.Handler) http.Handler {
 
 // isSetupRoute checks whether the path is a setup wizard or setup API route.
 func isSetupRoute(path string) bool {
+	if path == "/admin/setup" {
+		return true
+	}
 	if len(path) >= 18 && path[:18] == "/admin/setup/step/" {
 		return true
 	}

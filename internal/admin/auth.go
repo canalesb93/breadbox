@@ -19,6 +19,7 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRende
 				"PageTitle":     "Sign In",
 				"CSRFToken":     GenerateCSRFToken(r.Context(), sm),
 				"SetupComplete": r.URL.Query().Get("setup") == "complete",
+				"Flash":         GetFlash(r.Context(), sm),
 				"Username":      "",
 				"Error":         "",
 			}

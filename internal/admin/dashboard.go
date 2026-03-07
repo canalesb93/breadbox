@@ -6,6 +6,9 @@ import (
 	"time"
 
 	"breadbox/internal/app"
+	"breadbox/internal/db"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // DashboardHandler serves GET /admin/ — the dashboard home page.
@@ -46,6 +49,32 @@ func DashboardHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			lastSyncText = relativeTime(lastSync.Time)
 		}
 
+		// Onboarding checklist detection.
+		showOnboarding := false
+		var hasProvider, hasMember, hasConnection bool
+
+		dismissed, _ := a.Queries.GetAppConfig(ctx, "onboarding_dismissed")
+		if !(dismissed.Value.Valid && dismissed.Value.String == "true") {
+			showOnboarding = true
+
+			// Check provider
+			hasProvider = a.Config.PlaidClientID != "" || a.Config.TellerAppID != ""
+
+			// Check members
+			userCount, err := a.Queries.CountUsers(ctx)
+			if err != nil {
+				a.Logger.Error("count users", "error", err)
+			}
+			hasMember = userCount > 0
+
+			// Check connections
+			connCount, err := a.Queries.CountConnections(ctx)
+			if err != nil {
+				a.Logger.Error("count connections", "error", err)
+			}
+			hasConnection = connCount > 0
+		}
+
 		data := map[string]any{
 			"PageTitle":      "Dashboard",
 			"CurrentPage":    "dashboard",
@@ -55,8 +84,23 @@ func DashboardHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			"NeedsAttention": needsAttention,
 			"RecentLogs":     recentLogs,
 			"CSRFToken":      GetCSRFToken(r),
+			"ShowOnboarding": showOnboarding,
+			"HasProvider":    hasProvider,
+			"HasMember":      hasMember,
+			"HasConnection":  hasConnection,
 		}
 		tr.Render(w, r, "dashboard.html", data)
+	}
+}
+
+// DismissOnboardingHandler handles POST /admin/onboarding/dismiss.
+func DismissOnboardingHandler(a *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_ = a.Queries.SetAppConfig(r.Context(), db.SetAppConfigParams{
+			Key:   "onboarding_dismissed",
+			Value: pgtype.Text{String: "true", Valid: true},
+		})
+		http.Redirect(w, r, "/admin/", http.StatusSeeOther)
 	}
 }
 

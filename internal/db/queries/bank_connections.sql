@@ -86,3 +86,6 @@ SELECT user_id, COUNT(*) as connection_count
 FROM bank_connections
 WHERE status != 'disconnected'
 GROUP BY user_id;
+
+-- name: CountConnections :one
+SELECT count(*) FROM bank_connections WHERE status != 'disconnected';

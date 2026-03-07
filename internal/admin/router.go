@@ -25,6 +25,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 	r.Post("/login", LoginHandler(sm, a.Queries, tr))
 	r.Post("/logout", LogoutHandler(sm))
 
+	// New first-run admin creation (replaces wizard).
+	r.Get("/admin/setup", CreateAdminHandler(a.Queries, sm, tr))
+	r.Post("/admin/setup", CreateAdminHandler(a.Queries, sm, tr))
+
 	// Setup wizard (unauthenticated).
 	r.Route("/admin/setup", func(r chi.Router) {
 		r.Get("/step/1", SetupStep1Handler(a.Queries, tr))
@@ -51,6 +55,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Use(CSRFMiddleware(sm))
 
 		r.Get("/", DashboardHandler(a, tr))
+		r.Post("/onboarding/dismiss", DismissOnboardingHandler(a))
 
 		r.Route("/connections", func(r chi.Router) {
 			r.Get("/", ConnectionsListHandler(a, tr))

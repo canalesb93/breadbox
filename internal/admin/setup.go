@@ -17,6 +17,101 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// CreateAdminHandler handles GET/POST /admin/setup — Create Admin Account.
+// This is the minimal first-run page that replaces the multi-step wizard.
+func CreateAdminHandler(queries *db.Queries, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// If admin accounts already exist, redirect to dashboard.
+		count, err := queries.CountAdminAccounts(ctx)
+		if err == nil && count > 0 {
+			http.Redirect(w, r, "/admin/", http.StatusSeeOther)
+			return
+		}
+
+		if r.Method == http.MethodGet {
+			data := map[string]any{
+				"PageTitle": "Create Admin Account",
+				"CSRFToken": "",
+				"Username":  "",
+				"Error":     "",
+				"Errors":    map[string]string{},
+			}
+			tr.Render(w, r, "setup_create_admin.html", data)
+			return
+		}
+
+		// POST: validate and create account.
+		username := strings.TrimSpace(r.FormValue("username"))
+		password := r.FormValue("password")
+		confirmPassword := r.FormValue("confirm_password")
+
+		errors := map[string]string{}
+
+		if username == "" {
+			errors["Username"] = "Username is required"
+		} else if len(username) > 64 {
+			errors["Username"] = "Username must be 64 characters or fewer"
+		}
+
+		if len(password) < 8 {
+			errors["Password"] = "Password must be at least 8 characters"
+		}
+
+		if password != confirmPassword {
+			errors["ConfirmPassword"] = "Passwords do not match"
+		}
+
+		if len(errors) > 0 {
+			data := map[string]any{
+				"PageTitle": "Create Admin Account",
+				"CSRFToken": "",
+				"Username":  username,
+				"Error":     "",
+				"Errors":    errors,
+			}
+			tr.Render(w, r, "setup_create_admin.html", data)
+			return
+		}
+
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+		if err != nil {
+			data := map[string]any{
+				"PageTitle": "Create Admin Account",
+				"CSRFToken": "",
+				"Username":  username,
+				"Error":     "Failed to hash password",
+				"Errors":    map[string]string{},
+			}
+			tr.Render(w, r, "setup_create_admin.html", data)
+			return
+		}
+
+		_, err = queries.CreateAdminAccount(ctx, db.CreateAdminAccountParams{
+			Username:       username,
+			HashedPassword: hashedPassword,
+		})
+		if err != nil {
+			data := map[string]any{
+				"PageTitle": "Create Admin Account",
+				"CSRFToken": "",
+				"Username":  username,
+				"Error":     "Failed to create admin account",
+				"Errors":    map[string]string{},
+			}
+			tr.Render(w, r, "setup_create_admin.html", data)
+			return
+		}
+
+		// Do NOT store admin_username or setup_complete — those are being removed.
+
+		// Set flash and redirect to login.
+		SetFlash(ctx, sm, "success", "Admin account created. Sign in to get started.")
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	}
+}
+
 // SetupStep1Handler handles GET/POST /admin/setup/step/1 — Create Admin Account.
 func SetupStep1Handler(queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
