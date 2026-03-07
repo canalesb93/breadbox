@@ -25,28 +25,11 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 	r.Post("/login", LoginHandler(sm, a.Queries, tr))
 	r.Post("/logout", LogoutHandler(sm))
 
-	// New first-run admin creation (replaces wizard).
+	// First-run admin creation (unauthenticated).
 	r.Get("/admin/setup", CreateAdminHandler(a.Queries, sm, tr))
 	r.Post("/admin/setup", CreateAdminHandler(a.Queries, sm, tr))
 
-	// Setup wizard (unauthenticated).
-	r.Route("/admin/setup", func(r chi.Router) {
-		r.Get("/step/1", SetupStep1Handler(a.Queries, tr))
-		r.Post("/step/1", SetupStep1Handler(a.Queries, tr))
-		r.Get("/step/2", SetupStep2Handler(a.Queries, tr))
-		r.Post("/step/2", SetupStep2Handler(a.Queries, tr))
-		r.Get("/step/3", SetupStep3Handler(a.Queries, tr))
-		r.Post("/step/3", SetupStep3Handler(a.Queries, tr))
-		r.Get("/step/4", SetupStep4Handler(a.Queries, tr))
-		r.Post("/step/4", SetupStep4Handler(a.Queries, tr))
-		r.Get("/step/5", SetupStep5Handler(a.Queries, tr))
-		r.Post("/step/5", SetupStep5Handler(a.Queries, tr))
-		r.Get("/step/6", SetupStep6Handler(a.Queries, tr))
-		r.Post("/step/6", SetupStep6Handler(a.Queries, tr))
-	})
-
-	// Setup API (unauthenticated).
-	r.Get("/admin/api/setup/status", SetupStatusHandler(a.Queries))
+	// Programmatic setup API (unauthenticated).
 	r.Post("/admin/api/setup", ProgrammaticSetupHandler(a.Queries, sm))
 
 	// Authenticated admin routes (HTML pages).
