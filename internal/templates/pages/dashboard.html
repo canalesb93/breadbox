@@ -1,6 +1,56 @@
 {{define "content"}}
 <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
 
+{{if .ShowUpdateBanner}}
+<div class="alert alert-info mb-6" x-data="{ pulling: false, pulled: false, error: '' }">
+  <i data-lucide="download" class="w-5 h-5"></i>
+  <div class="flex-1">
+    <h3 class="font-bold">Update Available</h3>
+    <p class="text-sm">
+      Version <strong>v{{.LatestVersion}}</strong> is available (current: v{{.CurrentVersion}}).
+      {{if .LatestURL}}<a href="{{.LatestURL}}" target="_blank" rel="noopener" class="link">Release notes</a>{{end}}
+    </p>
+    <template x-if="pulled">
+      <p class="text-sm mt-1 text-success font-semibold">Image pulled! Run <code>docker compose up -d</code> to apply.</p>
+    </template>
+    <template x-if="error !== ''">
+      <p class="text-sm mt-1 text-error" x-text="error"></p>
+    </template>
+  </div>
+  <div class="flex gap-2 items-center">
+    {{if .DockerSocketAvailable}}
+    <button
+      class="btn btn-sm btn-primary"
+      x-show="!pulled"
+      :disabled="pulling"
+      @click="pulling = true; error = '';
+        fetch('/admin/api/update', {method: 'POST', headers: {'Content-Type': 'application/json'}})
+          .then(r => r.json())
+          .then(d => { if (d.ok) { pulled = true; } else { error = d.error || 'Update failed'; } })
+          .catch(() => { error = 'Network error'; })
+          .finally(() => { pulling = false; })">
+      <span x-show="!pulling">Pull Update</span>
+      <span x-show="pulling" class="loading loading-spinner loading-xs"></span>
+    </button>
+    {{end}}
+    <div class="dropdown dropdown-end">
+      <div tabindex="0" role="button" class="btn btn-sm btn-ghost">Update Command</div>
+      <div tabindex="0" class="dropdown-content card card-compact bg-base-200 shadow-lg p-3 w-80 z-10">
+        <code class="text-xs select-all">cd /opt/breadbox && docker compose pull && docker compose up -d</code>
+      </div>
+    </div>
+    <button class="btn btn-sm btn-ghost"
+      @click="fetch('/admin/api/update/dismiss', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({version: '{{.LatestVersion}}'})
+      }).then(() => $el.closest('.alert').remove())">
+      Dismiss
+    </button>
+  </div>
+</div>
+{{end}}
+
 {{if .ShowOnboarding}}
 <div class="card bg-base-100 shadow-lg border border-primary/20 mb-6">
   <div class="card-body">

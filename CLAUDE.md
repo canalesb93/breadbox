@@ -71,6 +71,12 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Icons: Lucide via CDN, `data-lucide` attributes replaced with inline SVG by `lucide.createIcons()`
 - DaisyUI components replace `bb-*` classes: `drawer` (sidebar), `stat` (metric cards), `table` (data tables), `badge` (status), `menu` (nav), `card` (sections), `modal` (dialogs), `toast`+`alert` (notifications), `steps` (wizard progress), `collapse` (accordions)
 - Custom `@apply` classes in `input.css` for app-specific patterns: `.bb-filter-bar`, `.bb-pagination`, `.bb-action-bar`, `.bb-amount`, `.bb-info-grid`
+- CI/CD: GitHub Actions (`.github/workflows/ci.yml`). PR → vet+test+build. Main → multi-arch push to `ghcr.io/canalesb93/breadbox:latest`. Tag → versioned image. Auto-deploy to dev VM via SSH.
+- Production deployment: `deploy/docker-compose.prod.yml` with Caddy (auto HTTPS), PostgreSQL, Breadbox from ghcr.io. `deploy/install.sh` for one-liner setup. `deploy/update.sh` for CLI updates.
+- Version checker: `internal/version/checker.go` — in-memory cached (1hr TTL) GitHub Releases API check. Shared by REST `GET /api/v1/version` (no auth) and dashboard handler.
+- Docker socket detection: `os.Stat("/var/run/docker.sock")` at startup → `App.DockerSocketAvailable`. Used by update handler to pull images via Docker Engine API (`net/http` with Unix socket transport, no Docker SDK dependency).
+- Update flow: dashboard banner shows when GitHub release is newer than current. Pull via Docker socket if available, then user runs `docker compose up -d`. Dismiss stores `update_dismissed_version` in `app_config`.
+- Dev VM: `breadbox.exe.xyz`. Auto-deploy from GitHub Actions on main merge. Secrets: `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`.
 
 ## Canonical Enums
 

@@ -33,6 +33,9 @@ func NewRouter(a *app.App, version string) http.Handler {
 	r.Get("/health/live", HealthLiveHandler(version))
 	r.Get("/health/ready", HealthReadyHandler(a, version))
 
+	// Version check — no auth required.
+	r.Get("/api/v1/version", VersionHandler(a.VersionChecker, version))
+
 	// REST API v1 — API key authenticated.
 	svc := service.New(a.Queries, a.DB, a.SyncEngine, a.Logger)
 	r.Route("/api/v1", func(r chi.Router) {

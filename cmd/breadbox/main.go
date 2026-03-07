@@ -19,6 +19,7 @@ import (
 	"breadbox/internal/seed"
 	"breadbox/internal/service"
 	"breadbox/internal/sync"
+	versionpkg "breadbox/internal/version"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -131,6 +132,12 @@ func runServe() error {
 	cfg.Version = version
 	cfg.StartTime = time.Now()
 
+	// Check for Docker socket availability (one-click updates).
+	dockerSocketAvailable := false
+	if _, err := os.Stat("/var/run/docker.sock"); err == nil {
+		dockerSocketAvailable = true
+	}
+
 	logger := newLogger(cfg)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -141,6 +148,9 @@ func runServe() error {
 		return fmt.Errorf("init app: %w", err)
 	}
 	defer a.DB.Close()
+
+	a.VersionChecker = versionpkg.NewChecker(version, logger)
+	a.DockerSocketAvailable = dockerSocketAvailable
 
 	// Merge app_config table values into config.
 	if err := config.LoadWithDB(ctx, cfg, a.DB); err != nil {
