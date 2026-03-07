@@ -19,6 +19,7 @@ This document defines the exact conventions used in `docs/ROADMAP.md`. All addit
 - Phase numbers are sequential integers. Use letter suffixes for sub-phases (e.g., `16A`, `16B`).
 - The `**Status:**` line is added when work begins or completes. Omit it for phases that haven't started.
 - `✅` goes on the `## Phase` line itself when the phase is complete.
+- The `**Spec:**` line references a dedicated spec document in `docs/` when the phase has one (e.g., `**Spec:** docs/design-system.md`). See SKILL.md "Spec Files for New Phases" for when to create one.
 
 ## Task Header
 

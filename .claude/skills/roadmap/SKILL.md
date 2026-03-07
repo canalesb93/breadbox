@@ -13,6 +13,24 @@ You are managing `docs/ROADMAP.md` — the living implementation roadmap for the
 
 ---
 
+## Reading the Roadmap Efficiently
+
+The roadmap file is large. **Do NOT read the entire file** unless absolutely necessary — it will consume a huge portion of the context window. Use targeted reads instead:
+
+| What you need | How to get it |
+|---|---|
+| Phase headers + status | `Grep` for `^## Phase` — shows all phase titles and ✅ markers |
+| Unchecked tasks | `Grep` for `^\- \[ \]` — shows all pending subtasks with line numbers |
+| A specific phase | `Grep` for `^## Phase {N}` to find its line number, then `Read` with `offset` and `limit` (~80-120 lines per phase) |
+| Task headers in a phase | `Grep` for `^### {N}\.` — shows all tasks in phase N |
+| Recent phases only | `Read` with `offset` set to the last ~500 lines of the file |
+| Completed task count | `Grep` for `^\- \[x\]` with `output_mode: "count"` |
+| Checkpoint for a phase | `Grep` for `### Checkpoint {N}` to find the line, then `Read` a small range |
+
+**Rule of thumb:** Use `Grep` to locate, then `Read` with `offset`/`limit` to view only the section you need.
+
+---
+
 ## Determine Mode
 
 Based on `$ARGUMENTS`, run one of the three modes below:
@@ -66,6 +84,29 @@ Write the new phase following the format in [format-reference.md](format-referen
 - Tasks should be self-contained: one package, one endpoint group, one page, etc.
 - Break large features into sub-phases (e.g., 18A, 18B) if they exceed 10 tasks
 
+### Spec Files for New Phases
+
+For non-trivial features, create a **spec document** in `docs/` alongside the roadmap entry. This serves two purposes: it gives the implementing agent detailed context without bloating the roadmap, and it becomes permanent documentation for the feature.
+
+**When to create a spec file:**
+- The feature has design decisions that need explaining (data model, API shape, trade-offs)
+- The phase has 5+ tasks with interconnected logic
+- The feature introduces new patterns or conventions that other code will follow
+- There are edge cases, error handling, or security considerations worth documenting
+
+**When NOT to create a spec file:**
+- Pure bug fixes or small polish phases
+- Phases that only rearrange existing code (refactors with no new concepts)
+- Work already fully described by an existing spec doc
+
+**Spec file conventions:**
+- Location: `docs/{feature-name}.md` (e.g., `docs/webhook-retry.md`, `docs/budget-tags.md`)
+- Reference from the roadmap: add `**Spec:** docs/{feature-name}.md` on the phase header, and `**Ref:** {feature-name}.md Section N` on individual tasks
+- Content: problem statement, design decisions, data model changes, API surface, edge cases
+- Keep it focused on the *what and why*, not step-by-step implementation — the roadmap tasks handle the *how*
+
+Existing examples in the project: `docs/data-model.md`, `docs/rest-api.md`, `docs/teller-integration.md`, `docs/csv-import.md`, `docs/design-system.md`.
+
 ### Step 4: Present for Review
 
 Show the complete draft to the user in a markdown code block. Do NOT write to the file yet. Ask for feedback and iterate if needed.
@@ -85,7 +126,13 @@ Use this to verify and mark completed tasks in the roadmap.
 
 ### Step 1: Find Unchecked Work
 
-Read `docs/ROADMAP.md` and identify all `- [ ]` items. Group them by phase. Ignore phases that are already marked `✅` in their header (fully complete).
+Use targeted searches — do NOT read the entire roadmap:
+
+1. `Grep` for `^## Phase` to get all phase headers and their ✅ status
+2. `Grep` for `^\- \[ \]` to find all unchecked subtasks with line numbers
+3. For each unchecked item, use the line number to identify which phase it belongs to
+
+Group unchecked items by phase. Ignore phases already marked `✅` in their header.
 
 ### Step 2: Present Unchecked Items
 
@@ -124,7 +171,11 @@ Use this for a quick overview of where the project stands.
 
 ### Workflow
 
-1. Read `docs/ROADMAP.md`
+1. Use targeted reads — do NOT load the entire roadmap:
+   - `Grep` for `^## Phase` to get all phase headers with ✅ status
+   - `Grep` for `^\- \[ \]` with `output_mode: "count"` to get pending task count
+   - `Grep` for `^\- \[x\]` with `output_mode: "count"` to get completed task count
+   - For the next upcoming phase, `Read` only that section (use `offset`/`limit`)
 2. Present a summary table:
 
 ```
