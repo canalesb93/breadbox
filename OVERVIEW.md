@@ -23,7 +23,7 @@ Breadbox is a service you host yourself that:
 ## Goals (MVP)
 
 - [ ] Connect bank accounts via Plaid Link (primary provider)
-- [ ] Abstract bank data provider behind an interface (Plaid first, Teller + CSV later)
+- [x] Abstract bank data provider behind an interface (Plaid, Teller, and CSV all implemented)
 - [ ] Sync transactions and account balances automatically (configurable interval, default 12h)
 - [ ] Track account ownership per family member (label/filter, not access control)
 - [ ] REST API exposing raw financial data (accounts, transactions, balances)
@@ -42,7 +42,7 @@ Breadbox is a service you host yourself that:
 - Multi-tenant / multi-family
 - Real-time streaming
 - Merchant name normalization
-- Teller or CSV import (provider interface ready, implementation deferred)
+- Teller and CSV import are now implemented (see Phases 9, 11)
 
 ## Architecture
 
@@ -75,8 +75,8 @@ HTTP server (chi router):
 - **MCP Server**: Streamable HTTP transport on the same router. MCP tools wrap
   the REST API layer. Agents connect remotely over HTTP. Stdio available as
   optional dev convenience (`breadbox mcp-stdio`).
-- **Admin Dashboard**: Server-rendered HTML (Go templates + Pico CSS + Plaid Link JS).
-  Consumes the REST API. Manages connections, family members, connection health,
+- **Admin Dashboard**: Server-rendered HTML (Go templates + DaisyUI 5/Tailwind CSS v4 + Alpine.js v3 + Plaid Link JS).
+  Consumes the service layer directly. Manages connections, family members, connection health,
   re-auth flows. Session authenticated.
 - **Sync Engine**: Cron + webhook-triggered bank data sync (background goroutines).
 - **Webhook Handler**: Receives Plaid/provider callbacks for sync triggers and
@@ -97,8 +97,10 @@ GET  /api/v1/transactions/:id         Single transaction
 GET  /api/v1/users                    List family members
 GET  /api/v1/connections              List bank connections with status
 GET  /api/v1/connections/:id/status   Connection health + last sync info
+GET  /api/v1/categories               List distinct category pairs (primary + detailed)
 POST /api/v1/sync                     Trigger sync (all or specific connection)
-GET  /health                          Health check (unauthenticated)
+GET  /health/live                     Basic health check (unauthenticated)
+GET  /health/ready                    Deep health check: DB + scheduler (unauthenticated)
 ```
 
 Auth: `X-API-Key: bb_xxxxx` header. Admin dashboard uses session cookies instead.
@@ -115,6 +117,9 @@ Thin wrappers around the REST API. Focus on raw data retrieval.
 | `list_users` | List family members |
 | `get_sync_status` | Connection health, last sync times, items needing re-auth |
 | `trigger_sync` | Manually trigger a data sync |
+| `list_categories` | List distinct category pairs (primary + detailed) |
+
+**MCP Resource:** `breadbox://overview` — returns live stats (account count, transaction count, date range, provider summary).
 
 Aggregations (spending summaries, income breakdowns, net worth) are deferred —
 agents can compute these from raw transaction data.
@@ -150,7 +155,7 @@ Key design decisions:
 | Migrations | goose | Simple SQL migrations |
 | HTTP | chi/v5 | Lightweight, composable middleware |
 | Scheduling | robfig/cron/v3 | Background sync scheduling |
-| Admin UI | Go html/template + Pico CSS | No build step. Plaid Link JS via script tag. |
+| Admin UI | Go html/template + DaisyUI 5/Tailwind v4 + Alpine.js v3 | CSS pre-compiled via standalone CLI (no Node.js). Lucide icons via CDN. |
 | Deployment | Docker Compose | PostgreSQL + app, single command |
 
 ## Bank Data Providers
@@ -172,25 +177,32 @@ require restructuring.
 - **Connection maintenance**: Banks break connections regularly. Must support Plaid Link update mode for re-authentication.
 - **API reference**: https://plaid.com/docs/llms-full.txt
 
-### Teller (Post-MVP)
+### Teller (Implemented — Phase 9)
 
 - 100 free live connections for indie developers
 - Simpler API, no screen scraping
 - US-only, fewer institutions than Plaid
+- mTLS auth (app-level cert/key) + per-connection access token
+- Date-range polling with 10-day overlap (no cursor)
+- Category mapping to Plaid-compatible primary + detailed categories
 
-### CSV/OFX Import (Post-MVP)
+### CSV Import (Implemented — Phase 11)
 
 - Zero cost, zero API dependency
-- Manual effort but always works
+- Import-only: stub Provider interface (no sync/webhook/reauth)
+- Dedup via SHA-256 hash of `account_id|date|amount|description`
+- Admin UI upload page at `/admin/connections/import-csv`
 
 ## First-Run Setup
 
 On first launch, if no admin account exists, Breadbox shows a setup wizard:
 
 1. Create admin account (username + password)
-2. Configure Plaid credentials (client ID + secret, environment)
-3. Set sync interval (default 12h)
-4. Optional: webhook URL for Plaid (with guidance on Cloudflare Tunnel setup)
+2. Configure bank providers (Plaid / Teller / Both / Skip)
+3. Optional: add a family member (name + email)
+4. Set sync interval (15m, 30m, 1h, 4h, 8h, 12h, 24h)
+5. Optional: webhook URL (with guidance on Cloudflare Tunnel setup)
+6. Review configuration and finish
 
 Settings stored in the App Config table. Subsequent launches skip the wizard.
 
@@ -203,3 +215,15 @@ Settings stored in the App Config table. Subsequent launches skip the wizard.
 5. **MCP Server** — Streamable HTTP transport, MCP tools wrapping REST layer, stdio convenience mode
 6. **Automated Sync + Webhooks** — Cron scheduling, webhook handler, connection health monitoring, graceful shutdown
 7. **Docker Deployment** — Multi-stage Dockerfile, Compose, persistent volumes, production polish
+8. **Multi-Provider Refactoring** — Provider interface abstraction, generic DB columns, shared crypto
+9. **Teller Provider** — mTLS auth, date-range sync, category mapping, webhook support
+10. **Enhanced Settings & Connection Management** — Display names, excluded accounts, pause/resume, per-connection sync intervals
+11. **CSV Import Provider** — Upload page, column mapping, dedup via SHA-256, stub Provider interface
+12A. **Admin UI Foundation** — Class-based Pico CSS, Alpine.js, badge functions, nav restructure
+12B. **Admin Transaction Pages** — Transaction list with filters, account detail, cross-linking
+13A. **Bug Fixes & Dashboard UX** — Setup wizard bugs, dashboard navigation, error messages, breadcrumbs
+13B. **Setup & Settings Overhaul** — Multi-provider wizard, password change, system info, config source badges
+14. **Deployment Readiness & Reliability** — README, encryption key validation, health check split, transactional sync, CLI tools
+15. **Agent-Optimized API** — Account/user names on transactions, categories endpoint, sort options, MCP enrichment
+16A. **Design System Foundation** — DaisyUI 5 + Tailwind CSS v4, drawer sidebar, icons, component classes
+16B. **Page Redesign** — Per-page visual upgrades using DaisyUI foundation

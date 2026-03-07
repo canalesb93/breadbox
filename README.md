@@ -10,7 +10,7 @@ Self-hosted financial data aggregation for families. Syncs bank data via [Plaid]
 - **pgx/v5 + sqlc** -- database driver and query generation
 - **goose** -- schema migrations
 - **robfig/cron** -- scheduled sync engine
-- **Pico CSS + Alpine.js** -- admin dashboard (no build step)
+- **DaisyUI 5 + Tailwind CSS v4 + Alpine.js v3** -- admin dashboard (CSS pre-compiled via standalone CLI, no Node.js)
 - **MCP server** -- Streamable HTTP at `/mcp`, stdio via `breadbox mcp-stdio`
 
 ## Prerequisites

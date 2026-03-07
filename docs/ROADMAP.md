@@ -1140,9 +1140,11 @@ Transaction list, account detail, and cross-linking throughout the admin UI.
 
 ---
 
-## Phase 13A: Bug Fixes & Dashboard UX
+## Phase 13A: Bug Fixes & Dashboard UX ✅
 
 Fix confirmed bugs in the setup wizard, improve dashboard navigation, and polish the onboarding experience.
+
+**Status:** Complete. All 10 tasks implemented.
 
 **Depends on:** None (can be done immediately on the current codebase, independent of Phases 10–12)
 
@@ -1241,9 +1243,11 @@ Fix confirmed bugs in the setup wizard, improve dashboard navigation, and polish
 
 ---
 
-## Phase 13B: Setup & Settings Overhaul
+## Phase 13B: Setup & Settings Overhaul ✅
 
 Restructure the wizard for multi-provider onboarding, add missing settings features, and improve the family members page.
+
+**Status:** Complete. Tasks 13B.1-13B.2 superseded by Phase 17B. Tasks 13B.3-13B.8 implemented.
 
 **Depends on:** Phase 13A (bug fixes land first). Some tasks benefit from Phase 12A (Alpine.js for confirmation dialogs) but can use vanilla JS fallback.
 
@@ -1503,9 +1507,11 @@ Independent of Phases 10-13. Addresses confirmed deployment blockers and data pi
 
 ---
 
-## Phase 15: Agent-Optimized API
+## Phase 15: Agent-Optimized API ✅
 
 Benefits from Phase 14 reliability fixes but not blocked by them. Improves the REST API and MCP tools for AI agent consumption.
+
+**Status:** Complete. All 9 tasks implemented.
 
 ### 15.1 Account Name + User Name on Transactions ✅
 

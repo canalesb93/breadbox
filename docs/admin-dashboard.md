@@ -2,8 +2,8 @@
 
 **Project:** Breadbox
 **Scope:** Admin web dashboard — all pages, flows, forms, interactions, and template structure
-**Rendering:** Server-rendered HTML via Go `html/template` + Pico CSS
-**JavaScript:** Minimal — Plaid Link SDK only, plus copy-to-clipboard and native confirm dialogs
+**Rendering:** Server-rendered HTML via Go `html/template` + DaisyUI 5 + Tailwind CSS v4 (see `docs/design-system.md`)
+**JavaScript:** Alpine.js v3 for interactivity, Plaid Link SDK, Lucide icons via CDN, copy-to-clipboard
 **Auth model:** Session cookie (12-hour TTL); all `/admin/` routes require active session
 
 ---
@@ -23,7 +23,7 @@
 11. [Sync Logs](#11-sync-logs)
 12. [Settings](#12-settings)
 13. [Navigation](#13-navigation)
-14. [Styling and Pico CSS](#14-styling-and-pico-css)
+14. [Styling and Design System](#14-styling-and-design-system)
 15. [Template Structure](#15-template-structure)
 16. [JavaScript Reference](#16-javascript-reference)
 17. [Internal API Endpoints (Admin-Only)](#17-internal-api-endpoints-admin-only)
@@ -37,10 +37,11 @@ The Breadbox admin dashboard is the single control surface for the self-hosted d
 
 **Technology constraints:**
 - Go `html/template` for all server-side rendering
-- Pico CSS loaded via CDN or vendored — no Sass, no PostCSS, no build step
-- No npm, no bundler, no JavaScript framework
+- DaisyUI 5 + Tailwind CSS v4 via `tailwindcss-extra` standalone CLI binary (no Node.js). See `docs/design-system.md`.
+- Alpine.js v3 for interactivity (CDN, no build step)
+- Lucide icons via CDN (`data-lucide` attributes replaced with inline SVG)
 - Plaid Link JS SDK loaded via `<script>` tag from `https://cdn.plaid.com/link/v2/stable/link-initialize.js`
-- Vanilla JS only, no TypeScript
+- No npm, no bundler, no TypeScript
 
 **URL namespace:**
 - `/admin/` — all dashboard pages, session-authenticated
@@ -99,7 +100,7 @@ When environment variable overrides are active, the Settings page displays the P
 
 Every wizard step uses a minimal centered layout (no sidebar navigation, no top nav bar). The base wizard layout includes:
 
-- `<head>` with Pico CSS link
+- `<head>` with DaisyUI/Tailwind CSS stylesheet link
 - Centered `<main>` container (max-width ~480px)
 - Page heading: "Breadbox Setup"
 - Step indicator: "Step N of 5"
@@ -427,7 +428,7 @@ Four summary cards displayed in a grid row (2×2 on tablet, 4×1 on wide screens
 | Last Sync | Relative time string | Timestamp of most recent `sync_logs` row with `status=success`, formatted as "X minutes ago" / "X hours ago" / "Never" |
 | Needs Attention | Integer count | Count of `bank_connections` rows with `status IN ('error', 'pending_reauth')` |
 
-The "Needs Attention" card uses a warning color (Pico CSS `data-theme` or `aria-invalid`) if the count is greater than 0.
+The "Needs Attention" card uses a warning accent (`border-l-4 border-warning`) if the count is greater than 0.
 
 **Wireframe:**
 
@@ -512,8 +513,8 @@ Displays all rows from `bank_connections` joined with `users` for the family mem
 
 | Status | Display Text | Color |
 |--------|-------------|-------|
-| `active` | Active | Green (`color: var(--pico-color-green)`) |
-| `error` | Error | Red (`color: var(--pico-color-red)`) |
+| `active` | Active | Green (`badge-success`) |
+| `error` | Error | Red (`badge-error`) |
 | `pending_reauth` | Re-auth Needed | Yellow/Orange |
 
 **Action buttons per row (rendered in the last column):**
@@ -854,7 +855,7 @@ When viewing `GET /admin/connections/:id` and `status IN ('error', 'pending_reau
 
 > "This connection requires re-authentication. The bank may have changed its login requirements, or your session may have expired. Click 'Re-authenticate' to reconnect."
 
-The banner uses Pico CSS's `role="alert"` or appropriate semantic element.
+The banner uses a DaisyUI `alert alert-warning` component.
 
 ### 8.3 Re-auth API Endpoint
 
@@ -1143,7 +1144,7 @@ The current page's nav item is highlighted. In Go templates, pass the current ro
 </li>
 ```
 
-Pico CSS `aria-current="page"` attribute on the `<a>` tag achieves highlight styling without custom CSS:
+DaisyUI `menu-active` class on the `<a>` tag achieves highlight styling:
 ```html
 <a href="/admin/" {{ if eq .CurrentPage "dashboard" }}aria-current="page"{{ end }}>Dashboard</a>
 ```
@@ -1164,69 +1165,43 @@ Display "Breadbox" as the application name at the top of the sidebar or as the l
 
 ---
 
-## 14. Styling and Pico CSS
+## 14. Styling and Design System
 
-### 14.1 Loading Pico CSS
+> **Note:** The admin dashboard was migrated from Pico CSS to DaisyUI 5 + Tailwind CSS v4 in Phase 16A. For the complete design system reference including component classes, theme configuration, icon inventory, and build setup, see **`docs/design-system.md`**.
 
-Pico CSS is loaded from CDN in the base layout `<head>`:
+### 14.1 CSS Framework
 
-```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-```
-
-Alternatively, vendor the file at `static/css/pico.min.css` and serve it from the Go binary's embedded filesystem to remove the CDN dependency. Vendoring is preferred for a self-hosted app that may run without internet access.
+- **DaisyUI 5 + Tailwind CSS v4** compiled via `tailwindcss-extra` standalone CLI binary (no Node.js required)
+- Source: `input.css` → compiled to `static/css/styles.css` via `make css`
+- Development: `make css-watch` for live recompilation
+- Theme: `corporate` (light) + `business` (dark) with auto-switch via `prefers-color-scheme`
 
 ### 14.2 Layout
 
-Pico CSS uses semantic HTML elements directly. No custom classes are required for basic layout:
-
-- `<nav>` for navigation
-- `<main>` for page content
-- `<article>` for cards
-- `<table>` for data tables (Pico styles them automatically)
-- `<form>` for forms
-- `<button>` for buttons (primary and secondary variants via `class="secondary"` or `class="outline"`)
-- `<mark>` for inline badges
-
-For the sidebar + content layout, a minimal CSS grid or flexbox layout is needed. This can be defined in a small `<style>` block in the base layout or a vendored `app.css` file (< 50 lines). Pico CSS's container classes may also be sufficient.
+- DaisyUI `drawer lg:drawer-open` pattern for sidebar navigation
+- Desktop: sidebar always visible. Mobile: hidden drawer toggled via hamburger button
+- DaisyUI `menu` component with `menu-title` dividers for "Data" and "System" nav groups
+- Active nav item highlighted via `menu-active` class
 
 ### 14.3 Status Badges
 
-Status badges are rendered as `<span>` or `<mark>` elements with data attributes for color:
+Status badges use DaisyUI `badge` component with template functions:
 
-```html
-<!-- Active -->
-<span data-badge="success">Active</span>
+- `statusBadge(status)` — connection status badges (`badge-success`, `badge-error`, `badge-warning`)
+- `syncBadge(status)` — sync status badges
 
-<!-- Error -->
-<span data-badge="error">Error</span>
+### 14.4 Flash Messages and Toasts
 
-<!-- Pending re-auth -->
-<span data-badge="warning">Re-auth Needed</span>
-```
+Flash messages use a global toast component in `base.html`:
 
-If Pico CSS does not provide `data-badge` utilities, use inline styles or a minimal custom CSS rule:
-
-```css
-[data-badge="success"] { color: var(--pico-color-green-500); }
-[data-badge="error"]   { color: var(--pico-color-red-500); }
-[data-badge="warning"] { color: var(--pico-color-amber-500); }
-```
-
-### 14.4 Flash Messages
-
-Flash messages (success/error feedback after form submissions) use Pico CSS's alert role:
-
-```html
-<div role="alert" data-flash="success">Settings saved.</div>
-<div role="alert" data-flash="error">Failed to save. Please try again.</div>
-```
-
-Flash messages are stored in the session between the POST redirect and the subsequent GET request (Post/Redirect/Get pattern). The server reads flash data from the session on the GET request, renders it into the template, and deletes it from the session.
+- DaisyUI `toast toast-end toast-bottom` with `alert` variants
+- Alpine.js `x-data` with toast array, listens to `@bb-toast.window` custom events
+- Auto-dismiss after 4 seconds
+- Pages dispatch toasts via: `$dispatch('bb-toast', { message: '...', type: 'success' })`
 
 ### 14.5 Responsive Behavior
 
-The dashboard targets tablet (768px+) and desktop. Mobile layout is not required for MVP. Sidebar navigation may collapse or be hidden on narrow viewports if desired, but this is not a requirement.
+The dashboard is responsive across mobile, tablet, and desktop. Sidebar collapses to a hamburger drawer on narrow viewports. Tables use `overflow-x-auto` wrappers for horizontal scrolling on small screens.
 
 ---
 
@@ -1283,7 +1258,7 @@ The base layout is defined in `base.html` and wraps all authenticated dashboard 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ .PageTitle }} — Breadbox</title>
-  <link rel="stylesheet" href="/static/css/pico.min.css">
+  <link rel="stylesheet" href="/static/css/styles.css">
   <link rel="stylesheet" href="/static/css/app.css">
 </head>
 <body>
@@ -1319,7 +1294,7 @@ Similar to base but without the sidebar nav, centered content:
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Breadbox Setup</title>
-  <link rel="stylesheet" href="/static/css/pico.min.css">
+  <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
   <main class="container" style="max-width: 480px; margin: 4rem auto;">
@@ -1568,7 +1543,7 @@ All form validation errors are rendered server-side. The pattern:
     <small>{{ .Errors.Username }}</small>
   {{ end }}
   ```
-  Pico CSS applies error styling to inputs with `aria-invalid="true"` automatically.
+  DaisyUI applies error styling to inputs with the `input-error` class.
 
 - Form values (excluding passwords) are preserved on error re-render.
 

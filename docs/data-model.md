@@ -83,8 +83,8 @@ This document defines the complete PostgreSQL database schema for the Breadbox M
 │ created_at      │         │ provider             │
 │ updated_at      │         │ institution_id        │
 └─────────────────┘         │ institution_name      │
-                            │ plaid_item_id        │
-                            │ plaid_access_token   │
+                            │ external_id          │
+                            │ encrypted_credentials│
                             │ sync_cursor          │
                             │ status               │
                             │ error_code           │
@@ -281,14 +281,16 @@ CREATE TYPE connection_status AS ENUM (
 | `provider` | `provider_type` | No | — | Which data provider manages this connection. |
 | `institution_id` | `TEXT` | Yes | `NULL` | Provider-specific institution identifier (e.g., Plaid's `ins_109508`). Used for display and deduplication. |
 | `institution_name` | `TEXT` | Yes | `NULL` | Human-readable institution name (e.g., "Chase"). Cached from provider to avoid re-fetching. |
-| `plaid_item_id` | `TEXT` | Yes | `NULL` | Plaid's `item_id` for this connection. `NULL` for non-Plaid providers. Stable identifier used in webhook payloads. |
-| `plaid_access_token` | `BYTEA` | Yes | `NULL` | AES-256-GCM encrypted Plaid access token. Stored as raw ciphertext bytes. `NULL` for non-Plaid providers. Never logged or returned by the API. |
+| `external_id` | `TEXT` | Yes | `NULL` | Provider-assigned identifier for this connection. For Plaid: `item_id`. For Teller: enrollment `id`. Used in webhook payloads and for deduplication. Unique per provider (see constraint below). Replaces the original `plaid_item_id` column (migration 00013). |
+| `encrypted_credentials` | `BYTEA` | Yes | `NULL` | AES-256-GCM encrypted provider credentials. For Plaid: access token. For Teller: access token. Stored as raw ciphertext bytes. Never logged or returned by the API. Replaces the original `plaid_access_token` column (migration 00013). |
 | `sync_cursor` | `TEXT` | Yes | `NULL` | Plaid cursor-based sync position. Passed as `cursor` in `/transactions/sync` requests to retrieve only changes since the last sync. `NULL` on initial sync (fetches full history). |
 | `status` | `connection_status` | No | `'active'` | Current health of the connection. |
 | `error_code` | `TEXT` | Yes | `NULL` | Provider error code when `status` is `error` or `pending_reauth` (e.g., Plaid's `ITEM_LOGIN_REQUIRED`). `NULL` otherwise. |
 | `error_message` | `TEXT` | Yes | `NULL` | Human-readable error description from the provider. Displayed in the dashboard to help the user understand what action is needed. `NULL` when healthy. |
 | `new_accounts_available` | `BOOLEAN` | No | `FALSE` | Set to `TRUE` when Plaid reports that new accounts are available to add for this item (from `NEW_ACCOUNTS_AVAILABLE` webhook). Cleared after the user reviews the accounts in the dashboard. |
 | `consent_expiration_time` | `TIMESTAMPTZ` | Yes | `NULL` | When the user's consent for this Plaid item expires, as reported by Plaid. `NULL` if the institution does not enforce consent expiration. |
+| `paused` | `BOOLEAN` | No | `FALSE` | When `TRUE`, cron-scheduled syncs skip this connection. Manual "Sync Now" still works. Orthogonal to `status`. Added in Phase 10 (migration 00015). |
+| `sync_interval_override_minutes` | `INTEGER` | Yes | `NULL` | Per-connection sync interval override. When set, cron checks this connection's staleness individually. `NULL` uses the global `sync_interval_minutes`. Added in Phase 10 (migration 00015). |
 | `last_synced_at` | `TIMESTAMPTZ` | Yes | `NULL` | Timestamp of the most recently completed successful sync. `NULL` if never synced. Used to compute "last seen" display and detect stale connections. Note: `last_attempted_sync_at` (the time of the most recent sync attempt regardless of outcome) does not need its own column — it can be derived from `sync_logs` with `SELECT MAX(started_at) FROM sync_logs WHERE connection_id = $1`. |
 | `created_at` | `TIMESTAMPTZ` | No | `NOW()` | Record creation timestamp. |
 | `updated_at` | `TIMESTAMPTZ` | No | `NOW()` | Last modification timestamp. |
@@ -310,10 +312,10 @@ When a user record is deleted, `user_id` is set to `NULL` rather than cascade-de
 #### Unique Constraints
 
 ```sql
-UNIQUE (plaid_item_id)  -- each Plaid Item may only appear once
+UNIQUE (provider, external_id)  -- each provider connection may only appear once
 ```
 
-The `plaid_item_id` unique constraint prevents duplicate connections from being created if the Link flow is invoked twice for the same institution login.
+The `(provider, external_id)` unique constraint prevents duplicate connections from being created if the Link/enrollment flow is invoked twice for the same institution login.
 
 #### Indexes
 
@@ -322,7 +324,7 @@ The `plaid_item_id` unique constraint prevents duplicate connections from being 
 | `bank_connections_pkey` | `id` | B-tree (implicit PK) | Primary key lookup. |
 | `bank_connections_user_id_idx` | `user_id` | B-tree | List all connections for a given user. Used by `GET /api/v1/connections?user_id=`. |
 | `bank_connections_status_idx` | `status` | B-tree | Filter connections by health status (e.g., find all `pending_reauth` for the dashboard health panel). |
-| `bank_connections_plaid_item_id_idx` | `plaid_item_id` | B-tree | Webhook handler looks up connection by `item_id`. Enforces unique constraint. |
+| `bank_connections_provider_external_id_idx` | `(provider, external_id)` | B-tree (unique) | Webhook handler looks up connection by provider + external ID. Enforces unique constraint. |
 
 ---
 
@@ -346,6 +348,8 @@ The `plaid_item_id` unique constraint prevents duplicate connections from being 
 | `balance_available` | `NUMERIC(12,2)` | Yes | `NULL` | Available balance. For depository accounts: funds available for withdrawal (current minus pending debits). For credit accounts: remaining credit. Plaid frequently returns `null` for credit accounts. |
 | `balance_limit` | `NUMERIC(12,2)` | Yes | `NULL` | Credit limit for credit accounts, or overdraft limit for some depository accounts. `NULL` for accounts without a limit concept. |
 | `iso_currency_code` | `TEXT` | Yes | `NULL` | ISO-4217 currency code for the balances (e.g., `USD`, `EUR`). `NULL` if Plaid returns an unofficial currency. |
+| `display_name` | `TEXT` | Yes | `NULL` | Optional user-assigned display name. Templates use `COALESCE(display_name, name)` for rendering. Added in Phase 10. |
+| `excluded` | `BOOLEAN` | No | `FALSE` | When `TRUE`, transaction upsert is skipped during sync (balances still refresh). Useful for accounts the user wants to track balances on but not import transactions from. Added in Phase 10. |
 | `last_balance_update` | `TIMESTAMPTZ` | Yes | `NULL` | When the balance columns were last refreshed from the provider. Set after each successful `/accounts/get` call. This is the canonical column name; `plaid-integration.md` should be updated to use `last_balance_update` instead of `balance_updated_at`. |
 | `created_at` | `TIMESTAMPTZ` | No | `NOW()` | Record creation timestamp. |
 | `updated_at` | `TIMESTAMPTZ` | No | `NOW()` | Last modification timestamp. |
@@ -705,17 +709,16 @@ Removed transactions (from Plaid's `removed` array) have their `deleted_at` colu
 - **API behavior:** All REST API and MCP queries add `WHERE deleted_at IS NULL` by default. Soft-deleted transactions are invisible to consumers unless explicitly requested.
 - **Storage cost:** Negligible. Breadbox is a personal finance tool; the volume of removed transactions is tiny.
 
-### 4.4 Provider-Specific Fields in `bank_connections`
+### 4.4 Provider-Agnostic Connection Fields
 
-Plaid-specific fields (`plaid_item_id`, `plaid_access_token`, `sync_cursor`) are stored as dedicated nullable columns on `bank_connections` rather than in a separate `plaid_connections` table or a `JSONB` blob.
+The `bank_connections` table uses generic column names (`external_id`, `encrypted_credentials`, `sync_cursor`) rather than provider-specific names. This was refactored in Phase 8 (migration 00013) from the original `plaid_item_id` and `plaid_access_token` columns.
 
 **Rationale:**
-- **Inspectability:** Named columns are visible in `psql \d bank_connections` and queryable with simple SQL. A `JSONB` blob requires knowing the internal JSON structure.
-- **Type safety:** `BYTEA` for the encrypted access token is a deliberate type choice. It cannot accidentally be treated as text.
-- **MVP simplicity:** With one provider (Plaid), a separate join table would add complexity for no benefit. When Teller is added, its fields can be added as additional nullable columns on the same table, or at that point, a separate table can be justified.
-- **NULL semantics are clear:** `plaid_item_id IS NULL` unambiguously means "this connection is not a Plaid connection."
-
-> **Note:** This is the canonical approach. `architecture.md` must be updated to match: the `bank_connections` table uses `plaid_item_id TEXT` and `plaid_access_token BYTEA` as explicit columns, not a single `encrypted_credentials BYTEA` blob and not an `external_id` column. The architecture spec's statement "No provider-specific columns exist at the top level of bank_connections" is incorrect and should be removed.
+- **Multi-provider support:** All three providers (Plaid, Teller, CSV) use the same columns. No provider-specific columns exist.
+- **Inspectability:** Named columns are visible in `psql \d bank_connections` and queryable with simple SQL. A `JSONB` blob would require knowing the internal JSON structure.
+- **Type safety:** `BYTEA` for the encrypted credentials is a deliberate type choice. It cannot accidentally be treated as text.
+- **Unique constraint:** `(provider, external_id)` ensures no duplicate connections per provider.
+- **NULL semantics are clear:** `external_id IS NULL` for CSV connections (import-only, no external identifier needed).
 
 ### 4.5 Data Preservation on Connection Removal
 
@@ -778,7 +781,7 @@ This section documents every index in the schema, the query pattern it supports,
 | `bank_connections_pkey` | `bank_connections` | `id` | B-tree | — | PK lookup. |
 | `bank_connections_user_id_idx` | `bank_connections` | `user_id` | B-tree | — | List connections for a user. |
 | `bank_connections_status_idx` | `bank_connections` | `status` | B-tree | — | Filter by status (health dashboard). |
-| `bank_connections_plaid_item_id_idx` | `bank_connections` | `plaid_item_id` | B-tree | — | Webhook lookup by item_id. Enforces unique constraint. |
+| `bank_connections_provider_external_id_idx` | `bank_connections` | `(provider, external_id)` | B-tree (unique) | — | Webhook lookup by provider + external_id. Enforces unique constraint. |
 
 #### `accounts`
 

@@ -4,7 +4,7 @@ Self-hosted financial data aggregation for families. Syncs bank data via Plaid a
 
 ## Tech Stack
 
-Go 1.24+ single binary. PostgreSQL, chi/v5 router, pgx/v5 + sqlc, goose migrations, robfig/cron. Admin UI: Go html/template + Pico CSS (class-based) + Alpine.js v3. MCP: github.com/modelcontextprotocol/go-sdk (Streamable HTTP). Plaid: github.com/plaid/plaid-go. Teller: hand-written HTTP client with mTLS (no SDK).
+Go 1.24+ single binary. PostgreSQL, chi/v5 router, pgx/v5 + sqlc, goose migrations, robfig/cron. Admin UI: Go html/template + DaisyUI 5 + Tailwind CSS v4 + Alpine.js v3. MCP: github.com/modelcontextprotocol/go-sdk (Streamable HTTP). Plaid: github.com/plaid/plaid-go. Teller: hand-written HTTP client with mTLS (no SDK).
 
 ## Architecture
 
@@ -39,7 +39,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Connection pause: `paused BOOLEAN DEFAULT FALSE` orthogonal to `status`. Only cron respects pause; manual "Sync Now" bypasses it.
 - Per-connection sync interval: `sync_interval_override_minutes INTEGER NULL`. Cron fires at minimum interval, checks each connection's staleness individually.
 - Alpine.js v3 for admin UI interactivity (CDN, no build step). Replaces `alert()`/`confirm()` with inline patterns.
-- Dark mode: Pico CSS `prefers-color-scheme` auto-switch (no hardcoded `data-theme`). Badge/flash colors use CSS custom properties.
+- Dark mode: DaisyUI `corporate`/`business` themes with `prefers-color-scheme` auto-switch (no hardcoded `data-theme`). Badge/flash colors use DaisyUI semantic classes.
 - Badge rendering: `statusBadge()` and `syncBadge()` template functions replace copy-pasted if-chains.
 - CSS spacing tokens: `--bb-gap-xs` (0.25rem) through `--bb-gap-xl` (2rem) in `:root`. Use these instead of hardcoded spacing values.
 - Template data helper: `BaseTemplateData(r, sm, currentPage, pageTitle)` returns `map[string]any` with common fields. Handlers can extend the returned map.

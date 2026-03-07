@@ -273,7 +273,7 @@ breadbox/
 │
 ├── web/
 │   ├── templates/
-│   │   ├── base.html            Base layout (nav, head, Pico CSS link)
+│   │   ├── base.html            Base layout (nav, head, DaisyUI/Tailwind CSS link)
 │   │   ├── setup/
 │   │   │   └── wizard.html      First-run setup wizard pages
 │   │   ├── admin/
@@ -285,8 +285,9 @@ breadbox/
 │   │   └── login.html
 │   └── static/
 │       └── css/
-│           └── app.css          Minimal overrides on top of Pico CSS
+│           └── styles.css       Compiled DaisyUI/Tailwind CSS output (from input.css)
 │
+├── input.css                    Tailwind/DaisyUI source CSS (compiled via `make css`)
 ├── go.mod
 ├── go.sum
 ├── Makefile
