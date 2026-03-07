@@ -43,12 +43,10 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Badge rendering: `statusBadge()` and `syncBadge()` template functions replace copy-pasted if-chains.
 - CSS spacing tokens: `--bb-gap-xs` (0.25rem) through `--bb-gap-xl` (2rem) in `:root`. Use these instead of hardcoded spacing values.
 - Template data helper: `BaseTemplateData(r, sm, currentPage, pageTitle)` returns `map[string]any` with common fields. Handlers can extend the returned map.
-- Setup wizard: deprecated in Phase 17B. Replaced by minimal first-run admin creation page + dashboard onboarding checklist. All configuration lives in settings.
-- First-run detection: `CountAdminAccounts == 0` → show "Create Admin Account" page. No `setup_complete` flag (removed in 17B.6).
-- Onboarding checklist: dashboard card shown until dismissed (`onboarding_dismissed` in `app_config`). Checks: provider configured, family member exists, connection exists.
-- Wizard is 6 steps: admin → providers → member → interval → webhook → review. Template filenames kept as-is; `StepNumber` set in handler data maps.
-- Wizard step 2: provider-agnostic "Configure Bank Providers" with radio group (Plaid/Teller/Both/Skip). Uses plain JS (wizard layout has no Alpine.js).
-- Wizard step 3: optional family member creation (name + email). Prevents empty member dropdown dead-end.
+- First-run: `CountAdminAccounts == 0` → redirect to `/admin/setup` (single-page admin creation form). No `setup_complete` flag. Wizard layout, no step indicator.
+- Onboarding checklist: dashboard "Getting Started" card shown until dismissed (`onboarding_dismissed` in `app_config`). Checks: provider configured, family member exists, connection exists.
+- CLI admin management: `breadbox create-admin` command with `--username`/`--password` flags or interactive prompts.
+- Programmatic setup: `POST /admin/api/setup` creates admin + sets config (only works when no admin exists).
 - Config source tracking: `ConfigSources map[string]string` populated in `Load()` (env) and `LoadWithDB()` (db/default). `configSource` template function renders badges.
 - Settings password change: POST `/admin/settings/password`, validates current password via bcrypt, minimum 8 chars for new password
 - Settings system info: `Version` and `StartTime` on `Config` struct, set in `main.go`. PostgreSQL version via inline `SELECT version()` query.
