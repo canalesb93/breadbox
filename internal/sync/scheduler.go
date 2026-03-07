@@ -52,6 +52,16 @@ func (s *Scheduler) IsRunning() bool {
 	return len(s.cron.Entries()) > 0
 }
 
+// NextRun returns the next scheduled cron fire time.
+// Returns zero time if no entries are scheduled.
+func (s *Scheduler) NextRun() time.Time {
+	entries := s.cron.Entries()
+	if len(entries) == 0 {
+		return time.Time{}
+	}
+	return entries[0].Next
+}
+
 // Stop gracefully stops the scheduler, waiting for any running jobs to finish.
 func (s *Scheduler) Stop() {
 	ctx := s.cron.Stop()

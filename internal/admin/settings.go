@@ -13,13 +13,24 @@ import (
 	"breadbox/internal/db"
 	plaidprovider "breadbox/internal/provider/plaid"
 	tellerprovider "breadbox/internal/provider/teller"
-	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// formatNextSync returns a human-readable string for the next sync time.
+func formatNextSync(nextRun time.Time) string {
+	if nextRun.IsZero() {
+		return ""
+	}
+	d := time.Until(nextRun)
+	if d <= 0 {
+		return "any moment now"
+	}
+	return "in " + formatUptime(d)
+}
 
 // SettingsGetHandler serves GET /admin/settings.
 func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
@@ -56,21 +67,26 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 			"ConfigSources":   a.Config.ConfigSources,
 			// Safety indicators (13B.7)
 			"HasEncryptionKey": len(a.Config.EncryptionKey) > 0,
+			// Next sync time (17A.3)
+			"NextSyncTime": func() string {
+				if a.Scheduler != nil {
+					return formatNextSync(a.Scheduler.NextRun())
+				}
+				return ""
+			}(),
 		}
 		tr.Render(w, r, "settings.html", data)
 	}
 }
 
-// SettingsPostHandler serves POST /admin/settings.
-func SettingsPostHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) http.HandlerFunc {
+// SettingsSyncPostHandler serves POST /admin/settings/sync.
+func SettingsSyncPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// Parse form values.
 		syncIntervalStr := r.FormValue("sync_interval_minutes")
 		webhookURL := strings.TrimSpace(r.FormValue("webhook_url"))
 
-		// Validate sync interval.
 		syncInterval, err := strconv.Atoi(syncIntervalStr)
 		if err != nil || !isValidSyncInterval(syncInterval) {
 			SetFlash(ctx, sm, "error", "Invalid sync interval.")
@@ -78,14 +94,12 @@ func SettingsPostHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRendere
 			return
 		}
 
-		// Validate webhook URL.
 		if webhookURL != "" && !strings.HasPrefix(webhookURL, "https://") {
 			SetFlash(ctx, sm, "error", "Webhook URL must use HTTPS.")
 			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
 			return
 		}
 
-		// Save sync settings.
 		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 			Key:   "sync_interval_minutes",
 			Value: pgtype.Text{String: fmt.Sprintf("%d", syncInterval), Valid: true},
@@ -108,6 +122,16 @@ func SettingsPostHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRendere
 		}
 		a.Config.WebhookURL = webhookURL
 
+		SetFlash(ctx, sm, "success", "Sync settings saved.")
+		http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+	}
+}
+
+// SettingsProvidersPostHandler serves POST /admin/settings/providers.
+func SettingsProvidersPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
 		// Handle Plaid credentials if not set from environment.
 		if os.Getenv("PLAID_CLIENT_ID") == "" {
 			plaidClientID := strings.TrimSpace(r.FormValue("plaid_client_id"))
@@ -115,7 +139,6 @@ func SettingsPostHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRendere
 			plaidEnv := strings.TrimSpace(r.FormValue("plaid_env"))
 
 			if plaidClientID != "" && plaidSecret != "" && plaidEnv != "" {
-				// Validate credentials before saving.
 				if err := plaidprovider.ValidateCredentials(ctx, plaidClientID, plaidSecret, plaidEnv); err != nil {
 					SetFlash(ctx, sm, "error", "Invalid Plaid credentials: "+err.Error())
 					http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
@@ -141,7 +164,7 @@ func SettingsPostHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRendere
 			}
 		}
 
-		// Handle Teller credentials if not set from environment (13B.6).
+		// Handle Teller credentials if not set from environment.
 		if os.Getenv("TELLER_APP_ID") == "" {
 			tellerAppID := strings.TrimSpace(r.FormValue("teller_app_id"))
 			tellerEnv := strings.TrimSpace(r.FormValue("teller_env"))
@@ -171,7 +194,7 @@ func SettingsPostHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRendere
 			}
 		}
 
-		SetFlash(ctx, sm, "success", "Settings saved.")
+		SetFlash(ctx, sm, "success", "Provider settings saved.")
 		http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
 	}
 }
