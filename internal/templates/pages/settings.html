@@ -1,44 +1,15 @@
 {{define "content"}}
 <h1 class="text-2xl font-bold mb-6">Settings</h1>
 
-{{if .HasEncryptionKey}}
-<div class="alert alert-success mb-6">Encryption: Configured</div>
-{{else}}
-<div class="alert alert-error mb-6">Encryption: NOT SET &mdash; access tokens cannot be stored</div>
-{{end}}
+<!-- Providers Section -->
+<div class="collapse collapse-arrow bg-base-100 shadow-sm mb-6">
+  <input type="checkbox" checked />
+  <div class="collapse-title text-xl font-medium">Providers</div>
+  <div class="collapse-content">
+    <form method="POST" action="/admin/settings/providers">
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
-<form method="POST" action="/admin/settings">
-  <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-
-  <div class="card bg-base-100 shadow-sm mb-6">
-    <div class="card-body">
-      <h2 class="card-title">Sync Settings</h2>
-
-      <label class="flex flex-col gap-1 text-sm" for="sync_interval_minutes">
-        Sync Interval {{configSource .ConfigSources "sync_interval_minutes"}}
-      </label>
-      <select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm w-full max-w-xs">
-        <option value="15"{{if eq .SyncIntervalMinutes 15}} selected{{end}}>Every 15 minutes</option>
-        <option value="30"{{if eq .SyncIntervalMinutes 30}} selected{{end}}>Every 30 minutes</option>
-        <option value="60"{{if eq .SyncIntervalMinutes 60}} selected{{end}}>Every hour</option>
-        <option value="240"{{if eq .SyncIntervalMinutes 240}} selected{{end}}>Every 4 hours</option>
-        <option value="480"{{if eq .SyncIntervalMinutes 480}} selected{{end}}>Every 8 hours</option>
-        <option value="720"{{if eq .SyncIntervalMinutes 720}} selected{{end}}>Every 12 hours</option>
-        <option value="1440"{{if eq .SyncIntervalMinutes 1440}} selected{{end}}>Every 24 hours</option>
-      </select>
-
-      <label class="flex flex-col gap-1 text-sm mt-4" for="webhook_url">
-        Webhook URL {{configSource .ConfigSources "webhook_url"}}
-      </label>
-      <input type="url" id="webhook_url" name="webhook_url" value="{{.WebhookURL}}" placeholder="https://example.com/webhooks/plaid" class="input input-sm w-full max-w-md">
-      <p class="text-xs text-base-content/60 mt-1">Plaid will send transaction updates to this URL. Must use HTTPS. Leave empty to disable.</p>
-    </div>
-  </div>
-
-  <div class="card bg-base-100 shadow-sm mb-6">
-    <div class="card-body">
-      <h2 class="card-title">Plaid Credentials</h2>
-
+      <h3 class="font-semibold text-sm mb-2">Plaid</h3>
       {{if .PlaidFromEnv}}
       <p class="text-sm">Plaid credentials are configured via environment variables and cannot be changed here.</p>
       <dl class="bb-info-grid mt-2">
@@ -77,13 +48,10 @@
         <span id="test-plaid-result" class="text-sm"></span>
       </div>
       {{end}}
-    </div>
-  </div>
 
-  <div class="card bg-base-100 shadow-sm mb-6">
-    <div class="card-body">
-      <h2 class="card-title">Teller</h2>
+      <div class="divider"></div>
 
+      <h3 class="font-semibold text-sm mb-2">Teller</h3>
       {{if .TellerFromEnv}}
       <p class="text-sm">Teller is configured via environment variables.</p>
       <dl class="bb-info-grid mt-2">
@@ -148,15 +116,78 @@ TELLER_WEBHOOK_SECRET=your-webhook-secret</code></pre>
         <span id="test-teller-result" class="text-sm"></span>
       </div>
       {{end}}
-    </div>
+
+      <div class="divider"></div>
+
+      <h3 class="font-semibold text-sm mb-2">CSV Import</h3>
+      <p class="text-sm">Always available. <a href="/admin/connections/import-csv" class="link link-primary">Import CSV file</a></p>
+
+      {{if or (not .PlaidFromEnv) (not .TellerFromEnv)}}
+      <div class="mt-4">
+        <button type="submit" class="btn btn-primary btn-sm">Save Provider Settings</button>
+      </div>
+      {{end}}
+    </form>
   </div>
+</div>
 
-  <button type="submit" class="btn btn-primary">Save Settings</button>
-</form>
+<!-- Sync & Scheduling Section -->
+<div class="collapse collapse-arrow bg-base-100 shadow-sm mb-6">
+  <input type="checkbox" checked />
+  <div class="collapse-title text-xl font-medium">Sync &amp; Scheduling</div>
+  <div class="collapse-content">
+    <p class="text-sm text-base-content/70 mb-4">Breadbox automatically syncs bank data on this schedule. Webhooks provide real-time updates when supported by the provider.</p>
+    <form method="POST" action="/admin/settings/sync">
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
-<div class="card bg-base-100 shadow-sm mb-6 mt-6">
-  <div class="card-body">
-    <h2 class="card-title">Security</h2>
+      <label class="flex flex-col gap-1 text-sm" for="sync_interval_minutes">
+        Sync Interval {{configSource .ConfigSources "sync_interval_minutes"}}
+      </label>
+      <select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm w-full max-w-xs">
+        <option value="15"{{if eq .SyncIntervalMinutes 15}} selected{{end}}>Every 15 minutes</option>
+        <option value="30"{{if eq .SyncIntervalMinutes 30}} selected{{end}}>Every 30 minutes</option>
+        <option value="60"{{if eq .SyncIntervalMinutes 60}} selected{{end}}>Every hour</option>
+        <option value="240"{{if eq .SyncIntervalMinutes 240}} selected{{end}}>Every 4 hours</option>
+        <option value="480"{{if eq .SyncIntervalMinutes 480}} selected{{end}}>Every 8 hours</option>
+        <option value="720"{{if eq .SyncIntervalMinutes 720}} selected{{end}}>Every 12 hours</option>
+        <option value="1440"{{if eq .SyncIntervalMinutes 1440}} selected{{end}}>Every 24 hours</option>
+      </select>
+
+      <label class="flex flex-col gap-1 text-sm mt-4" for="webhook_url">
+        Webhook URL {{configSource .ConfigSources "webhook_url"}}
+      </label>
+      <input type="url" id="webhook_url" name="webhook_url" value="{{.WebhookURL}}" placeholder="https://example.com/webhooks/plaid" class="input input-sm w-full max-w-md">
+      <p class="text-xs text-base-content/60 mt-1">Plaid will send transaction updates to this URL. Must use HTTPS. Leave empty to disable.</p>
+
+      {{if ne .NextSyncTime ""}}
+      <p class="text-xs text-base-content/60 mt-4">Next scheduled sync: {{.NextSyncTime}}</p>
+      {{end}}
+
+      <div class="mt-4">
+        <button type="submit" class="btn btn-primary btn-sm">Save Sync Settings</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Security Section -->
+<div class="collapse collapse-arrow bg-base-100 shadow-sm mb-6">
+  <input type="checkbox" checked />
+  <div class="collapse-title text-xl font-medium">Security</div>
+  <div class="collapse-content">
+    <div class="mb-4">
+      <span class="text-sm font-medium">Encryption Key:</span>
+      {{if .HasEncryptionKey}}
+      <span class="badge badge-success badge-sm">Configured</span>
+      {{else}}
+      <span class="badge badge-error badge-sm">NOT SET</span>
+      <span class="text-xs text-error ml-1">Access tokens cannot be stored</span>
+      {{end}}
+    </div>
+
+    <div class="divider"></div>
+
+    <h3 class="font-semibold text-sm mb-2">Change Password</h3>
     <form method="POST" action="/admin/settings/password">
       <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
       <label class="flex flex-col gap-1 text-sm" for="current_password">Current Password</label>
@@ -172,9 +203,11 @@ TELLER_WEBHOOK_SECRET=your-webhook-secret</code></pre>
   </div>
 </div>
 
-<div class="card bg-base-100 shadow-sm mb-6">
-  <div class="card-body">
-    <h2 class="card-title">System</h2>
+<!-- System Section (collapsed by default) -->
+<div class="collapse collapse-arrow bg-base-100 shadow-sm mb-6">
+  <input type="checkbox" />
+  <div class="collapse-title text-xl font-medium">System</div>
+  <div class="collapse-content">
     <dl class="bb-info-grid">
       <dt>Breadbox Version</dt><dd>{{.Version}}</dd>
       <dt>Go Runtime</dt><dd>{{.GoVersion}}</dd>

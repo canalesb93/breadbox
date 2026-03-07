@@ -1840,7 +1840,7 @@ Within 16B, all tasks are independent and can be parallelized.
 
 ---
 
-## Phase 17A: Settings Consolidation
+## Phase 17A: Settings Consolidation ✅
 
 Enhances the settings page to be the single surface for all app configuration. Absorbs the settings tasks from Phase 13B (13B.3-13B.7) and adds provider configuration that previously lived in the wizard. The settings page becomes a single page with collapsible card sections.
 
@@ -1848,65 +1848,65 @@ Enhances the settings page to be the single surface for all app configuration. A
 
 **Note:** Phase 13B tasks 13B.1 and 13B.2 (wizard enhancements) are superseded by Phase 17B. Tasks 13B.3-13B.7 are absorbed here. 13B.8 (family members connection count) remains independent.
 
-### 17A.1 Settings Page Restructure
+### 17A.1 Settings Page Restructure ✅
 
-- [ ] Reorganize the settings page into distinct card sections (DaisyUI `card` or `<article>` with clear headers):
+- [x] Reorganize the settings page into distinct card sections (DaisyUI `card` or `<article>` with clear headers):
   - **Providers** — Plaid config, Teller config, CSV status
   - **Sync & Scheduling** — sync interval, webhook URL
   - **Security** — admin password change, encryption key status
   - **System** — app version, Go version, PostgreSQL version, uptime, provider count
-- [ ] Each section is a collapsible card (DaisyUI `collapse` or `<details>`) — all expanded by default
-- [ ] Each section has its own form/save button (independent saves, not one giant form)
-- [ ] Remove the "Re-run Setup Wizard" link from settings footer
+- [x] Each section is a collapsible card (DaisyUI `collapse` or `<details>`) — all expanded by default
+- [x] Each section has its own form/save button (independent saves, not one giant form)
+- [x] Remove the "Re-run Setup Wizard" link from settings footer
 - **Absorbs:** 13B.4 (system info section structure), 13B.7 (safety indicators structure)
 - **Ref:** `internal/admin/settings.go` (lines 22-128), `internal/templates/pages/settings.html`
 - **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`
 
-### 17A.2 Provider Configuration Section
+### 17A.2 Provider Configuration Section ✅
 
-- [ ] **Plaid** (existing, enhanced): Client ID, Secret, Environment fields — editable when not from env vars. "Test Connection" button. Show "(from env)" badges when values come from environment.
-- [ ] **Teller** (new editability): Make `teller_app_id` and `teller_env` editable in the form when NOT set via env vars (they already have DB fallback paths in `config.LoadWithDB`). Cert/key paths remain read-only (file system paths, env-var-only). Show clear status: "Active (from env)" / "Partially configured" / "Not configured". Include copy-ready env var snippet in expandable `<details>` for the cert/key setup.
-- [ ] **CSV**: Read-only status line: "CSV Import: Always available" with link to `/admin/connections/import-csv` (Phase 11)
-- [ ] Provider test buttons: "Test Plaid" and "Test Teller" with inline result display
+- [x] **Plaid** (existing, enhanced): Client ID, Secret, Environment fields — editable when not from env vars. "Test Connection" button. Show "(from env)" badges when values come from environment.
+- [x] **Teller** (new editability): Make `teller_app_id` and `teller_env` editable in the form when NOT set via env vars (they already have DB fallback paths in `config.LoadWithDB`). Cert/key paths remain read-only (file system paths, env-var-only). Show clear status: "Active (from env)" / "Partially configured" / "Not configured". Include copy-ready env var snippet in expandable `<details>` for the cert/key setup.
+- [x] **CSV**: Read-only status line: "CSV Import: Always available" with link to `/admin/connections/import-csv` (Phase 11)
+- [x] Provider test buttons: "Test Plaid" and "Test Teller" with inline result display
 - **Absorbs:** 13B.6 (Teller configuration guidance)
 - **Ref:** `internal/admin/settings.go` (lines 22-43 for GET data, lines 46-128 for POST), `internal/config/load.go` (Teller DB fallback)
 - **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`
 
-### 17A.3 Sync & Scheduling Section
+### 17A.3 Sync & Scheduling Section ✅
 
-- [ ] Sync interval: dropdown with options (15m, 30m, 1h, 4h, 8h, 12h, 24h) — same as current settings, stored as `sync_interval_minutes`
-- [ ] Webhook URL: text input with HTTPS validation — same as current settings
-- [ ] Add brief explanatory text: "Breadbox automatically syncs bank data on this schedule. Webhooks provide real-time updates when supported by the provider."
-- [ ] Show next scheduled sync time if possible (from cron scheduler state)
+- [x] Sync interval: dropdown with options (15m, 30m, 1h, 4h, 8h, 12h, 24h) — same as current settings, stored as `sync_interval_minutes`
+- [x] Webhook URL: text input with HTTPS validation — same as current settings
+- [x] Add brief explanatory text: "Breadbox automatically syncs bank data on this schedule. Webhooks provide real-time updates when supported by the provider."
+- [x] Show next scheduled sync time if possible (from cron scheduler state)
 - **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`
 
-### 17A.4 Security Section
+### 17A.4 Security Section ✅
 
-- [ ] **Change Admin Password**: current password + new password + confirm new password form
-- [ ] New sqlc query: `UpdateAdminPassword(ctx, id, hashed_password)` — or `UpdateAdminPasswordByUsername`
-- [ ] Validate current password before accepting change. Minimum 8 characters (same as setup)
-- [ ] Flash: "Password updated successfully"
-- [ ] **Encryption Key Status**: Read-only indicator — "Configured" (green badge) or "NOT SET — access tokens cannot be stored" (red badge). Never show the actual key.
-- [ ] **Plaid Environment Change Warning**: if Plaid env is being changed from current value, show confirmation dialog warning about breaking live connections
+- [x] **Change Admin Password**: current password + new password + confirm new password form
+- [x] New sqlc query: `UpdateAdminPassword(ctx, id, hashed_password)` — or `UpdateAdminPasswordByUsername`
+- [x] Validate current password before accepting change. Minimum 8 characters (same as setup)
+- [x] Flash: "Password updated successfully"
+- [x] **Encryption Key Status**: Read-only indicator — "Configured" (green badge) or "NOT SET — access tokens cannot be stored" (red badge). Never show the actual key.
+- [x] **Plaid Environment Change Warning**: if Plaid env is being changed from current value, show confirmation dialog warning about breaking live connections
 - **Absorbs:** 13B.3 (change admin password), 13B.7 (safety indicators)
 - **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`, `internal/db/queries/admin_accounts.sql`
 
-### 17A.5 System Information Section
+### 17A.5 System Information Section ✅
 
-- [ ] Read-only, informational — primarily for operator debugging
-- [ ] Display: Breadbox version (from build-time `-ldflags -X`), Go runtime version (`runtime.Version()`), PostgreSQL version (`SELECT version()`), server uptime (`time.Since(startTime)`), configured providers count
-- [ ] Requires passing `startTime` from app init to the settings handler (or a global)
-- [ ] Collapsible by default (less important than other sections)
+- [x] Read-only, informational — primarily for operator debugging
+- [x] Display: Breadbox version (from build-time `-ldflags -X`), Go runtime version (`runtime.Version()`), PostgreSQL version (`SELECT version()`), server uptime (`time.Since(startTime)`), configured providers count
+- [x] Requires passing `startTime` from app init to the settings handler (or a global)
+- [x] Collapsible by default (less important than other sections)
 - **Absorbs:** 13B.4 (system information section)
 - **Files:** `internal/admin/settings.go`, `internal/templates/pages/settings.html`
 
-### 17A.6 Config Source Badges
+### 17A.6 Config Source Badges ✅
 
-- [ ] Add `ConfigSources map[string]string` (key → "env" / "db" / "default") populated during `config.LoadWithDB`
-- [ ] Pass to settings template alongside config values
-- [ ] Render muted badge next to each setting value: "(from env)", "(from database)", "(default)"
-- [ ] Makes the config precedence model (env → DB → default) visible and debuggable
-- [ ] Values from env are shown as read-only (cannot override env vars via the UI)
+- [x] Add `ConfigSources map[string]string` (key → "env" / "db" / "default") populated during `config.LoadWithDB`
+- [x] Pass to settings template alongside config values
+- [x] Render muted badge next to each setting value: "(from env)", "(from database)", "(default)"
+- [x] Makes the config precedence model (env → DB → default) visible and debuggable
+- [x] Values from env are shown as read-only (cannot override env vars via the UI)
 - **Absorbs:** 13B.5 (config source badges)
 - **Files:** `internal/config/config.go`, `internal/config/load.go`, `internal/admin/settings.go`, `internal/templates/pages/settings.html`
 
