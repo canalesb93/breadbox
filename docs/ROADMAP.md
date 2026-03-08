@@ -2383,3 +2383,179 @@ REST API endpoints, MCP tool updates, and full admin dashboard for managing cate
 11. Map an unmapped CSV category inline — affected transactions get recategorized
 12. Export mappings as JSON, edit, re-import — round-trip preserves all mappings
 13. Transaction list shows display names; click to override; override badge visible; reset works
+
+---
+
+## Post-MVP Roadmap (WIP)
+
+> **Status:** Draft — each phase needs further scoping before implementation.
+> Phases below build toward the v1 vision: a self-hosted financial hub that
+> works well for humans *and* AI agents.
+
+---
+
+### Phase 21: Transaction Comments & Audit Log (WIP)
+
+Data foundation for agentic review and human collaboration.
+
+**Scope:**
+- `transaction_comments` table — text content, author type (user/agent/system), timestamps
+- `audit_log` table — entity_type, entity_id, field, old_value, new_value, actor_type, actor_id
+- All existing mutations (category overrides, edits) write audit log entries
+- Comment CRUD: REST API + MCP tools + dashboard transaction detail panel
+- Audit log queryable via REST + MCP (agents can learn from past decisions)
+- Comments support markdown rendering in dashboard
+- Transaction detail view shows comment thread + change history timeline
+
+**Key deliverables:** 2 new tables, comment CRUD API+MCP, audit log writes on all mutations, audit log query API+MCP, transaction detail with comment thread + change history
+
+---
+
+### Phase 22: Agent-Optimized APIs & Token Efficiency (WIP)
+
+Make the API surface efficient for AI agent consumption.
+
+**Scope:**
+- `?fields=` param on transaction queries — agents pick only needed fields (e.g., `fields=id,date,amount,name,category`)
+- Category mapping CRUD via MCP tools (create/update/delete mappings without dashboard)
+- `transaction_summary` MCP tool — aggregated spending by category and/or time period (one call replaces paginating thousands of rows)
+- Enriched `breadbox://overview` resource with richer stats
+- Response size benchmarks before/after
+
+**Key deliverables:** field selection on transactions, category mapping MCP CRUD, aggregation tool, response size reduction for agents
+
+---
+
+### Phase 23: MCP Permissions & Custom Instructions (WIP)
+
+Admin control over what agents can do and how they behave.
+
+**Scope:**
+- Global MCP mode: read-only vs read-write toggle
+- Per-tool enable/disable in admin dashboard
+- Custom MCP server instructions — markdown editor at `/admin/mcp` (the "system prompt" agents see when connecting)
+- Instruction templates per task type (review, analysis, reporting)
+- API key scoping: keys flagged as read-only or full-access
+
+**Key deliverables:** MCP permissions model, instructions editor, scoped API keys, `/admin/mcp` page
+
+---
+
+### Phase 24: Review Queue & Review API (WIP)
+
+The core review system — humans and agents review transactions through a unified queue.
+
+**Scope:**
+- `review_queue` table — transaction_id, review_type, status (pending/approved/rejected/skipped), suggested_category_id, reviewer_type, reviewer_id
+- Auto-enqueue on sync: new transactions, uncategorized, or low-confidence category mapping
+- Review REST API: list pending, submit decision (approve/override), bulk review
+- Review MCP tools: `list_pending_reviews`, `submit_review`
+- Dashboard review page: card-based approve/reject/skip workflow with transaction context
+
+**Key deliverables:** review queue table, auto-enqueue on sync, review REST+MCP API, dashboard review page
+
+---
+
+### Phase 25: Agentic Review — External Agent Support (WIP)
+
+Let users' own AI agents (via MCP or API) review transactions autonomously.
+
+**Scope:**
+- Webhook notifications — configurable URL + secret, fired when new items enter review queue
+- Polling endpoint: `GET /api/v1/reviews/pending` for pull-based agents
+- Configurable review instructions in markdown (the context/prompt given to the reviewing agent)
+- MCP `review_transactions` tool — returns pending items with review instructions included
+- Agent submits decisions via `submit_review` MCP tool or REST API
+
+**Key deliverables:** webhook push notifications, polling endpoint, review instructions config, MCP review tools
+
+---
+
+### Phase 26: Agentic Review — Built-in Agent (WIP)
+
+Breadbox runs AI review internally — no external agent setup required.
+
+**Scope:**
+- AI provider config: API key for Anthropic/OpenAI, stored encrypted, configured via dashboard
+- Configurable review prompt (markdown editor)
+- On new review queue items: call AI API with transaction context + review instructions + similar past decisions (from audit log)
+- Results auto-submitted to review queue as "agent" actor
+- Manual trigger ("Review now") and automatic (on sync) modes
+- Rate limiting and cost controls (max reviews per sync, daily budget)
+
+**Key deliverables:** AI provider config page, internal agent runner, auto-review on sync, cost controls, review prompt editor
+
+---
+
+### Phase 27: Dashboard — Insights & Charts (WIP)
+
+Visual spending intelligence for the dashboard.
+
+**Scope:**
+- Category breakdown page — treemap or bar chart of spending by category
+- Spending over time — line/bar chart, filterable by category/account/user
+- Balance trend chart per account
+- Monthly comparison — this month vs last month vs average
+- Net income/spending summary card on main dashboard
+- Charting library: Chart.js via CDN (no build step, consistent with Alpine.js approach)
+
+**Key deliverables:** category breakdown page, spending timeline, balance trends, monthly comparison, dashboard summary cards
+
+---
+
+### Phase 28: Dashboard — Transaction UX & Filtering (WIP)
+
+Power-user transaction browsing and management.
+
+**Scope:**
+- Composable multi-select filter bar — category, account, user, date range, amount range
+- Saved filter presets (stored in `app_config` or dedicated table)
+- Inline bulk actions — categorize N selected, add comment to N selected
+- Transaction detail slide-out panel (improved from current)
+- Search by description/merchant name
+- Export filtered results as CSV
+
+**Key deliverables:** composable filter bar, saved presets, bulk actions, search, CSV export
+
+---
+
+### Phase 29: Multi-User & Household Access (WIP)
+
+Multiple household members with their own views and permissions.
+
+**Scope:**
+- User accounts linked to admin_accounts (or unified model)
+- Per-user account assignment — user A sees accounts 1,2; user B sees accounts 3,4
+- Privacy levels: shared (all see), private (owner only), household (family sees)
+- Role-based permissions: admin, member, viewer
+- Per-user dashboard view filtered to their assigned accounts
+
+**Key deliverables:** user accounts, account assignment, privacy levels, roles, per-user dashboard
+
+---
+
+### Phase 30: Provider Expansion (WIP — Research-Driven)
+
+Add more self-serve aggregation providers beyond Plaid and Teller.
+
+**Scope:**
+- Research and evaluate: GoCardless (EU open banking), TrueLayer (EU/UK), Finicity (Mastercard), MX, Akoya, Yodlee, Mono (Africa), Belvo (LatAm), Pluggy (LatAm)
+- Criteria: self-serve API access, geographic coverage, cost, data quality, Go SDK/REST API
+- Implement top 1-2 candidates behind existing `Provider` interface
+- Community contribution guide for adding new providers
+
+**Key deliverables:** provider comparison doc, 1-2 new provider implementations, contribution guide
+
+---
+
+### Phase Ordering & Dependencies
+
+```
+Phase 21 (comments/audit) ──> Phase 24 (review queue) ──> Phase 25 (external agents)
+                                                      ──> Phase 26 (built-in agent)
+Phase 22 (agent APIs) ──> Phase 23 (MCP permissions) ──> Phase 25 (external agents)
+Phase 27 (insights) ── independent
+Phase 28 (transaction UX) ── independent (but benefits from Phase 21 comments)
+Phase 29 (multi-user) ── independent (but informs Phase 23 scoping)
+Phase 30 (providers) ── independent
+```
