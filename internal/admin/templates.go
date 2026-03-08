@@ -155,6 +155,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/api_key_created.html",
 		"pages/sync_logs.html",
 		"pages/settings.html",
+		"pages/providers.html",
 		"pages/csv_import.html",
 		"pages/transactions.html",
 		"pages/account_detail.html",
