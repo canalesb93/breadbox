@@ -1174,7 +1174,7 @@ Display "Breadbox" as the application name at the top of the sidebar or as the l
 - **DaisyUI 5 + Tailwind CSS v4** compiled via `tailwindcss-extra` standalone CLI binary (no Node.js required)
 - Source: `input.css` → compiled to `static/css/styles.css` via `make css`
 - Development: `make css-watch` for live recompilation
-- Theme: `corporate` (light) + `business` (dark) with auto-switch via `prefers-color-scheme`
+- Theme: `light` (default) + `dark` with auto-switch via `prefers-color-scheme`
 
 ### 14.2 Layout
 

@@ -1610,7 +1610,7 @@ Migrates from Pico CSS to DaisyUI 5 + Tailwind CSS v4 via standalone CLI. Establ
 - [x] Output to `static/css/styles.css` — commit generated CSS to avoid CI complexity
 - [x] Update Dockerfile multi-stage build to run `make css` (download binary + compile)
 - [x] Add `tailwindcss-extra` binary to `.gitignore`
-- [x] Configure DaisyUI theme: `corporate --default, business --prefersdark` (auto dark mode)
+- [x] Configure DaisyUI theme: `light --default, dark --prefersdark` (auto dark mode)
 - **Ref:** `docs/design-system.md` Section 2 (Build Setup)
 - **Files:** `Makefile`, `input.css` (new), `static/css/styles.css` (generated), `Dockerfile`, `.gitignore`
 

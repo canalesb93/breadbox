@@ -39,7 +39,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Connection pause: `paused BOOLEAN DEFAULT FALSE` orthogonal to `status`. Only cron respects pause; manual "Sync Now" bypasses it.
 - Per-connection sync interval: `sync_interval_override_minutes INTEGER NULL`. Cron fires at minimum interval, checks each connection's staleness individually.
 - Alpine.js v3 for admin UI interactivity (CDN, no build step). Replaces `alert()`/`confirm()` with inline patterns.
-- Dark mode: DaisyUI `corporate`/`business` themes with `prefers-color-scheme` auto-switch (no hardcoded `data-theme`). Badge/flash colors use DaisyUI semantic classes.
+- Dark mode: DaisyUI `light`/`dark` themes with `prefers-color-scheme` auto-switch (no hardcoded `data-theme`). Badge/flash colors use DaisyUI semantic classes.
 - Badge rendering: `statusBadge()` and `syncBadge()` template functions replace copy-pasted if-chains.
 - CSS spacing tokens: `--bb-gap-xs` (0.25rem) through `--bb-gap-xl` (2rem) in `:root`. Use these instead of hardcoded spacing values.
 - Template data helper: `BaseTemplateData(r, sm, currentPage, pageTitle)` returns `map[string]any` with common fields. Handlers can extend the returned map.
@@ -70,7 +70,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - MCP `min_amount`/`max_amount` use `*float64` (not `float64`) to allow filtering by zero values
 - CSS framework: DaisyUI 5 + Tailwind CSS v4 via `tailwindcss-extra` standalone CLI binary. No Node.js. Replaces Pico CSS.
 - CSS build: `make css` compiles `input.css` → `static/css/styles.css`. `make css-watch` for dev. Dockerfile runs `make css` in build stage.
-- DaisyUI theme: `corporate` (light) + `business` (dark) auto-switch via `prefers-color-scheme`
+- DaisyUI theme: `light` (default) + `dark` auto-switch via `prefers-color-scheme`
 - Icons: Lucide via CDN, `data-lucide` attributes replaced with inline SVG by `lucide.createIcons()`
 - DaisyUI components replace `bb-*` classes: `drawer` (sidebar), `stat` (metric cards), `table` (data tables), `badge` (status), `menu` (nav), `card` (sections), `modal` (dialogs), `toast`+`alert` (notifications), `steps` (wizard progress), `collapse` (accordions)
 - Custom `@apply` classes in `input.css` for app-specific patterns: `.bb-filter-bar`, `.bb-pagination`, `.bb-action-bar`, `.bb-amount`, `.bb-info-grid`
