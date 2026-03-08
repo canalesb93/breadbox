@@ -9,6 +9,9 @@ RUN go mod download
 
 COPY . .
 
+# Generate sqlc code (generated files are gitignored)
+RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest && sqlc generate
+
 # Build CSS: download tailwindcss-extra (musl variant for Alpine) and compile input.css
 RUN apk add --no-cache libstdc++ libgcc \
     && ARCH=$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/') \

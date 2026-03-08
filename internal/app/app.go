@@ -14,6 +14,7 @@ import (
 	tellerprovider "breadbox/internal/provider/teller"
 	"breadbox/internal/service"
 	"breadbox/internal/sync"
+	"breadbox/internal/version"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -21,14 +22,16 @@ import (
 // App is the single dependency container for the process. It is constructed
 // once at startup and passed to every handler and worker.
 type App struct {
-	DB         *pgxpool.Pool
-	Queries    *db.Queries
-	Config     *config.Config
-	Logger     *slog.Logger
-	Providers  map[string]provider.Provider
-	SyncEngine *sync.Engine
-	Service    *service.Service
-	Scheduler  *sync.Scheduler
+	DB                    *pgxpool.Pool
+	Queries               *db.Queries
+	Config                *config.Config
+	Logger                *slog.Logger
+	Providers             map[string]provider.Provider
+	SyncEngine            *sync.Engine
+	Service               *service.Service
+	Scheduler             *sync.Scheduler
+	VersionChecker        *version.Checker
+	DockerSocketAvailable bool
 }
 
 // New creates a new App. It connects to the database, creates a Queries

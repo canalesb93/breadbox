@@ -96,6 +96,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/api-keys", ListAPIKeysHandler(svc))
 		r.Post("/api-keys", CreateAPIKeyHandler(svc))
 		r.Delete("/api-keys/{id}", RevokeAPIKeyHandler(svc))
+
+		r.Post("/update/dismiss", DismissUpdateHandler(a))
+		r.Post("/update", TriggerUpdateHandler(a))
 	})
 
 	return r

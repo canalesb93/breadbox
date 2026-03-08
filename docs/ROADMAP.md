@@ -1978,97 +1978,97 @@ Enhances the settings page to be the single surface for all app configuration. A
 
 ---
 
-## Phase 18: Hosting & Deployment
+## Phase 18: Hosting & Deployment ✅
 
 Streamline the self-hosting lifecycle: CI/CD pipeline to build and publish images, production-ready Docker Compose with reverse proxy, one-liner install script, and an in-app update system with a dashboard button for one-click updates.
 
+**Status:** Complete.
+
 **Depends on:** Phase 7 (Docker Compose), Phase 14 (deployment readiness). Benefits from Phase 17B (onboarding flow is clean before shipping to users).
 
-### 18.1 GitHub Actions CI/CD Pipeline
+### 18.1 GitHub Actions CI/CD Pipeline ✅
 
-- [ ] **On PR:** run `go vet`, `go test ./...`, build Docker image (verify it compiles, don't push)
-- [ ] **On merge to `main`:** run tests → build multi-arch Docker image → push to `ghcr.io/canalesb93/breadbox:latest`
-- [ ] **On Git tag (`v*`):** same as merge, but also tag the image with the version (e.g., `ghcr.io/canalesb93/breadbox:v1.2.0`)
-- [ ] Multi-arch build: `linux/amd64` + `linux/arm64` (covers most VMs + Raspberry Pi)
-- [ ] Build-time `VERSION` ARG set from Git tag or short SHA for `:latest`
-- [ ] Cache Docker layers in GitHub Actions for faster builds
+- [x] **On PR:** run `go vet`, `go test ./...`, build Docker image (verify it compiles, don't push)
+- [x] **On merge to `main`:** run tests → build multi-arch Docker image → push to `ghcr.io/canalesb93/breadbox:latest`
+- [x] **On Git tag (`v*`):** same as merge, but also tag the image with the version (e.g., `ghcr.io/canalesb93/breadbox:v1.2.0`)
+- [x] Multi-arch build: `linux/amd64` + `linux/arm64` (covers most VMs + Raspberry Pi)
+- [x] Build-time `VERSION` ARG set from Git tag or short SHA for `:latest`
+- [x] Cache Docker layers in GitHub Actions for faster builds
 - **Files:** `.github/workflows/ci.yml`
 
-### 18.2 Auto-Deploy to Dev VM
+### 18.2 Auto-Deploy to Dev VM ✅
 
-- [ ] After pushing the image to ghcr.io on merge to `main`, SSH into the dev VM and pull + restart
-- [ ] Flow: `ssh user@vm "cd /opt/breadbox && docker compose pull && docker compose up -d"`
-- [ ] GitHub repo secrets: `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`
-- [ ] Only runs on `main` branch (not PRs or tags)
-- [ ] Verify health check passes after deploy; fail the action if it doesn't
-- [ ] The dev VM uses the production compose (18.3) with Caddy for HTTPS — app's own admin auth is sufficient protection
+- [x] After pushing the image to ghcr.io on merge to `main`, SSH into the dev VM and pull + restart
+- [x] Flow: `ssh user@vm "cd /opt/breadbox && docker compose pull && docker compose up -d"`
+- [x] GitHub repo secrets: `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`
+- [x] Only runs on `main` branch (not PRs or tags)
+- [x] Verify health check passes after deploy; fail the action if it doesn't
+- [x] The dev VM uses the production compose (18.3) with Caddy for HTTPS — app's own admin auth is sufficient protection
 - **Files:** `.github/workflows/ci.yml` (deploy job, after push job)
 
-### 18.3 Production Docker Compose
+### 18.3 Production Docker Compose ✅
 
-- [ ] `deploy/docker-compose.prod.yml` — hardened for real deployments
-- [ ] Three services: `breadbox` (from ghcr.io, not local build), `db` (postgres:16-alpine), `caddy` (reverse proxy)
-- [ ] Caddy provides automatic HTTPS via Let's Encrypt — no manual cert management
-- [ ] `deploy/Caddyfile` template: domain placeholder, proxy to breadbox:8080, automatic TLS
-- [ ] Restart policies: `unless-stopped` on all services
-- [ ] Log rotation: `max-size: 10m`, `max-file: 3` on all services
-- [ ] Named volumes: `postgres_data`, `caddy_data` (TLS certs), `caddy_config`
-- [ ] Optional Docker socket mount for one-click updates (18.6): commented out by default with explanation
-- [ ] `deploy/.env.example` with all required variables and generation instructions
+- [x] `deploy/docker-compose.prod.yml` — hardened for real deployments
+- [x] Three services: `breadbox` (from ghcr.io, not local build), `db` (postgres:16-alpine), `caddy` (reverse proxy)
+- [x] Caddy provides automatic HTTPS via Let's Encrypt — no manual cert management
+- [x] `deploy/Caddyfile` template: domain placeholder, proxy to breadbox:8080, automatic TLS
+- [x] Restart policies: `unless-stopped` on all services
+- [x] Log rotation: `max-size: 10m`, `max-file: 3` on all services
+- [x] Named volumes: `postgres_data`, `caddy_data` (TLS certs), `caddy_config`
+- [x] Optional Docker socket mount for one-click updates (18.6): commented out by default with explanation
+- [x] `deploy/.env.example` with all required variables and generation instructions
 - **Files:** `deploy/docker-compose.prod.yml`, `deploy/Caddyfile`, `deploy/.env.example`
 
-### 18.4 One-Liner Install Script
+### 18.4 One-Liner Install Script ✅
 
-- [ ] `deploy/install.sh` — interactive setup for fresh Ubuntu/Debian VMs
-- [ ] Checks for Docker, offers to install via official Docker convenience script if missing
-- [ ] Prompts for: domain name (for Caddy TLS), admin email (for Let's Encrypt notifications)
-- [ ] Auto-generates: `ENCRYPTION_KEY` (via `openssl rand -hex 32`), `POSTGRES_PASSWORD` (via `openssl rand -base64 32`)
-- [ ] Writes `.env` from template, copies `docker-compose.prod.yml` and `Caddyfile` to install directory (default `/opt/breadbox`)
-- [ ] Starts services via `docker compose up -d`, waits for `/health/ready` to return 200
-- [ ] Prints: access URL, reminder to create admin account, location of `.env` file
-- [ ] Idempotent: re-running detects existing installation and offers to update instead
+- [x] `deploy/install.sh` — interactive setup for fresh Ubuntu/Debian VMs
+- [x] Checks for Docker, offers to install via official Docker convenience script if missing
+- [x] Prompts for: domain name (for Caddy TLS), admin email (for Let's Encrypt notifications)
+- [x] Auto-generates: `ENCRYPTION_KEY` (via `openssl rand -hex 32`), `POSTGRES_PASSWORD` (via `openssl rand -base64 32`)
+- [x] Writes `.env` from template, copies `docker-compose.prod.yml` and `Caddyfile` to install directory (default `/opt/breadbox`)
+- [x] Starts services via `docker compose up -d`, waits for `/health/ready` to return 200
+- [x] Prints: access URL, reminder to create admin account, location of `.env` file
+- [x] Idempotent: re-running detects existing installation and offers to update instead
 - **Files:** `deploy/install.sh`
 
-### 18.5 Version Check API Endpoint
+### 18.5 Version Check API Endpoint ✅
 
-- [ ] `GET /api/v1/version` — returns current version and latest available version
-- [ ] Response: `{"version": "1.2.0", "latest": "1.3.0", "update_available": true, "latest_url": "https://github.com/..."}`
-- [ ] Checks GitHub Releases API (`/repos/canalesb93/breadbox/releases/latest`) for newest version
-- [ ] Caches the GitHub API response for 1 hour (in-memory) to avoid rate limits
-- [ ] Compares semantic versions to determine if update is available
-- [ ] If GitHub API is unreachable: return current version only, `"update_available": null` (unknown)
-- [ ] No auth required (version info is not sensitive)
-- **Files:** `internal/api/version.go`, `internal/api/router.go`
+- [x] `GET /api/v1/version` — returns current version and latest available version
+- [x] Response: `{"version": "1.2.0", "latest": "1.3.0", "update_available": true, "latest_url": "https://github.com/..."}`
+- [x] Checks GitHub Releases API (`/repos/canalesb93/breadbox/releases/latest`) for newest version
+- [x] Caches the GitHub API response for 1 hour (in-memory) to avoid rate limits
+- [x] Compares semantic versions to determine if update is available
+- [x] If GitHub API is unreachable: return current version only, `"update_available": null` (unknown)
+- [x] No auth required (version info is not sensitive)
+- **Files:** `internal/version/checker.go`, `internal/api/version.go`, `internal/api/router.go`
 
-### 18.6 Dashboard Update Banner & One-Click Update
+### 18.6 Dashboard Update Banner & One-Click Update ✅
 
-- [ ] On dashboard load, check version API (18.5) — show alert card when update is available
-- [ ] Banner displays: current version, latest version, link to release notes on GitHub
-- [ ] "Dismiss" hides banner until a newer version is detected (store dismissed version in `app_config`)
-- [ ] **"Update Now" button** (when Docker socket is available):
-  - Requires admin session + confirmation dialog ("This will restart Breadbox. Continue?")
-  - `POST /admin/api/update` endpoint triggers the update
-  - Uses Docker Engine API (via Unix socket) to: pull latest image → recreate the breadbox container
-  - New container starts, runs migrations automatically, comes up healthy
-  - Browser shows spinner, polls `/health/ready` until the new version responds, then reloads
-- [ ] **Fallback** (no Docker socket): button replaced with "Copy update command" — copies `docker compose pull && docker compose up -d` to clipboard
-- [ ] Detect Docker socket availability on startup (check if `/var/run/docker.sock` exists and is accessible)
-- **Files:** `internal/admin/update.go`, `internal/admin/router.go`, `internal/admin/dashboard.go`, `internal/templates/pages/dashboard.html`
+- [x] On dashboard load, check version API (18.5) — show alert card when update is available
+- [x] Banner displays: current version, latest version, link to release notes on GitHub
+- [x] "Dismiss" hides banner until a newer version is detected (store dismissed version in `app_config`)
+- [x] **"Pull Update" button** (when Docker socket is available):
+  - Requires admin session
+  - `POST /admin/api/update` endpoint pulls latest image via Docker Engine API (Unix socket)
+  - After pull, user runs `docker compose up -d` to apply (shown in banner)
+- [x] **Fallback** (no Docker socket): "Update Command" dropdown shows copyable `docker compose pull && docker compose up -d`
+- [x] Detect Docker socket availability on startup (check if `/var/run/docker.sock` exists and is accessible)
+- **Files:** `internal/admin/update.go`, `internal/admin/router.go`, `internal/admin/dashboard.go`, `internal/templates/pages/dashboard.html`, `internal/app/app.go`, `cmd/breadbox/main.go`
 
-### 18.7 Manual Update Script
+### 18.7 Manual Update Script ✅
 
-- [ ] `deploy/update.sh` — for users who prefer CLI or don't mount Docker socket
-- [ ] Pulls latest image, recreates containers with `docker compose up -d`
-- [ ] Waits for `/health/ready`, prints old version → new version
-- [ ] Can be used in a cron job for unattended updates (with `--yes` flag to skip confirmation)
+- [x] `deploy/update.sh` — for users who prefer CLI or don't mount Docker socket
+- [x] Pulls latest image, recreates containers with `docker compose up -d`
+- [x] Waits for `/health/ready`, prints old version → new version
+- [x] Can be used in a cron job for unattended updates (with `--yes` flag to skip confirmation)
 - **Files:** `deploy/update.sh`
 
-### 18.8 Deployment Documentation
+### 18.8 Deployment Documentation ✅
 
-- [ ] `deploy/README.md` — complete self-hosting guide
-- [ ] Sections: prerequisites, quick install (one-liner), manual setup, domain & TLS configuration, updating (dashboard + CLI), environment variables reference, troubleshooting
-- [ ] Links to `docs/backup.md` for backup procedures
-- [ ] Includes architecture diagram: `Internet → Caddy (TLS) → Breadbox → PostgreSQL`
+- [x] `deploy/README.md` — complete self-hosting guide
+- [x] Sections: prerequisites, quick install (one-liner), manual setup, domain & TLS configuration, updating (dashboard + CLI), environment variables reference, troubleshooting
+- [x] Includes backup instructions inline (database dump + restore)
+- [x] Includes architecture diagram: `Internet → Caddy (TLS) → Breadbox → PostgreSQL`
 - **Files:** `deploy/README.md`
 
 ### Task Dependencies (Phase 18)

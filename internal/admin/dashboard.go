@@ -75,19 +75,44 @@ func DashboardHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			hasConnection = connCount > 0
 		}
 
+		// Version check for update banner.
+		var showUpdateBanner bool
+		var latestVersion, latestURL string
+		currentVersion := a.Config.Version
+
+		if currentVersion != "dev" && a.VersionChecker != nil {
+			updateAvailable, latest, err := a.VersionChecker.CheckForUpdate(ctx)
+			if err != nil {
+				a.Logger.Debug("version check failed", "error", err)
+			}
+			if updateAvailable != nil && *updateAvailable && latest != nil {
+				dismissed, _ := a.Queries.GetAppConfig(ctx, "update_dismissed_version")
+				if !(dismissed.Value.Valid && dismissed.Value.String == latest.Version) {
+					showUpdateBanner = true
+					latestVersion = latest.Version
+					latestURL = latest.URL
+				}
+			}
+		}
+
 		data := map[string]any{
-			"PageTitle":      "Dashboard",
-			"CurrentPage":    "dashboard",
-			"AccountCount":   accountCount,
-			"TxCount":        txCount,
-			"LastSync":       lastSyncText,
-			"NeedsAttention": needsAttention,
-			"RecentLogs":     recentLogs,
-			"CSRFToken":      GetCSRFToken(r),
-			"ShowOnboarding": showOnboarding,
-			"HasProvider":    hasProvider,
-			"HasMember":      hasMember,
-			"HasConnection":  hasConnection,
+			"PageTitle":              "Dashboard",
+			"CurrentPage":            "dashboard",
+			"AccountCount":           accountCount,
+			"TxCount":                txCount,
+			"LastSync":               lastSyncText,
+			"NeedsAttention":         needsAttention,
+			"RecentLogs":             recentLogs,
+			"CSRFToken":              GetCSRFToken(r),
+			"ShowOnboarding":         showOnboarding,
+			"HasProvider":            hasProvider,
+			"HasMember":              hasMember,
+			"HasConnection":          hasConnection,
+			"ShowUpdateBanner":       showUpdateBanner,
+			"LatestVersion":          latestVersion,
+			"LatestURL":              latestURL,
+			"CurrentVersion":         currentVersion,
+			"DockerSocketAvailable":  a.DockerSocketAvailable,
 		}
 		tr.Render(w, r, "dashboard.html", data)
 	}
