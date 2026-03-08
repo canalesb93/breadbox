@@ -7,9 +7,9 @@ INSERT INTO transactions (
   amount, iso_currency_code, date, authorized_date,
   datetime, authorized_datetime, name, merchant_name,
   category_primary, category_detailed, category_confidence,
-  payment_channel, pending
+  payment_channel, pending, category_id
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
 )
 ON CONFLICT (external_transaction_id) DO UPDATE SET
   account_id = EXCLUDED.account_id,
@@ -27,6 +27,7 @@ ON CONFLICT (external_transaction_id) DO UPDATE SET
   category_confidence = EXCLUDED.category_confidence,
   payment_channel = EXCLUDED.payment_channel,
   pending = EXCLUDED.pending,
+  category_id = CASE WHEN transactions.category_override THEN transactions.category_id ELSE EXCLUDED.category_id END,
   deleted_at = NULL,
   updated_at = NOW()
 RETURNING *;

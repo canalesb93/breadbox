@@ -9,6 +9,7 @@ import (
 
 	"breadbox/internal/db"
 	csvpkg "breadbox/internal/provider/csv"
+	bsync "breadbox/internal/sync"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
@@ -129,6 +130,12 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 		TotalRows:    len(params.Rows),
 	}
 
+	// Load category resolver for CSV provider
+	csvResolver, err := bsync.NewCategoryResolver(ctx, s.Pool, "csv")
+	if err != nil {
+		s.Logger.Warn("failed to load CSV category resolver", "error", err)
+	}
+
 	dateCol := params.ColumnMapping["date"]
 	amountCol := params.ColumnMapping["amount"]
 	descCol := params.ColumnMapping["description"]
@@ -213,6 +220,15 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 		var amountNumeric pgtype.Numeric
 		_ = amountNumeric.Scan(amount.String())
 
+		// Resolve category from CSV mapping table
+		var categoryID pgtype.UUID
+		if csvResolver != nil && category != "" {
+			categoryID = csvResolver.Resolve("csv", &category, nil)
+		} else if csvResolver != nil {
+			// No category in CSV → uncategorized
+			categoryID = csvResolver.Resolve("csv", nil, nil)
+		}
+
 		txn, err := s.Queries.UpsertTransaction(ctx, db.UpsertTransactionParams{
 			AccountID:             accountID,
 			ExternalTransactionID: externalTxnID,
@@ -224,6 +240,7 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 			CategoryPrimary:       pgtype.Text{String: category, Valid: category != ""},
 			PaymentChannel:        pgtype.Text{String: "other", Valid: true},
 			Pending:               false,
+			CategoryID:            categoryID,
 		})
 		if err != nil {
 			result.SkippedCount++
