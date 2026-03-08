@@ -44,7 +44,7 @@ Also available via Homebrew: `brew tap dobicinaitis/tailwind-cli-extra && brew i
 ```css
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: corporate --default, business --prefersdark;
+  themes: light --default, dark --prefersdark;
 }
 
 /* App-specific component classes */
@@ -141,10 +141,10 @@ The Go server already serves `static/` via `http.FileServer`. The generated CSS 
 
 ### Theme Pairing
 
-- **Light:** `corporate` — clean, professional, business-focused palette
-- **Dark:** `business` — professional dark theme with muted tones
+- **Light:** `light` — DaisyUI default light theme, clean and neutral
+- **Dark:** `dark` — DaisyUI default dark theme with good contrast
 
-Auto-switches based on `prefers-color-scheme`. Users can also force a theme with `data-theme="corporate"` or `data-theme="business"` on `<html>`.
+Auto-switches based on `prefers-color-scheme`. Users can also force a theme with `data-theme="light"` or `data-theme="dark"` on `<html>`.
 
 ### Custom Properties Retained
 
