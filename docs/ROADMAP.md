@@ -2188,65 +2188,68 @@ Move provider configuration to a dedicated top-level Providers page. Remove impl
 
 ---
 
-## Phase 20A: Category Mapping — Schema & Engine
+## Phase 20A: Category Mapping — Schema & Engine ✅
 
 Database-backed category taxonomy with provider mappings, sync engine integration, and service layer for category CRUD and resolution.
+
+**Status:** Complete.
 
 **Depends on:** Phase 19 (Provider Settings Refactor)
 
 **Spec:** `docs/category-mapping.md`
 
-### 20A.1 Schema Migration
+### 20A.1 Schema Migration ✅
 
-- [ ] Write goose migration: `categories` table (UUID PK, slug UNIQUE, display_name, parent_id self-ref FK with CASCADE, icon, color, sort_order, is_system, timestamps)
-- [ ] Write goose migration: `category_mappings` table (provider `provider_type`, provider_category TEXT, category_id FK with CASCADE, unique constraint on `(provider, provider_category)`, timestamps)
-- [ ] Write goose migration: add `category_id` UUID FK (ON DELETE SET NULL) and `category_override` BOOLEAN DEFAULT FALSE to `transactions` table
-- [ ] Create indexes: `categories(parent_id)`, `categories(slug)`, `category_mappings(provider)`, `category_mappings(category_id)`, `transactions(category_id)`
+- [x] Write goose migration: `categories` table (UUID PK, slug UNIQUE, display_name, parent_id self-ref FK with CASCADE, icon, color, sort_order, is_system, timestamps)
+- [x] Write goose migration: `category_mappings` table (provider `provider_type`, provider_category TEXT, category_id FK with CASCADE, unique constraint on `(provider, provider_category)`, timestamps)
+- [x] Write goose migration: add `category_id` UUID FK (ON DELETE SET NULL) and `category_override` BOOLEAN DEFAULT FALSE to `transactions` table
+- [x] Create indexes: `categories(parent_id)`, `categories(slug)`, `category_mappings(provider)`, `category_mappings(category_id)`, `transactions(category_id)`
+- [x] Fix Teller `SHOPPING` → `GENERAL_MERCHANDISE` in Go code and existing transactions (migration 00017)
 - **Ref:** `category-mapping.md` Section 2
-- **Files:** `internal/db/migrations/000XX_categories.sql`
+- **Files:** `internal/db/migrations/00017_fix_teller_shopping_categories.sql`, `internal/db/migrations/00018_categories.sql`, `internal/db/migrations/00019_transaction_categories.sql`
 
-### 20A.2 Seed Data
+### 20A.2 Seed Data ✅
 
-- [ ] Write Go seed function with full default taxonomy (~120 categories: 16 primaries + ~104 detailed with display names and Lucide icon names)
-- [ ] Seed default Plaid mappings (~120 rows, 1:1 with taxonomy — each Plaid `PRIMARY` and `DETAILED` string mapped)
-- [ ] Seed default Teller mappings (~27 rows, derived from existing `mapCategory()` lookup table)
-- [ ] Seed runs as goose Go migration with `ON CONFLICT (slug) DO NOTHING` / `ON CONFLICT (provider, provider_category) DO NOTHING` for idempotency
-- [ ] Write backfill step: resolve `category_id` for existing transactions by joining raw `category_primary`/`category_detailed` against `category_mappings`
+- [x] Write SQL seed migration with full default taxonomy (~120 categories: 17 including uncategorized, 16 primaries + ~104 detailed with display names and Lucide icon names)
+- [x] Seed default Plaid mappings (~120 rows, 1:1 with taxonomy — each Plaid `PRIMARY` and `DETAILED` string mapped)
+- [x] Seed default Teller mappings (~28 rows, derived from existing `mapCategory()` lookup table)
+- [x] Seed uses `ON CONFLICT (slug) DO NOTHING` / `ON CONFLICT (provider, provider_category) DO NOTHING` for idempotency
+- [x] Write backfill step: resolve `category_id` for existing transactions by joining raw `category_primary`/`category_detailed` against `category_mappings`
 - **Ref:** `category-mapping.md` Sections 3, 6
-- **Files:** `internal/db/migrations/000XX_category_seed.go`
+- **Files:** `internal/db/migrations/00020_category_seed.sql`
 
-### 20A.3 sqlc Queries
+### 20A.3 sqlc Queries ✅
 
-- [ ] CRUD queries for `categories`: Insert, GetByID, GetBySlug, List (with parent join for tree), Update, Delete
-- [ ] CRUD queries for `category_mappings`: Insert, GetByID, List (filterable by provider), Update, Delete, BulkUpsert
-- [ ] `ListUnmappedCategories` query: distinct `(category_primary, category_detailed)` from transactions where `category_id IS NULL AND category_override = FALSE AND deleted_at IS NULL`
-- [ ] `CountTransactionsByCategory` query for transaction counts per category
-- [ ] Update `UpsertTransaction` to include `category_id` and `category_override` columns
+- [x] CRUD queries for `categories`: Insert, GetByID, GetBySlug, List (with parent join for tree), Update, Delete
+- [x] CRUD queries for `category_mappings`: Insert, GetByID, List (filterable by provider), Update, Delete, BulkUpsert
+- [x] `ListUnmappedCategories` query: distinct `(category_primary, category_detailed)` from transactions where `category_id = uncategorized AND category_override = FALSE AND deleted_at IS NULL`
+- [x] `CountTransactionsByCategory` query for transaction counts per category
+- [x] Update `UpsertTransaction` to include `category_id` column; ON CONFLICT preserves `category_id` when `category_override = TRUE`
 - **Ref:** `category-mapping.md` Sections 2, 4
 - **Files:** `internal/db/queries/categories.sql`, `internal/db/queries/category_mappings.sql`, `internal/db/queries/transactions.sql`
 
-### 20A.4 Category Service Layer
+### 20A.4 Category Service Layer ✅
 
-- [ ] Category CRUD methods: ListCategories (tree), GetCategory, CreateCategory, UpdateCategory, DeleteCategory
-- [ ] Category mapping CRUD: ListMappings, CreateMapping, UpdateMapping, DeleteMapping, BulkUpsertMappings
-- [ ] `ListUnmappedCategories` — wraps query, returns structured unmapped pairs with provider info
-- [ ] MergeCategories(sourceID, targetID) — reassign transactions + mappings, then delete source
-- [ ] SetTransactionCategory(txID, categoryID) — set `category_id` + `category_override = true`
-- [ ] ResetTransactionCategory(txID) — clear override, re-resolve from mapping table
-- [ ] BulkReMap(oldCategoryID, newCategoryID, providerCategory) — update affected non-overridden transactions
-- [ ] Slug auto-generation from display name (lowercase, spaces→underscores, strip special chars, uniqueness check)
+- [x] Category CRUD methods: ListCategories (flat), ListCategoryTree, GetCategory, CreateCategory, UpdateCategory, DeleteCategory
+- [x] Category mapping CRUD: ListMappings, CreateMapping, UpdateMapping, DeleteMapping, BulkUpsertMappings
+- [x] `ListUnmappedCategories` — wraps query, returns structured unmapped pairs
+- [x] MergeCategories(sourceID, targetID) — reassign transactions + mappings, then delete source
+- [x] SetTransactionCategory(txID, categoryID) — set `category_id` + `category_override = true`
+- [x] ResetTransactionCategory(txID) — clear override, re-resolve from mapping table
+- [x] BulkReMap(oldCategoryID, newCategoryID, providerCategory) — update affected non-overridden transactions
+- [x] Slug auto-generation from display name (lowercase, spaces→underscores, strip special chars, uniqueness check with suffix)
 - **Ref:** `category-mapping.md` Sections 4, 5
-- **Files:** `internal/service/categories.go`, `internal/service/types.go`
+- **Files:** `internal/service/categories.go`
 
-### 20A.5 Sync Engine Integration
+### 20A.5 Sync Engine Integration ✅
 
-- [ ] Implement `categoryResolver` struct — in-memory `map[string]pgtype.UUID` loaded once per sync run
-- [ ] `Resolve(provider, detailed, primary)` method: try `provider:detailed` → `provider:primary` → NULL
-- [ ] Load resolver from `category_mappings` at start of each sync batch
-- [ ] Integrate into `upsertTransaction`: set `category_id` on every synced transaction
-- [ ] Skip resolution when `category_override = true` (preserve manual overrides)
-- [ ] Teller resolution chain: check `teller:raw` first → fall through to `plaid:translated` strings
-- [ ] Update CSV import to resolve categories through mapping table (store raw in `category_primary`, resolve to `category_id`)
+- [x] Implement `CategoryResolver` struct — in-memory `map[string]pgtype.UUID` loaded once per sync run
+- [x] `Resolve(provider, detailed, primary)` method: try `provider:detailed` → `provider:primary` → uncategorized
+- [x] Load resolver from `category_mappings` at start of each sync batch
+- [x] Integrate into `upsertTransaction`: set `category_id` on every synced transaction
+- [x] Skip resolution when `category_override = true` (preserved via ON CONFLICT SQL clause)
+- [x] Teller resolution: uses `teller:raw_category` mappings via the same Resolve method
+- [x] Update CSV import to resolve categories through mapping table (store raw in `category_primary`, resolve to `category_id`)
 - **Ref:** `category-mapping.md` Sections 4.1–4.4
 - **Files:** `internal/sync/engine.go`, `internal/sync/resolver.go`, `internal/service/csv_import.go`
 

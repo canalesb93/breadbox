@@ -131,6 +131,13 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 	}
 	cursor := previousCursor
 
+	// Load category resolver for this provider.
+	resolver, err := NewCategoryResolver(ctx, e.pool, string(conn.Provider))
+	if err != nil {
+		logger.Warn("failed to load category resolver, categories will be NULL", "error", err)
+		resolver = nil
+	}
+
 	// Account ID cache to avoid repeated lookups.
 	accountIDCache := make(map[string]pgtype.UUID)
 
@@ -205,7 +212,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				skipped++
 				continue
 			}
-			if err := e.upsertTransaction(ctx, txQueries, &pendingAdded[i], accountIDCache, logger); err != nil {
+			if err := e.upsertTransaction(ctx, txQueries, &pendingAdded[i], accountIDCache, string(conn.Provider), resolver, logger); err != nil {
 				logger.Error("upsert added transaction", "external_id", pendingAdded[i].ExternalID, "error", err)
 			}
 			added++
@@ -222,7 +229,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				skipped++
 				continue
 			}
-			if err := e.upsertTransaction(ctx, txQueries, &pendingModified[i], accountIDCache, logger); err != nil {
+			if err := e.upsertTransaction(ctx, txQueries, &pendingModified[i], accountIDCache, string(conn.Provider), resolver, logger); err != nil {
 				logger.Error("upsert modified transaction", "external_id", pendingModified[i].ExternalID, "error", err)
 			}
 			modified++
@@ -270,10 +277,22 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 }
 
 // upsertTransaction resolves the account ID and upserts a single transaction.
-func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *provider.Transaction, cache map[string]pgtype.UUID, logger *slog.Logger) error {
+func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *provider.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *CategoryResolver, logger *slog.Logger) error {
 	accountID, err := e.resolveAccountID(ctx, txn.AccountExternalID, cache)
 	if err != nil {
 		return fmt.Errorf("resolve account %s: %w", txn.AccountExternalID, err)
+	}
+
+	// Resolve category ID from provider mappings
+	var categoryID pgtype.UUID
+	if resolver != nil {
+		if providerName == "teller" {
+			// For Teller, resolve using the raw Teller category (stored in CategoryPrimary
+			// by the provider before mapCategory translates it)
+			categoryID = resolver.Resolve(providerName, txn.CategoryDetailed, txn.CategoryPrimary)
+		} else {
+			categoryID = resolver.Resolve(providerName, txn.CategoryDetailed, txn.CategoryPrimary)
+		}
 	}
 
 	params := db.UpsertTransactionParams{
@@ -293,6 +312,7 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		CategoryConfidence:    optionalText(txn.CategoryConfidence),
 		PaymentChannel:        pgtype.Text{String: txn.PaymentChannel, Valid: txn.PaymentChannel != ""},
 		Pending:               txn.Pending,
+		CategoryID:            categoryID,
 	}
 
 	_, err = q.UpsertTransaction(ctx, params)

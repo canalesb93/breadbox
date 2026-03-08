@@ -64,7 +64,8 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Transaction responses include denormalized `account_name` and `user_name` (JOIN in dynamic query builder)
 - MCP tool descriptions: domain-rich with amount conventions, filter docs, pagination behavior (not generic)
 - MCP server instructions: domain-rich onboarding text (data model, amount convention, category system, recommended query patterns)
-- Teller category mapping: `mapCategory()` returns `(primary, detailed)` pair. All Teller categories map to both primary and detailed Plaid-compatible categories. Will be superseded by DB-backed `category_mappings` table (Phase 20A).
+- Teller category mapping: `mapCategory()` returns `(primary, detailed)` pair for raw audit strings. DB-backed `category_mappings` table is the authority for resolving `category_id` (Phase 20A).
+- Teller SHOPPING fix: `clothing`, `electronics`, `shopping` categories corrected from `SHOPPING*` to `GENERAL_MERCHANDISE*` to match Plaid's taxonomy.
 - Transaction sort options: `sort_by` (date/amount/name) + `sort_order` (asc/desc). Cursor pagination only works with date sort.
 - Category system: `categories` table (UUID PK, slug, display_name, parent_id for 2-level hierarchy, icon, color). `category_mappings` table maps `(provider, provider_category)` → `category_id`. Transactions have `category_id` FK (SET NULL) + `category_override` boolean. Raw provider strings kept in `category_primary`/`category_detailed` for auditability. Resolution: detailed match → primary match → NULL. In-memory cache during sync. Spec: `docs/category-mapping.md`.
 - Category slugs: `lowercase_with_underscores` format (e.g., `food_and_drink_groceries`). Immutable after creation. Display names are mutable.
