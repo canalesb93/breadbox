@@ -3,18 +3,21 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev build test lint migrate-up migrate-down migrate-create sqlc seed docker-up docker-down css css-watch css-install
+.PHONY: dev build test lint generate migrate-up migrate-down migrate-create sqlc seed docker-up docker-down css css-watch css-install
 
-dev:
+# generate runs sqlc + css so all gitignored build artifacts exist
+generate: sqlc css
+
+dev: generate
 	go run ./cmd/breadbox serve
 
-build:
+build: generate
 	go build -o breadbox ./cmd/breadbox
 
-test:
+test: generate
 	go test ./...
 
-lint:
+lint: generate
 	go vet ./...
 
 migrate-up:
