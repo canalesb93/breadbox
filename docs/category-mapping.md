@@ -1,6 +1,6 @@
 # Category Mapping Design
 
-**Version:** 1.0
+**Version:** 1.1
 **Status:** Draft
 **Last Updated:** 2026-03-08
 
@@ -61,6 +61,7 @@ CREATE TABLE categories (
     color           TEXT NULL,                       -- hex color for charts: "#4ade80"
     sort_order      INTEGER NOT NULL DEFAULT 0,      -- display ordering within siblings
     is_system       BOOLEAN NOT NULL DEFAULT FALSE,  -- true for seeded defaults (deletable, just a hint)
+    hidden          BOOLEAN NOT NULL DEFAULT FALSE,  -- hidden from UI dropdowns/filters, mappings stay intact
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -74,7 +75,8 @@ CREATE INDEX categories_slug_idx ON categories(slug);
 - **Two levels only.** `parent_id IS NULL` = primary category. `parent_id IS NOT NULL` = detailed category. No deeper nesting. This matches Plaid's model and keeps queries simple.
 - **Slug is the stable key.** Display names can change freely. Slugs are what mappings and filters reference. Slugs use `lowercase_with_underscores`.
 - **`is_system` is advisory.** Users can rename, re-icon, recolor, or delete system categories. It's just a UI hint ("this came from the defaults").
-- **Self-referencing FK with CASCADE.** Deleting a primary category deletes its children. Transactions referencing deleted categories get handled separately (see Section 2.3).
+- **`hidden` declutters without destroying.** Hidden categories don't appear in UI dropdowns, filters, or tree views, but their mappings remain intact and sync continues to resolve them. Useful for categories the user doesn't care about (e.g., "Casinos & Gambling") without deleting the mapping chain.
+- **Self-referencing FK with CASCADE.** Deleting a primary category deletes its children and their mappings. The confirmation dialog warns about the full blast radius: child categories, mappings, and affected transaction counts. Transactions referencing deleted categories get `category_id = NULL` (see Section 2.3).
 
 ### 2.2 `category_mappings` Table
 
@@ -124,9 +126,23 @@ CREATE INDEX transactions_category_id_idx ON transactions(category_id);
 | `category_primary` | (existing) Raw primary category string from the provider. Kept for auditability and re-mapping. Never shown to end users. |
 | `category_detailed` | (existing) Raw detailed category string from the provider. Kept for auditability and re-mapping. Never shown to end users. |
 
-**`ON DELETE SET NULL`** on `category_id`: if a category is deleted, transactions become uncategorized rather than deleted. The raw provider strings remain, so re-mapping can recategorize them.
+**`ON DELETE SET NULL`** on `category_id`: if a category is deleted, transactions fall back to the system `uncategorized` category (see below). The raw provider strings remain, so re-mapping can recategorize them.
 
-### 2.4 Entity Relationship Summary
+### 2.4 System `uncategorized` Category
+
+Rather than using `category_id = NULL` to represent uncategorized transactions, the system seeds a first-class **`uncategorized`** category:
+
+- **Slug:** `uncategorized`
+- **Display Name:** Uncategorized
+- **`is_system = TRUE`, undeletable.** The app prevents deletion of this specific category (enforced in service layer, not DB constraint).
+- **`parent_id = NULL`** — it's a top-level category with no children.
+- **`hidden = FALSE`** by default, but users can hide it.
+
+**Why not NULL?** A real category is queryable (`category_slug=uncategorized`), appears in spending breakdowns, and doesn't require special-case NULL handling in every query. MCP agents can filter for uncategorized transactions naturally.
+
+**Fallback behavior:** When sync resolves no mapping and `category_override = FALSE`, the transaction gets `category_id = uncategorized.id` (not NULL). When a category is deleted (`ON DELETE SET NULL`), a cleanup step reassigns those transactions to `uncategorized`. The `category_id` column remains nullable at the DB level for safety, but application code treats NULL as a transient state that resolves to `uncategorized`.
+
+### 2.5 Entity Relationship Summary
 
 ```
 categories (self-referencing: parent_id → id)
@@ -190,11 +206,11 @@ The full set is ~120 rows (16 primaries + ~104 detailed). Implemented as a Go se
 
 ### 3.3 Seeding the Mappings
 
-The same seed function also populates `category_mappings` for all three providers:
+The same seed function also populates `category_mappings` for all three providers. **Each provider gets its own complete, independent set of mappings.** There is no cross-provider fallthrough.
 
-- **Plaid:** 1:1 mapping. `(plaid, "FOOD_AND_DRINK_GROCERIES")` → `food_and_drink_groceries` category. Also maps each primary string: `(plaid, "FOOD_AND_DRINK")` → `food_and_drink` category.
-- **Teller:** Uses the existing `tellerCategories` Go map. `(teller, "groceries")` → `food_and_drink_groceries`, `(teller, "dining")` → `food_and_drink_restaurant`, etc.
-- **CSV:** No default mappings. CSV categories are freeform. Users add mappings as needed, or the unmapped fallback handles it.
+- **Plaid:** 1:1 mapping from Plaid constants to user categories. `(plaid, "FOOD_AND_DRINK_GROCERIES")` → `food_and_drink_groceries`. Also maps each primary string: `(plaid, "FOOD_AND_DRINK")` → `food_and_drink`.
+- **Teller:** Maps raw Teller category strings directly to user categories. `(teller, "groceries")` → `food_and_drink_groceries`, `(teller, "dining")` → `food_and_drink_restaurant`, `(teller, "clothing")` → `general_merchandise_clothing_and_accessories`, etc. Derived from `tellerCategories` Go map but stored independently. All ~27 Teller categories get their own mapping rows.
+- **CSV:** No default mappings. CSV categories are freeform. Users add mappings as needed, or unmatched strings resolve to `uncategorized`.
 
 ---
 
@@ -206,12 +222,14 @@ When the sync engine upserts a transaction, it resolves the category through thi
 
 ```
 1. If transaction has category_override = true → SKIP (keep existing category_id)
-2. Look up provider_category in category_mappings:
-   a. Try detailed category first: (provider, "FOOD_AND_DRINK_GROCERIES")
-   b. If no match, try primary category: (provider, "FOOD_AND_DRINK")
-   c. If no match → unmapped fallback (Section 4.3)
+2. Look up in category_mappings using ONLY the transaction's own provider:
+   a. For Plaid: try (plaid, detailed) → then (plaid, primary) → uncategorized
+   b. For Teller: try (teller, raw_teller_category) → uncategorized
+   c. For CSV: try (csv, raw_string) → uncategorized
 3. Set category_id to the resolved category
 ```
+
+Each provider resolves independently — no cross-provider fallthrough (see Section 4.4).
 
 This lookup is a simple indexed query. For bulk sync performance, the sync engine loads the full mapping table for the relevant provider into a `map[string]UUID` at the start of each sync run. The mapping table is small (hundreds of rows max) and fits entirely in memory.
 
@@ -235,7 +253,7 @@ func (r *categoryResolver) Resolve(provider, detailed, primary *string) pgtype.U
             return id
         }
     }
-    return pgtype.UUID{} // NULL — unmapped
+    return r.uncategorizedID // system "uncategorized" category
 }
 ```
 
@@ -253,35 +271,48 @@ func loadMappings(ctx context.Context, pool *pgxpool.Pool, provider string) (*ca
 
 When a provider category has no mapping:
 
-1. **Transaction gets `category_id = NULL`.** It's uncategorized.
+1. **Transaction gets `category_id` set to the system `uncategorized` category.** It's queryable and visible in spending breakdowns.
 2. **The raw `category_primary` and `category_detailed` strings are still stored.** Nothing is lost.
-3. **Dashboard shows an "Unmapped Categories" section** on the category management page (see Section 8). This lists all distinct `(category_primary, category_detailed)` pairs from transactions where `category_id IS NULL AND category_override = FALSE`. The user can click to create a mapping.
+3. **Dashboard shows an "Unmapped Categories" section** on the category management page (see Section 8). This lists all distinct `(category_primary, category_detailed)` pairs from transactions where `category_id = uncategorized.id AND category_override = FALSE`. The user can click to create a mapping.
 
 This is a conscious choice: we don't auto-create categories for unknown provider strings. That would pollute the user's taxonomy with provider junk. Instead, we surface unmapped categories and let the user decide.
 
-### 4.4 Mapping Granularity
+### 4.4 Mapping Granularity — Per-Provider Independence
 
-Mappings work at the **string level** — whatever the provider sends. For Plaid, this means:
+**Each provider resolves categories independently through its own mappings.** There is no cross-provider fallthrough. A Plaid transaction resolves only from `(plaid, ...)` mappings. A Teller transaction resolves only from `(teller, ...)` mappings.
 
-- If the provider sends both primary and detailed, the detailed mapping wins (more specific).
-- If the provider sends only primary, the primary mapping is used.
-- Plaid detailed strings always start with the primary name, but the mapping table doesn't enforce this. It's just strings.
-
-For Teller, the provider sends a single category string (`"groceries"`, `"dining"`). The Teller provider maps this to a `(primary, detailed)` pair in Go code before it reaches the sync engine. So the mapping table sees the translated Plaid-compatible strings. **However**, we also seed direct Teller mappings `(teller, "groceries")` → user category, so the `mapCategory()` Go function becomes unnecessary once the mapping table is in place. The Go map stays as documentation/fallback but the DB mappings are authoritative.
-
-**Decision: Keep the Go-level Teller mapping.** The `mapCategory()` function in `teller/categories.go` continues to translate Teller categories to Plaid-compatible strings. The sync engine then resolves those Plaid-compatible strings through the mapping table using `provider = "plaid"` keys. This means Teller transactions go through two translation steps (Teller→Plaid strings→user category), but it simplifies the mapping table: users only need to customize Plaid-format mappings unless they want Teller-specific overrides. The `teller`-provider mappings in the DB exist as an override layer — if present, they short-circuit the Plaid fallback.
-
-**Revised resolution order for Teller:**
+**Plaid resolution:**
 
 ```
-1. Look up (teller, raw_teller_category) in mappings  → if found, done
-2. mapCategory() translates to Plaid strings
-3. Look up (plaid, plaid_detailed) in mappings         → if found, done
-4. Look up (plaid, plaid_primary) in mappings           → if found, done
-5. Unmapped
+1. Look up (plaid, category_detailed) → if found, done
+2. Look up (plaid, category_primary)  → if found, done
+3. → uncategorized
 ```
 
-This gives users the option to override at either the Teller or Plaid level. Most users will never touch this — the defaults just work.
+**Teller resolution:**
+
+The Teller provider sends a single raw category string (`"groceries"`, `"dining"`). The `mapCategory()` function in `teller/categories.go` translates this to `(primary, detailed)` strings that get stored in `category_primary`/`category_detailed`. The mapping table resolves from the **raw Teller string**:
+
+```
+1. Look up (teller, raw_teller_category) → if found, done
+2. → uncategorized
+```
+
+The `mapCategory()` Go function remains for populating `category_primary`/`category_detailed` (audit trail), but is **not used** in mapping resolution. The DB mapping table is the sole authority for resolving `category_id`.
+
+**Why no Plaid fallthrough?** The previous design had Teller transactions fall through to Plaid mappings if no Teller mapping existed. This was over-engineered:
+
+- Changing a Plaid mapping would silently change Teller transaction categorization — confusing to debug.
+- Two different `provider` keys affecting the same transaction creates hidden coupling.
+- The "simplification" of maintaining fewer mappings isn't worth the complexity cost.
+
+Instead, we seed **complete, independent mappings for both providers**. Both Plaid and Teller mappings point to the same user categories by default. Users who want provider-specific behavior just edit the relevant provider's mappings. One provider key per transaction, no indirection.
+
+**CSV resolution:**
+
+CSV has no default mappings. Freeform category strings stored in `category_detailed` are resolved via `(csv, raw_string)` mappings that users create as needed. Unmatched → `uncategorized`.
+
+**Pre-requisite: Fix `teller/categories.go`.** The current Go map uses `SHOPPING`/`SHOPPING_*` constants (lines 17, 20, 24, 34), but Plaid's taxonomy uses `GENERAL_MERCHANDISE`/`GENERAL_MERCHANDISE_*`. These must be corrected to `GENERAL_MERCHANDISE` before seeding Teller mappings, so that `category_primary`/`category_detailed` audit strings are consistent. See Section 6.5.
 
 ---
 
@@ -291,11 +322,24 @@ This gives users the option to override at either the Teller or Plaid level. Mos
 
 Users can create, rename, recolor, re-icon, reorder, and delete categories freely.
 
-- **Create:** Add a new primary or detailed category. User provides display name; slug is auto-generated from display name (lowercased, spaces→underscores, special chars stripped). Slug uniqueness is enforced.
+- **Create:** Add a new primary or detailed category. User provides display name; slug is auto-generated with an optional manual override.
+
+  **Slug generation algorithm:**
+  1. Lowercase the display name
+  2. Replace spaces, hyphens, and `&` with underscores
+  3. Strip all characters except `[a-z0-9_]`
+  4. Collapse consecutive underscores to one
+  5. Trim leading/trailing underscores
+  6. If slug is empty after stripping → reject with error
+  7. If slug collides with existing → append `_2`, `_3`, etc.
+  8. User can manually provide a slug to override auto-generation
+
+  Slug uniqueness is enforced by the DB UNIQUE constraint.
 - **Rename:** Change `display_name` at any time. Slug stays the same. All transactions and mappings continue to work.
 - **Recolor/re-icon:** Cosmetic changes, no impact on data.
 - **Reorder:** Change `sort_order` to control display ordering.
-- **Delete:** Category is removed. Transactions with that category get `category_id = NULL` (via `ON DELETE SET NULL`). Mappings are also removed (via `ON DELETE CASCADE`). User is warned before deleting.
+- **Delete:** Category is removed. Transactions with that category get reassigned to `uncategorized` (via `ON DELETE SET NULL` + cleanup). Mappings are also removed (via `ON DELETE CASCADE`). User is warned before deleting, with full blast radius shown (child categories, mappings, transaction counts).
+- **Hide:** Toggle `hidden = TRUE`. Category disappears from UI dropdowns and filter lists but mappings remain intact. Sync continues to resolve transactions to hidden categories. Useful for decluttering without data loss.
 
 ### 5.2 Merge Categories
 
@@ -360,33 +404,103 @@ Using a Go migration ensures the seed data is version-controlled alongside the c
 
 ### 6.3 Backfill Existing Transactions
 
-A third goose migration (Go) that backfills `category_id` for all existing transactions:
+A third goose migration (Go) that backfills `category_id` for all existing transactions. Since providers resolve independently, the backfill runs separate passes per provider.
+
+**Pass 1 — Plaid detailed:**
 
 ```sql
 UPDATE transactions t
 SET category_id = cm.category_id
 FROM category_mappings cm
-WHERE cm.provider = 'plaid'        -- Teller categories are already Plaid-normalized
+JOIN bank_accounts a ON t.account_id = a.id
+JOIN bank_connections c ON a.connection_id = c.id
+WHERE c.provider = 'plaid'
+  AND cm.provider = 'plaid'
   AND cm.provider_category = t.category_detailed
   AND t.category_id IS NULL
   AND t.deleted_at IS NULL;
 ```
 
-Then a second pass for transactions with only primary categories:
+**Pass 2 — Plaid primary-only:**
 
 ```sql
 UPDATE transactions t
 SET category_id = cm.category_id
 FROM category_mappings cm
-WHERE cm.provider = 'plaid'
+JOIN bank_accounts a ON t.account_id = a.id
+JOIN bank_connections c ON a.connection_id = c.id
+WHERE c.provider = 'plaid'
+  AND cm.provider = 'plaid'
   AND cm.provider_category = t.category_primary
   AND t.category_id IS NULL
   AND t.deleted_at IS NULL;
 ```
 
-This handles the majority of existing data. Any remaining `category_id IS NULL` transactions are truly unmapped (provider sent no category, or it was an unrecognized string).
+**Pass 3 — Teller:** Teller transactions store Plaid-normalized strings in `category_detailed` (via `mapCategory()`), but we need to resolve them through Teller-specific mappings. The backfill uses a reverse lookup: for each Teller category in the Go map, find transactions whose `category_detailed` matches the Plaid translation, and assign the Teller mapping's target category.
 
-### 6.4 Backward Compatibility
+```go
+// In the Go migration, iterate tellerCategories map
+for tellerCat, plaidMapping := range tellerCategories {
+    // Find teller transactions with this Plaid detailed string
+    // and assign using the (teller, tellerCat) mapping
+    pool.Exec(ctx, `
+        UPDATE transactions t
+        SET category_id = cm.category_id
+        FROM category_mappings cm
+        JOIN bank_accounts a ON t.account_id = a.id
+        JOIN bank_connections c ON a.connection_id = c.id
+        WHERE c.provider = 'teller'
+          AND cm.provider = 'teller'
+          AND cm.provider_category = $1
+          AND t.category_detailed = $2
+          AND t.category_id IS NULL
+          AND t.deleted_at IS NULL`,
+        tellerCat, plaidMapping.detailed)
+}
+```
+
+**Pass 4 — Remaining NULL → uncategorized:**
+
+```sql
+UPDATE transactions t
+SET category_id = (SELECT id FROM categories WHERE slug = 'uncategorized')
+WHERE t.category_id IS NULL
+  AND t.deleted_at IS NULL;
+```
+
+This ensures every non-deleted transaction has a `category_id` after migration.
+
+### 6.4 Pre-Migration Fix: Teller `SHOPPING` → `GENERAL_MERCHANDISE`
+
+**Before running the category migrations**, the `teller/categories.go` file must be fixed. Three Teller categories currently map to `SHOPPING`/`SHOPPING_*` constants, which don't exist in Plaid's taxonomy:
+
+| Teller Category | Current (wrong) | Corrected |
+|---|---|---|
+| `clothing` | `SHOPPING`, `SHOPPING_CLOTHING_AND_ACCESSORIES` | `GENERAL_MERCHANDISE`, `GENERAL_MERCHANDISE_CLOTHING_AND_ACCESSORIES` |
+| `electronics` | `SHOPPING`, `SHOPPING_ELECTRONICS` | `GENERAL_MERCHANDISE`, `GENERAL_MERCHANDISE_ELECTRONICS` |
+| `shopping` | `SHOPPING`, `SHOPPING_OTHER_SHOPPING` | `GENERAL_MERCHANDISE`, `GENERAL_MERCHANDISE_OTHER_GENERAL_MERCHANDISE` |
+
+This fix ensures that `category_primary`/`category_detailed` audit strings are consistent with Plaid's actual taxonomy. Existing transactions with the old `SHOPPING_*` strings will be handled by the backfill migration's Teller pass (Section 6.3 Pass 3), which resolves by Teller raw category, not by the stored Plaid string.
+
+A data migration should also update existing transactions:
+
+```sql
+UPDATE transactions t
+SET category_primary = 'GENERAL_MERCHANDISE',
+    category_detailed = CASE category_detailed
+        WHEN 'SHOPPING_CLOTHING_AND_ACCESSORIES' THEN 'GENERAL_MERCHANDISE_CLOTHING_AND_ACCESSORIES'
+        WHEN 'SHOPPING_ELECTRONICS' THEN 'GENERAL_MERCHANDISE_ELECTRONICS'
+        WHEN 'SHOPPING_OTHER_SHOPPING' THEN 'GENERAL_MERCHANDISE_OTHER_GENERAL_MERCHANDISE'
+    END
+FROM bank_accounts a
+JOIN bank_connections c ON a.connection_id = c.id
+WHERE t.account_id = a.id
+  AND c.provider = 'teller'
+  AND t.category_primary = 'SHOPPING'
+  AND t.deleted_at IS NULL;
+```
+
+### 6.5 Backward Compatibility
 
 The existing `category_primary` and `category_detailed` TEXT columns remain. They continue to be populated by sync. They serve as:
 
@@ -423,13 +537,13 @@ The REST API and MCP responses gain new fields but keep the old ones (see Sectio
 }
 ```
 
-The old `category_primary` and `category_detailed` fields are renamed to `category_primary_raw` and `category_detailed_raw` to avoid confusion. This is a breaking change but an acceptable one at this stage.
+The old `category_primary` and `category_detailed` fields are renamed to `category_primary_raw` and `category_detailed_raw` to avoid confusion. **This is an immediate breaking change** — no deprecation period. The old field names and filter parameters (`category`, `category_detailed`) are removed in the same release. Rationale: the app is pre-1.0 and self-hosted, so there's no large consumer base to migrate. MCP server instructions are updated in the same release to reference the new field names.
 
 **New filter parameters:**
 
-- `category_slug` — filter by category slug (replaces current `category` filter on raw strings)
-- `category_primary_slug` — filter by primary category slug
-- The old `category` and `category_detailed` filters continue to work against raw strings for backward compatibility, but are documented as deprecated.
+- `category_slug` — filter by category slug. **Parent-inclusive:** filtering by a parent slug (e.g., `food_and_drink`) returns transactions in that category AND all its children (`food_and_drink_groceries`, `food_and_drink_restaurant`, etc.). This is the natural behavior — "show me all Food & Drink" should include subcategories. Implementation: resolve the slug, check if it has children, and filter by `category_id IN (parent_id, child1_id, child2_id, ...)`.
+- `category_slug_exact` — filter by exact category slug only (no children). For the rare case where a user wants only transactions mapped to the parent itself.
+- The old `category` and `category_detailed` query parameters are removed (breaking change, see below).
 
 **New endpoints:**
 
@@ -513,7 +627,7 @@ The tree is collapsible by primary category. Drag-to-reorder for `sort_order` (A
 
 **"Add Category" button** at the top. Modal form: display name, parent (dropdown of primaries or "none" for new primary), icon picker, color picker.
 
-**"Unmapped Categories" alert card** at the top of the page if any transactions have `category_id IS NULL AND category_override = FALSE`. Shows count and links to the mapping editor filtered to show unmapped strings.
+**"Unmapped Categories" alert card** at the top of the page if any transactions have `category_id = uncategorized.id AND category_override = FALSE AND (category_primary IS NOT NULL OR category_detailed IS NOT NULL)`. Shows count and links to the mapping editor filtered to show unmapped strings.
 
 ### 8.2 Provider Mapping Editor
 
@@ -558,12 +672,15 @@ On the transaction list and detail pages:
 The existing dashboard can gain a "Spending by Category" summary card. Out of scope for the category mapping feature itself, but the data model supports it trivially:
 
 ```sql
-SELECT c.display_name, c.icon, c.color, SUM(t.amount)
+SELECT c.display_name, c.icon, c.color, t.iso_currency_code, SUM(t.amount)
 FROM transactions t
 JOIN categories c ON t.category_id = c.id
 WHERE t.date >= $1 AND t.amount > 0
-GROUP BY c.id ORDER BY SUM(t.amount) DESC
+GROUP BY c.id, t.iso_currency_code
+ORDER BY SUM(t.amount) DESC
 ```
+
+**Note:** Groups by currency to respect the "never sum across currencies" rule. The dashboard should display separate breakdowns per currency if the family has multi-currency accounts.
 
 ---
 
@@ -588,9 +705,10 @@ The `UNIQUE(provider, provider_category)` constraint prevents duplicate mappings
 
 When deleting a category that has transactions:
 
-1. Dashboard shows: "This category has 47 transactions. They will become uncategorized."
+1. Dashboard shows the full blast radius: "This category has 47 transactions. It also has 3 subcategories with 12 mappings that will be removed."
 2. Optionally offer "Move transactions to:" with a category picker.
-3. If confirmed without moving: `category_id` becomes NULL via `ON DELETE SET NULL`. Transactions can be re-mapped later.
+3. If confirmed without moving: `category_id` becomes NULL via `ON DELETE SET NULL`, then a cleanup step reassigns to `uncategorized`. Transactions can be re-mapped later.
+4. **Alternative: suggest hiding instead of deleting.** The confirmation dialog offers "Hide this category instead?" as a less destructive option.
 
 ### 9.4 Renaming Slugs
 
@@ -602,7 +720,7 @@ CSV imports store whatever the user mapped as `category_primary`/`category_detai
 
 ### 9.6 Empty/Null Provider Categories
 
-Some transactions arrive with no category at all (both `category_primary` and `category_detailed` are NULL). These get `category_id = NULL`. They don't appear in the "Unmapped Categories" list (there's nothing to map). Users can only categorize them via per-transaction override.
+Some transactions arrive with no category at all (both `category_primary` and `category_detailed` are NULL). These get `category_id` set to `uncategorized`. They don't appear in the "Unmapped Categories" list (there's nothing to map). Users can only categorize them via per-transaction override.
 
 ---
 
