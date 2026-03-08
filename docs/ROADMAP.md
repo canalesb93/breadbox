@@ -2383,3 +2383,116 @@ REST API endpoints, MCP tool updates, and full admin dashboard for managing cate
 11. Map an unmapped CSV category inline — affected transactions get recategorized
 12. Export mappings as JSON, edit, re-import — round-trip preserves all mappings
 13. Transaction list shows display names; click to override; override badge visible; reset works
+
+---
+
+## Post-MVP Roadmap
+
+> **Status:** All phases scoped with detailed PRD specs in `docs/`.
+> Phases below build toward the v1 vision: a self-hosted financial hub that
+> works well for humans *and* AI agents.
+
+---
+
+### Phase 21: Transaction Comments & Audit Log
+
+Data foundation for agentic review and human collaboration.
+
+- **Spec:** [`docs/phase-21-comments-audit-log.md`](phase-21-comments-audit-log.md)
+- **Key deliverables:** 2 new tables (`transaction_comments`, `audit_log`), comment CRUD (REST+MCP+dashboard), audit log writes on all mutations, audit log query API+MCP, transaction detail with comment thread + change history
+
+---
+
+### Phase 22: Agent-Optimized APIs & Token Efficiency
+
+Make the API surface efficient for AI agent consumption.
+
+- **Spec:** [`docs/phase-22-agent-optimized-apis.md`](phase-22-agent-optimized-apis.md)
+- **Key deliverables:** `?fields=` param on transactions, category mapping MCP CRUD, `transaction_summary` aggregation tool, enriched `breadbox://overview`, response size reduction
+
+---
+
+### Phase 23: MCP Permissions & Custom Instructions
+
+Admin control over what agents can do and how they behave.
+
+- **Spec:** [`docs/phase-23-mcp-permissions.md`](phase-23-mcp-permissions.md)
+- **Key deliverables:** global read-only/read-write mode, per-tool enable/disable, custom MCP instructions editor at `/admin/mcp`, API key scoping (read-only vs full-access)
+
+---
+
+### Phase 24: Review Queue & Review API
+
+The core review system — humans and agents review transactions through a unified queue.
+
+- **Spec:** [`docs/phase-24-review-queue.md`](phase-24-review-queue.md)
+- **Key deliverables:** `review_queue` table, auto-enqueue on sync, review REST+MCP API with bulk operations, dashboard review page with approve/reject/skip workflow
+
+---
+
+### Phase 25: Agentic Review — External Agent Support
+
+Let users' own AI agents (via MCP or API) review transactions autonomously.
+
+- **Spec:** [`docs/phase-25-external-agents.md`](phase-25-external-agents.md)
+- **Key deliverables:** outgoing webhook notifications (HMAC-SHA256), polling endpoint, configurable review instructions, MCP review tools
+
+---
+
+### Phase 26: Agentic Review — Built-in Agent
+
+Breadbox runs AI review internally — no external agent setup required.
+
+- **Spec:** [`docs/phase-26-builtin-agent.md`](phase-26-builtin-agent.md)
+- **Key deliverables:** AI provider abstraction (Anthropic/OpenAI), encrypted API key config, review prompt templates, agent runner with batching, cost controls, `/admin/ai` dashboard page
+
+---
+
+### Phase 27: Dashboard — Insights & Charts
+
+Visual spending intelligence for the dashboard.
+
+- **Spec:** [`docs/phase-27-insights-charts.md`](phase-27-insights-charts.md)
+- **Key deliverables:** Chart.js integration, category breakdown, spending over time, balance trends, monthly comparison, dashboard summary cards
+
+---
+
+### Phase 28: Dashboard — Transaction UX & Filtering
+
+Power-user transaction browsing and management.
+
+- **Spec:** [`docs/phase-28-transaction-ux.md`](phase-28-transaction-ux.md)
+- **Key deliverables:** composable filter bar, saved presets, bulk actions, search, transaction detail slide-out, CSV export
+
+---
+
+### Phase 29: Multi-User & Household Access
+
+Multiple household members with their own views and permissions.
+
+- **Spec:** [`docs/phase-29-multi-user.md`](phase-29-multi-user.md)
+- **Key deliverables:** unified user model, roles (admin/member/viewer), per-user account assignment, privacy levels, per-user dashboard filtering
+
+---
+
+### Phase 30: Provider Expansion
+
+Add more self-serve aggregation providers beyond Plaid and Teller.
+
+- **Spec:** [`docs/phase-30-provider-expansion.md`](phase-30-provider-expansion.md)
+- **Research:** [`docs/provider-research.md`](provider-research.md)
+- **Key deliverables:** Finicity (US/Canada) + Pluggy (Brazil) integrations, community contribution guide
+
+---
+
+### Phase Ordering & Dependencies
+
+```
+Phase 21 (comments/audit) ──> Phase 24 (review queue) ──> Phase 25 (external agents)
+                                                      ──> Phase 26 (built-in agent)
+Phase 22 (agent APIs) ──> Phase 23 (MCP permissions) ──> Phase 25 (external agents)
+Phase 27 (insights) ── independent
+Phase 28 (transaction UX) ── independent (but benefits from Phase 21 comments)
+Phase 29 (multi-user) ── independent (but informs Phase 23 scoping)
+Phase 30 (providers) ── independent
+```
