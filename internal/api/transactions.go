@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -71,16 +72,10 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			userID = &v
 		}
 
-		// Parse category.
-		var category *string
-		if v := q.Get("category"); v != "" {
-			category = &v
-		}
-
-		// Parse category_detailed.
-		var categoryDetailed *string
-		if v := q.Get("category_detailed"); v != "" {
-			categoryDetailed = &v
+		// Parse category_slug.
+		var categorySlug *string
+		if v := q.Get("category_slug"); v != "" {
+			categorySlug = &v
 		}
 
 		// Parse min_amount.
@@ -162,20 +157,19 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		params := service.TransactionListParams{
-			Cursor:           cursor,
-			Limit:            limit,
-			StartDate:        startDate,
-			EndDate:          endDate,
-			AccountID:        accountID,
-			UserID:           userID,
-			Category:         category,
-			CategoryDetailed: categoryDetailed,
-			MinAmount:        minAmount,
-			MaxAmount:        maxAmount,
-			Pending:          pending,
-			Search:           search,
-			SortBy:           sortBy,
-			SortOrder:        sortOrder,
+			Cursor:       cursor,
+			Limit:        limit,
+			StartDate:    startDate,
+			EndDate:      endDate,
+			AccountID:    accountID,
+			UserID:       userID,
+			CategorySlug: categorySlug,
+			MinAmount:    minAmount,
+			MaxAmount:    maxAmount,
+			Pending:      pending,
+			Search:       search,
+			SortBy:       sortBy,
+			SortOrder:    sortOrder,
 		}
 
 		result, err := svc.ListTransactions(r.Context(), params)
@@ -232,14 +226,9 @@ func CountTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			userID = &v
 		}
 
-		var category *string
-		if v := q.Get("category"); v != "" {
-			category = &v
-		}
-
-		var categoryDetailed *string
-		if v := q.Get("category_detailed"); v != "" {
-			categoryDetailed = &v
+		var categorySlug *string
+		if v := q.Get("category_slug"); v != "" {
+			categorySlug = &v
 		}
 
 		var minAmount *float64
@@ -292,16 +281,15 @@ func CountTransactionsHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		params := service.TransactionCountParams{
-			StartDate:        startDate,
-			EndDate:          endDate,
-			AccountID:        accountID,
-			UserID:           userID,
-			Category:         category,
-			CategoryDetailed: categoryDetailed,
-			MinAmount:        minAmount,
-			MaxAmount:        maxAmount,
-			Pending:          pending,
-			Search:           search,
+			StartDate:    startDate,
+			EndDate:      endDate,
+			AccountID:    accountID,
+			UserID:       userID,
+			CategorySlug: categorySlug,
+			MinAmount:    minAmount,
+			MaxAmount:    maxAmount,
+			Pending:      pending,
+			Search:       search,
 		}
 
 		count, err := svc.CountTransactionsFiltered(r.Context(), params)
@@ -330,5 +318,54 @@ func GetTransactionHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		writeData(w, txn)
+	}
+}
+
+// SetTransactionCategoryHandler sets a manual category override on a transaction.
+// PATCH /transactions/{id}/category
+func SetTransactionCategoryHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var input struct {
+			CategoryID string `json:"category_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+			return
+		}
+		if input.CategoryID == "" {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "category_id is required")
+			return
+		}
+		if err := svc.SetTransactionCategory(r.Context(), id, input.CategoryID); err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
+				return
+			}
+			if errors.Is(err, service.ErrCategoryNotFound) {
+				mw.WriteError(w, http.StatusNotFound, "CATEGORY_NOT_FOUND", "Category not found")
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to set transaction category")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// ResetTransactionCategoryHandler clears the manual category override on a transaction.
+// DELETE /transactions/{id}/category
+func ResetTransactionCategoryHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		if err := svc.ResetTransactionCategory(r.Context(), id); err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to reset transaction category")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }

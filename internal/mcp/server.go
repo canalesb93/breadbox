@@ -36,16 +36,22 @@ AMOUNT CONVENTION:
 - All amounts include iso_currency_code — never sum across different currencies
 
 CATEGORY SYSTEM:
-- category_primary: broad category (e.g. FOOD_AND_DRINK, TRANSPORTATION, SHOPPING)
-- category_detailed: specific subcategory (e.g. FOOD_AND_DRINK_GROCERIES, TRANSPORTATION_GAS)
-- Use list_categories to discover all available category values
+- Categories are organized in a 2-level hierarchy (primary → detailed subcategories)
+- Each category has: id (UUID), slug (stable identifier), display_name (human label), icon, color
+- Use list_categories to get the full taxonomy tree with IDs and slugs
+- Filter transactions with category_slug param (parent slug includes all children)
+- Use categorize_transaction to manually override a transaction's category
+- Use reset_transaction_category to undo a manual override
+- Use list_unmapped_categories to find raw provider categories without mappings
 
 RECOMMENDED QUERY PATTERNS:
 1. Start with list_users to identify family members
-2. Use list_accounts to see available bank accounts (filter by user_id for one member)
-3. Query transactions with date ranges and category filters for analysis
-4. Use count_transactions to get totals before paginating large result sets
-5. Check get_sync_status to verify data freshness before analysis`,
+2. Use list_accounts to see available bank accounts
+3. Use list_categories to understand the category taxonomy
+4. Query transactions with date ranges and category_slug filters
+5. Use count_transactions to get totals before paginating
+6. Check get_sync_status to verify data freshness
+7. Use list_unmapped_categories to identify categorization gaps`,
 		},
 	)
 

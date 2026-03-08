@@ -50,7 +50,7 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			params.ConnectionID = &v
 		}
 		if v := r.URL.Query().Get("category"); v != "" {
-			params.Category = &v
+			params.CategorySlug = &v
 		}
 		if v := r.URL.Query().Get("min_amount"); v != "" {
 			if f, err := strconv.ParseFloat(v, 64); err == nil {
@@ -91,17 +91,9 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			a.Logger.Error("list users for transaction filters", "error", err)
 		}
 
-		categoryPairs, err := svc.ListDistinctCategories(ctx)
+		categoryTree, err := svc.ListCategoryTree(ctx)
 		if err != nil {
 			a.Logger.Error("list categories for transaction filters", "error", err)
-		}
-		seen := make(map[string]bool)
-		var categories []string
-		for _, cp := range categoryPairs {
-			if !seen[cp.Primary] {
-				seen[cp.Primary] = true
-				categories = append(categories, cp.Primary)
-			}
 		}
 
 		connections, err := a.Queries.ListBankConnections(ctx)
@@ -117,7 +109,7 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			"Transactions":    result.Transactions,
 			"Accounts":        accounts,
 			"Users":           users,
-			"Categories":      categories,
+			"Categories":      categoryTree,
 			"Connections":     connections,
 			"Page":            result.Page,
 			"TotalPages":      result.TotalPages,
@@ -127,7 +119,7 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			"FilterAccountID": stringOrEmpty(params.AccountID),
 			"FilterUserID":    stringOrEmpty(params.UserID),
 			"FilterConnID":    stringOrEmpty(params.ConnectionID),
-			"FilterCategory":  stringOrEmpty(params.Category),
+			"FilterCategory":  stringOrEmpty(params.CategorySlug),
 			"FilterMinAmount": stringOrEmpty(floatParamPtr(r, "min_amount")),
 			"FilterMaxAmount": stringOrEmpty(floatParamPtr(r, "max_amount")),
 			"FilterPending":   r.URL.Query().Get("pending"),
@@ -184,7 +176,7 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			txParams.Search = &v
 		}
 		if v := r.URL.Query().Get("category"); v != "" {
-			txParams.Category = &v
+			txParams.CategorySlug = &v
 		}
 		if v := r.URL.Query().Get("pending"); v != "" {
 			b := v == "true"
@@ -196,17 +188,9 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			a.Logger.Error("list transactions for account detail", "error", err)
 		}
 
-		categoryPairs2, err := svc.ListDistinctCategories(ctx)
+		categoryTree, err := svc.ListCategoryTree(ctx)
 		if err != nil {
 			a.Logger.Error("list categories for account detail", "error", err)
-		}
-		seen2 := make(map[string]bool)
-		var categories []string
-		for _, cp := range categoryPairs2 {
-			if !seen2[cp.Primary] {
-				seen2[cp.Primary] = true
-				categories = append(categories, cp.Primary)
-			}
 		}
 
 		data := map[string]any{
@@ -217,7 +201,7 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			"Account":        detail,
 			"AccountID":      idStr,
 			"Transactions":   txResult.Transactions,
-			"Categories":     categories,
+			"Categories":     categoryTree,
 			"Page":           txResult.Page,
 			"TotalPages":     txResult.TotalPages,
 			"Total":          txResult.Total,

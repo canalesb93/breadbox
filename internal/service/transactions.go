@@ -19,14 +19,27 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		"t.category_primary, t.category_detailed, t.category_confidence, " +
 		"t.payment_channel, t.pending, t.deleted_at, t.created_at, t.updated_at, " +
 		"COALESCE(a.display_name, a.name) AS account_name, " +
-		"u.name AS user_name " +
+		"u.name AS user_name, " +
+		"t.category_id, t.category_override, " +
+		"c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, c.color AS cat_color, " +
+		"pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name " +
 		"FROM transactions t " +
 		"JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
-		"LEFT JOIN users u ON bc.user_id = u.id"
+		"LEFT JOIN users u ON bc.user_id = u.id " +
+		"LEFT JOIN categories c ON t.category_id = c.id " +
+		"LEFT JOIN categories pc ON c.parent_id = pc.id"
 
 	var args []any
 	argN := 1
+
+	limit := params.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 500 {
+		limit = 500
+	}
 
 	query += " WHERE t.deleted_at IS NULL"
 
@@ -62,16 +75,23 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		argN++
 	}
 
-	if params.Category != nil {
-		query += fmt.Sprintf(" AND t.category_primary = $%d", argN)
-		args = append(args, pgtype.Text{String: *params.Category, Valid: true})
-		argN++
-	}
-
-	if params.CategoryDetailed != nil {
-		query += fmt.Sprintf(" AND t.category_detailed = $%d", argN)
-		args = append(args, pgtype.Text{String: *params.CategoryDetailed, Valid: true})
-		argN++
+	if params.CategorySlug != nil {
+		catRow, err := s.Queries.GetCategoryBySlug(ctx, *params.CategorySlug)
+		if err != nil {
+			// Unknown slug — no results
+			return &TransactionListResult{Transactions: []TransactionResponse{}, Limit: limit}, nil
+		}
+		if !catRow.ParentID.Valid {
+			// Parent category — include self and all children
+			query += fmt.Sprintf(" AND (c.id = $%d OR c.parent_id = $%d)", argN, argN)
+			args = append(args, catRow.ID)
+			argN++
+		} else {
+			// Child category — exact match
+			query += fmt.Sprintf(" AND t.category_id = $%d", argN)
+			args = append(args, catRow.ID)
+			argN++
+		}
 	}
 
 	if params.MinAmount != nil {
@@ -132,14 +152,6 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 
 	query += fmt.Sprintf(" ORDER BY %s %s, t.id DESC", sortCol, sortDir)
 
-	limit := params.Limit
-	if limit <= 0 {
-		limit = 50
-	}
-	if limit > 500 {
-		limit = 500
-	}
-
 	// Fetch one extra to detect has_more
 	query += fmt.Sprintf(" LIMIT $%d", argN)
 	args = append(args, limit+1)
@@ -176,6 +188,14 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			updatedAt              pgtype.Timestamptz
 			accountName            string
 			userName               pgtype.Text
+			categoryID             pgtype.UUID
+			categoryOverride       bool
+			catSlug                pgtype.Text
+			catDisplayName         pgtype.Text
+			catIcon                pgtype.Text
+			catColor               pgtype.Text
+			catPrimarySlug         pgtype.Text
+			catPrimaryDisplayName  pgtype.Text
 		)
 
 		if err := rows.Scan(
@@ -186,6 +206,9 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			&categoryConfidence, &paymentChannel, &pending,
 			&deletedAt, &createdAt, &updatedAt,
 			&accountName, &userName,
+			&categoryID, &categoryOverride,
+			&catSlug, &catDisplayName, &catIcon, &catColor,
+			&catPrimarySlug, &catPrimaryDisplayName,
 		); err != nil {
 			return nil, fmt.Errorf("scan transaction: %w", err)
 		}
@@ -201,26 +224,43 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			dateVal = *ds
 		}
 
+		var catInfo *TransactionCategoryInfo
+		if catSlug.Valid {
+			catInfo = &TransactionCategoryInfo{
+				ID:          uuidPtr(categoryID),
+				Slug:        textPtr(catSlug),
+				DisplayName: textPtr(catDisplayName),
+				Icon:        textPtr(catIcon),
+				Color:       textPtr(catColor),
+			}
+			if catPrimarySlug.Valid {
+				catInfo.PrimarySlug = textPtr(catPrimarySlug)
+				catInfo.PrimaryDisplayName = textPtr(catPrimaryDisplayName)
+			}
+		}
+
 		transactions = append(transactions, TransactionResponse{
-			ID:                 formatUUID(id),
-			AccountID:          uuidPtr(accountID),
-			AccountName:        &accountName,
-			UserName:           textPtr(userName),
-			Amount:             amountVal,
-			IsoCurrencyCode:    textPtr(isoCurrencyCode),
-			Date:               dateVal,
-			AuthorizedDate:     dateStr(authorizedDate),
-			Datetime:           timestampStr(datetime),
-			AuthorizedDatetime: timestampStr(authorizedDatetime),
-			Name:               name,
-			MerchantName:       textPtr(merchantName),
-			CategoryPrimary:    textPtr(categoryPrimary),
-			CategoryDetailed:   textPtr(categoryDetailed),
-			CategoryConfidence: textPtr(categoryConfidence),
-			PaymentChannel:     textPtr(paymentChannel),
-			Pending:            pending,
-			CreatedAt:          createdAt.Time.UTC().Format(time.RFC3339),
-			UpdatedAt:          updatedAt.Time.UTC().Format(time.RFC3339),
+			ID:                  formatUUID(id),
+			AccountID:           uuidPtr(accountID),
+			AccountName:         &accountName,
+			UserName:            textPtr(userName),
+			Amount:              amountVal,
+			IsoCurrencyCode:     textPtr(isoCurrencyCode),
+			Date:                dateVal,
+			AuthorizedDate:      dateStr(authorizedDate),
+			Datetime:            timestampStr(datetime),
+			AuthorizedDatetime:  timestampStr(authorizedDatetime),
+			Name:                name,
+			MerchantName:        textPtr(merchantName),
+			Category:            catInfo,
+			CategoryOverride:    categoryOverride,
+			CategoryPrimaryRaw:  textPtr(categoryPrimary),
+			CategoryDetailedRaw: textPtr(categoryDetailed),
+			CategoryConfidence:  textPtr(categoryConfidence),
+			PaymentChannel:      textPtr(paymentChannel),
+			Pending:             pending,
+			CreatedAt:           createdAt.Time.UTC().Format(time.RFC3339),
+			UpdatedAt:           updatedAt.Time.UTC().Format(time.RFC3339),
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -256,7 +296,8 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 	query := "SELECT COUNT(*) FROM transactions t " +
 		"JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
-		"LEFT JOIN users u ON bc.user_id = u.id"
+		"LEFT JOIN users u ON bc.user_id = u.id " +
+		"LEFT JOIN categories c ON t.category_id = c.id"
 
 	var args []any
 	argN := 1
@@ -295,16 +336,23 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 		argN++
 	}
 
-	if params.Category != nil {
-		query += fmt.Sprintf(" AND t.category_primary = $%d", argN)
-		args = append(args, pgtype.Text{String: *params.Category, Valid: true})
-		argN++
-	}
-
-	if params.CategoryDetailed != nil {
-		query += fmt.Sprintf(" AND t.category_detailed = $%d", argN)
-		args = append(args, pgtype.Text{String: *params.CategoryDetailed, Valid: true})
-		argN++
+	if params.CategorySlug != nil {
+		catRow, err := s.Queries.GetCategoryBySlug(ctx, *params.CategorySlug)
+		if err != nil {
+			// Unknown slug — 0 count
+			return 0, nil
+		}
+		if !catRow.ParentID.Valid {
+			// Parent category — include self and all children
+			query += fmt.Sprintf(" AND (c.id = $%d OR c.parent_id = $%d)", argN, argN)
+			args = append(args, catRow.ID)
+			argN++
+		} else {
+			// Child category — exact match
+			query += fmt.Sprintf(" AND t.category_id = $%d", argN)
+			args = append(args, catRow.ID)
+			argN++
+		}
 	}
 
 	if params.MinAmount != nil {
@@ -340,15 +388,17 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 }
 
 func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransactionListParams) (*AdminTransactionListResult, error) {
-	query := "SELECT t.id, t.account_id, COALESCE(a.display_name, a.name, ''), " +
+	selectPrefix := "SELECT t.id, t.account_id, COALESCE(a.display_name, a.name, ''), " +
 		"COALESCE(bc.institution_name, ''), COALESCE(u.name, ''), " +
 		"t.date, t.name, t.merchant_name, t.amount, t.iso_currency_code, " +
-		"t.category_primary, t.pending, t.created_at, t.updated_at " +
-		"FROM transactions t " +
+		"c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, " +
+		"t.category_override, t.pending, t.created_at, t.updated_at "
+	fromClause := "FROM transactions t " +
 		"LEFT JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
 		"LEFT JOIN users u ON bc.user_id = u.id " +
-		"WHERE t.deleted_at IS NULL"
+		"LEFT JOIN categories c ON t.category_id = c.id "
+	query := selectPrefix + fromClause + "WHERE t.deleted_at IS NULL"
 
 	var args []any
 	argN := 1
@@ -395,10 +445,21 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		argN++
 	}
 
-	if params.Category != nil {
-		query += fmt.Sprintf(" AND t.category_primary = $%d", argN)
-		args = append(args, pgtype.Text{String: *params.Category, Valid: true})
-		argN++
+	if params.CategorySlug != nil {
+		catRow, err := s.Queries.GetCategoryBySlug(ctx, *params.CategorySlug)
+		if err != nil {
+			// Unknown slug — no results
+			return &AdminTransactionListResult{Transactions: []AdminTransactionRow{}, Total: 0, Page: 1, PageSize: params.PageSize, TotalPages: 0}, nil
+		}
+		if !catRow.ParentID.Valid {
+			query += fmt.Sprintf(" AND (c.id = $%d OR c.parent_id = $%d)", argN, argN)
+			args = append(args, catRow.ID)
+			argN++
+		} else {
+			query += fmt.Sprintf(" AND t.category_id = $%d", argN)
+			args = append(args, catRow.ID)
+			argN++
+		}
 	}
 
 	if params.MinAmount != nil {
@@ -425,22 +486,9 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		argN++
 	}
 
-	// Count query with same filters.
-	countQuery := "SELECT COUNT(*) FROM transactions t " +
-		"LEFT JOIN accounts a ON t.account_id = a.id " +
-		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
-		"LEFT JOIN users u ON bc.user_id = u.id " +
-		"WHERE t.deleted_at IS NULL"
-	// Reuse the WHERE clauses: extract them from query after the base WHERE.
-	whereClause := query[len("SELECT t.id, t.account_id, COALESCE(a.display_name, a.name, ''), "+
-		"COALESCE(bc.institution_name, ''), COALESCE(u.name, ''), "+
-		"t.date, t.name, t.merchant_name, t.amount, t.iso_currency_code, "+
-		"t.category_primary, t.pending, t.created_at, t.updated_at "+
-		"FROM transactions t "+
-		"LEFT JOIN accounts a ON t.account_id = a.id "+
-		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id "+
-		"LEFT JOIN users u ON bc.user_id = u.id "+
-		"WHERE t.deleted_at IS NULL"):]
+	// Count query with same filters — extract WHERE clauses from the built query.
+	countQuery := "SELECT COUNT(*) " + fromClause + "WHERE t.deleted_at IS NULL"
+	whereClause := query[len(selectPrefix+fromClause+"WHERE t.deleted_at IS NULL"):]
 	countQuery += whereClause
 
 	var total int64
@@ -475,27 +523,31 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	var transactions []AdminTransactionRow
 	for rows.Next() {
 		var (
-			id              pgtype.UUID
-			accountID       pgtype.UUID
-			accountName     string
-			institutionName string
-			userName        string
-			date            pgtype.Date
-			name            string
-			merchantName    pgtype.Text
-			amount          pgtype.Numeric
-			isoCurrencyCode pgtype.Text
-			categoryPrimary pgtype.Text
-			pending         bool
-			createdAt       pgtype.Timestamptz
-			updatedAt       pgtype.Timestamptz
+			id               pgtype.UUID
+			accountID        pgtype.UUID
+			accountName      string
+			institutionName  string
+			userName         string
+			date             pgtype.Date
+			name             string
+			merchantName     pgtype.Text
+			amount           pgtype.Numeric
+			isoCurrencyCode  pgtype.Text
+			catDisplayName   pgtype.Text
+			catSlug          pgtype.Text
+			catIcon          pgtype.Text
+			categoryOverride bool
+			pending          bool
+			createdAt        pgtype.Timestamptz
+			updatedAt        pgtype.Timestamptz
 		)
 
 		if err := rows.Scan(
 			&id, &accountID, &accountName,
 			&institutionName, &userName,
 			&date, &name, &merchantName, &amount, &isoCurrencyCode,
-			&categoryPrimary, &pending, &createdAt, &updatedAt,
+			&catDisplayName, &catSlug, &catIcon,
+			&categoryOverride, &pending, &createdAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan admin transaction: %w", err)
 		}
@@ -511,20 +563,23 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		}
 
 		transactions = append(transactions, AdminTransactionRow{
-			ID:              formatUUID(id),
-			AccountID:       formatUUID(accountID),
-			AccountName:     accountName,
-			InstitutionName: institutionName,
-			UserName:        userName,
-			Date:            dateVal,
-			Name:            name,
-			MerchantName:    textPtr(merchantName),
-			Amount:          amountVal,
-			IsoCurrencyCode: textPtr(isoCurrencyCode),
-			CategoryPrimary: textPtr(categoryPrimary),
-			Pending:         pending,
-			CreatedAt:       createdAt.Time.UTC().Format(time.RFC3339),
-			UpdatedAt:       updatedAt.Time.UTC().Format(time.RFC3339),
+			ID:                  formatUUID(id),
+			AccountID:           formatUUID(accountID),
+			AccountName:         accountName,
+			InstitutionName:     institutionName,
+			UserName:            userName,
+			Date:                dateVal,
+			Name:                name,
+			MerchantName:        textPtr(merchantName),
+			Amount:              amountVal,
+			IsoCurrencyCode:     textPtr(isoCurrencyCode),
+			CategoryDisplayName: textPtr(catDisplayName),
+			CategorySlug:        textPtr(catSlug),
+			CategoryIcon:        textPtr(catIcon),
+			CategoryOverride:    categoryOverride,
+			Pending:             pending,
+			CreatedAt:           createdAt.Time.UTC().Format(time.RFC3339),
+			UpdatedAt:           updatedAt.Time.UTC().Format(time.RFC3339),
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -590,23 +645,72 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 	}
 
 	resp := &TransactionResponse{
-		ID:                 formatUUID(txn.ID),
-		AccountID:          uuidPtr(txn.AccountID),
-		Amount:             amountVal,
-		IsoCurrencyCode:    textPtr(txn.IsoCurrencyCode),
-		Date:               dateVal,
-		AuthorizedDate:     dateStr(txn.AuthorizedDate),
-		Datetime:           timestampStr(txn.Datetime),
-		AuthorizedDatetime: timestampStr(txn.AuthorizedDatetime),
-		Name:               txn.Name,
-		MerchantName:       textPtr(txn.MerchantName),
-		CategoryPrimary:    textPtr(txn.CategoryPrimary),
-		CategoryDetailed:   textPtr(txn.CategoryDetailed),
-		CategoryConfidence: textPtr(txn.CategoryConfidence),
-		PaymentChannel:     textPtr(txn.PaymentChannel),
-		Pending:            txn.Pending,
-		CreatedAt:          txn.CreatedAt.Time.UTC().Format(time.RFC3339),
-		UpdatedAt:          txn.UpdatedAt.Time.UTC().Format(time.RFC3339),
+		ID:                  formatUUID(txn.ID),
+		AccountID:           uuidPtr(txn.AccountID),
+		Amount:              amountVal,
+		IsoCurrencyCode:     textPtr(txn.IsoCurrencyCode),
+		Date:                dateVal,
+		AuthorizedDate:      dateStr(txn.AuthorizedDate),
+		Datetime:            timestampStr(txn.Datetime),
+		AuthorizedDatetime:  timestampStr(txn.AuthorizedDatetime),
+		Name:                txn.Name,
+		MerchantName:        textPtr(txn.MerchantName),
+		CategoryPrimaryRaw:  textPtr(txn.CategoryPrimary),
+		CategoryDetailedRaw: textPtr(txn.CategoryDetailed),
+		CategoryConfidence:  textPtr(txn.CategoryConfidence),
+		CategoryOverride:    txn.CategoryOverride,
+		PaymentChannel:      textPtr(txn.PaymentChannel),
+		Pending:             txn.Pending,
+		CreatedAt:           txn.CreatedAt.Time.UTC().Format(time.RFC3339),
+		UpdatedAt:           txn.UpdatedAt.Time.UTC().Format(time.RFC3339),
 	}
+
+	// Load structured category info if category_id is set
+	if txn.CategoryID.Valid {
+		cat, err := s.Queries.GetCategoryByID(ctx, txn.CategoryID)
+		if err == nil {
+			catID := formatUUID(cat.ID)
+			catInfo := &TransactionCategoryInfo{
+				ID:          &catID,
+				Slug:        &cat.Slug,
+				DisplayName: &cat.DisplayName,
+				Icon:        textPtr(cat.Icon),
+				Color:       textPtr(cat.Color),
+			}
+			if cat.ParentID.Valid {
+				parent, err := s.Queries.GetCategoryByID(ctx, cat.ParentID)
+				if err == nil {
+					catInfo.PrimarySlug = &parent.Slug
+					catInfo.PrimaryDisplayName = &parent.DisplayName
+				}
+			}
+			resp.Category = catInfo
+		}
+	}
+
 	return resp, nil
+}
+
+// GetCategoryBySlug looks up a category by slug and returns it as a CategoryResponse.
+func (s *Service) GetCategoryBySlug(ctx context.Context, slug string) (*CategoryResponse, error) {
+	cat, err := s.Queries.GetCategoryBySlug(ctx, slug)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrCategoryNotFound
+		}
+		return nil, fmt.Errorf("get category by slug: %w", err)
+	}
+	return &CategoryResponse{
+		ID:          formatUUID(cat.ID),
+		Slug:        cat.Slug,
+		DisplayName: cat.DisplayName,
+		ParentID:    uuidPtr(cat.ParentID),
+		Icon:        textPtr(cat.Icon),
+		Color:       textPtr(cat.Color),
+		SortOrder:   cat.SortOrder,
+		IsSystem:    cat.IsSystem,
+		Hidden:      cat.Hidden,
+		CreatedAt:   cat.CreatedAt.Time.UTC().Format(time.RFC3339),
+		UpdatedAt:   cat.UpdatedAt.Time.UTC().Format(time.RFC3339),
+	}, nil
 }
