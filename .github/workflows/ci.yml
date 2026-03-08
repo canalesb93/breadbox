@@ -7,6 +7,10 @@ on:
     branches: [main]
     tags: ["v*"]
 
+concurrency:
+  group: deploy-dev-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write
@@ -53,6 +57,7 @@ jobs:
   build:
     name: Build & Push
     needs: test
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -108,6 +113,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    timeout-minutes: 5
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
@@ -119,6 +125,7 @@ jobs:
 
       - name: Verify health
         run: |
+          sleep 5
           for i in 1 2 3 4 5; do
             if curl -sf "https://${{ secrets.DEPLOY_HOST }}/health/ready"; then
               echo "Health check passed"

@@ -50,7 +50,10 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Config source tracking: `ConfigSources map[string]string` populated in `Load()` (env) and `LoadWithDB()` (db/default). `configSource` template function renders badges.
 - Settings password change: POST `/admin/settings/password`, validates current password via bcrypt, minimum 8 chars for new password
 - Settings system info: `Version` and `StartTime` on `Config` struct, set in `main.go`. PostgreSQL version via inline `SELECT version()` query.
-- Teller settings: `teller_app_id` and `teller_env` editable in settings when not from env. Cert/key remain env-only.
+- Teller settings: All Teller config (app_id, env, webhook_secret, cert/key PEM) editable via `/admin/providers`. Cert/key PEM files uploaded through dashboard are AES-256-GCM encrypted and stored base64-encoded in `app_config`. Env file paths take precedence over DB PEM.
+- Provider page: `/admin/providers` is a top-level nav page with equal-weight cards for Plaid, Teller, CSV. No "primary provider" concept. Settings page no longer contains provider configuration.
+- Provider reinitialization: `app.ReinitProvider(name)` hot-reloads providers after dashboard config changes. Sync engine shares the same `map[string]provider.Provider` reference.
+- Teller PEM client: `teller.NewClientFromPEM(certPEM, keyPEM)` creates mTLS client from in-memory PEM bytes (alternative to file-path constructor).
 - Human-readable error messages: `errorMessage()` template function maps provider error codes to user-friendly strings
 - Health check split: `/health/live` (basic HTTP 200) vs `/health/ready` (DB + scheduler verification)
 - Sync writes wrapped in a single DB transaction for atomicity (Phase 14)

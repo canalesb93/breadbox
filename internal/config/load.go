@@ -2,10 +2,13 @@ package config
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
+
+	"breadbox/internal/crypto"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -161,6 +164,34 @@ func LoadWithDB(ctx context.Context, cfg *Config, pool *pgxpool.Pool) error {
 		cfg.TellerEnv = appCfg["teller_env"]
 		if cfg.ConfigSources["teller_env"] == "" {
 			cfg.ConfigSources["teller_env"] = "db"
+		}
+	}
+
+	// Teller webhook secret from DB (if not from env).
+	if cfg.TellerWebhookSecret == "" {
+		cfg.TellerWebhookSecret = appCfg["teller_webhook_secret"]
+	}
+
+	// Teller certificate PEM from DB (encrypted, base64-encoded).
+	// Only load if file paths are not set from env.
+	if cfg.TellerCertPath == "" && cfg.TellerKeyPath == "" && len(cfg.EncryptionKey) > 0 {
+		if v, ok := appCfg["teller_cert_pem"]; ok && v != "" {
+			raw, err := base64.StdEncoding.DecodeString(v)
+			if err == nil {
+				dec, err := crypto.Decrypt(raw, cfg.EncryptionKey)
+				if err == nil {
+					cfg.TellerCertPEM = dec
+				}
+			}
+		}
+		if v, ok := appCfg["teller_key_pem"]; ok && v != "" {
+			raw, err := base64.StdEncoding.DecodeString(v)
+			if err == nil {
+				dec, err := crypto.Decrypt(raw, cfg.EncryptionKey)
+				if err == nil {
+					cfg.TellerKeyPEM = dec
+				}
+			}
 		}
 	}
 

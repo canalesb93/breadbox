@@ -1,7 +1,8 @@
-# Stage 1: Build
-FROM golang:1.24-alpine AS builder
+# Stage 1: Build (runs natively on the build host, cross-compiles Go)
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 
 ARG VERSION=dev
+ARG TARGETARCH
 
 WORKDIR /app
 COPY go.mod go.sum ./
@@ -19,7 +20,7 @@ RUN apk add --no-cache libstdc++ libgcc \
     && chmod +x tailwindcss-extra \
     && ./tailwindcss-extra -i input.css -o static/css/styles.css --minify
 
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -trimpath \
     -ldflags="-s -w -X main.version=${VERSION}" \
     -o /breadbox ./cmd/breadbox
 

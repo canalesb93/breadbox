@@ -23,20 +23,32 @@ func NewClient(certPath, keyPath string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load teller certificate: %w", err)
 	}
+	return newClientWithCert(cert), nil
+}
 
+// NewClientFromPEM creates a new Teller API client using PEM-encoded
+// certificate and private key bytes (e.g. stored encrypted in the database).
+func NewClientFromPEM(certPEM, keyPEM []byte) (*Client, error) {
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		return nil, fmt.Errorf("parse teller certificate PEM: %w", err)
+	}
+	return newClientWithCert(cert), nil
+}
+
+func newClientWithCert(cert tls.Certificate) *Client {
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			Certificates: []tls.Certificate{cert},
 		},
 	}
-
 	return &Client{
 		httpClient: &http.Client{
 			Transport: transport,
 			Timeout:   30 * time.Second,
 		},
 		baseURL: "https://api.teller.io",
-	}, nil
+	}
 }
 
 // doWithAuth sends an authenticated HTTP request to the Teller API.
