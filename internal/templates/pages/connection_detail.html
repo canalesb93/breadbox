@@ -75,7 +75,7 @@
 
 <h2 class="text-lg font-semibold mb-4">Accounts</h2>
 {{if .Accounts}}
-<div class="overflow-x-auto">
+<div class="overflow-x-auto border border-base-300 rounded-lg">
   <table class="table table-zebra table-xs">
     <thead>
       <tr>
@@ -90,7 +90,7 @@
     </thead>
     <tbody>
       {{range .Accounts}}
-      <tr class="hover:bg-base-200{{if .Excluded}} opacity-60{{end}}">
+      <tr class="hover:bg-base-300{{if .Excluded}} opacity-60{{end}}">
         <td><a href="/admin/accounts/{{formatUUID .ID}}">{{.Name}}</a></td>
         <td>
           <input type="text" value="{{.DisplayName.String}}" placeholder="{{.Name}}"
@@ -116,7 +116,7 @@
 
 <h2 class="text-lg font-semibold mt-8 mb-4">Sync History (last 10)</h2>
 {{if .SyncLogs}}
-<div class="overflow-x-auto">
+<div class="overflow-x-auto border border-base-300 rounded-lg">
   <table class="table table-zebra table-sm">
     <thead>
       <tr>
@@ -130,7 +130,7 @@
     </thead>
     <tbody>
       {{range .SyncLogs}}
-      <tr class="hover:bg-base-200">
+      <tr class="hover:bg-base-300">
         <td>{{.Trigger}}</td>
         <td>{{syncBadge (printf "%s" .Status)}}</td>
         <td>{{.AddedCount}}</td>

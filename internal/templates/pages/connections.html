@@ -8,7 +8,7 @@
 </div>
 
 {{if .Connections}}
-<div class="overflow-x-auto">
+<div class="overflow-x-auto border border-base-300 rounded-lg">
   <table class="table table-zebra table-sm">
     <thead>
       <tr>
@@ -22,7 +22,7 @@
     </thead>
     <tbody>
       {{range .Connections}}
-      <tr class="hover:bg-base-200">
+      <tr class="hover:bg-base-300">
         <td>{{.InstitutionName.String}}</td>
         <td>{{.UserName.String}}</td>
         <td>{{.AccountCount}}</td>
@@ -42,7 +42,7 @@
   </table>
 </div>
 {{else}}
-<div class="card bg-base-200 text-center p-8">
+<div class="card bg-base-100 border border-base-300 text-center p-8">
   <div class="flex flex-col items-center gap-4">
     <i data-lucide="inbox" class="w-12 h-12 text-base-content/30"></i>
     <p class="text-base-content/70">No bank connections yet. Connect your first bank to get started.</p>

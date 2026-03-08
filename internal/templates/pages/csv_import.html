@@ -3,7 +3,7 @@
 <h1 class="text-2xl font-bold mb-6">Import CSV</h1>
 
 <div id="step-1" {{if .ConnectionID}}class="hidden"{{end}}>
-  <div class="card bg-base-100 shadow-sm">
+  <div class="card bg-base-100 border border-base-300">
     <div class="card-body">
       <h2 class="card-title">Step 1: Upload File</h2>
       {{if .ConnectionID}}
@@ -35,7 +35,7 @@
 </div>
 
 <div id="step-2" class="hidden">
-  <div class="card bg-base-100 shadow-sm">
+  <div class="card bg-base-100 border border-base-300">
     <div class="card-body">
       <h2 class="card-title">Step 2: Map Columns</h2>
       <p id="template-detected" class="text-sm text-base-content/70"></p>
@@ -112,7 +112,7 @@
   </div>
 
   <div id="preview-table-container" class="hidden mt-4">
-    <div class="card bg-base-100 shadow-sm">
+    <div class="card bg-base-100 border border-base-300">
       <div class="card-body">
         <h2 class="card-title">Preview (first 10 rows)</h2>
         <div class="overflow-x-auto">
@@ -136,7 +136,7 @@
 </div>
 
 <div id="step-3" class="hidden">
-  <div class="card bg-base-100 shadow-sm">
+  <div class="card bg-base-100 border border-base-300">
     <div class="card-body">
       <h2 class="card-title">Step 3: Confirm Import</h2>
       <dl class="bb-info-grid my-4">
@@ -157,7 +157,7 @@
 </div>
 
 <div id="step-4" class="hidden">
-  <div class="card bg-base-100 shadow-sm">
+  <div class="card bg-base-100 border border-base-300">
     <div class="card-body">
       <h2 class="card-title">Import Complete</h2>
       <dl class="bb-info-grid my-4">
@@ -171,7 +171,7 @@
         <dd id="result-skipped"></dd>
       </dl>
       <div id="skip-reasons" class="hidden">
-        <details class="collapse collapse-arrow bg-base-200 mb-4">
+        <details class="collapse collapse-arrow bg-base-200 border border-base-300 mb-4">
           <summary class="collapse-title text-sm font-medium">Skipped Row Details</summary>
           <div class="collapse-content">
             <ul id="skip-reasons-list" class="list-disc list-inside text-sm"></ul>

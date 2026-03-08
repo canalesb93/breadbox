@@ -73,7 +73,7 @@
 </form>
 
 {{if .Transactions}}
-<div class="overflow-x-auto max-h-[70vh]">
+<div class="overflow-x-auto max-h-[70vh] border border-base-300 rounded-lg">
   <table class="table table-zebra table-sm table-pin-rows">
     <thead>
       <tr>
@@ -87,7 +87,7 @@
     </thead>
     {{range .Transactions}}
     <tbody x-data="{ expanded: false }">
-      <tr @click="expanded = !expanded" class="cursor-pointer hover:bg-base-200">
+      <tr @click="expanded = !expanded" class="cursor-pointer hover:bg-base-300">
         <td>{{.Date}}</td>
         <td>
           {{.Name}}
@@ -101,7 +101,7 @@
         <td>{{if .Pending}}<span class="badge badge-warning badge-sm">Pending</span>{{end}}</td>
       </tr>
       <tr x-show="expanded" x-cloak>
-        <td colspan="6" class="bg-base-200 px-4 py-2">
+        <td colspan="6" class="bg-base-100 border-t border-base-300 px-4 py-2">
           <dl class="bb-info-grid">
             {{if .MerchantName}}<dt>Merchant</dt><dd>{{.MerchantName}}</dd>{{end}}
             <dt>Transaction ID</dt><dd><code class="font-mono text-xs">{{.ID}}</code></dd>
@@ -138,7 +138,7 @@
 {{end}}
 
 {{else}}
-<div class="card bg-base-200 text-center p-8">
+<div class="card bg-base-100 border border-base-300 text-center p-8">
   <p>No transactions found.</p>
   {{if or .FilterStartDate .FilterEndDate .FilterAccountID .FilterUserID .FilterConnID .FilterCategory .FilterMinAmount .FilterMaxAmount .FilterPending .FilterSearch}}
   <a href="/admin/transactions" class="btn btn-sm btn-ghost mt-4">Clear filters</a>
