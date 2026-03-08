@@ -17,10 +17,12 @@ type Config struct {
 	PlaidEnv      string // "sandbox" | "development" | "production"
 
 	// Teller — may come from env (overrides app_config) or app_config table
-	TellerAppID        string
-	TellerCertPath     string
-	TellerKeyPath      string
-	TellerEnv          string // "sandbox" | "production"
+	TellerAppID         string
+	TellerCertPath      string // file path from env
+	TellerKeyPath       string // file path from env
+	TellerCertPEM       []byte // PEM bytes from DB (encrypted)
+	TellerKeyPEM        []byte // PEM bytes from DB (encrypted)
+	TellerEnv           string // "sandbox" | "production"
 	TellerWebhookSecret string
 
 	// From app_config table only

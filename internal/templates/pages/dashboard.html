@@ -64,7 +64,7 @@
         <span class="text-left">Create admin account</span>
       </li>
       <li class="step{{if .HasProvider}} step-primary{{end}}">
-        <span class="text-left">{{if .HasProvider}}Bank provider configured{{else}}<a href="/admin/settings" class="link">Configure a bank provider</a>{{end}}</span>
+        <span class="text-left">{{if .HasProvider}}Bank provider configured{{else}}<a href="/admin/providers" class="link">Configure a bank provider</a>{{end}}</span>
       </li>
       <li class="step{{if .HasMember}} step-primary{{end}}">
         <span class="text-left">{{if .HasMember}}Family member added{{else}}<a href="/admin/users/new" class="link">Add a family member</a>{{end}}</span>

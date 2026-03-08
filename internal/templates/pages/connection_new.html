@@ -1,6 +1,18 @@
 {{define "content"}}
 <h1 class="text-2xl font-bold mb-6">Connect New Bank</h1>
 
+{{if not (or .HasPlaid .HasTeller)}}
+<div class="card bg-base-100 shadow-sm">
+  <div class="card-body">
+    <h2 class="card-title">No Providers Configured</h2>
+    <p class="text-base-content/70">You need to configure at least one bank provider before creating connections.</p>
+    <div class="mt-2">
+      <a href="/admin/providers" class="btn btn-primary btn-sm">Configure Providers</a>
+    </div>
+  </div>
+</div>
+<p class="mt-4"><a href="/admin/connections" class="link">&larr; Back to Connections</a></p>
+{{else}}
 <div id="step-select" {{if .ShowLink}}class="hidden"{{end}}>
   <div class="card bg-base-100 shadow-sm">
     <div class="card-body">
@@ -59,7 +71,8 @@
   var retryBtn = document.getElementById("retry-btn");
   var backBtn = document.getElementById("back-btn");
   var selectedUserId = "";
-  var selectedProvider = "plaid";
+  var providerSelect = document.getElementById("provider");
+  var selectedProvider = providerSelect ? providerSelect.value : "";
 
   memberForm.addEventListener("submit", function (e) {
     e.preventDefault();
@@ -230,4 +243,5 @@
   retryBtn.addEventListener("click", startLink);
 })();
 </script>
+{{end}}
 {{end}}

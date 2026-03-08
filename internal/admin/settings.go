@@ -3,7 +3,6 @@ package admin
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -11,11 +10,8 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
-	plaidprovider "breadbox/internal/provider/plaid"
-	tellerprovider "breadbox/internal/provider/teller"
 
 	"github.com/alexedwards/scs/v2"
-	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -42,32 +38,23 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		_ = a.DB.QueryRow(ctx, "SELECT version()").Scan(&pgVersion)
 
 		data := map[string]any{
-			"PageTitle":         "Settings",
-			"CurrentPage":       "settings",
-			"CSRFToken":         GetCSRFToken(r),
-			"Flash":             GetFlash(ctx, sm),
+			"PageTitle":           "Settings",
+			"CurrentPage":         "settings",
+			"CSRFToken":           GetCSRFToken(r),
+			"Flash":               GetFlash(ctx, sm),
 			"SyncIntervalMinutes": a.Config.SyncIntervalMinutes,
-			"WebhookURL":        a.Config.WebhookURL,
-			"PlaidClientID":     a.Config.PlaidClientID,
-			"PlaidSecret":       a.Config.PlaidSecret,
-			"PlaidEnv":          a.Config.PlaidEnv,
-			"PlaidFromEnv":      os.Getenv("PLAID_CLIENT_ID") != "",
-			"TellerAppID":            a.Config.TellerAppID,
-			"TellerEnv":              a.Config.TellerEnv,
-			"TellerFromEnv":          os.Getenv("TELLER_APP_ID") != "",
-			"TellerCertConfigured":   a.Config.TellerCertPath != "" && a.Config.TellerKeyPath != "",
-			"TellerWebhookConfigured": a.Config.TellerWebhookSecret != "",
-			// System info (13B.4)
+			"WebhookURL":          a.Config.WebhookURL,
+			// System info
 			"Version":         a.Config.Version,
 			"GoVersion":       runtime.Version(),
 			"PostgresVersion": pgVersion,
 			"Uptime":          formatUptime(time.Since(a.Config.StartTime)),
 			"ProviderCount":   len(a.Providers),
-			// Config sources (13B.5)
+			// Config sources
 			"ConfigSources":   a.Config.ConfigSources,
-			// Safety indicators (13B.7)
+			// Safety indicators
 			"HasEncryptionKey": len(a.Config.EncryptionKey) > 0,
-			// Next sync time (17A.3)
+			// Next sync time
 			"NextSyncTime": func() string {
 				if a.Scheduler != nil {
 					return formatNextSync(a.Scheduler.NextRun())
@@ -124,120 +111,6 @@ func SettingsSyncPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 
 		SetFlash(ctx, sm, "success", "Sync settings saved.")
 		http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
-	}
-}
-
-// SettingsProvidersPostHandler serves POST /admin/settings/providers.
-func SettingsProvidersPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		// Handle Plaid credentials if not set from environment.
-		if os.Getenv("PLAID_CLIENT_ID") == "" {
-			plaidClientID := strings.TrimSpace(r.FormValue("plaid_client_id"))
-			plaidSecret := strings.TrimSpace(r.FormValue("plaid_secret"))
-			plaidEnv := strings.TrimSpace(r.FormValue("plaid_env"))
-
-			if plaidClientID != "" && plaidSecret != "" && plaidEnv != "" {
-				if err := plaidprovider.ValidateCredentials(ctx, plaidClientID, plaidSecret, plaidEnv); err != nil {
-					SetFlash(ctx, sm, "error", "Invalid Plaid credentials: "+err.Error())
-					http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
-					return
-				}
-
-				configEntries := []db.SetAppConfigParams{
-					{Key: "plaid_client_id", Value: pgtype.Text{String: plaidClientID, Valid: true}},
-					{Key: "plaid_secret", Value: pgtype.Text{String: plaidSecret, Valid: true}},
-					{Key: "plaid_env", Value: pgtype.Text{String: plaidEnv, Valid: true}},
-				}
-				for _, entry := range configEntries {
-					if err := a.Queries.SetAppConfig(ctx, entry); err != nil {
-						a.Logger.Error("save plaid config", "error", err, "key", entry.Key)
-						SetFlash(ctx, sm, "error", "Failed to save Plaid credentials.")
-						http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
-						return
-					}
-				}
-				a.Config.PlaidClientID = plaidClientID
-				a.Config.PlaidSecret = plaidSecret
-				a.Config.PlaidEnv = plaidEnv
-			}
-		}
-
-		// Handle Teller credentials if not set from environment.
-		if os.Getenv("TELLER_APP_ID") == "" {
-			tellerAppID := strings.TrimSpace(r.FormValue("teller_app_id"))
-			tellerEnv := strings.TrimSpace(r.FormValue("teller_env"))
-
-			if tellerAppID != "" {
-				if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
-					Key:   "teller_app_id",
-					Value: pgtype.Text{String: tellerAppID, Valid: true},
-				}); err != nil {
-					a.Logger.Error("save teller app id", "error", err)
-				} else {
-					a.Config.TellerAppID = tellerAppID
-				}
-			}
-			if tellerEnv != "" {
-				validTellerEnvs := map[string]bool{"sandbox": true, "production": true}
-				if validTellerEnvs[tellerEnv] {
-					if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
-						Key:   "teller_env",
-						Value: pgtype.Text{String: tellerEnv, Valid: true},
-					}); err != nil {
-						a.Logger.Error("save teller env", "error", err)
-					} else {
-						a.Config.TellerEnv = tellerEnv
-					}
-				}
-			}
-		}
-
-		SetFlash(ctx, sm, "success", "Provider settings saved.")
-		http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
-	}
-}
-
-// TestProviderHandler serves POST /admin/api/test-provider/{provider}.
-func TestProviderHandler(a *app.App) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		providerName := chi.URLParam(r, "provider")
-
-		type testResult struct {
-			Provider string `json:"provider"`
-			Success  bool   `json:"success"`
-			Message  string `json:"message"`
-		}
-
-		switch providerName {
-		case "plaid":
-			if a.Config.PlaidClientID == "" || a.Config.PlaidSecret == "" {
-				writeJSON(w, http.StatusOK, testResult{Provider: "plaid", Success: false, Message: "Plaid credentials not configured"})
-				return
-			}
-			err := plaidprovider.ValidateCredentials(r.Context(), a.Config.PlaidClientID, a.Config.PlaidSecret, a.Config.PlaidEnv)
-			if err != nil {
-				writeJSON(w, http.StatusOK, testResult{Provider: "plaid", Success: false, Message: err.Error()})
-				return
-			}
-			writeJSON(w, http.StatusOK, testResult{Provider: "plaid", Success: true, Message: "Connection successful"})
-
-		case "teller":
-			if a.Config.TellerCertPath == "" || a.Config.TellerKeyPath == "" {
-				writeJSON(w, http.StatusOK, testResult{Provider: "teller", Success: false, Message: "Teller certificate not configured"})
-				return
-			}
-			err := tellerprovider.ValidateCredentials(a.Config.TellerCertPath, a.Config.TellerKeyPath)
-			if err != nil {
-				writeJSON(w, http.StatusOK, testResult{Provider: "teller", Success: false, Message: err.Error()})
-				return
-			}
-			writeJSON(w, http.StatusOK, testResult{Provider: "teller", Success: true, Message: "Certificate valid"})
-
-		default:
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Unknown provider: " + providerName})
-		}
 	}
 }
 

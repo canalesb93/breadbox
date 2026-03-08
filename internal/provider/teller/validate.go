@@ -14,3 +14,13 @@ func ValidateCredentials(certPath, keyPath string) error {
 	}
 	return nil
 }
+
+// ValidateCredentialsPEM checks that PEM-encoded certificate and private key
+// bytes form a valid X.509 key pair.
+func ValidateCredentialsPEM(certPEM, keyPEM []byte) error {
+	_, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		return fmt.Errorf("invalid teller certificate PEM: %w", err)
+	}
+	return nil
+}

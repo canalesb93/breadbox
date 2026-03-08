@@ -65,9 +65,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/transactions", TransactionListHandler(a, sm, tr, svc))
 		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
 		r.Get("/sync-logs", SyncLogsHandler(a, sm, tr, svc))
+
+		r.Get("/providers", ProvidersGetHandler(a, sm, tr))
+		r.Post("/providers/plaid", ProvidersSavePlaidHandler(a, sm))
+		r.Post("/providers/teller", ProvidersSaveTellerHandler(a, sm))
+
 		r.Get("/settings", SettingsGetHandler(a, sm, tr))
 		r.Post("/settings/sync", SettingsSyncPostHandler(a, sm))
-		r.Post("/settings/providers", SettingsProvidersPostHandler(a, sm))
 		r.Post("/settings/password", ChangePasswordHandler(a, sm))
 	})
 
@@ -85,7 +89,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Delete("/connections/{id}", DeleteConnectionHandler(a))
 		r.Post("/accounts/{id}/excluded", UpdateAccountExcludedHandler(a))
 		r.Post("/accounts/{id}/display-name", UpdateAccountDisplayNameHandler(a))
-		r.Post("/test-provider/{provider}", TestProviderHandler(a))
+		r.Post("/test-provider/{provider}", ProvidersTestHandler(a))
 		r.Post("/users", CreateUserHandler(a))
 		r.Put("/users/{id}", UpdateUserHandler(a))
 
