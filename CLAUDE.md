@@ -64,9 +64,12 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Transaction responses include denormalized `account_name` and `user_name` (JOIN in dynamic query builder)
 - MCP tool descriptions: domain-rich with amount conventions, filter docs, pagination behavior (not generic)
 - MCP server instructions: domain-rich onboarding text (data model, amount convention, category system, recommended query patterns)
-- Teller category mapping: `mapCategory()` returns `(primary, detailed)` pair. All Teller categories map to both primary and detailed Plaid-compatible categories.
+- Teller category mapping: `mapCategory()` returns `(primary, detailed)` pair. All Teller categories map to both primary and detailed Plaid-compatible categories. Will be superseded by DB-backed `category_mappings` table (Phase 20A).
 - Transaction sort options: `sort_by` (date/amount/name) + `sort_order` (asc/desc). Cursor pagination only works with date sort.
-- `ListDistinctCategories` returns `[]CategoryPair{Primary, Detailed}` (not `[]string`). Used by REST `/api/v1/categories`, MCP `list_categories`, and admin dashboard.
+- Category system: `categories` table (UUID PK, slug, display_name, parent_id for 2-level hierarchy, icon, color). `category_mappings` table maps `(provider, provider_category)` → `category_id`. Transactions have `category_id` FK (SET NULL) + `category_override` boolean. Raw provider strings kept in `category_primary`/`category_detailed` for auditability. Resolution: detailed match → primary match → NULL. In-memory cache during sync. Spec: `docs/category-mapping.md`.
+- Category slugs: `lowercase_with_underscores` format (e.g., `food_and_drink_groceries`). Immutable after creation. Display names are mutable.
+- Category API: transaction responses include structured `category` object; raw fields renamed to `category_primary_raw`/`category_detailed_raw`. Filter by `category_slug` param.
+- `ListDistinctCategories` returns `[]CategoryPair{Primary, Detailed}` (not `[]string`). Will be replaced by `ListCategories` returning full taxonomy tree (Phase 20B).
 - MCP `min_amount`/`max_amount` use `*float64` (not `float64`) to allow filtering by zero values
 - CSS framework: DaisyUI 5 + Tailwind CSS v4 via `tailwindcss-extra` standalone CLI binary. No Node.js. Replaces Pico CSS.
 - CSS build: `make css` compiles `input.css` → `static/css/styles.css`. `make css-watch` for dev. Dockerfile runs `make css` in build stage.
@@ -90,7 +93,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 
 ## Spec Documents
 
-Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Teller-specific details are in `docs/teller-integration.md`. CSV import details are in `docs/csv-import.md`. Design system (CSS framework, components, icons) is in `docs/design-system.md`. Implementation order is in `docs/ROADMAP.md`.
+Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Teller-specific details are in `docs/teller-integration.md`. CSV import details are in `docs/csv-import.md`. Design system (CSS framework, components, icons) is in `docs/design-system.md`. Category mapping system is in `docs/category-mapping.md`. Implementation order is in `docs/ROADMAP.md`.
 
 ## Workflow Rules
 
