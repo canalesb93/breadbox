@@ -11,6 +11,8 @@ type OverviewStats struct {
 	ConnectionCount  int    `json:"connection_count"`
 	AccountCount     int    `json:"account_count"`
 	TransactionCount int64  `json:"transaction_count"`
+	CategoryCount    int    `json:"category_count"`
+	UnmappedCount    int    `json:"unmapped_transaction_count"`
 	EarliestDate     string `json:"earliest_transaction_date,omitempty"`
 	LatestDate       string `json:"latest_transaction_date,omitempty"`
 }
@@ -39,6 +41,18 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 		Scan(&stats.TransactionCount, &stats.EarliestDate, &stats.LatestDate)
 	if err != nil {
 		return nil, fmt.Errorf("count transactions: %w", err)
+	}
+
+	err = s.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM categories").Scan(&stats.CategoryCount)
+	if err != nil {
+		return nil, fmt.Errorf("count categories: %w", err)
+	}
+
+	err = s.Pool.QueryRow(ctx,
+		"SELECT COUNT(*) FROM transactions WHERE category_id IS NULL AND deleted_at IS NULL").
+		Scan(&stats.UnmappedCount)
+	if err != nil {
+		return nil, fmt.Errorf("count unmapped: %w", err)
 	}
 
 	return stats, nil

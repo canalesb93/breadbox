@@ -60,10 +60,15 @@
   </label>
   <label>
     Category
-    <select name="category">
+    <select name="category" class="select select-bordered select-sm">
       <option value="">All categories</option>
       {{range .Categories}}
-      <option value="{{.}}"{{if eq . $.FilterCategory}} selected{{end}}>{{.}}</option>
+      <optgroup label="{{.DisplayName}}">
+        <option value="{{.Slug}}"{{if eq .Slug $.FilterCategory}} selected{{end}}>All {{.DisplayName}}</option>
+        {{range .Children}}
+        <option value="{{.Slug}}"{{if eq .Slug $.FilterCategory}} selected{{end}}>{{.DisplayName}}</option>
+        {{end}}
+      </optgroup>
       {{end}}
     </select>
   </label>
@@ -108,7 +113,7 @@
         <td class="bb-amount{{if lt .Amount 0.0}} text-error{{end}}">
           {{printf "%.2f" .Amount}}{{if .IsoCurrencyCode}} {{.IsoCurrencyCode}}{{end}}
         </td>
-        <td>{{if .CategoryPrimary}}{{.CategoryPrimary}}{{else}}&mdash;{{end}}</td>
+        <td>{{if .CategoryDisplayName}}{{.CategoryDisplayName}}{{if .CategoryOverride}} <span class="badge badge-outline badge-xs">override</span>{{end}}{{else}}&mdash;{{end}}</td>
         <td>{{if .Pending}}<span class="badge badge-warning badge-sm">Pending</span>{{end}}</td>
       </tr>
       <tr x-show="expanded" x-cloak>

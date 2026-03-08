@@ -21,26 +21,38 @@ type AccountResponse struct {
 	UpdatedAt         string   `json:"updated_at"`
 }
 
+type TransactionCategoryInfo struct {
+	ID                 *string `json:"id"`
+	Slug               *string `json:"slug"`
+	DisplayName        *string `json:"display_name"`
+	PrimarySlug        *string `json:"primary_slug,omitempty"`
+	PrimaryDisplayName *string `json:"primary_display_name,omitempty"`
+	Icon               *string `json:"icon,omitempty"`
+	Color              *string `json:"color,omitempty"`
+}
+
 type TransactionResponse struct {
-	ID                 string   `json:"id"`
-	AccountID          *string  `json:"account_id"`
-	AccountName        *string  `json:"account_name"`
-	UserName           *string  `json:"user_name"`
-	Amount             float64  `json:"amount"`
-	IsoCurrencyCode    *string  `json:"iso_currency_code"`
-	Date               string   `json:"date"`
-	AuthorizedDate     *string  `json:"authorized_date"`
-	Datetime           *string  `json:"datetime"`
-	AuthorizedDatetime *string  `json:"authorized_datetime"`
-	Name               string   `json:"name"`
-	MerchantName       *string  `json:"merchant_name"`
-	CategoryPrimary    *string  `json:"category_primary"`
-	CategoryDetailed   *string  `json:"category_detailed"`
-	CategoryConfidence *string  `json:"category_confidence"`
-	PaymentChannel     *string  `json:"payment_channel"`
-	Pending            bool     `json:"pending"`
-	CreatedAt          string   `json:"created_at"`
-	UpdatedAt          string   `json:"updated_at"`
+	ID                 string                   `json:"id"`
+	AccountID          *string                  `json:"account_id"`
+	AccountName        *string                  `json:"account_name"`
+	UserName           *string                  `json:"user_name"`
+	Amount             float64                  `json:"amount"`
+	IsoCurrencyCode    *string                  `json:"iso_currency_code"`
+	Date               string                   `json:"date"`
+	AuthorizedDate     *string                  `json:"authorized_date"`
+	Datetime           *string                  `json:"datetime"`
+	AuthorizedDatetime *string                  `json:"authorized_datetime"`
+	Name               string                   `json:"name"`
+	MerchantName       *string                  `json:"merchant_name"`
+	Category           *TransactionCategoryInfo `json:"category"`
+	CategoryOverride   bool                     `json:"category_override"`
+	CategoryPrimaryRaw *string                  `json:"category_primary_raw"`
+	CategoryDetailedRaw *string                 `json:"category_detailed_raw"`
+	CategoryConfidence *string                  `json:"category_confidence"`
+	PaymentChannel     *string                  `json:"payment_channel"`
+	Pending            bool                     `json:"pending"`
+	CreatedAt          string                   `json:"created_at"`
+	UpdatedAt          string                   `json:"updated_at"`
 }
 
 type TransactionListResult struct {
@@ -51,33 +63,31 @@ type TransactionListResult struct {
 }
 
 type TransactionListParams struct {
-	Cursor           string
-	Limit            int
-	StartDate        *time.Time
-	EndDate          *time.Time
-	AccountID        *string
-	UserID           *string
-	Category         *string
-	CategoryDetailed *string
-	MinAmount        *float64
-	MaxAmount        *float64
-	Pending          *bool
-	Search           *string
-	SortBy           *string
-	SortOrder        *string
+	Cursor       string
+	Limit        int
+	StartDate    *time.Time
+	EndDate      *time.Time
+	AccountID    *string
+	UserID       *string
+	CategorySlug *string
+	MinAmount    *float64
+	MaxAmount    *float64
+	Pending      *bool
+	Search       *string
+	SortBy       *string
+	SortOrder    *string
 }
 
 type TransactionCountParams struct {
-	StartDate        *time.Time
-	EndDate          *time.Time
-	AccountID        *string
-	UserID           *string
-	Category         *string
-	CategoryDetailed *string
-	MinAmount        *float64
-	MaxAmount        *float64
-	Pending          *bool
-	Search           *string
+	StartDate    *time.Time
+	EndDate      *time.Time
+	AccountID    *string
+	UserID       *string
+	CategorySlug *string
+	MinAmount    *float64
+	MaxAmount    *float64
+	Pending      *bool
+	Search       *string
 }
 
 type CategoryPair struct {
@@ -179,7 +189,7 @@ type AdminTransactionListParams struct {
 	AccountID    *string
 	UserID       *string
 	ConnectionID *string
-	Category     *string
+	CategorySlug *string
 	MinAmount    *float64
 	MaxAmount    *float64
 	Pending      *bool
@@ -188,20 +198,23 @@ type AdminTransactionListParams struct {
 }
 
 type AdminTransactionRow struct {
-	ID              string
-	AccountID       string
-	AccountName     string
-	InstitutionName string
-	UserName        string
-	Date            string
-	Name            string
-	MerchantName    *string
-	Amount          float64
-	IsoCurrencyCode *string
-	CategoryPrimary *string
-	Pending         bool
-	CreatedAt       string
-	UpdatedAt       string
+	ID                  string
+	AccountID           string
+	AccountName         string
+	InstitutionName     string
+	UserName            string
+	Date                string
+	Name                string
+	MerchantName        *string
+	Amount              float64
+	IsoCurrencyCode     *string
+	CategoryDisplayName *string
+	CategorySlug        *string
+	CategoryIcon        *string
+	CategoryOverride    bool
+	Pending             bool
+	CreatedAt           string
+	UpdatedAt           string
 }
 
 type AdminTransactionListResult struct {

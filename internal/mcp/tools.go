@@ -19,7 +19,7 @@ func (s *MCPServer) registerTools() {
 
 	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
 		Name:        "query_transactions",
-		Description: "Query bank transactions with optional filters and cursor-based pagination. Amounts follow the convention: positive = money out (debit/purchase), negative = money in (credit/deposit). Dates are YYYY-MM-DD; start_date is inclusive, end_date is exclusive. Categories use Plaid's taxonomy (e.g. FOOD_AND_DRINK, TRANSPORTATION). Use category_detailed for subcategories (e.g. FOOD_AND_DRINK_GROCERIES). Results are ordered by date descending by default. Use sort_by and sort_order to change ordering. Pagination: pass the next_cursor from the response as cursor in the next request.",
+		Description: "Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (use list_categories to find slugs); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response.",
 	}, s.handleQueryTransactions)
 
 	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
@@ -29,7 +29,7 @@ func (s *MCPServer) registerTools() {
 
 	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
 		Name:        "list_categories",
-		Description: "List all distinct transaction categories. Returns (primary, detailed) pairs representing the category hierarchy. Primary categories are broad (e.g. FOOD_AND_DRINK, TRANSPORTATION). Detailed categories are specific (e.g. FOOD_AND_DRINK_GROCERIES, TRANSPORTATION_GAS). Use these values with the category and category_detailed filters in query_transactions and count_transactions.",
+		Description: "List the full category taxonomy as a tree. Categories have: slug (stable identifier for filtering), display_name (human label), icon, color, and optional children. Use category slugs with the category_slug filter in query_transactions and count_transactions. Parent slugs include all children when filtering.",
 	}, s.handleListCategories)
 
 	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
@@ -46,6 +46,21 @@ func (s *MCPServer) registerTools() {
 		Name:        "trigger_sync",
 		Description: "Trigger a manual sync of bank data from the provider (Plaid or Teller). Optionally specify a connection_id to sync a single connection; otherwise syncs all active connections. Returns immediately — the sync runs in the background. Check get_sync_status for results.",
 	}, s.handleTriggerSync)
+
+	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
+		Name:        "categorize_transaction",
+		Description: "Manually override a transaction's category. Use list_categories to find the category ID, then pass both the transaction_id and category_id. This creates a permanent override that won't be changed by automatic sync.",
+	}, s.handleCategorizeTransaction)
+
+	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
+		Name:        "reset_transaction_category",
+		Description: "Remove a manual category override from a transaction and re-resolve its category from the automatic mapping rules. Use this to undo a categorize_transaction action.",
+	}, s.handleResetTransactionCategory)
+
+	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
+		Name:        "list_unmapped_categories",
+		Description: "List distinct raw provider category strings from transactions that currently have no category mapping. These are transactions the system couldn't automatically categorize. Results show the raw primary and detailed category strings from the provider.",
+	}, s.handleListUnmappedCategories)
 }
 
 // --- Input types ---
@@ -55,37 +70,44 @@ type listAccountsInput struct {
 }
 
 type queryTransactionsInput struct {
-	StartDate        string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
-	EndDate          string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
-	AccountID        string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
-	UserID           string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
-	Category         string   `json:"category,omitempty" jsonschema:"Filter by primary category"`
-	CategoryDetailed string   `json:"category_detailed,omitempty" jsonschema:"Filter by detailed category (e.g. FOOD_AND_DRINK_GROCERIES)"`
-	MinAmount        *float64 `json:"min_amount,omitempty" jsonschema:"Minimum transaction amount (positive=debit, negative=credit). Amounts follow convention: positive = money out, negative = money in."`
-	MaxAmount        *float64 `json:"max_amount,omitempty" jsonschema:"Maximum transaction amount (positive=debit, negative=credit). Amounts follow convention: positive = money out, negative = money in."`
-	Pending          *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
-	Search           string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant name"`
-	Limit            int      `json:"limit,omitempty" jsonschema:"Maximum number of results (default 50, max 500)"`
-	Cursor           string   `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
-	SortBy           string   `json:"sort_by,omitempty" jsonschema:"Sort field: date (default), amount, or name. Cursor pagination only works with date sort."`
-	SortOrder        string   `json:"sort_order,omitempty" jsonschema:"Sort direction: desc (default) or asc"`
+	StartDate    string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
+	EndDate      string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
+	AccountID    string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
+	UserID       string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
+	CategorySlug string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug (parent slug includes all children). Use list_categories to find slugs."`
+	MinAmount    *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount (positive=debit, negative=credit)"`
+	MaxAmount    *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount (positive=debit, negative=credit)"`
+	Pending      *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
+	Search       string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant"`
+	Limit        int      `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
+	Cursor       string   `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
+	SortBy       string   `json:"sort_by,omitempty" jsonschema:"Sort: date (default), amount, name"`
+	SortOrder    string   `json:"sort_order,omitempty" jsonschema:"Sort direction: desc (default) or asc"`
 }
 
 type countTransactionsInput struct {
-	StartDate        string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
-	EndDate          string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
-	AccountID        string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
-	UserID           string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
-	Category         string   `json:"category,omitempty" jsonschema:"Filter by primary category"`
-	CategoryDetailed string   `json:"category_detailed,omitempty" jsonschema:"Filter by detailed category (e.g. FOOD_AND_DRINK_GROCERIES)"`
-	MinAmount        *float64 `json:"min_amount,omitempty" jsonschema:"Minimum transaction amount (positive=debit, negative=credit). Amounts follow convention: positive = money out, negative = money in."`
-	MaxAmount        *float64 `json:"max_amount,omitempty" jsonschema:"Maximum transaction amount (positive=debit, negative=credit). Amounts follow convention: positive = money out, negative = money in."`
-	Pending          *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
-	Search           string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant name"`
+	StartDate    string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
+	EndDate      string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
+	AccountID    string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
+	UserID       string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
+	CategorySlug string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
+	MinAmount    *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount"`
+	MaxAmount    *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount"`
+	Pending      *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
+	Search       string   `json:"search,omitempty" jsonschema:"Search name or merchant"`
 }
 
 type triggerSyncInput struct {
 	ConnectionID string `json:"connection_id,omitempty" jsonschema:"Sync a specific connection by ID. If omitted syncs all connections."`
+}
+
+type categorizeTransactionInput struct {
+	TransactionID string `json:"transaction_id" jsonschema:"The transaction ID to categorize"`
+	CategoryID    string `json:"category_id" jsonschema:"The category ID to assign (use list_categories to find IDs)"`
+}
+
+type resetTransactionCategoryInput struct {
+	TransactionID string `json:"transaction_id" jsonschema:"The transaction ID to reset"`
 }
 
 // --- Handlers ---
@@ -132,11 +154,8 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 	if input.UserID != "" {
 		params.UserID = &input.UserID
 	}
-	if input.Category != "" {
-		params.Category = &input.Category
-	}
-	if input.CategoryDetailed != "" {
-		params.CategoryDetailed = &input.CategoryDetailed
+	if input.CategorySlug != "" {
+		params.CategorySlug = &input.CategorySlug
 	}
 	if input.MinAmount != nil {
 		params.MinAmount = input.MinAmount
@@ -189,11 +208,8 @@ func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToo
 	if input.UserID != "" {
 		params.UserID = &input.UserID
 	}
-	if input.Category != "" {
-		params.Category = &input.Category
-	}
-	if input.CategoryDetailed != "" {
-		params.CategoryDetailed = &input.CategoryDetailed
+	if input.CategorySlug != "" {
+		params.CategorySlug = &input.CategorySlug
 	}
 	if input.MinAmount != nil {
 		params.MinAmount = input.MinAmount
@@ -218,7 +234,7 @@ func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToo
 
 func (s *MCPServer) handleListCategories(_ context.Context, _ *mcpsdk.CallToolRequest, _ any) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
-	categories, err := s.svc.ListDistinctCategories(ctx)
+	categories, err := s.svc.ListCategoryTree(ctx)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
@@ -266,6 +282,45 @@ func (s *MCPServer) handleTriggerSync(_ context.Context, _ *mcpsdk.CallToolReque
 			&mcpsdk.TextContent{Text: msg},
 		},
 	}, nil, nil
+}
+
+func (s *MCPServer) handleCategorizeTransaction(_ context.Context, _ *mcpsdk.CallToolRequest, input categorizeTransactionInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+	if input.TransactionID == "" || input.CategoryID == "" {
+		return errorResult(fmt.Errorf("transaction_id and category_id are required")), nil, nil
+	}
+	if err := s.svc.SetTransactionCategory(ctx, input.TransactionID, input.CategoryID); err != nil {
+		return errorResult(err), nil, nil
+	}
+	return &mcpsdk.CallToolResult{
+		Content: []mcpsdk.Content{
+			&mcpsdk.TextContent{Text: fmt.Sprintf("Transaction %s categorized successfully.", input.TransactionID)},
+		},
+	}, nil, nil
+}
+
+func (s *MCPServer) handleResetTransactionCategory(_ context.Context, _ *mcpsdk.CallToolRequest, input resetTransactionCategoryInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+	if input.TransactionID == "" {
+		return errorResult(fmt.Errorf("transaction_id is required")), nil, nil
+	}
+	if err := s.svc.ResetTransactionCategory(ctx, input.TransactionID); err != nil {
+		return errorResult(err), nil, nil
+	}
+	return &mcpsdk.CallToolResult{
+		Content: []mcpsdk.Content{
+			&mcpsdk.TextContent{Text: fmt.Sprintf("Transaction %s category reset to automatic.", input.TransactionID)},
+		},
+	}, nil, nil
+}
+
+func (s *MCPServer) handleListUnmappedCategories(_ context.Context, _ *mcpsdk.CallToolRequest, _ any) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+	unmapped, err := s.svc.ListUnmappedCategories(ctx)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(unmapped)
 }
 
 // --- Helpers ---

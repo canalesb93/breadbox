@@ -66,6 +66,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
 		r.Get("/sync-logs", SyncLogsHandler(a, sm, tr, svc))
 
+		r.Get("/categories", CategoriesPageHandler(svc, sm, tr))
+		r.Get("/categories/mappings", MappingsPageHandler(svc, sm, tr))
+
 		r.Get("/providers", ProvidersGetHandler(a, sm, tr))
 		r.Post("/providers/plaid", ProvidersSavePlaidHandler(a, sm))
 		r.Post("/providers/teller", ProvidersSaveTellerHandler(a, sm))
@@ -103,6 +106,23 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		r.Post("/update/dismiss", DismissUpdateHandler(a))
 		r.Post("/update", TriggerUpdateHandler(a))
+
+		// Category CRUD
+		r.Post("/categories", CreateCategoryAdminHandler(svc))
+		r.Put("/categories/{id}", UpdateCategoryAdminHandler(svc))
+		r.Delete("/categories/{id}", DeleteCategoryAdminHandler(svc))
+		r.Post("/categories/{id}/merge", MergeCategoryAdminHandler(svc))
+
+		// Category mapping CRUD
+		r.Post("/category-mappings", CreateMappingAdminHandler(svc))
+		r.Put("/category-mappings/{id}", UpdateMappingAdminHandler(svc))
+		r.Delete("/category-mappings/{id}", DeleteMappingAdminHandler(svc))
+		r.Put("/category-mappings/bulk", BulkUpsertMappingsAdminHandler(svc))
+		r.Get("/category-mappings/export", ExportMappingsAdminHandler(svc))
+
+		// Transaction category override
+		r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc))
+		r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc))
 	})
 
 	return r
