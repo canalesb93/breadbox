@@ -26,6 +26,8 @@
         <dd><code class="font-mono text-xs">{{.PlaidClientID}}</code></dd>
         <dt>Secret</dt>
         <dd><code class="font-mono text-xs">********</code></dd>
+        <dt>Webhook URL</dt>
+        <dd>{{if .WebhookURL}}<code class="font-mono text-xs">{{.WebhookURL}}</code>{{else}}<span class="text-base-content/60">Not set</span>{{end}}</dd>
       </dl>
       {{else}}
       <form method="POST" action="/admin/providers/plaid" autocomplete="off">
@@ -50,6 +52,12 @@
           <option value="production"{{if eq .PlaidEnv "production"}} selected{{end}}>Production</option>
         </select>
         <p class="text-xs text-base-content/60 mt-1">Credentials will be validated before saving.</p>
+
+        <label class="flex flex-col gap-1 text-sm mt-4" for="webhook_url">
+          Webhook URL {{configSource .ConfigSources "webhook_url"}}
+        </label>
+        <input type="url" id="webhook_url" name="webhook_url" value="{{.WebhookURL}}" placeholder="https://example.com/webhooks/plaid" autocomplete="off" class="input input-sm w-full">
+        <p class="text-xs text-base-content/60 mt-1">Plaid will send transaction updates to this URL. Must use HTTPS. Leave empty to disable.</p>
 
         <div class="mt-4">
           <button type="submit" class="btn btn-primary btn-sm">Save Plaid Settings</button>

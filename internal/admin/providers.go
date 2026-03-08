@@ -33,6 +33,7 @@ func ProvidersGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRendere
 			"PlaidFromEnv":    os.Getenv("PLAID_CLIENT_ID") != "",
 			"PlaidClientID":   a.Config.PlaidClientID,
 			"PlaidEnv":        a.Config.PlaidEnv,
+			"WebhookURL":      a.Config.WebhookURL,
 			"ConfigSources":   a.Config.ConfigSources,
 
 			// Teller state
@@ -65,6 +66,7 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 		plaidClientID := strings.TrimSpace(r.FormValue("plaid_client_id"))
 		plaidSecret := strings.TrimSpace(r.FormValue("plaid_secret"))
 		plaidEnv := strings.TrimSpace(r.FormValue("plaid_env"))
+		webhookURL := strings.TrimSpace(r.FormValue("webhook_url"))
 
 		// If secret is empty, keep the existing one (user didn't change it).
 		if plaidSecret == "" {
@@ -73,7 +75,7 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 
 		if plaidClientID == "" {
 			// Clearing Plaid config.
-			for _, key := range []string{"plaid_client_id", "plaid_secret", "plaid_env"} {
+			for _, key := range []string{"plaid_client_id", "plaid_secret", "plaid_env", "webhook_url"} {
 				_ = a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 					Key: key, Value: pgtype.Text{},
 				})
@@ -81,6 +83,7 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 			a.Config.PlaidClientID = ""
 			a.Config.PlaidSecret = ""
 			a.Config.PlaidEnv = "sandbox"
+			a.Config.WebhookURL = ""
 			_ = a.ReinitProvider("plaid")
 			SetFlash(ctx, sm, "success", "Plaid configuration cleared.")
 			http.Redirect(w, r, "/admin/providers", http.StatusSeeOther)
@@ -89,6 +92,12 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 
 		if plaidSecret == "" {
 			SetFlash(ctx, sm, "error", "Plaid secret is required.")
+			http.Redirect(w, r, "/admin/providers", http.StatusSeeOther)
+			return
+		}
+
+		if webhookURL != "" && !strings.HasPrefix(webhookURL, "https://") {
+			SetFlash(ctx, sm, "error", "Webhook URL must use HTTPS.")
 			http.Redirect(w, r, "/admin/providers", http.StatusSeeOther)
 			return
 		}
@@ -103,6 +112,7 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 			{Key: "plaid_client_id", Value: pgtype.Text{String: plaidClientID, Valid: true}},
 			{Key: "plaid_secret", Value: pgtype.Text{String: plaidSecret, Valid: true}},
 			{Key: "plaid_env", Value: pgtype.Text{String: plaidEnv, Valid: true}},
+			{Key: "webhook_url", Value: pgtype.Text{String: webhookURL, Valid: webhookURL != ""}},
 		}
 		for _, entry := range entries {
 			if err := a.Queries.SetAppConfig(ctx, entry); err != nil {
@@ -116,9 +126,11 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 		a.Config.PlaidClientID = plaidClientID
 		a.Config.PlaidSecret = plaidSecret
 		a.Config.PlaidEnv = plaidEnv
+		a.Config.WebhookURL = webhookURL
 		a.Config.ConfigSources["plaid_client_id"] = "db"
 		a.Config.ConfigSources["plaid_secret"] = "db"
 		a.Config.ConfigSources["plaid_env"] = "db"
+		a.Config.ConfigSources["webhook_url"] = "db"
 
 		if err := a.ReinitProvider("plaid"); err != nil {
 			a.Logger.Error("reinit plaid provider", "error", err)
