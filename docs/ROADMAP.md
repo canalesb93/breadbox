@@ -2096,3 +2096,92 @@ Streamline the self-hosting lifecycle: CI/CD pipeline to build and publish image
 8. Without Docker socket: banner shows copyable update command instead
 9. `deploy/update.sh` updates and restarts from CLI, prints version change summary
 10. `deploy/README.md` covers the full self-hosting lifecycle from install to updates
+
+---
+
+## Phase 19: Provider Settings Refactor ✅
+
+Move provider configuration to a dedicated top-level Providers page. Remove implicit "primary provider" concept, make all provider settings (including Teller certificates) fully dashboard-configurable, and reinitialize providers live after config changes.
+
+**Status:** Complete.
+
+**Depends on:** Phase 17A (Settings Consolidation), Phase 9 (Teller Provider)
+
+### 19.1 Teller Client: PEM Bytes Constructor ✅
+
+- [x] Add `NewClientFromPEM(certPEM, keyPEM []byte)` constructor using `tls.X509KeyPair`
+- [x] Extract shared `newClientWithCert(cert tls.Certificate)` helper from `NewClient`
+- [x] Add `ValidateCredentialsPEM(certPEM, keyPEM []byte)` in `validate.go`
+- **Files:** `internal/provider/teller/client.go`, `internal/provider/teller/validate.go`
+
+### 19.2 Config: Teller PEM Fields & Loader Updates ✅
+
+- [x] Add `TellerCertPEM []byte` and `TellerKeyPEM []byte` fields to `Config` struct
+- [x] In `LoadWithDB`, read `teller_cert_pem` and `teller_key_pem` from `app_config` — decrypt AES-256-GCM, base64-decode
+- [x] Only load PEM from DB when env cert/key paths are not set
+- [x] Also load `teller_webhook_secret` from DB as fallback
+- **Files:** `internal/config/config.go`, `internal/config/load.go`
+
+### 19.3 Provider Reinitialization ✅
+
+- [x] Create `internal/app/providers.go` with `initTellerProvider` helper (supports file paths or PEM bytes)
+- [x] Add `(a *App) ReinitProvider(name string) error` method — creates/replaces/removes providers in the live map
+- [x] Sync engine shares the same map reference, so changes propagate automatically
+- [x] Update `app.go` to use `initTellerProvider` helper at startup
+- **Files:** `internal/app/providers.go`, `internal/app/app.go`
+
+### 19.4 New Providers Page — Routes & Handler ✅
+
+- [x] `ProvidersGetHandler` — GET `/admin/providers` with per-provider status flags
+- [x] `ProvidersSavePlaidHandler` — POST `/admin/providers/plaid` with credential validation and `ReinitProvider`
+- [x] `ProvidersSaveTellerHandler` — POST `/admin/providers/teller` with multipart cert/key upload, AES-256-GCM encryption, DB storage
+- [x] `ProvidersTestHandler` — supports both file-path and PEM-based Teller validation
+- [x] Secret fields never pre-populated — empty field with "Unchanged" placeholder keeps existing value
+- [x] Register routes in `router.go`
+- **Files:** `internal/admin/providers.go`, `internal/admin/router.go`
+
+### 19.5 New Providers Page — Template & Nav ✅
+
+- [x] Equal-weight cards for Plaid, Teller, CSV in responsive 2-column grid
+- [x] Env-configured providers show as read-only with source badges
+- [x] Teller card includes PEM file upload inputs (`<input type="file" accept=".pem">`)
+- [x] Certificate status indicator when already configured
+- [x] `autocomplete="off"` on forms, `autocomplete="new-password"` on secrets
+- [x] Add "Providers" nav item with `plug` icon in System section
+- **Files:** `internal/templates/pages/providers.html`, `internal/templates/partials/nav.html`
+
+### 19.6 Remove Provider Section from Settings ✅
+
+- [x] Remove Providers collapse section and `testProvider`/`confirmPlaidEnvChange` JS from `settings.html`
+- [x] Remove provider-related data from `SettingsGetHandler`
+- [x] Remove `SettingsProvidersPostHandler` and `TestProviderHandler` from `settings.go`
+- [x] Remove `POST /admin/settings/providers` route from `router.go`
+- **Files:** `internal/templates/pages/settings.html`, `internal/admin/settings.go`, `internal/admin/router.go`
+
+### 19.7 Connection Creation: Provider Availability ✅
+
+- [x] Replace hardcoded `selectedProvider = "plaid"` with dynamic first-available selection
+- [x] Add "No Providers Configured" card with link to `/admin/providers` when none available
+- [x] Update onboarding checklist link from `/admin/settings` to `/admin/providers`
+- **Files:** `internal/templates/pages/connection_new.html`, `internal/templates/pages/dashboard.html`
+
+### Task Dependencies (Phase 19)
+
+```
+19.1 (PEM constructor)    ─┐
+19.2 (config PEM fields)  ─┤──> 19.3 (reinit) ──> 19.4 (handlers) ──> 19.5 (template)
+                           │                                       ──> 19.6 (settings cleanup)
+19.7 (connection fix)      — independent (uses existing HasPlaid/HasTeller)
+```
+
+### Checkpoint 19
+
+1. Navigate to `/admin/providers` — see Plaid, Teller, CSV as equal cards
+2. Settings page no longer shows provider configuration
+3. Configure Plaid entirely through dashboard (no env vars) — save, test connection works
+4. Configure Teller entirely through dashboard (upload cert/key PEM files, set app ID + env) — save, test connection works
+5. After saving provider config, immediately create a new connection with that provider (no restart needed)
+6. Connection "new" page only shows providers that are fully configured
+7. Credential fields are not auto-selected/auto-filled by browser on page load
+8. Providers configured via env vars show as read-only with env badge
+9. If no providers configured, connection page shows helpful message pointing to Providers page
