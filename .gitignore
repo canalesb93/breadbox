@@ -2,8 +2,9 @@
 /breadbox
 breadbox.exe
 
-# Tailwind CSS standalone binary
+# Tailwind CSS standalone binary and generated CSS
 tailwindcss-extra
+static/css/styles.css
 
 # Environment files
 .local.env
