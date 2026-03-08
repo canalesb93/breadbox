@@ -23,12 +23,6 @@
         <option value="1440"{{if eq .SyncIntervalMinutes 1440}} selected{{end}}>Every 24 hours</option>
       </select>
 
-      <label class="flex flex-col gap-1 text-sm mt-4" for="webhook_url">
-        Webhook URL {{configSource .ConfigSources "webhook_url"}}
-      </label>
-      <input type="url" id="webhook_url" name="webhook_url" value="{{.WebhookURL}}" placeholder="https://example.com/webhooks/plaid" class="input input-sm w-full max-w-md">
-      <p class="text-xs text-base-content/60 mt-1">Plaid will send transaction updates to this URL. Must use HTTPS. Leave empty to disable.</p>
-
       {{if ne .NextSyncTime ""}}
       <p class="text-xs text-base-content/60 mt-4">Next scheduled sync: {{.NextSyncTime}}</p>
       {{end}}

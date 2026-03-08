@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
-	"strings"
 	"time"
 
 	"breadbox/internal/app"
@@ -43,7 +42,6 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 			"CSRFToken":           GetCSRFToken(r),
 			"Flash":               GetFlash(ctx, sm),
 			"SyncIntervalMinutes": a.Config.SyncIntervalMinutes,
-			"WebhookURL":          a.Config.WebhookURL,
 			// System info
 			"Version":         a.Config.Version,
 			"GoVersion":       runtime.Version(),
@@ -72,17 +70,10 @@ func SettingsSyncPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 		ctx := r.Context()
 
 		syncIntervalStr := r.FormValue("sync_interval_minutes")
-		webhookURL := strings.TrimSpace(r.FormValue("webhook_url"))
 
 		syncInterval, err := strconv.Atoi(syncIntervalStr)
 		if err != nil || !isValidSyncInterval(syncInterval) {
 			SetFlash(ctx, sm, "error", "Invalid sync interval.")
-			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
-			return
-		}
-
-		if webhookURL != "" && !strings.HasPrefix(webhookURL, "https://") {
-			SetFlash(ctx, sm, "error", "Webhook URL must use HTTPS.")
 			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
 			return
 		}
@@ -97,17 +88,6 @@ func SettingsSyncPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 			return
 		}
 		a.Config.SyncIntervalMinutes = syncInterval
-
-		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
-			Key:   "webhook_url",
-			Value: pgtype.Text{String: webhookURL, Valid: webhookURL != ""},
-		}); err != nil {
-			a.Logger.Error("save webhook url", "error", err)
-			SetFlash(ctx, sm, "error", "Failed to save webhook URL.")
-			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
-			return
-		}
-		a.Config.WebhookURL = webhookURL
 
 		SetFlash(ctx, sm, "success", "Sync settings saved.")
 		http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
