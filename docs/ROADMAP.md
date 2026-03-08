@@ -2185,3 +2185,201 @@ Move provider configuration to a dedicated top-level Providers page. Remove impl
 7. Credential fields are not auto-selected/auto-filled by browser on page load
 8. Providers configured via env vars show as read-only with env badge
 9. If no providers configured, connection page shows helpful message pointing to Providers page
+
+---
+
+## Phase 20A: Category Mapping — Schema & Engine
+
+Database-backed category taxonomy with provider mappings, sync engine integration, and service layer for category CRUD and resolution.
+
+**Depends on:** Phase 19 (Provider Settings Refactor)
+
+**Spec:** `docs/category-mapping.md`
+
+### 20A.1 Schema Migration
+
+- [ ] Write goose migration: `categories` table (UUID PK, slug UNIQUE, display_name, parent_id self-ref FK with CASCADE, icon, color, sort_order, is_system, timestamps)
+- [ ] Write goose migration: `category_mappings` table (provider `provider_type`, provider_category TEXT, category_id FK with CASCADE, unique constraint on `(provider, provider_category)`, timestamps)
+- [ ] Write goose migration: add `category_id` UUID FK (ON DELETE SET NULL) and `category_override` BOOLEAN DEFAULT FALSE to `transactions` table
+- [ ] Create indexes: `categories(parent_id)`, `categories(slug)`, `category_mappings(provider)`, `category_mappings(category_id)`, `transactions(category_id)`
+- **Ref:** `category-mapping.md` Section 2
+- **Files:** `internal/db/migrations/000XX_categories.sql`
+
+### 20A.2 Seed Data
+
+- [ ] Write Go seed function with full default taxonomy (~120 categories: 16 primaries + ~104 detailed with display names and Lucide icon names)
+- [ ] Seed default Plaid mappings (~120 rows, 1:1 with taxonomy — each Plaid `PRIMARY` and `DETAILED` string mapped)
+- [ ] Seed default Teller mappings (~27 rows, derived from existing `mapCategory()` lookup table)
+- [ ] Seed runs as goose Go migration with `ON CONFLICT (slug) DO NOTHING` / `ON CONFLICT (provider, provider_category) DO NOTHING` for idempotency
+- [ ] Write backfill step: resolve `category_id` for existing transactions by joining raw `category_primary`/`category_detailed` against `category_mappings`
+- **Ref:** `category-mapping.md` Sections 3, 6
+- **Files:** `internal/db/migrations/000XX_category_seed.go`
+
+### 20A.3 sqlc Queries
+
+- [ ] CRUD queries for `categories`: Insert, GetByID, GetBySlug, List (with parent join for tree), Update, Delete
+- [ ] CRUD queries for `category_mappings`: Insert, GetByID, List (filterable by provider), Update, Delete, BulkUpsert
+- [ ] `ListUnmappedCategories` query: distinct `(category_primary, category_detailed)` from transactions where `category_id IS NULL AND category_override = FALSE AND deleted_at IS NULL`
+- [ ] `CountTransactionsByCategory` query for transaction counts per category
+- [ ] Update `UpsertTransaction` to include `category_id` and `category_override` columns
+- **Ref:** `category-mapping.md` Sections 2, 4
+- **Files:** `internal/db/queries/categories.sql`, `internal/db/queries/category_mappings.sql`, `internal/db/queries/transactions.sql`
+
+### 20A.4 Category Service Layer
+
+- [ ] Category CRUD methods: ListCategories (tree), GetCategory, CreateCategory, UpdateCategory, DeleteCategory
+- [ ] Category mapping CRUD: ListMappings, CreateMapping, UpdateMapping, DeleteMapping, BulkUpsertMappings
+- [ ] `ListUnmappedCategories` — wraps query, returns structured unmapped pairs with provider info
+- [ ] MergeCategories(sourceID, targetID) — reassign transactions + mappings, then delete source
+- [ ] SetTransactionCategory(txID, categoryID) — set `category_id` + `category_override = true`
+- [ ] ResetTransactionCategory(txID) — clear override, re-resolve from mapping table
+- [ ] BulkReMap(oldCategoryID, newCategoryID, providerCategory) — update affected non-overridden transactions
+- [ ] Slug auto-generation from display name (lowercase, spaces→underscores, strip special chars, uniqueness check)
+- **Ref:** `category-mapping.md` Sections 4, 5
+- **Files:** `internal/service/categories.go`, `internal/service/types.go`
+
+### 20A.5 Sync Engine Integration
+
+- [ ] Implement `categoryResolver` struct — in-memory `map[string]pgtype.UUID` loaded once per sync run
+- [ ] `Resolve(provider, detailed, primary)` method: try `provider:detailed` → `provider:primary` → NULL
+- [ ] Load resolver from `category_mappings` at start of each sync batch
+- [ ] Integrate into `upsertTransaction`: set `category_id` on every synced transaction
+- [ ] Skip resolution when `category_override = true` (preserve manual overrides)
+- [ ] Teller resolution chain: check `teller:raw` first → fall through to `plaid:translated` strings
+- [ ] Update CSV import to resolve categories through mapping table (store raw in `category_primary`, resolve to `category_id`)
+- **Ref:** `category-mapping.md` Sections 4.1–4.4
+- **Files:** `internal/sync/engine.go`, `internal/sync/resolver.go`, `internal/service/csv_import.go`
+
+### Task Dependencies (20A)
+
+```
+20A.1 (schema) ──> 20A.2 (seed data)  ──> 20A.3 (sqlc queries) ──> 20A.4 (service layer)
+                                                                 ──> 20A.5 (sync engine)
+```
+
+### Checkpoint 20A
+
+1. Run migrations — `categories` table has ~120 rows, `category_mappings` has ~150 rows
+2. `transactions` table has `category_id` and `category_override` columns
+3. Existing transactions have `category_id` backfilled (check with `SELECT count(*) FROM transactions WHERE category_id IS NOT NULL`)
+4. Service methods work: `ListCategories` returns a tree, `CreateCategory` adds a custom category
+5. Sync a Plaid connection — new transactions get `category_id` automatically
+6. Sync a Teller connection — categories resolve through Teller→Plaid→user category chain
+7. Import a CSV with category column — raw values stored, `category_id` resolved via mapping table
+8. `ListUnmappedCategories` returns any raw categories that have no mapping entry
+9. `SetTransactionCategory` sets override; `ResetTransactionCategory` clears it and re-resolves
+10. `MergeCategories` reassigns transactions and mappings, deletes source category
+
+---
+
+## Phase 20B: Category Mapping — API & Dashboard
+
+REST API endpoints, MCP tool updates, and full admin dashboard for managing categories, provider mappings, and per-transaction overrides.
+
+**Depends on:** Phase 20A (Category Mapping — Schema & Engine)
+
+**Spec:** `docs/category-mapping.md`
+
+### 20B.1 REST API — Category & Mapping Endpoints
+
+- [ ] `GET /api/v1/categories` — list full taxonomy as grouped tree (primaries with nested children, includes icon, color, transaction count)
+- [ ] `GET /api/v1/categories/:id` — single category with transaction count
+- [ ] `POST /api/v1/categories` — create custom category (display_name, parent_id, icon, color)
+- [ ] `PUT /api/v1/categories/:id` — update category (display_name, icon, color, sort_order)
+- [ ] `DELETE /api/v1/categories/:id` — delete category (returns transaction count for confirmation)
+- [ ] `POST /api/v1/categories/:id/merge` — merge into target category
+- [ ] `GET /api/v1/category-mappings` — list mappings (filterable by `?provider=`)
+- [ ] `PUT /api/v1/category-mappings` — bulk upsert mappings (JSON body)
+- [ ] `DELETE /api/v1/category-mappings/:id` — delete single mapping
+- [ ] `GET /api/v1/categories/unmapped` — list unmapped provider categories from transactions
+- **Ref:** `category-mapping.md` Section 7.1
+- **Files:** `internal/api/categories.go`, `internal/api/category_mappings.go`
+
+### 20B.2 REST API — Transaction Category Updates
+
+- [ ] Rename `category_primary` → `category_primary_raw` and `category_detailed` → `category_detailed_raw` in `TransactionResponse`
+- [ ] Add structured `category` object to `TransactionResponse`: `{id, slug, display_name, primary_slug, primary_display_name, icon, color}`
+- [ ] Add `category_override` boolean to `TransactionResponse`
+- [ ] Add `category_slug` and `category_primary_slug` filter params to `ListTransactions`
+- [ ] `PATCH /api/v1/transactions/:id/category` — override transaction category (accepts `category_id`)
+- [ ] `DELETE /api/v1/transactions/:id/category` — reset to automatic (re-resolve from mapping)
+- [ ] Update dynamic query builder to support `category_id`-based filtering alongside slug lookups
+- **Ref:** `category-mapping.md` Section 7.1
+- **Files:** `internal/api/transactions.go`, `internal/service/transactions.go`, `internal/service/types.go`
+
+### 20B.3 MCP Tool Updates
+
+- [ ] Update `list_categories` to return user taxonomy with display names, icons, tree structure
+- [ ] Update `query_transactions` to accept `category_slug` filter and return structured `category` object
+- [ ] Add `categorize_transaction` tool (input: `transaction_id`, `category_slug`; sets `category_override = true`)
+- [ ] Add `list_unmapped_categories` tool for data quality visibility
+- [ ] Update MCP server instructions: describe category system, recommend `list_categories` before filtering
+- [ ] Update `breadbox://overview` resource: add category stats (total, custom, unmapped counts)
+- **Ref:** `category-mapping.md` Sections 7.2–7.3
+- **Files:** `internal/mcp/tools.go`, `internal/mcp/server.go`
+
+### 20B.4 Admin Dashboard — Categories Page
+
+- [ ] New `/admin/categories` route and handler
+- [ ] Categories page template: tree-list grouped by primary category
+- [ ] Each row shows: icon, color swatch, display name, slug (muted), transaction count, visibility toggle
+- [ ] Inline editing of category display name (click to edit)
+- [ ] Add category modal: display name, parent group dropdown, icon picker (Lucide names), color picker
+- [ ] Edit category modal: same fields as add
+- [ ] Delete category: confirmation dialog showing transaction count, optional "move to" picker
+- [ ] Merge category: "Merge into..." action with target category dropdown
+- [ ] "Unmapped Categories" alert card at top when unmapped transactions exist (count + link to mapping editor)
+- [ ] Add "Categories" item to sidebar navigation
+- **Ref:** `category-mapping.md` Section 8.1
+- **Files:** `internal/admin/categories.go`, `internal/templates/pages/categories.html`
+
+### 20B.5 Admin Dashboard — Mapping Editor
+
+- [ ] Provider mappings section/tab on categories page (`/admin/categories/mappings`)
+- [ ] Mapping table: provider badge, source category string, arrow, target user category display name
+- [ ] Filter by provider dropdown (Plaid / Teller / CSV / All)
+- [ ] "Unmapped only" toggle: shows distinct raw categories from transactions with no mapping
+- [ ] Inline mapping creation: unmapped category row → target category dropdown → save
+- [ ] Edit existing mapping: click target category → dropdown to change
+- [ ] Delete user mapping (revert to unmapped)
+- [ ] Bulk JSON import/export: textarea with formatted JSON, validate on import
+- [ ] Re-map prompt: "N existing transactions match. Apply to existing?" with yes/no
+- **Ref:** `category-mapping.md` Section 8.2
+- **Files:** `internal/admin/category_mappings.go`, `internal/templates/pages/category_mappings.html`
+
+### 20B.6 Admin Dashboard — Transaction Category Display
+
+- [ ] Transaction list: show category display name with icon instead of raw `UPPER_SNAKE_CASE`
+- [ ] Category filter dropdown: display names grouped by primary category
+- [ ] Inline category override: click category cell → dropdown of all categories
+- [ ] Visual indicator for overridden categories (e.g., small override badge)
+- [ ] "Reset to automatic" action for overridden categories
+- [ ] Account detail page: same category display and filter updates
+- **Ref:** `category-mapping.md` Section 8.3
+- **Files:** `internal/admin/transactions.go`, `internal/templates/pages/transactions.html`, `internal/templates/pages/account_detail.html`
+
+### Task Dependencies (20B)
+
+```
+20B.1 (category API)     ─┐
+20B.2 (transaction API)   ├── independent API tasks, can parallelize
+20B.3 (MCP tools)         ┘
+20B.4 (categories UI)    ──> 20B.6 (transaction UI)
+20B.5 (mapping editor)   — independent
+```
+
+### Checkpoint 20B
+
+1. `GET /api/v1/categories` returns full taxonomy tree with display names, icons, colors, transaction counts
+2. `POST /api/v1/categories` creates a custom category; it appears in the taxonomy
+3. Transaction API responses include structured `category` object and `category_primary_raw`/`category_detailed_raw`
+4. `?category_slug=food_and_drink_groceries` filters transactions correctly
+5. `PATCH /api/v1/transactions/:id/category` overrides; `DELETE` resets and re-resolves
+6. `list_categories` MCP tool returns human-friendly grouped taxonomy
+7. `categorize_transaction` MCP tool sets override successfully
+8. Navigate to `/admin/categories` — see grouped tree with icons, counts, and visibility toggles
+9. Create, edit, delete, and merge categories from the dashboard
+10. Mapping editor: change a Teller mapping, see "Apply to existing?" prompt, confirm
+11. Map an unmapped CSV category inline — affected transactions get recategorized
+12. Export mappings as JSON, edit, re-import — round-trip preserves all mappings
+13. Transaction list shows display names; click to override; override badge visible; reset works
