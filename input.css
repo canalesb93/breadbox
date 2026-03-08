@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: corporate --default, business --prefersdark;
+  themes: light --default, dark --prefersdark;
 }
 
 /* Utility: hide Alpine.js elements until initialized */
@@ -54,5 +54,10 @@
 
   .bb-info-grid dd {
     @apply text-base-content;
+  }
+
+  /* Sidebar active nav item accent */
+  .menu li > .menu-active {
+    @apply border-l-3 border-primary;
   }
 }

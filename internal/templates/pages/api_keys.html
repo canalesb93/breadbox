@@ -8,7 +8,7 @@
 </div>
 
 {{if .Keys}}
-<div class="overflow-x-auto">
+<div class="overflow-x-auto border border-base-300 rounded-lg">
   <table class="table table-zebra table-sm">
     <thead>
       <tr>
@@ -22,7 +22,7 @@
     </thead>
     <tbody>
       {{range .Keys}}
-      <tr class="hover:bg-base-200">
+      <tr class="hover:bg-base-300">
         <td>{{.Name}}</td>
         <td><code class="font-mono text-sm">{{.KeyPrefix}}...</code></td>
         <td>{{if .LastUsedAt}}{{.LastUsedAt}}{{else}}&mdash;{{end}}</td>
@@ -52,7 +52,7 @@
   </table>
 </div>
 {{else}}
-<div class="card bg-base-200">
+<div class="card bg-base-100 border border-base-300">
   <div class="card-body items-center text-center py-12">
     <i data-lucide="key" class="w-12 h-12 text-base-content/30 mb-2"></i>
     <p class="text-base-content/70">No API keys yet.</p>
