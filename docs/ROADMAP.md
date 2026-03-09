@@ -2413,12 +2413,13 @@ Make the API surface efficient for AI agent consumption.
 
 ---
 
-### Phase 23: MCP Permissions & Custom Instructions
+### Phase 23: MCP Permissions & Custom Instructions ✅
 
 Admin control over what agents can do and how they behave.
 
 - **Spec:** [`docs/phase-23-mcp-permissions.md`](phase-23-mcp-permissions.md)
 - **Key deliverables:** global read-only/read-write mode, per-tool enable/disable, custom MCP instructions editor at `/admin/mcp`, API key scoping (read-only vs full-access)
+- **Status:** Complete. Global mode (read_only/read_write), per-tool enable/disable, custom instructions with templates, API key scope (full_access/read_only), RequireWriteScope middleware, per-request MCP server filtering, `/admin/mcp` settings page.
 
 ---
 

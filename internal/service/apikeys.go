@@ -15,7 +15,14 @@ import (
 
 const base62Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
-func (s *Service) CreateAPIKey(ctx context.Context, name string) (*CreateAPIKeyResult, error) {
+func (s *Service) CreateAPIKey(ctx context.Context, name string, scope string) (*CreateAPIKeyResult, error) {
+	if scope == "" {
+		scope = "full_access"
+	}
+	if scope != "full_access" && scope != "read_only" {
+		return nil, fmt.Errorf("invalid scope: %s", scope)
+	}
+
 	// Generate 32 random bytes
 	randomBytes := make([]byte, 32)
 	if _, err := rand.Read(randomBytes); err != nil {
@@ -46,6 +53,7 @@ func (s *Service) CreateAPIKey(ctx context.Context, name string) (*CreateAPIKeyR
 		Name:      name,
 		KeyHash:   keyHash,
 		KeyPrefix: keyPrefix,
+		Scope:     scope,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create api key: %w", err)
@@ -106,6 +114,7 @@ func apiKeyFromRow(r db.ApiKey) APIKeyResponse {
 		ID:         formatUUID(r.ID),
 		Name:       r.Name,
 		KeyPrefix:  r.KeyPrefix,
+		Scope:      r.Scope,
 		LastUsedAt: timestampStr(r.LastUsedAt),
 		RevokedAt:  timestampStr(r.RevokedAt),
 		CreatedAt:  r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),

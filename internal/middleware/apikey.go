@@ -44,6 +44,8 @@ func APIKeyAuth(svc *service.Service) func(http.Handler) http.Handler {
 			// Store API key identity in context for actor resolution.
 			keyID := formatUUID(apiKey.ID)
 			ctx := service.ContextWithAPIKey(r.Context(), keyID, apiKey.Name)
+			// Store full API key record for scope checks.
+			ctx = SetAPIKey(ctx, apiKey)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

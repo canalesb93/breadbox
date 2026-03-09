@@ -17,7 +17,8 @@ import (
 func CreateAPIKeyHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Name string `json:"name"`
+			Name  string `json:"name"`
+			Scope string `json:"scope"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
@@ -30,7 +31,10 @@ func CreateAPIKeyHandler(svc *service.Service) http.HandlerFunc {
 			})
 			return
 		}
-		result, err := svc.CreateAPIKey(r.Context(), req.Name)
+		if req.Scope == "" {
+			req.Scope = "full_access"
+		}
+		result, err := svc.CreateAPIKey(r.Context(), req.Name, req.Scope)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create API key"})
 			return
@@ -106,7 +110,11 @@ func APIKeyCreatePageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 			http.Redirect(w, r, "/admin/api-keys/new", http.StatusSeeOther)
 			return
 		}
-		result, err := svc.CreateAPIKey(r.Context(), name)
+		scope := r.FormValue("scope")
+		if scope == "" {
+			scope = "full_access"
+		}
+		result, err := svc.CreateAPIKey(r.Context(), name, scope)
 		if err != nil {
 			SetFlash(r.Context(), sm, "error", "Failed to create API key")
 			http.Redirect(w, r, "/admin/api-keys/new", http.StatusSeeOther)

@@ -1,28 +1,18 @@
 package mcp
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 
+	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// MCPServer wraps the MCP SDK server and the breadbox service layer.
-type MCPServer struct {
-	server *mcpsdk.Server
-	svc    *service.Service
-}
-
-// NewMCPServer creates a new MCP server, registers all tools, and returns it.
-func NewMCPServer(svc *service.Service, version string) *MCPServer {
-	server := mcpsdk.NewServer(
-		&mcpsdk.Implementation{
-			Name:    "breadbox",
-			Version: version,
-		},
-		&mcpsdk.ServerOptions{
-			Instructions: `Breadbox is a self-hosted financial data aggregation server for families. It syncs bank data from Plaid, Teller, and CSV imports into a unified PostgreSQL database.
+// BuiltInInstructions contains the default MCP server instructions.
+const BuiltInInstructions = `Breadbox is a self-hosted financial data aggregation server for families. It syncs bank data from Plaid, Teller, and CSV imports into a unified PostgreSQL database.
 
 DATA MODEL:
 - Users: family members who own bank connections
@@ -63,32 +53,218 @@ COMMENTS & AUDIT LOG:
 - Use add_transaction_comment to explain your reasoning when recategorizing transactions
 - Check list_transaction_comments before modifying a transaction to see prior context
 - Use get_transaction_history to understand how a transaction has been modified over time
-- Use query_audit_log with actor_type='user' to learn the family's categorization preferences`,
-		},
-	)
+- Use query_audit_log with actor_type='user' to learn the family's categorization preferences`
 
+// ToolClassification indicates whether a tool is read-only or performs writes.
+type ToolClassification string
+
+const (
+	ToolRead  ToolClassification = "read"
+	ToolWrite ToolClassification = "write"
+)
+
+// ToolDef holds a tool definition, its handler, and classification metadata.
+type ToolDef struct {
+	Tool           mcpsdk.Tool
+	Classification ToolClassification
+	// register is a function that registers this tool on a server.
+	register func(server *mcpsdk.Server)
+}
+
+// MCPServerConfig holds runtime MCP permissions loaded from app_config + API key.
+type MCPServerConfig struct {
+	Mode              string   // "read_only" or "read_write"
+	DisabledTools     []string // tool names to suppress
+	CustomInstructions string  // markdown appended to built-in instructions
+	APIKeyScope       string   // "full_access" or "read_only" — from request context
+}
+
+// MCPServer wraps the MCP SDK server and the breadbox service layer.
+type MCPServer struct {
+	svc      *service.Service
+	version  string
+	allTools []ToolDef
+}
+
+// NewMCPServer creates a new MCP server with all tools registered in a registry.
+func NewMCPServer(svc *service.Service, version string) *MCPServer {
 	s := &MCPServer{
-		server: server,
-		svc:    svc,
+		svc:     svc,
+		version: version,
 	}
-
-	s.registerTools()
-	s.registerResources()
-
+	s.buildToolRegistry()
 	return s
 }
 
-// Server returns the underlying MCP SDK server.
-func (s *MCPServer) Server() *mcpsdk.Server {
-	return s.server
+// buildToolRegistry populates the allTools slice with all available tools and their classifications.
+func (s *MCPServer) buildToolRegistry() {
+	s.allTools = []ToolDef{
+		makeToolDef("list_accounts", ToolRead,
+			"List all bank accounts synced from Plaid, Teller, or CSV import. Each account belongs to a bank connection and optionally a user (family member). Returns account type, balances, institution name, and currency. Filter by user_id to see one family member's accounts.",
+			s.handleListAccounts),
+		makeToolDef("query_transactions", ToolRead,
+			"Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (use list_categories to find slugs); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Use the fields parameter to request only the fields you need (e.g., fields=core,category) to significantly reduce response size.",
+			s.handleQueryTransactions),
+		makeToolDef("count_transactions", ToolRead,
+			"Count transactions matching optional filters. Same filters as query_transactions except cursor, limit, sort_by, and sort_order. Use this to get totals before paginating, or to compare counts across date ranges or categories.",
+			s.handleCountTransactions),
+		makeToolDef("list_categories", ToolRead,
+			"List the full category taxonomy as a tree. Categories have: slug (stable identifier for filtering), display_name (human label), icon, color, and optional children. Use category slugs with the category_slug filter in query_transactions and count_transactions. Parent slugs include all children when filtering.",
+			s.handleListCategories),
+		makeToolDef("list_users", ToolRead,
+			"List all users (family members) in the system. Each user can own bank connections and their associated accounts. Use the returned user IDs to filter accounts or transactions by family member.",
+			s.handleListUsers),
+		makeToolDef("get_sync_status", ToolRead,
+			"Get the status of all bank connections including provider type (plaid/teller/csv), sync status (active/error/pending_reauth), last sync time, and any error details. Use this to check data freshness or diagnose sync issues.",
+			s.handleGetSyncStatus),
+		makeToolDef("trigger_sync", ToolWrite,
+			"Trigger a manual sync of bank data from the provider (Plaid or Teller). Optionally specify a connection_id to sync a single connection; otherwise syncs all active connections. Returns immediately — the sync runs in the background. Check get_sync_status for results.",
+			s.handleTriggerSync),
+		makeToolDef("categorize_transaction", ToolWrite,
+			"Manually override a transaction's category. Use list_categories to find the category ID, then pass both the transaction_id and category_id. This creates a permanent override that won't be changed by automatic sync.",
+			s.handleCategorizeTransaction),
+		makeToolDef("reset_transaction_category", ToolWrite,
+			"Remove a manual category override from a transaction and re-resolve its category from the automatic mapping rules. Use this to undo a categorize_transaction action.",
+			s.handleResetTransactionCategory),
+		makeToolDef("list_unmapped_categories", ToolRead,
+			"List distinct raw provider category strings from transactions that currently have no category mapping. These are transactions the system couldn't automatically categorize. Results show the raw primary and detailed category strings from the provider.",
+			s.handleListUnmappedCategories),
+		makeToolDef("add_transaction_comment", ToolWrite,
+			"Add a comment to a transaction. Use this to explain categorization decisions, flag unusual transactions, or leave notes for the family. Comments are visible on the transaction detail page and to other agents. Supports markdown formatting.",
+			s.handleAddTransactionComment),
+		makeToolDef("list_transaction_comments", ToolRead,
+			"List all comments on a transaction, ordered chronologically. Check comments before making changes to understand prior context and decisions by other agents or family members.",
+			s.handleListTransactionComments),
+		makeToolDef("get_transaction_history", ToolRead,
+			"Get the change history (audit log) for a specific transaction. Shows all modifications including category changes, comment additions, and sync updates. Use this to understand how a transaction's categorization evolved over time and learn from past decisions.",
+			s.handleGetTransactionHistory),
+		makeToolDef("query_audit_log", ToolRead,
+			"Query the global audit log to see all changes across the system. Use entity_type to focus on specific data types. Filter by actor_type='agent' to see what other AI agents have done, or actor_type='user' to see manual changes by the family. Useful for learning patterns: e.g., query all category overrides to understand the family's preferences.",
+			s.handleQueryAuditLog),
+		makeToolDef("transaction_summary", ToolRead,
+			"Get aggregated transaction totals grouped by category and/or time period. Replaces the need to paginate through thousands of individual transactions for spending analysis. Amounts follow the convention: positive = money out (debit), negative = money in (credit). Only includes non-deleted, non-pending transactions by default.",
+			s.handleTransactionSummary),
+		makeToolDef("list_category_mappings", ToolRead,
+			"List category mappings that translate provider-specific category strings to user categories. Filter by provider to see mappings for a specific bank data source. Returns the provider, raw provider category string, and the mapped user category slug and display name.",
+			s.handleListCategoryMappings),
+		makeToolDef("create_category_mapping", ToolWrite,
+			"Create a new category mapping that tells the system how to translate a provider's raw category string to a user category. For example, map Teller's 'dining' to your 'food_and_drink_restaurant' category. The mapping takes effect on the next sync — existing transactions are not retroactively updated.",
+			s.handleCreateCategoryMapping),
+		makeToolDef("update_category_mapping", ToolWrite,
+			"Update an existing category mapping to point to a different user category. Identified by mapping ID or by the (provider, provider_category) pair. Does not retroactively update transactions — wait for next sync.",
+			s.handleUpdateCategoryMapping),
+		makeToolDef("delete_category_mapping", ToolWrite,
+			"Delete a category mapping. After deletion, transactions with this provider category string will fall back to 'uncategorized' on next sync. Identified by mapping ID or by (provider, provider_category) pair.",
+			s.handleDeleteCategoryMapping),
+	}
 }
 
-// NewHTTPHandler wraps the MCP server in a Streamable HTTP handler.
-func NewHTTPHandler(s *MCPServer) http.Handler {
+// makeToolDef is a helper to create a ToolDef with a typed handler.
+func makeToolDef[T any](name string, classification ToolClassification, description string, handler func(context.Context, *mcpsdk.CallToolRequest, T) (*mcpsdk.CallToolResult, any, error)) ToolDef {
+	return ToolDef{
+		Tool: mcpsdk.Tool{
+			Name:        name,
+			Description: description,
+		},
+		Classification: classification,
+		register: func(server *mcpsdk.Server) {
+			mcpsdk.AddTool(server, &mcpsdk.Tool{
+				Name:        name,
+				Description: description,
+			}, handler)
+		},
+	}
+}
+
+// BuildServer creates a filtered *mcpsdk.Server for the given config.
+func (s *MCPServer) BuildServer(cfg MCPServerConfig) *mcpsdk.Server {
+	instructions := BuiltInInstructions
+	if cfg.CustomInstructions != "" {
+		instructions += "\n\nCUSTOM INSTRUCTIONS:\n" + cfg.CustomInstructions
+	}
+
+	server := mcpsdk.NewServer(
+		&mcpsdk.Implementation{Name: "breadbox", Version: s.version},
+		&mcpsdk.ServerOptions{Instructions: instructions},
+	)
+
+	disabledSet := make(map[string]bool)
+	for _, name := range cfg.DisabledTools {
+		disabledSet[name] = true
+	}
+
+	for _, td := range s.allTools {
+		if disabledSet[td.Tool.Name] {
+			continue
+		}
+		if td.Classification == ToolWrite && (cfg.Mode == "read_only" || cfg.APIKeyScope == "read_only") {
+			continue
+		}
+		td.register(server)
+	}
+
+	s.registerResources(server)
+	return server
+}
+
+// Server returns a default MCP server with all tools registered (for backward compat / stdio).
+func (s *MCPServer) Server() *mcpsdk.Server {
+	return s.BuildServer(MCPServerConfig{
+		Mode:        "read_write",
+		APIKeyScope: "full_access",
+	})
+}
+
+// registerResources adds MCP resources to a server.
+func (s *MCPServer) registerResources(server *mcpsdk.Server) {
+	server.AddResource(&mcpsdk.Resource{
+		Name:        "Overview",
+		URI:         "breadbox://overview",
+		Description: "Live summary of the Breadbox data model: user, connection, account, and transaction counts plus the transaction date range. Read this first to understand the dataset scope.",
+		MIMEType:    "application/json",
+	}, s.handleOverviewResource)
+}
+
+// AllToolDefs returns the full tool registry for admin display.
+func (s *MCPServer) AllToolDefs() []ToolDef {
+	return s.allTools
+}
+
+// NewHTTPHandler wraps the MCP server in a Streamable HTTP handler with per-request filtering.
+func NewHTTPHandler(s *MCPServer, svc *service.Service) http.Handler {
 	return mcpsdk.NewStreamableHTTPHandler(
 		func(r *http.Request) *mcpsdk.Server {
-			return s.server
+			// Load MCP config from DB.
+			mcpCfg, err := svc.GetMCPConfig(r.Context())
+			if err != nil {
+				// Fall back to defaults on error.
+				mcpCfg = &service.MCPConfig{
+					Mode:          "read_only",
+					DisabledTools: []string{},
+				}
+			}
+
+			// Get API key scope from context.
+			apiKeyScope := "full_access"
+			if apiKey := mw.GetAPIKey(r.Context()); apiKey != nil {
+				apiKeyScope = apiKey.Scope
+			}
+
+			return s.BuildServer(MCPServerConfig{
+				Mode:               mcpCfg.Mode,
+				DisabledTools:      mcpCfg.DisabledTools,
+				CustomInstructions: mcpCfg.CustomInstructions,
+				APIKeyScope:        apiKeyScope,
+			})
 		},
 		nil,
 	)
+}
+
+// checkWritePermission verifies the requesting API key has write access.
+func checkWritePermission(ctx context.Context) error {
+	if apiKey := mw.GetAPIKey(ctx); apiKey != nil && apiKey.Scope == "read_only" {
+		return fmt.Errorf("this API key has read-only access and cannot perform write operations")
+	}
+	return nil
 }

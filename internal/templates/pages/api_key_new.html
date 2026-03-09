@@ -10,6 +10,14 @@
         <input type="text" id="name" name="name" class="input w-full" placeholder="e.g., Claude MCP, Dashboard" required autofocus>
         <p class="text-sm text-base-content/60 mt-1">A descriptive name to identify this API key.</p>
       </fieldset>
+      <fieldset class="fieldset mt-3">
+        <label class="fieldset-label" for="scope">Scope</label>
+        <select id="scope" name="scope" class="select select-bordered w-full">
+          <option value="full_access">Full Access &mdash; read and write</option>
+          <option value="read_only">Read Only &mdash; query data only</option>
+        </select>
+        <p class="text-sm text-base-content/60 mt-1">Read-only keys cannot trigger syncs, categorize transactions, or use write MCP tools.</p>
+      </fieldset>
       <div class="flex gap-2 mt-4">
         <button type="submit" class="btn btn-primary">Create API Key</button>
         <a href="/admin/api-keys" class="btn btn-ghost">Cancel</a>

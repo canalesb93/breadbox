@@ -13,6 +13,7 @@
     <thead>
       <tr>
         <th>Name</th>
+        <th>Scope</th>
         <th>Key Prefix</th>
         <th>Last Used</th>
         <th>Status</th>
@@ -24,6 +25,13 @@
       {{range .Keys}}
       <tr class="hover:bg-base-300">
         <td>{{.Name}}</td>
+        <td>
+          {{if eq .Scope "read_only"}}
+            <span class="badge badge-warning badge-sm">Read Only</span>
+          {{else}}
+            <span class="badge badge-info badge-sm">Full Access</span>
+          {{end}}
+        </td>
         <td><code class="font-mono text-sm">{{.KeyPrefix}}...</code></td>
         <td>{{if .LastUsedAt}}{{.LastUsedAt}}{{else}}&mdash;{{end}}</td>
         <td>
