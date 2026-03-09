@@ -1,6 +1,8 @@
 // Package testutil provides helpers for integration tests that need a real PostgreSQL database.
 //
-// Usage in tests:
+// Usage in tests (files must have //go:build integration):
+//
+//	//go:build integration
 //
 //	func TestMain(m *testing.M) {
 //		testutil.RunWithDB(m)
@@ -14,18 +16,23 @@
 //
 // The test database is created once per test binary (via TestMain), migrations are applied,
 // and tables are truncated between each test via Pool/Queries helpers.
+//
+// IMPORTANT: Integration tests must NOT use t.Parallel() — they share a single database
+// and truncate tables at the start of each test for isolation.
 package testutil
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math/big"
 	"os"
-	"strings"
 	"testing"
+	"time"
 
 	"breadbox/internal/db"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib" // database/sql driver for goose
 	"github.com/pressly/goose/v3"
@@ -103,6 +110,77 @@ func ServicePool(t *testing.T) (*pgxpool.Pool, *db.Queries) {
 	return p, db.New(p)
 }
 
+// --- Fixture helpers (fatal on error to catch silent setup failures) ---
+
+// MustCreateUser creates a user and fatals on error.
+func MustCreateUser(t *testing.T, q *db.Queries, name string) db.User {
+	t.Helper()
+	u, err := q.CreateUser(context.Background(), db.CreateUserParams{
+		Name: name,
+	})
+	if err != nil {
+		t.Fatalf("MustCreateUser(%q): %v", name, err)
+	}
+	return u
+}
+
+// MustCreateConnection creates an active Plaid bank connection and fatals on error.
+func MustCreateConnection(t *testing.T, q *db.Queries, userID pgtype.UUID, extID string) db.BankConnection {
+	t.Helper()
+	conn, err := q.CreateBankConnection(context.Background(), db.CreateBankConnectionParams{
+		Provider:             db.ProviderTypePlaid,
+		ExternalID:           pgtype.Text{String: extID, Valid: true},
+		EncryptedCredentials: []byte("test_encrypted"),
+		Status:               db.ConnectionStatusActive,
+		UserID:               userID,
+	})
+	if err != nil {
+		t.Fatalf("MustCreateConnection(%q): %v", extID, err)
+	}
+	return conn
+}
+
+// MustCreateAccount creates an account and fatals on error.
+func MustCreateAccount(t *testing.T, q *db.Queries, connID pgtype.UUID, extID, name string) db.Account {
+	t.Helper()
+	acct, err := q.UpsertAccount(context.Background(), db.UpsertAccountParams{
+		ConnectionID:      connID,
+		ExternalAccountID: extID,
+		Name:              name,
+		Type:              "depository",
+	})
+	if err != nil {
+		t.Fatalf("MustCreateAccount(%q): %v", name, err)
+	}
+	return acct
+}
+
+// MustCreateTransaction creates a transaction and fatals on error.
+func MustCreateTransaction(t *testing.T, q *db.Queries, acctID pgtype.UUID, extID, name string, amountCents int64, date string) db.Transaction {
+	t.Helper()
+	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
+		AccountID:             acctID,
+		ExternalTransactionID: extID,
+		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
+		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
+		Date:                  pgtype.Date{Time: MustParseDate(date), Valid: true},
+		Name:                  name,
+	})
+	if err != nil {
+		t.Fatalf("MustCreateTransaction(%q): %v", name, err)
+	}
+	return txn
+}
+
+// MustParseDate parses a "2006-01-02" date string and panics on failure.
+func MustParseDate(s string) time.Time {
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		panic(fmt.Sprintf("MustParseDate(%q): %v", s, err))
+	}
+	return t
+}
+
 func testDSN() string {
 	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
 		return dsn
@@ -129,27 +207,51 @@ func findMigrationsDir() string {
 	return "internal/db/migrations"
 }
 
-// truncateTables removes all data from application tables. System tables (goose, sessions) are preserved.
+// truncateTables dynamically discovers and truncates all application tables.
+// System tables (goose_db_version, sessions) are preserved.
 func truncateTables(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 
-	tables := []string{
-		"audit_log",
-		"transaction_comments",
-		"category_mappings",
-		"transactions",
-		"accounts",
-		"sync_logs",
-		"bank_connections",
-		"api_keys",
-		"users",
-		"categories",
-		"admin_accounts",
-		"app_config",
+	query := `SELECT tablename FROM pg_tables
+		WHERE schemaname = 'public'
+		AND tablename NOT IN ('goose_db_version', 'sessions')
+		ORDER BY tablename`
+
+	rows, err := pool.Query(context.Background(), query)
+	if err != nil {
+		t.Fatalf("testutil: list tables: %v", err)
+	}
+	defer rows.Close()
+
+	var tables []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatalf("testutil: scan table name: %v", err)
+		}
+		tables = append(tables, name)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("testutil: iterate tables: %v", err)
 	}
 
-	query := "TRUNCATE " + strings.Join(tables, ", ") + " CASCADE"
-	if _, err := pool.Exec(context.Background(), query); err != nil {
+	if len(tables) == 0 {
+		return
+	}
+
+	truncateSQL := "TRUNCATE " + joinQuoted(tables) + " CASCADE"
+	if _, err := pool.Exec(context.Background(), truncateSQL); err != nil {
 		t.Fatalf("testutil: truncate tables: %v", err)
 	}
+}
+
+func joinQuoted(names []string) string {
+	result := ""
+	for i, n := range names {
+		if i > 0 {
+			result += ", "
+		}
+		result += `"` + n + `"`
+	}
+	return result
 }
