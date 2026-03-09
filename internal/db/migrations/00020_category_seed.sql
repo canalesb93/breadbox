@@ -430,10 +430,10 @@ ON CONFLICT (provider, provider_category) DO NOTHING;
 -- Pass 1: Plaid detailed category match
 UPDATE transactions t
 SET category_id = cm.category_id
-FROM category_mappings cm
-JOIN accounts a ON t.account_id = a.id
-JOIN bank_connections c ON a.connection_id = c.id
-WHERE c.provider = 'plaid'
+FROM category_mappings cm, accounts a, bank_connections c
+WHERE t.account_id = a.id
+  AND a.connection_id = c.id
+  AND c.provider = 'plaid'
   AND cm.provider = 'plaid'
   AND cm.provider_category = t.category_detailed
   AND t.category_id IS NULL
@@ -442,10 +442,10 @@ WHERE c.provider = 'plaid'
 -- Pass 2: Plaid primary-only fallback
 UPDATE transactions t
 SET category_id = cm.category_id
-FROM category_mappings cm
-JOIN accounts a ON t.account_id = a.id
-JOIN bank_connections c ON a.connection_id = c.id
-WHERE c.provider = 'plaid'
+FROM category_mappings cm, accounts a, bank_connections c
+WHERE t.account_id = a.id
+  AND a.connection_id = c.id
+  AND c.provider = 'plaid'
   AND cm.provider = 'plaid'
   AND cm.provider_category = t.category_primary
   AND t.category_id IS NULL
@@ -457,10 +457,10 @@ WHERE c.provider = 'plaid'
 -- Plaid translation of that Teller category.
 UPDATE transactions t
 SET category_id = cm.category_id
-FROM category_mappings cm
-JOIN accounts a ON t.account_id = a.id
-JOIN bank_connections c ON a.connection_id = c.id
-WHERE c.provider = 'teller'
+FROM category_mappings cm, accounts a, bank_connections c
+WHERE t.account_id = a.id
+  AND a.connection_id = c.id
+  AND c.provider = 'teller'
   AND cm.provider = 'teller'
   AND t.category_id IS NULL
   AND t.deleted_at IS NULL
