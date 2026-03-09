@@ -61,6 +61,16 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/connections", ListConnectionsHandler(svc))
 		r.Get("/connections/{id}/status", GetConnectionStatusHandler(svc))
 		r.Post("/sync", TriggerSyncHandler(svc))
+
+		// Transaction comments
+		r.Get("/transactions/{transaction_id}/comments", ListCommentsHandler(svc))
+		r.Post("/transactions/{transaction_id}/comments", CreateCommentHandler(svc))
+		r.Put("/transactions/{transaction_id}/comments/{id}", UpdateCommentHandler(svc))
+		r.Delete("/transactions/{transaction_id}/comments/{id}", DeleteCommentHandler(svc))
+
+		// Audit log
+		r.Get("/audit-log", ListAuditLogHandler(svc))
+		r.Get("/transactions/{id}/audit-log", ListTransactionAuditLogHandler(svc))
 	})
 
 	// MCP server — API key authenticated.

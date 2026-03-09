@@ -161,6 +161,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/account_detail.html",
 		"pages/categories.html",
 		"pages/category_mappings.html",
+		"pages/transaction_detail.html",
 	}
 
 	// Pages using the wizard layout (login + first-run admin creation).

@@ -8,4 +8,5 @@ var (
 	ErrRevokedAPIKey  = errors.New("api key has been revoked")
 	ErrInvalidCursor  = errors.New("invalid cursor")
 	ErrSyncInProgress = errors.New("sync already in progress")
+	ErrForbidden      = errors.New("forbidden")
 )

@@ -8,7 +8,9 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
+	"breadbox/internal/service"
 
+	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -97,7 +99,7 @@ type createUserRequest struct {
 }
 
 // CreateUserHandler serves POST /admin/api/users.
-func CreateUserHandler(a *app.App) http.HandlerFunc {
+func CreateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req createUserRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -134,8 +136,14 @@ func CreateUserHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		actor := ActorFromSession(sm, r)
+		userID := formatUUID(user.ID)
+		_ = a.Service.WriteAuditLog(r.Context(), []service.AuditLogEntry{{
+			EntityType: "user", EntityID: userID, Action: "create", Actor: actor,
+		}})
+
 		writeJSON(w, http.StatusCreated, map[string]any{
-			"id":         formatUUID(user.ID),
+			"id":         userID,
 			"name":       user.Name,
 			"email":      nullTextToPtr(user.Email),
 			"created_at": user.CreatedAt.Time,
@@ -151,7 +159,7 @@ type updateUserRequest struct {
 }
 
 // UpdateUserHandler serves PUT /admin/api/users/{id}.
-func UpdateUserHandler(a *app.App) http.HandlerFunc {
+func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
 
@@ -213,6 +221,31 @@ func UpdateUserHandler(a *app.App) http.HandlerFunc {
 			a.Logger.Error("update user", "error", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update user"})
 			return
+		}
+
+		// Write audit log entries for changed fields.
+		actor := ActorFromSession(sm, r)
+		var entries []service.AuditLogEntry
+		if name != existing.Name {
+			field := "name"
+			oldVal := existing.Name
+			newVal := name
+			entries = append(entries, service.AuditLogEntry{
+				EntityType: "user", EntityID: idStr, Action: "update",
+				Field: &field, OldValue: &oldVal, NewValue: &newVal, Actor: actor,
+			})
+		}
+		if email != existing.Email {
+			field := "email"
+			oldVal := existing.Email.String
+			newVal := email.String
+			entries = append(entries, service.AuditLogEntry{
+				EntityType: "user", EntityID: idStr, Action: "update",
+				Field: &field, OldValue: &oldVal, NewValue: &newVal, Actor: actor,
+			})
+		}
+		if len(entries) > 0 {
+			_ = a.Service.WriteAuditLog(r.Context(), entries)
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{

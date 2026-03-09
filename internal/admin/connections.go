@@ -9,7 +9,9 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/db"
 	"breadbox/internal/provider"
+	"breadbox/internal/service"
 
+	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -371,7 +373,7 @@ func ConnectionReauthCompleteHandler(a *app.App) http.HandlerFunc {
 }
 
 // DeleteConnectionHandler serves DELETE /admin/api/connections/{id}.
-func DeleteConnectionHandler(a *app.App) http.HandlerFunc {
+func DeleteConnectionHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
 		ctx := r.Context()
@@ -406,6 +408,11 @@ func DeleteConnectionHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		actor := ActorFromSession(sm, r)
+		_ = a.Service.WriteAuditLog(ctx, []service.AuditLogEntry{{
+			EntityType: "connection", EntityID: idStr, Action: "delete", Actor: actor,
+		}})
+
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -438,7 +445,7 @@ func SyncConnectionHandler(a *app.App) http.HandlerFunc {
 }
 
 // UpdateAccountExcludedHandler serves POST /admin/api/accounts/{id}/excluded.
-func UpdateAccountExcludedHandler(a *app.App) http.HandlerFunc {
+func UpdateAccountExcludedHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
 
@@ -456,6 +463,10 @@ func UpdateAccountExcludedHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		// Capture old value for audit.
+		oldAccount, _ := a.Queries.GetAccount(r.Context(), accountID)
+		oldVal := fmt.Sprintf("%t", oldAccount.Excluded)
+
 		account, err := a.Queries.UpdateAccountExcluded(r.Context(), db.UpdateAccountExcludedParams{
 			ID:       accountID,
 			Excluded: req.Excluded,
@@ -466,12 +477,20 @@ func UpdateAccountExcludedHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		actor := ActorFromSession(sm, r)
+		field := "excluded"
+		newVal := fmt.Sprintf("%t", req.Excluded)
+		_ = a.Service.WriteAuditLog(r.Context(), []service.AuditLogEntry{{
+			EntityType: "account", EntityID: idStr, Action: "update",
+			Field: &field, OldValue: &oldVal, NewValue: &newVal, Actor: actor,
+		}})
+
 		writeJSON(w, http.StatusOK, account)
 	}
 }
 
 // UpdateAccountDisplayNameHandler serves POST /admin/api/accounts/{id}/display-name.
-func UpdateAccountDisplayNameHandler(a *app.App) http.HandlerFunc {
+func UpdateAccountDisplayNameHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
 
@@ -489,6 +508,10 @@ func UpdateAccountDisplayNameHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		// Capture old value for audit.
+		oldAccount, _ := a.Queries.GetAccount(r.Context(), accountID)
+		oldVal := oldAccount.DisplayName.String
+
 		var displayName pgtype.Text
 		if req.DisplayName != nil && *req.DisplayName != "" {
 			displayName = pgtype.Text{String: *req.DisplayName, Valid: true}
@@ -504,12 +527,20 @@ func UpdateAccountDisplayNameHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		actor := ActorFromSession(sm, r)
+		field := "display_name"
+		newVal := displayName.String
+		_ = a.Service.WriteAuditLog(r.Context(), []service.AuditLogEntry{{
+			EntityType: "account", EntityID: idStr, Action: "update",
+			Field: &field, OldValue: &oldVal, NewValue: &newVal, Actor: actor,
+		}})
+
 		writeJSON(w, http.StatusOK, account)
 	}
 }
 
 // UpdateConnectionPausedHandler serves POST /admin/api/connections/{id}/paused.
-func UpdateConnectionPausedHandler(a *app.App) http.HandlerFunc {
+func UpdateConnectionPausedHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
 
@@ -527,6 +558,10 @@ func UpdateConnectionPausedHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		// Capture old value.
+		oldConn, _ := a.Queries.GetBankConnection(r.Context(), connID)
+		oldVal := fmt.Sprintf("%t", oldConn.Paused)
+
 		conn, err := a.Queries.UpdateConnectionPaused(r.Context(), db.UpdateConnectionPausedParams{
 			ID:     connID,
 			Paused: req.Paused,
@@ -537,12 +572,20 @@ func UpdateConnectionPausedHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		actor := ActorFromSession(sm, r)
+		field := "paused"
+		newVal := fmt.Sprintf("%t", req.Paused)
+		_ = a.Service.WriteAuditLog(r.Context(), []service.AuditLogEntry{{
+			EntityType: "connection", EntityID: idStr, Action: "update",
+			Field: &field, OldValue: &oldVal, NewValue: &newVal, Actor: actor,
+		}})
+
 		writeJSON(w, http.StatusOK, conn)
 	}
 }
 
 // UpdateConnectionSyncIntervalHandler serves POST /admin/api/connections/{id}/sync-interval.
-func UpdateConnectionSyncIntervalHandler(a *app.App) http.HandlerFunc {
+func UpdateConnectionSyncIntervalHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
 
@@ -560,6 +603,13 @@ func UpdateConnectionSyncIntervalHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		// Capture old value.
+		oldConn, _ := a.Queries.GetBankConnection(r.Context(), connID)
+		oldVal := ""
+		if oldConn.SyncIntervalOverrideMinutes.Valid {
+			oldVal = fmt.Sprintf("%d", oldConn.SyncIntervalOverrideMinutes.Int32)
+		}
+
 		var interval pgtype.Int4
 		if req.Minutes != nil {
 			interval = pgtype.Int4{Int32: *req.Minutes, Valid: true}
@@ -574,6 +624,17 @@ func UpdateConnectionSyncIntervalHandler(a *app.App) http.HandlerFunc {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update connection"})
 			return
 		}
+
+		actor := ActorFromSession(sm, r)
+		field := "sync_interval_override_minutes"
+		newVal := ""
+		if req.Minutes != nil {
+			newVal = fmt.Sprintf("%d", *req.Minutes)
+		}
+		_ = a.Service.WriteAuditLog(r.Context(), []service.AuditLogEntry{{
+			EntityType: "connection", EntityID: idStr, Action: "update",
+			Field: &field, OldValue: &oldVal, NewValue: &newVal, Actor: actor,
+		}})
 
 		writeJSON(w, http.StatusOK, conn)
 	}

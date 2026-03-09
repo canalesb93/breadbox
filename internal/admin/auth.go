@@ -4,12 +4,16 @@ import (
 	"net/http"
 
 	"breadbox/internal/db"
+	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
 	"golang.org/x/crypto/bcrypt"
 )
 
-const sessionKeyAdminID = "admin_id"
+const (
+	sessionKeyAdminID       = "admin_id"
+	sessionKeyAdminUsername = "admin_username"
+)
 
 // LoginHandler returns an http.HandlerFunc that handles GET and POST /login.
 func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
@@ -71,8 +75,19 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRende
 		}
 
 		sm.Put(r.Context(), sessionKeyAdminID, formatUUID(admin.ID))
+		sm.Put(r.Context(), sessionKeyAdminUsername, admin.Username)
 		http.Redirect(w, r, "/admin/", http.StatusSeeOther)
 	}
+}
+
+// ActorFromSession builds a service.Actor from the admin session.
+func ActorFromSession(sm *scs.SessionManager, r *http.Request) service.Actor {
+	id := sm.GetString(r.Context(), sessionKeyAdminID)
+	name := sm.GetString(r.Context(), sessionKeyAdminUsername)
+	if name == "" {
+		name = "admin"
+	}
+	return service.Actor{Type: "user", ID: id, Name: name}
 }
 
 // LogoutHandler returns an http.HandlerFunc that handles POST /logout.

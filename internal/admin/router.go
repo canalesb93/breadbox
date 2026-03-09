@@ -63,6 +63,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		})
 
 		r.Get("/transactions", TransactionListHandler(a, sm, tr, svc))
+		r.Get("/transactions/{id}", TransactionDetailHandler(a, sm, tr, svc))
 		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
 		r.Get("/sync-logs", SyncLogsHandler(a, sm, tr, svc))
 
@@ -87,14 +88,14 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/connections/{id}/reauth", ConnectionReauthAPIHandler(a))
 		r.Post("/connections/{id}/reauth-complete", ConnectionReauthCompleteHandler(a))
 		r.Post("/connections/{id}/sync", SyncConnectionHandler(a))
-		r.Post("/connections/{id}/paused", UpdateConnectionPausedHandler(a))
-		r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(a))
-		r.Delete("/connections/{id}", DeleteConnectionHandler(a))
-		r.Post("/accounts/{id}/excluded", UpdateAccountExcludedHandler(a))
-		r.Post("/accounts/{id}/display-name", UpdateAccountDisplayNameHandler(a))
+		r.Post("/connections/{id}/paused", UpdateConnectionPausedHandler(a, sm))
+		r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(a, sm))
+		r.Delete("/connections/{id}", DeleteConnectionHandler(a, sm))
+		r.Post("/accounts/{id}/excluded", UpdateAccountExcludedHandler(a, sm))
+		r.Post("/accounts/{id}/display-name", UpdateAccountDisplayNameHandler(a, sm))
 		r.Post("/test-provider/{provider}", ProvidersTestHandler(a))
-		r.Post("/users", CreateUserHandler(a))
-		r.Put("/users/{id}", UpdateUserHandler(a))
+		r.Post("/users", CreateUserHandler(a, sm))
+		r.Put("/users/{id}", UpdateUserHandler(a, sm))
 
 		r.Post("/csv/upload", CSVUploadHandler(a, sm))
 		r.Post("/csv/preview", CSVPreviewHandler(a, sm))
@@ -123,6 +124,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Transaction category override
 		r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc))
 		r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc))
+
+		// Transaction comments
+		r.Post("/transactions/{id}/comments", CreateTransactionCommentHandler(a, sm, svc))
+		r.Delete("/transactions/{id}/comments/{comment_id}", DeleteTransactionCommentHandler(a, sm, svc))
 	})
 
 	return r

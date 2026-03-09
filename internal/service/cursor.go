@@ -38,3 +38,38 @@ func DecodeCursor(cursor string) (date time.Time, id string, err error) {
 	}
 	return date, p.ID, nil
 }
+
+// Timestamp-based cursors for audit log and other timestamp-ordered queries.
+
+type timestampCursorPayload struct {
+	Timestamp string `json:"t"`
+	ID        string `json:"i"`
+}
+
+func encodeTimestampCursor(ts time.Time, id string) string {
+	p := timestampCursorPayload{
+		Timestamp: ts.UTC().Format(time.RFC3339Nano),
+		ID:        id,
+	}
+	b, _ := json.Marshal(p)
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func decodeTimestampCursor(cursor string) (ts time.Time, id string, err error) {
+	b, err := base64.RawURLEncoding.DecodeString(cursor)
+	if err != nil {
+		return time.Time{}, "", ErrInvalidCursor
+	}
+	var p timestampCursorPayload
+	if err := json.Unmarshal(b, &p); err != nil {
+		return time.Time{}, "", ErrInvalidCursor
+	}
+	ts, err = time.Parse(time.RFC3339Nano, p.Timestamp)
+	if err != nil {
+		return time.Time{}, "", ErrInvalidCursor
+	}
+	if p.ID == "" {
+		return time.Time{}, "", ErrInvalidCursor
+	}
+	return ts, p.ID, nil
+}
