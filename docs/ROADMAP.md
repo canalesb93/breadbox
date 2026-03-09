@@ -2423,12 +2423,13 @@ Admin control over what agents can do and how they behave.
 
 ---
 
-### Phase 24: Review Queue & Review API
+### Phase 24: Review Queue & Review API ✅
 
 The core review system — humans and agents review transactions through a unified queue.
 
 - **Spec:** [`docs/phase-24-review-queue.md`](phase-24-review-queue.md)
 - **Key deliverables:** `review_queue` table, auto-enqueue on sync, review REST+MCP API with bulk operations, dashboard review page with approve/reject/skip workflow
+- **Completed:** Migration 00024, sqlc queries, service layer (ListReviews/SubmitReview/BulkSubmit/Enqueue/Dismiss/GetCounts), REST API (7 endpoints), MCP tools (list_pending_reviews, submit_review), admin dashboard page with filter bar and inline review actions, sync engine auto-enqueue hook, dashboard pending reviews widget
 
 ---
 

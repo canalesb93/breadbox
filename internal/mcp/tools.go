@@ -90,6 +90,20 @@ type transactionSummaryInput struct {
 	IncludePending *bool  `json:"include_pending,omitempty" jsonschema:"Include pending transactions (default false)"`
 }
 
+type listPendingReviewsInput struct {
+	ReviewType string `json:"review_type,omitempty" jsonschema:"Filter by review type: new_transaction, uncategorized, low_confidence, manual"`
+	AccountID  string `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
+	Limit      int    `json:"limit,omitempty" jsonschema:"Max results (default 20, max 100)"`
+	Cursor     string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
+}
+
+type submitReviewInput struct {
+	ReviewID   string `json:"review_id" jsonschema:"required,UUID of the review to submit"`
+	Decision   string `json:"decision" jsonschema:"required,Decision: approved, rejected, or skipped"`
+	CategoryID string `json:"category_id,omitempty" jsonschema:"Category ID to assign (use list_categories to find IDs). Only for approved decisions."`
+	Note       string `json:"note,omitempty" jsonschema:"Optional note explaining the decision"`
+}
+
 type listCategoryMappingsInput struct {
 	Provider     string `json:"provider,omitempty" jsonschema:"Filter by provider: plaid, teller, or csv"`
 	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Filter by target category slug (e.g. food_and_drink_restaurant). Use list_categories to find valid slugs."`
@@ -565,6 +579,61 @@ func (s *MCPServer) handleDeleteCategoryMapping(ctx context.Context, _ *mcpsdk.C
 		"provider":          prov,
 		"provider_category": provCat,
 	})
+}
+
+// --- Review Queue ---
+
+func (s *MCPServer) handleListPendingReviews(_ context.Context, _ *mcpsdk.CallToolRequest, input listPendingReviewsInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+	status := "pending"
+	params := service.ReviewListParams{
+		Status: &status,
+		Limit:  20,
+		Cursor: input.Cursor,
+	}
+	if input.ReviewType != "" {
+		params.ReviewType = &input.ReviewType
+	}
+	if input.AccountID != "" {
+		params.AccountID = &input.AccountID
+	}
+	if input.Limit > 0 {
+		if input.Limit > 100 {
+			input.Limit = 100
+		}
+		params.Limit = input.Limit
+	}
+	result, err := s.svc.ListReviews(ctx, params)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(result)
+}
+
+func (s *MCPServer) handleSubmitReview(ctx context.Context, _ *mcpsdk.CallToolRequest, input submitReviewInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.ReviewID == "" || input.Decision == "" {
+		return errorResult(fmt.Errorf("review_id and decision are required")), nil, nil
+	}
+	actor := service.ActorFromContext(ctx)
+	params := service.SubmitReviewParams{
+		ReviewID: input.ReviewID,
+		Decision: input.Decision,
+		Actor:    actor,
+	}
+	if input.CategoryID != "" {
+		params.CategoryID = &input.CategoryID
+	}
+	if input.Note != "" {
+		params.Note = &input.Note
+	}
+	result, err := s.svc.SubmitReview(ctx, params)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(result)
 }
 
 // --- Helpers ---

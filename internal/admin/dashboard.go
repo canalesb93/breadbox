@@ -39,6 +39,12 @@ func DashboardHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			needsAttention = 0
 		}
 
+		reviewPending, err := a.Queries.CountPendingReviews(ctx)
+		if err != nil {
+			a.Logger.Error("count pending reviews", "error", err)
+			reviewPending = 0
+		}
+
 		recentLogs, err := a.Queries.ListRecentSyncLogs(ctx)
 		if err != nil {
 			a.Logger.Error("list recent sync logs", "error", err)
@@ -113,6 +119,7 @@ func DashboardHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			"LatestURL":              latestURL,
 			"CurrentVersion":         currentVersion,
 			"DockerSocketAvailable":  a.DockerSocketAvailable,
+			"ReviewPending":          reviewPending,
 		}
 		tr.Render(w, r, "dashboard.html", data)
 	}

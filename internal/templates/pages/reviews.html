@@ -1,0 +1,296 @@
+{{define "content"}}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Reviews</h1>
+  {{if .Counts}}
+  <div class="flex gap-2">
+    <span class="badge badge-outline">{{.Counts.Pending}} pending</span>
+    <span class="badge badge-success badge-outline">{{.Counts.ApprovedToday}} approved today</span>
+    <span class="badge badge-error badge-outline">{{.Counts.RejectedToday}} rejected today</span>
+  </div>
+  {{end}}
+</div>
+
+<!-- Filter Bar -->
+<div class="bb-filter-bar mb-6">
+  <form method="GET" action="/admin/reviews" class="flex flex-wrap gap-3 items-end">
+    <div class="form-control">
+      <label class="label label-text text-xs">Status</label>
+      <select name="status" class="select select-bordered select-sm">
+        <option value="pending"{{if eq .StatusFilter "pending"}} selected{{end}}>Pending</option>
+        <option value="approved"{{if eq .StatusFilter "approved"}} selected{{end}}>Approved</option>
+        <option value="rejected"{{if eq .StatusFilter "rejected"}} selected{{end}}>Rejected</option>
+        <option value="skipped"{{if eq .StatusFilter "skipped"}} selected{{end}}>Skipped</option>
+        <option value="all"{{if eq .StatusFilter "all"}} selected{{end}}>All</option>
+      </select>
+    </div>
+    <div class="form-control">
+      <label class="label label-text text-xs">Type</label>
+      <select name="review_type" class="select select-bordered select-sm">
+        <option value="">All Types</option>
+        <option value="new_transaction"{{if eq .ReviewTypeFilter "new_transaction"}} selected{{end}}>New Transaction</option>
+        <option value="uncategorized"{{if eq .ReviewTypeFilter "uncategorized"}} selected{{end}}>Uncategorized</option>
+        <option value="low_confidence"{{if eq .ReviewTypeFilter "low_confidence"}} selected{{end}}>Low Confidence</option>
+        <option value="manual"{{if eq .ReviewTypeFilter "manual"}} selected{{end}}>Manual</option>
+      </select>
+    </div>
+    <div class="form-control">
+      <label class="label label-text text-xs">Account</label>
+      <select name="account_id" class="select select-bordered select-sm">
+        <option value="">All Accounts</option>
+        {{range .Accounts}}
+        <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.AccountIDFilter}} selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div class="form-control">
+      <label class="label label-text text-xs">Family Member</label>
+      <select name="user_id" class="select select-bordered select-sm">
+        <option value="">All Members</option>
+        {{range .Users}}
+        <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.UserIDFilter}} selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+    <a href="/admin/reviews" class="btn btn-sm btn-ghost">Reset</a>
+  </form>
+</div>
+
+<!-- Review Cards -->
+<div x-data="reviewQueue()" class="space-y-4">
+  {{if .Reviews}}
+  {{range .Reviews}}
+  <div class="card bg-base-100 shadow border border-base-300 review-card" x-data="{ submitting: false }" id="review-{{.ID}}">
+    <div class="card-body p-4">
+      <!-- Header: Review type badge + date -->
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          {{if eq .ReviewType "new_transaction"}}
+          <span class="badge badge-info badge-sm">New Transaction</span>
+          {{else if eq .ReviewType "uncategorized"}}
+          <span class="badge badge-warning badge-sm">Uncategorized</span>
+          {{else if eq .ReviewType "low_confidence"}}
+          <span class="badge badge-error badge-sm">Low Confidence</span>
+          {{else if eq .ReviewType "manual"}}
+          <span class="badge badge-neutral badge-sm">Manual</span>
+          {{end}}
+          {{if eq .Status "approved"}}
+          <span class="badge badge-success badge-sm">Approved</span>
+          {{else if eq .Status "rejected"}}
+          <span class="badge badge-error badge-sm">Rejected</span>
+          {{else if eq .Status "skipped"}}
+          <span class="badge badge-ghost badge-sm">Skipped</span>
+          {{end}}
+        </div>
+        <span class="text-xs text-base-content/50">{{.CreatedAt}}</span>
+      </div>
+
+      <!-- Transaction info -->
+      {{if .Transaction}}
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <a href="/admin/transactions/{{.TransactionID}}" class="font-semibold link link-hover">{{.Transaction.Name}}</a>
+          {{if .Transaction.MerchantName}}<div class="text-sm text-base-content/70">{{.Transaction.MerchantName}}</div>{{end}}
+          <div class="text-xs text-base-content/50">
+            {{if .Transaction.AccountName}}{{.Transaction.AccountName}}{{end}}
+            {{if .Transaction.UserName}} &middot; {{.Transaction.UserName}}{{end}}
+          </div>
+        </div>
+        <div class="text-right">
+          <div class="font-mono font-semibold bb-amount{{if lt .Transaction.Amount 0.0}} text-error{{end}}">
+            {{printf "%.2f" .Transaction.Amount}}
+            {{if .Transaction.IsoCurrencyCode}}{{.Transaction.IsoCurrencyCode}}{{end}}
+          </div>
+          <div class="text-xs text-base-content/50">{{.Transaction.Date}}</div>
+        </div>
+      </div>
+
+      <!-- Current/Suggested category -->
+      <div class="text-sm mb-3">
+        {{if .SuggestedCategory}}
+        <span class="text-base-content/70">Suggested:</span>
+        <span class="font-medium">{{.SuggestedCategory}}</span>
+        {{else if .Transaction.Category}}
+        <span class="text-base-content/70">Current:</span>
+        <span class="font-medium">{{.Transaction.Category.DisplayName}}</span>
+        {{else}}
+        <span class="text-base-content/50">No category</span>
+        {{end}}
+      </div>
+      {{end}}
+
+      {{if eq .Status "pending"}}
+      <!-- Action bar for pending reviews -->
+      <div class="border-t border-base-300 pt-3 mt-1">
+        <div class="flex flex-wrap gap-3 items-end">
+          <div class="form-control flex-1 min-w-[200px]">
+            <label class="label label-text text-xs py-0.5">Category</label>
+            <select class="select select-bordered select-sm w-full" id="cat-{{.ID}}" data-suggested="{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}">
+              <option value="">-- No change --</option>
+              {{range $.Categories}}
+              <option value="{{.ID}}">
+                {{if .ParentDisplayName}}{{.ParentDisplayName}} &rarr; {{end}}{{.DisplayName}}
+              </option>
+              {{end}}
+            </select>
+          </div>
+          <div class="form-control flex-1 min-w-[200px]">
+            <label class="label label-text text-xs py-0.5">Note</label>
+            <input type="text" class="input input-bordered input-sm w-full" placeholder="Optional note..." id="note-{{.ID}}">
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-success btn-sm" :disabled="submitting"
+              @click="submitReview('{{.ID}}', 'approved', $el)">
+              <span x-show="!submitting"><i data-lucide="check" class="w-3 h-3"></i> Approve</span>
+              <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+            </button>
+            <button class="btn btn-error btn-sm" :disabled="submitting"
+              @click="submitReview('{{.ID}}', 'rejected', $el)">
+              <span x-show="!submitting"><i data-lucide="x" class="w-3 h-3"></i> Reject</span>
+              <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+            </button>
+            <button class="btn btn-ghost btn-sm" :disabled="submitting"
+              @click="submitReview('{{.ID}}', 'skipped', $el)">
+              <span x-show="!submitting"><i data-lucide="arrow-right" class="w-3 h-3"></i> Skip</span>
+              <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+            </button>
+            <button class="btn btn-ghost btn-sm text-base-content/50" :disabled="submitting"
+              @click="dismissReview('{{.ID}}', $el)">
+              <i data-lucide="trash-2" class="w-3 h-3"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      {{else if .ReviewerName}}
+      <!-- Resolved info -->
+      <div class="border-t border-base-300 pt-2 mt-1 text-xs text-base-content/50">
+        Reviewed by {{.ReviewerName}} {{if .ReviewedAt}} on {{.ReviewedAt}}{{end}}
+        {{if .ReviewNote}}<br>Note: {{.ReviewNote}}{{end}}
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+
+  <!-- Pagination -->
+  {{if .HasMore}}
+  <div class="flex justify-center mt-6">
+    <a href="/admin/reviews?cursor={{.NextCursor}}&status={{.StatusFilter}}{{if .ReviewTypeFilter}}&review_type={{.ReviewTypeFilter}}{{end}}{{if .AccountIDFilter}}&account_id={{.AccountIDFilter}}{{end}}{{if .UserIDFilter}}&user_id={{.UserIDFilter}}{{end}}" class="btn btn-outline btn-sm">
+      Load More
+    </a>
+  </div>
+  {{end}}
+
+  {{else}}
+  <div class="card bg-base-100 shadow border border-base-300">
+    <div class="card-body items-center text-center py-12">
+      <i data-lucide="check-circle-2" class="w-12 h-12 text-success mb-2"></i>
+      <h2 class="card-title text-lg">All caught up!</h2>
+      <p class="text-base-content/70">No {{.StatusFilter}} reviews to show.</p>
+    </div>
+  </div>
+  {{end}}
+
+  <!-- Toast for notifications -->
+  <div id="review-toast" class="toast toast-end" style="display:none;">
+    <div class="alert" id="review-toast-alert">
+      <span id="review-toast-message"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+function reviewQueue() {
+  return {
+    submitReview(id, decision, el) {
+      const card = document.getElementById('review-' + id);
+      const catSelect = document.getElementById('cat-' + id);
+      const noteInput = document.getElementById('note-' + id);
+      const cardData = Alpine.$data(card);
+      cardData.submitting = true;
+
+      const body = { decision: decision };
+      if (catSelect && catSelect.value) {
+        body.category_id = catSelect.value;
+      }
+      if (noteInput && noteInput.value.trim()) {
+        body.note = noteInput.value.trim();
+      }
+
+      fetch('/admin/api/reviews/' + id + '/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          this.showToast(data.error, 'alert-error');
+          cardData.submitting = false;
+        } else {
+          card.style.transition = 'opacity 0.3s, max-height 0.3s';
+          card.style.opacity = '0';
+          card.style.maxHeight = '0';
+          card.style.overflow = 'hidden';
+          setTimeout(() => card.remove(), 300);
+          this.showToast('Review ' + decision, 'alert-success');
+        }
+      })
+      .catch(() => {
+        this.showToast('Network error', 'alert-error');
+        cardData.submitting = false;
+      });
+    },
+
+    dismissReview(id, el) {
+      const card = document.getElementById('review-' + id);
+      const cardData = Alpine.$data(card);
+      cardData.submitting = true;
+
+      fetch('/admin/api/reviews/' + id + '/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          this.showToast(data.error, 'alert-error');
+          cardData.submitting = false;
+        } else {
+          card.style.transition = 'opacity 0.3s, max-height 0.3s';
+          card.style.opacity = '0';
+          card.style.maxHeight = '0';
+          card.style.overflow = 'hidden';
+          setTimeout(() => card.remove(), 300);
+          this.showToast('Review dismissed', 'alert-info');
+        }
+      })
+      .catch(() => {
+        this.showToast('Network error', 'alert-error');
+        cardData.submitting = false;
+      });
+    },
+
+    showToast(message, alertClass) {
+      const toast = document.getElementById('review-toast');
+      const alert = document.getElementById('review-toast-alert');
+      const msg = document.getElementById('review-toast-message');
+      alert.className = 'alert ' + alertClass;
+      msg.textContent = message;
+      toast.style.display = '';
+      setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    }
+  }
+}
+
+// Preselect suggested categories
+document.querySelectorAll('select[data-suggested]').forEach(sel => {
+  const sugID = sel.getAttribute('data-suggested');
+  if (sugID) {
+    for (const opt of sel.options) {
+      if (opt.value === sugID) { opt.selected = true; break; }
+    }
+  }
+});
+</script>
+{{end}}
