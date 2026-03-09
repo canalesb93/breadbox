@@ -51,6 +51,13 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgres://breadbox:breadbox@localhost:5432/breadbox_test?sslmode=disable
+        run: |
+          go install github.com/pressly/goose/v3/cmd/goose@latest
+          goose -dir internal/db/migrations postgres "$DATABASE_URL" up
+
       - name: Run tests
         env:
           DATABASE_URL: postgres://breadbox:breadbox@localhost:5432/breadbox_test?sslmode=disable
