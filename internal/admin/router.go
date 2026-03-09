@@ -68,6 +68,8 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
 		r.Get("/sync-logs", SyncLogsHandler(a, sm, tr, svc))
 
+		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
+
 		r.Get("/categories", CategoriesPageHandler(svc, sm, tr))
 		r.Get("/categories/mappings", MappingsPageHandler(svc, sm, tr))
 
@@ -136,6 +138,12 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Transaction comments
 		r.Post("/transactions/{id}/comments", CreateTransactionCommentHandler(a, sm, svc))
 		r.Delete("/transactions/{id}/comments/{comment_id}", DeleteTransactionCommentHandler(a, sm, svc))
+
+		// Review queue
+		r.Post("/reviews/{id}/submit", SubmitReviewAdminHandler(a, sm, svc))
+		r.Post("/reviews/{id}/dismiss", DismissReviewAdminHandler(a, sm, svc))
+		r.Post("/reviews/enqueue", EnqueueReviewAdminHandler(a, sm, svc))
+		r.Post("/reviews/settings", ReviewSettingsHandler(a, sm))
 	})
 
 	return r

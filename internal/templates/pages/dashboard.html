@@ -132,6 +132,15 @@
     <div class="stat-value">{{.NeedsAttention}}</div>
   </div>
   {{end}}
+  {{if gt .ReviewPending 0}}
+  <a href="/admin/reviews" class="stat border-l-4 border-info hover:bg-base-300 no-underline">
+    <div class="stat-figure text-info">
+      <i data-lucide="clipboard-check" class="w-8 h-8"></i>
+    </div>
+    <div class="stat-title">Pending Reviews</div>
+    <div class="stat-value text-info">{{.ReviewPending}}</div>
+  </a>
+  {{end}}
 </div>
 
 <h2 class="text-lg font-semibold mb-4">Recent Sync Activity</h2>

@@ -603,6 +603,61 @@ The following keys are seeded during initial migration and used by the applicati
 | `webhook_url` | `(empty)` | Publicly accessible URL for Plaid webhooks. Optional. |
 | `sync_interval_hours` | `12` | How often the cron sync runs, in hours. |
 | `setup_complete` | `false` | Whether the first-run setup wizard has been completed. |
+| `review_auto_enqueue` | `true` | When true, sync auto-enqueues transactions for review. |
+| `review_confidence_threshold` | `0.5` | Category confidence below this value triggers low_confidence review. Range 0.0–1.0. |
+
+---
+
+### 2.9 `review_queue`
+
+**Purpose:** Queue for human or agent review of transactions. Items are auto-enqueued during sync (for new, uncategorized, or low-confidence transactions) or manually enqueued. Reviewers approve, reject, or skip items.
+
+#### Columns
+
+| Column | Type | Nullable | Default | Description |
+|---|---|---|---|---|
+| `id` | `UUID` | No | `gen_random_uuid()` | Primary key. |
+| `transaction_id` | `UUID` | No | — | FK → `transactions(id)`. The transaction under review. |
+| `review_type` | `TEXT` | No | — | Why the review was created: `new_transaction`, `uncategorized`, `low_confidence`, `manual`. |
+| `status` | `TEXT` | No | `'pending'` | Current state: `pending`, `approved`, `rejected`, `skipped`. |
+| `suggested_category_id` | `UUID` | Yes | `NULL` | FK → `categories(id)`. Category suggested by the system at enqueue time. |
+| `confidence_score` | `NUMERIC(5,4)` | Yes | `NULL` | Normalized confidence score (0.0–1.0) from the provider. |
+| `reviewer_type` | `TEXT` | Yes | `NULL` | Who reviewed: `user` or `agent`. Set on resolution. |
+| `reviewer_id` | `TEXT` | Yes | `NULL` | ID of the reviewer (admin user ID or API key prefix). |
+| `reviewer_name` | `TEXT` | Yes | `NULL` | Display name of the reviewer. |
+| `review_note` | `TEXT` | Yes | `NULL` | Optional note from the reviewer. |
+| `resolved_category_id` | `UUID` | Yes | `NULL` | FK → `categories(id)`. Category chosen by the reviewer (may differ from suggested). |
+| `created_at` | `TIMESTAMPTZ` | No | `NOW()` | When the review was enqueued. |
+| `reviewed_at` | `TIMESTAMPTZ` | Yes | `NULL` | When the review was resolved. |
+
+#### Primary Key
+
+`id`
+
+#### Foreign Keys
+
+| Column | References | On Delete |
+|---|---|---|
+| `transaction_id` | `transactions(id)` | `CASCADE` |
+| `suggested_category_id` | `categories(id)` | `SET NULL` |
+| `resolved_category_id` | `categories(id)` | `SET NULL` |
+
+#### Unique Constraints
+
+| Name | Columns | Condition |
+|---|---|---|
+| `review_queue_pending_unique_idx` | `transaction_id` | `WHERE status = 'pending'` |
+
+Only one pending review per transaction at a time.
+
+#### Indexes
+
+| Index | Columns | Type | Rationale |
+|---|---|---|---|
+| `review_queue_pkey` | `id` | B-tree (implicit PK) | Primary key lookup. |
+| `review_queue_pending_unique_idx` | `transaction_id` | Partial unique (WHERE status='pending') | Enforce single pending review per transaction. |
+| `review_queue_status_created_idx` | `status, created_at` | B-tree | List pending reviews in FIFO order; filter by status. |
+| `review_queue_transaction_id_idx` | `transaction_id` | B-tree | Look up reviews for a specific transaction. |
 
 ---
 

@@ -53,7 +53,13 @@ COMMENTS & AUDIT LOG:
 - Use add_transaction_comment to explain your reasoning when recategorizing transactions
 - Check list_transaction_comments before modifying a transaction to see prior context
 - Use get_transaction_history to understand how a transaction has been modified over time
-- Use query_audit_log with actor_type='user' to learn the family's categorization preferences`
+- Use query_audit_log with actor_type='user' to learn the family's categorization preferences
+
+REVIEW QUEUE:
+- Transactions are automatically enqueued for review during sync (new, uncategorized, or low-confidence)
+- Use list_pending_reviews to see what needs attention, filtered by review_type or account_id
+- Use submit_review to approve, reject, or skip reviews — approved reviews with a category_id override the transaction's category
+- Review decisions are logged in the audit trail and optionally as transaction comments`
 
 // ToolClassification indicates whether a tool is read-only or performs writes.
 type ToolClassification string
@@ -156,6 +162,12 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("delete_category_mapping", ToolWrite,
 			"Delete a category mapping. After deletion, transactions with this provider category string will fall back to 'uncategorized' on next sync. Identified by mapping ID or by (provider, provider_category) pair.",
 			s.handleDeleteCategoryMapping),
+		makeToolDef("list_pending_reviews", ToolRead,
+			"List pending transaction reviews in the review queue. Reviews are created automatically during sync for new, uncategorized, or low-confidence transactions, or manually via enqueue. Filter by review_type (new_transaction, uncategorized, low_confidence, manual) and account_id. Each review includes the full transaction details and suggested category.",
+			s.handleListPendingReviews),
+		makeToolDef("submit_review", ToolWrite,
+			"Submit a decision on a pending review. Decision must be 'approved', 'rejected', or 'skipped'. For approved reviews, optionally specify a category_id to override the transaction's category. Add a note to explain your reasoning. Use list_pending_reviews to find review IDs.",
+			s.handleSubmitReview),
 	}
 }
 

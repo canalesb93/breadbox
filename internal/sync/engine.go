@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	gosync "sync"
 	"time"
 
@@ -138,6 +139,23 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		resolver = nil
 	}
 
+	// Read review queue config.
+	reviewAutoEnqueue := true
+	if cfg, err := e.db.GetAppConfig(ctx, "review_auto_enqueue"); err == nil && cfg.Value.Valid {
+		if v, err := strconv.ParseBool(cfg.Value.String); err == nil {
+			reviewAutoEnqueue = v
+		}
+	}
+	var confidenceThreshold float64
+	if reviewAutoEnqueue {
+		confidenceThreshold = 0.5 // default
+		if cfg, err := e.db.GetAppConfig(ctx, "review_confidence_threshold"); err == nil && cfg.Value.Valid {
+			if v, err := strconv.ParseFloat(cfg.Value.String, 64); err == nil {
+				confidenceThreshold = v
+			}
+		}
+	}
+
 	// Account ID cache to avoid repeated lookups.
 	accountIDCache := make(map[string]pgtype.UUID)
 
@@ -212,8 +230,12 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				skipped++
 				continue
 			}
-			if err := e.upsertTransaction(ctx, txQueries, &pendingAdded[i], accountIDCache, string(conn.Provider), resolver, logger); err != nil {
+			txnResult, err := e.upsertTransaction(ctx, txQueries, &pendingAdded[i], accountIDCache, string(conn.Provider), resolver, logger)
+			if err != nil {
 				logger.Error("upsert added transaction", "external_id", pendingAdded[i].ExternalID, "error", err)
+			} else if reviewAutoEnqueue {
+				isNew := txnResult.CreatedAt.Time.Equal(txnResult.UpdatedAt.Time)
+				e.enqueueForReview(ctx, txQueries, txnResult, isNew, confidenceThreshold)
 			}
 			added++
 		}
@@ -229,8 +251,11 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				skipped++
 				continue
 			}
-			if err := e.upsertTransaction(ctx, txQueries, &pendingModified[i], accountIDCache, string(conn.Provider), resolver, logger); err != nil {
+			txnResult, err := e.upsertTransaction(ctx, txQueries, &pendingModified[i], accountIDCache, string(conn.Provider), resolver, logger)
+			if err != nil {
 				logger.Error("upsert modified transaction", "external_id", pendingModified[i].ExternalID, "error", err)
+			} else if reviewAutoEnqueue {
+				e.enqueueForReview(ctx, txQueries, txnResult, false, confidenceThreshold)
 			}
 			modified++
 		}
@@ -277,10 +302,10 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 }
 
 // upsertTransaction resolves the account ID and upserts a single transaction.
-func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *provider.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *CategoryResolver, logger *slog.Logger) error {
+func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *provider.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *CategoryResolver, logger *slog.Logger) (db.Transaction, error) {
 	accountID, err := e.resolveAccountID(ctx, txn.AccountExternalID, cache)
 	if err != nil {
-		return fmt.Errorf("resolve account %s: %w", txn.AccountExternalID, err)
+		return db.Transaction{}, fmt.Errorf("resolve account %s: %w", txn.AccountExternalID, err)
 	}
 
 	// Resolve category ID from provider mappings
@@ -315,8 +340,7 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		CategoryID:            categoryID,
 	}
 
-	_, err = q.UpsertTransaction(ctx, params)
-	return err
+	return q.UpsertTransaction(ctx, params)
 }
 
 // updateBalances fetches current balances from the provider and updates the DB.

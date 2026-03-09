@@ -105,6 +105,12 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - MCP instruction templates: hardcoded Go constants in `internal/mcp/templates.go` (spend_review, monthly_analysis, reporting). Loaded into editor via Alpine.js, saved as `mcp_custom_instructions`.
 - API key scope: `scope TEXT NOT NULL DEFAULT 'full_access'` column on `api_keys`. Values: `full_access`, `read_only`. `RequireWriteScope()` middleware blocks read-only keys from write REST endpoints. Full API key record stored in request context via `middleware.SetAPIKey()`/`GetAPIKey()`.
 - MCP admin page: `/admin/mcp` with four cards — global mode, tool access, server instructions, API key scope info. Nav item with `bot` Lucide icon between API Keys and Sync Logs.
+- Review queue: `review_queue` table with `review_type` (new_transaction, uncategorized, low_confidence, manual) and `status` (pending, approved, rejected, skipped). Auto-enqueued during sync when `review_auto_enqueue` app_config is true. Confidence threshold from `review_confidence_threshold` app_config. `reviewer_complete` constraint ensures reviewer metadata is set on resolution.
+- Review sync hook: `Engine.enqueueForReview()` called after each upsert inside the sync transaction. Priority: uncategorized > low_confidence > new_transaction. Skips `category_override=true` transactions. ON CONFLICT DO NOTHING for idempotency.
+- Review service: `ListReviews` uses dynamic SQL with transaction JOINs and cursor pagination (ASC for pending FIFO, DESC for resolved). `SubmitReview` handles category override + audit log + comment creation. `BulkSubmitReviews` iterates individually.
+- Review admin page: `/admin/reviews` with filter bar (status, type, account, user), card-based review queue with inline approve/reject/skip/dismiss, Alpine.js `reviewQueue()` for AJAX actions with card fade-out animation.
+- Review MCP tools: `list_pending_reviews` (ToolRead) and `submit_review` (ToolWrite) in `internal/mcp/tools.go`.
+- Review REST API: read endpoints at `/api/v1/reviews`, `/api/v1/reviews/counts`, `/api/v1/reviews/{id}`; write endpoints at `POST /reviews/{id}/submit`, `POST /reviews/bulk`, `POST /reviews/enqueue`, `DELETE /reviews/{id}`.
 
 ## Canonical Enums
 
@@ -115,6 +121,9 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - API key scope: `full_access`, `read_only`
 - MCP mode: `read_only`, `read_write`
 - MCP tool classification: `read`, `write`
+- Review type: `new_transaction`, `uncategorized`, `low_confidence`, `manual`
+- Review status: `pending`, `approved`, `rejected`, `skipped`
+- Reviewer type: `user`, `agent`
 
 ## Spec Documents
 
