@@ -6,6 +6,18 @@ Self-hosted financial data aggregation for families. Syncs bank data via Plaid a
 
 Go 1.24+ single binary. PostgreSQL, chi/v5 router, pgx/v5 + sqlc, goose migrations, robfig/cron. Admin UI: Go html/template + DaisyUI 5 + Tailwind CSS v4 + Alpine.js v3. MCP: github.com/modelcontextprotocol/go-sdk (Streamable HTTP). Plaid: github.com/plaid/plaid-go. Teller: hand-written HTTP client with mTLS (no SDK).
 
+## Testing
+
+- **Unit tests**: `go test ./...` (no DB needed). Covers crypto, CSV parsing, service utilities.
+- **Integration tests**: `make test-integration` or `DATABASE_URL=... go test -tags integration -count=1 ./...`. Requires a running PostgreSQL with `breadbox_test` database. Migrations run automatically via goose in `TestMain`.
+- **Build tag separation**: Integration test files must have `//go:build integration` at the top. This ensures `go test ./...` (without `-tags integration`) only runs unit tests and doesn't require a database.
+- **Test helper**: `internal/testutil/db.go` — call `testutil.RunWithDB(m)` from `TestMain`, then use `testutil.Pool(t)` or `testutil.Queries(t)` in tests. Tables are truncated between tests automatically.
+- **Fixture helpers**: Use `testutil.MustCreateUser`, `MustCreateConnection`, `MustCreateAccount`, `MustCreateTransaction` to create test data. These fatal on error to catch silent setup failures.
+- **Adding integration tests**: Any package that needs DB access should add a `TestMain` calling `testutil.RunWithDB(m)`. Use the `testutil.ServicePool(t)` helper to get pool+queries. See `internal/service/integration_test.go` for examples. Do NOT use `t.Parallel()` — tests share a database.
+- **Session hook**: `.claude/hooks/session-start.sh` creates the `breadbox` role and `breadbox_test` database automatically on web sessions.
+- **CI**: GitHub Actions spins up PostgreSQL, then runs `go test -tags integration ./...` with `DATABASE_URL` set. Migrations run automatically via `testutil.RunWithDB`.
+- **When adding new features**: Always add integration tests for new service layer methods and API endpoints. Prefer testing through the service layer rather than HTTP handlers.
+
 ## Architecture
 
 One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), MCP server (`/mcp`), admin dashboard (`/admin/...`), webhooks (`/webhooks/:provider`). Bank data providers are abstracted behind a `Provider` Go interface (Plaid first, Teller + CSV later).
