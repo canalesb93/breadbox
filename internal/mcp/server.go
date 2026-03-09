@@ -43,12 +43,18 @@ CATEGORY SYSTEM:
 - Use categorize_transaction to manually override a transaction's category
 - Use reset_transaction_category to undo a manual override
 - Use list_unmapped_categories to find raw provider categories without mappings
+- Use list_category_mappings, create_category_mapping, update_category_mapping, delete_category_mapping to manage how provider category strings map to user categories
+
+TOKEN EFFICIENCY:
+- Use the fields parameter on query_transactions to request only needed fields (e.g., fields=core,category). Aliases: core (id,date,amount,name,iso_currency_code), category (category,category_primary_raw,category_detailed_raw), timestamps (created_at,updated_at,datetime,authorized_datetime)
+- Use transaction_summary for aggregated spending analysis instead of paginating through individual transactions. Supports group_by: category, month, week, day, category_month
+- The breadbox://overview resource includes users, connections, accounts by type, and 30-day spending summary — often eliminates the need for separate list_users + list_accounts calls
 
 RECOMMENDED QUERY PATTERNS:
-1. Start with list_users to identify family members
-2. Use list_accounts to see available bank accounts
-3. Use list_categories to understand the category taxonomy
-4. Query transactions with date ranges and category_slug filters
+1. Read breadbox://overview first for dataset context (users, connections, accounts, spending)
+2. Use transaction_summary for spending analysis (group by category, month, etc.)
+3. Use query_transactions with fields=core,category for browsing individual transactions
+4. Use list_categories to understand the category taxonomy
 5. Use count_transactions to get totals before paginating
 6. Check get_sync_status to verify data freshness
 7. Use list_unmapped_categories to identify categorization gaps

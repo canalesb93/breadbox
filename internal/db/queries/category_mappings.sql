@@ -35,6 +35,14 @@ ON CONFLICT (provider, provider_category) DO UPDATE
 SET category_id = EXCLUDED.category_id, updated_at = NOW()
 RETURNING *;
 
+-- name: GetCategoryMappingByProviderCategory :one
+SELECT * FROM category_mappings
+WHERE provider = $1 AND provider_category = $2;
+
+-- name: DeleteCategoryMappingByProviderCategory :exec
+DELETE FROM category_mappings
+WHERE provider = $1 AND provider_category = $2;
+
 -- name: ListMappingsForResolver :many
 SELECT provider_category, category_id
 FROM category_mappings

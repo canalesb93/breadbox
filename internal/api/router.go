@@ -44,6 +44,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/accounts/{id}", GetAccountHandler(svc))
 		r.Get("/transactions", ListTransactionsHandler(svc))
 		r.Get("/transactions/count", CountTransactionsHandler(svc))
+		r.Get("/transactions/summary", TransactionSummaryHandler(svc))
 		r.Get("/transactions/{id}", GetTransactionHandler(svc))
 		r.Patch("/transactions/{id}/category", SetTransactionCategoryHandler(svc))
 		r.Delete("/transactions/{id}/category", ResetTransactionCategoryHandler(svc))

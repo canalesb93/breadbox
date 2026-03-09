@@ -2403,12 +2403,13 @@ Data foundation for agentic review and human collaboration.
 
 ---
 
-### Phase 22: Agent-Optimized APIs & Token Efficiency
+### Phase 22: Agent-Optimized APIs & Token Efficiency ✅
 
 Make the API surface efficient for AI agent consumption.
 
 - **Spec:** [`docs/phase-22-agent-optimized-apis.md`](phase-22-agent-optimized-apis.md)
 - **Key deliverables:** `?fields=` param on transactions, category mapping MCP CRUD, `transaction_summary` aggregation tool, enriched `breadbox://overview`, response size reduction
+- **Status:** Complete. Field selection (REST+MCP), transaction summary (REST+MCP), 4 category mapping MCP tools, enhanced overview with users/connections/spending summary, updated MCP instructions.
 
 ---
 
