@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"breadbox/internal/app"
@@ -271,26 +272,16 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			a.Logger.Error("list transaction audit log", "error", err)
 		}
 
-		// Resolve account name and user name.
+		// Use denormalized names from the transaction response.
 		var accountName, userName, accountID string
 		if txn.AccountID != nil {
 			accountID = *txn.AccountID
-			var acctUUID pgtype.UUID
-			if err := acctUUID.Scan(accountID); err == nil {
-				acct, err := a.Queries.GetAccount(ctx, acctUUID)
-				if err == nil {
-					accountName = acct.Name
-					if acct.ConnectionID.Valid {
-						conn, err := a.Queries.GetBankConnection(ctx, acct.ConnectionID)
-						if err == nil && conn.UserID.Valid {
-							user, err := a.Queries.GetUser(ctx, conn.UserID)
-							if err == nil {
-								userName = user.Name
-							}
-						}
-					}
-				}
-			}
+		}
+		if txn.AccountName != nil {
+			accountName = *txn.AccountName
+		}
+		if txn.UserName != nil {
+			userName = *txn.UserName
 		}
 
 		var entries []service.AuditLogResponse
@@ -339,7 +330,13 @@ func CreateTransactionCommentHandler(a *app.App, sm *scs.SessionManager, svc *se
 				writeJSON(w, http.StatusNotFound, map[string]string{"error": "Transaction not found"})
 				return
 			}
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			// Content validation errors are safe to surface; log and genericize others.
+			if strings.Contains(err.Error(), "content must be") {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+				return
+			}
+			a.Logger.Error("create comment", "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create comment"})
 			return
 		}
 

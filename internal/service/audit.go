@@ -158,6 +158,11 @@ func (s *Service) queryAuditLog(ctx context.Context, query string, args []any, l
 	defer rows.Close()
 
 	var entries []AuditLogResponse
+	type entryWithTime struct {
+		resp AuditLogResponse
+		ts   time.Time
+	}
+	var allEntries []entryWithTime
 	for rows.Next() {
 		var (
 			id         pgtype.UUID
@@ -189,7 +194,7 @@ func (s *Service) queryAuditLog(ctx context.Context, query string, args []any, l
 			ActorType:  actorType,
 			ActorID:    textPtr(actorID),
 			ActorName:  actorName,
-			CreatedAt:  createdAt.Time.UTC().Format(time.RFC3339),
+			CreatedAt:  createdAt.Time.UTC().Format(time.RFC3339Nano),
 		}
 
 		if len(metadata) > 0 {
@@ -199,22 +204,26 @@ func (s *Service) queryAuditLog(ctx context.Context, query string, args []any, l
 			}
 		}
 
-		entries = append(entries, entry)
+		allEntries = append(allEntries, entryWithTime{resp: entry, ts: createdAt.Time.UTC()})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows audit log: %w", err)
 	}
 
-	hasMore := len(entries) > limit
+	hasMore := len(allEntries) > limit
 	if hasMore {
-		entries = entries[:limit]
+		allEntries = allEntries[:limit]
+	}
+
+	entries = make([]AuditLogResponse, len(allEntries))
+	for i, e := range allEntries {
+		entries[i] = e.resp
 	}
 
 	var nextCursor string
-	if hasMore && len(entries) > 0 {
-		last := entries[len(entries)-1]
-		t, _ := time.Parse(time.RFC3339, last.CreatedAt)
-		nextCursor = encodeTimestampCursor(t, last.ID)
+	if hasMore && len(allEntries) > 0 {
+		last := allEntries[len(allEntries)-1]
+		nextCursor = encodeTimestampCursor(last.ts, last.resp.ID)
 	}
 
 	return &AuditLogListResult{

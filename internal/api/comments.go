@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
@@ -55,7 +56,11 @@ func CreateCommentHandler(svc *service.Service) http.HandlerFunc {
 				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
 				return
 			}
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			if strings.Contains(err.Error(), "content must be") {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create comment")
 			return
 		}
 
@@ -91,7 +96,11 @@ func UpdateCommentHandler(svc *service.Service) http.HandlerFunc {
 				mw.WriteError(w, http.StatusForbidden, "FORBIDDEN", "You can only edit your own comments")
 				return
 			}
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			if strings.Contains(err.Error(), "content must be") {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update comment")
 			return
 		}
 
