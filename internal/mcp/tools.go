@@ -19,7 +19,7 @@ func (s *MCPServer) registerTools() {
 
 	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
 		Name:        "query_transactions",
-		Description: "Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (use list_categories to find slugs); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response.",
+		Description: "Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (use list_categories to find slugs); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Use the fields parameter to request only the fields you need (e.g., fields=core,category) to significantly reduce response size.",
 	}, s.handleQueryTransactions)
 
 	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
@@ -81,6 +81,31 @@ func (s *MCPServer) registerTools() {
 		Name:        "query_audit_log",
 		Description: "Query the global audit log to see all changes across the system. Use entity_type to focus on specific data types. Filter by actor_type='agent' to see what other AI agents have done, or actor_type='user' to see manual changes by the family. Useful for learning patterns: e.g., query all category overrides to understand the family's preferences.",
 	}, s.handleQueryAuditLog)
+
+	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
+		Name:        "transaction_summary",
+		Description: "Get aggregated transaction totals grouped by category and/or time period. Replaces the need to paginate through thousands of individual transactions for spending analysis. Amounts follow the convention: positive = money out (debit), negative = money in (credit). Only includes non-deleted, non-pending transactions by default.",
+	}, s.handleTransactionSummary)
+
+	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
+		Name:        "list_category_mappings",
+		Description: "List category mappings that translate provider-specific category strings to user categories. Filter by provider to see mappings for a specific bank data source. Returns the provider, raw provider category string, and the mapped user category slug and display name.",
+	}, s.handleListCategoryMappings)
+
+	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
+		Name:        "create_category_mapping",
+		Description: "Create a new category mapping that tells the system how to translate a provider's raw category string to a user category. For example, map Teller's 'dining' to your 'food_and_drink_restaurant' category. The mapping takes effect on the next sync — existing transactions are not retroactively updated.",
+	}, s.handleCreateCategoryMapping)
+
+	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
+		Name:        "update_category_mapping",
+		Description: "Update an existing category mapping to point to a different user category. Identified by mapping ID or by the (provider, provider_category) pair. Does not retroactively update transactions — wait for next sync.",
+	}, s.handleUpdateCategoryMapping)
+
+	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
+		Name:        "delete_category_mapping",
+		Description: "Delete a category mapping. After deletion, transactions with this provider category string will fall back to 'uncategorized' on next sync. Identified by mapping ID or by (provider, provider_category) pair.",
+	}, s.handleDeleteCategoryMapping)
 }
 
 // --- Input types ---
@@ -103,6 +128,7 @@ type queryTransactionsInput struct {
 	Cursor       string   `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
 	SortBy       string   `json:"sort_by,omitempty" jsonschema:"Sort: date (default), amount, name"`
 	SortOrder    string   `json:"sort_order,omitempty" jsonschema:"Sort direction: desc (default) or asc"`
+	Fields       string   `json:"fields,omitempty" jsonschema:"Comma-separated list of fields to include in response. Aliases: core (id,date,amount,name,iso_currency_code), category (category,category_primary_raw,category_detailed_raw), timestamps (created_at,updated_at,datetime,authorized_datetime). Default: all fields. id is always included."`
 }
 
 type countTransactionsInput struct {
@@ -149,6 +175,39 @@ type queryAuditLogInput struct {
 	ActorType  string `json:"actor_type,omitempty" jsonschema:"Filter by who made the change: user, agent, system"`
 	Limit      int    `json:"limit,omitempty" jsonschema:"Max entries to return (default 50, max 200)"`
 	Cursor     string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
+}
+
+type transactionSummaryInput struct {
+	StartDate      string `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive. Defaults to 30 days ago."`
+	EndDate        string `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive. Defaults to today."`
+	GroupBy        string `json:"group_by" jsonschema:"required,How to group results: category, month, week, day, or category_month"`
+	AccountID      string `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
+	UserID         string `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
+	Category       string `json:"category,omitempty" jsonschema:"Filter by primary category before aggregating"`
+	IncludePending *bool  `json:"include_pending,omitempty" jsonschema:"Include pending transactions (default false)"`
+}
+
+type listCategoryMappingsInput struct {
+	Provider string `json:"provider,omitempty" jsonschema:"Filter by provider: plaid, teller, or csv"`
+}
+
+type createCategoryMappingInput struct {
+	Provider         string `json:"provider" jsonschema:"required,Provider type: plaid, teller, or csv"`
+	ProviderCategory string `json:"provider_category" jsonschema:"required,Raw category string from the provider (e.g. FOOD_AND_DRINK_GROCERIES for Plaid or dining for Teller)"`
+	CategorySlug     string `json:"category_slug" jsonschema:"required,Slug of the target user category (e.g. food_and_drink_restaurant). Use list_categories to find valid slugs."`
+}
+
+type updateCategoryMappingInput struct {
+	ID               string `json:"id,omitempty" jsonschema:"Mapping ID to update (alternative to provider + provider_category)"`
+	Provider         string `json:"provider,omitempty" jsonschema:"Provider type (required if not using id)"`
+	ProviderCategory string `json:"provider_category,omitempty" jsonschema:"Raw provider category string (required if not using id)"`
+	CategorySlug     string `json:"category_slug" jsonschema:"required,New target category slug"`
+}
+
+type deleteCategoryMappingInput struct {
+	ID               string `json:"id,omitempty" jsonschema:"Mapping ID to delete (alternative to provider + provider_category)"`
+	Provider         string `json:"provider,omitempty" jsonschema:"Provider type (required if not using id)"`
+	ProviderCategory string `json:"provider_category,omitempty" jsonschema:"Raw provider category string (required if not using id)"`
 }
 
 // --- Handlers ---
@@ -217,9 +276,27 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 		params.SortOrder = &input.SortOrder
 	}
 
+	fieldSet, err := service.ParseFields(input.Fields)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
 	result, err := s.svc.ListTransactions(ctx, params)
 	if err != nil {
 		return errorResult(err), nil, nil
+	}
+
+	if fieldSet != nil {
+		filtered := make([]map[string]any, len(result.Transactions))
+		for i, t := range result.Transactions {
+			filtered[i] = service.FilterTransactionFields(t, fieldSet)
+		}
+		return jsonResult(map[string]any{
+			"transactions": filtered,
+			"next_cursor":  result.NextCursor,
+			"has_more":     result.HasMore,
+			"limit":        result.Limit,
+		})
 	}
 
 	return jsonResult(result)
@@ -422,6 +499,147 @@ func (s *MCPServer) handleQueryAuditLog(ctx context.Context, _ *mcpsdk.CallToolR
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(result)
+}
+
+func (s *MCPServer) handleTransactionSummary(_ context.Context, _ *mcpsdk.CallToolRequest, input transactionSummaryInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+
+	params := service.TransactionSummaryParams{
+		GroupBy: input.GroupBy,
+	}
+
+	if input.StartDate != "" {
+		t, err := time.Parse("2006-01-02", input.StartDate)
+		if err != nil {
+			return errorResult(fmt.Errorf("invalid start_date: %w", err)), nil, nil
+		}
+		params.StartDate = &t
+	}
+	if input.EndDate != "" {
+		t, err := time.Parse("2006-01-02", input.EndDate)
+		if err != nil {
+			return errorResult(fmt.Errorf("invalid end_date: %w", err)), nil, nil
+		}
+		params.EndDate = &t
+	}
+	if input.AccountID != "" {
+		params.AccountID = &input.AccountID
+	}
+	if input.UserID != "" {
+		params.UserID = &input.UserID
+	}
+	if input.Category != "" {
+		params.Category = &input.Category
+	}
+	if input.IncludePending != nil && *input.IncludePending {
+		params.IncludePending = true
+	}
+
+	result, err := s.svc.GetTransactionSummary(ctx, params)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	return jsonResult(result)
+}
+
+func (s *MCPServer) handleListCategoryMappings(_ context.Context, _ *mcpsdk.CallToolRequest, input listCategoryMappingsInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+
+	var provider *string
+	if input.Provider != "" {
+		provider = &input.Provider
+	}
+
+	mappings, err := s.svc.ListMappings(ctx, provider)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	return jsonResult(map[string]any{
+		"mappings": mappings,
+		"count":    len(mappings),
+	})
+}
+
+func (s *MCPServer) handleCreateCategoryMapping(_ context.Context, _ *mcpsdk.CallToolRequest, input createCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+
+	if input.Provider == "" || input.ProviderCategory == "" || input.CategorySlug == "" {
+		return errorResult(fmt.Errorf("provider, provider_category, and category_slug are required")), nil, nil
+	}
+
+	switch input.Provider {
+	case "plaid", "teller", "csv":
+	default:
+		return errorResult(fmt.Errorf("invalid provider '%s'. Must be plaid, teller, or csv", input.Provider)), nil, nil
+	}
+
+	mapping, err := s.svc.CreateMappingBySlug(ctx, input.Provider, input.ProviderCategory, input.CategorySlug)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	return jsonResult(mapping)
+}
+
+func (s *MCPServer) handleUpdateCategoryMapping(_ context.Context, _ *mcpsdk.CallToolRequest, input updateCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+
+	if input.CategorySlug == "" {
+		return errorResult(fmt.Errorf("category_slug is required")), nil, nil
+	}
+	if input.ID == "" && (input.Provider == "" || input.ProviderCategory == "") {
+		return errorResult(fmt.Errorf("either id or (provider, provider_category) is required")), nil, nil
+	}
+
+	var id, provider, providerCategory *string
+	if input.ID != "" {
+		id = &input.ID
+	}
+	if input.Provider != "" {
+		provider = &input.Provider
+	}
+	if input.ProviderCategory != "" {
+		providerCategory = &input.ProviderCategory
+	}
+
+	mapping, err := s.svc.UpdateMappingBySlug(ctx, id, provider, providerCategory, input.CategorySlug)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	return jsonResult(mapping)
+}
+
+func (s *MCPServer) handleDeleteCategoryMapping(_ context.Context, _ *mcpsdk.CallToolRequest, input deleteCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+
+	if input.ID == "" && (input.Provider == "" || input.ProviderCategory == "") {
+		return errorResult(fmt.Errorf("either id or (provider, provider_category) is required")), nil, nil
+	}
+
+	var id, provider, providerCategory *string
+	if input.ID != "" {
+		id = &input.ID
+	}
+	if input.Provider != "" {
+		provider = &input.Provider
+	}
+	if input.ProviderCategory != "" {
+		providerCategory = &input.ProviderCategory
+	}
+
+	prov, provCat, err := s.svc.DeleteMappingByLookup(ctx, id, provider, providerCategory)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	return jsonResult(map[string]any{
+		"deleted":           true,
+		"provider":          prov,
+		"provider_category": provCat,
+	})
 }
 
 // --- Helpers ---

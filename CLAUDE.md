@@ -72,6 +72,10 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Category API: transaction responses include structured `category` object; raw fields renamed to `category_primary_raw`/`category_detailed_raw`. Filter by `category_slug` param.
 - `ListDistinctCategories` returns `[]CategoryPair{Primary, Detailed}` (not `[]string`). Will be replaced by `ListCategories` returning full taxonomy tree (Phase 20B).
 - MCP `min_amount`/`max_amount` use `*float64` (not `float64`) to allow filtering by zero values
+- Field selection: `?fields=` param on `GET /api/v1/transactions`, `GET /api/v1/transactions/{id}`, and MCP `query_transactions`. Aliases: `core` (id,date,amount,name,iso_currency_code), `category` (category,category_primary_raw,category_detailed_raw), `timestamps` (created_at,updated_at,datetime,authorized_datetime). `id` always included. Filtering happens in handlers, not service layer.
+- Transaction summary: `GET /api/v1/transactions/summary` and MCP `transaction_summary` tool. Server-side aggregation with `group_by`: category, month, week, day, category_month. Multi-currency handled per-row. Default date range: 30 days.
+- Category mapping MCP tools: `list_category_mappings`, `create_category_mapping`, `update_category_mapping`, `delete_category_mapping`. Accept category slugs (not IDs). Lookup by ID or (provider, provider_category) pair.
+- Enhanced overview resource: `breadbox://overview` includes users list, accounts_by_type, connections with account counts, 30-day spending summary with top 5 categories, pending transaction count.
 - CSS framework: DaisyUI 5 + Tailwind CSS v4 via `tailwindcss-extra` standalone CLI binary. No Node.js. Replaces Pico CSS.
 - CSS build: `make css` compiles `input.css` → `static/css/styles.css`. `make css-watch` for dev. Dockerfile runs `make css` in build stage.
 - DaisyUI theme: `light` (default) + `dark` auto-switch via `prefers-color-scheme`

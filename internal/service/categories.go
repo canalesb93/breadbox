@@ -634,6 +634,120 @@ func (s *Service) getMappingResponse(ctx context.Context, id pgtype.UUID) (*Cate
 	}, nil
 }
 
+// CreateMappingBySlug creates a category mapping using category slug instead of ID.
+func (s *Service) CreateMappingBySlug(ctx context.Context, provider, providerCategory, categorySlug string) (*CategoryMappingResponse, error) {
+	cat, err := s.Queries.GetCategoryBySlug(ctx, categorySlug)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("category '%s' not found. Use list_categories to see valid slugs", categorySlug)
+		}
+		return nil, fmt.Errorf("lookup category: %w", err)
+	}
+
+	m, err := s.Queries.InsertCategoryMapping(ctx, db.InsertCategoryMappingParams{
+		Provider:         db.ProviderType(provider),
+		ProviderCategory: providerCategory,
+		CategoryID:       cat.ID,
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+			return nil, fmt.Errorf("mapping already exists for (%s, %s). Use update_category_mapping to change it", provider, providerCategory)
+		}
+		return nil, fmt.Errorf("insert mapping: %w", err)
+	}
+
+	return s.getMappingResponse(ctx, m.ID)
+}
+
+// UpdateMappingBySlug updates a category mapping's target using slug, found by ID or (provider, provider_category).
+func (s *Service) UpdateMappingBySlug(ctx context.Context, id *string, provider *string, providerCategory *string, categorySlug string) (*CategoryMappingResponse, error) {
+	cat, err := s.Queries.GetCategoryBySlug(ctx, categorySlug)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("category '%s' not found. Use list_categories to see valid slugs", categorySlug)
+		}
+		return nil, fmt.Errorf("lookup category: %w", err)
+	}
+
+	var mappingID pgtype.UUID
+	if id != nil && *id != "" {
+		mappingID, err = parseUUID(*id)
+		if err != nil {
+			return nil, ErrMappingNotFound
+		}
+	} else if provider != nil && providerCategory != nil {
+		m, err2 := s.Queries.GetCategoryMappingByProviderCategory(ctx, db.GetCategoryMappingByProviderCategoryParams{
+			Provider:         db.ProviderType(*provider),
+			ProviderCategory: *providerCategory,
+		})
+		if err2 != nil {
+			if errors.Is(err2, pgx.ErrNoRows) {
+				return nil, ErrMappingNotFound
+			}
+			return nil, fmt.Errorf("lookup mapping: %w", err2)
+		}
+		mappingID = m.ID
+	} else {
+		return nil, fmt.Errorf("either id or (provider, provider_category) is required")
+	}
+
+	m, err := s.Queries.UpdateCategoryMapping(ctx, db.UpdateCategoryMappingParams{
+		ID:         mappingID,
+		CategoryID: cat.ID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrMappingNotFound
+		}
+		return nil, fmt.Errorf("update mapping: %w", err)
+	}
+
+	return s.getMappingResponse(ctx, m.ID)
+}
+
+// DeleteMappingByLookup deletes a mapping by ID or (provider, provider_category).
+func (s *Service) DeleteMappingByLookup(ctx context.Context, id *string, provider *string, providerCategory *string) (string, string, error) {
+	if id != nil && *id != "" {
+		mUID, err := parseUUID(*id)
+		if err != nil {
+			return "", "", ErrMappingNotFound
+		}
+		m, err := s.Queries.GetCategoryMappingByID(ctx, mUID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return "", "", ErrMappingNotFound
+			}
+			return "", "", fmt.Errorf("get mapping: %w", err)
+		}
+		if err := s.Queries.DeleteCategoryMapping(ctx, mUID); err != nil {
+			return "", "", fmt.Errorf("delete mapping: %w", err)
+		}
+		return string(m.Provider), m.ProviderCategory, nil
+	}
+
+	if provider != nil && providerCategory != nil {
+		_, err := s.Queries.GetCategoryMappingByProviderCategory(ctx, db.GetCategoryMappingByProviderCategoryParams{
+			Provider:         db.ProviderType(*provider),
+			ProviderCategory: *providerCategory,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return "", "", ErrMappingNotFound
+			}
+			return "", "", fmt.Errorf("lookup mapping: %w", err)
+		}
+		if err := s.Queries.DeleteCategoryMappingByProviderCategory(ctx, db.DeleteCategoryMappingByProviderCategoryParams{
+			Provider:         db.ProviderType(*provider),
+			ProviderCategory: *providerCategory,
+		}); err != nil {
+			return "", "", fmt.Errorf("delete mapping: %w", err)
+		}
+		return *provider, *providerCategory, nil
+	}
+
+	return "", "", fmt.Errorf("either id or (provider, provider_category) is required")
+}
+
 // GenerateSlug creates a URL-safe slug from a display name.
 func GenerateSlug(displayName string) string {
 	s := strings.ToLower(displayName)

@@ -172,6 +172,13 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			SortOrder:    sortOrder,
 		}
 
+		// Parse fields for field selection.
+		fieldSet, err := service.ParseFields(q.Get("fields"))
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_FIELDS", err.Error())
+			return
+		}
+
 		result, err := svc.ListTransactions(r.Context(), params)
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidCursor) {
@@ -179,6 +186,20 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 				return
 			}
 			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list transactions")
+			return
+		}
+
+		if fieldSet != nil {
+			filtered := make([]map[string]any, len(result.Transactions))
+			for i, t := range result.Transactions {
+				filtered[i] = service.FilterTransactionFields(t, fieldSet)
+			}
+			writeData(w, map[string]any{
+				"transactions": filtered,
+				"next_cursor":  result.NextCursor,
+				"has_more":     result.HasMore,
+				"limit":        result.Limit,
+			})
 			return
 		}
 
@@ -307,6 +328,12 @@ func GetTransactionHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 
+		fieldSet, err := service.ParseFields(r.URL.Query().Get("fields"))
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_FIELDS", err.Error())
+			return
+		}
+
 		txn, err := svc.GetTransaction(r.Context(), id)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
@@ -317,7 +344,68 @@ func GetTransactionHandler(svc *service.Service) http.HandlerFunc {
 			return
 		}
 
+		if fieldSet != nil {
+			writeData(w, service.FilterTransactionFields(*txn, fieldSet))
+			return
+		}
+
 		writeData(w, txn)
+	}
+}
+
+// TransactionSummaryHandler returns aggregated transaction totals.
+func TransactionSummaryHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+
+		groupBy := q.Get("group_by")
+		if groupBy == "" {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "group_by is required (category, month, week, day, category_month)")
+			return
+		}
+
+		params := service.TransactionSummaryParams{
+			GroupBy: groupBy,
+		}
+
+		if v := q.Get("start_date"); v != "" {
+			t, err := time.Parse("2006-01-02", v)
+			if err != nil {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be in YYYY-MM-DD format")
+				return
+			}
+			params.StartDate = &t
+		}
+
+		if v := q.Get("end_date"); v != "" {
+			t, err := time.Parse("2006-01-02", v)
+			if err != nil {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "end_date must be in YYYY-MM-DD format")
+				return
+			}
+			params.EndDate = &t
+		}
+
+		if v := q.Get("account_id"); v != "" {
+			params.AccountID = &v
+		}
+		if v := q.Get("user_id"); v != "" {
+			params.UserID = &v
+		}
+		if v := q.Get("category"); v != "" {
+			params.Category = &v
+		}
+		if q.Get("include_pending") == "true" {
+			params.IncludePending = true
+		}
+
+		result, err := svc.GetTransactionSummary(r.Context(), params)
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
+		}
+
+		writeData(w, result)
 	}
 }
 
