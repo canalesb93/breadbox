@@ -38,4 +38,21 @@ if ! make css 2>&1; then
   echo "WARN: make css failed"
 fi
 
+# --- Test database ---
+echo "==> Setting up test database..."
+if command -v pg_isready &>/dev/null; then
+  # Start PostgreSQL if not running
+  if ! pg_isready -q 2>/dev/null; then
+    pg_ctlcluster 16 main start 2>/dev/null || true
+  fi
+  # Create test user and database (idempotent)
+  sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='breadbox'" 2>/dev/null | grep -q 1 \
+    || sudo -u postgres psql -c "CREATE ROLE breadbox WITH LOGIN PASSWORD 'breadbox'" 2>/dev/null
+  sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='breadbox_test'" 2>/dev/null | grep -q 1 \
+    || sudo -u postgres createdb -O breadbox breadbox_test 2>/dev/null
+  echo "    breadbox_test database ready"
+else
+  echo "WARN: pg_isready not found, skipping test DB setup"
+fi
+
 echo "==> Session setup complete."
