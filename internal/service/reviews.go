@@ -30,6 +30,24 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 		status = *params.Status
 	}
 
+	// Validate status enum
+	switch status {
+	case "pending", "approved", "rejected", "skipped", "all":
+		// valid
+	default:
+		return nil, fmt.Errorf("%w: invalid status %q, must be one of: pending, approved, rejected, skipped, all", ErrInvalidParameter, status)
+	}
+
+	// Validate review_type enum if provided
+	if params.ReviewType != nil && *params.ReviewType != "" {
+		switch *params.ReviewType {
+		case "new_transaction", "uncategorized", "low_confidence", "manual":
+			// valid
+		default:
+			return nil, fmt.Errorf("%w: invalid review_type %q, must be one of: new_transaction, uncategorized, low_confidence, manual", ErrInvalidParameter, *params.ReviewType)
+		}
+	}
+
 	// Determine sort order: pending = oldest first (FIFO), resolved = newest first
 	isPending := status == "pending"
 
@@ -452,7 +470,7 @@ func (s *Service) SubmitReview(ctx context.Context, params SubmitReviewParams) (
 
 	// Apply category override to transaction if applicable
 	txnID := formatUUID(existing.TransactionID)
-	if categoryToApply != nil && (params.Decision == "approved" || params.Decision == "rejected") {
+	if categoryToApply != nil && (params.Decision == "approved" || params.CategoryID != nil) {
 		if err := s.SetTransactionCategory(ctx, txnID, *categoryToApply); err != nil {
 			s.Logger.Warn("failed to set transaction category from review", "error", err, "transaction_id", txnID)
 		}
@@ -573,6 +591,11 @@ func (s *Service) EnqueueManualReview(ctx context.Context, transactionID string,
 		ReviewType:    "manual",
 	})
 	if err != nil {
+		// ON CONFLICT DO NOTHING returns pgx.ErrNoRows when a pending review already exists.
+		// This handles the race between the pre-check above and the actual insert.
+		if err == pgx.ErrNoRows {
+			return nil, ErrReviewAlreadyPending
+		}
 		return nil, fmt.Errorf("enqueue review: %w", err)
 	}
 

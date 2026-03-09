@@ -93,6 +93,7 @@ type transactionSummaryInput struct {
 type listPendingReviewsInput struct {
 	ReviewType string `json:"review_type,omitempty" jsonschema:"Filter by review type: new_transaction, uncategorized, low_confidence, manual"`
 	AccountID  string `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
+	UserID     string `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
 	Limit      int    `json:"limit,omitempty" jsonschema:"Max results (default 20, max 100)"`
 	Cursor     string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
 }
@@ -596,6 +597,9 @@ func (s *MCPServer) handleListPendingReviews(_ context.Context, _ *mcpsdk.CallTo
 	}
 	if input.AccountID != "" {
 		params.AccountID = &input.AccountID
+	}
+	if input.UserID != "" {
+		params.UserID = &input.UserID
 	}
 	if input.Limit > 0 {
 		if input.Limit > 100 {

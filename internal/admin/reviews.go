@@ -7,10 +7,12 @@ import (
 	"strconv"
 
 	"breadbox/internal/app"
+	"breadbox/internal/db"
 	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // ReviewsPageHandler serves GET /admin/reviews.
@@ -66,7 +68,21 @@ func ReviewsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		// Load categories for the category selector.
 		categories, _ := svc.ListCategories(ctx)
 
+		// Load review settings from app_config.
+		reviewAutoEnqueue := true
+		if cfg, err := a.Queries.GetAppConfig(ctx, "review_auto_enqueue"); err == nil && cfg.Value.Valid {
+			if v, err := strconv.ParseBool(cfg.Value.String); err == nil {
+				reviewAutoEnqueue = v
+			}
+		}
+		reviewConfidenceThreshold := "0.5"
+		if cfg, err := a.Queries.GetAppConfig(ctx, "review_confidence_threshold"); err == nil && cfg.Value.Valid {
+			reviewConfidenceThreshold = cfg.Value.String
+		}
+
 		data := BaseTemplateData(r, sm, "reviews", "Reviews")
+		data["ReviewAutoEnqueue"] = reviewAutoEnqueue
+		data["ReviewConfidenceThreshold"] = reviewConfidenceThreshold
 		data["Reviews"] = result.Reviews
 		data["HasMore"] = result.HasMore
 		data["NextCursor"] = result.NextCursor
@@ -179,5 +195,41 @@ func EnqueueReviewAdminHandler(a *app.App, sm *scs.SessionManager, svc *service.
 		}
 
 		writeJSON(w, http.StatusCreated, result)
+	}
+}
+
+// ReviewSettingsHandler handles POST /admin/api/reviews/settings.
+func ReviewSettingsHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			AutoEnqueue         bool    `json:"auto_enqueue"`
+			ConfidenceThreshold float64 `json:"confidence_threshold"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+			return
+		}
+
+		ctx := r.Context()
+
+		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
+			Key:   "review_auto_enqueue",
+			Value: pgtype.Text{String: strconv.FormatBool(body.AutoEnqueue), Valid: true},
+		}); err != nil {
+			a.Logger.Error("save review_auto_enqueue", "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to save settings"})
+			return
+		}
+
+		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
+			Key:   "review_confidence_threshold",
+			Value: pgtype.Text{String: strconv.FormatFloat(body.ConfidenceThreshold, 'f', -1, 64), Valid: true},
+		}); err != nil {
+			a.Logger.Error("save review_confidence_threshold", "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to save settings"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	}
 }

@@ -3,11 +3,31 @@ package sync
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"breadbox/internal/db"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// confidenceLevelToScore maps Plaid category_confidence enum strings to
+// numeric scores for comparison against the confidence threshold.
+func confidenceLevelToScore(level string) float64 {
+	switch strings.ToUpper(level) {
+	case "VERY_HIGH":
+		return 0.95
+	case "HIGH":
+		return 0.80
+	case "MEDIUM":
+		return 0.50
+	case "LOW":
+		return 0.20
+	case "UNKNOWN":
+		return 0.0
+	default:
+		return -1 // unknown value, skip comparison
+	}
+}
 
 // enqueueForReview adds a transaction to the review queue if it meets
 // criteria (uncategorized, low confidence, or new).
@@ -24,8 +44,8 @@ func (e *Engine) enqueueForReview(ctx context.Context, txQueries *db.Queries, tx
 	if !hasCategory {
 		reviewType = "uncategorized"
 	} else if confidenceThreshold > 0 && txnResult.CategoryConfidence.Valid {
-		conf, err := strconv.ParseFloat(txnResult.CategoryConfidence.String, 64)
-		if err == nil && conf < confidenceThreshold {
+		conf := confidenceLevelToScore(txnResult.CategoryConfidence.String)
+		if conf >= 0 && conf < confidenceThreshold {
 			reviewType = "low_confidence"
 		}
 	}
@@ -46,7 +66,8 @@ func (e *Engine) enqueueForReview(ctx context.Context, txQueries *db.Queries, tx
 		params.SuggestedCategoryID = txnResult.CategoryID
 	}
 	if txnResult.CategoryConfidence.Valid {
-		if conf, err := strconv.ParseFloat(txnResult.CategoryConfidence.String, 64); err == nil {
+		conf := confidenceLevelToScore(txnResult.CategoryConfidence.String)
+		if conf >= 0 {
 			params.ConfidenceScore = numericFromFloat(conf)
 		}
 	}

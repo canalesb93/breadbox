@@ -10,6 +10,41 @@
   {{end}}
 </div>
 
+<!-- Review Settings -->
+<div class="collapse collapse-arrow bg-base-100 border border-base-300 mb-6">
+  <input type="checkbox" />
+  <div class="collapse-title font-medium">Review Settings</div>
+  <div class="collapse-content" x-data="{ autoEnqueue: {{.ReviewAutoEnqueue}}, threshold: '{{.ReviewConfidenceThreshold}}', saving: false }">
+    <div class="flex flex-wrap gap-6 items-end pt-2">
+      <div class="form-control">
+        <label class="label cursor-pointer gap-2">
+          <span class="label-text">Auto-enqueue on sync</span>
+          <input type="checkbox" class="toggle toggle-primary toggle-sm" x-model="autoEnqueue">
+        </label>
+      </div>
+      <div class="form-control">
+        <label class="label label-text text-xs">Confidence threshold</label>
+        <input type="number" step="0.1" min="0" max="1" class="input input-bordered input-sm w-24"
+          x-model="threshold" :disabled="!autoEnqueue">
+      </div>
+      <button class="btn btn-primary btn-sm" :disabled="saving"
+        @click="saving = true;
+          fetch('/admin/api/reviews/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+            body: JSON.stringify({ auto_enqueue: autoEnqueue, confidence_threshold: parseFloat(threshold) })
+          }).then(r => r.json()).then(d => { saving = false; }).catch(() => { saving = false; })">
+        <span x-show="!saving">Save</span>
+        <span x-show="saving" class="loading loading-spinner loading-xs"></span>
+      </button>
+    </div>
+    <p class="text-xs text-base-content/50 mt-2">
+      When enabled, new transactions are automatically added to the review queue during sync.
+      Transactions with category confidence below the threshold are flagged as "low confidence".
+    </p>
+  </div>
+</div>
+
 <!-- Filter Bar -->
 <div class="bb-filter-bar mb-6">
   <form method="GET" action="/admin/reviews" class="flex flex-wrap gap-3 items-end">
@@ -200,6 +235,8 @@
 </div>
 
 <script>
+var csrfToken = "{{.CSRFToken}}";
+
 function reviewQueue() {
   return {
     submitReview(id, decision, el) {
@@ -219,7 +256,7 @@ function reviewQueue() {
 
       fetch('/admin/api/reviews/' + id + '/submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
         body: JSON.stringify(body)
       })
       .then(r => r.json())
@@ -249,7 +286,7 @@ function reviewQueue() {
 
       fetch('/admin/api/reviews/' + id + '/dismiss', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }
       })
       .then(r => r.json())
       .then(data => {
