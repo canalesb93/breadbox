@@ -11,103 +11,6 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func (s *MCPServer) registerTools() {
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "list_accounts",
-		Description: "List all bank accounts synced from Plaid, Teller, or CSV import. Each account belongs to a bank connection and optionally a user (family member). Returns account type, balances, institution name, and currency. Filter by user_id to see one family member's accounts.",
-	}, s.handleListAccounts)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "query_transactions",
-		Description: "Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (use list_categories to find slugs); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Use the fields parameter to request only the fields you need (e.g., fields=core,category) to significantly reduce response size.",
-	}, s.handleQueryTransactions)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "count_transactions",
-		Description: "Count transactions matching optional filters. Same filters as query_transactions except cursor, limit, sort_by, and sort_order. Use this to get totals before paginating, or to compare counts across date ranges or categories.",
-	}, s.handleCountTransactions)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "list_categories",
-		Description: "List the full category taxonomy as a tree. Categories have: slug (stable identifier for filtering), display_name (human label), icon, color, and optional children. Use category slugs with the category_slug filter in query_transactions and count_transactions. Parent slugs include all children when filtering.",
-	}, s.handleListCategories)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "list_users",
-		Description: "List all users (family members) in the system. Each user can own bank connections and their associated accounts. Use the returned user IDs to filter accounts or transactions by family member.",
-	}, s.handleListUsers)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "get_sync_status",
-		Description: "Get the status of all bank connections including provider type (plaid/teller/csv), sync status (active/error/pending_reauth), last sync time, and any error details. Use this to check data freshness or diagnose sync issues.",
-	}, s.handleGetSyncStatus)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "trigger_sync",
-		Description: "Trigger a manual sync of bank data from the provider (Plaid or Teller). Optionally specify a connection_id to sync a single connection; otherwise syncs all active connections. Returns immediately — the sync runs in the background. Check get_sync_status for results.",
-	}, s.handleTriggerSync)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "categorize_transaction",
-		Description: "Manually override a transaction's category. Use list_categories to find the category ID, then pass both the transaction_id and category_id. This creates a permanent override that won't be changed by automatic sync.",
-	}, s.handleCategorizeTransaction)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "reset_transaction_category",
-		Description: "Remove a manual category override from a transaction and re-resolve its category from the automatic mapping rules. Use this to undo a categorize_transaction action.",
-	}, s.handleResetTransactionCategory)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "list_unmapped_categories",
-		Description: "List distinct raw provider category strings from transactions that currently have no category mapping. These are transactions the system couldn't automatically categorize. Results show the raw primary and detailed category strings from the provider.",
-	}, s.handleListUnmappedCategories)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "add_transaction_comment",
-		Description: "Add a comment to a transaction. Use this to explain categorization decisions, flag unusual transactions, or leave notes for the family. Comments are visible on the transaction detail page and to other agents. Supports markdown formatting.",
-	}, s.handleAddTransactionComment)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "list_transaction_comments",
-		Description: "List all comments on a transaction, ordered chronologically. Check comments before making changes to understand prior context and decisions by other agents or family members.",
-	}, s.handleListTransactionComments)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "get_transaction_history",
-		Description: "Get the change history (audit log) for a specific transaction. Shows all modifications including category changes, comment additions, and sync updates. Use this to understand how a transaction's categorization evolved over time and learn from past decisions.",
-	}, s.handleGetTransactionHistory)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "query_audit_log",
-		Description: "Query the global audit log to see all changes across the system. Use entity_type to focus on specific data types. Filter by actor_type='agent' to see what other AI agents have done, or actor_type='user' to see manual changes by the family. Useful for learning patterns: e.g., query all category overrides to understand the family's preferences.",
-	}, s.handleQueryAuditLog)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "transaction_summary",
-		Description: "Get aggregated transaction totals grouped by category and/or time period. Replaces the need to paginate through thousands of individual transactions for spending analysis. Amounts follow the convention: positive = money out (debit), negative = money in (credit). Only includes non-deleted, non-pending transactions by default.",
-	}, s.handleTransactionSummary)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "list_category_mappings",
-		Description: "List category mappings that translate provider-specific category strings to user categories. Filter by provider to see mappings for a specific bank data source. Returns the provider, raw provider category string, and the mapped user category slug and display name.",
-	}, s.handleListCategoryMappings)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "create_category_mapping",
-		Description: "Create a new category mapping that tells the system how to translate a provider's raw category string to a user category. For example, map Teller's 'dining' to your 'food_and_drink_restaurant' category. The mapping takes effect on the next sync — existing transactions are not retroactively updated.",
-	}, s.handleCreateCategoryMapping)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "update_category_mapping",
-		Description: "Update an existing category mapping to point to a different user category. Identified by mapping ID or by the (provider, provider_category) pair. Does not retroactively update transactions — wait for next sync.",
-	}, s.handleUpdateCategoryMapping)
-
-	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
-		Name:        "delete_category_mapping",
-		Description: "Delete a category mapping. After deletion, transactions with this provider category string will fall back to 'uncategorized' on next sync. Identified by mapping ID or by (provider, provider_category) pair.",
-	}, s.handleDeleteCategoryMapping)
-}
-
 // --- Input types ---
 
 type listAccountsInput struct {
@@ -380,8 +283,11 @@ func (s *MCPServer) handleGetSyncStatus(_ context.Context, _ *mcpsdk.CallToolReq
 	return jsonResult(connections)
 }
 
-func (s *MCPServer) handleTriggerSync(_ context.Context, _ *mcpsdk.CallToolRequest, input triggerSyncInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
+func (s *MCPServer) handleTriggerSync(ctx context.Context, _ *mcpsdk.CallToolRequest, input triggerSyncInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	ctx = context.Background()
 	var connectionID *string
 	if input.ConnectionID != "" {
 		connectionID = &input.ConnectionID
@@ -403,8 +309,11 @@ func (s *MCPServer) handleTriggerSync(_ context.Context, _ *mcpsdk.CallToolReque
 	}, nil, nil
 }
 
-func (s *MCPServer) handleCategorizeTransaction(_ context.Context, _ *mcpsdk.CallToolRequest, input categorizeTransactionInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
+func (s *MCPServer) handleCategorizeTransaction(ctx context.Context, _ *mcpsdk.CallToolRequest, input categorizeTransactionInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	ctx = context.Background()
 	if input.TransactionID == "" || input.CategoryID == "" {
 		return errorResult(fmt.Errorf("transaction_id and category_id are required")), nil, nil
 	}
@@ -418,8 +327,11 @@ func (s *MCPServer) handleCategorizeTransaction(_ context.Context, _ *mcpsdk.Cal
 	}, nil, nil
 }
 
-func (s *MCPServer) handleResetTransactionCategory(_ context.Context, _ *mcpsdk.CallToolRequest, input resetTransactionCategoryInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
+func (s *MCPServer) handleResetTransactionCategory(ctx context.Context, _ *mcpsdk.CallToolRequest, input resetTransactionCategoryInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	ctx = context.Background()
 	if input.TransactionID == "" {
 		return errorResult(fmt.Errorf("transaction_id is required")), nil, nil
 	}
@@ -443,6 +355,9 @@ func (s *MCPServer) handleListUnmappedCategories(_ context.Context, _ *mcpsdk.Ca
 }
 
 func (s *MCPServer) handleAddTransactionComment(ctx context.Context, _ *mcpsdk.CallToolRequest, input addTransactionCommentInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
 	if input.TransactionID == "" || input.Content == "" {
 		return errorResult(fmt.Errorf("transaction_id and content are required")), nil, nil
 	}
@@ -563,8 +478,11 @@ func (s *MCPServer) handleListCategoryMappings(_ context.Context, _ *mcpsdk.Call
 	})
 }
 
-func (s *MCPServer) handleCreateCategoryMapping(_ context.Context, _ *mcpsdk.CallToolRequest, input createCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
+func (s *MCPServer) handleCreateCategoryMapping(ctx context.Context, _ *mcpsdk.CallToolRequest, input createCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	ctx = context.Background()
 
 	if input.Provider == "" || input.ProviderCategory == "" || input.CategorySlug == "" {
 		return errorResult(fmt.Errorf("provider, provider_category, and category_slug are required")), nil, nil
@@ -584,8 +502,11 @@ func (s *MCPServer) handleCreateCategoryMapping(_ context.Context, _ *mcpsdk.Cal
 	return jsonResult(mapping)
 }
 
-func (s *MCPServer) handleUpdateCategoryMapping(_ context.Context, _ *mcpsdk.CallToolRequest, input updateCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
+func (s *MCPServer) handleUpdateCategoryMapping(ctx context.Context, _ *mcpsdk.CallToolRequest, input updateCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	ctx = context.Background()
 
 	if input.CategorySlug == "" {
 		return errorResult(fmt.Errorf("category_slug is required")), nil, nil
@@ -613,8 +534,11 @@ func (s *MCPServer) handleUpdateCategoryMapping(_ context.Context, _ *mcpsdk.Cal
 	return jsonResult(mapping)
 }
 
-func (s *MCPServer) handleDeleteCategoryMapping(_ context.Context, _ *mcpsdk.CallToolRequest, input deleteCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
+func (s *MCPServer) handleDeleteCategoryMapping(ctx context.Context, _ *mcpsdk.CallToolRequest, input deleteCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	ctx = context.Background()
 
 	if input.ID == "" && (input.Provider == "" || input.ProviderCategory == "") {
 		return errorResult(fmt.Errorf("either id or (provider, provider_category) is required")), nil, nil

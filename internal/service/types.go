@@ -141,6 +141,7 @@ type APIKeyResponse struct {
 	ID         string  `json:"id"`
 	Name       string  `json:"name"`
 	KeyPrefix  string  `json:"key_prefix"`
+	Scope      string  `json:"scope"`
 	LastUsedAt *string `json:"last_used_at"`
 	RevokedAt  *string `json:"revoked_at"`
 	CreatedAt  string  `json:"created_at"`

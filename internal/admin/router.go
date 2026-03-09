@@ -2,6 +2,7 @@ package admin
 
 import (
 	"breadbox/internal/app"
+	breadboxmcp "breadbox/internal/mcp"
 	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
@@ -11,7 +12,7 @@ import (
 // NewAdminRouter creates the chi.Router for all admin dashboard routes.
 // It includes unauthenticated routes (login, setup) and authenticated routes
 // (dashboard, connections, users, admin API).
-func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) chi.Router {
+func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service, mcpServer *breadboxmcp.MCPServer) chi.Router {
 	r := chi.NewRouter()
 
 	// Session middleware wraps everything so session data is available.
@@ -69,6 +70,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		r.Get("/categories", CategoriesPageHandler(svc, sm, tr))
 		r.Get("/categories/mappings", MappingsPageHandler(svc, sm, tr))
+
+		r.Route("/mcp", func(r chi.Router) {
+			r.Get("/", MCPSettingsGetHandler(svc, mcpServer, sm, tr))
+			r.Post("/mode", MCPSaveModeHandler(svc, sm))
+			r.Post("/tools", MCPSaveToolsHandler(svc, mcpServer, sm))
+			r.Post("/instructions", MCPSaveInstructionsHandler(svc, sm))
+		})
 
 		r.Get("/providers", ProvidersGetHandler(a, sm, tr))
 		r.Post("/providers/plaid", ProvidersSavePlaidHandler(a, sm))

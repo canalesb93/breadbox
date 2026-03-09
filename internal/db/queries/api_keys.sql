@@ -1,5 +1,5 @@
 -- name: CreateApiKey :one
-INSERT INTO api_keys (name, key_hash, key_prefix) VALUES ($1, $2, $3) RETURNING *;
+INSERT INTO api_keys (name, key_hash, key_prefix, scope) VALUES ($1, $2, $3, $4) RETURNING *;
 
 -- name: GetApiKeyByHash :one
 SELECT * FROM api_keys WHERE key_hash = $1;

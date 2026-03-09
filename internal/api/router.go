@@ -40,43 +40,46 @@ func NewRouter(a *app.App, version string) http.Handler {
 	svc := service.New(a.Queries, a.DB, a.SyncEngine, a.Logger)
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(mw.APIKeyAuth(svc))
+
+		// Read endpoints — all API keys.
 		r.Get("/accounts", ListAccountsHandler(svc))
 		r.Get("/accounts/{id}", GetAccountHandler(svc))
 		r.Get("/transactions", ListTransactionsHandler(svc))
 		r.Get("/transactions/count", CountTransactionsHandler(svc))
 		r.Get("/transactions/summary", TransactionSummaryHandler(svc))
 		r.Get("/transactions/{id}", GetTransactionHandler(svc))
-		r.Patch("/transactions/{id}/category", SetTransactionCategoryHandler(svc))
-		r.Delete("/transactions/{id}/category", ResetTransactionCategoryHandler(svc))
 		r.Get("/categories", ListCategoriesHandler(svc))
 		r.Get("/categories/unmapped", ListUnmappedCategoriesHandler(svc))
 		r.Get("/categories/{id}", GetCategoryHandler(svc))
-		r.Post("/categories", CreateCategoryHandler(svc))
-		r.Put("/categories/{id}", UpdateCategoryHandler(svc))
-		r.Delete("/categories/{id}", DeleteCategoryHandler(svc))
-		r.Post("/categories/{id}/merge", MergeCategoriesHandler(svc))
 		r.Get("/category-mappings", ListMappingsHandler(svc))
-		r.Put("/category-mappings", BulkUpsertMappingsHandler(svc))
-		r.Delete("/category-mappings/{id}", DeleteMappingHandler(svc))
 		r.Get("/users", ListUsersHandler(svc))
 		r.Get("/connections", ListConnectionsHandler(svc))
 		r.Get("/connections/{id}/status", GetConnectionStatusHandler(svc))
-		r.Post("/sync", TriggerSyncHandler(svc))
-
-		// Transaction comments
 		r.Get("/transactions/{transaction_id}/comments", ListCommentsHandler(svc))
-		r.Post("/transactions/{transaction_id}/comments", CreateCommentHandler(svc))
-		r.Put("/transactions/{transaction_id}/comments/{id}", UpdateCommentHandler(svc))
-		r.Delete("/transactions/{transaction_id}/comments/{id}", DeleteCommentHandler(svc))
-
-		// Audit log
 		r.Get("/audit-log", ListAuditLogHandler(svc))
 		r.Get("/transactions/{id}/audit-log", ListTransactionAuditLogHandler(svc))
+
+		// Write endpoints — full_access API keys only.
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireWriteScope())
+			r.Patch("/transactions/{id}/category", SetTransactionCategoryHandler(svc))
+			r.Delete("/transactions/{id}/category", ResetTransactionCategoryHandler(svc))
+			r.Post("/categories", CreateCategoryHandler(svc))
+			r.Put("/categories/{id}", UpdateCategoryHandler(svc))
+			r.Delete("/categories/{id}", DeleteCategoryHandler(svc))
+			r.Post("/categories/{id}/merge", MergeCategoriesHandler(svc))
+			r.Put("/category-mappings", BulkUpsertMappingsHandler(svc))
+			r.Delete("/category-mappings/{id}", DeleteMappingHandler(svc))
+			r.Post("/sync", TriggerSyncHandler(svc))
+			r.Post("/transactions/{transaction_id}/comments", CreateCommentHandler(svc))
+			r.Put("/transactions/{transaction_id}/comments/{id}", UpdateCommentHandler(svc))
+			r.Delete("/transactions/{transaction_id}/comments/{id}", DeleteCommentHandler(svc))
+		})
 	})
 
-	// MCP server — API key authenticated.
+	// MCP server — API key authenticated, per-request filtering.
 	mcpServer := breadboxmcp.NewMCPServer(svc, version)
-	mcpHandler := breadboxmcp.NewHTTPHandler(mcpServer)
+	mcpHandler := breadboxmcp.NewHTTPHandler(mcpServer, svc)
 	r.Group(func(r chi.Router) {
 		r.Use(mw.APIKeyAuth(svc))
 		r.Handle("/mcp", mcpHandler)
@@ -93,7 +96,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 	if err != nil {
 		a.Logger.Error("failed to initialize template renderer", "error", err)
 	} else {
-		adminRouter := admin.NewAdminRouter(a, sm, tr, svc)
+		adminRouter := admin.NewAdminRouter(a, sm, tr, svc, mcpServer)
 		r.Mount("/", adminRouter)
 	}
 

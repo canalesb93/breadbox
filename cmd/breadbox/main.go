@@ -308,6 +308,23 @@ func runMCPStdio() error {
 
 	mcpServer := breadboxmcp.NewMCPServer(a.Service, version)
 
+	// Load MCP config from DB for stdio mode.
+	mcpCfg, err := a.Service.GetMCPConfig(ctx)
+	if err != nil {
+		logger.Warn("failed to load MCP config, using defaults", "error", err)
+		mcpCfg = &service.MCPConfig{
+			Mode:          "read_only",
+			DisabledTools: []string{},
+		}
+	}
+
+	server := mcpServer.BuildServer(breadboxmcp.MCPServerConfig{
+		Mode:               mcpCfg.Mode,
+		DisabledTools:      mcpCfg.DisabledTools,
+		CustomInstructions: mcpCfg.CustomInstructions,
+		APIKeyScope:        "full_access", // stdio has no API key
+	})
+
 	// Graceful shutdown on SIGINT/SIGTERM.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -317,7 +334,7 @@ func runMCPStdio() error {
 	}()
 
 	logger.Info("starting MCP stdio server", "version", version)
-	return mcpServer.Server().Run(ctx, &mcpsdk.StdioTransport{})
+	return server.Run(ctx, &mcpsdk.StdioTransport{})
 }
 
 func runAPIKeys() error {
@@ -370,7 +387,7 @@ func runAPIKeys() error {
 		if len(os.Args) > 3 {
 			name = os.Args[3]
 		}
-		result, err := svc.CreateAPIKey(ctx, name)
+		result, err := svc.CreateAPIKey(ctx, name, "full_access")
 		if err != nil {
 			return fmt.Errorf("create api key: %w", err)
 		}

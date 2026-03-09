@@ -88,6 +88,11 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Docker socket detection: `os.Stat("/var/run/docker.sock")` at startup → `App.DockerSocketAvailable`. Used by update handler to pull images via Docker Engine API (`net/http` with Unix socket transport, no Docker SDK dependency).
 - Update flow: dashboard banner shows when GitHub release is newer than current. Pull via Docker socket if available, then user runs `docker compose up -d`. Dismiss stores `update_dismissed_version` in `app_config`.
 - Dev VM: `breadbox.exe.xyz` hosted on exe.dev. exe.dev handles TLS termination and HTTP proxying automatically (no Caddy needed on dev). Breadbox listens on a local port and exe.dev proxies `https://breadbox.exe.xyz` to it. Auto-deploy from GitHub Actions on main merge via SSH (`appleboy/ssh-action`). Secrets: `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`.
+- MCP permissions: global `mcp_mode` (read_only/read_write), per-tool enable/disable via `mcp_disabled_tools` JSON array, custom instructions via `mcp_custom_instructions` — all stored in `app_config`. Default mode is `read_only`.
+- MCP tool registry: `MCPServer.allTools []ToolDef` with `ToolClassification` (read/write). `BuildServer(MCPServerConfig)` creates a filtered `*mcpsdk.Server` per request. Write tools suppressed when mode is read_only, tool is in disabled list, or API key scope is read_only.
+- MCP instruction templates: hardcoded Go constants in `internal/mcp/templates.go` (spend_review, monthly_analysis, reporting). Loaded into editor via Alpine.js, saved as `mcp_custom_instructions`.
+- API key scope: `scope TEXT NOT NULL DEFAULT 'full_access'` column on `api_keys`. Values: `full_access`, `read_only`. `RequireWriteScope()` middleware blocks read-only keys from write REST endpoints. Full API key record stored in request context via `middleware.SetAPIKey()`/`GetAPIKey()`.
+- MCP admin page: `/admin/mcp` with four cards — global mode, tool access, server instructions, API key scope info. Nav item with `bot` Lucide icon between API Keys and Sync Logs.
 
 ## Canonical Enums
 
@@ -95,6 +100,9 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Sync status: `in_progress`, `success`, `error`
 - Sync trigger: `cron`, `webhook`, `manual`, `initial`
 - Provider type: `plaid`, `teller`, `csv`
+- API key scope: `full_access`, `read_only`
+- MCP mode: `read_only`, `read_write`
+- MCP tool classification: `read`, `write`
 
 ## Spec Documents
 
