@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev build test lint generate migrate-up migrate-down migrate-create sqlc seed docker-up docker-down css css-watch css-install
+.PHONY: dev build test test-integration lint generate migrate-up migrate-down migrate-create sqlc seed docker-up docker-down css css-watch css-install
 
 # generate runs sqlc + css so all gitignored build artifacts exist
 generate: sqlc css
@@ -16,6 +16,9 @@ build: generate
 
 test: generate
 	go test ./...
+
+test-integration: generate
+	DATABASE_URL=postgres://breadbox:breadbox@localhost:5432/breadbox_test?sslmode=disable go test -count=1 ./...
 
 lint: generate
 	go vet ./...
