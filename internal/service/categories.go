@@ -47,6 +47,7 @@ type CategoryMappingResponse struct {
 
 // UnmappedCategoryPair represents a provider category pair with no mapping.
 type UnmappedCategoryPair struct {
+	Provider string  `json:"provider"`
 	Primary  *string `json:"primary"`
 	Detailed *string `json:"detailed"`
 }
@@ -612,6 +613,7 @@ func (s *Service) ListUnmappedCategories(ctx context.Context) ([]UnmappedCategor
 	var result []UnmappedCategoryPair
 	for _, r := range rows {
 		result = append(result, UnmappedCategoryPair{
+			Provider: string(r.Provider),
 			Primary:  textPtr(r.CategoryPrimary),
 			Detailed: textPtr(r.CategoryDetailed),
 		})

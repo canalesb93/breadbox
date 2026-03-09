@@ -25,11 +25,12 @@
     <div class="overflow-x-auto">
       <table class="table table-sm">
         <thead>
-          <tr><th>Primary</th><th>Detailed</th><th>Map To</th></tr>
+          <tr><th>Provider</th><th>Primary</th><th>Detailed</th><th>Map To</th></tr>
         </thead>
         <tbody>
           {{range .UnmappedCategories}}
           <tr x-data="{categoryId: '', submitting: false}">
+            <td><span class="badge badge-sm {{if eq .Provider "plaid"}}badge-primary{{else if eq .Provider "teller"}}badge-secondary{{else}}badge-accent{{end}}">{{.Provider}}</span></td>
             <td>{{if .Primary}}{{.Primary}}{{else}}&mdash;{{end}}</td>
             <td>{{if .Detailed}}{{.Detailed}}{{else}}&mdash;{{end}}</td>
             <td class="flex gap-2">
@@ -42,8 +43,8 @@
               <button class="btn btn-sm btn-primary" :disabled="!categoryId || submitting" @click="
                 submitting = true;
                 let provCat = '{{if .Detailed}}{{.Detailed}}{{else}}{{.Primary}}{{end}}';
-                fetch('/admin/api/category-mappings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({provider: 'plaid', provider_category: provCat, category_id: categoryId})})
-                .then(r => { if(r.ok) location.reload(); else { submitting = false; } })
+                fetch('/admin/api/category-mappings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({provider: '{{.Provider}}', provider_category: provCat, category_id: categoryId})})
+                .then(r => { if(r.ok) location.reload(); else { submitting = false; alert('Failed to create mapping'); } })
                 .catch(() => { submitting = false; })
               ">Map</button>
             </td>
