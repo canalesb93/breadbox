@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -70,6 +71,7 @@ func ParseFields(raw string) (map[string]bool, error) {
 		for k := range fieldAliases {
 			validList = append(validList, k)
 		}
+		sort.Strings(validList)
 		return nil, fmt.Errorf("unknown field(s): %s. Valid fields: %s", strings.Join(unknown, ", "), strings.Join(validList, ", "))
 	}
 	fields["id"] = true // always include

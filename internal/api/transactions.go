@@ -401,7 +401,11 @@ func TransactionSummaryHandler(svc *service.Service) http.HandlerFunc {
 
 		result, err := svc.GetTransactionSummary(r.Context(), params)
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			if errors.Is(err, service.ErrInvalidParameter) {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get transaction summary")
 			return
 		}
 

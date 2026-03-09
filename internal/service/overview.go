@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // OverviewStats contains high-level statistics about the Breadbox dataset.
@@ -108,12 +110,15 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 	stats.Users = []OverviewUser{}
 	for userRows.Next() {
 		var u OverviewUser
-		var id [16]byte
+		var id pgtype.UUID
 		if err := userRows.Scan(&id, &u.Name); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
-		u.ID = fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", id[0:4], id[4:6], id[6:8], id[8:10], id[10:16])
+		u.ID = fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", id.Bytes[0:4], id.Bytes[4:6], id.Bytes[6:8], id.Bytes[8:10], id.Bytes[10:16])
 		stats.Users = append(stats.Users, u)
+	}
+	if err := userRows.Err(); err != nil {
+		return nil, fmt.Errorf("user rows: %w", err)
 	}
 
 	// Accounts by type
@@ -131,6 +136,9 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 		}
 		stats.AccountsByType[t] = c
 	}
+	if err := typeRows.Err(); err != nil {
+		return nil, fmt.Errorf("account type rows: %w", err)
+	}
 
 	// Connections with account counts
 	stats.Connections = []OverviewConnection{}
@@ -146,19 +154,22 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 	defer connRows.Close()
 	for connRows.Next() {
 		var c OverviewConnection
-		var id [16]byte
+		var id pgtype.UUID
 		var instName *string
 		var lastSynced *time.Time
 		if err := connRows.Scan(&id, &c.Provider, &instName, &c.Status, &lastSynced, &c.AccountCount); err != nil {
 			return nil, fmt.Errorf("scan connection: %w", err)
 		}
-		c.ID = fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", id[0:4], id[4:6], id[6:8], id[8:10], id[10:16])
+		c.ID = fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", id.Bytes[0:4], id.Bytes[4:6], id.Bytes[6:8], id.Bytes[8:10], id.Bytes[10:16])
 		c.InstitutionName = instName
 		if lastSynced != nil {
 			s := lastSynced.UTC().Format(time.RFC3339)
 			c.LastSyncedAt = &s
 		}
 		stats.Connections = append(stats.Connections, c)
+	}
+	if err := connRows.Err(); err != nil {
+		return nil, fmt.Errorf("connection rows: %w", err)
 	}
 
 	// 30-day spending summary
@@ -209,6 +220,9 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 				return nil, fmt.Errorf("scan category spend: %w", err)
 			}
 			spending.TopCategories = append(spending.TopCategories, cs)
+		}
+		if err := catRows.Err(); err != nil {
+			return nil, fmt.Errorf("category spend rows: %w", err)
 		}
 
 		stats.SpendingSummary30d = spending

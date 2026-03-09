@@ -20,7 +20,8 @@ func ListMappingsHandler(svc *service.Service) http.HandlerFunc {
 			providerPtr = &provider
 		}
 
-		mappings, err := svc.ListMappings(r.Context(), providerPtr)
+		categorySlug := r.URL.Query().Get("category_slug")
+		mappings, err := svc.ListMappings(r.Context(), providerPtr, categorySlug)
 		if err != nil {
 			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list mappings")
 			return

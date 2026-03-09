@@ -188,7 +188,8 @@ type transactionSummaryInput struct {
 }
 
 type listCategoryMappingsInput struct {
-	Provider string `json:"provider,omitempty" jsonschema:"Filter by provider: plaid, teller, or csv"`
+	Provider     string `json:"provider,omitempty" jsonschema:"Filter by provider: plaid, teller, or csv"`
+	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Filter by target category slug (e.g. food_and_drink_restaurant). Use list_categories to find valid slugs."`
 }
 
 type createCategoryMappingInput struct {
@@ -551,7 +552,7 @@ func (s *MCPServer) handleListCategoryMappings(_ context.Context, _ *mcpsdk.Call
 		provider = &input.Provider
 	}
 
-	mappings, err := s.svc.ListMappings(ctx, provider)
+	mappings, err := s.svc.ListMappings(ctx, provider, input.CategorySlug)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}

@@ -58,7 +58,7 @@ var validGroupBy = map[string]bool{
 // GetTransactionSummary returns aggregated transaction totals.
 func (s *Service) GetTransactionSummary(ctx context.Context, params TransactionSummaryParams) (*TransactionSummaryResult, error) {
 	if !validGroupBy[params.GroupBy] {
-		return nil, fmt.Errorf("invalid group_by: %s. Must be one of: category, month, week, day, category_month", params.GroupBy)
+		return nil, fmt.Errorf("%w: invalid group_by: %s. Must be one of: category, month, week, day, category_month", ErrInvalidParameter, params.GroupBy)
 	}
 
 	// Default date range: 30 days ago to tomorrow (exclusive end).
@@ -133,10 +133,10 @@ WHERE t.deleted_at IS NULL`, selectCols)
 	if params.Category != nil {
 		query += fmt.Sprintf(" AND t.category_primary = $%d", argN)
 		args = append(args, *params.Category)
-		argN++
+		argN++ //nolint:ineffassign // kept for consistency with other filters
 	}
 
-	query += fmt.Sprintf(" GROUP BY %s ORDER BY %s", groupCols, orderCols)
+	query += fmt.Sprintf(" GROUP BY %s ORDER BY %s LIMIT 1000", groupCols, orderCols)
 
 	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {

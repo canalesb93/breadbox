@@ -466,8 +466,8 @@ func (s *Service) BulkReMap(ctx context.Context, oldCategoryID, newCategoryID st
 
 // Category mapping CRUD
 
-// ListMappings returns all category mappings, optionally filtered by provider.
-func (s *Service) ListMappings(ctx context.Context, provider *string) ([]CategoryMappingResponse, error) {
+// ListMappings returns all category mappings, optionally filtered by provider and/or category slug.
+func (s *Service) ListMappings(ctx context.Context, provider *string, categorySlug ...string) ([]CategoryMappingResponse, error) {
 	var rows []db.ListCategoryMappingsRow
 	var err error
 
@@ -496,8 +496,17 @@ func (s *Service) ListMappings(ctx context.Context, provider *string) ([]Categor
 		}
 	}
 
+	// Determine optional category slug filter.
+	var slugFilter string
+	if len(categorySlug) > 0 && categorySlug[0] != "" {
+		slugFilter = categorySlug[0]
+	}
+
 	var result []CategoryMappingResponse
 	for _, r := range rows {
+		if slugFilter != "" && r.CategorySlug != slugFilter {
+			continue
+		}
 		result = append(result, CategoryMappingResponse{
 			ID:                  formatUUID(r.ID),
 			Provider:            string(r.Provider),

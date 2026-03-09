@@ -79,8 +79,10 @@ Every JSON field on `TransactionResponse` is selectable. The canonical set:
 | `authorized_datetime` | `authorized_datetime` | `t.authorized_datetime` | No |
 | `name` | `name` | `t.name` | No |
 | `merchant_name` | `merchant_name` | `t.merchant_name` | No |
-| `category_primary` | `category_primary` | `t.category_primary` | No |
-| `category_detailed` | `category_detailed` | `t.category_detailed` | No |
+| `category` | `category` | Structured category object (slug, display_name, icon, color) | No |
+| `category_override` | `category_override` | `t.category_override` | No |
+| `category_primary_raw` | `category_primary_raw` | `t.category_primary` (raw provider string) | No |
+| `category_detailed_raw` | `category_detailed_raw` | `t.category_detailed` (raw provider string) | No |
 | `category_confidence` | `category_confidence` | `t.category_confidence` | No |
 | `payment_channel` | `payment_channel` | `t.payment_channel` | No |
 | `pending` | `pending` | `t.pending` | No |
@@ -96,10 +98,10 @@ For common agent patterns, provide aliases that expand to multiple fields:
 | Alias | Expands To |
 |-------|-----------|
 | `core` | `id,date,amount,name,iso_currency_code` |
-| `category` | `category_primary,category_detailed` |
+| `category` | `category,category_primary_raw,category_detailed_raw` |
 | `timestamps` | `created_at,updated_at,datetime,authorized_datetime` |
 
-Example: `?fields=core,category,account_name` expands to `id,date,amount,name,iso_currency_code,category_primary,category_detailed,account_name`.
+Example: `?fields=core,category,account_name` expands to `id,date,amount,name,iso_currency_code,category,category_primary_raw,category_detailed_raw,account_name`.
 
 Aliases and explicit fields can be mixed. Duplicates are deduplicated.
 
@@ -110,15 +112,16 @@ var validFields = map[string]bool{
     "id": true, "account_id": true, "account_name": true, "user_name": true,
     "amount": true, "iso_currency_code": true, "date": true,
     "authorized_date": true, "datetime": true, "authorized_datetime": true,
-    "name": true, "merchant_name": true, "category_primary": true,
-    "category_detailed": true, "category_confidence": true,
+    "name": true, "merchant_name": true, "category": true,
+    "category_override": true, "category_primary_raw": true,
+    "category_detailed_raw": true, "category_confidence": true,
     "payment_channel": true, "pending": true, "created_at": true,
     "updated_at": true,
 }
 
 var fieldAliases = map[string][]string{
     "core":       {"id", "date", "amount", "name", "iso_currency_code"},
-    "category":   {"category_primary", "category_detailed"},
+    "category":   {"category", "category_primary_raw", "category_detailed_raw"},
     "timestamps": {"created_at", "updated_at", "datetime", "authorized_datetime"},
 }
 ```
@@ -190,8 +193,10 @@ func FilterTransactionFields(t TransactionResponse, fields map[string]bool) map[
     if fields["authorized_datetime"] { m["authorized_datetime"] = t.AuthorizedDatetime }
     if fields["name"] { m["name"] = t.Name }
     if fields["merchant_name"] { m["merchant_name"] = t.MerchantName }
-    if fields["category_primary"] { m["category_primary"] = t.CategoryPrimary }
-    if fields["category_detailed"] { m["category_detailed"] = t.CategoryDetailed }
+    if fields["category"] { m["category"] = t.Category }
+    if fields["category_override"] { m["category_override"] = t.CategoryOverride }
+    if fields["category_primary_raw"] { m["category_primary_raw"] = t.CategoryPrimaryRaw }
+    if fields["category_detailed_raw"] { m["category_detailed_raw"] = t.CategoryDetailedRaw }
     if fields["category_confidence"] { m["category_confidence"] = t.CategoryConfidence }
     if fields["payment_channel"] { m["payment_channel"] = t.PaymentChannel }
     if fields["pending"] { m["pending"] = t.Pending }
@@ -217,7 +222,7 @@ Add `fields` to the `queryTransactionsInput` struct:
 ```go
 type queryTransactionsInput struct {
     // ... existing fields ...
-    Fields string `json:"fields,omitempty" jsonschema:"Comma-separated list of fields to include in response. Aliases: core (id,date,amount,name,iso_currency_code), category (category_primary,category_detailed), timestamps (created_at,updated_at,datetime,authorized_datetime). Default: all fields. id is always included."`
+    Fields string `json:"fields,omitempty" jsonschema:"Comma-separated list of fields to include in response. Aliases: core (id,date,amount,name,iso_currency_code), category (category,category_primary_raw,category_detailed_raw), timestamps (created_at,updated_at,datetime,authorized_datetime). Default: all fields. id is always included."`
 }
 ```
 
