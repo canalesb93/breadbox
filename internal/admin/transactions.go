@@ -1,8 +1,11 @@
 package admin
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"breadbox/internal/app"
@@ -236,4 +239,130 @@ func floatParamPtr(r *http.Request, key string) *string {
 		return nil
 	}
 	return &v
+}
+
+// TransactionDetailHandler serves GET /admin/transactions/{id}.
+func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		idStr := chi.URLParam(r, "id")
+
+		txn, err := svc.GetTransaction(ctx, idStr)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				http.NotFound(w, r)
+				return
+			}
+			a.Logger.Error("get transaction detail", "error", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		comments, err := svc.ListComments(ctx, idStr)
+		if err != nil && !errors.Is(err, service.ErrNotFound) {
+			a.Logger.Error("list transaction comments", "error", err)
+		}
+
+		auditResult, err := svc.ListAuditLog(ctx, service.AuditLogListParams{
+			EntityType: "transaction",
+			EntityID:   idStr,
+			Limit:      50,
+		})
+		if err != nil {
+			a.Logger.Error("list transaction audit log", "error", err)
+		}
+
+		// Use denormalized names from the transaction response.
+		var accountName, userName, accountID string
+		if txn.AccountID != nil {
+			accountID = *txn.AccountID
+		}
+		if txn.AccountName != nil {
+			accountName = *txn.AccountName
+		}
+		if txn.UserName != nil {
+			userName = *txn.UserName
+		}
+
+		var entries []service.AuditLogResponse
+		if auditResult != nil {
+			entries = auditResult.Entries
+		}
+
+		data := map[string]any{
+			"PageTitle":     txn.Name,
+			"CurrentPage":   "transactions",
+			"CSRFToken":     GetCSRFToken(r),
+			"Flash":         GetFlash(ctx, sm),
+			"Transaction":   txn,
+			"TransactionID": idStr,
+			"AccountID":     accountID,
+			"AccountName":   accountName,
+			"UserName":      userName,
+			"Comments":      comments,
+			"AuditEntries":  entries,
+		}
+		tr.Render(w, r, "transaction_detail.html", data)
+	}
+}
+
+// CreateTransactionCommentHandler serves POST /admin/api/transactions/{id}/comments.
+func CreateTransactionCommentHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		txnID := chi.URLParam(r, "id")
+		actor := ActorFromSession(sm, r)
+
+		var input struct {
+			Content string `json:"content"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+			return
+		}
+
+		comment, err := svc.CreateComment(r.Context(), service.CreateCommentParams{
+			TransactionID: txnID,
+			Content:       input.Content,
+			Actor:         actor,
+		})
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "Transaction not found"})
+				return
+			}
+			// Content validation errors are safe to surface; log and genericize others.
+			if strings.Contains(err.Error(), "content must be") {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+				return
+			}
+			a.Logger.Error("create comment", "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create comment"})
+			return
+		}
+
+		writeJSON(w, http.StatusCreated, comment)
+	}
+}
+
+// DeleteTransactionCommentHandler serves DELETE /admin/api/transactions/{id}/comments/{comment_id}.
+func DeleteTransactionCommentHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		commentID := chi.URLParam(r, "comment_id")
+		actor := ActorFromSession(sm, r)
+
+		if err := svc.DeleteComment(r.Context(), commentID, actor); err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "Comment not found"})
+				return
+			}
+			if errors.Is(err, service.ErrForbidden) {
+				writeJSON(w, http.StatusForbidden, map[string]string{"error": "You can only delete your own comments"})
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete comment"})
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
 }

@@ -107,7 +107,7 @@
       <tr @click="expanded = !expanded" class="cursor-pointer hover:bg-base-300">
         <td>{{.Date}}</td>
         <td>
-          {{.Name}}
+          <a href="/admin/transactions/{{.ID}}" @click.stop class="link link-hover">{{.Name}}</a>
           {{if .MerchantName}}<small class="text-base-content/60"> ({{.MerchantName}})</small>{{end}}
         </td>
         <td class="bb-amount{{if lt .Amount 0.0}} text-error{{end}}">

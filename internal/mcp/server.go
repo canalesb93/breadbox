@@ -51,7 +51,13 @@ RECOMMENDED QUERY PATTERNS:
 4. Query transactions with date ranges and category_slug filters
 5. Use count_transactions to get totals before paginating
 6. Check get_sync_status to verify data freshness
-7. Use list_unmapped_categories to identify categorization gaps`,
+7. Use list_unmapped_categories to identify categorization gaps
+
+COMMENTS & AUDIT LOG:
+- Use add_transaction_comment to explain your reasoning when recategorizing transactions
+- Check list_transaction_comments before modifying a transaction to see prior context
+- Use get_transaction_history to understand how a transaction has been modified over time
+- Use query_audit_log with actor_type='user' to learn the family's categorization preferences`,
 		},
 	)
 

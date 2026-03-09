@@ -1,0 +1,169 @@
+{{define "content"}}
+<div class="breadcrumbs text-sm mb-4">
+  <ul>
+    <li><a href="/admin/transactions">Transactions</a></li>
+    <li>{{.Transaction.Name}}</li>
+  </ul>
+</div>
+
+<h1 class="text-2xl font-bold mb-6">{{.Transaction.Name}}</h1>
+
+<dl class="bb-info-grid mb-6">
+  <dt>Amount</dt>
+  <dd class="bb-amount{{if lt .Transaction.Amount 0.0}} text-error{{end}}">
+    {{printf "%.2f" .Transaction.Amount}}{{if .Transaction.IsoCurrencyCode}} {{.Transaction.IsoCurrencyCode}}{{end}}
+  </dd>
+  <dt>Date</dt>
+  <dd>{{.Transaction.Date}}</dd>
+  {{if .Transaction.MerchantName}}
+  <dt>Merchant</dt>
+  <dd>{{.Transaction.MerchantName}}</dd>
+  {{end}}
+  {{if .AccountName}}
+  <dt>Account</dt>
+  <dd><a href="/admin/accounts/{{.AccountID}}">{{.AccountName}}</a></dd>
+  {{end}}
+  {{if .UserName}}
+  <dt>Family Member</dt>
+  <dd>{{.UserName}}</dd>
+  {{end}}
+  <dt>Category</dt>
+  <dd>
+    {{if .Transaction.Category}}
+      {{if .Transaction.Category.DisplayName}}{{.Transaction.Category.DisplayName}}{{end}}
+      {{if .Transaction.CategoryOverride}} <span class="badge badge-outline badge-xs">override</span>{{end}}
+    {{else}}
+      &mdash;
+    {{end}}
+  </dd>
+  {{if .Transaction.CategoryPrimaryRaw}}
+  <dt>Raw Category</dt>
+  <dd>{{.Transaction.CategoryPrimaryRaw}}{{if .Transaction.CategoryDetailedRaw}} &rarr; {{.Transaction.CategoryDetailedRaw}}{{end}}</dd>
+  {{end}}
+  {{if .Transaction.PaymentChannel}}
+  <dt>Payment Channel</dt>
+  <dd>{{.Transaction.PaymentChannel}}</dd>
+  {{end}}
+  <dt>Status</dt>
+  <dd>{{if .Transaction.Pending}}<span class="badge badge-warning badge-sm">Pending</span>{{else}}Posted{{end}}</dd>
+  <dt>Transaction ID</dt>
+  <dd><code class="font-mono text-xs">{{.Transaction.ID}}</code></dd>
+  <dt>Created</dt>
+  <dd>{{.Transaction.CreatedAt}}</dd>
+  <dt>Updated</dt>
+  <dd>{{.Transaction.UpdatedAt}}</dd>
+</dl>
+
+<h2 class="text-xl font-semibold mb-4">Comments</h2>
+
+<div x-data="commentManager()" class="mb-8">
+  {{if .Comments}}
+  <div class="space-y-3 mb-4">
+    {{range .Comments}}
+    <div class="card bg-base-100 border border-base-300 p-4" data-comment-id="{{.ID}}">
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex-1">
+          <p class="text-sm whitespace-pre-wrap">{{.Content}}</p>
+          <p class="text-xs text-base-content/60 mt-1">
+            <span class="badge badge-ghost badge-xs">{{.AuthorType}}</span>
+            {{.AuthorName}} &middot; {{.CreatedAt}}
+          </p>
+        </div>
+        <button class="btn btn-ghost btn-xs text-error" @click="deleteComment('{{.ID}}')" title="Delete">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  <p class="text-sm text-base-content/60 mb-4">No comments yet.</p>
+  {{end}}
+
+  <div class="flex gap-2">
+    <textarea x-model="newComment" placeholder="Add a comment..." class="textarea textarea-bordered textarea-sm flex-1" rows="2"></textarea>
+    <button @click="addComment()" class="btn btn-sm btn-primary self-end" :disabled="!newComment.trim()">Add</button>
+  </div>
+</div>
+
+{{if .AuditEntries}}
+<h2 class="text-xl font-semibold mb-4">History</h2>
+<div class="overflow-x-auto border border-base-300 rounded-lg mb-6">
+  <table class="table table-zebra table-sm">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Action</th>
+        <th>Field</th>
+        <th>Old Value</th>
+        <th>New Value</th>
+        <th>Actor</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .AuditEntries}}
+      <tr>
+        <td class="text-xs">{{.CreatedAt}}</td>
+        <td><span class="badge badge-ghost badge-xs">{{.Action}}</span></td>
+        <td>{{if .Field}}{{.Field}}{{else}}&mdash;{{end}}</td>
+        <td class="text-xs max-w-32 truncate">{{if .OldValue}}{{.OldValue}}{{else}}&mdash;{{end}}</td>
+        <td class="text-xs max-w-32 truncate">{{if .NewValue}}{{.NewValue}}{{else}}&mdash;{{end}}</td>
+        <td><span class="badge badge-ghost badge-xs">{{.ActorType}}</span> {{.ActorName}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+
+<script>
+function showToast(message, type) {
+  window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type || 'error' } }));
+}
+
+function commentManager() {
+  return {
+    newComment: '',
+    addComment() {
+      var self = this;
+      var content = this.newComment.trim();
+      if (!content) return;
+      fetch('/admin/api/transactions/{{.TransactionID}}/comments', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({content: content})
+      })
+      .then(function(res) {
+        if (res.ok) {
+          self.newComment = '';
+          showToast('Comment added.', 'success');
+          location.reload();
+        } else {
+          return res.json().then(function(data) {
+            showToast(data.error || 'Failed to add comment.');
+          });
+        }
+      })
+      .catch(function() { showToast('Network error.'); });
+    },
+    deleteComment(id) {
+      if (!confirm('Delete this comment?')) return;
+      fetch('/admin/api/transactions/{{.TransactionID}}/comments/' + id, {
+        method: 'DELETE'
+      })
+      .then(function(res) {
+        if (res.ok || res.status === 204) {
+          showToast('Comment deleted.', 'success');
+          location.reload();
+        } else {
+          return res.json().then(function(data) {
+            showToast(data.error || 'Failed to delete comment.');
+          });
+        }
+      })
+      .catch(function() { showToast('Network error.'); });
+    }
+  };
+}
+</script>
+{{end}}

@@ -61,6 +61,26 @@ func (s *MCPServer) registerTools() {
 		Name:        "list_unmapped_categories",
 		Description: "List distinct raw provider category strings from transactions that currently have no category mapping. These are transactions the system couldn't automatically categorize. Results show the raw primary and detailed category strings from the provider.",
 	}, s.handleListUnmappedCategories)
+
+	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
+		Name:        "add_transaction_comment",
+		Description: "Add a comment to a transaction. Use this to explain categorization decisions, flag unusual transactions, or leave notes for the family. Comments are visible on the transaction detail page and to other agents. Supports markdown formatting.",
+	}, s.handleAddTransactionComment)
+
+	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
+		Name:        "list_transaction_comments",
+		Description: "List all comments on a transaction, ordered chronologically. Check comments before making changes to understand prior context and decisions by other agents or family members.",
+	}, s.handleListTransactionComments)
+
+	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
+		Name:        "get_transaction_history",
+		Description: "Get the change history (audit log) for a specific transaction. Shows all modifications including category changes, comment additions, and sync updates. Use this to understand how a transaction's categorization evolved over time and learn from past decisions.",
+	}, s.handleGetTransactionHistory)
+
+	mcpsdk.AddTool(s.server, &mcpsdk.Tool{
+		Name:        "query_audit_log",
+		Description: "Query the global audit log to see all changes across the system. Use entity_type to focus on specific data types. Filter by actor_type='agent' to see what other AI agents have done, or actor_type='user' to see manual changes by the family. Useful for learning patterns: e.g., query all category overrides to understand the family's preferences.",
+	}, s.handleQueryAuditLog)
 }
 
 // --- Input types ---
@@ -108,6 +128,27 @@ type categorizeTransactionInput struct {
 
 type resetTransactionCategoryInput struct {
 	TransactionID string `json:"transaction_id" jsonschema:"The transaction ID to reset"`
+}
+
+type addTransactionCommentInput struct {
+	TransactionID string `json:"transaction_id" jsonschema:"required,UUID of the transaction to comment on"`
+	Content       string `json:"content" jsonschema:"required,Comment text (markdown supported, max 10000 chars)"`
+}
+
+type listTransactionCommentsInput struct {
+	TransactionID string `json:"transaction_id" jsonschema:"required,UUID of the transaction"`
+}
+
+type getTransactionHistoryInput struct {
+	TransactionID string `json:"transaction_id" jsonschema:"required,UUID of the transaction"`
+	Limit         int    `json:"limit,omitempty" jsonschema:"Max entries to return (default 50, max 200)"`
+}
+
+type queryAuditLogInput struct {
+	EntityType string `json:"entity_type,omitempty" jsonschema:"Filter by entity type: transaction, account, connection, user"`
+	ActorType  string `json:"actor_type,omitempty" jsonschema:"Filter by who made the change: user, agent, system"`
+	Limit      int    `json:"limit,omitempty" jsonschema:"Max entries to return (default 50, max 200)"`
+	Cursor     string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
 }
 
 // --- Handlers ---
@@ -321,6 +362,66 @@ func (s *MCPServer) handleListUnmappedCategories(_ context.Context, _ *mcpsdk.Ca
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(unmapped)
+}
+
+func (s *MCPServer) handleAddTransactionComment(ctx context.Context, _ *mcpsdk.CallToolRequest, input addTransactionCommentInput) (*mcpsdk.CallToolResult, any, error) {
+	if input.TransactionID == "" || input.Content == "" {
+		return errorResult(fmt.Errorf("transaction_id and content are required")), nil, nil
+	}
+	actor := service.ActorFromContext(ctx)
+	comment, err := s.svc.CreateComment(ctx, service.CreateCommentParams{
+		TransactionID: input.TransactionID,
+		Content:       input.Content,
+		Actor:         actor,
+	})
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(comment)
+}
+
+func (s *MCPServer) handleListTransactionComments(ctx context.Context, _ *mcpsdk.CallToolRequest, input listTransactionCommentsInput) (*mcpsdk.CallToolResult, any, error) {
+	if input.TransactionID == "" {
+		return errorResult(fmt.Errorf("transaction_id is required")), nil, nil
+	}
+	comments, err := s.svc.ListComments(ctx, input.TransactionID)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(comments)
+}
+
+func (s *MCPServer) handleGetTransactionHistory(ctx context.Context, _ *mcpsdk.CallToolRequest, input getTransactionHistoryInput) (*mcpsdk.CallToolResult, any, error) {
+	if input.TransactionID == "" {
+		return errorResult(fmt.Errorf("transaction_id is required")), nil, nil
+	}
+	result, err := s.svc.ListAuditLog(ctx, service.AuditLogListParams{
+		EntityType: "transaction",
+		EntityID:   input.TransactionID,
+		Limit:      input.Limit,
+	})
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(result)
+}
+
+func (s *MCPServer) handleQueryAuditLog(ctx context.Context, _ *mcpsdk.CallToolRequest, input queryAuditLogInput) (*mcpsdk.CallToolResult, any, error) {
+	params := service.AuditLogGlobalParams{
+		Limit:  input.Limit,
+		Cursor: input.Cursor,
+	}
+	if input.EntityType != "" {
+		params.EntityType = &input.EntityType
+	}
+	if input.ActorType != "" {
+		params.ActorType = &input.ActorType
+	}
+	result, err := s.svc.ListAuditLogGlobal(ctx, params)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(result)
 }
 
 // --- Helpers ---
