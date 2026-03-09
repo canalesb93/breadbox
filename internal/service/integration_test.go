@@ -58,8 +58,8 @@ func TestListUsers_WithData(t *testing.T) {
 	svc, queries, _ := newService(t)
 	ctx := context.Background()
 
-	queries.CreateUser(ctx, db.CreateUserParams{Name: "Alice", Email: pgtype.Text{String: "alice@test.com", Valid: true}})
-	queries.CreateUser(ctx, db.CreateUserParams{Name: "Bob", Email: pgtype.Text{String: "bob@test.com", Valid: true}})
+	testutil.MustCreateUser(t, queries, "Alice")
+	testutil.MustCreateUser(t, queries, "Bob")
 
 	users, err := svc.ListUsers(ctx)
 	if err != nil {

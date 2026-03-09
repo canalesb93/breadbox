@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -207,11 +208,36 @@ func findMigrationsDir() string {
 	return "internal/db/migrations"
 }
 
+// cachedTruncateSQL is built once per test binary and reused for every test.
+var cachedTruncateSQL string
+
 // truncateTables dynamically discovers and truncates all application tables.
 // System tables (goose_db_version, sessions) are preserved.
+// The table list is cached after the first call since schema doesn't change mid-run.
 func truncateTables(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 
+	if cachedTruncateSQL == "" {
+		tables, err := discoverTables(pool)
+		if err != nil {
+			t.Fatalf("testutil: discover tables: %v", err)
+		}
+		if len(tables) == 0 {
+			return
+		}
+		quoted := make([]string, len(tables))
+		for i, n := range tables {
+			quoted[i] = `"` + n + `"`
+		}
+		cachedTruncateSQL = "TRUNCATE " + strings.Join(quoted, ", ") + " CASCADE"
+	}
+
+	if _, err := pool.Exec(context.Background(), cachedTruncateSQL); err != nil {
+		t.Fatalf("testutil: truncate tables: %v", err)
+	}
+}
+
+func discoverTables(pool *pgxpool.Pool) ([]string, error) {
 	query := `SELECT tablename FROM pg_tables
 		WHERE schemaname = 'public'
 		AND tablename NOT IN ('goose_db_version', 'sessions')
@@ -219,7 +245,7 @@ func truncateTables(t *testing.T, pool *pgxpool.Pool) {
 
 	rows, err := pool.Query(context.Background(), query)
 	if err != nil {
-		t.Fatalf("testutil: list tables: %v", err)
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -227,31 +253,9 @@ func truncateTables(t *testing.T, pool *pgxpool.Pool) {
 	for rows.Next() {
 		var name string
 		if err := rows.Scan(&name); err != nil {
-			t.Fatalf("testutil: scan table name: %v", err)
+			return nil, err
 		}
 		tables = append(tables, name)
 	}
-	if err := rows.Err(); err != nil {
-		t.Fatalf("testutil: iterate tables: %v", err)
-	}
-
-	if len(tables) == 0 {
-		return
-	}
-
-	truncateSQL := "TRUNCATE " + joinQuoted(tables) + " CASCADE"
-	if _, err := pool.Exec(context.Background(), truncateSQL); err != nil {
-		t.Fatalf("testutil: truncate tables: %v", err)
-	}
-}
-
-func joinQuoted(names []string) string {
-	result := ""
-	for i, n := range names {
-		if i > 0 {
-			result += ", "
-		}
-		result += `"` + n + `"`
-	}
-	return result
+	return tables, rows.Err()
 }
