@@ -261,10 +261,20 @@ func NewHTTPHandler(s *MCPServer, svc *service.Service) http.Handler {
 	)
 }
 
-// checkWritePermission verifies the requesting API key has write access.
-func checkWritePermission(ctx context.Context) error {
+// checkWritePermission verifies the requesting API key has write access and
+// that the global MCP mode allows writes. This is a belt-and-suspenders guard
+// since BuildServer already filters out write tools — but protects against
+// TOCTOU races between config changes and server construction.
+func (s *MCPServer) checkWritePermission(ctx context.Context) error {
 	if apiKey := mw.GetAPIKey(ctx); apiKey != nil && apiKey.Scope == "read_only" {
 		return fmt.Errorf("this API key has read-only access and cannot perform write operations")
+	}
+	mcpCfg, err := s.svc.GetMCPConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to verify MCP permissions")
+	}
+	if mcpCfg.Mode == "read_only" {
+		return fmt.Errorf("MCP server is in read-only mode")
 	}
 	return nil
 }

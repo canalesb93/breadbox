@@ -284,7 +284,7 @@ func (s *MCPServer) handleGetSyncStatus(_ context.Context, _ *mcpsdk.CallToolReq
 }
 
 func (s *MCPServer) handleTriggerSync(ctx context.Context, _ *mcpsdk.CallToolRequest, input triggerSyncInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := checkWritePermission(ctx); err != nil {
+	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
 	ctx = context.Background()
@@ -310,7 +310,7 @@ func (s *MCPServer) handleTriggerSync(ctx context.Context, _ *mcpsdk.CallToolReq
 }
 
 func (s *MCPServer) handleCategorizeTransaction(ctx context.Context, _ *mcpsdk.CallToolRequest, input categorizeTransactionInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := checkWritePermission(ctx); err != nil {
+	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
 	ctx = context.Background()
@@ -328,7 +328,7 @@ func (s *MCPServer) handleCategorizeTransaction(ctx context.Context, _ *mcpsdk.C
 }
 
 func (s *MCPServer) handleResetTransactionCategory(ctx context.Context, _ *mcpsdk.CallToolRequest, input resetTransactionCategoryInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := checkWritePermission(ctx); err != nil {
+	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
 	ctx = context.Background()
@@ -355,7 +355,7 @@ func (s *MCPServer) handleListUnmappedCategories(_ context.Context, _ *mcpsdk.Ca
 }
 
 func (s *MCPServer) handleAddTransactionComment(ctx context.Context, _ *mcpsdk.CallToolRequest, input addTransactionCommentInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := checkWritePermission(ctx); err != nil {
+	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
 	if input.TransactionID == "" || input.Content == "" {
@@ -479,7 +479,7 @@ func (s *MCPServer) handleListCategoryMappings(_ context.Context, _ *mcpsdk.Call
 }
 
 func (s *MCPServer) handleCreateCategoryMapping(ctx context.Context, _ *mcpsdk.CallToolRequest, input createCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := checkWritePermission(ctx); err != nil {
+	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
 	ctx = context.Background()
@@ -503,7 +503,7 @@ func (s *MCPServer) handleCreateCategoryMapping(ctx context.Context, _ *mcpsdk.C
 }
 
 func (s *MCPServer) handleUpdateCategoryMapping(ctx context.Context, _ *mcpsdk.CallToolRequest, input updateCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := checkWritePermission(ctx); err != nil {
+	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
 	ctx = context.Background()
@@ -535,7 +535,7 @@ func (s *MCPServer) handleUpdateCategoryMapping(ctx context.Context, _ *mcpsdk.C
 }
 
 func (s *MCPServer) handleDeleteCategoryMapping(ctx context.Context, _ *mcpsdk.CallToolRequest, input deleteCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := checkWritePermission(ctx); err != nil {
+	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
 	ctx = context.Background()

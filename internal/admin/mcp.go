@@ -106,8 +106,22 @@ func MCPSaveToolsHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer,
 			enabledSet[name] = true
 		}
 
+		// Load current mode so we can skip write tools when in read-only mode.
+		// Write tools are mode-locked (disabled checkboxes don't submit), so they
+		// should not be added to the disabled list — otherwise switching to
+		// read-write later would leave them stuck as disabled.
+		mcpCfg, err := svc.GetMCPConfig(r.Context())
+		if err != nil {
+			SetFlash(r.Context(), sm, "error", "Failed to load MCP config")
+			http.Redirect(w, r, "/admin/mcp", http.StatusSeeOther)
+			return
+		}
+
 		var disabled []string
 		for _, td := range mcpServer.AllToolDefs() {
+			if mcpCfg.Mode == "read_only" && td.Classification == breadboxmcp.ToolWrite {
+				continue // skip — write tools are suppressed by mode, not per-tool disable
+			}
 			if !enabledSet[td.Tool.Name] {
 				disabled = append(disabled, td.Tool.Name)
 			}

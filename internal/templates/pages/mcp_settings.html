@@ -151,7 +151,7 @@
         <h3 class="font-medium text-sm mb-2">Full Instructions (Built-in + Custom)</h3>
         <pre class="bg-base-200 p-4 rounded-lg text-xs overflow-auto max-h-96 whitespace-pre-wrap">{{.BuiltInInstructions}}
 
-<template x-if="instructions.length > 0"><span x-text="'\n\nCUSTOM INSTRUCTIONS:\n' + instructions"></span></template></pre>
+<span x-show="instructions.length > 0" x-text="'\n\nCUSTOM INSTRUCTIONS:\n' + instructions"></span></pre>
       </div>
     </div>
   </div>
