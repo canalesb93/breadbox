@@ -538,6 +538,11 @@ func (s *Service) CreateMapping(ctx context.Context, provider, providerCategory,
 		return nil, fmt.Errorf("insert mapping: %w", err)
 	}
 
+	// Re-resolve uncategorized transactions that match this new mapping
+	if err := s.reResolveAfterMapping(ctx, provider, providerCategory, catUID); err != nil {
+		return nil, fmt.Errorf("re-resolve transactions: %w", err)
+	}
+
 	// Re-fetch with joined category info
 	return s.getMappingResponse(ctx, m.ID)
 }
@@ -553,6 +558,15 @@ func (s *Service) UpdateMapping(ctx context.Context, id, categoryID string) (*Ca
 		return nil, ErrCategoryNotFound
 	}
 
+	// Fetch existing mapping to get provider + provider_category for re-resolution
+	existing, err := s.Queries.GetCategoryMappingByID(ctx, mUID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrMappingNotFound
+		}
+		return nil, fmt.Errorf("get existing mapping: %w", err)
+	}
+
 	m, err := s.Queries.UpdateCategoryMapping(ctx, db.UpdateCategoryMappingParams{
 		ID:         mUID,
 		CategoryID: catUID,
@@ -562,6 +576,11 @@ func (s *Service) UpdateMapping(ctx context.Context, id, categoryID string) (*Ca
 			return nil, ErrMappingNotFound
 		}
 		return nil, fmt.Errorf("update mapping: %w", err)
+	}
+
+	// Re-resolve uncategorized transactions that match this mapping
+	if err := s.reResolveAfterMapping(ctx, string(existing.Provider), existing.ProviderCategory, catUID); err != nil {
+		return nil, fmt.Errorf("re-resolve transactions: %w", err)
 	}
 
 	return s.getMappingResponse(ctx, m.ID)
@@ -598,6 +617,11 @@ func (s *Service) BulkUpsertMappings(ctx context.Context, entries []BulkMappingE
 		if err != nil {
 			return count, fmt.Errorf("upsert mapping %s/%s: %w", e.Provider, e.ProviderCategory, err)
 		}
+
+		// Re-resolve uncategorized transactions that match this mapping
+		if err := s.reResolveAfterMapping(ctx, e.Provider, e.ProviderCategory, catUID); err != nil {
+			return count, fmt.Errorf("re-resolve after upsert %s/%s: %w", e.Provider, e.ProviderCategory, err)
+		}
 		count++
 	}
 	return count, nil
@@ -619,6 +643,26 @@ func (s *Service) ListUnmappedCategories(ctx context.Context) ([]UnmappedCategor
 		})
 	}
 	return result, nil
+}
+
+// reResolveAfterMapping updates uncategorized transactions whose raw category
+// strings match the given providerCategory. This ensures that when a mapping is
+// created or updated, existing transactions are immediately re-categorized
+// instead of staying in "uncategorized" until the next sync.
+func (s *Service) reResolveAfterMapping(ctx context.Context, provider, providerCategory string, categoryID pgtype.UUID) error {
+	_, err := s.Pool.Exec(ctx, `
+		UPDATE transactions t
+		SET category_id = $1, updated_at = NOW()
+		FROM accounts a
+		JOIN bank_connections bc ON a.connection_id = bc.id
+		WHERE t.account_id = a.id
+		  AND bc.provider = $2
+		  AND t.category_id = (SELECT id FROM categories WHERE slug = 'uncategorized')
+		  AND t.category_override = FALSE
+		  AND t.deleted_at IS NULL
+		  AND (t.category_detailed = $3 OR t.category_primary = $3)
+	`, categoryID, provider, providerCategory)
+	return err
 }
 
 // getMappingResponse fetches a mapping with its joined category info.
@@ -667,6 +711,11 @@ func (s *Service) CreateMappingBySlug(ctx context.Context, provider, providerCat
 		return nil, fmt.Errorf("insert mapping: %w", err)
 	}
 
+	// Re-resolve uncategorized transactions that match this new mapping
+	if err := s.reResolveAfterMapping(ctx, provider, providerCategory, cat.ID); err != nil {
+		return nil, fmt.Errorf("re-resolve transactions: %w", err)
+	}
+
 	return s.getMappingResponse(ctx, m.ID)
 }
 
@@ -711,6 +760,15 @@ func (s *Service) UpdateMappingBySlug(ctx context.Context, id *string, provider 
 			return nil, ErrMappingNotFound
 		}
 		return nil, fmt.Errorf("update mapping: %w", err)
+	}
+
+	// Re-resolve uncategorized transactions that match this mapping
+	// Need to fetch the mapping to get the provider_category for re-resolution
+	existing, err := s.Queries.GetCategoryMappingByID(ctx, mappingID)
+	if err == nil {
+		if err2 := s.reResolveAfterMapping(ctx, string(existing.Provider), existing.ProviderCategory, cat.ID); err2 != nil {
+			return nil, fmt.Errorf("re-resolve transactions: %w", err2)
+		}
 	}
 
 	return s.getMappingResponse(ctx, m.ID)

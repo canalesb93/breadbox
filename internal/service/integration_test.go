@@ -407,6 +407,119 @@ func TestSoftDeletedTransactions_NotReturned(t *testing.T) {
 	}
 }
 
+// --- Category Mapping Re-Resolution ---
+
+func TestCreateMapping_ReResolvesUncategorizedTransactions(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	// Seed the uncategorized category (truncated between tests).
+	uncategorized, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "uncategorized", DisplayName: "Uncategorized", IsSystem: true,
+	})
+	if err != nil {
+		t.Fatalf("seed uncategorized: %v", err)
+	}
+
+	// Create a target category for the mapping.
+	groceries, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink_groceries", DisplayName: "Groceries",
+	})
+	if err != nil {
+		t.Fatalf("create groceries category: %v", err)
+	}
+
+	// Create user → connection → account.
+	acctID := seedTxnFixture(t, queries)
+
+	// Create a transaction with category_detailed that is currently uncategorized.
+	_, err = queries.UpsertTransaction(ctx, db.UpsertTransactionParams{
+		AccountID:             acctID,
+		ExternalTransactionID: "txn_grocery",
+		Amount:                pgtype.Numeric{Int: big.NewInt(2500), Exp: -2, Valid: true},
+		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
+		Date:                  pgtype.Date{Time: testutil.MustParseDate("2025-01-15"), Valid: true},
+		Name:                  "Whole Foods",
+		CategoryPrimary:       pgtype.Text{String: "FOOD_AND_DRINK", Valid: true},
+		CategoryDetailed:      pgtype.Text{String: "FOOD_AND_DRINK_GROCERIES", Valid: true},
+		CategoryID:            uncategorized.ID, // starts as uncategorized
+	})
+	if err != nil {
+		t.Fatalf("create transaction: %v", err)
+	}
+
+	// Verify it shows as unmapped.
+	unmapped, err := svc.ListUnmappedCategories(ctx)
+	if err != nil {
+		t.Fatalf("list unmapped: %v", err)
+	}
+	if len(unmapped) != 1 {
+		t.Fatalf("expected 1 unmapped category, got %d", len(unmapped))
+	}
+
+	// Now create a mapping for FOOD_AND_DRINK_GROCERIES → groceries.
+	_, err = svc.CreateMapping(ctx, "plaid", "FOOD_AND_DRINK_GROCERIES", formatUUID(groceries.ID))
+	if err != nil {
+		t.Fatalf("create mapping: %v", err)
+	}
+
+	// The transaction should now be re-resolved: no longer uncategorized.
+	unmapped, err = svc.ListUnmappedCategories(ctx)
+	if err != nil {
+		t.Fatalf("list unmapped after mapping: %v", err)
+	}
+	if len(unmapped) != 0 {
+		t.Errorf("expected 0 unmapped categories after mapping, got %d", len(unmapped))
+	}
+
+	// Verify the transaction now has the groceries category_id.
+	var gotCategoryID pgtype.UUID
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_grocery'",
+	).Scan(&gotCategoryID)
+	if err != nil {
+		t.Fatalf("query transaction category: %v", err)
+	}
+	if gotCategoryID != groceries.ID {
+		t.Errorf("expected category_id %v, got %v", groceries.ID, gotCategoryID)
+	}
+
+	// Ensure overridden transactions are NOT re-resolved.
+	_, err = queries.UpsertTransaction(ctx, db.UpsertTransactionParams{
+		AccountID:             acctID,
+		ExternalTransactionID: "txn_override",
+		Amount:                pgtype.Numeric{Int: big.NewInt(1000), Exp: -2, Valid: true},
+		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
+		Date:                  pgtype.Date{Time: testutil.MustParseDate("2025-01-16"), Valid: true},
+		Name:                  "Override Txn",
+		CategoryPrimary:       pgtype.Text{String: "FOOD_AND_DRINK", Valid: true},
+		CategoryDetailed:      pgtype.Text{String: "FOOD_AND_DRINK_COFFEE", Valid: true},
+		CategoryID:            uncategorized.ID,
+	})
+	if err != nil {
+		t.Fatalf("create override txn: %v", err)
+	}
+	// Set override flag.
+	pool.Exec(ctx, "UPDATE transactions SET category_override = TRUE WHERE external_transaction_id = 'txn_override'")
+
+	// Create mapping for FOOD_AND_DRINK_COFFEE → groceries (reuse category).
+	_, err = svc.CreateMapping(ctx, "plaid", "FOOD_AND_DRINK_COFFEE", formatUUID(groceries.ID))
+	if err != nil {
+		t.Fatalf("create mapping for coffee: %v", err)
+	}
+
+	// Overridden transaction should still be uncategorized.
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_override'",
+	).Scan(&gotCategoryID)
+	if err != nil {
+		t.Fatalf("query override txn category: %v", err)
+	}
+	if gotCategoryID != uncategorized.ID {
+		t.Errorf("overridden transaction should keep uncategorized, got %v", gotCategoryID)
+	}
+}
+
 // --- Helpers ---
 
 func formatUUID(u pgtype.UUID) string {
