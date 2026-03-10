@@ -198,6 +198,22 @@ func EnqueueReviewAdminHandler(a *app.App, sm *scs.SessionManager, svc *service.
 	}
 }
 
+// DismissAllReviewsAdminHandler handles POST /admin/api/reviews/dismiss-all.
+func DismissAllReviewsAdminHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		actor := ActorFromSession(sm, r)
+
+		count, err := svc.DismissAllPendingReviews(r.Context(), actor)
+		if err != nil {
+			a.Logger.Error("dismiss all reviews", "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal server error"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "dismissed": count})
+	}
+}
+
 // ReviewSettingsHandler handles POST /admin/api/reviews/settings.
 func ReviewSettingsHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

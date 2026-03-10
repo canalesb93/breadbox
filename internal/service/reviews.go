@@ -688,6 +688,28 @@ func (s *Service) DismissReview(ctx context.Context, id string, actor Actor) err
 	return nil
 }
 
+// DismissAllPendingReviews removes all pending review items from the queue.
+func (s *Service) DismissAllPendingReviews(ctx context.Context, actor Actor) (int64, error) {
+	count, err := s.Queries.DeleteAllPendingReviews(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("delete all pending reviews: %w", err)
+	}
+
+	if count > 0 {
+		_ = s.WriteAuditLog(ctx, []AuditLogEntry{{
+			EntityType: "review_queue",
+			EntityID:   "all",
+			Action:     "bulk_delete",
+			Actor:      actor,
+			Metadata: map[string]string{
+				"count": fmt.Sprintf("%d", count),
+			},
+		}})
+	}
+
+	return count, nil
+}
+
 // reviewFromRow converts a db.ReviewQueue row to a ReviewResponse, enriching with category slugs.
 func (s *Service) reviewFromRow(ctx context.Context, r db.ReviewQueue) ReviewResponse {
 	resp := ReviewResponse{

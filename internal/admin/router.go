@@ -148,6 +148,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Review queue
 		r.Post("/reviews/{id}/submit", SubmitReviewAdminHandler(a, sm, svc))
 		r.Post("/reviews/{id}/dismiss", DismissReviewAdminHandler(a, sm, svc))
+		r.Post("/reviews/dismiss-all", DismissAllReviewsAdminHandler(a, sm, svc))
 		r.Post("/reviews/enqueue", EnqueueReviewAdminHandler(a, sm, svc))
 		r.Post("/reviews/settings", ReviewSettingsHandler(a, sm))
 	})
