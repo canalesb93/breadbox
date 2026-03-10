@@ -400,17 +400,26 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		"LEFT JOIN categories c ON t.category_id = c.id "
 	query := selectPrefix + fromClause + "WHERE t.deleted_at IS NULL"
 
+	// Track which JOINs are needed for the WHERE clause (used by the count query).
+	var needAccountJoin, needConnectionJoin, needUserJoin, needCategoryJoin bool
+
 	var args []any
 	argN := 1
+	whereClauses := ""
 
 	if params.UserID != nil {
 		uid, err := parseUUID(*params.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid user id: %w", err)
 		}
-		query += fmt.Sprintf(" AND bc.user_id = $%d", argN)
+		clause := fmt.Sprintf(" AND bc.user_id = $%d", argN)
+		query += clause
+		whereClauses += clause
 		args = append(args, uid)
 		argN++
+		needAccountJoin = true
+		needConnectionJoin = true
+		needUserJoin = true
 	}
 
 	if params.ConnectionID != nil {
@@ -418,9 +427,12 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		if err != nil {
 			return nil, fmt.Errorf("invalid connection id: %w", err)
 		}
-		query += fmt.Sprintf(" AND a.connection_id = $%d", argN)
+		clause := fmt.Sprintf(" AND a.connection_id = $%d", argN)
+		query += clause
+		whereClauses += clause
 		args = append(args, cid)
 		argN++
+		needAccountJoin = true
 	}
 
 	if params.AccountID != nil {
@@ -428,19 +440,25 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		if err != nil {
 			return nil, fmt.Errorf("invalid account id: %w", err)
 		}
-		query += fmt.Sprintf(" AND t.account_id = $%d", argN)
+		clause := fmt.Sprintf(" AND t.account_id = $%d", argN)
+		query += clause
+		whereClauses += clause
 		args = append(args, aid)
 		argN++
 	}
 
 	if params.StartDate != nil {
-		query += fmt.Sprintf(" AND t.date >= $%d", argN)
+		clause := fmt.Sprintf(" AND t.date >= $%d", argN)
+		query += clause
+		whereClauses += clause
 		args = append(args, pgtype.Date{Time: *params.StartDate, Valid: true})
 		argN++
 	}
 
 	if params.EndDate != nil {
-		query += fmt.Sprintf(" AND t.date < $%d", argN)
+		clause := fmt.Sprintf(" AND t.date < $%d", argN)
+		query += clause
+		whereClauses += clause
 		args = append(args, pgtype.Date{Time: *params.EndDate, Valid: true})
 		argN++
 	}
@@ -452,44 +470,68 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			return &AdminTransactionListResult{Transactions: []AdminTransactionRow{}, Total: 0, Page: 1, PageSize: params.PageSize, TotalPages: 0}, nil
 		}
 		if !catRow.ParentID.Valid {
-			query += fmt.Sprintf(" AND (c.id = $%d OR c.parent_id = $%d)", argN, argN)
+			clause := fmt.Sprintf(" AND (c.id = $%d OR c.parent_id = $%d)", argN, argN)
+			query += clause
+			whereClauses += clause
 			args = append(args, catRow.ID)
 			argN++
+			needCategoryJoin = true
 		} else {
-			query += fmt.Sprintf(" AND t.category_id = $%d", argN)
+			clause := fmt.Sprintf(" AND t.category_id = $%d", argN)
+			query += clause
+			whereClauses += clause
 			args = append(args, catRow.ID)
 			argN++
 		}
 	}
 
 	if params.MinAmount != nil {
-		query += fmt.Sprintf(" AND t.amount >= $%d", argN)
+		clause := fmt.Sprintf(" AND t.amount >= $%d", argN)
+		query += clause
+		whereClauses += clause
 		args = append(args, *params.MinAmount)
 		argN++
 	}
 
 	if params.MaxAmount != nil {
-		query += fmt.Sprintf(" AND t.amount <= $%d", argN)
+		clause := fmt.Sprintf(" AND t.amount <= $%d", argN)
+		query += clause
+		whereClauses += clause
 		args = append(args, *params.MaxAmount)
 		argN++
 	}
 
 	if params.Pending != nil {
-		query += fmt.Sprintf(" AND t.pending = $%d", argN)
+		clause := fmt.Sprintf(" AND t.pending = $%d", argN)
+		query += clause
+		whereClauses += clause
 		args = append(args, *params.Pending)
 		argN++
 	}
 
 	if params.Search != nil {
-		query += fmt.Sprintf(" AND (t.name ILIKE '%%' || $%d || '%%' OR t.merchant_name ILIKE '%%' || $%d || '%%')", argN, argN)
+		clause := fmt.Sprintf(" AND (t.name ILIKE '%%' || $%d || '%%' OR t.merchant_name ILIKE '%%' || $%d || '%%')", argN, argN)
+		query += clause
+		whereClauses += clause
 		args = append(args, *params.Search)
 		argN++
 	}
 
-	// Count query with same filters — extract WHERE clauses from the built query.
-	countQuery := "SELECT COUNT(*) " + fromClause + "WHERE t.deleted_at IS NULL"
-	whereClause := query[len(selectPrefix+fromClause+"WHERE t.deleted_at IS NULL"):]
-	countQuery += whereClause
+	// Build a minimal count query with only the JOINs needed for WHERE filters.
+	countFrom := "FROM transactions t "
+	if needAccountJoin || needConnectionJoin || needUserJoin {
+		countFrom += "LEFT JOIN accounts a ON t.account_id = a.id "
+	}
+	if needConnectionJoin || needUserJoin {
+		countFrom += "LEFT JOIN bank_connections bc ON a.connection_id = bc.id "
+	}
+	if needUserJoin {
+		countFrom += "LEFT JOIN users u ON bc.user_id = u.id "
+	}
+	if needCategoryJoin {
+		countFrom += "LEFT JOIN categories c ON t.category_id = c.id "
+	}
+	countQuery := "SELECT COUNT(*) " + countFrom + "WHERE t.deleted_at IS NULL" + whereClauses
 
 	var total int64
 	if err := s.Pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
