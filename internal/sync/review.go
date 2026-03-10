@@ -31,7 +31,7 @@ func confidenceLevelToScore(level string) float64 {
 
 // enqueueForReview adds a transaction to the review queue if it meets
 // criteria (uncategorized, low confidence, or new).
-func (e *Engine) enqueueForReview(ctx context.Context, txQueries *db.Queries, txnResult db.Transaction, isNew bool, confidenceThreshold float64) {
+func (e *Engine) enqueueForReview(ctx context.Context, txQueries *db.Queries, txnResult db.Transaction, isNew bool, confidenceThreshold float64, resolver *CategoryResolver) {
 	// Skip if transaction has category_override = true
 	if txnResult.CategoryOverride {
 		return
@@ -40,7 +40,10 @@ func (e *Engine) enqueueForReview(ctx context.Context, txQueries *db.Queries, tx
 	reviewType := ""
 
 	// Priority: uncategorized > low_confidence > new_transaction
-	hasCategory := txnResult.CategoryPrimary.Valid || txnResult.CategoryID.Valid
+	// Treat the "uncategorized" fallback category as no real category.
+	isUncategorizedFallback := resolver != nil && txnResult.CategoryID.Valid &&
+		txnResult.CategoryID.Bytes == resolver.UncategorizedID().Bytes
+	hasCategory := (txnResult.CategoryPrimary.Valid || txnResult.CategoryID.Valid) && !isUncategorizedFallback
 	if !hasCategory {
 		reviewType = "uncategorized"
 	} else if confidenceThreshold > 0 && txnResult.CategoryConfidence.Valid {
@@ -62,7 +65,7 @@ func (e *Engine) enqueueForReview(ctx context.Context, txQueries *db.Queries, tx
 		TransactionID: txnResult.ID,
 		ReviewType:    reviewType,
 	}
-	if txnResult.CategoryID.Valid {
+	if txnResult.CategoryID.Valid && !isUncategorizedFallback {
 		params.SuggestedCategoryID = txnResult.CategoryID
 	}
 	if txnResult.CategoryConfidence.Valid {

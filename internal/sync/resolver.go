@@ -50,6 +50,11 @@ func NewCategoryResolver(ctx context.Context, pool *pgxpool.Pool, provider strin
 	return r, nil
 }
 
+// UncategorizedID returns the UUID of the "uncategorized" fallback category.
+func (r *CategoryResolver) UncategorizedID() pgtype.UUID {
+	return r.uncategorizedID
+}
+
 // Resolve looks up a category ID for the given provider and category strings.
 // Resolution chain: detailed → primary → uncategorized
 func (r *CategoryResolver) Resolve(provider string, detailed, primary *string) pgtype.UUID {
