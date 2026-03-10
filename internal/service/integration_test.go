@@ -758,7 +758,7 @@ func TestImportCategoriesTSV_CreateAndUpdate(t *testing.T) {
 	tsv += "new_parent\tNew Parent\t\tfolder\t\t0\tfalse\n"
 	tsv += "new_child\tNew Child\tnew_parent\tfile\t\t0\tfalse\n"
 
-	result, err := svc.ImportCategoriesTSV(ctx, tsv)
+	result, err := svc.ImportCategoriesTSV(ctx, tsv, false)
 	if err != nil {
 		t.Fatalf("ImportCategoriesTSV: %v", err)
 	}
@@ -816,7 +816,7 @@ func TestImportCategoriesTSV_ValidationErrors(t *testing.T) {
 	tsv += "orphan_child\tOrphan Child\tghost_parent\t\t\t0\tfalse\n"
 	tsv += "valid_cat\tValid Category\t\t\t\t0\tfalse\n"
 
-	result, err := svc.ImportCategoriesTSV(ctx, tsv)
+	result, err := svc.ImportCategoriesTSV(ctx, tsv, false)
 	if err != nil {
 		t.Fatalf("ImportCategoriesTSV: %v", err)
 	}
@@ -922,7 +922,7 @@ func TestImportMappingsTSV_CreateAndUpdate(t *testing.T) {
 	tsv += "csv\ttest_food\tfood_and_drink_groceries\n"
 	tsv += "csv\ttest_new\tfood_and_drink_restaurant\n"
 
-	result, err := svc.ImportMappingsTSV(ctx, tsv, false)
+	result, err := svc.ImportMappingsTSV(ctx, tsv, false, false)
 	if err != nil {
 		t.Fatalf("ImportMappingsTSV: %v", err)
 	}
@@ -992,7 +992,7 @@ func TestImportMappingsTSV_ApplyRetroactively(t *testing.T) {
 	tsv := "provider\tprovider_category\tcategory_slug\n"
 	tsv += "plaid\tFOOD_TEST\tfood_and_drink_groceries\n"
 
-	result, err := svc.ImportMappingsTSV(ctx, tsv, true)
+	result, err := svc.ImportMappingsTSV(ctx, tsv, true, false)
 	if err != nil {
 		t.Fatalf("ImportMappingsTSV: %v", err)
 	}
@@ -1066,7 +1066,7 @@ func TestRoundTrip_CategoriesTSV(t *testing.T) {
 	dataLines := len(lines) - 1 // exclude header
 
 	// Import same content
-	result, err := svc.ImportCategoriesTSV(ctx, tsv)
+	result, err := svc.ImportCategoriesTSV(ctx, tsv, false)
 	if err != nil {
 		t.Fatalf("ImportCategoriesTSV round-trip: %v", err)
 	}
@@ -1127,7 +1127,7 @@ func TestRoundTrip_MappingsTSV(t *testing.T) {
 	dataLines := len(lines) - 1
 
 	// Import same content
-	result, err := svc.ImportMappingsTSV(ctx, tsv, false)
+	result, err := svc.ImportMappingsTSV(ctx, tsv, false, false)
 	if err != nil {
 		t.Fatalf("ImportMappingsTSV round-trip: %v", err)
 	}
@@ -1143,6 +1143,139 @@ func TestRoundTrip_MappingsTSV(t *testing.T) {
 	}
 	if len(result.Errors) != 0 {
 		t.Errorf("expected 0 errors on round-trip, got %v", result.Errors)
+	}
+}
+
+func TestImportCategoriesTSV_ReplaceMode(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	// Seed the uncategorized system category (required for DeleteCategory).
+	_, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "uncategorized", DisplayName: "Uncategorized", IsSystem: true,
+	})
+	if err != nil {
+		t.Fatalf("seed uncategorized: %v", err)
+	}
+
+	// Create three custom categories.
+	_, err = svc.CreateCategory(ctx, service.CreateCategoryParams{
+		DisplayName: "Keep Me",
+	})
+	if err != nil {
+		t.Fatalf("create keep_me: %v", err)
+	}
+	_, err = svc.CreateCategory(ctx, service.CreateCategoryParams{
+		DisplayName: "Delete Me",
+	})
+	if err != nil {
+		t.Fatalf("create delete_me: %v", err)
+	}
+	_, err = svc.CreateCategory(ctx, service.CreateCategoryParams{
+		DisplayName: "Also Delete",
+	})
+	if err != nil {
+		t.Fatalf("create also_delete: %v", err)
+	}
+
+	// Import with only "keep_me" — replace mode should delete the other two.
+	// System categories (uncategorized) are never deleted regardless.
+	tsv := "slug\tdisplay_name\tparent_slug\ticon\tcolor\tsort_order\thidden\n"
+	tsv += "keep_me\tKeep Me\t\t\t\t0\tfalse\n"
+
+	result, err := svc.ImportCategoriesTSV(ctx, tsv, true)
+	if err != nil {
+		t.Fatalf("ImportCategoriesTSV replace: %v", err)
+	}
+
+	if result.Deleted != 2 {
+		t.Errorf("expected Deleted=2, got %d; errors=%v", result.Deleted, result.Errors)
+	}
+	if result.Unchanged != 1 {
+		t.Errorf("expected Unchanged=1, got %d (keep_me); created=%d updated=%d", result.Unchanged, result.Created, result.Updated)
+	}
+
+	// Verify deleted categories no longer exist.
+	_, err = svc.GetCategoryBySlug(ctx, "delete_me")
+	if err == nil {
+		t.Error("expected delete_me to be deleted")
+	}
+	_, err = svc.GetCategoryBySlug(ctx, "also_delete")
+	if err == nil {
+		t.Error("expected also_delete to be deleted")
+	}
+
+	// Verify kept category still exists.
+	_, err = svc.GetCategoryBySlug(ctx, "keep_me")
+	if err != nil {
+		t.Errorf("expected keep_me to still exist: %v", err)
+	}
+}
+
+func TestImportMappingsTSV_ReplaceMode(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	// Create two categories.
+	catA, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "cat_a", DisplayName: "Category A",
+	})
+	if err != nil {
+		t.Fatalf("create cat_a: %v", err)
+	}
+	catB, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "cat_b", DisplayName: "Category B",
+	})
+	if err != nil {
+		t.Fatalf("create cat_b: %v", err)
+	}
+
+	// Create three mappings.
+	_, err = queries.InsertCategoryMapping(ctx, db.InsertCategoryMappingParams{
+		Provider: db.ProviderTypePlaid, ProviderCategory: "FOOD", CategoryID: catA.ID,
+	})
+	if err != nil {
+		t.Fatalf("create mapping 1: %v", err)
+	}
+	_, err = queries.InsertCategoryMapping(ctx, db.InsertCategoryMappingParams{
+		Provider: db.ProviderTypePlaid, ProviderCategory: "TRAVEL", CategoryID: catB.ID,
+	})
+	if err != nil {
+		t.Fatalf("create mapping 2: %v", err)
+	}
+	_, err = queries.InsertCategoryMapping(ctx, db.InsertCategoryMappingParams{
+		Provider: db.ProviderTypeTeller, ProviderCategory: "shopping", CategoryID: catA.ID,
+	})
+	if err != nil {
+		t.Fatalf("create mapping 3: %v", err)
+	}
+
+	// Import with only one mapping — replace mode should delete the other two.
+	tsv := "provider\tprovider_category\tcategory_slug\n"
+	tsv += "plaid\tFOOD\tcat_a\n"
+
+	result, err := svc.ImportMappingsTSV(ctx, tsv, false, true)
+	if err != nil {
+		t.Fatalf("ImportMappingsTSV replace: %v", err)
+	}
+
+	if result.Deleted != 2 {
+		t.Errorf("expected Deleted=2, got %d", result.Deleted)
+	}
+	if result.Unchanged != 1 {
+		t.Errorf("expected Unchanged=1, got %d", result.Unchanged)
+	}
+
+	// Verify only one mapping remains.
+	mappings, err := svc.ListMappings(ctx, nil)
+	if err != nil {
+		t.Fatalf("ListMappings: %v", err)
+	}
+	if len(mappings) != 1 {
+		t.Errorf("expected 1 mapping remaining, got %d", len(mappings))
+	}
+	if len(mappings) > 0 && mappings[0].ProviderCategory != "FOOD" {
+		t.Errorf("expected remaining mapping to be FOOD, got %q", mappings[0].ProviderCategory)
 	}
 }
 

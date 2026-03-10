@@ -35,7 +35,9 @@ func ImportCategoriesTSVHandler(svc *service.Service) http.HandlerFunc {
 			return
 		}
 
-		result, err := svc.ImportCategoriesTSV(r.Context(), string(body))
+		replaceMode := r.URL.Query().Get("replace") == "true"
+
+		result, err := svc.ImportCategoriesTSV(r.Context(), string(body), replaceMode)
 		if err != nil {
 			mw.WriteError(w, http.StatusBadRequest, "IMPORT_ERROR", err.Error())
 			return
@@ -72,8 +74,9 @@ func ImportMappingsTSVHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		applyRetroactively := r.URL.Query().Get("apply_retroactively") == "true"
+		replaceMode := r.URL.Query().Get("replace") == "true"
 
-		result, err := svc.ImportMappingsTSV(r.Context(), string(body), applyRetroactively)
+		result, err := svc.ImportMappingsTSV(r.Context(), string(body), applyRetroactively, replaceMode)
 		if err != nil {
 			mw.WriteError(w, http.StatusBadRequest, "IMPORT_ERROR", err.Error())
 			return

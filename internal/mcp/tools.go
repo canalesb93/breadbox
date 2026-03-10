@@ -617,7 +617,7 @@ func (s *MCPServer) handleImportCategories(ctx context.Context, _ *mcpsdk.CallTo
 	if input.Content == "" {
 		return errorResult(fmt.Errorf("content is required")), nil, nil
 	}
-	result, err := s.svc.ImportCategoriesTSV(context.Background(), input.Content)
+	result, err := s.svc.ImportCategoriesTSV(context.Background(), input.Content, false)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
@@ -644,7 +644,7 @@ func (s *MCPServer) handleImportCategoryMappings(ctx context.Context, _ *mcpsdk.
 	if input.Content == "" {
 		return errorResult(fmt.Errorf("content is required")), nil, nil
 	}
-	result, err := s.svc.ImportMappingsTSV(context.Background(), input.Content, input.ApplyRetroactively)
+	result, err := s.svc.ImportMappingsTSV(context.Background(), input.Content, input.ApplyRetroactively, false)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
