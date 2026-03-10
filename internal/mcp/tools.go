@@ -108,6 +108,19 @@ type reviewDecisionInput struct {
 	Comment              *string `json:"comment,omitempty" jsonschema:"Explanation of the decision. Highly recommended for audit trail. Supports markdown."`
 }
 
+type exportCategoriesInput struct{}
+
+type importCategoriesInput struct {
+	Content string `json:"content" jsonschema:"required,TSV content with category definitions. Columns: slug, display_name, parent_slug, icon, color, sort_order, hidden"`
+}
+
+type exportCategoryMappingsInput struct{}
+
+type importCategoryMappingsInput struct {
+	Content            string `json:"content" jsonschema:"required,TSV content with category mappings. Columns: provider, provider_category, category_slug"`
+	ApplyRetroactively bool   `json:"apply_retroactively,omitempty" jsonschema:"Apply mapping changes to ALL matching non-overridden transactions not just uncategorized. Default false."`
+}
+
 type listCategoryMappingsInput struct {
 	Provider     string `json:"provider,omitempty" jsonschema:"Filter by provider: plaid, teller, or csv"`
 	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Filter by target category slug (e.g. food_and_drink_restaurant). Use list_categories to find valid slugs."`
@@ -583,6 +596,62 @@ func (s *MCPServer) handleDeleteCategoryMapping(ctx context.Context, _ *mcpsdk.C
 		"provider":          prov,
 		"provider_category": provCat,
 	})
+}
+
+// --- Bulk export/import ---
+
+func (s *MCPServer) handleExportCategories(_ context.Context, _ *mcpsdk.CallToolRequest, _ exportCategoriesInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+	tsv, err := s.svc.ExportCategoriesTSV(ctx)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return &mcpsdk.CallToolResult{
+		Content: []mcpsdk.Content{
+			&mcpsdk.TextContent{Text: tsv},
+		},
+	}, nil, nil
+}
+
+func (s *MCPServer) handleImportCategories(ctx context.Context, _ *mcpsdk.CallToolRequest, input importCategoriesInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.Content == "" {
+		return errorResult(fmt.Errorf("content is required")), nil, nil
+	}
+	result, err := s.svc.ImportCategoriesTSV(context.Background(), input.Content)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(result)
+}
+
+func (s *MCPServer) handleExportCategoryMappings(_ context.Context, _ *mcpsdk.CallToolRequest, _ exportCategoryMappingsInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+	tsv, err := s.svc.ExportMappingsTSV(ctx)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return &mcpsdk.CallToolResult{
+		Content: []mcpsdk.Content{
+			&mcpsdk.TextContent{Text: tsv},
+		},
+	}, nil, nil
+}
+
+func (s *MCPServer) handleImportCategoryMappings(ctx context.Context, _ *mcpsdk.CallToolRequest, input importCategoryMappingsInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.Content == "" {
+		return errorResult(fmt.Errorf("content is required")), nil, nil
+	}
+	result, err := s.svc.ImportMappingsTSV(context.Background(), input.Content, input.ApplyRetroactively)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(result)
 }
 
 // --- Review Queue ---

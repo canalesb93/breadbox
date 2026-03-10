@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -843,4 +844,424 @@ func derefStr(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// --- Bulk TSV export/import ---
+
+// CategoryImportResult summarizes the outcome of a category TSV import.
+type CategoryImportResult struct {
+	Created   int      `json:"created"`
+	Updated   int      `json:"updated"`
+	Unchanged int      `json:"unchanged"`
+	Errors    []string `json:"errors,omitempty"`
+}
+
+// MappingImportResult summarizes the outcome of a mapping TSV import.
+type MappingImportResult struct {
+	Created             int      `json:"created"`
+	Updated             int      `json:"updated"`
+	Unchanged           int      `json:"unchanged"`
+	TransactionsUpdated int64    `json:"transactions_updated"`
+	Errors              []string `json:"errors,omitempty"`
+}
+
+var slugRegexp = regexp.MustCompile(`^[a-z0-9_]+$`)
+
+// ExportCategoriesTSV returns all categories as a TSV string.
+// Parents are listed before their children.
+func (s *Service) ExportCategoriesTSV(ctx context.Context) (string, error) {
+	cats, err := s.ListCategories(ctx)
+	if err != nil {
+		return "", fmt.Errorf("list categories: %w", err)
+	}
+
+	headers := []string{"slug", "display_name", "parent_slug", "icon", "color", "sort_order", "hidden"}
+	var rows [][]string
+
+	// Parents first, then children — stable ordering
+	for _, c := range cats {
+		if c.ParentID != nil {
+			continue
+		}
+		rows = append(rows, categoryToTSVRow(c))
+	}
+	for _, c := range cats {
+		if c.ParentID == nil {
+			continue
+		}
+		rows = append(rows, categoryToTSVRow(c))
+	}
+
+	return formatTSV(headers, rows), nil
+}
+
+func categoryToTSVRow(c CategoryResponse) []string {
+	parentSlug := ""
+	if c.ParentSlug != nil {
+		parentSlug = *c.ParentSlug
+	}
+	icon := ""
+	if c.Icon != nil {
+		icon = *c.Icon
+	}
+	color := ""
+	if c.Color != nil {
+		color = *c.Color
+	}
+	return []string{
+		c.Slug,
+		c.DisplayName,
+		parentSlug,
+		icon,
+		color,
+		strconv.Itoa(int(c.SortOrder)),
+		strconv.FormatBool(c.Hidden),
+	}
+}
+
+// ImportCategoriesTSV parses TSV content and creates/updates categories.
+// Existing slugs are updated (display_name, icon, color, sort_order, hidden).
+// New slugs are created. Missing slugs are not deleted.
+func (s *Service) ImportCategoriesTSV(ctx context.Context, content string) (*CategoryImportResult, error) {
+	rows, err := parseTSV(content, 7)
+	if err != nil {
+		return nil, fmt.Errorf("parse TSV: %w", err)
+	}
+
+	result := &CategoryImportResult{}
+
+	type rowData struct {
+		lineNum     int
+		slug        string
+		displayName string
+		parentSlug  string
+		icon        string
+		color       string
+		sortOrder   int32
+		hidden      bool
+	}
+
+	var parents, children []rowData
+
+	for i, cols := range rows {
+		lineNum := i + 2 // 1-indexed, skip header
+
+		slug := strings.TrimSpace(cols[0])
+		displayName := strings.TrimSpace(cols[1])
+		parentSlug := strings.TrimSpace(cols[2])
+
+		if slug == "" {
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d: slug is required", lineNum))
+			continue
+		}
+		if !slugRegexp.MatchString(slug) {
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d: invalid slug '%s' (must be lowercase alphanumeric with underscores)", lineNum, slug))
+			continue
+		}
+		if displayName == "" {
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d: display_name is required", lineNum))
+			continue
+		}
+
+		sortOrder, _ := strconv.Atoi(strings.TrimSpace(cols[5]))
+		hidden, _ := strconv.ParseBool(strings.TrimSpace(cols[6]))
+
+		rd := rowData{
+			lineNum:     lineNum,
+			slug:        slug,
+			displayName: displayName,
+			parentSlug:  parentSlug,
+			icon:        strings.TrimSpace(cols[3]),
+			color:       strings.TrimSpace(cols[4]),
+			sortOrder:   int32(sortOrder),
+			hidden:      hidden,
+		}
+
+		if parentSlug == "" {
+			parents = append(parents, rd)
+		} else {
+			children = append(children, rd)
+		}
+	}
+
+	// Process parents first, then children
+	process := func(rd rowData) {
+		existing, err := s.Queries.GetCategoryBySlug(ctx, rd.slug)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d: lookup error: %v", rd.lineNum, err))
+			return
+		}
+
+		var iconPtr, colorPtr *string
+		if rd.icon != "" {
+			iconPtr = &rd.icon
+		}
+		if rd.color != "" {
+			colorPtr = &rd.color
+		}
+
+		if err == nil {
+			// Existing category — check if update needed
+			existingIcon := derefStr(textPtr(existing.Icon))
+			existingColor := derefStr(textPtr(existing.Color))
+			if existing.DisplayName == rd.displayName &&
+				existingIcon == rd.icon &&
+				existingColor == rd.color &&
+				existing.SortOrder == rd.sortOrder &&
+				existing.Hidden == rd.hidden {
+				result.Unchanged++
+				return
+			}
+			_, err := s.Queries.UpdateCategory(ctx, db.UpdateCategoryParams{
+				ID:          existing.ID,
+				DisplayName: rd.displayName,
+				Icon:        pgtype.Text{String: rd.icon, Valid: rd.icon != ""},
+				Color:       pgtype.Text{String: rd.color, Valid: rd.color != ""},
+				SortOrder:   rd.sortOrder,
+				Hidden:      rd.hidden,
+			})
+			if err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d: update error: %v", rd.lineNum, err))
+				return
+			}
+			result.Updated++
+		} else {
+			// New category — create
+			var parentID pgtype.UUID
+			if rd.parentSlug != "" {
+				parent, err := s.Queries.GetCategoryBySlug(ctx, rd.parentSlug)
+				if err != nil {
+					result.Errors = append(result.Errors, fmt.Sprintf("line %d: parent slug '%s' not found", rd.lineNum, rd.parentSlug))
+					return
+				}
+				parentID = parent.ID
+			}
+
+			_, err := s.Queries.InsertCategory(ctx, db.InsertCategoryParams{
+				Slug:        rd.slug,
+				DisplayName: rd.displayName,
+				ParentID:    parentID,
+				Icon:        pgtype.Text{String: derefStr(iconPtr), Valid: iconPtr != nil},
+				Color:       pgtype.Text{String: derefStr(colorPtr), Valid: colorPtr != nil},
+				SortOrder:   rd.sortOrder,
+				IsSystem:    false,
+				Hidden:      rd.hidden,
+			})
+			if err != nil {
+				if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+					result.Errors = append(result.Errors, fmt.Sprintf("line %d: slug '%s' already exists", rd.lineNum, rd.slug))
+				} else {
+					result.Errors = append(result.Errors, fmt.Sprintf("line %d: create error: %v", rd.lineNum, err))
+				}
+				return
+			}
+			result.Created++
+		}
+	}
+
+	for _, rd := range parents {
+		process(rd)
+	}
+	for _, rd := range children {
+		process(rd)
+	}
+
+	return result, nil
+}
+
+// ExportMappingsTSV returns all category mappings as a TSV string.
+func (s *Service) ExportMappingsTSV(ctx context.Context) (string, error) {
+	mappings, err := s.ListMappings(ctx, nil)
+	if err != nil {
+		return "", fmt.Errorf("list mappings: %w", err)
+	}
+
+	headers := []string{"provider", "provider_category", "category_slug"}
+	rows := make([][]string, len(mappings))
+	for i, m := range mappings {
+		rows[i] = []string{m.Provider, m.ProviderCategory, m.CategorySlug}
+	}
+
+	return formatTSV(headers, rows), nil
+}
+
+// ImportMappingsTSV parses TSV content and upserts category mappings.
+// If applyRetroactively is true, ALL non-overridden transactions matching
+// the raw category strings are re-categorized (not just uncategorized ones).
+func (s *Service) ImportMappingsTSV(ctx context.Context, content string, applyRetroactively bool) (*MappingImportResult, error) {
+	rows, err := parseTSV(content, 3)
+	if err != nil {
+		return nil, fmt.Errorf("parse TSV: %w", err)
+	}
+
+	result := &MappingImportResult{}
+
+	for i, cols := range rows {
+		lineNum := i + 2
+
+		provider := strings.TrimSpace(cols[0])
+		providerCategory := strings.TrimSpace(cols[1])
+		categorySlug := strings.TrimSpace(cols[2])
+
+		// Validate provider
+		switch provider {
+		case "plaid", "teller", "csv":
+		default:
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d: invalid provider '%s'", lineNum, provider))
+			continue
+		}
+
+		if providerCategory == "" {
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d: provider_category is required", lineNum))
+			continue
+		}
+		if categorySlug == "" {
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d: category_slug is required", lineNum))
+			continue
+		}
+
+		// Resolve category slug to ID
+		cat, err := s.Queries.GetCategoryBySlug(ctx, categorySlug)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d: category slug '%s' not found", lineNum, categorySlug))
+			} else {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d: category lookup error: %v", lineNum, err))
+			}
+			continue
+		}
+
+		// Check if mapping already exists and whether it changed
+		existing, err := s.Queries.GetCategoryMappingByProviderCategory(ctx, db.GetCategoryMappingByProviderCategoryParams{
+			Provider:         db.ProviderType(provider),
+			ProviderCategory: providerCategory,
+		})
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d: lookup error: %v", lineNum, err))
+			continue
+		}
+
+		if err == nil {
+			// Existing mapping — check if category changed
+			if existing.CategoryID == cat.ID {
+				result.Unchanged++
+				continue
+			}
+			// Update
+			_, err = s.Queries.UpdateCategoryMapping(ctx, db.UpdateCategoryMappingParams{
+				ID:         existing.ID,
+				CategoryID: cat.ID,
+			})
+			if err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d: update error: %v", lineNum, err))
+				continue
+			}
+			result.Updated++
+		} else {
+			// New mapping — create
+			_, err = s.Queries.InsertCategoryMapping(ctx, db.InsertCategoryMappingParams{
+				Provider:         db.ProviderType(provider),
+				ProviderCategory: providerCategory,
+				CategoryID:       cat.ID,
+			})
+			if err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d: create error: %v", lineNum, err))
+				continue
+			}
+			result.Created++
+		}
+
+		// Re-resolve transactions
+		if applyRetroactively {
+			affected, err := s.reResolveAllAfterMapping(ctx, provider, providerCategory, cat.ID)
+			if err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d: re-resolve error: %v", lineNum, err))
+				continue
+			}
+			result.TransactionsUpdated += affected
+		} else {
+			if err := s.reResolveAfterMapping(ctx, provider, providerCategory, cat.ID); err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d: re-resolve error: %v", lineNum, err))
+				continue
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// reResolveAllAfterMapping updates ALL non-overridden transactions whose raw
+// category strings match the given providerCategory, regardless of their current
+// category_id. This is the retroactive version of reResolveAfterMapping.
+func (s *Service) reResolveAllAfterMapping(ctx context.Context, provider, providerCategory string, categoryID pgtype.UUID) (int64, error) {
+	tag, err := s.Pool.Exec(ctx, `
+		UPDATE transactions t
+		SET category_id = $1, updated_at = NOW()
+		FROM accounts a
+		JOIN bank_connections bc ON a.connection_id = bc.id
+		WHERE t.account_id = a.id
+		  AND bc.provider = $2
+		  AND t.category_override = FALSE
+		  AND t.deleted_at IS NULL
+		  AND (t.category_detailed = $3 OR t.category_primary = $3)
+	`, categoryID, provider, providerCategory)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+// --- TSV helpers ---
+
+// formatTSV joins headers and rows into a tab-separated string.
+func formatTSV(headers []string, rows [][]string) string {
+	var b strings.Builder
+	b.WriteString(strings.Join(headers, "\t"))
+	b.WriteByte('\n')
+	for _, row := range rows {
+		b.WriteString(strings.Join(row, "\t"))
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+// parseTSV parses TSV content, validates column count, skips empty lines.
+// Returns data rows (header excluded).
+func parseTSV(content string, expectedCols int) ([][]string, error) {
+	// Normalize line endings
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	content = strings.ReplaceAll(content, "\r", "\n")
+
+	lines := strings.Split(content, "\n")
+
+	// Find header
+	var headerIdx int
+	for headerIdx < len(lines) {
+		if strings.TrimSpace(lines[headerIdx]) != "" {
+			break
+		}
+		headerIdx++
+	}
+	if headerIdx >= len(lines) {
+		return nil, fmt.Errorf("empty TSV content")
+	}
+
+	headerCols := strings.Split(lines[headerIdx], "\t")
+	if len(headerCols) != expectedCols {
+		return nil, fmt.Errorf("expected %d columns, got %d in header", expectedCols, len(headerCols))
+	}
+
+	var rows [][]string
+	for _, line := range lines[headerIdx+1:] {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		cols := strings.Split(line, "\t")
+		if len(cols) != expectedCols {
+			return nil, fmt.Errorf("expected %d columns, got %d: %s", expectedCols, len(cols), line)
+		}
+		rows = append(rows, cols)
+	}
+
+	return rows, nil
 }

@@ -46,8 +46,8 @@
             {{if .IsSystem}}<span class="badge badge-info badge-xs">System</span>{{end}}
             {{if .Children}}<span class="badge badge-neutral badge-xs">{{len .Children}}</span>{{end}}
             <div class="ml-auto flex gap-1" @click.stop>
-              <button class="btn btn-ghost btn-xs" @click.prevent="$dispatch('edit-category', {id: '{{.ID}}', displayName: '{{.DisplayName}}', icon: '{{if .Icon}}{{.Icon}}{{end}}', color: '{{if .Color}}{{.Color}}{{end}}', sortOrder: {{.SortOrder}}, hidden: {{.Hidden}}})" title="Edit"><i data-lucide="pencil" class="w-4 h-4"></i></button>
-              {{if not .IsSystem}}<button class="btn btn-ghost btn-xs text-error" @click.prevent="$dispatch('delete-category', {id: '{{.ID}}', name: '{{.DisplayName}}'})" title="Delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button>{{end}}
+              <button class="btn btn-ghost btn-xs" data-id="{{.ID}}" data-display-name="{{.DisplayName}}" data-icon="{{if .Icon}}{{.Icon}}{{end}}" data-color="{{if .Color}}{{.Color}}{{end}}" data-sort-order="{{.SortOrder}}" data-hidden="{{.Hidden}}" @click.prevent="$dispatch('edit-category', {id: $el.dataset.id, displayName: $el.dataset.displayName, icon: $el.dataset.icon, color: $el.dataset.color, sortOrder: parseInt($el.dataset.sortOrder) || 0, hidden: $el.dataset.hidden === 'true'})" title="Edit"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+              {{if not .IsSystem}}<button class="btn btn-ghost btn-xs text-error" data-id="{{.ID}}" data-name="{{.DisplayName}}" @click.prevent="$dispatch('delete-category', {id: $el.dataset.id, name: $el.dataset.name})" title="Delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button>{{end}}
             </div>
           </div>
         </div>
@@ -62,8 +62,8 @@
               <span class="text-xs text-base-content/30 hidden sm:inline font-mono">{{.Slug}}</span>
               {{if .Hidden}}<span class="badge badge-ghost badge-xs">Hidden</span>{{end}}
               <div class="ml-auto flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                <button class="btn btn-ghost btn-xs" @click="$dispatch('edit-category', {id: '{{.ID}}', displayName: '{{.DisplayName}}', icon: '{{if .Icon}}{{.Icon}}{{end}}', color: '{{if .Color}}{{.Color}}{{end}}', sortOrder: {{.SortOrder}}, hidden: {{.Hidden}}})" title="Edit"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
-                {{if not .IsSystem}}<button class="btn btn-ghost btn-xs text-error" @click="$dispatch('delete-category', {id: '{{.ID}}', name: '{{.DisplayName}}'})" title="Delete"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>{{end}}
+                <button class="btn btn-ghost btn-xs" data-id="{{.ID}}" data-display-name="{{.DisplayName}}" data-icon="{{if .Icon}}{{.Icon}}{{end}}" data-color="{{if .Color}}{{.Color}}{{end}}" data-sort-order="{{.SortOrder}}" data-hidden="{{.Hidden}}" @click="$dispatch('edit-category', {id: $el.dataset.id, displayName: $el.dataset.displayName, icon: $el.dataset.icon, color: $el.dataset.color, sortOrder: parseInt($el.dataset.sortOrder) || 0, hidden: $el.dataset.hidden === 'true'})" title="Edit"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                {{if not .IsSystem}}<button class="btn btn-ghost btn-xs text-error" data-id="{{.ID}}" data-name="{{.DisplayName}}" @click="$dispatch('delete-category', {id: $el.dataset.id, name: $el.dataset.name})" title="Delete"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>{{end}}
               </div>
             </div>
             {{end}}
@@ -121,6 +121,7 @@
                       <span x-text="item.label"></span>
                     </div>
                   </template>
+                  <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
                 </div>
               </div>
             </div>
@@ -171,6 +172,7 @@
                               <span x-text="item.label"></span>
                             </div>
                           </template>
+                          <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
                         </div>
                       </div>
                     </div>
@@ -215,6 +217,7 @@
                         <span x-text="item.label"></span>
                       </div>
                     </template>
+                    <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
                   </div>
                 </div>
               </div>
@@ -264,7 +267,7 @@
             </thead>
             <tbody>
               {{range .Mappings}}
-              <tr x-data="{editing: false, categoryId: '{{.CategoryID}}', submitting: false}" data-mapping-text="{{.ProviderCategory}} {{.CategoryDisplayName}}" x-show="!mappingSearch || '{{.ProviderCategory}}'.toLowerCase().includes(mappingSearch.toLowerCase()) || '{{.CategoryDisplayName}}'.toLowerCase().includes(mappingSearch.toLowerCase())">
+              <tr x-data="{editing: false, categoryId: '{{.CategoryID}}', submitting: false}" data-mapping-text="{{.ProviderCategory}} {{.CategoryDisplayName}}" x-show="!mappingSearch || $el.dataset.mappingText.toLowerCase().includes(mappingSearch.toLowerCase())">
                 <td><span class="badge badge-sm {{if eq .Provider "plaid"}}badge-primary{{else if eq .Provider "teller"}}badge-secondary{{else}}badge-accent{{end}}">{{.Provider}}</span></td>
                 <td class="font-mono text-sm">{{.ProviderCategory}}</td>
                 <td>
@@ -293,6 +296,7 @@
                                 <span x-text="item.label"></span>
                               </div>
                             </template>
+                            <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
                           </div>
                         </div>
                       </div>
@@ -371,6 +375,7 @@
                   <span x-text="item.label"></span>
                 </div>
               </template>
+              <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
             </div>
           </div>
         </div>

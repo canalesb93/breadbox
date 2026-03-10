@@ -127,12 +127,18 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Delete("/categories/{id}", DeleteCategoryAdminHandler(svc))
 		r.Post("/categories/{id}/merge", MergeCategoryAdminHandler(svc))
 
+		// Category bulk export/import (TSV)
+		r.Get("/categories/export-tsv", ExportCategoriesTSVAdminHandler(svc))
+		r.Post("/categories/import-tsv", ImportCategoriesTSVAdminHandler(svc))
+
 		// Category mapping CRUD
 		r.Post("/category-mappings", CreateMappingAdminHandler(svc))
 		r.Put("/category-mappings/{id}", UpdateMappingAdminHandler(svc))
 		r.Delete("/category-mappings/{id}", DeleteMappingAdminHandler(svc))
 		r.Put("/category-mappings/bulk", BulkUpsertMappingsAdminHandler(svc))
 		r.Get("/category-mappings/export", ExportMappingsAdminHandler(svc))
+		r.Get("/category-mappings/export-tsv", ExportMappingsTSVAdminHandler(svc))
+		r.Post("/category-mappings/import-tsv", ImportMappingsTSVAdminHandler(svc))
 
 		// Transaction category override
 		r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc))
