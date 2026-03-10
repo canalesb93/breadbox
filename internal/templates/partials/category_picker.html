@@ -164,5 +164,15 @@ function categoryPicker(config) {
       background: rgba(0,0,0,.4);
     }
   }
+  @keyframes bb-shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-4px); }
+    40%, 80% { transform: translateX(4px); }
+  }
+  .bb-picker-shake .bb-cat-picker button {
+    animation: bb-shake 0.4s ease-in-out;
+    outline: 2px solid oklch(var(--color-error));
+    outline-offset: -1px;
+  }
 </style>
 {{end}}
