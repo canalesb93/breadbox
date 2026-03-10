@@ -311,13 +311,7 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 	// Resolve category ID from provider mappings
 	var categoryID pgtype.UUID
 	if resolver != nil {
-		if providerName == "teller" {
-			// For Teller, resolve using the raw Teller category (stored in CategoryPrimary
-			// by the provider before mapCategory translates it)
-			categoryID = resolver.Resolve(providerName, txn.CategoryDetailed, txn.CategoryPrimary)
-		} else {
-			categoryID = resolver.Resolve(providerName, txn.CategoryDetailed, txn.CategoryPrimary)
-		}
+		categoryID = resolver.Resolve(providerName, txn.CategoryDetailed, txn.CategoryPrimary)
 	}
 
 	params := db.UpsertTransactionParams{
