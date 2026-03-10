@@ -316,6 +316,7 @@ type ReviewResponse struct {
 	TransactionID       string               `json:"transaction_id"`
 	ReviewType          string               `json:"review_type"`
 	Status              string               `json:"status"`
+	Provider            *string              `json:"provider,omitempty"`
 	SuggestedCategoryID *string              `json:"suggested_category_id,omitempty"`
 	SuggestedCategory   *string              `json:"suggested_category_slug,omitempty"`
 	ConfidenceScore     *float64             `json:"confidence_score,omitempty"`

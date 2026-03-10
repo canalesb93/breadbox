@@ -50,6 +50,12 @@ func NewTemplateRenderer() (*TemplateRenderer, error) {
 		funcMap: template.FuncMap{
 			"sub": func(a, b int) int { return a - b },
 			"add": func(a, b int) int { return a + b },
+			"mulFloat": func(a *float64, b float64) float64 {
+				if a == nil {
+					return 0
+				}
+				return *a * b
+			},
 			"relativeTime": func(t interface{}) string {
 				switch v := t.(type) {
 				case time.Time:
@@ -59,6 +65,19 @@ func NewTemplateRenderer() (*TemplateRenderer, error) {
 						return relativeTime(v.Time)
 					}
 					return "Never"
+				case string:
+					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
+						return relativeTime(parsed)
+					}
+					return v
+				case *string:
+					if v == nil {
+						return ""
+					}
+					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
+						return relativeTime(parsed)
+					}
+					return *v
 				default:
 					return ""
 				}
