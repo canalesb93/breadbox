@@ -114,7 +114,7 @@
 <div x-data="reviewQueue()" class="space-y-4">
   {{if .Reviews}}
   {{range .Reviews}}
-  <div class="card bg-base-100 shadow border border-base-300 review-card" x-data="{ submitting: false, selectedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', suggestedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', pickerShake: false }" id="review-{{.ID}}">
+  <div class="card bg-base-100 shadow border border-base-300 review-card" x-data="{ submitting: false, selectedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', suggestedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', feedback: '', pickerShake: false }" id="review-{{.ID}}">
     <div class="card-body p-4">
       <!-- Header row: badges + timestamp -->
       <div class="flex items-center justify-between flex-wrap gap-1">
@@ -162,11 +162,24 @@
         </div>
       </div>
 
-      <!-- Category info -->
+      <!-- Category info with inline thumbs for suggestions -->
       <div class="text-sm mt-2">
         {{if .SuggestedCategory}}
-        <span class="text-base-content/70">Suggested:</span>
-        <span class="font-medium">{{.SuggestedCategory}}</span>
+        <div class="flex items-center gap-2">
+          <span class="text-base-content/70">Suggested:</span>
+          <span class="font-medium">{{.SuggestedCategory}}</span>
+          {{if eq .Status "pending"}}
+          <div class="flex items-center gap-1 ml-auto">
+            <button class="btn btn-xs btn-circle" :class="feedback === 'up' ? 'btn-success' : 'btn-ghost text-base-content/40'" @click="feedback = feedback === 'up' ? '' : 'up'">
+              <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
+            </button>
+            <button class="btn btn-xs btn-circle" :class="feedback === 'down' ? 'btn-error' : 'btn-ghost text-base-content/40'"
+              @click="if (feedback === 'down') { feedback = ''; } else { feedback = 'down'; if (selectedCatId === suggestedCatId) { pickerShake = true; setTimeout(() => pickerShake = false, 600); } }">
+              <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>
+            </button>
+          </div>
+          {{end}}
+        </div>
         {{else if .Transaction.Category}}
         <span class="text-base-content/70">Category:</span>
         <span class="font-medium">{{.Transaction.Category.DisplayName}}</span>
@@ -184,7 +197,7 @@
           <label class="label label-text text-xs py-0.5">
             {{if .SuggestedCategoryID}}Correct category{{else}}Assign category{{end}}
           </label>
-          <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current'})" @category-change="selectedCatId = $event.detail.id">
+          <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current'})" @category-change="selectedCatId = $event.detail.id; if (selectedCatId !== suggestedCatId && suggestedCatId) { feedback = 'down'; }">
             <button type="button" class="btn btn-sm btn-ghost gap-2 w-full justify-start border border-base-300" @click="openPicker()">
               <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
               <span x-text="displayLabel" class="text-sm truncate"></span>
@@ -209,48 +222,24 @@
         </div>
         <!-- Note -->
         <div class="form-control mt-2">
-          <label class="label label-text text-xs py-0.5">Note <span class="text-base-content/40">(optional)</span></label>
+          <label class="label label-text text-xs py-0.5">Note <span class="text-base-content/40">(optional feedback for future categorization)</span></label>
           <input type="text" class="input input-bordered input-sm w-full" placeholder="Add context for future reference..." id="note-{{.ID}}">
         </div>
         <!-- Action buttons -->
         <div class="flex gap-2 flex-wrap mt-3 items-center">
-          {{if .SuggestedCategoryID}}
-          <!-- Thumbs up/down for cards with a suggested category -->
-          <div class="tooltip tooltip-bottom" data-tip="Suggestion is correct — approve with suggested category">
+          <div class="tooltip tooltip-bottom" data-tip="Accept and apply selected category">
             <button class="btn btn-success btn-sm gap-1" :disabled="submitting"
-              @click="submitReview('{{.ID}}', 'approved', suggestedCatId)">
-              <span x-show="!submitting" class="flex items-center gap-1">
-                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
-              </span>
-              <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-            </button>
-          </div>
-          <div class="tooltip tooltip-bottom" data-tip="Suggestion is wrong — select the correct category first">
-            <button class="btn btn-error btn-soft btn-sm gap-1"
-              :disabled="submitting || selectedCatId === suggestedCatId"
-              @click="if (selectedCatId === suggestedCatId) { pickerShake = true; setTimeout(() => pickerShake = false, 600); } else { submitReview('{{.ID}}', 'approved', selectedCatId); }">
-              <span x-show="!submitting" class="flex items-center gap-1">
-                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>
-              </span>
-              <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-            </button>
-          </div>
-          {{else}}
-          <!-- Standard approve for cards without a suggestion -->
-          <div class="tooltip tooltip-bottom" data-tip="Approve and apply selected category">
-            <button class="btn btn-success btn-sm gap-1" :disabled="submitting"
-              @click="submitReview('{{.ID}}', 'approved', selectedCatId)">
+              @click="if (feedback === 'down' && selectedCatId === suggestedCatId) { pickerShake = true; setTimeout(() => pickerShake = false, 600); } else { submitReview('{{.ID}}', 'approved', selectedCatId, feedback); }">
               <span x-show="!submitting" class="flex items-center gap-1">
                 <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                Approve
+                Accept
               </span>
               <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
             </button>
           </div>
-          {{end}}
           <div class="tooltip tooltip-bottom" data-tip="Skip for now — review later">
             <button class="btn btn-ghost btn-sm gap-1" :disabled="submitting"
-              @click="submitReview('{{.ID}}', 'skipped', null)">
+              @click="submitReview('{{.ID}}', 'skipped', null, '')">
               <span x-show="!submitting" class="flex items-center gap-1">
                 <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                 Skip
@@ -303,7 +292,7 @@ var csrfToken = "{{.CSRFToken}}";
 
 function reviewQueue() {
   return {
-    submitReview(id, decision, categoryId) {
+    submitReview(id, decision, categoryId, feedback) {
       const card = document.getElementById('review-' + id);
       const noteInput = document.getElementById('note-' + id);
       const cardData = Alpine.$data(card);
@@ -313,8 +302,19 @@ function reviewQueue() {
       if (categoryId) {
         body.category_id = categoryId;
       }
+
+      // Build note with feedback prefix for audit trail
+      let noteParts = [];
+      if (feedback === 'up') {
+        noteParts.push('[suggestion accepted]');
+      } else if (feedback === 'down') {
+        noteParts.push('[suggestion corrected]');
+      }
       if (noteInput && noteInput.value.trim()) {
-        body.note = noteInput.value.trim();
+        noteParts.push(noteInput.value.trim());
+      }
+      if (noteParts.length > 0) {
+        body.note = noteParts.join(' ');
       }
 
       fetch('/admin/api/reviews/' + id + '/submit', {
