@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"breadbox/internal/app"
+	"breadbox/internal/db"
 	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
@@ -83,26 +85,48 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			return
 		}
 
-		// Load filter dropdowns.
-		accounts, err := svc.ListAccounts(ctx, nil)
-		if err != nil {
-			a.Logger.Error("list accounts for transaction filters", "error", err)
-		}
-
-		users, err := a.Queries.ListUsers(ctx)
-		if err != nil {
-			a.Logger.Error("list users for transaction filters", "error", err)
-		}
-
-		categoryTree, err := svc.ListCategoryTree(ctx)
-		if err != nil {
-			a.Logger.Error("list categories for transaction filters", "error", err)
-		}
-
-		connections, err := a.Queries.ListBankConnections(ctx)
-		if err != nil {
-			a.Logger.Error("list connections for transaction filters", "error", err)
-		}
+		// Load filter dropdowns concurrently.
+		var (
+			accounts     []service.AccountResponse
+			users        []db.User
+			categoryTree []service.CategoryResponse
+			connections  []db.ListBankConnectionsRow
+			wg           sync.WaitGroup
+		)
+		wg.Add(4)
+		go func() {
+			defer wg.Done()
+			var err error
+			accounts, err = svc.ListAccounts(ctx, nil)
+			if err != nil {
+				a.Logger.Error("list accounts for transaction filters", "error", err)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			var err error
+			users, err = a.Queries.ListUsers(ctx)
+			if err != nil {
+				a.Logger.Error("list users for transaction filters", "error", err)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			var err error
+			categoryTree, err = svc.ListCategoryTree(ctx)
+			if err != nil {
+				a.Logger.Error("list categories for transaction filters", "error", err)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			var err error
+			connections, err = a.Queries.ListBankConnections(ctx)
+			if err != nil {
+				a.Logger.Error("list connections for transaction filters", "error", err)
+			}
+		}()
+		wg.Wait()
 
 		data := map[string]any{
 			"PageTitle":        "Transactions",
