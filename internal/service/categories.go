@@ -853,6 +853,7 @@ type CategoryImportResult struct {
 	Created   int      `json:"created"`
 	Updated   int      `json:"updated"`
 	Unchanged int      `json:"unchanged"`
+	Merged    int      `json:"merged"`
 	Deleted   int      `json:"deleted"`
 	Errors    []string `json:"errors,omitempty"`
 }
@@ -877,7 +878,7 @@ func (s *Service) ExportCategoriesTSV(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("list categories: %w", err)
 	}
 
-	headers := []string{"slug", "display_name", "parent_slug", "icon", "color", "sort_order", "hidden"}
+	headers := []string{"slug", "display_name", "parent_slug", "icon", "color", "sort_order", "hidden", "merge_into"}
 	var rows [][]string
 
 	// Parents first, then children — stable ordering
@@ -918,6 +919,7 @@ func categoryToTSVRow(c CategoryResponse) []string {
 		color,
 		strconv.Itoa(int(c.SortOrder)),
 		strconv.FormatBool(c.Hidden),
+		"", // merge_into — empty on export
 	}
 }
 
@@ -926,7 +928,7 @@ func categoryToTSVRow(c CategoryResponse) []string {
 // New slugs are created. If replaceMode is true, non-system categories not
 // present in the import are deleted (transactions set to uncategorized).
 func (s *Service) ImportCategoriesTSV(ctx context.Context, content string, replaceMode bool) (*CategoryImportResult, error) {
-	rows, err := parseTSV(content, 7)
+	rows, err := parseTSV(content, 7, 8)
 	if err != nil {
 		return nil, fmt.Errorf("parse TSV: %w", err)
 	}
@@ -942,9 +944,11 @@ func (s *Service) ImportCategoriesTSV(ctx context.Context, content string, repla
 		color       string
 		sortOrder   int32
 		hidden      bool
+		mergeInto   string
 	}
 
 	var parents, children []rowData
+	var merges []rowData // rows with merge_into set
 
 	for i, cols := range rows {
 		lineNum := i + 2 // 1-indexed, skip header
@@ -952,6 +956,7 @@ func (s *Service) ImportCategoriesTSV(ctx context.Context, content string, repla
 		slug := strings.TrimSpace(cols[0])
 		displayName := strings.TrimSpace(cols[1])
 		parentSlug := strings.TrimSpace(cols[2])
+		mergeInto := strings.TrimSpace(cols[7]) // 8th column, empty if not present
 
 		if slug == "" {
 			result.Errors = append(result.Errors, fmt.Sprintf("line %d: slug is required", lineNum))
@@ -961,6 +966,13 @@ func (s *Service) ImportCategoriesTSV(ctx context.Context, content string, repla
 			result.Errors = append(result.Errors, fmt.Sprintf("line %d: invalid slug '%s' (must be lowercase alphanumeric with underscores)", lineNum, slug))
 			continue
 		}
+
+		// If merge_into is set, this row is a merge instruction — not a category definition.
+		if mergeInto != "" {
+			merges = append(merges, rowData{lineNum: lineNum, slug: slug, mergeInto: mergeInto})
+			continue
+		}
+
 		if displayName == "" {
 			result.Errors = append(result.Errors, fmt.Sprintf("line %d: display_name is required", lineNum))
 			continue
@@ -1069,6 +1081,53 @@ func (s *Service) ImportCategoriesTSV(ctx context.Context, content string, repla
 		process(rd)
 	}
 
+	// Process merge instructions: merge source → target (transactions + mappings reassigned).
+	// Children of the source are also merged into the target before the source is deleted.
+	for _, m := range merges {
+		source, err := s.Queries.GetCategoryBySlug(ctx, m.slug)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				// Source doesn't exist — nothing to merge, skip silently
+				continue
+			}
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d: merge lookup error for '%s': %v", m.lineNum, m.slug, err))
+			continue
+		}
+		target, err := s.Queries.GetCategoryBySlug(ctx, m.mergeInto)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d: merge target '%s' not found", m.lineNum, m.mergeInto))
+			} else {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d: merge target lookup error: %v", m.lineNum, err))
+			}
+			continue
+		}
+
+		sourceID := formatUUID(source.ID)
+		targetID := formatUUID(target.ID)
+
+		// Merge children of source into target first
+		childIDs, err := s.Queries.ListChildCategoryIDs(ctx, source.ID)
+		if err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d: list children error: %v", m.lineNum, err))
+			continue
+		}
+		for _, childID := range childIDs {
+			childIDStr := formatUUID(childID)
+			if err := s.MergeCategories(ctx, childIDStr, targetID); err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d: merge child error: %v", m.lineNum, err))
+			} else {
+				result.Merged++
+			}
+		}
+
+		if err := s.MergeCategories(ctx, sourceID, targetID); err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d: merge '%s' → '%s' error: %v", m.lineNum, m.slug, m.mergeInto, err))
+			continue
+		}
+		result.Merged++
+	}
+
 	// Replace mode: delete non-system categories not present in the import.
 	if replaceMode {
 		// Collect all slugs from the import.
@@ -1123,7 +1182,7 @@ func (s *Service) ExportMappingsTSV(ctx context.Context) (string, error) {
 // the raw category strings are re-categorized (not just uncategorized ones).
 // If replaceMode is true, mappings not present in the import are deleted.
 func (s *Service) ImportMappingsTSV(ctx context.Context, content string, applyRetroactively bool, replaceMode bool) (*MappingImportResult, error) {
-	rows, err := parseTSV(content, 3)
+	rows, err := parseTSV(content, 3, 3)
 	if err != nil {
 		return nil, fmt.Errorf("parse TSV: %w", err)
 	}
@@ -1290,8 +1349,10 @@ func formatTSV(headers []string, rows [][]string) string {
 }
 
 // parseTSV parses TSV content, validates column count, skips empty lines.
-// Returns data rows (header excluded).
-func parseTSV(content string, expectedCols int) ([][]string, error) {
+// Returns data rows (header excluded). Rows are padded to maxCols if shorter.
+// minCols is the minimum accepted column count; maxCols is the maximum.
+// If minCols == maxCols, the column count must be exact.
+func parseTSV(content string, minCols, maxCols int) ([][]string, error) {
 	// Normalize line endings
 	content = strings.ReplaceAll(content, "\r\n", "\n")
 	content = strings.ReplaceAll(content, "\r", "\n")
@@ -1311,8 +1372,11 @@ func parseTSV(content string, expectedCols int) ([][]string, error) {
 	}
 
 	headerCols := strings.Split(lines[headerIdx], "\t")
-	if len(headerCols) != expectedCols {
-		return nil, fmt.Errorf("expected %d columns, got %d in header", expectedCols, len(headerCols))
+	if len(headerCols) < minCols || len(headerCols) > maxCols {
+		if minCols == maxCols {
+			return nil, fmt.Errorf("expected %d columns, got %d in header", minCols, len(headerCols))
+		}
+		return nil, fmt.Errorf("expected %d-%d columns, got %d in header", minCols, maxCols, len(headerCols))
 	}
 
 	var rows [][]string
@@ -1321,8 +1385,15 @@ func parseTSV(content string, expectedCols int) ([][]string, error) {
 			continue
 		}
 		cols := strings.Split(line, "\t")
-		if len(cols) != expectedCols {
-			return nil, fmt.Errorf("expected %d columns, got %d: %s", expectedCols, len(cols), line)
+		if len(cols) < minCols || len(cols) > maxCols {
+			if minCols == maxCols {
+				return nil, fmt.Errorf("expected %d columns, got %d: %s", minCols, len(cols), line)
+			}
+			return nil, fmt.Errorf("expected %d-%d columns, got %d: %s", minCols, maxCols, len(cols), line)
+		}
+		// Pad to maxCols for uniform access
+		for len(cols) < maxCols {
+			cols = append(cols, "")
 		}
 		rows = append(rows, cols)
 	}

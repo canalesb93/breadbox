@@ -346,9 +346,12 @@
                 <i data-lucide="list-tree" class="w-5 h-5"></i>
                 Categories
               </h2>
-              <p class="text-xs text-base-content/50 mt-0.5">TSV format: slug, display_name, parent_slug, icon, color, sort_order, hidden</p>
+              <p class="text-xs text-base-content/50 mt-0.5">TSV format: slug, display_name, parent_slug, icon, color, sort_order, hidden, merge_into</p>
             </div>
             <div class="flex gap-2">
+              <button class="btn btn-sm btn-ghost btn-square" title="Copy agent instructions" @click="copyAgentInstructions()">
+                <i data-lucide="bot" class="w-4 h-4"></i>
+              </button>
               <button class="btn btn-sm btn-outline" :disabled="catLoading" @click="exportCategories()">
                 <i data-lucide="download" class="w-4 h-4"></i>
                 <span x-show="!catLoading">Export</span>
@@ -361,7 +364,7 @@
               </button>
             </div>
           </div>
-          <textarea x-model="catText" class="textarea textarea-bordered w-full font-mono text-xs leading-relaxed" rows="12" placeholder="Click Export to load current categories, or paste TSV data here...&#10;&#10;slug&#9;display_name&#9;parent_slug&#9;icon&#9;color&#9;sort_order&#9;hidden&#10;food_and_drink&#9;Food & Drink&#9;&#9;utensils&#9;#ef4444&#9;0&#9;false" spellcheck="false"></textarea>
+          <textarea x-model="catText" class="textarea textarea-bordered w-full font-mono text-xs leading-relaxed" rows="12" placeholder="Click Export to load current categories, or paste TSV data here...&#10;&#10;slug&#9;display_name&#9;parent_slug&#9;icon&#9;color&#9;sort_order&#9;hidden&#9;merge_into&#10;food_and_drink&#9;Food & Drink&#9;&#9;utensils&#9;#ef4444&#9;0&#9;false&#9;&#10;old_category&#9;&#9;&#9;&#9;&#9;&#9;&#9;food_and_drink" spellcheck="false"></textarea>
           <!-- Import mode toggle -->
           <label class="label cursor-pointer justify-start gap-3 mt-1">
             <input type="checkbox" x-model="catReplace" class="toggle toggle-sm toggle-error">
@@ -377,6 +380,7 @@
                 <span x-show="catResult.created > 0" class="badge badge-success badge-sm" x-text="catResult.created + ' created'"></span>
                 <span x-show="catResult.updated > 0" class="badge badge-info badge-sm" x-text="catResult.updated + ' updated'"></span>
                 <span x-show="catResult.unchanged > 0" class="badge badge-ghost badge-sm" x-text="catResult.unchanged + ' unchanged'"></span>
+                <span x-show="catResult.merged > 0" class="badge badge-warning badge-sm" x-text="catResult.merged + ' merged'"></span>
                 <span x-show="catResult.deleted > 0" class="badge badge-error badge-sm" x-text="catResult.deleted + ' deleted'"></span>
               </div>
               <template x-if="catResult.errors && catResult.errors.length > 0">
@@ -457,6 +461,7 @@
         <div class="text-sm">
           <p class="font-semibold">How bulk edit works</p>
           <p>Export loads the current data into the text area as tab-separated values. Edit the text (or paste from a spreadsheet), then click Import. By default, existing entries are updated and new ones are created — rows you remove are <strong>not</strong> deleted. Enable <strong>Full replace</strong> to also delete any entries not present in the import.</p>
+          <p class="mt-1"><strong>Merging categories:</strong> To consolidate categories, set the <code>merge_into</code> column to the target category's slug. All transactions and mappings from the source category are moved to the target, then the source is deleted. Great for simplifying a complex taxonomy. Use the <i data-lucide="bot" class="w-3 h-3 inline"></i> button to copy instructions for an AI agent to help you edit the file.</p>
         </div>
       </div>
     </div>
@@ -725,6 +730,48 @@ function bulkEditTab() {
     mapResult: null,
     mapRetroactive: false,
     mapReplace: false,
+
+    copyAgentInstructions() {
+      const instructions = `## Breadbox Category Editor Instructions
+
+You are editing the category taxonomy for a personal finance app. The data is in TSV (tab-separated values) format with these columns:
+
+slug | display_name | parent_slug | icon | color | sort_order | hidden | merge_into
+
+### Column Reference
+- **slug**: Unique identifier (lowercase_with_underscores). Immutable once created.
+- **display_name**: Human-readable name shown in the UI.
+- **parent_slug**: Leave empty for top-level categories. Set to a parent's slug for subcategories (two-level hierarchy max).
+- **icon**: Lucide icon name (e.g., "utensils", "car", "home"). See lucide.dev/icons.
+- **color**: Hex color (e.g., "#ef4444"). Used in charts and badges.
+- **sort_order**: Integer for display ordering within a level. Lower numbers appear first.
+- **hidden**: "true" or "false". Hidden categories still work for mapping but don't appear in the UI.
+- **merge_into**: Leave empty to keep/create the category. Set to another slug to merge this category INTO that target — all transactions and mappings will be reassigned to the target, then this category is deleted.
+
+### How to Simplify Categories
+1. Keep the rows for categories you want to retain (edit display_name, icon, etc. as needed).
+2. For categories you want to consolidate, set \`merge_into\` to the target slug. You can leave display_name and other fields empty on merge rows since the row will be deleted after merging.
+3. For categories you want to delete entirely (transactions go to "uncategorized"), simply remove the row and enable "Full replace" mode on import.
+4. The "uncategorized" system category cannot be deleted or merged.
+5. Parents must appear before their children in the file.
+
+### Example
+\`\`\`tsv
+slug	display_name	parent_slug	icon	color	sort_order	hidden	merge_into
+food_and_drink	Food & Drink		utensils	#f97316	0	false
+food_and_drink_groceries	Groceries	food_and_drink	shopping-cart	#22c55e	1	false
+food_and_drink_coffee							food_and_drink
+food_and_drink_fast_food							food_and_drink
+\`\`\`
+In this example, "coffee" and "fast_food" are merged into "food_and_drink" (their transactions move to the parent).
+
+### Current Category Data
+Paste the exported TSV below this line, then edit it according to the instructions above.
+`;
+      navigator.clipboard.writeText(instructions).then(() => {
+        window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Agent instructions copied to clipboard',type:'success'}}));
+      });
+    },
 
     exportCategories() {
       this.catLoading = true;
