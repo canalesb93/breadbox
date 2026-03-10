@@ -853,6 +853,7 @@ type CategoryImportResult struct {
 	Created   int      `json:"created"`
 	Updated   int      `json:"updated"`
 	Unchanged int      `json:"unchanged"`
+	Deleted   int      `json:"deleted"`
 	Errors    []string `json:"errors,omitempty"`
 }
 
@@ -861,6 +862,7 @@ type MappingImportResult struct {
 	Created             int      `json:"created"`
 	Updated             int      `json:"updated"`
 	Unchanged           int      `json:"unchanged"`
+	Deleted             int      `json:"deleted"`
 	TransactionsUpdated int64    `json:"transactions_updated"`
 	Errors              []string `json:"errors,omitempty"`
 }
@@ -921,8 +923,9 @@ func categoryToTSVRow(c CategoryResponse) []string {
 
 // ImportCategoriesTSV parses TSV content and creates/updates categories.
 // Existing slugs are updated (display_name, icon, color, sort_order, hidden).
-// New slugs are created. Missing slugs are not deleted.
-func (s *Service) ImportCategoriesTSV(ctx context.Context, content string) (*CategoryImportResult, error) {
+// New slugs are created. If replaceMode is true, non-system categories not
+// present in the import are deleted (transactions set to uncategorized).
+func (s *Service) ImportCategoriesTSV(ctx context.Context, content string, replaceMode bool) (*CategoryImportResult, error) {
 	rows, err := parseTSV(content, 7)
 	if err != nil {
 		return nil, fmt.Errorf("parse TSV: %w", err)
@@ -1066,6 +1069,36 @@ func (s *Service) ImportCategoriesTSV(ctx context.Context, content string) (*Cat
 		process(rd)
 	}
 
+	// Replace mode: delete non-system categories not present in the import.
+	if replaceMode {
+		// Collect all slugs from the import.
+		importedSlugs := make(map[string]bool)
+		for _, rd := range parents {
+			importedSlugs[rd.slug] = true
+		}
+		for _, rd := range children {
+			importedSlugs[rd.slug] = true
+		}
+
+		allCats, err := s.ListCategories(ctx)
+		if err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("replace mode: failed to list categories: %v", err))
+			return result, nil
+		}
+
+		for _, c := range allCats {
+			if c.IsSystem || importedSlugs[c.Slug] {
+				continue
+			}
+			// Delete: reassign transactions to uncategorized, then delete.
+			if _, err := s.DeleteCategory(ctx, c.ID); err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("replace mode: failed to delete '%s': %v", c.Slug, err))
+				continue
+			}
+			result.Deleted++
+		}
+	}
+
 	return result, nil
 }
 
@@ -1088,7 +1121,8 @@ func (s *Service) ExportMappingsTSV(ctx context.Context) (string, error) {
 // ImportMappingsTSV parses TSV content and upserts category mappings.
 // If applyRetroactively is true, ALL non-overridden transactions matching
 // the raw category strings are re-categorized (not just uncategorized ones).
-func (s *Service) ImportMappingsTSV(ctx context.Context, content string, applyRetroactively bool) (*MappingImportResult, error) {
+// If replaceMode is true, mappings not present in the import are deleted.
+func (s *Service) ImportMappingsTSV(ctx context.Context, content string, applyRetroactively bool, replaceMode bool) (*MappingImportResult, error) {
 	rows, err := parseTSV(content, 3)
 	if err != nil {
 		return nil, fmt.Errorf("parse TSV: %w", err)
@@ -1184,6 +1218,36 @@ func (s *Service) ImportMappingsTSV(ctx context.Context, content string, applyRe
 				result.Errors = append(result.Errors, fmt.Sprintf("line %d: re-resolve error: %v", lineNum, err))
 				continue
 			}
+		}
+	}
+
+	// Replace mode: delete mappings not present in the import.
+	if replaceMode {
+		type mappingKey struct{ provider, category string }
+		importedKeys := make(map[mappingKey]bool)
+		for _, cols := range rows {
+			provider := strings.TrimSpace(cols[0])
+			providerCategory := strings.TrimSpace(cols[1])
+			if provider != "" && providerCategory != "" {
+				importedKeys[mappingKey{provider, providerCategory}] = true
+			}
+		}
+
+		allMappings, err := s.ListMappings(ctx, nil)
+		if err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("replace mode: failed to list mappings: %v", err))
+			return result, nil
+		}
+
+		for _, m := range allMappings {
+			if importedKeys[mappingKey{m.Provider, m.ProviderCategory}] {
+				continue
+			}
+			if err := s.DeleteMapping(ctx, m.ID); err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("replace mode: failed to delete mapping %s/%s: %v", m.Provider, m.ProviderCategory, err))
+				continue
+			}
+			result.Deleted++
 		}
 	}
 

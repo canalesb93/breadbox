@@ -362,6 +362,14 @@
             </div>
           </div>
           <textarea x-model="catText" class="textarea textarea-bordered w-full font-mono text-xs leading-relaxed" rows="12" placeholder="Click Export to load current categories, or paste TSV data here...&#10;&#10;slug&#9;display_name&#9;parent_slug&#9;icon&#9;color&#9;sort_order&#9;hidden&#10;food_and_drink&#9;Food & Drink&#9;&#9;utensils&#9;#ef4444&#9;0&#9;false" spellcheck="false"></textarea>
+          <!-- Import mode toggle -->
+          <label class="label cursor-pointer justify-start gap-3 mt-1">
+            <input type="checkbox" x-model="catReplace" class="toggle toggle-sm toggle-error">
+            <div>
+              <span class="label-text">Full replace</span>
+              <span class="text-xs text-base-content/50 block">Delete categories not in the import (system categories are kept). Off = only add &amp; update.</span>
+            </div>
+          </label>
           <!-- Result -->
           <template x-if="catResult">
             <div class="mt-2">
@@ -369,6 +377,7 @@
                 <span x-show="catResult.created > 0" class="badge badge-success badge-sm" x-text="catResult.created + ' created'"></span>
                 <span x-show="catResult.updated > 0" class="badge badge-info badge-sm" x-text="catResult.updated + ' updated'"></span>
                 <span x-show="catResult.unchanged > 0" class="badge badge-ghost badge-sm" x-text="catResult.unchanged + ' unchanged'"></span>
+                <span x-show="catResult.deleted > 0" class="badge badge-error badge-sm" x-text="catResult.deleted + ' deleted'"></span>
               </div>
               <template x-if="catResult.errors && catResult.errors.length > 0">
                 <div class="mt-2 text-sm text-error">
@@ -405,14 +414,23 @@
             </div>
           </div>
           <textarea x-model="mapText" class="textarea textarea-bordered w-full font-mono text-xs leading-relaxed" rows="12" placeholder="Click Export to load current mappings, or paste TSV data here...&#10;&#10;provider&#9;provider_category&#9;category_slug&#10;plaid&#9;FOOD_AND_DRINK_GROCERIES&#9;food_and_drink_groceries" spellcheck="false"></textarea>
-          <!-- Apply retroactively toggle -->
-          <label class="label cursor-pointer justify-start gap-3 mt-1">
-            <input type="checkbox" x-model="mapRetroactive" class="toggle toggle-sm">
-            <div>
-              <span class="label-text">Apply retroactively</span>
-              <span class="text-xs text-base-content/50 block">Re-categorize existing transactions that match updated mappings</span>
-            </div>
-          </label>
+          <!-- Import options -->
+          <div class="space-y-1 mt-1">
+            <label class="label cursor-pointer justify-start gap-3">
+              <input type="checkbox" x-model="mapReplace" class="toggle toggle-sm toggle-error">
+              <div>
+                <span class="label-text">Full replace</span>
+                <span class="text-xs text-base-content/50 block">Delete mappings not in the import. Off = only add &amp; update.</span>
+              </div>
+            </label>
+            <label class="label cursor-pointer justify-start gap-3">
+              <input type="checkbox" x-model="mapRetroactive" class="toggle toggle-sm">
+              <div>
+                <span class="label-text">Apply retroactively</span>
+                <span class="text-xs text-base-content/50 block">Re-categorize existing transactions that match updated mappings</span>
+              </div>
+            </label>
+          </div>
           <!-- Result -->
           <template x-if="mapResult">
             <div class="mt-2">
@@ -420,6 +438,7 @@
                 <span x-show="mapResult.created > 0" class="badge badge-success badge-sm" x-text="mapResult.created + ' created'"></span>
                 <span x-show="mapResult.updated > 0" class="badge badge-info badge-sm" x-text="mapResult.updated + ' updated'"></span>
                 <span x-show="mapResult.unchanged > 0" class="badge badge-ghost badge-sm" x-text="mapResult.unchanged + ' unchanged'"></span>
+                <span x-show="mapResult.deleted > 0" class="badge badge-error badge-sm" x-text="mapResult.deleted + ' deleted'"></span>
                 <span x-show="mapResult.transactions_updated > 0" class="badge badge-warning badge-sm" x-text="mapResult.transactions_updated + ' transactions re-categorized'"></span>
               </div>
               <template x-if="mapResult.errors && mapResult.errors.length > 0">
@@ -437,7 +456,7 @@
         <i data-lucide="info" class="w-5 h-5"></i>
         <div class="text-sm">
           <p class="font-semibold">How bulk edit works</p>
-          <p>Export loads the current data into the text area as tab-separated values. Edit the text (or paste from a spreadsheet), then click Import. Existing entries are updated, new ones are created. Rows you remove from the text will <strong>not</strong> be deleted — use the Categories or Mappings tabs to delete individual items.</p>
+          <p>Export loads the current data into the text area as tab-separated values. Edit the text (or paste from a spreadsheet), then click Import. By default, existing entries are updated and new ones are created — rows you remove are <strong>not</strong> deleted. Enable <strong>Full replace</strong> to also delete any entries not present in the import.</p>
         </div>
       </div>
     </div>
@@ -699,11 +718,13 @@ function bulkEditTab() {
     catLoading: false,
     catImporting: false,
     catResult: null,
+    catReplace: false,
     mapText: '',
     mapLoading: false,
     mapImporting: false,
     mapResult: null,
     mapRetroactive: false,
+    mapReplace: false,
 
     exportCategories() {
       this.catLoading = true;
@@ -717,9 +738,11 @@ function bulkEditTab() {
 
     importCategories() {
       if (!this.catText.trim()) return;
+      if (this.catReplace && !confirm('Full replace is enabled. Categories not in the import will be deleted and their transactions set to Uncategorized. Continue?')) return;
       this.catImporting = true;
       this.catResult = null;
-      fetch('/admin/api/categories/import-tsv', {
+      const params = this.catReplace ? '?replace=true' : '';
+      fetch('/admin/api/categories/import-tsv' + params, {
         method: 'POST',
         headers: {'Content-Type': 'text/tab-separated-values'},
         body: this.catText
@@ -730,7 +753,7 @@ function bulkEditTab() {
             window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: data.error.message || data.error, type:'error'}}));
           } else {
             this.catResult = data;
-            if (data.created > 0 || data.updated > 0) {
+            if (data.created > 0 || data.updated > 0 || data.deleted > 0) {
               window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Categories imported successfully', type:'success'}}));
             }
           }
@@ -751,9 +774,14 @@ function bulkEditTab() {
 
     importMappings() {
       if (!this.mapText.trim()) return;
+      if (this.mapReplace && !confirm('Full replace is enabled. Mappings not in the import will be deleted. Continue?')) return;
       this.mapImporting = true;
       this.mapResult = null;
-      const url = '/admin/api/category-mappings/import-tsv' + (this.mapRetroactive ? '?apply_retroactively=true' : '');
+      const qp = new URLSearchParams();
+      if (this.mapRetroactive) qp.set('apply_retroactively', 'true');
+      if (this.mapReplace) qp.set('replace', 'true');
+      const qs = qp.toString();
+      const url = '/admin/api/category-mappings/import-tsv' + (qs ? '?' + qs : '');
       fetch(url, {
         method: 'POST',
         headers: {'Content-Type': 'text/tab-separated-values'},
@@ -765,7 +793,7 @@ function bulkEditTab() {
             window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: data.error.message || data.error, type:'error'}}));
           } else {
             this.mapResult = data;
-            if (data.created > 0 || data.updated > 0) {
+            if (data.created > 0 || data.updated > 0 || data.deleted > 0) {
               window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Mappings imported successfully', type:'success'}}));
             }
           }
