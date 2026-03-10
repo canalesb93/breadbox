@@ -209,6 +209,7 @@ type AdminTransactionRow struct {
 	MerchantName        *string
 	Amount              float64
 	IsoCurrencyCode     *string
+	CategoryID          *string
 	CategoryDisplayName *string
 	CategorySlug        *string
 	CategoryIcon        *string

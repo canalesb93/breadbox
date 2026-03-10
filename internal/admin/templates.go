@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -114,6 +115,10 @@ func NewTemplateRenderer() (*TemplateRenderer, error) {
 					return `<span class="badge badge-ghost badge-sm">default</span>`
 				}
 			},
+			"toJSON": func(v any) template.JS {
+				b, _ := json.Marshal(v)
+				return template.JS(b)
+			},
 			"formatNumeric": func(n pgtype.Numeric) string {
 				if !n.Valid {
 					return ""
@@ -136,6 +141,7 @@ func NewTemplateRenderer() (*TemplateRenderer, error) {
 var templatePartials = []string{
 	"partials/flash.html",
 	"partials/nav.html",
+	"partials/category_picker.html",
 }
 
 func (tr *TemplateRenderer) parseTemplates() error {

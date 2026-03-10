@@ -1,4 +1,6 @@
 {{define "content"}}
+{{template "category-picker-styles" .}}
+
 <div class="breadcrumbs text-sm mb-4">
   <ul>
     <li><a href="/admin/transactions">Transactions</a></li>
@@ -28,13 +30,37 @@
   <dd>{{.UserName}}</dd>
   {{end}}
   <dt>Category</dt>
-  <dd>
-    {{if .Transaction.Category}}
-      {{if .Transaction.Category.DisplayName}}{{.Transaction.Category.DisplayName}}{{end}}
-      {{if .Transaction.CategoryOverride}} <span class="badge badge-outline badge-xs">override</span>{{end}}
-    {{else}}
-      &mdash;
-    {{end}}
+  <dd x-data="txCategoryEditor()">
+    <div class="flex items-center gap-2 flex-wrap">
+      <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'assign', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', initial: '{{if .Transaction.Category}}{{.Transaction.Category.ID}}{{end}}'})" @category-change="setCategoryFromPicker($event.detail)">
+        <button type="button" class="btn btn-sm btn-ghost gap-2 -ml-2" @click="openPicker()">
+          <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
+          <span x-text="displayLabel" class="text-sm"></span>
+          <i data-lucide="pencil" class="w-3 h-3 opacity-40"></i>
+        </button>
+        <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false">
+          <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
+            <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search categories..." class="input input-sm input-bordered w-full">
+          </div>
+          <div x-ref="listbox">
+            <template x-for="(item, idx) in filteredList" :key="item.id || idx">
+              <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item)">
+                <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
+                <template x-if="item.icon"><i :data-lucide="item.icon" class="bb-cat-icon"></i></template>
+                <span x-text="item.label"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+      {{if .Transaction.CategoryOverride}}<span class="badge badge-outline badge-xs">override</span>{{end}}
+      <template x-if="isOverride">
+        <button class="btn btn-ghost btn-xs text-base-content/50" @click="resetCategory()" title="Reset to auto-detected category">
+          <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Reset
+        </button>
+      </template>
+      <span x-show="saving" class="loading loading-spinner loading-xs"></span>
+    </div>
   </dd>
   {{if .Transaction.CategoryPrimaryRaw}}
   <dt>Raw Category</dt>
@@ -116,7 +142,52 @@
 </div>
 {{end}}
 
+{{template "category-picker-script" .}}
 <script>
+function txCategoryEditor() {
+  return {
+    saving: false,
+    isOverride: {{if .Transaction.CategoryOverride}}true{{else}}false{{end}},
+    setCategoryFromPicker(detail) {
+      if (!detail.id) {
+        this.resetCategory();
+        return;
+      }
+      this.saving = true;
+      fetch('/admin/api/transactions/{{.TransactionID}}/category', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({category_id: detail.id})
+      })
+      .then(r => {
+        this.saving = false;
+        if (r.ok) {
+          this.isOverride = true;
+          showToast('Category updated.', 'success');
+        } else {
+          r.json().then(d => showToast(d.error?.message || 'Failed to update category.'));
+        }
+      })
+      .catch(() => { this.saving = false; showToast('Network error.'); });
+    },
+    resetCategory() {
+      this.saving = true;
+      fetch('/admin/api/transactions/{{.TransactionID}}/category', { method: 'DELETE' })
+      .then(r => {
+        this.saving = false;
+        if (r.ok || r.status === 204) {
+          this.isOverride = false;
+          showToast('Category reset to auto-detected.', 'success');
+          location.reload();
+        } else {
+          showToast('Failed to reset category.');
+        }
+      })
+      .catch(() => { this.saving = false; showToast('Network error.'); });
+    }
+  };
+}
+
 function showToast(message, type) {
   window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type || 'error' } }));
 }

@@ -65,8 +65,8 @@ func ReviewsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		accounts, _ := a.Queries.ListAccounts(ctx)
 		users, _ := a.Queries.ListUsers(ctx)
 
-		// Load categories for the category selector.
-		categories, _ := svc.ListCategories(ctx)
+		// Load category tree for the category picker component.
+		categories, _ := svc.ListCategoryTree(ctx)
 
 		// Load review settings from app_config.
 		reviewAutoEnqueue := true
