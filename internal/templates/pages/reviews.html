@@ -3,6 +3,48 @@
 
 <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
   <h1 class="text-2xl font-bold">Reviews</h1>
+  {{if and (eq .StatusFilter "pending") .Counts (gt .Counts.Pending 0)}}
+  <div x-data="{ dismissing: false, confirmOpen: false }">
+    <button class="btn btn-sm btn-error btn-outline gap-1" @click="confirmOpen = true" :disabled="dismissing">
+      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+      Dismiss All
+    </button>
+    <!-- Confirmation modal -->
+    <dialog class="modal" :class="{ 'modal-open': confirmOpen }">
+      <div class="modal-box">
+        <h3 class="text-lg font-bold">Dismiss all pending reviews?</h3>
+        <p class="py-4">This will permanently remove all <strong>{{.Counts.Pending}}</strong> pending reviews from the queue. This cannot be undone.</p>
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="confirmOpen = false" :disabled="dismissing">Cancel</button>
+          <button class="btn btn-error gap-1" :disabled="dismissing"
+            @click="dismissing = true;
+              fetch('/admin/api/reviews/dismiss-all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }
+              })
+              .then(r => r.json())
+              .then(data => {
+                if (data.error) {
+                  window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: data.error, type:'error'}}));
+                  dismissing = false;
+                } else {
+                  window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: data.dismissed + ' reviews dismissed', type:'info'}}));
+                  setTimeout(() => window.location.reload(), 500);
+                }
+              })
+              .catch(() => {
+                window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Network error', type:'error'}}));
+                dismissing = false;
+              })">
+            <span x-show="!dismissing">Dismiss All</span>
+            <span x-show="dismissing" class="loading loading-spinner loading-xs"></span>
+          </button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="confirmOpen = false"><button>close</button></form>
+    </dialog>
+  </div>
+  {{end}}
 </div>
 
 <!-- Stats -->

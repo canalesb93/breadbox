@@ -25,6 +25,9 @@ RETURNING *;
 -- name: DeleteReview :exec
 DELETE FROM review_queue WHERE id = $1 AND status = 'pending';
 
+-- name: DeleteAllPendingReviews :execrows
+DELETE FROM review_queue WHERE status = 'pending';
+
 -- name: CountPendingReviews :one
 SELECT COUNT(*) FROM review_queue WHERE status = 'pending';
 
