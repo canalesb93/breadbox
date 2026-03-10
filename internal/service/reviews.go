@@ -63,7 +63,8 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 		u.name AS user_name,
 		t.category_id, t.category_override,
 		c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, c.color AS cat_color,
-		pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name
+		pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name,
+		bc.provider AS connection_provider
 		FROM review_queue rq
 		JOIN transactions t ON rq.transaction_id = t.id
 		JOIN accounts a ON t.account_id = a.id
@@ -189,6 +190,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			catColor              pgtype.Text
 			catPrimarySlug        pgtype.Text
 			catPrimaryDisplayName pgtype.Text
+			connectionProvider    pgtype.Text
 		)
 
 		if err := rows.Scan(
@@ -203,6 +205,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			&tCategoryID, &tCategoryOverride,
 			&catSlug, &catDisplayName, &catIcon, &catColor,
 			&catPrimarySlug, &catPrimaryDisplayName,
+			&connectionProvider,
 		); err != nil {
 			return nil, fmt.Errorf("scan review: %w", err)
 		}
@@ -255,6 +258,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			TransactionID:       formatUUID(rTransactionID),
 			ReviewType:          rReviewType,
 			Status:              rStatus,
+			Provider:            textPtr(connectionProvider),
 			SuggestedCategoryID: uuidPtr(rSuggestedCategoryID),
 			SuggestedCategory:   textPtr(suggestedSlug),
 			ConfidenceScore:     numericFloat(rConfidenceScore),

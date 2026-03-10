@@ -3,14 +3,29 @@
 
 <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
   <h1 class="text-2xl font-bold">Reviews</h1>
-  {{if .Counts}}
-  <div class="flex gap-2 flex-wrap">
-    <span class="badge badge-outline">{{.Counts.Pending}} pending</span>
-    <span class="badge badge-success badge-outline">{{.Counts.ApprovedToday}} approved today</span>
-    <span class="badge badge-error badge-outline">{{.Counts.RejectedToday}} rejected today</span>
-  </div>
-  {{end}}
 </div>
+
+<!-- Stats -->
+{{if .Counts}}
+<div class="stats stats-vertical sm:stats-horizontal shadow border border-base-300 w-full mb-6">
+  <div class="stat py-3 px-5">
+    <div class="stat-title text-xs">Pending</div>
+    <div class="stat-value text-lg {{if gt .Counts.Pending 0}}text-warning{{end}}">{{.Counts.Pending}}</div>
+  </div>
+  <div class="stat py-3 px-5">
+    <div class="stat-title text-xs">Approved today</div>
+    <div class="stat-value text-lg text-success">{{.Counts.ApprovedToday}}</div>
+  </div>
+  <div class="stat py-3 px-5">
+    <div class="stat-title text-xs">Rejected today</div>
+    <div class="stat-value text-lg text-error">{{.Counts.RejectedToday}}</div>
+  </div>
+  <div class="stat py-3 px-5">
+    <div class="stat-title text-xs">Skipped today</div>
+    <div class="stat-value text-lg">{{.Counts.SkippedToday}}</div>
+  </div>
+</div>
+{{end}}
 
 <!-- Review Settings -->
 <div class="collapse collapse-arrow bg-base-100 border border-base-300 mb-6">
@@ -25,7 +40,7 @@
         </label>
       </div>
       <div class="form-control">
-        <label class="label label-text text-xs">Confidence threshold</label>
+        <label class="label label-text text-xs">Confidence threshold <span class="badge badge-ghost badge-xs ml-1">Plaid only</span></label>
         <input type="number" step="0.1" min="0" max="1" class="input input-bordered input-sm w-24"
           x-model="threshold" :disabled="!autoEnqueue">
       </div>
@@ -42,7 +57,9 @@
     </div>
     <p class="text-xs text-base-content/50 mt-2">
       When enabled, new transactions are automatically added to the review queue during sync.
-      Transactions with category confidence below the threshold are flagged as "low confidence".
+      The confidence threshold only applies to <strong>Plaid</strong> transactions — Plaid provides a category confidence level
+      (very_high, high, medium, low) which is compared against this threshold. Teller and CSV transactions
+      are always enqueued as "uncategorized" or "new transaction" since they don't provide confidence scores.
     </p>
   </div>
 </div>
@@ -99,17 +116,20 @@
   {{range .Reviews}}
   <div class="card bg-base-100 shadow border border-base-300 review-card" x-data="{ submitting: false, selectedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}' }" id="review-{{.ID}}">
     <div class="card-body p-4">
-      <!-- Header: Review type badge + date -->
-      <div class="flex items-center justify-between mb-2 flex-wrap gap-1">
-        <div class="flex items-center gap-2">
+      <!-- Header row: badges + timestamp -->
+      <div class="flex items-center justify-between flex-wrap gap-1">
+        <div class="flex items-center gap-2 flex-wrap">
           {{if eq .ReviewType "new_transaction"}}
-          <span class="badge badge-info badge-sm">New Transaction</span>
+          <span class="badge badge-soft badge-info badge-sm">New Transaction</span>
           {{else if eq .ReviewType "uncategorized"}}
-          <span class="badge badge-warning badge-sm">Uncategorized</span>
+          <span class="badge badge-soft badge-warning badge-sm">Uncategorized</span>
           {{else if eq .ReviewType "low_confidence"}}
-          <span class="badge badge-error badge-sm">Low Confidence</span>
+          <span class="badge badge-soft badge-error badge-sm">Low Confidence{{if .ConfidenceScore}} ({{printf "%.0f" (mulFloat .ConfidenceScore 100.0)}}%){{end}}</span>
           {{else if eq .ReviewType "manual"}}
-          <span class="badge badge-neutral badge-sm">Manual</span>
+          <span class="badge badge-soft badge-neutral badge-sm">Manual</span>
+          {{end}}
+          {{if .Provider}}
+          <span class="badge badge-ghost badge-xs uppercase">{{.Provider}}</span>
           {{end}}
           {{if eq .Status "approved"}}
           <span class="badge badge-success badge-sm">Approved</span>
@@ -119,54 +139,54 @@
           <span class="badge badge-ghost badge-sm">Skipped</span>
           {{end}}
         </div>
-        <span class="text-xs text-base-content/50">{{.CreatedAt}}</span>
+        <span class="text-xs text-base-content/50">{{relativeTime .CreatedAt}}</span>
       </div>
 
       <!-- Transaction info -->
       {{if .Transaction}}
-      <div class="flex items-start justify-between mb-3 gap-3">
+      <div class="flex items-start justify-between mt-2 gap-3">
         <div class="min-w-0">
           <a href="/admin/transactions/{{.TransactionID}}" class="font-semibold link link-hover">{{.Transaction.Name}}</a>
           {{if .Transaction.MerchantName}}<div class="text-sm text-base-content/70">{{.Transaction.MerchantName}}</div>{{end}}
-          <div class="text-xs text-base-content/50">
+          <div class="text-xs text-base-content/50 mt-0.5">
             {{if .Transaction.AccountName}}{{.Transaction.AccountName}}{{end}}
             {{if .Transaction.UserName}} &middot; {{.Transaction.UserName}}{{end}}
           </div>
         </div>
         <div class="text-right flex-shrink-0">
-          <div class="font-mono font-semibold bb-amount{{if lt .Transaction.Amount 0.0}} text-error{{end}}">
+          <div class="font-mono font-semibold text-base bb-amount{{if lt .Transaction.Amount 0.0}} text-error{{end}}">
             {{printf "%.2f" .Transaction.Amount}}
-            {{if .Transaction.IsoCurrencyCode}}{{.Transaction.IsoCurrencyCode}}{{end}}
+            <span class="text-xs text-base-content/50 font-normal">{{if .Transaction.IsoCurrencyCode}}{{.Transaction.IsoCurrencyCode}}{{end}}</span>
           </div>
           <div class="text-xs text-base-content/50">{{.Transaction.Date}}</div>
         </div>
       </div>
 
-      <!-- Current/Suggested category -->
-      <div class="text-sm mb-3">
+      <!-- Category info -->
+      <div class="text-sm mt-2">
         {{if .SuggestedCategory}}
         <span class="text-base-content/70">Suggested:</span>
         <span class="font-medium">{{.SuggestedCategory}}</span>
         {{else if .Transaction.Category}}
-        <span class="text-base-content/70">Current:</span>
+        <span class="text-base-content/70">Category:</span>
         <span class="font-medium">{{.Transaction.Category.DisplayName}}</span>
         {{else}}
-        <span class="text-base-content/50">No category</span>
+        <span class="text-base-content/50 italic">No category assigned</span>
         {{end}}
       </div>
       {{end}}
 
       {{if eq .Status "pending"}}
       <!-- Action bar for pending reviews -->
-      <div class="border-t border-base-300 pt-3 mt-1">
+      <div class="border-t border-base-300 pt-3 mt-3">
         <div class="flex flex-wrap gap-3 items-end">
           <div class="form-control flex-1 min-w-[200px]">
-            <label class="label label-text text-xs py-0.5">Category</label>
-            <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', placeholder: 'No change', allowEmpty: true, emptyLabel: 'No change'})" @category-change="selectedCatId = $event.detail.id">
+            <label class="label label-text text-xs py-0.5">Assign category</label>
+            <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current'})" @category-change="selectedCatId = $event.detail.id">
               <button type="button" class="btn btn-sm btn-ghost gap-2 w-full justify-start border border-base-300" @click="openPicker()">
                 <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
                 <span x-text="displayLabel" class="text-sm truncate"></span>
-                <i data-lucide="chevron-down" class="w-3 h-3 ml-auto opacity-40"></i>
+                <svg class="w-3 h-3 ml-auto opacity-40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
               </button>
               <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false">
                 <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
@@ -189,33 +209,51 @@
             <label class="label label-text text-xs py-0.5">Note</label>
             <input type="text" class="input input-bordered input-sm w-full" placeholder="Optional note..." id="note-{{.ID}}">
           </div>
-          <div class="flex gap-2 flex-wrap">
-            <button class="btn btn-success btn-sm" :disabled="submitting"
+        </div>
+        <!-- Action buttons with descriptions -->
+        <div class="flex gap-2 flex-wrap mt-3">
+          <div class="tooltip tooltip-bottom" data-tip="Accept this transaction and apply the selected category">
+            <button class="btn btn-success btn-sm gap-1" :disabled="submitting"
               @click="submitReview('{{.ID}}', 'approved', selectedCatId)">
-              <span x-show="!submitting"><i data-lucide="check" class="w-3 h-3"></i> Approve</span>
+              <span x-show="!submitting" class="flex items-center gap-1">
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                Approve
+              </span>
               <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
             </button>
-            <button class="btn btn-error btn-sm" :disabled="submitting"
+          </div>
+          <div class="tooltip tooltip-bottom" data-tip="Flag this transaction as incorrectly categorized">
+            <button class="btn btn-error btn-soft btn-sm gap-1" :disabled="submitting"
               @click="submitReview('{{.ID}}', 'rejected', selectedCatId)">
-              <span x-show="!submitting"><i data-lucide="x" class="w-3 h-3"></i> Reject</span>
+              <span x-show="!submitting" class="flex items-center gap-1">
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                Reject
+              </span>
               <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
             </button>
-            <button class="btn btn-ghost btn-sm" :disabled="submitting"
+          </div>
+          <div class="tooltip tooltip-bottom" data-tip="Skip for now — review later">
+            <button class="btn btn-ghost btn-sm gap-1" :disabled="submitting"
               @click="submitReview('{{.ID}}', 'skipped', null)">
-              <span x-show="!submitting"><i data-lucide="arrow-right" class="w-3 h-3"></i> Skip</span>
+              <span x-show="!submitting" class="flex items-center gap-1">
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                Skip
+              </span>
               <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
             </button>
-            <button class="btn btn-ghost btn-sm text-base-content/50" :disabled="submitting"
+          </div>
+          <div class="tooltip tooltip-bottom" data-tip="Remove from review queue permanently">
+            <button class="btn btn-ghost btn-sm text-base-content/40" :disabled="submitting"
               @click="dismissReview('{{.ID}}')">
-              <i data-lucide="trash-2" class="w-3 h-3"></i>
+              <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
             </button>
           </div>
         </div>
       </div>
       {{else if .ReviewerName}}
       <!-- Resolved info -->
-      <div class="border-t border-base-300 pt-2 mt-1 text-xs text-base-content/50">
-        Reviewed by {{.ReviewerName}} {{if .ReviewedAt}} on {{.ReviewedAt}}{{end}}
+      <div class="border-t border-base-300 pt-2 mt-2 text-xs text-base-content/50">
+        Reviewed by {{.ReviewerName}} {{if .ReviewedAt}} &middot; {{relativeTime .ReviewedAt}}{{end}}
         {{if .ReviewNote}}<br>Note: {{.ReviewNote}}{{end}}
       </div>
       {{end}}
@@ -235,7 +273,7 @@
   {{else}}
   <div class="card bg-base-100 shadow border border-base-300">
     <div class="card-body items-center text-center py-12">
-      <i data-lucide="check-circle-2" class="w-12 h-12 text-success mb-2"></i>
+      <svg class="w-12 h-12 text-success mb-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
       <h2 class="card-title text-lg">All caught up!</h2>
       <p class="text-base-content/70">No {{.StatusFilter}} reviews to show.</p>
     </div>
