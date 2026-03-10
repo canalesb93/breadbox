@@ -1481,3 +1481,42 @@ func formatUUID(u pgtype.UUID) string {
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
 		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
+
+// --- Connection Deletion Soft-Deletes Transactions ---
+
+func TestSoftDeleteTransactionsByConnectionID(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	// Create two connections with accounts and transactions.
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn1 := testutil.MustCreateConnection(t, queries, user.ID, "item_del_1")
+	conn2 := testutil.MustCreateConnection(t, queries, user.ID, "item_del_2")
+	acct1 := testutil.MustCreateAccount(t, queries, conn1.ID, "ext_acct_1", "Checking")
+	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_acct_2", "Savings")
+
+	testutil.MustCreateTransaction(t, queries, acct1.ID, "txn_c1_a", "Coffee", 5, "2025-01-15")
+	testutil.MustCreateTransaction(t, queries, acct1.ID, "txn_c1_b", "Lunch", 15, "2025-01-16")
+	testutil.MustCreateTransaction(t, queries, acct2.ID, "txn_c2_a", "Groceries", 50, "2025-01-15")
+
+	// Soft-delete transactions for connection 1 only.
+	deleted, err := queries.SoftDeleteTransactionsByConnectionID(ctx, conn1.ID)
+	if err != nil {
+		t.Fatalf("soft delete by connection: %v", err)
+	}
+	if deleted != 2 {
+		t.Fatalf("expected 2 deleted, got %d", deleted)
+	}
+
+	// Only connection 2's transaction should remain visible.
+	result, err := svc.ListTransactions(ctx, service.TransactionListParams{})
+	if err != nil {
+		t.Fatalf("list transactions: %v", err)
+	}
+	if len(result.Transactions) != 1 {
+		t.Fatalf("expected 1 visible transaction, got %d", len(result.Transactions))
+	}
+	if result.Transactions[0].Name != "Groceries" {
+		t.Errorf("expected Groceries, got %s", result.Transactions[0].Name)
+	}
+}
