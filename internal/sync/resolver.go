@@ -66,11 +66,3 @@ func (r *CategoryResolver) Resolve(provider string, detailed, primary *string) p
 	return r.uncategorizedID
 }
 
-// ResolveTeller looks up a category ID using the raw Teller category string.
-// Teller has a flat namespace, so we only check one key.
-func (r *CategoryResolver) ResolveTeller(rawCategory string) pgtype.UUID {
-	if id, ok := r.mappings["teller:"+rawCategory]; ok {
-		return id
-	}
-	return r.uncategorizedID
-}

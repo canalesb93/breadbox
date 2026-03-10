@@ -407,6 +407,273 @@ func TestSoftDeletedTransactions_NotReturned(t *testing.T) {
 	}
 }
 
+// --- Category Mapping Re-Resolution ---
+
+func TestCreateMapping_ReResolvesUncategorizedTransactions(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	// Seed the uncategorized category (truncated between tests).
+	uncategorized, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "uncategorized", DisplayName: "Uncategorized", IsSystem: true,
+	})
+	if err != nil {
+		t.Fatalf("seed uncategorized: %v", err)
+	}
+
+	// Create a target category for the mapping.
+	groceries, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink_groceries", DisplayName: "Groceries",
+	})
+	if err != nil {
+		t.Fatalf("create groceries category: %v", err)
+	}
+
+	// Create user → connection → account.
+	acctID := seedTxnFixture(t, queries)
+
+	// Create a transaction with category_detailed that is currently uncategorized.
+	_, err = queries.UpsertTransaction(ctx, db.UpsertTransactionParams{
+		AccountID:             acctID,
+		ExternalTransactionID: "txn_grocery",
+		Amount:                pgtype.Numeric{Int: big.NewInt(2500), Exp: -2, Valid: true},
+		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
+		Date:                  pgtype.Date{Time: testutil.MustParseDate("2025-01-15"), Valid: true},
+		Name:                  "Whole Foods",
+		CategoryPrimary:       pgtype.Text{String: "FOOD_AND_DRINK", Valid: true},
+		CategoryDetailed:      pgtype.Text{String: "FOOD_AND_DRINK_GROCERIES", Valid: true},
+		CategoryID:            uncategorized.ID, // starts as uncategorized
+	})
+	if err != nil {
+		t.Fatalf("create transaction: %v", err)
+	}
+
+	// Verify it shows as unmapped.
+	unmapped, err := svc.ListUnmappedCategories(ctx)
+	if err != nil {
+		t.Fatalf("list unmapped: %v", err)
+	}
+	if len(unmapped) != 1 {
+		t.Fatalf("expected 1 unmapped category, got %d", len(unmapped))
+	}
+
+	// Now create a mapping for FOOD_AND_DRINK_GROCERIES → groceries.
+	_, err = svc.CreateMapping(ctx, "plaid", "FOOD_AND_DRINK_GROCERIES", formatUUID(groceries.ID))
+	if err != nil {
+		t.Fatalf("create mapping: %v", err)
+	}
+
+	// The transaction should now be re-resolved: no longer uncategorized.
+	unmapped, err = svc.ListUnmappedCategories(ctx)
+	if err != nil {
+		t.Fatalf("list unmapped after mapping: %v", err)
+	}
+	if len(unmapped) != 0 {
+		t.Errorf("expected 0 unmapped categories after mapping, got %d", len(unmapped))
+	}
+
+	// Verify the transaction now has the groceries category_id.
+	var gotCategoryID pgtype.UUID
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_grocery'",
+	).Scan(&gotCategoryID)
+	if err != nil {
+		t.Fatalf("query transaction category: %v", err)
+	}
+	if gotCategoryID != groceries.ID {
+		t.Errorf("expected category_id %v, got %v", groceries.ID, gotCategoryID)
+	}
+
+	// Ensure overridden transactions are NOT re-resolved.
+	_, err = queries.UpsertTransaction(ctx, db.UpsertTransactionParams{
+		AccountID:             acctID,
+		ExternalTransactionID: "txn_override",
+		Amount:                pgtype.Numeric{Int: big.NewInt(1000), Exp: -2, Valid: true},
+		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
+		Date:                  pgtype.Date{Time: testutil.MustParseDate("2025-01-16"), Valid: true},
+		Name:                  "Override Txn",
+		CategoryPrimary:       pgtype.Text{String: "FOOD_AND_DRINK", Valid: true},
+		CategoryDetailed:      pgtype.Text{String: "FOOD_AND_DRINK_COFFEE", Valid: true},
+		CategoryID:            uncategorized.ID,
+	})
+	if err != nil {
+		t.Fatalf("create override txn: %v", err)
+	}
+	// Set override flag.
+	pool.Exec(ctx, "UPDATE transactions SET category_override = TRUE WHERE external_transaction_id = 'txn_override'")
+
+	// Create mapping for FOOD_AND_DRINK_COFFEE → groceries (reuse category).
+	_, err = svc.CreateMapping(ctx, "plaid", "FOOD_AND_DRINK_COFFEE", formatUUID(groceries.ID))
+	if err != nil {
+		t.Fatalf("create mapping for coffee: %v", err)
+	}
+
+	// Overridden transaction should still be uncategorized.
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_override'",
+	).Scan(&gotCategoryID)
+	if err != nil {
+		t.Fatalf("query override txn category: %v", err)
+	}
+	if gotCategoryID != uncategorized.ID {
+		t.Errorf("overridden transaction should keep uncategorized, got %v", gotCategoryID)
+	}
+}
+
+// --- Teller Category Mapping ---
+
+// seedTellerTxnFixture creates user → teller connection → account and returns the account ID.
+func seedTellerTxnFixture(t *testing.T, queries *db.Queries) pgtype.UUID {
+	t.Helper()
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateTellerConnection(t, queries, user.ID, "teller_item_1")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "teller_acct_1", "Teller Checking")
+	return acct.ID
+}
+
+func TestCreateMapping_ReResolvesTellerRawCategories(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	// Seed categories.
+	uncategorized, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "uncategorized", DisplayName: "Uncategorized", IsSystem: true,
+	})
+	if err != nil {
+		t.Fatalf("seed uncategorized: %v", err)
+	}
+	groceries, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink_groceries", DisplayName: "Groceries",
+	})
+	if err != nil {
+		t.Fatalf("create groceries: %v", err)
+	}
+
+	acctID := seedTellerTxnFixture(t, queries)
+
+	// Create a Teller transaction with raw category in category_primary (as the fixed provider does).
+	_, err = queries.UpsertTransaction(ctx, db.UpsertTransactionParams{
+		AccountID:             acctID,
+		ExternalTransactionID: "teller_txn_grocery",
+		Amount:                pgtype.Numeric{Int: big.NewInt(2500), Exp: -2, Valid: true},
+		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
+		Date:                  pgtype.Date{Time: testutil.MustParseDate("2025-01-15"), Valid: true},
+		Name:                  "Whole Foods",
+		CategoryPrimary:       pgtype.Text{String: "groceries", Valid: true}, // raw Teller category
+		CategoryID:            uncategorized.ID,
+	})
+	if err != nil {
+		t.Fatalf("create teller transaction: %v", err)
+	}
+
+	// Verify it shows as unmapped.
+	unmapped, err := svc.ListUnmappedCategories(ctx)
+	if err != nil {
+		t.Fatalf("list unmapped: %v", err)
+	}
+	if len(unmapped) != 1 {
+		t.Fatalf("expected 1 unmapped category, got %d", len(unmapped))
+	}
+	if unmapped[0].Provider != "teller" {
+		t.Errorf("expected provider teller, got %s", unmapped[0].Provider)
+	}
+
+	// Create mapping for the raw Teller category "groceries".
+	_, err = svc.CreateMapping(ctx, "teller", "groceries", formatUUID(groceries.ID))
+	if err != nil {
+		t.Fatalf("create mapping: %v", err)
+	}
+
+	// Transaction should now be resolved.
+	unmapped, err = svc.ListUnmappedCategories(ctx)
+	if err != nil {
+		t.Fatalf("list unmapped after mapping: %v", err)
+	}
+	if len(unmapped) != 0 {
+		t.Errorf("expected 0 unmapped categories after mapping, got %d", len(unmapped))
+	}
+
+	// Verify the transaction has the correct category_id.
+	var gotCategoryID pgtype.UUID
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'teller_txn_grocery'",
+	).Scan(&gotCategoryID)
+	if err != nil {
+		t.Fatalf("query transaction category: %v", err)
+	}
+	if gotCategoryID != groceries.ID {
+		t.Errorf("expected category_id %v, got %v", groceries.ID, gotCategoryID)
+	}
+}
+
+func TestListUnmappedCategories_TellerShowsRawCategoryStrings(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	// Seed uncategorized category.
+	uncategorized, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "uncategorized", DisplayName: "Uncategorized", IsSystem: true,
+	})
+	if err != nil {
+		t.Fatalf("seed uncategorized: %v", err)
+	}
+
+	acctID := seedTellerTxnFixture(t, queries)
+
+	// Create transactions with raw Teller categories.
+	for _, tc := range []struct {
+		extID, name, category string
+	}{
+		{"teller_txn_1", "Whole Foods", "groceries"},
+		{"teller_txn_2", "Chipotle", "dining"},
+		{"teller_txn_3", "Shell Gas", "fuel"},
+	} {
+		_, err = queries.UpsertTransaction(ctx, db.UpsertTransactionParams{
+			AccountID:             acctID,
+			ExternalTransactionID: tc.extID,
+			Amount:                pgtype.Numeric{Int: big.NewInt(1000), Exp: -2, Valid: true},
+			IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
+			Date:                  pgtype.Date{Time: testutil.MustParseDate("2025-01-15"), Valid: true},
+			Name:                  tc.name,
+			CategoryPrimary:       pgtype.Text{String: tc.category, Valid: true},
+			CategoryID:            uncategorized.ID,
+		})
+		if err != nil {
+			t.Fatalf("create transaction %s: %v", tc.extID, err)
+		}
+	}
+
+	unmapped, err := svc.ListUnmappedCategories(ctx)
+	if err != nil {
+		t.Fatalf("list unmapped: %v", err)
+	}
+	if len(unmapped) != 3 {
+		t.Fatalf("expected 3 unmapped categories, got %d", len(unmapped))
+	}
+
+	// All should show raw Teller category strings, not Plaid taxonomy.
+	rawCategories := make(map[string]bool)
+	for _, u := range unmapped {
+		if u.Provider != "teller" {
+			t.Errorf("expected provider teller, got %s", u.Provider)
+		}
+		if u.Primary != nil {
+			rawCategories[*u.Primary] = true
+		}
+	}
+	for _, expected := range []string{"groceries", "dining", "fuel"} {
+		if !rawCategories[expected] {
+			t.Errorf("expected raw Teller category %q in unmapped list", expected)
+		}
+	}
+	// Plaid-style values should NOT appear.
+	for _, plaidVal := range []string{"FOOD_AND_DRINK_GROCERIES", "FOOD_AND_DRINK_RESTAURANT", "TRANSPORTATION_GAS"} {
+		if rawCategories[plaidVal] {
+			t.Errorf("Plaid-style value %q should NOT appear in Teller unmapped categories", plaidVal)
+		}
+	}
+}
+
 // --- Helpers ---
 
 func formatUUID(u pgtype.UUID) string {

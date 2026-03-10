@@ -141,6 +141,22 @@ func MustCreateConnection(t *testing.T, q *db.Queries, userID pgtype.UUID, extID
 	return conn
 }
 
+// MustCreateTellerConnection creates an active Teller bank connection and fatals on error.
+func MustCreateTellerConnection(t *testing.T, q *db.Queries, userID pgtype.UUID, extID string) db.BankConnection {
+	t.Helper()
+	conn, err := q.CreateBankConnection(context.Background(), db.CreateBankConnectionParams{
+		Provider:             db.ProviderTypeTeller,
+		ExternalID:           pgtype.Text{String: extID, Valid: true},
+		EncryptedCredentials: []byte("test_encrypted"),
+		Status:               db.ConnectionStatusActive,
+		UserID:               userID,
+	})
+	if err != nil {
+		t.Fatalf("MustCreateTellerConnection(%q): %v", extID, err)
+	}
+	return conn
+}
+
 // MustCreateAccount creates an account and fatals on error.
 func MustCreateAccount(t *testing.T, q *db.Queries, connID pgtype.UUID, extID, name string) db.Account {
 	t.Helper()

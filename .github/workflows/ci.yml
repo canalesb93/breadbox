@@ -64,7 +64,7 @@ jobs:
       - name: Run integration tests
         env:
           DATABASE_URL: postgres://breadbox:breadbox@localhost:5432/breadbox_test?sslmode=disable
-        run: go test -tags integration -count=1 ./...
+        run: go test -tags integration -count=1 -p 1 ./...
 
   build:
     name: Build & Push
