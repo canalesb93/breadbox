@@ -9,7 +9,6 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/db"
 	"breadbox/internal/service"
-	"breadbox/internal/webhook"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -263,7 +262,7 @@ func ReviewSettingsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateR
 func ReviewInstructionsSaveHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			SetFlash(r.Context(), sm, Flash{Type: "error", Message: "Invalid form data."})
+			SetFlash(r.Context(), sm, "error", "Invalid form data.")
 			http.Redirect(w, r, "/admin/reviews/settings", http.StatusSeeOther)
 			return
 		}
@@ -272,9 +271,9 @@ func ReviewInstructionsSaveHandler(a *app.App, sm *scs.SessionManager, svc *serv
 		templateSlug := r.FormValue("template")
 
 		if err := svc.SaveReviewInstructions(r.Context(), instructions, templateSlug); err != nil {
-			SetFlash(r.Context(), sm, Flash{Type: "error", Message: "Failed to save instructions: " + err.Error()})
+			SetFlash(r.Context(), sm, "error", "Failed to save instructions: " + err.Error())
 		} else {
-			SetFlash(r.Context(), sm, Flash{Type: "success", Message: "Review instructions saved."})
+			SetFlash(r.Context(), sm, "success", "Review instructions saved.")
 		}
 
 		http.Redirect(w, r, "/admin/reviews/settings", http.StatusSeeOther)
@@ -285,7 +284,7 @@ func ReviewInstructionsSaveHandler(a *app.App, sm *scs.SessionManager, svc *serv
 func ReviewWebhookSaveHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			SetFlash(r.Context(), sm, Flash{Type: "error", Message: "Invalid form data."})
+			SetFlash(r.Context(), sm, "error", "Invalid form data.")
 			http.Redirect(w, r, "/admin/reviews/settings", http.StatusSeeOther)
 			return
 		}
@@ -311,13 +310,13 @@ func ReviewWebhookSaveHandler(a *app.App, sm *scs.SessionManager, svc *service.S
 
 		result, err := svc.SaveWebhookConfig(r.Context(), cfg)
 		if err != nil {
-			SetFlash(r.Context(), sm, Flash{Type: "error", Message: "Failed to save webhook: " + err.Error()})
+			SetFlash(r.Context(), sm, "error", "Failed to save webhook: " + err.Error())
 		} else {
 			msg := "Webhook configuration saved."
 			if result.Secret != "" {
 				msg += " New secret generated."
 			}
-			SetFlash(r.Context(), sm, Flash{Type: "success", Message: msg})
+			SetFlash(r.Context(), sm, "success", msg)
 		}
 
 		http.Redirect(w, r, "/admin/reviews/settings", http.StatusSeeOther)
@@ -337,9 +336,7 @@ func ReviewWebhookTestHandler(a *app.App, svc *service.Service) http.HandlerFunc
 			return
 		}
 
-		// Create a temporary dispatcher for testing
-		disp := webhook.NewDispatcher(a.Queries, a.DB, a.Logger, a.Config.Version)
-		result, err := disp.SendTestWebhook(ctx, webhookURL, webhookSecret)
+		result, err := a.WebhookDispatcher.SendTestWebhook(ctx, webhookURL, webhookSecret)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 			return

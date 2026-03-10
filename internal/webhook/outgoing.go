@@ -21,6 +21,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Webhook event types.
+const EventReviewItemsAdded = "review_items_added"
+
+// Webhook delivery statuses.
+const (
+	DeliveryStatusPending = "pending"
+	DeliveryStatusSuccess = "success"
+	DeliveryStatusFailed  = "failed"
+)
+
 // Retry intervals for failed webhook deliveries.
 var retryIntervals = []time.Duration{
 	30 * time.Second,
@@ -56,7 +66,7 @@ func NewDispatcher(queries *db.Queries, pool *pgxpool.Pool, logger *slog.Logger,
 }
 
 // Enqueue creates a new delivery record and triggers async delivery.
-func (d *Dispatcher) Enqueue(ctx context.Context, event string, payload any, webhookURL string, webhookSecret string) error {
+func (d *Dispatcher) Enqueue(ctx context.Context, event string, payload any, webhookURL string) error {
 	if webhookURL == "" {
 		return nil // webhooks not configured, skip silently
 	}
@@ -173,7 +183,7 @@ func (d *Dispatcher) processDelivery(ctx context.Context, delivery db.WebhookDel
 		logger.Info("webhook delivered", "status", resp.StatusCode, "attempt", delivery.Attempts+1)
 		d.queries.UpdateWebhookDeliveryAttempt(ctx, db.UpdateWebhookDeliveryAttemptParams{
 			ID:             delivery.ID,
-			Status:         "success",
+			Status:         DeliveryStatusSuccess,
 			NextRetryAt:    pgtype.Timestamptz{},
 			ResponseStatus: pgtype.Int4{Int32: int32(resp.StatusCode), Valid: true},
 			ResponseBody:   pgtype.Text{String: respBodyStr, Valid: respBodyStr != ""},
@@ -198,7 +208,7 @@ func (d *Dispatcher) scheduleRetryOrFail(ctx context.Context, delivery db.Webhoo
 	nextRetry := time.Now().Add(retryIntervals[attempt])
 	d.queries.UpdateWebhookDeliveryAttempt(ctx, db.UpdateWebhookDeliveryAttemptParams{
 		ID:             delivery.ID,
-		Status:         "pending",
+		Status:         DeliveryStatusPending,
 		NextRetryAt:    pgtype.Timestamptz{Time: nextRetry, Valid: true},
 		ResponseStatus: pgtype.Int4{Int32: int32(statusCode), Valid: statusCode > 0},
 		ResponseBody:   pgtype.Text{String: respBody, Valid: respBody != ""},
@@ -214,7 +224,7 @@ func (d *Dispatcher) markFailed(ctx context.Context, delivery db.WebhookDelivery
 
 	d.queries.UpdateWebhookDeliveryAttempt(ctx, db.UpdateWebhookDeliveryAttemptParams{
 		ID:             delivery.ID,
-		Status:         "failed",
+		Status:         DeliveryStatusFailed,
 		NextRetryAt:    pgtype.Timestamptz{},
 		ResponseStatus: pgtype.Int4{Int32: int32(statusCode), Valid: statusCode > 0},
 		ResponseBody:   pgtype.Text{String: respBody, Valid: respBody != ""},

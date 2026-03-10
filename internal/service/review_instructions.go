@@ -16,7 +16,8 @@ import (
 const maxReviewInstructionsLength = 20000
 
 // GetReviewInstructions returns the current review instructions with template variables expanded.
-func (s *Service) GetReviewInstructions(ctx context.Context) (string, error) {
+// If pendingCount is non-nil, it is used instead of querying CountPendingReviews.
+func (s *Service) GetReviewInstructions(ctx context.Context, pendingCount ...int64) (string, error) {
 	raw, _, err := s.GetReviewInstructionsRaw(ctx)
 	if err != nil {
 		return "", err
@@ -24,7 +25,11 @@ func (s *Service) GetReviewInstructions(ctx context.Context) (string, error) {
 	if raw == "" {
 		return "No custom review instructions configured. Review each transaction and approve, reject, or skip based on your judgment.", nil
 	}
-	return s.expandReviewVariables(ctx, raw), nil
+	var pc *int64
+	if len(pendingCount) > 0 {
+		pc = &pendingCount[0]
+	}
+	return s.expandReviewVariables(ctx, raw, pc), nil
 }
 
 // GetReviewInstructionsRaw returns the raw instructions (not expanded) and template slug for editing.
@@ -61,11 +66,18 @@ func (s *Service) SaveReviewInstructions(ctx context.Context, instructions strin
 }
 
 // expandReviewVariables replaces {{variable}} tokens in review instructions with live data.
-func (s *Service) expandReviewVariables(ctx context.Context, raw string) string {
+// If cachedPendingCount is non-nil, it is used instead of querying the database.
+func (s *Service) expandReviewVariables(ctx context.Context, raw string, cachedPendingCount *int64) string {
 	// Total pending count
-	count, err := s.Queries.CountPendingReviews(ctx)
-	if err != nil {
-		count = 0
+	var count int64
+	if cachedPendingCount != nil {
+		count = *cachedPendingCount
+	} else {
+		var err error
+		count, err = s.Queries.CountPendingReviews(ctx)
+		if err != nil {
+			count = 0
+		}
 	}
 	raw = strings.ReplaceAll(raw, "{{total_pending}}", fmt.Sprintf("%d", count))
 
@@ -109,13 +121,6 @@ type WebhookConfig struct {
 	Secret           string   `json:"secret,omitempty"`
 	Events           []string `json:"events"`
 	SecretConfigured bool     `json:"secret_configured"`
-}
-
-// TestWebhookResult represents the result of a test webhook delivery.
-type TestWebhookResult struct {
-	Success        bool `json:"success"`
-	StatusCode     int  `json:"status_code"`
-	ResponseTimeMs int  `json:"response_time_ms"`
 }
 
 // GetWebhookConfig returns the current outgoing webhook configuration.

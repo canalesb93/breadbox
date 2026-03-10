@@ -20,6 +20,7 @@ import (
 	"breadbox/internal/service"
 	"breadbox/internal/sync"
 	versionpkg "breadbox/internal/version"
+	"breadbox/internal/webhook"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -191,7 +192,6 @@ func runServe() error {
 		if webhookURL == "" {
 			return
 		}
-		webhookSecret, _ := a.Service.GetWebhookSecret(webhookCtx)
 
 		// Look up institution name for the payload.
 		var institutionName string
@@ -203,7 +203,7 @@ func runServe() error {
 		}
 
 		payload := map[string]any{
-			"event":     "review_items_added",
+			"event":     webhook.EventReviewItemsAdded,
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
 			"data": map[string]any{
 				"count":            count,
@@ -213,7 +213,7 @@ func runServe() error {
 			},
 		}
 
-		if err := a.WebhookDispatcher.Enqueue(webhookCtx, "review_items_added", payload, webhookURL, webhookSecret); err != nil {
+		if err := a.WebhookDispatcher.Enqueue(webhookCtx, webhook.EventReviewItemsAdded, payload, webhookURL); err != nil {
 			logger.Error("enqueue review webhook", "error", err)
 		}
 	}

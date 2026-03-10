@@ -62,12 +62,6 @@ REVIEW QUEUE:
 - Decisions: approve (suggested category is correct), reject (provide override_category_slug), skip (unsure)
 - Always include a comment explaining your reasoning
 - Check the review instructions carefully — they contain household-specific context
-
-TRANSACTION REVIEW:
-- Use review_transactions to fetch pending items with instructions
-- Submit decisions with submit_review — always include a comment
-- Decisions: approve (suggested category is correct), reject (provide override_category_slug), skip (unsure)
-- Check the review instructions carefully — they contain household-specific context
 - Use get_transaction_history and list_transaction_comments to understand past decisions before reviewing`
 
 // ToolClassification indicates whether a tool is read-only or performs writes.

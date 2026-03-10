@@ -677,7 +677,7 @@ Only one pending review per transaction at a time.
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
 | `id` | `UUID` | No | `gen_random_uuid()` | Primary key. |
-| `event_type` | `TEXT` | No | — | Type of event: `review_items_added`. |
+| `event` | `TEXT` | No | — | Type of event: `review_items_added`. |
 | `payload` | `JSONB` | No | — | JSON payload sent to the webhook URL. |
 | `url` | `TEXT` | No | — | Target webhook URL at time of dispatch. |
 | `status` | `TEXT` | No | `'pending'` | Delivery status: `pending`, `success`, `failed`. |
@@ -688,7 +688,7 @@ Only one pending review per transaction at a time.
 | `response_body` | `TEXT` | Yes | `NULL` | Truncated response body from the last attempt. |
 | `error_message` | `TEXT` | Yes | `NULL` | Error message if the delivery failed (e.g., connection refused). |
 | `created_at` | `TIMESTAMPTZ` | No | `NOW()` | When the delivery was enqueued. |
-| `completed_at` | `TIMESTAMPTZ` | Yes | `NULL` | When the delivery reached a terminal state (success or final failure). |
+| `delivery_id` | `UUID` | No | — | Unique delivery UUID for idempotency and tracking in webhook headers. |
 
 #### Primary Key
 

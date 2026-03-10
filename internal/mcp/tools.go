@@ -625,8 +625,6 @@ func (s *MCPServer) handleReviewTransactions(_ context.Context, _ *mcpsdk.CallTo
 	}
 	if result.ReviewInstructions != nil {
 		response["instructions"] = *result.ReviewInstructions
-	} else {
-		response["instructions"] = "No custom review instructions configured. Review each transaction and approve, reject, or skip based on your judgment."
 	}
 
 	return jsonResult(response)

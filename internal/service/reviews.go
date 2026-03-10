@@ -949,7 +949,7 @@ func (s *Service) ListPendingReviews(ctx context.Context, params PendingReviewPa
 
 	// Include instructions if requested
 	if params.IncludeInstructions {
-		instructions, err := s.GetReviewInstructions(ctx)
+		instructions, err := s.GetReviewInstructions(ctx, totalPending)
 		if err == nil {
 			result.ReviewInstructions = &instructions
 		}
