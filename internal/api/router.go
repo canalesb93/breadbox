@@ -60,6 +60,8 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/transactions/{id}/audit-log", ListTransactionAuditLogHandler(svc))
 		r.Get("/reviews", ListReviewsHandler(svc))
 		r.Get("/reviews/counts", ReviewCountsHandler(svc))
+		r.Get("/reviews/pending", ListPendingReviewsHandler(svc))
+		r.Get("/reviews/instructions", GetReviewInstructionsHandler(svc))
 		r.Get("/reviews/{id}", GetReviewHandler(svc))
 
 		// Write endpoints — full_access API keys only.
@@ -79,6 +81,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Delete("/transactions/{transaction_id}/comments/{id}", DeleteCommentHandler(svc))
 			r.Post("/reviews/{id}/submit", SubmitReviewHandler(svc))
 			r.Post("/reviews/bulk", BulkSubmitReviewsHandler(svc))
+			r.Post("/reviews/submit", SubmitReviewsHandler(svc))
 			r.Post("/reviews/enqueue", EnqueueReviewHandler(svc))
 			r.Delete("/reviews/{id}", DismissReviewHandler(svc))
 		})

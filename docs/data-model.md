@@ -41,6 +41,8 @@ This document defines the complete PostgreSQL database schema for the Breadbox M
 | `sync_logs` | Immutable audit trail of every sync operation attempt. |
 | `api_keys` | Hashed API keys for REST API and MCP access. |
 | `app_config` | Key-value store for runtime configuration set during the first-run setup wizard. |
+| `review_queue` | Queue for human or agent review of transactions. Auto-enqueued during sync or manually created. |
+| `webhook_deliveries` | Audit log for outgoing webhook delivery attempts with retry tracking. |
 
 ### 1.2 Entity Relationship Diagram
 
@@ -605,6 +607,11 @@ The following keys are seeded during initial migration and used by the applicati
 | `setup_complete` | `false` | Whether the first-run setup wizard has been completed. |
 | `review_auto_enqueue` | `true` | When true, sync auto-enqueues transactions for review. |
 | `review_confidence_threshold` | `0.5` | Category confidence below this value triggers low_confidence review. Range 0.0–1.0. |
+| `review_webhook_url` | `(empty)` | HTTPS URL for outgoing webhook notifications when review items are added. |
+| `review_webhook_secret` | `(empty)` | HMAC-SHA256 secret for signing outgoing webhook payloads. |
+| `review_webhook_events` | `["review_items_added"]` | JSON array of event types to send via webhook. |
+| `review_instructions` | `(empty)` | Custom instructions included in review responses for external agents. Max 20,000 chars. |
+| `review_instruction_template` | `(empty)` | Name of the built-in template used for review instructions. Templates defined in `internal/service/review_templates.go`. |
 
 ---
 
@@ -658,6 +665,46 @@ Only one pending review per transaction at a time.
 | `review_queue_pending_unique_idx` | `transaction_id` | Partial unique (WHERE status='pending') | Enforce single pending review per transaction. |
 | `review_queue_status_created_idx` | `status, created_at` | B-tree | List pending reviews in FIFO order; filter by status. |
 | `review_queue_transaction_id_idx` | `transaction_id` | B-tree | Look up reviews for a specific transaction. |
+
+---
+
+### 2.10 `webhook_deliveries`
+
+**Purpose:** Audit log for outgoing webhook delivery attempts. Tracks each attempt to notify external systems (e.g., when review items are added). Supports retry logic and 7-day retention with hourly cleanup.
+
+#### Columns
+
+| Column | Type | Nullable | Default | Description |
+|---|---|---|---|---|
+| `id` | `UUID` | No | `gen_random_uuid()` | Primary key. |
+| `event_type` | `TEXT` | No | — | Type of event: `review_items_added`. |
+| `payload` | `JSONB` | No | — | JSON payload sent to the webhook URL. |
+| `url` | `TEXT` | No | — | Target webhook URL at time of dispatch. |
+| `status` | `TEXT` | No | `'pending'` | Delivery status: `pending`, `success`, `failed`. |
+| `attempts` | `INTEGER` | No | `0` | Number of delivery attempts made. |
+| `last_attempt_at` | `TIMESTAMPTZ` | Yes | `NULL` | Timestamp of the most recent delivery attempt. |
+| `next_retry_at` | `TIMESTAMPTZ` | Yes | `NULL` | When to retry next. NULL if no more retries. |
+| `response_status` | `INTEGER` | Yes | `NULL` | HTTP response status code from the last attempt. |
+| `response_body` | `TEXT` | Yes | `NULL` | Truncated response body from the last attempt. |
+| `error_message` | `TEXT` | Yes | `NULL` | Error message if the delivery failed (e.g., connection refused). |
+| `created_at` | `TIMESTAMPTZ` | No | `NOW()` | When the delivery was enqueued. |
+| `completed_at` | `TIMESTAMPTZ` | Yes | `NULL` | When the delivery reached a terminal state (success or final failure). |
+
+#### Primary Key
+
+`id`
+
+#### Foreign Keys
+
+None.
+
+#### Indexes
+
+| Index | Columns | Type | Rationale |
+|---|---|---|---|
+| `webhook_deliveries_pkey` | `id` | B-tree (implicit PK) | Primary key lookup. |
+| `webhook_deliveries_status_next_retry_idx` | `status, next_retry_at` | B-tree | Find pending deliveries due for retry. |
+| `webhook_deliveries_created_at_idx` | `created_at` | B-tree | 7-day retention cleanup queries. |
 
 ---
 

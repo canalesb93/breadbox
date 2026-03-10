@@ -25,6 +25,11 @@ type Engine struct {
 	providers map[string]provider.Provider
 	logger    *slog.Logger
 	locks     gosync.Map // connection ID string -> *gosync.Mutex
+
+	// OnReviewsEnqueued is called after a successful sync that auto-enqueued
+	// review items. Called AFTER the DB transaction commits. The callback
+	// receives the count of newly enqueued reviews and the connection ID.
+	OnReviewsEnqueued func(ctx context.Context, count int, connectionID string)
 }
 
 // NewEngine creates a new sync engine.
@@ -159,6 +164,9 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 	// Account ID cache to avoid repeated lookups.
 	accountIDCache := make(map[string]pgtype.UUID)
 
+	// Track enqueued review count for post-commit webhook notification.
+	var reviewsEnqueued int
+
 	// Buffer writes so we can discard them on ErrMutationDuringPagination.
 	var pendingRemovals []string
 	var pendingAdded []provider.Transaction
@@ -235,7 +243,9 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				logger.Error("upsert added transaction", "external_id", pendingAdded[i].ExternalID, "error", err)
 			} else if reviewAutoEnqueue {
 				isNew := txnResult.CreatedAt.Time.Equal(txnResult.UpdatedAt.Time)
-				e.enqueueForReview(ctx, txQueries, txnResult, isNew, confidenceThreshold)
+				if e.enqueueForReview(ctx, txQueries, txnResult, isNew, confidenceThreshold) {
+					reviewsEnqueued++
+				}
 			}
 			added++
 		}
@@ -255,7 +265,9 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			if err != nil {
 				logger.Error("upsert modified transaction", "external_id", pendingModified[i].ExternalID, "error", err)
 			} else if reviewAutoEnqueue {
-				e.enqueueForReview(ctx, txQueries, txnResult, false, confidenceThreshold)
+				if e.enqueueForReview(ctx, txQueries, txnResult, false, confidenceThreshold) {
+					reviewsEnqueued++
+				}
 			}
 			modified++
 		}
@@ -294,6 +306,11 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			ID:     connectionID,
 			Status: db.ConnectionStatusActive,
 		})
+
+		// Fire webhook notification for enqueued reviews AFTER commit.
+		if reviewsEnqueued > 0 && e.OnReviewsEnqueued != nil {
+			e.OnReviewsEnqueued(ctx, reviewsEnqueued, formatUUID(connectionID))
+		}
 
 		break
 	}

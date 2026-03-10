@@ -170,6 +170,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/transaction_detail.html",
 		"pages/mcp_settings.html",
 		"pages/reviews.html",
+		"pages/review_settings.html",
 	}
 
 	// Pages using the wizard layout (login + first-run admin creation).

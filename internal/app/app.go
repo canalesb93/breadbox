@@ -14,6 +14,7 @@ import (
 	"breadbox/internal/service"
 	"breadbox/internal/sync"
 	"breadbox/internal/version"
+	"breadbox/internal/webhook"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -30,6 +31,7 @@ type App struct {
 	Service               *service.Service
 	Scheduler             *sync.Scheduler
 	VersionChecker        *version.Checker
+	WebhookDispatcher     *webhook.Dispatcher
 	DockerSocketAvailable bool
 }
 
@@ -75,14 +77,16 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*App, er
 
 	syncEngine := sync.NewEngine(queries, pool, providers, logger)
 	svc := service.New(queries, pool, syncEngine, logger)
+	webhookDispatcher := webhook.NewDispatcher(queries, pool, logger, cfg.Version)
 
 	return &App{
-		DB:         pool,
-		Queries:    queries,
-		Config:     cfg,
-		Logger:     logger,
-		Providers:  providers,
-		SyncEngine: syncEngine,
-		Service:    svc,
+		DB:                pool,
+		Queries:           queries,
+		Config:            cfg,
+		Logger:            logger,
+		Providers:         providers,
+		SyncEngine:        syncEngine,
+		Service:           svc,
+		WebhookDispatcher: webhookDispatcher,
 	}, nil
 }

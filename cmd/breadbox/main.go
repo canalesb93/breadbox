@@ -176,6 +176,55 @@ func runServe() error {
 	scheduler.Start(cfg.SyncIntervalMinutes)
 	a.Scheduler = scheduler
 
+	// Register hourly webhook delivery cleanup.
+	if err := scheduler.AddFunc("@hourly", func() {
+		if err := a.WebhookDispatcher.Cleanup(context.Background()); err != nil {
+			logger.Error("webhook cleanup", "error", err)
+		}
+	}); err != nil {
+		logger.Error("failed to add webhook cleanup cron job", "error", err)
+	}
+
+	// Wire webhook notification callback into the sync engine.
+	a.SyncEngine.OnReviewsEnqueued = func(webhookCtx context.Context, count int, connectionID string) {
+		webhookURL, _ := a.Service.GetWebhookURL(webhookCtx)
+		if webhookURL == "" {
+			return
+		}
+		webhookSecret, _ := a.Service.GetWebhookSecret(webhookCtx)
+
+		// Look up institution name for the payload.
+		var institutionName string
+		var connUUID pgtype.UUID
+		if err := connUUID.Scan(connectionID); err == nil {
+			if conn, err := a.Queries.GetBankConnection(webhookCtx, connUUID); err == nil {
+				institutionName = conn.InstitutionName.String
+			}
+		}
+
+		payload := map[string]any{
+			"event":     "review_items_added",
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+			"data": map[string]any{
+				"count":            count,
+				"source":           "sync",
+				"connection_id":    connectionID,
+				"institution_name": institutionName,
+			},
+		}
+
+		if err := a.WebhookDispatcher.Enqueue(webhookCtx, "review_items_added", payload, webhookURL, webhookSecret); err != nil {
+			logger.Error("enqueue review webhook", "error", err)
+		}
+	}
+
+	// Process any pending webhook deliveries from before restart.
+	go func() {
+		if err := a.WebhookDispatcher.ProcessPending(context.Background()); err != nil {
+			logger.Error("process pending webhooks on startup", "error", err)
+		}
+	}()
+
 	// Run startup sync for stale connections in background.
 	go scheduler.RunStartupSync(ctx, cfg.SyncIntervalMinutes)
 

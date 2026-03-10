@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
@@ -235,5 +236,112 @@ func DismissReviewHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// ListPendingReviewsHandler returns pending review items for external agent polling.
+// GET /api/v1/reviews/pending
+func ListPendingReviewsHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+
+		limit := 50
+		if v := q.Get("limit"); v != "" {
+			parsed, err := strconv.Atoi(v)
+			if err != nil || parsed < 1 || parsed > 200 {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "limit must be between 1 and 200")
+				return
+			}
+			limit = parsed
+		}
+
+		params := service.PendingReviewParams{
+			Limit:  limit,
+			Cursor: q.Get("cursor"),
+		}
+
+		if v := q.Get("account_id"); v != "" {
+			params.AccountID = &v
+		}
+		if v := q.Get("user_id"); v != "" {
+			params.UserID = &v
+		}
+		if v := q.Get("category_slug"); v != "" {
+			params.CategorySlug = &v
+		}
+		if v := q.Get("since"); v != "" {
+			t, err := time.Parse(time.RFC3339, v)
+			if err != nil {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "since must be ISO 8601 format")
+				return
+			}
+			params.Since = &t
+		}
+		if q.Get("include_instructions") == "true" {
+			params.IncludeInstructions = true
+		}
+
+		result, err := svc.ListPendingReviews(r.Context(), params)
+		if err != nil {
+			if errors.Is(err, service.ErrInvalidCursor) {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "Invalid cursor")
+				return
+			}
+			if errors.Is(err, service.ErrInvalidParameter) {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list pending reviews")
+			return
+		}
+
+		writeData(w, result)
+	}
+}
+
+// SubmitReviewsHandler processes a batch of review decisions.
+// POST /api/v1/reviews/submit
+func SubmitReviewsHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var input struct {
+			Reviews []service.ReviewDecision `json:"reviews"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+			return
+		}
+
+		actor := service.ActorFromContext(r.Context())
+
+		result, err := svc.SubmitReviews(r.Context(), input.Reviews, actor)
+		if err != nil {
+			if errors.Is(err, service.ErrInvalidParameter) {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to submit reviews")
+			return
+		}
+
+		writeData(w, result)
+	}
+}
+
+// GetReviewInstructionsHandler returns the current review instructions.
+// GET /api/v1/reviews/instructions
+func GetReviewInstructionsHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		instructions, err := svc.GetReviewInstructions(r.Context())
+		if err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get review instructions")
+			return
+		}
+
+		_, templateSlug, _ := svc.GetReviewInstructionsRaw(r.Context())
+
+		writeData(w, map[string]any{
+			"instructions": instructions,
+			"template":     templateSlug,
+		})
 	}
 }

@@ -382,3 +382,51 @@ type ReviewCountsResponse struct {
 	RejectedToday int64 `json:"rejected_today"`
 	SkippedToday  int64 `json:"skipped_today"`
 }
+
+// Phase 25: Pending review types for external agent polling
+
+type PendingReviewParams struct {
+	Limit               int
+	Cursor              string
+	AccountID           *string
+	UserID              *string
+	CategorySlug        *string
+	Since               *time.Time
+	IncludeInstructions bool
+}
+
+type PendingReviewResult struct {
+	Items              []PendingReviewItem `json:"items"`
+	ReviewInstructions *string             `json:"review_instructions,omitempty"`
+	NextCursor         string              `json:"next_cursor,omitempty"`
+	HasMore            bool                `json:"has_more"`
+	TotalPending       int64               `json:"total_pending"`
+}
+
+type PendingReviewItem struct {
+	ReviewID              string              `json:"review_id"`
+	TransactionID         string              `json:"transaction_id"`
+	Transaction           TransactionResponse `json:"transaction"`
+	ReviewType            string              `json:"review_type"`
+	SuggestedCategoryID   *string             `json:"suggested_category_id,omitempty"`
+	SuggestedCategorySlug *string             `json:"suggested_category_slug,omitempty"`
+	CreatedAt             string              `json:"created_at"`
+}
+
+type ReviewDecision struct {
+	ReviewID             string  `json:"review_id"`
+	Decision             string  `json:"decision"`
+	OverrideCategorySlug *string `json:"override_category_slug,omitempty"`
+	Comment              *string `json:"comment,omitempty"`
+}
+
+type SubmitReviewsResult struct {
+	Submitted int                    `json:"submitted"`
+	Results   []ReviewDecisionResult `json:"results"`
+}
+
+type ReviewDecisionResult struct {
+	ReviewID string `json:"review_id"`
+	Status   string `json:"status"`
+	Error    string `json:"error,omitempty"`
+}

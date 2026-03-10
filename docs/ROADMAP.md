@@ -2433,12 +2433,13 @@ The core review system — humans and agents review transactions through a unifi
 
 ---
 
-### Phase 25: Agentic Review — External Agent Support
+### Phase 25: Agentic Review — External Agent Support ✅
 
 Let users' own AI agents (via MCP or API) review transactions autonomously.
 
 - **Spec:** [`docs/phase-25-external-agents.md`](phase-25-external-agents.md)
 - **Key deliverables:** outgoing webhook notifications (HMAC-SHA256), polling endpoint, configurable review instructions, MCP review tools
+- **Completed:** Migration 00025 (webhook_deliveries table), outgoing webhook dispatcher (`internal/webhook/outgoing.go`) with HMAC-SHA256 signing and retry logic (3 retries: 30s/5m/30m), review instructions with template variables and built-in templates (`internal/service/review_templates.go`), external agent polling endpoint (`GET /api/v1/reviews/pending`), bulk submit endpoint (`POST /api/v1/reviews/submit`), MCP tools (`review_transactions` replacing `list_pending_reviews`, `submit_review` with batch support), review settings page (`/admin/reviews/settings`) with instructions editor and webhook config, 7-day delivery retention with hourly cleanup
 
 ---
 

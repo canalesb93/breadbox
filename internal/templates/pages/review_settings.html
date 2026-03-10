@@ -1,0 +1,211 @@
+{{define "content"}}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">Review Settings</h1>
+    <a href="/admin/reviews" class="btn btn-ghost btn-sm gap-2">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+        Back to Reviews
+    </a>
+</div>
+
+<!-- Review Instructions -->
+<div class="card bg-base-100 shadow-sm mb-6" x-data="reviewInstructions()">
+    <div class="card-body">
+        <h2 class="card-title text-lg">Review Instructions</h2>
+        <p class="text-sm text-base-content/60 mb-4">
+            Configure the instructions that reviewing agents receive with each batch of pending transactions.
+            Use template variables like <code>{{`{{total_pending}}`}}</code>, <code>{{`{{family_members}}`}}</code>, <code>{{`{{date_range_start}}`}}</code>, <code>{{`{{date_range_end}}`}}</code>.
+        </p>
+
+        <div class="form-control mb-4">
+            <label class="label">
+                <span class="label-text font-medium">Template</span>
+            </label>
+            <select class="select select-bordered w-full max-w-xs" x-model="selectedTemplate" @change="loadTemplate()">
+                <option value="">Custom</option>
+                <template x-for="t in templates" :key="t.slug">
+                    <option :value="t.slug" x-text="t.name" :selected="t.slug === currentTemplate"></option>
+                </template>
+            </select>
+        </div>
+
+        <form method="POST" action="/admin/reviews/settings/instructions">
+            <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+            <input type="hidden" name="template" :value="selectedTemplate">
+            <div class="form-control mb-2">
+                <textarea name="instructions" class="textarea textarea-bordered font-mono h-64"
+                    x-model="instructions" @input="updateCount()"
+                    placeholder="Enter review instructions in markdown..."></textarea>
+            </div>
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-base-content/60" x-text="charCount + '/20000 characters'"></span>
+                <button type="submit" class="btn btn-primary btn-sm">Save Instructions</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Webhook Notifications -->
+<div class="card bg-base-100 shadow-sm mb-6" x-data="webhookConfig()">
+    <div class="card-body">
+        <h2 class="card-title text-lg">Webhook Notifications</h2>
+        <p class="text-sm text-base-content/60 mb-4">
+            Send notifications to an external agent when new items enter the review queue.
+        </p>
+
+        <form method="POST" action="/admin/reviews/settings/webhook">
+            <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text font-medium">Webhook URL</span>
+                </label>
+                <input type="url" name="url" class="input input-bordered w-full"
+                    placeholder="https://agent.example.com/webhook"
+                    value="{{.WebhookURL}}">
+                <label class="label">
+                    <span class="label-text-alt">Must use HTTPS. Leave empty to disable webhooks.</span>
+                </label>
+            </div>
+
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text font-medium">Secret</span>
+                </label>
+                {{if .SecretConfigured}}
+                <div class="flex gap-2">
+                    <input type="text" class="input input-bordered w-full" value="••••••••••••••••••••••••••••••••" disabled>
+                    <label class="label cursor-pointer gap-2">
+                        <input type="checkbox" name="regenerate_secret" class="checkbox checkbox-sm">
+                        <span class="label-text text-sm">Regenerate</span>
+                    </label>
+                </div>
+                {{else}}
+                <input type="text" name="secret" class="input input-bordered w-full"
+                    placeholder="Auto-generated if left empty">
+                <label class="label">
+                    <span class="label-text-alt">Minimum 32 characters. Auto-generated if left empty.</span>
+                </label>
+                {{end}}
+            </div>
+
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text font-medium">Events</span>
+                </label>
+                <label class="label cursor-pointer justify-start gap-3">
+                    <input type="checkbox" name="events" value="review_items_added" class="checkbox checkbox-sm" checked>
+                    <span class="label-text">New review items added</span>
+                </label>
+            </div>
+
+            <div class="flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">Save Webhook</button>
+                <button type="button" class="btn btn-ghost btn-sm" @click="testWebhook()" :disabled="testing">
+                    <span x-show="!testing">Send Test</span>
+                    <span x-show="testing" class="loading loading-spinner loading-xs"></span>
+                </button>
+                <span x-show="testResult" x-text="testResult" class="text-sm self-center"
+                    :class="testSuccess ? 'text-success' : 'text-error'"></span>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Recent Deliveries -->
+{{if .Deliveries}}
+<div class="card bg-base-100 shadow-sm mb-6">
+    <div class="card-body">
+        <h2 class="card-title text-lg">Recent Deliveries</h2>
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Event</th>
+                        <th>Status</th>
+                        <th>Time</th>
+                        <th>HTTP Code</th>
+                        <th>Error</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Deliveries}}
+                    <tr>
+                        <td class="font-mono text-xs">{{.Event}}</td>
+                        <td>
+                            {{if eq .Status "success"}}
+                            <span class="badge badge-success badge-sm">success</span>
+                            {{else if eq .Status "failed"}}
+                            <span class="badge badge-error badge-sm">failed</span>
+                            {{else}}
+                            <span class="badge badge-warning badge-sm">pending</span>
+                            {{end}}
+                        </td>
+                        <td class="text-sm">{{relativeTime .CreatedAt}}</td>
+                        <td>{{if .ResponseStatus.Valid}}{{.ResponseStatus.Int32}}{{else}}—{{end}}</td>
+                        <td class="text-sm text-error max-w-xs truncate">{{if .ErrorMessage.Valid}}{{.ErrorMessage.String}}{{end}}</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{{end}}
+
+<script>
+function reviewInstructions() {
+    return {
+        instructions: {{toJSON .Instructions}},
+        selectedTemplate: {{toJSON .TemplateSlugs}},
+        currentTemplate: {{toJSON .TemplateSlugs}},
+        templates: {{toJSON .TemplatesJSON}},
+        charCount: 0,
+        init() {
+            this.charCount = this.instructions.length;
+        },
+        updateCount() {
+            this.charCount = this.instructions.length;
+        },
+        loadTemplate() {
+            if (this.selectedTemplate === '') return;
+            const template = this.templates.find(t => t.slug === this.selectedTemplate);
+            if (template && confirm('Load template? This will replace current instructions.')) {
+                this.instructions = template.content;
+                this.updateCount();
+            } else if (!template) {
+                this.selectedTemplate = this.currentTemplate;
+            }
+        }
+    }
+}
+
+function webhookConfig() {
+    return {
+        testing: false,
+        testResult: '',
+        testSuccess: false,
+        async testWebhook() {
+            this.testing = true;
+            this.testResult = '';
+            try {
+                const resp = await fetch('/admin/api/review-webhooks/test', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    this.testResult = `Success (${data.status_code}) in ${data.response_time_ms}ms`;
+                    this.testSuccess = true;
+                } else {
+                    this.testResult = data.error || `Failed (${data.status_code || 'network error'})`;
+                    this.testSuccess = false;
+                }
+            } catch (e) {
+                this.testResult = 'Request failed';
+                this.testSuccess = false;
+            }
+            this.testing = false;
+        }
+    }
+}
+</script>
+{{end}}

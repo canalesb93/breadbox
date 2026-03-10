@@ -69,6 +69,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/sync-logs", SyncLogsHandler(a, sm, tr, svc))
 
 		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
+		r.Get("/reviews/settings", ReviewSettingsPageHandler(a, sm, tr, svc))
+		r.Post("/reviews/settings/instructions", ReviewInstructionsSaveHandler(a, sm, svc))
+		r.Post("/reviews/settings/webhook", ReviewWebhookSaveHandler(a, sm, svc))
 
 		r.Get("/categories", CategoriesPageHandler(svc, sm, tr))
 		r.Get("/categories/mappings", MappingsPageHandler(svc, sm, tr))
@@ -144,6 +147,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/reviews/{id}/dismiss", DismissReviewAdminHandler(a, sm, svc))
 		r.Post("/reviews/enqueue", EnqueueReviewAdminHandler(a, sm, svc))
 		r.Post("/reviews/settings", ReviewSettingsHandler(a, sm))
+		r.Post("/review-webhooks/test", ReviewWebhookTestHandler(a, svc))
 	})
 
 	return r

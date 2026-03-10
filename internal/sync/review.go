@@ -30,11 +30,12 @@ func confidenceLevelToScore(level string) float64 {
 }
 
 // enqueueForReview adds a transaction to the review queue if it meets
-// criteria (uncategorized, low confidence, or new).
-func (e *Engine) enqueueForReview(ctx context.Context, txQueries *db.Queries, txnResult db.Transaction, isNew bool, confidenceThreshold float64) {
+// criteria (uncategorized, low confidence, or new). Returns true if a
+// review item was actually inserted (not a conflict/duplicate).
+func (e *Engine) enqueueForReview(ctx context.Context, txQueries *db.Queries, txnResult db.Transaction, isNew bool, confidenceThreshold float64) bool {
 	// Skip if transaction has category_override = true
 	if txnResult.CategoryOverride {
-		return
+		return false
 	}
 
 	reviewType := ""
@@ -55,7 +56,7 @@ func (e *Engine) enqueueForReview(ctx context.Context, txQueries *db.Queries, tx
 	}
 
 	if reviewType == "" {
-		return
+		return false
 	}
 
 	params := db.EnqueueReviewParams{
@@ -72,8 +73,10 @@ func (e *Engine) enqueueForReview(ctx context.Context, txQueries *db.Queries, tx
 		}
 	}
 
-	// ON CONFLICT DO NOTHING handles the unique pending constraint
-	_, _ = txQueries.EnqueueReview(ctx, params)
+	// ON CONFLICT DO NOTHING handles the unique pending constraint.
+	// EnqueueReview returns pgx.ErrNoRows on conflict (no RETURNING row).
+	_, err := txQueries.EnqueueReview(ctx, params)
+	return err == nil
 }
 
 // numericFromFloat converts a float64 to pgtype.Numeric.

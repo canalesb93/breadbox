@@ -716,3 +716,311 @@ func (s *Service) reviewFromRow(ctx context.Context, r db.ReviewQueue) ReviewRes
 
 	return resp
 }
+
+// ListPendingReviews returns pending review items for external agent polling.
+func (s *Service) ListPendingReviews(ctx context.Context, params PendingReviewParams) (*PendingReviewResult, error) {
+	limit := params.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	query := `SELECT rq.id, rq.transaction_id, rq.review_type,
+		rq.suggested_category_id, rq.confidence_score, rq.created_at,
+		sc.slug AS suggested_slug,
+		t.amount, t.iso_currency_code, t.date, t.name, t.merchant_name,
+		t.category_primary, t.category_detailed, t.pending, t.created_at AS t_created_at, t.updated_at AS t_updated_at,
+		t.account_id, COALESCE(a.display_name, a.name) AS account_name,
+		u.name AS user_name,
+		t.category_id, t.category_override,
+		c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, c.color AS cat_color,
+		pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name
+		FROM review_queue rq
+		JOIN transactions t ON rq.transaction_id = t.id
+		JOIN accounts a ON t.account_id = a.id
+		LEFT JOIN bank_connections bc ON a.connection_id = bc.id
+		LEFT JOIN users u ON bc.user_id = u.id
+		LEFT JOIN categories sc ON rq.suggested_category_id = sc.id
+		LEFT JOIN categories c ON t.category_id = c.id
+		LEFT JOIN categories pc ON c.parent_id = pc.id`
+
+	var args []any
+	argN := 1
+
+	query += " WHERE rq.status = 'pending' AND t.deleted_at IS NULL"
+
+	if params.AccountID != nil {
+		aid, err := parseUUID(*params.AccountID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid account_id: %w", err)
+		}
+		query += fmt.Sprintf(" AND t.account_id = $%d", argN)
+		args = append(args, aid)
+		argN++
+	}
+
+	if params.UserID != nil {
+		uid, err := parseUUID(*params.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid user_id: %w", err)
+		}
+		query += fmt.Sprintf(" AND bc.user_id = $%d", argN)
+		args = append(args, uid)
+		argN++
+	}
+
+	if params.CategorySlug != nil {
+		query += fmt.Sprintf(" AND sc.slug = $%d", argN)
+		args = append(args, *params.CategorySlug)
+		argN++
+	}
+
+	if params.Since != nil {
+		query += fmt.Sprintf(" AND rq.created_at > $%d", argN)
+		args = append(args, pgtype.Timestamptz{Time: *params.Since, Valid: true})
+		argN++
+	}
+
+	if params.Cursor != "" {
+		cursorTime, cursorIDStr, err := decodeTimestampCursor(params.Cursor)
+		if err != nil {
+			return nil, ErrInvalidCursor
+		}
+		cursorUUID, err := parseUUID(cursorIDStr)
+		if err != nil {
+			return nil, ErrInvalidCursor
+		}
+		query += fmt.Sprintf(" AND (rq.created_at, rq.id) > ($%d, $%d)", argN, argN+1)
+		args = append(args, pgtype.Timestamptz{Time: cursorTime, Valid: true}, cursorUUID)
+		argN += 2
+	}
+
+	query += " ORDER BY rq.created_at ASC, rq.id ASC"
+	query += fmt.Sprintf(" LIMIT $%d", argN)
+	args = append(args, limit+1)
+
+	rows, err := s.Pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query pending reviews: %w", err)
+	}
+	defer rows.Close()
+
+	type itemWithTime struct {
+		item PendingReviewItem
+		ts   time.Time
+	}
+	var allItems []itemWithTime
+
+	for rows.Next() {
+		var (
+			rID                   pgtype.UUID
+			rTransactionID        pgtype.UUID
+			rReviewType           string
+			rSuggestedCategoryID  pgtype.UUID
+			rConfidenceScore      pgtype.Numeric
+			rCreatedAt            pgtype.Timestamptz
+			suggestedSlug         pgtype.Text
+			tAmount               pgtype.Numeric
+			tIsoCurrencyCode      pgtype.Text
+			tDate                 pgtype.Date
+			tName                 string
+			tMerchantName         pgtype.Text
+			tCategoryPrimary      pgtype.Text
+			tCategoryDetailed     pgtype.Text
+			tPending              bool
+			tCreatedAt            pgtype.Timestamptz
+			tUpdatedAt            pgtype.Timestamptz
+			tAccountID            pgtype.UUID
+			accountName           string
+			userName              pgtype.Text
+			tCategoryID           pgtype.UUID
+			tCategoryOverride     bool
+			catSlug               pgtype.Text
+			catDisplayName        pgtype.Text
+			catIcon               pgtype.Text
+			catColor              pgtype.Text
+			catPrimarySlug        pgtype.Text
+			catPrimaryDisplayName pgtype.Text
+		)
+
+		if err := rows.Scan(
+			&rID, &rTransactionID, &rReviewType,
+			&rSuggestedCategoryID, &rConfidenceScore, &rCreatedAt,
+			&suggestedSlug,
+			&tAmount, &tIsoCurrencyCode, &tDate, &tName, &tMerchantName,
+			&tCategoryPrimary, &tCategoryDetailed, &tPending, &tCreatedAt, &tUpdatedAt,
+			&tAccountID, &accountName, &userName,
+			&tCategoryID, &tCategoryOverride,
+			&catSlug, &catDisplayName, &catIcon, &catColor,
+			&catPrimarySlug, &catPrimaryDisplayName,
+		); err != nil {
+			return nil, fmt.Errorf("scan pending review: %w", err)
+		}
+
+		amountVal := 0.0
+		if f := numericFloat(tAmount); f != nil {
+			amountVal = *f
+		}
+		var dateVal string
+		if ds := dateStr(tDate); ds != nil {
+			dateVal = *ds
+		}
+
+		var catInfo *TransactionCategoryInfo
+		if catSlug.Valid {
+			catInfo = &TransactionCategoryInfo{
+				ID:          uuidPtr(tCategoryID),
+				Slug:        textPtr(catSlug),
+				DisplayName: textPtr(catDisplayName),
+				Icon:        textPtr(catIcon),
+				Color:       textPtr(catColor),
+			}
+			if catPrimarySlug.Valid {
+				catInfo.PrimarySlug = textPtr(catPrimarySlug)
+				catInfo.PrimaryDisplayName = textPtr(catPrimaryDisplayName)
+			}
+		}
+
+		txnResp := TransactionResponse{
+			ID:                  formatUUID(rTransactionID),
+			AccountID:           uuidPtr(tAccountID),
+			AccountName:         &accountName,
+			UserName:            textPtr(userName),
+			Amount:              amountVal,
+			IsoCurrencyCode:     textPtr(tIsoCurrencyCode),
+			Date:                dateVal,
+			Name:                tName,
+			MerchantName:        textPtr(tMerchantName),
+			Category:            catInfo,
+			CategoryOverride:    tCategoryOverride,
+			CategoryPrimaryRaw:  textPtr(tCategoryPrimary),
+			CategoryDetailedRaw: textPtr(tCategoryDetailed),
+			Pending:             tPending,
+			CreatedAt:           tCreatedAt.Time.UTC().Format(time.RFC3339),
+			UpdatedAt:           tUpdatedAt.Time.UTC().Format(time.RFC3339),
+		}
+
+		item := PendingReviewItem{
+			ReviewID:              formatUUID(rID),
+			TransactionID:         formatUUID(rTransactionID),
+			Transaction:           txnResp,
+			ReviewType:            rReviewType,
+			SuggestedCategoryID:   uuidPtr(rSuggestedCategoryID),
+			SuggestedCategorySlug: textPtr(suggestedSlug),
+			CreatedAt:             rCreatedAt.Time.UTC().Format(time.RFC3339),
+		}
+
+		allItems = append(allItems, itemWithTime{item: item, ts: rCreatedAt.Time.UTC()})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate pending reviews: %w", err)
+	}
+
+	hasMore := len(allItems) > limit
+	if hasMore {
+		allItems = allItems[:limit]
+	}
+
+	items := make([]PendingReviewItem, len(allItems))
+	for i, r := range allItems {
+		items[i] = r.item
+	}
+
+	var nextCursor string
+	if hasMore && len(allItems) > 0 {
+		last := allItems[len(allItems)-1]
+		nextCursor = encodeTimestampCursor(last.ts, last.item.ReviewID)
+	}
+
+	// Get total pending count
+	totalPending, err := s.Queries.CountPendingReviews(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("count pending: %w", err)
+	}
+
+	result := &PendingReviewResult{
+		Items:        items,
+		NextCursor:   nextCursor,
+		HasMore:      hasMore,
+		TotalPending: totalPending,
+	}
+
+	// Include instructions if requested
+	if params.IncludeInstructions {
+		instructions, err := s.GetReviewInstructions(ctx)
+		if err == nil {
+			result.ReviewInstructions = &instructions
+		}
+	}
+
+	return result, nil
+}
+
+// SubmitReviews processes a batch of review decisions from external agents.
+func (s *Service) SubmitReviews(ctx context.Context, decisions []ReviewDecision, actor Actor) (*SubmitReviewsResult, error) {
+	if len(decisions) == 0 {
+		return nil, fmt.Errorf("%w: reviews array is empty", ErrInvalidParameter)
+	}
+	if len(decisions) > 50 {
+		return nil, fmt.Errorf("%w: maximum 50 reviews per request", ErrInvalidParameter)
+	}
+
+	result := &SubmitReviewsResult{
+		Submitted: len(decisions),
+		Results:   make([]ReviewDecisionResult, len(decisions)),
+	}
+
+	for i, d := range decisions {
+		dr := ReviewDecisionResult{ReviewID: d.ReviewID}
+
+		// Validate decision values
+		var decision string
+		switch d.Decision {
+		case "approve":
+			decision = "approved"
+		case "reject":
+			decision = "rejected"
+		case "skip":
+			decision = "skipped"
+		default:
+			dr.Status = "error"
+			dr.Error = "invalid decision: must be approve, reject, or skip"
+			result.Results[i] = dr
+			continue
+		}
+
+		// For reject, require override_category_slug
+		var categoryID *string
+		if d.Decision == "reject" && d.OverrideCategorySlug != nil {
+			// Look up category by slug
+			cat, err := s.Queries.GetCategoryBySlug(ctx, *d.OverrideCategorySlug)
+			if err != nil {
+				dr.Status = "error"
+				dr.Error = fmt.Sprintf("category slug %q not found", *d.OverrideCategorySlug)
+				result.Results[i] = dr
+				continue
+			}
+			catID := formatUUID(cat.ID)
+			categoryID = &catID
+		}
+
+		_, err := s.SubmitReview(ctx, SubmitReviewParams{
+			ReviewID:   d.ReviewID,
+			Decision:   decision,
+			CategoryID: categoryID,
+			Note:       d.Comment,
+			Actor:      actor,
+		})
+		if err != nil {
+			dr.Status = "error"
+			dr.Error = err.Error()
+		} else {
+			dr.Status = "accepted"
+		}
+		result.Results[i] = dr
+	}
+
+	return result, nil
+}

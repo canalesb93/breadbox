@@ -9,6 +9,7 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/db"
 	"breadbox/internal/service"
+	"breadbox/internal/webhook"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -231,5 +232,119 @@ func ReviewSettingsHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	}
+}
+
+// ReviewSettingsPageHandler serves GET /admin/reviews/settings.
+func ReviewSettingsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		instructions, templateSlug, _ := svc.GetReviewInstructionsRaw(ctx)
+
+		webhookCfg, _ := svc.GetWebhookConfig(ctx)
+
+		deliveries, _ := a.Queries.ListRecentWebhookDeliveries(ctx, 20)
+
+		data := BaseTemplateData(r, sm, "reviews", "Review Settings")
+		data["Instructions"] = instructions
+		data["TemplateSlugs"] = templateSlug
+		data["TemplatesJSON"] = service.ReviewInstructionTemplates
+		data["WebhookURL"] = webhookCfg.URL
+		data["SecretConfigured"] = webhookCfg.SecretConfigured
+		data["WebhookEvents"] = webhookCfg.Events
+		data["Deliveries"] = deliveries
+
+		tr.Render(w, r, "review_settings.html", data)
+	}
+}
+
+// ReviewInstructionsSaveHandler handles POST /admin/reviews/settings/instructions.
+func ReviewInstructionsSaveHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			SetFlash(r.Context(), sm, Flash{Type: "error", Message: "Invalid form data."})
+			http.Redirect(w, r, "/admin/reviews/settings", http.StatusSeeOther)
+			return
+		}
+
+		instructions := r.FormValue("instructions")
+		templateSlug := r.FormValue("template")
+
+		if err := svc.SaveReviewInstructions(r.Context(), instructions, templateSlug); err != nil {
+			SetFlash(r.Context(), sm, Flash{Type: "error", Message: "Failed to save instructions: " + err.Error()})
+		} else {
+			SetFlash(r.Context(), sm, Flash{Type: "success", Message: "Review instructions saved."})
+		}
+
+		http.Redirect(w, r, "/admin/reviews/settings", http.StatusSeeOther)
+	}
+}
+
+// ReviewWebhookSaveHandler handles POST /admin/reviews/settings/webhook.
+func ReviewWebhookSaveHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			SetFlash(r.Context(), sm, Flash{Type: "error", Message: "Invalid form data."})
+			http.Redirect(w, r, "/admin/reviews/settings", http.StatusSeeOther)
+			return
+		}
+
+		url := r.FormValue("url")
+		secret := r.FormValue("secret")
+		regenerate := r.FormValue("regenerate_secret") == "on"
+
+		if regenerate {
+			secret = "" // Will trigger auto-generation in SaveWebhookConfig
+		}
+
+		events := r.Form["events"]
+		if len(events) == 0 {
+			events = []string{"review_items_added"}
+		}
+
+		cfg := service.WebhookConfig{
+			URL:    url,
+			Secret: secret,
+			Events: events,
+		}
+
+		result, err := svc.SaveWebhookConfig(r.Context(), cfg)
+		if err != nil {
+			SetFlash(r.Context(), sm, Flash{Type: "error", Message: "Failed to save webhook: " + err.Error()})
+		} else {
+			msg := "Webhook configuration saved."
+			if result.Secret != "" {
+				msg += " New secret generated."
+			}
+			SetFlash(r.Context(), sm, Flash{Type: "success", Message: msg})
+		}
+
+		http.Redirect(w, r, "/admin/reviews/settings", http.StatusSeeOther)
+	}
+}
+
+// ReviewWebhookTestHandler handles POST /admin/api/review-webhooks/test.
+func ReviewWebhookTestHandler(a *app.App, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		webhookURL, _ := svc.GetWebhookURL(ctx)
+		webhookSecret, _ := svc.GetWebhookSecret(ctx)
+
+		if webhookURL == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "No webhook URL configured"})
+			return
+		}
+
+		// Create a temporary dispatcher for testing
+		disp := webhook.NewDispatcher(a.Queries, a.DB, a.Logger, a.Config.Version)
+		result, err := disp.SendTestWebhook(ctx, webhookURL, webhookSecret)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, result)
 	}
 }

@@ -57,9 +57,18 @@ COMMENTS & AUDIT LOG:
 
 REVIEW QUEUE:
 - Transactions are automatically enqueued for review during sync (new, uncategorized, or low-confidence)
-- Use list_pending_reviews to see what needs attention, filtered by review_type or account_id
-- Use submit_review to approve, reject, or skip reviews — approved reviews with a category_id override the transaction's category
-- Review decisions are logged in the audit trail and optionally as transaction comments`
+- Use review_transactions to see what needs attention — it includes review instructions and transaction context
+- Use submit_review to approve, reject, or skip reviews — submit in batches for efficiency
+- Decisions: approve (suggested category is correct), reject (provide override_category_slug), skip (unsure)
+- Always include a comment explaining your reasoning
+- Check the review instructions carefully — they contain household-specific context
+
+TRANSACTION REVIEW:
+- Use review_transactions to fetch pending items with instructions
+- Submit decisions with submit_review — always include a comment
+- Decisions: approve (suggested category is correct), reject (provide override_category_slug), skip (unsure)
+- Check the review instructions carefully — they contain household-specific context
+- Use get_transaction_history and list_transaction_comments to understand past decisions before reviewing`
 
 // ToolClassification indicates whether a tool is read-only or performs writes.
 type ToolClassification string
@@ -162,11 +171,11 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("delete_category_mapping", ToolWrite,
 			"Delete a category mapping. After deletion, transactions with this provider category string will fall back to 'uncategorized' on next sync. Identified by mapping ID or by (provider, provider_category) pair.",
 			s.handleDeleteCategoryMapping),
-		makeToolDef("list_pending_reviews", ToolRead,
-			"List pending transaction reviews in the review queue. Reviews are created automatically during sync for new, uncategorized, or low-confidence transactions, or manually via enqueue. Filter by review_type (new_transaction, uncategorized, low_confidence, manual) and account_id. Each review includes the full transaction details and suggested category.",
-			s.handleListPendingReviews),
+		makeToolDef("review_transactions", ToolRead,
+			"Get pending transactions awaiting review, with instructions on how to review them. Each item includes the transaction details, suggested category, and review context. Use this as your starting point for reviewing transactions. After reviewing, submit decisions with submit_review. Amount convention: positive = money out (debits), negative = money in (credits).",
+			s.handleReviewTransactions),
 		makeToolDef("submit_review", ToolWrite,
-			"Submit a decision on a pending review. Decision must be 'approved', 'rejected', or 'skipped'. For approved reviews, optionally specify a category_id to override the transaction's category. Add a note to explain your reasoning. Use list_pending_reviews to find review IDs.",
+			"Submit review decisions for pending transactions. You can approve the suggested category, reject it with an override, or skip. Always include a comment explaining your reasoning — this builds the audit trail and helps the family understand your decisions. Submit in batches for efficiency (up to 50 at a time).",
 			s.handleSubmitReview),
 	}
 }

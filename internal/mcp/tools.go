@@ -90,19 +90,22 @@ type transactionSummaryInput struct {
 	IncludePending *bool  `json:"include_pending,omitempty" jsonschema:"Include pending transactions (default false)"`
 }
 
-type listPendingReviewsInput struct {
-	ReviewType string `json:"review_type,omitempty" jsonschema:"Filter by review type: new_transaction, uncategorized, low_confidence, manual"`
-	AccountID  string `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
-	UserID     string `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
-	Limit      int    `json:"limit,omitempty" jsonschema:"Max results (default 20, max 100)"`
-	Cursor     string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
+type reviewTransactionsInput struct {
+	Limit        int    `json:"limit,omitempty" jsonschema:"Max items to return (default 20, max 100). Start small to avoid overwhelming context."`
+	AccountID    string `json:"account_id,omitempty" jsonschema:"Filter by account UUID."`
+	UserID       string `json:"user_id,omitempty" jsonschema:"Filter by user (family member) UUID."`
+	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Filter by suggested category slug."`
 }
 
 type submitReviewInput struct {
-	ReviewID   string `json:"review_id" jsonschema:"required,UUID of the review to submit"`
-	Decision   string `json:"decision" jsonschema:"required,Decision: approved, rejected, or skipped"`
-	CategoryID string `json:"category_id,omitempty" jsonschema:"Category ID to assign (use list_categories to find IDs). Only for approved decisions."`
-	Note       string `json:"note,omitempty" jsonschema:"Optional note explaining the decision"`
+	Reviews []reviewDecisionInput `json:"reviews" jsonschema:"required,Array of review decisions. Submit one or more at a time."`
+}
+
+type reviewDecisionInput struct {
+	ReviewID             string  `json:"review_id" jsonschema:"required,UUID of the review queue item."`
+	Decision             string  `json:"decision" jsonschema:"required,One of: approve, reject, skip."`
+	OverrideCategorySlug *string `json:"override_category_slug,omitempty" jsonschema:"Category slug to apply when rejecting the suggested category. Required when decision is reject."`
+	Comment              *string `json:"comment,omitempty" jsonschema:"Explanation of the decision. Highly recommended for audit trail. Supports markdown."`
 }
 
 type listCategoryMappingsInput struct {
@@ -584,22 +587,11 @@ func (s *MCPServer) handleDeleteCategoryMapping(ctx context.Context, _ *mcpsdk.C
 
 // --- Review Queue ---
 
-func (s *MCPServer) handleListPendingReviews(_ context.Context, _ *mcpsdk.CallToolRequest, input listPendingReviewsInput) (*mcpsdk.CallToolResult, any, error) {
+func (s *MCPServer) handleReviewTransactions(_ context.Context, _ *mcpsdk.CallToolRequest, input reviewTransactionsInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
-	status := "pending"
-	params := service.ReviewListParams{
-		Status: &status,
-		Limit:  20,
-		Cursor: input.Cursor,
-	}
-	if input.ReviewType != "" {
-		params.ReviewType = &input.ReviewType
-	}
-	if input.AccountID != "" {
-		params.AccountID = &input.AccountID
-	}
-	if input.UserID != "" {
-		params.UserID = &input.UserID
+	params := service.PendingReviewParams{
+		Limit:               20,
+		IncludeInstructions: true,
 	}
 	if input.Limit > 0 {
 		if input.Limit > 100 {
@@ -607,36 +599,65 @@ func (s *MCPServer) handleListPendingReviews(_ context.Context, _ *mcpsdk.CallTo
 		}
 		params.Limit = input.Limit
 	}
-	result, err := s.svc.ListReviews(ctx, params)
+	if input.AccountID != "" {
+		params.AccountID = &input.AccountID
+	}
+	if input.UserID != "" {
+		params.UserID = &input.UserID
+	}
+	if input.CategorySlug != "" {
+		params.CategorySlug = &input.CategorySlug
+	}
+
+	result, err := s.svc.ListPendingReviews(ctx, params)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
-	return jsonResult(result)
+
+	// Build response with instructions at top level
+	response := map[string]any{
+		"items":         result.Items,
+		"total_pending": result.TotalPending,
+		"has_more":      result.HasMore,
+	}
+	if result.NextCursor != "" {
+		response["next_cursor"] = result.NextCursor
+	}
+	if result.ReviewInstructions != nil {
+		response["instructions"] = *result.ReviewInstructions
+	} else {
+		response["instructions"] = "No custom review instructions configured. Review each transaction and approve, reject, or skip based on your judgment."
+	}
+
+	return jsonResult(response)
 }
 
 func (s *MCPServer) handleSubmitReview(ctx context.Context, _ *mcpsdk.CallToolRequest, input submitReviewInput) (*mcpsdk.CallToolResult, any, error) {
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
-	if input.ReviewID == "" || input.Decision == "" {
-		return errorResult(fmt.Errorf("review_id and decision are required")), nil, nil
+	if len(input.Reviews) == 0 {
+		return errorResult(fmt.Errorf("reviews array is required and must not be empty")), nil, nil
 	}
+
 	actor := service.ActorFromContext(ctx)
-	params := service.SubmitReviewParams{
-		ReviewID: input.ReviewID,
-		Decision: input.Decision,
-		Actor:    actor,
+
+	// Convert input to service types
+	decisions := make([]service.ReviewDecision, len(input.Reviews))
+	for i, r := range input.Reviews {
+		decisions[i] = service.ReviewDecision{
+			ReviewID:             r.ReviewID,
+			Decision:             r.Decision,
+			OverrideCategorySlug: r.OverrideCategorySlug,
+			Comment:              r.Comment,
+		}
 	}
-	if input.CategoryID != "" {
-		params.CategoryID = &input.CategoryID
-	}
-	if input.Note != "" {
-		params.Note = &input.Note
-	}
-	result, err := s.svc.SubmitReview(ctx, params)
+
+	result, err := s.svc.SubmitReviews(ctx, decisions, actor)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
+
 	return jsonResult(result)
 }
 

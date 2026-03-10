@@ -109,8 +109,14 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Review sync hook: `Engine.enqueueForReview()` called after each upsert inside the sync transaction. Priority: uncategorized > low_confidence > new_transaction. Skips `category_override=true` transactions. ON CONFLICT DO NOTHING for idempotency.
 - Review service: `ListReviews` uses dynamic SQL with transaction JOINs and cursor pagination (ASC for pending FIFO, DESC for resolved). `SubmitReview` handles category override + audit log + comment creation. `BulkSubmitReviews` iterates individually.
 - Review admin page: `/admin/reviews` with filter bar (status, type, account, user), card-based review queue with inline approve/reject/skip/dismiss, Alpine.js `reviewQueue()` for AJAX actions with card fade-out animation.
-- Review MCP tools: `list_pending_reviews` (ToolRead) and `submit_review` (ToolWrite) in `internal/mcp/tools.go`.
+- Review MCP tools: `review_transactions` (ToolRead, replaces `list_pending_reviews`) includes instructions. `submit_review` (ToolWrite) accepts batch decisions with category slug overrides.
 - Review REST API: read endpoints at `/api/v1/reviews`, `/api/v1/reviews/counts`, `/api/v1/reviews/{id}`; write endpoints at `POST /reviews/{id}/submit`, `POST /reviews/bulk`, `POST /reviews/enqueue`, `DELETE /reviews/{id}`.
+- External agent polling: `GET /api/v1/reviews/pending` with filters (account_id, user_id, category_slug, since, include_instructions). Accessible to all API keys (read).
+- External agent submit: `POST /api/v1/reviews/submit` bulk submit with approve/reject/skip decisions. Requires `full_access` scope. Override by category slug (not ID).
+- Review instructions: `review_instructions` and `review_instruction_template` in `app_config`. Template variables (`{{total_pending}}`, `{{family_members}}`, etc.) expanded at response time. Max 20,000 chars. Built-in templates in `internal/service/review_templates.go`.
+- Review settings page: `/admin/reviews/settings` with instructions editor, webhook config, delivery log.
+- Outgoing webhooks: `review_webhook_url`, `review_webhook_secret`, `review_webhook_events` stored in `app_config`. HMAC-SHA256 signed with `t={ts},v1={sig}` format. `webhook_deliveries` table logs attempts. 3 retries (30s, 5m, 30m). 7-day retention with hourly cleanup.
+- Webhook dispatcher: `internal/webhook/outgoing.go`, initialized in App struct, fires after sync auto-enqueue via `Engine.OnReviewsEnqueued` callback. Reads config at dispatch time (not cached).
 
 ## Canonical Enums
 
@@ -124,6 +130,8 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Review type: `new_transaction`, `uncategorized`, `low_confidence`, `manual`
 - Review status: `pending`, `approved`, `rejected`, `skipped`
 - Reviewer type: `user`, `agent`
+- Webhook delivery status: `pending`, `success`, `failed`
+- Webhook event type: `review_items_added`
 
 ## Spec Documents
 
