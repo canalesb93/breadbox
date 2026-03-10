@@ -400,10 +400,36 @@ func DeleteConnectionHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 			}
 		}
 
-		// Soft-delete the connection locally.
-		err = a.Queries.DeleteBankConnection(ctx, connID)
+		// Soft-delete related transactions and the connection in a single transaction.
+		tx, err := a.DB.Begin(ctx)
+		if err != nil {
+			a.Logger.Error("begin delete connection tx", "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete connection"})
+			return
+		}
+		defer tx.Rollback(ctx)
+
+		txQueries := a.Queries.WithTx(tx)
+
+		deleted, err := txQueries.SoftDeleteTransactionsByConnectionID(ctx, connID)
+		if err != nil {
+			a.Logger.Error("soft delete transactions for connection", "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete connection"})
+			return
+		}
+		if deleted > 0 {
+			a.Logger.Info("soft-deleted transactions for connection", "connection_id", idStr, "count", deleted)
+		}
+
+		err = txQueries.DeleteBankConnection(ctx, connID)
 		if err != nil {
 			a.Logger.Error("delete bank connection", "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete connection"})
+			return
+		}
+
+		if err := tx.Commit(ctx); err != nil {
+			a.Logger.Error("commit delete connection tx", "error", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete connection"})
 			return
 		}
