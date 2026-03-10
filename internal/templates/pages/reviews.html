@@ -114,7 +114,7 @@
 <div x-data="reviewQueue()" class="space-y-4">
   {{if .Reviews}}
   {{range .Reviews}}
-  <div class="card bg-base-100 shadow border border-base-300 review-card" x-data="{ submitting: false, selectedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}' }" id="review-{{.ID}}">
+  <div class="card bg-base-100 shadow border border-base-300 review-card" x-data="{ submitting: false, selectedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', suggestedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', pickerShake: false }" id="review-{{.ID}}">
     <div class="card-body p-4">
       <!-- Header row: badges + timestamp -->
       <div class="flex items-center justify-between flex-wrap gap-1">
@@ -179,40 +179,65 @@
       {{if eq .Status "pending"}}
       <!-- Action bar for pending reviews -->
       <div class="border-t border-base-300 pt-3 mt-3">
-        <div class="flex flex-wrap gap-3 items-end">
-          <div class="form-control flex-1 min-w-[200px]">
-            <label class="label label-text text-xs py-0.5">Assign category</label>
-            <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current'})" @category-change="selectedCatId = $event.detail.id">
-              <button type="button" class="btn btn-sm btn-ghost gap-2 w-full justify-start border border-base-300" @click="openPicker()">
-                <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-                <span x-text="displayLabel" class="text-sm truncate"></span>
-                <svg class="w-3 h-3 ml-auto opacity-40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-              </button>
-              <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false">
-                <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
-                  <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search categories..." class="input input-sm input-bordered w-full">
-                </div>
-                <div x-ref="listbox">
-                  <template x-for="(item, idx) in filteredList" :key="item.id || idx">
-                    <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item)">
-                      <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
-                      <template x-if="item.icon"><i :data-lucide="item.icon" class="bb-cat-icon"></i></template>
-                      <span x-text="item.label"></span>
-                    </div>
-                  </template>
-                  <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
-                </div>
+        <!-- Category picker -->
+        <div class="form-control" :class="{ 'bb-picker-shake': pickerShake }">
+          <label class="label label-text text-xs py-0.5">
+            {{if .SuggestedCategoryID}}Correct category{{else}}Assign category{{end}}
+          </label>
+          <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current'})" @category-change="selectedCatId = $event.detail.id">
+            <button type="button" class="btn btn-sm btn-ghost gap-2 w-full justify-start border border-base-300" @click="openPicker()">
+              <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
+              <span x-text="displayLabel" class="text-sm truncate"></span>
+              <svg class="w-3 h-3 ml-auto opacity-40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false">
+              <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
+                <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search categories..." class="input input-sm input-bordered w-full">
+              </div>
+              <div x-ref="listbox">
+                <template x-for="(item, idx) in filteredList" :key="item.id || idx">
+                  <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item)">
+                    <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
+                    <template x-if="item.icon"><i :data-lucide="item.icon" class="bb-cat-icon"></i></template>
+                    <span x-text="item.label"></span>
+                  </div>
+                </template>
+                <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
               </div>
             </div>
           </div>
-          <div class="form-control flex-1 min-w-[200px]">
-            <label class="label label-text text-xs py-0.5">Note</label>
-            <input type="text" class="input input-bordered input-sm w-full" placeholder="Optional note..." id="note-{{.ID}}">
-          </div>
         </div>
-        <!-- Action buttons with descriptions -->
-        <div class="flex gap-2 flex-wrap mt-3">
-          <div class="tooltip tooltip-bottom" data-tip="Accept this transaction and apply the selected category">
+        <!-- Note -->
+        <div class="form-control mt-2">
+          <label class="label label-text text-xs py-0.5">Note <span class="text-base-content/40">(optional)</span></label>
+          <input type="text" class="input input-bordered input-sm w-full" placeholder="Add context for future reference..." id="note-{{.ID}}">
+        </div>
+        <!-- Action buttons -->
+        <div class="flex gap-2 flex-wrap mt-3 items-center">
+          {{if .SuggestedCategoryID}}
+          <!-- Thumbs up/down for cards with a suggested category -->
+          <div class="tooltip tooltip-bottom" data-tip="Suggestion is correct — approve with suggested category">
+            <button class="btn btn-success btn-sm gap-1" :disabled="submitting"
+              @click="submitReview('{{.ID}}', 'approved', suggestedCatId)">
+              <span x-show="!submitting" class="flex items-center gap-1">
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
+              </span>
+              <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+            </button>
+          </div>
+          <div class="tooltip tooltip-bottom" data-tip="Suggestion is wrong — select the correct category first">
+            <button class="btn btn-error btn-soft btn-sm gap-1"
+              :disabled="submitting || selectedCatId === suggestedCatId"
+              @click="if (selectedCatId === suggestedCatId) { pickerShake = true; setTimeout(() => pickerShake = false, 600); } else { submitReview('{{.ID}}', 'approved', selectedCatId); }">
+              <span x-show="!submitting" class="flex items-center gap-1">
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>
+              </span>
+              <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+            </button>
+          </div>
+          {{else}}
+          <!-- Standard approve for cards without a suggestion -->
+          <div class="tooltip tooltip-bottom" data-tip="Approve and apply selected category">
             <button class="btn btn-success btn-sm gap-1" :disabled="submitting"
               @click="submitReview('{{.ID}}', 'approved', selectedCatId)">
               <span x-show="!submitting" class="flex items-center gap-1">
@@ -222,16 +247,7 @@
               <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
             </button>
           </div>
-          <div class="tooltip tooltip-bottom" data-tip="Flag this transaction as incorrectly categorized">
-            <button class="btn btn-error btn-soft btn-sm gap-1" :disabled="submitting"
-              @click="submitReview('{{.ID}}', 'rejected', selectedCatId)">
-              <span x-show="!submitting" class="flex items-center gap-1">
-                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                Reject
-              </span>
-              <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-            </button>
-          </div>
+          {{end}}
           <div class="tooltip tooltip-bottom" data-tip="Skip for now — review later">
             <button class="btn btn-ghost btn-sm gap-1" :disabled="submitting"
               @click="submitReview('{{.ID}}', 'skipped', null)">
