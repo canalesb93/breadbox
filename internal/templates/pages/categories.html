@@ -2,7 +2,7 @@
 {{template "category-picker-styles" .}}
 
 <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
-  <h1 class="text-2xl font-bold">Categories</h1>
+  <h1 class="text-2xl font-bold">Categories {{if .Categories}}<span class="badge badge-neutral badge-sm align-middle">{{len .Categories}}</span>{{end}}</h1>
   <div class="flex gap-2 flex-wrap">
     {{if gt .UnmappedCount 0}}
     <button class="btn btn-sm btn-warning" onclick="document.querySelector('[data-tab=mappings]').click()">
@@ -61,7 +61,7 @@
               <span class="text-sm">{{.DisplayName}}</span>
               <span class="text-xs text-base-content/30 hidden sm:inline font-mono">{{.Slug}}</span>
               {{if .Hidden}}<span class="badge badge-ghost badge-xs">Hidden</span>{{end}}
-              <div class="ml-auto flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div class="ml-auto flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 <button class="btn btn-ghost btn-xs" @click="$dispatch('edit-category', {id: '{{.ID}}', displayName: '{{.DisplayName}}', icon: '{{if .Icon}}{{.Icon}}{{end}}', color: '{{if .Color}}{{.Color}}{{end}}', sortOrder: {{.SortOrder}}, hidden: {{.Hidden}}})" title="Edit"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
                 {{if not .IsSystem}}<button class="btn btn-ghost btn-xs text-error" @click="$dispatch('delete-category', {id: '{{.ID}}', name: '{{.DisplayName}}'})" title="Delete"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>{{end}}
               </div>
@@ -264,7 +264,7 @@
             </thead>
             <tbody>
               {{range .Mappings}}
-              <tr x-data="{editing: false, categoryId: '{{.CategoryID}}', submitting: false}" x-show="!mappingSearch || '{{.ProviderCategory}}'.toLowerCase().includes(mappingSearch.toLowerCase()) || '{{.CategoryDisplayName}}'.toLowerCase().includes(mappingSearch.toLowerCase())">
+              <tr x-data="{editing: false, categoryId: '{{.CategoryID}}', submitting: false}" data-mapping-text="{{.ProviderCategory}} {{.CategoryDisplayName}}" x-show="!mappingSearch || '{{.ProviderCategory}}'.toLowerCase().includes(mappingSearch.toLowerCase()) || '{{.CategoryDisplayName}}'.toLowerCase().includes(mappingSearch.toLowerCase())">
                 <td><span class="badge badge-sm {{if eq .Provider "plaid"}}badge-primary{{else if eq .Provider "teller"}}badge-secondary{{else}}badge-accent{{end}}">{{.Provider}}</span></td>
                 <td class="font-mono text-sm">{{.ProviderCategory}}</td>
                 <td>
@@ -318,6 +318,7 @@
               {{end}}
             </tbody>
           </table>
+          <p class="text-sm text-base-content/50 py-4 text-center" x-show="mappingSearch && mappingSearchEmpty" x-cloak>No mappings match your search.</p>
         </div>
         {{else}}
         <p class="text-sm text-base-content/50 py-4 text-center">No mappings configured yet.</p>
@@ -329,7 +330,7 @@
 
 <!-- Create Modal -->
 <dialog id="create-modal" class="modal modal-bottom sm:modal-middle">
-  <div class="modal-box" x-data="{displayName: '', parentId: '', icon: '', color: '#6366f1', sortOrder: 0, submitting: false, showIconPicker: false,
+  <form class="modal-box" x-data="{displayName: '', parentId: '', icon: '', color: '#6366f1', sortOrder: 0, submitting: false, showIconPicker: false,
     commonIcons: ['shopping-cart','utensils','car','home','briefcase','heart','zap','book','plane','music','gift','coffee','scissors','shirt','gamepad-2','graduation-cap','building-2','fuel','bus','train'],
     presetColors: ['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#64748b','#78716c']
   }" @submit.prevent="
@@ -420,7 +421,7 @@
         <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
       </button>
     </div>
-  </div>
+  </form>
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 
@@ -531,6 +532,12 @@ function mappingsTab() {
     bulkCategoryLabel: '',
     bulkSubmitting: false,
     mappingSearch: '',
+    get mappingSearchEmpty() {
+      if (!this.mappingSearch) return false;
+      const q = this.mappingSearch.toLowerCase();
+      const rows = document.querySelectorAll('[data-mapping-text]');
+      return Array.from(rows).every(r => !r.dataset.mappingText.toLowerCase().includes(q));
+    },
 
     toggleBulkSelect(el) {
       if (el.checked) {
