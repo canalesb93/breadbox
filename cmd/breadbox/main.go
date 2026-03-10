@@ -157,6 +157,20 @@ func runServe() error {
 		logger.Warn("failed to load app_config", "error", err)
 	}
 
+	// Re-initialize providers that may now be configured from DB values.
+	// app.New() runs before LoadWithDB, so providers configured via the
+	// dashboard (stored in app_config) won't have been created yet.
+	if a.Providers["plaid"] == nil && cfg.PlaidClientID != "" {
+		if err := a.ReinitProvider("plaid"); err != nil {
+			logger.Warn("failed to reinit plaid provider from db config", "error", err)
+		}
+	}
+	if a.Providers["teller"] == nil && cfg.TellerAppID != "" {
+		if err := a.ReinitProvider("teller"); err != nil {
+			logger.Warn("failed to reinit teller provider from db config", "error", err)
+		}
+	}
+
 	// Validate ENCRYPTION_KEY when bank providers are configured.
 	if cfg.EncryptionKey == nil && (cfg.PlaidClientID != "" || cfg.TellerAppID != "") {
 		return fmt.Errorf("ENCRYPTION_KEY is required when Plaid or Teller providers are configured. Generate one with: openssl rand -hex 32")
