@@ -108,7 +108,7 @@ type submitReviewInput struct {
 type exportCategoriesInput struct{}
 
 type importCategoriesInput struct {
-	Content string `json:"content" jsonschema:"required,TSV content with category definitions. Columns: slug, display_name, parent_slug, icon, color, sort_order, hidden"`
+	Content string `json:"content" jsonschema:"required,TSV content with category definitions. Columns: slug, display_name, parent_slug, icon, color, sort_order, hidden, merge_into. The merge_into column is optional — set to a target slug to merge the source category into the target (transactions and mappings reassigned then source deleted)."`
 }
 
 type exportCategoryMappingsInput struct{}

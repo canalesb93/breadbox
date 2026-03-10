@@ -712,7 +712,7 @@ func TestExportCategoriesTSV(t *testing.T) {
 	}
 
 	// Check header
-	expectedHeader := "slug\tdisplay_name\tparent_slug\ticon\tcolor\tsort_order\thidden"
+	expectedHeader := "slug\tdisplay_name\tparent_slug\ticon\tcolor\tsort_order\thidden\tmerge_into"
 	if lines[0] != expectedHeader {
 		t.Errorf("expected header %q, got %q", expectedHeader, lines[0])
 	}
@@ -1276,6 +1276,198 @@ func TestImportMappingsTSV_ReplaceMode(t *testing.T) {
 	}
 	if len(mappings) > 0 && mappings[0].ProviderCategory != "FOOD" {
 		t.Errorf("expected remaining mapping to be FOOD, got %q", mappings[0].ProviderCategory)
+	}
+}
+
+func TestImportCategoriesTSV_MergeInto(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	// Seed uncategorized (required for DeleteCategory inside MergeCategories).
+	_, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "uncategorized", DisplayName: "Uncategorized", IsSystem: true,
+	})
+	if err != nil {
+		t.Fatalf("seed uncategorized: %v", err)
+	}
+
+	// Create source and target categories directly in DB.
+	sourceCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "old_coffee", DisplayName: "Coffee Shops",
+	})
+	if err != nil {
+		t.Fatalf("create source: %v", err)
+	}
+	targetCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink", DisplayName: "Food & Drink",
+	})
+	if err != nil {
+		t.Fatalf("create target: %v", err)
+	}
+
+	// Create a transaction categorized under the source.
+	user := testutil.MustCreateUser(t, queries, "merge-user")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "merge-conn")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "merge-acct", "Merge Account")
+
+	_, err = queries.UpsertTransaction(ctx, db.UpsertTransactionParams{
+		AccountID:             acct.ID,
+		ExternalTransactionID: "txn_merge_1",
+		Amount:                pgtype.Numeric{Int: big.NewInt(550), Exp: -2, Valid: true},
+		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
+		Date:                  pgtype.Date{Time: testutil.MustParseDate("2025-01-15"), Valid: true},
+		Name:                  "Starbucks",
+		CategoryID:            sourceCat.ID,
+	})
+	if err != nil {
+		t.Fatalf("create transaction: %v", err)
+	}
+
+	// Create a mapping pointing to source.
+	_, err = queries.InsertCategoryMapping(ctx, db.InsertCategoryMappingParams{
+		Provider: db.ProviderTypePlaid, ProviderCategory: "COFFEE", CategoryID: sourceCat.ID,
+	})
+	if err != nil {
+		t.Fatalf("create mapping: %v", err)
+	}
+
+	// Import with merge_into: old_coffee → food_and_drink
+	tsv := "slug\tdisplay_name\tparent_slug\ticon\tcolor\tsort_order\thidden\tmerge_into\n"
+	tsv += "food_and_drink\tFood & Drink\t\tutensils\t#f97316\t0\tfalse\t\n"
+	tsv += "old_coffee\t\t\t\t\t\t\tfood_and_drink\n"
+
+	result, err := svc.ImportCategoriesTSV(ctx, tsv, false)
+	if err != nil {
+		t.Fatalf("ImportCategoriesTSV merge: %v", err)
+	}
+
+	if result.Merged != 1 {
+		t.Errorf("expected Merged=1, got %d; errors=%v", result.Merged, result.Errors)
+	}
+	if len(result.Errors) > 0 {
+		t.Errorf("unexpected errors: %v", result.Errors)
+	}
+
+	// Verify source category no longer exists.
+	_, err = svc.GetCategoryBySlug(ctx, "old_coffee")
+	if err == nil {
+		t.Error("expected old_coffee to be deleted after merge")
+	}
+
+	// Verify transaction was reassigned to target.
+	var gotCatID pgtype.UUID
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_merge_1'",
+	).Scan(&gotCatID)
+	if err != nil {
+		t.Fatalf("query transaction: %v", err)
+	}
+	if gotCatID.Bytes != targetCat.ID.Bytes {
+		t.Errorf("expected transaction category_id=%v, got %v", targetCat.ID, gotCatID)
+	}
+
+	// Verify mapping was reassigned to target.
+	mapping, err := queries.GetCategoryMappingByProviderCategory(ctx, db.GetCategoryMappingByProviderCategoryParams{
+		Provider: db.ProviderTypePlaid, ProviderCategory: "COFFEE",
+	})
+	if err != nil {
+		t.Fatalf("get mapping: %v", err)
+	}
+	if mapping.CategoryID.Bytes != targetCat.ID.Bytes {
+		t.Errorf("expected mapping category_id=%v, got %v", targetCat.ID, mapping.CategoryID)
+	}
+}
+
+func TestImportCategoriesTSV_MergeWithChildren(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	// Seed uncategorized.
+	_, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "uncategorized", DisplayName: "Uncategorized", IsSystem: true,
+	})
+	if err != nil {
+		t.Fatalf("seed uncategorized: %v", err)
+	}
+
+	// Create parent with children.
+	parent, err := svc.CreateCategory(ctx, service.CreateCategoryParams{
+		Slug: "old_parent", DisplayName: "Old Parent",
+	})
+	if err != nil {
+		t.Fatalf("create parent: %v", err)
+	}
+	_, err = svc.CreateCategory(ctx, service.CreateCategoryParams{
+		Slug: "old_child_1", DisplayName: "Old Child 1", ParentID: &parent.ID,
+	})
+	if err != nil {
+		t.Fatalf("create child 1: %v", err)
+	}
+	_, err = svc.CreateCategory(ctx, service.CreateCategoryParams{
+		Slug: "old_child_2", DisplayName: "Old Child 2", ParentID: &parent.ID,
+	})
+	if err != nil {
+		t.Fatalf("create child 2: %v", err)
+	}
+
+	// Create target.
+	_, err = svc.CreateCategory(ctx, service.CreateCategoryParams{
+		Slug: "new_target", DisplayName: "New Target",
+	})
+	if err != nil {
+		t.Fatalf("create target: %v", err)
+	}
+
+	// Merge parent (which has 2 children) → target. Should merge 3 total (2 children + 1 parent).
+	tsv := "slug\tdisplay_name\tparent_slug\ticon\tcolor\tsort_order\thidden\tmerge_into\n"
+	tsv += "new_target\tNew Target\t\t\t\t0\tfalse\t\n"
+	tsv += "old_parent\t\t\t\t\t\t\tnew_target\n"
+
+	result, err := svc.ImportCategoriesTSV(ctx, tsv, false)
+	if err != nil {
+		t.Fatalf("ImportCategoriesTSV merge with children: %v", err)
+	}
+
+	if result.Merged != 3 {
+		t.Errorf("expected Merged=3 (2 children + 1 parent), got %d; errors=%v", result.Merged, result.Errors)
+	}
+
+	// All three should be gone.
+	for _, slug := range []string{"old_parent", "old_child_1", "old_child_2"} {
+		_, err := svc.GetCategoryBySlug(ctx, slug)
+		if err == nil {
+			t.Errorf("expected %s to be deleted after merge", slug)
+		}
+	}
+}
+
+func TestImportCategoriesTSV_MergeNonexistentSource(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	// Create target only — source doesn't exist. Should skip silently.
+	_, err := svc.CreateCategory(ctx, service.CreateCategoryParams{
+		Slug: "target_cat", DisplayName: "Target",
+	})
+	if err != nil {
+		t.Fatalf("create target: %v", err)
+	}
+
+	tsv := "slug\tdisplay_name\tparent_slug\ticon\tcolor\tsort_order\thidden\tmerge_into\n"
+	tsv += "target_cat\tTarget\t\t\t\t0\tfalse\t\n"
+	tsv += "nonexistent\t\t\t\t\t\t\ttarget_cat\n"
+
+	result, err := svc.ImportCategoriesTSV(ctx, tsv, false)
+	if err != nil {
+		t.Fatalf("ImportCategoriesTSV: %v", err)
+	}
+
+	// Should skip the nonexistent source silently (no error, no merge count).
+	if result.Merged != 0 {
+		t.Errorf("expected Merged=0, got %d", result.Merged)
+	}
+	if len(result.Errors) != 0 {
+		t.Errorf("expected 0 errors, got %v", result.Errors)
 	}
 }
 

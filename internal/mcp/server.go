@@ -35,6 +35,7 @@ CATEGORY SYSTEM:
 - Use list_unmapped_categories to find raw provider categories without mappings
 - Use list_category_mappings, create_category_mapping, update_category_mapping, delete_category_mapping to manage how provider category strings map to user categories
 - For bulk editing: use export_categories / import_categories and export_category_mappings / import_category_mappings to export TSV text, edit it, and re-import. Set apply_retroactively=true on import_category_mappings to update ALL matching transactions (not just uncategorized)
+- To simplify/consolidate categories: export categories, then set the merge_into column to a target slug for categories you want to merge. All transactions and mappings from the source are moved to the target. This preserves categorization history while reducing complexity
 
 TOKEN EFFICIENCY:
 - Use the fields parameter on query_transactions to request only needed fields (e.g., fields=core,category). Aliases: core (id,date,amount,name,iso_currency_code), category (category,category_primary_raw,category_detailed_raw), timestamps (created_at,updated_at,datetime,authorized_datetime)
@@ -152,10 +153,10 @@ func (s *MCPServer) buildToolRegistry() {
 			"Get aggregated transaction totals grouped by category and/or time period. Replaces the need to paginate through thousands of individual transactions for spending analysis. Amounts follow the convention: positive = money out (debit), negative = money in (credit). Only includes non-deleted, non-pending transactions by default.",
 			s.handleTransactionSummary),
 		makeToolDef("export_categories", ToolRead,
-			"Export all category definitions as TSV text. The returned format can be edited externally (in a text editor, by an AI agent, etc.) and re-imported via import_categories. Columns: slug, display_name, parent_slug, icon, color, sort_order, hidden. Slugs are immutable identifiers; display_name and other fields can be changed.",
+			"Export all category definitions as TSV text. The returned format can be edited externally (in a text editor, by an AI agent, etc.) and re-imported via import_categories. Columns: slug, display_name, parent_slug, icon, color, sort_order, hidden, merge_into. Slugs are immutable identifiers; display_name and other fields can be changed. The merge_into column is empty on export.",
 			s.handleExportCategories),
 		makeToolDef("import_categories", ToolWrite,
-			"Import category definitions from TSV text. Existing slugs are updated (display_name, icon, color, sort_order, hidden). New slugs are created. Missing slugs are NOT deleted. Parents must appear before children. Use export_categories to get the current state, edit it, then import the modified version.",
+			"Import category definitions from TSV text. Existing slugs are updated (display_name, icon, color, sort_order, hidden). New slugs are created. Missing slugs are NOT deleted. Parents must appear before children. Use export_categories to get the current state, edit it, then import the modified version. To merge/consolidate categories, set the merge_into column to the target category slug — all transactions and mappings from the source are reassigned to the target, then the source is deleted. This is useful for simplifying a complex taxonomy without losing transaction categorization.",
 			s.handleImportCategories),
 		makeToolDef("export_category_mappings", ToolRead,
 			"Export all category mappings as TSV text. Columns: provider, provider_category, category_slug. The returned format can be edited and re-imported via import_category_mappings. Use this for bulk editing of how provider category strings map to user categories.",
