@@ -5,8 +5,11 @@ package service_test
 import (
 	"context"
 	"crypto/rand"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"breadbox/internal/db"
 	"breadbox/internal/service"
@@ -448,5 +451,486 @@ func TestWebhookDelivery_InsertAndQuery(t *testing.T) {
 	}
 	if len(pending) != 0 {
 		t.Errorf("expected 0 pending after success, got %d", len(pending))
+	}
+}
+
+// --- ListPendingReviews filters ---
+
+func TestListPendingReviews_FilterByAccountID(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	acct1 := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Checking")
+	acct2 := testutil.MustCreateAccount(t, queries, conn.ID, "ext_2", "Savings")
+
+	txn1 := testutil.MustCreateTransaction(t, queries, acct1.ID, "txn_1", "Coffee", 500, "2025-01-15")
+	txn2 := testutil.MustCreateTransaction(t, queries, acct2.ID, "txn_2", "Rent", 100000, "2025-01-15")
+
+	for _, txn := range []db.Transaction{txn1, txn2} {
+		if _, err := queries.EnqueueReview(ctx, db.EnqueueReviewParams{
+			TransactionID: txn.ID,
+			ReviewType:    "new_transaction",
+		}); err != nil {
+			t.Fatalf("EnqueueReview: %v", err)
+		}
+	}
+
+	acctID := formatUUID(acct1.ID)
+	result, err := svc.ListPendingReviews(ctx, service.PendingReviewParams{
+		AccountID: &acctID,
+	})
+	if err != nil {
+		t.Fatalf("ListPendingReviews: %v", err)
+	}
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 item filtered by account, got %d", len(result.Items))
+	}
+	if result.Items[0].Transaction.Name != "Coffee" {
+		t.Errorf("expected Coffee, got %s", result.Items[0].Transaction.Name)
+	}
+	// TotalPending should still reflect all pending (unfiltered)
+	if result.TotalPending != 2 {
+		t.Errorf("expected total pending 2, got %d", result.TotalPending)
+	}
+}
+
+func TestListPendingReviews_FilterByUserID(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	alice := testutil.MustCreateUser(t, queries, "Alice")
+	bob := testutil.MustCreateUser(t, queries, "Bob")
+	conn1 := testutil.MustCreateConnection(t, queries, alice.ID, "item_1")
+	conn2 := testutil.MustCreateConnection(t, queries, bob.ID, "item_2")
+	acct1 := testutil.MustCreateAccount(t, queries, conn1.ID, "ext_1", "Alice Checking")
+	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_2", "Bob Checking")
+
+	txn1 := testutil.MustCreateTransaction(t, queries, acct1.ID, "txn_1", "Alice Txn", 500, "2025-01-15")
+	txn2 := testutil.MustCreateTransaction(t, queries, acct2.ID, "txn_2", "Bob Txn", 700, "2025-01-15")
+
+	for _, txn := range []db.Transaction{txn1, txn2} {
+		if _, err := queries.EnqueueReview(ctx, db.EnqueueReviewParams{
+			TransactionID: txn.ID,
+			ReviewType:    "new_transaction",
+		}); err != nil {
+			t.Fatalf("EnqueueReview: %v", err)
+		}
+	}
+
+	bobID := formatUUID(bob.ID)
+	result, err := svc.ListPendingReviews(ctx, service.PendingReviewParams{
+		UserID: &bobID,
+	})
+	if err != nil {
+		t.Fatalf("ListPendingReviews: %v", err)
+	}
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 item filtered by user, got %d", len(result.Items))
+	}
+	if result.Items[0].Transaction.Name != "Bob Txn" {
+		t.Errorf("expected Bob Txn, got %s", result.Items[0].Transaction.Name)
+	}
+}
+
+func TestListPendingReviews_FilterBySince(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Checking")
+
+	txn1 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_1", "Old", 500, "2025-01-10")
+	txn2 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_2", "New", 700, "2025-01-15")
+
+	if _, err := queries.EnqueueReview(ctx, db.EnqueueReviewParams{
+		TransactionID: txn1.ID,
+		ReviewType:    "new_transaction",
+	}); err != nil {
+		t.Fatalf("EnqueueReview 1: %v", err)
+	}
+
+	// Sleep briefly so second enqueue has a later created_at
+	time.Sleep(10 * time.Millisecond)
+	midpoint := time.Now()
+	time.Sleep(10 * time.Millisecond)
+
+	if _, err := queries.EnqueueReview(ctx, db.EnqueueReviewParams{
+		TransactionID: txn2.ID,
+		ReviewType:    "new_transaction",
+	}); err != nil {
+		t.Fatalf("EnqueueReview 2: %v", err)
+	}
+
+	result, err := svc.ListPendingReviews(ctx, service.PendingReviewParams{
+		Since: &midpoint,
+	})
+	if err != nil {
+		t.Fatalf("ListPendingReviews: %v", err)
+	}
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 item since midpoint, got %d", len(result.Items))
+	}
+	if result.Items[0].Transaction.Name != "New" {
+		t.Errorf("expected New, got %s", result.Items[0].Transaction.Name)
+	}
+}
+
+func TestListPendingReviews_CursorPagination(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Checking")
+
+	// Create 3 transactions with reviews
+	for i := 0; i < 3; i++ {
+		txn := testutil.MustCreateTransaction(t, queries, acct.ID,
+			fmt.Sprintf("txn_%d", i), fmt.Sprintf("Item %d", i), int64(100*(i+1)), "2025-01-15")
+		if _, err := queries.EnqueueReview(ctx, db.EnqueueReviewParams{
+			TransactionID: txn.ID,
+			ReviewType:    "new_transaction",
+		}); err != nil {
+			t.Fatalf("EnqueueReview %d: %v", i, err)
+		}
+		time.Sleep(5 * time.Millisecond) // ensure distinct created_at
+	}
+
+	// Page 1: limit 2
+	page1, err := svc.ListPendingReviews(ctx, service.PendingReviewParams{Limit: 2})
+	if err != nil {
+		t.Fatalf("ListPendingReviews page 1: %v", err)
+	}
+	if len(page1.Items) != 2 {
+		t.Fatalf("expected 2 items on page 1, got %d", len(page1.Items))
+	}
+	if !page1.HasMore {
+		t.Error("expected HasMore=true on page 1")
+	}
+	if page1.NextCursor == "" {
+		t.Fatal("expected non-empty cursor on page 1")
+	}
+
+	// Page 2: use cursor
+	page2, err := svc.ListPendingReviews(ctx, service.PendingReviewParams{
+		Limit:  2,
+		Cursor: page1.NextCursor,
+	})
+	if err != nil {
+		t.Fatalf("ListPendingReviews page 2: %v", err)
+	}
+	if len(page2.Items) != 1 {
+		t.Fatalf("expected 1 item on page 2, got %d", len(page2.Items))
+	}
+	if page2.HasMore {
+		t.Error("expected HasMore=false on page 2")
+	}
+
+	// No overlap between pages
+	if page1.Items[0].ReviewID == page2.Items[0].ReviewID ||
+		page1.Items[1].ReviewID == page2.Items[0].ReviewID {
+		t.Error("page 2 items overlap with page 1")
+	}
+}
+
+// --- SubmitReviews edge cases ---
+
+func TestSubmitReviews_InvalidDecision(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Checking")
+	txn := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_1", "Test", 100, "2025-01-15")
+
+	r, err := queries.EnqueueReview(ctx, db.EnqueueReviewParams{
+		TransactionID: txn.ID,
+		ReviewType:    "new_transaction",
+	})
+	if err != nil {
+		t.Fatalf("EnqueueReview: %v", err)
+	}
+
+	actor := service.Actor{Type: "agent", ID: "test", Name: "Test"}
+	result, err := svc.SubmitReviews(ctx, []service.ReviewDecision{
+		{ReviewID: formatUUID(r.ID), Decision: "invalid_value"},
+	}, actor)
+	if err != nil {
+		t.Fatalf("SubmitReviews: %v", err)
+	}
+	if result.Results[0].Status != "error" {
+		t.Errorf("expected error status, got %s", result.Results[0].Status)
+	}
+	if !strings.Contains(result.Results[0].Error, "invalid decision") {
+		t.Errorf("expected invalid decision error, got: %s", result.Results[0].Error)
+	}
+}
+
+func TestSubmitReviews_AlreadyResolved(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Checking")
+	txn := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_1", "Test", 100, "2025-01-15")
+
+	r, err := queries.EnqueueReview(ctx, db.EnqueueReviewParams{
+		TransactionID: txn.ID,
+		ReviewType:    "new_transaction",
+	})
+	if err != nil {
+		t.Fatalf("EnqueueReview: %v", err)
+	}
+
+	actor := service.Actor{Type: "agent", ID: "test", Name: "Test"}
+
+	// First submit succeeds
+	_, err = svc.SubmitReviews(ctx, []service.ReviewDecision{
+		{ReviewID: formatUUID(r.ID), Decision: "approve"},
+	}, actor)
+	if err != nil {
+		t.Fatalf("First SubmitReviews: %v", err)
+	}
+
+	// Second submit on same review should return error per-item
+	result, err := svc.SubmitReviews(ctx, []service.ReviewDecision{
+		{ReviewID: formatUUID(r.ID), Decision: "reject"},
+	}, actor)
+	if err != nil {
+		t.Fatalf("Second SubmitReviews: %v", err)
+	}
+	if result.Results[0].Status != "error" {
+		t.Errorf("expected error for already-resolved review, got %s", result.Results[0].Status)
+	}
+}
+
+func TestSubmitReviews_CategoryOverrideAppliedToTransaction(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	// Create a category
+	cat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug:        "food_and_drink",
+		DisplayName: "Food & Drink",
+	})
+	if err != nil {
+		t.Fatalf("InsertCategory: %v", err)
+	}
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Checking")
+	txn := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_1", "Starbucks", 500, "2025-01-15")
+
+	r, err := queries.EnqueueReview(ctx, db.EnqueueReviewParams{
+		TransactionID: txn.ID,
+		ReviewType:    "uncategorized",
+	})
+	if err != nil {
+		t.Fatalf("EnqueueReview: %v", err)
+	}
+
+	actor := service.Actor{Type: "agent", ID: "test", Name: "Test"}
+	slug := "food_and_drink"
+	_, err = svc.SubmitReviews(ctx, []service.ReviewDecision{
+		{ReviewID: formatUUID(r.ID), Decision: "reject", OverrideCategorySlug: &slug},
+	}, actor)
+	if err != nil {
+		t.Fatalf("SubmitReviews: %v", err)
+	}
+
+	// Verify the transaction now has the category set AND category_override=true
+	var txnCategoryID pgtype.UUID
+	var txnCategoryOverride bool
+	err = pool.QueryRow(ctx,
+		"SELECT category_id, category_override FROM transactions WHERE id = $1", txn.ID,
+	).Scan(&txnCategoryID, &txnCategoryOverride)
+	if err != nil {
+		t.Fatalf("query transaction: %v", err)
+	}
+	if txnCategoryID != cat.ID {
+		t.Errorf("expected transaction category_id %v, got %v", cat.ID, txnCategoryID)
+	}
+	if !txnCategoryOverride {
+		t.Error("expected category_override=true on transaction after review override")
+	}
+}
+
+func TestSubmitReviews_EmptyArray(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	actor := service.Actor{Type: "agent", ID: "test", Name: "Test"}
+	_, err := svc.SubmitReviews(ctx, []service.ReviewDecision{}, actor)
+	if err == nil {
+		t.Fatal("expected error for empty decisions array")
+	}
+	if !errors.Is(err, service.ErrInvalidParameter) {
+		t.Errorf("expected ErrInvalidParameter, got: %v", err)
+	}
+}
+
+func TestSubmitReviews_NonexistentCategorySlug(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Checking")
+	txn := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_1", "Test", 100, "2025-01-15")
+
+	r, err := queries.EnqueueReview(ctx, db.EnqueueReviewParams{
+		TransactionID: txn.ID,
+		ReviewType:    "uncategorized",
+	})
+	if err != nil {
+		t.Fatalf("EnqueueReview: %v", err)
+	}
+
+	actor := service.Actor{Type: "agent", ID: "test", Name: "Test"}
+	slug := "nonexistent_category"
+	result, err := svc.SubmitReviews(ctx, []service.ReviewDecision{
+		{ReviewID: formatUUID(r.ID), Decision: "reject", OverrideCategorySlug: &slug},
+	}, actor)
+	if err != nil {
+		t.Fatalf("SubmitReviews: %v", err)
+	}
+	if result.Results[0].Status != "error" {
+		t.Errorf("expected error for nonexistent slug, got %s", result.Results[0].Status)
+	}
+	if !strings.Contains(result.Results[0].Error, "not found") {
+		t.Errorf("expected 'not found' error, got: %s", result.Results[0].Error)
+	}
+}
+
+// --- SaveReviewInstructions edge cases ---
+
+func TestSaveReviewInstructions_MaxLength(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	// 20001 chars should be rejected
+	longText := strings.Repeat("x", 20001)
+	err := svc.SaveReviewInstructions(ctx, longText, "")
+	if err == nil {
+		t.Fatal("expected error for instructions exceeding max length")
+	}
+	if !errors.Is(err, service.ErrInvalidParameter) {
+		t.Errorf("expected ErrInvalidParameter, got: %v", err)
+	}
+}
+
+func TestGetReviewInstructions_DefaultWhenEmpty(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	expanded, err := svc.GetReviewInstructions(ctx)
+	if err != nil {
+		t.Fatalf("GetReviewInstructions: %v", err)
+	}
+	if expanded == "" {
+		t.Error("expected non-empty default instructions")
+	}
+	if !strings.Contains(expanded, "Review each transaction") {
+		t.Errorf("expected default instructions text, got: %s", expanded)
+	}
+}
+
+func TestGetReviewInstructions_DateRangeExpansion(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Checking")
+
+	txn1 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_1", "Early", 100, "2025-01-10")
+	txn2 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_2", "Late", 200, "2025-01-20")
+
+	for _, txn := range []db.Transaction{txn1, txn2} {
+		if _, err := queries.EnqueueReview(ctx, db.EnqueueReviewParams{
+			TransactionID: txn.ID,
+			ReviewType:    "new_transaction",
+		}); err != nil {
+			t.Fatalf("EnqueueReview: %v", err)
+		}
+	}
+
+	instructions := "Date range: {{date_range_start}} to {{date_range_end}}"
+	if err := svc.SaveReviewInstructions(ctx, instructions, ""); err != nil {
+		t.Fatalf("SaveReviewInstructions: %v", err)
+	}
+
+	expanded, err := svc.GetReviewInstructions(ctx)
+	if err != nil {
+		t.Fatalf("GetReviewInstructions: %v", err)
+	}
+	if strings.Contains(expanded, "{{date_range_start}}") {
+		t.Error("expected {{date_range_start}} to be expanded")
+	}
+	if !strings.Contains(expanded, "2025-01-10") {
+		t.Errorf("expected earliest date 2025-01-10 in: %s", expanded)
+	}
+	if !strings.Contains(expanded, "2025-01-20") {
+		t.Errorf("expected latest date 2025-01-20 in: %s", expanded)
+	}
+}
+
+// --- WebhookConfig edge cases ---
+
+func TestSaveWebhookConfig_ClearURL(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	// First set a URL
+	_, err := svc.SaveWebhookConfig(ctx, service.WebhookConfig{
+		URL:    "https://example.com/hook",
+		Events: []string{"review_items_added"},
+	})
+	if err != nil {
+		t.Fatalf("SaveWebhookConfig: %v", err)
+	}
+
+	// Clear URL
+	result, err := svc.SaveWebhookConfig(ctx, service.WebhookConfig{
+		URL:    "",
+		Events: []string{"review_items_added"},
+	})
+	if err != nil {
+		t.Fatalf("SaveWebhookConfig clear: %v", err)
+	}
+	if result.URL != "" {
+		t.Errorf("expected empty URL after clear, got %s", result.URL)
+	}
+
+	// Verify via GetWebhookConfig
+	cfg, err := svc.GetWebhookConfig(ctx)
+	if err != nil {
+		t.Fatalf("GetWebhookConfig: %v", err)
+	}
+	if cfg.URL != "" {
+		t.Errorf("expected empty URL on re-read, got %s", cfg.URL)
+	}
+}
+
+func TestSaveWebhookConfig_SecretMinLength(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	_, err := svc.SaveWebhookConfig(ctx, service.WebhookConfig{
+		URL:    "https://example.com/hook",
+		Secret: "too_short",
+		Events: []string{"review_items_added"},
+	})
+	if err == nil {
+		t.Fatal("expected error for short secret")
+	}
+	if !errors.Is(err, service.ErrInvalidParameter) {
+		t.Errorf("expected ErrInvalidParameter, got: %v", err)
 	}
 }

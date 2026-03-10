@@ -65,6 +65,11 @@ func NewDispatcher(queries *db.Queries, pool *pgxpool.Pool, logger *slog.Logger,
 	}
 }
 
+// SetHTTPClient overrides the default HTTP client (used for testing).
+func (d *Dispatcher) SetHTTPClient(client *http.Client) {
+	d.client = client
+}
+
 // Enqueue creates a new delivery record and triggers async delivery.
 func (d *Dispatcher) Enqueue(ctx context.Context, event string, payload any, webhookURL string) error {
 	if webhookURL == "" {
