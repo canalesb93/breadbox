@@ -17,8 +17,8 @@
   </div>
 </div>
 
-<!-- Tabs: Tree + Mappings -->
-<div x-data="{ activeTab: (window.location.hash === '#mappings') ? 'mappings' : 'tree' }" x-init="$watch('activeTab', v => window.location.hash = v)">
+<!-- Tabs: Tree + Mappings + Bulk Edit -->
+<div x-data="{ activeTab: ({'#mappings':'mappings','#bulk':'bulk'}[window.location.hash]) || 'tree' }" x-init="$watch('activeTab', v => window.location.hash = v)">
   <div role="tablist" class="tabs tabs-bordered mb-6">
     <button role="tab" class="tab" :class="activeTab === 'tree' && 'tab-active'" @click="activeTab = 'tree'" data-tab="tree">
       <i data-lucide="list-tree" class="w-4 h-4 mr-1.5"></i> Categories
@@ -26,6 +26,9 @@
     <button role="tab" class="tab" :class="activeTab === 'mappings' && 'tab-active'" @click="activeTab = 'mappings'" data-tab="mappings">
       <i data-lucide="arrow-right-left" class="w-4 h-4 mr-1.5"></i> Mappings
       {{if gt .UnmappedCount 0}}<span class="badge badge-warning badge-xs ml-1">{{.UnmappedCount}}</span>{{end}}
+    </button>
+    <button role="tab" class="tab" :class="activeTab === 'bulk' && 'tab-active'" @click="activeTab = 'bulk'" data-tab="bulk">
+      <i data-lucide="file-spreadsheet" class="w-4 h-4 mr-1.5"></i> Bulk Edit
     </button>
   </div>
 
@@ -330,6 +333,115 @@
       </div>
     </div>
   </div>
+
+  <!-- Bulk Edit Tab -->
+  <div x-show="activeTab === 'bulk'" x-cloak x-data="bulkEditTab()">
+    <div class="space-y-6">
+      <!-- Categories TSV -->
+      <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body p-4">
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div>
+              <h2 class="card-title text-base">
+                <i data-lucide="list-tree" class="w-5 h-5"></i>
+                Categories
+              </h2>
+              <p class="text-xs text-base-content/50 mt-0.5">TSV format: slug, display_name, parent_slug, icon, color, sort_order, hidden</p>
+            </div>
+            <div class="flex gap-2">
+              <button class="btn btn-sm btn-outline" :disabled="catLoading" @click="exportCategories()">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span x-show="!catLoading">Export</span>
+                <span x-show="catLoading" class="loading loading-spinner loading-xs"></span>
+              </button>
+              <button class="btn btn-sm btn-primary" :disabled="!catText.trim() || catImporting" @click="importCategories()">
+                <i data-lucide="upload" class="w-4 h-4"></i>
+                <span x-show="!catImporting">Import</span>
+                <span x-show="catImporting" class="loading loading-spinner loading-xs"></span>
+              </button>
+            </div>
+          </div>
+          <textarea x-model="catText" class="textarea textarea-bordered w-full font-mono text-xs leading-relaxed" rows="12" placeholder="Click Export to load current categories, or paste TSV data here...&#10;&#10;slug&#9;display_name&#9;parent_slug&#9;icon&#9;color&#9;sort_order&#9;hidden&#10;food_and_drink&#9;Food & Drink&#9;&#9;utensils&#9;#ef4444&#9;0&#9;false" spellcheck="false"></textarea>
+          <!-- Result -->
+          <template x-if="catResult">
+            <div class="mt-2">
+              <div class="flex flex-wrap gap-2 text-sm">
+                <span x-show="catResult.created > 0" class="badge badge-success badge-sm" x-text="catResult.created + ' created'"></span>
+                <span x-show="catResult.updated > 0" class="badge badge-info badge-sm" x-text="catResult.updated + ' updated'"></span>
+                <span x-show="catResult.unchanged > 0" class="badge badge-ghost badge-sm" x-text="catResult.unchanged + ' unchanged'"></span>
+              </div>
+              <template x-if="catResult.errors && catResult.errors.length > 0">
+                <div class="mt-2 text-sm text-error">
+                  <template x-for="e in catResult.errors"><p x-text="e"></p></template>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Mappings TSV -->
+      <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body p-4">
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div>
+              <h2 class="card-title text-base">
+                <i data-lucide="arrow-right-left" class="w-5 h-5"></i>
+                Mappings
+              </h2>
+              <p class="text-xs text-base-content/50 mt-0.5">TSV format: provider, provider_category, category_slug</p>
+            </div>
+            <div class="flex gap-2">
+              <button class="btn btn-sm btn-outline" :disabled="mapLoading" @click="exportMappings()">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span x-show="!mapLoading">Export</span>
+                <span x-show="mapLoading" class="loading loading-spinner loading-xs"></span>
+              </button>
+              <button class="btn btn-sm btn-primary" :disabled="!mapText.trim() || mapImporting" @click="importMappings()">
+                <i data-lucide="upload" class="w-4 h-4"></i>
+                <span x-show="!mapImporting">Import</span>
+                <span x-show="mapImporting" class="loading loading-spinner loading-xs"></span>
+              </button>
+            </div>
+          </div>
+          <textarea x-model="mapText" class="textarea textarea-bordered w-full font-mono text-xs leading-relaxed" rows="12" placeholder="Click Export to load current mappings, or paste TSV data here...&#10;&#10;provider&#9;provider_category&#9;category_slug&#10;plaid&#9;FOOD_AND_DRINK_GROCERIES&#9;food_and_drink_groceries" spellcheck="false"></textarea>
+          <!-- Apply retroactively toggle -->
+          <label class="label cursor-pointer justify-start gap-3 mt-1">
+            <input type="checkbox" x-model="mapRetroactive" class="toggle toggle-sm">
+            <div>
+              <span class="label-text">Apply retroactively</span>
+              <span class="text-xs text-base-content/50 block">Re-categorize existing transactions that match updated mappings</span>
+            </div>
+          </label>
+          <!-- Result -->
+          <template x-if="mapResult">
+            <div class="mt-2">
+              <div class="flex flex-wrap gap-2 text-sm">
+                <span x-show="mapResult.created > 0" class="badge badge-success badge-sm" x-text="mapResult.created + ' created'"></span>
+                <span x-show="mapResult.updated > 0" class="badge badge-info badge-sm" x-text="mapResult.updated + ' updated'"></span>
+                <span x-show="mapResult.unchanged > 0" class="badge badge-ghost badge-sm" x-text="mapResult.unchanged + ' unchanged'"></span>
+                <span x-show="mapResult.transactions_updated > 0" class="badge badge-warning badge-sm" x-text="mapResult.transactions_updated + ' transactions re-categorized'"></span>
+              </div>
+              <template x-if="mapResult.errors && mapResult.errors.length > 0">
+                <div class="mt-2 text-sm text-error">
+                  <template x-for="e in mapResult.errors"><p x-text="e"></p></template>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Info card -->
+      <div class="alert alert-info">
+        <i data-lucide="info" class="w-5 h-5"></i>
+        <div class="text-sm">
+          <p class="font-semibold">How bulk edit works</p>
+          <p>Export loads the current data into the text area as tab-separated values. Edit the text (or paste from a spreadsheet), then click Import. Existing entries are updated, new ones are created. Rows you remove from the text will <strong>not</strong> be deleted — use the Categories or Mappings tabs to delete individual items.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Create Modal -->
@@ -577,6 +689,89 @@ function mappingsTab() {
       })
       .then(r => { if(r.ok) location.reload(); else { this.bulkSubmitting = false; window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Bulk mapping failed',type:'error'}})); } })
       .catch(() => { this.bulkSubmitting = false; });
+    }
+  };
+}
+
+function bulkEditTab() {
+  return {
+    catText: '',
+    catLoading: false,
+    catImporting: false,
+    catResult: null,
+    mapText: '',
+    mapLoading: false,
+    mapImporting: false,
+    mapResult: null,
+    mapRetroactive: false,
+
+    exportCategories() {
+      this.catLoading = true;
+      this.catResult = null;
+      fetch('/admin/api/categories/export-tsv')
+        .then(r => { if (!r.ok) throw new Error('Export failed'); return r.text(); })
+        .then(text => { this.catText = text; })
+        .catch(() => { window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Failed to export categories',type:'error'}})); })
+        .finally(() => { this.catLoading = false; });
+    },
+
+    importCategories() {
+      if (!this.catText.trim()) return;
+      this.catImporting = true;
+      this.catResult = null;
+      fetch('/admin/api/categories/import-tsv', {
+        method: 'POST',
+        headers: {'Content-Type': 'text/tab-separated-values'},
+        body: this.catText
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) {
+            window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: data.error.message || data.error, type:'error'}}));
+          } else {
+            this.catResult = data;
+            if (data.created > 0 || data.updated > 0) {
+              window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Categories imported successfully', type:'success'}}));
+            }
+          }
+        })
+        .catch(() => { window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Import failed',type:'error'}})); })
+        .finally(() => { this.catImporting = false; });
+    },
+
+    exportMappings() {
+      this.mapLoading = true;
+      this.mapResult = null;
+      fetch('/admin/api/category-mappings/export-tsv')
+        .then(r => { if (!r.ok) throw new Error('Export failed'); return r.text(); })
+        .then(text => { this.mapText = text; })
+        .catch(() => { window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Failed to export mappings',type:'error'}})); })
+        .finally(() => { this.mapLoading = false; });
+    },
+
+    importMappings() {
+      if (!this.mapText.trim()) return;
+      this.mapImporting = true;
+      this.mapResult = null;
+      const url = '/admin/api/category-mappings/import-tsv' + (this.mapRetroactive ? '?apply_retroactively=true' : '');
+      fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/tab-separated-values'},
+        body: this.mapText
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) {
+            window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: data.error.message || data.error, type:'error'}}));
+          } else {
+            this.mapResult = data;
+            if (data.created > 0 || data.updated > 0) {
+              window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Mappings imported successfully', type:'success'}}));
+            }
+          }
+        })
+        .catch(() => { window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Import failed',type:'error'}})); })
+        .finally(() => { this.mapImporting = false; });
     }
   };
 }
