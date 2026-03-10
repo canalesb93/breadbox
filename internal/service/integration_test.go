@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/big"
+	"strings"
 	"testing"
 
 	"breadbox/internal/db"
@@ -671,6 +672,477 @@ func TestListUnmappedCategories_TellerShowsRawCategoryStrings(t *testing.T) {
 		if rawCategories[plaidVal] {
 			t.Errorf("Plaid-style value %q should NOT appear in Teller unmapped categories", plaidVal)
 		}
+	}
+}
+
+// --- Bulk TSV Export/Import ---
+
+func TestExportCategoriesTSV(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	// Create some categories since tables are truncated between tests.
+	_, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink", DisplayName: "Food & Drink",
+	})
+	if err != nil {
+		t.Fatalf("create parent category: %v", err)
+	}
+
+	parent, err := queries.GetCategoryBySlug(ctx, "food_and_drink")
+	if err != nil {
+		t.Fatalf("get parent: %v", err)
+	}
+
+	_, err = queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink_groceries", DisplayName: "Groceries", ParentID: parent.ID,
+	})
+	if err != nil {
+		t.Fatalf("create child category: %v", err)
+	}
+
+	tsv, err := svc.ExportCategoriesTSV(ctx)
+	if err != nil {
+		t.Fatalf("ExportCategoriesTSV: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(tsv), "\n")
+	if len(lines) < 3 {
+		t.Fatalf("expected at least 3 lines (header + 2 categories), got %d", len(lines))
+	}
+
+	// Check header
+	expectedHeader := "slug\tdisplay_name\tparent_slug\ticon\tcolor\tsort_order\thidden"
+	if lines[0] != expectedHeader {
+		t.Errorf("expected header %q, got %q", expectedHeader, lines[0])
+	}
+
+	// Check for at least one parent (empty parent_slug) and one child (non-empty parent_slug)
+	hasParent := false
+	hasChild := false
+	for _, line := range lines[1:] {
+		cols := strings.Split(line, "\t")
+		if len(cols) < 3 {
+			continue
+		}
+		if cols[2] == "" {
+			hasParent = true
+		} else {
+			hasChild = true
+		}
+	}
+	if !hasParent {
+		t.Error("expected at least one parent category (empty parent_slug)")
+	}
+	if !hasChild {
+		t.Error("expected at least one child category (non-empty parent_slug)")
+	}
+}
+
+func TestImportCategoriesTSV_CreateAndUpdate(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	// Create a custom category via service
+	_, err := svc.CreateCategory(ctx, service.CreateCategoryParams{
+		Slug:        "test_parent",
+		DisplayName: "Test Parent",
+	})
+	if err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+
+	// Build TSV content
+	tsv := "slug\tdisplay_name\tparent_slug\ticon\tcolor\tsort_order\thidden\n"
+	tsv += "test_parent\tTest Parent Updated\t\tstar\t\t0\tfalse\n"
+	tsv += "new_parent\tNew Parent\t\tfolder\t\t0\tfalse\n"
+	tsv += "new_child\tNew Child\tnew_parent\tfile\t\t0\tfalse\n"
+
+	result, err := svc.ImportCategoriesTSV(ctx, tsv)
+	if err != nil {
+		t.Fatalf("ImportCategoriesTSV: %v", err)
+	}
+
+	if result.Created != 2 {
+		t.Errorf("expected Created=2, got %d", result.Created)
+	}
+	if result.Updated != 1 {
+		t.Errorf("expected Updated=1, got %d", result.Updated)
+	}
+	if result.Unchanged != 0 {
+		t.Errorf("expected Unchanged=0, got %d", result.Unchanged)
+	}
+	if len(result.Errors) != 0 {
+		t.Errorf("expected 0 errors, got %v", result.Errors)
+	}
+
+	// Verify the updated category
+	updated, err := svc.GetCategoryBySlug(ctx, "test_parent")
+	if err != nil {
+		t.Fatalf("get updated category: %v", err)
+	}
+	if updated.DisplayName != "Test Parent Updated" {
+		t.Errorf("expected display_name 'Test Parent Updated', got %q", updated.DisplayName)
+	}
+	if updated.Icon == nil || *updated.Icon != "star" {
+		t.Errorf("expected icon 'star', got %v", updated.Icon)
+	}
+
+	// Verify the new child category exists and has correct parent
+	child, err := svc.GetCategoryBySlug(ctx, "new_child")
+	if err != nil {
+		t.Fatalf("get child category: %v", err)
+	}
+	if child.DisplayName != "New Child" {
+		t.Errorf("expected display_name 'New Child', got %q", child.DisplayName)
+	}
+	// Verify parent by checking ParentID matches new_parent's ID
+	newParent, err := svc.GetCategoryBySlug(ctx, "new_parent")
+	if err != nil {
+		t.Fatalf("get new_parent category: %v", err)
+	}
+	if child.ParentID == nil || *child.ParentID != newParent.ID {
+		t.Errorf("expected parent_id %q, got %v", newParent.ID, child.ParentID)
+	}
+}
+
+func TestImportCategoriesTSV_ValidationErrors(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	tsv := "slug\tdisplay_name\tparent_slug\ticon\tcolor\tsort_order\thidden\n"
+	tsv += "INVALID-SLUG!\tBad Slug\t\t\t\t0\tfalse\n"
+	tsv += "empty_name\t\t\t\t\t0\tfalse\n"
+	tsv += "orphan_child\tOrphan Child\tghost_parent\t\t\t0\tfalse\n"
+	tsv += "valid_cat\tValid Category\t\t\t\t0\tfalse\n"
+
+	result, err := svc.ImportCategoriesTSV(ctx, tsv)
+	if err != nil {
+		t.Fatalf("ImportCategoriesTSV: %v", err)
+	}
+
+	if result.Created != 1 {
+		t.Errorf("expected Created=1, got %d", result.Created)
+	}
+	if len(result.Errors) != 3 {
+		t.Errorf("expected 3 errors, got %d: %v", len(result.Errors), result.Errors)
+	}
+
+	// Verify valid_cat was created
+	cat, err := svc.GetCategoryBySlug(ctx, "valid_cat")
+	if err != nil {
+		t.Fatalf("get valid_cat: %v", err)
+	}
+	if cat.DisplayName != "Valid Category" {
+		t.Errorf("expected 'Valid Category', got %q", cat.DisplayName)
+	}
+}
+
+func TestExportMappingsTSV(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	// Create a category and mapping since tables are truncated.
+	cat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink", DisplayName: "Food & Drink",
+	})
+	if err != nil {
+		t.Fatalf("create category: %v", err)
+	}
+
+	_, err = queries.InsertCategoryMapping(ctx, db.InsertCategoryMappingParams{
+		Provider:         db.ProviderTypePlaid,
+		ProviderCategory: "FOOD_AND_DRINK",
+		CategoryID:       cat.ID,
+	})
+	if err != nil {
+		t.Fatalf("create mapping: %v", err)
+	}
+
+	tsv, err := svc.ExportMappingsTSV(ctx)
+	if err != nil {
+		t.Fatalf("ExportMappingsTSV: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(tsv), "\n")
+	if len(lines) < 2 {
+		t.Fatalf("expected at least 2 lines (header + 1 mapping), got %d", len(lines))
+	}
+
+	expectedHeader := "provider\tprovider_category\tcategory_slug"
+	if lines[0] != expectedHeader {
+		t.Errorf("expected header %q, got %q", expectedHeader, lines[0])
+	}
+
+	// Check that plaid mappings are present
+	foundPlaid := false
+	for _, line := range lines[1:] {
+		if strings.HasPrefix(line, "plaid\t") {
+			foundPlaid = true
+			break
+		}
+	}
+	if !foundPlaid {
+		t.Error("expected at least one plaid mapping in export")
+	}
+}
+
+func TestImportMappingsTSV_CreateAndUpdate(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	// Create categories
+	foodDrink, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink", DisplayName: "Food & Drink",
+	})
+	if err != nil {
+		t.Fatalf("create food_and_drink: %v", err)
+	}
+	_, err = queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink_groceries", DisplayName: "Groceries", ParentID: foodDrink.ID,
+	})
+	if err != nil {
+		t.Fatalf("create groceries: %v", err)
+	}
+	_, err = queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink_restaurant", DisplayName: "Restaurant", ParentID: foodDrink.ID,
+	})
+	if err != nil {
+		t.Fatalf("create restaurant: %v", err)
+	}
+
+	// Create an existing mapping
+	_, err = svc.CreateMappingBySlug(ctx, "csv", "test_food", "food_and_drink")
+	if err != nil {
+		t.Fatalf("create initial mapping: %v", err)
+	}
+
+	// Build TSV to update the existing and create a new one
+	tsv := "provider\tprovider_category\tcategory_slug\n"
+	tsv += "csv\ttest_food\tfood_and_drink_groceries\n"
+	tsv += "csv\ttest_new\tfood_and_drink_restaurant\n"
+
+	result, err := svc.ImportMappingsTSV(ctx, tsv, false)
+	if err != nil {
+		t.Fatalf("ImportMappingsTSV: %v", err)
+	}
+
+	if result.Created != 1 {
+		t.Errorf("expected Created=1, got %d", result.Created)
+	}
+	if result.Updated != 1 {
+		t.Errorf("expected Updated=1, got %d", result.Updated)
+	}
+	if len(result.Errors) != 0 {
+		t.Errorf("expected 0 errors, got %v", result.Errors)
+	}
+}
+
+func TestImportMappingsTSV_ApplyRetroactively(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	// Create categories
+	foodDrink, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink", DisplayName: "Food & Drink",
+	})
+	if err != nil {
+		t.Fatalf("create food_and_drink: %v", err)
+	}
+	groceries, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink_groceries", DisplayName: "Groceries", ParentID: foodDrink.ID,
+	})
+	if err != nil {
+		t.Fatalf("create groceries: %v", err)
+	}
+
+	// Create user → connection (plaid) → account
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_retro")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "acct_retro", "Retro Checking")
+
+	// Create existing mapping: plaid FOOD_TEST → food_and_drink
+	_, err = svc.CreateMappingBySlug(ctx, "plaid", "FOOD_TEST", "food_and_drink")
+	if err != nil {
+		t.Fatalf("create initial mapping: %v", err)
+	}
+
+	// Create 3 non-overridden transactions with category_primary=FOOD_TEST, category_id=food_and_drink
+	for i := 0; i < 3; i++ {
+		extID := fmt.Sprintf("retro_txn_%d", i)
+		_, err = pool.Exec(ctx, `INSERT INTO transactions
+			(account_id, external_transaction_id, amount, iso_currency_code, date, name, category_primary, category_id, category_override)
+			VALUES ($1, $2, 10.00, 'USD', '2024-01-15', 'Test', $3, $4, $5)`,
+			acct.ID, extID, "FOOD_TEST", foodDrink.ID, false)
+		if err != nil {
+			t.Fatalf("insert transaction %d: %v", i, err)
+		}
+	}
+
+	// Create 1 overridden transaction
+	_, err = pool.Exec(ctx, `INSERT INTO transactions
+		(account_id, external_transaction_id, amount, iso_currency_code, date, name, category_primary, category_id, category_override)
+		VALUES ($1, $2, 10.00, 'USD', '2024-01-15', 'Override Test', $3, $4, $5)`,
+		acct.ID, "retro_txn_override", "FOOD_TEST", foodDrink.ID, true)
+	if err != nil {
+		t.Fatalf("insert overridden transaction: %v", err)
+	}
+
+	// Build TSV: change plaid/FOOD_TEST to point to food_and_drink_groceries
+	tsv := "provider\tprovider_category\tcategory_slug\n"
+	tsv += "plaid\tFOOD_TEST\tfood_and_drink_groceries\n"
+
+	result, err := svc.ImportMappingsTSV(ctx, tsv, true)
+	if err != nil {
+		t.Fatalf("ImportMappingsTSV: %v", err)
+	}
+
+	if result.Updated != 1 {
+		t.Errorf("expected Updated=1, got %d", result.Updated)
+	}
+	if result.TransactionsUpdated != 3 {
+		t.Errorf("expected TransactionsUpdated=3, got %d", result.TransactionsUpdated)
+	}
+
+	// Verify the overridden transaction still has the old category_id (food_and_drink)
+	var overrideCatID pgtype.UUID
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'retro_txn_override'",
+	).Scan(&overrideCatID)
+	if err != nil {
+		t.Fatalf("query override transaction: %v", err)
+	}
+	if overrideCatID != foodDrink.ID {
+		t.Errorf("overridden transaction should keep old category_id %v, got %v", foodDrink.ID, overrideCatID)
+	}
+
+	// Verify a non-overridden transaction now has groceries category_id
+	var normalCatID pgtype.UUID
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'retro_txn_0'",
+	).Scan(&normalCatID)
+	if err != nil {
+		t.Fatalf("query normal transaction: %v", err)
+	}
+	if normalCatID != groceries.ID {
+		t.Errorf("non-overridden transaction should have groceries category_id %v, got %v", groceries.ID, normalCatID)
+	}
+}
+
+func TestRoundTrip_CategoriesTSV(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	// Create some categories
+	parent, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink", DisplayName: "Food & Drink",
+		Icon: pgtype.Text{String: "utensils", Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("create parent: %v", err)
+	}
+	_, err = queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink_groceries", DisplayName: "Groceries", ParentID: parent.ID,
+		Icon: pgtype.Text{String: "shopping-cart", Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("create child: %v", err)
+	}
+	_, err = queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "income", DisplayName: "Income",
+	})
+	if err != nil {
+		t.Fatalf("create income: %v", err)
+	}
+
+	// Export
+	tsv, err := svc.ExportCategoriesTSV(ctx)
+	if err != nil {
+		t.Fatalf("ExportCategoriesTSV: %v", err)
+	}
+
+	// Count data lines
+	lines := strings.Split(strings.TrimSpace(tsv), "\n")
+	dataLines := len(lines) - 1 // exclude header
+
+	// Import same content
+	result, err := svc.ImportCategoriesTSV(ctx, tsv)
+	if err != nil {
+		t.Fatalf("ImportCategoriesTSV round-trip: %v", err)
+	}
+
+	if result.Created != 0 {
+		t.Errorf("expected Created=0 on round-trip, got %d", result.Created)
+	}
+	if result.Updated != 0 {
+		t.Errorf("expected Updated=0 on round-trip, got %d", result.Updated)
+	}
+	if result.Unchanged != dataLines {
+		t.Errorf("expected Unchanged=%d on round-trip, got %d", dataLines, result.Unchanged)
+	}
+	if len(result.Errors) != 0 {
+		t.Errorf("expected 0 errors on round-trip, got %v", result.Errors)
+	}
+}
+
+func TestRoundTrip_MappingsTSV(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	// Create categories and mappings
+	foodDrink, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink", DisplayName: "Food & Drink",
+	})
+	if err != nil {
+		t.Fatalf("create food_and_drink: %v", err)
+	}
+	groceries, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink_groceries", DisplayName: "Groceries", ParentID: foodDrink.ID,
+	})
+	if err != nil {
+		t.Fatalf("create groceries: %v", err)
+	}
+
+	_, err = queries.InsertCategoryMapping(ctx, db.InsertCategoryMappingParams{
+		Provider: db.ProviderTypePlaid, ProviderCategory: "FOOD_AND_DRINK", CategoryID: foodDrink.ID,
+	})
+	if err != nil {
+		t.Fatalf("create mapping 1: %v", err)
+	}
+	_, err = queries.InsertCategoryMapping(ctx, db.InsertCategoryMappingParams{
+		Provider: db.ProviderTypePlaid, ProviderCategory: "FOOD_AND_DRINK_GROCERIES", CategoryID: groceries.ID,
+	})
+	if err != nil {
+		t.Fatalf("create mapping 2: %v", err)
+	}
+
+	// Export
+	tsv, err := svc.ExportMappingsTSV(ctx)
+	if err != nil {
+		t.Fatalf("ExportMappingsTSV: %v", err)
+	}
+
+	// Count data lines
+	lines := strings.Split(strings.TrimSpace(tsv), "\n")
+	dataLines := len(lines) - 1
+
+	// Import same content
+	result, err := svc.ImportMappingsTSV(ctx, tsv, false)
+	if err != nil {
+		t.Fatalf("ImportMappingsTSV round-trip: %v", err)
+	}
+
+	if result.Created != 0 {
+		t.Errorf("expected Created=0 on round-trip, got %d", result.Created)
+	}
+	if result.Updated != 0 {
+		t.Errorf("expected Updated=0 on round-trip, got %d", result.Updated)
+	}
+	if result.Unchanged != dataLines {
+		t.Errorf("expected Unchanged=%d on round-trip, got %d", dataLines, result.Unchanged)
+	}
+	if len(result.Errors) != 0 {
+		t.Errorf("expected 0 errors on round-trip, got %v", result.Errors)
 	}
 }
 

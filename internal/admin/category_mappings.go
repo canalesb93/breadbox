@@ -3,6 +3,7 @@ package admin
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 
 	"breadbox/internal/service"
@@ -179,5 +180,83 @@ func ExportMappingsAdminHandler(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, mappings)
+	}
+}
+
+// ExportCategoriesTSVAdminHandler handles GET /admin/api/categories/export-tsv.
+func ExportCategoriesTSVAdminHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tsv, err := svc.ExportCategoriesTSV(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to export categories"})
+			return
+		}
+		w.Header().Set("Content-Type", "text/tab-separated-values")
+		w.Header().Set("Content-Disposition", "attachment; filename=categories.tsv")
+		w.Write([]byte(tsv))
+	}
+}
+
+// ImportCategoriesTSVAdminHandler handles POST /admin/api/categories/import-tsv.
+func ImportCategoriesTSVAdminHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
+			return
+		}
+		if len(body) == 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Request body is empty"})
+			return
+		}
+
+		result, err := svc.ImportCategoriesTSV(r.Context(), string(body))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"error": map[string]string{"code": "IMPORT_ERROR", "message": err.Error()},
+			})
+			return
+		}
+		writeJSON(w, http.StatusOK, result)
+	}
+}
+
+// ExportMappingsTSVAdminHandler handles GET /admin/api/category-mappings/export-tsv.
+func ExportMappingsTSVAdminHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tsv, err := svc.ExportMappingsTSV(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to export mappings"})
+			return
+		}
+		w.Header().Set("Content-Type", "text/tab-separated-values")
+		w.Header().Set("Content-Disposition", "attachment; filename=category_mappings.tsv")
+		w.Write([]byte(tsv))
+	}
+}
+
+// ImportMappingsTSVAdminHandler handles POST /admin/api/category-mappings/import-tsv.
+func ImportMappingsTSVAdminHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
+			return
+		}
+		if len(body) == 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Request body is empty"})
+			return
+		}
+
+		applyRetroactively := r.URL.Query().Get("apply_retroactively") == "true"
+
+		result, err := svc.ImportMappingsTSV(r.Context(), string(body), applyRetroactively)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"error": map[string]string{"code": "IMPORT_ERROR", "message": err.Error()},
+			})
+			return
+		}
+		writeJSON(w, http.StatusOK, result)
 	}
 }
