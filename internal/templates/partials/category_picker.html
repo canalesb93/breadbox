@@ -1,0 +1,155 @@
+{{define "category-picker-script"}}
+<script>
+function categoryPicker(config) {
+  return {
+    open: false,
+    search: '',
+    selectedId: config.initial || '',
+    selectedLabel: '',
+    categories: config.categories || [],
+    mode: config.mode || 'assign', // 'assign' (UUIDs) or 'filter' (slugs)
+    name: config.name || '',
+    placeholder: config.placeholder || 'Select category...',
+    allowEmpty: config.allowEmpty !== false,
+    emptyLabel: config.emptyLabel || 'All categories',
+    highlightIndex: -1,
+
+    get flatList() {
+      let items = [];
+      if (this.allowEmpty) {
+        items.push({ id: '', slug: '', label: this.emptyLabel, isParent: false, indent: false, icon: null, color: null, hidden: false });
+      }
+      for (const cat of this.categories) {
+        items.push({ id: cat.id, slug: cat.slug, label: cat.display_name, isParent: true, indent: false, icon: cat.icon, color: cat.color, hidden: cat.hidden || false });
+        if (cat.children) {
+          for (const child of cat.children) {
+            items.push({ id: child.id, slug: child.slug, label: child.display_name, isParent: false, indent: true, icon: child.icon, color: child.color, hidden: child.hidden || false, parentLabel: cat.display_name });
+          }
+        }
+      }
+      return items;
+    },
+
+    get filteredList() {
+      if (!this.search) return this.flatList.filter(i => !i.hidden || i.id === '');
+      const q = this.search.toLowerCase();
+      return this.flatList.filter(i => {
+        if (i.hidden && i.id !== '') return false;
+        if (i.id === '' && !this.allowEmpty) return false;
+        return i.label.toLowerCase().includes(q) || (i.parentLabel && i.parentLabel.toLowerCase().includes(q)) || (i.slug && i.slug.toLowerCase().includes(q));
+      });
+    },
+
+    get value() {
+      return this.mode === 'filter' ? this.selectedSlug : this.selectedId;
+    },
+
+    get selectedSlug() {
+      const item = this.flatList.find(i => (this.mode === 'filter' ? i.slug === this.selectedId : i.id === this.selectedId));
+      return item ? item.slug : '';
+    },
+
+    get displayLabel() {
+      if (!this.selectedId) return this.allowEmpty ? this.emptyLabel : this.placeholder;
+      const item = this.flatList.find(i => (this.mode === 'filter' ? i.slug === this.selectedId : i.id === this.selectedId));
+      if (!item) return this.placeholder;
+      return item.indent ? (item.parentLabel + ' \u203a ' + item.label) : item.label;
+    },
+
+    get displayColor() {
+      if (!this.selectedId) return null;
+      const item = this.flatList.find(i => (this.mode === 'filter' ? i.slug === this.selectedId : i.id === this.selectedId));
+      return item ? item.color : null;
+    },
+
+    get displayIcon() {
+      if (!this.selectedId) return null;
+      const item = this.flatList.find(i => (this.mode === 'filter' ? i.slug === this.selectedId : i.id === this.selectedId));
+      return item ? item.icon : null;
+    },
+
+    itemValue(item) {
+      return this.mode === 'filter' ? item.slug : item.id;
+    },
+
+    select(item) {
+      this.selectedId = this.itemValue(item);
+      this.open = false;
+      this.search = '';
+      this.highlightIndex = -1;
+      this.$dispatch('category-change', { id: item.id, slug: item.slug, label: item.label });
+      this.$nextTick(() => {
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nameAttr: 'data-lucide' });
+      });
+    },
+
+    handleKeydown(e) {
+      const list = this.filteredList;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        this.highlightIndex = Math.min(this.highlightIndex + 1, list.length - 1);
+        this.scrollToHighlighted();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        this.highlightIndex = Math.max(this.highlightIndex - 1, 0);
+        this.scrollToHighlighted();
+      } else if (e.key === 'Enter' && this.highlightIndex >= 0 && list[this.highlightIndex]) {
+        e.preventDefault();
+        this.select(list[this.highlightIndex]);
+      } else if (e.key === 'Escape') {
+        this.open = false;
+        this.search = '';
+        this.highlightIndex = -1;
+      }
+    },
+
+    scrollToHighlighted() {
+      this.$nextTick(() => {
+        const el = this.$refs.listbox?.querySelector('[data-highlighted="true"]');
+        if (el) el.scrollIntoView({ block: 'nearest' });
+      });
+    },
+
+    openPicker() {
+      this.open = true;
+      this.search = '';
+      this.highlightIndex = -1;
+      this.$nextTick(() => {
+        this.$refs.searchInput?.focus();
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nameAttr: 'data-lucide' });
+      });
+    },
+
+    init() {
+      this.$nextTick(() => {
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nameAttr: 'data-lucide' });
+      });
+    }
+  };
+}
+</script>
+{{end}}
+
+{{define "category-picker-styles"}}
+<style>
+  .bb-cat-picker { position: relative; }
+  .bb-cat-picker-dropdown {
+    position: absolute; z-index: 50; left: 0; right: 0; top: 100%;
+    margin-top: 0.25rem; max-height: 18rem; overflow-y: auto;
+    background: var(--b1, oklch(1 0 0)); border: 1px solid var(--bc, oklch(0.746 0 0)); border-radius: var(--rounded-btn, 0.5rem);
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -2px rgba(0,0,0,.1);
+  }
+  .bb-cat-item {
+    display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem;
+    cursor: pointer; min-height: 2.5rem; font-size: 0.875rem; transition: background 0.1s;
+  }
+  .bb-cat-item:hover, .bb-cat-item[data-highlighted="true"] { background: var(--b2, oklch(0.961 0 0)); }
+  .bb-cat-item--indent { padding-left: 2rem; }
+  .bb-cat-item--parent { font-weight: 600; }
+  .bb-cat-dot { width: 0.625rem; height: 0.625rem; border-radius: 9999px; flex-shrink: 0; }
+  .bb-cat-icon { width: 1rem; height: 1rem; flex-shrink: 0; opacity: 0.7; }
+  @media (max-width: 640px) {
+    .bb-cat-picker-dropdown { position: fixed; left: 0.5rem; right: 0.5rem; top: auto; bottom: 0; max-height: 60vh; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  }
+</style>
+{{end}}

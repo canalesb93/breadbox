@@ -391,7 +391,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	selectPrefix := "SELECT t.id, t.account_id, COALESCE(a.display_name, a.name, ''), " +
 		"COALESCE(bc.institution_name, ''), COALESCE(u.name, ''), " +
 		"t.date, t.name, t.merchant_name, t.amount, t.iso_currency_code, " +
-		"c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, " +
+		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, " +
 		"t.category_override, t.pending, t.created_at, t.updated_at "
 	fromClause := "FROM transactions t " +
 		"LEFT JOIN accounts a ON t.account_id = a.id " +
@@ -533,6 +533,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			merchantName     pgtype.Text
 			amount           pgtype.Numeric
 			isoCurrencyCode  pgtype.Text
+			categoryID       pgtype.UUID
 			catDisplayName   pgtype.Text
 			catSlug          pgtype.Text
 			catIcon          pgtype.Text
@@ -546,7 +547,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			&id, &accountID, &accountName,
 			&institutionName, &userName,
 			&date, &name, &merchantName, &amount, &isoCurrencyCode,
-			&catDisplayName, &catSlug, &catIcon,
+			&categoryID, &catDisplayName, &catSlug, &catIcon,
 			&categoryOverride, &pending, &createdAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan admin transaction: %w", err)
@@ -562,6 +563,12 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			dateVal = *ds
 		}
 
+		var catIDPtr *string
+		if categoryID.Valid {
+			s := formatUUID(categoryID)
+			catIDPtr = &s
+		}
+
 		transactions = append(transactions, AdminTransactionRow{
 			ID:                  formatUUID(id),
 			AccountID:           formatUUID(accountID),
@@ -573,6 +580,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			MerchantName:        textPtr(merchantName),
 			Amount:              amountVal,
 			IsoCurrencyCode:     textPtr(isoCurrencyCode),
+			CategoryID:          catIDPtr,
 			CategoryDisplayName: textPtr(catDisplayName),
 			CategorySlug:        textPtr(catSlug),
 			CategoryIcon:        textPtr(catIcon),

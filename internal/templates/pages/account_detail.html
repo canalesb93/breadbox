@@ -1,4 +1,6 @@
 {{define "content"}}
+{{template "category-picker-styles" .}}
+
 <div class="breadcrumbs text-sm mb-4">
   <ul>
     <li><a href="/admin/connections/{{.Account.ConnectionID}}">{{.Account.InstitutionName}}</a></li>
@@ -49,7 +51,7 @@
 
 <h2 class="text-xl font-semibold mb-4">Transactions</h2>
 
-<form method="GET" action="/admin/accounts/{{.AccountID}}" class="bb-filter-bar">
+<form method="GET" action="/admin/accounts/{{.AccountID}}" class="bb-filter-bar" x-data>
   <label>
     Start Date
     <input type="date" name="start_date" value="{{.FilterStartDate}}">
@@ -60,17 +62,27 @@
   </label>
   <label>
     Category
-    <select name="category" class="select select-bordered select-sm">
-      <option value="">All categories</option>
-      {{range .Categories}}
-      <optgroup label="{{.DisplayName}}">
-        <option value="{{.Slug}}"{{if eq .Slug $.FilterCategory}} selected{{end}}>All {{.DisplayName}}</option>
-        {{range .Children}}
-        <option value="{{.Slug}}"{{if eq .Slug $.FilterCategory}} selected{{end}}>{{.DisplayName}}</option>
-        {{end}}
-      </optgroup>
-      {{end}}
-    </select>
+    <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'filter', initial: '{{.FilterCategory}}', allowEmpty: true, emptyLabel: 'All categories'})" @category-change="$refs.catInput.value = selectedSlug">
+      <input type="hidden" name="category" x-ref="catInput" value="{{.FilterCategory}}">
+      <button type="button" class="select select-sm select-bordered w-auto min-w-[8rem] text-left flex items-center gap-2" @click="openPicker()">
+        <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
+        <span x-text="displayLabel" class="text-sm truncate"></span>
+      </button>
+      <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false">
+        <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
+          <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search categories..." class="input input-sm input-bordered w-full">
+        </div>
+        <div x-ref="listbox">
+          <template x-for="(item, idx) in filteredList" :key="item.slug || idx">
+            <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item); $refs.catInput.value = item.slug">
+              <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
+              <template x-if="item.icon"><i :data-lucide="item.icon" class="bb-cat-icon"></i></template>
+              <span x-text="item.label"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
   </label>
   <label>
     Pending
@@ -113,7 +125,28 @@
         <td class="bb-amount{{if lt .Amount 0.0}} text-error{{end}}">
           {{printf "%.2f" .Amount}}{{if .IsoCurrencyCode}} {{.IsoCurrencyCode}}{{end}}
         </td>
-        <td>{{if .CategoryDisplayName}}{{.CategoryDisplayName}}{{if .CategoryOverride}} <span class="badge badge-outline badge-xs">override</span>{{end}}{{else}}&mdash;{{end}}</td>
+        <td @click.stop>
+          <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: '\u2014', allowEmpty: true, emptyLabel: 'Uncategorized'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
+            <button type="button" class="btn btn-ghost btn-xs gap-1.5 -ml-1" @click="openPicker()">
+              <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
+              <span x-text="displayLabel" class="text-sm"></span>
+              {{if .CategoryOverride}}<span class="badge badge-outline badge-xs">override</span>{{end}}
+            </button>
+            <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false" style="min-width:16rem">
+              <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
+                <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search..." class="input input-sm input-bordered w-full">
+              </div>
+              <div x-ref="listbox">
+                <template x-for="(item, idx) in filteredList" :key="item.id || idx">
+                  <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item)">
+                    <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
+                    <span x-text="item.label"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </td>
         <td>{{if .Pending}}<span class="badge badge-warning badge-sm">Pending</span>{{end}}</td>
       </tr>
       <tr x-show="expanded" x-cloak>
@@ -160,9 +193,29 @@
 </div>
 {{end}}
 
+{{template "category-picker-script" .}}
 <script>
 function showToast(message, type) {
   window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type || 'error' } }));
+}
+
+function quickSetCategory(txId, categoryId) {
+  if (!categoryId) {
+    fetch('/admin/api/transactions/' + txId + '/category', { method: 'DELETE' })
+    .then(function(r) {
+      if (r.ok || r.status === 204) showToast('Category reset', 'success');
+    });
+    return;
+  }
+  fetch('/admin/api/transactions/' + txId + '/category', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({category_id: categoryId})
+  })
+  .then(function(r) {
+    if (r.ok) showToast('Category updated', 'success');
+    else r.json().then(function(d) { showToast(d.error?.message || 'Failed', 'error'); });
+  });
 }
 
 function updateDisplayName(accountId, val) {

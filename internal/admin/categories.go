@@ -13,6 +13,7 @@ import (
 )
 
 // CategoriesPageHandler serves GET /admin/categories.
+// Serves the combined categories + mappings page with tabs.
 func CategoriesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -29,9 +30,29 @@ func CategoriesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 			return
 		}
 
+		// Parse optional provider filter for mappings tab.
+		var providerPtr *string
+		if p := r.URL.Query().Get("provider"); p == "plaid" || p == "teller" || p == "csv" {
+			providerPtr = &p
+		}
+
+		mappings, err := svc.ListMappings(ctx, providerPtr)
+		if err != nil {
+			http.Error(w, "Failed to load mappings", http.StatusInternalServerError)
+			return
+		}
+
+		filterProvider := ""
+		if providerPtr != nil {
+			filterProvider = *providerPtr
+		}
+
 		data := BaseTemplateData(r, sm, "categories", "Categories")
 		data["Categories"] = categories
 		data["UnmappedCount"] = len(unmapped)
+		data["UnmappedCategories"] = unmapped
+		data["Mappings"] = mappings
+		data["FilterProvider"] = filterProvider
 		tr.Render(w, r, "categories.html", data)
 	}
 }

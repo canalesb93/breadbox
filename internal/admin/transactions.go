@@ -289,6 +289,12 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			entries = auditResult.Entries
 		}
 
+		// Load category tree for inline category picker.
+		categoryTree, err := svc.ListCategoryTree(ctx)
+		if err != nil {
+			a.Logger.Error("list categories for transaction detail", "error", err)
+		}
+
 		data := map[string]any{
 			"PageTitle":     txn.Name,
 			"CurrentPage":   "transactions",
@@ -301,6 +307,7 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			"UserName":      userName,
 			"Comments":      comments,
 			"AuditEntries":  entries,
+			"Categories":    categoryTree,
 		}
 		tr.Render(w, r, "transaction_detail.html", data)
 	}
