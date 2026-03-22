@@ -61,18 +61,18 @@ REVIEW QUEUE:
 - After reviewing, create transaction rules for patterns you noticed so future transactions are auto-categorized
 
 TRANSACTION RULES:
-- Rules auto-categorize future transactions during sync. Creating good rules is how the system learns over time.
+- Rules auto-categorize future transactions during sync. Good rules dramatically reduce future review work.
 - Conditions use a flexible JSON tree with AND/OR/NOT logic and operators: eq, contains, matches (regex), gt, gte, lt, lte, in
 - Available fields: name, merchant_name, amount, category_primary (raw provider category), category_detailed, pending, provider, account_id, user_id
 
-RULE QUALITY — IMPORTANT:
-- Prefer BROAD rules over per-merchant rules. A single rule matching a raw provider category covers hundreds of transactions.
-- BEST: Match on category_primary + provider to cover entire transaction classes. Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]} categorizes ALL Teller dining transactions at once.
-- GOOD: Match on merchant_name with contains for well-known merchants that span categories (e.g., Amazon, Walmart).
-- PER-MERCHANT rules are fine for specific cases (local businesses, merchants that always get miscategorized), but if many transactions share the same category_primary, prefer ONE broad rule over many merchant-specific ones.
-- Before creating rules, examine the category_primary and category_detailed fields on transactions — these raw provider categories are the most powerful matching criteria.
+RULE CREATION STRATEGY — follow this order:
+1. FIRST, create category_primary rules (highest impact). Look at the category_primary field on transactions — these are raw provider categories like "dining", "groceries", "phone", "accommodation", "fuel", "entertainment". One rule per category_primary covers ALL transactions with that label. Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]} → food_and_drink_restaurant. This single rule handles every dining transaction from Teller.
+2. THEN, create name-pattern rules for transaction types that span merchants: "ATM Withdrawal" → withdrawals, "Wire Transfer" → transfer_out, "Service Charge" → bank_fees, "Cash Deposit" → deposits. Use contains on the name field.
+3. LAST, create per-merchant rules only for specific merchants that get miscategorized or need a different category than their category_primary suggests (e.g., Walmart categorized as "shopping" but you want it under "groceries").
+
 - ALWAYS check list_transaction_rules before creating to avoid duplicates
-- Use batch_create_rules to create multiple rules efficiently`
+- Use batch_create_rules to create multiple rules efficiently
+- Before creating rules, query some transactions to see what category_primary values exist — use query_transactions with fields=core,category`
 
 // ToolClassification indicates whether a tool is read-only or performs writes.
 type ToolClassification string
