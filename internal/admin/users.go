@@ -8,7 +8,6 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
-	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -136,11 +135,7 @@ func CreateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 			return
 		}
 
-		actor := ActorFromSession(sm, r)
 		userID := formatUUID(user.ID)
-		_ = a.Service.WriteAuditLog(r.Context(), []service.AuditLogEntry{{
-			EntityType: "user", EntityID: userID, Action: "create", Actor: actor,
-		}})
 
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"id":         userID,
@@ -221,31 +216,6 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 			a.Logger.Error("update user", "error", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update user"})
 			return
-		}
-
-		// Write audit log entries for changed fields.
-		actor := ActorFromSession(sm, r)
-		var entries []service.AuditLogEntry
-		if name != existing.Name {
-			field := "name"
-			oldVal := existing.Name
-			newVal := name
-			entries = append(entries, service.AuditLogEntry{
-				EntityType: "user", EntityID: idStr, Action: "update",
-				Field: &field, OldValue: &oldVal, NewValue: &newVal, Actor: actor,
-			})
-		}
-		if email != existing.Email {
-			field := "email"
-			oldVal := existing.Email.String
-			newVal := email.String
-			entries = append(entries, service.AuditLogEntry{
-				EntityType: "user", EntityID: idStr, Action: "update",
-				Field: &field, OldValue: &oldVal, NewValue: &newVal, Actor: actor,
-			})
-		}
-		if len(entries) > 0 {
-			_ = a.Service.WriteAuditLog(r.Context(), entries)
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{

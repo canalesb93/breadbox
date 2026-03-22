@@ -55,21 +55,6 @@ func (s *Service) CreateComment(ctx context.Context, params CreateCommentParams)
 		return nil, fmt.Errorf("create comment: %w", err)
 	}
 
-	// Write audit log entry.
-	preview := content
-	if len(preview) > 100 {
-		preview = preview[:100] + "…"
-	}
-	field := "comment_added"
-	_ = s.WriteAuditLog(ctx, []AuditLogEntry{{
-		EntityType: "transaction",
-		EntityID:   params.TransactionID,
-		Action:     "update",
-		Field:      &field,
-		NewValue:   &preview,
-		Actor:      params.Actor,
-	}})
-
 	resp := commentFromRow(comment)
 	return &resp, nil
 }
@@ -152,17 +137,6 @@ func (s *Service) DeleteComment(ctx context.Context, id string, actor Actor) err
 	if err := s.Queries.DeleteComment(ctx, commentID); err != nil {
 		return fmt.Errorf("delete comment: %w", err)
 	}
-
-	// Write audit log entry.
-	field := "comment_deleted"
-	txnID := formatUUID(existing.TransactionID)
-	_ = s.WriteAuditLog(ctx, []AuditLogEntry{{
-		EntityType: "transaction",
-		EntityID:   txnID,
-		Action:     "update",
-		Field:      &field,
-		Actor:      actor,
-	}})
 
 	return nil
 }

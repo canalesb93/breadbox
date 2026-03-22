@@ -287,15 +287,6 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			a.Logger.Error("list transaction comments", "error", err)
 		}
 
-		auditResult, err := svc.ListAuditLog(ctx, service.AuditLogListParams{
-			EntityType: "transaction",
-			EntityID:   idStr,
-			Limit:      50,
-		})
-		if err != nil {
-			a.Logger.Error("list transaction audit log", "error", err)
-		}
-
 		// Use denormalized names from the transaction response.
 		var accountName, userName, accountID string
 		if txn.AccountID != nil {
@@ -306,11 +297,6 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 		}
 		if txn.UserName != nil {
 			userName = *txn.UserName
-		}
-
-		var entries []service.AuditLogResponse
-		if auditResult != nil {
-			entries = auditResult.Entries
 		}
 
 		// Load category tree for inline category picker.
@@ -330,7 +316,6 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			"AccountName":   accountName,
 			"UserName":      userName,
 			"Comments":      comments,
-			"AuditEntries":  entries,
 			"Categories":    categoryTree,
 		}
 		tr.Render(w, r, "transaction_detail.html", data)

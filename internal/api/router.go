@@ -58,8 +58,6 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/connections", ListConnectionsHandler(svc))
 		r.Get("/connections/{id}/status", GetConnectionStatusHandler(svc))
 		r.Get("/transactions/{transaction_id}/comments", ListCommentsHandler(svc))
-		r.Get("/audit-log", ListAuditLogHandler(svc))
-		r.Get("/transactions/{id}/audit-log", ListTransactionAuditLogHandler(svc))
 		r.Get("/reviews", ListReviewsHandler(svc))
 		r.Get("/reviews/counts", ReviewCountsHandler(svc))
 		r.Get("/reviews/{id}", GetReviewHandler(svc))

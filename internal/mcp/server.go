@@ -51,11 +51,9 @@ RECOMMENDED QUERY PATTERNS:
 6. Check get_sync_status to verify data freshness
 7. Use list_unmapped_categories to identify categorization gaps
 
-COMMENTS & AUDIT LOG:
+COMMENTS:
 - Use add_transaction_comment to explain your reasoning when recategorizing transactions
 - Check list_transaction_comments before modifying a transaction to see prior context
-- Use get_transaction_history to understand how a transaction has been modified over time
-- Use query_audit_log with actor_type='user' to learn the family's categorization preferences
 
 REVIEW QUEUE:
 - Transactions are automatically enqueued for review during sync (new, uncategorized, or low-confidence)
@@ -143,12 +141,6 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("list_transaction_comments", ToolRead,
 			"List all comments on a transaction, ordered chronologically. Check comments before making changes to understand prior context and decisions by other agents or family members.",
 			s.handleListTransactionComments),
-		makeToolDef("get_transaction_history", ToolRead,
-			"Get the change history (audit log) for a specific transaction. Shows all modifications including category changes, comment additions, and sync updates. Use this to understand how a transaction's categorization evolved over time and learn from past decisions.",
-			s.handleGetTransactionHistory),
-		makeToolDef("query_audit_log", ToolRead,
-			"Query the global audit log to see all changes across the system. Use entity_type to focus on specific data types. Filter by actor_type='agent' to see what other AI agents have done, or actor_type='user' to see manual changes by the family. Useful for learning patterns: e.g., query all category overrides to understand the family's preferences.",
-			s.handleQueryAuditLog),
 		makeToolDef("transaction_summary", ToolRead,
 			"Get aggregated transaction totals grouped by category and/or time period. Replaces the need to paginate through thousands of individual transactions for spending analysis. Amounts follow the convention: positive = money out (debit), negative = money in (credit). Only includes non-deleted, non-pending transactions by default.",
 			s.handleTransactionSummary),
