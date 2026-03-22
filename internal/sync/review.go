@@ -31,7 +31,7 @@ func confidenceLevelToScore(level string) float64 {
 
 // enqueueForReview adds a transaction to the review queue if it meets
 // criteria (uncategorized, low confidence, or new).
-func (e *Engine) enqueueForReview(ctx context.Context, txQueries *db.Queries, txnResult db.Transaction, isNew bool, confidenceThreshold float64, resolver *CategoryResolver) {
+func (e *Engine) enqueueForReview(ctx context.Context, txQueries *db.Queries, txnResult db.Transaction, isNew bool, confidenceThreshold float64, resolver *RuleResolver) {
 	// Skip if transaction has category_override = true
 	if txnResult.CategoryOverride {
 		return
