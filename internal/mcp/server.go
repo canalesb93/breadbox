@@ -56,24 +56,23 @@ COMMENTS:
 - Check list_transaction_comments before modifying a transaction to see prior context
 
 REVIEW QUEUE:
-- When asked to "review transactions", ALWAYS use the review queue. NEVER query transactions directly for review tasks.
-- Step 1: list_pending_reviews to get transactions needing review
-- Step 2: For EACH pending review, submit_review with decision "approved" and the correct category_slug. This is the primary task — every pending review must be resolved.
-- Step 3: AFTER all reviews are submitted, look for patterns (recurring merchants, similar names) and create transaction rules so future similar transactions are auto-categorized.
-- Do NOT skip to rule creation without first approving/categorizing the pending reviews. The reviews are the actual work; rules are the bonus.
-- Use batch_submit_reviews to process multiple reviews efficiently.
+- list_pending_reviews shows transactions flagged during sync that need categorization
+- Use submit_review (or batch_submit_reviews) to approve with the correct category_slug, or skip if uncertain
+- After reviewing, create transaction rules for patterns you noticed so future transactions are auto-categorized
 
 TRANSACTION RULES:
-- Rules auto-categorize future transactions during sync. Creating good rules during reviews is how the system learns over time.
-- Only create rules AFTER you have reviewed and categorized the pending transactions.
+- Rules auto-categorize future transactions during sync. Creating good rules is how the system learns over time.
 - Conditions use a flexible JSON tree with AND/OR/NOT logic and operators: eq, contains, matches (regex), gt, gte, lt, lte, in
 - Available fields: name, merchant_name, amount, category_primary (raw provider category), category_detailed, pending, provider, account_id, user_id
-- Use create_transaction_rule or batch_create_rules — think carefully about the pattern, scope, and whether a similar rule exists
-- Example: {"field": "name", "op": "contains", "value": "uber eats"} matches all Uber Eats transactions
-- Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]}
-- Rules persist and apply to ALL future transactions during sync — higher priority wins
+
+RULE QUALITY — IMPORTANT:
+- Prefer BROAD rules over per-merchant rules. A single rule matching a raw provider category covers hundreds of transactions.
+- BEST: Match on category_primary + provider to cover entire transaction classes. Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]} categorizes ALL Teller dining transactions at once.
+- GOOD: Match on merchant_name with contains for well-known merchants that span categories (e.g., Amazon, Walmart).
+- PER-MERCHANT rules are fine for specific cases (local businesses, merchants that always get miscategorized), but if many transactions share the same category_primary, prefer ONE broad rule over many merchant-specific ones.
+- Before creating rules, examine the category_primary and category_detailed fields on transactions — these raw provider categories are the most powerful matching criteria.
 - ALWAYS check list_transaction_rules before creating to avoid duplicates
-- Prefer broader patterns over exact matches (contains "uber" beats eq "UBER EATS #1234")`
+- Use batch_create_rules to create multiple rules efficiently`
 
 // ToolClassification indicates whether a tool is read-only or performs writes.
 type ToolClassification string
