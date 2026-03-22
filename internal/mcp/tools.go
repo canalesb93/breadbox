@@ -681,8 +681,8 @@ func (s *MCPServer) handleSubmitReview(ctx context.Context, _ *mcpsdk.CallToolRe
 type createTransactionRuleInput struct {
 	Name         string          `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
 	CategorySlug string          `json:"category_slug" jsonschema:"required,Category slug to assign when this rule matches (e.g. food_and_drink_restaurant). Use list_categories to find slugs."`
-	Conditions   json.RawMessage `json:"conditions" jsonschema:"required,Condition tree as JSON object. Leaf: {field op value}. Branch: {and: [...]} or {or: [...]} or {not: {...}}. Fields: name merchant_name amount category_primary category_detailed pending provider account_id user_id. Operators: eq neq contains not_contains matches gt gte lt lte in."`
-	Priority     int             `json:"priority,omitempty" jsonschema:"Priority (higher wins when multiple rules match). Default 10."`
+	Conditions   map[string]any `json:"conditions" jsonschema:"required,Condition tree as JSON object. Leaf: {field op value}. Branch: {and: [...]} or {or: [...]} or {not: {...}}. Fields: name merchant_name amount category_primary category_detailed pending provider account_id user_id. Operators: eq neq contains not_contains matches gt gte lt lte in."`
+	Priority     int            `json:"priority,omitempty" jsonschema:"Priority (higher wins when multiple rules match). Default 10."`
 	ExpiresIn    string          `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
 }
 
@@ -697,7 +697,7 @@ type listTransactionRulesInput struct {
 type updateTransactionRuleInput struct {
 	ID           string           `json:"id" jsonschema:"required,UUID of the rule to update"`
 	Name         *string          `json:"name,omitempty" jsonschema:"New name for the rule"`
-	Conditions   *json.RawMessage `json:"conditions,omitempty" jsonschema:"New condition tree (same format as create)"`
+	Conditions   map[string]any `json:"conditions,omitempty" jsonschema:"New condition tree (same format as create)"`
 	CategorySlug *string          `json:"category_slug,omitempty" jsonschema:"New category slug"`
 	Priority     *int             `json:"priority,omitempty" jsonschema:"New priority"`
 	Enabled      *bool            `json:"enabled,omitempty" jsonschema:"Enable or disable the rule"`
@@ -715,7 +715,7 @@ type batchCreateRulesInput struct {
 type batchRuleItem struct {
 	Name         string          `json:"name" jsonschema:"required,Human-readable rule name"`
 	CategorySlug string          `json:"category_slug" jsonschema:"required,Category slug to assign"`
-	Conditions   json.RawMessage `json:"conditions" jsonschema:"required,Condition tree as JSON object"`
+	Conditions   map[string]any `json:"conditions" jsonschema:"required,Condition tree as JSON object"`
 	Priority     int             `json:"priority,omitempty" jsonschema:"Priority (default 10)"`
 	ExpiresIn    string          `json:"expires_in,omitempty" jsonschema:"Optional expiry duration"`
 }
@@ -740,9 +740,9 @@ func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.C
 		return errorResult(fmt.Errorf("name and category_slug are required")), nil, nil
 	}
 
-	var conditions service.Condition
-	if err := json.Unmarshal(input.Conditions, &conditions); err != nil {
-		return errorResult(fmt.Errorf("invalid conditions JSON: %w", err)), nil, nil
+	conditions, err := parseConditions(input.Conditions)
+	if err != nil {
+		return errorResult(err), nil, nil
 	}
 
 	actor := service.ActorFromContext(ctx)
@@ -798,10 +798,10 @@ func (s *MCPServer) handleUpdateTransactionRule(ctx context.Context, _ *mcpsdk.C
 	}
 
 	var conditionsPtr *service.Condition
-	if input.Conditions != nil {
-		var c service.Condition
-		if err := json.Unmarshal(*input.Conditions, &c); err != nil {
-			return errorResult(fmt.Errorf("invalid conditions JSON: %w", err)), nil, nil
+	if len(input.Conditions) > 0 {
+		c, err := parseConditions(input.Conditions)
+		if err != nil {
+			return errorResult(err), nil, nil
 		}
 		conditionsPtr = &c
 	}
@@ -903,12 +903,12 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 			continue
 		}
 
-		var conditions service.Condition
-		if err := json.Unmarshal(r.Conditions, &conditions); err != nil {
+		conditions, err := parseConditions(r.Conditions)
+		if err != nil {
 			errors = append(errors, map[string]string{
 				"index": fmt.Sprintf("%d", i),
 				"name":  r.Name,
-				"error": fmt.Sprintf("invalid conditions JSON: %v", err),
+				"error": err.Error(),
 			})
 			continue
 		}
@@ -946,6 +946,19 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 }
 
 // --- Helpers ---
+
+// parseConditions converts a map[string]any (from MCP input) to a service.Condition.
+func parseConditions(m map[string]any) (service.Condition, error) {
+	data, err := json.Marshal(m)
+	if err != nil {
+		return service.Condition{}, fmt.Errorf("invalid conditions: %w", err)
+	}
+	var c service.Condition
+	if err := json.Unmarshal(data, &c); err != nil {
+		return service.Condition{}, fmt.Errorf("invalid conditions: %w", err)
+	}
+	return c, nil
+}
 
 func jsonResult(v any) (*mcpsdk.CallToolResult, any, error) {
 	data, err := json.Marshal(v)
