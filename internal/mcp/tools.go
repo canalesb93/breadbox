@@ -68,18 +68,6 @@ type listTransactionCommentsInput struct {
 	TransactionID string `json:"transaction_id" jsonschema:"required,UUID of the transaction"`
 }
 
-type getTransactionHistoryInput struct {
-	TransactionID string `json:"transaction_id" jsonschema:"required,UUID of the transaction"`
-	Limit         int    `json:"limit,omitempty" jsonschema:"Max entries to return (default 50, max 200)"`
-}
-
-type queryAuditLogInput struct {
-	EntityType string `json:"entity_type,omitempty" jsonschema:"Filter by entity type: transaction, account, connection, user"`
-	ActorType  string `json:"actor_type,omitempty" jsonschema:"Filter by who made the change: user, agent, system"`
-	Limit      int    `json:"limit,omitempty" jsonschema:"Max entries to return (default 50, max 200)"`
-	Cursor     string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
-}
-
 type transactionSummaryInput struct {
 	StartDate      string `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive. Defaults to 30 days ago."`
 	EndDate        string `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive. Defaults to today."`
@@ -410,39 +398,6 @@ func (s *MCPServer) handleListTransactionComments(ctx context.Context, _ *mcpsdk
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(comments)
-}
-
-func (s *MCPServer) handleGetTransactionHistory(ctx context.Context, _ *mcpsdk.CallToolRequest, input getTransactionHistoryInput) (*mcpsdk.CallToolResult, any, error) {
-	if input.TransactionID == "" {
-		return errorResult(fmt.Errorf("transaction_id is required")), nil, nil
-	}
-	result, err := s.svc.ListAuditLog(ctx, service.AuditLogListParams{
-		EntityType: "transaction",
-		EntityID:   input.TransactionID,
-		Limit:      input.Limit,
-	})
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(result)
-}
-
-func (s *MCPServer) handleQueryAuditLog(ctx context.Context, _ *mcpsdk.CallToolRequest, input queryAuditLogInput) (*mcpsdk.CallToolResult, any, error) {
-	params := service.AuditLogGlobalParams{
-		Limit:  input.Limit,
-		Cursor: input.Cursor,
-	}
-	if input.EntityType != "" {
-		params.EntityType = &input.EntityType
-	}
-	if input.ActorType != "" {
-		params.ActorType = &input.ActorType
-	}
-	result, err := s.svc.ListAuditLogGlobal(ctx, params)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(result)
 }
 
 func (s *MCPServer) handleTransactionSummary(_ context.Context, _ *mcpsdk.CallToolRequest, input transactionSummaryInput) (*mcpsdk.CallToolResult, any, error) {

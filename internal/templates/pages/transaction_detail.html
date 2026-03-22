@@ -113,36 +113,6 @@
   </div>
 </div>
 
-{{if .AuditEntries}}
-<h2 class="text-xl font-semibold mb-4">History</h2>
-<div class="overflow-x-auto border border-base-300 rounded-lg mb-6">
-  <table class="table table-zebra table-sm">
-    <thead>
-      <tr>
-        <th>Time</th>
-        <th>Action</th>
-        <th>Field</th>
-        <th>Old Value</th>
-        <th>New Value</th>
-        <th>Actor</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range .AuditEntries}}
-      <tr>
-        <td class="text-xs">{{.CreatedAt}}</td>
-        <td><span class="badge badge-ghost badge-xs">{{.Action}}</span></td>
-        <td>{{if .Field}}{{.Field}}{{else}}&mdash;{{end}}</td>
-        <td class="text-xs max-w-32 truncate">{{if .OldValue}}{{.OldValue}}{{else}}&mdash;{{end}}</td>
-        <td class="text-xs max-w-32 truncate">{{if .NewValue}}{{.NewValue}}{{else}}&mdash;{{end}}</td>
-        <td><span class="badge badge-ghost badge-xs">{{.ActorType}}</span> {{.ActorName}}</td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
-</div>
-{{end}}
-
 {{template "category-picker-script" .}}
 <script>
 function txCategoryEditor() {

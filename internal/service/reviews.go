@@ -478,42 +478,7 @@ func (s *Service) SubmitReview(ctx context.Context, params SubmitReviewParams) (
 		if err := s.SetTransactionCategory(ctx, txnID, *categoryToApply); err != nil {
 			s.Logger.Warn("failed to set transaction category from review", "error", err, "transaction_id", txnID)
 		}
-
-		// Audit log for category change
-		field := "category_id"
-		newVal := *categoryToApply
-		reviewIDStr := formatUUID(reviewID)
-		_ = s.WriteAuditLog(ctx, []AuditLogEntry{{
-			EntityType: "transaction",
-			EntityID:   txnID,
-			Action:     "update",
-			Field:      &field,
-			NewValue:   &newVal,
-			Actor:      params.Actor,
-			Metadata: map[string]string{
-				"trigger":   "review",
-				"review_id": reviewIDStr,
-			},
-		}})
 	}
-
-	// Audit log for review decision
-	field := "status"
-	oldVal := "pending"
-	reviewIDStr := formatUUID(reviewID)
-	_ = s.WriteAuditLog(ctx, []AuditLogEntry{{
-		EntityType: "review_queue",
-		EntityID:   reviewIDStr,
-		Action:     "update",
-		Field:      &field,
-		OldValue:   &oldVal,
-		NewValue:   &params.Decision,
-		Actor:      params.Actor,
-		Metadata: map[string]string{
-			"review_type":    existing.ReviewType,
-			"transaction_id": txnID,
-		},
-	}})
 
 	// If note provided, create a transaction comment
 	if params.Note != nil && strings.TrimSpace(*params.Note) != "" {
@@ -603,18 +568,6 @@ func (s *Service) EnqueueManualReview(ctx context.Context, transactionID string,
 		return nil, fmt.Errorf("enqueue review: %w", err)
 	}
 
-	// Audit log
-	reviewIDStr := formatUUID(review.ID)
-	_ = s.WriteAuditLog(ctx, []AuditLogEntry{{
-		EntityType: "review_queue",
-		EntityID:   reviewIDStr,
-		Action:     "create",
-		Actor:      actor,
-		Metadata: map[string]string{
-			"transaction_id": transactionID,
-		},
-	}})
-
 	resp := s.reviewFromRow(ctx, review)
 	return &resp, nil
 }
@@ -671,20 +624,6 @@ func (s *Service) DismissReview(ctx context.Context, id string, actor Actor) err
 		return fmt.Errorf("delete review: %w", err)
 	}
 
-	// Audit log
-	reviewIDStr := formatUUID(reviewID)
-	txnID := formatUUID(existing.TransactionID)
-	_ = s.WriteAuditLog(ctx, []AuditLogEntry{{
-		EntityType: "review_queue",
-		EntityID:   reviewIDStr,
-		Action:     "delete",
-		Actor:      actor,
-		Metadata: map[string]string{
-			"transaction_id": txnID,
-			"review_type":    existing.ReviewType,
-		},
-	}})
-
 	return nil
 }
 
@@ -693,18 +632,6 @@ func (s *Service) DismissAllPendingReviews(ctx context.Context, actor Actor) (in
 	count, err := s.Queries.DeleteAllPendingReviews(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("delete all pending reviews: %w", err)
-	}
-
-	if count > 0 {
-		_ = s.WriteAuditLog(ctx, []AuditLogEntry{{
-			EntityType: "review_queue",
-			EntityID:   "all",
-			Action:     "bulk_delete",
-			Actor:      actor,
-			Metadata: map[string]string{
-				"count": fmt.Sprintf("%d", count),
-			},
-		}})
 	}
 
 	return count, nil

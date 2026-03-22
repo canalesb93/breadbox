@@ -9,7 +9,6 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/db"
 	"breadbox/internal/provider"
-	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -434,11 +433,6 @@ func DeleteConnectionHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 			return
 		}
 
-		actor := ActorFromSession(sm, r)
-		_ = a.Service.WriteAuditLog(ctx, []service.AuditLogEntry{{
-			EntityType: "connection", EntityID: idStr, Action: "delete", Actor: actor,
-		}})
-
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -489,10 +483,6 @@ func UpdateAccountExcludedHandler(a *app.App, sm *scs.SessionManager) http.Handl
 			return
 		}
 
-		// Capture old value for audit.
-		oldAccount, _ := a.Queries.GetAccount(r.Context(), accountID)
-		oldVal := fmt.Sprintf("%t", oldAccount.Excluded)
-
 		account, err := a.Queries.UpdateAccountExcluded(r.Context(), db.UpdateAccountExcludedParams{
 			ID:       accountID,
 			Excluded: req.Excluded,
@@ -502,14 +492,6 @@ func UpdateAccountExcludedHandler(a *app.App, sm *scs.SessionManager) http.Handl
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update account"})
 			return
 		}
-
-		actor := ActorFromSession(sm, r)
-		field := "excluded"
-		newVal := fmt.Sprintf("%t", req.Excluded)
-		_ = a.Service.WriteAuditLog(r.Context(), []service.AuditLogEntry{{
-			EntityType: "account", EntityID: idStr, Action: "update",
-			Field: &field, OldValue: &oldVal, NewValue: &newVal, Actor: actor,
-		}})
 
 		writeJSON(w, http.StatusOK, account)
 	}
@@ -534,10 +516,6 @@ func UpdateAccountDisplayNameHandler(a *app.App, sm *scs.SessionManager) http.Ha
 			return
 		}
 
-		// Capture old value for audit.
-		oldAccount, _ := a.Queries.GetAccount(r.Context(), accountID)
-		oldVal := oldAccount.DisplayName.String
-
 		var displayName pgtype.Text
 		if req.DisplayName != nil && *req.DisplayName != "" {
 			displayName = pgtype.Text{String: *req.DisplayName, Valid: true}
@@ -552,14 +530,6 @@ func UpdateAccountDisplayNameHandler(a *app.App, sm *scs.SessionManager) http.Ha
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update account"})
 			return
 		}
-
-		actor := ActorFromSession(sm, r)
-		field := "display_name"
-		newVal := displayName.String
-		_ = a.Service.WriteAuditLog(r.Context(), []service.AuditLogEntry{{
-			EntityType: "account", EntityID: idStr, Action: "update",
-			Field: &field, OldValue: &oldVal, NewValue: &newVal, Actor: actor,
-		}})
 
 		writeJSON(w, http.StatusOK, account)
 	}
@@ -584,10 +554,6 @@ func UpdateConnectionPausedHandler(a *app.App, sm *scs.SessionManager) http.Hand
 			return
 		}
 
-		// Capture old value.
-		oldConn, _ := a.Queries.GetBankConnection(r.Context(), connID)
-		oldVal := fmt.Sprintf("%t", oldConn.Paused)
-
 		conn, err := a.Queries.UpdateConnectionPaused(r.Context(), db.UpdateConnectionPausedParams{
 			ID:     connID,
 			Paused: req.Paused,
@@ -597,14 +563,6 @@ func UpdateConnectionPausedHandler(a *app.App, sm *scs.SessionManager) http.Hand
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update connection"})
 			return
 		}
-
-		actor := ActorFromSession(sm, r)
-		field := "paused"
-		newVal := fmt.Sprintf("%t", req.Paused)
-		_ = a.Service.WriteAuditLog(r.Context(), []service.AuditLogEntry{{
-			EntityType: "connection", EntityID: idStr, Action: "update",
-			Field: &field, OldValue: &oldVal, NewValue: &newVal, Actor: actor,
-		}})
 
 		writeJSON(w, http.StatusOK, conn)
 	}
@@ -629,13 +587,6 @@ func UpdateConnectionSyncIntervalHandler(a *app.App, sm *scs.SessionManager) htt
 			return
 		}
 
-		// Capture old value.
-		oldConn, _ := a.Queries.GetBankConnection(r.Context(), connID)
-		oldVal := ""
-		if oldConn.SyncIntervalOverrideMinutes.Valid {
-			oldVal = fmt.Sprintf("%d", oldConn.SyncIntervalOverrideMinutes.Int32)
-		}
-
 		var interval pgtype.Int4
 		if req.Minutes != nil {
 			interval = pgtype.Int4{Int32: *req.Minutes, Valid: true}
@@ -650,17 +601,6 @@ func UpdateConnectionSyncIntervalHandler(a *app.App, sm *scs.SessionManager) htt
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update connection"})
 			return
 		}
-
-		actor := ActorFromSession(sm, r)
-		field := "sync_interval_override_minutes"
-		newVal := ""
-		if req.Minutes != nil {
-			newVal = fmt.Sprintf("%d", *req.Minutes)
-		}
-		_ = a.Service.WriteAuditLog(r.Context(), []service.AuditLogEntry{{
-			EntityType: "connection", EntityID: idStr, Action: "update",
-			Field: &field, OldValue: &oldVal, NewValue: &newVal, Actor: actor,
-		}})
 
 		writeJSON(w, http.StatusOK, conn)
 	}

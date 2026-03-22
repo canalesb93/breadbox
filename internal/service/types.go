@@ -261,54 +261,6 @@ type CommentResponse struct {
 	UpdatedAt     string  `json:"updated_at"`
 }
 
-// Audit log types
-
-type AuditLogEntry struct {
-	EntityType string
-	EntityID   string
-	Action     string // "create", "update", "delete"
-	Field      *string
-	OldValue   *string
-	NewValue   *string
-	Actor      Actor
-	Metadata   map[string]string
-}
-
-type AuditLogListParams struct {
-	EntityType string
-	EntityID   string
-	Limit      int
-	Cursor     string
-}
-
-type AuditLogGlobalParams struct {
-	EntityType *string
-	ActorType  *string
-	Limit      int
-	Cursor     string
-}
-
-type AuditLogListResult struct {
-	Entries    []AuditLogResponse `json:"entries"`
-	NextCursor string             `json:"next_cursor,omitempty"`
-	HasMore    bool               `json:"has_more"`
-}
-
-type AuditLogResponse struct {
-	ID         string            `json:"id"`
-	EntityType string            `json:"entity_type"`
-	EntityID   string            `json:"entity_id"`
-	Action     string            `json:"action"`
-	Field      *string           `json:"field,omitempty"`
-	OldValue   *string           `json:"old_value,omitempty"`
-	NewValue   *string           `json:"new_value,omitempty"`
-	ActorType  string            `json:"actor_type"`
-	ActorID    *string           `json:"actor_id,omitempty"`
-	ActorName  string            `json:"actor_name"`
-	Metadata   map[string]string `json:"metadata,omitempty"`
-	CreatedAt  string            `json:"created_at"`
-}
-
 // Review queue types
 
 type ReviewResponse struct {
