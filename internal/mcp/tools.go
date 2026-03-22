@@ -679,11 +679,11 @@ func (s *MCPServer) handleSubmitReview(ctx context.Context, _ *mcpsdk.CallToolRe
 // --- Transaction Rules ---
 
 type createTransactionRuleInput struct {
-	Name         string            `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
-	CategorySlug string            `json:"category_slug" jsonschema:"required,Category slug to assign when this rule matches (e.g. food_and_drink_restaurant). Use list_categories to find slugs."`
-	Conditions   service.Condition `json:"conditions" jsonschema:"required,Condition tree. Use field/op/value for leaf conditions or and/or/not for logical operators."`
-	Priority     int               `json:"priority,omitempty" jsonschema:"Priority (higher wins when multiple rules match). Default 10."`
-	ExpiresIn    string            `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
+	Name         string          `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
+	CategorySlug string          `json:"category_slug" jsonschema:"required,Category slug to assign when this rule matches (e.g. food_and_drink_restaurant). Use list_categories to find slugs."`
+	Conditions   json.RawMessage `json:"conditions" jsonschema:"required,Condition tree as JSON object. Leaf: {field op value}. Branch: {and: [...]} or {or: [...]} or {not: {...}}. Fields: name merchant_name amount category_primary category_detailed pending provider account_id user_id. Operators: eq neq contains not_contains matches gt gte lt lte in."`
+	Priority     int             `json:"priority,omitempty" jsonschema:"Priority (higher wins when multiple rules match). Default 10."`
+	ExpiresIn    string          `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
 }
 
 type listTransactionRulesInput struct {
@@ -695,13 +695,13 @@ type listTransactionRulesInput struct {
 }
 
 type updateTransactionRuleInput struct {
-	ID           string             `json:"id" jsonschema:"required,UUID of the rule to update"`
-	Name         *string            `json:"name,omitempty" jsonschema:"New name for the rule"`
-	Conditions   *service.Condition `json:"conditions,omitempty" jsonschema:"New condition tree"`
-	CategorySlug *string            `json:"category_slug,omitempty" jsonschema:"New category slug"`
-	Priority     *int               `json:"priority,omitempty" jsonschema:"New priority"`
-	Enabled      *bool              `json:"enabled,omitempty" jsonschema:"Enable or disable the rule"`
-	ExpiresAt    *string            `json:"expires_at,omitempty" jsonschema:"New expiry timestamp (RFC3339) or empty string to clear"`
+	ID           string           `json:"id" jsonschema:"required,UUID of the rule to update"`
+	Name         *string          `json:"name,omitempty" jsonschema:"New name for the rule"`
+	Conditions   *json.RawMessage `json:"conditions,omitempty" jsonschema:"New condition tree (same format as create)"`
+	CategorySlug *string          `json:"category_slug,omitempty" jsonschema:"New category slug"`
+	Priority     *int             `json:"priority,omitempty" jsonschema:"New priority"`
+	Enabled      *bool            `json:"enabled,omitempty" jsonschema:"Enable or disable the rule"`
+	ExpiresAt    *string          `json:"expires_at,omitempty" jsonschema:"New expiry timestamp (RFC3339) or empty string to clear"`
 }
 
 type deleteTransactionRuleInput struct {
@@ -728,6 +728,11 @@ func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.C
 		return errorResult(fmt.Errorf("name and category_slug are required")), nil, nil
 	}
 
+	var conditions service.Condition
+	if err := json.Unmarshal(input.Conditions, &conditions); err != nil {
+		return errorResult(fmt.Errorf("invalid conditions JSON: %w", err)), nil, nil
+	}
+
 	actor := service.ActorFromContext(ctx)
 	priority := input.Priority
 	if priority == 0 {
@@ -736,7 +741,7 @@ func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.C
 
 	rule, err := s.svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name:         input.Name,
-		Conditions:   input.Conditions,
+		Conditions:   conditions,
 		CategorySlug: input.CategorySlug,
 		Priority:     priority,
 		ExpiresIn:    input.ExpiresIn,
@@ -780,9 +785,18 @@ func (s *MCPServer) handleUpdateTransactionRule(ctx context.Context, _ *mcpsdk.C
 		return errorResult(fmt.Errorf("id is required")), nil, nil
 	}
 
+	var conditionsPtr *service.Condition
+	if input.Conditions != nil {
+		var c service.Condition
+		if err := json.Unmarshal(*input.Conditions, &c); err != nil {
+			return errorResult(fmt.Errorf("invalid conditions JSON: %w", err)), nil, nil
+		}
+		conditionsPtr = &c
+	}
+
 	rule, err := s.svc.UpdateTransactionRule(ctx, input.ID, service.UpdateTransactionRuleParams{
 		Name:         input.Name,
-		Conditions:   input.Conditions,
+		Conditions:   conditionsPtr,
 		CategorySlug: input.CategorySlug,
 		Priority:     input.Priority,
 		Enabled:      input.Enabled,
