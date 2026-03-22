@@ -439,19 +439,6 @@ func (s *Service) CreateTransactionRule(ctx context.Context, params CreateTransa
 	row.categoryDispName = pgtype.Text{String: cat.DisplayName, Valid: true}
 
 	resp := row.toResponse()
-
-	// Audit log
-	_ = s.WriteAuditLog(ctx, []AuditLogEntry{{
-		EntityType: "transaction_rule",
-		EntityID:   resp.ID,
-		Action:     "create",
-		Actor:      params.Actor,
-		Metadata: map[string]string{
-			"name":          params.Name,
-			"category_slug": params.CategorySlug,
-		},
-	}})
-
 	return &resp, nil
 }
 
