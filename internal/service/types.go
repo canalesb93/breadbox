@@ -335,3 +335,79 @@ type ReviewCountsResponse struct {
 	RejectedToday int64 `json:"rejected_today"`
 	SkippedToday  int64 `json:"skipped_today"`
 }
+
+// Transaction rule types
+
+type Condition struct {
+	Field string      `json:"field,omitempty"`
+	Op    string      `json:"op,omitempty"`
+	Value interface{} `json:"value,omitempty"`
+
+	And []Condition `json:"and,omitempty"`
+	Or  []Condition `json:"or,omitempty"`
+	Not *Condition  `json:"not,omitempty"`
+}
+
+type TransactionContext struct {
+	Name             string
+	MerchantName     string
+	Amount           float64
+	CategoryPrimary  string
+	CategoryDetailed string
+	Pending          bool
+	Provider         string
+	AccountID        string
+	UserID           string
+}
+
+type TransactionRuleResponse struct {
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Conditions    Condition `json:"conditions"`
+	CategoryID    *string   `json:"category_id,omitempty"`
+	CategorySlug  *string   `json:"category_slug,omitempty"`
+	CategoryName  *string   `json:"category_display_name,omitempty"`
+	Priority      int       `json:"priority"`
+	Enabled       bool      `json:"enabled"`
+	ExpiresAt     *string   `json:"expires_at,omitempty"`
+	CreatedByType string    `json:"created_by_type"`
+	CreatedByID   *string   `json:"created_by_id,omitempty"`
+	CreatedByName string    `json:"created_by_name"`
+	HitCount      int       `json:"hit_count"`
+	LastHitAt     *string   `json:"last_hit_at,omitempty"`
+	CreatedAt     string    `json:"created_at"`
+	UpdatedAt     string    `json:"updated_at"`
+}
+
+type TransactionRuleListParams struct {
+	CategorySlug *string
+	Enabled      *bool
+	Search       *string
+	Limit        int
+	Cursor       string
+}
+
+type TransactionRuleListResult struct {
+	Rules      []TransactionRuleResponse `json:"rules"`
+	NextCursor string                    `json:"next_cursor,omitempty"`
+	HasMore    bool                      `json:"has_more"`
+	Total      int64                     `json:"total"`
+}
+
+type CreateTransactionRuleParams struct {
+	Name         string
+	Conditions   Condition
+	CategorySlug string
+	Priority     int
+	ExpiresIn    string // e.g., "30d", "24h"
+	Actor        Actor
+}
+
+type UpdateTransactionRuleParams struct {
+	Name         *string
+	Conditions   *Condition
+	CategorySlug *string
+	Priority     *int
+	Enabled      *bool
+	ExpiresAt    *string // ISO timestamp or empty to clear
+}

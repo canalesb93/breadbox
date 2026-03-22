@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"breadbox/internal/service"
 	"breadbox/internal/templates"
 
 	"github.com/alexedwards/scs/v2"
@@ -138,6 +139,25 @@ func NewTemplateRenderer() (*TemplateRenderer, error) {
 				b, _ := json.Marshal(v)
 				return template.JS(b)
 			},
+			"conditionSummary": func(c service.Condition) string {
+				return service.ConditionSummary(c)
+			},
+			"deref": func(s *string) string {
+				if s == nil {
+					return ""
+				}
+				return *s
+			},
+			"expired": func(s *string) bool {
+				if s == nil {
+					return false
+				}
+				t, err := time.Parse(time.RFC3339, *s)
+				if err != nil {
+					return false
+				}
+				return t.Before(time.Now())
+			},
 			"formatNumeric": func(n pgtype.Numeric) string {
 				if !n.Valid {
 					return ""
@@ -189,6 +209,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/transaction_detail.html",
 		"pages/mcp_settings.html",
 		"pages/reviews.html",
+		"pages/rules.html",
 	}
 
 	// Pages using the wizard layout (login + first-run admin creation).

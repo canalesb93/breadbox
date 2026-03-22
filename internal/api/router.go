@@ -61,6 +61,8 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/reviews", ListReviewsHandler(svc))
 		r.Get("/reviews/counts", ReviewCountsHandler(svc))
 		r.Get("/reviews/{id}", GetReviewHandler(svc))
+		r.Get("/rules", ListRulesHandler(svc))
+		r.Get("/rules/{id}", GetRuleHandler(svc))
 
 		// Write endpoints — full_access API keys only.
 		r.Group(func(r chi.Router) {
@@ -83,6 +85,9 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Post("/reviews/bulk", BulkSubmitReviewsHandler(svc))
 			r.Post("/reviews/enqueue", EnqueueReviewHandler(svc))
 			r.Delete("/reviews/{id}", DismissReviewHandler(svc))
+			r.Post("/rules", CreateRuleHandler(svc))
+			r.Put("/rules/{id}", UpdateRuleHandler(svc))
+			r.Delete("/rules/{id}", DeleteRuleHandler(svc))
 		})
 	})
 

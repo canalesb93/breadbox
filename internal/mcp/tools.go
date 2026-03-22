@@ -664,6 +664,183 @@ func (s *MCPServer) handleSubmitReview(ctx context.Context, _ *mcpsdk.CallToolRe
 	return jsonResult(result)
 }
 
+// --- Transaction Rules ---
+
+type createTransactionRuleInput struct {
+	Name         string            `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
+	CategorySlug string            `json:"category_slug" jsonschema:"required,Category slug to assign when this rule matches (e.g. food_and_drink_restaurant). Use list_categories to find slugs."`
+	Conditions   service.Condition `json:"conditions" jsonschema:"required,Condition tree. Use field/op/value for leaf conditions or and/or/not for logical operators."`
+	Priority     int               `json:"priority,omitempty" jsonschema:"Priority (higher wins when multiple rules match). Default 10."`
+	ExpiresIn    string            `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
+}
+
+type listTransactionRulesInput struct {
+	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
+	Enabled      *bool  `json:"enabled,omitempty" jsonschema:"Filter by enabled status"`
+	Search       string `json:"search,omitempty" jsonschema:"Search by rule name"`
+	Limit        int    `json:"limit,omitempty" jsonschema:"Max results (default 50, max 200)"`
+	Cursor       string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
+}
+
+type updateTransactionRuleInput struct {
+	ID           string             `json:"id" jsonschema:"required,UUID of the rule to update"`
+	Name         *string            `json:"name,omitempty" jsonschema:"New name for the rule"`
+	Conditions   *service.Condition `json:"conditions,omitempty" jsonschema:"New condition tree"`
+	CategorySlug *string            `json:"category_slug,omitempty" jsonschema:"New category slug"`
+	Priority     *int               `json:"priority,omitempty" jsonschema:"New priority"`
+	Enabled      *bool              `json:"enabled,omitempty" jsonschema:"Enable or disable the rule"`
+	ExpiresAt    *string            `json:"expires_at,omitempty" jsonschema:"New expiry timestamp (RFC3339) or empty string to clear"`
+}
+
+type deleteTransactionRuleInput struct {
+	ID string `json:"id" jsonschema:"required,UUID of the rule to delete"`
+}
+
+type batchSubmitReviewsInput struct {
+	Reviews []batchReviewItem `json:"reviews" jsonschema:"required,Array of review decisions to submit"`
+}
+
+type batchReviewItem struct {
+	ReviewID     string  `json:"review_id" jsonschema:"required,UUID of the review"`
+	Decision     string  `json:"decision" jsonschema:"required,Decision: approved or skipped"`
+	CategorySlug *string `json:"category_slug,omitempty" jsonschema:"Category slug to assign (alternative to category_id). Use list_categories to find slugs."`
+	CategoryID   *string `json:"category_id,omitempty" jsonschema:"Category ID to assign (alternative to category_slug)"`
+	Note         *string `json:"note,omitempty" jsonschema:"Optional note explaining the decision"`
+}
+
+func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.CallToolRequest, input createTransactionRuleInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.Name == "" || input.CategorySlug == "" {
+		return errorResult(fmt.Errorf("name and category_slug are required")), nil, nil
+	}
+
+	actor := service.ActorFromContext(ctx)
+	priority := input.Priority
+	if priority == 0 {
+		priority = 10
+	}
+
+	rule, err := s.svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:         input.Name,
+		Conditions:   input.Conditions,
+		CategorySlug: input.CategorySlug,
+		Priority:     priority,
+		ExpiresIn:    input.ExpiresIn,
+		Actor:        actor,
+	})
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(rule)
+}
+
+func (s *MCPServer) handleListTransactionRules(_ context.Context, _ *mcpsdk.CallToolRequest, input listTransactionRulesInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+
+	params := service.TransactionRuleListParams{
+		Limit:  input.Limit,
+		Cursor: input.Cursor,
+	}
+	if input.CategorySlug != "" {
+		params.CategorySlug = &input.CategorySlug
+	}
+	if input.Enabled != nil {
+		params.Enabled = input.Enabled
+	}
+	if input.Search != "" {
+		params.Search = &input.Search
+	}
+
+	result, err := s.svc.ListTransactionRules(ctx, params)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(result)
+}
+
+func (s *MCPServer) handleUpdateTransactionRule(ctx context.Context, _ *mcpsdk.CallToolRequest, input updateTransactionRuleInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.ID == "" {
+		return errorResult(fmt.Errorf("id is required")), nil, nil
+	}
+
+	rule, err := s.svc.UpdateTransactionRule(ctx, input.ID, service.UpdateTransactionRuleParams{
+		Name:         input.Name,
+		Conditions:   input.Conditions,
+		CategorySlug: input.CategorySlug,
+		Priority:     input.Priority,
+		Enabled:      input.Enabled,
+		ExpiresAt:    input.ExpiresAt,
+	})
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(rule)
+}
+
+func (s *MCPServer) handleDeleteTransactionRule(ctx context.Context, _ *mcpsdk.CallToolRequest, input deleteTransactionRuleInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.ID == "" {
+		return errorResult(fmt.Errorf("id is required")), nil, nil
+	}
+
+	if err := s.svc.DeleteTransactionRule(ctx, input.ID); err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	return jsonResult(map[string]any{
+		"deleted": true,
+		"id":      input.ID,
+	})
+}
+
+func (s *MCPServer) handleBatchSubmitReviews(ctx context.Context, _ *mcpsdk.CallToolRequest, input batchSubmitReviewsInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if len(input.Reviews) == 0 {
+		return errorResult(fmt.Errorf("reviews array is required and must not be empty")), nil, nil
+	}
+
+	actor := service.ActorFromContext(ctx)
+
+	// Resolve category slugs to IDs
+	items := make([]service.BulkReviewItem, len(input.Reviews))
+	for i, r := range input.Reviews {
+		items[i] = service.BulkReviewItem{
+			ReviewID: r.ReviewID,
+			Decision: r.Decision,
+			Note:     r.Note,
+		}
+
+		// CategoryID takes precedence over CategorySlug
+		if r.CategoryID != nil && *r.CategoryID != "" {
+			items[i].CategoryID = r.CategoryID
+		} else if r.CategorySlug != nil && *r.CategorySlug != "" {
+			cat, err := s.svc.GetCategoryBySlug(ctx, *r.CategorySlug)
+			if err != nil {
+				return errorResult(fmt.Errorf("review %s: category slug %q not found", r.ReviewID, *r.CategorySlug)), nil, nil
+			}
+			items[i].CategoryID = &cat.ID
+		}
+	}
+
+	result, err := s.svc.BulkSubmitReviews(ctx, service.BulkSubmitReviewParams{
+		Reviews: items,
+		Actor:   actor,
+	})
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(result)
+}
+
 // --- Helpers ---
 
 func jsonResult(v any) (*mcpsdk.CallToolResult, any, error) {
