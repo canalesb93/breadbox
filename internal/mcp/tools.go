@@ -87,10 +87,11 @@ type listPendingReviewsInput struct {
 }
 
 type submitReviewInput struct {
-	ReviewID   string `json:"review_id" jsonschema:"required,UUID of the review to submit"`
-	Decision   string `json:"decision" jsonschema:"required,Decision: approved, rejected, or skipped"`
-	CategoryID string `json:"category_id,omitempty" jsonschema:"Category ID to assign (use list_categories to find IDs). Only for approved decisions."`
-	Note       string `json:"note,omitempty" jsonschema:"Optional note explaining the decision"`
+	ReviewID     string `json:"review_id" jsonschema:"required,UUID of the review to submit"`
+	Decision     string `json:"decision" jsonschema:"required,Decision: approved or skipped"`
+	CategoryID   string `json:"category_id,omitempty" jsonschema:"Category ID to assign. Provide either category_id or category_slug (not both)."`
+	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Category slug to assign (e.g. food_and_drink_groceries). Alternative to category_id — the slug is resolved to an ID automatically."`
+	Note         string `json:"note,omitempty" jsonschema:"Optional note explaining the decision"`
 }
 
 type exportCategoriesInput struct{}
@@ -646,13 +647,24 @@ func (s *MCPServer) handleSubmitReview(ctx context.Context, _ *mcpsdk.CallToolRe
 		return errorResult(fmt.Errorf("review_id and decision are required")), nil, nil
 	}
 	actor := service.ActorFromContext(ctx)
+
+	// Resolve category_slug to category_id if provided.
+	categoryID := input.CategoryID
+	if categoryID == "" && input.CategorySlug != "" {
+		cat, err := s.svc.GetCategoryBySlug(ctx, input.CategorySlug)
+		if err != nil {
+			return errorResult(fmt.Errorf("invalid category_slug %q: %w", input.CategorySlug, err)), nil, nil
+		}
+		categoryID = cat.ID
+	}
+
 	params := service.SubmitReviewParams{
 		ReviewID: input.ReviewID,
 		Decision: input.Decision,
 		Actor:    actor,
 	}
-	if input.CategoryID != "" {
-		params.CategoryID = &input.CategoryID
+	if categoryID != "" {
+		params.CategoryID = &categoryID
 	}
 	if input.Note != "" {
 		params.Note = &input.Note

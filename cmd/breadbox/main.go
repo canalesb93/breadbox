@@ -314,6 +314,11 @@ func runMCPStdio() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Set agent actor identity so ActorFromContext returns "agent" (not "system").
+	// Stdio has no API key middleware, but write actions like submit_review
+	// require reviewer_type to be "user" or "agent".
+	ctx = service.ContextWithAPIKey(ctx, "stdio", "MCP Stdio")
+
 	a, err := app.New(ctx, cfg, logger)
 	if err != nil {
 		return fmt.Errorf("init app: %w", err)
