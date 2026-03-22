@@ -132,10 +132,10 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 	}
 	cursor := previousCursor
 
-	// Load category resolver for this provider.
-	resolver, err := NewCategoryResolver(ctx, e.pool, string(conn.Provider))
+	// Load rule resolver (rules + category mappings) for this provider.
+	resolver, err := NewRuleResolver(ctx, e.pool, string(conn.Provider), logger)
 	if err != nil {
-		logger.Warn("failed to load category resolver, categories will be NULL", "error", err)
+		logger.Warn("failed to load rule resolver, categories will be NULL", "error", err)
 		resolver = nil
 	}
 
@@ -230,7 +230,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				skipped++
 				continue
 			}
-			txnResult, err := e.upsertTransaction(ctx, txQueries, &pendingAdded[i], accountIDCache, string(conn.Provider), resolver, logger)
+			txnResult, err := e.upsertTransaction(ctx, txQueries, &pendingAdded[i], accountIDCache, string(conn.Provider), resolver, conn.UserID, logger)
 			if err != nil {
 				logger.Error("upsert added transaction", "external_id", pendingAdded[i].ExternalID, "error", err)
 			} else if reviewAutoEnqueue {
@@ -251,7 +251,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				skipped++
 				continue
 			}
-			txnResult, err := e.upsertTransaction(ctx, txQueries, &pendingModified[i], accountIDCache, string(conn.Provider), resolver, logger)
+			txnResult, err := e.upsertTransaction(ctx, txQueries, &pendingModified[i], accountIDCache, string(conn.Provider), resolver, conn.UserID, logger)
 			if err != nil {
 				logger.Error("upsert modified transaction", "external_id", pendingModified[i].ExternalID, "error", err)
 			} else if reviewAutoEnqueue {
@@ -288,6 +288,13 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			return 0, 0, 0, fmt.Errorf("commit transaction: %w", err)
 		}
 
+		// Flush rule hit counts after commit (best-effort, non-fatal).
+		if resolver != nil {
+			if err := resolver.FlushHitCounts(ctx, e.pool); err != nil {
+				logger.Warn("failed to flush rule hit counts", "error", err)
+			}
+		}
+
 		// Update connection status to active (clear any previous errors).
 		// Kept outside the transaction as an independent status update.
 		_ = e.db.UpdateBankConnectionStatus(ctx, db.UpdateBankConnectionStatusParams{
@@ -302,16 +309,33 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 }
 
 // upsertTransaction resolves the account ID and upserts a single transaction.
-func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *provider.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *CategoryResolver, logger *slog.Logger) (db.Transaction, error) {
+func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *provider.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *RuleResolver, userID pgtype.UUID, logger *slog.Logger) (db.Transaction, error) {
 	accountID, err := e.resolveAccountID(ctx, txn.AccountExternalID, cache)
 	if err != nil {
 		return db.Transaction{}, fmt.Errorf("resolve account %s: %w", txn.AccountExternalID, err)
 	}
 
-	// Resolve category ID from provider mappings
+	// Resolve category ID using rules first, then category mappings as fallback.
 	var categoryID pgtype.UUID
 	if resolver != nil {
-		categoryID = resolver.Resolve(providerName, txn.CategoryDetailed, txn.CategoryPrimary)
+		tctx := TransactionContext{
+			Name:       txn.Name,
+			Amount:     txn.Amount.InexactFloat64(),
+			Pending:    txn.Pending,
+			Provider:   providerName,
+			AccountID:  formatUUID(accountID),
+			UserID:     formatUUID(userID),
+		}
+		if txn.MerchantName != nil {
+			tctx.MerchantName = *txn.MerchantName
+		}
+		if txn.CategoryPrimary != nil {
+			tctx.CategoryPrimary = *txn.CategoryPrimary
+		}
+		if txn.CategoryDetailed != nil {
+			tctx.CategoryDetailed = *txn.CategoryDetailed
+		}
+		categoryID = resolver.ResolveWithContext(providerName, tctx)
 	}
 
 	params := db.UpsertTransactionParams{
