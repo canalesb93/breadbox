@@ -61,12 +61,13 @@ REVIEW QUEUE:
 - Workflow: list_pending_reviews → examine each transaction → submit_review with the correct category_slug
 - Use query_transactions only for analysis, search, or browsing — not for reviewing
 - Use batch_submit_reviews to process multiple reviews at once
+- After reviewing, look for patterns among the transactions you categorized (recurring merchants, similar names). Create transaction rules for these patterns so future transactions are auto-categorized — this is a key part of the review process.
 
 TRANSACTION RULES:
-- Rules auto-categorize future transactions by matching conditions on any transaction field
+- Rules auto-categorize future transactions by matching conditions on any transaction field. Creating good rules during reviews is how the system learns and improves over time.
 - Conditions use a flexible JSON tree with AND/OR/NOT logic and operators: eq, contains, matches (regex), gt, gte, lt, lte, in
 - Available fields: name, merchant_name, amount, category_primary (raw provider category), category_detailed, pending, provider, account_id, user_id
-- Use create_transaction_rule to create rules — think carefully about the pattern, scope, and whether a similar rule exists
+- Use create_transaction_rule or batch_create_rules to create rules — think carefully about the pattern, scope, and whether a similar rule exists
 - Example: {"field": "name", "op": "contains", "value": "uber eats"} matches all Uber Eats transactions
 - Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]}
 - Rules persist and apply to ALL future transactions during sync — higher priority wins
