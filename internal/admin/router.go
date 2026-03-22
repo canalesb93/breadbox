@@ -69,6 +69,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/sync-logs", SyncLogsHandler(a, sm, tr, svc))
 
 		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
+		r.Get("/review-instructions", ReviewInstructionsPageHandler(sm, tr))
 		r.Get("/rules", RulesPageHandler(svc, sm, tr, a.Config.Version))
 
 		r.Get("/categories", CategoriesPageHandler(svc, sm, tr))
