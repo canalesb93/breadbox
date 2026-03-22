@@ -708,6 +708,18 @@ type deleteTransactionRuleInput struct {
 	ID string `json:"id" jsonschema:"required,UUID of the rule to delete"`
 }
 
+type batchCreateRulesInput struct {
+	Rules []batchRuleItem `json:"rules" jsonschema:"required,Array of rules to create"`
+}
+
+type batchRuleItem struct {
+	Name         string          `json:"name" jsonschema:"required,Human-readable rule name"`
+	CategorySlug string          `json:"category_slug" jsonschema:"required,Category slug to assign"`
+	Conditions   json.RawMessage `json:"conditions" jsonschema:"required,Condition tree as JSON object"`
+	Priority     int             `json:"priority,omitempty" jsonschema:"Priority (default 10)"`
+	ExpiresIn    string          `json:"expires_in,omitempty" jsonschema:"Optional expiry duration"`
+}
+
 type batchSubmitReviewsInput struct {
 	Reviews []batchReviewItem `json:"reviews" jsonschema:"required,Array of review decisions to submit"`
 }
@@ -865,6 +877,72 @@ func (s *MCPServer) handleBatchSubmitReviews(ctx context.Context, _ *mcpsdk.Call
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(result)
+}
+
+func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallToolRequest, input batchCreateRulesInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if len(input.Rules) == 0 {
+		return errorResult(fmt.Errorf("rules array is required and must not be empty")), nil, nil
+	}
+	if len(input.Rules) > 50 {
+		return errorResult(fmt.Errorf("maximum 50 rules per batch")), nil, nil
+	}
+
+	actor := service.ActorFromContext(ctx)
+	var created []service.TransactionRuleResponse
+	var errors []map[string]string
+
+	for i, r := range input.Rules {
+		if r.Name == "" || r.CategorySlug == "" || len(r.Conditions) == 0 {
+			errors = append(errors, map[string]string{
+				"index": fmt.Sprintf("%d", i),
+				"error": "name, category_slug, and conditions are required",
+			})
+			continue
+		}
+
+		var conditions service.Condition
+		if err := json.Unmarshal(r.Conditions, &conditions); err != nil {
+			errors = append(errors, map[string]string{
+				"index": fmt.Sprintf("%d", i),
+				"name":  r.Name,
+				"error": fmt.Sprintf("invalid conditions JSON: %v", err),
+			})
+			continue
+		}
+
+		priority := r.Priority
+		if priority == 0 {
+			priority = 10
+		}
+
+		rule, err := s.svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+			Name:         r.Name,
+			Conditions:   conditions,
+			CategorySlug: r.CategorySlug,
+			Priority:     priority,
+			ExpiresIn:    r.ExpiresIn,
+			Actor:        actor,
+		})
+		if err != nil {
+			errors = append(errors, map[string]string{
+				"index": fmt.Sprintf("%d", i),
+				"name":  r.Name,
+				"error": err.Error(),
+			})
+			continue
+		}
+		created = append(created, *rule)
+	}
+
+	return jsonResult(map[string]any{
+		"created": len(created),
+		"failed":  len(errors),
+		"rules":   created,
+		"errors":  errors,
+	})
 }
 
 // --- Helpers ---

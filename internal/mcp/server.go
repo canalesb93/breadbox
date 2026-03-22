@@ -201,6 +201,9 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("batch_submit_reviews", ToolWrite,
 			"Submit decisions on multiple pending reviews at once. Each review needs a decision (approved or skipped) and optionally a category_slug or category_id. More efficient than submitting reviews one at a time.",
 			s.handleBatchSubmitReviews),
+		makeToolDef("batch_create_rules", ToolWrite,
+			"Create multiple transaction rules at once. Each rule needs a name, category_slug, and conditions object. More efficient than creating rules one at a time. Returns created rules and any errors.",
+			s.handleBatchCreateRules),
 	}
 }
 
