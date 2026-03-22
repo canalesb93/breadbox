@@ -111,6 +111,14 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Review admin page: `/admin/reviews` with filter bar (status, type, account, user), card-based review queue with inline approve/reject/skip/dismiss, Alpine.js `reviewQueue()` for AJAX actions with card fade-out animation.
 - Review MCP tools: `list_pending_reviews` (ToolRead) and `submit_review` (ToolWrite) in `internal/mcp/tools.go`.
 - Review REST API: read endpoints at `/api/v1/reviews`, `/api/v1/reviews/counts`, `/api/v1/reviews/{id}`; write endpoints at `POST /reviews/{id}/submit`, `POST /reviews/bulk`, `POST /reviews/enqueue`, `DELETE /reviews/{id}`.
+- Transaction rules: `transaction_rules` table with recursive JSON condition tree (`conditions JSONB`). Rules auto-categorize future transactions during sync by matching conditions on transaction fields. Priority-ordered (higher wins). Support AND/OR/NOT logic with operators: eq, neq, contains, not_contains, matches (regex), gt, gte, lt, lte, in. Available fields: name, merchant_name, amount, category_primary, category_detailed, pending, provider, account_id, user_id.
+- Transaction rules service: `internal/service/rules.go` — `ValidateCondition` (recursive validation), `CompileCondition` (pre-compile regexes), `EvaluateCondition` (short-circuit evaluation). CRUD via dynamic SQL with cursor pagination. `ruleRow` struct with `scanDest()`/`toResponse()` eliminates scan variable duplication.
+- Transaction rules MCP tools: `create_transaction_rule` (ToolWrite), `list_transaction_rules` (ToolRead), `update_transaction_rule` (ToolWrite), `delete_transaction_rule` (ToolWrite), `batch_submit_reviews` (ToolWrite) in `internal/mcp/tools.go`.
+- Transaction rules REST API: read endpoints at `/api/v1/rules`, `/api/v1/rules/{id}`; write endpoints at `POST /rules`, `PUT /rules/{id}`, `DELETE /rules/{id}`.
+- Transaction rules admin: `/admin/rules` page with table, filter bar (search, category, enabled), create/edit modal with JSON condition editor, toggle enable/disable, delete. Nav item with `list-filter` Lucide icon.
+- Rule creator tracking: `created_by_type` (user/agent/system), `created_by_id`, `created_by_name` — uses Actor pattern from request context.
+- Rule expiry: optional `expires_at` timestamp. `expires_in` param on create accepts duration strings (24h, 30d, 1w). Expired rules excluded from sync but remain visible.
+- Rule hit tracking: `hit_count` and `last_hit_at` updated by `BatchIncrementHitCounts` during sync.
 
 ## Canonical Enums
 
@@ -124,6 +132,10 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Review type: `new_transaction`, `uncategorized`, `low_confidence`, `manual`
 - Review status: `pending`, `approved`, `rejected`, `skipped`
 - Reviewer type: `user`, `agent`
+- Rule creator type: `user`, `agent`, `system`
+- Condition operators (string): `eq`, `neq`, `contains`, `not_contains`, `matches`, `in`
+- Condition operators (numeric): `eq`, `neq`, `gt`, `gte`, `lt`, `lte`
+- Condition operators (bool): `eq`, `neq`
 
 ## Spec Documents
 

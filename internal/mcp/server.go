@@ -61,7 +61,20 @@ REVIEW QUEUE:
 - Transactions are automatically enqueued for review during sync (new, uncategorized, or low-confidence)
 - Use list_pending_reviews to see what needs attention, filtered by review_type or account_id
 - Use submit_review to approve, reject, or skip reviews — approved reviews with a category_id override the transaction's category
-- Review decisions are logged in the audit trail and optionally as transaction comments`
+- Review decisions are logged in the audit trail and optionally as transaction comments
+- Use batch_submit_reviews to process multiple reviews at once
+
+TRANSACTION RULES:
+- Rules auto-categorize future transactions by matching conditions on any transaction field
+- Conditions use a flexible JSON tree with AND/OR/NOT logic and operators: eq, contains, matches (regex), gt, gte, lt, lte, in
+- Available fields: name, merchant_name, amount, category_primary (raw provider category), category_detailed, pending, provider, account_id, user_id
+- Use create_transaction_rule to create rules — think carefully about the pattern, scope, and whether a similar rule exists
+- Example: {"field": "name", "op": "contains", "value": "uber eats"} matches all Uber Eats transactions
+- Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]}
+- Rules persist and apply to ALL future transactions during sync — higher priority wins
+- ALWAYS check list_transaction_rules before creating to avoid duplicates
+- Prefer broader patterns over exact matches (contains "uber" beats eq "UBER EATS #1234")
+- Use batch_submit_reviews to process multiple reviews at once`
 
 // ToolClassification indicates whether a tool is read-only or performs writes.
 type ToolClassification string
@@ -182,6 +195,21 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("submit_review", ToolWrite,
 			"Submit a decision on a pending review. Decision must be 'approved', 'rejected', or 'skipped'. For approved reviews, optionally specify a category_id to override the transaction's category. Add a note to explain your reasoning. Use list_pending_reviews to find review IDs.",
 			s.handleSubmitReview),
+		makeToolDef("create_transaction_rule", ToolWrite,
+			"Create a transaction rule for automatic categorization. Rules match conditions against transaction fields and apply to ALL future transactions during sync. IMPORTANT: Before creating, check list_transaction_rules to avoid duplicates. Prefer broader patterns (contains) over exact matches. Conditions use a JSON tree with AND/OR/NOT logic. Available fields: name, merchant_name, amount, category_primary (raw provider category), category_detailed, pending, provider, account_id, user_id. Operators: eq, neq, contains, not_contains, matches (regex), gt, gte, lt, lte, in.",
+			s.handleCreateTransactionRule),
+		makeToolDef("list_transaction_rules", ToolRead,
+			"List transaction rules with optional filters. Rules auto-categorize transactions during sync based on pattern matching. Use this to check existing rules before creating new ones.",
+			s.handleListTransactionRules),
+		makeToolDef("update_transaction_rule", ToolWrite,
+			"Update a transaction rule's name, conditions, category, priority, enabled status, or expiry.",
+			s.handleUpdateTransactionRule),
+		makeToolDef("delete_transaction_rule", ToolWrite,
+			"Delete a transaction rule by ID.",
+			s.handleDeleteTransactionRule),
+		makeToolDef("batch_submit_reviews", ToolWrite,
+			"Submit decisions on multiple pending reviews at once. Each review needs a decision (approved or skipped) and optionally a category_slug or category_id. More efficient than submitting reviews one at a time.",
+			s.handleBatchSubmitReviews),
 	}
 }
 
