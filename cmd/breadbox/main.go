@@ -36,7 +36,7 @@ var version = "dev"
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: breadbox <command>")
-		fmt.Fprintln(os.Stderr, "commands: serve, migrate, seed, mcp-stdio, api-keys, create-admin, reset-password, version")
+		fmt.Fprintln(os.Stderr, "commands: serve, migrate, seed, mcp-stdio, mcp-stdio-review, api-keys, create-admin, reset-password, version")
 		os.Exit(1)
 	}
 
@@ -58,6 +58,11 @@ func main() {
 		}
 	case "mcp-stdio":
 		if err := runMCPStdio(); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+	case "mcp-stdio-review":
+		if err := runMCPStdioReview(); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
@@ -302,7 +307,11 @@ func runMigrate() error {
 	return nil
 }
 
-func runMCPStdio() error {
+// serverBuilderFunc builds a filtered MCP server from config.
+type serverBuilderFunc func(breadboxmcp.MCPServerConfig) *mcpsdk.Server
+
+// runMCPStdioMode is the shared implementation for stdio MCP commands.
+func runMCPStdioMode(actorName string, builder func(*breadboxmcp.MCPServer) serverBuilderFunc) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -317,7 +326,7 @@ func runMCPStdio() error {
 	// Set agent actor identity so ActorFromContext returns "agent" (not "system").
 	// Stdio has no API key middleware, but write actions like submit_review
 	// require reviewer_type to be "user" or "agent".
-	ctx = service.ContextWithAPIKey(ctx, "stdio", "MCP Stdio")
+	ctx = service.ContextWithAPIKey(ctx, "stdio", actorName)
 
 	a, err := app.New(ctx, cfg, logger)
 	if err != nil {
@@ -337,7 +346,7 @@ func runMCPStdio() error {
 		}
 	}
 
-	server := mcpServer.BuildServer(breadboxmcp.MCPServerConfig{
+	server := builder(mcpServer)(breadboxmcp.MCPServerConfig{
 		Mode:               mcpCfg.Mode,
 		DisabledTools:      mcpCfg.DisabledTools,
 		CustomInstructions: mcpCfg.CustomInstructions,
@@ -352,8 +361,20 @@ func runMCPStdio() error {
 		cancel()
 	}()
 
-	logger.Info("starting MCP stdio server", "version", version)
+	logger.Info("starting MCP stdio server", "version", version, "mode", actorName)
 	return server.Run(ctx, &mcpsdk.StdioTransport{})
+}
+
+func runMCPStdio() error {
+	return runMCPStdioMode("MCP Stdio", func(s *breadboxmcp.MCPServer) serverBuilderFunc {
+		return s.BuildServer
+	})
+}
+
+func runMCPStdioReview() error {
+	return runMCPStdioMode("MCP Stdio Review", func(s *breadboxmcp.MCPServer) serverBuilderFunc {
+		return s.BuildReviewServer
+	})
 }
 
 func runAPIKeys() error {

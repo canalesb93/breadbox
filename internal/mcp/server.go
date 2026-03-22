@@ -100,9 +100,10 @@ type MCPServerConfig struct {
 
 // MCPServer wraps the MCP SDK server and the breadbox service layer.
 type MCPServer struct {
-	svc      *service.Service
-	version  string
-	allTools []ToolDef
+	svc         *service.Service
+	version     string
+	allTools    []ToolDef
+	reviewTools []ToolDef
 }
 
 // NewMCPServer creates a new MCP server with all tools registered in a registry.
@@ -112,6 +113,7 @@ func NewMCPServer(svc *service.Service, version string) *MCPServer {
 		version: version,
 	}
 	s.buildToolRegistry()
+	s.buildReviewToolRegistry()
 	return s
 }
 
@@ -225,24 +227,24 @@ func makeToolDef[T any](name string, classification ToolClassification, descript
 	}
 }
 
-// BuildServer creates a filtered *mcpsdk.Server for the given config.
-func (s *MCPServer) BuildServer(cfg MCPServerConfig) *mcpsdk.Server {
-	instructions := BuiltInInstructions
+// buildServer is the shared implementation for building a filtered *mcpsdk.Server.
+func (s *MCPServer) buildServer(name, baseInstructions string, tools []ToolDef, cfg MCPServerConfig) *mcpsdk.Server {
+	instructions := baseInstructions
 	if cfg.CustomInstructions != "" {
 		instructions += "\n\nCUSTOM INSTRUCTIONS:\n" + cfg.CustomInstructions
 	}
 
 	server := mcpsdk.NewServer(
-		&mcpsdk.Implementation{Name: "breadbox", Version: s.version},
+		&mcpsdk.Implementation{Name: name, Version: s.version},
 		&mcpsdk.ServerOptions{Instructions: instructions},
 	)
 
 	disabledSet := make(map[string]bool)
-	for _, name := range cfg.DisabledTools {
-		disabledSet[name] = true
+	for _, n := range cfg.DisabledTools {
+		disabledSet[n] = true
 	}
 
-	for _, td := range s.allTools {
+	for _, td := range tools {
 		if disabledSet[td.Tool.Name] {
 			continue
 		}
@@ -254,6 +256,11 @@ func (s *MCPServer) BuildServer(cfg MCPServerConfig) *mcpsdk.Server {
 
 	s.registerResources(server)
 	return server
+}
+
+// BuildServer creates a filtered *mcpsdk.Server for the given config.
+func (s *MCPServer) BuildServer(cfg MCPServerConfig) *mcpsdk.Server {
+	return s.buildServer("breadbox", BuiltInInstructions, s.allTools, cfg)
 }
 
 // Server returns a default MCP server with all tools registered (for backward compat / stdio).
@@ -279,27 +286,25 @@ func (s *MCPServer) AllToolDefs() []ToolDef {
 	return s.allTools
 }
 
-// NewHTTPHandler wraps the MCP server in a Streamable HTTP handler with per-request filtering.
-func NewHTTPHandler(s *MCPServer, svc *service.Service) http.Handler {
+// newHTTPHandler creates a Streamable HTTP handler that loads MCP config per-request
+// and delegates to the given server builder function.
+func newHTTPHandler(svc *service.Service, builder func(MCPServerConfig) *mcpsdk.Server) http.Handler {
 	return mcpsdk.NewStreamableHTTPHandler(
 		func(r *http.Request) *mcpsdk.Server {
-			// Load MCP config from DB.
 			mcpCfg, err := svc.GetMCPConfig(r.Context())
 			if err != nil {
-				// Fall back to defaults on error.
 				mcpCfg = &service.MCPConfig{
 					Mode:          "read_only",
 					DisabledTools: []string{},
 				}
 			}
 
-			// Get API key scope from context.
 			apiKeyScope := "full_access"
 			if apiKey := mw.GetAPIKey(r.Context()); apiKey != nil {
 				apiKeyScope = apiKey.Scope
 			}
 
-			return s.BuildServer(MCPServerConfig{
+			return builder(MCPServerConfig{
 				Mode:               mcpCfg.Mode,
 				DisabledTools:      mcpCfg.DisabledTools,
 				CustomInstructions: mcpCfg.CustomInstructions,
@@ -308,6 +313,11 @@ func NewHTTPHandler(s *MCPServer, svc *service.Service) http.Handler {
 		},
 		nil,
 	)
+}
+
+// NewHTTPHandler wraps the MCP server in a Streamable HTTP handler with per-request filtering.
+func NewHTTPHandler(s *MCPServer, svc *service.Service) http.Handler {
+	return newHTTPHandler(svc, s.BuildServer)
 }
 
 // checkWritePermission verifies the requesting API key has write access and
@@ -326,4 +336,82 @@ func (s *MCPServer) checkWritePermission(ctx context.Context) error {
 		return fmt.Errorf("MCP server is in read-only mode")
 	}
 	return nil
+}
+
+// ReviewBuiltInInstructions contains the MCP server instructions focused on the review workflow.
+const ReviewBuiltInInstructions = `Breadbox Review Agent — you categorize transactions flagged during bank sync.
+
+AMOUNT CONVENTION:
+- Positive amounts = money out (debits, purchases, payments)
+- Negative amounts = money in (credits, deposits, refunds)
+- All amounts include iso_currency_code — never sum across different currencies
+
+REVIEW WORKFLOW:
+1. Call list_pending_reviews (batch of 10-20) to get transactions needing categorization
+2. For each review, examine name, merchant_name, amount, and raw category fields (category_primary_raw, category_detailed_raw)
+3. Use list_categories to find the correct category slug
+4. Submit with submit_review (decision: "approved", category_slug: "...") or batch_submit_reviews for multiple
+5. Use "skipped" only when you cannot confidently determine the category — include a note explaining why
+6. After reviewing a batch, look for patterns and create transaction rules so similar future transactions are auto-categorized
+
+RULE CREATION STRATEGY — follow this order:
+1. FIRST, create category_primary rules (highest impact). Look at the category_primary field on transactions — these are raw provider categories like "dining", "groceries", "phone", "accommodation", "fuel", "entertainment". One rule per category_primary covers ALL transactions with that label. Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]} → food_and_drink_restaurant. This single rule handles every dining transaction from Teller.
+2. THEN, create name-pattern rules for transaction types that span merchants: "ATM Withdrawal" → withdrawals, "Wire Transfer" → transfer_out, "Service Charge" → bank_fees, "Cash Deposit" → deposits. Use contains on the name field.
+3. LAST, create per-merchant rules only for specific merchants that get miscategorized or need a different category than their category_primary suggests (e.g., Walmart categorized as "shopping" but you want it under "groceries").
+
+CONDITION FIELDS AND OPERATORS:
+- Fields: name, merchant_name, amount, category_primary (raw provider category), category_detailed, pending, provider, account_id, user_id
+- String operators: eq, neq, contains, not_contains, matches (regex), in
+- Numeric operators (amount): eq, neq, gt, gte, lt, lte
+- Boolean operators (pending): eq, neq
+- Logic: {"and": [...]}, {"or": [...]}, {"not": {...}} for combining conditions
+
+IMPORTANT:
+- ALWAYS check list_transaction_rules before creating to avoid duplicates
+- Use batch_create_rules to create multiple rules efficiently
+- Before creating rules, query some transactions to see what category_primary values exist — use query_transactions with fields=core,category
+- Use transaction_summary grouped by category to understand spending patterns`
+
+// buildReviewToolRegistry populates the reviewTools slice with tools relevant to the review workflow.
+func (s *MCPServer) buildReviewToolRegistry() {
+	// Define the subset of tool names relevant to reviews.
+	reviewToolNames := map[string]bool{
+		// Read tools
+		"list_pending_reviews":      true,
+		"list_categories":           true,
+		"query_transactions":        true,
+		"count_transactions":        true,
+		"list_transaction_rules":    true,
+		"list_accounts":             true,
+		"list_users":                true,
+		"list_transaction_comments": true,
+		"transaction_summary":       true,
+		// Write tools
+		"submit_review":          true,
+		"batch_submit_reviews":   true,
+		"create_transaction_rule": true,
+		"batch_create_rules":     true,
+	}
+
+	for _, td := range s.allTools {
+		if reviewToolNames[td.Tool.Name] {
+			s.reviewTools = append(s.reviewTools, td)
+		}
+	}
+}
+
+// BuildReviewServer creates a filtered *mcpsdk.Server for the review workflow.
+// It uses ReviewBuiltInInstructions and only the review-relevant tool subset.
+func (s *MCPServer) BuildReviewServer(cfg MCPServerConfig) *mcpsdk.Server {
+	return s.buildServer("breadbox-review", ReviewBuiltInInstructions, s.reviewTools, cfg)
+}
+
+// ReviewToolDefs returns the review tool registry for admin display.
+func (s *MCPServer) ReviewToolDefs() []ToolDef {
+	return s.reviewTools
+}
+
+// NewReviewHTTPHandler wraps the review MCP server in a Streamable HTTP handler with per-request filtering.
+func NewReviewHTTPHandler(s *MCPServer, svc *service.Service) http.Handler {
+	return newHTTPHandler(svc, s.BuildReviewServer)
 }

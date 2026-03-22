@@ -91,11 +91,18 @@ func NewRouter(a *app.App, version string) http.Handler {
 		})
 	})
 
-	// MCP server — API key authenticated, per-request filtering.
+	// MCP servers — API key authenticated, per-request filtering.
 	mcpServer := breadboxmcp.NewMCPServer(svc, version)
-	mcpHandler := breadboxmcp.NewHTTPHandler(mcpServer, svc)
 	r.Group(func(r chi.Router) {
 		r.Use(mw.APIKeyAuth(svc))
+
+		// Review MCP — mounted first so /mcp/review matches before /mcp/*.
+		reviewHandler := breadboxmcp.NewReviewHTTPHandler(mcpServer, svc)
+		r.Handle("/mcp/review", reviewHandler)
+		r.Handle("/mcp/review/*", reviewHandler)
+
+		// General MCP.
+		mcpHandler := breadboxmcp.NewHTTPHandler(mcpServer, svc)
 		r.Handle("/mcp", mcpHandler)
 		r.Handle("/mcp/*", mcpHandler)
 	})
