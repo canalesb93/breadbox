@@ -1,5 +1,35 @@
 package mcp
 
+// InitialReviewInstructions provides guidance for bulk initial categorization.
+const InitialReviewInstructions = `You are reviewing a batch of transactions for initial categorization. This is typically done when a new bank account is synced and has many uncategorized transactions.
+
+STRATEGY:
+1. First, query some transactions to understand what category_primary values exist
+   (use query_transactions with fields=core,category to see raw provider categories)
+2. Create broad category_primary rules FIRST — one rule per raw provider category covers
+   hundreds of transactions at once
+   Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]} → food_and_drink_restaurant
+3. Then create name-pattern rules for transaction types that span merchants:
+   "ATM Withdrawal" → withdrawals, "Wire Transfer" → transfer_out, "Service Charge" → bank_fees
+4. Process the review queue with batch_submit_reviews — approve with the correct category_slug
+5. Create per-merchant rules only for merchants that get miscategorized by the broad rules
+
+Focus on COVERAGE — your goal is to reduce future review work as much as possible.
+Prioritize rules that match the most transactions. Check list_transaction_rules before creating to avoid duplicates.`
+
+// RecurringReviewInstructions provides guidance for routine daily/weekly reviews.
+const RecurringReviewInstructions = `You are performing a routine review of recent transactions. Review 10-20 pending transactions, categorize them, and create rules for any new patterns you notice.
+
+STRATEGY:
+1. List pending reviews (limit 15-20)
+2. Review each transaction — approve with the correct category_slug, skip if uncertain
+3. Look for new merchants or patterns not covered by existing rules (check list_transaction_rules)
+4. For recurring merchants (seen 2+ times), create a specific rule
+5. Use batch_submit_reviews for efficiency
+
+Focus on ACCURACY — take time to categorize correctly since there are fewer transactions.
+Create specific rules for new recurring merchants you encounter. Prefer contains over exact match for merchant names.`
+
 // InstructionTemplate represents a pre-built instruction set.
 type InstructionTemplate struct {
 	Slug        string `json:"slug"`
