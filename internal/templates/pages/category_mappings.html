@@ -4,7 +4,7 @@
     <h1 class="text-2xl font-bold">Category Mappings</h1>
     <p class="text-sm text-base-content/60 mt-1">Map provider category strings to your category taxonomy</p>
   </div>
-  <a href="/admin/categories" class="btn btn-sm btn-outline">
+  <a href="/categories" class="btn btn-sm btn-outline">
     <i data-lucide="tag" class="w-4 h-4"></i> Back to Categories
   </a>
 </div>
@@ -43,7 +43,7 @@
               <button class="btn btn-sm btn-primary" :disabled="!categoryId || submitting" @click="
                 submitting = true;
                 let provCat = '{{if .Detailed}}{{.Detailed}}{{else}}{{.Primary}}{{end}}';
-                fetch('/admin/api/category-mappings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({provider: '{{.Provider}}', provider_category: provCat, category_id: categoryId})})
+                fetch('/-/category-mappings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({provider: '{{.Provider}}', provider_category: provCat, category_id: categoryId})})
                 .then(r => { if(r.ok) location.reload(); else { submitting = false; alert('Failed to create mapping'); } })
                 .catch(() => { submitting = false; })
               ">Map</button>
@@ -68,7 +68,7 @@
         <option value="csv"{{if eq .FilterProvider "csv"}} selected{{end}}>CSV</option>
       </select>
     </label>
-    {{if .FilterProvider}}<a href="/admin/categories/mappings" class="btn btn-sm btn-ghost">Clear</a>{{end}}
+    {{if .FilterProvider}}<a href="/categories/mappings" class="btn btn-sm btn-ghost">Clear</a>{{end}}
   </form>
 </div>
 
@@ -101,7 +101,7 @@
                   </select>
                   <button class="btn btn-sm btn-primary" :disabled="submitting" @click="
                     submitting = true;
-                    fetch('/admin/api/category-mappings/{{.ID}}', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({category_id: categoryId})})
+                    fetch('/-/category-mappings/{{.ID}}', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({category_id: categoryId})})
                     .then(r => { if(r.ok) location.reload(); else { submitting = false; editing = false; } })
                     .catch(() => { submitting = false; })
                   ">Save</button>
@@ -112,7 +112,7 @@
             <td>
               <button class="btn btn-ghost btn-xs text-error" @click="
                 if(confirm('Delete this mapping?')) {
-                  fetch('/admin/api/category-mappings/{{.ID}}', {method: 'DELETE'})
+                  fetch('/-/category-mappings/{{.ID}}', {method: 'DELETE'})
                   .then(r => { if(r.ok) location.reload(); })
                 }
               "><i data-lucide="trash-2" class="w-4 h-4"></i></button>

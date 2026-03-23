@@ -7,7 +7,7 @@
   <div class="collapse-title text-xl font-medium">Sync &amp; Scheduling</div>
   <div class="collapse-content">
     <p class="text-sm text-base-content/70 mb-4">Breadbox automatically syncs bank data on this schedule. Webhooks provide real-time updates when supported by the provider.</p>
-    <form method="POST" action="/admin/settings/sync">
+    <form method="POST" action="/settings/sync">
       <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
       <label class="flex flex-col gap-1 text-sm" for="sync_interval_minutes">
@@ -52,7 +52,7 @@
     <div class="divider"></div>
 
     <h3 class="font-semibold text-sm mb-2">Change Password</h3>
-    <form method="POST" action="/admin/settings/password">
+    <form method="POST" action="/settings/password">
       <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
       <label class="flex flex-col gap-1 text-sm" for="current_password">Current Password</label>
       <input type="password" id="current_password" name="current_password" required class="input input-sm w-full max-w-md">

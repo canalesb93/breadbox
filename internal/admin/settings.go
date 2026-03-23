@@ -74,7 +74,7 @@ func SettingsSyncPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 		syncInterval, err := strconv.Atoi(syncIntervalStr)
 		if err != nil || !isValidSyncInterval(syncInterval) {
 			SetFlash(ctx, sm, "error", "Invalid sync interval.")
-			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
 			return
 		}
 
@@ -84,13 +84,13 @@ func SettingsSyncPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 		}); err != nil {
 			a.Logger.Error("save sync interval", "error", err)
 			SetFlash(ctx, sm, "error", "Failed to save sync interval.")
-			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
 			return
 		}
 		a.Config.SyncIntervalMinutes = syncInterval
 
 		SetFlash(ctx, sm, "success", "Sync settings saved.")
-		http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 	}
 }
 
@@ -108,14 +108,14 @@ func ChangePasswordHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 		var adminID pgtype.UUID
 		if err := adminID.Scan(adminIDStr); err != nil {
 			SetFlash(ctx, sm, "error", "Invalid session.")
-			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
 			return
 		}
 
 		admin, err := a.Queries.GetAdminAccountByID(ctx, adminID)
 		if err != nil {
 			SetFlash(ctx, sm, "error", "Account not found.")
-			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
 			return
 		}
 
@@ -125,26 +125,26 @@ func ChangePasswordHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 
 		if err := bcrypt.CompareHashAndPassword(admin.HashedPassword, []byte(currentPassword)); err != nil {
 			SetFlash(ctx, sm, "error", "Current password is incorrect.")
-			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
 			return
 		}
 
 		if len(newPassword) < 8 {
 			SetFlash(ctx, sm, "error", "New password must be at least 8 characters.")
-			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
 			return
 		}
 
 		if newPassword != confirmPassword {
 			SetFlash(ctx, sm, "error", "New passwords do not match.")
-			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
 			return
 		}
 
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), 12)
 		if err != nil {
 			SetFlash(ctx, sm, "error", "Failed to hash password.")
-			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
 			return
 		}
 
@@ -154,12 +154,12 @@ func ChangePasswordHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 		}); err != nil {
 			a.Logger.Error("update admin password", "error", err)
 			SetFlash(ctx, sm, "error", "Failed to update password.")
-			http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
 			return
 		}
 
 		SetFlash(ctx, sm, "success", "Password updated successfully.")
-		http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 	}
 }
 

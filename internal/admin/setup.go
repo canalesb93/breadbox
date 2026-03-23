@@ -24,7 +24,7 @@ func CreateAdminHandler(queries *db.Queries, sm *scs.SessionManager, tr *Templat
 		// If admin accounts already exist, redirect to dashboard.
 		count, err := queries.CountAdminAccounts(ctx)
 		if err == nil && count > 0 {
-			http.Redirect(w, r, "/admin/", http.StatusSeeOther)
+			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
 

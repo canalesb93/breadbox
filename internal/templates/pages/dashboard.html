@@ -24,7 +24,7 @@
       x-show="!pulled"
       :disabled="pulling"
       @click="pulling = true; error = '';
-        fetch('/admin/api/update', {method: 'POST', headers: {'Content-Type': 'application/json'}})
+        fetch('/-/update', {method: 'POST', headers: {'Content-Type': 'application/json'}})
           .then(r => r.json())
           .then(d => { if (d.ok) { pulled = true; } else { error = d.error || 'Update failed'; } })
           .catch(() => { error = 'Network error'; })
@@ -40,7 +40,7 @@
       </div>
     </div>
     <button class="btn btn-sm btn-ghost"
-      @click="fetch('/admin/api/update/dismiss', {
+      @click="fetch('/-/update/dismiss', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({version: '{{.LatestVersion}}'})
@@ -64,17 +64,17 @@
         <span class="text-left">Create admin account</span>
       </li>
       <li class="step{{if .HasProvider}} step-primary{{end}}">
-        <span class="text-left">{{if .HasProvider}}Bank provider configured{{else}}<a href="/admin/providers" class="link">Configure a bank provider</a>{{end}}</span>
+        <span class="text-left">{{if .HasProvider}}Bank provider configured{{else}}<a href="/providers" class="link">Configure a bank provider</a>{{end}}</span>
       </li>
       <li class="step{{if .HasMember}} step-primary{{end}}">
-        <span class="text-left">{{if .HasMember}}Family member added{{else}}<a href="/admin/users/new" class="link">Add a family member</a>{{end}}</span>
+        <span class="text-left">{{if .HasMember}}Family member added{{else}}<a href="/users/new" class="link">Add a family member</a>{{end}}</span>
       </li>
       <li class="step{{if .HasConnection}} step-primary{{end}}">
-        <span class="text-left">{{if .HasConnection}}Bank connected{{else}}<a href="/admin/connections/new" class="link">Connect your first bank</a>{{end}}</span>
+        <span class="text-left">{{if .HasConnection}}Bank connected{{else}}<a href="/connections/new" class="link">Connect your first bank</a>{{end}}</span>
       </li>
     </ul>
     <div class="card-actions justify-end mt-2">
-      <form method="POST" action="/admin/onboarding/dismiss">
+      <form method="POST" action="/onboarding/dismiss">
         <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
         <button type="submit" class="btn btn-ghost btn-sm">Dismiss</button>
       </form>
@@ -88,7 +88,7 @@
   <i data-lucide="alert-triangle" class="w-5 h-5"></i>
   <div>
     <strong>{{.NeedsAttention}} connection(s) need attention.</strong>
-    <a href="/admin/connections" class="link ml-1">View connections &rarr;</a>
+    <a href="/connections" class="link ml-1">View connections &rarr;</a>
   </div>
 </div>
 {{end}}
@@ -101,7 +101,7 @@
     <div class="stat-title">Accounts Connected</div>
     <div class="stat-value">{{.AccountCount}}</div>
   </div>
-  <a href="/admin/transactions" class="stat hover:bg-base-300 no-underline">
+  <a href="/transactions" class="stat hover:bg-base-300 no-underline">
     <div class="stat-figure text-base-content/50">
       <i data-lucide="trending-up" class="w-8 h-8"></i>
     </div>
@@ -116,7 +116,7 @@
     <div class="stat-value text-lg">{{.LastSync}}</div>
   </div>
   {{if gt .NeedsAttention 0}}
-  <a href="/admin/connections" class="stat border-l-4 border-warning hover:bg-base-300 no-underline">
+  <a href="/connections" class="stat border-l-4 border-warning hover:bg-base-300 no-underline">
     <div class="stat-figure text-warning">
       <i data-lucide="alert-triangle" class="w-8 h-8"></i>
     </div>
@@ -133,7 +133,7 @@
   </div>
   {{end}}
   {{if gt .ReviewPending 0}}
-  <a href="/admin/reviews" class="stat border-l-4 border-info hover:bg-base-300 no-underline">
+  <a href="/reviews" class="stat border-l-4 border-info hover:bg-base-300 no-underline">
     <div class="stat-figure text-info">
       <i data-lucide="clipboard-check" class="w-8 h-8"></i>
     </div>
@@ -162,7 +162,7 @@
     <tbody>
       {{range .RecentLogs}}
       <tr class="hover:bg-base-300">
-        <td><a href="/admin/connections/{{formatUUID .ConnectionID}}">{{.InstitutionName.String}}</a></td>
+        <td><a href="/connections/{{formatUUID .ConnectionID}}">{{.InstitutionName.String}}</a></td>
         <td>{{.Trigger}}</td>
         <td>{{syncBadge (printf "%s" .Status)}}</td>
         <td>{{.AddedCount}}</td>
@@ -179,10 +179,10 @@
 {{end}}
 
 <div class="flex gap-3 mt-6">
-  <a href="/admin/connections/new" class="btn btn-primary">
+  <a href="/connections/new" class="btn btn-primary">
     <i data-lucide="plus" class="w-4 h-4"></i>
     Connect New Bank
   </a>
-  <a href="/admin/sync-logs" class="btn btn-ghost">View All Sync Logs</a>
+  <a href="/sync-logs" class="btn btn-ghost">View All Sync Logs</a>
 </div>
 {{end}}

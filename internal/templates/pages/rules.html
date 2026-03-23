@@ -33,7 +33,7 @@
       </select>
     </label>
     <button type="submit" class="btn btn-sm btn-ghost">Filter</button>
-    {{if or .SearchFilter .CategoryFilter .EnabledFilter}}<a href="/admin/rules" class="btn btn-sm btn-ghost">Clear</a>{{end}}
+    {{if or .SearchFilter .CategoryFilter .EnabledFilter}}<a href="/rules" class="btn btn-sm btn-ghost">Clear</a>{{end}}
   </form>
 </div>
 
@@ -109,7 +109,7 @@
 <!-- Pagination -->
 {{if .HasMore}}
 <div class="flex justify-center mt-4">
-  <a href="/admin/rules?cursor={{.NextCursor}}{{if .SearchFilter}}&search={{.SearchFilter}}{{end}}{{if .CategoryFilter}}&category_slug={{.CategoryFilter}}{{end}}{{if .EnabledFilter}}&enabled={{.EnabledFilter}}{{end}}" class="btn btn-sm btn-outline">Load More</a>
+  <a href="/rules?cursor={{.NextCursor}}{{if .SearchFilter}}&search={{.SearchFilter}}{{end}}{{if .CategoryFilter}}&category_slug={{.CategoryFilter}}{{end}}{{if .EnabledFilter}}&enabled={{.EnabledFilter}}{{end}}" class="btn btn-sm btn-outline">Load More</a>
 </div>
 {{end}}
 
@@ -231,7 +231,7 @@ function rulesPage() {
             category_slug: this.form.category_slug,
             priority: this.form.priority
           };
-          const resp = await fetch('/admin/api/rules/' + this.editingId, {
+          const resp = await fetch('/-/rules/' + this.editingId, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(body)
@@ -250,7 +250,7 @@ function rulesPage() {
             priority: this.form.priority,
             expires_in: this.form.expires_in || undefined
           };
-          const resp = await fetch('/admin/api/rules', {
+          const resp = await fetch('/-/rules', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(body)
@@ -270,7 +270,7 @@ function rulesPage() {
     },
     async toggleRule(id) {
       try {
-        const resp = await fetch('/admin/api/rules/' + id + '/toggle', { method: 'POST' });
+        const resp = await fetch('/-/rules/' + id + '/toggle', { method: 'POST' });
         if (resp.ok) location.reload();
       } catch (e) {
         // ignore
@@ -279,7 +279,7 @@ function rulesPage() {
     async deleteRule(id, el) {
       if (!confirm('Delete this rule? This cannot be undone.')) return;
       try {
-        const resp = await fetch('/admin/api/rules/' + id, { method: 'DELETE' });
+        const resp = await fetch('/-/rules/' + id, { method: 'DELETE' });
         if (resp.ok) location.reload();
       } catch (e) {
         // ignore

@@ -76,7 +76,7 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRende
 
 		sm.Put(r.Context(), sessionKeyAdminID, formatUUID(admin.ID))
 		sm.Put(r.Context(), sessionKeyAdminUsername, admin.Username)
-		http.Redirect(w, r, "/admin/", http.StatusSeeOther)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
 }
 

@@ -182,7 +182,7 @@
                     <button class="btn btn-sm btn-primary" :disabled="!selectedId || submitting" @click="
                       submitting = true;
                       let provCat = '{{if .Detailed}}{{.Detailed}}{{else}}{{.Primary}}{{end}}';
-                      fetch('/admin/api/category-mappings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({provider: '{{.Provider}}', provider_category: provCat, category_id: selectedId})})
+                      fetch('/-/category-mappings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({provider: '{{.Provider}}', provider_category: provCat, category_id: selectedId})})
                       .then(r => { if(r.ok) location.reload(); else { submitting = false; window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Failed to create mapping',type:'error'}})); } })
                       .catch(() => { submitting = false; })
                     ">Map</button>
@@ -227,7 +227,7 @@
               <button class="btn btn-sm btn-primary" :disabled="!selectedId || submitting" @click="
                 submitting = true;
                 let provCat = '{{if .Detailed}}{{.Detailed}}{{else}}{{.Primary}}{{end}}';
-                fetch('/admin/api/category-mappings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({provider: '{{.Provider}}', provider_category: provCat, category_id: selectedId})})
+                fetch('/-/category-mappings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({provider: '{{.Provider}}', provider_category: provCat, category_id: selectedId})})
                 .then(r => { if(r.ok) location.reload(); else { submitting = false; } })
                 .catch(() => { submitting = false; })
               ">Map</button>
@@ -251,7 +251,7 @@
             <option value="csv"{{if eq .FilterProvider "csv"}} selected{{end}}>CSV</option>
           </select>
         </label>
-        {{if .FilterProvider}}<a href="/admin/categories#mappings" class="btn btn-sm btn-ghost">Clear</a>{{end}}
+        {{if .FilterProvider}}<a href="/categories#mappings" class="btn btn-sm btn-ghost">Clear</a>{{end}}
       </form>
       <div class="ml-auto">
         <input type="text" placeholder="Search mappings..." class="input input-sm input-bordered w-48" @input="mappingSearch = $event.target.value">
@@ -305,7 +305,7 @@
                       </div>
                       <button class="btn btn-sm btn-primary" :disabled="submitting" @click="
                         submitting = true;
-                        fetch('/admin/api/category-mappings/{{.ID}}', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({category_id: categoryId})})
+                        fetch('/-/category-mappings/{{.ID}}', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({category_id: categoryId})})
                         .then(r => { if(r.ok) location.reload(); else { submitting = false; editing = false; } })
                         .catch(() => { submitting = false; })
                       ">Save</button>
@@ -316,7 +316,7 @@
                 <td>
                   <button class="btn btn-ghost btn-xs text-error" @click="
                     if(confirm('Delete this mapping?')) {
-                      fetch('/admin/api/category-mappings/{{.ID}}', {method: 'DELETE'})
+                      fetch('/-/category-mappings/{{.ID}}', {method: 'DELETE'})
                       .then(r => { if(r.ok) location.reload(); })
                     }
                   "><i data-lucide="trash-2" class="w-4 h-4"></i></button>
@@ -475,7 +475,7 @@
     presetColors: ['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#64748b','#78716c']
   }" @submit.prevent="
     submitting = true;
-    fetch('/admin/api/categories', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({display_name: displayName, parent_id: parentId || undefined, icon: icon || undefined, color: color || undefined, sort_order: sortOrder})})
+    fetch('/-/categories', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({display_name: displayName, parent_id: parentId || undefined, icon: icon || undefined, color: color || undefined, sort_order: sortOrder})})
     .then(r => { if(r.ok) location.reload(); else r.json().then(d => { window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error?.message || 'Error', type:'error'}})); submitting = false; }); })
     .catch(() => { submitting = false; })
   ">
@@ -631,7 +631,7 @@
       <button type="button" class="btn" onclick="document.getElementById('edit-modal').close()">Cancel</button>
       <button type="button" class="btn btn-primary" :disabled="submitting || !editDisplayName" @click="
         submitting = true;
-        fetch('/admin/api/categories/' + editId, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({display_name: editDisplayName, icon: editIcon || undefined, color: editColor || undefined, sort_order: editSortOrder, hidden: editHidden})})
+        fetch('/-/categories/' + editId, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({display_name: editDisplayName, icon: editIcon || undefined, color: editColor || undefined, sort_order: editSortOrder, hidden: editHidden})})
         .then(r => { if(r.ok) location.reload(); else r.json().then(d => { window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error?.message || 'Error', type:'error'}})); submitting = false; }); })
         .catch(() => { submitting = false; })
       ">
@@ -652,7 +652,7 @@
       <button type="button" class="btn" onclick="document.getElementById('delete-modal').close()">Cancel</button>
       <button type="button" class="btn btn-error" :disabled="submitting" @click="
         submitting = true;
-        fetch('/admin/api/categories/' + deleteId, {method: 'DELETE'})
+        fetch('/-/categories/' + deleteId, {method: 'DELETE'})
         .then(r => { if(r.ok) location.reload(); else r.json().then(d => { window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error?.message || 'Error', type:'error'}})); submitting = false; }); })
         .catch(() => { submitting = false; })
       ">
@@ -706,7 +706,7 @@ function mappingsTab() {
         const [provider, providerCategory] = v.split('||');
         return { provider, provider_category: providerCategory, category_id: this.bulkCategoryId };
       });
-      fetch('/admin/api/category-mappings/bulk', {
+      fetch('/-/category-mappings/bulk', {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({mappings})
@@ -776,7 +776,7 @@ Paste the exported TSV below this line, then edit it according to the instructio
     exportCategories() {
       this.catLoading = true;
       this.catResult = null;
-      fetch('/admin/api/categories/export-tsv')
+      fetch('/-/categories/export-tsv')
         .then(r => { if (!r.ok) throw new Error('Export failed'); return r.text(); })
         .then(text => { this.catText = text; })
         .catch(() => { window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Failed to export categories',type:'error'}})); })
@@ -789,7 +789,7 @@ Paste the exported TSV below this line, then edit it according to the instructio
       this.catImporting = true;
       this.catResult = null;
       const params = this.catReplace ? '?replace=true' : '';
-      fetch('/admin/api/categories/import-tsv' + params, {
+      fetch('/-/categories/import-tsv' + params, {
         method: 'POST',
         headers: {'Content-Type': 'text/tab-separated-values'},
         body: this.catText
@@ -812,7 +812,7 @@ Paste the exported TSV below this line, then edit it according to the instructio
     exportMappings() {
       this.mapLoading = true;
       this.mapResult = null;
-      fetch('/admin/api/category-mappings/export-tsv')
+      fetch('/-/category-mappings/export-tsv')
         .then(r => { if (!r.ok) throw new Error('Export failed'); return r.text(); })
         .then(text => { this.mapText = text; })
         .catch(() => { window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Failed to export mappings',type:'error'}})); })
@@ -828,7 +828,7 @@ Paste the exported TSV below this line, then edit it according to the instructio
       if (this.mapRetroactive) qp.set('apply_retroactively', 'true');
       if (this.mapReplace) qp.set('replace', 'true');
       const qs = qp.toString();
-      const url = '/admin/api/category-mappings/import-tsv' + (qs ? '?' + qs : '');
+      const url = '/-/category-mappings/import-tsv' + (qs ? '?' + qs : '');
       fetch(url, {
         method: 'POST',
         headers: {'Content-Type': 'text/tab-separated-values'},

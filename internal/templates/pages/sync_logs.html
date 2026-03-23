@@ -1,7 +1,7 @@
 {{define "content"}}
 <h1 class="text-2xl font-bold mb-6">Sync Logs</h1>
 
-<form method="GET" action="/admin/sync-logs" class="bb-filter-bar">
+<form method="GET" action="/sync-logs" class="bb-filter-bar">
   <label>
     Connection
     <select name="connection_id">
@@ -22,7 +22,7 @@
   </label>
   <button type="submit" class="btn btn-sm btn-primary self-end">Filter</button>
   {{if or .FilterConnID .FilterStatus}}
-  <a href="/admin/sync-logs" class="btn btn-sm btn-ghost self-end">Clear</a>
+  <a href="/sync-logs" class="btn btn-sm btn-ghost self-end">Clear</a>
   {{end}}
 </form>
 
@@ -71,13 +71,13 @@
 <div class="bb-pagination">
   <div>
     {{if gt .Page 1}}
-    <a href="/admin/sync-logs?page={{sub .Page 1}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterStatus}}&status={{$.FilterStatus}}{{end}}" class="btn btn-sm btn-ghost">&laquo; Previous</a>
+    <a href="/sync-logs?page={{sub .Page 1}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterStatus}}&status={{$.FilterStatus}}{{end}}" class="btn btn-sm btn-ghost">&laquo; Previous</a>
     {{end}}
   </div>
   <small class="text-base-content/70">Page {{.Page}} of {{.TotalPages}} ({{.Total}} total)</small>
   <div>
     {{if lt .Page .TotalPages}}
-    <a href="/admin/sync-logs?page={{add .Page 1}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterStatus}}&status={{$.FilterStatus}}{{end}}" class="btn btn-sm btn-ghost">Next &raquo;</a>
+    <a href="/sync-logs?page={{add .Page 1}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterStatus}}&status={{$.FilterStatus}}{{end}}" class="btn btn-sm btn-ghost">Next &raquo;</a>
     {{end}}
   </div>
 </div>
@@ -89,7 +89,7 @@
     <i data-lucide="refresh-cw" class="w-12 h-12 text-base-content/30 mb-2"></i>
     <p class="text-base-content/70">No sync logs found.</p>
     {{if or .FilterConnID .FilterStatus}}
-    <a href="/admin/sync-logs" class="btn btn-ghost btn-sm mt-2">Clear filters</a>
+    <a href="/sync-logs" class="btn btn-ghost btn-sm mt-2">Clear filters</a>
     {{end}}
   </div>
 </div>

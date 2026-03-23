@@ -18,7 +18,7 @@
           <button class="btn btn-ghost" @click="confirmOpen = false" :disabled="dismissing">Cancel</button>
           <button class="btn btn-error gap-1" :disabled="dismissing"
             @click="dismissing = true;
-              fetch('/admin/api/reviews/dismiss-all', {
+              fetch('/-/reviews/dismiss-all', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }
               })
@@ -88,7 +88,7 @@
       </div>
       <button class="btn btn-primary btn-sm" :disabled="saving"
         @click="saving = true;
-          fetch('/admin/api/reviews/settings', {
+          fetch('/-/reviews/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
             body: JSON.stringify({ auto_enqueue: autoEnqueue, confidence_threshold: parseFloat(threshold) })
@@ -108,7 +108,7 @@
 
 <!-- Filter Bar -->
 <div class="bb-filter-bar mb-6">
-  <form method="GET" action="/admin/reviews" class="flex flex-wrap gap-3 items-end">
+  <form method="GET" action="/reviews" class="flex flex-wrap gap-3 items-end">
     <div class="form-control">
       <label class="label label-text text-xs">Status</label>
       <select name="status" class="select select-bordered select-sm">
@@ -148,7 +148,7 @@
       </select>
     </div>
     <button type="submit" class="btn btn-sm btn-primary">Filter</button>
-    <a href="/admin/reviews" class="btn btn-sm btn-ghost">Reset</a>
+    <a href="/reviews" class="btn btn-sm btn-ghost">Reset</a>
   </form>
 </div>
 
@@ -188,7 +188,7 @@
       {{if .Transaction}}
       <div class="flex items-start justify-between mt-2 gap-3">
         <div class="min-w-0">
-          <a href="/admin/transactions/{{.TransactionID}}" class="font-semibold link link-hover">{{.Transaction.Name}}</a>
+          <a href="/transactions/{{.TransactionID}}" class="font-semibold link link-hover">{{.Transaction.Name}}</a>
           {{if .Transaction.MerchantName}}<div class="text-sm text-base-content/70">{{.Transaction.MerchantName}}</div>{{end}}
           <div class="text-xs text-base-content/50 mt-0.5">
             {{if .Transaction.AccountName}}{{.Transaction.AccountName}}{{end}}
@@ -311,7 +311,7 @@
   <!-- Pagination -->
   {{if .HasMore}}
   <div class="flex justify-center mt-6">
-    <a href="/admin/reviews?cursor={{.NextCursor}}&status={{.StatusFilter}}{{if .ReviewTypeFilter}}&review_type={{.ReviewTypeFilter}}{{end}}{{if .AccountIDFilter}}&account_id={{.AccountIDFilter}}{{end}}{{if .UserIDFilter}}&user_id={{.UserIDFilter}}{{end}}" class="btn btn-outline btn-sm">
+    <a href="/reviews?cursor={{.NextCursor}}&status={{.StatusFilter}}{{if .ReviewTypeFilter}}&review_type={{.ReviewTypeFilter}}{{end}}{{if .AccountIDFilter}}&account_id={{.AccountIDFilter}}{{end}}{{if .UserIDFilter}}&user_id={{.UserIDFilter}}{{end}}" class="btn btn-outline btn-sm">
       Load More
     </a>
   </div>
@@ -359,7 +359,7 @@ function reviewQueue() {
         body.note = noteParts.join(' ');
       }
 
-      fetch('/admin/api/reviews/' + id + '/submit', {
+      fetch('/-/reviews/' + id + '/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
         body: JSON.stringify(body)
@@ -389,7 +389,7 @@ function reviewQueue() {
       const cardData = Alpine.$data(card);
       cardData.submitting = true;
 
-      fetch('/admin/api/reviews/' + id + '/dismiss', {
+      fetch('/-/reviews/' + id + '/dismiss', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }
       })

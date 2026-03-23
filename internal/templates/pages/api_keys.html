@@ -1,7 +1,7 @@
 {{define "content"}}
 <div class="flex items-center justify-between mb-6">
   <h1 class="text-2xl font-bold m-0">API Keys</h1>
-  <a href="/admin/api-keys/new" class="btn btn-primary">
+  <a href="/api-keys/new" class="btn btn-primary">
     <i data-lucide="plus" class="w-4 h-4"></i>
     Create API Key
   </a>
@@ -44,7 +44,7 @@
         <td>{{.CreatedAt}}</td>
         <td>
           {{if not .RevokedAt}}
-          <form method="POST" action="/admin/api-keys/{{.ID}}/revoke" class="inline" x-data="{ confirming: false }">
+          <form method="POST" action="/api-keys/{{.ID}}/revoke" class="inline" x-data="{ confirming: false }">
             <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
             <button type="button" class="btn btn-ghost btn-xs" x-show="!confirming" @click="confirming = true">Revoke</button>
             <span x-show="confirming" x-cloak>
@@ -64,7 +64,7 @@
   <div class="card-body items-center text-center py-12">
     <i data-lucide="key" class="w-12 h-12 text-base-content/30 mb-2"></i>
     <p class="text-base-content/70">No API keys yet.</p>
-    <a href="/admin/api-keys/new" class="btn btn-primary mt-2">
+    <a href="/api-keys/new" class="btn btn-primary mt-2">
       <i data-lucide="plus" class="w-4 h-4"></i>
       Create your first API key
     </a>

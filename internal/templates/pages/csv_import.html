@@ -1,5 +1,5 @@
 {{define "content"}}
-<p class="mb-4"><a href="/admin/connections" class="link">&larr; Connections</a></p>
+<p class="mb-4"><a href="/connections" class="link">&larr; Connections</a></p>
 <h1 class="text-2xl font-bold mb-6">Import CSV</h1>
 
 <div id="step-1" {{if .ConnectionID}}class="hidden"{{end}}>
@@ -217,7 +217,7 @@
     var formData = new FormData();
     formData.append("file", fileInput.files[0]);
 
-    fetch("/admin/api/csv/upload", {
+    fetch("/-/csv/upload", {
       method: "POST",
       headers: {"X-CSRF-Token": csrfToken},
       body: formData
@@ -316,7 +316,7 @@
     var positiveIsDebit = document.querySelector('input[name="sign-convention"]:checked').value === "debit";
     var hasDebitCredit = document.getElementById("has-debit-credit").checked;
 
-    fetch("/admin/api/csv/preview", {
+    fetch("/-/csv/preview", {
       method: "POST",
       headers: {"Content-Type": "application/json", "X-CSRF-Token": csrfToken},
       body: JSON.stringify({
@@ -435,7 +435,7 @@
       body.account_name = document.getElementById("account-name").value || "CSV Import";
     }
 
-    fetch("/admin/api/csv/import", {
+    fetch("/-/csv/import", {
       method: "POST",
       headers: {"Content-Type": "application/json", "X-CSRF-Token": csrfToken},
       body: JSON.stringify(body)
@@ -475,7 +475,7 @@
       document.getElementById("skip-reasons").classList.remove("hidden");
     }
 
-    document.getElementById("result-link").href = "/admin/connections/" + data.ConnectionID;
+    document.getElementById("result-link").href = "/connections/" + data.ConnectionID;
     goToStep(4);
   }
 

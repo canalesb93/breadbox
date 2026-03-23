@@ -1,7 +1,7 @@
 {{define "content"}}
 <div class="flex items-center justify-between mb-6">
   <h1 class="text-2xl font-bold m-0">Bank Connections</h1>
-  <a href="/admin/connections/new" class="btn btn-primary">
+  <a href="/connections/new" class="btn btn-primary">
     <i data-lucide="plus" class="w-4 h-4"></i>
     Connect New Bank
   </a>
@@ -31,9 +31,9 @@
         </td>
         <td>{{if .LastSyncedAt.Valid}}{{relativeTime .LastSyncedAt.Time}}{{else}}Never{{end}}</td>
         <td class="flex gap-2">
-          <a href="/admin/connections/{{formatUUID .ID}}" class="btn btn-ghost btn-xs">View</a>
+          <a href="/connections/{{formatUUID .ID}}" class="btn btn-ghost btn-xs">View</a>
           {{if or (eq (printf "%s" .Status) "error") (eq (printf "%s" .Status) "pending_reauth")}}
-            <a href="/admin/connections/{{formatUUID .ID}}/reauth" class="btn btn-outline btn-warning btn-xs">Re-auth</a>
+            <a href="/connections/{{formatUUID .ID}}/reauth" class="btn btn-outline btn-warning btn-xs">Re-auth</a>
           {{end}}
         </td>
       </tr>
@@ -46,7 +46,7 @@
   <div class="flex flex-col items-center gap-4">
     <i data-lucide="inbox" class="w-12 h-12 text-base-content/30"></i>
     <p class="text-base-content/70">No bank connections yet. Connect your first bank to get started.</p>
-    <a href="/admin/connections/new" class="btn btn-primary">
+    <a href="/connections/new" class="btn btn-primary">
       <i data-lucide="plus" class="w-4 h-4"></i>
       Connect New Bank
     </a>

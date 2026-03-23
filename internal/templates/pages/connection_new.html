@@ -7,11 +7,11 @@
     <h2 class="card-title">No Providers Configured</h2>
     <p class="text-base-content/70">You need to configure at least one bank provider before creating connections.</p>
     <div class="mt-2">
-      <a href="/admin/providers" class="btn btn-primary btn-sm">Configure Providers</a>
+      <a href="/providers" class="btn btn-primary btn-sm">Configure Providers</a>
     </div>
   </div>
 </div>
-<p class="mt-4"><a href="/admin/connections" class="link">&larr; Back to Connections</a></p>
+<p class="mt-4"><a href="/connections" class="link">&larr; Back to Connections</a></p>
 {{else}}
 <div id="step-select" {{if .ShowLink}}class="hidden"{{end}}>
   <div class="card bg-base-100 border border-base-300">
@@ -44,7 +44,7 @@
       </form>
     </div>
   </div>
-  <p class="mt-4"><a href="/admin/connections" class="link">&larr; Back to Connections</a></p>
+  <p class="mt-4"><a href="/connections" class="link">&larr; Back to Connections</a></p>
 </div>
 
 <div id="step-link" class="hidden">
@@ -81,7 +81,7 @@
     selectedProvider = document.getElementById("provider").value || "plaid";
     if (!selectedUserId) return;
     if (selectedProvider === "csv") {
-      window.location.href = "/admin/connections/import-csv";
+      window.location.href = "/connections/import-csv";
       return;
     }
     memberNameEl.textContent = select.options[select.selectedIndex].text;
@@ -135,7 +135,7 @@
     linkStatus.classList.add("text-base-content/70");
     retryBtn.classList.add("hidden");
 
-    fetch("/admin/api/link-token", {
+    fetch("/-/link-token", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({user_id: selectedUserId, provider: selectedProvider})
@@ -162,7 +162,7 @@
       token: token,
       onSuccess: function (publicToken, metadata) {
         showMessage("Saving connection...");
-        fetch("/admin/api/exchange-token", {
+        fetch("/-/exchange-token", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({
@@ -177,7 +177,7 @@
         .then(function (res) { return res.json(); })
         .then(function (data) {
           if (data.connection_id) {
-            window.location.href = "/admin/connections/" + data.connection_id;
+            window.location.href = "/connections/" + data.connection_id;
           } else {
             showError(data.error || "An unknown error occurred.");
           }
@@ -209,7 +209,7 @@
           enrollment_id: enrollment.enrollment.id,
           institution_name: enrollment.enrollment.institution.name
         });
-        fetch("/admin/api/exchange-token", {
+        fetch("/-/exchange-token", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({
@@ -223,7 +223,7 @@
         .then(function(res) { return res.json(); })
         .then(function(data) {
           if (data.connection_id) {
-            window.location.href = "/admin/connections/" + data.connection_id;
+            window.location.href = "/connections/" + data.connection_id;
           } else {
             showError(data.error || "An unknown error occurred.");
           }

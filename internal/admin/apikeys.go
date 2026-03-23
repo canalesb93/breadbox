@@ -107,7 +107,7 @@ func APIKeyCreatePageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
 			SetFlash(r.Context(), sm, "error", "Name is required")
-			http.Redirect(w, r, "/admin/api-keys/new", http.StatusSeeOther)
+			http.Redirect(w, r, "/api-keys/new", http.StatusSeeOther)
 			return
 		}
 		scope := r.FormValue("scope")
@@ -117,13 +117,13 @@ func APIKeyCreatePageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 		result, err := svc.CreateAPIKey(r.Context(), name, scope)
 		if err != nil {
 			SetFlash(r.Context(), sm, "error", "Failed to create API key")
-			http.Redirect(w, r, "/admin/api-keys/new", http.StatusSeeOther)
+			http.Redirect(w, r, "/api-keys/new", http.StatusSeeOther)
 			return
 		}
 		// Store the plaintext key in the session so the "created" page can display it once.
 		sm.Put(r.Context(), "created_api_key", result.PlaintextKey)
 		sm.Put(r.Context(), "created_api_key_name", result.Name)
-		http.Redirect(w, r, "/admin/api-keys/"+result.ID+"/created", http.StatusSeeOther)
+		http.Redirect(w, r, "/api-keys/"+result.ID+"/created", http.StatusSeeOther)
 	}
 }
 
@@ -135,7 +135,7 @@ func APIKeyCreatedPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http
 		name := sm.PopString(r.Context(), "created_api_key_name")
 		if key == "" {
 			// Key already shown or session expired — redirect to list.
-			http.Redirect(w, r, "/admin/api-keys", http.StatusSeeOther)
+			http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
 			return
 		}
 		data := map[string]any{
@@ -158,6 +158,6 @@ func APIKeyRevokePageHandler(svc *service.Service, sm *scs.SessionManager) http.
 		} else {
 			SetFlash(r.Context(), sm, "success", "API key revoked successfully")
 		}
-		http.Redirect(w, r, "/admin/api-keys", http.StatusSeeOther)
+		http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
 	}
 }

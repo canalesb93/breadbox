@@ -3,7 +3,7 @@
 
 <div class="card bg-base-100 border border-base-300 max-w-lg">
   <div class="card-body">
-    <form method="POST" action="/admin/api-keys/new">
+    <form method="POST" action="/api-keys/new">
       <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
       <fieldset class="fieldset">
         <label class="fieldset-label" for="name">Name</label>
@@ -20,7 +20,7 @@
       </fieldset>
       <div class="flex gap-2 mt-4">
         <button type="submit" class="btn btn-primary">Create API Key</button>
-        <a href="/admin/api-keys" class="btn btn-ghost">Cancel</a>
+        <a href="/api-keys" class="btn btn-ghost">Cancel</a>
       </div>
     </form>
   </div>

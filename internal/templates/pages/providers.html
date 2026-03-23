@@ -30,7 +30,7 @@
         <dd>{{if .WebhookURL}}<code class="font-mono text-xs">{{.WebhookURL}}</code>{{else}}<span class="text-base-content/60">Not set</span>{{end}}</dd>
       </dl>
       {{else}}
-      <form method="POST" action="/admin/providers/plaid" autocomplete="off">
+      <form method="POST" action="/providers/plaid" autocomplete="off">
         <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
         <label class="flex flex-col gap-1 text-sm" for="plaid_client_id">
@@ -100,7 +100,7 @@
         <dd>{{if .TellerWebhookConfigured}}Configured{{else}}Not configured{{end}}</dd>
       </dl>
       {{else}}
-      <form method="POST" action="/admin/providers/teller" enctype="multipart/form-data" autocomplete="off">
+      <form method="POST" action="/providers/teller" enctype="multipart/form-data" autocomplete="off">
         <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
         <label class="flex flex-col gap-1 text-sm" for="teller_app_id">
@@ -169,7 +169,7 @@
         <span class="badge badge-success badge-sm">Always Available</span>
       </div>
       <p class="text-sm text-base-content/70 mb-4">Import transactions from CSV files. No configuration needed.</p>
-      <a href="/admin/connections/import-csv" class="btn btn-sm btn-ghost">Import CSV File</a>
+      <a href="/connections/import-csv" class="btn btn-sm btn-ghost">Import CSV File</a>
     </div>
   </div>
 
@@ -182,7 +182,7 @@ function testProvider(name) {
   btn.disabled = true;
   result.textContent = '';
   result.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Testing...';
-  fetch("/admin/api/test-provider/" + name, {
+  fetch("/-/test-provider/" + name, {
     method: "POST"
   })
   .then(function(res) { return res.json(); })

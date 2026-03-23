@@ -132,7 +132,7 @@ func DismissOnboardingHandler(a *app.App) http.HandlerFunc {
 			Key:   "onboarding_dismissed",
 			Value: pgtype.Text{String: "true", Valid: true},
 		})
-		http.Redirect(w, r, "/admin/", http.StatusSeeOther)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
 }
 

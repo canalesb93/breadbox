@@ -3,7 +3,7 @@
 
 <div class="breadcrumbs text-sm mb-4">
   <ul>
-    <li><a href="/admin/transactions">Transactions</a></li>
+    <li><a href="/transactions">Transactions</a></li>
     <li>{{.Transaction.Name}}</li>
   </ul>
 </div>
@@ -23,7 +23,7 @@
   {{end}}
   {{if .AccountName}}
   <dt>Account</dt>
-  <dd><a href="/admin/accounts/{{.AccountID}}">{{.AccountName}}</a></dd>
+  <dd><a href="/accounts/{{.AccountID}}">{{.AccountName}}</a></dd>
   {{end}}
   {{if .UserName}}
   <dt>Family Member</dt>
@@ -125,7 +125,7 @@ function txCategoryEditor() {
         return;
       }
       this.saving = true;
-      fetch('/admin/api/transactions/{{.TransactionID}}/category', {
+      fetch('/-/transactions/{{.TransactionID}}/category', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({category_id: detail.id})
@@ -143,7 +143,7 @@ function txCategoryEditor() {
     },
     resetCategory() {
       this.saving = true;
-      fetch('/admin/api/transactions/{{.TransactionID}}/category', { method: 'DELETE' })
+      fetch('/-/transactions/{{.TransactionID}}/category', { method: 'DELETE' })
       .then(r => {
         this.saving = false;
         if (r.ok || r.status === 204) {
@@ -170,7 +170,7 @@ function commentManager() {
       var self = this;
       var content = this.newComment.trim();
       if (!content) return;
-      fetch('/admin/api/transactions/{{.TransactionID}}/comments', {
+      fetch('/-/transactions/{{.TransactionID}}/comments', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({content: content})
@@ -190,7 +190,7 @@ function commentManager() {
     },
     deleteComment(id) {
       if (!confirm('Delete this comment?')) return;
-      fetch('/admin/api/transactions/{{.TransactionID}}/comments/' + id, {
+      fetch('/-/transactions/{{.TransactionID}}/comments/' + id, {
         method: 'DELETE'
       })
       .then(function(res) {
