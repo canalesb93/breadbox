@@ -83,11 +83,11 @@ func MCPSaveModeHandler(svc *service.Service, sm *scs.SessionManager) http.Handl
 		mode := r.FormValue("mode")
 		if err := svc.SaveMCPMode(r.Context(), mode); err != nil {
 			SetFlash(r.Context(), sm, "error", "Invalid mode: must be read_only or read_write")
-			http.Redirect(w, r, "/admin/mcp", http.StatusSeeOther)
+			http.Redirect(w, r, "/mcp-settings", http.StatusSeeOther)
 			return
 		}
 		SetFlash(r.Context(), sm, "success", "MCP mode updated.")
-		http.Redirect(w, r, "/admin/mcp", http.StatusSeeOther)
+		http.Redirect(w, r, "/mcp-settings", http.StatusSeeOther)
 	}
 }
 
@@ -96,7 +96,7 @@ func MCPSaveToolsHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer,
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			SetFlash(r.Context(), sm, "error", "Invalid form data")
-			http.Redirect(w, r, "/admin/mcp", http.StatusSeeOther)
+			http.Redirect(w, r, "/mcp-settings", http.StatusSeeOther)
 			return
 		}
 
@@ -113,7 +113,7 @@ func MCPSaveToolsHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer,
 		mcpCfg, err := svc.GetMCPConfig(r.Context())
 		if err != nil {
 			SetFlash(r.Context(), sm, "error", "Failed to load MCP config")
-			http.Redirect(w, r, "/admin/mcp", http.StatusSeeOther)
+			http.Redirect(w, r, "/mcp-settings", http.StatusSeeOther)
 			return
 		}
 
@@ -129,11 +129,11 @@ func MCPSaveToolsHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer,
 
 		if err := svc.SaveMCPDisabledTools(r.Context(), disabled); err != nil {
 			SetFlash(r.Context(), sm, "error", "Failed to save tool settings")
-			http.Redirect(w, r, "/admin/mcp", http.StatusSeeOther)
+			http.Redirect(w, r, "/mcp-settings", http.StatusSeeOther)
 			return
 		}
 		SetFlash(r.Context(), sm, "success", "Tool access updated.")
-		http.Redirect(w, r, "/admin/mcp", http.StatusSeeOther)
+		http.Redirect(w, r, "/mcp-settings", http.StatusSeeOther)
 	}
 }
 
@@ -145,10 +145,10 @@ func MCPSaveInstructionsHandler(svc *service.Service, sm *scs.SessionManager) ht
 
 		if err := svc.SaveMCPInstructions(r.Context(), instructions, templateSlug); err != nil {
 			SetFlash(r.Context(), sm, "error", err.Error())
-			http.Redirect(w, r, "/admin/mcp", http.StatusSeeOther)
+			http.Redirect(w, r, "/mcp-settings", http.StatusSeeOther)
 			return
 		}
 		SetFlash(r.Context(), sm, "success", "Instructions saved.")
-		http.Redirect(w, r, "/admin/mcp", http.StatusSeeOther)
+		http.Redirect(w, r, "/mcp-settings", http.StatusSeeOther)
 	}
 }

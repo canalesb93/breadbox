@@ -1,5 +1,5 @@
 {{define "content"}}
-<p class="mb-4"><a href="/admin/users" class="link">&larr; Back to Family Members</a></p>
+<p class="mb-4"><a href="/users" class="link">&larr; Back to Family Members</a></p>
 
 <h1 class="text-2xl font-bold mb-6">{{if .IsEdit}}Edit {{.User.Name}}{{else}}Add Family Member{{end}}</h1>
 
@@ -24,7 +24,7 @@
 
       <div class="flex gap-2 mt-4">
         <button type="submit" class="btn btn-primary">{{if .IsEdit}}Save Changes{{else}}Create Member{{end}}</button>
-        <a href="/admin/users" class="btn btn-ghost">Cancel</a>
+        <a href="/users" class="btn btn-ghost">Cancel</a>
       </div>
     </form>
   </div>
@@ -55,7 +55,7 @@
       body.email = email;
     }
 
-    var url = isEdit ? "/admin/api/users/" + userId : "/admin/api/users";
+    var url = isEdit ? "/-/users/" + userId : "/-/users";
     var method = isEdit ? "PUT" : "POST";
 
     fetch(url, {
@@ -65,7 +65,7 @@
     })
     .then(function (res) {
       if (res.ok) {
-        window.location.href = "/admin/users";
+        window.location.href = "/users";
       } else {
         return res.json().then(function (data) {
           var msg = "An error occurred.";

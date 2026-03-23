@@ -9,7 +9,7 @@
 <div role="alert" class="alert alert-error mb-4">{{.Error}}</div>
 {{end}}
 
-<form method="POST" action="/admin/setup">
+<form method="POST" action="/setup">
   {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
 
   <fieldset class="fieldset">

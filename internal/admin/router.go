@@ -27,14 +27,14 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 	r.Post("/logout", LogoutHandler(sm))
 
 	// First-run admin creation (unauthenticated).
-	r.Get("/admin/setup", CreateAdminHandler(a.Queries, sm, tr))
-	r.Post("/admin/setup", CreateAdminHandler(a.Queries, sm, tr))
+	r.Get("/setup", CreateAdminHandler(a.Queries, sm, tr))
+	r.Post("/setup", CreateAdminHandler(a.Queries, sm, tr))
 
 	// Programmatic setup API (unauthenticated).
-	r.Post("/admin/api/setup", ProgrammaticSetupHandler(a.Queries, sm))
+	r.Post("/-/setup", ProgrammaticSetupHandler(a.Queries, sm))
 
 	// Authenticated admin routes (HTML pages).
-	r.Route("/admin", func(r chi.Router) {
+	r.Group(func(r chi.Router) {
 		r.Use(RequireAuth(sm))
 		r.Use(CSRFMiddleware(sm))
 
@@ -75,7 +75,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/categories", CategoriesPageHandler(svc, sm, tr))
 		r.Get("/categories/mappings", MappingsPageHandler(svc, sm, tr))
 
-		r.Route("/mcp", func(r chi.Router) {
+		r.Route("/mcp-settings", func(r chi.Router) {
 			r.Get("/", MCPSettingsGetHandler(svc, mcpServer, sm, tr))
 			r.Post("/mode", MCPSaveModeHandler(svc, sm))
 			r.Post("/tools", MCPSaveToolsHandler(svc, mcpServer, sm))
@@ -92,7 +92,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 	})
 
 	// Admin API (authenticated, JSON responses).
-	r.Route("/admin/api", func(r chi.Router) {
+	r.Route("/-", func(r chi.Router) {
 		r.Use(RequireAuth(sm))
 
 		r.Post("/link-token", LinkTokenHandler(a))

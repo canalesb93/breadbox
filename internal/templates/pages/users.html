@@ -1,14 +1,14 @@
 {{define "content"}}
 <div class="flex items-center justify-between mb-6">
   <h1 class="text-2xl font-bold m-0">Family Members</h1>
-  <a href="/admin/users/new" class="btn btn-primary">
+  <a href="/users/new" class="btn btn-primary">
     <i data-lucide="plus" class="w-4 h-4"></i>
     Add Family Member
   </a>
 </div>
 
 {{if .Created}}
-<div class="alert alert-success mb-4">Member created. <a href="/admin/connections/new" class="link">Connect a bank for them &rarr;</a></div>
+<div class="alert alert-success mb-4">Member created. <a href="/connections/new" class="link">Connect a bank for them &rarr;</a></div>
 {{end}}
 
 {{if .Users}}
@@ -31,7 +31,7 @@
         <td>{{index $.ConnectionCounts (formatUUID .ID)}}</td>
         <td>{{if .CreatedAt.Valid}}{{.CreatedAt.Time.Format "Jan 2, 2006"}}{{end}}</td>
         <td>
-          <a href="/admin/users/{{formatUUID .ID}}/edit" class="btn btn-ghost btn-xs">Edit</a>
+          <a href="/users/{{formatUUID .ID}}/edit" class="btn btn-ghost btn-xs">Edit</a>
         </td>
       </tr>
       {{end}}
@@ -43,7 +43,7 @@
   <div class="card-body items-center text-center py-12">
     <i data-lucide="users" class="w-12 h-12 text-base-content/30 mb-2"></i>
     <p class="text-base-content/70">No family members yet.</p>
-    <a href="/admin/users/new" class="btn btn-primary mt-2">
+    <a href="/users/new" class="btn btn-primary mt-2">
       <i data-lucide="plus" class="w-4 h-4"></i>
       Add your first family member
     </a>

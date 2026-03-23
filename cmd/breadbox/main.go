@@ -261,7 +261,7 @@ func runServe() error {
 		logger.Warn("ENCRYPTION_KEY not set — encrypted provider credentials will not work")
 	}
 	if adminCount == 0 {
-		logger.Warn("no admin account — create one at /admin/setup or via 'breadbox create-admin'")
+		logger.Warn("no admin account — create one at /setup or via 'breadbox create-admin'")
 	}
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("http server: %w", err)

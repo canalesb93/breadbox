@@ -1,7 +1,7 @@
 {{define "content"}}
 <div class="breadcrumbs text-sm mb-4">
   <ul>
-    <li><a href="/admin/connections">Connections</a></li>
+    <li><a href="/connections">Connections</a></li>
     <li>{{.Connection.InstitutionName.String}}</li>
   </ul>
 </div>
@@ -12,7 +12,7 @@
   <div>
     <strong>This connection requires re-authentication.</strong> The bank may have changed its login requirements, or your session may have expired.
     {{if .Connection.ErrorCode.Valid}}<br><small>{{errorMessage .Connection.ErrorCode.String}}</small>{{else if .Connection.ErrorMessage.Valid}}<br><small>{{.Connection.ErrorMessage.String}}</small>{{end}}
-    <br><a href="/admin/connections/{{.ConnID}}/reauth" class="link font-semibold">Re-authenticate &rarr;</a>
+    <br><a href="/connections/{{.ConnID}}/reauth" class="link font-semibold">Re-authenticate &rarr;</a>
   </div>
 </div>
 {{end}}
@@ -34,10 +34,10 @@
 
 <div class="bb-action-bar">
   {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
-  <a href="/admin/connections/{{.ConnID}}/reauth" class="btn btn-outline btn-sm">Re-authenticate</a>
+  <a href="/connections/{{.ConnID}}/reauth" class="btn btn-outline btn-sm">Re-authenticate</a>
   {{end}}
   {{if eq (printf "%s" .Connection.Provider) "csv"}}
-  <a href="/admin/connections/import-csv?connection_id={{.ConnID}}" class="btn btn-outline btn-sm">Import More</a>
+  <a href="/connections/import-csv?connection_id={{.ConnID}}" class="btn btn-outline btn-sm">Import More</a>
   {{end}}
   {{if eq (printf "%s" .Connection.Status) "active"}}
   <button class="btn btn-outline btn-sm" onclick="syncConnection()" id="sync-btn">
@@ -91,7 +91,7 @@
     <tbody>
       {{range .Accounts}}
       <tr class="hover:bg-base-300{{if .Excluded}} opacity-60{{end}}">
-        <td><a href="/admin/accounts/{{formatUUID .ID}}">{{.Name}}</a></td>
+        <td><a href="/accounts/{{formatUUID .ID}}">{{.Name}}</a></td>
         <td>
           <input type="text" value="{{.DisplayName.String}}" placeholder="{{.Name}}"
             onchange="updateDisplayName('{{formatUUID .ID}}', this.value)"
@@ -165,7 +165,7 @@ function syncConnection() {
   var btn = document.getElementById('sync-btn');
   btn.disabled = true;
   btn.textContent = 'Syncing...';
-  fetch("/admin/api/connections/{{.ConnID}}/sync", {
+  fetch("/-/connections/{{.ConnID}}/sync", {
     method: "POST"
   })
   .then(function(res) {
@@ -188,12 +188,12 @@ function syncConnection() {
 }
 
 function removeConnection() {
-  fetch("/admin/api/connections/{{.ConnID}}", {
+  fetch("/-/connections/{{.ConnID}}", {
     method: "DELETE"
   })
   .then(function (res) {
     if (res.ok) {
-      window.location.href = "/admin/connections";
+      window.location.href = "/connections";
     } else {
       return res.json().then(function (data) {
         showToast(data.error || "Failed to remove connection.");
@@ -210,7 +210,7 @@ function togglePause() {
   var isPaused = btn.textContent.trim() === 'Resume';
   var newPaused = !isPaused;
   btn.disabled = true;
-  fetch("/admin/api/connections/{{.ConnID}}/paused", {
+  fetch("/-/connections/{{.ConnID}}/paused", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({paused: newPaused})
@@ -235,7 +235,7 @@ function updateSyncInterval(val) {
   var body = val === "" ? {minutes: null} : {minutes: parseInt(val, 10)};
   var status = document.getElementById('interval-status');
   status.textContent = 'Saving...';
-  fetch("/admin/api/connections/{{.ConnID}}/sync-interval", {
+  fetch("/-/connections/{{.ConnID}}/sync-interval", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify(body)
@@ -257,7 +257,7 @@ function updateSyncInterval(val) {
 
 function updateDisplayName(accountId, val) {
   var body = val === "" ? {display_name: null} : {display_name: val};
-  fetch("/admin/api/accounts/" + accountId + "/display-name", {
+  fetch("/-/accounts/" + accountId + "/display-name", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify(body)
@@ -275,7 +275,7 @@ function updateDisplayName(accountId, val) {
 }
 
 function toggleExcluded(accountId, checked) {
-  fetch("/admin/api/accounts/" + accountId + "/excluded", {
+  fetch("/-/accounts/" + accountId + "/excluded", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({excluded: checked})
