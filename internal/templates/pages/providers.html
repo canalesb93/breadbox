@@ -113,6 +113,7 @@
         </label>
         <select id="teller_env" name="teller_env" class="select select-sm w-full max-w-xs">
           <option value="sandbox"{{if eq .TellerEnv "sandbox"}} selected{{end}}>Sandbox</option>
+          <option value="development"{{if eq .TellerEnv "development"}} selected{{end}}>Development</option>
           <option value="production"{{if eq .TellerEnv "production"}} selected{{end}}>Production</option>
         </select>
 
