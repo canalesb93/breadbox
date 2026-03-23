@@ -184,7 +184,7 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 			return
 		}
 
-		validTellerEnvs := map[string]bool{"sandbox": true, "production": true}
+		validTellerEnvs := map[string]bool{"sandbox": true, "development": true, "production": true}
 		if !validTellerEnvs[tellerEnv] {
 			tellerEnv = "sandbox"
 		}
