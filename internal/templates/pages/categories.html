@@ -166,27 +166,12 @@
         </div>
         <div class="flex gap-2 items-center" x-show="bulkSelected.length > 0">
           <span class="text-xs text-base-content/50" x-text="bulkSelected.length + ' selected'"></span>
-          <div class="bb-cat-picker inline-block" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'assign', placeholder: 'Map to...', allowEmpty: false})" @category-change.stop="bulkCategoryId = $event.detail.id; bulkCategoryLabel = $event.detail.label">
+          <div class="bb-cat-picker inline-block" data-picker-source="bulk-map-cat" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'assign', placeholder: 'Map to...', allowEmpty: false})" @category-change.stop="bulkCategoryId = $event.detail.id; bulkCategoryLabel = $event.detail.label">
             <button type="button" class="btn btn-sm btn-outline rounded-xl gap-2" @click="openPicker()">
               <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
               <span x-text="bulkCategoryLabel || 'Map to...'" class="text-sm"></span>
               <i data-lucide="chevron-down" class="w-3 h-3"></i>
             </button>
-            <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false">
-              <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
-                <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search categories..." class="input input-sm input-bordered w-full rounded-lg">
-              </div>
-              <div x-ref="listbox">
-                <template x-for="(item, idx) in filteredList" :key="item.id || item.slug || idx">
-                  <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item)">
-                    <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
-                    <template x-if="item.icon"><i :data-lucide="item.icon" class="bb-cat-icon"></i></template>
-                    <span x-text="item.label"></span>
-                  </div>
-                </template>
-                <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
-              </div>
-            </div>
           </div>
           <button class="btn btn-sm btn-primary rounded-xl" :disabled="!bulkCategoryId || bulkSubmitting" @click="submitBulkMapping()">
             <span x-show="!bulkSubmitting">Map All</span>
@@ -217,27 +202,12 @@
               </td>
               <td>
                 <div class="flex gap-2 items-center">
-                  <div class="bb-cat-picker flex-1" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', placeholder: 'Select...', allowEmpty: false})">
+                  <div class="bb-cat-picker flex-1" data-picker-source="unmap-d-{{.Provider}}-{{if .Detailed}}{{.Detailed}}{{else}}{{.Primary}}{{end}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', placeholder: 'Select...', allowEmpty: false})">
                     <button type="button" class="btn btn-sm btn-ghost gap-2 w-full justify-start rounded-xl" @click="openPicker()">
                       <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
                       <span x-text="displayLabel" class="text-sm truncate"></span>
                       <i data-lucide="chevron-down" class="w-3 h-3 ml-auto"></i>
                     </button>
-                    <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false">
-                      <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
-                        <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search..." class="input input-sm input-bordered w-full rounded-lg">
-                      </div>
-                      <div x-ref="listbox">
-                        <template x-for="(item, idx) in filteredList" :key="item.id || idx">
-                          <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item)">
-                            <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
-                            <template x-if="item.icon"><i :data-lucide="item.icon" class="bb-cat-icon"></i></template>
-                            <span x-text="item.label"></span>
-                          </div>
-                        </template>
-                        <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
-                      </div>
-                    </div>
                   </div>
                   <button class="btn btn-sm btn-primary rounded-lg" :disabled="!selectedId || submitting" @click="
                     submitting = true;
@@ -264,25 +234,11 @@
             <span class="font-mono text-sm truncate">{{if .Detailed}}{{.Detailed}}{{else}}{{.Primary}}{{end}}</span>
           </div>
           <div class="flex gap-2">
-            <div class="bb-cat-picker flex-1" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', placeholder: 'Select...', allowEmpty: false})">
+            <div class="bb-cat-picker flex-1" data-picker-source="unmap-m-{{.Provider}}-{{if .Detailed}}{{.Detailed}}{{else}}{{.Primary}}{{end}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', placeholder: 'Select...', allowEmpty: false})">
               <button type="button" class="btn btn-sm btn-ghost gap-2 w-full justify-start rounded-xl" @click="openPicker()">
                 <span x-text="displayLabel" class="text-sm truncate"></span>
                 <i data-lucide="chevron-down" class="w-3 h-3 ml-auto"></i>
               </button>
-              <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false">
-                <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
-                  <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search..." class="input input-sm input-bordered w-full rounded-lg">
-                </div>
-                <div x-ref="listbox">
-                  <template x-for="(item, idx) in filteredList" :key="item.id || idx">
-                    <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item)">
-                      <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
-                      <span x-text="item.label"></span>
-                    </div>
-                  </template>
-                  <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
-                </div>
-              </div>
             </div>
             <button class="btn btn-sm btn-primary rounded-lg" :disabled="!selectedId || submitting" @click="
               submitting = true;
@@ -347,26 +303,12 @@
                 </template>
                 <template x-if="editing">
                   <div class="flex gap-2 items-center">
-                    <div class="bb-cat-picker flex-1" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', placeholder: 'Select...', allowEmpty: false, initial: categoryId})">
+                    <div class="bb-cat-picker flex-1" data-picker-source="map-edit-{{.ID}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', placeholder: 'Select...', allowEmpty: false, initial: categoryId})" @category-change="categoryId = $event.detail.id">
                       <button type="button" class="btn btn-sm btn-ghost gap-2 w-full justify-start rounded-xl" @click="openPicker()">
                         <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
                         <span x-text="displayLabel" class="text-sm truncate"></span>
                         <i data-lucide="chevron-down" class="w-3 h-3 ml-auto"></i>
                       </button>
-                      <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false">
-                        <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
-                          <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search..." class="input input-sm input-bordered w-full rounded-lg">
-                        </div>
-                        <div x-ref="listbox">
-                          <template x-for="(item, idx) in filteredList" :key="item.id || idx">
-                            <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item); categoryId = item.id">
-                              <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
-                              <span x-text="item.label"></span>
-                            </div>
-                          </template>
-                          <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
-                        </div>
-                      </div>
                     </div>
                     <button class="btn btn-sm btn-primary rounded-lg" :disabled="submitting" @click="
                       submitting = true;
@@ -572,25 +514,11 @@
 
       <label class="form-control w-full">
         <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Parent Category</span></div>
-        <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'assign', placeholder: 'None (top-level)', allowEmpty: true, emptyLabel: 'None (top-level)'})" @category-change="parentId = $event.detail.id">
+        <div class="bb-cat-picker" data-picker-source="cat-create-parent" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'assign', placeholder: 'None (top-level)', allowEmpty: true, emptyLabel: 'None (top-level)'})" @category-change="parentId = $event.detail.id">
           <button type="button" class="select select-bordered w-full text-left flex items-center gap-2 rounded-xl" @click="openPicker()">
             <span x-text="displayLabel" class="flex-1 text-sm"></span>
             <i data-lucide="chevron-down" class="w-4 h-4 opacity-40"></i>
           </button>
-          <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false">
-            <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
-              <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search..." class="input input-sm input-bordered w-full rounded-lg">
-            </div>
-            <div x-ref="listbox">
-              <template x-for="(item, idx) in filteredList" :key="item.id || idx">
-                <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item)">
-                  <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
-                  <span x-text="item.label"></span>
-                </div>
-              </template>
-              <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
-            </div>
-          </div>
         </div>
       </label>
 
