@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"breadbox/internal/service"
 
@@ -47,12 +48,71 @@ func CategoriesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 			filterProvider = *providerPtr
 		}
 
+		// Parse date range for spending data (default 30 days).
+		spendingDays := 30
+		if d := r.URL.Query().Get("days"); d != "" {
+			switch d {
+			case "7":
+				spendingDays = 7
+			case "30":
+				spendingDays = 30
+			case "90":
+				spendingDays = 90
+			case "365":
+				spendingDays = 365
+			}
+		}
+		spendingStart := time.Now().AddDate(0, 0, -spendingDays)
+
+		// Fetch spending by category for the selected period.
+		type CategorySpending struct {
+			Amount           float64
+			TransactionCount int64
+			Percent          float64 // percentage of total spending
+		}
+		spendingByCategory := make(map[string]CategorySpending)
+		var totalSpending float64
+		var maxCategorySpend float64
+
+		catSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+			GroupBy:      "category",
+			StartDate:    &spendingStart,
+			SpendingOnly: true,
+		})
+		if err == nil && catSummary != nil {
+			for _, row := range catSummary.Summary {
+				slug := "uncategorized"
+				if row.Category != nil && *row.Category != "" {
+					slug = *row.Category
+				}
+				spendingByCategory[slug] = CategorySpending{
+					Amount:           row.TotalAmount,
+					TransactionCount: row.TransactionCount,
+				}
+				totalSpending += row.TotalAmount
+				if row.TotalAmount > maxCategorySpend {
+					maxCategorySpend = row.TotalAmount
+				}
+			}
+			// Calculate percentages.
+			if totalSpending > 0 {
+				for slug, cs := range spendingByCategory {
+					cs.Percent = (cs.Amount / totalSpending) * 100
+					spendingByCategory[slug] = cs
+				}
+			}
+		}
+
 		data := BaseTemplateData(r, sm, "categories", "Categories")
 		data["Categories"] = categories
 		data["UnmappedCount"] = len(unmapped)
 		data["UnmappedCategories"] = unmapped
 		data["Mappings"] = mappings
 		data["FilterProvider"] = filterProvider
+		data["SpendingByCategory"] = spendingByCategory
+		data["TotalSpending"] = totalSpending
+		data["MaxCategorySpend"] = maxCategorySpend
+		data["SpendingDays"] = spendingDays
 		tr.Render(w, r, "categories.html", data)
 	}
 }
