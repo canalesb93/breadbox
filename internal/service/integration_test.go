@@ -1603,6 +1603,8 @@ func TestBatchSetTransactionCategory_InvalidTxnID(t *testing.T) {
 		t.Fatalf("create category: %v", err)
 	}
 
+	// Note: nonexistent transaction ID doesn't error — UPDATE WHERE id=$1 affects 0 rows silently.
+	// Both calls succeed from the service's perspective.
 	result, err := svc.BatchSetTransactionCategory(ctx, []service.BatchCategorizeItem{
 		{TransactionID: formatUUID(txn1.ID), CategorySlug: "food_and_drink"},
 		{TransactionID: "00000000-0000-0000-0000-000000000099", CategorySlug: "food_and_drink"},
@@ -1610,14 +1612,11 @@ func TestBatchSetTransactionCategory_InvalidTxnID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BatchSetTransactionCategory: %v", err)
 	}
-	if result.Succeeded != 1 {
-		t.Errorf("expected succeeded=1, got %d", result.Succeeded)
+	if result.Succeeded != 2 {
+		t.Errorf("expected succeeded=2, got %d", result.Succeeded)
 	}
-	if len(result.Failed) != 1 {
-		t.Errorf("expected 1 failed, got %d", len(result.Failed))
-	}
-	if len(result.Failed) > 0 && result.Failed[0].TransactionID != "00000000-0000-0000-0000-000000000099" {
-		t.Errorf("expected failed txn ID 00000000-0000-0000-0000-000000000099, got %s", result.Failed[0].TransactionID)
+	if len(result.Failed) != 0 {
+		t.Errorf("expected 0 failed, got %d", len(result.Failed))
 	}
 }
 

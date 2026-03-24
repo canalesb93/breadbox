@@ -508,11 +508,13 @@ func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecat
 		return nil, fmt.Errorf("invalid target category ID: %w", err)
 	}
 
-	// Build dynamic UPDATE query with same WHERE pattern as ListTransactions
+	// Build dynamic UPDATE query with same WHERE pattern as ListTransactions.
+	// Note: In PostgreSQL UPDATE...FROM, the target table (t) cannot be referenced
+	// in FROM-clause JOINs. The categories JOIN is only needed for CategorySlug filter
+	// and is added conditionally below.
 	query := "UPDATE transactions t SET category_id = $1, category_override = TRUE, updated_at = NOW()" +
 		" FROM accounts a" +
 		" LEFT JOIN bank_connections bc ON a.connection_id = bc.id" +
-		" LEFT JOIN categories c ON t.category_id = c.id" +
 		" WHERE t.account_id = a.id AND t.deleted_at IS NULL"
 
 	args := []any{targetUID}
@@ -556,7 +558,8 @@ func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecat
 			return &BulkRecategorizeResult{}, nil // unknown slug — no matches
 		}
 		if !catRow.ParentID.Valid {
-			query += fmt.Sprintf(" AND (c.id = $%d OR c.parent_id = $%d)", argN, argN)
+			// Parent category: match transactions with this category or any child
+			query += fmt.Sprintf(" AND t.category_id IN (SELECT id FROM categories WHERE id = $%d OR parent_id = $%d)", argN, argN)
 			args = append(args, catRow.ID)
 			argN++
 		} else {
