@@ -514,6 +514,16 @@
     80% { transform: translateX(3px); }
   }
 
+  /* ── Mobile transaction cards ── */
+  .bb-tx-card {
+    @apply overflow-hidden;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .bb-tx-card:active {
+    @apply bg-base-200/30;
+  }
+
   /* ── Smooth collapse for filter panels ── */
   [x-collapse] {
     transition: height 0.2s ease-out, opacity 0.15s ease !important;
