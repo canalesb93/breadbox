@@ -247,11 +247,14 @@
       {{range .TopCategories}}
       <div class="group">
         <div class="flex items-center justify-between mb-1">
-          <span class="text-sm text-base-content/70 group-hover:text-base-content transition-colors">{{.Name}}</span>
+          <span class="flex items-center gap-1.5 text-sm text-base-content/70 group-hover:text-base-content transition-colors">
+            {{if .Color}}<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{.Color}}"></span>{{end}}
+            {{.Name}}
+          </span>
           <span class="text-sm font-semibold tabular-nums text-base-content/80">{{formatAmount .Amount}}</span>
         </div>
         <div class="w-full h-1.5 bg-base-200 rounded-full overflow-hidden">
-          <div class="h-full bg-base-content/20 rounded-full transition-all duration-500" style="width: {{printf "%.0f" (percent .Amount $.MaxCategorySpend)}}%"></div>
+          <div class="h-full rounded-full transition-all duration-500" style="width: {{printf "%.0f" (percent .Amount $.MaxCategorySpend)}}%;{{if .Color}} background-color: {{.Color}}{{else}} background-color: oklch(0.65 0 0){{end}}"></div>
         </div>
       </div>
       {{end}}

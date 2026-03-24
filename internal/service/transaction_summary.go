@@ -15,6 +15,7 @@ type TransactionSummaryParams struct {
 	UserID         *string
 	Category       *string
 	IncludePending bool
+	SpendingOnly   bool // Only include positive amounts (debits/spending)
 }
 
 // TransactionSummaryResult is the response for a transaction summary query.
@@ -27,6 +28,8 @@ type TransactionSummaryResult struct {
 // TransactionSummaryRow is a single aggregated row.
 type TransactionSummaryRow struct {
 	Category         *string `json:"category,omitempty"`
+	CategoryIcon     *string `json:"category_icon,omitempty"`
+	CategoryColor    *string `json:"category_color,omitempty"`
 	Period           *string `json:"period,omitempty"`
 	TotalAmount      float64 `json:"total_amount"`
 	TransactionCount int64   `json:"transaction_count"`
@@ -74,11 +77,13 @@ func (s *Service) GetTransactionSummary(ctx context.Context, params TransactionS
 
 	// Build SELECT clause based on group_by.
 	var selectCols, groupCols, orderCols string
+	joinCategories := false
 	switch params.GroupBy {
 	case "category":
-		selectCols = "t.category_primary AS category, t.iso_currency_code"
-		groupCols = "t.category_primary, t.iso_currency_code"
+		selectCols = "COALESCE(cat.display_name, t.category_primary) AS category, cat.icon AS category_icon, cat.color AS category_color, t.iso_currency_code"
+		groupCols = "COALESCE(cat.display_name, t.category_primary), cat.icon, cat.color, t.iso_currency_code"
 		orderCols = "SUM(t.amount) DESC"
+		joinCategories = true
 	case "month":
 		selectCols = "to_char(date_trunc('month', t.date), 'YYYY-MM') AS period, t.iso_currency_code"
 		groupCols = "date_trunc('month', t.date), t.iso_currency_code"
@@ -92,22 +97,30 @@ func (s *Service) GetTransactionSummary(ctx context.Context, params TransactionS
 		groupCols = "t.date, t.iso_currency_code"
 		orderCols = "t.date DESC"
 	case "category_month":
-		selectCols = "t.category_primary AS category, to_char(date_trunc('month', t.date), 'YYYY-MM') AS period, t.iso_currency_code"
-		groupCols = "t.category_primary, date_trunc('month', t.date), t.iso_currency_code"
+		selectCols = "COALESCE(cat.display_name, t.category_primary) AS category, cat.icon AS category_icon, cat.color AS category_color, to_char(date_trunc('month', t.date), 'YYYY-MM') AS period, t.iso_currency_code"
+		groupCols = "COALESCE(cat.display_name, t.category_primary), cat.icon, cat.color, date_trunc('month', t.date), t.iso_currency_code"
 		orderCols = "date_trunc('month', t.date) DESC, SUM(t.amount) DESC"
+		joinCategories = true
 	}
 
 	query := fmt.Sprintf(`SELECT %s, SUM(t.amount) AS total_amount, COUNT(*) AS transaction_count
 FROM transactions t
 JOIN accounts a ON t.account_id = a.id
-LEFT JOIN bank_connections bc ON a.connection_id = bc.id
-WHERE t.deleted_at IS NULL`, selectCols)
+LEFT JOIN bank_connections bc ON a.connection_id = bc.id`, selectCols)
+	if joinCategories {
+		query += "\nLEFT JOIN categories cat ON t.category_id = cat.id"
+	}
+	query += "\nWHERE t.deleted_at IS NULL"
 
 	args := []any{}
 	argN := 1
 
 	if !params.IncludePending {
 		query += " AND t.pending = false"
+	}
+
+	if params.SpendingOnly {
+		query += " AND t.amount > 0"
 	}
 
 	query += fmt.Sprintf(" AND t.date >= $%d", argN)
@@ -153,11 +166,11 @@ WHERE t.deleted_at IS NULL`, selectCols)
 		var row TransactionSummaryRow
 		switch params.GroupBy {
 		case "category":
-			err = rows.Scan(&row.Category, &row.IsoCurrencyCode, &row.TotalAmount, &row.TransactionCount)
+			err = rows.Scan(&row.Category, &row.CategoryIcon, &row.CategoryColor, &row.IsoCurrencyCode, &row.TotalAmount, &row.TransactionCount)
 		case "month", "week", "day":
 			err = rows.Scan(&row.Period, &row.IsoCurrencyCode, &row.TotalAmount, &row.TransactionCount)
 		case "category_month":
-			err = rows.Scan(&row.Category, &row.Period, &row.IsoCurrencyCode, &row.TotalAmount, &row.TransactionCount)
+			err = rows.Scan(&row.Category, &row.CategoryIcon, &row.CategoryColor, &row.Period, &row.IsoCurrencyCode, &row.TotalAmount, &row.TransactionCount)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("scan summary row: %w", err)

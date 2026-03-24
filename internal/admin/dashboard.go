@@ -7,7 +7,6 @@ import (
 	"math"
 	"net/http"
 	"sort"
-	"strings"
 	"time"
 
 	"breadbox/internal/app"
@@ -61,9 +60,10 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			lastSyncText = relativeTime(lastSync.Time)
 		}
 
-		// Spending by category (last 30 days).
+		// Spending by category (last 30 days) — only positive amounts (debits).
 		categorySummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
-			GroupBy: "category",
+			GroupBy:      "category",
+			SpendingOnly: true,
 		})
 		if err != nil {
 			a.Logger.Error("category summary", "error", err)
@@ -72,6 +72,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		// Top spending categories for the breakdown list.
 		type CategorySpend struct {
 			Name   string
+			Color  string
 			Amount float64
 		}
 		var topCategories []CategorySpend
@@ -84,17 +85,15 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				if row.Category != nil && *row.Category != "" {
 					label = *row.Category
 				}
-				// Only include positive amounts (spending)
-				if row.TotalAmount > 0 {
-					labels = append(labels, label)
-					amounts = append(amounts, row.TotalAmount)
-					// Title-case the label for the top categories display.
-					displayLabel := strings.ReplaceAll(label, "_", " ")
-					displayLabel = strings.Title(displayLabel) //nolint:staticcheck // simple title case
-					topCategories = append(topCategories, CategorySpend{Name: displayLabel, Amount: row.TotalAmount})
-					if row.TotalAmount > maxCategorySpend {
-						maxCategorySpend = row.TotalAmount
-					}
+				labels = append(labels, label)
+				amounts = append(amounts, row.TotalAmount)
+				color := ""
+				if row.CategoryColor != nil {
+					color = *row.CategoryColor
+				}
+				topCategories = append(topCategories, CategorySpend{Name: label, Color: color, Amount: row.TotalAmount})
+				if row.TotalAmount > maxCategorySpend {
+					maxCategorySpend = row.TotalAmount
 				}
 			}
 			if lb, err := json.Marshal(labels); err == nil {
@@ -109,9 +108,10 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			topCategories = topCategories[:8]
 		}
 
-		// Daily spending trend (last 30 days).
+		// Daily spending trend (last 30 days) — only positive amounts (debits).
 		dailySummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
-			GroupBy: "day",
+			GroupBy:      "day",
+			SpendingOnly: true,
 		})
 		if err != nil {
 			a.Logger.Error("daily summary", "error", err)
@@ -121,9 +121,10 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		prevStart := time.Now().AddDate(0, 0, -60)
 		prevEnd := time.Now().AddDate(0, 0, -30)
 		prevSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
-			GroupBy:   "category",
-			StartDate: &prevStart,
-			EndDate:   &prevEnd,
+			GroupBy:      "category",
+			StartDate:    &prevStart,
+			EndDate:      &prevEnd,
+			SpendingOnly: true,
 		})
 		if err != nil {
 			a.Logger.Error("previous period summary", "error", err)
@@ -131,9 +132,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		var prevTotalSpending float64
 		if prevSummary != nil {
 			for _, row := range prevSummary.Summary {
-				if row.TotalAmount > 0 {
-					prevTotalSpending += row.TotalAmount
-				}
+				prevTotalSpending += row.TotalAmount
 			}
 		}
 		// Calculate spending change percentage.
@@ -153,12 +152,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 					label = *row.Period
 				}
 				labels = append(labels, label)
-				// Use absolute value for spending trend
-				amt := row.TotalAmount
-				if amt < 0 {
-					amt = -amt
-				}
-				amounts = append(amounts, amt)
+				amounts = append(amounts, row.TotalAmount)
 			}
 			if lb, err := json.Marshal(labels); err == nil {
 				dailyLabelsJSON = template.JS(lb)
@@ -242,9 +236,16 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		}
 
 		// Total income (30 days) — negative amounts in our system are credits/income.
+		// Use a separate summary query without SpendingOnly to get income totals.
 		var totalIncome float64
-		if dailySummary != nil {
-			for _, row := range dailySummary.Summary {
+		incomeSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+			GroupBy: "day",
+		})
+		if err != nil {
+			a.Logger.Error("income summary", "error", err)
+		}
+		if incomeSummary != nil {
+			for _, row := range incomeSummary.Summary {
 				if row.TotalAmount < 0 {
 					totalIncome += -row.TotalAmount
 				}
