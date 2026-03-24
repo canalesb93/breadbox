@@ -731,6 +731,382 @@ func (s *Service) ListActiveRulesForSync(ctx context.Context) ([]TransactionRule
 	return rules, nil
 }
 
+// transactionContextQuery is the base query for loading transactions with full context
+// (JOIN through accounts → bank_connections → users) for rule evaluation.
+const transactionContextQuery = `SELECT t.id, t.name, COALESCE(t.merchant_name, ''), t.amount,
+	COALESCE(t.category_primary, ''), COALESCE(t.category_detailed, ''),
+	t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, '')
+	FROM transactions t
+	JOIN accounts a ON t.account_id = a.id
+	JOIN bank_connections bc ON a.connection_id = bc.id
+	LEFT JOIN users u ON bc.user_id = u.id
+	WHERE t.deleted_at IS NULL AND t.category_override = FALSE`
+
+// transactionContextRow holds a scanned transaction row for rule evaluation.
+type transactionContextRow struct {
+	id        pgtype.UUID
+	tctx      TransactionContext
+	accountID pgtype.UUID
+}
+
+func scanTransactionContextRow(dest []any) *transactionContextRow {
+	r := &transactionContextRow{}
+	dest[0] = &r.id
+	dest[1] = &r.tctx.Name
+	dest[2] = &r.tctx.MerchantName
+	dest[3] = &r.tctx.Amount
+	dest[4] = &r.tctx.CategoryPrimary
+	dest[5] = &r.tctx.CategoryDetailed
+	dest[6] = &r.tctx.Pending
+	dest[7] = &r.tctx.Provider
+	dest[8] = &r.tctx.AccountID
+	dest[9] = &r.tctx.UserID
+	dest[10] = &r.tctx.UserName
+	return r
+}
+
+// ApplyRuleRetroactively applies a single rule to all existing non-deleted, non-overridden
+// transactions. Returns count of affected rows.
+func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (int64, error) {
+	rule, err := s.GetTransactionRule(ctx, ruleID)
+	if err != nil {
+		return 0, err
+	}
+	if !rule.Enabled {
+		return 0, fmt.Errorf("%w: rule is disabled", ErrInvalidParameter)
+	}
+	if rule.ExpiresAt != nil {
+		t, _ := time.Parse(time.RFC3339, *rule.ExpiresAt)
+		if !t.IsZero() && t.Before(time.Now()) {
+			return 0, fmt.Errorf("%w: rule is expired", ErrInvalidParameter)
+		}
+	}
+	if rule.CategoryID == nil {
+		return 0, fmt.Errorf("%w: rule has no category", ErrInvalidParameter)
+	}
+
+	compiled, err := CompileCondition(rule.Conditions)
+	if err != nil {
+		return 0, fmt.Errorf("compile rule conditions: %w", err)
+	}
+
+	catID, err := parseUUID(*rule.CategoryID)
+	if err != nil {
+		return 0, fmt.Errorf("parse category id: %w", err)
+	}
+
+	var totalAffected int64
+	var lastID pgtype.UUID
+
+	for {
+		query := transactionContextQuery
+		var args []any
+		argN := 1
+
+		if lastID.Valid {
+			query += fmt.Sprintf(" AND t.id > $%d", argN)
+			args = append(args, lastID)
+			argN++
+		}
+		query += " ORDER BY t.id ASC"
+		query += fmt.Sprintf(" LIMIT $%d", argN)
+		args = append(args, 1000)
+
+		rows, err := s.Pool.Query(ctx, query, args...)
+		if err != nil {
+			return totalAffected, fmt.Errorf("query transactions: %w", err)
+		}
+
+		var matchIDs []pgtype.UUID
+		rowCount := 0
+
+		for rows.Next() {
+			rowCount++
+			dest := make([]any, 11)
+			r := scanTransactionContextRow(dest)
+			if err := rows.Scan(dest...); err != nil {
+				rows.Close()
+				return totalAffected, fmt.Errorf("scan transaction: %w", err)
+			}
+			lastID = r.id
+
+			if EvaluateCondition(compiled, r.tctx) {
+				matchIDs = append(matchIDs, r.id)
+			}
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return totalAffected, fmt.Errorf("iterate transactions: %w", err)
+		}
+
+		// Bulk update matching transactions
+		if len(matchIDs) > 0 {
+			tag, err := s.Pool.Exec(ctx,
+				`UPDATE transactions SET category_id = $1, updated_at = NOW()
+				WHERE id = ANY($2) AND category_override = FALSE AND deleted_at IS NULL`,
+				catID, matchIDs)
+			if err != nil {
+				return totalAffected, fmt.Errorf("update transactions: %w", err)
+			}
+			totalAffected += tag.RowsAffected()
+		}
+
+		if rowCount < 1000 {
+			break
+		}
+	}
+
+	// Update hit count
+	if totalAffected > 0 {
+		ruleUUID, _ := parseUUID(ruleID)
+		_, _ = s.Pool.Exec(ctx, "UPDATE transaction_rules SET hit_count = hit_count + $2, last_hit_at = NOW() WHERE id = $1", ruleUUID, totalAffected)
+	}
+
+	return totalAffected, nil
+}
+
+// ApplyAllRulesRetroactively applies all active rules (priority DESC) to existing transactions.
+// First match wins per transaction. Returns a map of rule_id → match_count.
+func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]int64, error) {
+	rules, err := s.ListActiveRulesForSync(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list active rules: %w", err)
+	}
+	if len(rules) == 0 {
+		return map[string]int64{}, nil
+	}
+
+	// Compile all rules
+	type compiledRule struct {
+		id       string
+		catID    pgtype.UUID
+		compiled *CompiledCondition
+	}
+	var compiled []compiledRule
+	for _, r := range rules {
+		if r.CategoryID == nil {
+			continue
+		}
+		cc, err := CompileCondition(r.Conditions)
+		if err != nil {
+			continue
+		}
+		catID, err := parseUUID(*r.CategoryID)
+		if err != nil {
+			continue
+		}
+		compiled = append(compiled, compiledRule{id: r.ID, catID: catID, compiled: cc})
+	}
+	if len(compiled) == 0 {
+		return map[string]int64{}, nil
+	}
+
+	hitCounts := make(map[string]int64)
+	var lastID pgtype.UUID
+
+	for {
+		query := transactionContextQuery
+		var args []any
+		argN := 1
+
+		if lastID.Valid {
+			query += fmt.Sprintf(" AND t.id > $%d", argN)
+			args = append(args, lastID)
+			argN++
+		}
+		query += " ORDER BY t.id ASC"
+		query += fmt.Sprintf(" LIMIT $%d", argN)
+		args = append(args, 1000)
+
+		rows, err := s.Pool.Query(ctx, query, args...)
+		if err != nil {
+			return hitCounts, fmt.Errorf("query transactions: %w", err)
+		}
+
+		// Map category_id → list of transaction IDs to update
+		updates := make(map[pgtype.UUID][]pgtype.UUID)
+		// Map category_id → rule_id (for hit count tracking)
+		catToRule := make(map[pgtype.UUID]string)
+		rowCount := 0
+
+		for rows.Next() {
+			rowCount++
+			dest := make([]any, 11)
+			r := scanTransactionContextRow(dest)
+			if err := rows.Scan(dest...); err != nil {
+				rows.Close()
+				return hitCounts, fmt.Errorf("scan transaction: %w", err)
+			}
+			lastID = r.id
+
+			// First matching rule wins (rules already sorted by priority DESC)
+			for _, cr := range compiled {
+				if EvaluateCondition(cr.compiled, r.tctx) {
+					updates[cr.catID] = append(updates[cr.catID], r.id)
+					catToRule[cr.catID] = cr.id
+					hitCounts[cr.id]++
+					break
+				}
+			}
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return hitCounts, fmt.Errorf("iterate transactions: %w", err)
+		}
+
+		// Bulk update per category
+		for catID, txnIDs := range updates {
+			_, err := s.Pool.Exec(ctx,
+				`UPDATE transactions SET category_id = $1, updated_at = NOW()
+				WHERE id = ANY($2) AND category_override = FALSE AND deleted_at IS NULL`,
+				catID, txnIDs)
+			if err != nil {
+				return hitCounts, fmt.Errorf("update transactions: %w", err)
+			}
+		}
+
+		if rowCount < 1000 {
+			break
+		}
+	}
+
+	// Update hit counts for all matched rules
+	for ruleID, count := range hitCounts {
+		id, err := parseUUID(ruleID)
+		if err != nil {
+			continue
+		}
+		_, _ = s.Pool.Exec(ctx, "UPDATE transaction_rules SET hit_count = hit_count + $2, last_hit_at = NOW() WHERE id = $1", id, count)
+	}
+
+	return hitCounts, nil
+}
+
+// RulePreviewMatch contains a sample transaction that matched a rule preview.
+type RulePreviewMatch struct {
+	TransactionID      string  `json:"transaction_id"`
+	Name               string  `json:"name"`
+	Amount             float64 `json:"amount"`
+	Date               string  `json:"date"`
+	CategoryPrimaryRaw string  `json:"category_primary_raw"`
+	CurrentCategorySlug string `json:"current_category_slug,omitempty"`
+}
+
+// RulePreviewResult contains the results of a rule preview/dry-run.
+type RulePreviewResult struct {
+	MatchCount   int64              `json:"match_count"`
+	TotalScanned int64              `json:"total_scanned"`
+	SampleMatches []RulePreviewMatch `json:"sample_matches"`
+}
+
+// PreviewRule evaluates conditions against existing transactions without modifying anything.
+// Returns match count, total scanned, and sample matches.
+func (s *Service) PreviewRule(ctx context.Context, conditions Condition, sampleSize int) (*RulePreviewResult, error) {
+	if err := ValidateCondition(conditions); err != nil {
+		return nil, err
+	}
+
+	compiled, err := CompileCondition(conditions)
+	if err != nil {
+		return nil, fmt.Errorf("compile conditions: %w", err)
+	}
+
+	if sampleSize <= 0 {
+		sampleSize = 10
+	}
+	if sampleSize > 50 {
+		sampleSize = 50
+	}
+
+	result := &RulePreviewResult{}
+	var lastID pgtype.UUID
+
+	// Extended query to also get date and current category slug
+	baseQuery := `SELECT t.id, t.name, COALESCE(t.merchant_name, ''), t.amount,
+		COALESCE(t.category_primary, ''), COALESCE(t.category_detailed, ''),
+		t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
+		t.date, COALESCE(c.slug, '')
+		FROM transactions t
+		JOIN accounts a ON t.account_id = a.id
+		JOIN bank_connections bc ON a.connection_id = bc.id
+		LEFT JOIN users u ON bc.user_id = u.id
+		LEFT JOIN categories c ON t.category_id = c.id
+		WHERE t.deleted_at IS NULL`
+
+	for {
+		query := baseQuery
+		var args []any
+		argN := 1
+
+		if lastID.Valid {
+			query += fmt.Sprintf(" AND t.id > $%d", argN)
+			args = append(args, lastID)
+			argN++
+		}
+		query += " ORDER BY t.id ASC"
+		query += fmt.Sprintf(" LIMIT $%d", argN)
+		args = append(args, 1000)
+
+		rows, err := s.Pool.Query(ctx, query, args...)
+		if err != nil {
+			return nil, fmt.Errorf("query transactions: %w", err)
+		}
+
+		rowCount := 0
+		for rows.Next() {
+			rowCount++
+			var (
+				id           pgtype.UUID
+				tctx         TransactionContext
+				date         pgtype.Date
+				catSlug      string
+			)
+			if err := rows.Scan(&id, &tctx.Name, &tctx.MerchantName, &tctx.Amount,
+				&tctx.CategoryPrimary, &tctx.CategoryDetailed,
+				&tctx.Pending, &tctx.Provider, &tctx.AccountID, &tctx.UserID, &tctx.UserName,
+				&date, &catSlug); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("scan transaction: %w", err)
+			}
+			lastID = id
+			result.TotalScanned++
+
+			if EvaluateCondition(compiled, tctx) {
+				result.MatchCount++
+				if len(result.SampleMatches) < sampleSize {
+					match := RulePreviewMatch{
+						TransactionID:      formatUUID(id),
+						Name:               tctx.Name,
+						Amount:             tctx.Amount,
+						CategoryPrimaryRaw: tctx.CategoryPrimary,
+					}
+					if date.Valid {
+						match.Date = date.Time.Format("2006-01-02")
+					}
+					if catSlug != "" {
+						match.CurrentCategorySlug = catSlug
+					}
+					result.SampleMatches = append(result.SampleMatches, match)
+				}
+			}
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("iterate transactions: %w", err)
+		}
+
+		if rowCount < 1000 {
+			break
+		}
+	}
+
+	if result.SampleMatches == nil {
+		result.SampleMatches = []RulePreviewMatch{}
+	}
+
+	return result, nil
+}
+
 // BatchIncrementHitCounts updates hit counts for rules that matched.
 func (s *Service) BatchIncrementHitCounts(ctx context.Context, hits map[string]int) error {
 	for ruleID, count := range hits {

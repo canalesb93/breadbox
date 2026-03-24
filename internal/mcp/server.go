@@ -212,6 +212,18 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("batch_create_rules", ToolWrite,
 			"Create multiple transaction rules at once. Each rule needs a name, category_slug, and conditions object. More efficient than creating rules one at a time. Returns created rules and any errors.",
 			s.handleBatchCreateRules),
+		makeToolDef("apply_rules", ToolWrite,
+			"Apply transaction rules retroactively to existing transactions. Pass rule_id to apply a single rule, or omit to apply all active rules (first match wins by priority). Updates category_id on matching non-deleted, non-overridden transactions. Returns count of affected transactions.",
+			s.handleApplyRules),
+		makeToolDef("preview_rule", ToolRead,
+			"Preview/dry-run a rule's conditions against existing transactions without making changes. Returns match_count, total_scanned, and sample_matches with transaction details. Use this to test conditions before creating a rule.",
+			s.handlePreviewRule),
+		makeToolDef("batch_categorize_transactions", ToolWrite,
+			"Categorize multiple transactions at once. Each item needs a transaction_id and category_slug. Max 200 items per request. Sets category_override=true on each transaction. More efficient than calling categorize_transaction repeatedly. Returns succeeded count and any per-item errors.",
+			s.handleBatchCategorize),
+		makeToolDef("bulk_recategorize", ToolWrite,
+			"Recategorize all transactions matching a filter to a new category. Requires target_category_slug and at least one filter (safety requirement). Sets category_override=true since this is an explicit action. Use this for bulk corrections — e.g., recategorize all transactions currently tagged 'general_merchandise' in a date range to 'groceries'. Returns matched/updated counts.",
+			s.handleBulkRecategorize),
 	}
 }
 

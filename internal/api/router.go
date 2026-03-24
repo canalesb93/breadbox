@@ -88,6 +88,9 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Post("/rules", CreateRuleHandler(svc))
 			r.Put("/rules/{id}", UpdateRuleHandler(svc))
 			r.Delete("/rules/{id}", DeleteRuleHandler(svc))
+			r.Post("/rules/{id}/apply", ApplyRuleHandler(svc))
+			r.Post("/rules/apply-all", ApplyAllRulesHandler(svc))
+			r.Post("/rules/preview", PreviewRuleHandler(svc))
 		})
 	})
 

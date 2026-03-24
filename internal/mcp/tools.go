@@ -699,11 +699,12 @@ func (s *MCPServer) handleSubmitReview(ctx context.Context, _ *mcpsdk.CallToolRe
 // --- Transaction Rules ---
 
 type createTransactionRuleInput struct {
-	Name         string          `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
-	CategorySlug string          `json:"category_slug" jsonschema:"required,Category slug to assign when this rule matches (e.g. food_and_drink_restaurant). Use list_categories to find slugs."`
-	Conditions   map[string]any `json:"conditions" jsonschema:"required,JSON condition object. Simple: {\"field\": \"name\", \"op\": \"contains\", \"value\": \"uber\"}. AND: {\"and\": [{...}, {...}]}. OR: {\"or\": [{...}, {...}]}. NOT: {\"not\": {...}}. Fields: name merchant_name amount category_primary category_detailed pending provider account_id user_id user_name. Ops: eq neq contains not_contains matches(regex) gt gte lt lte in."`
-	Priority     int            `json:"priority,omitempty" jsonschema:"Priority (higher wins when multiple rules match). Default 10."`
-	ExpiresIn    string          `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
+	Name               string         `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
+	CategorySlug       string         `json:"category_slug" jsonschema:"required,Category slug to assign when this rule matches (e.g. food_and_drink_restaurant). Use list_categories to find slugs."`
+	Conditions         map[string]any `json:"conditions" jsonschema:"required,JSON condition object. Simple: {\"field\": \"name\", \"op\": \"contains\", \"value\": \"uber\"}. AND: {\"and\": [{...}, {...}]}. OR: {\"or\": [{...}, {...}]}. NOT: {\"not\": {...}}. Fields: name merchant_name amount category_primary category_detailed pending provider account_id user_id user_name. Ops: eq neq contains not_contains matches(regex) gt gte lt lte in."`
+	Priority           int            `json:"priority,omitempty" jsonschema:"Priority (higher wins when multiple rules match). Default 10."`
+	ExpiresIn          string         `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
+	ApplyRetroactively bool           `json:"apply_retroactively,omitempty" jsonschema:"If true, immediately apply this rule to all existing non-overridden transactions after creation."`
 }
 
 type listTransactionRulesInput struct {
@@ -738,6 +739,15 @@ type batchRuleItem struct {
 	Conditions   map[string]any `json:"conditions" jsonschema:"required,Condition tree as JSON object"`
 	Priority     int             `json:"priority,omitempty" jsonschema:"Priority (default 10)"`
 	ExpiresIn    string          `json:"expires_in,omitempty" jsonschema:"Optional expiry duration"`
+}
+
+type applyRulesInput struct {
+	RuleID string `json:"rule_id,omitempty" jsonschema:"Optional UUID of a specific rule to apply. If omitted, applies all active rules (first match wins by priority)."`
+}
+
+type previewRuleInput struct {
+	Conditions map[string]any `json:"conditions" jsonschema:"required,Condition tree to evaluate against existing transactions (same format as create_transaction_rule conditions)."`
+	SampleSize int            `json:"sample_size,omitempty" jsonschema:"Number of sample matching transactions to return (default 10, max 50)."`
 }
 
 type batchSubmitReviewsInput struct {
@@ -782,7 +792,17 @@ func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.C
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
-	return jsonResult(rule)
+
+	resp := map[string]any{"rule": rule}
+	if input.ApplyRetroactively {
+		count, err := s.svc.ApplyRuleRetroactively(ctx, rule.ID)
+		if err != nil {
+			resp["retroactive_error"] = err.Error()
+		} else {
+			resp["retroactive_matches"] = count
+		}
+	}
+	return jsonResult(resp)
 }
 
 func (s *MCPServer) handleListTransactionRules(_ context.Context, _ *mcpsdk.CallToolRequest, input listTransactionRulesInput) (*mcpsdk.CallToolResult, any, error) {
@@ -856,6 +876,56 @@ func (s *MCPServer) handleDeleteTransactionRule(ctx context.Context, _ *mcpsdk.C
 		"deleted": true,
 		"id":      input.ID,
 	})
+}
+
+func (s *MCPServer) handleApplyRules(ctx context.Context, _ *mcpsdk.CallToolRequest, input applyRulesInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	if input.RuleID != "" {
+		count, err := s.svc.ApplyRuleRetroactively(ctx, input.RuleID)
+		if err != nil {
+			return errorResult(err), nil, nil
+		}
+		return jsonResult(map[string]any{
+			"rule_id":        input.RuleID,
+			"affected_count": count,
+		})
+	}
+
+	results, err := s.svc.ApplyAllRulesRetroactively(ctx)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	var totalAffected int64
+	for _, count := range results {
+		totalAffected += count
+	}
+	return jsonResult(map[string]any{
+		"rules_applied":  results,
+		"total_affected": totalAffected,
+	})
+}
+
+func (s *MCPServer) handlePreviewRule(_ context.Context, _ *mcpsdk.CallToolRequest, input previewRuleInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+
+	if len(input.Conditions) == 0 {
+		return errorResult(fmt.Errorf("conditions are required")), nil, nil
+	}
+
+	conditions, err := parseConditions(input.Conditions)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	result, err := s.svc.PreviewRule(ctx, conditions, input.SampleSize)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(result)
 }
 
 func (s *MCPServer) handleBatchSubmitReviews(ctx context.Context, _ *mcpsdk.CallToolRequest, input batchSubmitReviewsInput) (*mcpsdk.CallToolResult, any, error) {
@@ -963,6 +1033,112 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 		"rules":   created,
 		"errors":  errors,
 	})
+}
+
+// --- Batch categorize / Bulk recategorize ---
+
+type batchCategorizeInput struct {
+	Items []batchCategorizeItemInput `json:"items" jsonschema:"required,Array of transaction/category pairs (max 200)"`
+}
+
+type batchCategorizeItemInput struct {
+	TransactionID string `json:"transaction_id" jsonschema:"required,UUID of the transaction"`
+	CategorySlug  string `json:"category_slug" jsonschema:"required,Category slug to assign (e.g. food_and_drink_restaurant). Use list_categories to find slugs."`
+}
+
+type bulkRecategorizeInput struct {
+	TargetCategorySlug string   `json:"target_category_slug" jsonschema:"required,Category slug to assign to all matching transactions"`
+	StartDate          string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
+	EndDate            string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
+	AccountID          string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
+	UserID             string   `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
+	CategorySlug       string   `json:"category_slug,omitempty" jsonschema:"Filter by current category slug"`
+	MinAmount          *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount (positive=debit, negative=credit)"`
+	MaxAmount          *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount (positive=debit, negative=credit)"`
+	Pending            *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
+	Search             string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant"`
+	NameContains       string   `json:"name_contains,omitempty" jsonschema:"Filter transactions whose name contains this string"`
+}
+
+func (s *MCPServer) handleBatchCategorize(ctx context.Context, _ *mcpsdk.CallToolRequest, input batchCategorizeInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if len(input.Items) == 0 {
+		return errorResult(fmt.Errorf("items array is required and must not be empty")), nil, nil
+	}
+
+	items := make([]service.BatchCategorizeItem, len(input.Items))
+	for i, item := range input.Items {
+		items[i] = service.BatchCategorizeItem{
+			TransactionID: item.TransactionID,
+			CategorySlug:  item.CategorySlug,
+		}
+	}
+
+	result, err := s.svc.BatchSetTransactionCategory(ctx, items)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(result)
+}
+
+func (s *MCPServer) handleBulkRecategorize(ctx context.Context, _ *mcpsdk.CallToolRequest, input bulkRecategorizeInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.TargetCategorySlug == "" {
+		return errorResult(fmt.Errorf("target_category_slug is required")), nil, nil
+	}
+
+	params := service.BulkRecategorizeParams{
+		TargetCategorySlug: input.TargetCategorySlug,
+	}
+
+	if input.StartDate != "" {
+		t, err := time.Parse("2006-01-02", input.StartDate)
+		if err != nil {
+			return errorResult(fmt.Errorf("invalid start_date: %w", err)), nil, nil
+		}
+		params.StartDate = &t
+	}
+	if input.EndDate != "" {
+		t, err := time.Parse("2006-01-02", input.EndDate)
+		if err != nil {
+			return errorResult(fmt.Errorf("invalid end_date: %w", err)), nil, nil
+		}
+		params.EndDate = &t
+	}
+	if input.AccountID != "" {
+		params.AccountID = &input.AccountID
+	}
+	if input.UserID != "" {
+		params.UserID = &input.UserID
+	}
+	if input.CategorySlug != "" {
+		params.CategorySlug = &input.CategorySlug
+	}
+	if input.MinAmount != nil {
+		params.MinAmount = input.MinAmount
+	}
+	if input.MaxAmount != nil {
+		params.MaxAmount = input.MaxAmount
+	}
+	if input.Pending != nil {
+		params.Pending = input.Pending
+	}
+	if input.Search != "" {
+		params.Search = &input.Search
+	}
+	if input.NameContains != "" {
+		params.NameContains = &input.NameContains
+	}
+
+	result, err := s.svc.BulkRecategorizeByFilter(ctx, params)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(result)
 }
 
 // --- Helpers ---
