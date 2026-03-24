@@ -47,7 +47,7 @@ func (p *TellerProvider) GetBalances(ctx context.Context, conn provider.Connecti
 			return nil, fmt.Errorf("teller balance get for %s: %w", acct.ExternalID, err)
 		}
 
-		if resp.StatusCode == http.StatusForbidden {
+		if isReauthResponse(resp) {
 			resp.Body.Close()
 			return nil, ErrReauthRequired
 		}
