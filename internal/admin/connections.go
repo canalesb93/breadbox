@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
@@ -248,29 +249,163 @@ func ConnectionDetailHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 			a.Logger.Error("list accounts by connection", "error", err)
 		}
 
-		syncLogs, err := a.Queries.GetSyncLogsByConnection(ctx, db.GetSyncLogsByConnectionParams{
+		// Fetch more sync logs for health stats (last 50).
+		allSyncLogs, err := a.Queries.GetSyncLogsByConnection(ctx, db.GetSyncLogsByConnectionParams{
 			ConnectionID: connID,
-			Limit:        10,
+			Limit:        50,
 		})
 		if err != nil {
 			a.Logger.Error("get sync logs by connection", "error", err)
 		}
 
+		// Only show the last 10 in the UI list.
+		syncLogs := allSyncLogs
+		if len(syncLogs) > 10 {
+			syncLogs = syncLogs[:10]
+		}
+
+		// Compute sync health stats from all logs.
+		var totalSyncs, successSyncs, errorSyncs int
+		var totalAdded, totalModified, totalRemoved int
+		var lastSuccessTime string
+		var lastSuccessRelative string
+		var avgDurationSec float64
+		var durationCount int
+		// Build a map of day -> status for the last 14 days (sync timeline).
+		type DaySync struct {
+			Date       string
+			Label      string
+			ShortLabel string
+			Success    int
+			Error      int
+			Total      int
+		}
+		dayMap := make(map[string]*DaySync)
+		now := time.Now()
+		var daySyncs []DaySync
+		for i := 13; i >= 0; i-- {
+			day := now.AddDate(0, 0, -i)
+			key := day.Format("2006-01-02")
+			label := day.Format("Jan 2")
+			shortLabel := day.Format("2")
+			ds := &DaySync{Date: key, Label: label, ShortLabel: shortLabel}
+			dayMap[key] = ds
+			daySyncs = append(daySyncs, *ds)
+		}
+
+		for _, log := range allSyncLogs {
+			totalSyncs++
+			totalAdded += int(log.AddedCount)
+			totalModified += int(log.ModifiedCount)
+			totalRemoved += int(log.RemovedCount)
+
+			if string(log.Status) == "success" {
+				successSyncs++
+				if lastSuccessTime == "" && log.StartedAt.Valid {
+					lastSuccessTime = log.StartedAt.Time.Local().Format("Jan 2, 2006 3:04 PM")
+					lastSuccessRelative = relativeTime(log.StartedAt.Time)
+				}
+			} else if string(log.Status) == "error" {
+				errorSyncs++
+			}
+
+			// Calculate duration.
+			if log.StartedAt.Valid && log.CompletedAt.Valid {
+				dur := log.CompletedAt.Time.Sub(log.StartedAt.Time).Seconds()
+				if dur >= 0 && dur < 600 { // sanity check: under 10 min
+					avgDurationSec += dur
+					durationCount++
+				}
+			}
+
+			// Populate day map.
+			if log.StartedAt.Valid {
+				dayKey := log.StartedAt.Time.Local().Format("2006-01-02")
+				if ds, ok := dayMap[dayKey]; ok {
+					ds.Total++
+					if string(log.Status) == "success" {
+						ds.Success++
+					} else if string(log.Status) == "error" {
+						ds.Error++
+					}
+				}
+			}
+		}
+
+		if durationCount > 0 {
+			avgDurationSec /= float64(durationCount)
+		}
+
+		var successRate float64
+		if totalSyncs > 0 {
+			successRate = float64(successSyncs) / float64(totalSyncs) * 100
+		}
+
+		// Rebuild daySyncs from the map (map was modified in-place).
+		daySyncs = nil
+		for i := 13; i >= 0; i-- {
+			day := now.AddDate(0, 0, -i)
+			key := day.Format("2006-01-02")
+			if ds, ok := dayMap[key]; ok {
+				daySyncs = append(daySyncs, *ds)
+			}
+		}
+
+		// Compute total balance across all accounts.
+		var totalBalance float64
+		var hasBalance bool
+		for _, acct := range accounts {
+			if acct.BalanceCurrent.Valid {
+				n, err := numericToFloat(acct.BalanceCurrent)
+				if err == nil {
+					totalBalance += n
+					hasBalance = true
+				}
+			}
+		}
+
 		data := map[string]any{
-			"PageTitle":   conn.InstitutionName.String,
-			"CurrentPage": "connections",
-			"Connection":  conn,
-			"Accounts":    accounts,
-			"SyncLogs":    syncLogs,
-			"ConnID":      idStr,
-			"CSRFToken":   GetCSRFToken(r),
+			"PageTitle":            conn.InstitutionName.String,
+			"CurrentPage":         "connections",
+			"Connection":          conn,
+			"Accounts":            accounts,
+			"SyncLogs":            syncLogs,
+			"ConnID":              idStr,
+			"CSRFToken":           GetCSRFToken(r),
 			"Breadcrumbs": []Breadcrumb{
 				{Label: "Connections", Href: "/connections"},
 				{Label: conn.InstitutionName.String},
 			},
+			// Sync health stats
+			"TotalSyncs":          totalSyncs,
+			"SuccessSyncs":        successSyncs,
+			"ErrorSyncs":          errorSyncs,
+			"SuccessRate":         successRate,
+			"TotalAdded":          totalAdded,
+			"TotalModified":       totalModified,
+			"TotalRemoved":        totalRemoved,
+			"AvgDurationSec":      avgDurationSec,
+			"LastSuccessTime":     lastSuccessTime,
+			"LastSuccessRelative": lastSuccessRelative,
+			"DaySyncs":            daySyncs,
+			// Account totals
+			"TotalBalance":        totalBalance,
+			"HasBalance":          hasBalance,
 		}
 		tr.Render(w, r, "connection_detail.html", data)
 	}
+}
+
+// numericToFloat converts a pgtype.Numeric to float64.
+func numericToFloat(n pgtype.Numeric) (float64, error) {
+	if !n.Valid {
+		return 0, fmt.Errorf("null numeric")
+	}
+	f, err := n.Float64Value()
+	if err != nil {
+		return 0, err
+	}
+	return f.Float64, nil
 }
 
 // ConnectionReauthHandler serves GET /admin/connections/{id}/reauth.

@@ -19,7 +19,13 @@
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
   <div class="flex items-center gap-4">
     <div class="w-12 h-12 rounded-xl bg-base-200 flex items-center justify-center">
-      <i data-lucide="building-2" class="w-6 h-6 text-base-content/50"></i>
+      {{if eq (printf "%s" .Connection.Provider) "plaid"}}
+      <i data-lucide="building-2" class="w-6 h-6 text-info"></i>
+      {{else if eq (printf "%s" .Connection.Provider) "teller"}}
+      <i data-lucide="landmark" class="w-6 h-6 text-success"></i>
+      {{else}}
+      <i data-lucide="file-spreadsheet" class="w-6 h-6 text-warning"></i>
+      {{end}}
     </div>
     <div>
       <h1 class="bb-page-title">{{.Connection.InstitutionName.String}}</h1>
@@ -27,7 +33,11 @@
         {{statusBadge (printf "%s" .Connection.Status)}}
         {{if .Connection.Paused}}<span class="badge badge-ghost badge-sm">Paused</span>{{end}}
         <span class="text-xs text-base-content/40">&middot;</span>
-        <span class="text-xs text-base-content/40">{{.Connection.Provider}}</span>
+        <span class="text-xs text-base-content/40 capitalize">{{printf "%s" .Connection.Provider}}</span>
+        {{if .Connection.UserName.Valid}}
+        <span class="text-xs text-base-content/40">&middot;</span>
+        <span class="text-xs text-base-content/40">{{.Connection.UserName.String}}</span>
+        {{end}}
       </div>
     </div>
   </div>
@@ -63,12 +73,84 @@
   </div>
 </div>
 
-<!-- Connection Info + Settings -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+<!-- Sync Health Stats -->
+{{if gt .TotalSyncs 0}}
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 bb-stagger">
+  <div class="bb-card p-4">
+    <div class="text-xs font-medium text-base-content/40 mb-1">Success Rate</div>
+    <div class="flex items-baseline gap-1.5">
+      <span class="text-2xl font-semibold tabular-nums{{if ge .SuccessRate 90.0}} text-success{{else if ge .SuccessRate 50.0}} text-warning{{else}} text-error{{end}}">{{printf "%.0f" .SuccessRate}}%</span>
+    </div>
+    <div class="text-[0.65rem] text-base-content/30 mt-1 tabular-nums">{{.SuccessSyncs}}/{{.TotalSyncs}} syncs</div>
+  </div>
+  <div class="bb-card p-4">
+    <div class="text-xs font-medium text-base-content/40 mb-1">Last Successful</div>
+    <div class="text-sm font-semibold truncate">{{if .LastSuccessRelative}}{{.LastSuccessRelative}}{{else}}<span class="text-base-content/30">Never</span>{{end}}</div>
+    {{if .LastSuccessTime}}<div class="text-[0.65rem] text-base-content/30 mt-1 truncate" title="{{.LastSuccessTime}}">{{.LastSuccessTime}}</div>{{end}}
+  </div>
+  <div class="bb-card p-4">
+    <div class="text-xs font-medium text-base-content/40 mb-1">Transactions Synced</div>
+    <div class="text-2xl font-semibold tabular-nums">{{.TotalAdded}}</div>
+    <div class="text-[0.65rem] text-base-content/30 mt-1 tabular-nums">
+      {{if gt .TotalModified 0}}{{.TotalModified}} modified{{end}}
+      {{if gt .TotalRemoved 0}} &middot; {{.TotalRemoved}} removed{{end}}
+      {{if and (eq .TotalModified 0) (eq .TotalRemoved 0)}}total added{{end}}
+    </div>
+  </div>
+  <div class="bb-card p-4">
+    <div class="text-xs font-medium text-base-content/40 mb-1">Avg Duration</div>
+    <div class="text-2xl font-semibold tabular-nums">
+      {{if gt .AvgDurationSec 60.0}}{{printf "%.0f" (divFloat .AvgDurationSec 60.0)}}m{{else if gt .AvgDurationSec 1.0}}{{printf "%.1f" .AvgDurationSec}}s{{else if gt .AvgDurationSec 0.0}}{{printf "%.0f" (mulFloatRaw .AvgDurationSec 1000.0)}}ms{{else}}<span class="text-base-content/30">&mdash;</span>{{end}}
+    </div>
+    <div class="text-[0.65rem] text-base-content/30 mt-1">per sync</div>
+  </div>
+</div>
+
+<!-- Sync Timeline (14 days) -->
+<div class="bb-card p-5 mb-6">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-sm font-semibold text-base-content/70">Sync Activity</h2>
+    <span class="text-xs text-base-content/30">Last 14 days</span>
+  </div>
+  <div class="flex items-end gap-1" style="height: 56px;">
+    {{range .DaySyncs}}
+    <div class="flex-1 flex flex-col items-center gap-0.5 group relative">
+      {{if gt .Total 0}}
+      <div class="flex flex-col-reverse gap-px w-full" style="height: 40px;">
+        {{if gt .Success 0}}
+        <div class="w-full rounded-sm bg-success/60 transition-colors group-hover:bg-success/80" style="height: {{if gt .Error 0}}{{printf "%.0f" (divFloat (mulFloatRaw (intToFloat .Success) 40.0) (intToFloat .Total))}}px{{else}}40px{{end}}; min-height: 4px;"></div>
+        {{end}}
+        {{if gt .Error 0}}
+        <div class="w-full rounded-sm bg-error/60 transition-colors group-hover:bg-error/80" style="height: {{if gt .Success 0}}{{printf "%.0f" (divFloat (mulFloatRaw (intToFloat .Error) 40.0) (intToFloat .Total))}}px{{else}}40px{{end}}; min-height: 4px;"></div>
+        {{end}}
+      </div>
+      {{else}}
+      <div class="w-full h-[40px] flex items-end">
+        <div class="w-full h-1 rounded-sm bg-base-300/50"></div>
+      </div>
+      {{end}}
+      <div class="text-[0.5rem] text-base-content/25 tabular-nums leading-none">{{.ShortLabel}}</div>
+      <!-- Tooltip -->
+      <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-base-content text-base-100 text-[0.6rem] px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 tabular-nums">
+        {{.Label}}: {{.Total}} sync{{if ne .Total 1}}s{{end}}{{if gt .Error 0}} ({{.Error}} err){{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+  <div class="flex items-center gap-4 mt-3 text-[0.65rem] text-base-content/40">
+    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-success/60"></span> Success</span>
+    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-error/60"></span> Error</span>
+    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-base-300/50"></span> No syncs</span>
+  </div>
+</div>
+{{end}}
+
+<!-- Connection Details + Sync Settings -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
   <!-- Connection Details Card -->
-  <div class="bb-card p-6 lg:col-span-2">
+  <div class="bb-card p-5 lg:col-span-2">
     <h2 class="text-sm font-semibold text-base-content/50 mb-4">Connection Details</h2>
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-5">
       <div>
         <p class="text-xs text-base-content/40 mb-1">Family Member</p>
         <p class="text-sm font-medium">{{pgtext .Connection.UserName}}</p>
@@ -82,14 +164,14 @@
         <p class="text-sm font-medium">{{if .Connection.CreatedAt.Valid}}{{.Connection.CreatedAt.Time.Format "Jan 2, 2006"}}{{else}}&mdash;{{end}}</p>
       </div>
       <div>
-        <p class="text-xs text-base-content/40 mb-1">Status</p>
-        <p class="text-sm font-medium">{{statusBadge (printf "%s" .Connection.Status)}}</p>
+        <p class="text-xs text-base-content/40 mb-1">Last Synced</p>
+        <p class="text-sm font-medium">{{if .Connection.LastSyncedAt.Valid}}{{relativeTime .Connection.LastSyncedAt.Time}}{{else}}<span class="text-base-content/30">Never</span>{{end}}</p>
       </div>
     </div>
   </div>
 
   <!-- Sync Settings Card -->
-  <div class="bb-card p-6">
+  <div class="bb-card p-5">
     <h2 class="text-sm font-semibold text-base-content/50 mb-4">Sync Settings</h2>
     <div>
       <label class="text-xs text-base-content/40 mb-1.5 block">Sync Interval</label>
@@ -109,74 +191,84 @@
 </div>
 
 <!-- Accounts -->
-<div class="bb-card mb-8">
-  <div class="px-6 pt-6 pb-4 flex items-center justify-between">
-    <h2 class="text-sm font-semibold text-base-content/50">Accounts</h2>
-    {{if .Accounts}}<span class="text-xs text-base-content/30">{{len .Accounts}} total</span>{{end}}
+{{if .Accounts}}
+<div class="mb-6">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-sm font-semibold text-base-content/70">Accounts</h2>
+    <span class="text-xs text-base-content/30">{{len .Accounts}} total{{if .HasBalance}} &middot; {{formatBalance .TotalBalance}}{{end}}</span>
   </div>
-  {{if .Accounts}}
-  <div class="overflow-x-auto">
-    <table class="table table-sm">
-      <thead>
-        <tr class="text-xs text-base-content/50 border-b border-base-300">
-          <th class="font-medium">Account</th>
-          <th class="font-medium">Display Name</th>
-          <th class="font-medium">Type</th>
-          <th class="font-medium text-right">Current Balance</th>
-          <th class="font-medium text-right">Available</th>
-          <th class="font-medium text-center w-20">Excluded</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{range .Accounts}}
-        <tr class="hover:bg-base-200/40 transition-colors duration-150{{if .Excluded}} opacity-50{{end}}">
-          <td>
-            <a href="/accounts/{{formatUUID .ID}}" class="font-medium text-sm hover:text-primary transition-colors no-underline">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bb-stagger">
+    {{range .Accounts}}
+    <div class="bb-card p-4{{if .Excluded}} opacity-50{{end}}">
+      <div class="flex items-start justify-between gap-2 mb-3">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+            <i data-lucide="{{accountTypeIcon .Type}}" class="w-4 h-4 text-base-content/40"></i>
+          </div>
+          <div class="min-w-0">
+            <a href="/accounts/{{formatUUID .ID}}" class="text-sm font-medium hover:text-primary transition-colors no-underline block truncate">
               {{.Name}}
             </a>
-            {{if .Mask.Valid}}<span class="text-xs text-base-content/30 ml-1">&bull;&bull;{{.Mask.String}}</span>{{end}}
-          </td>
-          <td>
-            <input type="text" value="{{.DisplayName.String}}" placeholder="Custom name..."
-              onchange="updateDisplayName('{{formatUUID .ID}}', this.value)"
-              class="input input-xs input-ghost w-36 hover:input-bordered focus:input-bordered transition-all">
-          </td>
-          <td class="text-xs text-base-content/50">{{.Type}}{{if .Subtype.Valid}} / {{.Subtype.String}}{{end}}</td>
-          <td class="text-right tabular-nums text-sm font-semibold">
-            {{if .BalanceCurrent.Valid}}{{formatNumeric .BalanceCurrent}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
-          </td>
-          <td class="text-right tabular-nums text-sm text-base-content/60">
-            {{if .BalanceAvailable.Valid}}{{formatNumeric .BalanceAvailable}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
-          </td>
-          <td class="text-center">
-            <input type="checkbox" class="checkbox checkbox-xs" {{if .Excluded}}checked{{end}}
-              onchange="toggleExcluded('{{formatUUID .ID}}', this.checked)">
-          </td>
-        </tr>
+            <div class="text-xs text-base-content/40">
+              {{accountTypeLabel .Type (pgtext .Subtype)}}
+              {{if .Mask.Valid}} &middot; ····{{.Mask.String}}{{end}}
+            </div>
+          </div>
+        </div>
+        {{if .Excluded}}
+        <span class="badge badge-ghost badge-xs shrink-0">Excluded</span>
         {{end}}
-      </tbody>
-    </table>
-  </div>
-  {{else}}
-  <div class="px-6 pb-6">
-    <div class="flex flex-col items-center justify-center py-10 text-base-content/30">
-      <i data-lucide="wallet" class="w-10 h-10 mb-3 opacity-50"></i>
-      <p class="text-sm">No accounts found for this connection</p>
-      <p class="text-xs mt-1">Accounts will appear after the first sync</p>
+      </div>
+      <!-- Balances -->
+      <div class="flex items-end justify-between gap-3">
+        <div class="min-w-0">
+          {{if .BalanceCurrent.Valid}}
+          <div class="text-xs text-base-content/40 mb-0.5">Current</div>
+          <div class="text-lg font-semibold tabular-nums">{{formatNumeric .BalanceCurrent}}</div>
+          {{else}}
+          <div class="text-xs text-base-content/30">No balance data</div>
+          {{end}}
+        </div>
+        {{if .BalanceAvailable.Valid}}
+        <div class="text-right">
+          <div class="text-xs text-base-content/40 mb-0.5">Available</div>
+          <div class="text-sm font-medium tabular-nums text-base-content/60">{{formatNumeric .BalanceAvailable}}</div>
+        </div>
+        {{end}}
+      </div>
+      <!-- Inline actions -->
+      <div class="flex items-center gap-2 mt-3 pt-3 border-t border-base-300/50">
+        <input type="text" value="{{.DisplayName.String}}" placeholder="Display name..."
+          onchange="updateDisplayName('{{formatUUID .ID}}', this.value)"
+          class="input input-xs input-ghost flex-1 hover:input-bordered focus:input-bordered transition-all rounded-lg text-xs">
+        <label class="flex items-center gap-1.5 text-xs text-base-content/40 cursor-pointer shrink-0" title="Exclude from sync">
+          <input type="checkbox" class="checkbox checkbox-xs" {{if .Excluded}}checked{{end}}
+            onchange="toggleExcluded('{{formatUUID .ID}}', this.checked)">
+          <span>Exclude</span>
+        </label>
+      </div>
     </div>
+    {{end}}
   </div>
-  {{end}}
 </div>
+{{else}}
+<div class="bb-card mb-6">
+  <div class="flex flex-col items-center justify-center py-12 text-base-content/30">
+    <i data-lucide="wallet" class="w-10 h-10 mb-3 opacity-50"></i>
+    <p class="text-sm">No accounts found for this connection</p>
+    <p class="text-xs mt-1">Accounts will appear after the first sync</p>
+  </div>
+</div>
+{{end}}
 
 <!-- Sync History -->
 <div class="bb-card">
-  <div class="px-6 pt-6 pb-4 flex items-center justify-between">
-    <h2 class="text-sm font-semibold text-base-content/50">Sync History</h2>
+  <div class="px-5 pt-5 pb-3 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-base-content/70">Sync History</h2>
     <span class="text-xs text-base-content/30">Last 10</span>
   </div>
   <!-- Skeleton shown during sync -->
-  <div id="sync-history-skeleton" class="px-6 pb-6" style="display:none">
-    <!-- Pulsing "syncing" indicator -->
+  <div id="sync-history-skeleton" class="px-5 pb-5" style="display:none">
     <div class="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/10 mb-2">
       <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
         <span class="loading loading-spinner loading-xs text-primary"></span>
@@ -190,26 +282,29 @@
   </div>
   <div id="sync-history-content">
   {{if .SyncLogs}}
-  <div class="px-6 pb-6 space-y-2">
+  <div class="px-5 pb-5 space-y-1.5">
     {{range .SyncLogs}}
     <div class="flex items-center justify-between p-3 rounded-xl bg-base-200/30 hover:bg-base-200/60 transition-colors duration-150">
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 min-w-0">
         <div class="w-8 h-8 rounded-lg {{if eq (printf "%s" .Status) "success"}}bg-success/10{{else if eq (printf "%s" .Status) "error"}}bg-error/10{{else}}bg-base-200{{end}} flex items-center justify-center shrink-0">
           {{if eq (printf "%s" .Status) "success"}}<i data-lucide="check" class="w-4 h-4 text-success"></i>
           {{else if eq (printf "%s" .Status) "error"}}<i data-lucide="x" class="w-4 h-4 text-error"></i>
-          {{else}}<i data-lucide="loader" class="w-4 h-4 text-base-content/40"></i>{{end}}
+          {{else}}<i data-lucide="loader" class="w-4 h-4 text-base-content/40 animate-spin"></i>{{end}}
         </div>
-        <div>
-          <div class="flex items-center gap-2">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
             <span class="text-sm font-medium capitalize">{{.Trigger}}</span>
             <span class="text-xs text-base-content/40">{{relativeTime .StartedAt}}</span>
+            {{if and .StartedAt.Valid .CompletedAt.Valid}}
+            <span class="text-[0.65rem] text-base-content/25 tabular-nums">{{syncDuration .StartedAt.Time .CompletedAt.Time}}</span>
+            {{end}}
           </div>
           {{if and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid}}
-          <p class="text-xs text-error/70 mt-0.5 max-w-md truncate">{{.ErrorMessage.String}}</p>
+          <p class="text-xs text-error/70 mt-0.5 max-w-md truncate" title="{{.ErrorMessage.String}}">{{.ErrorMessage.String}}</p>
           {{end}}
         </div>
       </div>
-      <div class="flex items-center gap-3 tabular-nums text-xs">
+      <div class="flex items-center gap-3 tabular-nums text-xs shrink-0">
         {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
         {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
         {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
@@ -219,7 +314,7 @@
     {{end}}
   </div>
   {{else}}
-  <div class="px-6 pb-6">
+  <div class="px-5 pb-5">
     <div class="flex flex-col items-center justify-center py-10 text-base-content/30">
       <i data-lucide="refresh-cw" class="w-10 h-10 mb-3 opacity-50"></i>
       <p class="text-sm">No sync history yet</p>
@@ -239,7 +334,6 @@ function syncConnection() {
   btn.disabled = true;
   btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Syncing...';
 
-  // Show skeleton loading state in sync history
   var syncHistory = document.getElementById('sync-history-content');
   var syncSkeleton = document.getElementById('sync-history-skeleton');
   if (syncHistory && syncSkeleton) {

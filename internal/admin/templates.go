@@ -69,6 +69,28 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return *a * b
 			},
+			"divFloat": func(a, b float64) float64 {
+				if b == 0 {
+					return 0
+				}
+				return a / b
+			},
+			"mulFloatRaw": func(a, b float64) float64 {
+				return a * b
+			},
+			"intToFloat": func(a int) float64 {
+				return float64(a)
+			},
+			"syncDuration": func(start, end time.Time) string {
+				d := end.Sub(start)
+				if d < time.Second {
+					return fmt.Sprintf("%dms", d.Milliseconds())
+				}
+				if d < time.Minute {
+					return fmt.Sprintf("%.1fs", d.Seconds())
+				}
+				return fmt.Sprintf("%.0fm", d.Minutes())
+			},
 			"relativeTime": func(t interface{}) string {
 				switch v := t.(type) {
 				case time.Time:
