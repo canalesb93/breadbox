@@ -1,80 +1,109 @@
 {{define "content"}}
-<h1 class="text-2xl font-bold mb-6">Sync Logs</h1>
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Sync Logs</h1>
+    <p class="text-sm text-base-content/50 mt-1">History of bank data synchronizations</p>
+  </div>
+</div>
 
-<form method="GET" action="/sync-logs" class="bb-filter-bar">
-  <label>
-    Connection
-    <select name="connection_id">
-      <option value="">All connections</option>
-      {{range .Connections}}
-      <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.FilterConnID}} selected{{end}}>{{.InstitutionName.String}}</option>
-      {{end}}
-    </select>
-  </label>
-  <label>
-    Status
-    <select name="status">
-      <option value="">All statuses</option>
-      <option value="success"{{if eq .FilterStatus "success"}} selected{{end}}>Success</option>
-      <option value="error"{{if eq .FilterStatus "error"}} selected{{end}}>Error</option>
-      <option value="in_progress"{{if eq .FilterStatus "in_progress"}} selected{{end}}>In Progress</option>
-    </select>
-  </label>
-  <button type="submit" class="btn btn-sm btn-primary self-end">Filter</button>
-  {{if or .FilterConnID .FilterStatus}}
-  <a href="/sync-logs" class="btn btn-sm btn-ghost self-end">Clear</a>
-  {{end}}
-</form>
+<!-- Filter Bar -->
+<div class="bb-card p-4 mb-6">
+  <form method="GET" action="/sync-logs" class="flex flex-wrap items-end gap-3">
+    <div class="form-control">
+      <label class="text-xs font-medium text-base-content/50 mb-1">Connection</label>
+      <select name="connection_id" class="select select-sm bg-base-200/50 border-base-200 min-w-[10rem]">
+        <option value="">All connections</option>
+        {{range .Connections}}
+        <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.FilterConnID}} selected{{end}}>{{.InstitutionName.String}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div class="form-control">
+      <label class="text-xs font-medium text-base-content/50 mb-1">Status</label>
+      <select name="status" class="select select-sm bg-base-200/50 border-base-200 min-w-[8rem]">
+        <option value="">All statuses</option>
+        <option value="success"{{if eq .FilterStatus "success"}} selected{{end}}>Success</option>
+        <option value="error"{{if eq .FilterStatus "error"}} selected{{end}}>Error</option>
+        <option value="in_progress"{{if eq .FilterStatus "in_progress"}} selected{{end}}>In Progress</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+    {{if or .FilterConnID .FilterStatus}}
+    <a href="/sync-logs" class="btn btn-ghost btn-sm">Clear</a>
+    {{end}}
+  </form>
+</div>
 
 {{if .Logs}}
-<div class="overflow-x-auto max-h-[70vh] border border-base-300 rounded-lg">
-  <table class="table table-zebra table-sm table-pin-rows">
-    <thead>
-      <tr>
-        <th>Connection</th>
-        <th>Trigger</th>
-        <th>Status</th>
-        <th>+Add</th>
-        <th>~Mod</th>
-        <th>-Rem</th>
-        <th>Duration</th>
-        <th>Started</th>
-        <th>Error</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range .Logs}}
-      <tr class="hover:bg-base-300">
-        <td>{{.InstitutionName}}</td>
-        <td>{{.Trigger}}</td>
-        <td>{{syncBadge .Status}}</td>
-        <td>{{.AddedCount}}</td>
-        <td>{{.ModifiedCount}}</td>
-        <td>{{.RemovedCount}}</td>
-        <td>{{if .Duration}}{{.Duration}}{{else}}&mdash;{{end}}</td>
-        <td>{{if .StartedAt}}{{.StartedAt}}{{else}}&mdash;{{end}}</td>
-        <td>
-          {{if .ErrorMessage}}
-          <details>
-            <summary class="cursor-pointer text-sm link">View</summary>
-            <small class="text-error">{{.ErrorMessage}}</small>
-          </details>
-          {{else}}&mdash;{{end}}
-        </td>
-      </tr>
+<!-- Results count -->
+<div class="text-xs text-base-content/40 mb-3 px-1">{{.Total}} sync log{{if ne .Total 1}}s{{end}}</div>
+
+<div class="space-y-2">
+  {{range .Logs}}
+  <div class="bb-card px-5 py-3.5 flex items-center gap-4 flex-wrap">
+    <!-- Institution icon + name -->
+    <div class="flex items-center gap-3 min-w-0 w-44 shrink-0">
+      <div class="w-8 h-8 rounded-lg bg-base-200/50 flex items-center justify-center shrink-0">
+        <i data-lucide="building-2" class="w-4 h-4 text-base-content/40"></i>
+      </div>
+      <div class="min-w-0">
+        <div class="text-sm font-medium truncate">{{.InstitutionName}}</div>
+        <div class="text-xs text-base-content/40">{{if .StartedAt}}{{.StartedAt}}{{end}}</div>
+      </div>
+    </div>
+
+    <!-- Trigger -->
+    <div class="w-16 shrink-0">
+      <span class="badge badge-ghost badge-xs uppercase tracking-wide">{{.Trigger}}</span>
+    </div>
+
+    <!-- Counts -->
+    <div class="flex items-center gap-3 text-xs tabular-nums flex-1">
+      {{if .AddedCount}}
+      <span class="text-success font-medium">+{{.AddedCount}}</span>
       {{end}}
-    </tbody>
-  </table>
+      {{if .ModifiedCount}}
+      <span class="text-info font-medium">~{{.ModifiedCount}}</span>
+      {{end}}
+      {{if .RemovedCount}}
+      <span class="text-error font-medium">-{{.RemovedCount}}</span>
+      {{end}}
+      {{if and (not .AddedCount) (not .ModifiedCount) (not .RemovedCount)}}
+      <span class="text-base-content/25">No changes</span>
+      {{end}}
+    </div>
+
+    <!-- Duration -->
+    <div class="w-20 text-xs text-base-content/50 text-right shrink-0">
+      {{if .Duration}}{{.Duration}}{{else}}&mdash;{{end}}
+    </div>
+
+    <!-- Status + Error -->
+    <div class="w-24 shrink-0 flex items-center justify-end gap-2">
+      {{if .ErrorMessage}}
+      <div class="dropdown dropdown-end">
+        <div tabindex="0" role="button" class="btn btn-ghost btn-xs text-error">
+          <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+        </div>
+        <div tabindex="0" class="dropdown-content card card-compact bg-base-100 shadow-xl border border-base-200 p-3 w-72 z-10">
+          <p class="text-xs text-error font-mono break-all">{{.ErrorMessage}}</p>
+        </div>
+      </div>
+      {{end}}
+      {{syncBadge .Status}}
+    </div>
+  </div>
+  {{end}}
 </div>
 
 {{if gt .TotalPages 1}}
-<div class="bb-pagination">
+<div class="flex items-center justify-between mt-6">
   <div>
     {{if gt .Page 1}}
     <a href="/sync-logs?page={{sub .Page 1}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterStatus}}&status={{$.FilterStatus}}{{end}}" class="btn btn-sm btn-ghost">&laquo; Previous</a>
     {{end}}
   </div>
-  <small class="text-base-content/70">Page {{.Page}} of {{.TotalPages}} ({{.Total}} total)</small>
+  <span class="text-xs text-base-content/40">Page {{.Page}} of {{.TotalPages}}</span>
   <div>
     {{if lt .Page .TotalPages}}
     <a href="/sync-logs?page={{add .Page 1}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterStatus}}&status={{$.FilterStatus}}{{end}}" class="btn btn-sm btn-ghost">Next &raquo;</a>
@@ -84,12 +113,15 @@
 {{end}}
 
 {{else}}
-<div class="card bg-base-100 border border-base-300">
-  <div class="card-body items-center text-center py-12">
-    <i data-lucide="refresh-cw" class="w-12 h-12 text-base-content/30 mb-2"></i>
-    <p class="text-base-content/70">No sync logs found.</p>
+<div class="bb-card p-12 text-center">
+  <div class="flex flex-col items-center">
+    <div class="w-16 h-16 rounded-2xl bg-base-200/60 flex items-center justify-center mb-4">
+      <i data-lucide="refresh-cw" class="w-8 h-8 text-base-content/25"></i>
+    </div>
+    <h3 class="text-lg font-semibold mb-1">No sync logs found</h3>
+    <p class="text-sm text-base-content/50 mb-5">{{if or .FilterConnID .FilterStatus}}Try adjusting your filters.{{else}}Sync logs will appear here after your first bank sync.{{end}}</p>
     {{if or .FilterConnID .FilterStatus}}
-    <a href="/sync-logs" class="btn btn-ghost btn-sm mt-2">Clear filters</a>
+    <a href="/sync-logs" class="btn btn-ghost btn-sm">Clear filters</a>
     {{end}}
   </div>
 </div>
