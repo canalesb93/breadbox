@@ -30,6 +30,11 @@
         <div class="flex-1 min-w-0">
           <span class="text-sm font-semibold truncate">{{.PageTitle}}</span>
         </div>
+        <div class="flex-none">
+          <button class="btn btn-square btn-ghost" @click="$dispatch('open-cmdk')">
+            <i data-lucide="search" class="w-4 h-4"></i>
+          </button>
+        </div>
       </div>
       <!-- Page content -->
       <main class="p-4 sm:p-6 max-w-6xl min-h-screen bb-page-enter">
@@ -47,6 +52,14 @@
           <i data-lucide="package" class="w-5 h-5"></i>
           Breadbox
         </a>
+        <!-- Search trigger -->
+        <div class="bb-sidebar-search" @click="$dispatch('open-cmdk')" role="button" tabindex="0" @keydown.enter="$dispatch('open-cmdk')">
+          <i data-lucide="search"></i>
+          <span>Search...</span>
+          <span class="bb-sidebar-search-hint">
+            <kbd>&#8984;</kbd><kbd>K</kbd>
+          </span>
+        </div>
         {{template "nav" .}}
       </aside>
     </div>
@@ -72,6 +85,78 @@
     </template>
   </div>
 
+  <!-- Command Palette (Cmd+K) -->
+  <div x-data="commandPalette()" x-show="open" x-cloak
+       @open-cmdk.window="openPalette()"
+       @keydown.window="handleGlobalKey($event)">
+    <!-- Backdrop -->
+    <div class="bb-cmdk-backdrop" @click="closePalette()"></div>
+    <!-- Dialog -->
+    <div class="bb-cmdk-dialog" @keydown.escape.prevent="closePalette()" @keydown.arrow-down.prevent="moveDown()" @keydown.arrow-up.prevent="moveUp()" @keydown.enter.prevent="selectActive()">
+      <!-- Search input -->
+      <div class="bb-cmdk-input-wrap">
+        <i data-lucide="search"></i>
+        <input type="text"
+          class="bb-cmdk-input"
+          placeholder="Type a command or search..."
+          x-ref="cmdkInput"
+          x-model="query"
+          @input="onInput()"
+          autocomplete="off"
+          spellcheck="false">
+        <div class="bb-cmdk-kbd" style="font-size:0.6rem" @click="closePalette()">esc</div>
+      </div>
+
+      <!-- Results list -->
+      <div class="bb-cmdk-list" x-ref="cmdkList">
+        <template x-if="filteredItems.length === 0 && query.length > 0">
+          <div class="bb-cmdk-empty">
+            <i data-lucide="search-x"></i>
+            <span class="text-sm">No results found</span>
+          </div>
+        </template>
+        <template x-for="(group, gi) in filteredGroups" :key="group.label">
+          <div class="bb-cmdk-group">
+            <div class="bb-cmdk-group-label" x-text="group.label"></div>
+            <template x-for="(item, ii) in group.items" :key="item.id">
+              <div class="bb-cmdk-item"
+                   :data-active="activeIndex === item._flatIndex"
+                   :data-cmdk-idx="item._flatIndex"
+                   @click="go(item)"
+                   @mouseenter="activeIndex = item._flatIndex">
+                <div class="bb-cmdk-item-icon">
+                  <i :data-lucide="item.icon"></i>
+                </div>
+                <div class="bb-cmdk-item-label">
+                  <div class="bb-cmdk-item-title" x-text="item.title"></div>
+                  <template x-if="item.desc">
+                    <div class="bb-cmdk-item-desc" x-text="item.desc"></div>
+                  </template>
+                </div>
+                <template x-if="item.shortcut">
+                  <div class="bb-cmdk-item-shortcut">
+                    <template x-for="k in item.shortcut" :key="k">
+                      <span class="bb-cmdk-kbd" x-text="k"></span>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      <!-- Footer hints -->
+      <div class="bb-cmdk-footer">
+        <div class="flex items-center gap-3">
+          <span><kbd>&uarr;</kbd> <kbd>&darr;</kbd> navigate</span>
+          <span><kbd>&crarr;</kbd> open</span>
+          <span><kbd>esc</kbd> close</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <script>
     lucide.createIcons();
@@ -89,6 +174,134 @@
         });
       });
     })();
+
+    // Command Palette Alpine component
+    function commandPalette() {
+      var allItems = [
+        // Navigation
+        { id: 'nav-dashboard', group: 'Navigation', title: 'Dashboard', desc: 'Overview and stats', icon: 'layout-dashboard', href: '/', keywords: 'home overview net worth' },
+        { id: 'nav-transactions', group: 'Navigation', title: 'Transactions', desc: 'View all transactions', icon: 'receipt', href: '/transactions', keywords: 'payments expenses spending' },
+        { id: 'nav-connections', group: 'Navigation', title: 'Connections', desc: 'Bank connections', icon: 'link', href: '/connections', keywords: 'banks accounts linked' },
+        { id: 'nav-reviews', group: 'Navigation', title: 'Reviews', desc: 'Transaction review queue', icon: 'clipboard-check', href: '/reviews', keywords: 'pending approve categorize' },
+        { id: 'nav-rules', group: 'Navigation', title: 'Rules', desc: 'Auto-categorization rules', icon: 'list-filter', href: '/rules', keywords: 'automation patterns categorize' },
+        { id: 'nav-categories', group: 'Navigation', title: 'Categories', desc: 'Category taxonomy', icon: 'tag', href: '/categories', keywords: 'tags labels organize' },
+        { id: 'nav-users', group: 'Navigation', title: 'Family Members', desc: 'Manage family members', icon: 'users', href: '/users', keywords: 'people household members' },
+        // System
+        { id: 'sys-providers', group: 'System', title: 'Providers', desc: 'Configure Plaid, Teller, CSV', icon: 'plug', href: '/providers', keywords: 'plaid teller csv bank setup' },
+        { id: 'sys-api-keys', group: 'System', title: 'API Keys', desc: 'Manage API access keys', icon: 'key', href: '/api-keys', keywords: 'tokens authentication' },
+        { id: 'sys-mcp', group: 'System', title: 'MCP Settings', desc: 'AI agent configuration', icon: 'bot', href: '/mcp-settings', keywords: 'agent tools permissions' },
+        { id: 'sys-sync-logs', group: 'System', title: 'Sync Logs', desc: 'Sync history and status', icon: 'refresh-cw', href: '/sync-logs', keywords: 'history errors status' },
+        { id: 'sys-settings', group: 'System', title: 'Settings', desc: 'Sync schedule, security, system', icon: 'settings', href: '/settings', keywords: 'schedule password encryption' },
+        { id: 'sys-review-agent', group: 'System', title: 'Review Agent', desc: 'MCP review instructions', icon: 'message-square-code', href: '/review-instructions', keywords: 'agent instructions prompts' },
+        // Actions
+        { id: 'act-connect', group: 'Quick Actions', title: 'Connect a Bank', desc: 'Add a new bank connection', icon: 'plus-circle', href: '/connections/new', keywords: 'add new link' },
+        { id: 'act-import', group: 'Quick Actions', title: 'Import CSV', desc: 'Import transactions from CSV', icon: 'upload', href: '/connections/import-csv', keywords: 'upload file' },
+        { id: 'act-api-key', group: 'Quick Actions', title: 'Create API Key', desc: 'Generate a new API key', icon: 'key-round', href: '/api-keys/new', keywords: 'new token' },
+        { id: 'act-user', group: 'Quick Actions', title: 'Add Family Member', desc: 'Add a new family member', icon: 'user-plus', href: '/users/new', keywords: 'new person' },
+      ];
+
+      return {
+        open: false,
+        query: '',
+        activeIndex: 0,
+        _allItems: allItems,
+
+        get filteredItems() {
+          if (!this.query.trim()) return this._allItems;
+          var q = this.query.toLowerCase().trim();
+          var terms = q.split(/\s+/);
+          return this._allItems.filter(function(item) {
+            var haystack = (item.title + ' ' + (item.desc || '') + ' ' + (item.keywords || '')).toLowerCase();
+            return terms.every(function(term) { return haystack.indexOf(term) !== -1; });
+          });
+        },
+
+        get filteredGroups() {
+          var items = this.filteredItems;
+          var groups = [];
+          var seen = {};
+          var flatIndex = 0;
+          items.forEach(function(item) {
+            if (!seen[item.group]) {
+              seen[item.group] = { label: item.group, items: [] };
+              groups.push(seen[item.group]);
+            }
+            var clone = Object.assign({}, item, { _flatIndex: flatIndex });
+            seen[item.group].items.push(clone);
+            flatIndex++;
+          });
+          return groups;
+        },
+
+        openPalette() {
+          this.open = true;
+          this.query = '';
+          this.activeIndex = 0;
+          var self = this;
+          setTimeout(function() {
+            if (self.$refs.cmdkInput) {
+              self.$refs.cmdkInput.focus();
+            }
+            lucide.createIcons({ nodes: [document.querySelector('.bb-cmdk-dialog')] });
+          }, 50);
+        },
+
+        closePalette() {
+          this.open = false;
+          this.query = '';
+        },
+
+        handleGlobalKey(e) {
+          if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            if (this.open) {
+              this.closePalette();
+            } else {
+              this.openPalette();
+            }
+          }
+        },
+
+        onInput() {
+          this.activeIndex = 0;
+        },
+
+        moveDown() {
+          var max = this.filteredItems.length - 1;
+          if (this.activeIndex < max) this.activeIndex++;
+          else this.activeIndex = 0;
+          this.scrollToActive();
+        },
+
+        moveUp() {
+          if (this.activeIndex > 0) this.activeIndex--;
+          else this.activeIndex = this.filteredItems.length - 1;
+          this.scrollToActive();
+        },
+
+        scrollToActive() {
+          var self = this;
+          setTimeout(function() {
+            var el = document.querySelector('[data-cmdk-idx="' + self.activeIndex + '"]');
+            if (el) el.scrollIntoView({ block: 'nearest' });
+          }, 10);
+        },
+
+        selectActive() {
+          var items = this.filteredItems;
+          if (items.length > 0 && this.activeIndex < items.length) {
+            this.go(items[this.activeIndex]);
+          }
+        },
+
+        go(item) {
+          if (item.href) {
+            window.location.href = item.href;
+          }
+          this.closePalette();
+        }
+      };
+    }
   </script>
 </body>
 </html>
