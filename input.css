@@ -3,109 +3,107 @@
   themes: false;
 }
 
-/* ─── Breadbox Light Theme (Mercury-inspired) ─── */
+/* ─── Breadbox Light Theme (shadcn/ui neutral palette) ─── */
 @plugin "daisyui/theme" {
   name: "breadbox-light";
   default: true;
   color-scheme: light;
 
-  /* Backgrounds: pure white cards on warm off-white canvas */
-  --color-base-100: oklch(100% 0 0);
-  --color-base-200: oklch(97.5% 0.003 250);
-  --color-base-300: oklch(93% 0.005 250);
-  --color-base-content: oklch(18% 0.005 250);
+  /* Backgrounds: pure white surfaces on very subtle gray canvas */
+  --color-base-100: oklch(1 0 0);          /* pure white — cards, main surfaces */
+  --color-base-200: oklch(0.97 0 0);       /* subtle gray — secondary surfaces, hover */
+  --color-base-300: oklch(0.922 0 0);      /* border gray — dividers, borders */
+  --color-base-content: oklch(0.145 0 0);  /* near-black — primary text */
 
-  /* Primary: refined deep indigo — the singular brand accent */
-  --color-primary: oklch(48% 0.17 265);
-  --color-primary-content: oklch(98% 0.005 265);
+  /* Primary: near-black (shadcn neutral primary) */
+  --color-primary: oklch(0.205 0 0);
+  --color-primary-content: oklch(0.985 0 0);
 
-  /* Secondary: cool slate — for secondary actions and muted UI */
-  --color-secondary: oklch(55% 0.04 260);
-  --color-secondary-content: oklch(98% 0.003 260);
+  /* Secondary: light gray background (shadcn secondary) */
+  --color-secondary: oklch(0.97 0 0);
+  --color-secondary-content: oklch(0.205 0 0);
 
-  /* Accent: soft teal — for special highlights and differentiation */
-  --color-accent: oklch(62% 0.1 195);
-  --color-accent-content: oklch(98% 0.005 195);
+  /* Accent: same as secondary — shadcn is monochrome-first */
+  --color-accent: oklch(0.97 0 0);
+  --color-accent-content: oklch(0.205 0 0);
 
-  /* Neutral: deep charcoal — for badges, tags, overlays */
-  --color-neutral: oklch(20% 0.005 250);
-  --color-neutral-content: oklch(95% 0.003 250);
+  /* Neutral: dark for badges, overlays */
+  --color-neutral: oklch(0.269 0 0);
+  --color-neutral-content: oklch(0.985 0 0);
 
-  /* Semantic: muted, sophisticated tones (not neon) */
-  --color-info: oklch(62% 0.1 245);
-  --color-info-content: oklch(98% 0.005 245);
-  --color-success: oklch(62% 0.14 155);
-  --color-success-content: oklch(98% 0.005 155);
-  --color-warning: oklch(72% 0.14 75);
-  --color-warning-content: oklch(25% 0.05 75);
-  --color-error: oklch(60% 0.17 20);
-  --color-error-content: oklch(98% 0.005 20);
+  /* Semantic: restrained, professional tones */
+  --color-info: oklch(0.62 0.1 245);
+  --color-info-content: oklch(0.985 0 0);
+  --color-success: oklch(0.62 0.14 155);
+  --color-success-content: oklch(0.985 0 0);
+  --color-warning: oklch(0.72 0.14 75);
+  --color-warning-content: oklch(0.205 0 0);
+  --color-error: oklch(0.577 0.245 27.325);
+  --color-error-content: oklch(0.985 0 0);
 
-  /* Shape: generous radius, subtle depth */
+  /* Shape: shadcn radius (0.625rem), minimal depth */
   --radius-selector: 0.625rem;
   --radius-field: 0.5rem;
-  --radius-box: 1rem;
+  --radius-box: 0.75rem;
   --border: 1px;
-  --depth: 1;
+  --depth: 0;
   --noise: 0;
 }
 
-/* ─── Breadbox Dark Theme (rich, warm — not "inverted light") ─── */
+/* ─── Breadbox Dark Theme (shadcn/ui neutral dark) ─── */
 @plugin "daisyui/theme" {
   name: "breadbox-dark";
   prefersdark: true;
   color-scheme: dark;
 
-  /* Backgrounds: warm charcoal tones, NOT blue-tinted */
-  --color-base-100: oklch(20% 0.006 270);
-  --color-base-200: oklch(17.5% 0.005 270);
-  --color-base-300: oklch(15% 0.004 270);
-  --color-base-content: oklch(93% 0.005 250);
+  /* Backgrounds: true dark, slightly lighter cards */
+  --color-base-100: oklch(0.205 0 0);     /* card/surface — slightly lighter than bg */
+  --color-base-200: oklch(0.145 0 0);     /* canvas — near-black background */
+  --color-base-300: oklch(0.269 0 0);     /* borders — subtle separation */
+  --color-base-content: oklch(0.985 0 0); /* near-white text */
 
-  /* Primary: lighter indigo for dark bg contrast */
-  --color-primary: oklch(68% 0.16 265);
-  --color-primary-content: oklch(15% 0.02 265);
+  /* Primary: near-white (inverted from light) */
+  --color-primary: oklch(0.922 0 0);
+  --color-primary-content: oklch(0.205 0 0);
 
-  /* Secondary: lifted slate */
-  --color-secondary: oklch(65% 0.03 260);
-  --color-secondary-content: oklch(15% 0.01 260);
+  /* Secondary: dark gray surface */
+  --color-secondary: oklch(0.269 0 0);
+  --color-secondary-content: oklch(0.985 0 0);
 
-  /* Accent: brightened teal */
-  --color-accent: oklch(72% 0.1 195);
-  --color-accent-content: oklch(15% 0.02 195);
+  /* Accent: same as secondary */
+  --color-accent: oklch(0.269 0 0);
+  --color-accent-content: oklch(0.985 0 0);
 
-  /* Neutral: lifted dark for subtle contrasts */
-  --color-neutral: oklch(25% 0.006 270);
-  --color-neutral-content: oklch(90% 0.003 250);
+  /* Neutral: slightly lifted dark */
+  --color-neutral: oklch(0.269 0 0);
+  --color-neutral-content: oklch(0.985 0 0);
 
   /* Semantic: slightly brighter for dark bg readability */
-  --color-info: oklch(70% 0.1 245);
-  --color-info-content: oklch(15% 0.02 245);
-  --color-success: oklch(70% 0.14 155);
-  --color-success-content: oklch(15% 0.02 155);
-  --color-warning: oklch(78% 0.13 75);
-  --color-warning-content: oklch(20% 0.04 75);
-  --color-error: oklch(68% 0.16 20);
-  --color-error-content: oklch(15% 0.02 20);
+  --color-info: oklch(0.70 0.1 245);
+  --color-info-content: oklch(0.145 0 0);
+  --color-success: oklch(0.70 0.14 155);
+  --color-success-content: oklch(0.145 0 0);
+  --color-warning: oklch(0.78 0.13 75);
+  --color-warning-content: oklch(0.205 0 0);
+  --color-error: oklch(0.704 0.191 22.216);
+  --color-error-content: oklch(0.145 0 0);
 
-  /* Shape: same generous radius */
+  /* Shape: same radius */
   --radius-selector: 0.625rem;
   --radius-field: 0.5rem;
-  --radius-box: 1rem;
+  --radius-box: 0.75rem;
   --border: 1px;
-  --depth: 1;
+  --depth: 0;
   --noise: 0;
 }
 
 /* Utility: hide Alpine.js elements until initialized */
 [x-cloak] { display: none !important; }
 
-/* ─── Mercury-inspired global overrides ─── */
+/* ─── shadcn-inspired global overrides ─── */
 @layer base {
-  /* Smoother scrolling */
   html { scroll-behavior: smooth; }
 
-  /* Better font rendering */
   body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -115,22 +113,22 @@
 /* ─── App-specific component classes ─── */
 @layer components {
 
-  /* ── Cards: Mercury-style soft containers ── */
+  /* ── Cards: shadcn-style — border, not shadow ── */
   .bb-card {
-    @apply bg-base-100 rounded-2xl shadow-sm border border-base-200 transition-shadow duration-200;
+    @apply bg-base-100 rounded-xl border border-base-300 transition-colors duration-150;
   }
 
   .bb-card--interactive {
-    @apply hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer;
+    @apply hover:bg-base-200/50 cursor-pointer;
   }
 
   /* ── Sidebar ── */
   .bb-sidebar {
-    @apply bg-base-100 min-h-full w-64 px-4 py-6 flex flex-col border-r border-base-200;
+    @apply bg-base-100 min-h-full w-64 px-3 py-5 flex flex-col border-r border-base-300;
   }
 
   .bb-sidebar-brand {
-    @apply text-xl font-bold px-3 py-1 mb-6 no-underline text-base-content flex items-center gap-2;
+    @apply text-lg font-semibold px-3 py-1 mb-5 no-underline text-base-content flex items-center gap-2;
   }
 
   .bb-sidebar-nav {
@@ -138,14 +136,14 @@
   }
 
   .bb-sidebar-section {
-    @apply text-[0.65rem] font-semibold uppercase tracking-widest text-base-content/40 px-3 pt-5 pb-1.5;
+    @apply text-[0.65rem] font-medium uppercase tracking-widest text-base-content/40 px-3 pt-5 pb-1.5;
   }
 
   .bb-sidebar-link {
-    @apply flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium
-           text-base-content/70 no-underline
-           transition-all duration-150
-           hover:bg-base-200/80 hover:text-base-content;
+    @apply flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium
+           text-base-content/60 no-underline
+           transition-colors duration-100
+           hover:bg-base-200 hover:text-base-content;
   }
 
   .bb-sidebar-link--active {
@@ -153,7 +151,7 @@
   }
 
   .bb-sidebar-link i, .bb-sidebar-link svg {
-    @apply w-[1.125rem] h-[1.125rem] opacity-60;
+    @apply w-4 h-4 opacity-50;
   }
 
   .bb-sidebar-link--active i, .bb-sidebar-link--active svg {
@@ -162,7 +160,7 @@
 
   /* ── Filter bar ── */
   .bb-filter-bar {
-    @apply flex flex-wrap items-end gap-4 mb-6;
+    @apply flex flex-wrap items-end gap-3 mb-5;
   }
 
   .bb-filter-bar label {
@@ -213,11 +211,10 @@
     @apply text-base-content;
   }
 
-  /* ── Stat cards (Mercury: soft, no colored borders) ── */
+  /* ── Stat cards (shadcn: clean border, no shadow, no hover lift) ── */
   .bb-stat-card {
-    @apply flex items-center gap-4 rounded-2xl bg-base-100 px-6 py-5
-           shadow-sm border border-base-200 transition-all duration-200 ease-in-out
-           hover:shadow-md hover:-translate-y-0.5;
+    @apply flex items-center gap-4 rounded-xl bg-base-100 px-5 py-4
+           border border-base-300;
   }
 
   .bb-stat-card--primary,
@@ -226,11 +223,11 @@
   .bb-stat-card--warning,
   .bb-stat-card--info,
   .bb-stat-card--neutral {
-    /* No colored left borders in Mercury style — keep them uniform */
+    /* No colored variants — monochrome first */
   }
 
   .bb-stat-card__icon {
-    @apply flex items-center justify-center w-11 h-11 rounded-xl bg-base-200/60 shrink-0;
+    @apply flex items-center justify-center w-10 h-10 rounded-lg bg-base-200 shrink-0;
   }
 
   .bb-stat-card__body {
@@ -238,46 +235,33 @@
   }
 
   .bb-stat-card__value {
-    @apply text-2xl font-bold leading-tight tabular-nums;
+    @apply text-2xl font-semibold leading-tight tabular-nums;
   }
 
   .bb-stat-card__label {
-    @apply text-xs font-medium text-base-content/45 mt-0.5;
+    @apply text-xs font-medium text-base-content/50 mt-0.5;
   }
 
   /* ── Page header pattern ── */
   .bb-page-header {
-    @apply flex items-center justify-between mb-8;
+    @apply flex items-center justify-between mb-6;
   }
 
   .bb-page-title {
-    @apply text-2xl font-bold tracking-tight;
+    @apply text-xl font-semibold tracking-tight;
   }
 
   /* ── Wizard / Auth pages (login, setup, error) ── */
   .bb-wizard-bg {
-    @apply bg-base-200 min-h-screen flex items-center justify-center p-4 relative overflow-hidden;
+    @apply bg-base-200 min-h-screen flex items-center justify-center p-4;
   }
 
   .bb-wizard-orb {
-    @apply absolute pointer-events-none;
-    width: 600px;
-    height: 600px;
-    top: -200px;
-    right: -100px;
-    border-radius: 50%;
-    background: radial-gradient(circle, oklch(48% 0.17 265 / 0.06) 0%, transparent 70%);
-    filter: blur(60px);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .bb-wizard-orb {
-      background: radial-gradient(circle, oklch(68% 0.16 265 / 0.08) 0%, transparent 70%);
-    }
+    @apply hidden;
   }
 
   .bb-wizard-container {
-    @apply relative z-10 w-full max-w-[420px];
+    @apply w-full max-w-[420px];
   }
 
   .bb-wizard-brand {
@@ -285,26 +269,25 @@
   }
 
   .bb-wizard-brand-icon {
-    @apply w-12 h-12 rounded-2xl bg-primary text-primary-content
-           flex items-center justify-center shadow-md;
+    @apply w-10 h-10 rounded-xl bg-primary text-primary-content
+           flex items-center justify-center;
   }
 
   .bb-wizard-card {
-    @apply bg-base-100 rounded-3xl shadow-lg border border-base-200 p-8;
-    animation: bb-wizard-enter 0.4s ease-out;
+    @apply bg-base-100 rounded-xl border border-base-300 p-6;
+    animation: bb-wizard-enter 0.3s ease-out;
   }
 
   @keyframes bb-wizard-enter {
     from {
       opacity: 0;
-      transform: translateY(12px);
+      transform: translateY(8px);
     }
     to {
       opacity: 1;
       transform: translateY(0);
     }
   }
-
 
   /* ── Error pages (404, 500) ── */
   .bb-error-page {
@@ -318,14 +301,14 @@
   }
 
   .bb-error-icon {
-    @apply w-14 h-14 rounded-2xl flex items-center justify-center mb-6;
+    @apply w-12 h-12 rounded-xl flex items-center justify-center mb-5;
   }
 
   .bb-error-title {
-    @apply text-xl font-bold mb-2;
+    @apply text-lg font-semibold mb-2;
   }
 
   .bb-error-message {
-    @apply text-sm text-base-content/50 max-w-sm mb-8 leading-relaxed;
+    @apply text-sm text-base-content/50 max-w-sm mb-6 leading-relaxed;
   }
 }

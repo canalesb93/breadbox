@@ -18,7 +18,7 @@
     <label class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-1.5" for="username">Username</label>
     <input type="text" id="username" name="username" value="{{.Username}}" required autocomplete="username"
            placeholder="Choose a username"
-           class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-200 focus:bg-base-100 focus:border-primary/40 transition-all duration-200{{if .Errors.Username}} input-error{{end}}">
+           class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200{{if .Errors.Username}} input-error{{end}}">
     {{if .Errors.Username}}<p class="text-xs text-error mt-1.5">{{.Errors.Username}}</p>{{end}}
   </div>
 
@@ -26,7 +26,7 @@
     <label class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-1.5" for="password">Password</label>
     <input type="password" id="password" name="password" required autocomplete="new-password" minlength="8"
            placeholder="Create a password"
-           class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-200 focus:bg-base-100 focus:border-primary/40 transition-all duration-200{{if .Errors.Password}} input-error{{end}}">
+           class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200{{if .Errors.Password}} input-error{{end}}">
     <p class="text-xs text-base-content/40 mt-1.5">Minimum 8 characters</p>
     {{if .Errors.Password}}<p class="text-xs text-error mt-1">{{.Errors.Password}}</p>{{end}}
   </div>
@@ -35,11 +35,11 @@
     <label class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-1.5" for="confirm_password">Confirm Password</label>
     <input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password"
            placeholder="Confirm your password"
-           class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-200 focus:bg-base-100 focus:border-primary/40 transition-all duration-200{{if .Errors.ConfirmPassword}} input-error{{end}}">
+           class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200{{if .Errors.ConfirmPassword}} input-error{{end}}">
     {{if .Errors.ConfirmPassword}}<p class="text-xs text-error mt-1.5">{{.Errors.ConfirmPassword}}</p>{{end}}
   </div>
 
-  <button type="submit" class="btn btn-primary w-full h-12 rounded-xl text-base font-semibold shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 mt-1">
+  <button type="submit" class="btn btn-primary w-full h-12 rounded-xl text-base font-semibold transition-colors duration-150 mt-1">
     Create Account
     <i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
   </button>

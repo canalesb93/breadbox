@@ -45,7 +45,7 @@
 </nav>
 
 <!-- Sign out -->
-<form method="POST" action="/logout" class="mt-auto pt-4 border-t border-base-200">
+<form method="POST" action="/logout" class="mt-auto pt-4 border-t border-base-300">
   {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
   <button type="submit" class="bb-sidebar-link w-full justify-start">
     <i data-lucide="log-out"></i> Sign Out
