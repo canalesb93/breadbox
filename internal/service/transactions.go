@@ -391,13 +391,14 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	selectPrefix := "SELECT t.id, t.account_id, COALESCE(a.display_name, a.name, ''), " +
 		"COALESCE(bc.institution_name, ''), COALESCE(u.name, ''), " +
 		"t.date, t.name, t.merchant_name, t.amount, t.iso_currency_code, " +
-		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, " +
+		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
 		"t.category_override, t.pending, t.created_at, t.updated_at "
 	fromClause := "FROM transactions t " +
 		"LEFT JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
 		"LEFT JOIN users u ON bc.user_id = u.id " +
-		"LEFT JOIN categories c ON t.category_id = c.id "
+		"LEFT JOIN categories c ON t.category_id = c.id " +
+		"LEFT JOIN categories pc ON c.parent_id = pc.id "
 	query := selectPrefix + fromClause + "WHERE t.deleted_at IS NULL"
 
 	// Track which JOINs are needed for the WHERE clause (used by the count query).
@@ -579,6 +580,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			catDisplayName   pgtype.Text
 			catSlug          pgtype.Text
 			catIcon          pgtype.Text
+			catColor         pgtype.Text
 			categoryOverride bool
 			pending          bool
 			createdAt        pgtype.Timestamptz
@@ -589,7 +591,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			&id, &accountID, &accountName,
 			&institutionName, &userName,
 			&date, &name, &merchantName, &amount, &isoCurrencyCode,
-			&categoryID, &catDisplayName, &catSlug, &catIcon,
+			&categoryID, &catDisplayName, &catSlug, &catIcon, &catColor,
 			&categoryOverride, &pending, &createdAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan admin transaction: %w", err)
@@ -626,6 +628,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			CategoryDisplayName: textPtr(catDisplayName),
 			CategorySlug:        textPtr(catSlug),
 			CategoryIcon:        textPtr(catIcon),
+			CategoryColor:       textPtr(catColor),
 			CategoryOverride:    categoryOverride,
 			Pending:             pending,
 			CreatedAt:           createdAt.Time.UTC().Format(time.RFC3339),

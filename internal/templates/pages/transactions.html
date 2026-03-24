@@ -155,8 +155,11 @@
             <td @click.stop>
               <div class="bb-cat-picker" data-picker-source="tx-cat-{{.ID}}" x-data="categoryPicker({categories: window.__bbCategories, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: '\u2014', allowEmpty: true, emptyLabel: 'Uncategorized'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
                 <button type="button" class="btn btn-ghost btn-xs gap-1.5 -ml-1" @click="openPicker()">
+                  {{if .CategoryColor}}
+                  <span class="bb-cat-dot" x-show="!displayColor" style="background-color: {{deref .CategoryColor}}"></span>
+                  {{end}}
                   <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-                  <span x-text="displayLabel" class="text-sm"></span>
+                  <span x-text="displayLabel" class="text-sm">{{if .CategoryDisplayName}}{{deref .CategoryDisplayName}}{{else}}&mdash;{{end}}</span>
                   {{if .CategoryOverride}}<span class="badge badge-outline badge-xs">override</span>{{end}}
                 </button>
               </div>
@@ -219,10 +222,17 @@
             <a href="/transactions/{{.ID}}" @click.stop class="font-medium text-sm hover:text-primary transition-colors truncate">{{.Name}}</a>
             {{if .Pending}}<span class="badge badge-warning badge-xs">Pending</span>{{end}}
           </div>
-          <div class="flex items-center gap-2 mt-0.5">
-            <span class="text-xs text-base-content/50">{{formatDate .Date}}</span>
-            <span class="text-xs text-base-content/30">&middot;</span>
-            <span class="text-xs text-base-content/50 truncate">{{.AccountName}}</span>
+          <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/50 flex-wrap">
+            <span>{{formatDate .Date}}</span>
+            <span class="text-base-content/30">&middot;</span>
+            <span class="truncate">{{.AccountName}}</span>
+            {{if .CategoryDisplayName}}
+            <span class="text-base-content/20">&middot;</span>
+            <span class="inline-flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {{if .CategoryColor}}{{deref .CategoryColor}}{{else}}oklch(0.65 0 0){{end}}"></span>
+              <span class="text-base-content/50">{{deref .CategoryDisplayName}}</span>
+            </span>
+            {{end}}
           </div>
         </div>
         <!-- Right: amount -->
