@@ -60,4 +60,52 @@
   .menu li > .menu-active {
     @apply border-l-3 border-primary;
   }
+
+  /* Dashboard stat cards */
+  .bb-stat-card {
+    @apply flex items-center gap-4 rounded-xl border border-base-300 bg-base-100 px-5 py-4
+           shadow-sm transition-all duration-200 ease-in-out
+           hover:shadow-md hover:-translate-y-0.5
+           border-l-4;
+  }
+
+  .bb-stat-card--primary {
+    @apply border-l-primary;
+  }
+
+  .bb-stat-card--secondary {
+    @apply border-l-secondary;
+  }
+
+  .bb-stat-card--accent {
+    @apply border-l-accent;
+  }
+
+  .bb-stat-card--warning {
+    @apply border-l-warning;
+  }
+
+  .bb-stat-card--info {
+    @apply border-l-info;
+  }
+
+  .bb-stat-card--neutral {
+    @apply border-l-base-content/20;
+  }
+
+  .bb-stat-card__icon {
+    @apply flex items-center justify-center w-10 h-10 rounded-lg bg-base-200/60 shrink-0;
+  }
+
+  .bb-stat-card__body {
+    @apply flex flex-col min-w-0;
+  }
+
+  .bb-stat-card__value {
+    @apply text-2xl font-bold leading-tight tabular-nums;
+  }
+
+  .bb-stat-card__label {
+    @apply text-xs font-medium uppercase tracking-wide text-base-content/60 mt-0.5;
+  }
 }

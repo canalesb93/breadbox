@@ -93,52 +93,64 @@
 </div>
 {{end}}
 
-<div class="stats stats-vertical lg:stats-horizontal shadow border border-base-300 mb-8 w-full">
-  <div class="stat">
-    <div class="stat-figure text-base-content/50">
-      <i data-lucide="building-2" class="w-8 h-8"></i>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-8">
+  <div class="bb-stat-card bb-stat-card--primary">
+    <div class="bb-stat-card__icon text-primary">
+      <i data-lucide="building-2" class="w-6 h-6"></i>
     </div>
-    <div class="stat-title">Accounts Connected</div>
-    <div class="stat-value">{{.AccountCount}}</div>
+    <div class="bb-stat-card__body">
+      <span class="bb-stat-card__value">{{.AccountCount}}</span>
+      <span class="bb-stat-card__label">Accounts Connected</span>
+    </div>
   </div>
-  <a href="/transactions" class="stat hover:bg-base-300 no-underline">
-    <div class="stat-figure text-base-content/50">
-      <i data-lucide="trending-up" class="w-8 h-8"></i>
+  <a href="/transactions" class="bb-stat-card bb-stat-card--secondary no-underline">
+    <div class="bb-stat-card__icon text-secondary">
+      <i data-lucide="trending-up" class="w-6 h-6"></i>
     </div>
-    <div class="stat-title">Transactions Synced</div>
-    <div class="stat-value">{{.TxCount}}</div>
+    <div class="bb-stat-card__body">
+      <span class="bb-stat-card__value">{{.TxCount}}</span>
+      <span class="bb-stat-card__label">Transactions Synced</span>
+    </div>
   </a>
-  <div class="stat">
-    <div class="stat-figure text-base-content/50">
-      <i data-lucide="clock" class="w-8 h-8"></i>
+  <div class="bb-stat-card bb-stat-card--accent">
+    <div class="bb-stat-card__icon text-accent">
+      <i data-lucide="clock" class="w-6 h-6"></i>
     </div>
-    <div class="stat-title">Last Sync</div>
-    <div class="stat-value text-lg">{{.LastSync}}</div>
+    <div class="bb-stat-card__body">
+      <span class="bb-stat-card__value text-xl">{{.LastSync}}</span>
+      <span class="bb-stat-card__label">Last Sync</span>
+    </div>
   </div>
   {{if gt .NeedsAttention 0}}
-  <a href="/connections" class="stat border-l-4 border-warning hover:bg-base-300 no-underline">
-    <div class="stat-figure text-warning">
-      <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+  <a href="/connections" class="bb-stat-card bb-stat-card--warning no-underline">
+    <div class="bb-stat-card__icon text-warning">
+      <i data-lucide="alert-triangle" class="w-6 h-6"></i>
     </div>
-    <div class="stat-title">Needs Attention</div>
-    <div class="stat-value text-warning">{{.NeedsAttention}}</div>
+    <div class="bb-stat-card__body">
+      <span class="bb-stat-card__value text-warning">{{.NeedsAttention}}</span>
+      <span class="bb-stat-card__label">Needs Attention</span>
+    </div>
   </a>
   {{else}}
-  <div class="stat">
-    <div class="stat-figure text-base-content/50">
-      <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+  <div class="bb-stat-card bb-stat-card--neutral">
+    <div class="bb-stat-card__icon text-base-content/40">
+      <i data-lucide="check-circle" class="w-6 h-6"></i>
     </div>
-    <div class="stat-title">Needs Attention</div>
-    <div class="stat-value">{{.NeedsAttention}}</div>
+    <div class="bb-stat-card__body">
+      <span class="bb-stat-card__value">0</span>
+      <span class="bb-stat-card__label">Needs Attention</span>
+    </div>
   </div>
   {{end}}
   {{if gt .ReviewPending 0}}
-  <a href="/reviews" class="stat border-l-4 border-info hover:bg-base-300 no-underline">
-    <div class="stat-figure text-info">
-      <i data-lucide="clipboard-check" class="w-8 h-8"></i>
+  <a href="/reviews" class="bb-stat-card bb-stat-card--info no-underline">
+    <div class="bb-stat-card__icon text-info">
+      <i data-lucide="clipboard-check" class="w-6 h-6"></i>
     </div>
-    <div class="stat-title">Pending Reviews</div>
-    <div class="stat-value text-info">{{.ReviewPending}}</div>
+    <div class="bb-stat-card__body">
+      <span class="bb-stat-card__value text-info">{{.ReviewPending}}</span>
+      <span class="bb-stat-card__label">Pending Reviews</span>
+    </div>
   </a>
   {{end}}
 </div>
