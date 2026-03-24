@@ -15,6 +15,11 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 </head>
 <body>
+  <!-- Navigation progress bar -->
+  <div class="bb-progress-bar" id="bb-nav-progress">
+    <div class="bb-progress-bar__fill" id="bb-nav-progress-fill"></div>
+  </div>
+
   <div class="drawer lg:drawer-open">
     <input id="bb-drawer" type="checkbox" class="drawer-toggle" />
 
@@ -444,6 +449,14 @@
 
         go(item) {
           if (item.href) {
+            if (window.bbProgress) window.bbProgress.start();
+            var main = document.querySelector('main');
+            if (main) {
+              main.style.transition = 'opacity 0.15s ease, filter 0.15s ease';
+              main.style.opacity = '0.6';
+              main.style.filter = 'blur(1px)';
+              main.style.pointerEvents = 'none';
+            }
             window.location.href = item.href;
           }
           this.closePalette();
@@ -465,6 +478,125 @@
         }
       };
     }
+
+    // Navigation Progress Bar
+    (function() {
+      var bar = document.getElementById('bb-nav-progress');
+      var fill = document.getElementById('bb-nav-progress-fill');
+      if (!bar || !fill) return;
+
+      var progress = 0;
+      var tickTimer = null;
+      var isActive = false;
+
+      function start() {
+        if (isActive) return;
+        isActive = true;
+        progress = 0;
+        fill.style.width = '0%';
+        fill.classList.remove('bb-progress-bar__fill--done');
+        bar.classList.remove('bb-progress-bar--fade');
+        bar.classList.add('bb-progress-bar--active');
+
+        // Quick initial jump
+        setTimeout(function() { setProgress(15); }, 50);
+        setTimeout(function() { setProgress(30); }, 200);
+
+        // Slow trickle
+        tickTimer = setInterval(function() {
+          if (progress < 85) {
+            progress += (85 - progress) * 0.03;
+            fill.style.width = progress + '%';
+          }
+        }, 200);
+      }
+
+      function setProgress(val) {
+        progress = val;
+        fill.style.width = val + '%';
+      }
+
+      function finish() {
+        if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+        fill.classList.add('bb-progress-bar__fill--done');
+        isActive = false;
+
+        setTimeout(function() {
+          bar.classList.add('bb-progress-bar--fade');
+          setTimeout(function() {
+            bar.classList.remove('bb-progress-bar--active', 'bb-progress-bar--fade');
+            fill.classList.remove('bb-progress-bar__fill--done');
+            fill.style.width = '0%';
+          }, 500);
+        }, 150);
+      }
+
+      // Expose globally
+      window.bbProgress = { start: start, finish: finish, setProgress: setProgress };
+
+      // Main content area for fade effect
+      var mainContent = document.querySelector('main');
+
+      // Intercept navigation clicks (sidebar links, breadcrumbs, any internal link)
+      document.addEventListener('click', function(e) {
+        var link = e.target.closest('a[href]');
+        if (!link) return;
+
+        var href = link.getAttribute('href');
+        // Only intercept internal same-origin links
+        if (!href || href.startsWith('#') || href.startsWith('javascript:') ||
+            href.startsWith('http://') && !href.startsWith(window.location.origin) ||
+            href.startsWith('https://') && !href.startsWith(window.location.origin)) return;
+
+        // Don't intercept if modifier keys are held (new tab, etc.)
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+        // Don't intercept if target is _blank
+        if (link.target === '_blank') return;
+
+        // Skip same-page links
+        if (href === window.location.pathname + window.location.search) return;
+
+        // Start the progress bar for this navigation
+        start();
+
+        // Subtle content fade during navigation
+        if (mainContent) {
+          mainContent.style.transition = 'opacity 0.15s ease, filter 0.15s ease';
+          mainContent.style.opacity = '0.6';
+          mainContent.style.filter = 'blur(1px)';
+          mainContent.style.pointerEvents = 'none';
+        }
+      });
+
+      // Handle form submissions
+      document.addEventListener('submit', function(e) {
+        var form = e.target;
+        if (form && form.method && form.method.toLowerCase() === 'get') {
+          start();
+        }
+      });
+
+      // Finish on page load (covers back/forward navigation via bfcache)
+      window.addEventListener('pageshow', function(e) {
+        if (isActive) finish();
+        // Restore main content if page was served from bfcache
+        if (e.persisted) {
+          var main = document.querySelector('main');
+          if (main) {
+            main.style.opacity = '';
+            main.style.filter = '';
+            main.style.pointerEvents = '';
+            main.style.transition = '';
+          }
+        }
+      });
+
+      // Before unload — ensure bar stays visible
+      window.addEventListener('beforeunload', function() {
+        if (isActive) setProgress(90);
+      });
+    })();
 
     // Global Keyboard Shortcuts (vim-style g+key navigation, ?-key help)
     (function() {
@@ -563,6 +695,14 @@
 
           if (routes && routes[key]) {
             e.preventDefault();
+            if (window.bbProgress) window.bbProgress.start();
+            var main = document.querySelector('main');
+            if (main) {
+              main.style.transition = 'opacity 0.15s ease, filter 0.15s ease';
+              main.style.opacity = '0.6';
+              main.style.filter = 'blur(1px)';
+              main.style.pointerEvents = 'none';
+            }
             window.location.href = routes[key];
           }
           return;

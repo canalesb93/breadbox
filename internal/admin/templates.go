@@ -385,6 +385,7 @@ var templatePartials = []string{
 	"partials/flash.html",
 	"partials/nav.html",
 	"partials/category_picker.html",
+	"partials/skeletons.html",
 }
 
 func (tr *TemplateRenderer) parseTemplates() error {

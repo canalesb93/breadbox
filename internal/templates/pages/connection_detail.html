@@ -179,6 +179,21 @@
     <h2 class="text-sm font-semibold text-base-content/50">Sync History</h2>
     <span class="text-xs text-base-content/30">Last 10</span>
   </div>
+  <!-- Skeleton shown during sync -->
+  <div id="sync-history-skeleton" class="px-6 pb-6" style="display:none">
+    <!-- Pulsing "syncing" indicator -->
+    <div class="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/10 mb-2">
+      <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+        <span class="loading loading-spinner loading-xs text-primary"></span>
+      </div>
+      <div>
+        <div class="text-sm font-medium">Syncing in progress</div>
+        <div class="text-xs text-base-content/40">Fetching latest transactions...</div>
+      </div>
+    </div>
+    {{template "skeleton-sync-list" .}}
+  </div>
+  <div id="sync-history-content">
   {{if .SyncLogs}}
   <div class="px-6 pb-6 space-y-2">
     {{range .SyncLogs}}
@@ -216,6 +231,7 @@
     </div>
   </div>
   {{end}}
+  </div><!-- /sync-history-content -->
 </div>
 
 <script>
@@ -227,11 +243,23 @@ function syncConnection() {
   var btn = document.getElementById('sync-btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Syncing...';
+
+  // Show skeleton loading state in sync history
+  var syncHistory = document.getElementById('sync-history-content');
+  var syncSkeleton = document.getElementById('sync-history-skeleton');
+  if (syncHistory && syncSkeleton) {
+    syncHistory.classList.add('bb-loading-fade');
+    syncSkeleton.style.display = 'block';
+  }
+
+  if (window.bbProgress) window.bbProgress.start();
+
   fetch("/-/connections/{{.ConnID}}/sync", { method: "POST" })
   .then(function(res) {
     if (res.ok) {
       btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i> Synced!';
       lucide.createIcons({nodes: [btn]});
+      if (window.bbProgress) window.bbProgress.finish();
       setTimeout(function() { window.location.reload(); }, 3000);
     } else {
       return res.json().then(function(data) {
@@ -239,6 +267,9 @@ function syncConnection() {
         btn.disabled = false;
         btn.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Sync Now';
         lucide.createIcons({nodes: [btn]});
+        if (syncHistory) syncHistory.classList.remove('bb-loading-fade');
+        if (syncSkeleton) syncSkeleton.style.display = 'none';
+        if (window.bbProgress) window.bbProgress.finish();
       });
     }
   })
@@ -247,21 +278,28 @@ function syncConnection() {
     btn.disabled = false;
     btn.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Sync Now';
     lucide.createIcons({nodes: [btn]});
+    if (syncHistory) syncHistory.classList.remove('bb-loading-fade');
+    if (syncSkeleton) syncSkeleton.style.display = 'none';
+    if (window.bbProgress) window.bbProgress.finish();
   });
 }
 
 function removeConnection() {
+  if (window.bbProgress) window.bbProgress.start();
   fetch("/-/connections/{{.ConnID}}", { method: "DELETE" })
   .then(function (res) {
     if (res.ok) {
+      if (window.bbProgress) window.bbProgress.finish();
       window.location.href = "/connections";
     } else {
+      if (window.bbProgress) window.bbProgress.finish();
       return res.json().then(function (data) {
         showToast(data.error || "Failed to remove connection.");
       });
     }
   })
   .catch(function () {
+    if (window.bbProgress) window.bbProgress.finish();
     showToast("Network error. Please try again.");
   });
 }
