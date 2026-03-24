@@ -21,14 +21,14 @@
     <!-- Main content -->
     <div class="drawer-content bg-base-200">
       <!-- Mobile navbar -->
-      <div class="navbar bg-base-100 lg:hidden border-b border-base-300">
+      <div class="navbar bg-base-100 lg:hidden border-b border-base-300 sticky top-0 z-30">
         <div class="flex-none">
           <label for="bb-drawer" class="btn btn-square btn-ghost">
             <i data-lucide="menu" class="w-5 h-5"></i>
           </label>
         </div>
-        <div class="flex-1">
-          <span class="text-lg font-bold">Breadbox</span>
+        <div class="flex-1 min-w-0">
+          <span class="text-sm font-semibold truncate">{{.PageTitle}}</span>
         </div>
       </div>
       <!-- Page content -->
@@ -73,7 +73,23 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-  <script>lucide.createIcons();</script>
+  <script>
+    lucide.createIcons();
+    // Auto-close sidebar on mobile when a nav link is tapped
+    (function() {
+      var toggle = document.getElementById('bb-drawer');
+      if (!toggle) return;
+      var side = document.querySelector('.drawer-side');
+      if (!side) return;
+      side.querySelectorAll('a.bb-sidebar-link, button[type="submit"]').forEach(function(link) {
+        link.addEventListener('click', function() {
+          if (window.innerWidth < 1024) {
+            toggle.checked = false;
+          }
+        });
+      });
+    })();
+  </script>
 </body>
 </html>
 {{end}}

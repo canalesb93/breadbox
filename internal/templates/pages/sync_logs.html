@@ -8,10 +8,10 @@
 
 <!-- Filter Bar -->
 <div class="bb-card p-4 mb-6">
-  <form method="GET" action="/sync-logs" class="flex flex-wrap items-end gap-3">
+  <form method="GET" action="/sync-logs" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3">
     <div class="form-control">
       <label class="text-xs font-medium text-base-content/50 mb-1">Connection</label>
-      <select name="connection_id" class="select select-sm bg-base-200/50 border-base-300 min-w-[10rem]">
+      <select name="connection_id" class="select select-sm bg-base-200/50 border-base-300 w-full sm:w-auto sm:min-w-[10rem]">
         <option value="">All connections</option>
         {{range .Connections}}
         <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.FilterConnID}} selected{{end}}>{{.InstitutionName.String}}</option>
@@ -20,7 +20,7 @@
     </div>
     <div class="form-control">
       <label class="text-xs font-medium text-base-content/50 mb-1">Status</label>
-      <select name="status" class="select select-sm bg-base-200/50 border-base-300 min-w-[8rem]">
+      <select name="status" class="select select-sm bg-base-200/50 border-base-300 w-full sm:w-auto sm:min-w-[8rem]">
         <option value="">All statuses</option>
         <option value="success"{{if eq .FilterStatus "success"}} selected{{end}}>Success</option>
         <option value="error"{{if eq .FilterStatus "error"}} selected{{end}}>Error</option>
