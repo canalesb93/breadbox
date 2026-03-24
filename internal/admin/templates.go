@@ -170,6 +170,12 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return t.Before(time.Now())
 			},
+			"percent": func(value, max float64) float64 {
+				if max <= 0 {
+					return 0
+				}
+				return (value / max) * 100
+			},
 			"formatAmount": func(amount float64) string {
 				neg := amount < 0
 				abs := math.Abs(amount)

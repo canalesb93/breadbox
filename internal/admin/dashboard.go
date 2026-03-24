@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"breadbox/internal/app"
@@ -68,6 +69,13 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			a.Logger.Error("category summary", "error", err)
 		}
 		var categoryLabelsJSON, categoryAmountsJSON template.JS
+		// Top spending categories for the breakdown list.
+		type CategorySpend struct {
+			Name   string
+			Amount float64
+		}
+		var topCategories []CategorySpend
+		var maxCategorySpend float64
 		if categorySummary != nil && len(categorySummary.Summary) > 0 {
 			labels := make([]string, 0, len(categorySummary.Summary))
 			amounts := make([]float64, 0, len(categorySummary.Summary))
@@ -80,6 +88,13 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				if row.TotalAmount > 0 {
 					labels = append(labels, label)
 					amounts = append(amounts, row.TotalAmount)
+					// Title-case the label for the top categories display.
+					displayLabel := strings.ReplaceAll(label, "_", " ")
+					displayLabel = strings.Title(displayLabel) //nolint:staticcheck // simple title case
+					topCategories = append(topCategories, CategorySpend{Name: displayLabel, Amount: row.TotalAmount})
+					if row.TotalAmount > maxCategorySpend {
+						maxCategorySpend = row.TotalAmount
+					}
 				}
 			}
 			if lb, err := json.Marshal(labels); err == nil {
@@ -89,6 +104,10 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				categoryAmountsJSON = template.JS(ab)
 			}
 		}
+		// Limit to top 8 categories.
+		if len(topCategories) > 8 {
+			topCategories = topCategories[:8]
+		}
 
 		// Daily spending trend (last 30 days).
 		dailySummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
@@ -97,6 +116,30 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		if err != nil {
 			a.Logger.Error("daily summary", "error", err)
 		}
+
+		// Previous 30-day period spending for comparison.
+		prevStart := time.Now().AddDate(0, 0, -60)
+		prevEnd := time.Now().AddDate(0, 0, -30)
+		prevSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+			GroupBy:   "category",
+			StartDate: &prevStart,
+			EndDate:   &prevEnd,
+		})
+		if err != nil {
+			a.Logger.Error("previous period summary", "error", err)
+		}
+		var prevTotalSpending float64
+		if prevSummary != nil {
+			for _, row := range prevSummary.Summary {
+				if row.TotalAmount > 0 {
+					prevTotalSpending += row.TotalAmount
+				}
+			}
+		}
+		// Calculate spending change percentage.
+		var spendingChangePercent float64
+		var hasSpendingChange bool
+		// We compute these after totalSpending is calculated below.
 		var dailyLabelsJSON, dailyAmountsJSON template.JS
 		if dailySummary != nil && len(dailySummary.Summary) > 0 {
 			// Reverse so oldest is first (API returns DESC).
@@ -190,6 +233,12 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		var totalSpending float64
 		if categorySummary != nil && categorySummary.Totals.TotalAmount != nil {
 			totalSpending = *categorySummary.Totals.TotalAmount
+		}
+
+		// Compute spending change vs previous period.
+		if prevTotalSpending > 0 {
+			hasSpendingChange = true
+			spendingChangePercent = ((totalSpending - prevTotalSpending) / prevTotalSpending) * 100
 		}
 
 		// Total income (30 days) — negative amounts in our system are credits/income.
@@ -312,6 +361,11 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"NetWorth":              netWorth,
 			"TotalAssets":           totalAssets,
 			"TotalLiabilities":     totalLiabilities,
+			"TopCategories":        topCategories,
+			"MaxCategorySpend":     maxCategorySpend,
+			"PrevTotalSpending":    prevTotalSpending,
+			"SpendingChangePercent": spendingChangePercent,
+			"HasSpendingChange":    hasSpendingChange,
 		}
 		tr.Render(w, r, "dashboard.html", data)
 	}
