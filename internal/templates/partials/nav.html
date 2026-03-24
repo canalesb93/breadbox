@@ -44,11 +44,28 @@
   </a>
 </nav>
 
-<!-- Sign out -->
-<form method="POST" action="/logout" class="mt-auto pt-4 border-t border-base-300">
-  {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
-  <button type="submit" class="bb-sidebar-link w-full justify-start">
-    <i data-lucide="log-out"></i> Sign Out
-  </button>
-</form>
+<!-- User profile + Sign out -->
+<div class="mt-auto pt-4 border-t border-base-300">
+  <div class="bb-sidebar-profile">
+    <div class="bb-sidebar-profile-avatar">
+      {{if .AdminUsername}}{{slice .AdminUsername 0 1}}{{else}}A{{end}}
+    </div>
+    <div class="bb-sidebar-profile-info">
+      <div class="bb-sidebar-profile-name">{{if .AdminUsername}}{{.AdminUsername}}{{else}}Admin{{end}}</div>
+      <div class="bb-sidebar-profile-role">Administrator</div>
+    </div>
+    <form method="POST" action="/logout" class="bb-sidebar-profile-logout">
+      {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+      <button type="submit" class="bb-sidebar-logout-btn" title="Sign out">
+        <i data-lucide="log-out"></i>
+      </button>
+    </form>
+  </div>
+  {{if .AppVersion}}
+  <div class="bb-sidebar-version">
+    <i data-lucide="package" class="w-3 h-3"></i>
+    <span>Breadbox v{{.AppVersion}}</span>
+  </div>
+  {{end}}
+</div>
 {{end}}

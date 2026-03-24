@@ -111,10 +111,11 @@ func NewRouter(a *app.App, version string) http.Handler {
 	// Admin dashboard: session manager + template renderer + admin router.
 	isSecure := a.Config.Environment == "production" || a.Config.Environment == "docker"
 	sm := admin.NewSessionManager(a.DB, isSecure)
-	tr, err := admin.NewTemplateRenderer()
+	tr, err := admin.NewTemplateRenderer(sm)
 	if err != nil {
 		a.Logger.Error("failed to initialize template renderer", "error", err)
 	} else {
+		tr.SetVersion(a.Config.Version)
 		adminRouter := admin.NewAdminRouter(a, sm, tr, svc, mcpServer)
 		r.Mount("/", adminRouter)
 	}

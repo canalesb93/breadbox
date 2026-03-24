@@ -738,4 +738,55 @@
     @apply inline-flex items-center justify-center min-w-[1.1rem] h-4 px-0.5
            text-[0.55rem] font-medium bg-base-200 border border-base-300 rounded;
   }
+
+  /* ── Sidebar user profile ── */
+  .bb-sidebar-profile {
+    @apply flex items-center gap-2.5 px-2 py-2 rounded-lg;
+    transition: background-color 0.15s ease;
+  }
+
+  .bb-sidebar-profile-avatar {
+    @apply w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center
+           text-xs font-semibold text-primary shrink-0 uppercase;
+    transition: background-color 0.15s ease;
+  }
+
+  .bb-sidebar-profile-info {
+    @apply flex-1 min-w-0;
+  }
+
+  .bb-sidebar-profile-name {
+    @apply text-sm font-medium text-base-content truncate leading-tight;
+  }
+
+  .bb-sidebar-profile-role {
+    @apply text-[0.65rem] text-base-content/35 leading-tight mt-0.5;
+  }
+
+  .bb-sidebar-profile-logout {
+    @apply shrink-0;
+  }
+
+  .bb-sidebar-logout-btn {
+    @apply flex items-center justify-center w-7 h-7 rounded-md
+           text-base-content/30 cursor-pointer border-0 bg-transparent;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .bb-sidebar-logout-btn:hover {
+    @apply bg-base-200 text-base-content/60;
+  }
+
+  .bb-sidebar-logout-btn svg, .bb-sidebar-logout-btn i {
+    @apply w-3.5 h-3.5;
+  }
+
+  /* ── Sidebar version badge ── */
+  .bb-sidebar-version {
+    @apply flex items-center gap-1.5 px-3 mt-2 text-[0.6rem] text-base-content/20;
+  }
+
+  .bb-sidebar-version svg, .bb-sidebar-version i {
+    @apply opacity-50;
+  }
 }
