@@ -199,3 +199,56 @@ func (s *Service) CountSyncLogsFiltered(ctx context.Context, params SyncLogListP
 	}
 	return count, nil
 }
+
+// SyncLogStats returns aggregate statistics about sync logs, optionally filtered.
+func (s *Service) SyncLogStats(ctx context.Context, params SyncLogListParams) (*SyncLogStats, error) {
+	query := `SELECT
+		COUNT(*) AS total,
+		COUNT(*) FILTER (WHERE sl.status = 'success') AS success_count,
+		COUNT(*) FILTER (WHERE sl.status = 'error') AS error_count,
+		COALESCE(AVG(EXTRACT(MILLISECONDS FROM (sl.completed_at - sl.started_at))) FILTER (WHERE sl.completed_at IS NOT NULL), 0) AS avg_duration_ms,
+		COALESCE(SUM(sl.added_count), 0) AS total_added,
+		COALESCE(SUM(sl.modified_count), 0) AS total_modified,
+		COALESCE(SUM(sl.removed_count), 0) AS total_removed
+	FROM sync_logs sl
+	JOIN bank_connections bc ON sl.connection_id = bc.id
+	WHERE 1=1`
+	args := []any{}
+	argN := 1
+
+	if params.ConnectionID != nil {
+		uid, err := parseUUID(*params.ConnectionID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid connection id: %w", err)
+		}
+		query += fmt.Sprintf(" AND sl.connection_id = $%d", argN)
+		args = append(args, uid)
+		argN++
+	}
+
+	if params.Status != nil {
+		query += fmt.Sprintf(" AND sl.status = $%d::sync_status", argN)
+		args = append(args, *params.Status)
+		argN++
+	}
+
+	var stats SyncLogStats
+	err := s.Pool.QueryRow(ctx, query, args...).Scan(
+		&stats.TotalSyncs,
+		&stats.SuccessCount,
+		&stats.ErrorCount,
+		&stats.AvgDurationMs,
+		&stats.TotalAdded,
+		&stats.TotalModified,
+		&stats.TotalRemoved,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("sync log stats: %w", err)
+	}
+
+	if stats.TotalSyncs > 0 {
+		stats.SuccessRate = float64(stats.SuccessCount) / float64(stats.TotalSyncs) * 100
+	}
+
+	return &stats, nil
+}

@@ -50,18 +50,45 @@ func SyncLogsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, s
 		filterConnID := stringOrEmpty(params.ConnectionID)
 		filterStatus := stringOrEmpty(params.Status)
 
+		// Compute summary stats (unfiltered by status for overview).
+		statsParams := service.SyncLogListParams{}
+		if params.ConnectionID != nil {
+			statsParams.ConnectionID = params.ConnectionID
+		}
+		stats, err := svc.SyncLogStats(ctx, statsParams)
+		if err != nil {
+			a.Logger.Error("sync log stats", "error", err)
+			stats = &service.SyncLogStats{} // graceful fallback
+		}
+
+		// Also count per-status for the tab badges.
+		successStatus := "success"
+		errorStatus := "error"
+		inProgressStatus := "in_progress"
+		successParams := service.SyncLogListParams{ConnectionID: params.ConnectionID, Status: &successStatus}
+		errorParams := service.SyncLogListParams{ConnectionID: params.ConnectionID, Status: &errorStatus}
+		inProgressParams := service.SyncLogListParams{ConnectionID: params.ConnectionID, Status: &inProgressStatus}
+
+		successCount, _ := svc.CountSyncLogsFiltered(ctx, successParams)
+		errorCount, _ := svc.CountSyncLogsFiltered(ctx, errorParams)
+		inProgressCount, _ := svc.CountSyncLogsFiltered(ctx, inProgressParams)
+
 		data := map[string]any{
-			"PageTitle":      "Sync Logs",
-			"CurrentPage":    "sync-logs",
-			"CSRFToken":      GetCSRFToken(r),
-			"Flash":          GetFlash(ctx, sm),
-			"Logs":           result.Logs,
-			"Connections":    connections,
-			"FilterConnID":   filterConnID,
-			"FilterStatus":   filterStatus,
-			"Page":           result.Page,
-			"TotalPages":     result.TotalPages,
-			"Total":          result.Total,
+			"PageTitle":        "Sync Logs",
+			"CurrentPage":      "sync-logs",
+			"CSRFToken":        GetCSRFToken(r),
+			"Flash":            GetFlash(ctx, sm),
+			"Logs":             result.Logs,
+			"Connections":      connections,
+			"FilterConnID":     filterConnID,
+			"FilterStatus":     filterStatus,
+			"Page":             result.Page,
+			"TotalPages":       result.TotalPages,
+			"Total":            result.Total,
+			"Stats":            stats,
+			"SuccessCount":     successCount,
+			"ErrorCount":       errorCount,
+			"InProgressCount":  inProgressCount,
 		}
 		tr.Render(w, r, "sync_logs.html", data)
 	}

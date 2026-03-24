@@ -6,157 +6,197 @@
   </div>
 </div>
 
-<!-- Filter Bar -->
-<div class="bb-card p-4 mb-6">
-  <form method="GET" action="/sync-logs" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3">
-    <div class="form-control">
-      <label class="text-xs font-medium text-base-content/50 mb-1">Connection</label>
-      <select name="connection_id" class="select select-sm select-bordered w-full sm:w-auto sm:min-w-[10rem] rounded-xl">
-        <option value="">All connections</option>
-        {{range .Connections}}
-        <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.FilterConnID}} selected{{end}}>{{.InstitutionName.String}}</option>
+<!-- Summary Stats Cards -->
+{{if .Stats}}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 bb-stagger">
+  <!-- Total Syncs -->
+  <div class="bb-card p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+        <i data-lucide="refresh-cw" class="w-4 h-4 text-base-content/40"></i>
+      </div>
+      <div>
+        <div class="text-2xl font-semibold tabular-nums leading-none">{{.Stats.TotalSyncs}}</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Total syncs</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success Rate -->
+  <div class="bb-card p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 {{if gt .Stats.SuccessRate 80.0}}bg-success/10{{else if gt .Stats.SuccessRate 50.0}}bg-warning/10{{else}}bg-error/10{{end}}">
+        {{if gt .Stats.SuccessRate 80.0}}
+        <i data-lucide="check-circle-2" class="w-4 h-4 text-success"></i>
+        {{else if gt .Stats.SuccessRate 50.0}}
+        <i data-lucide="alert-triangle" class="w-4 h-4 text-warning"></i>
+        {{else}}
+        <i data-lucide="x-circle" class="w-4 h-4 text-error"></i>
         {{end}}
-      </select>
+      </div>
+      <div>
+        <div class="text-2xl font-semibold tabular-nums leading-none {{if gt .Stats.SuccessRate 80.0}}text-success{{else if gt .Stats.SuccessRate 50.0}}text-warning{{else}}text-error{{end}}">{{printf "%.0f" .Stats.SuccessRate}}%</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Success rate</div>
+      </div>
     </div>
-    <div class="form-control">
-      <label class="text-xs font-medium text-base-content/50 mb-1">Status</label>
-      <select name="status" class="select select-sm select-bordered w-full sm:w-auto sm:min-w-[8rem] rounded-xl">
-        <option value="">All statuses</option>
-        <option value="success"{{if eq .FilterStatus "success"}} selected{{end}}>Success</option>
-        <option value="error"{{if eq .FilterStatus "error"}} selected{{end}}>Error</option>
-        <option value="in_progress"{{if eq .FilterStatus "in_progress"}} selected{{end}}>In Progress</option>
-      </select>
+  </div>
+
+  <!-- Errors -->
+  <div class="bb-card p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 {{if gt .Stats.ErrorCount 0}}bg-error/10{{else}}bg-base-200/60{{end}}">
+        <i data-lucide="alert-circle" class="w-4 h-4 {{if gt .Stats.ErrorCount 0}}text-error/70{{else}}text-base-content/40{{end}}"></i>
+      </div>
+      <div>
+        <div class="text-2xl font-semibold tabular-nums leading-none {{if gt .Stats.ErrorCount 0}}text-error{{end}}">{{.Stats.ErrorCount}}</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Errors</div>
+      </div>
     </div>
-    <button type="submit" class="btn btn-primary btn-sm rounded-xl">Filter</button>
-    {{if or .FilterConnID .FilterStatus}}
-    <a href="/sync-logs" class="btn btn-ghost btn-sm rounded-xl">Clear</a>
+  </div>
+
+  <!-- Avg Duration -->
+  <div class="bb-card p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+        <i data-lucide="timer" class="w-4 h-4 text-base-content/40"></i>
+      </div>
+      <div>
+        <div class="text-2xl font-semibold tabular-nums leading-none">
+          {{if gt .Stats.AvgDurationMs 999.0}}{{printf "%.1f" (divFloat .Stats.AvgDurationMs 1000.0)}}s{{else}}{{printf "%.0f" .Stats.AvgDurationMs}}ms{{end}}
+        </div>
+        <div class="text-xs text-base-content/40 mt-0.5">Avg duration</div>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+<!-- Status Filter Tabs + Connection Dropdown -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <!-- Status pill tabs -->
+  <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5">
+    <a href="/sync-logs{{if .FilterConnID}}?connection_id={{.FilterConnID}}{{end}}"
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5
+              {{if not .FilterStatus}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
+      All
+      <span class="text-[0.6rem] tabular-nums opacity-60">{{.Stats.TotalSyncs}}</span>
+    </a>
+    <a href="/sync-logs?status=success{{if .FilterConnID}}&connection_id={{.FilterConnID}}{{end}}"
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5
+              {{if eq .FilterStatus "success"}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
+      <span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+      Success
+      <span class="text-[0.6rem] tabular-nums opacity-60">{{.SuccessCount}}</span>
+    </a>
+    <a href="/sync-logs?status=error{{if .FilterConnID}}&connection_id={{.FilterConnID}}{{end}}"
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5
+              {{if eq .FilterStatus "error"}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
+      <span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+      Errors
+      <span class="text-[0.6rem] tabular-nums opacity-60">{{.ErrorCount}}</span>
+    </a>
+    <a href="/sync-logs?status=in_progress{{if .FilterConnID}}&connection_id={{.FilterConnID}}{{end}}"
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5
+              {{if eq .FilterStatus "in_progress"}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
+      <span class="w-1.5 h-1.5 rounded-full bg-warning"></span>
+      In Progress
+      <span class="text-[0.6rem] tabular-nums opacity-60">{{.InProgressCount}}</span>
+    </a>
+  </div>
+
+  <!-- Connection filter dropdown -->
+  <form method="GET" action="/sync-logs" class="flex items-center gap-2">
+    {{if .FilterStatus}}<input type="hidden" name="status" value="{{.FilterStatus}}">{{end}}
+    <select name="connection_id" class="select select-sm select-bordered rounded-xl text-xs min-w-[10rem]"
+            onchange="this.form.submit()">
+      <option value="">All connections</option>
+      {{range .Connections}}
+      <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.FilterConnID}} selected{{end}}>{{.InstitutionName.String}}</option>
+      {{end}}
+    </select>
+    {{if .FilterConnID}}
+    <a href="/sync-logs{{if $.FilterStatus}}?status={{$.FilterStatus}}{{end}}" class="btn btn-ghost btn-xs rounded-lg">
+      <i data-lucide="x" class="w-3 h-3"></i>
+    </a>
     {{end}}
   </form>
 </div>
 
 {{if .Logs}}
+
 <!-- Results count -->
 <div class="text-xs text-base-content/40 mb-3 px-1">{{.Total}} sync log{{if ne .Total 1}}s{{end}}</div>
 
-<!-- Desktop table view (hidden on mobile) -->
-<div class="bb-card overflow-hidden mb-2 hidden md:block">
-  <table class="table table-sm w-full">
-    <thead>
-      <tr class="text-xs text-base-content/40">
-        <th class="font-medium">Connection</th>
-        <th class="font-medium">When</th>
-        <th class="font-medium">Trigger</th>
-        <th class="font-medium">Changes</th>
-        <th class="font-medium text-right">Duration</th>
-        <th class="font-medium text-right">Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range .Logs}}
-      <tr class="hover:bg-base-200/30">
-        <!-- Connection -->
-        <td>
-          <div class="flex items-center gap-2.5">
-            <div class="w-7 h-7 rounded-lg bg-base-200/50 flex items-center justify-center shrink-0">
-              <i data-lucide="building-2" class="w-3.5 h-3.5 text-base-content/40"></i>
-            </div>
-            <span class="text-sm font-medium">{{.InstitutionName}}</span>
-          </div>
-        </td>
-        <!-- Timestamp -->
-        <td>
-          <div class="text-sm text-base-content/70">{{relativeTime .StartedAt}}</div>
-          <div class="text-xs text-base-content/30">{{formatDateShort .StartedAt}}</div>
-        </td>
-        <!-- Trigger -->
-        <td>
-          <span class="badge badge-ghost badge-xs">{{.Trigger}}</span>
-        </td>
-        <!-- Changes -->
-        <td>
-          <div class="flex items-center gap-2.5 text-xs tabular-nums">
-            {{if .AddedCount}}
-            <span class="text-success font-medium">+{{.AddedCount}}</span>
-            {{end}}
-            {{if .ModifiedCount}}
-            <span class="text-info font-medium">~{{.ModifiedCount}}</span>
-            {{end}}
-            {{if .RemovedCount}}
-            <span class="text-error font-medium">-{{.RemovedCount}}</span>
-            {{end}}
-            {{if and (not .AddedCount) (not .ModifiedCount) (not .RemovedCount)}}
-            <span class="text-base-content/25">No changes</span>
-            {{end}}
-          </div>
-        </td>
-        <!-- Duration -->
-        <td class="text-right">
-          <span class="text-xs text-base-content/50 tabular-nums">{{if .Duration}}{{.Duration}}{{else}}&mdash;{{end}}</span>
-        </td>
-        <!-- Status -->
-        <td class="text-right">
-          <div class="flex items-center justify-end gap-1.5">
-            {{if .ErrorMessage}}
-            <div class="dropdown dropdown-end dropdown-hover">
-              <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-circle text-error/70">
-                <i data-lucide="info" class="w-3.5 h-3.5"></i>
-              </div>
-              <div tabindex="0" class="dropdown-content bg-base-100 shadow-lg border border-base-300 rounded-xl p-3 w-80 z-10">
-                <div class="text-xs font-medium text-error mb-1">Error Details</div>
-                <p class="text-xs text-base-content/60 font-mono break-all leading-relaxed">{{.ErrorMessage}}</p>
-              </div>
-            </div>
-            {{end}}
-            {{syncBadge .Status}}
-          </div>
-        </td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
-</div>
-
-<!-- Mobile card view (hidden on desktop) -->
-<div class="space-y-2 md:hidden bb-stagger">
+<!-- Timeline view -->
+<div class="space-y-1 bb-stagger">
   {{range .Logs}}
-  <div class="bb-card p-4">
-    <!-- Header: connection + status -->
-    <div class="flex items-center justify-between mb-2.5">
-      <div class="flex items-center gap-2.5 min-w-0">
-        <div class="w-7 h-7 rounded-lg bg-base-200/50 flex items-center justify-center shrink-0">
-          <i data-lucide="building-2" class="w-3.5 h-3.5 text-base-content/40"></i>
-        </div>
-        <div class="min-w-0">
-          <div class="text-sm font-medium truncate">{{.InstitutionName}}</div>
-          <div class="text-xs text-base-content/40">{{relativeTime .StartedAt}}</div>
+  <div class="bb-card bb-card--interactive group transition-all duration-150 {{if eq .Status "error"}}border-error/20 hover:border-error/30{{end}}" x-data="{ open: false }">
+    <a href="/connections/{{.ConnectionID}}" class="flex items-center gap-4 py-3 px-4 no-underline">
+      <!-- Status indicator -->
+      <div class="relative shrink-0">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center
+                    {{if eq .Status "success"}}bg-success/10{{else if eq .Status "error"}}bg-error/10{{else if eq .Status "in_progress"}}bg-warning/10{{else}}bg-base-200/50{{end}}">
+          {{if eq .Status "success"}}
+          <i data-lucide="check" class="w-3.5 h-3.5 text-success"></i>
+          {{else if eq .Status "error"}}
+          <i data-lucide="x" class="w-3.5 h-3.5 text-error"></i>
+          {{else if eq .Status "in_progress"}}
+          <i data-lucide="loader" class="w-3.5 h-3.5 text-warning animate-spin"></i>
+          {{else}}
+          <i data-lucide="minus" class="w-3.5 h-3.5 text-base-content/30"></i>
+          {{end}}
         </div>
       </div>
-      <div class="flex items-center gap-1.5 shrink-0">
-        {{syncBadge .Status}}
-      </div>
-    </div>
 
-    <!-- Details row -->
-    <div class="flex items-center justify-between text-xs text-base-content/50 pt-2 border-t border-base-300/50">
-      <div class="flex items-center gap-3">
-        <span class="badge badge-ghost badge-xs">{{.Trigger}}</span>
-        <div class="flex items-center gap-2 tabular-nums">
+      <!-- Main content -->
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium group-hover:text-primary transition-colors">{{.InstitutionName}}</span>
+          <span class="badge badge-ghost badge-xs opacity-60">{{.Trigger}}</span>
+        </div>
+        <div class="flex items-center gap-3 mt-0.5 text-xs text-base-content/40">
+          <span>{{relativeTime .StartedAt}}</span>
+          {{if .Duration}}
+          <span class="text-base-content/25">&middot;</span>
+          <span class="tabular-nums">{{.Duration}}</span>
+          {{end}}
+        </div>
+      </div>
+
+      <!-- Changes + Status -->
+      <div class="flex items-center gap-4 shrink-0">
+        <!-- Transaction changes -->
+        <div class="flex items-center gap-2 text-xs tabular-nums">
           {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
           {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
           {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
           {{if and (not .AddedCount) (not .ModifiedCount) (not .RemovedCount)}}
-          <span class="text-base-content/25">No changes</span>
+          <span class="text-base-content/20 text-xs">No changes</span>
           {{end}}
         </div>
-      </div>
-      <span class="tabular-nums">{{if .Duration}}{{.Duration}}{{else}}&mdash;{{end}}</span>
-    </div>
 
-    <!-- Error message if present -->
+        <!-- Status badge -->
+        {{syncBadge .Status}}
+
+        <!-- Error expand button -->
+        {{if .ErrorMessage}}
+        <button @click.prevent="open = !open" class="btn btn-ghost btn-xs btn-circle text-error/50 hover:text-error hover:bg-error/10 transition-colors">
+          <i data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
+        </button>
+        {{end}}
+      </div>
+    </a>
+
+    <!-- Expandable error detail -->
     {{if .ErrorMessage}}
-    <div class="mt-2.5 flex items-start gap-2 text-xs text-error/80 bg-error/5 rounded-lg px-3 py-2">
-      <i data-lucide="alert-circle" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
-      <span class="font-mono break-all leading-relaxed">{{.ErrorMessage}}</span>
+    <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="border-t border-base-200">
+      <div class="flex items-start gap-2.5 px-4 py-3 ml-12">
+        <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-error/60 shrink-0 mt-0.5"></i>
+        <div class="min-w-0">
+          <div class="text-xs font-medium text-error/80 mb-0.5">Error Details</div>
+          <p class="text-xs text-base-content/50 font-mono break-all leading-relaxed">{{deref .ErrorMessage}}</p>
+        </div>
+      </div>
     </div>
     {{end}}
   </div>
