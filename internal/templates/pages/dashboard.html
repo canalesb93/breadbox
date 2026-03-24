@@ -120,8 +120,16 @@
       <span class="text-xs font-medium text-base-content/50">Spending</span>
       <span class="text-xs text-base-content/30">30d</span>
     </div>
-    <div class="text-3xl font-semibold tabular-nums tracking-tight">
-      {{formatBalance .TotalSpending}}
+    <div class="flex items-baseline gap-3">
+      <div class="text-3xl font-semibold tabular-nums tracking-tight">
+        {{formatBalance .TotalSpending}}
+      </div>
+      {{if .HasSpendingChange}}
+      <div class="flex items-center gap-1 text-xs font-medium {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
+        <i data-lucide="{{if gt .SpendingChangePercent 0.0}}trending-up{{else}}trending-down{{end}}" class="w-3 h-3"></i>
+        {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}%
+      </div>
+      {{end}}
     </div>
     <div class="flex items-center gap-4 mt-3 text-xs text-base-content/50">
       <a href="/transactions" class="flex items-center gap-1 hover:text-base-content transition-colors">
@@ -201,7 +209,18 @@
   <!-- Spending Trend Chart -->
   <div class="bb-card lg:col-span-2 p-5">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="text-sm font-semibold text-base-content/70">Daily Spending</h2>
+      <div class="flex items-center gap-2">
+        <h2 class="text-sm font-semibold text-base-content/70">Daily Spending</h2>
+        <span class="text-xs text-base-content/30">Last 30 days</span>
+      </div>
+      {{if .HasSpendingChange}}
+      <div class="flex items-center gap-1.5 text-xs text-base-content/40">
+        <span>vs prev 30d:</span>
+        <span class="font-medium {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
+          {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}%
+        </span>
+      </div>
+      {{end}}
     </div>
     {{if .DailyLabels}}
     <div class="h-52">
@@ -217,19 +236,30 @@
     {{end}}
   </div>
 
-  <!-- Category Breakdown Chart -->
+  <!-- Top Spending Categories -->
   <div class="bb-card p-5">
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-sm font-semibold text-base-content/70">By Category</h2>
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm font-semibold text-base-content/70">Top Categories</h2>
+      <a href="/categories" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
     </div>
-    {{if .CategoryLabels}}
-    <div class="h-52 flex items-center justify-center">
-      <canvas id="categoryChart"></canvas>
+    {{if .TopCategories}}
+    <div class="space-y-3">
+      {{range .TopCategories}}
+      <div class="group">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-sm text-base-content/70 group-hover:text-base-content transition-colors">{{.Name}}</span>
+          <span class="text-sm font-semibold tabular-nums text-base-content/80">{{formatAmount .Amount}}</span>
+        </div>
+        <div class="w-full h-1.5 bg-base-200 rounded-full overflow-hidden">
+          <div class="h-full bg-base-content/20 rounded-full transition-all duration-500" style="width: {{printf "%.0f" (percent .Amount $.MaxCategorySpend)}}%"></div>
+        </div>
+      </div>
+      {{end}}
     </div>
     {{else}}
-    <div class="flex items-center justify-center h-52 text-base-content/40">
+    <div class="flex items-center justify-center h-40 text-base-content/40">
       <div class="text-center">
-        <i data-lucide="pie-chart" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
+        <i data-lucide="pie-chart" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
         <p class="text-sm">No category data yet</p>
       </div>
     </div>
@@ -382,7 +412,7 @@ document.addEventListener('DOMContentLoaded', function() {
     displayColors: false,
   };
 
-  // Spending Trend
+  // Spending Trend — bar chart with rounded tops
   const trendCtx = document.getElementById('spendingTrendChart');
   if (trendCtx) {
     const dailyLabels = {{.DailyLabels}};
@@ -394,22 +424,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     new Chart(trendCtx, {
-      type: 'line',
+      type: 'bar',
       data: {
         labels: shortLabels,
         datasets: [{
-          label: 'Spending',
+          label: 'Daily Spending',
           data: dailyData,
-          borderColor: isDark ? 'hsl(0 0% 70%)' : 'hsl(0 0% 15%)',
-          backgroundColor: isDark ? 'hsla(0,0%,70%,0.06)' : 'hsla(0,0%,15%,0.04)',
-          fill: true,
-          tension: 0.4,
-          borderWidth: 1.5,
-          pointRadius: 0,
-          pointHoverRadius: 4,
-          pointHoverBackgroundColor: isDark ? 'hsl(0 0% 70%)' : 'hsl(0 0% 15%)',
-          pointHoverBorderColor: isDark ? 'hsl(0 0% 12%)' : 'hsl(0 0% 100%)',
-          pointHoverBorderWidth: 2,
+          backgroundColor: isDark ? 'hsl(0 0% 55% / 0.4)' : 'hsl(0 0% 15% / 0.15)',
+          hoverBackgroundColor: isDark ? 'hsl(0 0% 65% / 0.6)' : 'hsl(0 0% 15% / 0.3)',
+          borderRadius: 4,
+          borderSkipped: false,
+          barPercentage: 0.7,
+          categoryPercentage: 0.85,
         }]
       },
       options: {
@@ -444,65 +470,6 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   }
-
-  // Category Doughnut
-  {{if .CategoryLabels}}
-  const catCtx = document.getElementById('categoryChart');
-  if (catCtx) {
-    const categoryLabels = {{.CategoryLabels}};
-    const categoryData = {{.CategoryAmounts}};
-
-    /* Neutral-first palette: grays + one muted accent per segment */
-    const palette = isDark
-      ? ['hsl(0 0% 65%)', 'hsl(0 0% 50%)', 'hsl(0 0% 40%)',
-         'hsl(210 8% 55%)', 'hsl(160 10% 50%)', 'hsl(30 12% 55%)',
-         'hsl(0 0% 75%)', 'hsl(200 6% 45%)', 'hsl(140 8% 45%)',
-         'hsl(45 10% 50%)', 'hsl(0 0% 58%)', 'hsl(180 6% 48%)']
-      : ['hsl(0 0% 15%)', 'hsl(0 0% 30%)', 'hsl(0 0% 45%)',
-         'hsl(210 10% 40%)', 'hsl(160 12% 38%)', 'hsl(30 15% 42%)',
-         'hsl(0 0% 55%)', 'hsl(200 8% 50%)', 'hsl(140 10% 45%)',
-         'hsl(45 12% 48%)', 'hsl(0 0% 65%)', 'hsl(180 8% 42%)'];
-
-    new Chart(catCtx, {
-      type: 'doughnut',
-      data: {
-        labels: categoryLabels,
-        datasets: [{
-          data: categoryData,
-          backgroundColor: palette.slice(0, categoryData.length),
-          borderWidth: isDark ? 1 : 1,
-          borderColor: isDark ? 'hsl(0 0% 12%)' : 'hsl(0 0% 100%)',
-          hoverOffset: 3
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '68%',
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: {
-              color: textColor,
-              font: { size: 10, weight: '500' },
-              boxWidth: 8,
-              boxHeight: 8,
-              padding: 10,
-              usePointStyle: true,
-              pointStyle: 'circle'
-            }
-          },
-          tooltip: {
-            ...tooltipStyle,
-            callbacks: {
-              label: ctx => ctx.label + ': $' + ctx.parsed.toFixed(2)
-            }
-          }
-        }
-      }
-    });
-  }
-  {{end}}
 });
 </script>
 {{end}}
