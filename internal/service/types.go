@@ -213,6 +213,7 @@ type AdminTransactionRow struct {
 	CategoryDisplayName *string
 	CategorySlug        *string
 	CategoryIcon        *string
+	CategoryColor       *string
 	CategoryOverride    bool
 	Pending             bool
 	CreatedAt           string
