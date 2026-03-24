@@ -1520,3 +1520,481 @@ func TestSoftDeleteTransactionsByConnectionID(t *testing.T) {
 		t.Errorf("expected Groceries, got %s", result.Transactions[0].Name)
 	}
 }
+
+// --- BatchSetTransactionCategory ---
+
+func TestBatchSetTransactionCategory_Success(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	txn1 := testutil.MustCreateTransaction(t, queries, acctID, "txn_batch_1", "Coffee", 500, "2025-01-15")
+	txn2 := testutil.MustCreateTransaction(t, queries, acctID, "txn_batch_2", "Lunch", 1200, "2025-01-16")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_batch_3", "Groceries", 5000, "2025-01-17")
+
+	cat1, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink", DisplayName: "Food & Drink",
+	})
+	if err != nil {
+		t.Fatalf("create category 1: %v", err)
+	}
+	cat2, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "transportation", DisplayName: "Transportation",
+	})
+	if err != nil {
+		t.Fatalf("create category 2: %v", err)
+	}
+
+	result, err := svc.BatchSetTransactionCategory(ctx, []service.BatchCategorizeItem{
+		{TransactionID: formatUUID(txn1.ID), CategorySlug: "food_and_drink"},
+		{TransactionID: formatUUID(txn2.ID), CategorySlug: "transportation"},
+	})
+	if err != nil {
+		t.Fatalf("BatchSetTransactionCategory: %v", err)
+	}
+	if result.Succeeded != 2 {
+		t.Errorf("expected succeeded=2, got %d", result.Succeeded)
+	}
+	if len(result.Failed) != 0 {
+		t.Errorf("expected 0 failed, got %d", len(result.Failed))
+	}
+
+	// Verify txn1 has cat1
+	var gotCatID pgtype.UUID
+	err = pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE id = $1", txn1.ID).Scan(&gotCatID)
+	if err != nil {
+		t.Fatalf("query txn1 category: %v", err)
+	}
+	if gotCatID != cat1.ID {
+		t.Errorf("txn1: expected category %v, got %v", cat1.ID, gotCatID)
+	}
+
+	// Verify txn2 has cat2
+	err = pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE id = $1", txn2.ID).Scan(&gotCatID)
+	if err != nil {
+		t.Fatalf("query txn2 category: %v", err)
+	}
+	if gotCatID != cat2.ID {
+		t.Errorf("txn2: expected category %v, got %v", cat2.ID, gotCatID)
+	}
+
+	// Verify txn3 is unchanged (no category_id set)
+	var gotCatIDNullable pgtype.UUID
+	err = pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_batch_3'").Scan(&gotCatIDNullable)
+	if err != nil {
+		t.Fatalf("query txn3 category: %v", err)
+	}
+	if gotCatIDNullable.Valid {
+		t.Errorf("txn3 should have no category, got %v", gotCatIDNullable)
+	}
+}
+
+func TestBatchSetTransactionCategory_InvalidTxnID(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	txn1 := testutil.MustCreateTransaction(t, queries, acctID, "txn_ok", "Coffee", 500, "2025-01-15")
+
+	_, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "food_and_drink", DisplayName: "Food & Drink",
+	})
+	if err != nil {
+		t.Fatalf("create category: %v", err)
+	}
+
+	result, err := svc.BatchSetTransactionCategory(ctx, []service.BatchCategorizeItem{
+		{TransactionID: formatUUID(txn1.ID), CategorySlug: "food_and_drink"},
+		{TransactionID: "00000000-0000-0000-0000-000000000099", CategorySlug: "food_and_drink"},
+	})
+	if err != nil {
+		t.Fatalf("BatchSetTransactionCategory: %v", err)
+	}
+	if result.Succeeded != 1 {
+		t.Errorf("expected succeeded=1, got %d", result.Succeeded)
+	}
+	if len(result.Failed) != 1 {
+		t.Errorf("expected 1 failed, got %d", len(result.Failed))
+	}
+	if len(result.Failed) > 0 && result.Failed[0].TransactionID != "00000000-0000-0000-0000-000000000099" {
+		t.Errorf("expected failed txn ID 00000000-0000-0000-0000-000000000099, got %s", result.Failed[0].TransactionID)
+	}
+}
+
+func TestBatchSetTransactionCategory_MaxLimitExceeded(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	items := make([]service.BatchCategorizeItem, 201)
+	for i := range items {
+		items[i] = service.BatchCategorizeItem{
+			TransactionID: fmt.Sprintf("00000000-0000-0000-0000-%012d", i),
+			CategorySlug:  "food",
+		}
+	}
+
+	_, err := svc.BatchSetTransactionCategory(ctx, items)
+	if err == nil {
+		t.Fatal("expected error for > 200 items, got nil")
+	}
+	if !strings.Contains(err.Error(), "maximum 200") {
+		t.Errorf("expected 'maximum 200' error, got: %v", err)
+	}
+}
+
+// --- BulkRecategorizeByFilter ---
+
+func TestBulkRecategorizeByFilter_SearchFilter(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_uber_1", "UBER TRIP", 2500, "2025-01-15")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_uber_2", "UBER EATS", 1800, "2025-01-16")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_other_1", "Starbucks", 500, "2025-01-17")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_other_2", "Shell Gas", 4000, "2025-01-18")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_other_3", "Amazon", 7500, "2025-01-19")
+
+	targetCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "transportation", DisplayName: "Transportation",
+	})
+	if err != nil {
+		t.Fatalf("create category: %v", err)
+	}
+
+	search := "UBER"
+	result, err := svc.BulkRecategorizeByFilter(ctx, service.BulkRecategorizeParams{
+		Search:             &search,
+		TargetCategorySlug: "transportation",
+	})
+	if err != nil {
+		t.Fatalf("BulkRecategorizeByFilter: %v", err)
+	}
+	if result.UpdatedCount != 2 {
+		t.Errorf("expected updated_count=2, got %d", result.UpdatedCount)
+	}
+
+	// Verify UBER transactions got the target category and category_override=true
+	rows, err := pool.Query(ctx,
+		"SELECT external_transaction_id, category_id, category_override FROM transactions WHERE name ILIKE '%UBER%' ORDER BY external_transaction_id")
+	if err != nil {
+		t.Fatalf("query UBER txns: %v", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var extID string
+		var catID pgtype.UUID
+		var override bool
+		if err := rows.Scan(&extID, &catID, &override); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		if catID != targetCat.ID {
+			t.Errorf("%s: expected category %v, got %v", extID, targetCat.ID, catID)
+		}
+		if !override {
+			t.Errorf("%s: expected category_override=true", extID)
+		}
+	}
+
+	// Verify non-UBER transactions are unchanged
+	var unchangedCount int
+	err = pool.QueryRow(ctx,
+		"SELECT COUNT(*) FROM transactions WHERE name NOT ILIKE '%UBER%' AND category_id IS NULL").Scan(&unchangedCount)
+	if err != nil {
+		t.Fatalf("query unchanged: %v", err)
+	}
+	if unchangedCount != 3 {
+		t.Errorf("expected 3 unchanged transactions, got %d", unchangedCount)
+	}
+}
+
+func TestBulkRecategorizeByFilter_NoFilterError(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	_, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "misc", DisplayName: "Misc",
+	})
+	if err != nil {
+		t.Fatalf("create category: %v", err)
+	}
+
+	_, err = svc.BulkRecategorizeByFilter(ctx, service.BulkRecategorizeParams{
+		TargetCategorySlug: "misc",
+	})
+	if err == nil {
+		t.Fatal("expected error when no filter provided, got nil")
+	}
+	if !strings.Contains(err.Error(), "at least one filter") {
+		t.Errorf("expected 'at least one filter' error, got: %v", err)
+	}
+}
+
+// --- ApplyRuleRetroactively ---
+
+func TestApplyRuleRetroactively_MatchesAndSkipsOverrides(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	// Create 5 transactions: 3 with "Starbucks" in name, 2 without
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_sb_1", "Starbucks Coffee", 500, "2025-01-15")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_sb_2", "Starbucks Reserve", 700, "2025-01-16")
+	txnSb3 := testutil.MustCreateTransaction(t, queries, acctID, "txn_sb_3", "Starbucks Drive", 450, "2025-01-17")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_other_1", "Shell Gas", 4000, "2025-01-18")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_other_2", "Amazon", 7500, "2025-01-19")
+
+	// Set one Starbucks transaction with category_override=true (should be skipped)
+	overrideCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "other_override", DisplayName: "Other Override",
+	})
+	if err != nil {
+		t.Fatalf("create override category: %v", err)
+	}
+	_, err = pool.Exec(ctx,
+		"UPDATE transactions SET category_id = $1, category_override = TRUE WHERE id = $2",
+		overrideCat.ID, txnSb3.ID)
+	if err != nil {
+		t.Fatalf("set override: %v", err)
+	}
+
+	// Create target category
+	coffeeCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "coffee", DisplayName: "Coffee",
+	})
+	if err != nil {
+		t.Fatalf("create coffee category: %v", err)
+	}
+
+	// Create a rule: name contains "Starbucks"
+	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name: "Starbucks Rule",
+		Conditions: service.Condition{
+			Field: "name",
+			Op:    "contains",
+			Value: "Starbucks",
+		},
+		CategorySlug: "coffee",
+		Priority:     100,
+		Actor:        service.Actor{Type: "system", Name: "test"},
+	})
+	if err != nil {
+		t.Fatalf("CreateTransactionRule: %v", err)
+	}
+
+	count, err := svc.ApplyRuleRetroactively(ctx, rule.ID)
+	if err != nil {
+		t.Fatalf("ApplyRuleRetroactively: %v", err)
+	}
+	// Should match 2 (txn_sb_1 and txn_sb_2), txn_sb_3 has override
+	if count != 2 {
+		t.Errorf("expected count=2, got %d", count)
+	}
+
+	// Verify txn_sb_1 and txn_sb_2 have coffee category
+	for _, extID := range []string{"txn_sb_1", "txn_sb_2"} {
+		var catID pgtype.UUID
+		err = pool.QueryRow(ctx,
+			"SELECT category_id FROM transactions WHERE external_transaction_id = $1", extID).Scan(&catID)
+		if err != nil {
+			t.Fatalf("query %s: %v", extID, err)
+		}
+		if catID != coffeeCat.ID {
+			t.Errorf("%s: expected coffee category, got %v", extID, catID)
+		}
+	}
+
+	// Verify txn_sb_3 still has override category (not changed)
+	var overrideCatID pgtype.UUID
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_sb_3'").Scan(&overrideCatID)
+	if err != nil {
+		t.Fatalf("query txn_sb_3: %v", err)
+	}
+	if overrideCatID != overrideCat.ID {
+		t.Errorf("txn_sb_3: expected override category %v, got %v", overrideCat.ID, overrideCatID)
+	}
+
+	// Verify non-matching transactions are unchanged
+	for _, extID := range []string{"txn_other_1", "txn_other_2"} {
+		var catID pgtype.UUID
+		err = pool.QueryRow(ctx,
+			"SELECT category_id FROM transactions WHERE external_transaction_id = $1", extID).Scan(&catID)
+		if err != nil {
+			t.Fatalf("query %s: %v", extID, err)
+		}
+		if catID.Valid {
+			t.Errorf("%s: expected no category, got %v", extID, catID)
+		}
+	}
+}
+
+// --- ApplyAllRulesRetroactively ---
+
+func TestApplyAllRulesRetroactively_PriorityWins(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	// Create transactions: "Starbucks Coffee" matches both rules, "Shell Gas" matches only gas rule
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_sb", "Starbucks Coffee", 500, "2025-01-15")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_gas", "Shell Gas", 4000, "2025-01-16")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_unrelated", "Amazon Purchase", 7500, "2025-01-17")
+
+	// Create categories
+	coffeeCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "coffee", DisplayName: "Coffee",
+	})
+	if err != nil {
+		t.Fatalf("create coffee category: %v", err)
+	}
+	gasCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "gas", DisplayName: "Gas",
+	})
+	if err != nil {
+		t.Fatalf("create gas category: %v", err)
+	}
+
+	// Rule 1 (higher priority): name contains "Coffee"
+	_, err = svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name: "Coffee Rule",
+		Conditions: service.Condition{
+			Field: "name",
+			Op:    "contains",
+			Value: "Coffee",
+		},
+		CategorySlug: "coffee",
+		Priority:     200,
+		Actor:        service.Actor{Type: "system", Name: "test"},
+	})
+	if err != nil {
+		t.Fatalf("create coffee rule: %v", err)
+	}
+
+	// Rule 2 (lower priority): name contains "Gas"
+	_, err = svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name: "Gas Rule",
+		Conditions: service.Condition{
+			Field: "name",
+			Op:    "contains",
+			Value: "Gas",
+		},
+		CategorySlug: "gas",
+		Priority:     100,
+		Actor:        service.Actor{Type: "system", Name: "test"},
+	})
+	if err != nil {
+		t.Fatalf("create gas rule: %v", err)
+	}
+
+	hitCounts, err := svc.ApplyAllRulesRetroactively(ctx)
+	if err != nil {
+		t.Fatalf("ApplyAllRulesRetroactively: %v", err)
+	}
+
+	// Coffee rule should match "Starbucks Coffee" (1 hit)
+	// Gas rule should match "Shell Gas" (1 hit)
+	totalHits := int64(0)
+	for _, c := range hitCounts {
+		totalHits += c
+	}
+	if totalHits != 2 {
+		t.Errorf("expected total hits=2, got %d (map: %v)", totalHits, hitCounts)
+	}
+
+	// Verify "Starbucks Coffee" got coffee category (higher priority rule won)
+	var catID pgtype.UUID
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_sb'").Scan(&catID)
+	if err != nil {
+		t.Fatalf("query txn_sb: %v", err)
+	}
+	if catID != coffeeCat.ID {
+		t.Errorf("txn_sb: expected coffee category %v, got %v", coffeeCat.ID, catID)
+	}
+
+	// Verify "Shell Gas" got gas category
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_gas'").Scan(&catID)
+	if err != nil {
+		t.Fatalf("query txn_gas: %v", err)
+	}
+	if catID != gasCat.ID {
+		t.Errorf("txn_gas: expected gas category %v, got %v", gasCat.ID, catID)
+	}
+
+	// Verify "Amazon Purchase" is unchanged
+	var unrelatedCatID pgtype.UUID
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_unrelated'").Scan(&unrelatedCatID)
+	if err != nil {
+		t.Fatalf("query txn_unrelated: %v", err)
+	}
+	if unrelatedCatID.Valid {
+		t.Errorf("txn_unrelated: expected no category, got %v", unrelatedCatID)
+	}
+}
+
+// --- PreviewRule ---
+
+func TestPreviewRule_MatchCount(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_sb_1", "Starbucks", 500, "2025-01-15")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_sb_2", "Starbucks Reserve", 700, "2025-01-16")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_sb_3", "Starbucks Drive", 450, "2025-01-17")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_other_1", "Shell Gas", 4000, "2025-01-18")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_other_2", "Amazon", 7500, "2025-01-19")
+
+	result, err := svc.PreviewRule(ctx, service.Condition{
+		Field: "name",
+		Op:    "contains",
+		Value: "Starbucks",
+	}, 10)
+	if err != nil {
+		t.Fatalf("PreviewRule: %v", err)
+	}
+	if result.MatchCount != 3 {
+		t.Errorf("expected match_count=3, got %d", result.MatchCount)
+	}
+	if result.TotalScanned != 5 {
+		t.Errorf("expected total_scanned=5, got %d", result.TotalScanned)
+	}
+	if len(result.SampleMatches) != 3 {
+		t.Errorf("expected 3 sample_matches, got %d", len(result.SampleMatches))
+	}
+}
+
+func TestPreviewRule_SampleSizeLimit(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	// Create 5 transactions that all match
+	for i := 0; i < 5; i++ {
+		testutil.MustCreateTransaction(t, queries, acctID,
+			fmt.Sprintf("txn_match_%d", i),
+			fmt.Sprintf("Starbucks %d", i),
+			int64(500+i*100), "2025-01-15")
+	}
+
+	result, err := svc.PreviewRule(ctx, service.Condition{
+		Field: "name",
+		Op:    "contains",
+		Value: "Starbucks",
+	}, 2) // limit to 2 samples
+	if err != nil {
+		t.Fatalf("PreviewRule: %v", err)
+	}
+	if result.MatchCount != 5 {
+		t.Errorf("expected match_count=5, got %d", result.MatchCount)
+	}
+	if result.TotalScanned != 5 {
+		t.Errorf("expected total_scanned=5, got %d", result.TotalScanned)
+	}
+	if len(result.SampleMatches) != 2 {
+		t.Errorf("expected 2 sample_matches (limited by sampleSize), got %d", len(result.SampleMatches))
+	}
+}
