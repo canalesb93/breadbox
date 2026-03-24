@@ -498,6 +498,8 @@
           }
           for (var i = 0; i < this.categories.length; i++) {
             var cat = this.categories[i];
+            // Skip the DB "uncategorized" category when allowEmpty provides its own empty option
+            if (this.allowEmpty && cat.slug === 'uncategorized') continue;
             items.push({ id: cat.id, slug: cat.slug, label: cat.display_name, isParent: true, indent: false, icon: cat.icon, color: cat.color, hidden: cat.hidden || false });
             if (cat.children) {
               for (var j = 0; j < cat.children.length; j++) {
