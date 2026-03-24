@@ -516,6 +516,10 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 		if _, exists := m["AppVersion"]; !exists && tr.version != "" {
 			m["AppVersion"] = tr.version
 		}
+		// Auto-inject sidebar notification badges from middleware context.
+		if _, exists := m["NavBadges"]; !exists {
+			m["NavBadges"] = getNavBadges(r.Context())
+		}
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

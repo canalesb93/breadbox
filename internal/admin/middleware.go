@@ -1,12 +1,56 @@
 package admin
 
 import (
+	"context"
+	"log/slog"
 	"net/http"
 
 	"breadbox/internal/db"
 
 	"github.com/alexedwards/scs/v2"
 )
+
+const navBadgesKey contextKey = "navBadges"
+
+// NavBadges holds notification counts displayed in the sidebar navigation.
+type NavBadges struct {
+	PendingReviews       int64
+	ConnectionsAttention int64
+}
+
+// NavBadgesMiddleware fetches sidebar notification badge counts and stores them
+// in the request context. The Render method auto-injects these into template data.
+func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			badges := NavBadges{}
+
+			if pending, err := queries.CountPendingReviews(ctx); err == nil {
+				badges.PendingReviews = pending
+			} else {
+				logger.Debug("nav badges: count pending reviews", "error", err)
+			}
+
+			if attn, err := queries.CountConnectionsNeedingAttention(ctx); err == nil {
+				badges.ConnectionsAttention = attn
+			} else {
+				logger.Debug("nav badges: count connections needing attention", "error", err)
+			}
+
+			ctx = context.WithValue(ctx, navBadgesKey, badges)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// getNavBadges retrieves NavBadges from the request context. Returns zero-value if absent.
+func getNavBadges(ctx context.Context) NavBadges {
+	if badges, ok := ctx.Value(navBadgesKey).(NavBadges); ok {
+		return badges
+	}
+	return NavBadges{}
+}
 
 // RequireAuth is chi middleware that checks for an authenticated admin session.
 // If the session does not contain an admin_id, it redirects to /login.
