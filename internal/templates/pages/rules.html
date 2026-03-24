@@ -152,7 +152,8 @@
 {{end}}
 
 <!-- Create/Edit Rule Modal -->
-<dialog class="modal" :class="{'modal-open': showCreateModal || showEditModal}">
+<dialog id="rules-modal" class="modal" x-ref="rulesModal"
+  x-effect="(showCreateModal || showEditModal) ? $refs.rulesModal?.showModal() : $refs.rulesModal?.close()">
   <div class="modal-box max-w-lg rounded-xl">
     <h3 class="font-bold text-lg mb-6" x-text="showEditModal ? 'Edit Rule' : 'Create Rule'"></h3>
     <form @submit.prevent="submitRule()">
