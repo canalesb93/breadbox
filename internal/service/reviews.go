@@ -359,6 +359,108 @@ func (s *Service) countReviewsFiltered(ctx context.Context, status string, param
 	return count, nil
 }
 
+// ListReviewsByTransactionID returns all reviews (any status) for a given transaction.
+func (s *Service) ListReviewsByTransactionID(ctx context.Context, transactionID string) ([]ReviewResponse, error) {
+	txnID, err := parseUUID(transactionID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+
+	query := `SELECT id, transaction_id, review_type, status,
+		suggested_category_id, confidence_score,
+		reviewer_type, reviewer_id, reviewer_name, review_note,
+		resolved_category_id, created_at, reviewed_at
+		FROM review_queue
+		WHERE transaction_id = $1
+		ORDER BY created_at DESC`
+
+	rows, err := s.Pool.Query(ctx, query, txnID)
+	if err != nil {
+		return nil, fmt.Errorf("list reviews by transaction: %w", err)
+	}
+	defer rows.Close()
+
+	var reviews []ReviewResponse
+	for rows.Next() {
+		var (
+			rID                 pgtype.UUID
+			rTransactionID      pgtype.UUID
+			rReviewType         string
+			rStatus             string
+			rSuggestedCatID     pgtype.UUID
+			rConfidenceScore    pgtype.Numeric
+			rReviewerType       pgtype.Text
+			rReviewerID         pgtype.Text
+			rReviewerName       pgtype.Text
+			rReviewNote         pgtype.Text
+			rResolvedCatID      pgtype.UUID
+			rCreatedAt          pgtype.Timestamptz
+			rReviewedAt         pgtype.Timestamptz
+		)
+		if err := rows.Scan(
+			&rID, &rTransactionID, &rReviewType, &rStatus,
+			&rSuggestedCatID, &rConfidenceScore,
+			&rReviewerType, &rReviewerID, &rReviewerName, &rReviewNote,
+			&rResolvedCatID, &rCreatedAt, &rReviewedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan review row: %w", err)
+		}
+
+		review := ReviewResponse{
+			ID:            formatUUID(rID),
+			TransactionID: formatUUID(rTransactionID),
+			ReviewType:    rReviewType,
+			Status:        rStatus,
+			ReviewerType:  textPtr(rReviewerType),
+			ReviewerName:  textPtr(rReviewerName),
+			ReviewNote:    textPtr(rReviewNote),
+		}
+		if rSuggestedCatID.Valid {
+			s := formatUUID(rSuggestedCatID)
+			review.SuggestedCategoryID = &s
+		}
+		if rResolvedCatID.Valid {
+			s := formatUUID(rResolvedCatID)
+			review.ResolvedCategoryID = &s
+		}
+		if f := numericFloat(rConfidenceScore); f != nil {
+			review.ConfidenceScore = f
+		}
+		if rReviewerID.Valid {
+			review.ReviewerID = &rReviewerID.String
+		}
+		if rCreatedAt.Valid {
+			s := rCreatedAt.Time.UTC().Format(time.RFC3339)
+			review.CreatedAt = s
+		}
+		if rReviewedAt.Valid {
+			s := rReviewedAt.Time.UTC().Format(time.RFC3339)
+			review.ReviewedAt = &s
+		}
+
+		// Resolve category slugs.
+		if rSuggestedCatID.Valid {
+			if cat, err := s.Queries.GetCategoryByID(ctx, rSuggestedCatID); err == nil {
+				slug := cat.Slug
+				review.SuggestedCategory = &slug
+			}
+		}
+		if rResolvedCatID.Valid {
+			if cat, err := s.Queries.GetCategoryByID(ctx, rResolvedCatID); err == nil {
+				slug := cat.Slug
+				review.ResolvedCategory = &slug
+			}
+		}
+
+		reviews = append(reviews, review)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate reviews: %w", err)
+	}
+
+	return reviews, nil
+}
+
 // GetReview returns a single review item with full transaction context.
 func (s *Service) GetReview(ctx context.Context, id string) (*ReviewResponse, error) {
 	reviewID, err := parseUUID(id)

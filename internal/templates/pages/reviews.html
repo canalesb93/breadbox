@@ -134,51 +134,76 @@
 </div>
 
 <!-- Filter Bar -->
-<div class="bb-card px-4 sm:px-6 py-4 mb-6">
-  <form method="GET" action="/reviews" class="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 sm:items-end">
-    <div class="form-control">
-      <label class="label label-text text-xs text-base-content/50 pb-1">Status</label>
-      <select name="status" class="select select-bordered select-sm rounded-xl">
-        <option value="pending"{{if eq .StatusFilter "pending"}} selected{{end}}>Pending</option>
-        <option value="approved"{{if eq .StatusFilter "approved"}} selected{{end}}>Approved</option>
-        <option value="rejected"{{if eq .StatusFilter "rejected"}} selected{{end}}>Rejected</option>
-        <option value="skipped"{{if eq .StatusFilter "skipped"}} selected{{end}}>Skipped</option>
-        <option value="all"{{if eq .StatusFilter "all"}} selected{{end}}>All</option>
-      </select>
-    </div>
-    <div class="form-control">
-      <label class="label label-text text-xs text-base-content/50 pb-1">Type</label>
-      <select name="review_type" class="select select-bordered select-sm rounded-xl">
-        <option value="">All Types</option>
-        <option value="new_transaction"{{if eq .ReviewTypeFilter "new_transaction"}} selected{{end}}>New Transaction</option>
-        <option value="uncategorized"{{if eq .ReviewTypeFilter "uncategorized"}} selected{{end}}>Uncategorized</option>
-        <option value="low_confidence"{{if eq .ReviewTypeFilter "low_confidence"}} selected{{end}}>Low Confidence</option>
-        <option value="manual"{{if eq .ReviewTypeFilter "manual"}} selected{{end}}>Manual</option>
-      </select>
-    </div>
-    <div class="form-control">
-      <label class="label label-text text-xs text-base-content/50 pb-1">Account</label>
-      <select name="account_id" class="select select-bordered select-sm rounded-xl">
-        <option value="">All Accounts</option>
-        {{range .Accounts}}
-        <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.AccountIDFilter}} selected{{end}}>{{.Name}}</option>
+<div class="bb-card mb-6" x-data="{ filtersOpen: {{if or (and (ne .StatusFilter "pending") (ne .StatusFilter "")) .ReviewTypeFilter .AccountIDFilter .UserIDFilter}}true{{else}}false{{end}} }">
+  <div class="p-0">
+    <button type="button" class="bb-filter-toggle" @click="filtersOpen = !filtersOpen">
+      <div class="flex items-center gap-2">
+        <i data-lucide="sliders-horizontal" class="w-4 h-4 text-base-content/60"></i>
+        <span>Filters</span>
+        {{if or (and (ne .StatusFilter "pending") (ne .StatusFilter "")) .ReviewTypeFilter .AccountIDFilter .UserIDFilter}}
+        <span class="badge badge-primary badge-xs">Active</span>
         {{end}}
-      </select>
-    </div>
-    <div class="form-control">
-      <label class="label label-text text-xs text-base-content/50 pb-1">Family Member</label>
-      <select name="user_id" class="select select-bordered select-sm rounded-xl">
-        <option value="">All Members</option>
-        {{range .Users}}
-        <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.UserIDFilter}} selected{{end}}>{{.Name}}</option>
-        {{end}}
-      </select>
-    </div>
-    <div class="flex gap-2">
-      <button type="submit" class="btn btn-sm btn-primary rounded-xl">Filter</button>
-      <a href="/reviews" class="btn btn-sm btn-ghost rounded-xl">Reset</a>
-    </div>
-  </form>
+      </div>
+      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/40 transition-transform duration-200" :class="filtersOpen ? 'rotate-180' : ''"></i>
+    </button>
+
+    <form method="GET" action="/reviews" x-show="filtersOpen" x-cloak
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0 -translate-y-2"
+      x-transition:enter-end="opacity-100 translate-y-0"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-start="opacity-100 translate-y-0"
+      x-transition:leave-end="opacity-0 -translate-y-2"
+      class="bb-filter-form">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4 pt-3">
+        <label class="bb-filter-label">
+          Status
+          <select name="status" class="select select-sm select-bordered w-full">
+            <option value="pending"{{if eq .StatusFilter "pending"}} selected{{end}}>Pending</option>
+            <option value="approved"{{if eq .StatusFilter "approved"}} selected{{end}}>Approved</option>
+            <option value="rejected"{{if eq .StatusFilter "rejected"}} selected{{end}}>Rejected</option>
+            <option value="skipped"{{if eq .StatusFilter "skipped"}} selected{{end}}>Skipped</option>
+            <option value="all"{{if eq .StatusFilter "all"}} selected{{end}}>All</option>
+          </select>
+        </label>
+        <label class="bb-filter-label">
+          Type
+          <select name="review_type" class="select select-sm select-bordered w-full">
+            <option value="">All Types</option>
+            <option value="new_transaction"{{if eq .ReviewTypeFilter "new_transaction"}} selected{{end}}>New Transaction</option>
+            <option value="uncategorized"{{if eq .ReviewTypeFilter "uncategorized"}} selected{{end}}>Uncategorized</option>
+            <option value="low_confidence"{{if eq .ReviewTypeFilter "low_confidence"}} selected{{end}}>Low Confidence</option>
+            <option value="manual"{{if eq .ReviewTypeFilter "manual"}} selected{{end}}>Manual</option>
+          </select>
+        </label>
+        <label class="bb-filter-label">
+          Account
+          <select name="account_id" class="select select-sm select-bordered w-full">
+            <option value="">All Accounts</option>
+            {{range .Accounts}}
+            <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.AccountIDFilter}} selected{{end}}>{{.Name}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label class="bb-filter-label">
+          Family Member
+          <select name="user_id" class="select select-sm select-bordered w-full">
+            <option value="">All Members</option>
+            {{range .Users}}
+            <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.UserIDFilter}} selected{{end}}>{{.Name}}</option>
+            {{end}}
+          </select>
+        </label>
+      </div>
+      <div class="bb-filter-actions">
+        <a href="/reviews" class="btn btn-sm btn-ghost rounded-xl">Reset</a>
+        <button type="submit" class="btn btn-sm btn-primary rounded-xl">
+          <i data-lucide="search" class="w-3.5 h-3.5"></i>
+          Filter
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- Review Cards -->
