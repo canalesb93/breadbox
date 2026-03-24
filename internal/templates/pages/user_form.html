@@ -1,4 +1,6 @@
 {{define "content"}}
+{{template "breadcrumb" .}}
+
 <div class="bb-page-header">
   <div>
     <h1 class="bb-page-title">{{if .IsEdit}}Edit {{.User.Name}}{{else}}Add Family Member{{end}}</h1>

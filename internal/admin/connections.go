@@ -57,6 +57,10 @@ func NewConnectionHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			"HasPlaid":    a.Providers["plaid"] != nil,
 			"HasTeller":   a.Providers["teller"] != nil,
 			"TellerEnv":   a.Config.TellerEnv,
+			"Breadcrumbs": []Breadcrumb{
+				{Label: "Connections", Href: "/connections"},
+				{Label: "Connect New Bank"},
+			},
 		}
 		tr.Render(w, r, "connection_new.html", data)
 	}
@@ -260,6 +264,10 @@ func ConnectionDetailHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 			"SyncLogs":    syncLogs,
 			"ConnID":      idStr,
 			"CSRFToken":   GetCSRFToken(r),
+			"Breadcrumbs": []Breadcrumb{
+				{Label: "Connections", Href: "/connections"},
+				{Label: conn.InstitutionName.String},
+			},
 		}
 		tr.Render(w, r, "connection_detail.html", data)
 	}
@@ -292,6 +300,11 @@ func ConnectionReauthHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 			"CSRFToken":   GetCSRFToken(r),
 			"TellerAppID": a.Config.TellerAppID,
 			"TellerEnv":   a.Config.TellerEnv,
+			"Breadcrumbs": []Breadcrumb{
+				{Label: "Connections", Href: "/connections"},
+				{Label: conn.InstitutionName.String, Href: "/connections/" + idStr},
+				{Label: "Re-authenticate"},
+			},
 		}
 		tr.Render(w, r, "connection_reauth.html", data)
 	}

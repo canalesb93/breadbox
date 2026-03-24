@@ -38,6 +38,13 @@ type WizardData struct {
 	StepNumber int
 }
 
+// Breadcrumb represents one item in a navigation breadcrumb trail.
+// If Href is empty, it's rendered as the current page (no link).
+type Breadcrumb struct {
+	Label string
+	Href  string
+}
+
 // TemplateRenderer parses and renders HTML templates.
 type TemplateRenderer struct {
 	mu        sync.RWMutex
@@ -386,6 +393,7 @@ var templatePartials = []string{
 	"partials/nav.html",
 	"partials/category_picker.html",
 	"partials/skeletons.html",
+	"partials/breadcrumb.html",
 }
 
 func (tr *TemplateRenderer) parseTemplates() error {

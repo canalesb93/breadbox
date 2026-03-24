@@ -237,6 +237,11 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			"FilterCategory":  r.URL.Query().Get("category"),
 			"FilterPending":   r.URL.Query().Get("pending"),
 			"FilterSearch":    r.URL.Query().Get("search"),
+			"Breadcrumbs": []Breadcrumb{
+				{Label: "Connections", Href: "/connections"},
+				{Label: detail.InstitutionName, Href: "/connections/" + detail.ConnectionID},
+				{Label: accountDisplayName(detail)},
+			},
 		}
 		tr.Render(w, r, "account_detail.html", data)
 	}
@@ -305,6 +310,15 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			a.Logger.Error("list categories for transaction detail", "error", err)
 		}
 
+		// Build breadcrumbs: Transactions > Account Name > Transaction Name
+		breadcrumbs := []Breadcrumb{
+			{Label: "Transactions", Href: "/transactions"},
+		}
+		if accountName != "" && accountID != "" {
+			breadcrumbs = append(breadcrumbs, Breadcrumb{Label: accountName, Href: "/accounts/" + accountID})
+		}
+		breadcrumbs = append(breadcrumbs, Breadcrumb{Label: txn.Name})
+
 		data := map[string]any{
 			"PageTitle":     txn.Name,
 			"CurrentPage":   "transactions",
@@ -317,6 +331,7 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			"UserName":      userName,
 			"Comments":      comments,
 			"Categories":    categoryTree,
+			"Breadcrumbs":   breadcrumbs,
 		}
 		tr.Render(w, r, "transaction_detail.html", data)
 	}

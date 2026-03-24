@@ -63,6 +63,10 @@ func MappingsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 		data["AllCategories"] = flattenCategories(tree)
 		data["UnmappedCategories"] = unmapped
 		data["FilterProvider"] = filterProvider
+		data["Breadcrumbs"] = []Breadcrumb{
+			{Label: "Categories", Href: "/categories"},
+			{Label: "Mappings"},
+		}
 
 		tr.Render(w, r, "category_mappings.html", data)
 	}
