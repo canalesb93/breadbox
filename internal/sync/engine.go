@@ -117,6 +117,14 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		excludedSet[id] = true
 	}
 
+	// Look up user name for rule matching.
+	var userName string
+	if conn.UserID.Valid {
+		if user, err := e.db.GetUser(ctx, conn.UserID); err == nil {
+			userName = user.Name
+		}
+	}
+
 	// Build provider.Connection from DB row.
 	provConn := provider.Connection{
 		ProviderName:         string(conn.Provider),
@@ -230,7 +238,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				skipped++
 				continue
 			}
-			txnResult, err := e.upsertTransaction(ctx, txQueries, &pendingAdded[i], accountIDCache, string(conn.Provider), resolver, conn.UserID, logger)
+			txnResult, err := e.upsertTransaction(ctx, txQueries, &pendingAdded[i], accountIDCache, string(conn.Provider), resolver, conn.UserID, userName, logger)
 			if err != nil {
 				logger.Error("upsert added transaction", "external_id", pendingAdded[i].ExternalID, "error", err)
 			} else if reviewAutoEnqueue {
@@ -251,7 +259,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				skipped++
 				continue
 			}
-			txnResult, err := e.upsertTransaction(ctx, txQueries, &pendingModified[i], accountIDCache, string(conn.Provider), resolver, conn.UserID, logger)
+			txnResult, err := e.upsertTransaction(ctx, txQueries, &pendingModified[i], accountIDCache, string(conn.Provider), resolver, conn.UserID, userName, logger)
 			if err != nil {
 				logger.Error("upsert modified transaction", "external_id", pendingModified[i].ExternalID, "error", err)
 			} else if reviewAutoEnqueue {
@@ -309,7 +317,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 }
 
 // upsertTransaction resolves the account ID and upserts a single transaction.
-func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *provider.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *RuleResolver, userID pgtype.UUID, logger *slog.Logger) (db.Transaction, error) {
+func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *provider.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *RuleResolver, userID pgtype.UUID, userName string, logger *slog.Logger) (db.Transaction, error) {
 	accountID, err := e.resolveAccountID(ctx, txn.AccountExternalID, cache)
 	if err != nil {
 		return db.Transaction{}, fmt.Errorf("resolve account %s: %w", txn.AccountExternalID, err)
@@ -325,6 +333,7 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 			Provider:   providerName,
 			AccountID:  formatUUID(accountID),
 			UserID:     formatUUID(userID),
+			UserName:   userName,
 		}
 		if txn.MerchantName != nil {
 			tctx.MerchantName = *txn.MerchantName

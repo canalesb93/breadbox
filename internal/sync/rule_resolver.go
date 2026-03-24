@@ -33,6 +33,7 @@ type TransactionContext struct {
 	Provider         string  // "plaid", "teller", "csv"
 	AccountID        string  // UUID string
 	UserID           string  // UUID string
+	UserName         string  // family member name
 }
 
 // RuleResolver loads transaction rules and category mappings, evaluating them during sync.
@@ -349,6 +350,8 @@ func evaluateLeaf(c *compiledCondition, tctx TransactionContext) bool {
 		return evaluateString(c, tctx.AccountID)
 	case "user_id":
 		return evaluateString(c, tctx.UserID)
+	case "user_name":
+		return evaluateString(c, tctx.UserName)
 	default:
 		return false // unknown field
 	}
