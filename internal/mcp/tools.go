@@ -82,8 +82,9 @@ type listPendingReviewsInput struct {
 	ReviewType string `json:"review_type,omitempty" jsonschema:"Filter by review type: new_transaction, uncategorized, low_confidence, manual"`
 	AccountID  string `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
 	UserID     string `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
-	Limit      int    `json:"limit,omitempty" jsonschema:"Max results (default 20, max 100)"`
+	Limit      int    `json:"limit,omitempty" jsonschema:"Max results (default 20, max 500)"`
 	Cursor     string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
+	Fields     string `json:"fields,omitempty" jsonschema:"Comma-separated fields to include. Aliases: triage (id+type+status+key transaction fields), review_core (id+type+status+confidence+created_at), transaction_core (transaction id+name+amount+date+category+account+user). Supports transaction.* fields (e.g. transaction.name, transaction.amount). Default: all fields."`
 }
 
 type submitReviewInput struct {
@@ -627,14 +628,33 @@ func (s *MCPServer) handleListPendingReviews(_ context.Context, _ *mcpsdk.CallTo
 		params.UserID = &input.UserID
 	}
 	if input.Limit > 0 {
-		if input.Limit > 100 {
-			input.Limit = 100
+		if input.Limit > 500 {
+			input.Limit = 500
 		}
 		params.Limit = input.Limit
 	}
+
+	fieldSet, err := service.ParseReviewFields(input.Fields)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
 	result, err := s.svc.ListReviews(ctx, params)
 	if err != nil {
 		return errorResult(err), nil, nil
+	}
+
+	if fieldSet != nil {
+		filtered := make([]map[string]any, len(result.Reviews))
+		for i, r := range result.Reviews {
+			filtered[i] = service.FilterReviewFields(r, fieldSet)
+		}
+		return jsonResult(map[string]any{
+			"reviews":     filtered,
+			"next_cursor": result.NextCursor,
+			"has_more":    result.HasMore,
+			"total":       result.Total,
+		})
 	}
 	return jsonResult(result)
 }
