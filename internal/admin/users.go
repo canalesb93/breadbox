@@ -26,6 +26,7 @@ type UserAccountSummary struct {
 	BalanceCurrent  float64
 	IsoCurrencyCode string
 	IsLiability     bool
+	HasBalance      bool
 }
 
 // EnrichedUser holds a user plus their computed financial summary.
@@ -75,12 +76,11 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 				eu.AccountCount = len(accounts)
 				for _, acct := range accounts {
 					bal, err := numericToFloat(acct.BalanceCurrent)
-					if err != nil {
-						continue
-					}
+					hasBal := err == nil
 					subtype := ""
 					if acct.Subtype.Valid {
-						subtype = acct.Subtype.String
+						// Clean up subtype for display (e.g. "credit_card" -> "Credit Card")
+						subtype = strings.ReplaceAll(acct.Subtype.String, "_", " ")
 					}
 					mask := ""
 					if acct.Mask.Valid {
@@ -100,12 +100,17 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 					}
 
 					isLiability := acct.Type == "credit" || acct.Type == "loan"
-					if isLiability {
-						eu.TotalLiabilities += math.Abs(bal)
-						eu.NetWorth -= math.Abs(bal)
-					} else {
-						eu.TotalAssets += bal
-						eu.NetWorth += bal
+					displayBal := bal
+					if hasBal {
+						if isLiability {
+							eu.TotalLiabilities += math.Abs(bal)
+							eu.NetWorth -= math.Abs(bal)
+							// Show liabilities as negative in the UI
+							displayBal = -math.Abs(bal)
+						} else {
+							eu.TotalAssets += bal
+							eu.NetWorth += bal
+						}
 					}
 
 					eu.Accounts = append(eu.Accounts, UserAccountSummary{
@@ -115,9 +120,10 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 						Subtype:         subtype,
 						Mask:            mask,
 						InstitutionName: institution,
-						BalanceCurrent:  bal,
+						BalanceCurrent:  displayBal,
 						IsoCurrencyCode: currency,
 						IsLiability:     isLiability,
+						HasBalance:      hasBal,
 					})
 				}
 			}
