@@ -292,6 +292,8 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			BalanceCurrent  float64
 			IsoCurrencyCode string
 			IsLiability     bool
+			SparklineData   template.JS // JSON array of daily spending amounts (30 days)
+			SpendingTotal   float64     // Total spending in last 30 days for this account
 		}
 		var dashAccounts []DashboardAccount
 		for _, acct := range accounts {
@@ -325,6 +327,36 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				netWorth += bal
 			}
 
+			// Fetch per-account daily spending for sparkline.
+			acctID := acct.ID
+			acctDailySummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+				GroupBy:      "day",
+				AccountID:    &acctID,
+				SpendingOnly: true,
+			})
+			var sparklineJSON template.JS
+			var acctSpendTotal float64
+			if err == nil && acctDailySummary != nil && len(acctDailySummary.Summary) > 0 {
+				// Build a map of date->amount, then fill in 30 days.
+				dayMap := make(map[string]float64, len(acctDailySummary.Summary))
+				for _, row := range acctDailySummary.Summary {
+					if row.Period != nil {
+						dayMap[*row.Period] = row.TotalAmount
+						acctSpendTotal += row.TotalAmount
+					}
+				}
+				// Build array for last 30 days (oldest first).
+				now := time.Now()
+				sparkData := make([]float64, 30)
+				for i := 29; i >= 0; i-- {
+					day := now.AddDate(0, 0, -i).Format("2006-01-02")
+					sparkData[29-i] = dayMap[day]
+				}
+				if sb, err := json.Marshal(sparkData); err == nil {
+					sparklineJSON = template.JS(sb)
+				}
+			}
+
 			dashAccounts = append(dashAccounts, DashboardAccount{
 				ID:              acct.ID,
 				Name:            acct.Name,
@@ -335,6 +367,8 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				BalanceCurrent:  bal,
 				IsoCurrencyCode: currency,
 				IsLiability:     isLiability,
+				SparklineData:   sparklineJSON,
+				SpendingTotal:   acctSpendTotal,
 			})
 		}
 		// Sort: depository first, then credit, then loan, then others.
