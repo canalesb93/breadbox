@@ -23,11 +23,11 @@
         <div class="flex items-center gap-3 min-w-0">
           <div class="w-10 h-10 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
             {{if eq (printf "%s" .Provider) "plaid"}}
-            <i data-lucide="building-2" class="w-5 h-5 text-primary"></i>
+            <i data-lucide="building-2" class="w-5 h-5 text-info"></i>
             {{else if eq (printf "%s" .Provider) "teller"}}
-            <i data-lucide="landmark" class="w-5 h-5 text-secondary"></i>
+            <i data-lucide="landmark" class="w-5 h-5 text-success"></i>
             {{else}}
-            <i data-lucide="file-spreadsheet" class="w-5 h-5 text-accent"></i>
+            <i data-lucide="file-spreadsheet" class="w-5 h-5 text-warning"></i>
             {{end}}
           </div>
           <div class="min-w-0">

@@ -12,8 +12,8 @@
   <div class="bb-card p-0 overflow-hidden">
     <div class="px-6 py-5 border-b border-base-300 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-          <i data-lucide="building-2" class="w-5 h-5 text-primary"></i>
+        <div class="w-10 h-10 rounded-xl bg-info/10 flex items-center justify-center">
+          <i data-lucide="building-2" class="w-5 h-5 text-info"></i>
         </div>
         <div>
           <h2 class="font-semibold">Plaid</h2>
@@ -30,12 +30,12 @@
       {{if .PlaidFromEnv}}
       <p class="text-sm text-base-content/50 mb-4">Configured via environment variables (read-only).</p>
       <dl class="bb-info-grid">
-        <dt>Environment {{configSource .ConfigSources "plaid_env"}}</dt>
-        <dd>{{.PlaidEnv}}</dd>
         <dt>Client ID {{configSource .ConfigSources "plaid_client_id"}}</dt>
         <dd><code class="font-mono text-xs">{{.PlaidClientID}}</code></dd>
         <dt>Secret</dt>
         <dd><code class="font-mono text-xs">********</code></dd>
+        <dt>Environment {{configSource .ConfigSources "plaid_env"}}</dt>
+        <dd>{{.PlaidEnv}}</dd>
         <dt>Webhook URL</dt>
         <dd>{{if .WebhookURL}}<code class="font-mono text-xs">{{.WebhookURL}}</code>{{else}}<span class="text-base-content/40">Not set</span>{{end}}</dd>
       </dl>
@@ -94,8 +94,8 @@
   <div class="bb-card p-0 overflow-hidden">
     <div class="px-6 py-5 border-b border-base-300 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
-          <i data-lucide="landmark" class="w-5 h-5 text-accent"></i>
+        <div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
+          <i data-lucide="landmark" class="w-5 h-5 text-success"></i>
         </div>
         <div>
           <h2 class="font-semibold">Teller</h2>
@@ -114,10 +114,10 @@
       <dl class="bb-info-grid">
         <dt>App ID {{configSource .ConfigSources "teller_app_id"}}</dt>
         <dd><code class="font-mono text-xs">{{.TellerAppID}}</code></dd>
-        <dt>Environment {{configSource .ConfigSources "teller_env"}}</dt>
-        <dd>{{.TellerEnv}}</dd>
         <dt>Certificate</dt>
         <dd>{{if .TellerCertConfigured}}Configured{{else}}Not configured{{end}}</dd>
+        <dt>Environment {{configSource .ConfigSources "teller_env"}}</dt>
+        <dd>{{.TellerEnv}}</dd>
         <dt>Webhook Secret</dt>
         <dd>{{if .TellerWebhookConfigured}}Configured{{else}}Not configured{{end}}</dd>
       </dl>

@@ -47,14 +47,26 @@ Pick ONE area that will have the most visual impact given what's already been do
 
 Priority areas (pick based on what's needed most right now):
 
-- **Global design tokens / theme overhaul** — Update `input.css` with Mercury-style tokens: softer borders, larger radii, refined spacing, improved base-100/base-200 contrast. This lifts every page at once.
-- **Sidebar & navigation polish** — Match Mercury: clean search bar, generous spacing, subtle active states (filled background, not left border), minimal section headers.
-- **Dashboard redesign** — Big balance card at top, clean chart styling, better visual hierarchy. Less cramped.
-- **Transaction list refinement** — Cleaner table rows, better amount formatting (large, right-aligned), minimal borders between rows.
-- **Page-specific redesigns** — Pick any untouched page (reviews, rules, categories, settings, providers, sync logs, MCP, users) and transform it.
-- **Data visualization polish** — Chart styling refinement: lighter gridlines, cleaner tooltips, better color palette.
-- **Empty states & polish** — Loading skeletons, helpful empty states, error pages. The details that make an app feel finished.
-- **Mobile & responsiveness** — Collapsible sidebar, responsive cards, touch-friendly targets.
+**Data & functionality improvements** (OK to modify Go handlers if needed):
+- **Dashboard data richness** — Show error indicators on sync logs (like the sync logs page does), spending trends with month-over-month comparison, account balance sparklines, pending transaction count
+- **Inline category display** — Transaction rows should show category badges inline (colored dot + name), both in the transactions list and the dashboard recent transactions. Make categories glanceable.
+- **Better data formatting** — Ensure all amounts use proper currency formatting with commas, all dates are human-readable, all durations show relative time
+- **Search improvements** — Global search via Cmd+K could show recent transactions, accounts, not just page navigation
+- **Notification/alert system** — Surface sync errors, pending reviews, and connection issues prominently
+
+**Visual polish & consistency**:
+- **Icon rendering** — Ensure ALL Lucide icons render correctly. Call `lucide.createIcons()` after Alpine.js renders dynamic content. Check providers page, review instructions, connection cards.
+- **Light mode QA** — Browse every page in light mode, fix any elements that are invisible or have poor contrast
+- **Dark mode QA** — Same for dark mode
+- **Responsive sweep** — Check each page on mobile viewport, fix overflow/layout issues
+- **Interaction polish** — Hover states, focus rings, transitions, loading indicators
+
+**Feature additions** (pure frontend, or minimal Go changes):
+- **Inline editing** — Edit account display names, category assignments, rule names without navigating to detail pages
+- **Bulk actions** — Select multiple transactions for batch categorization
+- **Data export** — CSV download button for filtered transaction views
+- **Keyboard shortcuts expansion** — More vim-style shortcuts for common actions
+- **Toast improvements** — More descriptive success/error messages with undo options
 
 DO NOT duplicate work from previous agents. Build on it or tackle something new.
 
@@ -98,10 +110,11 @@ The target aesthetic is **shadcn/ui** (https://ui.shadcn.com) — the gold stand
 
 ### What NOT to do
 
-- Don't modify Go backend logic, database schema, or API endpoints unless your UI change absolutely requires it.
+- Don't modify database schema or migrations.
 - Don't break existing functionality.
 - Don't add npm/Node dependencies.
 - Don't make half-finished changes — complete what you start.
+- Go handler and service layer changes are OK when they add data to templates or improve the UI experience. Keep changes minimal and focused.
 
 ### Build and Test
 

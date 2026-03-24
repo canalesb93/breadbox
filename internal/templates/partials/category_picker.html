@@ -20,6 +20,8 @@ function categoryPicker(config) {
         items.push({ id: '', slug: '', label: this.emptyLabel, isParent: false, indent: false, icon: null, color: null, hidden: false });
       }
       for (const cat of this.categories) {
+        // Skip the DB "uncategorized" category when allowEmpty provides its own empty option
+        if (this.allowEmpty && cat.slug === 'uncategorized') continue;
         items.push({ id: cat.id, slug: cat.slug, label: cat.display_name, isParent: true, indent: false, icon: cat.icon, color: cat.color, hidden: cat.hidden || false });
         if (cat.children) {
           for (const child of cat.children) {
