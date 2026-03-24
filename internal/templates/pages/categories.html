@@ -48,10 +48,10 @@
     <div class="text-sm text-base-content/40 mb-4 px-1">{{len .Categories}} top-level categories</div>
     <div class="space-y-3">
       {{range .Categories}}
-      <div class="bb-card overflow-hidden" x-data="{open: false}">
+      <div class="bb-card overflow-hidden group" x-data="{open: false}">
         <!-- Parent row -->
-        <button type="button" class="w-full flex items-center gap-4 px-6 py-4 hover:bg-base-200/30 transition-colors duration-150 text-left"
-          @click="open = !open">
+        <div role="button" tabindex="0" class="w-full flex items-center gap-4 px-6 py-4 hover:bg-base-200/30 transition-colors duration-150 text-left cursor-pointer select-none"
+          @click="open = !open" @keydown.enter="open = !open" @keydown.space.prevent="open = !open">
           <div class="flex items-center justify-center w-10 h-10 rounded-xl shrink-0"
             style="{{if .Color}}background-color: {{.Color}}15{{else}}background-color: oklch(48% 0.17 265 / 0.08){{end}}">
             {{if .Icon}}<i data-lucide="{{.Icon}}" class="w-5 h-5" style="{{if .Color}}color: {{.Color}}{{end}}"></i>
@@ -80,7 +80,7 @@
               title="Delete"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>{{end}}
           </div>
           <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 shrink-0" :class="open ? 'rotate-180' : ''"></i>
-        </button>
+        </div>
 
         {{if .Children}}
         <!-- Children -->
