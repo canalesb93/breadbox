@@ -239,6 +239,64 @@ func NewTemplateRenderer() (*TemplateRenderer, error) {
 				}
 				return acctType
 			},
+			"formatDateTime": func(t interface{}) string {
+				format := func(tm time.Time) string {
+					return tm.Local().Format("Jan 2, 2006 3:04 PM")
+				}
+				switch v := t.(type) {
+				case time.Time:
+					return format(v)
+				case *time.Time:
+					if v == nil {
+						return ""
+					}
+					return format(*v)
+				case string:
+					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
+						return format(parsed)
+					}
+					return v
+				case *string:
+					if v == nil {
+						return ""
+					}
+					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
+						return format(parsed)
+					}
+					return *v
+				default:
+					return ""
+				}
+			},
+			"formatDateShort": func(t interface{}) string {
+				format := func(tm time.Time) string {
+					return tm.Local().Format("Jan 2, 3:04 PM")
+				}
+				switch v := t.(type) {
+				case time.Time:
+					return format(v)
+				case *time.Time:
+					if v == nil {
+						return ""
+					}
+					return format(*v)
+				case string:
+					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
+						return format(parsed)
+					}
+					return v
+				case *string:
+					if v == nil {
+						return ""
+					}
+					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
+						return format(parsed)
+					}
+					return *v
+				default:
+					return ""
+				}
+			},
 			"formatNumeric": func(n pgtype.Numeric) string {
 				if !n.Valid {
 					return ""
