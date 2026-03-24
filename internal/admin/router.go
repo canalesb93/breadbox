@@ -38,7 +38,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Use(RequireAuth(sm))
 		r.Use(CSRFMiddleware(sm))
 
-		r.Get("/", DashboardHandler(a, tr))
+		r.Get("/", DashboardHandler(a, svc, tr))
 		r.Post("/onboarding/dismiss", DismissOnboardingHandler(a))
 
 		r.Route("/connections", func(r chi.Router) {

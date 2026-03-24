@@ -158,6 +158,12 @@ func NewTemplateRenderer() (*TemplateRenderer, error) {
 				}
 				return t.Before(time.Now())
 			},
+			"formatAmount": func(amount float64) string {
+				if amount < 0 {
+					return fmt.Sprintf("-$%.2f", -amount)
+				}
+				return fmt.Sprintf("$%.2f", amount)
+			},
 			"formatNumeric": func(n pgtype.Numeric) string {
 				if !n.Valid {
 					return ""

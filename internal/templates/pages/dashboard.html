@@ -1,5 +1,8 @@
 {{define "content"}}
-<h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Dashboard</h1>
+  <span class="text-sm text-base-content/50">Last 30 days</span>
+</div>
 
 {{if .ShowUpdateBanner}}
 <div class="alert alert-info mb-6" x-data="{ pulling: false, pulled: false, error: '' }">
@@ -93,6 +96,7 @@
 </div>
 {{end}}
 
+<!-- Stat Cards -->
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-8">
   <div class="bb-stat-card bb-stat-card--primary">
     <div class="bb-stat-card__icon text-primary">
@@ -100,16 +104,16 @@
     </div>
     <div class="bb-stat-card__body">
       <span class="bb-stat-card__value">{{.AccountCount}}</span>
-      <span class="bb-stat-card__label">Accounts Connected</span>
+      <span class="bb-stat-card__label">Accounts</span>
     </div>
   </div>
   <a href="/transactions" class="bb-stat-card bb-stat-card--secondary no-underline">
     <div class="bb-stat-card__icon text-secondary">
-      <i data-lucide="trending-up" class="w-6 h-6"></i>
+      <i data-lucide="receipt" class="w-6 h-6"></i>
     </div>
     <div class="bb-stat-card__body">
       <span class="bb-stat-card__value">{{.TxCount}}</span>
-      <span class="bb-stat-card__label">Transactions Synced</span>
+      <span class="bb-stat-card__label">Transactions</span>
     </div>
   </a>
   <div class="bb-stat-card bb-stat-card--accent">
@@ -117,7 +121,7 @@
       <i data-lucide="clock" class="w-6 h-6"></i>
     </div>
     <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value text-xl">{{.LastSync}}</span>
+      <span class="bb-stat-card__value text-lg">{{.LastSync}}</span>
       <span class="bb-stat-card__label">Last Sync</span>
     </div>
   </div>
@@ -155,46 +159,304 @@
   {{end}}
 </div>
 
-<h2 class="text-lg font-semibold mb-4">Recent Sync Activity</h2>
-
-{{if .RecentLogs}}
-<div class="overflow-x-auto border border-base-300 rounded-lg">
-  <table class="table table-zebra table-sm">
-    <thead>
-      <tr>
-        <th>Institution</th>
-        <th>Trigger</th>
-        <th>Status</th>
-        <th>+Add</th>
-        <th>~Mod</th>
-        <th>-Rem</th>
-        <th>When</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range .RecentLogs}}
-      <tr class="hover:bg-base-300">
-        <td><a href="/connections/{{formatUUID .ConnectionID}}">{{.InstitutionName.String}}</a></td>
-        <td>{{.Trigger}}</td>
-        <td>{{syncBadge (printf "%s" .Status)}}</td>
-        <td>{{.AddedCount}}</td>
-        <td>{{.ModifiedCount}}</td>
-        <td>{{.RemovedCount}}</td>
-        <td>{{relativeTime .StartedAt}}</td>
-      </tr>
+<!-- Charts Row -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+  <!-- Spending Trend Chart -->
+  <div class="card bg-base-100 shadow-sm border border-base-300 lg:col-span-2">
+    <div class="card-body p-5">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="card-title text-base">
+          <i data-lucide="trending-up" class="w-4 h-4 text-primary"></i>
+          Daily Spending
+        </h2>
+      </div>
+      {{if .DailyLabels}}
+      <div class="h-56">
+        <canvas id="spendingTrendChart"></canvas>
+      </div>
+      {{else}}
+      <div class="flex items-center justify-center h-56 text-base-content/40">
+        <div class="text-center">
+          <i data-lucide="bar-chart-3" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
+          <p class="text-sm">No spending data yet</p>
+        </div>
+      </div>
       {{end}}
-    </tbody>
-  </table>
-</div>
-{{else}}
-<p class="text-base-content/70">No sync activity yet. Connect a bank to get started.</p>
-{{end}}
+    </div>
+  </div>
 
-<div class="flex gap-3 mt-6">
-  <a href="/connections/new" class="btn btn-primary">
-    <i data-lucide="plus" class="w-4 h-4"></i>
-    Connect New Bank
-  </a>
-  <a href="/sync-logs" class="btn btn-ghost">View All Sync Logs</a>
+  <!-- Category Breakdown Chart -->
+  <div class="card bg-base-100 shadow-sm border border-base-300">
+    <div class="card-body p-5">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="card-title text-base">
+          <i data-lucide="pie-chart" class="w-4 h-4 text-secondary"></i>
+          By Category
+        </h2>
+      </div>
+      {{if .CategoryLabels}}
+      <div class="h-56 flex items-center justify-center">
+        <canvas id="categoryChart"></canvas>
+      </div>
+      {{else}}
+      <div class="flex items-center justify-center h-56 text-base-content/40">
+        <div class="text-center">
+          <i data-lucide="pie-chart" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
+          <p class="text-sm">No category data yet</p>
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </div>
 </div>
+
+<!-- Recent Transactions + Sync Activity -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+  <!-- Recent Transactions -->
+  <div class="card bg-base-100 shadow-sm border border-base-300 lg:col-span-2">
+    <div class="card-body p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="card-title text-base">
+          <i data-lucide="list" class="w-4 h-4 text-accent"></i>
+          Recent Transactions
+        </h2>
+        <a href="/transactions" class="btn btn-ghost btn-xs">View all</a>
+      </div>
+      {{if .RecentTransactions}}
+      <div class="overflow-x-auto -mx-5">
+        <table class="table table-sm">
+          <thead>
+            <tr class="text-xs text-base-content/50 uppercase">
+              <th>Description</th>
+              <th>Account</th>
+              <th>Category</th>
+              <th class="text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .RecentTransactions}}
+            <tr class="hover:bg-base-200/50 transition-colors duration-150">
+              <td>
+                <div class="flex flex-col">
+                  <span class="font-medium text-sm truncate max-w-48">{{.Name}}</span>
+                  <span class="text-xs text-base-content/50">{{.Date}}</span>
+                </div>
+              </td>
+              <td class="text-sm text-base-content/70">{{.AccountName}}</td>
+              <td>
+                {{if .CategoryDisplayName}}
+                <span class="badge badge-ghost badge-sm">{{if .CategoryIcon}}{{.CategoryIcon}} {{end}}{{deref .CategoryDisplayName}}</span>
+                {{else}}
+                <span class="text-base-content/30 text-xs">—</span>
+                {{end}}
+              </td>
+              <td class="text-right tabular-nums text-sm font-medium{{if gt .Amount 0.0}} text-base-content{{else}} text-success{{end}}">
+                {{formatAmount .Amount}}
+              </td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+      {{else}}
+      <div class="flex items-center justify-center py-8 text-base-content/40">
+        <div class="text-center">
+          <i data-lucide="receipt" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+          <p class="text-sm">No transactions yet</p>
+          <a href="/connections/new" class="btn btn-primary btn-sm mt-3">Connect a bank</a>
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </div>
+
+  <!-- Recent Sync Activity -->
+  <div class="card bg-base-100 shadow-sm border border-base-300">
+    <div class="card-body p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="card-title text-base">
+          <i data-lucide="refresh-cw" class="w-4 h-4 text-info"></i>
+          Sync Activity
+        </h2>
+        <a href="/sync-logs" class="btn btn-ghost btn-xs">View all</a>
+      </div>
+      {{if .RecentLogs}}
+      <div class="space-y-2">
+        {{range .RecentLogs}}
+        <a href="/connections/{{formatUUID .ConnectionID}}" class="flex items-center justify-between p-2.5 rounded-lg hover:bg-base-200/60 transition-colors duration-150 no-underline group">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-8 h-8 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
+              <i data-lucide="building-2" class="w-4 h-4 text-base-content/60"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.InstitutionName.String}}</div>
+              <div class="text-xs text-base-content/50">{{relativeTime .StartedAt}}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            {{if .AddedCount}}<span class="text-xs text-success font-medium">+{{.AddedCount}}</span>{{end}}
+            {{syncBadge (printf "%s" .Status)}}
+          </div>
+        </a>
+        {{end}}
+      </div>
+      {{else}}
+      <div class="flex items-center justify-center py-8 text-base-content/40">
+        <div class="text-center">
+          <i data-lucide="refresh-cw" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+          <p class="text-sm">No sync activity yet</p>
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="flex gap-3">
+  <a href="/connections/new" class="btn btn-primary btn-sm">
+    <i data-lucide="plus" class="w-4 h-4"></i>
+    Connect Bank
+  </a>
+  <a href="/reviews" class="btn btn-ghost btn-sm">
+    <i data-lucide="clipboard-check" class="w-4 h-4"></i>
+    Review Queue
+  </a>
+</div>
+
+<!-- Chart.js Initialization -->
+{{if .DailyLabels}}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const textColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
+
+  Chart.defaults.font.family = 'system-ui, -apple-system, sans-serif';
+
+  // Spending Trend
+  const trendCtx = document.getElementById('spendingTrendChart');
+  if (trendCtx) {
+    const dailyLabels = {{.DailyLabels}};
+    const dailyData = {{.DailyAmounts}};
+
+    // Format labels to short dates
+    const shortLabels = dailyLabels.map(d => {
+      const date = new Date(d + 'T00:00:00');
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+
+    new Chart(trendCtx, {
+      type: 'line',
+      data: {
+        labels: shortLabels,
+        datasets: [{
+          label: 'Spending',
+          data: dailyData,
+          borderColor: isDark ? '#6366f1' : '#4f46e5',
+          backgroundColor: isDark ? 'rgba(99,102,241,0.1)' : 'rgba(79,70,229,0.08)',
+          fill: true,
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointHoverBackgroundColor: isDark ? '#6366f1' : '#4f46e5',
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: isDark ? '#1e1e2e' : '#fff',
+            titleColor: isDark ? '#cdd6f4' : '#1e1b4b',
+            bodyColor: isDark ? '#a6adc8' : '#4b5563',
+            borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+            borderWidth: 1,
+            padding: 10,
+            displayColors: false,
+            callbacks: {
+              label: ctx => '$' + ctx.parsed.y.toFixed(2)
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: textColor, font: { size: 10 }, maxTicksLimit: 8, maxRotation: 0 }
+          },
+          y: {
+            grid: { color: gridColor },
+            ticks: {
+              color: textColor,
+              font: { size: 10 },
+              callback: v => '$' + v.toLocaleString()
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Category Doughnut
+  {{if .CategoryLabels}}
+  const catCtx = document.getElementById('categoryChart');
+  if (catCtx) {
+    const categoryLabels = {{.CategoryLabels}};
+    const categoryData = {{.CategoryAmounts}};
+
+    const palette = [
+      '#6366f1', '#8b5cf6', '#a78bfa', '#c084fc',
+      '#e879f9', '#f472b6', '#fb7185', '#f97316',
+      '#facc15', '#34d399', '#22d3ee', '#38bdf8'
+    ];
+
+    new Chart(catCtx, {
+      type: 'doughnut',
+      data: {
+        labels: categoryLabels,
+        datasets: [{
+          data: categoryData,
+          backgroundColor: palette.slice(0, categoryData.length),
+          borderWidth: 0,
+          hoverOffset: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              color: textColor,
+              font: { size: 10 },
+              boxWidth: 10,
+              padding: 8,
+              usePointStyle: true,
+              pointStyle: 'circle'
+            }
+          },
+          tooltip: {
+            backgroundColor: isDark ? '#1e1e2e' : '#fff',
+            titleColor: isDark ? '#cdd6f4' : '#1e1b4b',
+            bodyColor: isDark ? '#a6adc8' : '#4b5563',
+            borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {
+              label: ctx => ctx.label + ': $' + ctx.parsed.toFixed(2)
+            }
+          }
+        }
+      }
+    });
+  }
+  {{end}}
+});
+</script>
+{{end}}
 {{end}}
