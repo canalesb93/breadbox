@@ -151,6 +151,9 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				b, _ := json.Marshal(v)
 				return template.JS(b)
 			},
+			"safeCSS": func(s string) template.CSS {
+				return template.CSS(s)
+			},
 			"conditionSummary": func(c service.Condition) string {
 				return service.ConditionSummary(c)
 			},
