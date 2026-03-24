@@ -6,8 +6,74 @@
 /* Utility: hide Alpine.js elements until initialized */
 [x-cloak] { display: none !important; }
 
-/* App-specific component classes */
+/* ─── Mercury-inspired global overrides ─── */
+@layer base {
+  /* Softer, rounder defaults for all DaisyUI components */
+  :root {
+    --rounded-box: 1rem;
+    --rounded-btn: 0.625rem;
+    --rounded-badge: 0.5rem;
+  }
+
+  /* Smoother scrolling */
+  html { scroll-behavior: smooth; }
+
+  /* Better font rendering */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ─── App-specific component classes ─── */
 @layer components {
+
+  /* ── Cards: Mercury-style soft containers ── */
+  .bb-card {
+    @apply bg-base-100 rounded-2xl shadow-sm border border-base-200 transition-shadow duration-200;
+  }
+
+  .bb-card--interactive {
+    @apply hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer;
+  }
+
+  /* ── Sidebar ── */
+  .bb-sidebar {
+    @apply bg-base-100 min-h-full w-64 px-4 py-6 flex flex-col border-r border-base-200;
+  }
+
+  .bb-sidebar-brand {
+    @apply text-xl font-bold px-3 py-1 mb-6 no-underline text-base-content flex items-center gap-2;
+  }
+
+  .bb-sidebar-nav {
+    @apply flex flex-col gap-0.5 flex-1;
+  }
+
+  .bb-sidebar-section {
+    @apply text-[0.65rem] font-semibold uppercase tracking-widest text-base-content/40 px-3 pt-5 pb-1.5;
+  }
+
+  .bb-sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium
+           text-base-content/70 no-underline
+           transition-all duration-150
+           hover:bg-base-200/80 hover:text-base-content;
+  }
+
+  .bb-sidebar-link--active {
+    @apply bg-base-200 text-base-content font-semibold;
+  }
+
+  .bb-sidebar-link i, .bb-sidebar-link svg {
+    @apply w-[1.125rem] h-[1.125rem] opacity-60;
+  }
+
+  .bb-sidebar-link--active i, .bb-sidebar-link--active svg {
+    @apply opacity-100;
+  }
+
+  /* ── Filter bar ── */
   .bb-filter-bar {
     @apply flex flex-wrap items-end gap-4 mb-6;
   }
@@ -24,14 +90,17 @@
     @apply input input-sm w-auto min-w-[8rem];
   }
 
+  /* ── Pagination ── */
   .bb-pagination {
     @apply flex items-center justify-between mt-4;
   }
 
+  /* ── Action bar ── */
   .bb-action-bar {
     @apply flex items-center gap-2 mb-4;
   }
 
+  /* ── Amount formatting ── */
   .bb-amount {
     @apply text-right tabular-nums;
   }
@@ -44,57 +113,37 @@
     @apply text-right tabular-nums text-success;
   }
 
+  /* ── Info grid (detail pages) ── */
   .bb-info-grid {
     @apply grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm;
   }
 
   .bb-info-grid dt {
-    @apply font-medium text-base-content/70;
+    @apply font-medium text-base-content/50;
   }
 
   .bb-info-grid dd {
     @apply text-base-content;
   }
 
-  /* Sidebar active nav item accent */
-  .menu li > .menu-active {
-    @apply border-l-3 border-primary;
-  }
-
-  /* Dashboard stat cards */
+  /* ── Stat cards (Mercury: soft, no colored borders) ── */
   .bb-stat-card {
-    @apply flex items-center gap-4 rounded-xl border border-base-300 bg-base-100 px-5 py-4
-           shadow-sm transition-all duration-200 ease-in-out
-           hover:shadow-md hover:-translate-y-0.5
-           border-l-4;
+    @apply flex items-center gap-4 rounded-2xl bg-base-100 px-6 py-5
+           shadow-sm border border-base-200 transition-all duration-200 ease-in-out
+           hover:shadow-md hover:-translate-y-0.5;
   }
 
-  .bb-stat-card--primary {
-    @apply border-l-primary;
-  }
-
-  .bb-stat-card--secondary {
-    @apply border-l-secondary;
-  }
-
-  .bb-stat-card--accent {
-    @apply border-l-accent;
-  }
-
-  .bb-stat-card--warning {
-    @apply border-l-warning;
-  }
-
-  .bb-stat-card--info {
-    @apply border-l-info;
-  }
-
+  .bb-stat-card--primary,
+  .bb-stat-card--secondary,
+  .bb-stat-card--accent,
+  .bb-stat-card--warning,
+  .bb-stat-card--info,
   .bb-stat-card--neutral {
-    @apply border-l-base-content/20;
+    /* No colored left borders in Mercury style — keep them uniform */
   }
 
   .bb-stat-card__icon {
-    @apply flex items-center justify-center w-10 h-10 rounded-lg bg-base-200/60 shrink-0;
+    @apply flex items-center justify-center w-11 h-11 rounded-xl bg-base-200/60 shrink-0;
   }
 
   .bb-stat-card__body {
@@ -106,6 +155,15 @@
   }
 
   .bb-stat-card__label {
-    @apply text-xs font-medium uppercase tracking-wide text-base-content/60 mt-0.5;
+    @apply text-xs font-medium text-base-content/45 mt-0.5;
+  }
+
+  /* ── Page header pattern ── */
+  .bb-page-header {
+    @apply flex items-center justify-between mb-8;
+  }
+
+  .bb-page-title {
+    @apply text-2xl font-bold tracking-tight;
   }
 }
