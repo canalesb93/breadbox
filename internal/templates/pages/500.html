@@ -1,12 +1,19 @@
 {{define "content"}}
-<div class="flex items-center justify-center min-h-[50vh]">
-  <div class="card bg-base-200">
-    <div class="card-body items-center text-center py-12">
-      <i data-lucide="alert-triangle" class="w-12 h-12 text-warning mb-2"></i>
-      <h1 class="text-2xl font-bold">Something Went Wrong</h1>
-      <p class="text-base-content/70">An unexpected error occurred. Please try again. If the problem persists, check the application logs.</p>
-      <a href="javascript:history.back()" class="btn btn-primary mt-4">Back</a>
-    </div>
+<div class="bb-error-page">
+  <p class="bb-error-code">500</p>
+  <div class="bb-error-icon bg-error/10">
+    <i data-lucide="alert-triangle" class="w-7 h-7 text-error/60"></i>
+  </div>
+  <h1 class="bb-error-title">Something went wrong</h1>
+  <p class="bb-error-message">An unexpected error occurred. Please try again. If the problem persists, check the application logs.</p>
+  <div class="flex items-center gap-3">
+    <a href="javascript:location.reload()" class="btn btn-primary rounded-xl px-6">
+      <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+      Try Again
+    </a>
+    <a href="/" class="btn btn-ghost rounded-xl px-6">
+      Dashboard
+    </a>
   </div>
 </div>
 {{end}}

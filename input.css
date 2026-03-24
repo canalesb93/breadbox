@@ -253,4 +253,79 @@
   .bb-page-title {
     @apply text-2xl font-bold tracking-tight;
   }
+
+  /* ── Wizard / Auth pages (login, setup, error) ── */
+  .bb-wizard-bg {
+    @apply bg-base-200 min-h-screen flex items-center justify-center p-4 relative overflow-hidden;
+  }
+
+  .bb-wizard-orb {
+    @apply absolute pointer-events-none;
+    width: 600px;
+    height: 600px;
+    top: -200px;
+    right: -100px;
+    border-radius: 50%;
+    background: radial-gradient(circle, oklch(48% 0.17 265 / 0.06) 0%, transparent 70%);
+    filter: blur(60px);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-wizard-orb {
+      background: radial-gradient(circle, oklch(68% 0.16 265 / 0.08) 0%, transparent 70%);
+    }
+  }
+
+  .bb-wizard-container {
+    @apply relative z-10 w-full max-w-[420px];
+  }
+
+  .bb-wizard-brand {
+    @apply flex justify-center mb-8;
+  }
+
+  .bb-wizard-brand-icon {
+    @apply w-12 h-12 rounded-2xl bg-primary text-primary-content
+           flex items-center justify-center shadow-md;
+  }
+
+  .bb-wizard-card {
+    @apply bg-base-100 rounded-3xl shadow-lg border border-base-200 p-8;
+    animation: bb-wizard-enter 0.4s ease-out;
+  }
+
+  @keyframes bb-wizard-enter {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+
+  /* ── Error pages (404, 500) ── */
+  .bb-error-page {
+    @apply flex flex-col items-center justify-center text-center;
+    min-height: 50vh;
+  }
+
+  .bb-error-code {
+    @apply text-8xl font-bold text-base-content/8 leading-none mb-2;
+    letter-spacing: -0.04em;
+  }
+
+  .bb-error-icon {
+    @apply w-14 h-14 rounded-2xl flex items-center justify-center mb-6;
+  }
+
+  .bb-error-title {
+    @apply text-xl font-bold mb-2;
+  }
+
+  .bb-error-message {
+    @apply text-sm text-base-content/50 max-w-sm mb-8 leading-relaxed;
+  }
 }
