@@ -789,4 +789,113 @@
   .bb-sidebar-version svg, .bb-sidebar-version i {
     @apply opacity-50;
   }
+
+  /* ─── Keyboard Shortcuts Help Overlay ─── */
+  .bb-shortcuts-backdrop {
+    @apply fixed inset-0 z-50;
+    background: oklch(0 0 0 / 0.45);
+    backdrop-filter: blur(6px);
+    animation: bb-shortcuts-backdrop-in 0.15s ease-out;
+  }
+
+  @keyframes bb-shortcuts-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .bb-shortcuts-dialog {
+    @apply fixed z-50 bg-base-100 border border-base-300 rounded-xl overflow-hidden;
+    top: min(12%, 100px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(95vw, 640px);
+    max-height: min(80vh, 560px);
+    overflow-y: auto;
+    box-shadow: 0 16px 70px oklch(0 0 0 / 0.15), 0 0 0 1px oklch(0 0 0 / 0.04);
+    animation: bb-shortcuts-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-shortcuts-dialog {
+      box-shadow: 0 16px 70px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(1 0 0 / 0.06);
+    }
+  }
+
+  @keyframes bb-shortcuts-dialog-in {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) scale(0.96) translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) scale(1) translateY(0);
+    }
+  }
+
+  .bb-shortcuts-header {
+    @apply flex items-center justify-between px-6 py-4 border-b border-base-300 sticky top-0 bg-base-100 z-10;
+  }
+
+  .bb-shortcuts-title {
+    @apply text-sm font-semibold;
+  }
+
+  .bb-shortcuts-close {
+    @apply flex items-center justify-center w-7 h-7 rounded-md
+           text-base-content/40 cursor-pointer border-0 bg-transparent;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .bb-shortcuts-close:hover {
+    @apply bg-base-200 text-base-content/70;
+  }
+
+  .bb-shortcuts-close svg, .bb-shortcuts-close i {
+    @apply w-4 h-4;
+  }
+
+  .bb-shortcuts-body {
+    @apply px-6 py-5;
+  }
+
+  .bb-shortcuts-group {
+    @apply mb-5;
+  }
+
+  .bb-shortcuts-group:last-child {
+    @apply mb-0;
+  }
+
+  .bb-shortcuts-group-label {
+    @apply text-[0.65rem] font-medium text-base-content/35 mb-2;
+  }
+
+  .bb-shortcuts-row {
+    @apply flex items-center justify-between py-2;
+  }
+
+  .bb-shortcuts-row + .bb-shortcuts-row {
+    @apply border-t border-base-300/50;
+  }
+
+  .bb-shortcuts-label {
+    @apply text-sm text-base-content/70;
+  }
+
+  .bb-shortcuts-keys {
+    @apply flex items-center gap-1.5;
+  }
+
+  .bb-shortcuts-kbd {
+    @apply inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5
+           text-[0.65rem] font-medium text-base-content/50 bg-base-200 border border-base-300 rounded;
+  }
+
+  .bb-shortcuts-then {
+    @apply text-[0.6rem] text-base-content/25;
+  }
+
+  .bb-shortcuts-footer {
+    @apply px-6 py-3 border-t border-base-300 text-[0.6rem] text-base-content/25 text-center;
+  }
 }
