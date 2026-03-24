@@ -27,7 +27,7 @@
       <i data-lucide="building-2" class="w-6 h-6 text-base-content/50"></i>
     </div>
     <div>
-      <h1 class="text-2xl font-bold tracking-tight">{{.Connection.InstitutionName.String}}</h1>
+      <h1 class="bb-page-title">{{.Connection.InstitutionName.String}}</h1>
       <div class="flex items-center gap-2 mt-0.5">
         {{statusBadge (printf "%s" .Connection.Status)}}
         {{if .Connection.Paused}}<span class="badge badge-ghost badge-sm">Paused</span>{{end}}
@@ -72,7 +72,7 @@
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
   <!-- Connection Details Card -->
   <div class="bb-card p-6 lg:col-span-2">
-    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider mb-4">Connection Details</h2>
+    <h2 class="text-sm font-semibold text-base-content/50 mb-4">Connection Details</h2>
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
       <div>
         <p class="text-xs text-base-content/40 mb-1">Family Member</p>
@@ -95,7 +95,7 @@
 
   <!-- Sync Settings Card -->
   <div class="bb-card p-6">
-    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider mb-4">Sync Settings</h2>
+    <h2 class="text-sm font-semibold text-base-content/50 mb-4">Sync Settings</h2>
     <div>
       <label class="text-xs text-base-content/40 mb-1.5 block">Sync Interval</label>
       <select id="sync-interval" onchange="updateSyncInterval(this.value)" class="select select-sm select-bordered w-full">
@@ -116,14 +116,14 @@
 <!-- Accounts -->
 <div class="bb-card mb-8">
   <div class="px-6 pt-6 pb-4 flex items-center justify-between">
-    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider">Accounts</h2>
+    <h2 class="text-sm font-semibold text-base-content/50">Accounts</h2>
     {{if .Accounts}}<span class="text-xs text-base-content/30">{{len .Accounts}} total</span>{{end}}
   </div>
   {{if .Accounts}}
   <div class="overflow-x-auto">
     <table class="table table-sm">
       <thead>
-        <tr class="text-xs text-base-content/40 uppercase tracking-wider border-b border-base-300">
+        <tr class="text-xs text-base-content/50 border-b border-base-300">
           <th class="font-medium">Account</th>
           <th class="font-medium">Display Name</th>
           <th class="font-medium">Type</th>
@@ -176,7 +176,7 @@
 <!-- Sync History -->
 <div class="bb-card">
   <div class="px-6 pt-6 pb-4 flex items-center justify-between">
-    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider">Sync History</h2>
+    <h2 class="text-sm font-semibold text-base-content/50">Sync History</h2>
     <span class="text-xs text-base-content/30">Last 10</span>
   </div>
   {{if .SyncLogs}}

@@ -1,6 +1,6 @@
 {{define "content"}}
 <div class="text-center mb-8">
-  <h1 class="text-2xl font-bold tracking-tight">Welcome back</h1>
+  <h1 class="text-xl font-semibold tracking-tight">Welcome back</h1>
   <p class="text-sm text-base-content/50 mt-1.5">Sign in to your Breadbox dashboard</p>
 </div>
 
@@ -15,14 +15,14 @@
   {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
 
   <div>
-    <label class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-1.5" for="username">Username</label>
+    <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="username">Username</label>
     <input type="text" id="username" name="username" value="{{.Username}}" required autocomplete="username"
            placeholder="Enter your username"
            class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200">
   </div>
 
   <div>
-    <label class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-1.5" for="password">Password</label>
+    <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="password">Password</label>
     <input type="password" id="password" name="password" required autocomplete="current-password"
            placeholder="Enter your password"
            class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200">

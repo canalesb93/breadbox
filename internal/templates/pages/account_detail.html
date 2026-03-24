@@ -15,7 +15,7 @@
       <i data-lucide="{{if eq .Account.Type "credit"}}credit-card{{else if eq .Account.Type "investment"}}trending-up{{else if eq .Account.Type "loan"}}landmark{{else}}wallet{{end}}" class="w-6 h-6 text-base-content/50"></i>
     </div>
     <div>
-      <h1 class="text-2xl font-bold tracking-tight">{{if .Account.DisplayName}}{{.Account.DisplayName}}{{else}}{{.Account.Name}}{{end}}</h1>
+      <h1 class="bb-page-title">{{if .Account.DisplayName}}{{.Account.DisplayName}}{{else}}{{.Account.Name}}{{end}}</h1>
       <div class="flex items-center gap-2 mt-0.5">
         <span class="text-xs text-base-content/40 capitalize">{{.Account.Type}}{{if .Account.Subtype}} &middot; {{.Account.Subtype}}{{end}}</span>
         {{if .Account.Mask}}<span class="text-xs text-base-content/30">&bull;&bull;&bull;&bull;{{.Account.Mask}}</span>{{end}}
@@ -29,25 +29,25 @@
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
   <!-- Balance Card -->
   <div class="bb-card p-6 lg:col-span-2">
-    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider mb-5">Balances</h2>
+    <h2 class="text-sm font-semibold text-base-content/50 mb-5">Balances</h2>
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-6">
       <div>
         <p class="text-xs text-base-content/40 mb-1">Current Balance</p>
-        <p class="text-2xl font-bold tabular-nums">
+        <p class="text-2xl font-semibold tabular-nums">
           {{if .Account.BalanceCurrent}}{{printf "%.2f" .Account.BalanceCurrent}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
         </p>
         {{if .Account.IsoCurrencyCode}}<p class="text-xs text-base-content/30 mt-0.5">{{.Account.IsoCurrencyCode}}</p>{{end}}
       </div>
       <div>
         <p class="text-xs text-base-content/40 mb-1">Available</p>
-        <p class="text-2xl font-bold tabular-nums text-base-content/60">
+        <p class="text-2xl font-semibold tabular-nums text-base-content/60">
           {{if .Account.BalanceAvailable}}{{printf "%.2f" .Account.BalanceAvailable}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
         </p>
       </div>
       {{if .Account.BalanceLimit}}
       <div>
         <p class="text-xs text-base-content/40 mb-1">Credit Limit</p>
-        <p class="text-2xl font-bold tabular-nums text-base-content/60">{{printf "%.2f" .Account.BalanceLimit}}</p>
+        <p class="text-2xl font-semibold tabular-nums text-base-content/60">{{printf "%.2f" .Account.BalanceLimit}}</p>
       </div>
       {{end}}
     </div>
@@ -55,7 +55,7 @@
 
   <!-- Account Settings Card -->
   <div class="bb-card p-6">
-    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider mb-5">Settings</h2>
+    <h2 class="text-sm font-semibold text-base-content/50 mb-5">Settings</h2>
     <div class="space-y-4">
       <div>
         <label class="text-xs text-base-content/40 mb-1.5 block">Display Name</label>
@@ -91,7 +91,7 @@
 <div class="bb-card">
   <div class="px-6 pt-6 pb-4">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider">Transactions</h2>
+      <h2 class="text-sm font-semibold text-base-content/50">Transactions</h2>
       {{if .Transactions}}<span class="text-xs text-base-content/30">{{.Total}} total</span>{{end}}
     </div>
 
@@ -153,7 +153,7 @@
   <div class="overflow-x-auto">
     <table class="table table-sm">
       <thead>
-        <tr class="text-xs text-base-content/40 uppercase tracking-wider border-b border-base-300">
+        <tr class="text-xs text-base-content/50 border-b border-base-300">
           <th class="font-medium">Date</th>
           <th class="font-medium">Description</th>
           <th class="font-medium text-right">Amount</th>

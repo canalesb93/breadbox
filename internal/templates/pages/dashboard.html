@@ -97,7 +97,7 @@
   <!-- Net Worth Card -->
   <div class="bb-card p-6">
     <div class="flex items-center gap-2 mb-1">
-      <span class="text-xs font-medium text-base-content/50 uppercase tracking-wide">Net Worth</span>
+      <span class="text-xs font-medium text-base-content/50">Net Worth</span>
     </div>
     <div class="text-3xl font-semibold tabular-nums tracking-tight">
       {{formatBalance .NetWorth}}
@@ -117,7 +117,7 @@
   <!-- Spending Card -->
   <div class="bb-card p-6">
     <div class="flex items-center gap-2 mb-1">
-      <span class="text-xs font-medium text-base-content/50 uppercase tracking-wide">Spending</span>
+      <span class="text-xs font-medium text-base-content/50">Spending</span>
       <span class="text-xs text-base-content/30">30d</span>
     </div>
     <div class="text-3xl font-semibold tabular-nums tracking-tight">
@@ -138,7 +138,7 @@
   <!-- Income Card -->
   <div class="bb-card p-6">
     <div class="flex items-center gap-2 mb-1">
-      <span class="text-xs font-medium text-base-content/50 uppercase tracking-wide">Income</span>
+      <span class="text-xs font-medium text-base-content/50">Income</span>
       <span class="text-xs text-base-content/30">30d</span>
     </div>
     <div class="text-3xl font-semibold tabular-nums tracking-tight text-success">
@@ -165,7 +165,7 @@
 {{if .Accounts}}
 <div class="mb-8">
   <div class="flex items-center justify-between mb-4">
-    <h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Accounts</h2>
+    <h2 class="text-sm font-semibold text-base-content/70">Accounts</h2>
     <a href="/connections" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
   </div>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bb-stagger">
@@ -201,7 +201,7 @@
   <!-- Spending Trend Chart -->
   <div class="bb-card lg:col-span-2 p-5">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Daily Spending</h2>
+      <h2 class="text-sm font-semibold text-base-content/70">Daily Spending</h2>
     </div>
     {{if .DailyLabels}}
     <div class="h-52">
@@ -220,7 +220,7 @@
   <!-- Category Breakdown Chart -->
   <div class="bb-card p-5">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wide">By Category</h2>
+      <h2 class="text-sm font-semibold text-base-content/70">By Category</h2>
     </div>
     {{if .CategoryLabels}}
     <div class="h-52 flex items-center justify-center">
@@ -242,7 +242,7 @@
   <!-- Recent Transactions -->
   <div class="bb-card lg:col-span-2 p-5">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Recent Transactions</h2>
+      <h2 class="text-sm font-semibold text-base-content/70">Recent Transactions</h2>
       <a href="/transactions" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
     </div>
     {{if .RecentTransactions}}
@@ -284,7 +284,7 @@
     <!-- Recent Sync Activity -->
     <div class="bb-card p-5 flex-1">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Sync Activity</h2>
+        <h2 class="text-sm font-semibold text-base-content/70">Sync Activity</h2>
         <a href="/sync-logs" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
       </div>
       {{if .RecentLogs}}
