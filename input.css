@@ -898,4 +898,199 @@
   .bb-shortcuts-footer {
     @apply px-6 py-3 border-t border-base-300 text-[0.6rem] text-base-content/25 text-center;
   }
+
+  /* ─── Navigation Progress Bar (YouTube/GitHub style) ─── */
+  .bb-progress-bar {
+    @apply fixed top-0 left-0 right-0 z-[100] h-[2.5px] pointer-events-none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .bb-progress-bar--active {
+    opacity: 1;
+  }
+
+  .bb-progress-bar__fill {
+    @apply h-full;
+    width: 0%;
+    background: oklch(0.205 0 0);
+    border-radius: 0 2px 2px 0;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 8px oklch(0.205 0 0 / 0.3);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-progress-bar__fill {
+      background: oklch(0.922 0 0);
+      box-shadow: 0 0 8px oklch(0.922 0 0 / 0.3);
+    }
+  }
+
+  .bb-progress-bar__fill--done {
+    width: 100% !important;
+    transition: width 0.2s ease-out;
+  }
+
+  .bb-progress-bar--fade {
+    opacity: 0;
+    transition: opacity 0.4s ease 0.1s;
+  }
+
+  /* ─── Skeleton Loading System ─── */
+  .bb-skeleton {
+    @apply rounded-md;
+    background: oklch(0.95 0 0);
+    position: relative;
+    overflow: hidden;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-skeleton {
+      background: oklch(0.25 0 0);
+    }
+  }
+
+  .bb-skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      oklch(1 0 0 / 0.4) 50%,
+      transparent 100%
+    );
+    animation: bb-shimmer 1.8s ease-in-out infinite;
+    transform: translateX(-100%);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-skeleton::after {
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        oklch(1 0 0 / 0.06) 50%,
+        transparent 100%
+      );
+    }
+  }
+
+  @keyframes bb-shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    60%, 100% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* Skeleton size variants */
+  .bb-skeleton--text {
+    @apply h-3.5 rounded;
+    width: 100%;
+  }
+
+  .bb-skeleton--text-sm {
+    @apply h-3 rounded;
+    width: 80%;
+  }
+
+  .bb-skeleton--text-xs {
+    @apply h-2.5 rounded;
+    width: 60%;
+  }
+
+  .bb-skeleton--heading {
+    @apply h-5 rounded w-48;
+  }
+
+  .bb-skeleton--title {
+    @apply h-6 rounded w-56;
+  }
+
+  .bb-skeleton--badge {
+    @apply h-5 w-16 rounded-full;
+  }
+
+  .bb-skeleton--circle {
+    @apply rounded-full;
+    width: 40px;
+    height: 40px;
+  }
+
+  .bb-skeleton--circle-sm {
+    @apply rounded-full;
+    width: 32px;
+    height: 32px;
+  }
+
+  .bb-skeleton--avatar {
+    @apply rounded-xl;
+    width: 48px;
+    height: 48px;
+  }
+
+  .bb-skeleton--amount {
+    @apply h-7 w-24 rounded;
+  }
+
+  .bb-skeleton--btn {
+    @apply h-8 w-20 rounded-lg;
+  }
+
+  .bb-skeleton--card {
+    @apply rounded-xl border border-base-300 p-6;
+    background: oklch(0.98 0 0);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-skeleton--card {
+      background: oklch(0.22 0 0);
+    }
+  }
+
+  /* Pre-built skeleton patterns */
+  .bb-skeleton-stat {
+    @apply flex items-center gap-4 rounded-xl border border-base-300 px-5 py-4;
+  }
+
+  .bb-skeleton-table-row {
+    @apply flex items-center gap-4 px-4 py-3 border-b border-base-300/50;
+  }
+
+  .bb-skeleton-table-row:last-child {
+    @apply border-b-0;
+  }
+
+  .bb-skeleton-list-item {
+    @apply flex items-center gap-3 p-3 rounded-xl;
+  }
+
+  /* Page-level skeleton overlay (shown during nav transitions) */
+  .bb-page-skeleton {
+    @apply min-h-[60vh];
+    animation: bb-skeleton-enter 0.2s ease-out both;
+  }
+
+  @keyframes bb-skeleton-enter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Inline loading fade */
+  .bb-loading-fade {
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  /* Pulse animation for active skeleton areas */
+  .bb-skeleton-pulse {
+    animation: bb-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes bb-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
 }
