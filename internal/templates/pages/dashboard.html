@@ -1,8 +1,4 @@
 {{define "content"}}
-<div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold">Dashboard</h1>
-  <span class="text-sm text-base-content/50">Last 30 days</span>
-</div>
 
 {{if .ShowUpdateBanner}}
 <div class="alert alert-info mb-6" x-data="{ pulling: false, pulled: false, error: '' }">
@@ -96,204 +92,215 @@
 </div>
 {{end}}
 
-<!-- Stat Cards -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-8 bb-stagger">
-  <div class="bb-stat-card bb-stat-card--primary">
-    <div class="bb-stat-card__icon text-primary">
-      <i data-lucide="building-2" class="w-6 h-6"></i>
+<!-- Financial Summary Hero -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8 bb-stagger">
+  <!-- Net Worth Card -->
+  <div class="bb-card p-6">
+    <div class="flex items-center gap-2 mb-1">
+      <span class="text-xs font-medium text-base-content/50 uppercase tracking-wide">Net Worth</span>
     </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value">{{.AccountCount}}</span>
-      <span class="bb-stat-card__label">Accounts</span>
+    <div class="text-3xl font-semibold tabular-nums tracking-tight">
+      {{formatBalance .NetWorth}}
     </div>
-  </div>
-  <a href="/transactions" class="bb-stat-card bb-stat-card--secondary no-underline">
-    <div class="bb-stat-card__icon text-secondary">
-      <i data-lucide="receipt" class="w-6 h-6"></i>
-    </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value">{{.TxCount}}</span>
-      <span class="bb-stat-card__label">Transactions</span>
-    </div>
-  </a>
-  <div class="bb-stat-card bb-stat-card--accent">
-    <div class="bb-stat-card__icon text-accent">
-      <i data-lucide="clock" class="w-6 h-6"></i>
-    </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value text-lg">{{.LastSync}}</span>
-      <span class="bb-stat-card__label">Last Sync</span>
+    <div class="flex items-center gap-4 mt-3 text-xs text-base-content/50">
+      <span class="flex items-center gap-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-base-content/30"></span>
+        Assets {{formatBalance .TotalAssets}}
+      </span>
+      <span class="flex items-center gap-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-error/50"></span>
+        Liabilities {{formatBalance .TotalLiabilities}}
+      </span>
     </div>
   </div>
-  {{if gt .NeedsAttention 0}}
-  <a href="/connections" class="bb-stat-card bb-stat-card--warning no-underline">
-    <div class="bb-stat-card__icon text-warning">
-      <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-    </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value text-warning">{{.NeedsAttention}}</span>
-      <span class="bb-stat-card__label">Needs Attention</span>
-    </div>
-  </a>
-  {{else}}
-  <div class="bb-stat-card bb-stat-card--neutral">
-    <div class="bb-stat-card__icon text-base-content/40">
-      <i data-lucide="check-circle" class="w-6 h-6"></i>
-    </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value">0</span>
-      <span class="bb-stat-card__label">Needs Attention</span>
-    </div>
-  </div>
-  {{end}}
-  {{if gt .ReviewPending 0}}
-  <a href="/reviews" class="bb-stat-card bb-stat-card--info no-underline">
-    <div class="bb-stat-card__icon text-info">
-      <i data-lucide="clipboard-check" class="w-6 h-6"></i>
-    </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value text-info">{{.ReviewPending}}</span>
-      <span class="bb-stat-card__label">Pending Reviews</span>
-    </div>
-  </a>
-  {{end}}
-</div>
 
-<!-- Charts Row -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 bb-stagger">
-  <!-- Spending Trend Chart -->
-  <div class="card bg-base-100 border border-base-300 lg:col-span-2">
-    <div class="card-body p-5">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="card-title text-base">
-          <i data-lucide="trending-up" class="w-4 h-4 text-primary"></i>
-          Daily Spending
-        </h2>
-      </div>
-      {{if .DailyLabels}}
-      <div class="h-56">
-        <canvas id="spendingTrendChart"></canvas>
-      </div>
-      {{else}}
-      <div class="flex items-center justify-center h-56 text-base-content/40">
-        <div class="text-center">
-          <i data-lucide="bar-chart-3" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
-          <p class="text-sm">No spending data yet</p>
-        </div>
-      </div>
+  <!-- Spending Card -->
+  <div class="bb-card p-6">
+    <div class="flex items-center gap-2 mb-1">
+      <span class="text-xs font-medium text-base-content/50 uppercase tracking-wide">Spending</span>
+      <span class="text-xs text-base-content/30">30d</span>
+    </div>
+    <div class="text-3xl font-semibold tabular-nums tracking-tight">
+      {{formatBalance .TotalSpending}}
+    </div>
+    <div class="flex items-center gap-4 mt-3 text-xs text-base-content/50">
+      <a href="/transactions" class="flex items-center gap-1 hover:text-base-content transition-colors">
+        <i data-lucide="receipt" class="w-3 h-3"></i>
+        {{.TxCount}} transactions
+      </a>
+      <span class="flex items-center gap-1">
+        <i data-lucide="clock" class="w-3 h-3"></i>
+        Synced {{.LastSync}}
+      </span>
+    </div>
+  </div>
+
+  <!-- Income Card -->
+  <div class="bb-card p-6">
+    <div class="flex items-center gap-2 mb-1">
+      <span class="text-xs font-medium text-base-content/50 uppercase tracking-wide">Income</span>
+      <span class="text-xs text-base-content/30">30d</span>
+    </div>
+    <div class="text-3xl font-semibold tabular-nums tracking-tight text-success">
+      {{formatBalance .TotalIncome}}
+    </div>
+    <div class="flex items-center gap-4 mt-3 text-xs text-base-content/50">
+      {{if gt .ReviewPending 0}}
+      <a href="/reviews" class="flex items-center gap-1 hover:text-base-content transition-colors">
+        <i data-lucide="clipboard-check" class="w-3 h-3"></i>
+        {{.ReviewPending}} pending reviews
+      </a>
+      {{end}}
+      {{if gt .NeedsAttention 0}}
+      <a href="/connections" class="flex items-center gap-1 text-warning hover:text-warning/80 transition-colors">
+        <i data-lucide="alert-triangle" class="w-3 h-3"></i>
+        {{.NeedsAttention}} need attention
+      </a>
       {{end}}
     </div>
+  </div>
+</div>
+
+<!-- Accounts Overview -->
+{{if .Accounts}}
+<div class="mb-8">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Accounts</h2>
+    <a href="/connections" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
+  </div>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bb-stagger">
+    {{range .Accounts}}
+    <a href="/accounts/{{.ID}}" class="bb-card bb-card--interactive p-4 no-underline group">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+          <i data-lucide="{{accountTypeIcon .Type}}" class="w-4 h-4 text-base-content/40"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</div>
+              <div class="text-xs text-base-content/40">{{.InstitutionName}}{{if .Mask}} ····{{.Mask}}{{end}}</div>
+            </div>
+            <div class="text-right shrink-0">
+              <div class="text-sm font-semibold tabular-nums{{if .IsLiability}} text-error/80{{end}}">
+                {{if .IsLiability}}-{{end}}{{formatBalance .BalanceCurrent}}
+              </div>
+              <div class="text-xs text-base-content/30">{{accountTypeLabel .Type .Subtype}}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </a>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+<!-- Charts Row -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8 bb-stagger">
+  <!-- Spending Trend Chart -->
+  <div class="bb-card lg:col-span-2 p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Daily Spending</h2>
+    </div>
+    {{if .DailyLabels}}
+    <div class="h-52">
+      <canvas id="spendingTrendChart"></canvas>
+    </div>
+    {{else}}
+    <div class="flex items-center justify-center h-52 text-base-content/40">
+      <div class="text-center">
+        <i data-lucide="bar-chart-3" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
+        <p class="text-sm">No spending data yet</p>
+      </div>
+    </div>
+    {{end}}
   </div>
 
   <!-- Category Breakdown Chart -->
-  <div class="card bg-base-100 border border-base-300">
-    <div class="card-body p-5">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="card-title text-base">
-          <i data-lucide="pie-chart" class="w-4 h-4 text-secondary"></i>
-          By Category
-        </h2>
-      </div>
-      {{if .CategoryLabels}}
-      <div class="h-56 flex items-center justify-center">
-        <canvas id="categoryChart"></canvas>
-      </div>
-      {{else}}
-      <div class="flex items-center justify-center h-56 text-base-content/40">
-        <div class="text-center">
-          <i data-lucide="pie-chart" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
-          <p class="text-sm">No category data yet</p>
-        </div>
-      </div>
-      {{end}}
+  <div class="bb-card p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wide">By Category</h2>
     </div>
+    {{if .CategoryLabels}}
+    <div class="h-52 flex items-center justify-center">
+      <canvas id="categoryChart"></canvas>
+    </div>
+    {{else}}
+    <div class="flex items-center justify-center h-52 text-base-content/40">
+      <div class="text-center">
+        <i data-lucide="pie-chart" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
+        <p class="text-sm">No category data yet</p>
+      </div>
+    </div>
+    {{end}}
   </div>
 </div>
 
 <!-- Recent Transactions + Sync Activity -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
   <!-- Recent Transactions -->
-  <div class="card bg-base-100 border border-base-300 lg:col-span-2">
-    <div class="card-body p-5">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="card-title text-base">
-          <i data-lucide="list" class="w-4 h-4 text-accent"></i>
-          Recent Transactions
-        </h2>
-        <a href="/transactions" class="btn btn-ghost btn-xs">View all</a>
-      </div>
-      {{if .RecentTransactions}}
-      <div class="overflow-x-auto -mx-5">
-        <table class="table table-sm">
-          <thead>
-            <tr class="text-xs text-base-content/50 uppercase">
-              <th>Description</th>
-              <th>Account</th>
-              <th>Category</th>
-              <th class="text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{range .RecentTransactions}}
-            <tr class="hover:bg-base-200/50 transition-colors duration-150">
-              <td>
-                <div class="flex flex-col">
-                  <span class="font-medium text-sm truncate max-w-48">{{.Name}}</span>
-                  <span class="text-xs text-base-content/50">{{.Date}}</span>
-                </div>
-              </td>
-              <td class="text-sm text-base-content/70">{{.AccountName}}</td>
-              <td>
-                {{if .CategoryDisplayName}}
-                <span class="badge badge-ghost badge-sm">{{if .CategoryIcon}}{{.CategoryIcon}} {{end}}{{deref .CategoryDisplayName}}</span>
-                {{else}}
-                <span class="text-base-content/30 text-xs">—</span>
-                {{end}}
-              </td>
-              <td class="text-right tabular-nums text-sm font-medium{{if gt .Amount 0.0}} text-base-content{{else}} text-success{{end}}">
-                {{formatAmount .Amount}}
-              </td>
-            </tr>
+  <div class="bb-card lg:col-span-2 p-5">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Recent Transactions</h2>
+      <a href="/transactions" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
+    </div>
+    {{if .RecentTransactions}}
+    <div class="space-y-0.5">
+      {{range .RecentTransactions}}
+      <div class="flex items-center justify-between py-2.5 px-1 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-base-200/50 flex items-center justify-center shrink-0">
+            {{if .CategoryIcon}}
+            <i data-lucide="{{.CategoryIcon}}" class="w-3.5 h-3.5 text-base-content/40"></i>
+            {{else}}
+            <i data-lucide="minus" class="w-3.5 h-3.5 text-base-content/20"></i>
             {{end}}
-          </tbody>
-        </table>
-      </div>
-      {{else}}
-      <div class="flex items-center justify-center py-8 text-base-content/40">
-        <div class="text-center">
-          <i data-lucide="receipt" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
-          <p class="text-sm">No transactions yet</p>
-          <a href="/connections/new" class="btn btn-primary btn-sm mt-3">Connect a bank</a>
+          </div>
+          <div class="min-w-0">
+            <div class="text-sm font-medium truncate max-w-64">{{.Name}}</div>
+            <div class="text-xs text-base-content/40">{{.AccountName}} · {{.Date}}</div>
+          </div>
+        </div>
+        <div class="text-sm font-semibold tabular-nums shrink-0 pl-3{{if gt .Amount 0.0}} text-base-content{{else}} text-success{{end}}">
+          {{formatAmount .Amount}}
         </div>
       </div>
       {{end}}
     </div>
+    {{else}}
+    <div class="flex items-center justify-center py-8 text-base-content/40">
+      <div class="text-center">
+        <i data-lucide="receipt" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+        <p class="text-sm">No transactions yet</p>
+        <a href="/connections/new" class="btn btn-primary btn-sm mt-3">Connect a bank</a>
+      </div>
+    </div>
+    {{end}}
   </div>
 
-  <!-- Recent Sync Activity -->
-  <div class="card bg-base-100 border border-base-300">
-    <div class="card-body p-5">
+  <!-- Right Column: Sync Activity + Quick Actions -->
+  <div class="flex flex-col gap-4">
+    <!-- Recent Sync Activity -->
+    <div class="bb-card p-5 flex-1">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="card-title text-base">
-          <i data-lucide="refresh-cw" class="w-4 h-4 text-info"></i>
-          Sync Activity
-        </h2>
-        <a href="/sync-logs" class="btn btn-ghost btn-xs">View all</a>
+        <h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Sync Activity</h2>
+        <a href="/sync-logs" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
       </div>
       {{if .RecentLogs}}
-      <div class="space-y-2">
+      <div class="space-y-1">
         {{range .RecentLogs}}
-        <a href="/connections/{{formatUUID .ConnectionID}}" class="flex items-center justify-between p-2.5 rounded-lg hover:bg-base-200/60 transition-colors duration-150 no-underline group">
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="w-8 h-8 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
-              <i data-lucide="building-2" class="w-4 h-4 text-base-content/60"></i>
+        <a href="/connections/{{formatUUID .ConnectionID}}" class="flex items-center justify-between py-2 px-1 rounded-lg hover:bg-base-200/40 transition-colors duration-150 no-underline group -mx-1">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-6 h-6 rounded-md bg-base-200/50 flex items-center justify-center shrink-0">
+              <i data-lucide="building-2" class="w-3 h-3 text-base-content/40"></i>
             </div>
             <div class="min-w-0">
-              <div class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.InstitutionName.String}}</div>
-              <div class="text-xs text-base-content/50">{{relativeTime .StartedAt}}</div>
+              <div class="text-xs font-medium truncate group-hover:text-primary transition-colors">{{.InstitutionName.String}}</div>
+              <div class="text-xs text-base-content/30">{{relativeTime .StartedAt}}</div>
             </div>
           </div>
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="flex items-center gap-1.5 shrink-0">
             {{if .AddedCount}}<span class="text-xs text-success font-medium">+{{.AddedCount}}</span>{{end}}
             {{syncBadge (printf "%s" .Status)}}
           </div>
@@ -301,27 +308,29 @@
         {{end}}
       </div>
       {{else}}
-      <div class="flex items-center justify-center py-8 text-base-content/40">
+      <div class="flex items-center justify-center py-6 text-base-content/40">
         <div class="text-center">
-          <i data-lucide="refresh-cw" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
-          <p class="text-sm">No sync activity yet</p>
+          <i data-lucide="refresh-cw" class="w-6 h-6 mx-auto mb-2 opacity-40"></i>
+          <p class="text-xs">No sync activity yet</p>
         </div>
       </div>
       {{end}}
     </div>
-  </div>
-</div>
 
-<!-- Quick Actions -->
-<div class="flex gap-3">
-  <a href="/connections/new" class="btn btn-primary btn-sm">
-    <i data-lucide="plus" class="w-4 h-4"></i>
-    Connect Bank
-  </a>
-  <a href="/reviews" class="btn btn-ghost btn-sm">
-    <i data-lucide="clipboard-check" class="w-4 h-4"></i>
-    Review Queue
-  </a>
+    <!-- Quick Actions -->
+    <div class="bb-card p-4">
+      <div class="flex gap-2">
+        <a href="/connections/new" class="btn btn-primary btn-sm flex-1">
+          <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+          Connect Bank
+        </a>
+        <a href="/reviews" class="btn btn-ghost btn-sm flex-1">
+          <i data-lucide="clipboard-check" class="w-3.5 h-3.5"></i>
+          Reviews
+        </a>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Chart.js Initialization -->

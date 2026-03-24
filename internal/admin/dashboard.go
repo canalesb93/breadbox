@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"math"
 	"net/http"
+	"sort"
 	"time"
 
 	"breadbox/internal/app"
@@ -190,6 +192,96 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			totalSpending = *categorySummary.Totals.TotalAmount
 		}
 
+		// Total income (30 days) — negative amounts in our system are credits/income.
+		var totalIncome float64
+		if dailySummary != nil {
+			for _, row := range dailySummary.Summary {
+				if row.TotalAmount < 0 {
+					totalIncome += -row.TotalAmount
+				}
+			}
+		}
+
+		// Accounts with balances for the overview section.
+		accounts, err := svc.ListAccounts(ctx, nil)
+		if err != nil {
+			a.Logger.Error("list accounts for dashboard", "error", err)
+		}
+
+		// Compute net worth and group by type.
+		var netWorth float64
+		var totalAssets, totalLiabilities float64
+		type DashboardAccount struct {
+			ID              string
+			Name            string
+			InstitutionName string
+			Type            string
+			Subtype         string
+			Mask            string
+			BalanceCurrent  float64
+			IsoCurrencyCode string
+			IsLiability     bool
+		}
+		var dashAccounts []DashboardAccount
+		for _, acct := range accounts {
+			if acct.BalanceCurrent == nil {
+				continue
+			}
+			bal := *acct.BalanceCurrent
+			institution := ""
+			if acct.InstitutionName != nil {
+				institution = *acct.InstitutionName
+			}
+			subtype := ""
+			if acct.Subtype != nil {
+				subtype = *acct.Subtype
+			}
+			mask := ""
+			if acct.Mask != nil {
+				mask = *acct.Mask
+			}
+			currency := "USD"
+			if acct.IsoCurrencyCode != nil {
+				currency = *acct.IsoCurrencyCode
+			}
+
+			isLiability := acct.Type == "credit" || acct.Type == "loan"
+			if isLiability {
+				totalLiabilities += math.Abs(bal)
+				netWorth -= math.Abs(bal)
+			} else {
+				totalAssets += bal
+				netWorth += bal
+			}
+
+			dashAccounts = append(dashAccounts, DashboardAccount{
+				ID:              acct.ID,
+				Name:            acct.Name,
+				InstitutionName: institution,
+				Type:            acct.Type,
+				Subtype:         subtype,
+				Mask:            mask,
+				BalanceCurrent:  bal,
+				IsoCurrencyCode: currency,
+				IsLiability:     isLiability,
+			})
+		}
+		// Sort: depository first, then credit, then loan, then others.
+		typeOrder := map[string]int{"depository": 0, "investment": 1, "credit": 2, "loan": 3}
+		sort.Slice(dashAccounts, func(i, j int) bool {
+			oi, oj := 4, 4
+			if v, ok := typeOrder[dashAccounts[i].Type]; ok {
+				oi = v
+			}
+			if v, ok := typeOrder[dashAccounts[j].Type]; ok {
+				oj = v
+			}
+			if oi != oj {
+				return oi < oj
+			}
+			return dashAccounts[i].Name < dashAccounts[j].Name
+		})
+
 		data := map[string]any{
 			"PageTitle":              "Dashboard",
 			"CurrentPage":            "dashboard",
@@ -215,6 +307,11 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"DailyAmounts":           dailyAmountsJSON,
 			"RecentTransactions":     recentTransactions,
 			"TotalSpending":          totalSpending,
+			"TotalIncome":            totalIncome,
+			"Accounts":              dashAccounts,
+			"NetWorth":              netWorth,
+			"TotalAssets":           totalAssets,
+			"TotalLiabilities":     totalLiabilities,
 		}
 		tr.Render(w, r, "dashboard.html", data)
 	}
