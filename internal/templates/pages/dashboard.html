@@ -214,29 +214,41 @@
 {{end}}
 
 <!-- Charts Row -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8 bb-stagger">
-  <!-- Spending Trend Chart -->
-  <div class="bb-card lg:col-span-2 p-5">
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-2">
-        <h2 class="text-sm font-semibold text-base-content/70">Daily Spending</h2>
-        <span class="text-xs text-base-content/30">Last 30 days</span>
-      </div>
-      {{if .HasSpendingChange}}
-      <div class="flex items-center gap-1.5 text-xs text-base-content/40">
-        <span>vs prev 30d:</span>
-        <span class="font-medium {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
-          {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}%
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-8 bb-stagger">
+  <!-- Spending & Income Chart -->
+  <div class="bb-card lg:col-span-3 p-5">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <h2 class="text-sm font-semibold text-base-content/70">Spending</h2>
+        {{if .HasSpendingChange}}
+        <span class="text-xs font-medium {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
+          {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}% vs prev
         </span>
+        {{end}}
       </div>
-      {{end}}
+      <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5">
+        <a href="/?days=7" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 7}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">7d</a>
+        <a href="/?days=30" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 30}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">30d</a>
+        <a href="/?days=90" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 90}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">90d</a>
+        <a href="/?days=365" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 365}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">12m</a>
+      </div>
     </div>
     {{if .DailyLabels}}
-    <div class="h-52">
+    <div class="h-56">
       <canvas id="spendingTrendChart"></canvas>
     </div>
+    <div class="flex items-center gap-5 mt-3 pt-3 border-t border-base-200">
+      <span class="flex items-center gap-1.5 text-xs text-base-content/50">
+        <span class="w-2.5 h-1.5 rounded-sm bg-base-content/15"></span>
+        Spending
+      </span>
+      <span class="flex items-center gap-1.5 text-xs text-base-content/50">
+        <span class="w-2.5 h-1.5 rounded-sm" style="background: oklch(0.62 0.14 155 / 0.35)"></span>
+        Income
+      </span>
+    </div>
     {{else}}
-    <div class="flex items-center justify-center h-52 text-base-content/40">
+    <div class="flex items-center justify-center h-56 text-base-content/40">
       <div class="text-center">
         <i data-lucide="bar-chart-3" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
         <p class="text-sm">No spending data yet</p>
@@ -245,39 +257,33 @@
     {{end}}
   </div>
 
-  <!-- Top Spending Categories — Donut Chart + Legend -->
-  <div class="bb-card p-5">
+  <!-- Top Spending Categories — Horizontal Bar Chart -->
+  <div class="bb-card lg:col-span-2 p-5">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-sm font-semibold text-base-content/70">Top Categories</h2>
       <a href="/categories" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
     </div>
     {{if .TopCategories}}
-    <div class="flex flex-col items-center">
-      <!-- Donut Chart -->
-      <div class="relative w-44 h-44 mb-4">
-        <canvas id="categoryDonutChart"></canvas>
-        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span class="text-lg font-semibold tabular-nums">{{formatBalance .TotalSpending}}</span>
-          <span class="text-[0.65rem] text-base-content/40">30 days</span>
-        </div>
-      </div>
-      <!-- Legend -->
-      <div class="w-full space-y-2">
-        {{range .TopCategories}}
-        <div class="flex items-center justify-between group">
-          <span class="flex items-center gap-2 text-xs text-base-content/60 group-hover:text-base-content transition-colors truncate">
-            <span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background-color: {{safeCSS .Color}}"></span>
+    <div class="space-y-3">
+      {{range .TopCategories}}
+      <div class="group">
+        <div class="flex items-center justify-between mb-1">
+          <span class="flex items-center gap-2 text-xs font-medium text-base-content/70 group-hover:text-base-content transition-colors truncate">
+            <span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{safeCSS .Color}}"></span>
             <span class="truncate">{{.Name}}</span>
           </span>
-          <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0 ml-2">{{formatAmount .Amount}}</span>
+          <span class="text-xs font-semibold tabular-nums text-base-content/80 shrink-0 ml-3">{{formatAmount .Amount}}</span>
         </div>
-        {{end}}
+        <div class="w-full h-2 bg-base-200/80 rounded-full overflow-hidden">
+          <div class="h-full rounded-full transition-all duration-500 ease-out" style="width: {{printf "%.1f" .Percent}}%; background-color: {{safeCSS .Color}}; opacity: 0.7;"></div>
+        </div>
       </div>
+      {{end}}
     </div>
     {{else}}
-    <div class="flex items-center justify-center h-40 text-base-content/40">
+    <div class="flex items-center justify-center h-48 text-base-content/40">
       <div class="text-center">
-        <i data-lucide="pie-chart" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+        <i data-lucide="bar-chart-2" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
         <p class="text-sm">No category data yet</p>
       </div>
     </div>
@@ -409,33 +415,28 @@
 <!-- Sparkline Rendering -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
   document.querySelectorAll('.bb-sparkline').forEach(function(el) {
     try {
-      const values = JSON.parse(el.dataset.values);
-      const isLiability = el.dataset.liability === 'true';
+      var values = JSON.parse(el.dataset.values);
+      var isLiability = el.dataset.liability === 'true';
       if (!values || values.length === 0) return;
 
-      const w = 120, h = 32, padding = 1;
-      const max = Math.max.apply(null, values);
-      const hasData = max > 0;
+      var w = 120, h = 32, padding = 1;
+      var max = Math.max.apply(null, values);
+      var hasData = max > 0;
       if (!hasData) return;
 
-      // Normalize values to fit in the chart area.
-      const points = values.map(function(v, i) {
+      var points = values.map(function(v, i) {
         var x = padding + (i / (values.length - 1)) * (w - padding * 2);
         var y = h - padding - ((v / max) * (h - padding * 2));
         return x + ',' + y;
       });
 
-      // Build SVG polyline path.
       var pathD = 'M' + points.join(' L');
-
-      // Build fill area (closed path from line down to bottom).
       var fillD = pathD + ' L' + (w - padding) + ',' + h + ' L' + padding + ',' + h + ' Z';
 
-      // Colors: liability accounts get a warm tone, regular accounts get a cool neutral.
       var strokeColor, fillColor;
       if (isLiability) {
         strokeColor = isDark ? 'oklch(0.65 0.15 25)' : 'oklch(0.55 0.15 25)';
@@ -459,74 +460,130 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <!-- Chart.js Initialization -->
-{{if or .DailyLabels .CategoryLabels}}
+{{if .DailyLabels}}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
-  const textColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
+  var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  var gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+  var textColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
 
   Chart.defaults.font.family = 'Inter, system-ui, -apple-system, sans-serif';
 
-  /* shadcn-aligned tooltip style */
-  const tooltipStyle = {
+  /* shadcn-aligned tooltip */
+  var tooltipStyle = {
     backgroundColor: isDark ? 'hsl(0 0% 12%)' : 'hsl(0 0% 100%)',
     titleColor: isDark ? 'hsl(0 0% 93%)' : 'hsl(0 0% 9%)',
     bodyColor: isDark ? 'hsl(0 0% 64%)' : 'hsl(0 0% 45%)',
     borderColor: isDark ? 'hsl(0 0% 18%)' : 'hsl(0 0% 90%)',
     borderWidth: 1,
-    padding: 10,
+    padding: { top: 8, bottom: 8, left: 12, right: 12 },
     cornerRadius: 8,
-    titleFont: { size: 12, weight: '600' },
+    titleFont: { size: 11, weight: '600' },
     bodyFont: { size: 12 },
     displayColors: false,
+    titleMarginBottom: 4,
   };
 
-  {{if .DailyLabels}}
-  // Spending Trend — bar chart with rounded tops
-  const trendCtx = document.getElementById('spendingTrendChart');
+  // Spending + Income chart
+  var trendCtx = document.getElementById('spendingTrendChart');
   if (trendCtx) {
-    const dailyLabels = {{.DailyLabels}};
-    const dailyData = {{.DailyAmounts}};
+    var dailyLabels = {{.DailyLabels}};
+    var dailyData = {{.DailyAmounts}};
+    var incomeData = {{.DailyIncomeAmounts}};
+    var chartDays = {{.ChartDays}};
 
-    const shortLabels = dailyLabels.map(d => {
-      const date = new Date(d + 'T00:00:00');
+    var shortLabels = dailyLabels.map(function(d) {
+      if (chartDays === 365) {
+        var parts = d.split('-');
+        var mdate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+        return mdate.toLocaleDateString('en-US', { month: 'short' });
+      }
+      var date = new Date(d + 'T00:00:00');
+      if (chartDays <= 7) {
+        return date.toLocaleDateString('en-US', { weekday: 'short' });
+      }
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     });
 
+    // Bar width based on data density
+    var barPct = chartDays <= 7 ? 0.6 : chartDays <= 30 ? 0.65 : 0.75;
+    var catPct = chartDays <= 7 ? 0.7 : chartDays <= 30 ? 0.8 : 0.9;
+
+    // Colors
+    var spendBg = isDark ? 'oklch(0.65 0 0 / 0.3)' : 'oklch(0.15 0 0 / 0.12)';
+    var spendHover = isDark ? 'oklch(0.65 0 0 / 0.5)' : 'oklch(0.15 0 0 / 0.22)';
+    var incomeBg = isDark ? 'oklch(0.70 0.14 155 / 0.3)' : 'oklch(0.62 0.14 155 / 0.25)';
+    var incomeHover = isDark ? 'oklch(0.70 0.14 155 / 0.5)' : 'oklch(0.62 0.14 155 / 0.4)';
+
+    var hasIncome = incomeData && incomeData.some(function(v) { return v > 0; });
+
+    var datasets = [{
+      label: 'Spending',
+      data: dailyData,
+      backgroundColor: spendBg,
+      hoverBackgroundColor: spendHover,
+      borderRadius: { topLeft: 4, topRight: 4 },
+      borderSkipped: false,
+      barPercentage: barPct,
+      categoryPercentage: catPct,
+      order: 1,
+    }];
+
+    if (hasIncome) {
+      datasets.push({
+        label: 'Income',
+        data: incomeData,
+        backgroundColor: incomeBg,
+        hoverBackgroundColor: incomeHover,
+        borderRadius: { topLeft: 4, topRight: 4 },
+        borderSkipped: false,
+        barPercentage: barPct,
+        categoryPercentage: catPct,
+        order: 2,
+      });
+    }
+
+    var maxTicks = chartDays <= 7 ? 7 : chartDays <= 30 ? 8 : chartDays <= 90 ? 10 : 12;
+
     new Chart(trendCtx, {
       type: 'bar',
-      data: {
-        labels: shortLabels,
-        datasets: [{
-          label: 'Daily Spending',
-          data: dailyData,
-          backgroundColor: isDark ? 'hsl(0 0% 55% / 0.4)' : 'hsl(0 0% 15% / 0.15)',
-          hoverBackgroundColor: isDark ? 'hsl(0 0% 65% / 0.6)' : 'hsl(0 0% 15% / 0.3)',
-          borderRadius: 4,
-          borderSkipped: false,
-          barPercentage: 0.7,
-          categoryPercentage: 0.85,
-        }]
-      },
+      data: { labels: shortLabels, datasets: datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { display: false },
-          tooltip: {
-            ...tooltipStyle,
+          tooltip: Object.assign({}, tooltipStyle, {
             callbacks: {
-              label: ctx => '$' + ctx.parsed.y.toFixed(2)
+              title: function(items) {
+                var idx = items[0].dataIndex;
+                var d = dailyLabels[idx];
+                if (chartDays === 365) {
+                  var parts = d.split('-');
+                  var mdate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+                  return mdate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                }
+                var tdate = new Date(d + 'T00:00:00');
+                return tdate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+              },
+              label: function(ctx) {
+                var prefix = ctx.dataset.label === 'Income' ? '+ ' : '';
+                return prefix + '$' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+              }
             }
-          }
+          })
         },
         scales: {
           x: {
             grid: { display: false },
             border: { display: false },
-            ticks: { color: textColor, font: { size: 10, weight: '500' }, maxTicksLimit: 8, maxRotation: 0 }
+            ticks: {
+              color: textColor,
+              font: { size: 10, weight: '500' },
+              maxTicksLimit: maxTicks,
+              maxRotation: 0,
+            }
           },
           y: {
             grid: { color: gridColor, drawBorder: false },
@@ -534,88 +591,19 @@ document.addEventListener('DOMContentLoaded', function() {
             ticks: {
               color: textColor,
               font: { size: 10, weight: '500' },
-              callback: v => '$' + v.toLocaleString()
-            }
+              maxTicksLimit: 5,
+              callback: function(v) { return '$' + v.toLocaleString(); }
+            },
+            beginAtZero: true,
           }
+        },
+        animation: {
+          duration: 400,
+          easing: 'easeOutQuart',
         }
       }
     });
   }
-  {{end}}
-
-  {{if .CategoryLabels}}
-  // Category Donut Chart
-  const donutCtx = document.getElementById('categoryDonutChart');
-  if (donutCtx) {
-    const allLabels = {{.CategoryLabels}};
-    const allAmounts = {{.CategoryAmounts}};
-    const allColors = {{.CategoryColors}};
-
-    // Consolidate: show top 8 individually, group the rest as "Other".
-    const MAX_SLICES = 8;
-    let catLabels, catAmounts, bgColors;
-    if (allLabels.length <= MAX_SLICES + 1) {
-      catLabels = allLabels;
-      catAmounts = allAmounts;
-      bgColors = allColors;
-    } else {
-      catLabels = allLabels.slice(0, MAX_SLICES);
-      catAmounts = allAmounts.slice(0, MAX_SLICES);
-      const otherSum = allAmounts.slice(MAX_SLICES).reduce((a, b) => a + b, 0);
-      catLabels.push('Other');
-      catAmounts.push(otherSum);
-      bgColors = allColors.slice(0, MAX_SLICES);
-      bgColors.push('oklch(0.45 0 0)');
-    }
-
-    new Chart(donutCtx, {
-      type: 'doughnut',
-      data: {
-        labels: catLabels,
-        datasets: [{
-          data: catAmounts,
-          backgroundColor: bgColors,
-          hoverBackgroundColor: bgColors,
-          borderWidth: 2,
-          borderColor: isDark ? 'hsl(0 0% 13%)' : 'hsl(0 0% 100%)',
-          hoverBorderColor: isDark ? 'hsl(0 0% 13%)' : 'hsl(0 0% 100%)',
-          spacing: 1,
-          hoverOffset: 4,
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        cutout: '68%',
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            ...tooltipStyle,
-            displayColors: true,
-            boxWidth: 8,
-            boxHeight: 8,
-            boxPadding: 4,
-            usePointStyle: true,
-            pointStyle: 'rectRounded',
-            callbacks: {
-              label: function(ctx) {
-                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-                const pct = ((ctx.parsed / total) * 100).toFixed(1);
-                return ' $' + ctx.parsed.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' (' + pct + '%)';
-              }
-            }
-          }
-        },
-        animation: {
-          animateRotate: true,
-          animateScale: false,
-          duration: 600,
-          easing: 'easeOutQuart',
-        },
-      }
-    });
-  }
-  {{end}}
 });
 </script>
 {{end}}
