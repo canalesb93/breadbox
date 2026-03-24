@@ -15,7 +15,7 @@
       <i data-lucide="{{if lt .Transaction.Amount 0.0}}arrow-up-right{{else}}arrow-down-left{{end}}" class="w-6 h-6 {{if lt .Transaction.Amount 0.0}}text-error{{else}}text-success{{end}}"></i>
     </div>
     <div>
-      <h1 class="text-2xl font-bold tracking-tight">{{.Transaction.Name}}</h1>
+      <h1 class="bb-page-title">{{.Transaction.Name}}</h1>
       <div class="flex items-center gap-2 mt-0.5">
         <span class="text-xs text-base-content/40">{{.Transaction.Date}}</span>
         {{if .Transaction.MerchantName}}
@@ -27,7 +27,7 @@
     </div>
   </div>
   <div class="text-right">
-    <p class="text-3xl font-bold tabular-nums{{if lt .Transaction.Amount 0.0}} text-error{{end}}">
+    <p class="text-3xl font-semibold tabular-nums{{if lt .Transaction.Amount 0.0}} text-error{{end}}">
       {{printf "%.2f" .Transaction.Amount}}
     </p>
     {{if .Transaction.IsoCurrencyCode}}<p class="text-xs text-base-content/30 mt-0.5">{{.Transaction.IsoCurrencyCode}}</p>{{end}}
@@ -38,7 +38,7 @@
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
   <!-- Transaction Details -->
   <div class="bb-card p-6 lg:col-span-2">
-    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider mb-5">Details</h2>
+    <h2 class="text-sm font-semibold text-base-content/50 mb-5">Details</h2>
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-5 gap-x-6">
       <div>
         <p class="text-xs text-base-content/40 mb-1">Date</p>
@@ -101,7 +101,7 @@
 
   <!-- Category Card -->
   <div class="bb-card p-6" x-data="txCategoryEditor()">
-    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider mb-5">Category</h2>
+    <h2 class="text-sm font-semibold text-base-content/50 mb-5">Category</h2>
 
     <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'assign', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', initial: '{{if .Transaction.Category}}{{.Transaction.Category.ID}}{{end}}'})" @category-change="setCategoryFromPicker($event.detail)">
       <button type="button" class="w-full flex items-center gap-3 p-3 rounded-xl bg-base-200/50 hover:bg-base-200 transition-colors" @click="openPicker()">
@@ -141,7 +141,7 @@
 <!-- Comments Section -->
 <div class="bb-card" x-data="commentManager()">
   <div class="px-6 pt-6 pb-4 flex items-center justify-between">
-    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider">Comments</h2>
+    <h2 class="text-sm font-semibold text-base-content/50">Comments</h2>
     <span class="text-xs text-base-content/30">{{len .Comments}} total</span>
   </div>
 

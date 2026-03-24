@@ -208,7 +208,7 @@
   }
 
   .bb-sidebar-section {
-    @apply text-[0.65rem] font-medium uppercase tracking-widest text-base-content/40 px-3 pt-5 pb-1.5;
+    @apply text-[0.65rem] font-medium text-base-content/40 px-3 pt-5 pb-1.5;
   }
 
   .bb-sidebar-link {
