@@ -49,9 +49,9 @@
   {{end}}
 </div>
 
-<!-- Stat Cards -->
+<!-- Stat Cards: Pending, Approved Today, Skipped Today -->
 {{if .Counts}}
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 bb-stagger">
+<div class="grid grid-cols-3 gap-4 mb-8 bb-stagger">
   <div class="bb-stat-card">
     <div class="bb-stat-card__icon text-warning">
       <i data-lucide="clock" class="w-5 h-5"></i>
@@ -68,15 +68,6 @@
     <div class="bb-stat-card__body">
       <span class="bb-stat-card__value text-success">{{.Counts.ApprovedToday}}</span>
       <span class="bb-stat-card__label">Approved Today</span>
-    </div>
-  </div>
-  <div class="bb-stat-card">
-    <div class="bb-stat-card__icon text-error">
-      <i data-lucide="x-circle" class="w-5 h-5"></i>
-    </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value text-error">{{.Counts.RejectedToday}}</span>
-      <span class="bb-stat-card__label">Rejected Today</span>
     </div>
   </div>
   <div class="bb-stat-card">
@@ -133,185 +124,277 @@
   </div>
 </div>
 
-<!-- Filter Bar -->
-<div class="bb-card px-4 sm:px-6 py-4 mb-6">
-  <form method="GET" action="/reviews" class="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 sm:items-end">
-    <div class="form-control">
-      <label class="label label-text text-xs text-base-content/50 pb-1">Status</label>
-      <select name="status" class="select select-bordered select-sm rounded-xl">
-        <option value="pending"{{if eq .StatusFilter "pending"}} selected{{end}}>Pending</option>
-        <option value="approved"{{if eq .StatusFilter "approved"}} selected{{end}}>Approved</option>
-        <option value="rejected"{{if eq .StatusFilter "rejected"}} selected{{end}}>Rejected</option>
-        <option value="skipped"{{if eq .StatusFilter "skipped"}} selected{{end}}>Skipped</option>
-        <option value="all"{{if eq .StatusFilter "all"}} selected{{end}}>All</option>
-      </select>
-    </div>
-    <div class="form-control">
-      <label class="label label-text text-xs text-base-content/50 pb-1">Type</label>
-      <select name="review_type" class="select select-bordered select-sm rounded-xl">
-        <option value="">All Types</option>
-        <option value="new_transaction"{{if eq .ReviewTypeFilter "new_transaction"}} selected{{end}}>New Transaction</option>
-        <option value="uncategorized"{{if eq .ReviewTypeFilter "uncategorized"}} selected{{end}}>Uncategorized</option>
-        <option value="low_confidence"{{if eq .ReviewTypeFilter "low_confidence"}} selected{{end}}>Low Confidence</option>
-        <option value="manual"{{if eq .ReviewTypeFilter "manual"}} selected{{end}}>Manual</option>
-      </select>
-    </div>
-    <div class="form-control">
-      <label class="label label-text text-xs text-base-content/50 pb-1">Account</label>
-      <select name="account_id" class="select select-bordered select-sm rounded-xl">
-        <option value="">All Accounts</option>
-        {{range .Accounts}}
-        <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.AccountIDFilter}} selected{{end}}>{{.Name}}</option>
+<!-- Filter Bar (collapsible, consistent with transactions page) -->
+<div class="bb-card mb-6" x-data="{ filtersOpen: {{if or .ReviewTypeFilter .AccountIDFilter .UserIDFilter}}true{{else}}false{{end}} }">
+  <div class="p-0">
+    <button type="button" class="flex items-center justify-between w-full px-4 sm:px-5 py-3 text-sm font-medium hover:bg-base-200/50 transition-colors duration-150 rounded-t-xl cursor-pointer"
+      @click="filtersOpen = !filtersOpen">
+      <div class="flex items-center gap-2">
+        <i data-lucide="sliders-horizontal" class="w-4 h-4 text-base-content/60"></i>
+        <span>Filters</span>
+        {{if or .ReviewTypeFilter .AccountIDFilter .UserIDFilter}}
+        <span class="badge badge-primary badge-xs">Active</span>
         {{end}}
-      </select>
-    </div>
-    <div class="form-control">
-      <label class="label label-text text-xs text-base-content/50 pb-1">Family Member</label>
-      <select name="user_id" class="select select-bordered select-sm rounded-xl">
-        <option value="">All Members</option>
-        {{range .Users}}
-        <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.UserIDFilter}} selected{{end}}>{{.Name}}</option>
-        {{end}}
-      </select>
-    </div>
-    <div class="flex gap-2">
-      <button type="submit" class="btn btn-sm btn-primary rounded-xl">Filter</button>
-      <a href="/reviews" class="btn btn-sm btn-ghost rounded-xl">Reset</a>
-    </div>
-  </form>
+      </div>
+      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/40 transition-transform duration-200" :class="filtersOpen ? 'rotate-180' : ''"></i>
+    </button>
+
+    <form method="GET" action="/reviews" x-show="filtersOpen" x-cloak
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0 -translate-y-2"
+      x-transition:enter-end="opacity-100 translate-y-0"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-start="opacity-100 translate-y-0"
+      x-transition:leave-end="opacity-0 -translate-y-2"
+      class="px-4 sm:px-5 pb-4 pt-2 border-t border-base-300">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+        <div class="form-control">
+          <label class="label label-text text-xs text-base-content/50 pb-1">Status</label>
+          <select name="status" class="select select-bordered select-sm rounded-xl w-full">
+            <option value="pending"{{if eq .StatusFilter "pending"}} selected{{end}}>Pending</option>
+            <option value="approved"{{if eq .StatusFilter "approved"}} selected{{end}}>Approved</option>
+            <option value="skipped"{{if eq .StatusFilter "skipped"}} selected{{end}}>Skipped</option>
+            <option value="all"{{if eq .StatusFilter "all"}} selected{{end}}>All</option>
+          </select>
+        </div>
+        <div class="form-control">
+          <label class="label label-text text-xs text-base-content/50 pb-1">Type</label>
+          <select name="review_type" class="select select-bordered select-sm rounded-xl w-full">
+            <option value="">All Types</option>
+            <option value="new_transaction"{{if eq .ReviewTypeFilter "new_transaction"}} selected{{end}}>New Transaction</option>
+            <option value="uncategorized"{{if eq .ReviewTypeFilter "uncategorized"}} selected{{end}}>Uncategorized</option>
+            <option value="low_confidence"{{if eq .ReviewTypeFilter "low_confidence"}} selected{{end}}>Low Confidence</option>
+            <option value="manual"{{if eq .ReviewTypeFilter "manual"}} selected{{end}}>Manual</option>
+          </select>
+        </div>
+        <div class="form-control">
+          <label class="label label-text text-xs text-base-content/50 pb-1">Account</label>
+          <select name="account_id" class="select select-bordered select-sm rounded-xl w-full">
+            <option value="">All Accounts</option>
+            {{range .Accounts}}
+            <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.AccountIDFilter}} selected{{end}}>{{.Name}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div class="form-control">
+          <label class="label label-text text-xs text-base-content/50 pb-1">Family Member</label>
+          <select name="user_id" class="select select-bordered select-sm rounded-xl w-full">
+            <option value="">All Members</option>
+            {{range .Users}}
+            <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.UserIDFilter}} selected{{end}}>{{.Name}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div class="flex gap-2 items-end">
+          <button type="submit" class="btn btn-sm btn-primary rounded-xl flex-1">Filter</button>
+          {{if or .ReviewTypeFilter .AccountIDFilter .UserIDFilter}}
+          <a href="/reviews" class="btn btn-sm btn-ghost rounded-xl">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+          </a>
+          {{end}}
+        </div>
+      </div>
+    </form>
+  </div>
 </div>
 
+<!-- Keyboard shortcut hints (pending reviews only) -->
+{{if and (eq .StatusFilter "pending") .Reviews}}
+<div class="flex items-center gap-4 text-xs text-base-content/40 mb-4 px-1">
+  <span class="flex items-center gap-1.5">
+    <kbd class="kbd kbd-xs">A</kbd> Approve
+  </span>
+  <span class="flex items-center gap-1.5">
+    <kbd class="kbd kbd-xs">S</kbd> Skip
+  </span>
+  <span class="flex items-center gap-1.5">
+    <kbd class="kbd kbd-xs">&uarr;</kbd><kbd class="kbd kbd-xs">&darr;</kbd> Navigate
+  </span>
+</div>
+{{end}}
+
 <!-- Review Cards -->
-<div x-data="reviewQueue()" class="space-y-4">
+<div x-data="reviewQueue()" class="space-y-4" @keydown.window="handleKeyboard($event)">
   {{if .Reviews}}
-  {{range .Reviews}}
-  <div class="bb-card bb-card--interactive p-0 review-card" x-data="{ submitting: false, selectedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', suggestedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', feedback: '', pickerShake: false }" id="review-{{.ID}}">
-    <div class="p-6">
-      <!-- Header row: badges + timestamp -->
-      <div class="flex items-center justify-between flex-wrap gap-2">
-        <div class="flex items-center gap-2 flex-wrap">
-          {{if eq .ReviewType "new_transaction"}}
-          <span class="badge badge-soft badge-info badge-sm rounded-lg">New Transaction</span>
-          {{else if eq .ReviewType "uncategorized"}}
+  {{$isPending := eq .StatusFilter "pending"}}
+  {{range $index, $review := .Reviews}}
+  <div class="bb-card p-0 review-card transition-all duration-150"
+    :class="{ 'ring-2 ring-primary/40 ring-offset-2 ring-offset-base-100': activeIndex === {{$index}} }"
+    x-data="{ submitting: false, selectedCatId: '{{if $review.SuggestedCategoryID}}{{$review.SuggestedCategoryID}}{{end}}', suggestedCatId: '{{if $review.SuggestedCategoryID}}{{$review.SuggestedCategoryID}}{{end}}', feedback: '', pickerShake: false }"
+    id="review-{{$review.ID}}" data-review-index="{{$index}}">
+    <div class="p-5 sm:p-6">
+      <!-- Main content: two-column layout on larger screens -->
+      {{if $review.Transaction}}
+      <div class="flex flex-col sm:flex-row sm:items-start gap-4">
+        <!-- Left: transaction details -->
+        <div class="flex-1 min-w-0">
+          <!-- Amount + Name row -->
+          <div class="flex items-start gap-3">
+            <div class="text-2xl font-bold tabular-nums whitespace-nowrap{{if lt $review.Transaction.Amount 0.0}} text-error{{end}}">
+              {{formatAmount $review.Transaction.Amount}}
+            </div>
+            <div class="min-w-0 pt-1">
+              <a href="/transactions/{{$review.TransactionID}}" class="text-sm font-semibold link link-hover block truncate">{{$review.Transaction.Name}}</a>
+              {{if $review.Transaction.MerchantName}}
+              <div class="text-xs text-base-content/50 truncate">{{$review.Transaction.MerchantName}}</div>
+              {{end}}
+            </div>
+          </div>
+          <!-- Meta row: date, account, user -->
+          <div class="flex items-center gap-2 mt-2 text-xs text-base-content/40 flex-wrap">
+            <span class="flex items-center gap-1">
+              <i data-lucide="calendar" class="w-3 h-3"></i>
+              {{formatDate $review.Transaction.Date}}
+            </span>
+            {{if $review.Transaction.AccountName}}
+            <span class="text-base-content/20">/</span>
+            <span class="flex items-center gap-1">
+              <i data-lucide="wallet" class="w-3 h-3"></i>
+              {{$review.Transaction.AccountName}}
+            </span>
+            {{end}}
+            {{if $review.Transaction.UserName}}
+            <span class="text-base-content/20">/</span>
+            <span>{{$review.Transaction.UserName}}</span>
+            {{end}}
+          </div>
+        </div>
+
+        <!-- Right: badges + timestamp -->
+        <div class="flex flex-wrap items-center gap-2 sm:flex-col sm:items-end sm:gap-1.5 shrink-0">
+          {{if eq $review.ReviewType "new_transaction"}}
+          <span class="badge badge-soft badge-info badge-sm rounded-lg">New</span>
+          {{else if eq $review.ReviewType "uncategorized"}}
           <span class="badge badge-soft badge-warning badge-sm rounded-lg">Uncategorized</span>
-          {{else if eq .ReviewType "low_confidence"}}
-          <span class="badge badge-soft badge-error badge-sm rounded-lg">Low Confidence{{if .ConfidenceScore}} ({{printf "%.0f" (mulFloat .ConfidenceScore 100.0)}}%){{end}}</span>
-          {{else if eq .ReviewType "manual"}}
+          {{else if eq $review.ReviewType "low_confidence"}}
+          <span class="badge badge-soft badge-error badge-sm rounded-lg">Low Confidence{{if $review.ConfidenceScore}} {{printf "%.0f" (mulFloat $review.ConfidenceScore 100.0)}}%{{end}}</span>
+          {{else if eq $review.ReviewType "manual"}}
           <span class="badge badge-soft badge-neutral badge-sm rounded-lg">Manual</span>
           {{end}}
-          {{if .Provider}}
-          <span class="badge badge-ghost badge-xs rounded-lg">{{.Provider}}</span>
-          {{end}}
-          {{if eq .Status "approved"}}
-          <span class="badge badge-success badge-sm rounded-lg">Approved</span>
-          {{else if eq .Status "rejected"}}
-          <span class="badge badge-error badge-sm rounded-lg">Rejected</span>
-          {{else if eq .Status "skipped"}}
+          {{if eq $review.Status "approved"}}
+          <span class="badge badge-success badge-sm rounded-lg gap-1">
+            {{if and $review.ReviewerType (eq (deref $review.ReviewerType) "agent")}}
+            <i data-lucide="bot" class="w-3 h-3"></i>
+            {{end}}
+            Approved
+          </span>
+          {{else if eq $review.Status "skipped"}}
           <span class="badge badge-ghost badge-sm rounded-lg">Skipped</span>
           {{end}}
-        </div>
-        <span class="text-xs text-base-content/40">{{relativeTime .CreatedAt}}</span>
-      </div>
-
-      <!-- Transaction info -->
-      {{if .Transaction}}
-      <div class="flex items-start justify-between mt-4 gap-4">
-        <div class="min-w-0">
-          <a href="/transactions/{{.TransactionID}}" class="text-base font-semibold link link-hover">{{.Transaction.Name}}</a>
-          {{if .Transaction.MerchantName}}<div class="text-sm text-base-content/60 mt-0.5">{{.Transaction.MerchantName}}</div>{{end}}
-          <div class="text-xs text-base-content/40 mt-1">
-            {{if .Transaction.AccountName}}{{.Transaction.AccountName}}{{end}}
-            {{if .Transaction.UserName}} &middot; {{.Transaction.UserName}}{{end}}
-          </div>
-        </div>
-        <div class="text-right flex-shrink-0">
-          <div class="text-xl font-bold tabular-nums{{if lt .Transaction.Amount 0.0}} text-error{{end}}">
-            {{formatAmount .Transaction.Amount}}
-          </div>
-          <div class="text-xs text-base-content/40 mt-0.5">
-            {{formatDate .Transaction.Date}}
-          </div>
+          <span class="text-xs text-base-content/30">{{relativeTime $review.CreatedAt}}</span>
         </div>
       </div>
 
-      <!-- Category info with inline thumbs for suggestions -->
-      <div class="text-sm mt-3">
-        {{if .SuggestedCategory}}
-        <div class="flex items-center gap-2">
+      <!-- Category suggestion row -->
+      <div class="mt-3 pt-3 border-t border-base-200">
+        {{if $review.SuggestedCategory}}
+        <div class="flex items-center gap-2 text-sm">
+          <i data-lucide="tag" class="w-3.5 h-3.5 text-base-content/40"></i>
           <span class="text-base-content/50">Suggested:</span>
-          <span class="font-medium">{{.SuggestedCategory}}</span>
-          {{if eq .Status "pending"}}
+          <span class="font-medium badge badge-ghost badge-sm rounded-lg">{{$review.SuggestedCategory}}</span>
+          {{if eq $review.Status "pending"}}
           <div class="flex items-center gap-1 ml-auto">
-            <button class="btn btn-xs btn-circle" :class="feedback === 'up' ? 'btn-success' : 'btn-ghost text-base-content/30'" @click="feedback = feedback === 'up' ? '' : 'up'">
+            <button class="btn btn-xs btn-circle" :class="feedback === 'up' ? 'btn-success' : 'btn-ghost text-base-content/30'" @click="feedback = feedback === 'up' ? '' : 'up'" title="Good suggestion">
               <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
             </button>
-            <button class="btn btn-xs btn-circle" :class="feedback === 'down' ? 'btn-error' : 'btn-ghost text-base-content/30'"
+            <button class="btn btn-xs btn-circle" :class="feedback === 'down' ? 'btn-error' : 'btn-ghost text-base-content/30'" title="Bad suggestion"
               @click="if (feedback === 'down') { feedback = ''; } else { feedback = 'down'; if (selectedCatId === suggestedCatId) { pickerShake = true; setTimeout(() => pickerShake = false, 600); } }">
               <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>
             </button>
           </div>
           {{end}}
         </div>
-        {{else if .Transaction.Category}}
-        <span class="text-base-content/50">Category:</span>
-        <span class="font-medium">{{.Transaction.Category.DisplayName}}</span>
+        {{else if $review.Transaction.Category}}
+        <div class="flex items-center gap-2 text-sm">
+          <i data-lucide="tag" class="w-3.5 h-3.5 text-base-content/40"></i>
+          <span class="text-base-content/50">Category:</span>
+          <span class="font-medium">{{$review.Transaction.Category.DisplayName}}</span>
+        </div>
         {{else}}
-        <span class="text-base-content/40 italic">No category assigned</span>
+        <div class="flex items-center gap-2 text-sm">
+          <i data-lucide="tag" class="w-3.5 h-3.5 text-base-content/30"></i>
+          <span class="text-base-content/30 italic">No category assigned</span>
+        </div>
         {{end}}
       </div>
       {{end}}
 
-      {{if eq .Status "pending"}}
+      {{if eq $review.Status "pending"}}
       <!-- Action bar for pending reviews -->
-      <div class="border-t border-base-300 pt-4 mt-4">
-        <!-- Category picker -->
-        <div class="form-control" :class="{ 'bb-picker-shake': pickerShake }">
-          <label class="label label-text text-xs text-base-content/40 py-0.5">
-            {{if .SuggestedCategoryID}}Correct category{{else}}Assign category{{end}}
-          </label>
-          <div class="bb-cat-picker" data-picker-source="review-{{.ID}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current'})" @category-change="selectedCatId = $event.detail.id; if (selectedCatId !== suggestedCatId && suggestedCatId) { feedback = 'down'; }">
-            <button type="button" class="btn btn-sm btn-ghost gap-2 w-full justify-start border border-base-300 rounded-xl" @click="openPicker()">
-              <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-              <span x-text="displayLabel" class="text-sm truncate"></span>
-              <svg class="w-3 h-3 ml-auto opacity-40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      <div class="border-t border-base-300 pt-4 mt-3">
+        <div class="flex flex-col sm:flex-row gap-3 sm:items-end">
+          <!-- Category picker -->
+          <div class="form-control flex-1" :class="{ 'bb-picker-shake': pickerShake }">
+            <label class="label label-text text-xs text-base-content/40 py-0.5">
+              {{if $review.SuggestedCategoryID}}Correct category{{else}}Assign category{{end}}
+            </label>
+            <div class="bb-cat-picker" data-picker-source="review-{{$review.ID}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if $review.SuggestedCategoryID}}{{$review.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current'})" @category-change="selectedCatId = $event.detail.id; if (selectedCatId !== suggestedCatId && suggestedCatId) { feedback = 'down'; }">
+              <button type="button" class="btn btn-sm btn-ghost gap-2 w-full justify-start border border-base-300 rounded-xl" @click="openPicker()">
+                <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
+                <span x-text="displayLabel" class="text-sm truncate"></span>
+                <svg class="w-3 h-3 ml-auto opacity-40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+            </div>
+          </div>
+          <!-- Note -->
+          <div class="form-control flex-1">
+            <label class="label label-text text-xs text-base-content/40 py-0.5">Note <span class="text-base-content/30">(optional)</span></label>
+            <input type="text" class="input input-bordered input-sm w-full rounded-xl" placeholder="Add context..." id="note-{{$review.ID}}">
+          </div>
+          <!-- Action buttons -->
+          <div class="flex gap-2 items-end shrink-0">
+            <button class="btn btn-success btn-sm rounded-xl gap-1" :disabled="submitting"
+              @click="if (feedback === 'down' && selectedCatId === suggestedCatId) { pickerShake = true; setTimeout(() => pickerShake = false, 600); } else { submitReview('{{$review.ID}}', 'approved', selectedCatId, feedback); }">
+              <span x-show="!submitting" class="flex items-center gap-1">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Approve</span>
+              </span>
+              <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+            </button>
+            <button class="btn btn-ghost btn-sm rounded-xl gap-1" :disabled="submitting"
+              @click="submitReview('{{$review.ID}}', 'skipped', null, '')">
+              <span x-show="!submitting" class="flex items-center gap-1">
+                <i data-lucide="skip-forward" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Skip</span>
+              </span>
+              <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+            </button>
+            <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30" :disabled="submitting"
+              @click="dismissReview('{{$review.ID}}')" title="Dismiss">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>
           </div>
         </div>
-        <!-- Note -->
-        <div class="form-control mt-3">
-          <label class="label label-text text-xs text-base-content/40 py-0.5">Note <span class="text-base-content/30">(optional)</span></label>
-          <input type="text" class="input input-bordered input-sm w-full rounded-xl" placeholder="Add context for future reference..." id="note-{{.ID}}">
-        </div>
-        <!-- Action buttons -->
-        <div class="flex gap-2 flex-wrap mt-4 items-center">
-          <button class="btn btn-success btn-sm rounded-xl gap-1" :disabled="submitting"
-            @click="if (feedback === 'down' && selectedCatId === suggestedCatId) { pickerShake = true; setTimeout(() => pickerShake = false, 600); } else { submitReview('{{.ID}}', 'approved', selectedCatId, feedback); }">
-            <span x-show="!submitting" class="flex items-center gap-1">
-              <i data-lucide="check" class="w-4 h-4"></i>
-              Accept
-            </span>
-            <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-          </button>
-          <button class="btn btn-ghost btn-sm rounded-xl gap-1" :disabled="submitting"
-            @click="submitReview('{{.ID}}', 'skipped', null, '')">
-            <span x-show="!submitting" class="flex items-center gap-1">
-              <i data-lucide="skip-forward" class="w-4 h-4"></i>
-              Skip
-            </span>
-            <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-          </button>
-          <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30" :disabled="submitting"
-            @click="dismissReview('{{.ID}}')">
-            <i data-lucide="trash-2" class="w-4 h-4"></i>
-          </button>
-        </div>
       </div>
-      {{else if .ReviewerName}}
+      {{else}}
       <!-- Resolved info -->
-      <div class="border-t border-base-300 pt-3 mt-4 text-xs text-base-content/40">
-        Reviewed by {{.ReviewerName}} {{if .ReviewedAt}} &middot; {{relativeTime .ReviewedAt}}{{end}}
-        {{if .ReviewNote}}<br>Note: {{.ReviewNote}}{{end}}
+      {{if $review.ReviewerName}}
+      <div class="border-t border-base-200 pt-3 mt-3">
+        <div class="flex items-center gap-2 text-xs text-base-content/40">
+          {{if and $review.ReviewerType (eq (deref $review.ReviewerType) "agent")}}
+          <span class="inline-flex items-center gap-1 badge badge-soft badge-sm badge-info rounded-lg">
+            <i data-lucide="bot" class="w-3 h-3"></i>
+            AI Review
+          </span>
+          {{else}}
+          <i data-lucide="user" class="w-3 h-3"></i>
+          {{end}}
+          <span>{{$review.ReviewerName}}</span>
+          {{if $review.ReviewedAt}}<span class="text-base-content/20">/</span> <span>{{relativeTime $review.ReviewedAt}}</span>{{end}}
+        </div>
+        {{if $review.ReviewNote}}
+        <div class="mt-2 text-xs text-base-content/50 bg-base-200/50 rounded-lg px-3 py-2">
+          {{if and $review.ReviewerType (eq (deref $review.ReviewerType) "agent")}}
+          <div class="flex items-center gap-1 text-info/70 font-medium mb-1">
+            <i data-lucide="bot" class="w-3 h-3"></i>
+            Agent reasoning
+          </div>
+          {{end}}
+          {{$review.ReviewNote}}
+        </div>
+        {{end}}
       </div>
+      {{end}}
       {{end}}
     </div>
   </div>
@@ -327,15 +410,28 @@
   {{end}}
 
   {{else}}
+  <!-- Empty state -->
+  {{if eq .StatusFilter "pending"}}
   <div class="bb-card">
-    <div class="flex flex-col items-center text-center py-16 px-6">
-      <div class="w-16 h-16 rounded-xl bg-success/10 flex items-center justify-center mb-4">
-        <i data-lucide="check-circle" class="w-8 h-8 text-success"></i>
+    <div class="flex flex-col items-center text-center py-20 px-6">
+      <div class="w-20 h-20 rounded-2xl bg-success/10 flex items-center justify-center mb-5">
+        <i data-lucide="party-popper" class="w-10 h-10 text-success"></i>
       </div>
-      <h2 class="text-lg font-semibold mb-1">All caught up!</h2>
-      <p class="text-base-content/50 text-sm">No {{.StatusFilter}} reviews to show.</p>
+      <h2 class="text-xl font-semibold mb-2">All caught up!</h2>
+      <p class="text-base-content/50 text-sm max-w-sm">No pending reviews in the queue. New transactions will appear here automatically when synced.</p>
     </div>
   </div>
+  {{else}}
+  <div class="bb-card">
+    <div class="flex flex-col items-center text-center py-16 px-6">
+      <div class="w-16 h-16 rounded-xl bg-base-200 flex items-center justify-center mb-4">
+        <i data-lucide="inbox" class="w-8 h-8 text-base-content/30"></i>
+      </div>
+      <h2 class="text-lg font-semibold mb-1">No reviews found</h2>
+      <p class="text-base-content/50 text-sm">No {{.StatusFilter}} reviews match your current filters.</p>
+    </div>
+  </div>
+  {{end}}
   {{end}}
 </div>
 
@@ -345,6 +441,49 @@ var csrfToken = "{{.CSRFToken}}";
 
 function reviewQueue() {
   return {
+    activeIndex: -1,
+
+    handleKeyboard(e) {
+      // Don't capture when typing in an input/select/textarea
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      // Don't capture when a modal or picker is open
+      if (document.querySelector('.modal-open') || document.querySelector('.bb-cat-picker-dropdown')) return;
+
+      const cards = document.querySelectorAll('.review-card');
+      if (cards.length === 0) return;
+
+      if (e.key === 'ArrowDown' || e.key === 'j') {
+        e.preventDefault();
+        this.activeIndex = Math.min(this.activeIndex + 1, cards.length - 1);
+        cards[this.activeIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else if (e.key === 'ArrowUp' || e.key === 'k') {
+        e.preventDefault();
+        this.activeIndex = Math.max(this.activeIndex - 1, 0);
+        cards[this.activeIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else if (e.key === 'a' && this.activeIndex >= 0) {
+        e.preventDefault();
+        const card = cards[this.activeIndex];
+        if (!card) return;
+        const cardData = Alpine.$data(card);
+        if (cardData.submitting) return;
+        const id = card.id.replace('review-', '');
+        if (cardData.feedback === 'down' && cardData.selectedCatId === cardData.suggestedCatId) {
+          cardData.pickerShake = true;
+          setTimeout(() => cardData.pickerShake = false, 600);
+        } else {
+          this.submitReview(id, 'approved', cardData.selectedCatId, cardData.feedback);
+        }
+      } else if (e.key === 's' && this.activeIndex >= 0) {
+        e.preventDefault();
+        const card = cards[this.activeIndex];
+        if (!card) return;
+        const cardData = Alpine.$data(card);
+        if (cardData.submitting) return;
+        const id = card.id.replace('review-', '');
+        this.submitReview(id, 'skipped', null, '');
+      }
+    },
+
     submitReview(id, decision, categoryId, feedback) {
       const card = document.getElementById('review-' + id);
       const noteInput = document.getElementById('note-' + id);
@@ -380,12 +519,22 @@ function reviewQueue() {
           window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: data.error, type:'error'}}));
           cardData.submitting = false;
         } else {
-          card.style.transition = 'opacity 0.3s, max-height 0.3s, margin 0.3s';
+          card.style.transition = 'opacity 0.3s, max-height 0.3s, margin 0.3s, padding 0.3s';
           card.style.opacity = '0';
           card.style.maxHeight = '0';
           card.style.overflow = 'hidden';
           card.style.marginBottom = '0';
-          setTimeout(() => card.remove(), 300);
+          card.style.padding = '0';
+          setTimeout(() => {
+            card.remove();
+            // Adjust active index after removal
+            const remaining = document.querySelectorAll('.review-card');
+            if (remaining.length === 0) {
+              this.activeIndex = -1;
+            } else if (this.activeIndex >= remaining.length) {
+              this.activeIndex = remaining.length - 1;
+            }
+          }, 300);
           window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Review ' + decision, type:'success'}}));
         }
       })
@@ -410,12 +559,21 @@ function reviewQueue() {
           window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: data.error, type:'error'}}));
           cardData.submitting = false;
         } else {
-          card.style.transition = 'opacity 0.3s, max-height 0.3s, margin 0.3s';
+          card.style.transition = 'opacity 0.3s, max-height 0.3s, margin 0.3s, padding 0.3s';
           card.style.opacity = '0';
           card.style.maxHeight = '0';
           card.style.overflow = 'hidden';
           card.style.marginBottom = '0';
-          setTimeout(() => card.remove(), 300);
+          card.style.padding = '0';
+          setTimeout(() => {
+            card.remove();
+            const remaining = document.querySelectorAll('.review-card');
+            if (remaining.length === 0) {
+              this.activeIndex = -1;
+            } else if (this.activeIndex >= remaining.length) {
+              this.activeIndex = remaining.length - 1;
+            }
+          }, 300);
           window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Review dismissed', type:'info'}}));
         }
       })
