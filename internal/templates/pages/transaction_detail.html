@@ -98,27 +98,12 @@
   <div class="bb-card p-6" x-data="txCategoryEditor()">
     <h2 class="text-sm font-semibold text-base-content/50 mb-5">Category</h2>
 
-    <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'assign', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', initial: '{{if .Transaction.Category}}{{.Transaction.Category.ID}}{{end}}'})" @category-change="setCategoryFromPicker($event.detail)">
+    <div class="bb-cat-picker" data-picker-source="txd-cat" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'assign', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', initial: '{{if .Transaction.Category}}{{.Transaction.Category.ID}}{{end}}'})" @category-change="setCategoryFromPicker($event.detail)">
       <button type="button" class="w-full flex items-center gap-3 p-3 rounded-xl bg-base-200/50 hover:bg-base-200 transition-colors" @click="openPicker()">
         <template x-if="displayColor"><span class="w-3 h-3 rounded-full shrink-0" :style="'background-color:' + displayColor"></span></template>
         <span x-text="displayLabel" class="text-sm font-medium flex-1 text-left"></span>
         <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30"></i>
       </button>
-      <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false">
-        <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
-          <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search categories..." class="input input-sm input-bordered w-full">
-        </div>
-        <div x-ref="listbox">
-          <template x-for="(item, idx) in filteredList" :key="item.id || idx">
-            <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item)">
-              <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
-              <template x-if="item.icon"><i :data-lucide="item.icon" class="bb-cat-icon"></i></template>
-              <span x-text="item.label"></span>
-            </div>
-          </template>
-          <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
-        </div>
-      </div>
     </div>
 
     <div class="flex items-center gap-2 mt-3">

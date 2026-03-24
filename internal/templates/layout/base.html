@@ -268,6 +268,75 @@
     </div>
   </div>
 
+  <!-- Global Category Picker Overlay -->
+  <div x-data="globalCategoryPicker()" x-show="open" x-cloak
+       @open-category-picker.window="openPicker($event.detail)"
+       @keydown.window.escape="if (open) { closePicker(); $event.stopPropagation(); }">
+    <!-- Backdrop -->
+    <div class="bb-catpicker-backdrop" @click="closePicker()"></div>
+    <!-- Dialog -->
+    <div class="bb-catpicker-dialog"
+         @click.stop
+         @keydown.escape.prevent="closePicker()"
+         @keydown.arrow-down.prevent="moveDown()"
+         @keydown.arrow-up.prevent="moveUp()"
+         @keydown.enter.prevent="selectActive()">
+      <!-- Search input -->
+      <div class="bb-catpicker-input-wrap">
+        <i data-lucide="tag"></i>
+        <input type="text"
+          class="bb-catpicker-input"
+          placeholder="Search categories..."
+          x-ref="catPickerInput"
+          x-model="search"
+          @input="activeIndex = 0"
+          autocomplete="off"
+          spellcheck="false">
+        <div class="bb-cmdk-kbd" style="font-size:0.6rem" @click="closePicker()">esc</div>
+      </div>
+
+      <!-- Results list -->
+      <div class="bb-catpicker-list" x-ref="catPickerList">
+        <div class="py-1">
+          <template x-for="(item, idx) in filteredList" :key="item.slug + '-' + idx">
+            <div class="bb-catpicker-item"
+                 :class="{'bb-catpicker-item--indent': item.indent, 'bb-catpicker-item--parent': item.isParent}"
+                 :data-active="activeIndex === idx"
+                 :data-catpicker-idx="idx"
+                 @click="selectItem(item)"
+                 @mouseenter="activeIndex = idx">
+              <template x-if="item.color">
+                <span class="bb-catpicker-dot" :style="'background-color:' + item.color"></span>
+              </template>
+              <template x-if="item.icon">
+                <i :data-lucide="item.icon" class="bb-catpicker-icon"></i>
+              </template>
+              <span x-text="item.label" class="truncate"></span>
+              <template x-if="item.indent && item.parentLabel">
+                <span class="text-xs text-base-content/30 ml-auto truncate" x-text="item.parentLabel"></span>
+              </template>
+            </div>
+          </template>
+        </div>
+        <template x-if="search && filteredList.length === 0">
+          <div class="bb-catpicker-empty">
+            <i data-lucide="search-x"></i>
+            <span class="text-sm">No categories found</span>
+          </div>
+        </template>
+      </div>
+
+      <!-- Footer -->
+      <div class="bb-catpicker-footer">
+        <div class="flex items-center gap-3">
+          <span><kbd>&uarr;</kbd> <kbd>&darr;</kbd> navigate</span>
+          <span><kbd>&crarr;</kbd> select</span>
+          <span><kbd>esc</kbd> close</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Command Palette (Cmd+K) -->
   <div x-data="commandPalette()" x-show="open" x-cloak
        @open-cmdk.window="openPalette()"
@@ -408,6 +477,110 @@
         }));
       });
     };
+
+    // Global Category Picker component
+    function globalCategoryPicker() {
+      return {
+        open: false,
+        search: '',
+        activeIndex: 0,
+        mode: 'assign',
+        allowEmpty: true,
+        emptyLabel: 'Uncategorized',
+        sourceId: '',
+        categories: [],
+        _resolve: null,
+
+        get flatList() {
+          var items = [];
+          if (this.allowEmpty) {
+            items.push({ id: '', slug: '', label: this.emptyLabel, isParent: false, indent: false, icon: null, color: null, hidden: false });
+          }
+          for (var i = 0; i < this.categories.length; i++) {
+            var cat = this.categories[i];
+            items.push({ id: cat.id, slug: cat.slug, label: cat.display_name, isParent: true, indent: false, icon: cat.icon, color: cat.color, hidden: cat.hidden || false });
+            if (cat.children) {
+              for (var j = 0; j < cat.children.length; j++) {
+                var child = cat.children[j];
+                items.push({ id: child.id, slug: child.slug, label: child.display_name, isParent: false, indent: true, icon: child.icon, color: child.color, hidden: child.hidden || false, parentLabel: cat.display_name });
+              }
+            }
+          }
+          return items;
+        },
+
+        get filteredList() {
+          var list = this.flatList;
+          if (!this.search) return list.filter(function(i) { return !i.hidden || i.id === ''; });
+          var q = this.search.toLowerCase();
+          return list.filter(function(i) {
+            if (i.hidden && i.id !== '') return false;
+            return i.label.toLowerCase().indexOf(q) !== -1 ||
+              (i.parentLabel && i.parentLabel.toLowerCase().indexOf(q) !== -1) ||
+              (i.slug && i.slug.toLowerCase().indexOf(q) !== -1);
+          });
+        },
+
+        openPicker(detail) {
+          this.mode = detail.mode || 'assign';
+          this.allowEmpty = detail.allowEmpty !== false;
+          this.emptyLabel = detail.emptyLabel || 'Uncategorized';
+          this.sourceId = detail.sourceId || '';
+          this.categories = detail.categories || window.__bbCategories || [];
+          this.search = '';
+          this.activeIndex = 0;
+          this.open = true;
+
+          var self = this;
+          setTimeout(function() {
+            if (self.$refs.catPickerInput) self.$refs.catPickerInput.focus();
+            var dialog = document.querySelector('.bb-catpicker-dialog');
+            if (dialog) lucide.createIcons({ nodes: [dialog] });
+          }, 50);
+        },
+
+        closePicker() {
+          this.open = false;
+          this.search = '';
+        },
+
+        moveDown() {
+          var max = this.filteredList.length - 1;
+          if (this.activeIndex < max) this.activeIndex++;
+          else this.activeIndex = 0;
+          this.scrollToActive();
+        },
+
+        moveUp() {
+          if (this.activeIndex > 0) this.activeIndex--;
+          else this.activeIndex = this.filteredList.length - 1;
+          this.scrollToActive();
+        },
+
+        scrollToActive() {
+          var self = this;
+          setTimeout(function() {
+            var el = document.querySelector('[data-catpicker-idx="' + self.activeIndex + '"]');
+            if (el) el.scrollIntoView({ block: 'nearest' });
+          }, 10);
+        },
+
+        selectActive() {
+          var items = this.filteredList;
+          if (items.length > 0 && this.activeIndex < items.length) {
+            this.selectItem(items[this.activeIndex]);
+          }
+        },
+
+        selectItem(item) {
+          var value = this.mode === 'filter' ? item.slug : item.id;
+          window.dispatchEvent(new CustomEvent('category-picked', {
+            detail: { id: item.id, slug: item.slug, label: item.label, value: value, sourceId: this.sourceId }
+          }));
+          this.closePicker();
+        }
+      };
+    }
 
     // Command Palette Alpine component
     function commandPalette() {
