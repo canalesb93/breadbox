@@ -259,7 +259,7 @@
           </div>
           <div class="min-w-0">
             <div class="text-sm font-medium truncate max-w-64">{{.Name}}</div>
-            <div class="text-xs text-base-content/40">{{.AccountName}} · {{.Date}}</div>
+            <div class="text-xs text-base-content/40">{{.AccountName}} · {{formatDate .Date}}</div>
           </div>
         </div>
         <div class="text-sm font-semibold tabular-nums shrink-0 pl-3{{if gt .Amount 0.0}} text-base-content{{else}} text-success{{end}}">

@@ -164,10 +164,13 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				return t.Before(time.Now())
 			},
 			"formatAmount": func(amount float64) string {
-				if amount < 0 {
-					return fmt.Sprintf("-$%.2f", -amount)
+				neg := amount < 0
+				abs := math.Abs(amount)
+				formatted := formatCurrency(abs)
+				if neg {
+					return "-" + formatted
 				}
-				return fmt.Sprintf("$%.2f", amount)
+				return formatted
 			},
 			"formatBalance": func(amount float64) string {
 				abs := math.Abs(amount)
@@ -301,16 +304,21 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return ""
 				}
 			},
+			"formatDate": func(s string) string {
+				if t, err := time.Parse("2006-01-02", s); err == nil {
+					return t.Format("Jan 2, 2006")
+				}
+				return s
+			},
 			"formatNumeric": func(n pgtype.Numeric) string {
 				if !n.Valid {
 					return ""
 				}
-				// Use the decimal representation from the numeric value.
 				f, err := n.Float64Value()
 				if err != nil || !f.Valid {
 					return ""
 				}
-				return fmt.Sprintf("%.2f", f.Float64)
+				return formatCurrency(math.Abs(f.Float64))
 			},
 			"fmtBalance": func(v interface{}) string {
 				var f float64
@@ -513,6 +521,24 @@ func BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage, page
 // SetVersion sets the application version for auto-injection into template data.
 func (tr *TemplateRenderer) SetVersion(v string) {
 	tr.version = v
+}
+
+// formatCurrency formats a non-negative float as "$X,XXX.XX".
+func formatCurrency(abs float64) string {
+	whole := int(abs)
+	cents := int(math.Round((abs - float64(whole)) * 100))
+	s := fmt.Sprintf("%d", whole)
+	if len(s) > 3 {
+		result := ""
+		for i, c := range s {
+			if i > 0 && (len(s)-i)%3 == 0 {
+				result += ","
+			}
+			result += string(c)
+		}
+		s = result
+	}
+	return fmt.Sprintf("$%s.%02d", s, cents)
 }
 
 // AdminUsername returns the admin username from the session for use in template data maps.

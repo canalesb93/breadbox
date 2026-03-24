@@ -148,7 +148,7 @@
           </td>
           <td class="text-xs text-base-content/50">{{.Type}}{{if .Subtype.Valid}} / {{.Subtype.String}}{{end}}</td>
           <td class="text-right tabular-nums text-sm font-semibold">
-            {{if .BalanceCurrent.Valid}}{{formatNumeric .BalanceCurrent}}{{if .IsoCurrencyCode.Valid}} <span class="text-xs text-base-content/40 font-normal">{{.IsoCurrencyCode.String}}</span>{{end}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
+            {{if .BalanceCurrent.Valid}}{{formatNumeric .BalanceCurrent}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
           </td>
           <td class="text-right tabular-nums text-sm text-base-content/60">
             {{if .BalanceAvailable.Valid}}{{formatNumeric .BalanceAvailable}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
