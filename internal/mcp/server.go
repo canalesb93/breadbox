@@ -30,7 +30,8 @@ CATEGORY SYSTEM:
 - Each category has: id (UUID), slug (stable identifier), display_name (human label), icon, color
 - Use list_categories to get the full taxonomy tree with IDs and slugs
 - Filter transactions with category_slug param (parent slug includes all children)
-- Use categorize_transaction to manually override a transaction's category
+- Use categorize_transaction to manually override a single transaction's category
+- For bulk category changes: use batch_categorize_transactions (multiple transactions, one category) or bulk_recategorize (change all transactions from one category to another)
 - Use reset_transaction_category to undo a manual override
 - Use list_unmapped_categories to find raw provider categories without mappings
 - Use list_category_mappings, create_category_mapping, update_category_mapping, delete_category_mapping to manage how provider category strings map to user categories
@@ -39,6 +40,7 @@ CATEGORY SYSTEM:
 
 TOKEN EFFICIENCY:
 - Use the fields parameter on query_transactions to request only needed fields (e.g., fields=core,category). Aliases: core (id,date,amount,name,iso_currency_code), category (category,category_primary_raw,category_detailed_raw), timestamps (created_at,updated_at,datetime,authorized_datetime)
+- Use fields=triage on list_pending_reviews to get only fields needed for categorization decisions — dramatically reduces response size
 - Use transaction_summary for aggregated spending analysis instead of paginating through individual transactions. Supports group_by: category, month, week, day, category_month
 - The breadbox://overview resource includes users, connections, accounts by type, and 30-day spending summary — often eliminates the need for separate list_users + list_accounts calls
 
@@ -56,14 +58,19 @@ COMMENTS:
 - Check list_transaction_comments before modifying a transaction to see prior context
 
 REVIEW QUEUE:
-- list_pending_reviews shows transactions flagged during sync that need categorization
-- Use submit_review (or batch_submit_reviews) to approve with the correct category_slug, or skip if uncertain
+- list_pending_reviews shows transactions flagged during sync that need categorization. Use fields=triage to dramatically reduce response size. Supports limit up to 500.
+- Use submit_review (or batch_submit_reviews, up to 200 at once) to approve with the correct category_slug, or skip if uncertain
+- For bulk category work: batch_categorize_transactions assigns one category to many transactions; bulk_recategorize moves all transactions from one category to another
 - After reviewing, create transaction rules for patterns you noticed so future transactions are auto-categorized
 
 TRANSACTION RULES:
 - Rules auto-categorize future transactions during sync. Good rules dramatically reduce future review work.
 - Conditions use a flexible JSON tree with AND/OR/NOT logic and operators: eq, contains, matches (regex), gt, gte, lt, lte, in
 - Available fields: name, merchant_name, amount, category_primary (raw provider category), category_detailed, pending, provider, account_id, user_id, user_name (family member name)
+- Set apply_retroactively=true when creating rules to apply them to existing transactions immediately
+- Use apply_rules to apply all rules at once to the backlog, or apply_rules with rule_id for a specific rule
+- Use preview_rule to test a condition before creating — shows match count and sample transactions
+- Teller's "general" category is a catch-all — do NOT create a category_primary rule for it, use name patterns instead
 
 RULE CREATION STRATEGY — follow this order:
 1. FIRST, create category_primary rules (highest impact). Look at the category_primary field on transactions — these are raw provider categories like "dining", "groceries", "phone", "accommodation", "fuel", "entertainment". One rule per category_primary covers ALL transactions with that label. Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]} → food_and_drink_restaurant. This single rule handles every dining transaction from Teller.
