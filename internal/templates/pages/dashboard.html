@@ -97,7 +97,7 @@
 {{end}}
 
 <!-- Stat Cards -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-8">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-8 bb-stagger">
   <div class="bb-stat-card bb-stat-card--primary">
     <div class="bb-stat-card__icon text-primary">
       <i data-lucide="building-2" class="w-6 h-6"></i>
@@ -160,7 +160,7 @@
 </div>
 
 <!-- Charts Row -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 bb-stagger">
   <!-- Spending Trend Chart -->
   <div class="card bg-base-100 border border-base-300 lg:col-span-2">
     <div class="card-body p-5">
@@ -334,13 +334,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
   Chart.defaults.font.family = 'Inter, system-ui, -apple-system, sans-serif';
 
+  /* shadcn-aligned tooltip style */
+  const tooltipStyle = {
+    backgroundColor: isDark ? 'hsl(0 0% 12%)' : 'hsl(0 0% 100%)',
+    titleColor: isDark ? 'hsl(0 0% 93%)' : 'hsl(0 0% 9%)',
+    bodyColor: isDark ? 'hsl(0 0% 64%)' : 'hsl(0 0% 45%)',
+    borderColor: isDark ? 'hsl(0 0% 18%)' : 'hsl(0 0% 90%)',
+    borderWidth: 1,
+    padding: 10,
+    cornerRadius: 8,
+    titleFont: { size: 12, weight: '600' },
+    bodyFont: { size: 12 },
+    displayColors: false,
+  };
+
   // Spending Trend
   const trendCtx = document.getElementById('spendingTrendChart');
   if (trendCtx) {
     const dailyLabels = {{.DailyLabels}};
     const dailyData = {{.DailyAmounts}};
 
-    // Format labels to short dates
     const shortLabels = dailyLabels.map(d => {
       const date = new Date(d + 'T00:00:00');
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -353,15 +366,15 @@ document.addEventListener('DOMContentLoaded', function() {
         datasets: [{
           label: 'Spending',
           data: dailyData,
-          borderColor: isDark ? '#8b8cf7' : '#4338a8',
-          backgroundColor: isDark ? 'rgba(139,140,247,0.08)' : 'rgba(67,56,168,0.06)',
+          borderColor: isDark ? 'hsl(0 0% 70%)' : 'hsl(0 0% 15%)',
+          backgroundColor: isDark ? 'hsla(0,0%,70%,0.06)' : 'hsla(0,0%,15%,0.04)',
           fill: true,
-          tension: 0.35,
-          borderWidth: 2,
+          tension: 0.4,
+          borderWidth: 1.5,
           pointRadius: 0,
-          pointHoverRadius: 5,
-          pointHoverBackgroundColor: isDark ? '#8b8cf7' : '#4338a8',
-          pointHoverBorderColor: isDark ? '#1a1a2e' : '#ffffff',
+          pointHoverRadius: 4,
+          pointHoverBackgroundColor: isDark ? 'hsl(0 0% 70%)' : 'hsl(0 0% 15%)',
+          pointHoverBorderColor: isDark ? 'hsl(0 0% 12%)' : 'hsl(0 0% 100%)',
           pointHoverBorderWidth: 2,
         }]
       },
@@ -372,14 +385,7 @@ document.addEventListener('DOMContentLoaded', function() {
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: isDark ? '#1a1a2e' : '#fff',
-            titleColor: isDark ? '#e0e0ec' : '#1a1a2e',
-            bodyColor: isDark ? '#a0a0b8' : '#555566',
-            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-            borderWidth: 1,
-            padding: 12,
-            cornerRadius: 10,
-            displayColors: false,
+            ...tooltipStyle,
             callbacks: {
               label: ctx => '$' + ctx.parsed.y.toFixed(2)
             }
@@ -388,13 +394,15 @@ document.addEventListener('DOMContentLoaded', function() {
         scales: {
           x: {
             grid: { display: false },
-            ticks: { color: textColor, font: { size: 10 }, maxTicksLimit: 8, maxRotation: 0 }
+            border: { display: false },
+            ticks: { color: textColor, font: { size: 10, weight: '500' }, maxTicksLimit: 8, maxRotation: 0 }
           },
           y: {
-            grid: { color: gridColor },
+            grid: { color: gridColor, drawBorder: false },
+            border: { display: false },
             ticks: {
               color: textColor,
-              font: { size: 10 },
+              font: { size: 10, weight: '500' },
               callback: v => '$' + v.toLocaleString()
             }
           }
@@ -410,14 +418,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const categoryLabels = {{.CategoryLabels}};
     const categoryData = {{.CategoryAmounts}};
 
-    /* Refined palette: indigo core with desaturated complementary tones */
+    /* Neutral-first palette: grays + one muted accent per segment */
     const palette = isDark
-      ? ['#8b8cf7', '#a39ef5', '#7b9cf0', '#6db8c4', '#82c9a0',
-         '#c4a66d', '#d4907a', '#b88bb4', '#8a9baa', '#6e8b9e',
-         '#a08db8', '#7eaab4']
-      : ['#4338a8', '#5e4fb8', '#3b6daa', '#2d8f9a', '#3d8f6a',
-         '#9a7b3d', '#b86050', '#8f5f8a', '#5a6e80', '#4a7080',
-         '#7a6898', '#4d8a8f'];
+      ? ['hsl(0 0% 65%)', 'hsl(0 0% 50%)', 'hsl(0 0% 40%)',
+         'hsl(210 8% 55%)', 'hsl(160 10% 50%)', 'hsl(30 12% 55%)',
+         'hsl(0 0% 75%)', 'hsl(200 6% 45%)', 'hsl(140 8% 45%)',
+         'hsl(45 10% 50%)', 'hsl(0 0% 58%)', 'hsl(180 6% 48%)']
+      : ['hsl(0 0% 15%)', 'hsl(0 0% 30%)', 'hsl(0 0% 45%)',
+         'hsl(210 10% 40%)', 'hsl(160 12% 38%)', 'hsl(30 15% 42%)',
+         'hsl(0 0% 55%)', 'hsl(200 8% 50%)', 'hsl(140 10% 45%)',
+         'hsl(45 12% 48%)', 'hsl(0 0% 65%)', 'hsl(180 8% 42%)'];
 
     new Chart(catCtx, {
       type: 'doughnut',
@@ -426,34 +436,30 @@ document.addEventListener('DOMContentLoaded', function() {
         datasets: [{
           data: categoryData,
           backgroundColor: palette.slice(0, categoryData.length),
-          borderWidth: 0,
-          hoverOffset: 4
+          borderWidth: isDark ? 1 : 1,
+          borderColor: isDark ? 'hsl(0 0% 12%)' : 'hsl(0 0% 100%)',
+          hoverOffset: 3
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '65%',
+        cutout: '68%',
         plugins: {
           legend: {
             position: 'bottom',
             labels: {
               color: textColor,
-              font: { size: 10 },
-              boxWidth: 10,
-              padding: 8,
+              font: { size: 10, weight: '500' },
+              boxWidth: 8,
+              boxHeight: 8,
+              padding: 10,
               usePointStyle: true,
               pointStyle: 'circle'
             }
           },
           tooltip: {
-            backgroundColor: isDark ? '#1a1a2e' : '#fff',
-            titleColor: isDark ? '#e0e0ec' : '#1a1a2e',
-            bodyColor: isDark ? '#a0a0b8' : '#555566',
-            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-            borderWidth: 1,
-            padding: 12,
-            cornerRadius: 10,
+            ...tooltipStyle,
             callbacks: {
               label: ctx => ctx.label + ': $' + ctx.parsed.toFixed(2)
             }

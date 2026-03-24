@@ -108,6 +108,66 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* ── Themed text selection ── */
+  ::selection {
+    background: oklch(0.205 0 0 / 0.15);
+    color: oklch(0.145 0 0);
+  }
+  @media (prefers-color-scheme: dark) {
+    ::selection {
+      background: oklch(0.922 0 0 / 0.2);
+      color: oklch(0.985 0 0);
+    }
+  }
+
+  /* ── Focus rings: accessible, consistent, shadcn-style ── */
+  :focus-visible {
+    outline: 2px solid oklch(0.205 0 0 / 0.4);
+    outline-offset: 2px;
+    border-radius: inherit;
+  }
+  @media (prefers-color-scheme: dark) {
+    :focus-visible {
+      outline-color: oklch(0.922 0 0 / 0.4);
+    }
+  }
+
+  /* ── Thin scrollbars ── */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.922 0 0 / 0.5) transparent;
+  }
+  @media (prefers-color-scheme: dark) {
+    * {
+      scrollbar-color: oklch(0.269 0 0 / 0.7) transparent;
+    }
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.922 0 0 / 0.5);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.922 0 0 / 0.7);
+  }
+  @media (prefers-color-scheme: dark) {
+    ::-webkit-scrollbar-thumb {
+      background: oklch(0.269 0 0 / 0.7);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: oklch(0.4 0 0 / 0.7);
+    }
+  }
+
+  /* ── Global link transitions ── */
+  a { transition: color 0.15s ease; }
 }
 
 /* ─── App-specific component classes ─── */
@@ -115,11 +175,23 @@
 
   /* ── Cards: shadcn-style — border, not shadow ── */
   .bb-card {
-    @apply bg-base-100 rounded-xl border border-base-300 transition-colors duration-150;
+    @apply bg-base-100 rounded-xl border border-base-300;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease;
   }
 
   .bb-card--interactive {
-    @apply hover:bg-base-200/50 cursor-pointer;
+    @apply cursor-pointer;
+  }
+
+  .bb-card--interactive:hover {
+    @apply bg-base-200/50;
+    border-color: oklch(0.85 0 0);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-card--interactive:hover {
+      border-color: oklch(0.35 0 0);
+    }
   }
 
   /* ── Sidebar ── */
@@ -142,8 +214,12 @@
   .bb-sidebar-link {
     @apply flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium
            text-base-content/60 no-underline
-           transition-colors duration-100
            hover:bg-base-200 hover:text-base-content;
+    transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  }
+
+  .bb-sidebar-link:active {
+    transform: scale(0.98);
   }
 
   .bb-sidebar-link--active {
@@ -152,6 +228,11 @@
 
   .bb-sidebar-link i, .bb-sidebar-link svg {
     @apply w-4 h-4 opacity-50;
+    transition: opacity 0.15s ease;
+  }
+
+  .bb-sidebar-link:hover i, .bb-sidebar-link:hover svg {
+    @apply opacity-70;
   }
 
   .bb-sidebar-link--active i, .bb-sidebar-link--active svg {
@@ -211,10 +292,22 @@
     @apply text-base-content;
   }
 
-  /* ── Stat cards (shadcn: clean border, no shadow, no hover lift) ── */
+  /* ── Stat cards (shadcn: clean border, subtle hover) ── */
   .bb-stat-card {
     @apply flex items-center gap-4 rounded-xl bg-base-100 px-5 py-4
            border border-base-300;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+
+  a.bb-stat-card:hover {
+    @apply bg-base-200/50;
+    border-color: oklch(0.85 0 0);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    a.bb-stat-card:hover {
+      border-color: oklch(0.35 0 0);
+    }
   }
 
   .bb-stat-card--primary,
@@ -228,6 +321,7 @@
 
   .bb-stat-card__icon {
     @apply flex items-center justify-center w-10 h-10 rounded-lg bg-base-200 shrink-0;
+    transition: background-color 0.15s ease;
   }
 
   .bb-stat-card__body {
@@ -310,5 +404,118 @@
 
   .bb-error-message {
     @apply text-sm text-base-content/50 max-w-sm mb-6 leading-relaxed;
+  }
+
+  /* ── Page entrance animation ── */
+  .bb-page-enter {
+    animation: bb-page-enter 0.25s ease-out both;
+  }
+
+  @keyframes bb-page-enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Staggered children animation */
+  .bb-stagger > * {
+    animation: bb-page-enter 0.25s ease-out both;
+  }
+  .bb-stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .bb-stagger > *:nth-child(2) { animation-delay: 40ms; }
+  .bb-stagger > *:nth-child(3) { animation-delay: 80ms; }
+  .bb-stagger > *:nth-child(4) { animation-delay: 120ms; }
+  .bb-stagger > *:nth-child(5) { animation-delay: 160ms; }
+  .bb-stagger > *:nth-child(6) { animation-delay: 200ms; }
+
+  /* ── Button polish ── */
+  .btn {
+    transition: background-color 0.15s ease, color 0.15s ease,
+                border-color 0.15s ease, transform 0.1s ease,
+                box-shadow 0.15s ease, opacity 0.15s ease !important;
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.97) !important;
+  }
+
+  /* ── Badge transitions ── */
+  .badge {
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+
+  /* ── Table row polish ── */
+  .table tbody tr {
+    transition: background-color 0.12s ease;
+  }
+
+  /* ── Toggle transitions ── */
+  .toggle {
+    transition: background-color 0.2s ease, border-color 0.2s ease !important;
+  }
+
+  /* ── Select/Input focus transitions ── */
+  .select, .input, .textarea {
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease !important;
+  }
+
+  /* ── Modal backdrop smooth ── */
+  .modal-backdrop {
+    transition: opacity 0.2s ease !important;
+  }
+
+  /* ── Toast entrance ── */
+  .toast .alert {
+    animation: bb-toast-enter 0.3s ease-out both;
+  }
+
+  @keyframes bb-toast-enter {
+    from {
+      opacity: 0;
+      transform: translateX(20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+  }
+
+  /* ── Dropdown smooth open ── */
+  .dropdown-content {
+    animation: bb-dropdown-enter 0.15s ease-out both;
+  }
+
+  @keyframes bb-dropdown-enter {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* ── Category picker shake animation (reviews page) ── */
+  .bb-picker-shake {
+    animation: bb-shake 0.4s ease-in-out;
+  }
+
+  @keyframes bb-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
+  }
+
+  /* ── Smooth collapse for filter panels ── */
+  [x-collapse] {
+    transition: height 0.2s ease-out, opacity 0.15s ease !important;
   }
 }
