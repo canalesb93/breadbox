@@ -43,12 +43,16 @@ type TemplateRenderer struct {
 	mu        sync.RWMutex
 	templates map[string]*template.Template
 	funcMap   template.FuncMap
+	sm        *scs.SessionManager
+	version   string
 }
 
 // NewTemplateRenderer parses all embedded templates and returns a renderer.
-func NewTemplateRenderer() (*TemplateRenderer, error) {
+// sm is used to auto-inject the admin username into template data.
+func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 	tr := &TemplateRenderer{
 		templates: make(map[string]*template.Template),
+		sm:        sm,
 		funcMap: template.FuncMap{
 			"sub": func(a, b int) int { return a - b },
 			"add": func(a, b int) int { return a + b },
@@ -425,6 +429,16 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 		return
 	}
 
+	// Auto-inject common fields into map data if not already present.
+	if m, ok := data.(map[string]any); ok {
+		if _, exists := m["AdminUsername"]; !exists && tr.sm != nil {
+			m["AdminUsername"] = tr.sm.GetString(r.Context(), sessionKeyAdminUsername)
+		}
+		if _, exists := m["AppVersion"]; !exists && tr.version != "" {
+			m["AppVersion"] = tr.version
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
 		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
@@ -435,11 +449,22 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 // Handlers can add page-specific fields to the returned map before rendering.
 func BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage, pageTitle string) map[string]any {
 	return map[string]any{
-		"PageTitle":   pageTitle,
-		"CurrentPage": currentPage,
-		"Flash":       GetFlash(r.Context(), sm),
-		"CSRFToken":   GetCSRFToken(r),
+		"PageTitle":     pageTitle,
+		"CurrentPage":   currentPage,
+		"Flash":         GetFlash(r.Context(), sm),
+		"CSRFToken":     GetCSRFToken(r),
+		"AdminUsername": sm.GetString(r.Context(), sessionKeyAdminUsername),
 	}
+}
+
+// SetVersion sets the application version for auto-injection into template data.
+func (tr *TemplateRenderer) SetVersion(v string) {
+	tr.version = v
+}
+
+// AdminUsername returns the admin username from the session for use in template data maps.
+func AdminUsername(r *http.Request, sm *scs.SessionManager) string {
+	return sm.GetString(r.Context(), sessionKeyAdminUsername)
 }
 
 // RenderTo writes the named template to any io.Writer.
