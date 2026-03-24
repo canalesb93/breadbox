@@ -1,54 +1,93 @@
 {{define "content"}}
+<!-- Page Header -->
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold m-0">Bank Connections</h1>
-  <a href="/connections/new" class="btn btn-primary">
+  <div class="flex items-center gap-3">
+    <h1 class="text-2xl font-bold">Connections</h1>
+    {{if .Connections}}
+    <span class="badge badge-ghost badge-sm">{{len .Connections}}</span>
+    {{end}}
+  </div>
+  <a href="/connections/new" class="btn btn-primary btn-sm">
     <i data-lucide="plus" class="w-4 h-4"></i>
-    Connect New Bank
+    Connect Bank
   </a>
 </div>
 
 {{if .Connections}}
-<div class="overflow-x-auto border border-base-300 rounded-lg">
-  <table class="table table-zebra table-sm">
-    <thead>
-      <tr>
-        <th>Institution</th>
-        <th>Family Member</th>
-        <th>Accounts</th>
-        <th>Status</th>
-        <th>Last Synced</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range .Connections}}
-      <tr class="hover:bg-base-300">
-        <td>{{.InstitutionName.String}}</td>
-        <td>{{.UserName.String}}</td>
-        <td>{{.AccountCount}}</td>
-        <td>
-          {{statusBadge (printf "%s" .Status)}}{{if .Paused}} <span class="badge badge-ghost badge-sm">Paused</span>{{end}}
-        </td>
-        <td>{{if .LastSyncedAt.Valid}}{{relativeTime .LastSyncedAt.Time}}{{else}}Never{{end}}</td>
-        <td class="flex gap-2">
-          <a href="/connections/{{formatUUID .ID}}" class="btn btn-ghost btn-xs">View</a>
-          {{if or (eq (printf "%s" .Status) "error") (eq (printf "%s" .Status) "pending_reauth")}}
-            <a href="/connections/{{formatUUID .ID}}/reauth" class="btn btn-outline btn-warning btn-xs">Re-auth</a>
-          {{end}}
-        </td>
-      </tr>
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+  {{range .Connections}}
+  <a href="/connections/{{formatUUID .ID}}" class="card bg-base-100 shadow-sm border border-base-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 no-underline group">
+    <div class="card-body p-5">
+      <!-- Header: Institution + Status -->
+      <div class="flex items-start justify-between gap-3 mb-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-10 h-10 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+            {{if eq (printf "%s" .Provider) "plaid"}}
+            <i data-lucide="building-2" class="w-5 h-5 text-primary"></i>
+            {{else if eq (printf "%s" .Provider) "teller"}}
+            <i data-lucide="landmark" class="w-5 h-5 text-secondary"></i>
+            {{else}}
+            <i data-lucide="file-spreadsheet" class="w-5 h-5 text-accent"></i>
+            {{end}}
+          </div>
+          <div class="min-w-0">
+            <h3 class="font-semibold text-sm group-hover:text-primary transition-colors truncate">{{.InstitutionName.String}}</h3>
+            <span class="text-xs text-base-content/50">{{.UserName.String}}</span>
+          </div>
+        </div>
+        <div class="flex flex-col items-end gap-1 shrink-0">
+          {{statusBadge (printf "%s" .Status)}}
+          {{if .Paused}}<span class="badge badge-ghost badge-xs">Paused</span>{{end}}
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="flex items-center gap-4 text-xs text-base-content/60">
+        <div class="flex items-center gap-1.5">
+          <i data-lucide="wallet" class="w-3.5 h-3.5"></i>
+          <span>{{.AccountCount}} account{{if ne .AccountCount 1}}s{{end}}</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span>{{if .LastSyncedAt.Valid}}{{relativeTime .LastSyncedAt.Time}}{{else}}Never synced{{end}}</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <i data-lucide="plug" class="w-3.5 h-3.5"></i>
+          <span class="capitalize">{{printf "%s" .Provider}}</span>
+        </div>
+      </div>
+
+      <!-- Error message if any -->
+      {{if .ErrorMessage.Valid}}
+      <div class="mt-3 flex items-start gap-2 text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
+        <span>{{errorMessage .ErrorCode.String}}</span>
+      </div>
       {{end}}
-    </tbody>
-  </table>
+
+      {{if .NewAccountsAvailable}}
+      <div class="mt-3 flex items-center gap-2 text-xs text-info bg-info/10 rounded-lg px-3 py-2">
+        <i data-lucide="plus-circle" class="w-3.5 h-3.5 shrink-0"></i>
+        <span>New accounts available to link</span>
+      </div>
+      {{end}}
+    </div>
+  </a>
+  {{end}}
 </div>
+
 {{else}}
-<div class="card bg-base-100 border border-base-300 text-center p-8">
-  <div class="flex flex-col items-center gap-4">
-    <i data-lucide="inbox" class="w-12 h-12 text-base-content/30"></i>
-    <p class="text-base-content/70">No bank connections yet. Connect your first bank to get started.</p>
+<!-- Empty State -->
+<div class="card bg-base-100 shadow-sm border border-base-300">
+  <div class="card-body items-center text-center py-16">
+    <div class="w-16 h-16 rounded-2xl bg-base-200/60 flex items-center justify-center mb-4">
+      <i data-lucide="building-2" class="w-8 h-8 text-base-content/20"></i>
+    </div>
+    <h3 class="text-lg font-semibold mb-1">No bank connections yet</h3>
+    <p class="text-sm text-base-content/60 max-w-sm mb-4">Connect your first bank to start syncing transactions and tracking your finances.</p>
     <a href="/connections/new" class="btn btn-primary">
       <i data-lucide="plus" class="w-4 h-4"></i>
-      Connect New Bank
+      Connect Your First Bank
     </a>
   </div>
 </div>
