@@ -129,14 +129,14 @@
 
     <!-- Actions -->
     <div class="flex items-center gap-1 flex-shrink-0">
-      <button class="btn btn-ghost btn-xs btn-square rounded-lg" title="Toggle" @click="toggleRule('{{.ID}}')">
-        {{if .Enabled}}<i data-lucide="pause" class="w-4 h-4"></i>{{else}}<i data-lucide="play" class="w-4 h-4"></i>{{end}}
+      <button class="btn btn-ghost btn-xs btn-square rounded-lg" title="Toggle" @click.stop="toggleRule('{{.ID}}')">
+        {{if .Enabled}}<i data-lucide="pause" class="w-4 h-4 pointer-events-none"></i>{{else}}<i data-lucide="play" class="w-4 h-4 pointer-events-none"></i>{{end}}
       </button>
-      <button class="btn btn-ghost btn-xs btn-square rounded-lg" title="Edit" @click="editRule({{toJSON .}})">
-        <i data-lucide="pencil" class="w-4 h-4"></i>
+      <button class="btn btn-ghost btn-xs btn-square rounded-lg" title="Edit" @click.stop="editRule({{toJSON .}})">
+        <i data-lucide="pencil" class="w-4 h-4 pointer-events-none"></i>
       </button>
-      <button class="btn btn-ghost btn-xs btn-square rounded-lg text-error/60" title="Delete" :disabled="deleting" @click="deleteRule('{{.ID}}', $el)">
-        <i data-lucide="trash-2" class="w-4 h-4"></i>
+      <button class="btn btn-ghost btn-xs btn-square rounded-lg text-error/60" title="Delete" :disabled="deleting" @click.stop="deleteRule('{{.ID}}', $el)">
+        <i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i>
       </button>
     </div>
   </div>
@@ -152,7 +152,8 @@
 {{end}}
 
 <!-- Create/Edit Rule Modal -->
-<dialog class="modal" :class="{'modal-open': showCreateModal || showEditModal}">
+<dialog id="rules-modal" class="modal" x-ref="rulesModal"
+  x-effect="(showCreateModal || showEditModal) ? $refs.rulesModal?.showModal() : $refs.rulesModal?.close()">
   <div class="modal-box max-w-lg rounded-xl">
     <h3 class="font-bold text-lg mb-6" x-text="showEditModal ? 'Edit Rule' : 'Create Rule'"></h3>
     <form @submit.prevent="submitRule()">
