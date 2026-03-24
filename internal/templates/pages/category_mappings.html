@@ -1,127 +1,134 @@
 {{define "content"}}
-<div class="flex items-center justify-between mb-6">
+<div class="bb-page-header">
   <div>
-    <h1 class="text-2xl font-bold">Category Mappings</h1>
-    <p class="text-sm text-base-content/60 mt-1">Map provider category strings to your category taxonomy</p>
+    <h1 class="bb-page-title">Category Mappings</h1>
+    <p class="text-sm text-base-content/50 mt-1">Map provider category strings to your category taxonomy</p>
   </div>
-  <a href="/categories" class="btn btn-sm btn-outline">
-    <i data-lucide="tag" class="w-4 h-4"></i> Back to Categories
+  <a href="/categories" class="btn btn-sm btn-ghost rounded-xl gap-2">
+    <i data-lucide="arrow-left" class="w-4 h-4"></i> Categories
   </a>
 </div>
 
 {{if .UnmappedCategories}}
-<div class="alert alert-warning mb-6" x-data="{show: true}" x-show="show">
-  <i data-lucide="alert-triangle" class="w-5 h-5"></i>
-  <div>
-    <h3 class="font-bold">{{len .UnmappedCategories}} unmapped provider categories</h3>
-    <p class="text-sm">These categories from your bank providers don't have a mapping yet.</p>
-  </div>
-</div>
-
-<!-- Unmapped categories section -->
-<div class="card bg-base-100 shadow-sm mb-6">
-  <div class="card-body">
-    <h2 class="card-title text-lg">Unmapped Categories</h2>
-    <div class="overflow-x-auto">
-      <table class="table table-sm">
-        <thead>
-          <tr><th>Provider</th><th>Primary</th><th>Detailed</th><th>Map To</th></tr>
-        </thead>
-        <tbody>
-          {{range .UnmappedCategories}}
-          <tr x-data="{categoryId: '', submitting: false}">
-            <td><span class="badge badge-sm {{if eq .Provider "plaid"}}badge-primary{{else if eq .Provider "teller"}}badge-secondary{{else}}badge-accent{{end}}">{{.Provider}}</span></td>
-            <td>{{if .Primary}}{{.Primary}}{{else}}&mdash;{{end}}</td>
-            <td>{{if .Detailed}}{{.Detailed}}{{else}}&mdash;{{end}}</td>
-            <td class="flex gap-2">
-              <select x-model="categoryId" class="select select-bordered select-sm w-48">
-                <option value="">Select category...</option>
-                {{range $.AllCategories}}
-                <option value="{{.ID}}">{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
-                {{end}}
-              </select>
-              <button class="btn btn-sm btn-primary" :disabled="!categoryId || submitting" @click="
-                submitting = true;
-                let provCat = '{{if .Detailed}}{{.Detailed}}{{else}}{{.Primary}}{{end}}';
-                fetch('/-/category-mappings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({provider: '{{.Provider}}', provider_category: provCat, category_id: categoryId})})
-                .then(r => { if(r.ok) location.reload(); else { submitting = false; alert('Failed to create mapping'); } })
-                .catch(() => { submitting = false; })
-              ">Map</button>
-            </td>
-          </tr>
-          {{end}}
-        </tbody>
-      </table>
+<div class="bb-card p-5 mb-6 border-warning/20" x-data="{show: true}" x-show="show">
+  <div class="flex items-center gap-3 mb-4">
+    <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-warning/10">
+      <i data-lucide="alert-triangle" class="w-5 h-5 text-warning"></i>
     </div>
+    <div>
+      <h3 class="text-sm font-semibold">{{len .UnmappedCategories}} unmapped categories</h3>
+      <p class="text-xs text-base-content/45">These categories from your bank providers need a mapping.</p>
+    </div>
+  </div>
+
+  <div class="overflow-x-auto rounded-xl border border-base-200">
+    <table class="table table-sm">
+      <thead>
+        <tr class="bg-base-200/50">
+          <th class="text-xs font-medium text-base-content/50">Provider</th>
+          <th class="text-xs font-medium text-base-content/50">Primary</th>
+          <th class="text-xs font-medium text-base-content/50">Detailed</th>
+          <th class="text-xs font-medium text-base-content/50">Map To</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .UnmappedCategories}}
+        <tr x-data="{categoryId: '', submitting: false}">
+          <td><span class="badge badge-sm {{if eq .Provider "plaid"}}badge-primary{{else if eq .Provider "teller"}}badge-secondary{{else}}badge-accent{{end}}">{{.Provider}}</span></td>
+          <td class="text-sm">{{if .Primary}}{{.Primary}}{{else}}&mdash;{{end}}</td>
+          <td class="text-sm font-mono text-xs">{{if .Detailed}}{{.Detailed}}{{else}}&mdash;{{end}}</td>
+          <td class="flex gap-2 items-center">
+            <select x-model="categoryId" class="select select-sm w-48 bg-base-200/50 border-base-200 rounded-lg">
+              <option value="">Select category...</option>
+              {{range $.AllCategories}}
+              <option value="{{.ID}}">{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
+              {{end}}
+            </select>
+            <button class="btn btn-sm btn-primary rounded-lg" :disabled="!categoryId || submitting" @click="
+              submitting = true;
+              let provCat = '{{if .Detailed}}{{.Detailed}}{{else}}{{.Primary}}{{end}}';
+              fetch('/-/category-mappings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({provider: '{{.Provider}}', provider_category: provCat, category_id: categoryId})})
+              .then(r => { if(r.ok) location.reload(); else { submitting = false; alert('Failed to create mapping'); } })
+              .catch(() => { submitting = false; })
+            ">Map</button>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
   </div>
 </div>
 {{end}}
 
 <!-- Filter bar -->
-<div class="bb-filter-bar mb-4">
-  <form method="GET" class="flex items-center gap-3">
-    <label class="form-control">
-      <select name="provider" class="select select-bordered select-sm" onchange="this.form.submit()">
+<div class="bb-card px-6 py-4 mb-6">
+  <form method="GET" class="flex items-end gap-4 flex-wrap">
+    <div class="form-control">
+      <label class="label label-text text-xs text-base-content/50 pb-1">Provider</label>
+      <select name="provider" class="select select-bordered select-sm rounded-xl" onchange="this.form.submit()">
         <option value="">All Providers</option>
         <option value="plaid"{{if eq .FilterProvider "plaid"}} selected{{end}}>Plaid</option>
         <option value="teller"{{if eq .FilterProvider "teller"}} selected{{end}}>Teller</option>
         <option value="csv"{{if eq .FilterProvider "csv"}} selected{{end}}>CSV</option>
       </select>
-    </label>
-    {{if .FilterProvider}}<a href="/categories/mappings" class="btn btn-sm btn-ghost">Clear</a>{{end}}
+    </div>
+    {{if .FilterProvider}}<a href="/categories/mappings" class="btn btn-sm btn-ghost rounded-xl">Clear</a>{{end}}
   </form>
 </div>
 
 <!-- Mappings table -->
-<div class="card bg-base-100 shadow-sm">
-  <div class="card-body">
-    <div class="flex items-center justify-between mb-2">
-      <h2 class="card-title text-lg">Mappings ({{len .Mappings}})</h2>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="table table-sm">
-        <thead>
-          <tr><th>Provider</th><th>Provider Category</th><th>Mapped To</th><th></th></tr>
-        </thead>
-        <tbody>
-          {{range .Mappings}}
-          <tr x-data="{editing: false, categoryId: '{{.CategoryID}}', submitting: false}">
-            <td><span class="badge badge-sm {{if eq .Provider "plaid"}}badge-primary{{else if eq .Provider "teller"}}badge-secondary{{else}}badge-accent{{end}}">{{.Provider}}</span></td>
-            <td class="font-mono text-sm">{{.ProviderCategory}}</td>
-            <td>
-              <template x-if="!editing">
-                <span @click="editing = true" class="cursor-pointer hover:underline">{{.CategoryDisplayName}}</span>
-              </template>
-              <template x-if="editing">
-                <div class="flex gap-2">
-                  <select x-model="categoryId" class="select select-bordered select-sm w-48">
-                    {{range $.AllCategories}}
-                    <option value="{{.ID}}">{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
-                    {{end}}
-                  </select>
-                  <button class="btn btn-sm btn-primary" :disabled="submitting" @click="
-                    submitting = true;
-                    fetch('/-/category-mappings/{{.ID}}', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({category_id: categoryId})})
-                    .then(r => { if(r.ok) location.reload(); else { submitting = false; editing = false; } })
-                    .catch(() => { submitting = false; })
-                  ">Save</button>
-                  <button class="btn btn-sm btn-ghost" @click="editing = false">Cancel</button>
-                </div>
-              </template>
-            </td>
-            <td>
-              <button class="btn btn-ghost btn-xs text-error" @click="
-                if(confirm('Delete this mapping?')) {
-                  fetch('/-/category-mappings/{{.ID}}', {method: 'DELETE'})
-                  .then(r => { if(r.ok) location.reload(); })
-                }
-              "><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-            </td>
-          </tr>
-          {{end}}
-        </tbody>
-      </table>
-    </div>
+<div class="bb-card p-6">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-sm font-semibold text-base-content/70">Mappings ({{len .Mappings}})</h2>
+  </div>
+  <div class="overflow-x-auto rounded-xl border border-base-200">
+    <table class="table table-sm">
+      <thead>
+        <tr class="bg-base-200/50">
+          <th class="text-xs font-medium text-base-content/50">Provider</th>
+          <th class="text-xs font-medium text-base-content/50">Provider Category</th>
+          <th class="text-xs font-medium text-base-content/50">Mapped To</th>
+          <th class="text-xs font-medium text-base-content/50 w-10"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Mappings}}
+        <tr x-data="{editing: false, categoryId: '{{.CategoryID}}', submitting: false}" class="hover:bg-base-200/30 transition-colors">
+          <td><span class="badge badge-sm {{if eq .Provider "plaid"}}badge-primary{{else if eq .Provider "teller"}}badge-secondary{{else}}badge-accent{{end}}">{{.Provider}}</span></td>
+          <td class="font-mono text-xs text-base-content/70">{{.ProviderCategory}}</td>
+          <td>
+            <template x-if="!editing">
+              <span @click="editing = true" class="text-sm cursor-pointer hover:text-primary transition-colors">{{.CategoryDisplayName}}</span>
+            </template>
+            <template x-if="editing">
+              <div class="flex gap-2 items-center">
+                <select x-model="categoryId" class="select select-sm w-48 bg-base-200/50 border-base-200 rounded-lg">
+                  {{range $.AllCategories}}
+                  <option value="{{.ID}}">{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
+                  {{end}}
+                </select>
+                <button class="btn btn-sm btn-primary rounded-lg" :disabled="submitting" @click="
+                  submitting = true;
+                  fetch('/-/category-mappings/{{.ID}}', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({category_id: categoryId})})
+                  .then(r => { if(r.ok) location.reload(); else { submitting = false; editing = false; } })
+                  .catch(() => { submitting = false; })
+                ">Save</button>
+                <button class="btn btn-sm btn-ghost rounded-lg" @click="editing = false">Cancel</button>
+              </div>
+            </template>
+          </td>
+          <td>
+            <button class="btn btn-ghost btn-xs text-error opacity-50 hover:opacity-100 transition-opacity" @click="
+              if(confirm('Delete this mapping?')) {
+                fetch('/-/category-mappings/{{.ID}}', {method: 'DELETE'})
+                .then(r => { if(r.ok) location.reload(); })
+              }
+            "><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
   </div>
 </div>
 

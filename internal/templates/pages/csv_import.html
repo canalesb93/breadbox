@@ -1,17 +1,63 @@
 {{define "content"}}
-<p class="mb-4"><a href="/connections" class="link">&larr; Connections</a></p>
-<h1 class="text-2xl font-bold mb-6">Import CSV</h1>
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Import CSV</h1>
+    <p class="text-sm text-base-content/50 mt-1">Import transactions from a CSV, TSV, or TXT file</p>
+  </div>
+  <a href="/connections" class="btn btn-sm btn-ghost rounded-xl gap-2">
+    <i data-lucide="arrow-left" class="w-4 h-4"></i> Connections
+  </a>
+</div>
 
-<div id="step-1" {{if .ConnectionID}}class="hidden"{{end}}>
-  <div class="card bg-base-100 border border-base-300">
-    <div class="card-body">
-      <h2 class="card-title">Step 1: Upload File</h2>
+<!-- Step indicator -->
+<div x-data="{step: {{if .ConnectionID}}1{{else}}1{{end}}}" x-init="window._csvWizard = {setStep: (s) => { step = s; }}">
+
+  <div class="flex items-center gap-0 mb-8 max-w-xl" id="step-indicator">
+    <template x-for="(s, i) in [{n:1, label:'Upload'}, {n:2, label:'Map Columns'}, {n:3, label:'Confirm'}, {n:4, label:'Done'}]" :key="i">
+      <div class="flex items-center" :class="i < 3 ? 'flex-1' : ''">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-200"
+               :class="step > s.n ? 'bg-success text-success-content' : step === s.n ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/40'">
+            <template x-if="step > s.n"><i data-lucide="check" class="w-4 h-4"></i></template>
+            <template x-if="step <= s.n"><span x-text="s.n"></span></template>
+          </div>
+          <span class="text-xs font-medium whitespace-nowrap transition-colors duration-200"
+                :class="step >= s.n ? 'text-base-content' : 'text-base-content/40'" x-text="s.label"></span>
+        </div>
+        <template x-if="i < 3">
+          <div class="flex-1 h-px mx-3 transition-colors duration-200"
+               :class="step > s.n ? 'bg-success/40' : 'bg-base-200'"></div>
+        </template>
+      </div>
+    </template>
+  </div>
+
+  <!-- Step 1: Upload -->
+  <div id="step-1" x-show="step === 1" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" {{if .ConnectionID}}{{end}}>
+    <div class="bb-card p-8 max-w-2xl">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/8">
+          <i data-lucide="upload" class="w-5 h-5 text-primary"></i>
+        </div>
+        <div>
+          <h2 class="text-base font-semibold">Upload File</h2>
+          <p class="text-xs text-base-content/45">Select your CSV file and family member</p>
+        </div>
+      </div>
+
       {{if .ConnectionID}}
-      <p>Re-importing to: <strong>{{.ExistingConnectionName}}</strong> ({{.ExistingUserName}})</p>
+      <div class="flex items-center gap-3 px-4 py-3 rounded-xl bg-base-200/50 mb-6">
+        <i data-lucide="link" class="w-4 h-4 text-base-content/50"></i>
+        <div class="text-sm">
+          <span class="text-base-content/50">Re-importing to:</span>
+          <span class="font-medium">{{.ExistingConnectionName}}</span>
+          <span class="text-base-content/40">({{.ExistingUserName}})</span>
+        </div>
+      </div>
       {{else}}
-      <fieldset class="fieldset">
-        <label class="fieldset-label" for="csv-user-id">Family Member</label>
-        <select id="csv-user-id" class="select w-full" required>
+      <fieldset class="fieldset mb-5">
+        <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="csv-user-id">Family Member</label>
+        <select id="csv-user-id" class="select w-full bg-base-200/50 border-base-200 focus:border-primary rounded-xl" required>
           <option value="" disabled selected>Select a member...</option>
           {{range .Users}}
           <option value="{{formatUUID .ID}}">{{.Name}}</option>
@@ -20,111 +66,142 @@
       </fieldset>
       {{end}}
 
-      <fieldset class="fieldset">
-        <label class="fieldset-label" for="csv-file">CSV File</label>
-        <input type="file" id="csv-file" accept=".csv,.tsv,.txt" class="file-input w-full">
-        <p class="text-sm text-base-content/60 mt-1">Supported: CSV, TSV, TXT files up to 10MB. Max 50,000 rows.</p>
+      <fieldset class="fieldset mb-6">
+        <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="csv-file">CSV File</label>
+        <input type="file" id="csv-file" accept=".csv,.tsv,.txt" class="file-input file-input-bordered w-full bg-base-200/50 border-base-200 rounded-xl">
+        <p class="text-xs text-base-content/40 mt-2">Supported: CSV, TSV, TXT files up to 10MB. Max 50,000 rows.</p>
       </fieldset>
 
-      <div class="mt-4">
-        <button type="button" id="upload-btn" class="btn btn-primary" onclick="uploadFile()">Upload &amp; Parse</button>
+      <div class="flex items-center gap-3 pt-2">
+        <button type="button" id="upload-btn" class="btn btn-primary btn-sm rounded-xl" onclick="uploadFile()">
+          <i data-lucide="upload" class="w-4 h-4"></i> Upload &amp; Parse
+        </button>
+        <p id="upload-status" class="text-sm text-error"></p>
       </div>
-      <p id="upload-status" class="text-sm text-error mt-2"></p>
     </div>
   </div>
-</div>
 
-<div id="step-2" class="hidden">
-  <div class="card bg-base-100 border border-base-300">
-    <div class="card-body">
-      <h2 class="card-title">Step 2: Map Columns</h2>
-      <p id="template-detected" class="text-sm text-base-content/70"></p>
+  <!-- Step 2: Map Columns -->
+  <div id="step-2" x-show="step === 2" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
+    <div class="bb-card p-8 max-w-3xl">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-accent/8">
+          <i data-lucide="columns" class="w-5 h-5 text-accent"></i>
+        </div>
+        <div>
+          <h2 class="text-base font-semibold">Map Columns</h2>
+          <p id="template-detected" class="text-xs text-base-content/45"></p>
+        </div>
+      </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
         <fieldset class="fieldset">
-          <label class="fieldset-label" for="map-date">Date Column <span class="text-xs text-base-content/50">(required)</span></label>
-          <select id="map-date" class="select w-full"></select>
+          <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-date">
+            Date Column <span class="text-xs text-base-content/30">(required)</span>
+          </label>
+          <select id="map-date" class="select w-full bg-base-200/50 border-base-200 rounded-xl"></select>
         </fieldset>
         <fieldset class="fieldset">
-          <label class="fieldset-label" for="map-amount">Amount Column <span class="text-xs text-base-content/50">(required)</span></label>
-          <select id="map-amount" class="select w-full"></select>
+          <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-amount">
+            Amount Column <span class="text-xs text-base-content/30">(required)</span>
+          </label>
+          <select id="map-amount" class="select w-full bg-base-200/50 border-base-200 rounded-xl"></select>
         </fieldset>
         <fieldset class="fieldset">
-          <label class="fieldset-label" for="map-description">Description Column <span class="text-xs text-base-content/50">(required)</span></label>
-          <select id="map-description" class="select w-full"></select>
+          <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-description">
+            Description Column <span class="text-xs text-base-content/30">(required)</span>
+          </label>
+          <select id="map-description" class="select w-full bg-base-200/50 border-base-200 rounded-xl"></select>
         </fieldset>
         <fieldset class="fieldset">
-          <label class="fieldset-label" for="map-category">Category Column <span class="text-xs text-base-content/50">(optional)</span></label>
-          <select id="map-category" class="select w-full"></select>
+          <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-category">
+            Category Column <span class="text-xs text-base-content/30">(optional)</span>
+          </label>
+          <select id="map-category" class="select w-full bg-base-200/50 border-base-200 rounded-xl"></select>
         </fieldset>
         <fieldset class="fieldset">
-          <label class="fieldset-label" for="map-merchant">Merchant Column <span class="text-xs text-base-content/50">(optional)</span></label>
-          <select id="map-merchant" class="select w-full"></select>
+          <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-merchant">
+            Merchant Column <span class="text-xs text-base-content/30">(optional)</span>
+          </label>
+          <select id="map-merchant" class="select w-full bg-base-200/50 border-base-200 rounded-xl"></select>
         </fieldset>
       </div>
 
-      <div id="debit-credit-section" class="hidden mt-4">
-        <fieldset class="fieldset border border-base-300 rounded-lg p-4">
-          <legend class="fieldset-label px-2">Split Debit/Credit Columns</legend>
+      <div id="debit-credit-section" class="hidden mb-6">
+        <div class="rounded-xl bg-base-200/30 border border-base-200 p-5">
+          <p class="text-sm font-medium text-base-content/70 mb-4">Split Debit/Credit Columns</p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <fieldset class="fieldset">
-              <label class="fieldset-label" for="map-debit">Debit Column</label>
-              <select id="map-debit" class="select w-full"></select>
+              <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-debit">Debit Column</label>
+              <select id="map-debit" class="select w-full bg-base-100 border-base-200 rounded-xl"></select>
             </fieldset>
             <fieldset class="fieldset">
-              <label class="fieldset-label" for="map-credit">Credit Column</label>
-              <select id="map-credit" class="select w-full"></select>
+              <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-credit">Credit Column</label>
+              <select id="map-credit" class="select w-full bg-base-100 border-base-200 rounded-xl"></select>
             </fieldset>
           </div>
-        </fieldset>
+        </div>
       </div>
 
-      <fieldset class="fieldset border border-base-300 rounded-lg p-4 mt-4">
-        <legend class="fieldset-label px-2">Sign Convention</legend>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="radio" name="sign-convention" value="debit" checked class="radio radio-sm">
-          <span class="text-sm">Positive = Debit (charges, money out)</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer mt-2">
-          <input type="radio" name="sign-convention" value="credit" class="radio radio-sm">
-          <span class="text-sm">Positive = Credit (payments, money in)</span>
-        </label>
-      </fieldset>
+      <div class="rounded-xl bg-base-200/30 border border-base-200 p-5 mb-6">
+        <p class="text-sm font-medium text-base-content/70 mb-3">Sign Convention</p>
+        <div class="flex flex-col gap-2.5">
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="radio" name="sign-convention" value="debit" checked class="radio radio-sm radio-primary">
+            <span class="text-sm">Positive = Debit (charges, money out)</span>
+          </label>
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="radio" name="sign-convention" value="credit" class="radio radio-sm radio-primary">
+            <span class="text-sm">Positive = Credit (payments, money in)</span>
+          </label>
+        </div>
+      </div>
 
-      <label class="flex items-center gap-2 cursor-pointer mt-4">
-        <input type="checkbox" id="has-debit-credit" class="checkbox checkbox-sm" onchange="toggleDebitCredit()">
-        <span class="text-sm">Separate debit/credit columns (e.g., Capital One)</span>
+      <label class="flex items-center gap-3 cursor-pointer mb-6">
+        <input type="checkbox" id="has-debit-credit" class="checkbox checkbox-sm checkbox-primary" onchange="toggleDebitCredit()">
+        <span class="text-sm text-base-content/70">Separate debit/credit columns (e.g., Capital One)</span>
       </label>
 
       {{if not .ConnectionID}}
-      <fieldset class="fieldset mt-4">
-        <label class="fieldset-label" for="account-name">Account Name</label>
-        <input type="text" id="account-name" class="input w-full" value="CSV Import" placeholder="e.g., Chase Checking CSV">
+      <fieldset class="fieldset mb-6">
+        <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="account-name">Account Name</label>
+        <input type="text" id="account-name" class="input w-full bg-base-200/50 border-base-200 rounded-xl" value="CSV Import" placeholder="e.g., Chase Checking CSV">
       </fieldset>
       {{end}}
 
-      <div class="flex gap-2 mt-4">
-        <button type="button" class="btn btn-ghost" onclick="previewData()">Preview</button>
-        <button type="button" id="continue-btn" class="btn btn-primary hidden" onclick="goToStep3()">Continue to Import</button>
+      <div class="flex items-center gap-3 pt-2">
+        <button type="button" class="btn btn-ghost btn-sm rounded-xl" onclick="window._csvWizard.setStep(1)">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i> Back
+        </button>
+        <button type="button" class="btn btn-sm btn-outline rounded-xl" onclick="previewData()">
+          <i data-lucide="eye" class="w-4 h-4"></i> Preview
+        </button>
+        <button type="button" id="continue-btn" class="btn btn-primary btn-sm rounded-xl hidden" onclick="goToStep3()">
+          Continue <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+        <p id="preview-status" class="text-sm text-error"></p>
       </div>
-      <p id="preview-status" class="text-sm text-error mt-2"></p>
     </div>
-  </div>
 
-  <div id="preview-table-container" class="hidden mt-4">
-    <div class="card bg-base-100 border border-base-300">
-      <div class="card-body">
-        <h2 class="card-title">Preview (first 10 rows)</h2>
-        <div class="overflow-x-auto">
-          <table id="preview-table" class="table table-zebra table-sm">
+    <!-- Preview table -->
+    <div id="preview-table-container" class="hidden mt-6">
+      <div class="bb-card p-6 max-w-3xl">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-info/8">
+            <i data-lucide="table" class="w-4 h-4 text-info"></i>
+          </div>
+          <h3 class="text-sm font-semibold">Preview (first 10 rows)</h3>
+        </div>
+        <div class="overflow-x-auto rounded-xl border border-base-200">
+          <table id="preview-table" class="table table-sm">
             <thead>
-              <tr>
-                <th>Date</th>
-                <th>Amount</th>
-                <th>Description</th>
-                <th>Category</th>
-                <th>Merchant</th>
-                <th>Status</th>
+              <tr class="bg-base-200/50">
+                <th class="text-xs font-medium text-base-content/50">Date</th>
+                <th class="text-xs font-medium text-base-content/50">Amount</th>
+                <th class="text-xs font-medium text-base-content/50">Description</th>
+                <th class="text-xs font-medium text-base-content/50">Category</th>
+                <th class="text-xs font-medium text-base-content/50">Merchant</th>
+                <th class="text-xs font-medium text-base-content/50">Status</th>
               </tr>
             </thead>
             <tbody id="preview-body"></tbody>
@@ -133,52 +210,89 @@
       </div>
     </div>
   </div>
-</div>
 
-<div id="step-3" class="hidden">
-  <div class="card bg-base-100 border border-base-300">
-    <div class="card-body">
-      <h2 class="card-title">Step 3: Confirm Import</h2>
-      <dl class="bb-info-grid my-4">
-        <dt>Total Rows</dt>
-        <dd id="summary-rows"></dd>
-        <dt>Account Name</dt>
-        <dd id="summary-account"></dd>
-        <dt>Family Member</dt>
-        <dd id="summary-member"></dd>
-      </dl>
-      <div class="flex gap-2">
-        <button type="button" class="btn btn-ghost" onclick="goToStep(2)">&larr; Back</button>
-        <button type="button" id="import-btn" class="btn btn-primary" onclick="doImport()">Import Transactions</button>
+  <!-- Step 3: Confirm -->
+  <div id="step-3" x-show="step === 3" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
+    <div class="bb-card p-8 max-w-lg">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-warning/8">
+          <i data-lucide="file-check" class="w-5 h-5 text-warning"></i>
+        </div>
+        <div>
+          <h2 class="text-base font-semibold">Confirm Import</h2>
+          <p class="text-xs text-base-content/45">Review before importing</p>
+        </div>
       </div>
-      <p id="import-status" class="text-sm text-error mt-2"></p>
+
+      <div class="space-y-4 mb-8">
+        <div class="flex items-center justify-between py-3 border-b border-base-200">
+          <span class="text-sm text-base-content/50">Total Rows</span>
+          <span id="summary-rows" class="text-sm font-semibold tabular-nums"></span>
+        </div>
+        <div class="flex items-center justify-between py-3 border-b border-base-200">
+          <span class="text-sm text-base-content/50">Account Name</span>
+          <span id="summary-account" class="text-sm font-semibold"></span>
+        </div>
+        <div class="flex items-center justify-between py-3">
+          <span class="text-sm text-base-content/50">Family Member</span>
+          <span id="summary-member" class="text-sm font-semibold"></span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button type="button" class="btn btn-ghost btn-sm rounded-xl" onclick="goToStep(2)">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i> Back
+        </button>
+        <button type="button" id="import-btn" class="btn btn-primary btn-sm rounded-xl" onclick="doImport()">
+          <i data-lucide="download" class="w-4 h-4"></i> Import Transactions
+        </button>
+      </div>
+      <p id="import-status" class="text-sm text-error mt-3"></p>
     </div>
   </div>
-</div>
 
-<div id="step-4" class="hidden">
-  <div class="card bg-base-100 border border-base-300">
-    <div class="card-body">
-      <h2 class="card-title">Import Complete</h2>
-      <dl class="bb-info-grid my-4">
-        <dt>Total Rows</dt>
-        <dd id="result-total"></dd>
-        <dt>New Transactions</dt>
-        <dd id="result-new"></dd>
-        <dt>Updated Transactions</dt>
-        <dd id="result-updated"></dd>
-        <dt>Skipped</dt>
-        <dd id="result-skipped"></dd>
-      </dl>
-      <div id="skip-reasons" class="hidden">
-        <details class="collapse collapse-arrow bg-base-200 border border-base-300 mb-4">
-          <summary class="collapse-title text-sm font-medium">Skipped Row Details</summary>
-          <div class="collapse-content">
-            <ul id="skip-reasons-list" class="list-disc list-inside text-sm"></ul>
+  <!-- Step 4: Complete -->
+  <div id="step-4" x-show="step === 4" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
+    <div class="bb-card p-8 max-w-lg">
+      <div class="flex flex-col items-center text-center mb-8">
+        <div class="w-16 h-16 rounded-2xl bg-success/10 flex items-center justify-center mb-4">
+          <i data-lucide="check-circle-2" class="w-8 h-8 text-success"></i>
+        </div>
+        <h2 class="text-lg font-semibold mb-1">Import Complete</h2>
+        <p class="text-sm text-base-content/50">Your transactions have been imported successfully</p>
+      </div>
+
+      <div class="space-y-3 mb-8">
+        <div class="flex items-center justify-between py-3 px-4 rounded-xl bg-base-200/50">
+          <span class="text-sm text-base-content/50">Total Rows</span>
+          <span id="result-total" class="text-sm font-semibold tabular-nums"></span>
+        </div>
+        <div class="flex items-center justify-between py-3 px-4 rounded-xl bg-success/5">
+          <span class="text-sm text-success">New Transactions</span>
+          <span id="result-new" class="text-sm font-semibold tabular-nums text-success"></span>
+        </div>
+        <div class="flex items-center justify-between py-3 px-4 rounded-xl bg-info/5">
+          <span class="text-sm text-info">Updated Transactions</span>
+          <span id="result-updated" class="text-sm font-semibold tabular-nums text-info"></span>
+        </div>
+        <div class="flex items-center justify-between py-3 px-4 rounded-xl bg-base-200/50">
+          <span class="text-sm text-base-content/50">Skipped</span>
+          <span id="result-skipped" class="text-sm font-semibold tabular-nums"></span>
+        </div>
+      </div>
+
+      <div id="skip-reasons" class="hidden mb-6">
+        <details class="rounded-xl bg-warning/5 border border-warning/20">
+          <summary class="px-4 py-3 text-sm font-medium cursor-pointer text-warning">Skipped Row Details</summary>
+          <div class="px-4 pb-4">
+            <ul id="skip-reasons-list" class="list-disc list-inside text-sm text-base-content/70 space-y-1"></ul>
           </div>
         </details>
       </div>
-      <a id="result-link" href="#" class="btn btn-primary">View Connection &rarr;</a>
+
+      <a id="result-link" href="#" class="btn btn-primary btn-sm rounded-xl w-full">
+        View Connection <i data-lucide="arrow-right" class="w-4 h-4"></i>
+      </a>
     </div>
   </div>
 </div>
@@ -349,12 +463,12 @@
     tbody.innerHTML = "";
     rows.forEach(function(row) {
       var tr = document.createElement("tr");
-      if (row.error) tr.classList.add("bg-error/10");
-      tr.innerHTML = "<td>" + esc(row.date) + "</td>" +
-        "<td>" + esc(row.amount) + "</td>" +
-        "<td>" + esc(row.description) + "</td>" +
-        "<td>" + esc(row.category) + "</td>" +
-        "<td>" + esc(row.merchant) + "</td>" +
+      if (row.error) tr.classList.add("bg-error/5");
+      tr.innerHTML = "<td class='text-sm'>" + esc(row.date) + "</td>" +
+        "<td class='text-sm tabular-nums'>" + esc(row.amount) + "</td>" +
+        "<td class='text-sm'>" + esc(row.description) + "</td>" +
+        "<td class='text-sm'>" + esc(row.category) + "</td>" +
+        "<td class='text-sm'>" + esc(row.merchant) + "</td>" +
         "<td>" + (row.error ? "<span class='badge badge-error badge-sm'>" + esc(row.error) + "</span>" : "<span class='badge badge-success badge-sm'>OK</span>") + "</td>";
       tbody.appendChild(tr);
     });
@@ -400,14 +514,11 @@
   };
 
   window.goToStep = function(n) {
-    for (var i = 1; i <= 4; i++) {
-      var el = document.getElementById("step-" + i);
-      if (i === n) {
-        el.classList.remove("hidden");
-      } else {
-        el.classList.add("hidden");
-      }
+    if (window._csvWizard) {
+      window._csvWizard.setStep(n);
     }
+    // Re-init Lucide icons for the new step
+    setTimeout(function() { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 50);
   };
 
   window.doImport = function() {

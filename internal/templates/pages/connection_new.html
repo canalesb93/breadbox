@@ -1,64 +1,114 @@
 {{define "content"}}
-<h1 class="text-2xl font-bold mb-6">Connect New Bank</h1>
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Connect New Bank</h1>
+    <p class="text-sm text-base-content/50 mt-1">Link a bank account to start syncing transactions</p>
+  </div>
+  <a href="/connections" class="btn btn-sm btn-ghost rounded-xl gap-2">
+    <i data-lucide="arrow-left" class="w-4 h-4"></i> Connections
+  </a>
+</div>
 
 {{if not (or .HasPlaid .HasTeller)}}
-<div class="card bg-base-100 shadow-sm">
-  <div class="card-body">
-    <h2 class="card-title">No Providers Configured</h2>
-    <p class="text-base-content/70">You need to configure at least one bank provider before creating connections.</p>
-    <div class="mt-2">
-      <a href="/providers" class="btn btn-primary btn-sm">Configure Providers</a>
+<!-- No providers configured -->
+<div class="bb-card p-8 max-w-lg">
+  <div class="flex flex-col items-center text-center">
+    <div class="w-16 h-16 rounded-2xl bg-warning/10 flex items-center justify-center mb-4">
+      <i data-lucide="plug-zap" class="w-8 h-8 text-warning"></i>
     </div>
+    <h2 class="text-lg font-semibold mb-1">No Providers Configured</h2>
+    <p class="text-sm text-base-content/50 mb-6">You need to configure at least one bank provider before creating connections.</p>
+    <a href="/providers" class="btn btn-primary btn-sm rounded-xl">
+      <i data-lucide="settings" class="w-4 h-4"></i> Configure Providers
+    </a>
   </div>
 </div>
-<p class="mt-4"><a href="/connections" class="link">&larr; Back to Connections</a></p>
 {{else}}
 <div id="step-select" {{if .ShowLink}}class="hidden"{{end}}>
-  <div class="card bg-base-100 border border-base-300">
-    <div class="card-body">
-      <h2 class="card-title">Select Family Member</h2>
-      <p class="text-base-content/70">Choose which family member this bank connection belongs to.</p>
-      <form id="member-form" class="flex flex-col gap-4 mt-2">
-        <label class="form-control w-full max-w-xs">
-          <div class="label"><span class="label-text">Bank Provider</span></div>
-          <select id="provider" name="provider" required class="select select-sm w-full max-w-xs">
-            {{if .HasPlaid}}<option value="plaid">Plaid</option>{{end}}
-            {{if .HasTeller}}<option value="teller">Teller</option>{{end}}
-            <option value="csv">CSV Import</option>
-          </select>
-        </label>
-
-        <label class="form-control w-full max-w-xs">
-          <div class="label"><span class="label-text">Family Member</span></div>
-          <select id="user_id" name="user_id" required class="select select-sm w-full max-w-xs">
-            <option value="" disabled selected>Select a member...</option>
-            {{range .Users}}
-            <option value="{{formatUUID .ID}}">{{.Name}}</option>
-            {{end}}
-          </select>
-        </label>
-
-        <div>
-          <button type="submit" class="btn btn-primary btn-sm">Continue to Bank Selection</button>
-        </div>
-      </form>
+  <div class="bb-card p-8 max-w-lg">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/8">
+        <i data-lucide="user-plus" class="w-5 h-5 text-primary"></i>
+      </div>
+      <div>
+        <h2 class="text-base font-semibold">Select Details</h2>
+        <p class="text-xs text-base-content/45">Choose provider and family member</p>
+      </div>
     </div>
+
+    <form id="member-form" class="flex flex-col gap-5">
+      <fieldset class="fieldset">
+        <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Bank Provider</label>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="provider-cards">
+          {{if .HasPlaid}}
+          <label class="relative cursor-pointer">
+            <input type="radio" name="provider" value="plaid" class="peer sr-only" checked>
+            <div class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-200 bg-base-200/30
+                        peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300">
+              <i data-lucide="building-2" class="w-6 h-6 text-base-content/60"></i>
+              <span class="text-sm font-medium">Plaid</span>
+            </div>
+          </label>
+          {{end}}
+          {{if .HasTeller}}
+          <label class="relative cursor-pointer">
+            <input type="radio" name="provider" value="teller" class="peer sr-only" {{if not .HasPlaid}}checked{{end}}>
+            <div class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-200 bg-base-200/30
+                        peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300">
+              <i data-lucide="landmark" class="w-6 h-6 text-base-content/60"></i>
+              <span class="text-sm font-medium">Teller</span>
+            </div>
+          </label>
+          {{end}}
+          <label class="relative cursor-pointer">
+            <input type="radio" name="provider" value="csv" class="peer sr-only">
+            <div class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-200 bg-base-200/30
+                        peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300">
+              <i data-lucide="file-spreadsheet" class="w-6 h-6 text-base-content/60"></i>
+              <span class="text-sm font-medium">CSV</span>
+            </div>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="fieldset">
+        <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="user_id">Family Member</label>
+        <select id="user_id" name="user_id" required class="select w-full bg-base-200/50 border-base-200 focus:border-primary rounded-xl">
+          <option value="" disabled selected>Select a member...</option>
+          {{range .Users}}
+          <option value="{{formatUUID .ID}}">{{.Name}}</option>
+          {{end}}
+        </select>
+      </fieldset>
+
+      <div class="pt-2">
+        <button type="submit" class="btn btn-primary btn-sm rounded-xl">
+          Continue <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </form>
   </div>
-  <p class="mt-4"><a href="/connections" class="link">&larr; Back to Connections</a></p>
 </div>
 
 <div id="step-link" class="hidden">
-  <div class="card bg-base-100 border border-base-300">
-    <div class="card-body">
-      <h2 class="card-title">Connect Bank</h2>
-      <p>Connecting for: <strong id="member-name"></strong></p>
-      <p id="link-status" class="text-base-content/70">Opening bank connection dialog...</p>
-      <div>
-        <button id="retry-btn" class="btn btn-primary btn-sm hidden">Retry</button>
+  <div class="bb-card p-8 max-w-lg">
+    <div class="flex flex-col items-center text-center">
+      <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+        <i data-lucide="link" class="w-8 h-8 text-primary"></i>
+      </div>
+      <h2 class="text-lg font-semibold mb-1">Connect Bank</h2>
+      <p class="text-sm text-base-content/50 mb-1">Connecting for: <span id="member-name" class="font-semibold text-base-content"></span></p>
+      <p id="link-status" class="text-sm text-base-content/50 mb-6">Opening bank connection dialog...</p>
+      <div class="flex items-center gap-3">
+        <button id="retry-btn" class="btn btn-primary btn-sm rounded-xl hidden">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i> Retry
+        </button>
+        <button id="back-btn" class="btn btn-ghost btn-sm rounded-xl">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i> Back
+        </button>
       </div>
     </div>
   </div>
-  <p class="mt-4"><a href="#" id="back-btn" class="link">&larr; Back to member selection</a></p>
 </div>
 
 <script>
@@ -71,14 +121,14 @@
   var retryBtn = document.getElementById("retry-btn");
   var backBtn = document.getElementById("back-btn");
   var selectedUserId = "";
-  var providerSelect = document.getElementById("provider");
-  var selectedProvider = providerSelect ? providerSelect.value : "";
+  var selectedProvider = "";
 
   memberForm.addEventListener("submit", function (e) {
     e.preventDefault();
     var select = document.getElementById("user_id");
     selectedUserId = select.value;
-    selectedProvider = document.getElementById("provider").value || "plaid";
+    var providerRadio = document.querySelector('input[name="provider"]:checked');
+    selectedProvider = providerRadio ? providerRadio.value : "plaid";
     if (!selectedUserId) return;
     if (selectedProvider === "csv") {
       window.location.href = "/connections/import-csv";
@@ -87,6 +137,7 @@
     memberNameEl.textContent = select.options[select.selectedIndex].text;
     stepSelect.classList.add("hidden");
     stepLink.classList.remove("hidden");
+    setTimeout(function() { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 50);
     loadProviderSDK(selectedProvider, startLink);
   });
 
@@ -112,27 +163,27 @@
     stepSelect.classList.remove("hidden");
     linkStatus.textContent = "Opening bank connection dialog...";
     linkStatus.classList.remove("text-error");
-    linkStatus.classList.add("text-base-content/70");
+    linkStatus.classList.add("text-base-content/50");
     retryBtn.classList.add("hidden");
   });
 
   function showError(msg) {
     linkStatus.textContent = msg;
     linkStatus.classList.add("text-error");
-    linkStatus.classList.remove("text-base-content/70");
+    linkStatus.classList.remove("text-base-content/50");
     retryBtn.classList.remove("hidden");
   }
 
   function showMessage(msg) {
     linkStatus.textContent = msg;
     linkStatus.classList.remove("text-error");
-    linkStatus.classList.add("text-base-content/70");
+    linkStatus.classList.add("text-base-content/50");
   }
 
   function startLink() {
     linkStatus.textContent = "Opening bank connection dialog...";
     linkStatus.classList.remove("text-error");
-    linkStatus.classList.add("text-base-content/70");
+    linkStatus.classList.add("text-base-content/50");
     retryBtn.classList.add("hidden");
 
     fetch("/-/link-token", {
