@@ -10,7 +10,7 @@
 
   <!-- Plaid Card -->
   <div class="bb-card p-0 overflow-hidden">
-    <div class="px-6 py-5 border-b border-base-200 flex items-center justify-between">
+    <div class="px-6 py-5 border-b border-base-300 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
           <i data-lucide="building-2" class="w-5 h-5 text-primary"></i>
@@ -82,7 +82,7 @@
       {{end}}
 
       {{if .PlaidConfigured}}
-      <div class="mt-5 flex items-center gap-3 border-t border-base-200 pt-4">
+      <div class="mt-5 flex items-center gap-3 border-t border-base-300 pt-4">
         <button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick="testProvider('plaid')" id="test-plaid-btn">Test Connection</button>
         <span id="test-plaid-result" class="text-sm"></span>
       </div>
@@ -92,7 +92,7 @@
 
   <!-- Teller Card -->
   <div class="bb-card p-0 overflow-hidden">
-    <div class="px-6 py-5 border-b border-base-200 flex items-center justify-between">
+    <div class="px-6 py-5 border-b border-base-300 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
           <i data-lucide="landmark" class="w-5 h-5 text-accent"></i>
@@ -140,7 +140,7 @@
         </div>
 
         {{if not .TellerCertFromEnv}}
-        <div class="border-t border-base-200 pt-4 mt-4">
+        <div class="border-t border-base-300 pt-4 mt-4">
           <h3 class="text-sm font-medium mb-3 text-base-content/60">mTLS Certificate</h3>
 
           {{if .TellerCertConfigured}}
@@ -181,7 +181,7 @@
       {{end}}
 
       {{if .TellerConfigured}}
-      <div class="mt-5 flex items-center gap-3 border-t border-base-200 pt-4">
+      <div class="mt-5 flex items-center gap-3 border-t border-base-300 pt-4">
         <button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick="testProvider('teller')" id="test-teller-btn">Test Connection</button>
         <span id="test-teller-result" class="text-sm"></span>
       </div>
@@ -191,7 +191,7 @@
 
   <!-- CSV Card -->
   <div class="bb-card p-0 overflow-hidden">
-    <div class="px-6 py-5 border-b border-base-200 flex items-center justify-between">
+    <div class="px-6 py-5 border-b border-base-300 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
           <i data-lucide="file-spreadsheet" class="w-5 h-5 text-success"></i>

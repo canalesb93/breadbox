@@ -11,7 +11,7 @@
   <form method="GET" action="/sync-logs" class="flex flex-wrap items-end gap-3">
     <div class="form-control">
       <label class="text-xs font-medium text-base-content/50 mb-1">Connection</label>
-      <select name="connection_id" class="select select-sm bg-base-200/50 border-base-200 min-w-[10rem]">
+      <select name="connection_id" class="select select-sm bg-base-200/50 border-base-300 min-w-[10rem]">
         <option value="">All connections</option>
         {{range .Connections}}
         <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.FilterConnID}} selected{{end}}>{{.InstitutionName.String}}</option>
@@ -20,7 +20,7 @@
     </div>
     <div class="form-control">
       <label class="text-xs font-medium text-base-content/50 mb-1">Status</label>
-      <select name="status" class="select select-sm bg-base-200/50 border-base-200 min-w-[8rem]">
+      <select name="status" class="select select-sm bg-base-200/50 border-base-300 min-w-[8rem]">
         <option value="">All statuses</option>
         <option value="success"{{if eq .FilterStatus "success"}} selected{{end}}>Success</option>
         <option value="error"{{if eq .FilterStatus "error"}} selected{{end}}>Error</option>
@@ -85,7 +85,7 @@
         <div tabindex="0" role="button" class="btn btn-ghost btn-xs text-error">
           <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
         </div>
-        <div tabindex="0" class="dropdown-content card card-compact bg-base-100 shadow-xl border border-base-200 p-3 w-72 z-10">
+        <div tabindex="0" class="dropdown-content card card-compact bg-base-100 shadow-sm border border-base-300 p-3 w-72 z-10">
           <p class="text-xs text-error font-mono break-all">{{.ErrorMessage}}</p>
         </div>
       </div>
@@ -115,7 +115,7 @@
 {{else}}
 <div class="bb-card p-12 text-center">
   <div class="flex flex-col items-center">
-    <div class="w-16 h-16 rounded-2xl bg-base-200/60 flex items-center justify-center mb-4">
+    <div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
       <i data-lucide="refresh-cw" class="w-8 h-8 text-base-content/25"></i>
     </div>
     <h3 class="text-lg font-semibold mb-1">No sync logs found</h3>

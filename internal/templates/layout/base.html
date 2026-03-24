@@ -19,9 +19,9 @@
     <input id="bb-drawer" type="checkbox" class="drawer-toggle" />
 
     <!-- Main content -->
-    <div class="drawer-content bg-base-200/50">
+    <div class="drawer-content bg-base-200">
       <!-- Mobile navbar -->
-      <div class="navbar bg-base-100 lg:hidden border-b border-base-200">
+      <div class="navbar bg-base-100 lg:hidden border-b border-base-300">
         <div class="flex-none">
           <label for="bb-drawer" class="btn btn-square btn-ghost">
             <i data-lucide="menu" class="w-5 h-5"></i>
@@ -32,7 +32,7 @@
         </div>
       </div>
       <!-- Page content -->
-      <main class="p-8 max-w-6xl min-h-screen">
+      <main class="p-6 max-w-6xl min-h-screen">
         {{template "flash" .}}
         {{block "content" .}}{{end}}
       </main>
@@ -60,7 +60,7 @@
          setTimeout(() => toasts.shift(), 4000)
        ">
     <template x-for="t in toasts" :key="t.id">
-      <div class="alert shadow-lg rounded-xl"
+      <div class="alert rounded-lg border border-base-300"
            :class="{
              'alert-success': t.type === 'success',
              'alert-error': t.type === 'error',

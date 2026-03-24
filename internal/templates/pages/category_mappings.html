@@ -38,7 +38,7 @@
           <td class="text-sm">{{if .Primary}}{{.Primary}}{{else}}&mdash;{{end}}</td>
           <td class="text-sm font-mono text-xs">{{if .Detailed}}{{.Detailed}}{{else}}&mdash;{{end}}</td>
           <td class="flex gap-2 items-center">
-            <select x-model="categoryId" class="select select-sm w-48 bg-base-200/30 border-base-200 rounded-xl">
+            <select x-model="categoryId" class="select select-sm w-48 bg-base-200/30 border-base-300 rounded-xl">
               <option value="">Select category...</option>
               {{range $.AllCategories}}
               <option value="{{.ID}}">{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
@@ -104,7 +104,7 @@
             </template>
             <template x-if="editing">
               <div class="flex gap-2 items-center">
-                <select x-model="categoryId" class="select select-sm w-48 bg-base-200/30 border-base-200 rounded-xl">
+                <select x-model="categoryId" class="select select-sm w-48 bg-base-200/30 border-base-300 rounded-xl">
                   {{range $.AllCategories}}
                   <option value="{{.ID}}">{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
                   {{end}}
@@ -134,7 +134,7 @@
   </div>
   {{else}}
   <div class="flex flex-col items-center text-center py-12">
-    <div class="w-14 h-14 rounded-2xl bg-base-200/60 flex items-center justify-center mb-3">
+    <div class="w-14 h-14 rounded-xl bg-base-200/60 flex items-center justify-center mb-3">
       <i data-lucide="arrow-right-left" class="w-7 h-7 text-base-content/30"></i>
     </div>
     <p class="text-sm text-base-content/45">No mappings configured yet.</p>

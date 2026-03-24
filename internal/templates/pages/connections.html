@@ -16,7 +16,7 @@
 {{if .Connections}}
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
   {{range .Connections}}
-  <a href="/connections/{{formatUUID .ID}}" class="card bg-base-100 shadow-sm border border-base-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 no-underline group">
+  <a href="/connections/{{formatUUID .ID}}" class="card bg-base-100 border border-base-300 hover:bg-base-200/50 transition-colors duration-150 no-underline group">
     <div class="card-body p-5">
       <!-- Header: Institution + Status -->
       <div class="flex items-start justify-between gap-3 mb-3">
@@ -78,9 +78,9 @@
 
 {{else}}
 <!-- Empty State -->
-<div class="card bg-base-100 shadow-sm border border-base-300">
+<div class="card bg-base-100 border border-base-300">
   <div class="card-body items-center text-center py-16">
-    <div class="w-16 h-16 rounded-2xl bg-base-200/60 flex items-center justify-center mb-4">
+    <div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
       <i data-lucide="building-2" class="w-8 h-8 text-base-content/20"></i>
     </div>
     <h3 class="text-lg font-semibold mb-1">No bank connections yet</h3>

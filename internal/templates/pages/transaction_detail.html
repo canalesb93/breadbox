@@ -11,7 +11,7 @@
 <!-- Header with amount -->
 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
   <div class="flex items-center gap-4">
-    <div class="w-12 h-12 rounded-2xl {{if lt .Transaction.Amount 0.0}}bg-error/10{{else}}bg-success/10{{end}} flex items-center justify-center">
+    <div class="w-12 h-12 rounded-xl {{if lt .Transaction.Amount 0.0}}bg-error/10{{else}}bg-success/10{{end}} flex items-center justify-center">
       <i data-lucide="{{if lt .Transaction.Amount 0.0}}arrow-up-right{{else}}arrow-down-left{{end}}" class="w-6 h-6 {{if lt .Transaction.Amount 0.0}}text-error{{else}}text-success{{end}}"></i>
     </div>
     <div>
@@ -81,7 +81,7 @@
     </div>
 
     <!-- Metadata -->
-    <div class="mt-6 pt-5 border-t border-base-200">
+    <div class="mt-6 pt-5 border-t border-base-300">
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-6 text-xs">
         <div>
           <p class="text-base-content/30 mb-0.5">Transaction ID</p>
@@ -172,7 +172,7 @@
   {{end}}
 
   <!-- Add Comment -->
-  <div class="px-6 py-4 mt-2 border-t border-base-200">
+  <div class="px-6 py-4 mt-2 border-t border-base-300">
     <div class="flex gap-3">
       <div class="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center shrink-0 mt-0.5">
         <i data-lucide="user" class="w-4 h-4 text-base-content/40"></i>

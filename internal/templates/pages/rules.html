@@ -51,7 +51,7 @@
 {{if not .Rules}}
 <div class="bb-card">
   <div class="flex flex-col items-center text-center py-16 px-6">
-    <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+    <div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
       <i data-lucide="list-filter" class="w-8 h-8 text-primary"></i>
     </div>
     <h2 class="text-lg font-semibold mb-1">No rules yet</h2>
@@ -153,7 +153,7 @@
 
 <!-- Create/Edit Rule Modal -->
 <dialog class="modal" :class="{'modal-open': showCreateModal || showEditModal}">
-  <div class="modal-box max-w-lg rounded-2xl">
+  <div class="modal-box max-w-lg rounded-xl">
     <h3 class="font-bold text-lg mb-6" x-text="showEditModal ? 'Edit Rule' : 'Create Rule'"></h3>
     <form @submit.prevent="submitRule()">
       <div class="form-control mb-4">

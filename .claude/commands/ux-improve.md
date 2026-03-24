@@ -76,16 +76,25 @@ git checkout -b auto-improvement/<short-descriptive-name>
 - **No Node.js**, no npm, no build step beyond `make css`.
 - **Go handlers** in `internal/api/`, service layer in `internal/service/`.
 
-### Design Principles — "Mercury Style"
+### Design Principles — "shadcn/ui aesthetic via DaisyUI"
 
-- **Light and airy** — Think white space, soft shadows, generous padding. The app should feel calm and premium, not dense and busy. Prefer `bg-base-100` cards on `bg-base-200` backgrounds with subtle separation.
-- **Soft shapes** — Use `rounded-2xl` for cards and containers. Avoid sharp corners. Buttons should be rounded too.
-- **Minimal borders** — Prefer shadows and background color contrast over visible borders. If borders are needed, use very subtle ones (`border-base-200` not `border-base-300`).
-- **Typography over decoration** — Use font size and weight to create hierarchy, not colors or icons. Financial amounts should be large and bold. Labels should be small and muted.
-- **Sparing color** — Mostly grayscale/neutral palette. Green for positive amounts/success, red for negative/errors. One accent color max. No rainbow badges.
-- **Snappy** — CSS transitions (150-250ms), smooth hover states, subtle lift on interactive cards.
-- **Consistent design system** — Before implementing, read `input.css` and existing templates. Reuse and extend existing patterns. If you add new reusable patterns, define them in `input.css`. Use DaisyUI semantic classes consistently.
-- **Dark mode aware** — The app uses `prefers-color-scheme` auto-switch. Design should work in both, but dark mode should still feel "Mercury-esque" — dark grays, not pure black, with the same soft aesthetic.
+The target aesthetic is **shadcn/ui** (https://ui.shadcn.com) — the gold standard for modern web UIs. We use DaisyUI for structural components but override its theme to match shadcn's visual language.
+
+**shadcn design DNA:**
+- **Neutral-first palette** — Almost entirely grayscale. Pure white backgrounds, near-black text. Color is used only for semantic meaning (destructive red, success green) and one primary accent.
+- **OKLCH color space** — shadcn uses OKLCH. Light mode: `background: oklch(1 0 0)`, `foreground: oklch(0.145 0 0)`, `border: oklch(0.922 0 0)`. Dark mode: `background: oklch(0.145 0 0)`, `foreground: oklch(0.985 0 0)`, `border: oklch(1 0 0 / 10%)`.
+- **Subtle borders over shadows** — shadcn prefers thin `1px` borders in muted gray over box-shadows. Cards have `border-border` not `shadow-md`.
+- **Consistent radius** — `--radius: 0.625rem` for most elements. Cards slightly larger. Not overly rounded.
+- **Tight, purposeful spacing** — Not as padded as Mercury. More like `p-4` to `p-6`, not `p-8`. Dense but clean.
+- **Typography hierarchy via weight** — Semibold headings, normal body, muted secondary text (`text-muted-foreground`). No uppercase labels.
+- **Minimal decoration** — No colored left borders, no gradient backgrounds, no icon circles. Let content speak.
+- **Dark mode: true dark** — Near-black background (`oklch(0.145 0 0)`), slightly lighter cards (`oklch(0.205 0 0)`), muted borders. Rich and clean.
+
+**How to apply with DaisyUI:**
+- Use `@plugin "daisyui/theme"` to define custom themes with shadcn's OKLCH values mapped to DaisyUI's semantic tokens (`--color-base-100`, `--color-base-content`, `--color-primary`, etc.)
+- Keep DaisyUI structural components (`drawer`, `table`, `modal`, `collapse`, `badge`) but ensure they're styled to match shadcn's minimal aesthetic
+- Avoid DaisyUI's more opinionated components (colored badges, gradient buttons) — use ghost/outline variants
+- Use `border-base-200` (light) or `border-base-content/10` (dark) for all borders
 
 ### What NOT to do
 

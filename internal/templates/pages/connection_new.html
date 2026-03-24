@@ -13,7 +13,7 @@
 <!-- No providers configured -->
 <div class="bb-card p-8 max-w-lg">
   <div class="flex flex-col items-center text-center">
-    <div class="w-16 h-16 rounded-2xl bg-warning/10 flex items-center justify-center mb-4">
+    <div class="w-16 h-16 rounded-xl bg-warning/10 flex items-center justify-center mb-4">
       <i data-lucide="plug-zap" class="w-8 h-8 text-warning"></i>
     </div>
     <h2 class="text-lg font-semibold mb-1">No Providers Configured</h2>
@@ -43,7 +43,7 @@
           {{if .HasPlaid}}
           <label class="relative cursor-pointer">
             <input type="radio" name="provider" value="plaid" class="peer sr-only" checked>
-            <div class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-200 bg-base-200/30
+            <div class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-300 bg-base-200/30
                         peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300">
               <i data-lucide="building-2" class="w-6 h-6 text-base-content/60"></i>
               <span class="text-sm font-medium">Plaid</span>
@@ -53,7 +53,7 @@
           {{if .HasTeller}}
           <label class="relative cursor-pointer">
             <input type="radio" name="provider" value="teller" class="peer sr-only" {{if not .HasPlaid}}checked{{end}}>
-            <div class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-200 bg-base-200/30
+            <div class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-300 bg-base-200/30
                         peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300">
               <i data-lucide="landmark" class="w-6 h-6 text-base-content/60"></i>
               <span class="text-sm font-medium">Teller</span>
@@ -62,7 +62,7 @@
           {{end}}
           <label class="relative cursor-pointer">
             <input type="radio" name="provider" value="csv" class="peer sr-only">
-            <div class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-200 bg-base-200/30
+            <div class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-300 bg-base-200/30
                         peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300">
               <i data-lucide="file-spreadsheet" class="w-6 h-6 text-base-content/60"></i>
               <span class="text-sm font-medium">CSV</span>
@@ -73,7 +73,7 @@
 
       <fieldset class="fieldset">
         <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="user_id">Family Member</label>
-        <select id="user_id" name="user_id" required class="select w-full bg-base-200/50 border-base-200 focus:border-primary rounded-xl">
+        <select id="user_id" name="user_id" required class="select w-full bg-base-200/50 border-base-300 focus:border-primary rounded-xl">
           <option value="" disabled selected>Select a member...</option>
           {{range .Users}}
           <option value="{{formatUUID .ID}}">{{.Name}}</option>
@@ -93,7 +93,7 @@
 <div id="step-link" class="hidden">
   <div class="bb-card p-8 max-w-lg">
     <div class="flex flex-col items-center text-center">
-      <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+      <div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
         <i data-lucide="link" class="w-8 h-8 text-primary"></i>
       </div>
       <h2 class="text-lg font-semibold mb-1">Connect Bank</h2>
