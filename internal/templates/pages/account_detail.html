@@ -34,20 +34,20 @@
       <div>
         <p class="text-xs text-base-content/40 mb-1">Current Balance</p>
         <p class="text-2xl font-semibold tabular-nums">
-          {{if .Account.BalanceCurrent}}{{printf "%.2f" .Account.BalanceCurrent}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
+          {{if .Account.BalanceCurrent}}{{fmtBalance .Account.BalanceCurrent}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
         </p>
-        {{if .Account.IsoCurrencyCode}}<p class="text-xs text-base-content/30 mt-0.5">{{.Account.IsoCurrencyCode}}</p>{{end}}
+        {{if .Account.IsoCurrencyCode}}<p class="text-xs text-base-content/30 mt-0.5">{{deref .Account.IsoCurrencyCode}}</p>{{end}}
       </div>
       <div>
         <p class="text-xs text-base-content/40 mb-1">Available</p>
         <p class="text-2xl font-semibold tabular-nums text-base-content/60">
-          {{if .Account.BalanceAvailable}}{{printf "%.2f" .Account.BalanceAvailable}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
+          {{if .Account.BalanceAvailable}}{{fmtBalance .Account.BalanceAvailable}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
         </p>
       </div>
       {{if .Account.BalanceLimit}}
       <div>
         <p class="text-xs text-base-content/40 mb-1">Credit Limit</p>
-        <p class="text-2xl font-semibold tabular-nums text-base-content/60">{{printf "%.2f" .Account.BalanceLimit}}</p>
+        <p class="text-2xl font-semibold tabular-nums text-base-content/60">{{fmtBalance .Account.BalanceLimit}}</p>
       </div>
       {{end}}
     </div>
