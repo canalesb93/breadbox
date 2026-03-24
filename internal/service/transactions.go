@@ -392,7 +392,9 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		"COALESCE(bc.institution_name, ''), COALESCE(u.name, ''), " +
 		"t.date, t.name, t.merchant_name, t.amount, t.iso_currency_code, " +
 		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
-		"t.category_override, t.pending, t.created_at, t.updated_at "
+		"t.category_override, t.pending, " +
+		"EXISTS(SELECT 1 FROM review_queue rq WHERE rq.transaction_id = t.id AND rq.reviewer_type = 'agent' AND rq.status IN ('approved', 'rejected')) AS agent_reviewed, " +
+		"t.created_at, t.updated_at "
 	fromClause := "FROM transactions t " +
 		"LEFT JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
@@ -586,6 +588,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			catColor         pgtype.Text
 			categoryOverride bool
 			pending          bool
+			agentReviewed    bool
 			createdAt        pgtype.Timestamptz
 			updatedAt        pgtype.Timestamptz
 		)
@@ -595,7 +598,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			&institutionName, &userName,
 			&date, &name, &merchantName, &amount, &isoCurrencyCode,
 			&categoryID, &catDisplayName, &catSlug, &catIcon, &catColor,
-			&categoryOverride, &pending, &createdAt, &updatedAt,
+			&categoryOverride, &pending, &agentReviewed, &createdAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan admin transaction: %w", err)
 		}
@@ -634,6 +637,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			CategoryColor:       textPtr(catColor),
 			CategoryOverride:    categoryOverride,
 			Pending:             pending,
+			AgentReviewed:       agentReviewed,
 			CreatedAt:           createdAt.Time.UTC().Format(time.RFC3339),
 			UpdatedAt:           updatedAt.Time.UTC().Format(time.RFC3339),
 		})

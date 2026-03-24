@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -184,6 +185,9 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return ""
 				}
 				return *s
+			},
+			"humanize": func(s string) string {
+				return strings.ReplaceAll(s, "_", " ")
 			},
 			"pageRange": func(current, total int) []int {
 				// Returns page numbers to display: always include first, last,

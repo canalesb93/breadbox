@@ -587,6 +587,12 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			a.Logger.Error("list transaction comments", "error", err)
 		}
 
+		// Fetch review history for this transaction.
+		reviews, err := svc.ListReviewsByTransactionID(ctx, idStr)
+		if err != nil && !errors.Is(err, service.ErrNotFound) {
+			a.Logger.Error("list transaction reviews", "error", err)
+		}
+
 		// Use denormalized names from the transaction response.
 		var accountName, userName, accountID string
 		if txn.AccountID != nil {
@@ -625,6 +631,7 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			"AccountName":   accountName,
 			"UserName":      userName,
 			"Comments":      comments,
+			"Reviews":       reviews,
 			"Categories":    categoryTree,
 			"Breadcrumbs":   breadcrumbs,
 		}

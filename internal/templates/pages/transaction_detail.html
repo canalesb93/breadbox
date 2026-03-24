@@ -118,6 +118,56 @@
   </div>
 </div>
 
+<!-- Review History Section -->
+{{if .Reviews}}
+<div class="bb-card p-6 mb-8">
+  <div class="flex items-center gap-2 mb-5">
+    <i data-lucide="scan-search" class="w-4 h-4 text-base-content/40"></i>
+    <h2 class="text-sm font-semibold text-base-content/50">Review History</h2>
+    <span class="text-xs text-base-content/30">{{len .Reviews}} review{{if gt (len .Reviews) 1}}s{{end}}</span>
+  </div>
+
+  <div class="space-y-3">
+    {{range .Reviews}}
+    <div class="flex items-start gap-3 p-3 rounded-xl bg-base-200/30">
+      <div class="w-8 h-8 rounded-full {{if eq (deref .ReviewerType) "agent"}}bg-primary/10{{else}}bg-base-200{{end}} flex items-center justify-center shrink-0">
+        {{if eq (deref .ReviewerType) "agent"}}
+        <i data-lucide="bot" class="w-4 h-4 text-primary"></i>
+        {{else}}
+        <i data-lucide="user" class="w-4 h-4 text-base-content/40"></i>
+        {{end}}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          {{if .ReviewerName}}<span class="text-sm font-medium">{{deref .ReviewerName}}</span>{{end}}
+          {{if eq (deref .ReviewerType) "agent"}}<span class="badge badge-primary badge-xs gap-1"><i data-lucide="bot" class="w-2.5 h-2.5"></i>AI</span>{{end}}
+          <span class="text-xs px-1.5 py-0.5 rounded-md font-medium
+            {{if eq .Status "approved"}}bg-success/10 text-success
+            {{else if eq .Status "rejected"}}bg-error/10 text-error
+            {{else if eq .Status "skipped"}}bg-warning/10 text-warning
+            {{else}}bg-base-200 text-base-content/50
+            {{end}}">{{.Status}}</span>
+          <span class="text-xs text-base-content/30 capitalize">{{humanize .ReviewType}}</span>
+        </div>
+        {{if .ReviewNote}}
+        <p class="text-sm text-base-content/70 mt-1.5 whitespace-pre-wrap leading-relaxed">{{deref .ReviewNote}}</p>
+        {{end}}
+        {{if .ResolvedCategory}}
+        <div class="flex items-center gap-1.5 mt-1.5">
+          <span class="text-xs text-base-content/40">Category set to</span>
+          <span class="badge badge-ghost badge-xs capitalize">{{humanize (deref .ResolvedCategory)}}</span>
+        </div>
+        {{end}}
+        <div class="text-xs text-base-content/30 mt-1.5">
+          {{if .ReviewedAt}}Reviewed {{relativeTime .ReviewedAt}}{{else}}Created {{relativeTime .CreatedAt}}{{end}}
+        </div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
 <!-- Comments Section -->
 <div class="bb-card" x-data="commentManager()">
   <div class="px-6 pt-6 pb-4 flex items-center justify-between">

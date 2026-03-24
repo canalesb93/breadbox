@@ -216,6 +216,7 @@ type AdminTransactionRow struct {
 	CategoryColor       *string
 	CategoryOverride    bool
 	Pending             bool
+	AgentReviewed       bool
 	CreatedAt           string
 	UpdatedAt           string
 }
