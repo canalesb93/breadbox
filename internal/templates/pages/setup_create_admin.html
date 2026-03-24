@@ -1,39 +1,47 @@
 {{define "content"}}
-<div class="text-center mb-6">
-  <i data-lucide="package" class="w-10 h-10 mx-auto mb-2"></i>
-  <h1 class="text-2xl font-bold">Welcome to Breadbox</h1>
-  <p class="text-sm text-base-content/60">Create your admin account to get started.</p>
+<div class="text-center mb-8">
+  <h1 class="text-2xl font-bold tracking-tight">Create your account</h1>
+  <p class="text-sm text-base-content/50 mt-1.5">Set up the admin account to get started with Breadbox</p>
 </div>
 
 {{if .Error}}
-<div role="alert" class="alert alert-error mb-4">{{.Error}}</div>
+<div role="alert" class="flex items-center gap-3 rounded-xl bg-error/10 text-error px-4 py-3 text-sm mb-6">
+  <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+  <span>{{.Error}}</span>
+</div>
 {{end}}
 
-<form method="POST" action="/setup">
+<form method="POST" action="/setup" class="space-y-5">
   {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
 
-  <fieldset class="fieldset">
-    <label class="fieldset-label" for="username">Username</label>
+  <div>
+    <label class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-1.5" for="username">Username</label>
     <input type="text" id="username" name="username" value="{{.Username}}" required autocomplete="username"
-           class="input w-full{{if .Errors.Username}} input-error{{end}}">
-    {{if .Errors.Username}}<p class="text-xs text-error mt-1">{{.Errors.Username}}</p>{{end}}
-  </fieldset>
+           placeholder="Choose a username"
+           class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-200 focus:bg-base-100 focus:border-primary/40 transition-all duration-200{{if .Errors.Username}} input-error{{end}}">
+    {{if .Errors.Username}}<p class="text-xs text-error mt-1.5">{{.Errors.Username}}</p>{{end}}
+  </div>
 
-  <fieldset class="fieldset">
-    <label class="fieldset-label" for="password">Password</label>
+  <div>
+    <label class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-1.5" for="password">Password</label>
     <input type="password" id="password" name="password" required autocomplete="new-password" minlength="8"
-           class="input w-full{{if .Errors.Password}} input-error{{end}}">
-    <p class="text-xs text-base-content/60 mt-1">Minimum 8 characters</p>
+           placeholder="Create a password"
+           class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-200 focus:bg-base-100 focus:border-primary/40 transition-all duration-200{{if .Errors.Password}} input-error{{end}}">
+    <p class="text-xs text-base-content/40 mt-1.5">Minimum 8 characters</p>
     {{if .Errors.Password}}<p class="text-xs text-error mt-1">{{.Errors.Password}}</p>{{end}}
-  </fieldset>
+  </div>
 
-  <fieldset class="fieldset">
-    <label class="fieldset-label" for="confirm_password">Confirm Password</label>
+  <div>
+    <label class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-1.5" for="confirm_password">Confirm Password</label>
     <input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password"
-           class="input w-full{{if .Errors.ConfirmPassword}} input-error{{end}}">
-    {{if .Errors.ConfirmPassword}}<p class="text-xs text-error mt-1">{{.Errors.ConfirmPassword}}</p>{{end}}
-  </fieldset>
+           placeholder="Confirm your password"
+           class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-200 focus:bg-base-100 focus:border-primary/40 transition-all duration-200{{if .Errors.ConfirmPassword}} input-error{{end}}">
+    {{if .Errors.ConfirmPassword}}<p class="text-xs text-error mt-1.5">{{.Errors.ConfirmPassword}}</p>{{end}}
+  </div>
 
-  <button type="submit" class="btn btn-primary w-full mt-6">Create Account</button>
+  <button type="submit" class="btn btn-primary w-full h-12 rounded-xl text-base font-semibold shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 mt-1">
+    Create Account
+    <i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
+  </button>
 </form>
 {{end}}

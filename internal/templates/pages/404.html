@@ -1,12 +1,14 @@
 {{define "content"}}
-<div class="flex items-center justify-center min-h-[50vh]">
-  <div class="card bg-base-200">
-    <div class="card-body items-center text-center py-12">
-      <i data-lucide="search" class="w-12 h-12 text-base-content/30 mb-2"></i>
-      <h1 class="text-2xl font-bold">Page Not Found</h1>
-      <p class="text-base-content/70">The page you requested doesn't exist.</p>
-      <a href="/" class="btn btn-primary mt-4">Back to Dashboard</a>
-    </div>
+<div class="bb-error-page">
+  <p class="bb-error-code">404</p>
+  <div class="bb-error-icon bg-base-200/80">
+    <i data-lucide="compass" class="w-7 h-7 text-base-content/40"></i>
   </div>
+  <h1 class="bb-error-title">Page not found</h1>
+  <p class="bb-error-message">The page you're looking for doesn't exist or has been moved.</p>
+  <a href="/" class="btn btn-primary rounded-xl px-6">
+    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+    Back to Dashboard
+  </a>
 </div>
 {{end}}
