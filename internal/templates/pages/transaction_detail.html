@@ -3,15 +3,15 @@
 
 {{template "breadcrumb" .}}
 
-<!-- Header with amount -->
-<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+<!-- Hero: Transaction name + amount -->
+<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
   <div class="flex items-center gap-4">
-    <div class="w-12 h-12 rounded-xl {{if lt .Transaction.Amount 0.0}}bg-error/10{{else}}bg-success/10{{end}} flex items-center justify-center">
+    <div class="w-12 h-12 rounded-xl {{if lt .Transaction.Amount 0.0}}bg-error/10{{else}}bg-success/10{{end}} flex items-center justify-center shrink-0">
       <i data-lucide="{{if lt .Transaction.Amount 0.0}}arrow-up-right{{else}}arrow-down-left{{end}}" class="w-6 h-6 {{if lt .Transaction.Amount 0.0}}text-error{{else}}text-success{{end}}"></i>
     </div>
     <div>
       <h1 class="bb-page-title">{{.Transaction.Name}}</h1>
-      <div class="flex items-center gap-2 mt-0.5">
+      <div class="flex items-center gap-2 mt-0.5 flex-wrap">
         <span class="text-xs text-base-content/40">{{formatDate .Transaction.Date}}</span>
         {{if .Transaction.MerchantName}}
         <span class="text-xs text-base-content/30">&middot;</span>
@@ -21,7 +21,7 @@
       </div>
     </div>
   </div>
-  <div class="text-right">
+  <div class="text-right sm:text-right">
     <p class="text-3xl font-semibold tabular-nums{{if lt .Transaction.Amount 0.0}} text-error{{end}}">
       {{formatAmount .Transaction.Amount}}
     </p>
@@ -29,8 +29,47 @@
   </div>
 </div>
 
-<!-- Details + Category -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+<!-- Account Context Banner -->
+{{if .AccountName}}
+<div class="bb-card p-0 mb-6 overflow-hidden">
+  <div class="flex items-center gap-4 px-5 py-3.5">
+    <div class="w-9 h-9 rounded-lg bg-base-200/70 flex items-center justify-center shrink-0">
+      <i data-lucide="building-2" class="w-4.5 h-4.5 text-base-content/40"></i>
+    </div>
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2">
+        <a href="/accounts/{{.AccountID}}" class="text-sm font-semibold hover:text-primary transition-colors no-underline truncate">{{.AccountName}}</a>
+        {{if .AccountMask}}<span class="text-xs text-base-content/30 font-mono">&middot;&middot;&middot;&middot;{{.AccountMask}}</span>{{end}}
+      </div>
+      <div class="flex items-center gap-2 mt-0.5">
+        {{if .InstitutionName}}
+        <span class="text-xs text-base-content/40">{{.InstitutionName}}</span>
+        {{end}}
+        {{if .AccountType}}
+        <span class="text-xs text-base-content/30">&middot;</span>
+        <span class="text-xs text-base-content/40 capitalize">{{.AccountType}}</span>
+        {{end}}
+        {{if .UserName}}
+        <span class="text-xs text-base-content/30">&middot;</span>
+        <span class="text-xs text-base-content/40">{{.UserName}}</span>
+        {{end}}
+      </div>
+    </div>
+    {{if and .Account .Account.BalanceCurrent}}
+    <div class="text-right shrink-0 hidden sm:block">
+      <p class="text-xs text-base-content/40 mb-0.5">Balance</p>
+      <p class="text-sm font-semibold tabular-nums">{{formatAmount (derefFloat .Account.BalanceCurrent)}}</p>
+    </div>
+    {{end}}
+    <a href="/accounts/{{.AccountID}}" class="btn btn-ghost btn-xs rounded-lg shrink-0">
+      <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+    </a>
+  </div>
+</div>
+{{end}}
+
+<!-- Main content: Details + Category sidebar -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
   <!-- Transaction Details -->
   <div class="bb-card p-6 lg:col-span-2">
     <h2 class="text-sm font-semibold text-base-content/50 mb-5">Details</h2>
@@ -42,7 +81,7 @@
       {{if .Transaction.MerchantName}}
       <div>
         <p class="text-xs text-base-content/40 mb-1">Merchant</p>
-        <p class="text-sm font-medium">{{.Transaction.MerchantName}}</p>
+        <p class="text-sm font-medium">{{deref .Transaction.MerchantName}}</p>
       </div>
       {{end}}
       {{if .AccountName}}
@@ -57,20 +96,38 @@
         <p class="text-sm font-medium">{{.UserName}}</p>
       </div>
       {{end}}
+      {{if .InstitutionName}}
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Institution</p>
+        {{if .ConnectionID}}
+        <a href="/connections/{{.ConnectionID}}" class="text-sm font-medium hover:text-primary transition-colors no-underline">{{.InstitutionName}}</a>
+        {{else}}
+        <p class="text-sm font-medium">{{.InstitutionName}}</p>
+        {{end}}
+      </div>
+      {{end}}
       {{if .Transaction.PaymentChannel}}
       <div>
         <p class="text-xs text-base-content/40 mb-1">Payment Channel</p>
-        <p class="text-sm font-medium capitalize">{{.Transaction.PaymentChannel}}</p>
+        <p class="text-sm font-medium capitalize">{{deref .Transaction.PaymentChannel}}</p>
       </div>
       {{end}}
       <div>
         <p class="text-xs text-base-content/40 mb-1">Status</p>
-        <p class="text-sm font-medium">{{if .Transaction.Pending}}Pending{{else}}Posted{{end}}</p>
+        <div class="flex items-center gap-1.5">
+          {{if .Transaction.Pending}}
+          <span class="w-1.5 h-1.5 rounded-full bg-warning"></span>
+          <span class="text-sm font-medium">Pending</span>
+          {{else}}
+          <span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+          <span class="text-sm font-medium">Posted</span>
+          {{end}}
+        </div>
       </div>
       {{if .Transaction.CategoryPrimaryRaw}}
-      <div class="col-span-2">
+      <div class="col-span-2 sm:col-span-3">
         <p class="text-xs text-base-content/40 mb-1">Raw Provider Category</p>
-        <p class="text-sm font-mono text-base-content/60">{{.Transaction.CategoryPrimaryRaw}}{{if .Transaction.CategoryDetailedRaw}} &rarr; {{.Transaction.CategoryDetailedRaw}}{{end}}</p>
+        <p class="text-sm font-mono text-base-content/60">{{deref .Transaction.CategoryPrimaryRaw}}{{if .Transaction.CategoryDetailedRaw}} &rarr; {{deref .Transaction.CategoryDetailedRaw}}{{end}}</p>
       </div>
       {{end}}
     </div>
@@ -118,100 +175,121 @@
   </div>
 </div>
 
-<!-- Review History Section -->
-{{if .Reviews}}
-<div class="bb-card p-6 mb-8">
-  <div class="flex items-center gap-2 mb-5">
-    <i data-lucide="scan-search" class="w-4 h-4 text-base-content/40"></i>
-    <h2 class="text-sm font-semibold text-base-content/50">Review History</h2>
-    <span class="text-xs text-base-content/30">{{len .Reviews}} review{{if gt (len .Reviews) 1}}s{{end}}</span>
-  </div>
+<!-- Review History + Comments side by side on desktop -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-  <div class="space-y-3">
-    {{range .Reviews}}
-    <div class="flex items-start gap-3 p-3 rounded-xl bg-base-200/30">
-      <div class="w-8 h-8 rounded-full {{if eq (deref .ReviewerType) "agent"}}bg-primary/10{{else}}bg-base-200{{end}} flex items-center justify-center shrink-0">
-        {{if eq (deref .ReviewerType) "agent"}}
-        <i data-lucide="bot" class="w-4 h-4 text-primary"></i>
-        {{else}}
-        <i data-lucide="user" class="w-4 h-4 text-base-content/40"></i>
-        {{end}}
+  <!-- Review History Section -->
+  <div class="bb-card p-6">
+    <div class="flex items-center gap-2 mb-5">
+      <i data-lucide="scan-search" class="w-4 h-4 text-base-content/40"></i>
+      <h2 class="text-sm font-semibold text-base-content/50">Review History</h2>
+      {{if .Reviews}}
+      <span class="text-xs text-base-content/30">{{len .Reviews}} review{{if gt (len .Reviews) 1}}s{{end}}</span>
+      {{end}}
+    </div>
+
+    {{if .Reviews}}
+    <div class="space-y-3">
+      {{range .Reviews}}
+      <div class="flex items-start gap-3 p-3 rounded-xl bg-base-200/30">
+        <div class="w-8 h-8 rounded-full {{if eq (deref .ReviewerType) "agent"}}bg-primary/10{{else}}bg-base-200{{end}} flex items-center justify-center shrink-0">
+          {{if eq (deref .ReviewerType) "agent"}}
+          <i data-lucide="bot" class="w-4 h-4 text-primary"></i>
+          {{else}}
+          <i data-lucide="user" class="w-4 h-4 text-base-content/40"></i>
+          {{end}}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            {{if .ReviewerName}}<span class="text-sm font-medium">{{deref .ReviewerName}}</span>{{end}}
+            {{if eq (deref .ReviewerType) "agent"}}<span class="badge badge-primary badge-xs gap-1"><i data-lucide="bot" class="w-2.5 h-2.5"></i>AI</span>{{end}}
+            <span class="text-xs px-1.5 py-0.5 rounded-md font-medium
+              {{if eq .Status "approved"}}bg-success/10 text-success
+              {{else if eq .Status "rejected"}}bg-error/10 text-error
+              {{else if eq .Status "skipped"}}bg-warning/10 text-warning
+              {{else}}bg-base-200 text-base-content/50
+              {{end}}">{{.Status}}</span>
+            <span class="text-xs text-base-content/30 capitalize">{{humanize .ReviewType}}</span>
+          </div>
+          {{if .ReviewNote}}
+          <p class="text-sm text-base-content/70 mt-1.5 whitespace-pre-wrap leading-relaxed">{{deref .ReviewNote}}</p>
+          {{end}}
+          {{if .ResolvedCategory}}
+          <div class="flex items-center gap-1.5 mt-1.5">
+            <span class="text-xs text-base-content/40">Category set to</span>
+            <span class="badge badge-ghost badge-xs capitalize">{{humanize (deref .ResolvedCategory)}}</span>
+          </div>
+          {{end}}
+          <div class="text-xs text-base-content/30 mt-1.5">
+            {{if .ReviewedAt}}Reviewed {{relativeTime .ReviewedAt}}{{else}}Created {{relativeTime .CreatedAt}}{{end}}
+          </div>
+        </div>
       </div>
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2 flex-wrap">
-          {{if .ReviewerName}}<span class="text-sm font-medium">{{deref .ReviewerName}}</span>{{end}}
-          {{if eq (deref .ReviewerType) "agent"}}<span class="badge badge-primary badge-xs gap-1"><i data-lucide="bot" class="w-2.5 h-2.5"></i>AI</span>{{end}}
-          <span class="text-xs px-1.5 py-0.5 rounded-md font-medium
-            {{if eq .Status "approved"}}bg-success/10 text-success
-            {{else if eq .Status "rejected"}}bg-error/10 text-error
-            {{else if eq .Status "skipped"}}bg-warning/10 text-warning
-            {{else}}bg-base-200 text-base-content/50
-            {{end}}">{{.Status}}</span>
-          <span class="text-xs text-base-content/30 capitalize">{{humanize .ReviewType}}</span>
-        </div>
-        {{if .ReviewNote}}
-        <p class="text-sm text-base-content/70 mt-1.5 whitespace-pre-wrap leading-relaxed">{{deref .ReviewNote}}</p>
-        {{end}}
-        {{if .ResolvedCategory}}
-        <div class="flex items-center gap-1.5 mt-1.5">
-          <span class="text-xs text-base-content/40">Category set to</span>
-          <span class="badge badge-ghost badge-xs capitalize">{{humanize (deref .ResolvedCategory)}}</span>
-        </div>
-        {{end}}
-        <div class="text-xs text-base-content/30 mt-1.5">
-          {{if .ReviewedAt}}Reviewed {{relativeTime .ReviewedAt}}{{else}}Created {{relativeTime .CreatedAt}}{{end}}
-        </div>
+      {{end}}
+    </div>
+    {{else}}
+    <div class="flex flex-col items-center text-center py-8 px-4">
+      <div class="w-10 h-10 rounded-xl bg-base-200/50 flex items-center justify-center mb-3">
+        <i data-lucide="scan-search" class="w-5 h-5 text-base-content/25"></i>
       </div>
+      <p class="text-sm text-base-content/30">No reviews yet</p>
     </div>
     {{end}}
   </div>
-</div>
-{{end}}
 
-<!-- Comments Section -->
-<div class="bb-card" x-data="commentManager()">
-  <div class="px-6 pt-6 pb-4 flex items-center justify-between">
-    <h2 class="text-sm font-semibold text-base-content/50">Comments</h2>
-    <span class="text-xs text-base-content/30">{{len .Comments}} total</span>
-  </div>
-
-  {{if .Comments}}
-  <div class="px-6 space-y-3">
-    {{range .Comments}}
-    <div class="flex items-start gap-3 p-3 rounded-xl bg-base-200/30 group" data-comment-id="{{.ID}}">
-      <div class="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center shrink-0">
-        <i data-lucide="{{if eq .AuthorType "agent"}}bot{{else}}user{{end}}" class="w-4 h-4 text-base-content/40"></i>
+  <!-- Comments Section -->
+  <div class="bb-card" x-data="commentManager()">
+    <div class="px-6 pt-6 pb-4 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <i data-lucide="message-circle" class="w-4 h-4 text-base-content/40"></i>
+        <h2 class="text-sm font-semibold text-base-content/50">Comments</h2>
       </div>
-      <div class="flex-1 min-w-0">
-        <p class="text-sm whitespace-pre-wrap leading-relaxed">{{.Content}}</p>
-        <div class="flex items-center gap-2 mt-2">
-          <span class="text-xs font-medium text-base-content/50">{{.AuthorName}}</span>
-          <span class="text-xs text-base-content/30">{{relativeTime .CreatedAt}}</span>
-        </div>
-      </div>
-      <button class="btn btn-ghost btn-xs opacity-0 group-hover:opacity-100 transition-opacity text-error/50 hover:text-error" @click="deleteComment('{{.ID}}')" title="Delete">
-        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-      </button>
+      <span class="text-xs text-base-content/30">{{len .Comments}} total</span>
     </div>
-    {{end}}
-  </div>
-  {{else}}
-  <div class="px-6">
-    <p class="text-sm text-base-content/30 py-4">No comments yet</p>
-  </div>
-  {{end}}
 
-  <!-- Add Comment -->
-  <div class="px-6 py-4 mt-2 border-t border-base-300">
-    <div class="flex gap-3">
-      <div class="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center shrink-0 mt-0.5">
-        <i data-lucide="user" class="w-4 h-4 text-base-content/40"></i>
-      </div>
-      <div class="flex-1 flex gap-2">
-        <textarea x-model="newComment" placeholder="Add a comment..." class="textarea textarea-bordered textarea-sm flex-1 min-h-[2.5rem] resize-none" rows="1" @input="$el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'"></textarea>
-        <button @click="addComment()" class="btn btn-sm btn-primary self-end rounded-xl" :disabled="!newComment.trim()">
-          <i data-lucide="send" class="w-3.5 h-3.5"></i>
+    {{if .Comments}}
+    <div class="px-6 space-y-3">
+      {{range .Comments}}
+      <div class="flex items-start gap-3 p-3 rounded-xl bg-base-200/30 group" data-comment-id="{{.ID}}">
+        <div class="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center shrink-0">
+          <i data-lucide="{{if eq .AuthorType "agent"}}bot{{else}}user{{end}}" class="w-4 h-4 text-base-content/40"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm whitespace-pre-wrap leading-relaxed">{{.Content}}</p>
+          <div class="flex items-center gap-2 mt-2">
+            <span class="text-xs font-medium text-base-content/50">{{.AuthorName}}</span>
+            <span class="text-xs text-base-content/30">{{relativeTime .CreatedAt}}</span>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-xs opacity-0 group-hover:opacity-100 transition-opacity text-error/50 hover:text-error" @click="deleteComment('{{.ID}}')" title="Delete">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
         </button>
+      </div>
+      {{end}}
+    </div>
+    {{else}}
+    <div class="px-6">
+      <div class="flex flex-col items-center text-center py-8 px-4">
+        <div class="w-10 h-10 rounded-xl bg-base-200/50 flex items-center justify-center mb-3">
+          <i data-lucide="message-circle" class="w-5 h-5 text-base-content/25"></i>
+        </div>
+        <p class="text-sm text-base-content/30">No comments yet</p>
+      </div>
+    </div>
+    {{end}}
+
+    <!-- Add Comment -->
+    <div class="px-6 py-4 mt-2 border-t border-base-300">
+      <div class="flex gap-3">
+        <div class="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center shrink-0 mt-0.5">
+          <i data-lucide="user" class="w-4 h-4 text-base-content/40"></i>
+        </div>
+        <div class="flex-1 flex gap-2">
+          <textarea x-model="newComment" placeholder="Add a comment..." class="textarea textarea-bordered textarea-sm flex-1 min-h-[2.5rem] resize-none" rows="1" @input="$el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'"></textarea>
+          <button @click="addComment()" class="btn btn-sm btn-primary self-end rounded-xl" :disabled="!newComment.trim()">
+            <i data-lucide="send" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
       </div>
     </div>
   </div>

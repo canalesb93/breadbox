@@ -186,6 +186,12 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return *s
 			},
+			"derefFloat": func(f *float64) float64 {
+				if f == nil {
+					return 0
+				}
+				return *f
+			},
 			"humanize": func(s string) string {
 				return strings.ReplaceAll(s, "_", " ")
 			},
@@ -457,6 +463,12 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return ""
 				}
 				return v.String
+			},
+			"mapFloat": func(m map[string]float64, key string) float64 {
+				return m[key]
+			},
+			"mapInt": func(m map[string]int64, key string) int64 {
+				return m[key]
 			},
 		},
 	}

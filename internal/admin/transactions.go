@@ -593,15 +593,46 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			a.Logger.Error("list transaction reviews", "error", err)
 		}
 
-		// Use denormalized names from the transaction response.
-		var accountName, userName, accountID string
+		// Fetch account context for richer detail display.
+		var accountID, accountName, userName string
+		var institutionName, accountMask, accountType, connectionID string
+		var account *service.AccountResponse
+
 		if txn.AccountID != nil {
 			accountID = *txn.AccountID
+			acct, acctErr := svc.GetAccount(ctx, accountID)
+			if acctErr == nil {
+				account = acct
+				accountName = acct.Name
+				if acct.InstitutionName != nil {
+					institutionName = *acct.InstitutionName
+				}
+				if acct.Mask != nil {
+					accountMask = *acct.Mask
+				}
+				accountType = acct.Type
+				if acct.ConnectionID != nil {
+					connectionID = *acct.ConnectionID
+				}
+				// Fetch user name from the account's user_id.
+				if acct.UserID != nil {
+					var uid pgtype.UUID
+					if scanErr := uid.Scan(*acct.UserID); scanErr == nil {
+						u, uErr := a.Queries.GetUser(ctx, uid)
+						if uErr == nil {
+							userName = u.Name
+						}
+					}
+				}
+			} else {
+				a.Logger.Error("get account for transaction detail", "error", acctErr)
+			}
 		}
-		if txn.AccountName != nil {
+		// Fall back to denormalized names if account lookup didn't populate them.
+		if accountName == "" && txn.AccountName != nil {
 			accountName = *txn.AccountName
 		}
-		if txn.UserName != nil {
+		if userName == "" && txn.UserName != nil {
 			userName = *txn.UserName
 		}
 
@@ -621,19 +652,24 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 		breadcrumbs = append(breadcrumbs, Breadcrumb{Label: txn.Name})
 
 		data := map[string]any{
-			"PageTitle":     txn.Name,
-			"CurrentPage":   "transactions",
-			"CSRFToken":     GetCSRFToken(r),
-			"Flash":         GetFlash(ctx, sm),
-			"Transaction":   txn,
-			"TransactionID": idStr,
-			"AccountID":     accountID,
-			"AccountName":   accountName,
-			"UserName":      userName,
-			"Comments":      comments,
-			"Reviews":       reviews,
-			"Categories":    categoryTree,
-			"Breadcrumbs":   breadcrumbs,
+			"PageTitle":       txn.Name,
+			"CurrentPage":     "transactions",
+			"CSRFToken":       GetCSRFToken(r),
+			"Flash":           GetFlash(ctx, sm),
+			"Transaction":     txn,
+			"TransactionID":   idStr,
+			"AccountID":       accountID,
+			"AccountName":     accountName,
+			"UserName":        userName,
+			"InstitutionName": institutionName,
+			"AccountMask":     accountMask,
+			"AccountType":     accountType,
+			"ConnectionID":    connectionID,
+			"Account":         account,
+			"Comments":        comments,
+			"Reviews":         reviews,
+			"Categories":      categoryTree,
+			"Breadcrumbs":     breadcrumbs,
 		}
 		tr.Render(w, r, "transaction_detail.html", data)
 	}
