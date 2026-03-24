@@ -1,115 +1,189 @@
 {{define "content"}}
 {{template "category-picker-styles" .}}
 
-<div class="breadcrumbs text-sm mb-4">
+<div class="breadcrumbs text-sm mb-6 text-base-content/50">
   <ul>
-    <li><a href="/transactions">Transactions</a></li>
+    <li><a href="/transactions" class="hover:text-primary transition-colors">Transactions</a></li>
     <li>{{.Transaction.Name}}</li>
   </ul>
 </div>
 
-<h1 class="text-2xl font-bold mb-6">{{.Transaction.Name}}</h1>
+<!-- Header with amount -->
+<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+  <div class="flex items-center gap-4">
+    <div class="w-12 h-12 rounded-2xl {{if lt .Transaction.Amount 0.0}}bg-error/10{{else}}bg-success/10{{end}} flex items-center justify-center">
+      <i data-lucide="{{if lt .Transaction.Amount 0.0}}arrow-up-right{{else}}arrow-down-left{{end}}" class="w-6 h-6 {{if lt .Transaction.Amount 0.0}}text-error{{else}}text-success{{end}}"></i>
+    </div>
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">{{.Transaction.Name}}</h1>
+      <div class="flex items-center gap-2 mt-0.5">
+        <span class="text-xs text-base-content/40">{{.Transaction.Date}}</span>
+        {{if .Transaction.MerchantName}}
+        <span class="text-xs text-base-content/30">&middot;</span>
+        <span class="text-xs text-base-content/40">{{.Transaction.MerchantName}}</span>
+        {{end}}
+        {{if .Transaction.Pending}}<span class="badge badge-warning badge-xs ml-1">Pending</span>{{end}}
+      </div>
+    </div>
+  </div>
+  <div class="text-right">
+    <p class="text-3xl font-bold tabular-nums{{if lt .Transaction.Amount 0.0}} text-error{{end}}">
+      {{printf "%.2f" .Transaction.Amount}}
+    </p>
+    {{if .Transaction.IsoCurrencyCode}}<p class="text-xs text-base-content/30 mt-0.5">{{.Transaction.IsoCurrencyCode}}</p>{{end}}
+  </div>
+</div>
 
-<dl class="bb-info-grid mb-6">
-  <dt>Amount</dt>
-  <dd class="bb-amount{{if lt .Transaction.Amount 0.0}} text-error{{end}}">
-    {{printf "%.2f" .Transaction.Amount}}{{if .Transaction.IsoCurrencyCode}} {{.Transaction.IsoCurrencyCode}}{{end}}
-  </dd>
-  <dt>Date</dt>
-  <dd>{{.Transaction.Date}}</dd>
-  {{if .Transaction.MerchantName}}
-  <dt>Merchant</dt>
-  <dd>{{.Transaction.MerchantName}}</dd>
-  {{end}}
-  {{if .AccountName}}
-  <dt>Account</dt>
-  <dd><a href="/accounts/{{.AccountID}}">{{.AccountName}}</a></dd>
-  {{end}}
-  {{if .UserName}}
-  <dt>Family Member</dt>
-  <dd>{{.UserName}}</dd>
-  {{end}}
-  <dt>Category</dt>
-  <dd x-data="txCategoryEditor()">
-    <div class="flex items-center gap-2 flex-wrap">
-      <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'assign', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', initial: '{{if .Transaction.Category}}{{.Transaction.Category.ID}}{{end}}'})" @category-change="setCategoryFromPicker($event.detail)">
-        <button type="button" class="btn btn-sm btn-ghost gap-2 -ml-2" @click="openPicker()">
-          <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-          <span x-text="displayLabel" class="text-sm"></span>
-          <i data-lucide="pencil" class="w-3 h-3 opacity-40"></i>
-        </button>
-        <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false">
-          <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
-            <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search categories..." class="input input-sm input-bordered w-full">
-          </div>
-          <div x-ref="listbox">
-            <template x-for="(item, idx) in filteredList" :key="item.id || idx">
-              <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item)">
-                <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
-                <template x-if="item.icon"><i :data-lucide="item.icon" class="bb-cat-icon"></i></template>
-                <span x-text="item.label"></span>
-              </div>
-            </template>
-            <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
-          </div>
+<!-- Details + Category -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+  <!-- Transaction Details -->
+  <div class="bb-card p-6 lg:col-span-2">
+    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider mb-5">Details</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-5 gap-x-6">
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Date</p>
+        <p class="text-sm font-medium">{{.Transaction.Date}}</p>
+      </div>
+      {{if .Transaction.MerchantName}}
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Merchant</p>
+        <p class="text-sm font-medium">{{.Transaction.MerchantName}}</p>
+      </div>
+      {{end}}
+      {{if .AccountName}}
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Account</p>
+        <a href="/accounts/{{.AccountID}}" class="text-sm font-medium hover:text-primary transition-colors no-underline">{{.AccountName}}</a>
+      </div>
+      {{end}}
+      {{if .UserName}}
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Family Member</p>
+        <p class="text-sm font-medium">{{.UserName}}</p>
+      </div>
+      {{end}}
+      {{if .Transaction.PaymentChannel}}
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Payment Channel</p>
+        <p class="text-sm font-medium capitalize">{{.Transaction.PaymentChannel}}</p>
+      </div>
+      {{end}}
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Status</p>
+        <p class="text-sm font-medium">{{if .Transaction.Pending}}Pending{{else}}Posted{{end}}</p>
+      </div>
+      {{if .Transaction.CategoryPrimaryRaw}}
+      <div class="col-span-2">
+        <p class="text-xs text-base-content/40 mb-1">Raw Provider Category</p>
+        <p class="text-sm font-mono text-base-content/60">{{.Transaction.CategoryPrimaryRaw}}{{if .Transaction.CategoryDetailedRaw}} &rarr; {{.Transaction.CategoryDetailedRaw}}{{end}}</p>
+      </div>
+      {{end}}
+    </div>
+
+    <!-- Metadata -->
+    <div class="mt-6 pt-5 border-t border-base-200">
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-6 text-xs">
+        <div>
+          <p class="text-base-content/30 mb-0.5">Transaction ID</p>
+          <code class="font-mono text-base-content/50 break-all">{{.Transaction.ID}}</code>
+        </div>
+        <div>
+          <p class="text-base-content/30 mb-0.5">Created</p>
+          <p class="text-base-content/50">{{.Transaction.CreatedAt}}</p>
+        </div>
+        <div>
+          <p class="text-base-content/30 mb-0.5">Updated</p>
+          <p class="text-base-content/50">{{.Transaction.UpdatedAt}}</p>
         </div>
       </div>
-      {{if .Transaction.CategoryOverride}}<span class="badge badge-outline badge-xs">override</span>{{end}}
+    </div>
+  </div>
+
+  <!-- Category Card -->
+  <div class="bb-card p-6" x-data="txCategoryEditor()">
+    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider mb-5">Category</h2>
+
+    <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'assign', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', initial: '{{if .Transaction.Category}}{{.Transaction.Category.ID}}{{end}}'})" @category-change="setCategoryFromPicker($event.detail)">
+      <button type="button" class="w-full flex items-center gap-3 p-3 rounded-xl bg-base-200/50 hover:bg-base-200 transition-colors" @click="openPicker()">
+        <template x-if="displayColor"><span class="w-3 h-3 rounded-full shrink-0" :style="'background-color:' + displayColor"></span></template>
+        <span x-text="displayLabel" class="text-sm font-medium flex-1 text-left"></span>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30"></i>
+      </button>
+      <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false">
+        <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
+          <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search categories..." class="input input-sm input-bordered w-full">
+        </div>
+        <div x-ref="listbox">
+          <template x-for="(item, idx) in filteredList" :key="item.id || idx">
+            <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item)">
+              <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
+              <template x-if="item.icon"><i :data-lucide="item.icon" class="bb-cat-icon"></i></template>
+              <span x-text="item.label"></span>
+            </div>
+          </template>
+          <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2 mt-3">
+      {{if .Transaction.CategoryOverride}}<span class="badge badge-ghost badge-xs">Manual override</span>{{end}}
       <template x-if="isOverride">
-        <button class="btn btn-ghost btn-xs text-base-content/50" @click="resetCategory()" title="Reset to auto-detected category">
-          <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Reset
+        <button class="btn btn-ghost btn-xs text-base-content/40 hover:text-base-content" @click="resetCategory()">
+          <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Reset to auto
         </button>
       </template>
       <span x-show="saving" class="loading loading-spinner loading-xs"></span>
     </div>
-  </dd>
-  {{if .Transaction.CategoryPrimaryRaw}}
-  <dt>Raw Category</dt>
-  <dd>{{.Transaction.CategoryPrimaryRaw}}{{if .Transaction.CategoryDetailedRaw}} &rarr; {{.Transaction.CategoryDetailedRaw}}{{end}}</dd>
-  {{end}}
-  {{if .Transaction.PaymentChannel}}
-  <dt>Payment Channel</dt>
-  <dd>{{.Transaction.PaymentChannel}}</dd>
-  {{end}}
-  <dt>Status</dt>
-  <dd>{{if .Transaction.Pending}}<span class="badge badge-warning badge-sm">Pending</span>{{else}}Posted{{end}}</dd>
-  <dt>Transaction ID</dt>
-  <dd><code class="font-mono text-xs">{{.Transaction.ID}}</code></dd>
-  <dt>Created</dt>
-  <dd>{{.Transaction.CreatedAt}}</dd>
-  <dt>Updated</dt>
-  <dd>{{.Transaction.UpdatedAt}}</dd>
-</dl>
+  </div>
+</div>
 
-<h2 class="text-xl font-semibold mb-4">Comments</h2>
+<!-- Comments Section -->
+<div class="bb-card" x-data="commentManager()">
+  <div class="px-6 pt-6 pb-4 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider">Comments</h2>
+    <span class="text-xs text-base-content/30">{{len .Comments}} total</span>
+  </div>
 
-<div x-data="commentManager()" class="mb-8">
   {{if .Comments}}
-  <div class="space-y-3 mb-4">
+  <div class="px-6 space-y-3">
     {{range .Comments}}
-    <div class="card bg-base-100 border border-base-300 p-4" data-comment-id="{{.ID}}">
-      <div class="flex items-start justify-between gap-2">
-        <div class="flex-1">
-          <p class="text-sm whitespace-pre-wrap">{{.Content}}</p>
-          <p class="text-xs text-base-content/60 mt-1">
-            <span class="badge badge-ghost badge-xs">{{.AuthorType}}</span>
-            {{.AuthorName}} &middot; {{.CreatedAt}}
-          </p>
-        </div>
-        <button class="btn btn-ghost btn-xs text-error" @click="deleteComment('{{.ID}}')" title="Delete">
-          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-        </button>
+    <div class="flex items-start gap-3 p-3 rounded-xl bg-base-200/30 group" data-comment-id="{{.ID}}">
+      <div class="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center shrink-0">
+        <i data-lucide="{{if eq .AuthorType "agent"}}bot{{else}}user{{end}}" class="w-4 h-4 text-base-content/40"></i>
       </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm whitespace-pre-wrap leading-relaxed">{{.Content}}</p>
+        <div class="flex items-center gap-2 mt-2">
+          <span class="text-xs font-medium text-base-content/50">{{.AuthorName}}</span>
+          <span class="text-xs text-base-content/30">{{.CreatedAt}}</span>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-xs opacity-0 group-hover:opacity-100 transition-opacity text-error/50 hover:text-error" @click="deleteComment('{{.ID}}')" title="Delete">
+        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+      </button>
     </div>
     {{end}}
   </div>
   {{else}}
-  <p class="text-sm text-base-content/60 mb-4">No comments yet.</p>
+  <div class="px-6">
+    <p class="text-sm text-base-content/30 py-4">No comments yet</p>
+  </div>
   {{end}}
 
-  <div class="flex gap-2">
-    <textarea x-model="newComment" placeholder="Add a comment..." class="textarea textarea-bordered textarea-sm flex-1" rows="2"></textarea>
-    <button @click="addComment()" class="btn btn-sm btn-primary self-end" :disabled="!newComment.trim()">Add</button>
+  <!-- Add Comment -->
+  <div class="px-6 py-4 mt-2 border-t border-base-200">
+    <div class="flex gap-3">
+      <div class="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center shrink-0 mt-0.5">
+        <i data-lucide="user" class="w-4 h-4 text-base-content/40"></i>
+      </div>
+      <div class="flex-1 flex gap-2">
+        <textarea x-model="newComment" placeholder="Add a comment..." class="textarea textarea-bordered textarea-sm flex-1 min-h-[2.5rem] resize-none" rows="1" @input="$el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'"></textarea>
+        <button @click="addComment()" class="btn btn-sm btn-primary self-end" :disabled="!newComment.trim()">
+          <i data-lucide="send" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 

@@ -1,199 +1,245 @@
 {{define "content"}}
 {{template "category-picker-styles" .}}
 
-<div class="breadcrumbs text-sm mb-4">
+<div class="breadcrumbs text-sm mb-6 text-base-content/50">
   <ul>
-    <li><a href="/connections/{{.Account.ConnectionID}}">{{.Account.InstitutionName}}</a></li>
+    <li><a href="/connections/{{.Account.ConnectionID}}" class="hover:text-primary transition-colors">{{.Account.InstitutionName}}</a></li>
     <li>{{if .Account.DisplayName}}{{.Account.DisplayName}}{{else}}{{.Account.Name}}{{end}}</li>
   </ul>
 </div>
 
-<h1 class="text-2xl font-bold mb-6">{{if .Account.DisplayName}}{{.Account.DisplayName}}{{else}}{{.Account.Name}}{{end}}</h1>
-
-<dl class="bb-info-grid mb-6">
-  <dt>Account Name</dt>
-  <dd>{{.Account.Name}}{{if .Account.OfficialName}} ({{.Account.OfficialName}}){{end}}</dd>
-  <dt>Type</dt>
-  <dd>{{.Account.Type}}{{if .Account.Subtype}} / {{.Account.Subtype}}{{end}}</dd>
-  {{if .Account.Mask}}
-  <dt>Mask</dt>
-  <dd>&bull;&bull;&bull;&bull;{{.Account.Mask}}</dd>
-  {{end}}
-  <dt>Current Balance</dt>
-  <dd>{{if .Account.BalanceCurrent}}{{printf "%.2f" .Account.BalanceCurrent}}{{if .Account.IsoCurrencyCode}} {{.Account.IsoCurrencyCode}}{{end}}{{else}}&mdash;{{end}}</dd>
-  <dt>Available Balance</dt>
-  <dd>{{if .Account.BalanceAvailable}}{{printf "%.2f" .Account.BalanceAvailable}}{{if .Account.IsoCurrencyCode}} {{.Account.IsoCurrencyCode}}{{end}}{{else}}&mdash;{{end}}</dd>
-  {{if .Account.BalanceLimit}}
-  <dt>Credit Limit</dt>
-  <dd>{{printf "%.2f" .Account.BalanceLimit}} {{.Account.IsoCurrencyCode}}</dd>
-  {{end}}
-  <dt>Connection</dt>
-  <dd><a href="/connections/{{.Account.ConnectionID}}">{{.Account.InstitutionName}}</a></dd>
-  <dt>Family Member</dt>
-  <dd>{{if .Account.UserName}}{{.Account.UserName}}{{else}}&mdash;{{end}}</dd>
-  <dt>Provider</dt>
-  <dd>{{if .Account.Provider}}{{.Account.Provider}}{{else}}&mdash;{{end}}</dd>
-</dl>
-
-<div class="flex flex-wrap items-end gap-4 mb-6">
-  <label class="flex flex-col gap-1 text-sm">
-    Display Name
-    <input type="text" value="{{if .Account.DisplayName}}{{.Account.DisplayName}}{{end}}" placeholder="{{.Account.Name}}"
-      onchange="updateDisplayName('{{.AccountID}}', this.value)"
-      class="input input-sm w-64">
-  </label>
-  <label class="flex items-center gap-2 text-sm self-end">
-    <input type="checkbox" class="checkbox checkbox-sm" {{if .Account.Excluded}}checked{{end}}
-      onchange="toggleExcluded('{{.AccountID}}', this.checked)">
-    Excluded from sync
-  </label>
-</div>
-
-<h2 class="text-xl font-semibold mb-4">Transactions</h2>
-
-<form method="GET" action="/accounts/{{.AccountID}}" class="bb-filter-bar" x-data>
-  <label>
-    Start Date
-    <input type="date" name="start_date" value="{{.FilterStartDate}}">
-  </label>
-  <label>
-    End Date
-    <input type="date" name="end_date" value="{{.FilterEndDate}}">
-  </label>
-  <label>
-    Category
-    <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'filter', initial: '{{.FilterCategory}}', allowEmpty: true, emptyLabel: 'All categories'})" @category-change="$refs.catInput.value = selectedSlug">
-      <input type="hidden" name="category" x-ref="catInput" value="{{.FilterCategory}}">
-      <button type="button" class="select select-sm select-bordered w-auto min-w-[8rem] text-left flex items-center gap-2" @click="openPicker()">
-        <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-        <span x-text="displayLabel" class="text-sm truncate"></span>
-      </button>
-      <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false">
-        <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
-          <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search categories..." class="input input-sm input-bordered w-full">
-        </div>
-        <div x-ref="listbox">
-          <template x-for="(item, idx) in filteredList" :key="item.slug || idx">
-            <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item); $refs.catInput.value = item.slug">
-              <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
-              <template x-if="item.icon"><i :data-lucide="item.icon" class="bb-cat-icon"></i></template>
-              <span x-text="item.label"></span>
-            </div>
-          </template>
-          <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
-        </div>
+<!-- Header -->
+<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+  <div class="flex items-center gap-4">
+    <div class="w-12 h-12 rounded-2xl bg-base-200 flex items-center justify-center">
+      <i data-lucide="{{if eq .Account.Type "credit"}}credit-card{{else if eq .Account.Type "investment"}}trending-up{{else if eq .Account.Type "loan"}}landmark{{else}}wallet{{end}}" class="w-6 h-6 text-base-content/50"></i>
+    </div>
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">{{if .Account.DisplayName}}{{.Account.DisplayName}}{{else}}{{.Account.Name}}{{end}}</h1>
+      <div class="flex items-center gap-2 mt-0.5">
+        <span class="text-xs text-base-content/40 capitalize">{{.Account.Type}}{{if .Account.Subtype}} &middot; {{.Account.Subtype}}{{end}}</span>
+        {{if .Account.Mask}}<span class="text-xs text-base-content/30">&bull;&bull;&bull;&bull;{{.Account.Mask}}</span>{{end}}
+        {{if .Account.Excluded}}<span class="badge badge-ghost badge-xs">Excluded</span>{{end}}
       </div>
     </div>
-  </label>
-  <label>
-    Pending
-    <select name="pending">
-      <option value="">All</option>
-      <option value="true"{{if eq .FilterPending "true"}} selected{{end}}>Yes</option>
-      <option value="false"{{if eq .FilterPending "false"}} selected{{end}}>No</option>
-    </select>
-  </label>
-  <label>
-    Search
-    <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Name or merchant">
-  </label>
-  <button type="submit" class="btn btn-sm btn-primary self-end">Filter</button>
-  {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
-  <a href="/accounts/{{.AccountID}}" class="btn btn-sm btn-ghost self-end">Clear</a>
-  {{end}}
-</form>
+  </div>
+</div>
 
-{{if .Transactions}}
-<div class="overflow-x-auto max-h-[70vh] border border-base-300 rounded-lg">
-  <table class="table table-zebra table-sm table-pin-rows">
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Description</th>
-        <th class="text-right">Amount</th>
-        <th>Category</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    {{range .Transactions}}
-    <tbody x-data="{ expanded: false }">
-      <tr @click="expanded = !expanded" class="cursor-pointer hover:bg-base-300">
-        <td>{{.Date}}</td>
-        <td>
-          <a href="/transactions/{{.ID}}" @click.stop class="link link-hover">{{.Name}}</a>
-          {{if .MerchantName}}<small class="text-base-content/60"> ({{.MerchantName}})</small>{{end}}
-        </td>
-        <td class="bb-amount{{if lt .Amount 0.0}} text-error{{end}}">
-          {{printf "%.2f" .Amount}}{{if .IsoCurrencyCode}} {{.IsoCurrencyCode}}{{end}}
-        </td>
-        <td @click.stop>
-          <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: '\u2014', allowEmpty: true, emptyLabel: 'Uncategorized'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
-            <button type="button" class="btn btn-ghost btn-xs gap-1.5 -ml-1" @click="openPicker()">
-              <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-              <span x-text="displayLabel" class="text-sm"></span>
-              {{if .CategoryOverride}}<span class="badge badge-outline badge-xs">override</span>{{end}}
-            </button>
-            <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false" style="min-width:16rem">
-              <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
-                <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search..." class="input input-sm input-bordered w-full">
-              </div>
-              <div x-ref="listbox">
-                <template x-for="(item, idx) in filteredList" :key="item.id || idx">
-                  <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item)">
-                    <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
-                    <span x-text="item.label"></span>
-                  </div>
-                </template>
-                <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
-              </div>
+<!-- Balance Cards + Account Info -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+  <!-- Balance Card -->
+  <div class="bb-card p-6 lg:col-span-2">
+    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider mb-5">Balances</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-6">
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Current Balance</p>
+        <p class="text-2xl font-bold tabular-nums">
+          {{if .Account.BalanceCurrent}}{{printf "%.2f" .Account.BalanceCurrent}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
+        </p>
+        {{if .Account.IsoCurrencyCode}}<p class="text-xs text-base-content/30 mt-0.5">{{.Account.IsoCurrencyCode}}</p>{{end}}
+      </div>
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Available</p>
+        <p class="text-2xl font-bold tabular-nums text-base-content/60">
+          {{if .Account.BalanceAvailable}}{{printf "%.2f" .Account.BalanceAvailable}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
+        </p>
+      </div>
+      {{if .Account.BalanceLimit}}
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Credit Limit</p>
+        <p class="text-2xl font-bold tabular-nums text-base-content/60">{{printf "%.2f" .Account.BalanceLimit}}</p>
+      </div>
+      {{end}}
+    </div>
+  </div>
+
+  <!-- Account Settings Card -->
+  <div class="bb-card p-6">
+    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider mb-5">Settings</h2>
+    <div class="space-y-4">
+      <div>
+        <label class="text-xs text-base-content/40 mb-1.5 block">Display Name</label>
+        <input type="text" value="{{if .Account.DisplayName}}{{.Account.DisplayName}}{{end}}" placeholder="{{.Account.Name}}"
+          onchange="updateDisplayName('{{.AccountID}}', this.value)"
+          class="input input-sm input-bordered w-full">
+      </div>
+      <div>
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" class="checkbox checkbox-sm" {{if .Account.Excluded}}checked{{end}}
+            onchange="toggleExcluded('{{.AccountID}}', this.checked)">
+          <div>
+            <span class="text-sm font-medium">Excluded from sync</span>
+            <p class="text-xs text-base-content/40">Skip transaction sync for this account</p>
+          </div>
+        </label>
+      </div>
+      <div class="pt-2 border-t border-base-200">
+        <p class="text-xs text-base-content/40 mb-1">Connection</p>
+        <a href="/connections/{{.Account.ConnectionID}}" class="text-sm font-medium hover:text-primary transition-colors no-underline">{{.Account.InstitutionName}}</a>
+      </div>
+      {{if .Account.UserName}}
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Family Member</p>
+        <p class="text-sm font-medium">{{.Account.UserName}}</p>
+      </div>
+      {{end}}
+    </div>
+  </div>
+</div>
+
+<!-- Transactions Section -->
+<div class="bb-card">
+  <div class="px-6 pt-6 pb-4">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider">Transactions</h2>
+      {{if .Transactions}}<span class="text-xs text-base-content/30">{{.Total}} total</span>{{end}}
+    </div>
+
+    <!-- Filters -->
+    <form method="GET" action="/accounts/{{.AccountID}}" class="flex flex-wrap items-end gap-3 pb-4 border-b border-base-200" x-data>
+      <label class="flex flex-col gap-1">
+        <span class="text-xs text-base-content/40">Start Date</span>
+        <input type="date" name="start_date" value="{{.FilterStartDate}}" class="input input-sm input-bordered">
+      </label>
+      <label class="flex flex-col gap-1">
+        <span class="text-xs text-base-content/40">End Date</span>
+        <input type="date" name="end_date" value="{{.FilterEndDate}}" class="input input-sm input-bordered">
+      </label>
+      <label class="flex flex-col gap-1">
+        <span class="text-xs text-base-content/40">Category</span>
+        <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'filter', initial: '{{.FilterCategory}}', allowEmpty: true, emptyLabel: 'All categories'})" @category-change="$refs.catInput.value = selectedSlug">
+          <input type="hidden" name="category" x-ref="catInput" value="{{.FilterCategory}}">
+          <button type="button" class="select select-sm select-bordered w-auto min-w-[8rem] text-left flex items-center gap-2" @click="openPicker()">
+            <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
+            <span x-text="displayLabel" class="text-sm truncate"></span>
+          </button>
+          <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false">
+            <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
+              <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search categories..." class="input input-sm input-bordered w-full">
+            </div>
+            <div x-ref="listbox">
+              <template x-for="(item, idx) in filteredList" :key="item.slug || idx">
+                <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item); $refs.catInput.value = item.slug">
+                  <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
+                  <template x-if="item.icon"><i :data-lucide="item.icon" class="bb-cat-icon"></i></template>
+                  <span x-text="item.label"></span>
+                </div>
+              </template>
+              <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
             </div>
           </div>
-        </td>
-        <td>{{if .Pending}}<span class="badge badge-warning badge-sm">Pending</span>{{end}}</td>
-      </tr>
-      <tr x-show="expanded" x-cloak>
-        <td colspan="5" class="bg-base-100 border-t border-base-300 px-4 py-2">
-          <dl class="bb-info-grid">
-            {{if .MerchantName}}<dt>Merchant</dt><dd>{{.MerchantName}}</dd>{{end}}
-            <dt>Transaction ID</dt><dd><code class="font-mono text-xs">{{.ID}}</code></dd>
-            <dt>Created</dt><dd>{{.CreatedAt}}</dd>
-            <dt>Updated</dt><dd>{{.UpdatedAt}}</dd>
-          </dl>
-        </td>
-      </tr>
-    </tbody>
-    {{end}}
-  </table>
-</div>
-
-{{if gt .TotalPages 1}}
-<nav class="bb-pagination">
-  <div>
-    {{if gt .Page 1}}
-    <div class="join">
-      <a href="/accounts/{{$.AccountID}}?page={{sub .Page 1}}{{if $.FilterStartDate}}&start_date={{$.FilterStartDate}}{{end}}{{if $.FilterEndDate}}&end_date={{$.FilterEndDate}}{{end}}{{if $.FilterCategory}}&category={{$.FilterCategory}}{{end}}{{if $.FilterPending}}&pending={{$.FilterPending}}{{end}}{{if $.FilterSearch}}&search={{$.FilterSearch}}{{end}}" class="join-item btn btn-sm">&laquo; Previous</a>
-    </div>
-    {{end}}
+        </div>
+      </label>
+      <label class="flex flex-col gap-1">
+        <span class="text-xs text-base-content/40">Status</span>
+        <select name="pending" class="select select-sm select-bordered">
+          <option value="">All</option>
+          <option value="true"{{if eq .FilterPending "true"}} selected{{end}}>Pending</option>
+          <option value="false"{{if eq .FilterPending "false"}} selected{{end}}>Posted</option>
+        </select>
+      </label>
+      <label class="flex flex-col gap-1">
+        <span class="text-xs text-base-content/40">Search</span>
+        <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Name or merchant" class="input input-sm input-bordered">
+      </label>
+      <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+      {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
+      <a href="/accounts/{{.AccountID}}" class="btn btn-sm btn-ghost">Clear</a>
+      {{end}}
+    </form>
   </div>
-  <span class="text-sm text-base-content/70">Page {{.Page}} of {{.TotalPages}} ({{.Total}} total)</span>
-  <div>
-    {{if lt .Page .TotalPages}}
-    <div class="join">
-      <a href="/accounts/{{$.AccountID}}?page={{add .Page 1}}{{if $.FilterStartDate}}&start_date={{$.FilterStartDate}}{{end}}{{if $.FilterEndDate}}&end_date={{$.FilterEndDate}}{{end}}{{if $.FilterCategory}}&category={{$.FilterCategory}}{{end}}{{if $.FilterPending}}&pending={{$.FilterPending}}{{end}}{{if $.FilterSearch}}&search={{$.FilterSearch}}{{end}}" class="join-item btn btn-sm">Next &raquo;</a>
-    </div>
-    {{end}}
-  </div>
-</nav>
-{{end}}
 
-{{else}}
-<div class="card bg-base-100 border border-base-300 text-center p-8">
-  <p>No transactions found for this account.</p>
-  {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
-  <a href="/accounts/{{.AccountID}}" class="btn btn-sm btn-ghost mt-4">Clear filters</a>
+  {{if .Transactions}}
+  <div class="overflow-x-auto">
+    <table class="table table-sm">
+      <thead>
+        <tr class="text-xs text-base-content/40 uppercase tracking-wider border-b border-base-200">
+          <th class="font-medium">Date</th>
+          <th class="font-medium">Description</th>
+          <th class="font-medium text-right">Amount</th>
+          <th class="font-medium">Category</th>
+          <th class="font-medium">Status</th>
+        </tr>
+      </thead>
+      {{range .Transactions}}
+      <tbody x-data="{ expanded: false }">
+        <tr @click="expanded = !expanded" class="cursor-pointer hover:bg-base-200/40 transition-colors duration-150">
+          <td class="text-sm text-base-content/60 whitespace-nowrap">{{.Date}}</td>
+          <td>
+            <a href="/transactions/{{.ID}}" @click.stop class="font-medium text-sm hover:text-primary transition-colors no-underline">{{.Name}}</a>
+            {{if .MerchantName}}<span class="text-xs text-base-content/40 ml-1">{{.MerchantName}}</span>{{end}}
+          </td>
+          <td class="text-right tabular-nums text-sm font-semibold{{if lt .Amount 0.0}} text-error{{end}}">
+            {{printf "%.2f" .Amount}}{{if .IsoCurrencyCode}} <span class="text-xs text-base-content/30 font-normal">{{.IsoCurrencyCode}}</span>{{end}}
+          </td>
+          <td @click.stop>
+            <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: '\u2014', allowEmpty: true, emptyLabel: 'Uncategorized'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
+              <button type="button" class="btn btn-ghost btn-xs gap-1.5 -ml-1" @click="openPicker()">
+                <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
+                <span x-text="displayLabel" class="text-sm"></span>
+                {{if .CategoryOverride}}<span class="badge badge-outline badge-xs">override</span>{{end}}
+              </button>
+              <div class="bb-cat-picker-dropdown" x-show="open" x-cloak @click.outside="open = false" @keydown.window.escape="open = false" style="min-width:16rem">
+                <div class="p-2 border-b border-base-300 sticky top-0 bg-base-100 z-10">
+                  <input type="text" x-model="search" x-ref="searchInput" @keydown="handleKeydown($event)" placeholder="Search..." class="input input-sm input-bordered w-full">
+                </div>
+                <div x-ref="listbox">
+                  <template x-for="(item, idx) in filteredList" :key="item.id || idx">
+                    <div class="bb-cat-item" :class="{'bb-cat-item--indent': item.indent, 'bb-cat-item--parent': item.isParent}" :data-highlighted="idx === highlightIndex" @click="select(item)">
+                      <template x-if="item.color"><span class="bb-cat-dot" :style="'background-color:' + item.color"></span></template>
+                      <span x-text="item.label"></span>
+                    </div>
+                  </template>
+                  <div class="bb-cat-empty" x-show="search && !hasResults" x-cloak>No results found</div>
+                </div>
+              </div>
+            </div>
+          </td>
+          <td>{{if .Pending}}<span class="badge badge-warning badge-xs">Pending</span>{{end}}</td>
+        </tr>
+        <tr x-show="expanded" x-cloak>
+          <td colspan="5" class="bg-base-200/30 px-6 py-3">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+              {{if .MerchantName}}<div><span class="text-xs text-base-content/40 block">Merchant</span>{{.MerchantName}}</div>{{end}}
+              <div><span class="text-xs text-base-content/40 block">Transaction ID</span><code class="font-mono text-xs text-base-content/50">{{.ID}}</code></div>
+              <div><span class="text-xs text-base-content/40 block">Created</span>{{.CreatedAt}}</div>
+              <div><span class="text-xs text-base-content/40 block">Updated</span>{{.UpdatedAt}}</div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+      {{end}}
+    </table>
+  </div>
+
+  {{if gt .TotalPages 1}}
+  <div class="px-6 py-4 flex items-center justify-between border-t border-base-200">
+    <div>
+      {{if gt .Page 1}}
+      <a href="/accounts/{{$.AccountID}}?page={{sub .Page 1}}{{if $.FilterStartDate}}&start_date={{$.FilterStartDate}}{{end}}{{if $.FilterEndDate}}&end_date={{$.FilterEndDate}}{{end}}{{if $.FilterCategory}}&category={{$.FilterCategory}}{{end}}{{if $.FilterPending}}&pending={{$.FilterPending}}{{end}}{{if $.FilterSearch}}&search={{$.FilterSearch}}{{end}}" class="btn btn-sm btn-ghost">&larr; Previous</a>
+      {{end}}
+    </div>
+    <span class="text-xs text-base-content/40">Page {{.Page}} of {{.TotalPages}}</span>
+    <div>
+      {{if lt .Page .TotalPages}}
+      <a href="/accounts/{{$.AccountID}}?page={{add .Page 1}}{{if $.FilterStartDate}}&start_date={{$.FilterStartDate}}{{end}}{{if $.FilterEndDate}}&end_date={{$.FilterEndDate}}{{end}}{{if $.FilterCategory}}&category={{$.FilterCategory}}{{end}}{{if $.FilterPending}}&pending={{$.FilterPending}}{{end}}{{if $.FilterSearch}}&search={{$.FilterSearch}}{{end}}" class="btn btn-sm btn-ghost">Next &rarr;</a>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+
+  {{else}}
+  <div class="px-6 pb-8">
+    <div class="flex flex-col items-center justify-center py-10 text-base-content/30">
+      <i data-lucide="receipt" class="w-10 h-10 mb-3 opacity-50"></i>
+      <p class="text-sm">No transactions found</p>
+      {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
+      <a href="/accounts/{{.AccountID}}" class="btn btn-sm btn-ghost mt-3">Clear filters</a>
+      {{end}}
+    </div>
+  </div>
   {{end}}
 </div>
-{{end}}
 
 {{template "category-picker-script" .}}
 <script>
