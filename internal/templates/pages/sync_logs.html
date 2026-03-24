@@ -11,7 +11,7 @@
   <form method="GET" action="/sync-logs" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3">
     <div class="form-control">
       <label class="text-xs font-medium text-base-content/50 mb-1">Connection</label>
-      <select name="connection_id" class="select select-sm bg-base-200/50 border-base-300 w-full sm:w-auto sm:min-w-[10rem]">
+      <select name="connection_id" class="select select-sm select-bordered w-full sm:w-auto sm:min-w-[10rem] rounded-xl">
         <option value="">All connections</option>
         {{range .Connections}}
         <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.FilterConnID}} selected{{end}}>{{.InstitutionName.String}}</option>
@@ -20,16 +20,16 @@
     </div>
     <div class="form-control">
       <label class="text-xs font-medium text-base-content/50 mb-1">Status</label>
-      <select name="status" class="select select-sm bg-base-200/50 border-base-300 w-full sm:w-auto sm:min-w-[8rem]">
+      <select name="status" class="select select-sm select-bordered w-full sm:w-auto sm:min-w-[8rem] rounded-xl">
         <option value="">All statuses</option>
         <option value="success"{{if eq .FilterStatus "success"}} selected{{end}}>Success</option>
         <option value="error"{{if eq .FilterStatus "error"}} selected{{end}}>Error</option>
         <option value="in_progress"{{if eq .FilterStatus "in_progress"}} selected{{end}}>In Progress</option>
       </select>
     </div>
-    <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+    <button type="submit" class="btn btn-primary btn-sm rounded-xl">Filter</button>
     {{if or .FilterConnID .FilterStatus}}
-    <a href="/sync-logs" class="btn btn-ghost btn-sm">Clear</a>
+    <a href="/sync-logs" class="btn btn-ghost btn-sm rounded-xl">Clear</a>
     {{end}}
   </form>
 </div>
@@ -167,13 +167,13 @@
 <div class="flex items-center justify-between mt-6">
   <div>
     {{if gt .Page 1}}
-    <a href="/sync-logs?page={{sub .Page 1}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterStatus}}&status={{$.FilterStatus}}{{end}}" class="btn btn-sm btn-ghost">&laquo; Previous</a>
+    <a href="/sync-logs?page={{sub .Page 1}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterStatus}}&status={{$.FilterStatus}}{{end}}" class="btn btn-sm btn-ghost rounded-xl">&laquo; Previous</a>
     {{end}}
   </div>
   <span class="text-xs text-base-content/40">Page {{.Page}} of {{.TotalPages}}</span>
   <div>
     {{if lt .Page .TotalPages}}
-    <a href="/sync-logs?page={{add .Page 1}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterStatus}}&status={{$.FilterStatus}}{{end}}" class="btn btn-sm btn-ghost">Next &raquo;</a>
+    <a href="/sync-logs?page={{add .Page 1}}{{if $.FilterConnID}}&connection_id={{$.FilterConnID}}{{end}}{{if $.FilterStatus}}&status={{$.FilterStatus}}{{end}}" class="btn btn-sm btn-ghost rounded-xl">Next &raquo;</a>
     {{end}}
   </div>
 </div>
@@ -188,7 +188,7 @@
     <h3 class="text-lg font-semibold mb-1">No sync logs found</h3>
     <p class="text-sm text-base-content/50 mb-5">{{if or .FilterConnID .FilterStatus}}Try adjusting your filters.{{else}}Sync logs will appear here after your first bank sync.{{end}}</p>
     {{if or .FilterConnID .FilterStatus}}
-    <a href="/sync-logs" class="btn btn-ghost btn-sm">Clear filters</a>
+    <a href="/sync-logs" class="btn btn-ghost btn-sm rounded-xl">Clear filters</a>
     {{end}}
   </div>
 </div>

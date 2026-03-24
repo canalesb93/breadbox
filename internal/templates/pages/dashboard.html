@@ -19,7 +19,7 @@
   <div class="flex gap-2 items-center">
     {{if .DockerSocketAvailable}}
     <button
-      class="btn btn-sm btn-primary"
+      class="btn btn-sm btn-primary rounded-xl"
       x-show="!pulled"
       :disabled="pulling"
       @click="pulling = true; error = '';
@@ -33,7 +33,7 @@
     </button>
     {{end}}
     <div class="dropdown dropdown-end">
-      <div tabindex="0" role="button" class="btn btn-sm btn-ghost">Update Command</div>
+      <div tabindex="0" role="button" class="btn btn-sm btn-ghost rounded-xl">Update Command</div>
       <div tabindex="0" class="dropdown-content card card-compact bg-base-200 shadow-sm p-3 w-80 z-10">
         <code class="text-xs select-all">cd /opt/breadbox && docker compose pull && docker compose up -d</code>
       </div>
@@ -51,9 +51,9 @@
 {{end}}
 
 {{if .ShowOnboarding}}
-<div class="card bg-base-100 border border-base-300 mb-6">
-  <div class="card-body">
-    <h2 class="card-title">
+<div class="bb-card mb-6">
+  <div class="p-6">
+    <h2 class="flex items-center gap-2 text-lg font-semibold">
       <i data-lucide="rocket" class="w-5 h-5 text-primary"></i>
       Getting Started
     </h2>
@@ -72,10 +72,10 @@
         <span class="text-left">{{if .HasConnection}}Bank connected{{else}}<a href="/connections/new" class="link">Connect your first bank</a>{{end}}</span>
       </li>
     </ul>
-    <div class="card-actions justify-end mt-2">
+    <div class="flex justify-end mt-2">
       <form method="POST" action="/onboarding/dismiss">
         <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-        <button type="submit" class="btn btn-ghost btn-sm">Dismiss</button>
+        <button type="submit" class="btn btn-ghost btn-sm rounded-xl">Dismiss</button>
       </form>
     </div>
   </div>
@@ -273,7 +273,7 @@
       <div class="text-center">
         <i data-lucide="receipt" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
         <p class="text-sm">No transactions yet</p>
-        <a href="/connections/new" class="btn btn-primary btn-sm mt-3">Connect a bank</a>
+        <a href="/connections/new" class="btn btn-primary btn-sm mt-3 rounded-xl">Connect a bank</a>
       </div>
     </div>
     {{end}}
@@ -320,11 +320,11 @@
     <!-- Quick Actions -->
     <div class="bb-card p-4">
       <div class="flex gap-2">
-        <a href="/connections/new" class="btn btn-primary btn-sm flex-1">
+        <a href="/connections/new" class="btn btn-primary btn-sm flex-1 rounded-xl">
           <i data-lucide="plus" class="w-3.5 h-3.5"></i>
           Connect Bank
         </a>
-        <a href="/reviews" class="btn btn-ghost btn-sm flex-1">
+        <a href="/reviews" class="btn btn-ghost btn-sm flex-1 rounded-xl">
           <i data-lucide="clipboard-check" class="w-3.5 h-3.5"></i>
           Reviews
         </a>
