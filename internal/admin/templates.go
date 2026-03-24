@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"math"
 	"net/http"
 	"path"
 	"sync"
@@ -163,6 +164,80 @@ func NewTemplateRenderer() (*TemplateRenderer, error) {
 					return fmt.Sprintf("-$%.2f", -amount)
 				}
 				return fmt.Sprintf("$%.2f", amount)
+			},
+			"formatBalance": func(amount float64) string {
+				abs := math.Abs(amount)
+				if abs >= 1_000_000 {
+					return fmt.Sprintf("$%.1fM", abs/1_000_000)
+				}
+				if abs >= 1_000 {
+					whole := int(abs)
+					cents := int((abs - float64(whole)) * 100)
+					// Format with comma separators
+					s := fmt.Sprintf("%d", whole)
+					if len(s) > 3 {
+						result := ""
+						for i, c := range s {
+							if i > 0 && (len(s)-i)%3 == 0 {
+								result += ","
+							}
+							result += string(c)
+						}
+						s = result
+					}
+					return fmt.Sprintf("$%s.%02d", s, cents)
+				}
+				return fmt.Sprintf("$%.2f", abs)
+			},
+			"accountTypeIcon": func(acctType string) string {
+				switch acctType {
+				case "depository":
+					return "landmark"
+				case "credit":
+					return "credit-card"
+				case "loan":
+					return "file-text"
+				case "investment":
+					return "trending-up"
+				default:
+					return "wallet"
+				}
+			},
+			"accountTypeLabel": func(acctType, subtype string) string {
+				if subtype != "" {
+					labels := map[string]string{
+						"checking":         "Checking",
+						"savings":          "Savings",
+						"credit card":      "Credit Card",
+						"credit_card":      "Credit Card",
+						"money market":     "Money Market",
+						"money_market":     "Money Market",
+						"cd":               "CD",
+						"paypal":           "PayPal",
+						"student":          "Student Loan",
+						"mortgage":         "Mortgage",
+						"auto":             "Auto Loan",
+						"401k":             "401(k)",
+						"ira":              "IRA",
+						"brokerage":        "Brokerage",
+						"prepaid":          "Prepaid",
+						"hsa":              "HSA",
+					}
+					if label, ok := labels[subtype]; ok {
+						return label
+					}
+					return subtype
+				}
+				labels := map[string]string{
+					"depository":  "Bank Account",
+					"credit":     "Credit Card",
+					"loan":       "Loan",
+					"investment": "Investment",
+				}
+				if label, ok := labels[acctType]; ok {
+					return label
+				}
+				return acctType
 			},
 			"formatNumeric": func(n pgtype.Numeric) string {
 				if !n.Valid {
