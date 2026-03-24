@@ -38,60 +38,127 @@
 <!-- Results count -->
 <div class="text-xs text-base-content/40 mb-3 px-1">{{.Total}} sync log{{if ne .Total 1}}s{{end}}</div>
 
-<div class="space-y-2 bb-stagger">
+<!-- Desktop table view (hidden on mobile) -->
+<div class="bb-card overflow-hidden mb-2 hidden md:block">
+  <table class="table table-sm w-full">
+    <thead>
+      <tr class="text-xs text-base-content/40">
+        <th class="font-medium">Connection</th>
+        <th class="font-medium">When</th>
+        <th class="font-medium">Trigger</th>
+        <th class="font-medium">Changes</th>
+        <th class="font-medium text-right">Duration</th>
+        <th class="font-medium text-right">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Logs}}
+      <tr class="hover:bg-base-200/30">
+        <!-- Connection -->
+        <td>
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg bg-base-200/50 flex items-center justify-center shrink-0">
+              <i data-lucide="building-2" class="w-3.5 h-3.5 text-base-content/40"></i>
+            </div>
+            <span class="text-sm font-medium">{{.InstitutionName}}</span>
+          </div>
+        </td>
+        <!-- Timestamp -->
+        <td>
+          <div class="text-sm text-base-content/70">{{relativeTime .StartedAt}}</div>
+          <div class="text-xs text-base-content/30">{{formatDateShort .StartedAt}}</div>
+        </td>
+        <!-- Trigger -->
+        <td>
+          <span class="badge badge-ghost badge-xs">{{.Trigger}}</span>
+        </td>
+        <!-- Changes -->
+        <td>
+          <div class="flex items-center gap-2.5 text-xs tabular-nums">
+            {{if .AddedCount}}
+            <span class="text-success font-medium">+{{.AddedCount}}</span>
+            {{end}}
+            {{if .ModifiedCount}}
+            <span class="text-info font-medium">~{{.ModifiedCount}}</span>
+            {{end}}
+            {{if .RemovedCount}}
+            <span class="text-error font-medium">-{{.RemovedCount}}</span>
+            {{end}}
+            {{if and (not .AddedCount) (not .ModifiedCount) (not .RemovedCount)}}
+            <span class="text-base-content/25">No changes</span>
+            {{end}}
+          </div>
+        </td>
+        <!-- Duration -->
+        <td class="text-right">
+          <span class="text-xs text-base-content/50 tabular-nums">{{if .Duration}}{{.Duration}}{{else}}&mdash;{{end}}</span>
+        </td>
+        <!-- Status -->
+        <td class="text-right">
+          <div class="flex items-center justify-end gap-1.5">
+            {{if .ErrorMessage}}
+            <div class="dropdown dropdown-end dropdown-hover">
+              <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-circle text-error/70">
+                <i data-lucide="info" class="w-3.5 h-3.5"></i>
+              </div>
+              <div tabindex="0" class="dropdown-content bg-base-100 shadow-lg border border-base-300 rounded-xl p-3 w-80 z-10">
+                <div class="text-xs font-medium text-error mb-1">Error Details</div>
+                <p class="text-xs text-base-content/60 font-mono break-all leading-relaxed">{{.ErrorMessage}}</p>
+              </div>
+            </div>
+            {{end}}
+            {{syncBadge .Status}}
+          </div>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+
+<!-- Mobile card view (hidden on desktop) -->
+<div class="space-y-2 md:hidden bb-stagger">
   {{range .Logs}}
-  <div class="bb-card px-5 py-3.5 flex items-center gap-4 flex-wrap">
-    <!-- Institution icon + name -->
-    <div class="flex items-center gap-3 min-w-0 w-44 shrink-0">
-      <div class="w-8 h-8 rounded-lg bg-base-200/50 flex items-center justify-center shrink-0">
-        <i data-lucide="building-2" class="w-4 h-4 text-base-content/40"></i>
-      </div>
-      <div class="min-w-0">
-        <div class="text-sm font-medium truncate">{{.InstitutionName}}</div>
-        <div class="text-xs text-base-content/40">{{if .StartedAt}}{{.StartedAt}}{{end}}</div>
-      </div>
-    </div>
-
-    <!-- Trigger -->
-    <div class="w-16 shrink-0">
-      <span class="badge badge-ghost badge-xs uppercase tracking-wide">{{.Trigger}}</span>
-    </div>
-
-    <!-- Counts -->
-    <div class="flex items-center gap-3 text-xs tabular-nums flex-1">
-      {{if .AddedCount}}
-      <span class="text-success font-medium">+{{.AddedCount}}</span>
-      {{end}}
-      {{if .ModifiedCount}}
-      <span class="text-info font-medium">~{{.ModifiedCount}}</span>
-      {{end}}
-      {{if .RemovedCount}}
-      <span class="text-error font-medium">-{{.RemovedCount}}</span>
-      {{end}}
-      {{if and (not .AddedCount) (not .ModifiedCount) (not .RemovedCount)}}
-      <span class="text-base-content/25">No changes</span>
-      {{end}}
-    </div>
-
-    <!-- Duration -->
-    <div class="w-20 text-xs text-base-content/50 text-right shrink-0">
-      {{if .Duration}}{{.Duration}}{{else}}&mdash;{{end}}
-    </div>
-
-    <!-- Status + Error -->
-    <div class="w-24 shrink-0 flex items-center justify-end gap-2">
-      {{if .ErrorMessage}}
-      <div class="dropdown dropdown-end">
-        <div tabindex="0" role="button" class="btn btn-ghost btn-xs text-error">
-          <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+  <div class="bb-card p-4">
+    <!-- Header: connection + status -->
+    <div class="flex items-center justify-between mb-2.5">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-7 h-7 rounded-lg bg-base-200/50 flex items-center justify-center shrink-0">
+          <i data-lucide="building-2" class="w-3.5 h-3.5 text-base-content/40"></i>
         </div>
-        <div tabindex="0" class="dropdown-content card card-compact bg-base-100 shadow-sm border border-base-300 p-3 w-72 z-10">
-          <p class="text-xs text-error font-mono break-all">{{.ErrorMessage}}</p>
+        <div class="min-w-0">
+          <div class="text-sm font-medium truncate">{{.InstitutionName}}</div>
+          <div class="text-xs text-base-content/40">{{relativeTime .StartedAt}}</div>
         </div>
       </div>
-      {{end}}
-      {{syncBadge .Status}}
+      <div class="flex items-center gap-1.5 shrink-0">
+        {{syncBadge .Status}}
+      </div>
     </div>
+
+    <!-- Details row -->
+    <div class="flex items-center justify-between text-xs text-base-content/50 pt-2 border-t border-base-300/50">
+      <div class="flex items-center gap-3">
+        <span class="badge badge-ghost badge-xs">{{.Trigger}}</span>
+        <div class="flex items-center gap-2 tabular-nums">
+          {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
+          {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
+          {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
+          {{if and (not .AddedCount) (not .ModifiedCount) (not .RemovedCount)}}
+          <span class="text-base-content/25">No changes</span>
+          {{end}}
+        </div>
+      </div>
+      <span class="tabular-nums">{{if .Duration}}{{.Duration}}{{else}}&mdash;{{end}}</span>
+    </div>
+
+    <!-- Error message if present -->
+    {{if .ErrorMessage}}
+    <div class="mt-2.5 flex items-start gap-2 text-xs text-error/80 bg-error/5 rounded-lg px-3 py-2">
+      <i data-lucide="alert-circle" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
+      <span class="font-mono break-all leading-relaxed">{{.ErrorMessage}}</span>
+    </div>
+    {{end}}
   </div>
   {{end}}
 </div>

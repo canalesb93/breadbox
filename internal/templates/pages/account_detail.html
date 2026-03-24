@@ -202,8 +202,8 @@
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
               {{if .MerchantName}}<div><span class="text-xs text-base-content/40 block">Merchant</span>{{.MerchantName}}</div>{{end}}
               <div><span class="text-xs text-base-content/40 block">Transaction ID</span><code class="font-mono text-xs text-base-content/50">{{.ID}}</code></div>
-              <div><span class="text-xs text-base-content/40 block">Created</span>{{.CreatedAt}}</div>
-              <div><span class="text-xs text-base-content/40 block">Updated</span>{{.UpdatedAt}}</div>
+              <div><span class="text-xs text-base-content/40 block">Created</span>{{formatDateTime .CreatedAt}}</div>
+              <div><span class="text-xs text-base-content/40 block">Updated</span>{{formatDateTime .UpdatedAt}}</div>
             </div>
           </td>
         </tr>

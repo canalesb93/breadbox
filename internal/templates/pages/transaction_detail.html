@@ -89,11 +89,11 @@
         </div>
         <div>
           <p class="text-base-content/30 mb-0.5">Created</p>
-          <p class="text-base-content/50">{{.Transaction.CreatedAt}}</p>
+          <p class="text-base-content/50">{{formatDateTime .Transaction.CreatedAt}}</p>
         </div>
         <div>
           <p class="text-base-content/30 mb-0.5">Updated</p>
-          <p class="text-base-content/50">{{.Transaction.UpdatedAt}}</p>
+          <p class="text-base-content/50">{{formatDateTime .Transaction.UpdatedAt}}</p>
         </div>
       </div>
     </div>
@@ -156,7 +156,7 @@
         <p class="text-sm whitespace-pre-wrap leading-relaxed">{{.Content}}</p>
         <div class="flex items-center gap-2 mt-2">
           <span class="text-xs font-medium text-base-content/50">{{.AuthorName}}</span>
-          <span class="text-xs text-base-content/30">{{.CreatedAt}}</span>
+          <span class="text-xs text-base-content/30">{{relativeTime .CreatedAt}}</span>
         </div>
       </div>
       <button class="btn btn-ghost btn-xs opacity-0 group-hover:opacity-100 transition-opacity text-error/50 hover:text-error" @click="deleteComment('{{.ID}}')" title="Delete">

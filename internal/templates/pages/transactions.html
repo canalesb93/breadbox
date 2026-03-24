@@ -201,8 +201,8 @@
                 <dt>Transaction ID</dt><dd><code class="font-mono text-xs bg-base-200 px-1.5 py-0.5 rounded">{{.ID}}</code></dd>
                 <dt>Account</dt><dd>{{.AccountName}} ({{.InstitutionName}})</dd>
                 <dt>Family Member</dt><dd>{{if .UserName}}{{.UserName}}{{else}}<span class="text-base-content/30">&mdash;</span>{{end}}</dd>
-                <dt>Created</dt><dd>{{.CreatedAt}}</dd>
-                <dt>Updated</dt><dd>{{.UpdatedAt}}</dd>
+                <dt>Created</dt><dd>{{formatDateTime .CreatedAt}}</dd>
+                <dt>Updated</dt><dd>{{formatDateTime .UpdatedAt}}</dd>
               </dl>
             </td>
           </tr>
