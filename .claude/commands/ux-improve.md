@@ -33,18 +33,28 @@ Also **look at the actual app** — use Chrome MCP tools (`navigate`, `read_page
 
 Pick ONE area that will have the most visual impact given what's already been done. Think like a designer: what would make the biggest difference right now?
 
-**The vision**: A modern fintech dashboard with clean typography, thoughtful spacing, smooth interactions, rich data visualization, and a cohesive design language. Not a generic admin template — a product that looks like it was designed by a team that cares.
+**The vision**: Think **Mercury** (mercury.com). Clean, light, airy, premium. Not a generic admin template — a product that feels like it cost $10M to design. Study Mercury's aesthetic and apply it here.
+
+**Design DNA** (this is what makes Mercury feel premium — internalize these):
+
+- **Soft, rounded cards** — Large border-radius (`rounded-2xl` or `rounded-3xl`), subtle shadows (`shadow-sm` or even just a faint border), NO heavy outlines. Cards should feel like they float.
+- **Generous whitespace** — Don't cram things together. Let elements breathe. Padding inside cards should be `p-6` or `p-8`, not `p-4`.
+- **Big, bold numbers** — Financial amounts should be large (`text-3xl` or `text-4xl font-semibold`), using a clean sans-serif. The dollar sign can be smaller than the number.
+- **Mostly monochrome** — Black/dark text on white/light backgrounds. Color is used sparingly for accents: green for income/positive, red for expenses/negative, maybe one brand accent. No rainbow of colors.
+- **Clean sidebar** — Generous item spacing, subtle active state (light background fill, not heavy borders), clean iconography. No section dividers or heavy visual weight.
+- **Minimal chrome** — Remove unnecessary borders, reduce visual noise. Prefer whitespace and subtle background color differences over borders to separate sections.
+- **Typography hierarchy** — Clear distinction between headings, subtext, and data. Use font-weight and size contrast, not color variety.
 
 Priority areas (pick based on what's needed most right now):
 
-- **Dashboard overhaul** — Spending charts, category breakdowns, balance trends, recent activity feed. Chart.js via CDN. Make the dashboard actually useful, not just stat cards.
-- **Transaction list** — The core screen. Needs to be fast, filterable, sortable, with amount formatting, category color badges, merchant icons, and smooth pagination. Think Mint/Monarch level.
-- **Navigation & layout** — Sidebar polish, active states, transitions, section grouping, responsive collapse, app-wide visual consistency.
-- **Typography & design system** — Font sizing scale, color palette refinement, consistent component styling, micro-interactions (hover states, focus rings, transitions).
-- **Data visualization** — Charts, sparklines, progress bars, trend indicators. Make financial data visual and glanceable.
-- **Page-specific redesigns** — Pick any page (connections, reviews, rules, categories, settings, providers, MCP) and transform it from functional to beautiful.
-- **Empty states & polish** — Loading skeletons, helpful empty states, error pages, toasts, confirmation dialogs. The details that make an app feel finished.
-- **Mobile & responsiveness** — Make it work beautifully on tablets and phones. Collapsible sidebar, responsive tables, touch-friendly targets.
+- **Global design tokens / theme overhaul** — Update `input.css` with Mercury-style tokens: softer borders, larger radii, refined spacing, improved base-100/base-200 contrast. This lifts every page at once.
+- **Sidebar & navigation polish** — Match Mercury: clean search bar, generous spacing, subtle active states (filled background, not left border), minimal section headers.
+- **Dashboard redesign** — Big balance card at top, clean chart styling, better visual hierarchy. Less cramped.
+- **Transaction list refinement** — Cleaner table rows, better amount formatting (large, right-aligned), minimal borders between rows.
+- **Page-specific redesigns** — Pick any untouched page (reviews, rules, categories, settings, providers, sync logs, MCP, users) and transform it.
+- **Data visualization polish** — Chart styling refinement: lighter gridlines, cleaner tooltips, better color palette.
+- **Empty states & polish** — Loading skeletons, helpful empty states, error pages. The details that make an app feel finished.
+- **Mobile & responsiveness** — Collapsible sidebar, responsive cards, touch-friendly targets.
 
 DO NOT duplicate work from previous agents. Build on it or tackle something new.
 
@@ -66,14 +76,16 @@ git checkout -b auto-improvement/<short-descriptive-name>
 - **No Node.js**, no npm, no build step beyond `make css`.
 - **Go handlers** in `internal/api/`, service layer in `internal/service/`.
 
-### Design Principles
+### Design Principles — "Mercury Style"
 
-- **Modern and clean** — Generous whitespace, clear hierarchy, no visual clutter.
-- **Snappy** — CSS transitions (150-250ms), no jarring reflows, smooth hover states.
-- **Consistent design system** — This is critical. Before implementing, read `input.css` and the existing templates to understand the patterns already in use (component classes like `bb-stat-card`, `bb-filter-bar`, `bb-amount`, etc.). Reuse and extend existing patterns — do NOT invent one-off styles or diverge from the established look. Every page should feel like it belongs to the same app. Use DaisyUI semantic classes (`card`, `badge`, `table`, `btn`, `alert`, etc.) consistently. If you add new reusable patterns, define them as `@apply` classes in `input.css`.
-- **Dark mode first** — The app uses `prefers-color-scheme` auto-switch. Design for dark, verify it works in light.
-- **Data-dense but readable** — Financial apps need to show lots of data. Use typography and spacing to keep it scannable.
-- **Match the dashboard** — The dashboard sets the visual standard: card-based sections with `bg-base-100 shadow-sm border border-base-300`, compact headers with icons, and generous but not wasteful spacing. Other pages should follow this same card/section pattern.
+- **Light and airy** — Think white space, soft shadows, generous padding. The app should feel calm and premium, not dense and busy. Prefer `bg-base-100` cards on `bg-base-200` backgrounds with subtle separation.
+- **Soft shapes** — Use `rounded-2xl` for cards and containers. Avoid sharp corners. Buttons should be rounded too.
+- **Minimal borders** — Prefer shadows and background color contrast over visible borders. If borders are needed, use very subtle ones (`border-base-200` not `border-base-300`).
+- **Typography over decoration** — Use font size and weight to create hierarchy, not colors or icons. Financial amounts should be large and bold. Labels should be small and muted.
+- **Sparing color** — Mostly grayscale/neutral palette. Green for positive amounts/success, red for negative/errors. One accent color max. No rainbow badges.
+- **Snappy** — CSS transitions (150-250ms), smooth hover states, subtle lift on interactive cards.
+- **Consistent design system** — Before implementing, read `input.css` and existing templates. Reuse and extend existing patterns. If you add new reusable patterns, define them in `input.css`. Use DaisyUI semantic classes consistently.
+- **Dark mode aware** — The app uses `prefers-color-scheme` auto-switch. Design should work in both, but dark mode should still feel "Mercury-esque" — dark grays, not pure black, with the same soft aesthetic.
 
 ### What NOT to do
 
