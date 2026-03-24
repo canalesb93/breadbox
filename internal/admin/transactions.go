@@ -103,9 +103,17 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			page = 1
 		}
 
+		pageSize := 50
+		if v, err := strconv.Atoi(r.URL.Query().Get("per_page")); err == nil {
+			switch v {
+			case 25, 50, 100:
+				pageSize = v
+			}
+		}
+
 		params := service.AdminTransactionListParams{
 			Page:     page,
-			PageSize: 50,
+			PageSize: pageSize,
 		}
 
 		if v := r.URL.Query().Get("start_date"); v != "" {
@@ -206,6 +214,9 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 		// Build export URL from active filters (excludes page param).
 		exportURL := buildExportURL(r)
 
+		// Build pagination base URL (all params except page).
+		paginationBase := buildPaginationBase(r)
+
 		// Group transactions by date for the modern list view.
 		dateGroups := groupTransactionsByDate(result.Transactions)
 
@@ -221,9 +232,13 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			"Categories":       categoryTree,
 			"Connections":      connections,
 			"Page":             result.Page,
+			"PageSize":         result.PageSize,
 			"TotalPages":       result.TotalPages,
 			"Total":            result.Total,
 			"ExportURL":         exportURL,
+			"PaginationBase":    paginationBase,
+			"ShowingStart":      (result.Page-1)*result.PageSize + 1,
+			"ShowingEnd":        min(int64(result.Page*result.PageSize), result.Total),
 			"FilterStartDate":  stringOrEmpty(dateParamPtr(r, "start_date")),
 			"FilterEndDate":    stringOrEmpty(dateParamPtr(r, "end_date")),
 			"FilterAccountID":  stringOrEmpty(params.AccountID),
@@ -676,6 +691,27 @@ func DeleteTransactionCommentHandler(a *app.App, sm *scs.SessionManager, svc *se
 
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+// buildPaginationBase returns the query string for pagination links (all params except page).
+func buildPaginationBase(r *http.Request) string {
+	paginationParams := []string{
+		"start_date", "end_date", "account_id", "user_id",
+		"connection_id", "category", "min_amount", "max_amount",
+		"pending", "search", "sort", "per_page",
+	}
+	q := r.URL.Query()
+	qs := make([]string, 0, len(paginationParams))
+	for _, key := range paginationParams {
+		if v := q.Get(key); v != "" {
+			qs = append(qs, key+"="+v)
+		}
+	}
+	base := "/transactions?page="
+	if len(qs) > 0 {
+		base = "/transactions?" + strings.Join(qs, "&") + "&page="
+	}
+	return base
 }
 
 // buildExportURL returns the full CSV export URL with the current filter params.

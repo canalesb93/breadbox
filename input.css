@@ -659,6 +659,106 @@
     }
   }
 
+  /* ── View Toggle (pill buttons) ── */
+  .bb-view-toggle {
+    @apply inline-flex items-center rounded-lg border border-base-300 p-0.5 gap-0;
+    background: oklch(0.97 0 0);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-view-toggle {
+      background: oklch(0.18 0 0);
+    }
+  }
+
+  .bb-view-toggle__btn {
+    @apply flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md
+           text-base-content/50 cursor-pointer select-none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .bb-view-toggle__btn:hover {
+    @apply text-base-content/70;
+  }
+
+  .bb-view-toggle__btn--active {
+    @apply bg-base-100 text-base-content shadow-sm;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-view-toggle__btn--active {
+      @apply bg-base-300/50 text-base-content;
+    }
+  }
+
+  /* ── Consistent filter toggle button ── */
+  .bb-filter-toggle {
+    @apply flex items-center justify-between w-full px-4 sm:px-5 py-3 text-sm font-medium
+           hover:bg-base-200/50 transition-colors duration-150 rounded-t-xl cursor-pointer;
+  }
+
+  .bb-filter-form {
+    @apply px-4 sm:px-5 pb-4 border-t border-base-300/50;
+  }
+
+  .bb-filter-label {
+    @apply flex flex-col gap-1 text-xs font-medium text-base-content/50;
+  }
+
+  .bb-filter-actions {
+    @apply flex justify-end gap-2;
+  }
+
+  /* ── Table header for list view ── */
+  .bb-table-header {
+    @apply flex items-center gap-3 px-4 py-2 text-xs font-medium text-base-content/40
+           border-b border-base-300/50 bg-base-200/30;
+  }
+
+  /* ── Date column visibility (hidden in grouped, shown in list) ── */
+  .bb-date-group .bb-tx-date {
+    display: none !important;
+  }
+
+  /* ── Paginator ── */
+  .bb-paginator {
+    @apply flex flex-col sm:flex-row items-center justify-between gap-3 pt-5 px-1;
+  }
+
+  .bb-paginator__info {
+    @apply flex items-center gap-4;
+  }
+
+  .bb-paginator__per-page {
+    @apply flex items-center gap-2;
+  }
+
+  .bb-paginator__nav {
+    @apply flex items-center gap-1;
+  }
+
+  .bb-paginator__btn {
+    @apply flex items-center justify-center min-w-[2rem] h-8 px-2 text-xs font-medium
+           text-base-content/60 rounded-lg border border-transparent
+           hover:bg-base-200 hover:text-base-content;
+    transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+    tabular-nums: lining-nums;
+  }
+
+  .bb-paginator__btn--active {
+    @apply bg-base-100 text-base-content border-base-300 font-semibold shadow-sm;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-paginator__btn--active {
+      @apply bg-base-300/40 text-base-content border-base-300;
+    }
+  }
+
+  .bb-paginator__ellipsis {
+    @apply flex items-center justify-center w-8 h-8 text-xs text-base-content/30;
+  }
+
   /* ─── Command Palette (Cmd+K) ─── */
   .bb-cmdk-backdrop {
     @apply fixed inset-0 z-50;

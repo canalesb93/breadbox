@@ -185,6 +185,49 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return *s
 			},
+			"pageRange": func(current, total int) []int {
+				// Returns page numbers to display: always include first, last,
+				// current, and neighbors. Use 0 as ellipsis sentinel.
+				if total <= 7 {
+					pages := make([]int, total)
+					for i := range pages {
+						pages[i] = i + 1
+					}
+					return pages
+				}
+				seen := map[int]bool{}
+				add := func(p int) {
+					if p >= 1 && p <= total {
+						seen[p] = true
+					}
+				}
+				add(1)
+				add(total)
+				for d := -1; d <= 1; d++ {
+					add(current + d)
+				}
+				sorted := make([]int, 0, len(seen))
+				for p := range seen {
+					sorted = append(sorted, p)
+				}
+				// Sort
+				for i := 0; i < len(sorted); i++ {
+					for j := i + 1; j < len(sorted); j++ {
+						if sorted[j] < sorted[i] {
+							sorted[i], sorted[j] = sorted[j], sorted[i]
+						}
+					}
+				}
+				// Insert 0 for gaps
+				result := make([]int, 0, len(sorted)*2)
+				for i, p := range sorted {
+					if i > 0 && p > sorted[i-1]+1 {
+						result = append(result, 0) // ellipsis
+					}
+					result = append(result, p)
+				}
+				return result
+			},
 			"expired": func(s *string) bool {
 				if s == nil {
 					return false
