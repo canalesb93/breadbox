@@ -2,6 +2,7 @@ package admin
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -13,6 +14,30 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// UserAccountSummary holds a single account's display info for the users page.
+type UserAccountSummary struct {
+	ID              string
+	Name            string
+	Type            string
+	Subtype         string
+	Mask            string
+	InstitutionName string
+	BalanceCurrent  float64
+	IsoCurrencyCode string
+	IsLiability     bool
+}
+
+// EnrichedUser holds a user plus their computed financial summary.
+type EnrichedUser struct {
+	db.User
+	Accounts         []UserAccountSummary
+	ConnectionCount  int64
+	AccountCount     int
+	TotalAssets      float64
+	TotalLiabilities float64
+	NetWorth         float64
+}
 
 // UsersListHandler serves GET /admin/users.
 func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
@@ -35,13 +60,77 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			}
 		}
 
+		// Enrich each user with account data and financial summary.
+		enrichedUsers := make([]EnrichedUser, 0, len(users))
+		for _, u := range users {
+			eu := EnrichedUser{
+				User:            u,
+				ConnectionCount: connectionCounts[formatUUID(u.ID)],
+			}
+
+			accounts, err := a.Queries.ListAccountsByUser(ctx, u.ID)
+			if err != nil {
+				a.Logger.Error("list accounts for user", "error", err, "user_id", formatUUID(u.ID))
+			} else {
+				eu.AccountCount = len(accounts)
+				for _, acct := range accounts {
+					bal, err := numericToFloat(acct.BalanceCurrent)
+					if err != nil {
+						continue
+					}
+					subtype := ""
+					if acct.Subtype.Valid {
+						subtype = acct.Subtype.String
+					}
+					mask := ""
+					if acct.Mask.Valid {
+						mask = acct.Mask.String
+					}
+					institution := ""
+					if acct.InstitutionName.Valid {
+						institution = acct.InstitutionName.String
+					}
+					currency := "USD"
+					if acct.IsoCurrencyCode.Valid {
+						currency = acct.IsoCurrencyCode.String
+					}
+					displayName := acct.Name
+					if acct.DisplayName.Valid {
+						displayName = acct.DisplayName.String
+					}
+
+					isLiability := acct.Type == "credit" || acct.Type == "loan"
+					if isLiability {
+						eu.TotalLiabilities += math.Abs(bal)
+						eu.NetWorth -= math.Abs(bal)
+					} else {
+						eu.TotalAssets += bal
+						eu.NetWorth += bal
+					}
+
+					eu.Accounts = append(eu.Accounts, UserAccountSummary{
+						ID:              formatUUID(acct.ID),
+						Name:            displayName,
+						Type:            acct.Type,
+						Subtype:         subtype,
+						Mask:            mask,
+						InstitutionName: institution,
+						BalanceCurrent:  bal,
+						IsoCurrencyCode: currency,
+						IsLiability:     isLiability,
+					})
+				}
+			}
+
+			enrichedUsers = append(enrichedUsers, eu)
+		}
+
 		data := map[string]any{
-			"PageTitle":        "Family Members",
-			"CurrentPage":      "users",
-			"Users":            users,
-			"ConnectionCounts": connectionCounts,
-			"CSRFToken":        GetCSRFToken(r),
-			"Created":          r.URL.Query().Get("created") == "1",
+			"PageTitle":     "Family Members",
+			"CurrentPage":   "users",
+			"EnrichedUsers": enrichedUsers,
+			"CSRFToken":     GetCSRFToken(r),
+			"Created":       r.URL.Query().Get("created") == "1",
 		}
 		tr.Render(w, r, "users.html", data)
 	}

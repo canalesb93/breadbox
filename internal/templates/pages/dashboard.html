@@ -92,6 +92,19 @@
 </div>
 {{end}}
 
+<!-- Dashboard Page Header with Global Date Range Picker -->
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Dashboard</h1>
+  </div>
+  <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5">
+    <a href="/?days=7" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 7}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">7d</a>
+    <a href="/?days=30" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 30}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">30d</a>
+    <a href="/?days=90" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 90}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">90d</a>
+    <a href="/?days=365" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 365}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">12m</a>
+  </div>
+</div>
+
 <!-- Net Worth Hero with Trend Chart -->
 <div class="bb-card mb-6 bb-stagger">
   <div class="p-6 pb-0">
@@ -116,7 +129,7 @@
       <!-- Right: Spending + Income summary pills -->
       <div class="flex items-center gap-3 sm:gap-4">
         <div class="flex flex-col items-end">
-          <div class="text-xs text-base-content/40 mb-0.5">Spending <span class="text-base-content/25">30d</span></div>
+          <div class="text-xs text-base-content/40 mb-0.5">Spending <span class="text-base-content/25">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}}</span></div>
           <div class="flex items-baseline gap-1.5">
             <span class="text-lg font-semibold tabular-nums">{{formatBalance .TotalSpending}}</span>
             {{if .HasSpendingChange}}
@@ -128,7 +141,7 @@
         </div>
         <div class="w-px h-8 bg-base-300"></div>
         <div class="flex flex-col items-end">
-          <div class="text-xs text-base-content/40 mb-0.5">Income <span class="text-base-content/25">30d</span></div>
+          <div class="text-xs text-base-content/40 mb-0.5">Income <span class="text-base-content/25">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}}</span></div>
           <span class="text-lg font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</span>
         </div>
       </div>
@@ -223,12 +236,6 @@
           {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}% vs prev
         </span>
         {{end}}
-      </div>
-      <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5">
-        <a href="/?days=7" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 7}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">7d</a>
-        <a href="/?days=30" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 30}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">30d</a>
-        <a href="/?days=90" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 90}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">90d</a>
-        <a href="/?days=365" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 365}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">12m</a>
       </div>
     </div>
     {{if .DailyLabels}}
