@@ -21,6 +21,22 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
+		// Parse chart date range from query param (default 30 days).
+		chartDays := 30
+		if d := r.URL.Query().Get("days"); d != "" {
+			switch d {
+			case "7":
+				chartDays = 7
+			case "30":
+				chartDays = 30
+			case "90":
+				chartDays = 90
+			case "365":
+				chartDays = 365
+			}
+		}
+		chartStart := time.Now().AddDate(0, 0, -chartDays)
+
 		accountCount, err := a.Queries.CountAccounts(ctx)
 		if err != nil {
 			a.Logger.Error("count accounts", "error", err)
@@ -60,9 +76,10 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			lastSyncText = relativeTime(lastSync.Time)
 		}
 
-		// Spending by category (last 30 days) — only positive amounts (debits).
+		// Spending by category for the selected date range — only positive amounts (debits).
 		categorySummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
 			GroupBy:      "category",
+			StartDate:    &chartStart,
 			SpendingOnly: true,
 		})
 		if err != nil {
@@ -71,9 +88,10 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		var categoryLabelsJSON, categoryAmountsJSON, categoryColorsJSON template.JS
 		// Top spending categories for the breakdown list.
 		type CategorySpend struct {
-			Name   string
-			Color  string
-			Amount float64
+			Name    string
+			Color   string
+			Amount  float64
+			Percent float64
 		}
 		// Curated fallback palette for categories without a DB color.
 		categoryPalette := []string{
@@ -124,23 +142,59 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				categoryColorsJSON = template.JS(cb)
 			}
 		}
-		// Limit to top 8 categories for the legend list.
+		// Limit to top 8 categories for the bar chart.
 		if len(topCategories) > 8 {
 			topCategories = topCategories[:8]
 		}
+		// Calculate percentages for horizontal bar chart.
+		if catTotal := func() float64 {
+			var t float64
+			for _, c := range topCategories {
+				t += c.Amount
+			}
+			return t
+		}(); catTotal > 0 {
+			for i := range topCategories {
+				topCategories[i].Percent = (topCategories[i].Amount / catTotal) * 100
+			}
+		}
 
-		// Daily spending trend (last 30 days) — only positive amounts (debits).
+		// Daily spending trend for selected range — only positive amounts (debits).
+		// For 365-day range, group by month instead of day.
+		chartGroupBy := "day"
+		if chartDays == 365 {
+			chartGroupBy = "month"
+		}
 		dailySummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
-			GroupBy:      "day",
+			GroupBy:      chartGroupBy,
+			StartDate:    &chartStart,
 			SpendingOnly: true,
 		})
 		if err != nil {
 			a.Logger.Error("daily summary", "error", err)
 		}
 
-		// Previous 30-day period spending for comparison.
-		prevStart := time.Now().AddDate(0, 0, -60)
-		prevEnd := time.Now().AddDate(0, 0, -30)
+		// Daily income for the same period (for chart overlay).
+		dailyIncomeSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+			GroupBy:   chartGroupBy,
+			StartDate: &chartStart,
+		})
+		if err != nil {
+			a.Logger.Error("daily income summary", "error", err)
+		}
+		// Build income map (period -> abs(negative amounts)).
+		incomeByPeriod := make(map[string]float64)
+		if dailyIncomeSummary != nil {
+			for _, row := range dailyIncomeSummary.Summary {
+				if row.TotalAmount < 0 && row.Period != nil {
+					incomeByPeriod[*row.Period] = -row.TotalAmount
+				}
+			}
+		}
+
+		// Previous period spending for comparison.
+		prevStart := time.Now().AddDate(0, 0, -chartDays*2)
+		prevEnd := time.Now().AddDate(0, 0, -chartDays)
 		prevSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
 			GroupBy:      "category",
 			StartDate:    &prevStart,
@@ -160,12 +214,13 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		var spendingChangePercent float64
 		var hasSpendingChange bool
 		// We compute these after totalSpending is calculated below.
-		var dailyLabelsJSON, dailyAmountsJSON template.JS
+		var dailyLabelsJSON, dailyAmountsJSON, dailyIncomeAmountsJSON template.JS
 		if dailySummary != nil && len(dailySummary.Summary) > 0 {
 			// Reverse so oldest is first (API returns DESC).
 			rows := dailySummary.Summary
 			labels := make([]string, 0, len(rows))
 			amounts := make([]float64, 0, len(rows))
+			incomeAmounts := make([]float64, 0, len(rows))
 			for i := len(rows) - 1; i >= 0; i-- {
 				row := rows[i]
 				label := ""
@@ -174,12 +229,16 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				}
 				labels = append(labels, label)
 				amounts = append(amounts, row.TotalAmount)
+				incomeAmounts = append(incomeAmounts, incomeByPeriod[label])
 			}
 			if lb, err := json.Marshal(labels); err == nil {
 				dailyLabelsJSON = template.JS(lb)
 			}
 			if ab, err := json.Marshal(amounts); err == nil {
 				dailyAmountsJSON = template.JS(ab)
+			}
+			if ib, err := json.Marshal(incomeAmounts); err == nil {
+				dailyIncomeAmountsJSON = template.JS(ib)
 			}
 		}
 
@@ -244,7 +303,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			recentTransactions = recentTx.Transactions
 		}
 
-		// Total spending (30 days).
+		// Total spending for the selected period.
 		var totalSpending float64
 		if categorySummary != nil && categorySummary.Totals.TotalAmount != nil {
 			totalSpending = *categorySummary.Totals.TotalAmount
@@ -411,18 +470,20 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"CategoryColors":         categoryColorsJSON,
 			"DailyLabels":            dailyLabelsJSON,
 			"DailyAmounts":           dailyAmountsJSON,
+			"DailyIncomeAmounts":     dailyIncomeAmountsJSON,
+			"ChartDays":              chartDays,
 			"RecentTransactions":     recentTransactions,
 			"TotalSpending":          totalSpending,
 			"TotalIncome":            totalIncome,
-			"Accounts":              dashAccounts,
-			"NetWorth":              netWorth,
-			"TotalAssets":           totalAssets,
-			"TotalLiabilities":     totalLiabilities,
-			"TopCategories":        topCategories,
-			"MaxCategorySpend":     maxCategorySpend,
-			"PrevTotalSpending":    prevTotalSpending,
-			"SpendingChangePercent": spendingChangePercent,
-			"HasSpendingChange":    hasSpendingChange,
+			"Accounts":               dashAccounts,
+			"NetWorth":               netWorth,
+			"TotalAssets":            totalAssets,
+			"TotalLiabilities":       totalLiabilities,
+			"TopCategories":          topCategories,
+			"MaxCategorySpend":       maxCategorySpend,
+			"PrevTotalSpending":      prevTotalSpending,
+			"SpendingChangePercent":  spendingChangePercent,
+			"HasSpendingChange":      hasSpendingChange,
 		}
 		tr.Render(w, r, "dashboard.html", data)
 	}
