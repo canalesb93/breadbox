@@ -1,6 +1,100 @@
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: light --default, dark --prefersdark;
+  themes: false;
+}
+
+/* ─── Breadbox Light Theme (Mercury-inspired) ─── */
+@plugin "daisyui/theme" {
+  name: "breadbox-light";
+  default: true;
+  color-scheme: light;
+
+  /* Backgrounds: pure white cards on warm off-white canvas */
+  --color-base-100: oklch(100% 0 0);
+  --color-base-200: oklch(97.5% 0.003 250);
+  --color-base-300: oklch(93% 0.005 250);
+  --color-base-content: oklch(18% 0.005 250);
+
+  /* Primary: refined deep indigo — the singular brand accent */
+  --color-primary: oklch(48% 0.17 265);
+  --color-primary-content: oklch(98% 0.005 265);
+
+  /* Secondary: cool slate — for secondary actions and muted UI */
+  --color-secondary: oklch(55% 0.04 260);
+  --color-secondary-content: oklch(98% 0.003 260);
+
+  /* Accent: soft teal — for special highlights and differentiation */
+  --color-accent: oklch(62% 0.1 195);
+  --color-accent-content: oklch(98% 0.005 195);
+
+  /* Neutral: deep charcoal — for badges, tags, overlays */
+  --color-neutral: oklch(20% 0.005 250);
+  --color-neutral-content: oklch(95% 0.003 250);
+
+  /* Semantic: muted, sophisticated tones (not neon) */
+  --color-info: oklch(62% 0.1 245);
+  --color-info-content: oklch(98% 0.005 245);
+  --color-success: oklch(62% 0.14 155);
+  --color-success-content: oklch(98% 0.005 155);
+  --color-warning: oklch(72% 0.14 75);
+  --color-warning-content: oklch(25% 0.05 75);
+  --color-error: oklch(60% 0.17 20);
+  --color-error-content: oklch(98% 0.005 20);
+
+  /* Shape: generous radius, subtle depth */
+  --radius-selector: 0.625rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* ─── Breadbox Dark Theme (rich, warm — not "inverted light") ─── */
+@plugin "daisyui/theme" {
+  name: "breadbox-dark";
+  prefersdark: true;
+  color-scheme: dark;
+
+  /* Backgrounds: warm charcoal tones, NOT blue-tinted */
+  --color-base-100: oklch(20% 0.006 270);
+  --color-base-200: oklch(17.5% 0.005 270);
+  --color-base-300: oklch(15% 0.004 270);
+  --color-base-content: oklch(93% 0.005 250);
+
+  /* Primary: lighter indigo for dark bg contrast */
+  --color-primary: oklch(68% 0.16 265);
+  --color-primary-content: oklch(15% 0.02 265);
+
+  /* Secondary: lifted slate */
+  --color-secondary: oklch(65% 0.03 260);
+  --color-secondary-content: oklch(15% 0.01 260);
+
+  /* Accent: brightened teal */
+  --color-accent: oklch(72% 0.1 195);
+  --color-accent-content: oklch(15% 0.02 195);
+
+  /* Neutral: lifted dark for subtle contrasts */
+  --color-neutral: oklch(25% 0.006 270);
+  --color-neutral-content: oklch(90% 0.003 250);
+
+  /* Semantic: slightly brighter for dark bg readability */
+  --color-info: oklch(70% 0.1 245);
+  --color-info-content: oklch(15% 0.02 245);
+  --color-success: oklch(70% 0.14 155);
+  --color-success-content: oklch(15% 0.02 155);
+  --color-warning: oklch(78% 0.13 75);
+  --color-warning-content: oklch(20% 0.04 75);
+  --color-error: oklch(68% 0.16 20);
+  --color-error-content: oklch(15% 0.02 20);
+
+  /* Shape: same generous radius */
+  --radius-selector: 0.625rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
 }
 
 /* Utility: hide Alpine.js elements until initialized */
@@ -8,13 +102,6 @@
 
 /* ─── Mercury-inspired global overrides ─── */
 @layer base {
-  /* Softer, rounder defaults for all DaisyUI components */
-  :root {
-    --rounded-box: 1rem;
-    --rounded-btn: 0.625rem;
-    --rounded-badge: 0.5rem;
-  }
-
   /* Smoother scrolling */
   html { scroll-behavior: smooth; }
 
