@@ -249,11 +249,11 @@
   }
 
   .bb-filter-bar select {
-    @apply select select-sm w-auto min-w-[8rem];
+    @apply select select-sm w-full sm:w-auto sm:min-w-[8rem];
   }
 
   .bb-filter-bar input {
-    @apply input input-sm w-auto min-w-[8rem];
+    @apply input input-sm w-full sm:w-auto sm:min-w-[8rem];
   }
 
   /* ── Pagination ── */
@@ -338,7 +338,7 @@
 
   /* ── Page header pattern ── */
   .bb-page-header {
-    @apply flex items-center justify-between mb-6;
+    @apply flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6;
   }
 
   .bb-page-title {
@@ -527,5 +527,39 @@
   /* ── Smooth collapse for filter panels ── */
   [x-collapse] {
     transition: height 0.2s ease-out, opacity 0.15s ease !important;
+  }
+
+  /* ── Mobile sidebar overlay above sticky navbar ── */
+  .drawer-side {
+    z-index: 40 !important;
+  }
+
+  /* ── Responsive stat cards: stack value/label tighter on small screens ── */
+  @media (max-width: 639px) {
+    .bb-stat-card {
+      @apply px-4 py-3 gap-3;
+    }
+    .bb-stat-card__value {
+      @apply text-xl;
+    }
+    .bb-stat-card__icon {
+      @apply w-9 h-9;
+    }
+  }
+
+  /* ── Mobile-friendly info grid ── */
+  @media (max-width: 639px) {
+    .bb-info-grid {
+      @apply grid-cols-1 gap-y-3;
+    }
+    .bb-info-grid dt {
+      @apply mb-0.5;
+    }
+    .bb-info-grid dd {
+      @apply pb-3 border-b border-base-300/50;
+    }
+    .bb-info-grid dd:last-of-type {
+      @apply border-b-0 pb-0;
+    }
   }
 }
