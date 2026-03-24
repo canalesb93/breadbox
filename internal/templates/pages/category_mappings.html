@@ -121,10 +121,11 @@
           </td>
           <td>
             <button class="btn btn-ghost btn-xs text-error/50 hover:text-error rounded-lg transition-colors" @click="
-              if(confirm('Delete this mapping?')) {
+              bbConfirm({title:'Delete mapping?',message:'This category mapping will be removed. Existing transactions are not affected.',confirmLabel:'Delete',variant:'danger'}).then(function(ok){
+                if(!ok) return;
                 fetch('/-/category-mappings/{{.ID}}', {method: 'DELETE'})
                 .then(r => { if(r.ok) location.reload(); })
-              }
+              })
             "><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
           </td>
         </tr>

@@ -936,6 +936,58 @@
     transition: opacity 0.4s ease 0.1s;
   }
 
+  /* ─── Confirmation Modal ─── */
+  .bb-confirm-backdrop {
+    @apply fixed inset-0 z-50;
+    background: oklch(0 0 0 / 0.4);
+    backdrop-filter: blur(4px);
+    animation: bb-confirm-backdrop-in 0.15s ease-out;
+  }
+
+  @keyframes bb-confirm-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .bb-confirm-dialog {
+    @apply fixed z-50 bg-base-100 border border-base-300 rounded-xl overflow-hidden;
+    top: min(30%, 200px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(92vw, 420px);
+    box-shadow: 0 16px 70px oklch(0 0 0 / 0.15), 0 0 0 1px oklch(0 0 0 / 0.04);
+    animation: bb-confirm-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-confirm-dialog {
+      box-shadow: 0 16px 70px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(1 0 0 / 0.06);
+    }
+  }
+
+  @keyframes bb-confirm-dialog-in {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) scale(0.96) translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) scale(1) translateY(0);
+    }
+  }
+
+  .bb-confirm-body {
+    @apply flex items-start gap-4 px-5 pt-5 pb-4;
+  }
+
+  .bb-confirm-icon {
+    @apply w-10 h-10 rounded-xl flex items-center justify-center shrink-0;
+  }
+
+  .bb-confirm-actions {
+    @apply flex items-center justify-end gap-2 px-5 py-3.5 border-t border-base-300 bg-base-200/30;
+  }
+
   /* ─── Skeleton Loading System ─── */
   .bb-skeleton {
     @apply rounded-md;

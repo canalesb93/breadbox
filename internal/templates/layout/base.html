@@ -70,6 +70,37 @@
     </div>
   </div>
 
+  <!-- Global Confirmation Modal -->
+  <div x-data="bbConfirmModal()" x-cloak
+       @bb-confirm.window="showConfirm($event.detail)"
+       @keydown.window.escape="if (visible) cancel()">
+    <template x-if="visible">
+      <div>
+        <div class="bb-confirm-backdrop" @click="cancel()"></div>
+        <div class="bb-confirm-dialog" @click.stop>
+          <div class="bb-confirm-body">
+            <div class="bb-confirm-icon" :class="variant === 'danger' ? 'bg-error/10' : 'bg-warning/10'">
+              <i :data-lucide="variant === 'danger' ? 'trash-2' : 'alert-triangle'"
+                 :class="variant === 'danger' ? 'w-5 h-5 text-error' : 'w-5 h-5 text-warning'"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h3 class="text-sm font-semibold mb-1" x-text="title"></h3>
+              <p class="text-sm text-base-content/50 leading-relaxed" x-text="message"></p>
+            </div>
+          </div>
+          <div class="bb-confirm-actions">
+            <button class="btn btn-sm btn-ghost rounded-lg" @click="cancel()" x-text="cancelLabel"></button>
+            <button class="btn btn-sm rounded-lg"
+                    :class="variant === 'danger' ? 'btn-error' : 'btn-warning'"
+                    @click="confirm()"
+                    x-text="confirmLabel"
+                    x-ref="confirmBtn"></button>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
   <!-- Global toast -->
   <div class="toast toast-end toast-bottom z-50"
        x-data="{ toasts: [] }"
@@ -327,6 +358,56 @@
         });
       });
     })();
+
+    // Global Confirmation Modal
+    function bbConfirmModal() {
+      return {
+        visible: false,
+        title: '',
+        message: '',
+        confirmLabel: 'Confirm',
+        cancelLabel: 'Cancel',
+        variant: 'danger',
+        _resolve: null,
+
+        showConfirm(detail) {
+          this.title = detail.title || 'Are you sure?';
+          this.message = detail.message || '';
+          this.confirmLabel = detail.confirmLabel || 'Confirm';
+          this.cancelLabel = detail.cancelLabel || 'Cancel';
+          this.variant = detail.variant || 'danger';
+          this._resolve = detail.resolve || null;
+          this.visible = true;
+          var self = this;
+          setTimeout(function() {
+            if (self.$refs.confirmBtn) self.$refs.confirmBtn.focus();
+            var dialog = document.querySelector('.bb-confirm-dialog');
+            if (dialog) lucide.createIcons({ nodes: [dialog] });
+          }, 50);
+        },
+
+        confirm() {
+          this.visible = false;
+          if (this._resolve) this._resolve(true);
+          this._resolve = null;
+        },
+
+        cancel() {
+          this.visible = false;
+          if (this._resolve) this._resolve(false);
+          this._resolve = null;
+        }
+      };
+    }
+
+    // Helper: returns a Promise that resolves to true/false
+    window.bbConfirm = function(opts) {
+      return new Promise(function(resolve) {
+        window.dispatchEvent(new CustomEvent('bb-confirm', {
+          detail: Object.assign({}, opts, { resolve: resolve })
+        }));
+      });
+    };
 
     // Command Palette Alpine component
     function commandPalette() {
