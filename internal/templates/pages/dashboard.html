@@ -248,7 +248,7 @@
     {{if .RecentTransactions}}
     <div class="space-y-0.5">
       {{range .RecentTransactions}}
-      <div class="flex items-center justify-between py-2.5 px-1 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1">
+      <a href="/transactions/{{.ID}}" class="flex items-center justify-between py-2.5 px-1 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline">
         <div class="flex items-center gap-3 min-w-0">
           <div class="w-8 h-8 rounded-lg bg-base-200/50 flex items-center justify-center shrink-0">
             {{if .CategoryIcon}}
@@ -265,7 +265,7 @@
         <div class="text-sm font-semibold tabular-nums shrink-0 pl-3{{if gt .Amount 0.0}} text-base-content{{else}} text-success{{end}}">
           {{formatAmount .Amount}}
         </div>
-      </div>
+      </a>
       {{end}}
     </div>
     {{else}}

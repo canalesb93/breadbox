@@ -185,7 +185,7 @@
 <div x-data="reviewQueue()" class="space-y-4">
   {{if .Reviews}}
   {{range .Reviews}}
-  <div class="bb-card bb-card--interactive p-0 overflow-hidden review-card" x-data="{ submitting: false, selectedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', suggestedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', feedback: '', pickerShake: false }" id="review-{{.ID}}">
+  <div class="bb-card bb-card--interactive p-0 review-card" x-data="{ submitting: false, selectedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', suggestedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', feedback: '', pickerShake: false }" id="review-{{.ID}}">
     <div class="p-6">
       <!-- Header row: badges + timestamp -->
       <div class="flex items-center justify-between flex-wrap gap-2">

@@ -36,7 +36,7 @@
           <span class="text-sm font-semibold truncate">{{.PageTitle}}</span>
         </div>
         <div class="flex-none">
-          <button class="btn btn-square btn-ghost" @click="$dispatch('open-cmdk')">
+          <button class="btn btn-square btn-ghost" x-data @click="$dispatch('open-cmdk')">
             <i data-lucide="search" class="w-4 h-4"></i>
           </button>
         </div>
@@ -58,7 +58,7 @@
           Breadbox
         </a>
         <!-- Search trigger -->
-        <div class="bb-sidebar-search" @click="$dispatch('open-cmdk')" role="button" tabindex="0" @keydown.enter="$dispatch('open-cmdk')">
+        <div class="bb-sidebar-search" x-data @click="$dispatch('open-cmdk')" role="button" tabindex="0" @keydown.enter="$dispatch('open-cmdk')">
           <i data-lucide="search"></i>
           <span>Search...</span>
           <span class="bb-sidebar-search-hint">

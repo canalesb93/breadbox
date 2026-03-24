@@ -75,7 +75,7 @@
 
       <fieldset class="fieldset">
         <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="user_id">Family Member</label>
-        <select id="user_id" name="user_id" required class="select w-full bg-base-200/50 border-base-300 focus:border-primary rounded-xl">
+        <select id="user_id" name="user_id" required class="select select-bordered w-full rounded-xl">
           <option value="" disabled selected>Select a member...</option>
           {{range .Users}}
           <option value="{{formatUUID .ID}}">{{.Name}}</option>
