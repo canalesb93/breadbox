@@ -1,10 +1,5 @@
 {{define "content"}}
-<div class="breadcrumbs text-sm mb-6 text-base-content/50">
-  <ul>
-    <li><a href="/connections" class="hover:text-primary transition-colors">Connections</a></li>
-    <li>{{.Connection.InstitutionName.String}}</li>
-  </ul>
-</div>
+{{template "breadcrumb" .}}
 
 {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
 <div class="bb-card border-error/30 bg-error/5 p-5 mb-6 flex items-start gap-4">

@@ -173,6 +173,31 @@
 /* ─── App-specific component classes ─── */
 @layer components {
 
+  /* ── Breadcrumbs: shadcn-style navigation trail ── */
+  .bb-breadcrumb {
+    @apply flex items-center gap-1.5 text-sm mb-6;
+  }
+
+  .bb-breadcrumb-item {
+    @apply text-base-content/40 transition-colors duration-150;
+  }
+
+  .bb-breadcrumb-item a {
+    @apply text-base-content/40 no-underline hover:text-base-content/70 transition-colors duration-150;
+  }
+
+  .bb-breadcrumb-sep {
+    @apply text-base-content/25 select-none;
+  }
+
+  .bb-breadcrumb-sep svg {
+    @apply w-3.5 h-3.5;
+  }
+
+  .bb-breadcrumb-current {
+    @apply text-base-content/70 font-medium truncate max-w-[20rem];
+  }
+
   /* ── Cards: shadcn-style — border, not shadow ── */
   .bb-card {
     @apply bg-base-100 rounded-xl border border-base-300;

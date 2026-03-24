@@ -1,12 +1,7 @@
 {{define "content"}}
 {{template "category-picker-styles" .}}
 
-<div class="breadcrumbs text-sm mb-6 text-base-content/50">
-  <ul>
-    <li><a href="/transactions" class="hover:text-primary transition-colors">Transactions</a></li>
-    <li>{{.Transaction.Name}}</li>
-  </ul>
-</div>
+{{template "breadcrumb" .}}
 
 <!-- Header with amount -->
 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">

@@ -95,6 +95,10 @@ func APIKeyNewPageHandler(tr *TemplateRenderer) http.HandlerFunc {
 			"PageTitle":   "Create API Key",
 			"CurrentPage": "api-keys",
 			"CSRFToken":   GetCSRFToken(r),
+			"Breadcrumbs": []Breadcrumb{
+				{Label: "API Keys", Href: "/api-keys"},
+				{Label: "Create"},
+			},
 		}
 		tr.Render(w, r, "api_key_new.html", data)
 	}
@@ -144,6 +148,10 @@ func APIKeyCreatedPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http
 			"PlaintextKey": key,
 			"KeyName":      name,
 			"CSRFToken":    GetCSRFToken(r),
+			"Breadcrumbs": []Breadcrumb{
+				{Label: "API Keys", Href: "/api-keys"},
+				{Label: "Key Created"},
+			},
 		}
 		tr.Render(w, r, "api_key_created.html", data)
 	}

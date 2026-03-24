@@ -1,12 +1,7 @@
 {{define "content"}}
 {{template "category-picker-styles" .}}
 
-<div class="breadcrumbs text-sm mb-6 text-base-content/50">
-  <ul>
-    <li><a href="/connections/{{.Account.ConnectionID}}" class="hover:text-primary transition-colors">{{.Account.InstitutionName}}</a></li>
-    <li>{{if .Account.DisplayName}}{{.Account.DisplayName}}{{else}}{{.Account.Name}}{{end}}</li>
-  </ul>
-</div>
+{{template "breadcrumb" .}}
 
 <!-- Header -->
 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">

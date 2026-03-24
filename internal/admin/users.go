@@ -55,6 +55,10 @@ func NewUserHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			"CurrentPage": "users",
 			"IsEdit":      false,
 			"CSRFToken":   GetCSRFToken(r),
+			"Breadcrumbs": []Breadcrumb{
+				{Label: "Family Members", Href: "/users"},
+				{Label: "Add Member"},
+			},
 		}
 		tr.Render(w, r, "user_form.html", data)
 	}
@@ -86,6 +90,10 @@ func EditUserHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			"User":        user,
 			"UserID":      idStr,
 			"CSRFToken":   GetCSRFToken(r),
+			"Breadcrumbs": []Breadcrumb{
+				{Label: "Family Members", Href: "/users"},
+				{Label: user.Name},
+			},
 		}
 		tr.Render(w, r, "user_form.html", data)
 	}

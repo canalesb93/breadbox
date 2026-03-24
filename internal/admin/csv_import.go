@@ -46,6 +46,9 @@ func CSVImportPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 		}
 
 		// If re-importing, load connection details.
+		breadcrumbs := []Breadcrumb{
+			{Label: "Connections", Href: "/connections"},
+		}
 		if connectionID != "" {
 			var connUUID pgtype.UUID
 			if err := connUUID.Scan(connectionID); err == nil {
@@ -54,9 +57,12 @@ func CSVImportPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 					data["ExistingConnectionName"] = conn.InstitutionName.String
 					data["ExistingUserID"] = formatUUID(conn.UserID)
 					data["ExistingUserName"] = conn.UserName
+					breadcrumbs = append(breadcrumbs, Breadcrumb{Label: conn.InstitutionName.String, Href: "/connections/" + connectionID})
 				}
 			}
 		}
+		breadcrumbs = append(breadcrumbs, Breadcrumb{Label: "Import CSV"})
+		data["Breadcrumbs"] = breadcrumbs
 
 		tr.Render(w, r, "csv_import.html", data)
 	}
