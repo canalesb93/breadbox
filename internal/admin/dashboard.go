@@ -68,29 +68,47 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		if err != nil {
 			a.Logger.Error("category summary", "error", err)
 		}
-		var categoryLabelsJSON, categoryAmountsJSON template.JS
+		var categoryLabelsJSON, categoryAmountsJSON, categoryColorsJSON template.JS
 		// Top spending categories for the breakdown list.
 		type CategorySpend struct {
 			Name   string
 			Color  string
 			Amount float64
 		}
+		// Curated fallback palette for categories without a DB color.
+		categoryPalette := []string{
+			"oklch(0.55 0.12 250)", // blue
+			"oklch(0.55 0.14 160)", // teal
+			"oklch(0.58 0.12 35)",  // warm amber
+			"oklch(0.52 0.14 300)", // purple
+			"oklch(0.58 0.10 80)",  // olive
+			"oklch(0.50 0.12 200)", // slate blue
+			"oklch(0.55 0.12 120)", // green
+			"oklch(0.48 0.10 350)", // rose
+			"oklch(0.45 0 0)",      // gray (for "Other")
+		}
+
 		var topCategories []CategorySpend
 		var maxCategorySpend float64
 		if categorySummary != nil && len(categorySummary.Summary) > 0 {
 			labels := make([]string, 0, len(categorySummary.Summary))
 			amounts := make([]float64, 0, len(categorySummary.Summary))
-			for _, row := range categorySummary.Summary {
+			colors := make([]string, 0, len(categorySummary.Summary))
+			for i, row := range categorySummary.Summary {
 				label := "Uncategorized"
 				if row.Category != nil && *row.Category != "" {
 					label = *row.Category
 				}
 				labels = append(labels, label)
 				amounts = append(amounts, row.TotalAmount)
+				// Use DB color if set, otherwise use palette color.
 				color := ""
-				if row.CategoryColor != nil {
+				if row.CategoryColor != nil && *row.CategoryColor != "" {
 					color = *row.CategoryColor
+				} else {
+					color = categoryPalette[i%len(categoryPalette)]
 				}
+				colors = append(colors, color)
 				topCategories = append(topCategories, CategorySpend{Name: label, Color: color, Amount: row.TotalAmount})
 				if row.TotalAmount > maxCategorySpend {
 					maxCategorySpend = row.TotalAmount
@@ -102,8 +120,11 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			if ab, err := json.Marshal(amounts); err == nil {
 				categoryAmountsJSON = template.JS(ab)
 			}
+			if cb, err := json.Marshal(colors); err == nil {
+				categoryColorsJSON = template.JS(cb)
+			}
 		}
-		// Limit to top 8 categories.
+		// Limit to top 8 categories for the legend list.
 		if len(topCategories) > 8 {
 			topCategories = topCategories[:8]
 		}
@@ -353,6 +374,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"ReviewPending":          reviewPending,
 			"CategoryLabels":         categoryLabelsJSON,
 			"CategoryAmounts":        categoryAmountsJSON,
+			"CategoryColors":         categoryColorsJSON,
 			"DailyLabels":            dailyLabelsJSON,
 			"DailyAmounts":           dailyAmountsJSON,
 			"RecentTransactions":     recentTransactions,

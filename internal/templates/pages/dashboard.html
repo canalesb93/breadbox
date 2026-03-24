@@ -236,28 +236,34 @@
     {{end}}
   </div>
 
-  <!-- Top Spending Categories -->
+  <!-- Top Spending Categories — Donut Chart + Legend -->
   <div class="bb-card p-5">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-sm font-semibold text-base-content/70">Top Categories</h2>
       <a href="/categories" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
     </div>
     {{if .TopCategories}}
-    <div class="space-y-3">
-      {{range .TopCategories}}
-      <div class="group">
-        <div class="flex items-center justify-between mb-1">
-          <span class="flex items-center gap-1.5 text-sm text-base-content/70 group-hover:text-base-content transition-colors">
-            {{if .Color}}<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{.Color}}"></span>{{end}}
-            {{.Name}}
-          </span>
-          <span class="text-sm font-semibold tabular-nums text-base-content/80">{{formatAmount .Amount}}</span>
-        </div>
-        <div class="w-full h-1.5 bg-base-200 rounded-full overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-500" style="width: {{printf "%.0f" (percent .Amount $.MaxCategorySpend)}}%;{{if .Color}} background-color: {{.Color}}{{else}} background-color: oklch(0.65 0 0){{end}}"></div>
+    <div class="flex flex-col items-center">
+      <!-- Donut Chart -->
+      <div class="relative w-44 h-44 mb-4">
+        <canvas id="categoryDonutChart"></canvas>
+        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span class="text-lg font-semibold tabular-nums">{{formatBalance .TotalSpending}}</span>
+          <span class="text-[0.65rem] text-base-content/40">30 days</span>
         </div>
       </div>
-      {{end}}
+      <!-- Legend -->
+      <div class="w-full space-y-2">
+        {{range .TopCategories}}
+        <div class="flex items-center justify-between group">
+          <span class="flex items-center gap-2 text-xs text-base-content/60 group-hover:text-base-content transition-colors truncate">
+            <span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background-color: {{safeCSS .Color}}"></span>
+            <span class="truncate">{{.Name}}</span>
+          </span>
+          <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0 ml-2">{{formatAmount .Amount}}</span>
+        </div>
+        {{end}}
+      </div>
     </div>
     {{else}}
     <div class="flex items-center justify-center h-40 text-base-content/40">
@@ -297,7 +303,7 @@
               {{if .CategoryDisplayName}}
               <span class="text-base-content/20">&middot;</span>
               <span class="inline-flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {{if .CategoryColor}}{{deref .CategoryColor}}{{else}}oklch(0.65 0 0){{end}}"></span>
+                <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}{{safeCSS "oklch(0.65 0 0)"}}{{end}}"></span>
                 <span class="text-base-content/50">{{deref .CategoryDisplayName}}</span>
               </span>
               {{end}}
@@ -392,7 +398,7 @@
 </div>
 
 <!-- Chart.js Initialization -->
-{{if .DailyLabels}}
+{{if or .DailyLabels .CategoryLabels}}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -415,6 +421,7 @@ document.addEventListener('DOMContentLoaded', function() {
     displayColors: false,
   };
 
+  {{if .DailyLabels}}
   // Spending Trend — bar chart with rounded tops
   const trendCtx = document.getElementById('spendingTrendChart');
   if (trendCtx) {
@@ -473,6 +480,81 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   }
+  {{end}}
+
+  {{if .CategoryLabels}}
+  // Category Donut Chart
+  const donutCtx = document.getElementById('categoryDonutChart');
+  if (donutCtx) {
+    const allLabels = {{.CategoryLabels}};
+    const allAmounts = {{.CategoryAmounts}};
+    const allColors = {{.CategoryColors}};
+
+    // Consolidate: show top 8 individually, group the rest as "Other".
+    const MAX_SLICES = 8;
+    let catLabels, catAmounts, bgColors;
+    if (allLabels.length <= MAX_SLICES + 1) {
+      catLabels = allLabels;
+      catAmounts = allAmounts;
+      bgColors = allColors;
+    } else {
+      catLabels = allLabels.slice(0, MAX_SLICES);
+      catAmounts = allAmounts.slice(0, MAX_SLICES);
+      const otherSum = allAmounts.slice(MAX_SLICES).reduce((a, b) => a + b, 0);
+      catLabels.push('Other');
+      catAmounts.push(otherSum);
+      bgColors = allColors.slice(0, MAX_SLICES);
+      bgColors.push('oklch(0.45 0 0)');
+    }
+
+    new Chart(donutCtx, {
+      type: 'doughnut',
+      data: {
+        labels: catLabels,
+        datasets: [{
+          data: catAmounts,
+          backgroundColor: bgColors,
+          hoverBackgroundColor: bgColors,
+          borderWidth: 2,
+          borderColor: isDark ? 'hsl(0 0% 13%)' : 'hsl(0 0% 100%)',
+          hoverBorderColor: isDark ? 'hsl(0 0% 13%)' : 'hsl(0 0% 100%)',
+          spacing: 1,
+          hoverOffset: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '68%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            ...tooltipStyle,
+            displayColors: true,
+            boxWidth: 8,
+            boxHeight: 8,
+            boxPadding: 4,
+            usePointStyle: true,
+            pointStyle: 'rectRounded',
+            callbacks: {
+              label: function(ctx) {
+                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                const pct = ((ctx.parsed / total) * 100).toFixed(1);
+                return ' $' + ctx.parsed.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' (' + pct + '%)';
+              }
+            }
+          }
+        },
+        animation: {
+          animateRotate: true,
+          animateScale: false,
+          duration: 600,
+          easing: 'easeOutQuart',
+        },
+      }
+    });
+  }
+  {{end}}
 });
 </script>
 {{end}}
