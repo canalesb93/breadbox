@@ -1,72 +1,72 @@
 {{define "content"}}
-<div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold m-0">API Keys</h1>
-  <a href="/api-keys/new" class="btn btn-primary">
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">API Keys</h1>
+    <p class="text-sm text-base-content/50 mt-1">Manage keys for REST API and MCP access</p>
+  </div>
+  <a href="/api-keys/new" class="btn btn-primary btn-sm">
     <i data-lucide="plus" class="w-4 h-4"></i>
-    Create API Key
+    Create Key
   </a>
 </div>
 
 {{if .Keys}}
-<div class="overflow-x-auto border border-base-300 rounded-lg">
-  <table class="table table-zebra table-sm">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Scope</th>
-        <th>Key Prefix</th>
-        <th>Last Used</th>
-        <th>Status</th>
-        <th>Created</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range .Keys}}
-      <tr class="hover:bg-base-300">
-        <td>{{.Name}}</td>
-        <td>
+<div class="space-y-3">
+  {{range .Keys}}
+  <div class="bb-card p-5 flex items-center justify-between gap-4 flex-wrap" x-data="{ confirming: false }">
+    <div class="flex items-center gap-4 min-w-0">
+      <div class="flex items-center justify-center w-10 h-10 rounded-xl shrink-0
+        {{if .RevokedAt}}bg-base-200/40{{else if eq .Scope "read_only"}}bg-warning/8{{else}}bg-primary/8{{end}}">
+        <i data-lucide="key" class="w-5 h-5 {{if .RevokedAt}}text-base-content/25{{else if eq .Scope "read_only"}}text-warning{{else}}text-primary{{end}}"></i>
+      </div>
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="font-semibold text-sm {{if .RevokedAt}}text-base-content/40 line-through{{end}}">{{.Name}}</span>
           {{if eq .Scope "read_only"}}
-            <span class="badge badge-warning badge-sm">Read Only</span>
+          <span class="badge badge-soft badge-warning badge-xs">Read Only</span>
           {{else}}
-            <span class="badge badge-info badge-sm">Full Access</span>
+          <span class="badge badge-soft badge-primary badge-xs">Full Access</span>
           {{end}}
-        </td>
-        <td><code class="font-mono text-sm">{{.KeyPrefix}}...</code></td>
-        <td>{{if .LastUsedAt}}{{.LastUsedAt}}{{else}}&mdash;{{end}}</td>
-        <td>
           {{if .RevokedAt}}
-            <span class="badge badge-error badge-sm">Revoked</span>
-          {{else}}
-            <span class="badge badge-success badge-sm">Active</span>
+          <span class="badge badge-soft badge-error badge-xs">Revoked</span>
           {{end}}
-        </td>
-        <td>{{.CreatedAt}}</td>
-        <td>
-          {{if not .RevokedAt}}
-          <form method="POST" action="/api-keys/{{.ID}}/revoke" class="inline" x-data="{ confirming: false }">
-            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
-            <button type="button" class="btn btn-ghost btn-xs" x-show="!confirming" @click="confirming = true">Revoke</button>
-            <span x-show="confirming" x-cloak>
-              <button type="submit" class="btn btn-error btn-xs">Confirm</button>
-              <button type="button" class="btn btn-ghost btn-xs" @click="confirming = false">Cancel</button>
-            </span>
-          </form>
-          {{end}}
-        </td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
+        </div>
+        <div class="flex items-center gap-3 mt-0.5 text-xs text-base-content/40">
+          <code class="font-mono bg-base-200/50 px-1.5 py-0.5 rounded">{{.KeyPrefix}}...</code>
+          <span>Created {{.CreatedAt}}</span>
+          {{if .LastUsedAt}}<span>Last used {{.LastUsedAt}}</span>{{end}}
+        </div>
+      </div>
+    </div>
+
+    {{if not .RevokedAt}}
+    <div class="shrink-0">
+      <form method="POST" action="/api-keys/{{.ID}}/revoke" class="inline">
+        <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+        <button type="button" class="btn btn-ghost btn-sm text-base-content/50 hover:text-error" x-show="!confirming" @click="confirming = true">
+          Revoke
+        </button>
+        <span x-show="confirming" x-cloak class="flex items-center gap-1.5">
+          <button type="submit" class="btn btn-error btn-sm btn-soft">Confirm</button>
+          <button type="button" class="btn btn-ghost btn-sm" @click="confirming = false">Cancel</button>
+        </span>
+      </form>
+    </div>
+    {{end}}
+  </div>
+  {{end}}
 </div>
 {{else}}
-<div class="card bg-base-100 border border-base-300">
-  <div class="card-body items-center text-center py-12">
-    <i data-lucide="key" class="w-12 h-12 text-base-content/30 mb-2"></i>
-    <p class="text-base-content/70">No API keys yet.</p>
-    <a href="/api-keys/new" class="btn btn-primary mt-2">
+<div class="bb-card p-12 text-center">
+  <div class="flex flex-col items-center">
+    <div class="w-16 h-16 rounded-2xl bg-base-200/60 flex items-center justify-center mb-4">
+      <i data-lucide="key" class="w-8 h-8 text-base-content/25"></i>
+    </div>
+    <h3 class="text-lg font-semibold mb-1">No API keys yet</h3>
+    <p class="text-sm text-base-content/50 mb-5 max-w-sm">Create an API key to connect MCP agents or integrate with external tools.</p>
+    <a href="/api-keys/new" class="btn btn-primary btn-sm">
       <i data-lucide="plus" class="w-4 h-4"></i>
-      Create your first API key
+      Create your first key
     </a>
   </div>
 </div>

@@ -1,51 +1,71 @@
 {{define "content"}}
-<div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold m-0">Family Members</h1>
-  <a href="/users/new" class="btn btn-primary">
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Family Members</h1>
+    <p class="text-sm text-base-content/50 mt-1">Manage who has bank connections in Breadbox</p>
+  </div>
+  <a href="/users/new" class="btn btn-primary btn-sm">
     <i data-lucide="plus" class="w-4 h-4"></i>
-    Add Family Member
+    Add Member
   </a>
 </div>
 
 {{if .Created}}
-<div class="alert alert-success mb-4">Member created. <a href="/connections/new" class="link">Connect a bank for them &rarr;</a></div>
+<div class="alert alert-success mb-6 rounded-2xl">
+  <i data-lucide="check-circle" class="w-5 h-5"></i>
+  <span>Member created. <a href="/connections/new" class="link font-medium">Connect a bank for them</a></span>
+</div>
 {{end}}
 
 {{if .Users}}
-<div class="overflow-x-auto border border-base-300 rounded-lg">
-  <table class="table table-zebra table-sm">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Email</th>
-        <th>Connections</th>
-        <th>Created</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range .Users}}
-      <tr class="hover:bg-base-300">
-        <td>{{.Name}}</td>
-        <td>{{if .Email.Valid}}{{.Email.String}}{{else}}&mdash;{{end}}</td>
-        <td>{{index $.ConnectionCounts (formatUUID .ID)}}</td>
-        <td>{{if .CreatedAt.Valid}}{{.CreatedAt.Time.Format "Jan 2, 2006"}}{{end}}</td>
-        <td>
-          <a href="/users/{{formatUUID .ID}}/edit" class="btn btn-ghost btn-xs">Edit</a>
-        </td>
-      </tr>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  {{range .Users}}
+  <div class="bb-card bb-card--interactive p-6 group">
+    <div class="flex items-start justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-base">
+          {{slice .Name 0 1}}
+        </div>
+        <div>
+          <h3 class="font-semibold text-base">{{.Name}}</h3>
+          {{if .Email.Valid}}
+          <p class="text-xs text-base-content/45">{{.Email.String}}</p>
+          {{else}}
+          <p class="text-xs text-base-content/30 italic">No email</p>
+          {{end}}
+        </div>
+      </div>
+      <a href="/users/{{formatUUID .ID}}/edit" class="btn btn-ghost btn-xs opacity-0 group-hover:opacity-100 transition-opacity">
+        <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+      </a>
+    </div>
+
+    <div class="flex items-center gap-4 pt-3 border-t border-base-200">
+      <div class="flex items-center gap-1.5 text-xs text-base-content/50">
+        <i data-lucide="link" class="w-3.5 h-3.5"></i>
+        <span class="font-medium text-base-content/70">{{index $.ConnectionCounts (formatUUID .ID)}}</span> connections
+      </div>
+      {{if .CreatedAt.Valid}}
+      <div class="flex items-center gap-1.5 text-xs text-base-content/40">
+        <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+        {{.CreatedAt.Time.Format "Jan 2, 2006"}}
+      </div>
       {{end}}
-    </tbody>
-  </table>
+    </div>
+  </div>
+  {{end}}
 </div>
 {{else}}
-<div class="card bg-base-100 border border-base-300">
-  <div class="card-body items-center text-center py-12">
-    <i data-lucide="users" class="w-12 h-12 text-base-content/30 mb-2"></i>
-    <p class="text-base-content/70">No family members yet.</p>
-    <a href="/users/new" class="btn btn-primary mt-2">
+<div class="bb-card p-12 text-center">
+  <div class="flex flex-col items-center">
+    <div class="w-16 h-16 rounded-2xl bg-base-200/60 flex items-center justify-center mb-4">
+      <i data-lucide="users" class="w-8 h-8 text-base-content/25"></i>
+    </div>
+    <h3 class="text-lg font-semibold mb-1">No family members yet</h3>
+    <p class="text-sm text-base-content/50 mb-5 max-w-sm">Add family members to connect their bank accounts and track spending across the household.</p>
+    <a href="/users/new" class="btn btn-primary btn-sm">
       <i data-lucide="plus" class="w-4 h-4"></i>
-      Add your first family member
+      Add your first member
     </a>
   </div>
 </div>

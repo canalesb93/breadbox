@@ -1,19 +1,32 @@
 {{define "content"}}
-<h1 class="text-2xl font-bold mb-6">Settings</h1>
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Settings</h1>
+    <p class="text-sm text-base-content/50 mt-1">Manage sync schedule, security, and system info</p>
+  </div>
+</div>
 
-<!-- Sync & Scheduling Section -->
-<div class="collapse collapse-arrow bg-base-100 border border-base-300 mb-6">
-  <input type="checkbox" checked />
-  <div class="collapse-title text-xl font-medium">Sync &amp; Scheduling</div>
-  <div class="collapse-content">
-    <p class="text-sm text-base-content/70 mb-4">Breadbox automatically syncs bank data on this schedule. Webhooks provide real-time updates when supported by the provider.</p>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+  <!-- Sync & Scheduling -->
+  <div class="bb-card p-6">
+    <div class="flex items-center gap-3 mb-5">
+      <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/8">
+        <i data-lucide="refresh-cw" class="w-5 h-5 text-primary"></i>
+      </div>
+      <div>
+        <h2 class="text-base font-semibold">Sync Schedule</h2>
+        <p class="text-xs text-base-content/45">Automatic bank data sync interval</p>
+      </div>
+    </div>
+
     <form method="POST" action="/settings/sync">
       <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
-      <label class="flex flex-col gap-1 text-sm" for="sync_interval_minutes">
+      <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="sync_interval_minutes">
         Sync Interval {{configSource .ConfigSources "sync_interval_minutes"}}
       </label>
-      <select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm w-full max-w-xs">
+      <select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm w-full bg-base-200/50 border-base-200 focus:border-primary">
         <option value="15"{{if eq .SyncIntervalMinutes 15}} selected{{end}}>Every 15 minutes</option>
         <option value="30"{{if eq .SyncIntervalMinutes 30}} selected{{end}}>Every 30 minutes</option>
         <option value="60"{{if eq .SyncIntervalMinutes 60}} selected{{end}}>Every hour</option>
@@ -24,62 +37,109 @@
       </select>
 
       {{if ne .NextSyncTime ""}}
-      <p class="text-xs text-base-content/60 mt-4">Next scheduled sync: {{.NextSyncTime}}</p>
+      <p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
+        <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+        Next sync: {{.NextSyncTime}}
+      </p>
       {{end}}
 
-      <div class="mt-4">
-        <button type="submit" class="btn btn-primary btn-sm">Save Sync Settings</button>
+      <div class="mt-5 pt-4 border-t border-base-200">
+        <button type="submit" class="btn btn-primary btn-sm">Save Schedule</button>
       </div>
     </form>
   </div>
-</div>
 
-<!-- Security Section -->
-<div class="collapse collapse-arrow bg-base-100 border border-base-300 mb-6">
-  <input type="checkbox" checked />
-  <div class="collapse-title text-xl font-medium">Security</div>
-  <div class="collapse-content">
-    <div class="mb-4">
-      <span class="text-sm font-medium">Encryption Key:</span>
+  <!-- Security -->
+  <div class="bb-card p-6">
+    <div class="flex items-center gap-3 mb-5">
+      <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-error/8">
+        <i data-lucide="shield" class="w-5 h-5 text-error"></i>
+      </div>
+      <div>
+        <h2 class="text-base font-semibold">Security</h2>
+        <p class="text-xs text-base-content/45">Encryption and authentication</p>
+      </div>
+    </div>
+
+    <!-- Encryption Key Status -->
+    <div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 mb-5">
+      <div class="flex items-center gap-2.5">
+        <i data-lucide="key-round" class="w-4 h-4 text-base-content/50"></i>
+        <span class="text-sm font-medium">Encryption Key</span>
+      </div>
       {{if .HasEncryptionKey}}
-      <span class="badge badge-success badge-sm">Configured</span>
+      <span class="badge badge-success badge-sm">Active</span>
       {{else}}
-      <span class="badge badge-error badge-sm">NOT SET</span>
-      <span class="text-xs text-error ml-1">Access tokens cannot be stored</span>
+      <div class="flex items-center gap-1.5">
+        <span class="badge badge-error badge-sm">Not Set</span>
+      </div>
       {{end}}
     </div>
 
-    <div class="divider"></div>
+    {{if not .HasEncryptionKey}}
+    <div class="text-xs text-error/80 bg-error/5 rounded-lg p-3 mb-5">
+      <i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-1"></i>
+      Access tokens cannot be stored without an encryption key. Set the ENCRYPTION_KEY environment variable.
+    </div>
+    {{end}}
 
-    <h3 class="font-semibold text-sm mb-2">Change Password</h3>
-    <form method="POST" action="/settings/password">
+    <!-- Change Password -->
+    <h3 class="text-sm font-semibold text-base-content/70 mb-3">Change Password</h3>
+    <form method="POST" action="/settings/password" class="space-y-3">
       <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-      <label class="flex flex-col gap-1 text-sm" for="current_password">Current Password</label>
-      <input type="password" id="current_password" name="current_password" required class="input input-sm w-full max-w-md">
-      <label class="flex flex-col gap-1 text-sm mt-4" for="new_password">New Password</label>
-      <input type="password" id="new_password" name="new_password" required minlength="8" class="input input-sm w-full max-w-md">
-      <label class="flex flex-col gap-1 text-sm mt-4" for="confirm_password">Confirm New Password</label>
-      <input type="password" id="confirm_password" name="confirm_password" required class="input input-sm w-full max-w-md">
-      <div class="mt-4">
-        <button type="submit" class="btn btn-primary btn-sm">Change Password</button>
+      <div>
+        <label class="text-xs font-medium text-base-content/50 mb-1 block" for="current_password">Current Password</label>
+        <input type="password" id="current_password" name="current_password" required class="input input-sm w-full bg-base-200/50 border-base-200 focus:border-primary">
+      </div>
+      <div>
+        <label class="text-xs font-medium text-base-content/50 mb-1 block" for="new_password">New Password</label>
+        <input type="password" id="new_password" name="new_password" required minlength="8" class="input input-sm w-full bg-base-200/50 border-base-200 focus:border-primary">
+      </div>
+      <div>
+        <label class="text-xs font-medium text-base-content/50 mb-1 block" for="confirm_password">Confirm New Password</label>
+        <input type="password" id="confirm_password" name="confirm_password" required class="input input-sm w-full bg-base-200/50 border-base-200 focus:border-primary">
+      </div>
+      <div class="pt-2">
+        <button type="submit" class="btn btn-primary btn-sm">Update Password</button>
       </div>
     </form>
   </div>
-</div>
 
-<!-- System Section (collapsed by default) -->
-<div class="collapse collapse-arrow bg-base-100 border border-base-300 mb-6">
-  <input type="checkbox" />
-  <div class="collapse-title text-xl font-medium">System</div>
-  <div class="collapse-content">
-    <dl class="bb-info-grid">
-      <dt>Breadbox Version</dt><dd>{{.Version}}</dd>
-      <dt>Go Runtime</dt><dd>{{.GoVersion}}</dd>
-      <dt>PostgreSQL</dt><dd>{{.PostgresVersion}}</dd>
-      <dt>Uptime</dt><dd>{{.Uptime}}</dd>
-      <dt>Providers</dt><dd>{{.ProviderCount}} configured</dd>
-    </dl>
+  <!-- System Info -->
+  <div class="bb-card p-6 lg:col-span-2">
+    <div class="flex items-center gap-3 mb-5">
+      <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-base-200/60">
+        <i data-lucide="cpu" class="w-5 h-5 text-base-content/50"></i>
+      </div>
+      <div>
+        <h2 class="text-base font-semibold">System</h2>
+        <p class="text-xs text-base-content/45">Runtime and version information</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div class="p-3.5 rounded-xl bg-base-200/40">
+        <div class="text-xs font-medium text-base-content/40 mb-1">Version</div>
+        <div class="text-sm font-semibold tabular-nums">{{.Version}}</div>
+      </div>
+      <div class="p-3.5 rounded-xl bg-base-200/40">
+        <div class="text-xs font-medium text-base-content/40 mb-1">Go Runtime</div>
+        <div class="text-sm font-semibold">{{.GoVersion}}</div>
+      </div>
+      <div class="p-3.5 rounded-xl bg-base-200/40">
+        <div class="text-xs font-medium text-base-content/40 mb-1">PostgreSQL</div>
+        <div class="text-sm font-semibold truncate" title="{{.PostgresVersion}}">{{.PostgresVersion}}</div>
+      </div>
+      <div class="p-3.5 rounded-xl bg-base-200/40">
+        <div class="text-xs font-medium text-base-content/40 mb-1">Uptime</div>
+        <div class="text-sm font-semibold">{{.Uptime}}</div>
+      </div>
+      <div class="p-3.5 rounded-xl bg-base-200/40">
+        <div class="text-xs font-medium text-base-content/40 mb-1">Providers</div>
+        <div class="text-sm font-semibold">{{.ProviderCount}} configured</div>
+      </div>
+    </div>
   </div>
-</div>
 
+</div>
 {{end}}
