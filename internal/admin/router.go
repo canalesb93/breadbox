@@ -37,6 +37,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 	r.Group(func(r chi.Router) {
 		r.Use(RequireAuth(sm))
 		r.Use(CSRFMiddleware(sm))
+		r.Use(NavBadgesMiddleware(a.Queries, a.Logger))
 
 		r.Get("/", DashboardHandler(a, svc, tr))
 		r.Post("/onboarding/dismiss", DismissOnboardingHandler(a))

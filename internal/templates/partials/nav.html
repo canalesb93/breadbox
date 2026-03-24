@@ -5,13 +5,21 @@
     <i data-lucide="layout-dashboard"></i> Dashboard
   </a>
   <a href="/connections" class="bb-sidebar-link{{if eq .CurrentPage "connections"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="link"></i> Connections
+    <i data-lucide="link"></i>
+    <span class="flex-1">Connections</span>
+    {{if and .NavBadges (gt .NavBadges.ConnectionsAttention 0)}}
+    <span class="bb-nav-badge bb-nav-badge--warn">{{.NavBadges.ConnectionsAttention}}</span>
+    {{end}}
   </a>
   <a href="/transactions" class="bb-sidebar-link{{if eq .CurrentPage "transactions"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="receipt"></i> Transactions
   </a>
   <a href="/reviews" class="bb-sidebar-link{{if eq .CurrentPage "reviews"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="clipboard-check"></i> Reviews
+    <i data-lucide="clipboard-check"></i>
+    <span class="flex-1">Reviews</span>
+    {{if and .NavBadges (gt .NavBadges.PendingReviews 0)}}
+    <span class="bb-nav-badge">{{.NavBadges.PendingReviews}}</span>
+    {{end}}
   </a>
   <a href="/review-instructions" class="bb-sidebar-link{{if eq .CurrentPage "review-instructions"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="message-square-code"></i> Review Agent
