@@ -128,30 +128,34 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 		}()
 		wg.Wait()
 
+		// Build export URL from active filters (excludes page param).
+		exportURL := buildExportURL(r)
+
 		data := map[string]any{
-			"PageTitle":        "Transactions",
-			"CurrentPage":     "transactions",
-			"CSRFToken":       GetCSRFToken(r),
-			"Flash":           GetFlash(ctx, sm),
-			"Transactions":    result.Transactions,
-			"Accounts":        accounts,
-			"Users":           users,
-			"Categories":      categoryTree,
-			"Connections":     connections,
-			"Page":            result.Page,
-			"TotalPages":      result.TotalPages,
-			"Total":           result.Total,
-			"FilterStartDate": stringOrEmpty(dateParamPtr(r, "start_date")),
-			"FilterEndDate":   stringOrEmpty(dateParamPtr(r, "end_date")),
-			"FilterAccountID": stringOrEmpty(params.AccountID),
-			"FilterUserID":    stringOrEmpty(params.UserID),
-			"FilterConnID":    stringOrEmpty(params.ConnectionID),
-			"FilterCategory":  stringOrEmpty(params.CategorySlug),
-			"FilterMinAmount": stringOrEmpty(floatParamPtr(r, "min_amount")),
-			"FilterMaxAmount": stringOrEmpty(floatParamPtr(r, "max_amount")),
-			"FilterPending":   r.URL.Query().Get("pending"),
-			"FilterSearch":    r.URL.Query().Get("search"),
-			"FilterSort":      r.URL.Query().Get("sort"),
+			"PageTitle":         "Transactions",
+			"CurrentPage":      "transactions",
+			"CSRFToken":        GetCSRFToken(r),
+			"Flash":            GetFlash(ctx, sm),
+			"Transactions":     result.Transactions,
+			"Accounts":         accounts,
+			"Users":            users,
+			"Categories":       categoryTree,
+			"Connections":      connections,
+			"Page":             result.Page,
+			"TotalPages":       result.TotalPages,
+			"Total":            result.Total,
+			"ExportURL":         exportURL,
+			"FilterStartDate":  stringOrEmpty(dateParamPtr(r, "start_date")),
+			"FilterEndDate":    stringOrEmpty(dateParamPtr(r, "end_date")),
+			"FilterAccountID":  stringOrEmpty(params.AccountID),
+			"FilterUserID":     stringOrEmpty(params.UserID),
+			"FilterConnID":     stringOrEmpty(params.ConnectionID),
+			"FilterCategory":   stringOrEmpty(params.CategorySlug),
+			"FilterMinAmount":  stringOrEmpty(floatParamPtr(r, "min_amount")),
+			"FilterMaxAmount":  stringOrEmpty(floatParamPtr(r, "max_amount")),
+			"FilterPending":    r.URL.Query().Get("pending"),
+			"FilterSearch":     r.URL.Query().Get("search"),
+			"FilterSort":       r.URL.Query().Get("sort"),
 		}
 		tr.Render(w, r, "transactions.html", data)
 	}
@@ -220,6 +224,21 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			a.Logger.Error("list categories for account detail", "error", err)
 		}
 
+		// Build export URL for this account's transactions.
+		acctExportURL := "/-/transactions/export-csv?account_id=" + idStr
+		if sd := r.URL.Query().Get("start_date"); sd != "" {
+			acctExportURL += "&start_date=" + sd
+		}
+		if ed := r.URL.Query().Get("end_date"); ed != "" {
+			acctExportURL += "&end_date=" + ed
+		}
+		if cat := r.URL.Query().Get("category"); cat != "" {
+			acctExportURL += "&category=" + cat
+		}
+		if search := r.URL.Query().Get("search"); search != "" {
+			acctExportURL += "&search=" + search
+		}
+
 		data := map[string]any{
 			"PageTitle":       detail.InstitutionName + " — " + accountDisplayName(detail),
 			"CurrentPage":    "transactions",
@@ -232,6 +251,7 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			"Page":           txResult.Page,
 			"TotalPages":     txResult.TotalPages,
 			"Total":          txResult.Total,
+			"ExportURL":      acctExportURL,
 			"FilterStartDate": stringOrEmpty(dateParamPtr(r, "start_date")),
 			"FilterEndDate":   stringOrEmpty(dateParamPtr(r, "end_date")),
 			"FilterCategory":  r.URL.Query().Get("category"),
@@ -396,4 +416,25 @@ func DeleteTransactionCommentHandler(a *app.App, sm *scs.SessionManager, svc *se
 
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+// buildExportURL returns the full CSV export URL with the current filter params.
+func buildExportURL(r *http.Request) string {
+	exportParams := []string{
+		"start_date", "end_date", "account_id", "user_id",
+		"connection_id", "category", "min_amount", "max_amount",
+		"pending", "search", "sort",
+	}
+	q := r.URL.Query()
+	qs := make([]string, 0, len(exportParams))
+	for _, key := range exportParams {
+		if v := q.Get(key); v != "" {
+			qs = append(qs, key+"="+v)
+		}
+	}
+	url := "/-/transactions/export-csv"
+	if len(qs) > 0 {
+		url += "?" + strings.Join(qs, "&")
+	}
+	return url
 }

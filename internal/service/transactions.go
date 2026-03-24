@@ -546,7 +546,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	query += fmt.Sprintf(" ORDER BY t.date %s, t.id %s", sortOrder, sortOrder)
 
 	pageSize := params.PageSize
-	if pageSize <= 0 {
+	if pageSize == 0 {
 		pageSize = 50
 	}
 	page := params.Page
@@ -554,8 +554,11 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		page = 1
 	}
 
-	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argN, argN+1)
-	args = append(args, pageSize, (page-1)*pageSize)
+	// PageSize -1 means export all (no pagination).
+	if pageSize > 0 {
+		query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argN, argN+1)
+		args = append(args, pageSize, (page-1)*pageSize)
+	}
 
 	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
@@ -639,7 +642,10 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		return nil, fmt.Errorf("iterate admin transactions: %w", err)
 	}
 
-	totalPages := int(math.Ceil(float64(total) / float64(pageSize)))
+	totalPages := 1
+	if pageSize > 0 {
+		totalPages = int(math.Ceil(float64(total) / float64(pageSize)))
+	}
 
 	return &AdminTransactionListResult{
 		Transactions: transactions,

@@ -139,6 +139,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/category-mappings/export-tsv", ExportMappingsTSVAdminHandler(svc))
 		r.Post("/category-mappings/import-tsv", ImportMappingsTSVAdminHandler(svc))
 
+		// Transaction CSV export
+		r.Get("/transactions/export-csv", ExportTransactionsCSVHandler(a, svc))
+
 		// Transaction category override
 		r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc))
 		r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc))
