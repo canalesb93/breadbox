@@ -65,16 +65,18 @@ func (p *TellerProvider) SyncTransactions(ctx context.Context, conn provider.Con
 		return provider.SyncResult{}, fmt.Errorf("teller: fetch accounts for sync: %w", err)
 	}
 
-	// Build a currency map from accounts.
+	// Build currency and type maps from accounts.
 	currencyMap := make(map[string]string, len(accounts))
+	accountTypeMap := make(map[string]string, len(accounts))
 	for _, acct := range accounts {
 		currencyMap[acct.ExternalID] = acct.ISOCurrencyCode
+		accountTypeMap[acct.ExternalID] = acct.Type
 	}
 
 	var allTxns []provider.Transaction
 
 	for _, acct := range accounts {
-		txns, err := p.fetchTransactionsForAccount(ctx, token, acct.ExternalID, fromDateStr, toDateStr, currencyMap)
+		txns, err := p.fetchTransactionsForAccount(ctx, token, acct.ExternalID, fromDateStr, toDateStr, currencyMap, accountTypeMap)
 		if err != nil {
 			return provider.SyncResult{}, err
 		}
@@ -94,6 +96,7 @@ func (p *TellerProvider) fetchTransactionsForAccount(
 	ctx context.Context,
 	accessToken, accountID, fromDate, toDate string,
 	currencyMap map[string]string,
+	accountTypeMap map[string]string,
 ) ([]provider.Transaction, error) {
 	var allTxns []provider.Transaction
 	var fromID string
@@ -128,7 +131,7 @@ func (p *TellerProvider) fetchTransactionsForAccount(
 		resp.Body.Close()
 
 		for _, txn := range page {
-			mapped, err := mapTellerTransaction(txn, currencyMap)
+			mapped, err := mapTellerTransaction(txn, currencyMap, accountTypeMap)
 			if err != nil {
 				p.logger.WarnContext(ctx, "teller: skipping transaction with parse error",
 					"transaction_id", txn.ID,
@@ -151,13 +154,17 @@ func (p *TellerProvider) fetchTransactionsForAccount(
 }
 
 // mapTellerTransaction converts a Teller API transaction to provider.Transaction.
-func mapTellerTransaction(txn tellerTransaction, currencyMap map[string]string) (provider.Transaction, error) {
-	// Parse amount and negate (Teller: negative=debit, Breadbox: positive=debit).
+func mapTellerTransaction(txn tellerTransaction, currencyMap map[string]string, accountTypeMap map[string]string) (provider.Transaction, error) {
+	// Parse amount and normalize sign to Breadbox convention (positive=debit).
+	// Teller depository: negative=debit → negate to match.
+	// Teller credit: positive=charge(debit) → already matches, no negation needed.
 	amount, err := decimal.NewFromString(txn.Amount)
 	if err != nil {
 		return provider.Transaction{}, fmt.Errorf("parse amount %q: %w", txn.Amount, err)
 	}
-	amount = amount.Neg()
+	if accountTypeMap[txn.AccountID] != "credit" {
+		amount = amount.Neg()
+	}
 
 	// Parse date.
 	date, err := time.Parse("2006-01-02", txn.Date)
