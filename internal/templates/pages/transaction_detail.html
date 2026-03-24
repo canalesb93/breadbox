@@ -179,7 +179,7 @@
       </div>
       <div class="flex-1 flex gap-2">
         <textarea x-model="newComment" placeholder="Add a comment..." class="textarea textarea-bordered textarea-sm flex-1 min-h-[2.5rem] resize-none" rows="1" @input="$el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'"></textarea>
-        <button @click="addComment()" class="btn btn-sm btn-primary self-end" :disabled="!newComment.trim()">
+        <button @click="addComment()" class="btn btn-sm btn-primary self-end rounded-xl" :disabled="!newComment.trim()">
           <i data-lucide="send" class="w-3.5 h-3.5"></i>
         </button>
       </div>

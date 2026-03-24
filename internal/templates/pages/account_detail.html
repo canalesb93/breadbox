@@ -142,9 +142,9 @@
         <span class="text-xs text-base-content/40">Search</span>
         <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Name or merchant" class="input input-sm input-bordered">
       </label>
-      <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+      <button type="submit" class="btn btn-sm btn-primary rounded-xl">Filter</button>
       {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
-      <a href="/accounts/{{.AccountID}}" class="btn btn-sm btn-ghost">Clear</a>
+      <a href="/accounts/{{.AccountID}}" class="btn btn-sm btn-ghost rounded-xl">Clear</a>
       {{end}}
     </form>
   </div>

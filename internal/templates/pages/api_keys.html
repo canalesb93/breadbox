@@ -4,7 +4,7 @@
     <h1 class="bb-page-title">API Keys</h1>
     <p class="text-sm text-base-content/50 mt-1">Manage keys for REST API and MCP access</p>
   </div>
-  <a href="/api-keys/new" class="btn btn-primary btn-sm">
+  <a href="/api-keys/new" class="btn btn-primary btn-sm rounded-xl">
     <i data-lucide="plus" class="w-4 h-4"></i>
     Create Key
   </a>
@@ -47,8 +47,8 @@
           Revoke
         </button>
         <span x-show="confirming" x-cloak class="flex items-center gap-1.5">
-          <button type="submit" class="btn btn-error btn-sm btn-soft">Confirm</button>
-          <button type="button" class="btn btn-ghost btn-sm" @click="confirming = false">Cancel</button>
+          <button type="submit" class="btn btn-error btn-sm btn-soft rounded-xl">Confirm</button>
+          <button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="confirming = false">Cancel</button>
         </span>
       </form>
     </div>
@@ -64,7 +64,7 @@
     </div>
     <h3 class="text-lg font-semibold mb-1">No API keys yet</h3>
     <p class="text-sm text-base-content/50 mb-5 max-w-sm">Create an API key to connect MCP agents or integrate with external tools.</p>
-    <a href="/api-keys/new" class="btn btn-primary btn-sm">
+    <a href="/api-keys/new" class="btn btn-primary btn-sm rounded-xl">
       <i data-lucide="plus" class="w-4 h-4"></i>
       Create your first key
     </a>

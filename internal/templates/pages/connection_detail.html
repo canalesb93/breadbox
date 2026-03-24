@@ -15,7 +15,7 @@
     <p class="font-semibold text-sm">This connection requires re-authentication</p>
     <p class="text-sm text-base-content/60 mt-0.5">The bank may have changed its login requirements, or your session may have expired.</p>
     {{if .Connection.ErrorCode.Valid}}<p class="text-xs text-base-content/50 mt-1">{{errorMessage .Connection.ErrorCode.String}}</p>{{else if .Connection.ErrorMessage.Valid}}<p class="text-xs text-base-content/50 mt-1">{{.Connection.ErrorMessage.String}}</p>{{end}}
-    <a href="/connections/{{.ConnID}}/reauth" class="btn btn-sm btn-error mt-3">Re-authenticate</a>
+    <a href="/connections/{{.ConnID}}/reauth" class="btn btn-sm btn-error mt-3 rounded-xl">Re-authenticate</a>
   </div>
 </div>
 {{end}}
@@ -38,30 +38,30 @@
   </div>
   <div class="flex items-center gap-2 flex-wrap">
     {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
-    <a href="/connections/{{.ConnID}}/reauth" class="btn btn-sm btn-outline">Re-authenticate</a>
+    <a href="/connections/{{.ConnID}}/reauth" class="btn btn-sm btn-outline rounded-xl">Re-authenticate</a>
     {{end}}
     {{if eq (printf "%s" .Connection.Provider) "csv"}}
-    <a href="/connections/import-csv?connection_id={{.ConnID}}" class="btn btn-sm btn-outline">
+    <a href="/connections/import-csv?connection_id={{.ConnID}}" class="btn btn-sm btn-outline rounded-xl">
       <i data-lucide="upload" class="w-3.5 h-3.5"></i>
       Import More
     </a>
     {{end}}
     {{if eq (printf "%s" .Connection.Status) "active"}}
-    <button class="btn btn-sm btn-primary" onclick="syncConnection()" id="sync-btn">
+    <button class="btn btn-sm btn-primary rounded-xl" onclick="syncConnection()" id="sync-btn">
       <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
       Sync Now
     </button>
     {{end}}
-    <button class="btn btn-sm btn-ghost" onclick="togglePause()" id="pause-btn">
+    <button class="btn btn-sm btn-ghost rounded-xl" onclick="togglePause()" id="pause-btn">
       <i data-lucide="{{if .Connection.Paused}}play{{else}}pause{{end}}" class="w-3.5 h-3.5"></i>
       {{if .Connection.Paused}}Resume{{else}}Pause{{end}}
     </button>
     <span x-data="{ confirming: false }">
-      <button class="btn btn-sm btn-ghost text-error/70 hover:text-error" x-show="!confirming" @click="confirming = true" id="remove-btn">
+      <button class="btn btn-sm btn-ghost text-error/70 hover:text-error rounded-xl" x-show="!confirming" @click="confirming = true" id="remove-btn">
         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
       </button>
       <span x-show="confirming" x-cloak class="inline-flex gap-2">
-        <button class="btn btn-error btn-sm" @click="removeConnection()">Yes, Remove</button>
+        <button class="btn btn-error btn-sm rounded-xl" @click="removeConnection()">Yes, Remove</button>
         <button class="btn btn-ghost btn-sm" @click="confirming = false">Cancel</button>
       </span>
     </span>
@@ -98,7 +98,7 @@
     <h2 class="text-sm font-semibold text-base-content/50 mb-4">Sync Settings</h2>
     <div>
       <label class="text-xs text-base-content/40 mb-1.5 block">Sync Interval</label>
-      <select id="sync-interval" onchange="updateSyncInterval(this.value)" class="select select-sm select-bordered w-full">
+      <select id="sync-interval" onchange="updateSyncInterval(this.value)" class="select select-sm select-bordered w-full rounded-xl">
         <option value=""{{if not .Connection.SyncIntervalOverrideMinutes.Valid}} selected{{end}}>Use global default</option>
         <option value="15"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 15)}} selected{{end}}>Every 15 minutes</option>
         <option value="30"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 30)}} selected{{end}}>Every 30 minutes</option>
