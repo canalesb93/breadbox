@@ -358,6 +358,7 @@ type TransactionContext struct {
 	Provider         string
 	AccountID        string
 	UserID           string
+	UserName         string
 }
 
 type TransactionRuleResponse struct {

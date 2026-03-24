@@ -26,6 +26,7 @@ var validConditionFields = map[string]string{
 	"provider":          "string",
 	"account_id":        "string",
 	"user_id":           "string",
+	"user_name":         "string",
 }
 
 // stringOps are operators valid for string fields.
@@ -232,6 +233,8 @@ func evaluateLeaf(c *CompiledCondition, tctx TransactionContext) bool {
 		return evalString(c, tctx.AccountID)
 	case "user_id":
 		return evalString(c, tctx.UserID)
+	case "user_name":
+		return evalString(c, tctx.UserName)
 	}
 	return false
 }
