@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"math"
+
 	"breadbox/internal/app"
 	"breadbox/internal/db"
 	"breadbox/internal/provider"
@@ -15,6 +17,21 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// ConnectionAccount holds an account with its balance converted to float64 for templates.
+type ConnectionAccount struct {
+	db.Account
+	BalanceFloat float64
+	HasBalance   bool
+}
+
+// ConnectionWithAccounts pairs a connection row with its accounts and computed totals.
+type ConnectionWithAccounts struct {
+	db.ListBankConnectionsRow
+	Accounts     []ConnectionAccount
+	TotalBalance float64
+	HasBalance   bool
+}
 
 // ConnectionsListHandler serves GET /admin/connections.
 func ConnectionsListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
@@ -28,11 +45,68 @@ func ConnectionsListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			return
 		}
 
+		// Fetch accounts for each connection and compute balances.
+		var enriched []ConnectionWithAccounts
+		var totalAssets, totalLiabilities float64
+		var hasAnyBalance bool
+
+		for _, conn := range connections {
+			cwa := ConnectionWithAccounts{ListBankConnectionsRow: conn}
+
+			accounts, err := a.Queries.ListAccountsByConnection(ctx, conn.ID)
+			if err != nil {
+				a.Logger.Error("list accounts for connection", "error", err, "connection_id", formatUUID(conn.ID))
+			} else {
+				for _, acct := range accounts {
+					ca := ConnectionAccount{Account: acct}
+					if acct.BalanceCurrent.Valid {
+						if f, err := numericToFloat(acct.BalanceCurrent); err == nil {
+							ca.HasBalance = true
+							cwa.HasBalance = true
+							hasAnyBalance = true
+
+							// Classify as asset or liability based on account type.
+							switch acct.Type {
+							case "credit", "loan":
+								totalLiabilities += math.Abs(f)
+								// Show as negative for display.
+								ca.BalanceFloat = -math.Abs(f)
+							default:
+								totalAssets += f
+								ca.BalanceFloat = f
+							}
+						}
+					}
+					cwa.Accounts = append(cwa.Accounts, ca)
+				}
+			}
+			enriched = append(enriched, cwa)
+		}
+
+		netWorth := totalAssets - totalLiabilities
+
+		// Compute per-connection display total from display-ready balances.
+		for i := range enriched {
+			if enriched[i].HasBalance {
+				total := 0.0
+				for _, a := range enriched[i].Accounts {
+					if a.HasBalance {
+						total += a.BalanceFloat
+					}
+				}
+				enriched[i].TotalBalance = total
+			}
+		}
+
 		data := map[string]any{
-			"PageTitle":   "Connections",
-			"CurrentPage": "connections",
-			"Connections": connections,
-			"CSRFToken":   GetCSRFToken(r),
+			"PageTitle":        "Connections",
+			"CurrentPage":      "connections",
+			"Connections":      enriched,
+			"CSRFToken":        GetCSRFToken(r),
+			"TotalAssets":      totalAssets,
+			"TotalLiabilities": totalLiabilities,
+			"NetWorth":         netWorth,
+			"HasAnyBalance":    hasAnyBalance,
 		}
 		tr.Render(w, r, "connections.html", data)
 	}
