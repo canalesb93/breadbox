@@ -235,3 +235,49 @@ func ResetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerFunc
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
+
+// BatchSetTransactionCategoryAdminHandler handles POST /admin/api/transactions/batch-categorize.
+// Accepts {items: [{transaction_id, category_id}]} and sets category overrides on all.
+func BatchSetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Items []struct {
+				TransactionID string `json:"transaction_id"`
+				CategoryID    string `json:"category_id"`
+			} `json:"items"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeCategoryError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+			return
+		}
+		if len(req.Items) == 0 {
+			writeCategoryError(w, http.StatusBadRequest, "VALIDATION_ERROR", "items array is required")
+			return
+		}
+		if len(req.Items) > 200 {
+			writeCategoryError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Maximum 200 items per batch")
+			return
+		}
+
+		succeeded := 0
+		failed := 0
+		for _, item := range req.Items {
+			if item.TransactionID == "" || item.CategoryID == "" {
+				failed++
+				continue
+			}
+			if err := svc.SetTransactionCategory(r.Context(), item.TransactionID, item.CategoryID); err != nil {
+				failed++
+				continue
+			}
+			succeeded++
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"succeeded": succeeded,
+			"failed":    failed,
+			"total":     len(req.Items),
+		})
+	}
+}

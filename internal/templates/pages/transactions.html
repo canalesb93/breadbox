@@ -130,12 +130,20 @@
 {{if .Transactions}}
 
 <!-- ═══ Desktop Table (hidden on mobile) ═══ -->
-<div class="hidden lg:block">
+<div class="hidden lg:block" x-data>
   <div class="bb-card overflow-hidden">
     <div class="overflow-x-auto">
       <table class="table table-sm">
         <thead>
           <tr class="text-xs text-base-content/50 border-b border-base-300">
+            <th class="w-10 !px-3">
+              <label class="flex items-center cursor-pointer" @click.stop>
+                <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+                  :checked="$store.bulk.sel.length === window.__bbTxMeta.length && window.__bbTxMeta.length > 0"
+                  :indeterminate="$store.bulk.sel.length > 0 && $store.bulk.sel.length < window.__bbTxMeta.length"
+                  @change="$store.bulk.toggleAll()">
+              </label>
+            </th>
             <th class="font-medium">Date</th>
             <th class="font-medium">Description</th>
             <th class="font-medium text-right">Amount</th>
@@ -146,7 +154,15 @@
         </thead>
         {{range .Transactions}}
         <tbody x-data="{ expanded: false }">
-          <tr @click="expanded = !expanded" class="cursor-pointer hover:bg-base-200/50 transition-colors duration-150">
+          <tr @click="expanded = !expanded" class="cursor-pointer hover:bg-base-200/50 transition-colors duration-150"
+            :class="$store.bulk.isIn('{{.ID}}') && 'bg-primary/5'">
+            <td class="!px-3" @click.stop>
+              <label class="flex items-center cursor-pointer">
+                <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+                  :checked="$store.bulk.isIn('{{.ID}}')"
+                  @change="$store.bulk.toggle('{{.ID}}')">
+              </label>
+            </td>
             <td class="text-sm text-base-content/70 whitespace-nowrap">{{formatDate .Date}}</td>
             <td>
               <div class="flex flex-col">
@@ -175,7 +191,7 @@
             </td>
           </tr>
           <tr x-show="expanded" x-cloak>
-            <td colspan="6" class="bg-base-200/30 border-t border-base-300 px-6 py-3">
+            <td colspan="7" class="bg-base-200/30 border-t border-base-300 px-6 py-3">
               <dl class="bb-info-grid">
                 {{if .MerchantName}}<dt>Merchant</dt><dd>{{deref .MerchantName}}</dd>{{end}}
                 <dt>Transaction ID</dt><dd><code class="font-mono text-xs bg-base-200 px-1.5 py-0.5 rounded">{{.ID}}</code></dd>
@@ -216,14 +232,20 @@
 </div>
 
 <!-- ═══ Mobile Card List (hidden on desktop) ═══ -->
-<div class="lg:hidden">
+<div class="lg:hidden" x-data>
   <div class="space-y-2">
     {{range .Transactions}}
-    <div class="bb-card bb-tx-card" x-data="{ expanded: false }">
+    <div class="bb-card bb-tx-card transition-colors duration-150" :class="$store.bulk.isIn('{{.ID}}') && 'ring-1 ring-primary/30 bg-primary/5'" x-data="{ expanded: false }">
       <!-- Main row: tap to expand -->
-      <div class="flex items-center gap-3 px-4 py-3 cursor-pointer" @click="expanded = !expanded">
+      <div class="flex items-center gap-3 px-4 py-3 cursor-pointer">
+        <!-- Checkbox -->
+        <label class="flex items-center shrink-0 cursor-pointer" @click.stop>
+          <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+            :checked="$store.bulk.isIn('{{.ID}}')"
+            @change="$store.bulk.toggle('{{.ID}}')">
+        </label>
         <!-- Left: name + meta -->
-        <div class="flex-1 min-w-0">
+        <div class="flex-1 min-w-0" @click="expanded = !expanded">
           <div class="flex items-center gap-2">
             <a href="/transactions/{{.ID}}" @click.stop class="font-medium text-sm hover:text-primary transition-colors truncate">{{.Name}}</a>
             {{if .Pending}}<span class="badge badge-warning badge-xs">Pending</span>{{end}}
@@ -242,13 +264,13 @@
           </div>
         </div>
         <!-- Right: amount -->
-        <div class="text-right shrink-0">
+        <div class="text-right shrink-0" @click="expanded = !expanded">
           <span class="text-sm font-semibold tabular-nums{{if gt .Amount 0.0}} text-base-content{{else}} text-success{{end}}">
             {{formatAmount .Amount}}
           </span>
         </div>
         <!-- Expand chevron -->
-        <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 shrink-0 transition-transform duration-200" :class="expanded ? 'rotate-180' : ''"></i>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 shrink-0 transition-transform duration-200" :class="expanded ? 'rotate-180' : ''" @click="expanded = !expanded"></i>
       </div>
 
       <!-- Expanded details -->
@@ -332,9 +354,167 @@
 </div>
 {{end}}
 
+<!-- Floating bulk action bar is created via JS in <body> to avoid parent transform breaking position:fixed -->
+
 {{template "category-picker-script" .}}
 <script>
 window.__bbCategories = {{toJSON .Categories}};
+
+/* Transaction metadata for bulk operations */
+window.__bbTxMeta = [
+  {{range .Transactions}}
+  { id: '{{.ID}}', hasCat: {{if .CategoryID}}true{{else}}false{{end}} },
+  {{end}}
+];
+
+/* ── Floating Bulk Action Bar (injected into <body> to avoid parent transform issues) ── */
+document.addEventListener('DOMContentLoaded', function() {
+  var bar = document.createElement('div');
+  bar.id = 'bb-bulk-bar';
+  bar.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;z-index:40;opacity:0;transform:translateX(-50%) translateY(1rem);pointer-events:none;transition:opacity 0.2s ease,transform 0.2s ease';
+  bar.innerHTML = '<div class="flex items-center gap-3 bg-base-100 border border-base-300 rounded-2xl shadow-lg px-5 py-3">'
+    + '<div class="flex items-center gap-2 text-sm">'
+    + '<span id="bb-bulk-count" class="flex items-center justify-center w-6 h-6 bg-primary text-primary-content rounded-lg text-xs font-bold tabular-nums">0</span>'
+    + '<span class="text-base-content/70 font-medium">selected</span>'
+    + '</div>'
+    + '<div class="w-px h-6 bg-base-300"></div>'
+    + '<button type="button" id="bb-bulk-uncat" class="btn btn-ghost btn-sm rounded-xl text-xs gap-1.5" title="Select all uncategorized on this page">'
+    + '<i data-lucide="circle-off" class="w-3.5 h-3.5"></i>'
+    + '<span class="hidden sm:inline">Uncategorized</span>'
+    + '</button>'
+    + '<div class="w-px h-6 bg-base-300"></div>'
+    + '<button type="button" id="bb-bulk-categorize" class="btn btn-primary btn-sm rounded-xl gap-1.5">'
+    + '<i data-lucide="tags" class="w-3.5 h-3.5"></i> Categorize'
+    + '</button>'
+    + '<button type="button" id="bb-bulk-clear" class="btn btn-ghost btn-sm btn-circle" title="Clear selection">'
+    + '<i data-lucide="x" class="w-4 h-4"></i>'
+    + '</button>'
+    + '</div>';
+  document.body.appendChild(bar);
+  if (typeof lucide !== 'undefined') lucide.createIcons({ nameAttr: 'data-lucide', attrs: {}, namePrefix: '' });
+
+  document.getElementById('bb-bulk-uncat').addEventListener('click', function() {
+    Alpine.store('bulk').selectUncategorized();
+  });
+  document.getElementById('bb-bulk-categorize').addEventListener('click', function() {
+    // Open category picker for bulk action
+    window.dispatchEvent(new CustomEvent('open-category-picker', {
+      detail: {
+        mode: 'assign',
+        allowEmpty: false,
+        emptyLabel: '',
+        categories: window.__bbCategories || [],
+        sourceId: 'bulk-categorize'
+      }
+    }));
+  });
+  document.getElementById('bb-bulk-clear').addEventListener('click', function() {
+    Alpine.store('bulk').clear();
+  });
+
+  // Listen for category-picked from bulk picker
+  window.addEventListener('category-picked', function(e) {
+    if (e.detail.sourceId === 'bulk-categorize' && e.detail.id) {
+      Alpine.store('bulk').categorize(e.detail.id);
+    }
+  });
+});
+
+/* ── Alpine Store: Bulk Selection State ── */
+document.addEventListener('alpine:init', function() {
+  Alpine.store('bulk', {
+    sel: [],
+    processing: false,
+
+    _updateBar() {
+      var bar = document.getElementById('bb-bulk-bar');
+      if (!bar) return;
+      var show = this.sel.length > 0;
+      bar.style.opacity = show ? '1' : '0';
+      bar.style.transform = 'translateX(-50%) translateY(' + (show ? '0' : '1rem') + ')';
+      bar.style.pointerEvents = show ? 'auto' : 'none';
+      var countEl = document.getElementById('bb-bulk-count');
+      if (countEl) countEl.textContent = this.sel.length;
+    },
+
+    isIn(id) {
+      return this.sel.indexOf(id) !== -1;
+    },
+
+    toggle(id) {
+      var idx = this.sel.indexOf(id);
+      if (idx !== -1) {
+        this.sel = this.sel.filter(function(x) { return x !== id; });
+      } else {
+        this.sel = this.sel.concat([id]);
+      }
+      this._updateBar();
+    },
+
+    toggleAll() {
+      if (this.sel.length === window.__bbTxMeta.length) {
+        this.sel = [];
+      } else {
+        this.sel = window.__bbTxMeta.map(function(t) { return t.id; });
+      }
+      this._updateBar();
+    },
+
+    selectUncategorized() {
+      var uncatIds = window.__bbTxMeta.filter(function(t) { return !t.hasCat; }).map(function(t) { return t.id; });
+      if (uncatIds.length === 0) {
+        window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'All transactions on this page are categorized', type:'info'}}));
+        return;
+      }
+      var current = this.sel.slice();
+      uncatIds.forEach(function(id) {
+        if (current.indexOf(id) === -1) current.push(id);
+      });
+      this.sel = current;
+      this._updateBar();
+      window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: uncatIds.length + ' uncategorized selected', type:'success'}}));
+    },
+
+    clear() {
+      this.sel = [];
+      this._updateBar();
+    },
+
+    categorize(categoryId) {
+      if (!categoryId || this.sel.length === 0) return;
+      var self = this;
+      self.processing = true;
+      var items = self.sel.map(function(id) { return { transaction_id: id, category_id: categoryId }; });
+
+      fetch('/-/transactions/batch-categorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: items })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        self.processing = false;
+        if (data.succeeded > 0) {
+          window.dispatchEvent(new CustomEvent('bb-toast', {
+            detail: {
+              message: data.succeeded + ' transaction' + (data.succeeded === 1 ? '' : 's') + ' categorized' + (data.failed > 0 ? ' (' + data.failed + ' failed)' : ''),
+              type: data.failed > 0 ? 'warning' : 'success'
+            }
+          }));
+          setTimeout(function() { window.location.reload(); }, 800);
+        } else {
+          window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Failed to categorize transactions', type:'error'}}));
+        }
+      })
+      .catch(function() {
+        self.processing = false;
+        window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Network error', type:'error'}}));
+      });
+    }
+  });
+});
+
+/* ── Single transaction category quick-set ── */
 function quickSetCategory(txId, categoryId) {
   if (!categoryId) {
     fetch('/-/transactions/' + txId + '/category', { method: 'DELETE' })
