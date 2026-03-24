@@ -562,4 +562,180 @@
       @apply border-b-0 pb-0;
     }
   }
+
+  /* ─── Command Palette (Cmd+K) ─── */
+  .bb-cmdk-backdrop {
+    @apply fixed inset-0 z-50;
+    background: oklch(0 0 0 / 0.4);
+    backdrop-filter: blur(4px);
+    animation: bb-cmdk-backdrop-in 0.15s ease-out;
+  }
+
+  @keyframes bb-cmdk-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .bb-cmdk-dialog {
+    @apply fixed z-50 bg-base-100 border border-base-300 rounded-xl overflow-hidden;
+    top: min(20%, 140px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(95vw, 560px);
+    max-height: min(70vh, 460px);
+    box-shadow: 0 16px 70px oklch(0 0 0 / 0.15), 0 0 0 1px oklch(0 0 0 / 0.04);
+    animation: bb-cmdk-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-cmdk-dialog {
+      box-shadow: 0 16px 70px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(1 0 0 / 0.06);
+    }
+  }
+
+  @keyframes bb-cmdk-dialog-in {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) scale(0.96) translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) scale(1) translateY(0);
+    }
+  }
+
+  .bb-cmdk-input-wrap {
+    @apply flex items-center gap-3 px-4 border-b border-base-300;
+  }
+
+  .bb-cmdk-input-wrap svg,
+  .bb-cmdk-input-wrap i {
+    @apply w-4 h-4 text-base-content/30 shrink-0;
+  }
+
+  .bb-cmdk-input {
+    @apply w-full py-3.5 text-sm bg-transparent border-none outline-none placeholder:text-base-content/30;
+  }
+
+  .bb-cmdk-input:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  .bb-cmdk-list {
+    @apply overflow-y-auto;
+    max-height: min(55vh, 370px);
+    scrollbar-width: thin;
+  }
+
+  .bb-cmdk-group {
+    @apply py-2;
+  }
+
+  .bb-cmdk-group-label {
+    @apply px-4 py-1.5 text-[0.65rem] font-medium text-base-content/35;
+  }
+
+  .bb-cmdk-item {
+    @apply flex items-center gap-3 px-4 py-2 mx-2 rounded-lg text-sm cursor-pointer;
+    transition: background-color 0.1s ease, color 0.1s ease;
+  }
+
+  .bb-cmdk-item:hover,
+  .bb-cmdk-item[data-active="true"] {
+    @apply bg-base-200 text-base-content;
+  }
+
+  .bb-cmdk-item[data-active="true"] {
+    @apply bg-primary/8;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-cmdk-item[data-active="true"] {
+      @apply bg-primary/12;
+    }
+  }
+
+  .bb-cmdk-item-icon {
+    @apply w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0;
+  }
+
+  .bb-cmdk-item[data-active="true"] .bb-cmdk-item-icon {
+    @apply bg-primary/10;
+  }
+
+  .bb-cmdk-item-icon svg,
+  .bb-cmdk-item-icon i {
+    @apply w-4 h-4 text-base-content/40;
+  }
+
+  .bb-cmdk-item[data-active="true"] .bb-cmdk-item-icon svg,
+  .bb-cmdk-item[data-active="true"] .bb-cmdk-item-icon i {
+    @apply text-primary;
+  }
+
+  .bb-cmdk-item-label {
+    @apply flex-1 min-w-0;
+  }
+
+  .bb-cmdk-item-title {
+    @apply text-sm font-medium truncate;
+  }
+
+  .bb-cmdk-item-desc {
+    @apply text-xs text-base-content/40 truncate;
+  }
+
+  .bb-cmdk-item-shortcut {
+    @apply flex items-center gap-1 shrink-0;
+  }
+
+  .bb-cmdk-kbd {
+    @apply inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1
+           text-[0.6rem] font-medium text-base-content/40 bg-base-200 border border-base-300 rounded;
+  }
+
+  .bb-cmdk-footer {
+    @apply flex items-center justify-between px-4 py-2.5 border-t border-base-300 text-[0.65rem] text-base-content/30;
+  }
+
+  .bb-cmdk-footer kbd {
+    @apply inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1
+           text-[0.6rem] font-medium text-base-content/40 bg-base-200 border border-base-300 rounded mx-0.5;
+  }
+
+  .bb-cmdk-empty {
+    @apply flex flex-col items-center justify-center py-12 text-base-content/30;
+  }
+
+  .bb-cmdk-empty svg,
+  .bb-cmdk-empty i {
+    @apply w-8 h-8 mb-2 opacity-40;
+  }
+
+  /* ── Sidebar Cmd+K trigger ── */
+  .bb-sidebar-search {
+    @apply flex items-center gap-2.5 px-3 py-2 mx-0 mb-3 rounded-lg
+           text-sm text-base-content/35 bg-base-200/50 border border-base-300/50
+           cursor-pointer select-none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .bb-sidebar-search:hover {
+    @apply bg-base-200 border-base-300;
+  }
+
+  .bb-sidebar-search svg,
+  .bb-sidebar-search i {
+    @apply w-3.5 h-3.5;
+  }
+
+  .bb-sidebar-search-hint {
+    @apply ml-auto flex items-center gap-0.5 text-[0.6rem] text-base-content/25;
+  }
+
+  .bb-sidebar-search-hint kbd {
+    @apply inline-flex items-center justify-center min-w-[1.1rem] h-4 px-0.5
+           text-[0.55rem] font-medium bg-base-200 border border-base-300 rounded;
+  }
 }
