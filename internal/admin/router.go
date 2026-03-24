@@ -142,6 +142,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Transaction CSV export
 		r.Get("/transactions/export-csv", ExportTransactionsCSVHandler(a, svc))
 
+		// Transaction bulk categorize
+		r.Post("/transactions/batch-categorize", BatchSetTransactionCategoryAdminHandler(svc))
+
 		// Transaction category override
 		r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc))
 		r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc))
