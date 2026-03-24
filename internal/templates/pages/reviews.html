@@ -226,10 +226,10 @@
         </div>
         <div class="text-right flex-shrink-0">
           <div class="text-xl font-bold tabular-nums{{if lt .Transaction.Amount 0.0}} text-error{{end}}">
-            {{printf "%.2f" .Transaction.Amount}}
+            {{formatAmount .Transaction.Amount}}
           </div>
           <div class="text-xs text-base-content/40 mt-0.5">
-            {{if .Transaction.IsoCurrencyCode}}{{.Transaction.IsoCurrencyCode}} &middot; {{end}}{{.Transaction.Date}}
+            {{formatDate .Transaction.Date}}
           </div>
         </div>
       </div>

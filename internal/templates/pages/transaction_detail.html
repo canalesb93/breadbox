@@ -17,10 +17,10 @@
     <div>
       <h1 class="bb-page-title">{{.Transaction.Name}}</h1>
       <div class="flex items-center gap-2 mt-0.5">
-        <span class="text-xs text-base-content/40">{{.Transaction.Date}}</span>
+        <span class="text-xs text-base-content/40">{{formatDate .Transaction.Date}}</span>
         {{if .Transaction.MerchantName}}
         <span class="text-xs text-base-content/30">&middot;</span>
-        <span class="text-xs text-base-content/40">{{.Transaction.MerchantName}}</span>
+        <span class="text-xs text-base-content/40">{{deref .Transaction.MerchantName}}</span>
         {{end}}
         {{if .Transaction.Pending}}<span class="badge badge-warning badge-xs ml-1">Pending</span>{{end}}
       </div>
@@ -28,9 +28,9 @@
   </div>
   <div class="text-right">
     <p class="text-3xl font-semibold tabular-nums{{if lt .Transaction.Amount 0.0}} text-error{{end}}">
-      {{printf "%.2f" .Transaction.Amount}}
+      {{formatAmount .Transaction.Amount}}
     </p>
-    {{if .Transaction.IsoCurrencyCode}}<p class="text-xs text-base-content/30 mt-0.5">{{.Transaction.IsoCurrencyCode}}</p>{{end}}
+    {{if .Transaction.IsoCurrencyCode}}<p class="text-xs text-base-content/30 mt-0.5">{{deref .Transaction.IsoCurrencyCode}}</p>{{end}}
   </div>
 </div>
 
@@ -42,7 +42,7 @@
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-5 gap-x-6">
       <div>
         <p class="text-xs text-base-content/40 mb-1">Date</p>
-        <p class="text-sm font-medium">{{.Transaction.Date}}</p>
+        <p class="text-sm font-medium">{{formatDate .Transaction.Date}}</p>
       </div>
       {{if .Transaction.MerchantName}}
       <div>

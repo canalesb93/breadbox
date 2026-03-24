@@ -164,13 +164,13 @@
       {{range .Transactions}}
       <tbody x-data="{ expanded: false }">
         <tr @click="expanded = !expanded" class="cursor-pointer hover:bg-base-200/40 transition-colors duration-150">
-          <td class="text-sm text-base-content/60 whitespace-nowrap">{{.Date}}</td>
+          <td class="text-sm text-base-content/60 whitespace-nowrap">{{formatDate .Date}}</td>
           <td>
             <a href="/transactions/{{.ID}}" @click.stop class="font-medium text-sm hover:text-primary transition-colors no-underline">{{.Name}}</a>
             {{if .MerchantName}}<span class="text-xs text-base-content/40 ml-1">{{.MerchantName}}</span>{{end}}
           </td>
           <td class="text-right tabular-nums text-sm font-semibold{{if lt .Amount 0.0}} text-error{{end}}">
-            {{printf "%.2f" .Amount}}{{if .IsoCurrencyCode}} <span class="text-xs text-base-content/30 font-normal">{{.IsoCurrencyCode}}</span>{{end}}
+            {{formatAmount .Amount}}
           </td>
           <td @click.stop>
             <div class="bb-cat-picker" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: '\u2014', allowEmpty: true, emptyLabel: 'Uncategorized'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
