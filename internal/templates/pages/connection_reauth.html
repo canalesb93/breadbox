@@ -5,21 +5,34 @@
 <script src="https://cdn.teller.io/connect/connect.js"></script>
 {{end}}
 
-<div class="breadcrumbs text-sm mb-4">
-  <ul>
-    <li><a href="/connections">Connections</a></li>
-    <li><a href="/connections/{{.ConnID}}">{{.Connection.InstitutionName.String}}</a></li>
-    <li>Re-authenticate</li>
-  </ul>
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Re-authenticate</h1>
+    <p class="text-sm text-base-content/50 mt-1">{{.Connection.InstitutionName.String}} needs to be re-connected</p>
+  </div>
+  <a href="/connections/{{.ConnID}}" class="btn btn-sm btn-ghost rounded-xl gap-2">
+    <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Connection
+  </a>
 </div>
 
-<h1 class="text-2xl font-bold mb-6">Re-authenticate {{.Connection.InstitutionName.String}}</h1>
-
-<div class="card bg-base-100 shadow-sm">
-  <div class="card-body">
-    <p>Re-connecting for: <strong>{{.Connection.UserName}}</strong></p>
-    <p id="link-status" class="text-base-content/70">Opening re-authentication dialog...</p>
-    <button id="retry-btn" class="btn btn-primary btn-sm hidden">Retry</button>
+<div class="bb-card p-8 max-w-lg">
+  <div class="flex flex-col items-center text-center">
+    <div class="w-16 h-16 rounded-2xl bg-warning/10 flex items-center justify-center mb-4">
+      <i data-lucide="shield-alert" class="w-8 h-8 text-warning"></i>
+    </div>
+    <h2 class="text-lg font-semibold mb-1">{{.Connection.InstitutionName.String}}</h2>
+    <p class="text-sm text-base-content/50 mb-1">
+      Re-connecting for: <span class="font-semibold text-base-content">{{.Connection.UserName}}</span>
+    </p>
+    <p id="link-status" class="text-sm text-base-content/50 mb-6">Opening re-authentication dialog...</p>
+    <div class="flex items-center gap-3">
+      <button id="retry-btn" class="btn btn-primary btn-sm rounded-xl hidden">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i> Retry
+      </button>
+      <a href="/connections/{{.ConnID}}" class="btn btn-ghost btn-sm rounded-xl">
+        <i data-lucide="x" class="w-4 h-4"></i> Cancel
+      </a>
+    </div>
   </div>
 </div>
 
@@ -33,20 +46,20 @@
   function showError(msg) {
     linkStatus.textContent = msg;
     linkStatus.classList.add("text-error");
-    linkStatus.classList.remove("text-base-content/70");
+    linkStatus.classList.remove("text-base-content/50");
     retryBtn.classList.remove("hidden");
   }
 
   function showMessage(msg) {
     linkStatus.textContent = msg;
     linkStatus.classList.remove("text-error");
-    linkStatus.classList.add("text-base-content/70");
+    linkStatus.classList.add("text-base-content/50");
   }
 
   function startReauth() {
     linkStatus.textContent = "Opening re-authentication dialog...";
     linkStatus.classList.remove("text-error");
-    linkStatus.classList.add("text-base-content/70");
+    linkStatus.classList.add("text-base-content/50");
     retryBtn.classList.add("hidden");
 
     fetch("/-/connections/" + connId + "/reauth", {

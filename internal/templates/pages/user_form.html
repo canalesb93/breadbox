@@ -1,33 +1,54 @@
 {{define "content"}}
-<p class="mb-4"><a href="/users" class="link">&larr; Back to Family Members</a></p>
-
-<h1 class="text-2xl font-bold mb-6">{{if .IsEdit}}Edit {{.User.Name}}{{else}}Add Family Member{{end}}</h1>
-
-<div class="card bg-base-100 border border-base-300 max-w-lg">
-  <div class="card-body">
-    <form id="user-form">
-      <fieldset class="fieldset">
-        <label class="fieldset-label" for="name">Name <span class="text-error">*</span></label>
-        <input type="text" id="name" name="name" class="input w-full" required maxlength="128"
-          value="{{if .IsEdit}}{{.User.Name}}{{end}}"
-          placeholder="e.g., Alex Canales">
-      </fieldset>
-
-      <fieldset class="fieldset">
-        <label class="fieldset-label" for="email">Email <span class="text-base-content/50 text-xs">(optional)</span></label>
-        <input type="email" id="email" name="email" class="input w-full"
-          value="{{if and .IsEdit .User.Email.Valid}}{{.User.Email.String}}{{end}}"
-          placeholder="e.g., alex@example.com">
-      </fieldset>
-
-      <div id="form-error" class="alert alert-error mb-4 hidden"></div>
-
-      <div class="flex gap-2 mt-4">
-        <button type="submit" class="btn btn-primary">{{if .IsEdit}}Save Changes{{else}}Create Member{{end}}</button>
-        <a href="/users" class="btn btn-ghost">Cancel</a>
-      </div>
-    </form>
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">{{if .IsEdit}}Edit {{.User.Name}}{{else}}Add Family Member{{end}}</h1>
+    <p class="text-sm text-base-content/50 mt-1">{{if .IsEdit}}Update member details{{else}}Add a new person to your family group{{end}}</p>
   </div>
+  <a href="/users" class="btn btn-sm btn-ghost rounded-xl gap-2">
+    <i data-lucide="arrow-left" class="w-4 h-4"></i> Family Members
+  </a>
+</div>
+
+<div class="bb-card p-8 max-w-lg">
+  <div class="flex items-center gap-3 mb-6">
+    <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/8">
+      <i data-lucide="{{if .IsEdit}}user-pen{{else}}user-plus{{end}}" class="w-5 h-5 text-primary"></i>
+    </div>
+    <div>
+      <h2 class="text-base font-semibold">{{if .IsEdit}}Member Details{{else}}New Member{{end}}</h2>
+      <p class="text-xs text-base-content/45">{{if .IsEdit}}Update name and email{{else}}Enter their name and optional email{{end}}</p>
+    </div>
+  </div>
+
+  <form id="user-form">
+    <fieldset class="fieldset mb-5">
+      <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="name">
+        Name <span class="text-error text-xs">*</span>
+      </label>
+      <input type="text" id="name" name="name" class="input w-full bg-base-200/50 border-base-200 focus:border-primary rounded-xl" required maxlength="128"
+        value="{{if .IsEdit}}{{.User.Name}}{{end}}"
+        placeholder="e.g., Alex Canales">
+    </fieldset>
+
+    <fieldset class="fieldset mb-6">
+      <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="email">
+        Email <span class="text-xs text-base-content/30">(optional)</span>
+      </label>
+      <input type="email" id="email" name="email" class="input w-full bg-base-200/50 border-base-200 focus:border-primary rounded-xl"
+        value="{{if and .IsEdit .User.Email.Valid}}{{.User.Email.String}}{{end}}"
+        placeholder="e.g., alex@example.com">
+    </fieldset>
+
+    <div id="form-error" class="rounded-xl bg-error/10 border border-error/20 text-error text-sm px-4 py-3 mb-4 hidden"></div>
+
+    <div class="flex gap-3 pt-2">
+      <button type="submit" class="btn btn-primary btn-sm rounded-xl">
+        <i data-lucide="{{if .IsEdit}}save{{else}}plus{{end}}" class="w-4 h-4"></i>
+        {{if .IsEdit}}Save Changes{{else}}Create Member{{end}}
+      </button>
+      <a href="/users" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
+    </div>
+  </form>
 </div>
 
 <script>
