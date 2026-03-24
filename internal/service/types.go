@@ -412,3 +412,41 @@ type UpdateTransactionRuleParams struct {
 	Enabled      *bool
 	ExpiresAt    *string // ISO timestamp or empty to clear
 }
+
+// Batch categorize types
+
+type BatchCategorizeItem struct {
+	TransactionID string `json:"transaction_id"`
+	CategorySlug  string `json:"category_slug"`
+}
+
+type BatchCategorizeResult struct {
+	Succeeded int                    `json:"succeeded"`
+	Failed    []BatchCategorizeError `json:"failed,omitempty"`
+}
+
+type BatchCategorizeError struct {
+	TransactionID string `json:"transaction_id"`
+	Error         string `json:"error"`
+}
+
+// Bulk recategorize types
+
+type BulkRecategorizeParams struct {
+	StartDate          *time.Time
+	EndDate            *time.Time
+	AccountID          *string
+	UserID             *string
+	CategorySlug       *string // current category filter
+	MinAmount          *float64
+	MaxAmount          *float64
+	Pending            *bool
+	Search             *string
+	NameContains       *string
+	TargetCategorySlug string
+}
+
+type BulkRecategorizeResult struct {
+	MatchedCount int64 `json:"matched_count"`
+	UpdatedCount int64 `json:"updated_count"`
+}
