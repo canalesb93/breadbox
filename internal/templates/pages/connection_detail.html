@@ -1,160 +1,222 @@
 {{define "content"}}
-<div class="breadcrumbs text-sm mb-4">
+<div class="breadcrumbs text-sm mb-6 text-base-content/50">
   <ul>
-    <li><a href="/connections">Connections</a></li>
+    <li><a href="/connections" class="hover:text-primary transition-colors">Connections</a></li>
     <li>{{.Connection.InstitutionName.String}}</li>
   </ul>
 </div>
 
 {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
-<div class="alert alert-error mb-4">
-  <i data-lucide="alert-triangle" class="w-5 h-5"></i>
-  <div>
-    <strong>This connection requires re-authentication.</strong> The bank may have changed its login requirements, or your session may have expired.
-    {{if .Connection.ErrorCode.Valid}}<br><small>{{errorMessage .Connection.ErrorCode.String}}</small>{{else if .Connection.ErrorMessage.Valid}}<br><small>{{.Connection.ErrorMessage.String}}</small>{{end}}
-    <br><a href="/connections/{{.ConnID}}/reauth" class="link font-semibold">Re-authenticate &rarr;</a>
+<div class="bb-card border-error/30 bg-error/5 p-5 mb-6 flex items-start gap-4">
+  <div class="w-10 h-10 rounded-xl bg-error/10 flex items-center justify-center shrink-0">
+    <i data-lucide="alert-triangle" class="w-5 h-5 text-error"></i>
+  </div>
+  <div class="flex-1 min-w-0">
+    <p class="font-semibold text-sm">This connection requires re-authentication</p>
+    <p class="text-sm text-base-content/60 mt-0.5">The bank may have changed its login requirements, or your session may have expired.</p>
+    {{if .Connection.ErrorCode.Valid}}<p class="text-xs text-base-content/50 mt-1">{{errorMessage .Connection.ErrorCode.String}}</p>{{else if .Connection.ErrorMessage.Valid}}<p class="text-xs text-base-content/50 mt-1">{{.Connection.ErrorMessage.String}}</p>{{end}}
+    <a href="/connections/{{.ConnID}}/reauth" class="btn btn-sm btn-error mt-3">Re-authenticate</a>
   </div>
 </div>
 {{end}}
 
-<h1 class="text-2xl font-bold mb-4">{{.Connection.InstitutionName.String}}</h1>
-
-<dl class="bb-info-grid mb-6">
-  <dt>Family Member</dt>
-  <dd>{{.Connection.UserName}}</dd>
-  <dt>Status</dt>
-  <dd>
-    {{statusBadge (printf "%s" .Connection.Status)}}{{if .Connection.Paused}} <span class="badge badge-ghost badge-sm">Paused</span>{{end}}
-  </dd>
-  <dt>Connected</dt>
-  <dd>{{if .Connection.CreatedAt.Valid}}{{.Connection.CreatedAt.Time.Format "January 2, 2006"}}{{end}}</dd>
-  <dt>Provider</dt>
-  <dd>{{.Connection.Provider}}</dd>
-</dl>
-
-<div class="bb-action-bar">
-  {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
-  <a href="/connections/{{.ConnID}}/reauth" class="btn btn-outline btn-sm">Re-authenticate</a>
-  {{end}}
-  {{if eq (printf "%s" .Connection.Provider) "csv"}}
-  <a href="/connections/import-csv?connection_id={{.ConnID}}" class="btn btn-outline btn-sm">Import More</a>
-  {{end}}
-  {{if eq (printf "%s" .Connection.Status) "active"}}
-  <button class="btn btn-outline btn-sm" onclick="syncConnection()" id="sync-btn">
-    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-    Sync Now
-  </button>
-  {{end}}
-  <button class="btn btn-outline btn-sm" onclick="togglePause()" id="pause-btn">{{if .Connection.Paused}}Resume{{else}}Pause{{end}}</button>
-  <span x-data="{ confirming: false }">
-    <button class="btn btn-outline btn-error btn-sm" x-show="!confirming" @click="confirming = true" id="remove-btn">
-      <i data-lucide="trash-2" class="w-4 h-4"></i>
-      Remove
+<!-- Header with actions -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+  <div class="flex items-center gap-4">
+    <div class="w-12 h-12 rounded-2xl bg-base-200 flex items-center justify-center">
+      <i data-lucide="building-2" class="w-6 h-6 text-base-content/50"></i>
+    </div>
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">{{.Connection.InstitutionName.String}}</h1>
+      <div class="flex items-center gap-2 mt-0.5">
+        {{statusBadge (printf "%s" .Connection.Status)}}
+        {{if .Connection.Paused}}<span class="badge badge-ghost badge-sm">Paused</span>{{end}}
+        <span class="text-xs text-base-content/40">&middot;</span>
+        <span class="text-xs text-base-content/40">{{.Connection.Provider}}</span>
+      </div>
+    </div>
+  </div>
+  <div class="flex items-center gap-2 flex-wrap">
+    {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
+    <a href="/connections/{{.ConnID}}/reauth" class="btn btn-sm btn-outline">Re-authenticate</a>
+    {{end}}
+    {{if eq (printf "%s" .Connection.Provider) "csv"}}
+    <a href="/connections/import-csv?connection_id={{.ConnID}}" class="btn btn-sm btn-outline">
+      <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+      Import More
+    </a>
+    {{end}}
+    {{if eq (printf "%s" .Connection.Status) "active"}}
+    <button class="btn btn-sm btn-primary" onclick="syncConnection()" id="sync-btn">
+      <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+      Sync Now
     </button>
-    <span x-show="confirming" x-cloak class="inline-flex gap-2">
-      <button class="btn btn-error btn-sm" @click="removeConnection()">Yes, Remove</button>
-      <button class="btn btn-ghost btn-sm" @click="confirming = false">Cancel</button>
+    {{end}}
+    <button class="btn btn-sm btn-ghost" onclick="togglePause()" id="pause-btn">
+      <i data-lucide="{{if .Connection.Paused}}play{{else}}pause{{end}}" class="w-3.5 h-3.5"></i>
+      {{if .Connection.Paused}}Resume{{else}}Pause{{end}}
+    </button>
+    <span x-data="{ confirming: false }">
+      <button class="btn btn-sm btn-ghost text-error/70 hover:text-error" x-show="!confirming" @click="confirming = true" id="remove-btn">
+        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+      </button>
+      <span x-show="confirming" x-cloak class="inline-flex gap-2">
+        <button class="btn btn-error btn-sm" @click="removeConnection()">Yes, Remove</button>
+        <button class="btn btn-ghost btn-sm" @click="confirming = false">Cancel</button>
+      </span>
     </span>
-  </span>
+  </div>
 </div>
 
-<div class="flex items-center gap-2 mb-8">
-  <label for="sync-interval" class="text-sm font-medium">Sync Interval:</label>
-  <select id="sync-interval" onchange="updateSyncInterval(this.value)" class="select select-sm w-auto">
-    <option value=""{{if not .Connection.SyncIntervalOverrideMinutes.Valid}} selected{{end}}>Use global</option>
-    <option value="15"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 15)}} selected{{end}}>Every 15 min</option>
-    <option value="30"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 30)}} selected{{end}}>Every 30 min</option>
-    <option value="60"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 60)}} selected{{end}}>Every 1 hour</option>
-    <option value="120"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 120)}} selected{{end}}>Every 2 hours</option>
-    <option value="240"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 240)}} selected{{end}}>Every 4 hours</option>
-    <option value="720"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 720)}} selected{{end}}>Every 12 hours</option>
-    <option value="1440"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 1440)}} selected{{end}}>Every 24 hours</option>
-  </select>
-  <span id="interval-status" class="text-sm text-base-content/70"></span>
+<!-- Connection Info + Settings -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+  <!-- Connection Details Card -->
+  <div class="bb-card p-6 lg:col-span-2">
+    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider mb-4">Connection Details</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Family Member</p>
+        <p class="text-sm font-medium">{{.Connection.UserName}}</p>
+      </div>
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Provider</p>
+        <p class="text-sm font-medium capitalize">{{.Connection.Provider}}</p>
+      </div>
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Connected</p>
+        <p class="text-sm font-medium">{{if .Connection.CreatedAt.Valid}}{{.Connection.CreatedAt.Time.Format "Jan 2, 2006"}}{{else}}&mdash;{{end}}</p>
+      </div>
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Status</p>
+        <p class="text-sm font-medium">{{statusBadge (printf "%s" .Connection.Status)}}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sync Settings Card -->
+  <div class="bb-card p-6">
+    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider mb-4">Sync Settings</h2>
+    <div>
+      <label class="text-xs text-base-content/40 mb-1.5 block">Sync Interval</label>
+      <select id="sync-interval" onchange="updateSyncInterval(this.value)" class="select select-sm select-bordered w-full">
+        <option value=""{{if not .Connection.SyncIntervalOverrideMinutes.Valid}} selected{{end}}>Use global default</option>
+        <option value="15"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 15)}} selected{{end}}>Every 15 minutes</option>
+        <option value="30"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 30)}} selected{{end}}>Every 30 minutes</option>
+        <option value="60"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 60)}} selected{{end}}>Every hour</option>
+        <option value="120"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 120)}} selected{{end}}>Every 2 hours</option>
+        <option value="240"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 240)}} selected{{end}}>Every 4 hours</option>
+        <option value="720"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 720)}} selected{{end}}>Every 12 hours</option>
+        <option value="1440"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 1440)}} selected{{end}}>Every 24 hours</option>
+      </select>
+      <span id="interval-status" class="text-xs text-base-content/50 mt-1 block"></span>
+    </div>
+  </div>
 </div>
 
-<h2 class="text-lg font-semibold mb-4">Accounts</h2>
-{{if .Accounts}}
-<div class="overflow-x-auto border border-base-300 rounded-lg">
-  <table class="table table-zebra table-xs">
-    <thead>
-      <tr>
-        <th>Account Name</th>
-        <th>Display Name</th>
-        <th>Mask</th>
-        <th>Type</th>
-        <th>Current Balance</th>
-        <th>Available Balance</th>
-        <th>Excluded</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range .Accounts}}
-      <tr class="hover:bg-base-300{{if .Excluded}} opacity-60{{end}}">
-        <td><a href="/accounts/{{formatUUID .ID}}">{{.Name}}</a></td>
-        <td>
-          <input type="text" value="{{.DisplayName.String}}" placeholder="{{.Name}}"
-            onchange="updateDisplayName('{{formatUUID .ID}}', this.value)"
-            class="input input-xs w-40">
-        </td>
-        <td>{{if .Mask.Valid}}&bull;&bull;&bull;&bull;{{.Mask.String}}{{end}}</td>
-        <td>{{.Type}}{{if .Subtype.Valid}} / {{.Subtype.String}}{{end}}</td>
-        <td class="bb-amount">{{if .BalanceCurrent.Valid}}{{formatNumeric .BalanceCurrent}}{{if .IsoCurrencyCode.Valid}} {{.IsoCurrencyCode.String}}{{end}}{{else}}&mdash;{{end}}</td>
-        <td class="bb-amount">{{if .BalanceAvailable.Valid}}{{formatNumeric .BalanceAvailable}}{{if .IsoCurrencyCode.Valid}} {{.IsoCurrencyCode.String}}{{end}}{{else}}&mdash;{{end}}</td>
-        <td>
-          <input type="checkbox" class="checkbox checkbox-xs" {{if .Excluded}}checked{{end}}
-            onchange="toggleExcluded('{{formatUUID .ID}}', this.checked)">
-        </td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
+<!-- Accounts -->
+<div class="bb-card mb-8">
+  <div class="px-6 pt-6 pb-4 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider">Accounts</h2>
+    {{if .Accounts}}<span class="text-xs text-base-content/30">{{len .Accounts}} total</span>{{end}}
+  </div>
+  {{if .Accounts}}
+  <div class="overflow-x-auto">
+    <table class="table table-sm">
+      <thead>
+        <tr class="text-xs text-base-content/40 uppercase tracking-wider border-b border-base-200">
+          <th class="font-medium">Account</th>
+          <th class="font-medium">Display Name</th>
+          <th class="font-medium">Type</th>
+          <th class="font-medium text-right">Current Balance</th>
+          <th class="font-medium text-right">Available</th>
+          <th class="font-medium text-center w-20">Excluded</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Accounts}}
+        <tr class="hover:bg-base-200/40 transition-colors duration-150{{if .Excluded}} opacity-50{{end}}">
+          <td>
+            <a href="/accounts/{{formatUUID .ID}}" class="font-medium text-sm hover:text-primary transition-colors no-underline">
+              {{.Name}}
+            </a>
+            {{if .Mask.Valid}}<span class="text-xs text-base-content/30 ml-1">&bull;&bull;{{.Mask.String}}</span>{{end}}
+          </td>
+          <td>
+            <input type="text" value="{{.DisplayName.String}}" placeholder="Custom name..."
+              onchange="updateDisplayName('{{formatUUID .ID}}', this.value)"
+              class="input input-xs input-ghost w-36 hover:input-bordered focus:input-bordered transition-all">
+          </td>
+          <td class="text-xs text-base-content/50">{{.Type}}{{if .Subtype.Valid}} / {{.Subtype.String}}{{end}}</td>
+          <td class="text-right tabular-nums text-sm font-semibold">
+            {{if .BalanceCurrent.Valid}}{{formatNumeric .BalanceCurrent}}{{if .IsoCurrencyCode.Valid}} <span class="text-xs text-base-content/40 font-normal">{{.IsoCurrencyCode.String}}</span>{{end}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
+          </td>
+          <td class="text-right tabular-nums text-sm text-base-content/60">
+            {{if .BalanceAvailable.Valid}}{{formatNumeric .BalanceAvailable}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
+          </td>
+          <td class="text-center">
+            <input type="checkbox" class="checkbox checkbox-xs" {{if .Excluded}}checked{{end}}
+              onchange="toggleExcluded('{{formatUUID .ID}}', this.checked)">
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <div class="px-6 pb-6">
+    <div class="flex flex-col items-center justify-center py-10 text-base-content/30">
+      <i data-lucide="wallet" class="w-10 h-10 mb-3 opacity-50"></i>
+      <p class="text-sm">No accounts found for this connection</p>
+      <p class="text-xs mt-1">Accounts will appear after the first sync</p>
+    </div>
+  </div>
+  {{end}}
 </div>
-{{else}}
-<p class="text-base-content/70">No accounts found for this connection.</p>
-{{end}}
 
-<h2 class="text-lg font-semibold mt-8 mb-4">Sync History (last 10)</h2>
-{{if .SyncLogs}}
-<div class="overflow-x-auto border border-base-300 rounded-lg">
-  <table class="table table-zebra table-sm">
-    <thead>
-      <tr>
-        <th>Trigger</th>
-        <th>Status</th>
-        <th>+Add</th>
-        <th>~Mod</th>
-        <th>-Rem</th>
-        <th>Started</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range .SyncLogs}}
-      <tr class="hover:bg-base-300">
-        <td>{{.Trigger}}</td>
-        <td>{{syncBadge (printf "%s" .Status)}}</td>
-        <td>{{.AddedCount}}</td>
-        <td>{{.ModifiedCount}}</td>
-        <td>{{.RemovedCount}}</td>
-        <td>{{relativeTime .StartedAt}}</td>
-      </tr>
-      {{if and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid}}
-      <tr>
-        <td colspan="6">
-          <details>
-            <summary class="cursor-pointer text-sm text-error">Error details</summary>
-            <p class="text-sm mt-1">{{.ErrorMessage.String}}</p>
-          </details>
-        </td>
-      </tr>
-      {{end}}
-      {{end}}
-    </tbody>
-  </table>
+<!-- Sync History -->
+<div class="bb-card">
+  <div class="px-6 pt-6 pb-4 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-base-content/40 uppercase tracking-wider">Sync History</h2>
+    <span class="text-xs text-base-content/30">Last 10</span>
+  </div>
+  {{if .SyncLogs}}
+  <div class="px-6 pb-6 space-y-2">
+    {{range .SyncLogs}}
+    <div class="flex items-center justify-between p-3 rounded-xl bg-base-200/30 hover:bg-base-200/60 transition-colors duration-150">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg {{if eq (printf "%s" .Status) "success"}}bg-success/10{{else if eq (printf "%s" .Status) "error"}}bg-error/10{{else}}bg-base-200{{end}} flex items-center justify-center shrink-0">
+          {{if eq (printf "%s" .Status) "success"}}<i data-lucide="check" class="w-4 h-4 text-success"></i>
+          {{else if eq (printf "%s" .Status) "error"}}<i data-lucide="x" class="w-4 h-4 text-error"></i>
+          {{else}}<i data-lucide="loader" class="w-4 h-4 text-base-content/40"></i>{{end}}
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium capitalize">{{.Trigger}}</span>
+            <span class="text-xs text-base-content/40">{{relativeTime .StartedAt}}</span>
+          </div>
+          {{if and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid}}
+          <p class="text-xs text-error/70 mt-0.5 max-w-md truncate">{{.ErrorMessage.String}}</p>
+          {{end}}
+        </div>
+      </div>
+      <div class="flex items-center gap-3 tabular-nums text-xs">
+        {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
+        {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
+        {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
+        {{syncBadge (printf "%s" .Status)}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="px-6 pb-6">
+    <div class="flex flex-col items-center justify-center py-10 text-base-content/30">
+      <i data-lucide="refresh-cw" class="w-10 h-10 mb-3 opacity-50"></i>
+      <p class="text-sm">No sync history yet</p>
+    </div>
+  </div>
+  {{end}}
 </div>
-{{else}}
-<p class="text-base-content/70">No sync history yet.</p>
-{{end}}
 
 <script>
 function showToast(message, type) {
@@ -164,33 +226,32 @@ function showToast(message, type) {
 function syncConnection() {
   var btn = document.getElementById('sync-btn');
   btn.disabled = true;
-  btn.textContent = 'Syncing...';
-  fetch("/-/connections/{{.ConnID}}/sync", {
-    method: "POST"
-  })
+  btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Syncing...';
+  fetch("/-/connections/{{.ConnID}}/sync", { method: "POST" })
   .then(function(res) {
     if (res.ok) {
-      btn.textContent = 'Sync Triggered!';
+      btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i> Synced!';
+      lucide.createIcons({nodes: [btn]});
       setTimeout(function() { window.location.reload(); }, 3000);
     } else {
       return res.json().then(function(data) {
         showToast(data.error || "Failed to trigger sync.");
         btn.disabled = false;
-        btn.textContent = 'Sync Now';
+        btn.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Sync Now';
+        lucide.createIcons({nodes: [btn]});
       });
     }
   })
   .catch(function() {
     showToast("Network error. Please try again.");
     btn.disabled = false;
-    btn.textContent = 'Sync Now';
+    btn.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Sync Now';
+    lucide.createIcons({nodes: [btn]});
   });
 }
 
 function removeConnection() {
-  fetch("/-/connections/{{.ConnID}}", {
-    method: "DELETE"
-  })
+  fetch("/-/connections/{{.ConnID}}", { method: "DELETE" })
   .then(function (res) {
     if (res.ok) {
       window.location.href = "/connections";
@@ -263,7 +324,9 @@ function updateDisplayName(accountId, val) {
     body: JSON.stringify(body)
   })
   .then(function(res) {
-    if (!res.ok) {
+    if (res.ok) {
+      showToast("Display name updated.", "success");
+    } else {
       return res.json().then(function(data) {
         showToast(data.error || "Failed to update display name.");
       });
@@ -282,6 +345,7 @@ function toggleExcluded(accountId, checked) {
   })
   .then(function(res) {
     if (res.ok) {
+      showToast(checked ? "Account excluded." : "Account included.", "success");
       window.location.reload();
     } else {
       return res.json().then(function(data) {
