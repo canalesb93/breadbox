@@ -85,6 +85,153 @@
     </template>
   </div>
 
+  <!-- Keyboard Shortcuts Help (?-key) -->
+  <div x-data="shortcutsHelp()" x-show="open" x-cloak
+       @open-shortcuts.window="openHelp()"
+       @keydown.window.escape="if (open) { open = false; $event.stopPropagation(); }">
+    <div class="bb-shortcuts-backdrop" @click="open = false"></div>
+    <div class="bb-shortcuts-dialog">
+      <div class="bb-shortcuts-header">
+        <span class="bb-shortcuts-title">Keyboard Shortcuts</span>
+        <button class="bb-shortcuts-close" @click="open = false">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="bb-shortcuts-body">
+        <!-- General -->
+        <div class="bb-shortcuts-group">
+          <div class="bb-shortcuts-group-label">General</div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Open command palette</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">&#8984;</kbd>
+              <kbd class="bb-shortcuts-kbd">K</kbd>
+            </span>
+          </div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Show keyboard shortcuts</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">?</kbd>
+            </span>
+          </div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Close dialog / cancel</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">Esc</kbd>
+            </span>
+          </div>
+        </div>
+        <!-- Go to navigation -->
+        <div class="bb-shortcuts-group">
+          <div class="bb-shortcuts-group-label">Go to</div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Dashboard</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">g</kbd>
+              <span class="bb-shortcuts-then">then</span>
+              <kbd class="bb-shortcuts-kbd">d</kbd>
+            </span>
+          </div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Transactions</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">g</kbd>
+              <span class="bb-shortcuts-then">then</span>
+              <kbd class="bb-shortcuts-kbd">t</kbd>
+            </span>
+          </div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Connections</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">g</kbd>
+              <span class="bb-shortcuts-then">then</span>
+              <kbd class="bb-shortcuts-kbd">c</kbd>
+            </span>
+          </div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Reviews</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">g</kbd>
+              <span class="bb-shortcuts-then">then</span>
+              <kbd class="bb-shortcuts-kbd">r</kbd>
+            </span>
+          </div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Rules</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">g</kbd>
+              <span class="bb-shortcuts-then">then</span>
+              <kbd class="bb-shortcuts-kbd">u</kbd>
+            </span>
+          </div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Categories</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">g</kbd>
+              <span class="bb-shortcuts-then">then</span>
+              <kbd class="bb-shortcuts-kbd">a</kbd>
+            </span>
+          </div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Sync Logs</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">g</kbd>
+              <span class="bb-shortcuts-then">then</span>
+              <kbd class="bb-shortcuts-kbd">l</kbd>
+            </span>
+          </div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Settings</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">g</kbd>
+              <span class="bb-shortcuts-then">then</span>
+              <kbd class="bb-shortcuts-kbd">s</kbd>
+            </span>
+          </div>
+        </div>
+        <!-- Actions -->
+        <div class="bb-shortcuts-group">
+          <div class="bb-shortcuts-group-label">Actions</div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Connect a bank</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">n</kbd>
+              <span class="bb-shortcuts-then">then</span>
+              <kbd class="bb-shortcuts-kbd">c</kbd>
+            </span>
+          </div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Import CSV</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">n</kbd>
+              <span class="bb-shortcuts-then">then</span>
+              <kbd class="bb-shortcuts-kbd">i</kbd>
+            </span>
+          </div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Create API key</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">n</kbd>
+              <span class="bb-shortcuts-then">then</span>
+              <kbd class="bb-shortcuts-kbd">k</kbd>
+            </span>
+          </div>
+          <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Add family member</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">n</kbd>
+              <span class="bb-shortcuts-then">then</span>
+              <kbd class="bb-shortcuts-kbd">u</kbd>
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="bb-shortcuts-footer">
+        Press <kbd class="bb-shortcuts-kbd" style="display:inline-flex;vertical-align:middle;">?</kbd> anytime to toggle this panel
+      </div>
+    </div>
+  </div>
+
   <!-- Command Palette (Cmd+K) -->
   <div x-data="commandPalette()" x-show="open" x-cloak
        @open-cmdk.window="openPalette()"
@@ -152,6 +299,7 @@
           <span><kbd>&uarr;</kbd> <kbd>&darr;</kbd> navigate</span>
           <span><kbd>&crarr;</kbd> open</span>
           <span><kbd>esc</kbd> close</span>
+          <span><kbd>?</kbd> shortcuts</span>
         </div>
       </div>
     </div>
@@ -302,6 +450,135 @@
         }
       };
     }
+
+    // Shortcuts Help Panel
+    function shortcutsHelp() {
+      return {
+        open: false,
+        openHelp: function() {
+          this.open = true;
+          var self = this;
+          setTimeout(function() {
+            var dialog = document.querySelector('.bb-shortcuts-dialog');
+            if (dialog) lucide.createIcons({ nodes: [dialog] });
+          }, 50);
+        }
+      };
+    }
+
+    // Global Keyboard Shortcuts (vim-style g+key navigation, ?-key help)
+    (function() {
+      var pendingPrefix = null;
+      var prefixTimeout = null;
+      var COMBO_WINDOW = 800; // ms to type second key
+
+      // Route maps for two-key combos
+      var goRoutes = {
+        d: '/',
+        t: '/transactions',
+        c: '/connections',
+        r: '/reviews',
+        u: '/rules',
+        a: '/categories',
+        l: '/sync-logs',
+        s: '/settings',
+        p: '/providers',
+        m: '/mcp-settings',
+        k: '/api-keys',
+        f: '/users'
+      };
+
+      var newRoutes = {
+        c: '/connections/new',
+        i: '/connections/import-csv',
+        k: '/api-keys/new',
+        u: '/users/new'
+      };
+
+      function isInputFocused() {
+        var el = document.activeElement;
+        if (!el) return false;
+        var tag = el.tagName.toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+        if (el.contentEditable === 'true') return true;
+        return false;
+      }
+
+      function isOverlayOpen() {
+        // Check if command palette or shortcuts help is open
+        var cmdkEl = document.querySelector('[x-data="commandPalette()"]');
+        var shortcutsEl = document.querySelector('[x-data="shortcutsHelp()"]');
+        if (cmdkEl && cmdkEl.style.display !== 'none' && cmdkEl.__x && cmdkEl.__x.$data && cmdkEl.__x.$data.open) return true;
+        if (shortcutsEl && shortcutsEl.style.display !== 'none' && shortcutsEl.__x && shortcutsEl.__x.$data && shortcutsEl.__x.$data.open) return true;
+        // Also check by visibility of backdrop
+        var backdrops = document.querySelectorAll('.bb-cmdk-backdrop, .bb-shortcuts-backdrop');
+        for (var i = 0; i < backdrops.length; i++) {
+          if (backdrops[i].offsetParent !== null) return true;
+        }
+        return false;
+      }
+
+      function clearPrefix() {
+        pendingPrefix = null;
+        if (prefixTimeout) {
+          clearTimeout(prefixTimeout);
+          prefixTimeout = null;
+        }
+      }
+
+      document.addEventListener('keydown', function(e) {
+        // Skip if modifier keys are held (except shift for ?)
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        // Skip if typing in an input
+        if (isInputFocused()) return;
+        // Skip if an overlay is open
+        if (isOverlayOpen()) return;
+
+        var key = e.key;
+
+        // ? opens shortcuts help (shift + / on most keyboards)
+        if (key === '?') {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('open-shortcuts'));
+          clearPrefix();
+          return;
+        }
+
+        // / focuses the command palette (like GitHub)
+        if (key === '/') {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('open-cmdk'));
+          clearPrefix();
+          return;
+        }
+
+        // Two-key combos: g+key, n+key
+        if (pendingPrefix) {
+          var prefix = pendingPrefix;
+          clearPrefix();
+
+          var routes = null;
+          if (prefix === 'g') routes = goRoutes;
+          else if (prefix === 'n') routes = newRoutes;
+
+          if (routes && routes[key]) {
+            e.preventDefault();
+            window.location.href = routes[key];
+          }
+          return;
+        }
+
+        // Start a prefix sequence
+        if (key === 'g' || key === 'n') {
+          pendingPrefix = key;
+          prefixTimeout = setTimeout(function() {
+            pendingPrefix = null;
+            prefixTimeout = null;
+          }, COMBO_WINDOW);
+          return;
+        }
+      });
+    })();
   </script>
 </body>
 </html>

@@ -61,11 +61,17 @@
       </button>
     </form>
   </div>
-  {{if .AppVersion}}
   <div class="bb-sidebar-version">
+    {{if .AppVersion}}
     <i data-lucide="package" class="w-3 h-3"></i>
     <span>Breadbox v{{.AppVersion}}</span>
+    {{else}}
+    <i data-lucide="package" class="w-3 h-3"></i>
+    <span>Breadbox vdev</span>
+    {{end}}
+    <span class="ml-auto" style="cursor:pointer;opacity:0.5" @click="$dispatch('open-shortcuts')" title="Keyboard shortcuts">
+      <kbd class="bb-shortcuts-kbd" style="font-size:0.5rem;min-width:1rem;height:1rem;padding:0 0.25rem">?</kbd>
+    </span>
   </div>
-  {{end}}
 </div>
 {{end}}
