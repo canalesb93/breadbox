@@ -1,24 +1,30 @@
 {{define "content"}}
-<h1 class="text-2xl font-bold mb-6">Review Instructions</h1>
-<p class="text-sm text-base-content/60 mb-6">Pre-built instruction blocks to pass to MCP agents for transaction review. Copy the instructions and paste them into your agent's prompt.</p>
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Review Instructions</h1>
+    <p class="text-sm text-base-content/50 mt-1">Pre-built instruction blocks for MCP agents doing transaction review</p>
+  </div>
+</div>
 
 <div class="grid gap-6">
 
   <!-- Card 1: Initial Review Mode -->
-  <div class="card bg-base-100 border border-base-300" x-data="{ copied: false }">
-    <div class="card-body">
-      <div class="flex items-center gap-2 mb-1">
-        <h2 class="card-title text-lg">
-          <i data-lucide="layers" class="w-5 h-5"></i>
-          Initial Review
-        </h2>
-        <span class="badge badge-primary badge-sm">Bulk Analysis</span>
+  <div class="bb-card p-0 overflow-hidden" x-data="{ copied: false }">
+    <div class="px-6 py-5 border-b border-base-200 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+        <i data-lucide="layers" class="w-5 h-5 text-primary"></i>
       </div>
-      <p class="text-sm text-base-content/70 mb-4">Use when a new account is synced and you have many uncategorized transactions. Focuses on creating broad rules for maximum coverage.</p>
+      <div class="flex items-center gap-2">
+        <h2 class="font-semibold">Initial Review</h2>
+        <span class="badge badge-primary badge-xs rounded-lg">Bulk Analysis</span>
+      </div>
+    </div>
+    <div class="px-6 py-5">
+      <p class="text-sm text-base-content/50 mb-4">Use when a new account is synced and you have many uncategorized transactions. Focuses on creating broad rules for maximum coverage.</p>
       <div class="relative">
-        <pre class="bg-base-200 rounded-lg p-4 text-sm whitespace-pre-wrap overflow-auto max-h-80 font-mono">{{.InitialReviewInstructions}}</pre>
+        <pre class="bg-base-200 rounded-xl p-4 text-sm whitespace-pre-wrap overflow-auto max-h-80 font-mono text-base-content/70">{{.InitialReviewInstructions}}</pre>
         <button
-          class="btn btn-sm btn-ghost absolute top-2 right-2"
+          class="btn btn-sm btn-ghost rounded-xl absolute top-2 right-2"
           @click="navigator.clipboard.writeText({{.InitialReviewInstructions | printf `%q`}}).then(() => { copied = true; setTimeout(() => copied = false, 2000) })"
         >
           <template x-if="!copied">
@@ -33,20 +39,22 @@
   </div>
 
   <!-- Card 2: Recurring Review Mode -->
-  <div class="card bg-base-100 border border-base-300" x-data="{ copied: false }">
-    <div class="card-body">
-      <div class="flex items-center gap-2 mb-1">
-        <h2 class="card-title text-lg">
-          <i data-lucide="repeat" class="w-5 h-5"></i>
-          Recurring Review
-        </h2>
-        <span class="badge badge-secondary badge-sm">Daily / Weekly</span>
+  <div class="bb-card p-0 overflow-hidden" x-data="{ copied: false }">
+    <div class="px-6 py-5 border-b border-base-200 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center">
+        <i data-lucide="repeat" class="w-5 h-5 text-secondary"></i>
       </div>
-      <p class="text-sm text-base-content/70 mb-4">Use for routine review of incoming transactions. Reviews a small batch with more attention per transaction.</p>
+      <div class="flex items-center gap-2">
+        <h2 class="font-semibold">Recurring Review</h2>
+        <span class="badge badge-secondary badge-xs rounded-lg">Daily / Weekly</span>
+      </div>
+    </div>
+    <div class="px-6 py-5">
+      <p class="text-sm text-base-content/50 mb-4">Use for routine review of incoming transactions. Reviews a small batch with more attention per transaction.</p>
       <div class="relative">
-        <pre class="bg-base-200 rounded-lg p-4 text-sm whitespace-pre-wrap overflow-auto max-h-80 font-mono">{{.RecurringReviewInstructions}}</pre>
+        <pre class="bg-base-200 rounded-xl p-4 text-sm whitespace-pre-wrap overflow-auto max-h-80 font-mono text-base-content/70">{{.RecurringReviewInstructions}}</pre>
         <button
-          class="btn btn-sm btn-ghost absolute top-2 right-2"
+          class="btn btn-sm btn-ghost rounded-xl absolute top-2 right-2"
           @click="navigator.clipboard.writeText({{.RecurringReviewInstructions | printf `%q`}}).then(() => { copied = true; setTimeout(() => copied = false, 2000) })"
         >
           <template x-if="!copied">
@@ -61,29 +69,32 @@
   </div>
 
   <!-- Card 3: Connection Info -->
-  <div class="card bg-base-100 border border-base-300" x-data="{ copiedConfig: false }">
-    <div class="card-body">
-      <h2 class="card-title text-lg">
-        <i data-lucide="plug" class="w-5 h-5"></i>
-        Review MCP Connection
-      </h2>
-      <p class="text-sm text-base-content/70 mb-4">Connect your MCP agent to the review server using one of the methods below.</p>
-
-      <div class="grid gap-4">
+  <div class="bb-card p-0 overflow-hidden" x-data="{ copiedConfig: false }">
+    <div class="px-6 py-5 border-b border-base-200 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+        <i data-lucide="plug" class="w-5 h-5 text-accent"></i>
+      </div>
+      <div>
+        <h2 class="font-semibold">Review MCP Connection</h2>
+        <p class="text-xs text-base-content/40">Connect your MCP agent to the review server</p>
+      </div>
+    </div>
+    <div class="px-6 py-5">
+      <div class="space-y-5">
         <div>
-          <h3 class="font-medium text-sm mb-1">HTTP Endpoint</h3>
-          <div class="bg-base-200 rounded-lg p-3 font-mono text-sm break-all">https://&lt;host&gt;/mcp/review</div>
+          <h3 class="font-medium text-sm mb-2 text-base-content/60">HTTP Endpoint</h3>
+          <div class="bg-base-200 rounded-xl p-3 font-mono text-sm break-all text-base-content/70">https://&lt;host&gt;/mcp/review</div>
         </div>
 
         <div>
-          <h3 class="font-medium text-sm mb-1">Stdio Command</h3>
-          <div class="bg-base-200 rounded-lg p-3 font-mono text-sm">docker exec -i breadbox-app-1 /app/breadbox mcp-stdio-review</div>
+          <h3 class="font-medium text-sm mb-2 text-base-content/60">Stdio Command</h3>
+          <div class="bg-base-200 rounded-xl p-3 font-mono text-sm text-base-content/70">docker exec -i breadbox-app-1 /app/breadbox mcp-stdio-review</div>
         </div>
 
         <div>
-          <h3 class="font-medium text-sm mb-2">Claude Desktop Config (stdio)</h3>
+          <h3 class="font-medium text-sm mb-2 text-base-content/60">Claude Desktop Config (stdio)</h3>
           <div class="relative">
-            <pre class="bg-base-200 rounded-lg p-4 text-sm font-mono overflow-auto">{
+            <pre class="bg-base-200 rounded-xl p-4 text-sm font-mono overflow-auto text-base-content/70">{
   "mcpServers": {
     "breadbox-review": {
       "command": "docker",
@@ -92,7 +103,7 @@
   }
 }</pre>
             <button
-              class="btn btn-sm btn-ghost absolute top-2 right-2"
+              class="btn btn-sm btn-ghost rounded-xl absolute top-2 right-2"
               @click="navigator.clipboard.writeText(JSON.stringify({mcpServers:{'breadbox-review':{command:'docker',args:['exec','-i','breadbox-app-1','/app/breadbox','mcp-stdio-review']}}}, null, 2)).then(() => { copiedConfig = true; setTimeout(() => copiedConfig = false, 2000) })"
             >
               <template x-if="!copiedConfig">

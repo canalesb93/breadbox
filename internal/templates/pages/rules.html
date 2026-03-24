@@ -1,131 +1,169 @@
 {{define "content"}}
 <div x-data="rulesPage()" x-init="init()">
 
-<div class="flex items-center justify-between mb-6">
+<div class="bb-page-header">
   <div>
-    <h1 class="text-2xl font-bold">Transaction Rules</h1>
-    <p class="text-sm text-base-content/60 mt-1">Rules auto-categorize future transactions based on pattern matching</p>
+    <h1 class="bb-page-title">Transaction Rules</h1>
+    <p class="text-sm text-base-content/50 mt-1">Auto-categorize future transactions based on pattern matching</p>
   </div>
-  <button class="btn btn-primary btn-sm" @click="showCreateModal = true">
+  <button class="btn btn-primary btn-sm rounded-xl" @click="showCreateModal = true">
     <i data-lucide="plus" class="w-4 h-4"></i> New Rule
   </button>
 </div>
 
 <!-- Filter bar -->
-<div class="bb-filter-bar mb-4">
-  <form method="GET" class="flex items-center gap-3 flex-wrap">
-    <label class="form-control">
-      <input type="text" name="search" placeholder="Search by name..." value="{{.SearchFilter}}" class="input input-bordered input-sm w-48" />
-    </label>
-    <label class="form-control">
-      <select name="category_slug" class="select select-bordered select-sm" onchange="this.form.submit()">
+<div class="bb-card px-6 py-4 mb-6">
+  <form method="GET" class="flex items-end gap-4 flex-wrap">
+    <div class="form-control">
+      <label class="label label-text text-xs text-base-content/50 pb-1">Search</label>
+      <input type="text" name="search" placeholder="Search by name..." value="{{.SearchFilter}}" class="input input-bordered input-sm w-48 rounded-xl" />
+    </div>
+    <div class="form-control">
+      <label class="label label-text text-xs text-base-content/50 pb-1">Category</label>
+      <select name="category_slug" class="select select-bordered select-sm rounded-xl" onchange="this.form.submit()">
         <option value="">All Categories</option>
         {{range .FlatCategories}}
         <option value="{{.Slug}}"{{if eq $.CategoryFilter .Slug}} selected{{end}}>{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
         {{end}}
       </select>
-    </label>
-    <label class="form-control">
-      <select name="enabled" class="select select-bordered select-sm" onchange="this.form.submit()">
-        <option value="">All Status</option>
+    </div>
+    <div class="form-control">
+      <label class="label label-text text-xs text-base-content/50 pb-1">Status</label>
+      <select name="enabled" class="select select-bordered select-sm rounded-xl" onchange="this.form.submit()">
+        <option value="">All</option>
         <option value="true"{{if eq .EnabledFilter "true"}} selected{{end}}>Enabled</option>
         <option value="false"{{if eq .EnabledFilter "false"}} selected{{end}}>Disabled</option>
       </select>
-    </label>
-    <button type="submit" class="btn btn-sm btn-ghost">Filter</button>
-    {{if or .SearchFilter .CategoryFilter .EnabledFilter}}<a href="/rules" class="btn btn-sm btn-ghost">Clear</a>{{end}}
+    </div>
+    <div class="flex gap-2">
+      <button type="submit" class="btn btn-sm btn-ghost rounded-xl">Filter</button>
+      {{if or .SearchFilter .CategoryFilter .EnabledFilter}}<a href="/rules" class="btn btn-sm btn-ghost rounded-xl">Clear</a>{{end}}
+    </div>
   </form>
 </div>
 
 <!-- Rules count -->
-<div class="text-sm text-base-content/60 mb-3">
+<div class="text-sm text-base-content/40 mb-4 px-1">
   {{.Total}} rule{{if ne .Total 1}}s{{end}} found
 </div>
 
-<!-- Rules table -->
-<div class="card bg-base-100 shadow-sm">
-  <div class="card-body p-0">
-    <div class="overflow-x-auto">
-      <table class="table table-sm">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Conditions</th>
-            <th>Category</th>
-            <th>Priority</th>
-            <th>Hits</th>
-            <th>Status</th>
-            <th>Created By</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {{if not .Rules}}
-          <tr><td colspan="8" class="text-center text-base-content/60 py-8">No rules found. Create one to start auto-categorizing transactions.</td></tr>
+<!-- Rules as cards instead of table for Mercury feel -->
+{{if not .Rules}}
+<div class="bb-card">
+  <div class="flex flex-col items-center text-center py-16 px-6">
+    <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+      <i data-lucide="list-filter" class="w-8 h-8 text-primary"></i>
+    </div>
+    <h2 class="text-lg font-semibold mb-1">No rules yet</h2>
+    <p class="text-base-content/50 text-sm mb-4">Create a rule to start auto-categorizing transactions.</p>
+    <button class="btn btn-primary btn-sm rounded-xl" @click="showCreateModal = true">
+      <i data-lucide="plus" class="w-4 h-4"></i> Create Rule
+    </button>
+  </div>
+</div>
+{{end}}
+
+<div class="space-y-3">
+{{range .Rules}}
+<div class="bb-card p-0 overflow-hidden" x-data="{deleting: false}">
+  <div class="flex items-center gap-4 px-6 py-4">
+    <!-- Status indicator -->
+    <div class="flex-shrink-0">
+      {{if .Enabled}}
+        {{if and .ExpiresAt (expired .ExpiresAt)}}
+        <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
+          <i data-lucide="clock" class="w-5 h-5 text-warning"></i>
+        </div>
+        {{else}}
+        <div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
+          <i data-lucide="zap" class="w-5 h-5 text-success"></i>
+        </div>
+        {{end}}
+      {{else}}
+      <div class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center">
+        <i data-lucide="pause" class="w-5 h-5 text-base-content/30"></i>
+      </div>
+      {{end}}
+    </div>
+
+    <!-- Main info -->
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2">
+        <span class="font-semibold text-sm truncate">{{.Name}}</span>
+        {{if .Enabled}}
+          {{if and .ExpiresAt (expired .ExpiresAt)}}
+          <span class="badge badge-warning badge-xs rounded-lg">Expired</span>
           {{end}}
-          {{range .Rules}}
-          <tr x-data="{deleting: false}">
-            <td class="font-medium max-w-48 truncate" title="{{.Name}}">{{.Name}}</td>
-            <td class="text-xs font-mono max-w-64 truncate" title="{{conditionSummary .Conditions}}">{{conditionSummary .Conditions}}</td>
-            <td>
-              {{if .CategoryName}}<span class="badge badge-outline badge-sm">{{deref .CategoryName}}</span>{{else}}<span class="text-base-content/40">&mdash;</span>{{end}}
-            </td>
-            <td>{{.Priority}}</td>
-            <td>{{.HitCount}}</td>
-            <td>
-              {{if .Enabled}}
-                {{if and .ExpiresAt (expired .ExpiresAt)}}
-                  <span class="badge badge-warning badge-sm">Expired</span>
-                {{else}}
-                  <span class="badge badge-success badge-sm">Enabled</span>
-                {{end}}
-              {{else}}
-                <span class="badge badge-ghost badge-sm">Disabled</span>
-              {{end}}
-            </td>
-            <td class="text-sm">
-              <span class="badge badge-ghost badge-xs">{{.CreatedByType}}</span>
-              {{.CreatedByName}}
-            </td>
-            <td class="flex gap-1">
-              <button class="btn btn-ghost btn-xs" title="Toggle" @click="toggleRule('{{.ID}}')">
-                {{if .Enabled}}<i data-lucide="pause" class="w-4 h-4"></i>{{else}}<i data-lucide="play" class="w-4 h-4"></i>{{end}}
-              </button>
-              <button class="btn btn-ghost btn-xs" title="Edit" @click="editRule({{toJSON .}})">
-                <i data-lucide="pencil" class="w-4 h-4"></i>
-              </button>
-              <button class="btn btn-ghost btn-xs text-error" title="Delete" :disabled="deleting" @click="deleteRule('{{.ID}}', $el)">
-                <i data-lucide="trash-2" class="w-4 h-4"></i>
-              </button>
-            </td>
-          </tr>
-          {{end}}
-        </tbody>
-      </table>
+        {{else}}
+        <span class="badge badge-ghost badge-xs rounded-lg">Disabled</span>
+        {{end}}
+      </div>
+      <div class="text-xs text-base-content/40 mt-0.5 font-mono truncate" title="{{conditionSummary .Conditions}}">{{conditionSummary .Conditions}}</div>
+    </div>
+
+    <!-- Category -->
+    <div class="hidden sm:flex flex-col items-end gap-0.5 flex-shrink-0">
+      {{if .CategoryName}}
+      <span class="badge badge-outline badge-sm rounded-lg">{{deref .CategoryName}}</span>
+      {{else}}
+      <span class="text-base-content/30 text-xs">&mdash;</span>
+      {{end}}
+    </div>
+
+    <!-- Stats -->
+    <div class="hidden md:flex items-center gap-4 text-xs text-base-content/40 flex-shrink-0">
+      <div class="text-center">
+        <div class="font-semibold text-sm text-base-content/70 tabular-nums">{{.HitCount}}</div>
+        <div>hits</div>
+      </div>
+      <div class="text-center">
+        <div class="font-semibold text-sm text-base-content/70 tabular-nums">{{.Priority}}</div>
+        <div>priority</div>
+      </div>
+    </div>
+
+    <!-- Creator badge -->
+    <div class="hidden lg:block flex-shrink-0">
+      <span class="badge badge-ghost badge-xs rounded-lg">{{.CreatedByType}}</span>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center gap-1 flex-shrink-0">
+      <button class="btn btn-ghost btn-xs btn-square rounded-lg" title="Toggle" @click="toggleRule('{{.ID}}')">
+        {{if .Enabled}}<i data-lucide="pause" class="w-4 h-4"></i>{{else}}<i data-lucide="play" class="w-4 h-4"></i>{{end}}
+      </button>
+      <button class="btn btn-ghost btn-xs btn-square rounded-lg" title="Edit" @click="editRule({{toJSON .}})">
+        <i data-lucide="pencil" class="w-4 h-4"></i>
+      </button>
+      <button class="btn btn-ghost btn-xs btn-square rounded-lg text-error/60" title="Delete" :disabled="deleting" @click="deleteRule('{{.ID}}', $el)">
+        <i data-lucide="trash-2" class="w-4 h-4"></i>
+      </button>
     </div>
   </div>
+</div>
+{{end}}
 </div>
 
 <!-- Pagination -->
 {{if .HasMore}}
-<div class="flex justify-center mt-4">
-  <a href="/rules?cursor={{.NextCursor}}{{if .SearchFilter}}&search={{.SearchFilter}}{{end}}{{if .CategoryFilter}}&category_slug={{.CategoryFilter}}{{end}}{{if .EnabledFilter}}&enabled={{.EnabledFilter}}{{end}}" class="btn btn-sm btn-outline">Load More</a>
+<div class="flex justify-center mt-8">
+  <a href="/rules?cursor={{.NextCursor}}{{if .SearchFilter}}&search={{.SearchFilter}}{{end}}{{if .CategoryFilter}}&category_slug={{.CategoryFilter}}{{end}}{{if .EnabledFilter}}&enabled={{.EnabledFilter}}{{end}}" class="btn btn-sm btn-outline rounded-xl">Load More</a>
 </div>
 {{end}}
 
 <!-- Create/Edit Rule Modal -->
 <dialog class="modal" :class="{'modal-open': showCreateModal || showEditModal}">
-  <div class="modal-box max-w-lg">
-    <h3 class="font-bold text-lg mb-4" x-text="showEditModal ? 'Edit Rule' : 'Create Rule'"></h3>
+  <div class="modal-box max-w-lg rounded-2xl">
+    <h3 class="font-bold text-lg mb-6" x-text="showEditModal ? 'Edit Rule' : 'Create Rule'"></h3>
     <form @submit.prevent="submitRule()">
-      <div class="form-control mb-3">
-        <label class="label"><span class="label-text">Name</span></label>
-        <input type="text" x-model="form.name" class="input input-bordered input-sm" placeholder="e.g., Uber Eats transactions" required />
+      <div class="form-control mb-4">
+        <label class="label"><span class="label-text text-sm font-medium">Name</span></label>
+        <input type="text" x-model="form.name" class="input input-bordered input-sm rounded-xl" placeholder="e.g., Uber Eats transactions" required />
       </div>
 
-      <div class="form-control mb-3">
-        <label class="label"><span class="label-text">Category</span></label>
-        <select x-model="form.category_slug" class="select select-bordered select-sm" required>
+      <div class="form-control mb-4">
+        <label class="label"><span class="label-text text-sm font-medium">Category</span></label>
+        <select x-model="form.category_slug" class="select select-bordered select-sm rounded-xl" required>
           <option value="">Select category...</option>
           {{range .FlatCategories}}
           <option value="{{.Slug}}">{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
@@ -133,37 +171,36 @@
         </select>
       </div>
 
-      <div class="form-control mb-3">
-        <label class="label"><span class="label-text">Priority</span></label>
-        <input type="number" x-model.number="form.priority" class="input input-bordered input-sm w-24" min="0" max="1000" />
-        <label class="label"><span class="label-text-alt">Higher priority rules are evaluated first (default: 10)</span></label>
+      <div class="form-control mb-4">
+        <label class="label"><span class="label-text text-sm font-medium">Priority</span></label>
+        <input type="number" x-model.number="form.priority" class="input input-bordered input-sm w-24 rounded-xl" min="0" max="1000" />
+        <label class="label"><span class="label-text-alt text-base-content/40">Higher priority rules are evaluated first (default: 10)</span></label>
       </div>
 
-      <div class="form-control mb-3">
-        <label class="label"><span class="label-text">Conditions (JSON)</span></label>
-        <textarea x-model="form.conditions_json" class="textarea textarea-bordered textarea-sm font-mono text-xs" rows="6" placeholder='{"field": "name", "op": "contains", "value": "uber eats"}' required></textarea>
+      <div class="form-control mb-4">
+        <label class="label"><span class="label-text text-sm font-medium">Conditions (JSON)</span></label>
+        <textarea x-model="form.conditions_json" class="textarea textarea-bordered textarea-sm font-mono text-xs rounded-xl" rows="6" placeholder='{"field": "name", "op": "contains", "value": "uber eats"}' required></textarea>
         <label class="label">
-          <span class="label-text-alt">
+          <span class="label-text-alt text-base-content/40">
             Fields: name, merchant_name, amount, category_primary, category_detailed, pending, provider, account_id, user_id.
-            Operators: eq, neq, contains, not_contains, matches (regex), gt, gte, lt, lte, in.
-            Use and/or/not for logical operators.
+            Operators: eq, neq, contains, not_contains, matches, gt, gte, lt, lte, in.
           </span>
         </label>
       </div>
 
-      <div class="form-control mb-3" x-show="!showEditModal">
-        <label class="label"><span class="label-text">Expires In (optional)</span></label>
-        <input type="text" x-model="form.expires_in" class="input input-bordered input-sm w-32" placeholder="e.g., 30d" />
-        <label class="label"><span class="label-text-alt">Duration: 24h, 7d, 4w. Leave empty for no expiry.</span></label>
+      <div class="form-control mb-4" x-show="!showEditModal">
+        <label class="label"><span class="label-text text-sm font-medium">Expires In</span> <span class="text-base-content/40 text-xs">(optional)</span></label>
+        <input type="text" x-model="form.expires_in" class="input input-bordered input-sm w-32 rounded-xl" placeholder="e.g., 30d" />
+        <label class="label"><span class="label-text-alt text-base-content/40">Duration: 24h, 7d, 4w. Leave empty for no expiry.</span></label>
       </div>
 
-      <div x-show="formError" class="alert alert-error alert-sm mb-3">
+      <div x-show="formError" class="alert alert-error text-sm mb-4 rounded-xl">
         <span x-text="formError"></span>
       </div>
 
       <div class="modal-action">
-        <button type="button" class="btn btn-ghost btn-sm" @click="closeModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm" :disabled="submitting">
+        <button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm rounded-xl" :disabled="submitting">
           <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
           <span x-text="showEditModal ? 'Save' : 'Create'"></span>
         </button>

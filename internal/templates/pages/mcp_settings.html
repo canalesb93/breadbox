@@ -1,99 +1,104 @@
 {{define "content"}}
-<h1 class="text-2xl font-bold mb-6">MCP Settings</h1>
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">MCP Settings</h1>
+    <p class="text-sm text-base-content/50 mt-1">Configure how AI agents interact with your financial data</p>
+  </div>
+</div>
 
 <div class="grid gap-6">
 
   <!-- Card 1: Global Mode -->
-  <div class="card bg-base-100 border border-base-300">
-    <div class="card-body">
-      <h2 class="card-title text-lg">
-        <i data-lucide="shield" class="w-5 h-5"></i>
-        Global Mode
-      </h2>
-      <p class="text-sm text-base-content/70 mb-4">Controls whether MCP-connected agents can perform write operations (sync, categorize, comment) or are limited to read-only data queries.</p>
+  <div class="bb-card p-0 overflow-hidden">
+    <div class="px-6 py-5 border-b border-base-200 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+        <i data-lucide="shield" class="w-5 h-5 text-primary"></i>
+      </div>
+      <div>
+        <h2 class="font-semibold">Global Mode</h2>
+        <p class="text-xs text-base-content/40">Control agent read/write permissions</p>
+      </div>
+    </div>
+    <div class="px-6 py-5">
       <form method="POST" action="/mcp-settings/mode">
         <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
         <div class="flex flex-col gap-3">
-          <label class="label cursor-pointer justify-start gap-3">
-            <input type="radio" name="mode" value="read_only" class="radio radio-primary" {{if eq .MCPConfig.Mode "read_only"}}checked{{end}}>
+          <label class="flex items-start gap-3 cursor-pointer p-3 rounded-xl hover:bg-base-200/50 transition-colors duration-150">
+            <input type="radio" name="mode" value="read_only" class="radio radio-primary mt-0.5" {{if eq .MCPConfig.Mode "read_only"}}checked{{end}}>
             <div>
-              <span class="font-medium">Read Only</span>
-              <span class="badge badge-ghost badge-sm ml-2">Default</span>
-              <p class="text-sm text-base-content/60">Agents can query data but cannot trigger syncs, categorize transactions, or make changes.</p>
+              <div class="flex items-center gap-2">
+                <span class="font-medium text-sm">Read Only</span>
+                <span class="badge badge-ghost badge-xs rounded-lg">Default</span>
+              </div>
+              <p class="text-xs text-base-content/40 mt-0.5">Agents can query data but cannot trigger syncs, categorize transactions, or make changes.</p>
             </div>
           </label>
-          <label class="label cursor-pointer justify-start gap-3">
-            <input type="radio" name="mode" value="read_write" class="radio radio-primary" {{if eq .MCPConfig.Mode "read_write"}}checked{{end}}>
+          <label class="flex items-start gap-3 cursor-pointer p-3 rounded-xl hover:bg-base-200/50 transition-colors duration-150">
+            <input type="radio" name="mode" value="read_write" class="radio radio-primary mt-0.5" {{if eq .MCPConfig.Mode "read_write"}}checked{{end}}>
             <div>
-              <span class="font-medium">Read & Write</span>
-              <p class="text-sm text-base-content/60">Agents can query data and perform write operations like syncing, categorizing, and commenting.</p>
+              <span class="font-medium text-sm">Read & Write</span>
+              <p class="text-xs text-base-content/40 mt-0.5">Agents can query data and perform write operations like syncing, categorizing, and commenting.</p>
             </div>
           </label>
         </div>
-        <div class="mt-4">
-          <button type="submit" class="btn btn-primary btn-sm">Save Mode</button>
+        <div class="mt-5">
+          <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Mode</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Card 2: Tool Access -->
-  <div class="card bg-base-100 border border-base-300">
-    <div class="card-body">
-      <h2 class="card-title text-lg">
-        <i data-lucide="wrench" class="w-5 h-5"></i>
-        Tool Access
-      </h2>
-      <p class="text-sm text-base-content/70 mb-4">Enable or disable individual tools. Disabled tools are hidden from all agents. Write tools are automatically disabled when global mode is Read Only.</p>
+  <div class="bb-card p-0 overflow-hidden">
+    <div class="px-6 py-5 border-b border-base-200 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center">
+        <i data-lucide="wrench" class="w-5 h-5 text-secondary"></i>
+      </div>
+      <div>
+        <h2 class="font-semibold">Tool Access</h2>
+        <p class="text-xs text-base-content/40">Enable or disable individual MCP tools</p>
+      </div>
+    </div>
+    <div class="px-6 py-5">
+      <p class="text-sm text-base-content/50 mb-4">Disabled tools are hidden from all agents. Write tools are automatically disabled in Read Only mode.</p>
       <form method="POST" action="/mcp-settings/tools">
         <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-        <div class="overflow-x-auto">
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>Enabled</th>
-                <th>Tool</th>
-                <th>Type</th>
-              </tr>
-            </thead>
-            <tbody>
-              {{range .Tools}}
-              <tr>
-                <td>
-                  {{if .WriteLocked}}
-                    <input type="checkbox" class="toggle toggle-sm" disabled title="Disabled by Read Only mode">
-                  {{else}}
-                    <input type="checkbox" name="enabled_tools" value="{{.Name}}" class="toggle toggle-sm toggle-primary" {{if .Enabled}}checked{{end}}>
-                  {{end}}
-                </td>
-                <td>
-                  <div class="font-mono text-sm">{{.Name}}</div>
-                  <div class="text-xs text-base-content/50 max-w-md truncate">{{.Description}}</div>
-                </td>
-                <td>
-                  {{if eq .Classification "write"}}
-                    <span class="badge badge-warning badge-sm">write</span>
-                  {{else}}
-                    <span class="badge badge-info badge-sm">read</span>
-                  {{end}}
-                  {{if .WriteLocked}}
-                    <i data-lucide="lock" class="w-3 h-3 inline text-base-content/40" title="Locked by Read Only mode"></i>
-                  {{end}}
-                </td>
-              </tr>
+        <div class="space-y-1">
+          {{range .Tools}}
+          <div class="flex items-center justify-between p-3 rounded-xl hover:bg-base-200/50 transition-colors duration-150">
+            <div class="flex items-center gap-3 min-w-0">
+              {{if .WriteLocked}}
+                <input type="checkbox" class="toggle toggle-sm" disabled title="Disabled by Read Only mode">
+              {{else}}
+                <input type="checkbox" name="enabled_tools" value="{{.Name}}" class="toggle toggle-sm toggle-primary" {{if .Enabled}}checked{{end}}>
               {{end}}
-            </tbody>
-          </table>
+              <div class="min-w-0">
+                <div class="font-mono text-sm">{{.Name}}</div>
+                <div class="text-xs text-base-content/40 truncate max-w-md">{{.Description}}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5 flex-shrink-0 ml-3">
+              {{if eq .Classification "write"}}
+                <span class="badge badge-warning badge-xs rounded-lg">write</span>
+              {{else}}
+                <span class="badge badge-info badge-xs rounded-lg">read</span>
+              {{end}}
+              {{if .WriteLocked}}
+                <i data-lucide="lock" class="w-3 h-3 text-base-content/30"></i>
+              {{end}}
+            </div>
+          </div>
+          {{end}}
         </div>
-        <div class="mt-4">
-          <button type="submit" class="btn btn-primary btn-sm">Save Tool Access</button>
+        <div class="mt-5">
+          <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Tool Access</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Card 3: Server Instructions -->
-  <div class="card bg-base-100 border border-base-300" x-data="{
+  <div class="bb-card p-0 overflow-hidden" x-data="{
     instructions: {{.MCPConfig.CustomInstructions | printf `%q`}},
     template: '{{.MCPConfig.InstructionTemplate}}',
     templates: {{.TemplatesJSON}},
@@ -114,18 +119,22 @@
       }
     }
   }">
-    <div class="card-body">
-      <h2 class="card-title text-lg">
-        <i data-lucide="file-text" class="w-5 h-5"></i>
-        Server Instructions
-      </h2>
-      <p class="text-sm text-base-content/70 mb-4">Custom instructions appended to the built-in MCP server instructions. Agents see these when they connect. Use markdown formatting.</p>
+    <div class="px-6 py-5 border-b border-base-200 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+        <i data-lucide="file-text" class="w-5 h-5 text-accent"></i>
+      </div>
+      <div>
+        <h2 class="font-semibold">Server Instructions</h2>
+        <p class="text-xs text-base-content/40">Custom instructions for connected agents</p>
+      </div>
+    </div>
+    <div class="px-6 py-5">
       <form method="POST" action="/mcp-settings/instructions">
         <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
-        <div class="form-control mb-3">
-          <label class="label"><span class="label-text font-medium">Template</span></label>
-          <select name="template" class="select select-bordered select-sm w-full max-w-xs" x-model="template" @change="loadTemplate(template)">
+        <div class="form-control mb-4">
+          <label class="label"><span class="label-text text-sm font-medium">Template</span></label>
+          <select name="template" class="select select-bordered select-sm w-full max-w-xs rounded-xl" x-model="template" @change="loadTemplate(template)">
             <option value="">Custom</option>
             {{range .Templates}}
             <option value="{{.Slug}}">{{.Name}} &mdash; {{.Description}}</option>
@@ -133,23 +142,23 @@
           </select>
         </div>
 
-        <div class="form-control mb-3">
-          <label class="label"><span class="label-text font-medium">Custom Instructions</span></label>
-          <textarea name="instructions" class="textarea textarea-bordered font-mono text-sm h-48 w-full" maxlength="10000" x-model="instructions" placeholder="Enter custom instructions for MCP agents..."></textarea>
+        <div class="form-control mb-4">
+          <label class="label"><span class="label-text text-sm font-medium">Custom Instructions</span></label>
+          <textarea name="instructions" class="textarea textarea-bordered font-mono text-sm h-48 w-full rounded-xl" maxlength="10000" x-model="instructions" placeholder="Enter custom instructions for MCP agents..."></textarea>
           <label class="label">
-            <span class="label-text-alt" x-text="instructions.length + '/10000'"></span>
+            <span class="label-text-alt text-base-content/40" x-text="instructions.length + '/10000'"></span>
           </label>
         </div>
 
-        <div class="flex gap-2 items-center mb-3">
-          <button type="submit" class="btn btn-primary btn-sm">Save Instructions</button>
-          <button type="button" class="btn btn-ghost btn-sm" @click="showPreview = !showPreview" x-text="showPreview ? 'Hide Preview' : 'Show Preview'"></button>
+        <div class="flex gap-2 items-center">
+          <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Instructions</button>
+          <button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="showPreview = !showPreview" x-text="showPreview ? 'Hide Preview' : 'Show Preview'"></button>
         </div>
       </form>
 
-      <div x-show="showPreview" x-cloak class="mt-2">
-        <h3 class="font-medium text-sm mb-2">Full Instructions (Built-in + Custom)</h3>
-        <pre class="bg-base-200 p-4 rounded-lg text-xs overflow-auto max-h-96 whitespace-pre-wrap">{{.BuiltInInstructions}}
+      <div x-show="showPreview" x-cloak class="mt-4">
+        <h3 class="font-medium text-sm mb-2 text-base-content/60">Full Instructions (Built-in + Custom)</h3>
+        <pre class="bg-base-200 p-4 rounded-xl text-xs overflow-auto max-h-96 whitespace-pre-wrap">{{.BuiltInInstructions}}
 
 <span x-show="instructions.length > 0" x-text="'\n\nCUSTOM INSTRUCTIONS:\n' + instructions"></span></pre>
       </div>
@@ -157,31 +166,42 @@
   </div>
 
   <!-- Card 4: API Key Scopes -->
-  <div class="card bg-base-100 border border-base-300">
-    <div class="card-body">
-      <h2 class="card-title text-lg">
-        <i data-lucide="key" class="w-5 h-5"></i>
-        API Key Scopes
-      </h2>
-      <p class="text-sm text-base-content/70 mb-4">Each API key can be scoped to limit what operations it can perform. Read-only keys cannot invoke write tools or write REST endpoints, even when global mode is Read & Write.</p>
-      <div class="stats shadow">
-        <div class="stat">
-          <div class="stat-title">Full Access</div>
-          <div class="stat-value text-2xl">{{.FullAccessCount}}</div>
-          <div class="stat-desc">Read + Write</div>
+  <div class="bb-card p-0 overflow-hidden">
+    <div class="px-6 py-5 border-b border-base-200 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
+        <i data-lucide="key" class="w-5 h-5 text-warning"></i>
+      </div>
+      <div>
+        <h2 class="font-semibold">API Key Scopes</h2>
+        <p class="text-xs text-base-content/40">Manage API key access levels</p>
+      </div>
+    </div>
+    <div class="px-6 py-5">
+      <p class="text-sm text-base-content/50 mb-5">Read-only keys cannot invoke write tools or write REST endpoints, even when global mode is Read & Write.</p>
+      <div class="grid grid-cols-2 gap-4 mb-5">
+        <div class="bb-stat-card">
+          <div class="bb-stat-card__icon text-primary">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+          </div>
+          <div class="bb-stat-card__body">
+            <span class="bb-stat-card__value">{{.FullAccessCount}}</span>
+            <span class="bb-stat-card__label">Full Access</span>
+          </div>
         </div>
-        <div class="stat">
-          <div class="stat-title">Read Only</div>
-          <div class="stat-value text-2xl">{{.ReadOnlyCount}}</div>
-          <div class="stat-desc">Query only</div>
+        <div class="bb-stat-card">
+          <div class="bb-stat-card__icon text-secondary">
+            <i data-lucide="eye" class="w-5 h-5"></i>
+          </div>
+          <div class="bb-stat-card__body">
+            <span class="bb-stat-card__value">{{.ReadOnlyCount}}</span>
+            <span class="bb-stat-card__label">Read Only</span>
+          </div>
         </div>
       </div>
-      <div class="mt-4">
-        <a href="/api-keys" class="btn btn-ghost btn-sm">
-          <i data-lucide="external-link" class="w-4 h-4"></i>
-          Manage API Keys
-        </a>
-      </div>
+      <a href="/api-keys" class="btn btn-ghost btn-sm rounded-xl">
+        <i data-lucide="external-link" class="w-4 h-4"></i>
+        Manage API Keys
+      </a>
     </div>
   </div>
 
