@@ -27,7 +27,7 @@ Browse the current templates and CSS to see the state of the UI:
 ls internal/templates/pages/ internal/templates/partials/ internal/templates/layouts/
 ```
 
-Also **look at the actual app** — use Chrome MCP to navigate to `http://localhost:8080` and take a screenshot to see what it currently looks like. This is critical for choosing what to work on.
+Also **look at the actual app** — use Chrome MCP tools (`navigate`, `read_page`, `javascript_tool`, etc.) to browse `http://localhost:8080` and see the current state. This is critical for choosing what to work on. Do NOT use the `app-screenshot` skill during discovery or implementation — just use the regular Chrome MCP tools to navigate and inspect pages visually. Save the screenshot skill for the final PR submission only.
 
 ## Phase 2: Choose Your Focus
 
@@ -70,9 +70,10 @@ git checkout -b auto-improvement/<short-descriptive-name>
 
 - **Modern and clean** — Generous whitespace, clear hierarchy, no visual clutter.
 - **Snappy** — CSS transitions (150-250ms), no jarring reflows, smooth hover states.
-- **Consistent** — Use DaisyUI semantic classes. Reuse patterns. Don't invent one-off styles.
+- **Consistent design system** — This is critical. Before implementing, read `input.css` and the existing templates to understand the patterns already in use (component classes like `bb-stat-card`, `bb-filter-bar`, `bb-amount`, etc.). Reuse and extend existing patterns — do NOT invent one-off styles or diverge from the established look. Every page should feel like it belongs to the same app. Use DaisyUI semantic classes (`card`, `badge`, `table`, `btn`, `alert`, etc.) consistently. If you add new reusable patterns, define them as `@apply` classes in `input.css`.
 - **Dark mode first** — The app uses `prefers-color-scheme` auto-switch. Design for dark, verify it works in light.
 - **Data-dense but readable** — Financial apps need to show lots of data. Use typography and spacing to keep it scannable.
+- **Match the dashboard** — The dashboard sets the visual standard: card-based sections with `bg-base-100 shadow-sm border border-base-300`, compact headers with icons, and generous but not wasteful spacing. Other pages should follow this same card/section pattern.
 
 ### What NOT to do
 
@@ -95,7 +96,7 @@ If the app fails to start, check `tail -20 /tmp/breadbox.log` and fix the issue 
 
 ## Phase 4: Screenshot
 
-Take 1-2 screenshots that show the impact of your changes. Use the `app-screenshot` skill:
+Take 1-2 screenshots that show the impact of your changes. **This is the ONLY phase where you should use the screenshot/upload pipeline.** During discovery and implementation, use regular Chrome MCP tools (`navigate`, `read_page`, etc.) instead.
 
 1. Navigate Chrome MCP to the page you changed
 2. If redirected to login, use JS to submit: `canalesb93@gmail.com` / `password`
@@ -183,3 +184,4 @@ gh issue edit 55 --body "${CURRENT_BODY}
 - Include at least one screenshot in the PR.
 - Don't delete existing features — improve them.
 - Be bold. The goal is transformation, not incremental tweaks.
+- **Design consistency is non-negotiable.** Read `input.css` and at least 2-3 existing page templates before writing any CSS or HTML. Your changes must look like they belong to the same app as the dashboard. If something feels off, it probably is — match the existing patterns.
