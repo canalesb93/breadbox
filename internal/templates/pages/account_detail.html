@@ -20,64 +20,185 @@
   </div>
 </div>
 
-<!-- Balance Cards + Account Info -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+<!-- Financial Summary Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 bb-stagger">
   <!-- Balance Card -->
-  <div class="bb-card p-6 lg:col-span-2">
-    <h2 class="text-sm font-semibold text-base-content/50 mb-5">Balances</h2>
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-6">
-      <div>
-        <p class="text-xs text-base-content/40 mb-1">Current Balance</p>
-        <p class="text-2xl font-semibold tabular-nums">
-          {{if .Account.BalanceCurrent}}{{fmtBalance .Account.BalanceCurrent}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
-        </p>
-        {{if .Account.IsoCurrencyCode}}<p class="text-xs text-base-content/30 mt-0.5">{{deref .Account.IsoCurrencyCode}}</p>{{end}}
+  <div class="bb-card p-5">
+    <div class="text-xs font-medium text-base-content/50 mb-1">Current Balance</div>
+    <div class="text-2xl font-semibold tabular-nums tracking-tight{{if .IsLiability}} text-error/80{{end}}">
+      {{if .Account.BalanceCurrent}}{{if .IsLiability}}-{{end}}{{fmtBalance .Account.BalanceCurrent}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
+    </div>
+    {{if .Account.IsoCurrencyCode}}<div class="text-xs text-base-content/30 mt-1">{{deref .Account.IsoCurrencyCode}}</div>{{end}}
+  </div>
+
+  <!-- Spending Card -->
+  <div class="bb-card p-5">
+    <div class="flex items-center gap-2 mb-1">
+      <span class="text-xs font-medium text-base-content/50">Spending</span>
+      <span class="text-xs text-base-content/30">30d</span>
+    </div>
+    <div class="flex items-baseline gap-2">
+      <div class="text-2xl font-semibold tabular-nums tracking-tight">
+        {{formatBalance .TotalSpending}}
       </div>
-      <div>
-        <p class="text-xs text-base-content/40 mb-1">Available</p>
-        <p class="text-2xl font-semibold tabular-nums text-base-content/60">
-          {{if .Account.BalanceAvailable}}{{fmtBalance .Account.BalanceAvailable}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
-        </p>
-      </div>
-      {{if .Account.BalanceLimit}}
-      <div>
-        <p class="text-xs text-base-content/40 mb-1">Credit Limit</p>
-        <p class="text-2xl font-semibold tabular-nums text-base-content/60">{{fmtBalance .Account.BalanceLimit}}</p>
+      {{if .HasSpendingChange}}
+      <div class="flex items-center gap-0.5 text-xs font-medium {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
+        <i data-lucide="{{if gt .SpendingChangePercent 0.0}}trending-up{{else}}trending-down{{end}}" class="w-3 h-3"></i>
+        {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}%
       </div>
       {{end}}
     </div>
+    <div class="text-xs text-base-content/40 mt-1">{{.TxCount30d}} transactions</div>
   </div>
 
-  <!-- Account Settings Card -->
-  <div class="bb-card p-6">
-    <h2 class="text-sm font-semibold text-base-content/50 mb-5">Settings</h2>
-    <div class="space-y-4">
-      <div>
-        <label class="text-xs text-base-content/40 mb-1.5 block">Display Name</label>
-        <input type="text" value="{{if .Account.DisplayName}}{{.Account.DisplayName}}{{end}}" placeholder="{{.Account.Name}}"
-          onchange="updateDisplayName('{{.AccountID}}', this.value)"
-          class="input input-sm input-bordered w-full">
+  <!-- Income Card -->
+  <div class="bb-card p-5">
+    <div class="flex items-center gap-2 mb-1">
+      <span class="text-xs font-medium text-base-content/50">Income</span>
+      <span class="text-xs text-base-content/30">30d</span>
+    </div>
+    <div class="text-2xl font-semibold tabular-nums tracking-tight text-success">
+      {{formatBalance .TotalIncome}}
+    </div>
+  </div>
+
+  <!-- Available / Credit Utilization Card -->
+  {{if .HasCreditUtil}}
+  <div class="bb-card p-5">
+    <div class="text-xs font-medium text-base-content/50 mb-1">Credit Utilization</div>
+    <div class="text-2xl font-semibold tabular-nums tracking-tight{{if gt .CreditUtilization 75.0}} text-error/80{{else if gt .CreditUtilization 30.0}} text-warning{{end}}">
+      {{printf "%.0f" .CreditUtilization}}%
+    </div>
+    <div class="mt-2">
+      <div class="w-full h-1.5 bg-base-200 rounded-full overflow-hidden">
+        <div class="h-full rounded-full transition-all duration-500{{if gt .CreditUtilization 75.0}} bg-error/70{{else if gt .CreditUtilization 30.0}} bg-warning{{else}} bg-success/60{{end}}"
+          style="width: {{if gt .CreditUtilization 100.0}}100{{else}}{{printf "%.0f" .CreditUtilization}}{{end}}%"></div>
       </div>
-      <div>
-        <label class="flex items-center gap-3 cursor-pointer">
-          <input type="checkbox" class="checkbox checkbox-sm" {{if .Account.Excluded}}checked{{end}}
-            onchange="toggleExcluded('{{.AccountID}}', this.checked)">
-          <div>
-            <span class="text-sm font-medium">Excluded from sync</span>
-            <p class="text-xs text-base-content/40">Skip transaction sync for this account</p>
-          </div>
-        </label>
+      <div class="flex justify-between mt-1 text-xs text-base-content/30">
+        <span>{{fmtBalance .Account.BalanceCurrent}} used</span>
+        <span>{{fmtBalance .Account.BalanceLimit}} limit</span>
       </div>
-      <div class="pt-2 border-t border-base-300">
-        <p class="text-xs text-base-content/40 mb-1">Connection</p>
-        <a href="/connections/{{.Account.ConnectionID}}" class="text-sm font-medium hover:text-primary transition-colors no-underline">{{.Account.InstitutionName}}</a>
+    </div>
+  </div>
+  {{else}}
+  <div class="bb-card p-5">
+    <div class="text-xs font-medium text-base-content/50 mb-1">Available</div>
+    <div class="text-2xl font-semibold tabular-nums tracking-tight text-base-content/60">
+      {{if .Account.BalanceAvailable}}{{fmtBalance .Account.BalanceAvailable}}{{else}}<span class="text-base-content/20">&mdash;</span>{{end}}
+    </div>
+  </div>
+  {{end}}
+</div>
+
+<!-- Charts Row -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8 bb-stagger">
+  <!-- Daily Spending Chart -->
+  <div class="bb-card lg:col-span-2 p-5">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <h2 class="text-sm font-semibold text-base-content/70">Daily Spending</h2>
+        <span class="text-xs text-base-content/30">Last 30 days</span>
       </div>
-      {{if .Account.UserName}}
-      <div>
-        <p class="text-xs text-base-content/40 mb-1">Family Member</p>
-        <p class="text-sm font-medium">{{.Account.UserName}}</p>
+      {{if .HasSpendingChange}}
+      <div class="flex items-center gap-1.5 text-xs text-base-content/40">
+        <span>vs prev 30d:</span>
+        <span class="font-medium {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
+          {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}%
+        </span>
       </div>
       {{end}}
+    </div>
+    {{if .DailyLabels}}
+    <div class="h-52">
+      <canvas id="acctSpendingChart"></canvas>
+    </div>
+    {{else}}
+    <div class="flex items-center justify-center h-52 text-base-content/40">
+      <div class="text-center">
+        <i data-lucide="bar-chart-3" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
+        <p class="text-sm">No spending data yet</p>
+      </div>
+    </div>
+    {{end}}
+  </div>
+
+  <!-- Category Breakdown -->
+  <div class="bb-card p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm font-semibold text-base-content/70">Categories</h2>
+      <span class="text-xs text-base-content/30">30 days</span>
+    </div>
+    {{if .TopCategories}}
+    <div class="flex flex-col items-center">
+      <div class="relative w-40 h-40 mb-4">
+        <canvas id="acctCategoryChart"></canvas>
+        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span class="text-lg font-semibold tabular-nums">{{formatBalance .TotalSpending}}</span>
+          <span class="text-[0.65rem] text-base-content/40">total</span>
+        </div>
+      </div>
+      <div class="w-full space-y-2">
+        {{range .TopCategories}}
+        <div class="flex items-center justify-between group">
+          <span class="flex items-center gap-2 text-xs text-base-content/60 group-hover:text-base-content transition-colors truncate">
+            <span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background-color: {{safeCSS .Color}}"></span>
+            <span class="truncate">{{.Name}}</span>
+          </span>
+          <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0 ml-2">{{formatAmount .Amount}}</span>
+        </div>
+        {{end}}
+      </div>
+    </div>
+    {{else}}
+    <div class="flex items-center justify-center h-40 text-base-content/40">
+      <div class="text-center">
+        <i data-lucide="pie-chart" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+        <p class="text-sm">No category data yet</p>
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+
+<!-- Account Settings (collapsible) -->
+<div class="bb-card mb-8">
+  <div class="collapse collapse-arrow bg-base-100" x-data="{ open: false }">
+    <input type="checkbox" x-model="open">
+    <div class="collapse-title py-4 px-6 text-sm font-semibold text-base-content/50 min-h-0">
+      <div class="flex items-center gap-2">
+        <i data-lucide="settings" class="w-4 h-4"></i>
+        Account Settings
+      </div>
+    </div>
+    <div class="collapse-content px-6 pb-5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
+        <div>
+          <label class="text-xs text-base-content/40 mb-1.5 block">Display Name</label>
+          <input type="text" value="{{if .Account.DisplayName}}{{.Account.DisplayName}}{{end}}" placeholder="{{.Account.Name}}"
+            onchange="updateDisplayName('{{.AccountID}}', this.value)"
+            class="input input-sm input-bordered w-full">
+        </div>
+        <div>
+          <label class="flex items-center gap-3 cursor-pointer mt-5">
+            <input type="checkbox" class="checkbox checkbox-sm" {{if .Account.Excluded}}checked{{end}}
+              onchange="toggleExcluded('{{.AccountID}}', this.checked)">
+            <div>
+              <span class="text-sm font-medium">Excluded from sync</span>
+              <p class="text-xs text-base-content/40">Skip transaction sync</p>
+            </div>
+          </label>
+        </div>
+        <div>
+          <p class="text-xs text-base-content/40 mb-1">Connection</p>
+          <a href="/connections/{{.Account.ConnectionID}}" class="text-sm font-medium hover:text-primary transition-colors no-underline">{{.Account.InstitutionName}}</a>
+        </div>
+        {{if .Account.UserName}}
+        <div>
+          <p class="text-xs text-base-content/40 mb-1">Family Member</p>
+          <p class="text-sm font-medium">{{.Account.UserName}}</p>
+        </div>
+        {{end}}
+      </div>
     </div>
   </div>
 </div>
@@ -214,6 +335,131 @@
 </div>
 
 {{template "category-picker-script" .}}
+
+<!-- Chart.js Initialization -->
+{{if or .DailyLabels .CategoryLabels}}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  var gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  var textColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
+
+  Chart.defaults.font.family = 'Inter, system-ui, -apple-system, sans-serif';
+
+  var tooltipStyle = {
+    backgroundColor: isDark ? 'hsl(0 0% 12%)' : 'hsl(0 0% 100%)',
+    titleColor: isDark ? 'hsl(0 0% 93%)' : 'hsl(0 0% 9%)',
+    bodyColor: isDark ? 'hsl(0 0% 64%)' : 'hsl(0 0% 45%)',
+    borderColor: isDark ? 'hsl(0 0% 18%)' : 'hsl(0 0% 90%)',
+    borderWidth: 1,
+    padding: 10,
+    cornerRadius: 8,
+    titleFont: { size: 12, weight: '600' },
+    bodyFont: { size: 12 },
+    displayColors: false,
+  };
+
+  {{if .DailyLabels}}
+  // Daily spending bar chart
+  var trendCtx = document.getElementById('acctSpendingChart');
+  if (trendCtx) {
+    var dailyLabels = {{.DailyLabels}};
+    var dailyData = {{.DailyAmounts}};
+
+    var shortLabels = dailyLabels.map(function(d) {
+      var date = new Date(d + 'T00:00:00');
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+
+    new Chart(trendCtx, {
+      type: 'bar',
+      data: {
+        labels: shortLabels,
+        datasets: [{
+          data: dailyData,
+          backgroundColor: isDark ? 'oklch(0.65 0.02 250 / 0.5)' : 'oklch(0.45 0.02 250 / 0.35)',
+          hoverBackgroundColor: isDark ? 'oklch(0.65 0.02 250 / 0.8)' : 'oklch(0.45 0.02 250 / 0.6)',
+          borderRadius: 4,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: Object.assign({}, tooltipStyle, {
+            callbacks: {
+              label: function(ctx) { return '$' + ctx.parsed.y.toFixed(2); }
+            }
+          })
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: textColor, font: { size: 10 }, maxTicksLimit: 8, maxRotation: 0 },
+            border: { display: false }
+          },
+          y: {
+            grid: { color: gridColor },
+            ticks: {
+              color: textColor,
+              font: { size: 10 },
+              callback: function(v) { return '$' + v; }
+            },
+            border: { display: false },
+            beginAtZero: true
+          }
+        }
+      }
+    });
+  }
+  {{end}}
+
+  {{if .CategoryLabels}}
+  // Category donut chart
+  var donutCtx = document.getElementById('acctCategoryChart');
+  if (donutCtx) {
+    var catLabels = {{.CategoryLabels}};
+    var catAmounts = {{.CategoryAmounts}};
+    var catColors = {{.CategoryColors}};
+
+    new Chart(donutCtx, {
+      type: 'doughnut',
+      data: {
+        labels: catLabels,
+        datasets: [{
+          data: catAmounts,
+          backgroundColor: catColors,
+          borderWidth: 0,
+          hoverBorderWidth: 0,
+          hoverOffset: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '70%',
+        plugins: {
+          legend: { display: false },
+          tooltip: Object.assign({}, tooltipStyle, {
+            callbacks: {
+              label: function(ctx) {
+                var total = ctx.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+                var pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(0) : 0;
+                return ctx.label + ': $' + ctx.parsed.toFixed(2) + ' (' + pct + '%)';
+              }
+            }
+          })
+        }
+      }
+    });
+  }
+  {{end}}
+});
+</script>
+{{end}}
+
 <script>
 function showToast(message, type) {
   window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type || 'error' } }));
