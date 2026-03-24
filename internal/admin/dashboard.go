@@ -315,11 +315,12 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			spendingChangePercent = ((totalSpending - prevTotalSpending) / prevTotalSpending) * 100
 		}
 
-		// Total income (30 days) — negative amounts in our system are credits/income.
+		// Total income for the selected date range — negative amounts in our system are credits/income.
 		// Use a separate summary query without SpendingOnly to get income totals.
 		var totalIncome float64
 		incomeSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
-			GroupBy: "day",
+			GroupBy:   "day",
+			StartDate: &chartStart,
 		})
 		if err != nil {
 			a.Logger.Error("income summary", "error", err)
@@ -329,6 +330,27 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				if row.TotalAmount < 0 {
 					totalIncome += -row.TotalAmount
 				}
+			}
+		}
+
+		// Cash flow: net = income - spending, savings rate = net/income * 100.
+		var cashFlowNet float64
+		var savingsRate float64
+		var hasCashFlow bool
+		if totalIncome > 0 || totalSpending > 0 {
+			hasCashFlow = true
+			cashFlowNet = totalIncome - totalSpending
+			if totalIncome > 0 {
+				savingsRate = (cashFlowNet / totalIncome) * 100
+			}
+		}
+
+		// Spending vs income ratio for the visual bar (spending as % of income).
+		var spendingRatio float64
+		if totalIncome > 0 {
+			spendingRatio = (totalSpending / totalIncome) * 100
+			if spendingRatio > 100 {
+				spendingRatio = 100
 			}
 		}
 
@@ -531,6 +553,10 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"HasSpendingChange":      hasSpendingChange,
 			"NetWorthLabels":         netWorthLabelsJSON,
 			"NetWorthValues":         netWorthValuesJSON,
+			"CashFlowNet":            cashFlowNet,
+			"SavingsRate":            savingsRate,
+			"HasCashFlow":            hasCashFlow,
+			"SpendingRatio":          spendingRatio,
 		}
 		tr.Render(w, r, "dashboard.html", data)
 	}
