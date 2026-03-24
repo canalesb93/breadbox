@@ -1460,4 +1460,235 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
   }
+
+  /* ── Keyboard shortcut badges ── */
+  .bb-kbd {
+    @apply inline-flex items-center justify-center min-w-[1.25rem] h-[1.25rem]
+           text-[0.6rem] font-mono font-medium leading-none
+           rounded px-1;
+    background: oklch(0.97 0 0);
+    color: oklch(0.4 0 0);
+    border: 1px solid oklch(0.9 0 0);
+    box-shadow: 0 1px 0 oklch(0.88 0 0);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-kbd {
+      background: oklch(0.25 0 0);
+      color: oklch(0.7 0 0);
+      border-color: oklch(0.35 0 0);
+      box-shadow: 0 1px 0 oklch(0.15 0 0);
+    }
+  }
+
+  /* ── Triage mode: compact review rows ── */
+  .bb-triage-row {
+    @apply relative;
+    border-bottom: 1px solid oklch(0.922 0 0);
+    transition: background-color 0.1s ease;
+  }
+
+  .bb-triage-row:last-child {
+    border-bottom: none;
+  }
+
+  .bb-triage-row:hover {
+    background: oklch(0.98 0 0);
+  }
+
+  .bb-triage-row--focused {
+    background: oklch(0.97 0 0) !important;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-triage-row {
+      border-bottom-color: oklch(0.269 0 0);
+    }
+    .bb-triage-row:hover {
+      background: oklch(0.23 0 0);
+    }
+    .bb-triage-row--focused {
+      background: oklch(0.25 0 0) !important;
+    }
+  }
+
+  .bb-triage-row__main {
+    @apply flex items-center gap-3 px-4 py-2.5;
+    min-height: 2.75rem;
+  }
+
+  .bb-triage-row__indicator {
+    @apply w-0.5 h-6 rounded-full shrink-0 transition-all duration-150;
+    background: transparent;
+  }
+
+  .bb-triage-row__indicator--active {
+    background: oklch(0.205 0 0);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-triage-row__indicator--active {
+      background: oklch(0.922 0 0);
+    }
+  }
+
+  .bb-triage-row__type {
+    @apply shrink-0 w-12;
+  }
+
+  .bb-triage-badge {
+    @apply inline-flex items-center justify-center text-[0.6rem] font-semibold
+           leading-none rounded px-1.5 py-0.5;
+  }
+
+  .bb-triage-badge--info {
+    background: oklch(0.62 0.1 245 / 0.12);
+    color: oklch(0.50 0.1 245);
+  }
+  .bb-triage-badge--warning {
+    background: oklch(0.72 0.14 75 / 0.15);
+    color: oklch(0.55 0.14 55);
+  }
+  .bb-triage-badge--error {
+    background: oklch(0.577 0.245 27.325 / 0.12);
+    color: oklch(0.50 0.2 27);
+  }
+  .bb-triage-badge--neutral {
+    background: oklch(0.5 0 0 / 0.1);
+    color: oklch(0.5 0 0);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-triage-badge--info {
+      background: oklch(0.70 0.1 245 / 0.15);
+      color: oklch(0.75 0.1 245);
+    }
+    .bb-triage-badge--warning {
+      background: oklch(0.78 0.13 75 / 0.15);
+      color: oklch(0.82 0.12 75);
+    }
+    .bb-triage-badge--error {
+      background: oklch(0.704 0.191 22.216 / 0.15);
+      color: oklch(0.75 0.17 22);
+    }
+    .bb-triage-badge--neutral {
+      background: oklch(0.6 0 0 / 0.12);
+      color: oklch(0.65 0 0);
+    }
+  }
+
+  .bb-triage-row__name {
+    @apply flex flex-col min-w-0 flex-1;
+    max-width: 220px;
+  }
+
+  .bb-triage-row__account {
+    @apply hidden lg:block min-w-0;
+    width: 130px;
+  }
+
+  .bb-triage-row__category {
+    @apply hidden md:block min-w-0;
+    width: 140px;
+  }
+
+  .bb-triage-row__date {
+    @apply hidden sm:block shrink-0;
+    width: 90px;
+  }
+
+  .bb-triage-row__amount {
+    @apply shrink-0 text-right;
+    width: 90px;
+  }
+
+  .bb-triage-row__actions {
+    @apply flex items-center gap-1 shrink-0 ml-2;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .bb-triage-row:hover .bb-triage-row__actions,
+  .bb-triage-row--focused .bb-triage-row__actions {
+    opacity: 1;
+  }
+
+  .bb-triage-row__resolved {
+    @apply shrink-0 ml-2;
+  }
+
+  .bb-triage-action {
+    @apply inline-flex items-center justify-center w-7 h-7 rounded-lg
+           border border-transparent cursor-pointer;
+    transition: all 0.1s ease;
+    background: transparent;
+    color: oklch(0.5 0 0);
+  }
+
+  .bb-triage-action:hover {
+    border-color: oklch(0.9 0 0);
+    background: oklch(0.97 0 0);
+  }
+
+  .bb-triage-action--accept:hover {
+    color: oklch(0.55 0.14 155);
+    border-color: oklch(0.62 0.14 155 / 0.3);
+    background: oklch(0.62 0.14 155 / 0.08);
+  }
+
+  .bb-triage-action--skip:hover {
+    color: oklch(0.45 0 0);
+    border-color: oklch(0.85 0 0);
+    background: oklch(0.95 0 0);
+  }
+
+  .bb-triage-action--dismiss:hover {
+    color: oklch(0.55 0.2 27);
+    border-color: oklch(0.577 0.245 27.325 / 0.3);
+    background: oklch(0.577 0.245 27.325 / 0.08);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-triage-action {
+      color: oklch(0.6 0 0);
+    }
+    .bb-triage-action:hover {
+      border-color: oklch(0.35 0 0);
+      background: oklch(0.25 0 0);
+    }
+    .bb-triage-action--accept:hover {
+      color: oklch(0.75 0.14 155);
+      border-color: oklch(0.70 0.14 155 / 0.3);
+      background: oklch(0.70 0.14 155 / 0.1);
+    }
+    .bb-triage-action--skip:hover {
+      color: oklch(0.7 0 0);
+      border-color: oklch(0.4 0 0);
+      background: oklch(0.28 0 0);
+    }
+    .bb-triage-action--dismiss:hover {
+      color: oklch(0.75 0.17 22);
+      border-color: oklch(0.704 0.191 22.216 / 0.3);
+      background: oklch(0.704 0.191 22.216 / 0.1);
+    }
+  }
+
+  .bb-triage-action:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  /* Triage detail panel */
+  .bb-triage-detail {
+    @apply px-6 py-4 border-t;
+    border-color: oklch(0.94 0 0);
+    background: oklch(0.985 0 0);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-triage-detail {
+      border-color: oklch(0.28 0 0);
+      background: oklch(0.22 0 0);
+    }
+  }
 }

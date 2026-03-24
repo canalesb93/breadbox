@@ -25,9 +25,19 @@ func ReviewsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 			statusFilter = "pending"
 		}
 
+		viewMode := r.URL.Query().Get("view")
+		if viewMode == "" {
+			viewMode = "triage" // default to triage mode
+		}
+
+		defaultLimit := 20
+		if viewMode == "triage" {
+			defaultLimit = 50
+		}
+
 		params := service.ReviewListParams{
 			Status: &statusFilter,
-			Limit:  20,
+			Limit:  defaultLimit,
 		}
 
 		if v := r.URL.Query().Get("review_type"); v != "" {
@@ -92,6 +102,7 @@ func ReviewsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		data["ReviewTypeFilter"] = r.URL.Query().Get("review_type")
 		data["AccountIDFilter"] = r.URL.Query().Get("account_id")
 		data["UserIDFilter"] = r.URL.Query().Get("user_id")
+		data["ViewMode"] = viewMode
 		data["Accounts"] = accounts
 		data["Users"] = users
 		data["Categories"] = categories
