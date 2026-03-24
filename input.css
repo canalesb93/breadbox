@@ -592,6 +592,15 @@
     80% { transform: translateX(3px); }
   }
 
+  /* ── Transaction row hover (date-grouped list) ── */
+  .bb-tx-row {
+    transition: background-color 0.12s ease;
+  }
+
+  .bb-tx-row:hover {
+    @apply bg-base-200/40;
+  }
+
   /* ── Mobile transaction cards ── */
   .bb-tx-card {
     @apply overflow-hidden;

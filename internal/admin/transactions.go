@@ -3,6 +3,7 @@ package admin
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,6 +18,79 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// DateGroup holds transactions grouped by a single date.
+type DateGroup struct {
+	Date         string // raw date string, e.g. "2026-03-24"
+	Label        string // human-friendly: "Today", "Yesterday", "Mon, Mar 22"
+	Transactions []service.AdminTransactionRow
+	DayTotal     float64 // net spending for the day (positive = outflow)
+	DayIncome    float64 // total income (credits) for the day
+	DaySpending  float64 // total spending (debits) for the day
+}
+
+// groupTransactionsByDate groups a flat list of transactions into date groups
+// with smart labels (Today, Yesterday, or weekday + date).
+func groupTransactionsByDate(txns []service.AdminTransactionRow) []DateGroup {
+	if len(txns) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+	today := now.Format("2006-01-02")
+	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
+
+	// Preserve order: transactions come sorted by date desc.
+	var groups []DateGroup
+	groupIdx := map[string]int{}
+
+	for i := range txns {
+		tx := txns[i]
+		date := tx.Date
+
+		idx, exists := groupIdx[date]
+		if !exists {
+			label := smartDateLabel(date, today, yesterday)
+			groups = append(groups, DateGroup{
+				Date:  date,
+				Label: label,
+			})
+			idx = len(groups) - 1
+			groupIdx[date] = idx
+		}
+
+		groups[idx].Transactions = append(groups[idx].Transactions, tx)
+
+		// Amount > 0 means outflow (debit), < 0 means income (credit) in Breadbox convention
+		if tx.Amount > 0 {
+			groups[idx].DaySpending += tx.Amount
+		} else {
+			groups[idx].DayIncome += math.Abs(tx.Amount)
+		}
+		groups[idx].DayTotal += tx.Amount
+	}
+
+	return groups
+}
+
+// smartDateLabel returns "Today", "Yesterday", or "Mon, Mar 22" / "Mon, Mar 22, 2025" for older.
+func smartDateLabel(dateStr, today, yesterday string) string {
+	if dateStr == today {
+		return "Today"
+	}
+	if dateStr == yesterday {
+		return "Yesterday"
+	}
+	t, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return dateStr
+	}
+	now := time.Now()
+	if t.Year() == now.Year() {
+		return t.Format("Mon, Jan 2")
+	}
+	return t.Format("Mon, Jan 2, 2006")
+}
 
 // TransactionListHandler serves GET /admin/transactions.
 func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) http.HandlerFunc {
@@ -131,12 +205,16 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 		// Build export URL from active filters (excludes page param).
 		exportURL := buildExportURL(r)
 
+		// Group transactions by date for the modern list view.
+		dateGroups := groupTransactionsByDate(result.Transactions)
+
 		data := map[string]any{
 			"PageTitle":         "Transactions",
 			"CurrentPage":      "transactions",
 			"CSRFToken":        GetCSRFToken(r),
 			"Flash":            GetFlash(ctx, sm),
 			"Transactions":     result.Transactions,
+			"DateGroups":       dateGroups,
 			"Accounts":         accounts,
 			"Users":            users,
 			"Categories":       categoryTree,
