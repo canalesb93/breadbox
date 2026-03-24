@@ -263,21 +263,23 @@ function commentManager() {
       .catch(function() { showToast('Network error.'); });
     },
     deleteComment(id) {
-      if (!confirm('Delete this comment?')) return;
-      fetch('/-/transactions/{{.TransactionID}}/comments/' + id, {
-        method: 'DELETE'
-      })
-      .then(function(res) {
-        if (res.ok || res.status === 204) {
-          showToast('Comment deleted.', 'success');
-          location.reload();
-        } else {
-          return res.json().then(function(data) {
-            showToast(data.error || 'Failed to delete comment.');
-          });
-        }
-      })
-      .catch(function() { showToast('Network error.'); });
+      bbConfirm({title:'Delete comment?',message:'This comment will be permanently removed.',confirmLabel:'Delete',variant:'danger'}).then(function(ok){
+        if(!ok) return;
+        fetch('/-/transactions/{{.TransactionID}}/comments/' + id, {
+          method: 'DELETE'
+        })
+        .then(function(res) {
+          if (res.ok || res.status === 204) {
+            showToast('Comment deleted.', 'success');
+            location.reload();
+          } else {
+            return res.json().then(function(data) {
+              showToast(data.error || 'Failed to delete comment.');
+            });
+          }
+        })
+        .catch(function() { showToast('Network error.'); });
+      });
     }
   };
 }

@@ -380,10 +380,11 @@
               </td>
               <td>
                 <button class="btn btn-ghost btn-xs text-error/50 hover:text-error rounded-lg transition-colors" @click="
-                  if(confirm('Delete this mapping?')) {
+                  bbConfirm({title:'Delete mapping?',message:'This category mapping will be removed. Existing transactions are not affected.',confirmLabel:'Delete',variant:'danger'}).then(function(ok){
+                    if(!ok) return;
                     fetch('/-/category-mappings/{{.ID}}', {method: 'DELETE'})
                     .then(r => { if(r.ok) location.reload(); })
-                  }
+                  })
                 "><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
               </td>
             </tr>
@@ -870,9 +871,12 @@ Paste the exported TSV below this line, then edit it according to the instructio
         .finally(() => { this.catLoading = false; });
     },
 
-    importCategories() {
+    async importCategories() {
       if (!this.catText.trim()) return;
-      if (this.catReplace && !confirm('Full replace is enabled. Categories not in the import will be deleted and their transactions set to Uncategorized. Continue?')) return;
+      if (this.catReplace) {
+        const ok = await bbConfirm({title:'Replace all categories?',message:'Categories not in the import will be deleted and their transactions set to Uncategorized.',confirmLabel:'Replace',variant:'danger'});
+        if (!ok) return;
+      }
       this.catImporting = true;
       this.catResult = null;
       const params = this.catReplace ? '?replace=true' : '';
@@ -906,9 +910,12 @@ Paste the exported TSV below this line, then edit it according to the instructio
         .finally(() => { this.mapLoading = false; });
     },
 
-    importMappings() {
+    async importMappings() {
       if (!this.mapText.trim()) return;
-      if (this.mapReplace && !confirm('Full replace is enabled. Mappings not in the import will be deleted. Continue?')) return;
+      if (this.mapReplace) {
+        const ok = await bbConfirm({title:'Replace all mappings?',message:'Mappings not in the import will be deleted.',confirmLabel:'Replace',variant:'danger'});
+        if (!ok) return;
+      }
       this.mapImporting = true;
       this.mapResult = null;
       const qp = new URLSearchParams();

@@ -103,14 +103,15 @@
     template: '{{.MCPConfig.InstructionTemplate}}',
     templates: {{.TemplatesJSON}},
     showPreview: false,
-    loadTemplate(slug) {
+    async loadTemplate(slug) {
       if (slug === '') {
         return;
       }
       const t = this.templates.find(t => t.slug === slug);
       if (t) {
         if (this.instructions && this.instructions !== t.content) {
-          if (!confirm('Replace current instructions with template?')) {
+          const ok = await bbConfirm({title:'Replace instructions?',message:'Your current instructions will be replaced with the selected template.',confirmLabel:'Replace',variant:'warning'});
+          if (!ok) {
             this.template = '{{.MCPConfig.InstructionTemplate}}';
             return;
           }

@@ -314,7 +314,8 @@ function rulesPage() {
       }
     },
     async deleteRule(id, el) {
-      if (!confirm('Delete this rule? This cannot be undone.')) return;
+      const ok = await bbConfirm({title:'Delete this rule?',message:'This rule will be permanently deleted. This cannot be undone.',confirmLabel:'Delete',variant:'danger'});
+      if (!ok) return;
       try {
         const resp = await fetch('/-/rules/' + id, { method: 'DELETE' });
         if (resp.ok) location.reload();
