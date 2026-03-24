@@ -83,7 +83,7 @@ func (p *TellerProvider) fetchAccounts(ctx context.Context, accessToken string) 
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusForbidden {
+	if isReauthResponse(resp) {
 		return nil, ErrReauthRequired
 	}
 	if resp.StatusCode != http.StatusOK {

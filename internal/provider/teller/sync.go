@@ -113,7 +113,7 @@ func (p *TellerProvider) fetchTransactionsForAccount(
 			return nil, fmt.Errorf("teller transactions get: %w", err)
 		}
 
-		if resp.StatusCode == http.StatusForbidden {
+		if isReauthResponse(resp) {
 			resp.Body.Close()
 			return nil, ErrReauthRequired
 		}
