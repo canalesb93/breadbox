@@ -312,6 +312,59 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return fmt.Sprintf("%.2f", f.Float64)
 			},
+			"fmtBalance": func(v interface{}) string {
+				var f float64
+				switch val := v.(type) {
+				case *float64:
+					if val == nil {
+						return ""
+					}
+					f = *val
+				case float64:
+					f = val
+				default:
+					return ""
+				}
+				neg := f < 0
+				abs := math.Abs(f)
+				whole := int(abs)
+				cents := int(math.Round((abs - float64(whole)) * 100))
+				s := fmt.Sprintf("%d", whole)
+				if len(s) > 3 {
+					result := ""
+					for i, c := range s {
+						if i > 0 && (len(s)-i)%3 == 0 {
+							result += ","
+						}
+						result += string(c)
+					}
+					s = result
+				}
+				formatted := fmt.Sprintf("$%s.%02d", s, cents)
+				if neg {
+					formatted = "-" + formatted
+				}
+				return formatted
+			},
+			"fmtFloat": func(v interface{}) string {
+				switch val := v.(type) {
+				case *float64:
+					if val == nil {
+						return ""
+					}
+					return fmt.Sprintf("%.2f", *val)
+				case float64:
+					return fmt.Sprintf("%.2f", val)
+				default:
+					return ""
+				}
+			},
+			"pgtext": func(v pgtype.Text) string {
+				if !v.Valid {
+					return ""
+				}
+				return v.String
+			},
 		},
 	}
 	if err := tr.parseTemplates(); err != nil {

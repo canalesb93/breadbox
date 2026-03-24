@@ -22,7 +22,7 @@
     </div>
     <h2 class="text-lg font-semibold mb-1">{{.Connection.InstitutionName.String}}</h2>
     <p class="text-sm text-base-content/50 mb-1">
-      Re-connecting for: <span class="font-semibold text-base-content">{{.Connection.UserName}}</span>
+      Re-connecting for: <span class="font-semibold text-base-content">{{pgtext .Connection.UserName}}</span>
     </p>
     <p id="link-status" class="text-sm text-base-content/50 mb-6">Opening re-authentication dialog...</p>
     <div class="flex items-center gap-3">
