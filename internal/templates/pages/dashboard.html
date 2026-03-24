@@ -329,10 +329,10 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-  const textColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
+  const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  const textColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
 
-  Chart.defaults.font.family = 'system-ui, -apple-system, sans-serif';
+  Chart.defaults.font.family = 'Inter, system-ui, -apple-system, sans-serif';
 
   // Spending Trend
   const trendCtx = document.getElementById('spendingTrendChart');
@@ -353,14 +353,16 @@ document.addEventListener('DOMContentLoaded', function() {
         datasets: [{
           label: 'Spending',
           data: dailyData,
-          borderColor: isDark ? '#6366f1' : '#4f46e5',
-          backgroundColor: isDark ? 'rgba(99,102,241,0.1)' : 'rgba(79,70,229,0.08)',
+          borderColor: isDark ? '#8b8cf7' : '#4338a8',
+          backgroundColor: isDark ? 'rgba(139,140,247,0.08)' : 'rgba(67,56,168,0.06)',
           fill: true,
-          tension: 0.3,
+          tension: 0.35,
           borderWidth: 2,
           pointRadius: 0,
-          pointHoverRadius: 4,
-          pointHoverBackgroundColor: isDark ? '#6366f1' : '#4f46e5',
+          pointHoverRadius: 5,
+          pointHoverBackgroundColor: isDark ? '#8b8cf7' : '#4338a8',
+          pointHoverBorderColor: isDark ? '#1a1a2e' : '#ffffff',
+          pointHoverBorderWidth: 2,
         }]
       },
       options: {
@@ -370,12 +372,13 @@ document.addEventListener('DOMContentLoaded', function() {
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: isDark ? '#1e1e2e' : '#fff',
-            titleColor: isDark ? '#cdd6f4' : '#1e1b4b',
-            bodyColor: isDark ? '#a6adc8' : '#4b5563',
-            borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+            backgroundColor: isDark ? '#1a1a2e' : '#fff',
+            titleColor: isDark ? '#e0e0ec' : '#1a1a2e',
+            bodyColor: isDark ? '#a0a0b8' : '#555566',
+            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
             borderWidth: 1,
-            padding: 10,
+            padding: 12,
+            cornerRadius: 10,
             displayColors: false,
             callbacks: {
               label: ctx => '$' + ctx.parsed.y.toFixed(2)
@@ -407,11 +410,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const categoryLabels = {{.CategoryLabels}};
     const categoryData = {{.CategoryAmounts}};
 
-    const palette = [
-      '#6366f1', '#8b5cf6', '#a78bfa', '#c084fc',
-      '#e879f9', '#f472b6', '#fb7185', '#f97316',
-      '#facc15', '#34d399', '#22d3ee', '#38bdf8'
-    ];
+    /* Refined palette: indigo core with desaturated complementary tones */
+    const palette = isDark
+      ? ['#8b8cf7', '#a39ef5', '#7b9cf0', '#6db8c4', '#82c9a0',
+         '#c4a66d', '#d4907a', '#b88bb4', '#8a9baa', '#6e8b9e',
+         '#a08db8', '#7eaab4']
+      : ['#4338a8', '#5e4fb8', '#3b6daa', '#2d8f9a', '#3d8f6a',
+         '#9a7b3d', '#b86050', '#8f5f8a', '#5a6e80', '#4a7080',
+         '#7a6898', '#4d8a8f'];
 
     new Chart(catCtx, {
       type: 'doughnut',
@@ -441,12 +447,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           },
           tooltip: {
-            backgroundColor: isDark ? '#1e1e2e' : '#fff',
-            titleColor: isDark ? '#cdd6f4' : '#1e1b4b',
-            bodyColor: isDark ? '#a6adc8' : '#4b5563',
-            borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+            backgroundColor: isDark ? '#1a1a2e' : '#fff',
+            titleColor: isDark ? '#e0e0ec' : '#1a1a2e',
+            bodyColor: isDark ? '#a0a0b8' : '#555566',
+            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
             borderWidth: 1,
-            padding: 10,
+            padding: 12,
+            cornerRadius: 10,
             callbacks: {
               label: ctx => ctx.label + ': $' + ctx.parsed.toFixed(2)
             }
