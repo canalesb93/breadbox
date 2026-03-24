@@ -461,3 +461,111 @@ func ResetTransactionCategoryHandler(svc *service.Service) http.HandlerFunc {
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
+
+// BatchCategorizeHandler handles POST /api/v1/transactions/batch-categorize.
+func BatchCategorizeHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var input struct {
+			Items []service.BatchCategorizeItem `json:"items"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+			return
+		}
+
+		result, err := svc.BatchSetTransactionCategory(r.Context(), input.Items)
+		if err != nil {
+			if errors.Is(err, service.ErrInvalidParameter) {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to batch categorize transactions")
+			return
+		}
+
+		writeData(w, result)
+	}
+}
+
+// BulkRecategorizeHandler handles POST /api/v1/transactions/bulk-recategorize.
+func BulkRecategorizeHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var input struct {
+			TargetCategorySlug string   `json:"target_category_slug"`
+			StartDate          string   `json:"start_date"`
+			EndDate            string   `json:"end_date"`
+			AccountID          string   `json:"account_id"`
+			UserID             string   `json:"user_id"`
+			CategorySlug       string   `json:"category_slug"`
+			MinAmount          *float64 `json:"min_amount"`
+			MaxAmount          *float64 `json:"max_amount"`
+			Pending            *bool    `json:"pending"`
+			Search             string   `json:"search"`
+			NameContains       string   `json:"name_contains"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+			return
+		}
+
+		if input.TargetCategorySlug == "" {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "target_category_slug is required")
+			return
+		}
+
+		params := service.BulkRecategorizeParams{
+			TargetCategorySlug: input.TargetCategorySlug,
+			MinAmount:          input.MinAmount,
+			MaxAmount:          input.MaxAmount,
+			Pending:            input.Pending,
+		}
+
+		if input.StartDate != "" {
+			t, err := time.Parse("2006-01-02", input.StartDate)
+			if err != nil {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "invalid start_date format")
+				return
+			}
+			params.StartDate = &t
+		}
+		if input.EndDate != "" {
+			t, err := time.Parse("2006-01-02", input.EndDate)
+			if err != nil {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "invalid end_date format")
+				return
+			}
+			params.EndDate = &t
+		}
+		if input.AccountID != "" {
+			params.AccountID = &input.AccountID
+		}
+		if input.UserID != "" {
+			params.UserID = &input.UserID
+		}
+		if input.CategorySlug != "" {
+			params.CategorySlug = &input.CategorySlug
+		}
+		if input.Search != "" {
+			params.Search = &input.Search
+		}
+		if input.NameContains != "" {
+			params.NameContains = &input.NameContains
+		}
+
+		result, err := svc.BulkRecategorizeByFilter(r.Context(), params)
+		if err != nil {
+			if errors.Is(err, service.ErrInvalidParameter) {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				return
+			}
+			if errors.Is(err, service.ErrCategoryNotFound) {
+				mw.WriteError(w, http.StatusNotFound, "CATEGORY_NOT_FOUND", err.Error())
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to bulk recategorize transactions")
+			return
+		}
+
+		writeData(w, result)
+	}
+}

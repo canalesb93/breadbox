@@ -4,28 +4,50 @@ package mcp
 const InitialReviewInstructions = `You are reviewing a batch of transactions for initial categorization. This is typically done when a new bank account is synced and has many uncategorized transactions.
 
 STRATEGY:
-1. First, query some transactions to understand what category_primary values exist
+1. Query some transactions to understand what category_primary values exist
    (use query_transactions with fields=core,category to see raw provider categories)
-2. Create broad category_primary rules FIRST — one rule per raw provider category covers
-   hundreds of transactions at once
+2. Create broad category_primary rules with apply_retroactively=true — one rule per raw
+   provider category covers hundreds of transactions at once. SKIP "general" (see below).
    Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]} → food_and_drink_restaurant
-3. Then create name-pattern rules for transaction types that span merchants:
-   "ATM Withdrawal" → withdrawals, "Wire Transfer" → transfer_out, "Service Charge" → bank_fees
-4. Process the review queue with batch_submit_reviews — approve with the correct category_slug
-5. Create per-merchant rules only for merchants that get miscategorized by the broad rules
+3. Create name-pattern rules (also with apply_retroactively=true) for transaction types
+   that span merchants: "ATM Withdrawal" → withdrawals, "Wire Transfer" → transfer_out,
+   "Service Charge" → bank_fees, "Cash Deposit" → deposits
+4. Use apply_rules to apply all rules at once to remaining uncategorized transactions
+5. Use list_pending_reviews with fields=triage and a high limit (200-500) to see what remains
+6. Use batch_submit_reviews (up to 200) or bulk_recategorize for bulk actions on remaining items
+7. Create per-merchant rules only for merchants that get miscategorized by the broad rules
+
+TELLER CATEGORIES:
+Teller's "general" category is a useless catch-all covering 30%+ of transactions. Do NOT
+create a category_primary rule for "general" — it will miscategorize everything. Instead,
+use name-pattern rules (contains on the name field) for transactions with category_primary="general".
+Known Teller raw categories: accommodation, advertising, bar, charity, clothing, dining,
+education, electronics, entertainment, fuel, general, groceries, health, home, income,
+insurance, investment, loan, office, phone, service, shopping, software, sport, tax,
+transport, utilities
+
+SCALE:
+For queues >200 transactions, consider splitting work by account_id or provider using
+parallel sub-agents. Each sub-agent handles one account's transactions independently,
+creating rules and submitting reviews for their slice.
+
+TOKEN EFFICIENCY:
+Always use fields=triage on list_pending_reviews — it returns only the fields needed for
+categorization decisions and dramatically reduces response size.
 
 Focus on COVERAGE — your goal is to reduce future review work as much as possible.
 Prioritize rules that match the most transactions. Check list_transaction_rules before creating to avoid duplicates.`
 
 // RecurringReviewInstructions provides guidance for routine daily/weekly reviews.
-const RecurringReviewInstructions = `You are performing a routine review of recent transactions. Review 10-20 pending transactions, categorize them, and create rules for any new patterns you notice.
+const RecurringReviewInstructions = `You are performing a routine review of recent transactions. Review pending transactions, categorize them, and create rules for any new patterns you notice.
 
 STRATEGY:
-1. List pending reviews (limit 15-20)
+1. List pending reviews with fields=triage (limit 15-30)
 2. Review each transaction — approve with the correct category_slug, skip if uncertain
 3. Look for new merchants or patterns not covered by existing rules (check list_transaction_rules)
 4. For recurring merchants (seen 2+ times), create a specific rule
-5. Use batch_submit_reviews for efficiency
+5. Use batch_submit_reviews (up to 200) for efficiency
+6. If you created new rules, use apply_rules with rule_id to apply them to any remaining backlog
 
 Focus on ACCURACY — take time to categorize correctly since there are fewer transactions.
 Create specific rules for new recurring merchants you encounter. Prefer contains over exact match for merchant names.`

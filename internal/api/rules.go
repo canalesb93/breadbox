@@ -191,3 +191,76 @@ func DeleteRuleHandler(svc *service.Service) http.HandlerFunc {
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
+
+// ApplyRuleHandler applies a single rule retroactively to existing transactions.
+func ApplyRuleHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+
+		count, err := svc.ApplyRuleRetroactively(r.Context(), id)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Rule not found")
+				return
+			}
+			if errors.Is(err, service.ErrInvalidParameter) {
+				mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to apply rule")
+			return
+		}
+
+		writeData(w, map[string]any{
+			"rule_id":        id,
+			"affected_count": count,
+		})
+	}
+}
+
+// ApplyAllRulesHandler applies all active rules retroactively.
+func ApplyAllRulesHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		results, err := svc.ApplyAllRulesRetroactively(r.Context())
+		if err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to apply rules")
+			return
+		}
+
+		var totalAffected int64
+		for _, count := range results {
+			totalAffected += count
+		}
+
+		writeData(w, map[string]any{
+			"rules_applied":  results,
+			"total_affected": totalAffected,
+		})
+	}
+}
+
+// PreviewRuleHandler previews a rule's conditions against existing transactions.
+func PreviewRuleHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var input struct {
+			Conditions service.Condition `json:"conditions"`
+			SampleSize int               `json:"sample_size"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+			return
+		}
+
+		result, err := svc.PreviewRule(r.Context(), input.Conditions, input.SampleSize)
+		if err != nil {
+			if errors.Is(err, service.ErrInvalidParameter) {
+				mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to preview rule")
+			return
+		}
+
+		writeData(w, result)
+	}
+}

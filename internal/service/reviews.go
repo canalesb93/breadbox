@@ -20,8 +20,8 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 	if limit <= 0 {
 		limit = 50
 	}
-	if limit > 200 {
-		limit = 200
+	if limit > 500 {
+		limit = 500
 	}
 
 	// Default to pending status
@@ -499,8 +499,8 @@ func (s *Service) BulkSubmitReviews(ctx context.Context, params BulkSubmitReview
 	if len(params.Reviews) == 0 {
 		return nil, fmt.Errorf("%w: reviews array is empty", ErrInvalidParameter)
 	}
-	if len(params.Reviews) > 100 {
-		return nil, fmt.Errorf("%w: maximum 100 reviews per bulk request", ErrInvalidParameter)
+	if len(params.Reviews) > 200 {
+		return nil, fmt.Errorf("%w: maximum 200 reviews per bulk request", ErrInvalidParameter)
 	}
 
 	result := &BulkReviewResult{}

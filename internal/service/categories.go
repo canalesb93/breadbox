@@ -439,6 +439,177 @@ func (s *Service) ResetTransactionCategory(ctx context.Context, txnID string) er
 	return err
 }
 
+// BatchSetTransactionCategory sets category overrides on multiple transactions at once.
+func (s *Service) BatchSetTransactionCategory(ctx context.Context, items []BatchCategorizeItem) (*BatchCategorizeResult, error) {
+	if len(items) == 0 {
+		return nil, fmt.Errorf("%w: items array is empty", ErrInvalidParameter)
+	}
+	if len(items) > 200 {
+		return nil, fmt.Errorf("%w: maximum 200 items per batch", ErrInvalidParameter)
+	}
+
+	// Pre-resolve all unique slugs to category IDs
+	slugToID := make(map[string]string)
+	for _, item := range items {
+		if _, ok := slugToID[item.CategorySlug]; !ok {
+			cat, err := s.GetCategoryBySlug(ctx, item.CategorySlug)
+			if err != nil {
+				slugToID[item.CategorySlug] = "" // mark as unresolvable
+			} else {
+				slugToID[item.CategorySlug] = cat.ID
+			}
+		}
+	}
+
+	result := &BatchCategorizeResult{}
+
+	for _, item := range items {
+		categoryID := slugToID[item.CategorySlug]
+		if categoryID == "" {
+			result.Failed = append(result.Failed, BatchCategorizeError{
+				TransactionID: item.TransactionID,
+				Error:         fmt.Sprintf("category slug %q not found", item.CategorySlug),
+			})
+			continue
+		}
+
+		if err := s.SetTransactionCategory(ctx, item.TransactionID, categoryID); err != nil {
+			result.Failed = append(result.Failed, BatchCategorizeError{
+				TransactionID: item.TransactionID,
+				Error:         err.Error(),
+			})
+		} else {
+			result.Succeeded++
+		}
+	}
+
+	return result, nil
+}
+
+// BulkRecategorizeByFilter updates all transactions matching filters to a new category.
+func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecategorizeParams) (*BulkRecategorizeResult, error) {
+	// Require at least one filter to prevent accidental recategorize-all
+	hasFilter := params.StartDate != nil || params.EndDate != nil ||
+		params.AccountID != nil || params.UserID != nil ||
+		params.CategorySlug != nil || params.MinAmount != nil ||
+		params.MaxAmount != nil || params.Pending != nil ||
+		params.Search != nil || params.NameContains != nil
+	if !hasFilter {
+		return nil, fmt.Errorf("%w: at least one filter is required to prevent accidental bulk recategorization", ErrInvalidParameter)
+	}
+
+	// Resolve target category
+	targetCat, err := s.GetCategoryBySlug(ctx, params.TargetCategorySlug)
+	if err != nil {
+		return nil, fmt.Errorf("%w: target category %q not found", ErrCategoryNotFound, params.TargetCategorySlug)
+	}
+	targetUID, err := parseUUID(targetCat.ID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid target category ID: %w", err)
+	}
+
+	// Build dynamic UPDATE query with same WHERE pattern as ListTransactions.
+	// Note: In PostgreSQL UPDATE...FROM, the target table (t) cannot be referenced
+	// in FROM-clause JOINs. The categories JOIN is only needed for CategorySlug filter
+	// and is added conditionally below.
+	query := "UPDATE transactions t SET category_id = $1, category_override = TRUE, updated_at = NOW()" +
+		" FROM accounts a" +
+		" LEFT JOIN bank_connections bc ON a.connection_id = bc.id" +
+		" WHERE t.account_id = a.id AND t.deleted_at IS NULL"
+
+	args := []any{targetUID}
+	argN := 2
+
+	if params.UserID != nil {
+		uid, err := parseUUID(*params.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid user id: %w", err)
+		}
+		query += fmt.Sprintf(" AND bc.user_id = $%d", argN)
+		args = append(args, uid)
+		argN++
+	}
+
+	if params.AccountID != nil {
+		aid, err := parseUUID(*params.AccountID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid account id: %w", err)
+		}
+		query += fmt.Sprintf(" AND t.account_id = $%d", argN)
+		args = append(args, aid)
+		argN++
+	}
+
+	if params.StartDate != nil {
+		query += fmt.Sprintf(" AND t.date >= $%d", argN)
+		args = append(args, pgtype.Date{Time: *params.StartDate, Valid: true})
+		argN++
+	}
+
+	if params.EndDate != nil {
+		query += fmt.Sprintf(" AND t.date < $%d", argN)
+		args = append(args, pgtype.Date{Time: *params.EndDate, Valid: true})
+		argN++
+	}
+
+	if params.CategorySlug != nil {
+		catRow, err := s.Queries.GetCategoryBySlug(ctx, *params.CategorySlug)
+		if err != nil {
+			return &BulkRecategorizeResult{}, nil // unknown slug — no matches
+		}
+		if !catRow.ParentID.Valid {
+			// Parent category: match transactions with this category or any child
+			query += fmt.Sprintf(" AND t.category_id IN (SELECT id FROM categories WHERE id = $%d OR parent_id = $%d)", argN, argN)
+			args = append(args, catRow.ID)
+			argN++
+		} else {
+			query += fmt.Sprintf(" AND t.category_id = $%d", argN)
+			args = append(args, catRow.ID)
+			argN++
+		}
+	}
+
+	if params.MinAmount != nil {
+		query += fmt.Sprintf(" AND t.amount >= $%d", argN)
+		args = append(args, *params.MinAmount)
+		argN++
+	}
+
+	if params.MaxAmount != nil {
+		query += fmt.Sprintf(" AND t.amount <= $%d", argN)
+		args = append(args, *params.MaxAmount)
+		argN++
+	}
+
+	if params.Pending != nil {
+		query += fmt.Sprintf(" AND t.pending = $%d", argN)
+		args = append(args, *params.Pending)
+		argN++
+	}
+
+	if params.Search != nil {
+		query += fmt.Sprintf(" AND (t.name ILIKE '%%' || $%d || '%%' OR t.merchant_name ILIKE '%%' || $%d || '%%')", argN, argN)
+		args = append(args, *params.Search)
+		argN++
+	}
+
+	if params.NameContains != nil {
+		query += fmt.Sprintf(" AND t.name ILIKE '%%' || $%d || '%%'", argN)
+		args = append(args, *params.NameContains)
+		argN++
+	}
+
+	tag, err := s.Pool.Exec(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("bulk recategorize: %w", err)
+	}
+
+	return &BulkRecategorizeResult{
+		MatchedCount: tag.RowsAffected(),
+		UpdatedCount: tag.RowsAffected(),
+	}, nil
+}
+
 // BulkReMap updates non-overridden transactions from oldCategoryID to newCategoryID
 // where the raw provider category matches.
 func (s *Service) BulkReMap(ctx context.Context, oldCategoryID, newCategoryID string, providerCategory *string) (int64, error) {
