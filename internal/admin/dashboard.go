@@ -1,18 +1,21 @@
 package admin
 
 import (
+	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"time"
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
+	"breadbox/internal/service"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // DashboardHandler serves GET /admin/ — the dashboard home page.
-func DashboardHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
+func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -53,6 +56,80 @@ func DashboardHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 		lastSyncText := "Never"
 		if lastSync.Valid {
 			lastSyncText = relativeTime(lastSync.Time)
+		}
+
+		// Spending by category (last 30 days).
+		categorySummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+			GroupBy: "category",
+		})
+		if err != nil {
+			a.Logger.Error("category summary", "error", err)
+		}
+		var categoryLabelsJSON, categoryAmountsJSON template.JS
+		if categorySummary != nil && len(categorySummary.Summary) > 0 {
+			labels := make([]string, 0, len(categorySummary.Summary))
+			amounts := make([]float64, 0, len(categorySummary.Summary))
+			for _, row := range categorySummary.Summary {
+				label := "Uncategorized"
+				if row.Category != nil && *row.Category != "" {
+					label = *row.Category
+				}
+				// Only include positive amounts (spending)
+				if row.TotalAmount > 0 {
+					labels = append(labels, label)
+					amounts = append(amounts, row.TotalAmount)
+				}
+			}
+			if lb, err := json.Marshal(labels); err == nil {
+				categoryLabelsJSON = template.JS(lb)
+			}
+			if ab, err := json.Marshal(amounts); err == nil {
+				categoryAmountsJSON = template.JS(ab)
+			}
+		}
+
+		// Daily spending trend (last 30 days).
+		dailySummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+			GroupBy: "day",
+		})
+		if err != nil {
+			a.Logger.Error("daily summary", "error", err)
+		}
+		var dailyLabelsJSON, dailyAmountsJSON template.JS
+		if dailySummary != nil && len(dailySummary.Summary) > 0 {
+			// Reverse so oldest is first (API returns DESC).
+			rows := dailySummary.Summary
+			labels := make([]string, 0, len(rows))
+			amounts := make([]float64, 0, len(rows))
+			for i := len(rows) - 1; i >= 0; i-- {
+				row := rows[i]
+				label := ""
+				if row.Period != nil {
+					label = *row.Period
+				}
+				labels = append(labels, label)
+				// Use absolute value for spending trend
+				amt := row.TotalAmount
+				if amt < 0 {
+					amt = -amt
+				}
+				amounts = append(amounts, amt)
+			}
+			if lb, err := json.Marshal(labels); err == nil {
+				dailyLabelsJSON = template.JS(lb)
+			}
+			if ab, err := json.Marshal(amounts); err == nil {
+				dailyAmountsJSON = template.JS(ab)
+			}
+		}
+
+		// Recent transactions (last 10).
+		recentTx, err := svc.ListTransactionsAdmin(ctx, service.AdminTransactionListParams{
+			Page:     1,
+			PageSize: 8,
+		})
+		if err != nil {
+			a.Logger.Error("recent transactions", "error", err)
 		}
 
 		// Onboarding checklist detection.
@@ -101,6 +178,18 @@ func DashboardHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			}
 		}
 
+		// Build recent transactions data for template.
+		var recentTransactions []service.AdminTransactionRow
+		if recentTx != nil {
+			recentTransactions = recentTx.Transactions
+		}
+
+		// Total spending (30 days).
+		var totalSpending float64
+		if categorySummary != nil && categorySummary.Totals.TotalAmount != nil {
+			totalSpending = *categorySummary.Totals.TotalAmount
+		}
+
 		data := map[string]any{
 			"PageTitle":              "Dashboard",
 			"CurrentPage":            "dashboard",
@@ -120,6 +209,12 @@ func DashboardHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			"CurrentVersion":         currentVersion,
 			"DockerSocketAvailable":  a.DockerSocketAvailable,
 			"ReviewPending":          reviewPending,
+			"CategoryLabels":         categoryLabelsJSON,
+			"CategoryAmounts":        categoryAmountsJSON,
+			"DailyLabels":            dailyLabelsJSON,
+			"DailyAmounts":           dailyAmountsJSON,
+			"RecentTransactions":     recentTransactions,
+			"TotalSpending":          totalSpending,
 		}
 		tr.Render(w, r, "dashboard.html", data)
 	}
