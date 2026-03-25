@@ -80,6 +80,9 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 
 	query += " WHERE t.deleted_at IS NULL"
 
+	// Exclude reviews for matched dependent transactions.
+	query += " AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))"
+
 	if status != "all" {
 		query += fmt.Sprintf(" AND rq.status = $%d", argN)
 		args = append(args, status)
@@ -107,7 +110,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 		if err != nil {
 			return nil, fmt.Errorf("invalid user_id: %w", err)
 		}
-		query += fmt.Sprintf(" AND bc.user_id = $%d", argN)
+		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
 		args = append(args, uid)
 		argN++
 	}
@@ -676,7 +679,14 @@ func (s *Service) EnqueueManualReview(ctx context.Context, transactionID string,
 
 // GetReviewCounts returns aggregate counts for the review queue.
 func (s *Service) GetReviewCounts(ctx context.Context) (*ReviewCountsResponse, error) {
-	pending, err := s.Queries.CountPendingReviews(ctx)
+	// Count pending reviews, excluding matched dependent transactions.
+	var pending int64
+	err := s.Pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM review_queue rq
+		JOIN transactions t ON rq.transaction_id = t.id
+		JOIN accounts a ON t.account_id = a.id
+		WHERE rq.status = 'pending'
+		  AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`).Scan(&pending)
 	if err != nil {
 		return nil, fmt.Errorf("count pending: %w", err)
 	}
