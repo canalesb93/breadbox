@@ -191,6 +191,10 @@ func MergeCategoriesHandler(svc *service.Service) http.HandlerFunc {
 				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Category not found")
 				return
 			}
+			if errors.Is(err, service.ErrInvalidParameter) {
+				mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+				return
+			}
 			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to merge categories")
 			return
 		}

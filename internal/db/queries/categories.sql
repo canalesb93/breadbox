@@ -61,6 +61,11 @@ UPDATE transactions
 SET category_override = FALSE, updated_at = NOW()
 WHERE id = $1;
 
+-- name: ReassignRulesCategory :exec
+UPDATE transaction_rules
+SET category_id = $2, updated_at = NOW()
+WHERE category_id = $1;
+
 -- name: ListUnmappedCategories :many
 SELECT DISTINCT bc.provider, t.category_primary, t.category_detailed
 FROM transactions t

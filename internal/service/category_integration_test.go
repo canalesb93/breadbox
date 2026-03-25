@@ -483,6 +483,66 @@ func TestMergeCategories_TargetNotFound(t *testing.T) {
 	}
 }
 
+func TestMergeCategories_ReassignsRulesInsteadOfDeleting(t *testing.T) {
+	svc, _, pool := newService(t)
+	ctx := context.Background()
+
+	source := mustCreateCategoryViaService(t, svc, "merge_rule_src", "Rule Source", nil)
+	target := mustCreateCategoryViaService(t, svc, "merge_rule_tgt", "Rule Target", nil)
+
+	// Create a rule pointing to the source category.
+	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:         "Test Rule For Merge",
+		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "coffee"},
+		CategorySlug: "merge_rule_src",
+		Priority:     10,
+		Actor:        service.Actor{Type: "system", Name: "test"},
+	})
+	if err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+
+	// Merge source into target.
+	err = svc.MergeCategories(ctx, source.ID, target.ID)
+	if err != nil {
+		t.Fatalf("MergeCategories: %v", err)
+	}
+
+	// The rule should still exist and point to the target category (not deleted).
+	gotRule, err := svc.GetTransactionRule(ctx, rule.ID)
+	if err != nil {
+		t.Fatalf("rule should still exist after merge, got error: %v", err)
+	}
+	if gotRule.CategorySlug == nil || *gotRule.CategorySlug != "merge_rule_tgt" {
+		got := "<nil>"
+		if gotRule.CategorySlug != nil {
+			got = *gotRule.CategorySlug
+		}
+		t.Errorf("rule category_slug should be reassigned to target; got %q, want %q", got, "merge_rule_tgt")
+	}
+
+	// Double-check via direct DB query that the rule's category_id matches target.
+	tgtUID, _ := parseUUIDForTest(target.ID)
+	ruleUID, _ := parseUUIDForTest(rule.ID)
+	var ruleCatID pgtype.UUID
+	err = pool.QueryRow(ctx, "SELECT category_id FROM transaction_rules WHERE id = $1", ruleUID).Scan(&ruleCatID)
+	if err != nil {
+		t.Fatalf("query rule category: %v", err)
+	}
+	if ruleCatID != tgtUID {
+		t.Errorf("rule category_id should be target UUID")
+	}
+}
+
+func TestMergeCategories_SelfMerge(t *testing.T) {
+	svc, _, _ := newService(t)
+	cat := mustCreateCategoryViaService(t, svc, "self_merge", "Self Merge", nil)
+	err := svc.MergeCategories(context.Background(), cat.ID, cat.ID)
+	if err == nil {
+		t.Error("expected error when merging category into itself, got nil")
+	}
+}
+
 // --- SetTransactionCategory ---
 
 func TestSetTransactionCategory_Success(t *testing.T) {
