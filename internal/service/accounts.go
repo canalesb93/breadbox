@@ -113,6 +113,7 @@ func accountFromAllRow(r db.ListAccountsRow) AccountResponse {
 		LastBalanceUpdate: timestampStr(r.LastBalanceUpdate),
 		CreatedAt:         r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:         r.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		ConnectionStatus:  nullConnStatusPtr(r.ConnectionStatus),
 	}
 }
 
@@ -134,6 +135,7 @@ func accountFromUserRow(r db.ListAccountsByUserRow) AccountResponse {
 		LastBalanceUpdate: timestampStr(r.LastBalanceUpdate),
 		CreatedAt:         r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:         r.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		ConnectionStatus:  connStatusPtr(r.ConnectionStatus),
 	}
 }
 
@@ -155,6 +157,7 @@ func accountFromGetRow(r db.GetAccountRow) AccountResponse {
 		LastBalanceUpdate: timestampStr(r.LastBalanceUpdate),
 		CreatedAt:         r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:         r.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		ConnectionStatus:  nullConnStatusPtr(r.ConnectionStatus),
 	}
 }
 

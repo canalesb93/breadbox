@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"time"
 
+	"breadbox/internal/db"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -90,4 +92,17 @@ func datePtr(d pgtype.Date) *time.Time {
 	}
 	t := d.Time
 	return &t
+}
+
+func nullConnStatusPtr(s db.NullConnectionStatus) *string {
+	if !s.Valid {
+		return nil
+	}
+	str := string(s.ConnectionStatus)
+	return &str
+}
+
+func connStatusPtr(s db.ConnectionStatus) *string {
+	str := string(s)
+	return &str
 }

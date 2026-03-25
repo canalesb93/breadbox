@@ -485,7 +485,8 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			IsoCurrencyCode string
 			IsLiability     bool
 			SparklineData   template.JS // JSON array of daily spending amounts (30 days)
-			SpendingTotal   float64     // Total spending in last 30 days for this account
+			SpendingTotal    float64     // Total spending in last 30 days for this account
+			ConnectionStatus string      // active, error, pending_reauth, disconnected
 		}
 		var dashAccounts []DashboardAccount
 		for _, acct := range accounts {
@@ -549,18 +550,23 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				}
 			}
 
+			connStatus := ""
+			if acct.ConnectionStatus != nil {
+				connStatus = *acct.ConnectionStatus
+			}
 			dashAccounts = append(dashAccounts, DashboardAccount{
-				ID:              acct.ID,
-				Name:            acct.Name,
-				InstitutionName: institution,
-				Type:            acct.Type,
-				Subtype:         subtype,
-				Mask:            mask,
-				BalanceCurrent:  bal,
-				IsoCurrencyCode: currency,
-				IsLiability:     isLiability,
-				SparklineData:   sparklineJSON,
-				SpendingTotal:   acctSpendTotal,
+				ID:               acct.ID,
+				Name:             acct.Name,
+				InstitutionName:  institution,
+				Type:             acct.Type,
+				Subtype:          subtype,
+				Mask:             mask,
+				BalanceCurrent:   bal,
+				IsoCurrencyCode:  currency,
+				IsLiability:      isLiability,
+				SparklineData:    sparklineJSON,
+				SpendingTotal:    acctSpendTotal,
+				ConnectionStatus: connStatus,
 			})
 		}
 		// Sort: depository first, then credit, then loan, then others.
@@ -737,6 +743,13 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		if err != nil {
 			a.Logger.Error("list bank connections for health", "error", err)
 		}
+		// Default staleness threshold: 2x the global sync interval (or 24h minimum).
+		globalSyncInterval := time.Duration(a.Config.SyncIntervalMinutes) * time.Minute
+		defaultStaleThreshold := globalSyncInterval * 2
+		if defaultStaleThreshold < 24*time.Hour {
+			defaultStaleThreshold = 24 * time.Hour
+		}
+
 		for _, conn := range bankConnections {
 			if string(conn.Status) == "disconnected" {
 				continue
@@ -751,9 +764,20 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			}
 			lastSync := "Never"
 			isStale := false
+
+			// Use the connection's override interval if set, otherwise use global default.
+			staleThreshold := defaultStaleThreshold
+			if conn.SyncIntervalOverrideMinutes.Valid {
+				connInterval := time.Duration(conn.SyncIntervalOverrideMinutes.Int32) * time.Minute
+				staleThreshold = connInterval * 2
+				if staleThreshold < time.Hour {
+					staleThreshold = time.Hour
+				}
+			}
+
 			if conn.LastSyncedAt.Valid {
 				lastSync = relativeTime(conn.LastSyncedAt.Time)
-				if time.Since(conn.LastSyncedAt.Time) > 24*time.Hour {
+				if time.Since(conn.LastSyncedAt.Time) > staleThreshold {
 					isStale = true
 				}
 			} else {
