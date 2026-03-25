@@ -41,6 +41,7 @@ type TransactionContext struct {
 type RuleResolver struct {
 	rules           []compiledRule
 	mappings        map[string]pgtype.UUID // "provider:category" -> UUID
+	slugCache       map[[16]byte]string    // category UUID bytes -> slug
 	uncategorizedID pgtype.UUID
 	hitCounts       map[[16]byte]int // rule UUID bytes -> hit count accumulator
 }
@@ -73,6 +74,7 @@ type ruleRow struct {
 func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, logger *slog.Logger) (*RuleResolver, error) {
 	r := &RuleResolver{
 		mappings:  make(map[string]pgtype.UUID),
+		slugCache: make(map[[16]byte]string),
 		hitCounts: make(map[[16]byte]int),
 	}
 
@@ -109,6 +111,21 @@ func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, l
 	err = pool.QueryRow(ctx, "SELECT id FROM categories WHERE slug = 'uncategorized'").Scan(&r.uncategorizedID)
 	if err != nil {
 		return nil, fmt.Errorf("load uncategorized category: %w", err)
+	}
+
+	// Load category slug cache for suggestion filtering.
+	slugRows, err := pool.Query(ctx, "SELECT id, slug FROM categories")
+	if err != nil {
+		return nil, fmt.Errorf("load category slugs: %w", err)
+	}
+	defer slugRows.Close()
+	for slugRows.Next() {
+		var id pgtype.UUID
+		var slug string
+		if err := slugRows.Scan(&id, &slug); err != nil {
+			return nil, fmt.Errorf("scan category slug: %w", err)
+		}
+		r.slugCache[id.Bytes] = slug
 	}
 
 	return r, nil
@@ -232,6 +249,14 @@ func compileCondition(c *Condition) (*compiledCondition, error) {
 // UncategorizedID returns the UUID of the "uncategorized" fallback category.
 func (r *RuleResolver) UncategorizedID() pgtype.UUID {
 	return r.uncategorizedID
+}
+
+// CategorySlug returns the slug for a category UUID, or empty string if unknown.
+func (r *RuleResolver) CategorySlug(id pgtype.UUID) string {
+	if !id.Valid {
+		return ""
+	}
+	return r.slugCache[id.Bytes]
 }
 
 // Resolve does a mapping-only lookup (no rules). Backward-compatible with CategoryResolver.

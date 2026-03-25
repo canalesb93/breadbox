@@ -303,12 +303,13 @@ type ReviewResponse struct {
 }
 
 type ReviewListParams struct {
-	Status     *string
-	ReviewType *string
-	AccountID  *string
-	UserID     *string
-	Limit      int
-	Cursor     string
+	Status             *string
+	ReviewType         *string
+	AccountID          *string
+	UserID             *string
+	CategoryPrimaryRaw *string
+	Limit              int
+	Cursor             string
 }
 
 type ReviewListResult struct {

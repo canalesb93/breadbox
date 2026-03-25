@@ -48,13 +48,19 @@ func ListReviewsHandler(svc *service.Service) http.HandlerFunc {
 			userID = &v
 		}
 
+		var categoryPrimaryRaw *string
+		if v := q.Get("category_primary_raw"); v != "" {
+			categoryPrimaryRaw = &v
+		}
+
 		result, err := svc.ListReviews(r.Context(), service.ReviewListParams{
-			Status:     status,
-			ReviewType: reviewType,
-			AccountID:  accountID,
-			UserID:     userID,
-			Limit:      limit,
-			Cursor:     q.Get("cursor"),
+			Status:             status,
+			ReviewType:         reviewType,
+			AccountID:          accountID,
+			UserID:             userID,
+			CategoryPrimaryRaw: categoryPrimaryRaw,
+			Limit:              limit,
+			Cursor:             q.Get("cursor"),
 		})
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidCursor) {
@@ -199,6 +205,31 @@ func EnqueueReviewHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		writeJSON(w, http.StatusCreated, review)
+	}
+}
+
+// ReviewSummaryHandler returns pending reviews grouped by category_primary_raw.
+func ReviewSummaryHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		result, err := svc.GetReviewSummary(r.Context())
+		if err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get review summary")
+			return
+		}
+		writeData(w, result)
+	}
+}
+
+// AutoApproveCategorizedHandler bulk-approves reviews whose transactions already have categories.
+func AutoApproveCategorizedHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		actor := service.ActorFromContext(r.Context())
+		result, err := svc.AutoApproveCategorizedReviews(r.Context(), actor)
+		if err != nil {
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to auto-approve reviews")
+			return
+		}
+		writeData(w, result)
 	}
 }
 

@@ -65,8 +65,19 @@ func (e *Engine) enqueueForReview(ctx context.Context, txQueries *db.Queries, tx
 		TransactionID: txnResult.ID,
 		ReviewType:    reviewType,
 	}
+	// Suggest the category only if it's a real, specific category.
+	// Suppress catch-all categories (slug ending in _other) and the uncategorized fallback
+	// — these are misleading defaults that cause agents to approve bad categories.
 	if txnResult.CategoryID.Valid && !isUncategorizedFallback {
-		params.SuggestedCategoryID = txnResult.CategoryID
+		suggest := true
+		if resolver != nil {
+			if slug := resolver.CategorySlug(txnResult.CategoryID); strings.HasSuffix(slug, "_other") {
+				suggest = false
+			}
+		}
+		if suggest {
+			params.SuggestedCategoryID = txnResult.CategoryID
+		}
 	}
 	if txnResult.CategoryConfidence.Valid {
 		conf := confidenceLevelToScore(txnResult.CategoryConfidence.String)

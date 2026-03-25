@@ -115,6 +115,12 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 		argN++
 	}
 
+	if params.CategoryPrimaryRaw != nil {
+		query += fmt.Sprintf(" AND t.category_primary = $%d", argN)
+		args = append(args, *params.CategoryPrimaryRaw)
+		argN++
+	}
+
 	if params.Cursor != "" {
 		cursorTime, cursorIDStr, err := decodeTimestampCursor(params.Cursor)
 		if err != nil {
@@ -354,6 +360,12 @@ func (s *Service) countReviewsFiltered(ctx context.Context, status string, param
 		uid, _ := parseUUID(*params.UserID)
 		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
 		args = append(args, uid)
+		argN++
+	}
+
+	if params.CategoryPrimaryRaw != nil {
+		query += fmt.Sprintf(" AND t.category_primary = $%d", argN)
+		args = append(args, *params.CategoryPrimaryRaw)
 		argN++
 	}
 
@@ -750,6 +762,151 @@ func (s *Service) DismissAllPendingReviews(ctx context.Context, actor Actor) (in
 	}
 
 	return count, nil
+}
+
+// AutoApproveCategorizedReviews bulk-approves pending reviews whose transactions
+// already have a non-null, non-uncategorized category_id (e.g., from rules).
+// This bridges the gap between the rules system and the review queue.
+func (s *Service) AutoApproveCategorizedReviews(ctx context.Context, actor Actor) (*AutoApproveResult, error) {
+	// Find pending reviews where the transaction already has a good category.
+	rows, err := s.Pool.Query(ctx, `
+		SELECT rq.id, t.category_id
+		FROM review_queue rq
+		JOIN transactions t ON rq.transaction_id = t.id
+		JOIN categories c ON t.category_id = c.id
+		WHERE rq.status = 'pending'
+		  AND t.category_id IS NOT NULL
+		  AND c.slug != 'uncategorized'
+		  AND t.category_override = FALSE`)
+	if err != nil {
+		return nil, fmt.Errorf("query categorized reviews: %w", err)
+	}
+	defer rows.Close()
+
+	type match struct {
+		reviewID   pgtype.UUID
+		categoryID pgtype.UUID
+	}
+	var matches []match
+	for rows.Next() {
+		var m match
+		if err := rows.Scan(&m.reviewID, &m.categoryID); err != nil {
+			return nil, fmt.Errorf("scan: %w", err)
+		}
+		matches = append(matches, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate: %w", err)
+	}
+
+	if len(matches) == 0 {
+		return &AutoApproveResult{Approved: 0, Remaining: 0}, nil
+	}
+
+	// Bulk approve them.
+	var reviewerType, reviewerID, reviewerName pgtype.Text
+	if actor.Type != "" {
+		reviewerType = pgtype.Text{String: actor.Type, Valid: true}
+	}
+	if actor.ID != "" {
+		reviewerID = pgtype.Text{String: actor.ID, Valid: true}
+	}
+	if actor.Name != "" {
+		reviewerName = pgtype.Text{String: actor.Name, Valid: true}
+	}
+
+	approved := 0
+	for _, m := range matches {
+		_, err := s.Queries.UpdateReviewDecision(ctx, db.UpdateReviewDecisionParams{
+			ID:                 m.reviewID,
+			Status:             "approved",
+			ReviewerType:       reviewerType,
+			ReviewerID:         reviewerID,
+			ReviewerName:       reviewerName,
+			ReviewNote:         pgtype.Text{String: "Auto-approved: transaction already categorized by rules", Valid: true},
+			ResolvedCategoryID: m.categoryID,
+		})
+		if err == nil {
+			approved++
+		}
+	}
+
+	remaining, _ := s.Queries.CountPendingReviews(ctx)
+
+	return &AutoApproveResult{
+		Approved:  approved,
+		Remaining: remaining,
+	}, nil
+}
+
+// ReviewSummaryRow is a single group in a review summary.
+type ReviewSummaryRow struct {
+	CategoryPrimaryRaw string   `json:"category_primary_raw"`
+	Count              int64    `json:"count"`
+	SampleNames        []string `json:"sample_names"`
+}
+
+// ReviewSummaryResult is the response for the review summary endpoint.
+type ReviewSummaryResult struct {
+	TotalPending int64              `json:"total_pending"`
+	Groups       []ReviewSummaryRow `json:"groups"`
+}
+
+// AutoApproveResult is the response for auto-approving categorized reviews.
+type AutoApproveResult struct {
+	Approved  int   `json:"approved"`
+	Remaining int64 `json:"remaining"`
+}
+
+// GetReviewSummary returns pending reviews grouped by category_primary_raw with counts
+// and sample transaction names. Avoids token-heavy full review listings.
+func (s *Service) GetReviewSummary(ctx context.Context) (*ReviewSummaryResult, error) {
+	rows, err := s.Pool.Query(ctx, `
+		SELECT COALESCE(t.category_primary, 'NONE') AS cat_raw,
+		       COUNT(*) AS cnt,
+		       array_agg(DISTINCT LEFT(t.name, 40) ORDER BY LEFT(t.name, 40)) FILTER (WHERE t.name IS NOT NULL) AS sample_names
+		FROM review_queue rq
+		JOIN transactions t ON rq.transaction_id = t.id
+		JOIN accounts a ON t.account_id = a.id
+		WHERE rq.status = 'pending'
+		  AND t.deleted_at IS NULL
+		  AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))
+		GROUP BY COALESCE(t.category_primary, 'NONE')
+		ORDER BY COUNT(*) DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("review summary query: %w", err)
+	}
+	defer rows.Close()
+
+	var groups []ReviewSummaryRow
+	var total int64
+
+	for rows.Next() {
+		var row ReviewSummaryRow
+		var sampleNames []string
+		if err := rows.Scan(&row.CategoryPrimaryRaw, &row.Count, &sampleNames); err != nil {
+			return nil, fmt.Errorf("scan summary: %w", err)
+		}
+		// Limit sample names to 5
+		if len(sampleNames) > 5 {
+			sampleNames = sampleNames[:5]
+		}
+		row.SampleNames = sampleNames
+		groups = append(groups, row)
+		total += row.Count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate summary: %w", err)
+	}
+
+	if groups == nil {
+		groups = []ReviewSummaryRow{}
+	}
+
+	return &ReviewSummaryResult{
+		TotalPending: total,
+		Groups:       groups,
+	}, nil
 }
 
 // reviewFromRow converts a db.ReviewQueue row to a ReviewResponse, enriching with category slugs.

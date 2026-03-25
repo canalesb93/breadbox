@@ -58,9 +58,11 @@ COMMENTS:
 - Check list_transaction_comments before modifying a transaction to see prior context
 
 REVIEW QUEUE:
-- list_pending_reviews shows transactions flagged during sync that need categorization. Use fields=triage to dramatically reduce response size. Supports limit up to 500.
+- Start with review_summary to see pending reviews grouped by raw provider category with counts — much more efficient than listing all reviews
+- Use list_pending_reviews with category_primary_raw filter to process one group at a time. Use fields=triage to reduce response size. Supports limit up to 500.
 - Use submit_review (or batch_submit_reviews, up to 200 at once) to approve with the correct category_slug, or skip if uncertain
 - For bulk category work: batch_categorize_transactions assigns one category to many transactions; bulk_recategorize moves all transactions from one category to another
+- After creating rules with apply_retroactively=true, call auto_approve_categorized_reviews to clear reviews that rules already handled
 - After reviewing, create transaction rules for patterns you noticed so future transactions are auto-categorized
 
 TRANSACTION RULES:
@@ -255,6 +257,12 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("reject_match", ToolWrite,
 			"Reject a false auto-match between two transactions. Removes the match record and clears the attributed_user_id on the primary transaction.",
 			s.handleRejectMatch),
+		makeToolDef("review_summary", ToolRead,
+			"Get pending reviews grouped by raw provider category (category_primary_raw) with counts and sample transaction names. Much more token-efficient than listing all reviews — use this first to understand the review queue composition, then use list_pending_reviews with category_primary_raw filter to process one group at a time.",
+			s.handleReviewSummary),
+		makeToolDef("auto_approve_categorized_reviews", ToolWrite,
+			"Bulk-approve all pending reviews whose transactions already have a category (e.g., from rules). This bridges the gap between rules and reviews — after creating rules with apply_retroactively=true, call this to clear the review queue of transactions that rules already handled. Returns count of approved reviews and remaining pending count.",
+			s.handleAutoApproveCategorized),
 	}
 }
 
