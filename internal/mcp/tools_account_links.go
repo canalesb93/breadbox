@@ -54,8 +54,11 @@ func (s *MCPServer) handleListAccountLinks(_ context.Context, _ *mcpsdk.CallTool
 	return jsonResult(links)
 }
 
-func (s *MCPServer) handleCreateAccountLink(_ context.Context, _ *mcpsdk.CallToolRequest, input createAccountLinkInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
+func (s *MCPServer) handleCreateAccountLink(ctx context.Context, _ *mcpsdk.CallToolRequest, input createAccountLinkInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	ctx = context.Background()
 	link, err := s.svc.CreateAccountLink(ctx, service.CreateAccountLinkParams{
 		PrimaryAccountID:   input.PrimaryAccountID,
 		DependentAccountID: input.DependentAccountID,
@@ -82,16 +85,22 @@ func (s *MCPServer) handleCreateAccountLink(_ context.Context, _ *mcpsdk.CallToo
 	})
 }
 
-func (s *MCPServer) handleDeleteAccountLink(_ context.Context, _ *mcpsdk.CallToolRequest, input deleteAccountLinkInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
+func (s *MCPServer) handleDeleteAccountLink(ctx context.Context, _ *mcpsdk.CallToolRequest, input deleteAccountLinkInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	ctx = context.Background()
 	if err := s.svc.DeleteAccountLink(ctx, input.LinkID); err != nil {
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(map[string]string{"status": "deleted"})
 }
 
-func (s *MCPServer) handleReconcileAccountLink(_ context.Context, _ *mcpsdk.CallToolRequest, input reconcileAccountLinkInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
+func (s *MCPServer) handleReconcileAccountLink(ctx context.Context, _ *mcpsdk.CallToolRequest, input reconcileAccountLinkInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	ctx = context.Background()
 	result, err := s.svc.RunMatchReconciliation(ctx, input.LinkID)
 	if err != nil {
 		return errorResult(err), nil, nil
@@ -108,16 +117,22 @@ func (s *MCPServer) handleListTransactionMatches(_ context.Context, _ *mcpsdk.Ca
 	return jsonResult(matches)
 }
 
-func (s *MCPServer) handleConfirmMatch(_ context.Context, _ *mcpsdk.CallToolRequest, input confirmMatchInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
+func (s *MCPServer) handleConfirmMatch(ctx context.Context, _ *mcpsdk.CallToolRequest, input confirmMatchInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	ctx = context.Background()
 	if err := s.svc.ConfirmMatch(ctx, input.MatchID); err != nil {
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(map[string]string{"status": "confirmed"})
 }
 
-func (s *MCPServer) handleRejectMatch(_ context.Context, _ *mcpsdk.CallToolRequest, input rejectMatchInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
+func (s *MCPServer) handleRejectMatch(ctx context.Context, _ *mcpsdk.CallToolRequest, input rejectMatchInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	ctx = context.Background()
 	if err := s.svc.RejectMatch(ctx, input.MatchID); err != nil {
 		return errorResult(err), nil, nil
 	}
