@@ -76,14 +76,14 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 	}
 
 	err = s.Pool.QueryRow(ctx,
-		"SELECT COUNT(*), COALESCE(MIN(date)::text, ''), COALESCE(MAX(date)::text, '') FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.deleted_at IS NULL AND a.is_dependent_linked = FALSE").
+		"SELECT COUNT(*), COALESCE(MIN(date)::text, ''), COALESCE(MAX(date)::text, '') FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.deleted_at IS NULL AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))").
 		Scan(&stats.TransactionCount, &stats.EarliestDate, &stats.LatestDate)
 	if err != nil {
 		return nil, fmt.Errorf("count transactions: %w", err)
 	}
 
 	err = s.Pool.QueryRow(ctx,
-		"SELECT COUNT(*) FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.deleted_at IS NULL AND t.pending = true AND a.is_dependent_linked = FALSE").
+		"SELECT COUNT(*) FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.deleted_at IS NULL AND t.pending = true AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))").
 		Scan(&stats.PendingTransactionCount)
 	if err != nil {
 		return nil, fmt.Errorf("count pending: %w", err)
@@ -95,7 +95,7 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 	}
 
 	err = s.Pool.QueryRow(ctx,
-		"SELECT COUNT(*) FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.category_id IS NULL AND t.deleted_at IS NULL AND a.is_dependent_linked = FALSE").
+		"SELECT COUNT(*) FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.category_id IS NULL AND t.deleted_at IS NULL AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))").
 		Scan(&stats.UnmappedCount)
 	if err != nil {
 		return nil, fmt.Errorf("count unmapped: %w", err)
@@ -182,7 +182,7 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 		SELECT COALESCE(SUM(t.amount), 0), COUNT(*), COUNT(DISTINCT t.iso_currency_code)
 		FROM transactions t
 		JOIN accounts a ON t.account_id = a.id
-		WHERE t.deleted_at IS NULL AND t.pending = false AND t.date >= $1 AND t.amount > 0 AND a.is_dependent_linked = FALSE`,
+		WHERE t.deleted_at IS NULL AND t.pending = false AND t.date >= $1 AND t.amount > 0 AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`,
 		thirtyDaysAgo).Scan(&spendTotal, &spendCount, &currencyCount)
 	if err != nil {
 		return nil, fmt.Errorf("spending summary: %w", err)
@@ -192,7 +192,7 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 		err = s.Pool.QueryRow(ctx, `
 			SELECT t.iso_currency_code FROM transactions t
 			JOIN accounts a ON t.account_id = a.id
-			WHERE t.deleted_at IS NULL AND t.pending = false AND t.date >= $1 AND t.amount > 0 AND a.is_dependent_linked = FALSE LIMIT 1`,
+			WHERE t.deleted_at IS NULL AND t.pending = false AND t.date >= $1 AND t.amount > 0 AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id)) LIMIT 1`,
 			thirtyDaysAgo).Scan(&spendCurrency)
 		if err != nil {
 			return nil, fmt.Errorf("spending currency: %w", err)
@@ -209,7 +209,7 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 			SELECT COALESCE(t.category_primary, 'UNCATEGORIZED'), SUM(t.amount), COUNT(*)
 			FROM transactions t
 			JOIN accounts a ON t.account_id = a.id
-			WHERE t.deleted_at IS NULL AND t.pending = false AND t.date >= $1 AND t.amount > 0 AND a.is_dependent_linked = FALSE
+			WHERE t.deleted_at IS NULL AND t.pending = false AND t.date >= $1 AND t.amount > 0 AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))
 			GROUP BY t.category_primary
 			ORDER BY SUM(t.amount) DESC
 			LIMIT 5`, thirtyDaysAgo)

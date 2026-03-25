@@ -111,7 +111,7 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`, selectCols)
 		query += "\nLEFT JOIN categories cat ON t.category_id = cat.id"
 	}
 	query += "\nWHERE t.deleted_at IS NULL"
-	query += " AND a.is_dependent_linked = FALSE"
+	query += " AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))"
 
 	args := []any{}
 	argN := 1

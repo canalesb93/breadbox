@@ -45,9 +45,9 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 
 	query += " WHERE t.deleted_at IS NULL"
 
-	// Exclude dependent-linked accounts by default.
+	// Exclude matched dependent transactions (but keep unmatched ones visible).
 	if !params.IncludeDependent {
-		query += " AND a.is_dependent_linked = FALSE"
+		query += " AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))"
 	}
 
 	if params.UserID != nil {
@@ -318,7 +318,7 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 	query += " WHERE t.deleted_at IS NULL"
 
 	if !params.IncludeDependent {
-		query += " AND a.is_dependent_linked = FALSE"
+		query += " AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))"
 	}
 
 	if params.UserID != nil {
@@ -427,8 +427,8 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	argN := 1
 	whereClauses := ""
 
-	// Exclude dependent-linked accounts by default.
-	depClause := " AND a.is_dependent_linked = FALSE"
+	// Exclude matched dependent transactions (keep unmatched visible).
+	depClause := " AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))"
 	query += depClause
 	whereClauses += depClause
 	needAccountJoin = true
