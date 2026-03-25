@@ -368,6 +368,56 @@
   </div>
 </div>
 
+<!-- Smart Spending Insights -->
+{{if .SpendingInsights}}
+<div class="bb-card mb-8 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/8">
+        <i data-lucide="lightbulb" class="w-3.5 h-3.5 text-primary"></i>
+      </div>
+      <h2 class="text-sm font-semibold text-base-content/70">Spending Insights</h2>
+    </div>
+    <span class="text-xs text-base-content/30">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}} vs prev</span>
+  </div>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+    {{range .SpendingInsights}}
+    <div class="group relative p-4 rounded-xl border transition-all duration-200
+      {{if eq .Sentiment "negative"}}border-error/15 bg-error/3 hover:bg-error/5 hover:border-error/25
+      {{else if eq .Sentiment "positive"}}border-success/15 bg-success/3 hover:bg-success/5 hover:border-success/25
+      {{else if eq .Sentiment "info"}}border-primary/15 bg-primary/3 hover:bg-primary/5 hover:border-primary/25
+      {{else}}border-base-300/60 bg-base-200/20 hover:bg-base-200/40 hover:border-base-300{{end}}">
+      <!-- Icon + Trend indicator -->
+      <div class="flex items-center gap-2.5 mb-2.5">
+        <div class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0
+          {{if eq .Sentiment "negative"}}bg-error/10
+          {{else if eq .Sentiment "positive"}}bg-success/10
+          {{else if eq .Sentiment "info"}}bg-primary/10
+          {{else}}bg-base-200/60{{end}}">
+          <i data-lucide="{{.Icon}}" class="w-4 h-4
+            {{if eq .Sentiment "negative"}}text-error/70
+            {{else if eq .Sentiment "positive"}}text-success/70
+            {{else if eq .Sentiment "info"}}text-primary/70
+            {{else}}text-base-content/40{{end}}"></i>
+        </div>
+        {{if ne .Change 0.0}}
+        <span class="text-[0.65rem] font-semibold px-1.5 py-0.5 rounded-full
+          {{if gt .Change 0.0}}bg-error/10 text-error/80
+          {{else}}bg-success/10 text-success/80{{end}}">
+          {{if gt .Change 0.0}}+{{end}}{{printf "%.0f" .Change}}%
+        </span>
+        {{end}}
+      </div>
+      <!-- Title -->
+      <div class="text-sm font-semibold text-base-content/85 leading-tight mb-1">{{.Title}}</div>
+      <!-- Detail -->
+      <div class="text-xs text-base-content/45 leading-relaxed">{{.Detail}}</div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
 <!-- Cash Flow Summary -->
 {{if .HasCashFlow}}
 <div class="bb-card mb-8 p-5 bb-stagger">
