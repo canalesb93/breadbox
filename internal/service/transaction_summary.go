@@ -133,14 +133,22 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`, selectCols)
 	argN++
 
 	if params.AccountID != nil {
+		aid, err := parseUUID(*params.AccountID)
+		if err != nil {
+			return nil, fmt.Errorf("%w: invalid account_id", ErrInvalidParameter)
+		}
 		query += fmt.Sprintf(" AND t.account_id = $%d", argN)
-		args = append(args, *params.AccountID)
+		args = append(args, aid)
 		argN++
 	}
 
 	if params.UserID != nil {
+		uid, err := parseUUID(*params.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("%w: invalid user_id", ErrInvalidParameter)
+		}
 		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
-		args = append(args, *params.UserID)
+		args = append(args, uid)
 		argN++
 	}
 
