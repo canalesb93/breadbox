@@ -182,6 +182,18 @@ type SyncLogRow struct {
 	Duration        *string
 }
 
+// SyncLogStats contains aggregate statistics about sync logs.
+type SyncLogStats struct {
+	TotalSyncs    int64
+	SuccessCount  int64
+	ErrorCount    int64
+	SuccessRate   float64 // 0-100 percentage
+	AvgDurationMs float64 // average duration in milliseconds
+	TotalAdded    int64
+	TotalModified int64
+	TotalRemoved  int64
+}
+
 type AdminTransactionListParams struct {
 	Page         int
 	PageSize     int
