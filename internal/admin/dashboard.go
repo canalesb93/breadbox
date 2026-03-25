@@ -653,7 +653,8 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		}
 
 		// Net worth trend: compute daily net worth by working backwards from current balance.
-		// Query all daily transaction totals (net: spending positive, income negative) for chart period.
+		// Query all daily transaction totals (spending=positive, income=negative) for chart period.
+		// Going backwards: past_nw = current_nw + daily_net (positive spending means higher past balance).
 		netWorthTrendStart := time.Now().AddDate(0, 0, -chartDays)
 		dailyNetSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
 			GroupBy:   "day",
@@ -685,9 +686,13 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			day := now.AddDate(0, 0, -(nwDays - i))
 			dayStr := day.Format("2006-01-02")
 			nwLabels[i] = dayStr
-			// Net worth on day[i] = net worth on day[i+1] - net_transactions on day[i+1].
+			// Net worth on day[i] = net worth on day[i+1] + net_transactions on day[i+1].
+			// Positive transactions = spending (reduce net worth going forward),
+			// so going backwards: previous day = current day + spending that day.
+			// Negative transactions = income (increase net worth going forward),
+			// so going backwards: previous day = current day + (negative income) = lower.
 			nextDayStr := now.AddDate(0, 0, -(nwDays - i - 1)).Format("2006-01-02")
-			nwValues[i] = nwValues[i+1] - dailyNetMap[nextDayStr]
+			nwValues[i] = nwValues[i+1] + dailyNetMap[nextDayStr]
 		}
 		var netWorthLabelsJSON, netWorthValuesJSON template.JS
 		if lb, err := json.Marshal(nwLabels); err == nil {
