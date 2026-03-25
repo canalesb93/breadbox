@@ -1,4 +1,5 @@
 {{define "content"}}
+{{template "category-picker-styles" .}}
 
 {{if .ShowUpdateBanner}}
 <div class="alert alert-info mb-6" x-data="{ pulling: false, pulled: false, error: '' }">
@@ -208,101 +209,40 @@
   </div>
   {{end}}
 
-  <!-- Asset Groups -->
-  {{if .AssetGroups}}
-  <div class="space-y-3 mb-4 bb-stagger">
-    {{range .AssetGroups}}
-    <div class="bb-card p-0 overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-3 bg-base-200/30 border-b border-base-300/50">
-        <div class="flex items-center gap-2.5">
-          <i data-lucide="{{.Icon}}" class="w-4 h-4 text-base-content/40"></i>
-          <span class="text-xs font-semibold text-base-content/60 tracking-wide">{{.Label}}</span>
+  <!-- Flat Account List -->
+  <div class="bb-card p-0 overflow-hidden bb-stagger">
+    <div class="divide-y divide-base-300/40">
+      {{range .Accounts}}
+      <a href="/accounts/{{.ID}}" class="flex items-center gap-3 px-5 py-3 hover:bg-base-200/40 transition-colors duration-150 no-underline group">
+        <div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+          <i data-lucide="{{accountTypeIcon .Type}}" class="w-4 h-4 text-base-content/40"></i>
         </div>
-        <span class="text-sm font-semibold tabular-nums text-base-content">{{formatBalance .Total}}</span>
-      </div>
-      <div class="divide-y divide-base-300/40">
-        {{range .Accounts}}
-        <a href="/accounts/{{.ID}}" class="flex items-center gap-3 px-5 py-3 hover:bg-base-200/40 transition-colors duration-150 no-underline group">
-          <div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
-            <i data-lucide="{{accountTypeIcon .Type}}" class="w-4 h-4 text-base-content/40"></i>
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-1.5">
-              <span class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</span>
-              {{if and .ConnectionStatus (ne .ConnectionStatus "active")}}
-              <span class="shrink-0 text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full {{if eq .ConnectionStatus "error"}}bg-error/8 text-error/70{{else if eq .ConnectionStatus "pending_reauth"}}bg-warning/8 text-warning{{else if eq .ConnectionStatus "disconnected"}}bg-base-300/60 text-base-content/40{{end}}">{{if eq .ConnectionStatus "pending_reauth"}}reauth{{else}}{{.ConnectionStatus}}{{end}}</span>
-              {{end}}
-            </div>
-            <div class="text-xs text-base-content/40">{{.InstitutionName}}{{if .Mask}} ····{{.Mask}}{{end}}</div>
-          </div>
-          <div class="flex items-center gap-3 shrink-0">
-            {{if .SparklineData}}
-            <div class="bb-sparkline w-20 h-6 hidden sm:block" data-values="{{.SparklineData}}" data-liability="{{.IsLiability}}"></div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5">
+            <span class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</span>
+            {{if and .ConnectionStatus (ne .ConnectionStatus "active")}}
+            <span class="shrink-0 text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full {{if eq .ConnectionStatus "error"}}bg-error/8 text-error/70{{else if eq .ConnectionStatus "pending_reauth"}}bg-warning/8 text-warning{{else if eq .ConnectionStatus "disconnected"}}bg-base-300/60 text-base-content/40{{end}}">{{if eq .ConnectionStatus "pending_reauth"}}reauth{{else}}{{.ConnectionStatus}}{{end}}</span>
             {{end}}
-            <div class="text-right">
-              <div class="text-sm font-semibold tabular-nums">{{formatBalance .BalanceCurrent}}</div>
-              {{if gt .SpendingTotal 0.0}}
-              <div class="text-[0.65rem] text-base-content/40 tabular-nums">{{formatBalance .SpendingTotal}} spent</div>
-              {{else}}
-              <div class="text-xs text-base-content/30">{{accountTypeLabel .Type .Subtype}}</div>
-              {{end}}
-            </div>
           </div>
-        </a>
-        {{end}}
-      </div>
-    </div>
-    {{end}}
-  </div>
-  {{end}}
-
-  <!-- Liability Groups -->
-  {{if .LiabilityGroups}}
-  <div class="space-y-3 bb-stagger">
-    {{range .LiabilityGroups}}
-    <div class="bb-card p-0 overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-3 bg-base-200/30 border-b border-base-300/50">
-        <div class="flex items-center gap-2.5">
-          <i data-lucide="{{.Icon}}" class="w-4 h-4 text-base-content/40"></i>
-          <span class="text-xs font-semibold text-base-content/60 tracking-wide">{{.Label}}</span>
+          <div class="text-xs text-base-content/40">{{.InstitutionName}}{{if .Mask}} ····{{.Mask}}{{end}}</div>
         </div>
-        <span class="text-sm font-semibold tabular-nums text-error/80">-{{formatBalance .Total}}</span>
-      </div>
-      <div class="divide-y divide-base-300/40">
-        {{range .Accounts}}
-        <a href="/accounts/{{.ID}}" class="flex items-center gap-3 px-5 py-3 hover:bg-base-200/40 transition-colors duration-150 no-underline group">
-          <div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
-            <i data-lucide="{{accountTypeIcon .Type}}" class="w-4 h-4 text-base-content/40"></i>
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-1.5">
-              <span class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</span>
-              {{if and .ConnectionStatus (ne .ConnectionStatus "active")}}
-              <span class="shrink-0 text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full {{if eq .ConnectionStatus "error"}}bg-error/8 text-error/70{{else if eq .ConnectionStatus "pending_reauth"}}bg-warning/8 text-warning{{else if eq .ConnectionStatus "disconnected"}}bg-base-300/60 text-base-content/40{{end}}">{{if eq .ConnectionStatus "pending_reauth"}}reauth{{else}}{{.ConnectionStatus}}{{end}}</span>
-              {{end}}
-            </div>
-            <div class="text-xs text-base-content/40">{{.InstitutionName}}{{if .Mask}} ····{{.Mask}}{{end}}</div>
-          </div>
-          <div class="flex items-center gap-3 shrink-0">
-            {{if .SparklineData}}
-            <div class="bb-sparkline w-20 h-6 hidden sm:block" data-values="{{.SparklineData}}" data-liability="{{.IsLiability}}"></div>
+        <div class="flex items-center gap-3 shrink-0">
+          {{if .SparklineData}}
+          <div class="bb-sparkline w-20 h-6 hidden sm:block" data-values="{{.SparklineData}}" data-liability="{{.IsLiability}}"></div>
+          {{end}}
+          <div class="text-right">
+            <div class="text-sm font-semibold tabular-nums{{if .IsLiability}} text-error/80{{end}}">{{if .IsLiability}}-{{end}}{{formatBalance .BalanceCurrent}}</div>
+            {{if gt .SpendingTotal 0.0}}
+            <div class="text-[0.65rem] text-base-content/40 tabular-nums">{{formatBalance .SpendingTotal}} spent</div>
+            {{else}}
+            <div class="text-xs text-base-content/30">{{accountTypeLabel .Type .Subtype}}</div>
             {{end}}
-            <div class="text-right">
-              <div class="text-sm font-semibold tabular-nums text-error/80">-{{formatBalance .BalanceCurrent}}</div>
-              {{if gt .SpendingTotal 0.0}}
-              <div class="text-[0.65rem] text-base-content/40 tabular-nums">{{formatBalance .SpendingTotal}} spent</div>
-              {{else}}
-              <div class="text-xs text-base-content/30">{{accountTypeLabel .Type .Subtype}}</div>
-              {{end}}
-            </div>
           </div>
-        </a>
-        {{end}}
-      </div>
+        </div>
+      </a>
+      {{end}}
     </div>
-    {{end}}
   </div>
-  {{end}}
 </div>
 {{end}}
 
@@ -697,8 +637,8 @@
     {{if .RecentTransactions}}
     <div class="space-y-0.5">
       {{range .RecentTransactions}}
-      <a href="/transactions/{{.ID}}" class="flex items-center justify-between py-2.5 px-1 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline">
-        <div class="flex items-center gap-3 min-w-0">
+      <div class="flex items-center gap-3 py-2.5 px-1 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1">
+        <a href="/transactions/{{.ID}}" class="flex items-center gap-3 min-w-0 flex-1 no-underline">
           {{if .CategoryIcon}}
           <div class="bb-tx-avatar bb-tx-avatar--sm" style="--avatar-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}oklch(0.65 0 0){{end}}">
             <i data-lucide="{{deref .CategoryIcon}}" class="w-3.5 h-3.5"></i>
@@ -712,13 +652,6 @@
             <div class="text-sm font-medium truncate max-w-64">{{.Name}}</div>
             <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40">
               <span>{{.AccountName}} · {{formatDate .Date}}</span>
-              {{if .CategoryDisplayName}}
-              <span class="text-base-content/20">&middot;</span>
-              <span class="inline-flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}{{safeCSS "oklch(0.65 0 0)"}}{{end}}"></span>
-                <span class="text-base-content/50">{{deref .CategoryDisplayName}}</span>
-              </span>
-              {{end}}
               {{if .AgentReviewed}}
               <span class="text-base-content/20">&middot;</span>
               <span class="inline-flex items-center gap-0.5 text-primary/60" title="Categorized by AI agent">
@@ -727,11 +660,18 @@
               {{end}}
             </div>
           </div>
+        </a>
+        <!-- Category Picker -->
+        <div class="shrink-0 hidden sm:block" x-data="categoryPicker({categories: window.__bbDashCategories, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: '\u2014', allowEmpty: true, emptyLabel: 'Uncategorized'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
+          <button type="button" class="btn btn-ghost btn-xs gap-1.5 rounded-lg" @click="openPicker()">
+            <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
+            <span x-text="displayLabel" class="text-xs truncate max-w-20">{{if .CategoryDisplayName}}{{deref .CategoryDisplayName}}{{else}}&mdash;{{end}}</span>
+          </button>
         </div>
-        <span class="bb-tx-amount{{if lt .Amount 0.0}} bb-tx-amount--income{{end}}">
+        <span class="bb-tx-amount{{if lt .Amount 0.0}} bb-tx-amount--income{{end}} shrink-0">
           {{formatAmount .Amount}}
         </span>
-      </a>
+      </div>
       {{end}}
     </div>
     {{else}}
@@ -1227,4 +1167,34 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {{end}}
+
+{{template "category-picker-script" .}}
+<script>
+window.__bbDashCategories = {{toJSON .Categories}};
+
+/* ── Single transaction category quick-set (dashboard) ── */
+function quickSetCategory(txId, categoryId) {
+  if (!categoryId) {
+    fetch('/-/transactions/' + txId + '/category', { method: 'DELETE' })
+    .then(r => {
+      if (r.ok || r.status === 204) {
+        window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Category reset', type:'success'}}));
+      }
+    });
+    return;
+  }
+  fetch('/-/transactions/' + txId + '/category', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({category_id: categoryId})
+  })
+  .then(r => {
+    if (r.ok) {
+      window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Category updated', type:'success'}}));
+    } else {
+      r.json().then(d => window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error?.message || 'Failed', type:'error'}})));
+    }
+  });
+}
+</script>
 {{end}}
