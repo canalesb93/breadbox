@@ -850,6 +850,94 @@ func TestAutoApproveCategorizedReviews_SkipsCategoryOverride(t *testing.T) {
 	}
 }
 
+func TestSubmitReview_RejectWithCategoryDoesNotModifyTransaction(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_reject_cat")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_reject_cat", "Checking")
+	txn := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_reject_cat", "Coffee Shop", 550, "2025-01-15")
+
+	review := mustEnqueueReview(t, queries, txn.ID, "uncategorized")
+
+	// Create a category
+	cat := mustCreateCategory(t, queries, "reject_test_cat", "Reject Test Category")
+	catID := formatUUID(cat.ID)
+
+	// Reject with an explicit category — the category should NOT be applied
+	result, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
+		ReviewID:   formatUUID(review.ID),
+		Decision:   "rejected",
+		CategoryID: &catID,
+		Actor:      testActor,
+	})
+	if err != nil {
+		t.Fatalf("SubmitReview: %v", err)
+	}
+	if result.Status != "rejected" {
+		t.Errorf("expected status=rejected, got %s", result.Status)
+	}
+
+	// Verify the transaction was NOT modified — category_id should still be NULL
+	// and category_override should still be FALSE
+	var txnCatID pgtype.UUID
+	var catOverride bool
+	err = pool.QueryRow(ctx, "SELECT category_id, category_override FROM transactions WHERE id = $1", txn.ID).Scan(&txnCatID, &catOverride)
+	if err != nil {
+		t.Fatalf("query transaction: %v", err)
+	}
+	if txnCatID.Valid {
+		t.Errorf("expected transaction category_id to remain NULL after rejection, got %s", formatUUID(txnCatID))
+	}
+	if catOverride {
+		t.Error("expected category_override=false after rejection, but got true")
+	}
+}
+
+func TestSubmitReview_SkipWithCategoryDoesNotModifyTransaction(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_skip_cat")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_skip_cat", "Checking")
+	txn := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_skip_cat", "Restaurant", 2000, "2025-01-20")
+
+	review := mustEnqueueReview(t, queries, txn.ID, "uncategorized")
+
+	cat := mustCreateCategory(t, queries, "skip_test_cat", "Skip Test Category")
+	catID := formatUUID(cat.ID)
+
+	// Skip with an explicit category — the category should NOT be applied
+	result, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
+		ReviewID:   formatUUID(review.ID),
+		Decision:   "skipped",
+		CategoryID: &catID,
+		Actor:      testActor,
+	})
+	if err != nil {
+		t.Fatalf("SubmitReview: %v", err)
+	}
+	if result.Status != "skipped" {
+		t.Errorf("expected status=skipped, got %s", result.Status)
+	}
+
+	// Verify the transaction was NOT modified
+	var txnCatID pgtype.UUID
+	var catOverride bool
+	err = pool.QueryRow(ctx, "SELECT category_id, category_override FROM transactions WHERE id = $1", txn.ID).Scan(&txnCatID, &catOverride)
+	if err != nil {
+		t.Fatalf("query transaction: %v", err)
+	}
+	if txnCatID.Valid {
+		t.Errorf("expected transaction category_id to remain NULL after skip, got %s", formatUUID(txnCatID))
+	}
+	if catOverride {
+		t.Error("expected category_override=false after skip, but got true")
+	}
+}
+
 func TestAutoApproveCategorizedReviews_NoneEligible(t *testing.T) {
 	svc, queries, _ := newService(t)
 	ctx := context.Background()
