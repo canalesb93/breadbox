@@ -13,6 +13,7 @@ import (
 	bsync "breadbox/internal/sync"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -389,10 +390,22 @@ func (s *Service) SetTransactionCategory(ctx context.Context, txnID, categoryID 
 		return ErrCategoryNotFound
 	}
 
-	return s.Queries.SetTransactionCategoryOverride(ctx, db.SetTransactionCategoryOverrideParams{
+	rowsAffected, err := s.Queries.SetTransactionCategoryOverride(ctx, db.SetTransactionCategoryOverrideParams{
 		ID:         txnUID,
 		CategoryID: catUID,
 	})
+	if err != nil {
+		// Check for FK violation on category_id (nonexistent category)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return ErrCategoryNotFound
+		}
+		return fmt.Errorf("set category override: %w", err)
+	}
+	if rowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // ResetTransactionCategory clears the manual override and re-resolves category from mappings.
@@ -403,8 +416,12 @@ func (s *Service) ResetTransactionCategory(ctx context.Context, txnID string) er
 	}
 
 	// Clear the override flag
-	if err := s.Queries.ClearTransactionCategoryOverride(ctx, txnUID); err != nil {
+	rowsAffected, err := s.Queries.ClearTransactionCategoryOverride(ctx, txnUID)
+	if err != nil {
 		return fmt.Errorf("clear override: %w", err)
+	}
+	if rowsAffected == 0 {
+		return ErrNotFound
 	}
 
 	// Re-resolve: look up the transaction's raw categories and resolve through mappings
