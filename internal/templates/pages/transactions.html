@@ -503,14 +503,16 @@ function quickSetCategory(txId, categoryId) {
         @change="$store.bulk.toggle('{{.ID}}')">
     </label>
 
-    <!-- Category Icon -->
-    <div class="w-9 h-9 rounded-xl bg-base-200/60 flex items-center justify-center shrink-0">
-      {{if .CategoryIcon}}
-      <i data-lucide="{{deref .CategoryIcon}}" class="w-4 h-4 text-base-content/40"></i>
-      {{else}}
-      <i data-lucide="minus" class="w-4 h-4 text-base-content/20"></i>
-      {{end}}
+    <!-- Category Icon / Merchant Avatar -->
+    {{if .CategoryIcon}}
+    <div class="bb-tx-avatar" style="--avatar-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}oklch(0.65 0 0){{end}}">
+      <i data-lucide="{{deref .CategoryIcon}}" class="w-4 h-4"></i>
     </div>
+    {{else}}
+    <div class="bb-tx-avatar bb-tx-avatar--letter">
+      <span>{{firstChar .Name}}</span>
+    </div>
+    {{end}}
 
     <!-- Description + Details -->
     <div class="flex-1 min-w-0">
@@ -547,7 +549,7 @@ function quickSetCategory(txId, categoryId) {
 
     <!-- Amount -->
     <div class="text-right shrink-0 pl-3">
-      <span class="text-sm font-semibold tabular-nums{{if gt .Amount 0.0}} text-base-content{{else}} text-success{{end}}">
+      <span class="bb-tx-amount{{if lt .Amount 0.0}} bb-tx-amount--income{{end}}">
         {{formatAmount .Amount}}
       </span>
     </div>

@@ -238,6 +238,21 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return result
 			},
+			"firstChar": func(s string) string {
+				if s == "" {
+					return "?"
+				}
+				for _, r := range s {
+					c := strings.ToUpper(string(r))
+					if c >= "A" && c <= "Z" {
+						return c
+					}
+					if c >= "0" && c <= "9" {
+						return c
+					}
+				}
+				return strings.ToUpper(string([]rune(s)[0]))
+			},
 			"expired": func(s *string) bool {
 				if s == nil {
 					return false
