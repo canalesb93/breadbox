@@ -8,6 +8,8 @@ package service_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -1061,6 +1063,130 @@ func upsertTxnPending(t *testing.T, q *db.Queries, acctID pgtype.UUID, extID, na
 	return txn
 }
 
+// --- Transaction Summary: UUID validation for account_id and user_id ---
+
+func TestGetTransactionSummary_InvalidAccountID(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+	badID := "not-a-uuid"
+
+	_, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+		GroupBy:   "month",
+		StartDate: &start,
+		EndDate:   &end,
+		AccountID: &badID,
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid account_id, got nil")
+	}
+	if !isInvalidParam(err) {
+		t.Errorf("expected ErrInvalidParameter, got: %v", err)
+	}
+}
+
+func TestGetTransactionSummary_InvalidUserID(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+	badID := "also-not-a-uuid"
+
+	_, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+		GroupBy:   "month",
+		StartDate: &start,
+		EndDate:   &end,
+		UserID:    &badID,
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid user_id, got nil")
+	}
+	if !isInvalidParam(err) {
+		t.Errorf("expected ErrInvalidParameter, got: %v", err)
+	}
+}
+
+func TestGetTransactionSummary_ValidAccountIDFilter(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_1", "Coffee Shop", 500, "2025-01-15")
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+	acctIDStr := formatTestUUID(acctID)
+
+	result, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+		GroupBy:   "month",
+		StartDate: &start,
+		EndDate:   &end,
+		AccountID: &acctIDStr,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Totals.TransactionCount != 1 {
+		t.Errorf("expected 1 transaction, got %d", result.Totals.TransactionCount)
+	}
+}
+
+func TestGetTransactionSummary_ValidUserIDFilter(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Bob")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_user_sum")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_user_sum", "Checking")
+
+	testutil.MustCreateTransaction(t, queries, acct.ID, "txn_bob", "Lunch", 1200, "2025-01-15")
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+	userIDStr := formatTestUUID(user.ID)
+
+	result, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+		GroupBy:   "month",
+		StartDate: &start,
+		EndDate:   &end,
+		UserID:    &userIDStr,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Totals.TransactionCount != 1 {
+		t.Errorf("expected 1 transaction, got %d", result.Totals.TransactionCount)
+	}
+}
+
+func TestGetTransactionSummary_NonexistentAccountIDReturnsEmpty(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_1", "Coffee", 500, "2025-01-15")
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+	fakeID := "00000000-0000-0000-0000-000000000099"
+
+	result, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+		GroupBy:   "month",
+		StartDate: &start,
+		EndDate:   &end,
+		AccountID: &fakeID,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Totals.TransactionCount != 0 {
+		t.Errorf("expected 0 transactions for nonexistent account, got %d", result.Totals.TransactionCount)
+	}
+}
+
 func upsertTxnWithAmount(t *testing.T, q *db.Queries, acctID pgtype.UUID, extID, name string, amountCents int64, date string) db.Transaction {
 	t.Helper()
 	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
@@ -1075,4 +1201,15 @@ func upsertTxnWithAmount(t *testing.T, q *db.Queries, acctID pgtype.UUID, extID,
 		t.Fatalf("upsertTxnWithAmount(%q): %v", name, err)
 	}
 	return txn
+}
+
+// isInvalidParam checks if an error wraps service.ErrInvalidParameter.
+func isInvalidParam(err error) bool {
+	return errors.Is(err, service.ErrInvalidParameter)
+}
+
+// formatTestUUID converts a pgtype.UUID to a standard UUID string.
+func formatTestUUID(u pgtype.UUID) string {
+	b := u.Bytes
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
