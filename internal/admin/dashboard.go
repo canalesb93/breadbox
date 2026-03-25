@@ -852,6 +852,159 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			})
 		}
 
+		// ── Smart Spending Insights: per-category trend analysis ──
+		type SpendingInsight struct {
+			Icon       string  // Lucide icon name
+			Title      string  // Short headline (e.g., "Restaurants up 45%")
+			Detail     string  // Supporting context
+			Amount     float64 // Relevant amount
+			Change     float64 // Percent change (positive = increase, negative = decrease)
+			Sentiment  string  // "positive" (saving), "negative" (overspending), "neutral", "info"
+			Category   string  // Category name for linking
+		}
+		var spendingInsights []SpendingInsight
+
+		// Build per-category spending maps: current period vs previous period.
+		currentCatMap := make(map[string]float64)
+		if categorySummary != nil {
+			for _, row := range categorySummary.Summary {
+				label := "Uncategorized"
+				if row.Category != nil && *row.Category != "" {
+					label = *row.Category
+				}
+				currentCatMap[label] = row.TotalAmount
+			}
+		}
+		prevCatMap := make(map[string]float64)
+		if prevSummary != nil {
+			for _, row := range prevSummary.Summary {
+				label := "Uncategorized"
+				if row.Category != nil && *row.Category != "" {
+					label = *row.Category
+				}
+				prevCatMap[label] = row.TotalAmount
+			}
+		}
+
+		// Find biggest category increase and decrease.
+		var biggestIncreaseCat string
+		var biggestIncreaseAmt, biggestIncreasePct float64
+		var biggestDecreaseCat string
+		var biggestDecreaseAmt, biggestDecreasePct float64
+
+		for cat, curAmt := range currentCatMap {
+			prevAmt, existed := prevCatMap[cat]
+			if !existed || prevAmt < 10 {
+				continue // Skip categories without meaningful previous data.
+			}
+			changePct := ((curAmt - prevAmt) / prevAmt) * 100
+			if changePct > biggestIncreasePct && changePct > 15 {
+				biggestIncreaseCat = cat
+				biggestIncreaseAmt = curAmt
+				biggestIncreasePct = changePct
+			}
+			if changePct < biggestDecreasePct && changePct < -15 {
+				biggestDecreaseCat = cat
+				biggestDecreaseAmt = curAmt
+				biggestDecreasePct = changePct
+			}
+		}
+
+		if biggestIncreaseCat != "" {
+			spendingInsights = append(spendingInsights, SpendingInsight{
+				Icon:      "trending-up",
+				Title:     fmt.Sprintf("%s up %.0f%%", biggestIncreaseCat, biggestIncreasePct),
+				Detail:    fmt.Sprintf("$%.0f spent vs $%.0f last period", biggestIncreaseAmt, prevCatMap[biggestIncreaseCat]),
+				Amount:    biggestIncreaseAmt,
+				Change:    biggestIncreasePct,
+				Sentiment: "negative",
+				Category:  biggestIncreaseCat,
+			})
+		}
+
+		if biggestDecreaseCat != "" {
+			spendingInsights = append(spendingInsights, SpendingInsight{
+				Icon:      "trending-down",
+				Title:     fmt.Sprintf("%s down %.0f%%", biggestDecreaseCat, math.Abs(biggestDecreasePct)),
+				Detail:    fmt.Sprintf("$%.0f spent vs $%.0f last period", biggestDecreaseAmt, prevCatMap[biggestDecreaseCat]),
+				Amount:    biggestDecreaseAmt,
+				Change:    biggestDecreasePct,
+				Sentiment: "positive",
+				Category:  biggestDecreaseCat,
+			})
+		}
+
+		// Find the largest single transaction this period.
+		var largestTxName string
+		var largestTxAmount float64
+		var largestTxDate string
+		err = a.DB.QueryRow(ctx, `
+			SELECT COALESCE(merchant_name, name), amount, TO_CHAR(date, 'Mon DD')
+			FROM transactions
+			WHERE deleted_at IS NULL AND date >= $1 AND amount > 0 AND pending = false
+			ORDER BY amount DESC
+			LIMIT 1
+		`, chartStart).Scan(&largestTxName, &largestTxAmount, &largestTxDate)
+		if err == nil && largestTxAmount >= 50 {
+			spendingInsights = append(spendingInsights, SpendingInsight{
+				Icon:      "receipt",
+				Title:     fmt.Sprintf("Largest: $%.0f", largestTxAmount),
+				Detail:    fmt.Sprintf("%s on %s", largestTxName, largestTxDate),
+				Amount:    largestTxAmount,
+				Sentiment: "neutral",
+			})
+		}
+
+		// Recurring spending detection: merchants that appear 3+ times this period.
+		var recurringMerchant string
+		var recurringCount int64
+		var recurringTotal float64
+		err = a.DB.QueryRow(ctx, `
+			SELECT COALESCE(merchant_name, name), COUNT(*), SUM(amount)
+			FROM transactions
+			WHERE deleted_at IS NULL AND date >= $1 AND amount > 0 AND pending = false
+			GROUP BY COALESCE(merchant_name, name)
+			HAVING COUNT(*) >= 3
+			ORDER BY SUM(amount) DESC
+			LIMIT 1
+		`, chartStart).Scan(&recurringMerchant, &recurringCount, &recurringTotal)
+		if err == nil && recurringCount >= 3 {
+			spendingInsights = append(spendingInsights, SpendingInsight{
+				Icon:      "repeat",
+				Title:     fmt.Sprintf("%s: %dx", recurringMerchant, recurringCount),
+				Detail:    fmt.Sprintf("$%.0f total across %d transactions", recurringTotal, recurringCount),
+				Amount:    recurringTotal,
+				Sentiment: "info",
+			})
+		}
+
+		// Find new spending categories (in current but not in previous), max 1.
+		newCatCount := 0
+		for cat, amt := range currentCatMap {
+			if cat == "Uncategorized" {
+				continue
+			}
+			if _, existed := prevCatMap[cat]; !existed && amt >= 20 {
+				spendingInsights = append(spendingInsights, SpendingInsight{
+					Icon:      "sparkles",
+					Title:     fmt.Sprintf("New: %s", cat),
+					Detail:    fmt.Sprintf("$%.0f in first-time spending", amt),
+					Amount:    amt,
+					Sentiment: "info",
+					Category:  cat,
+				})
+				newCatCount++
+				if newCatCount >= 1 {
+					break
+				}
+			}
+		}
+
+		// Cap at 5 insights max.
+		if len(spendingInsights) > 5 {
+			spendingInsights = spendingInsights[:5]
+		}
+
 		data := map[string]any{
 			"PageTitle":              "Dashboard",
 			"CurrentPage":            "dashboard",
@@ -923,6 +1076,8 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"StaleCount":            staleCount,
 			// Insights.
 			"Insights":              insights,
+			// Smart spending insights.
+			"SpendingInsights":      spendingInsights,
 		}
 		tr.Render(w, r, "dashboard.html", data)
 	}
