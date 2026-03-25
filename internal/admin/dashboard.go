@@ -718,6 +718,140 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			netWorthValuesJSON = template.JS(vb)
 		}
 
+		// ── Connection Health: per-connection status for dashboard panel ──
+		type ConnectionHealthRow struct {
+			ID              string
+			Name            string // Institution name
+			Provider        string
+			Status          string // active, error, pending_reauth, disconnected
+			ErrorMessage    string
+			LastSyncedAt    string // relative time string
+			AccountCount    int64
+			Paused          bool
+			IsStale         bool // hasn't synced in 24+ hours
+		}
+		var connectionHealth []ConnectionHealthRow
+		var healthyCount, errorCount, staleCount int
+
+		bankConnections, err := a.Queries.ListBankConnections(ctx)
+		if err != nil {
+			a.Logger.Error("list bank connections for health", "error", err)
+		}
+		for _, conn := range bankConnections {
+			if string(conn.Status) == "disconnected" {
+				continue
+			}
+			name := "Unknown"
+			if conn.InstitutionName.Valid {
+				name = conn.InstitutionName.String
+			}
+			errMsg := ""
+			if conn.ErrorMessage.Valid {
+				errMsg = conn.ErrorMessage.String
+			}
+			lastSync := "Never"
+			isStale := false
+			if conn.LastSyncedAt.Valid {
+				lastSync = relativeTime(conn.LastSyncedAt.Time)
+				if time.Since(conn.LastSyncedAt.Time) > 24*time.Hour {
+					isStale = true
+				}
+			} else {
+				isStale = true
+			}
+
+			status := string(conn.Status)
+			switch status {
+			case "active":
+				if isStale {
+					staleCount++
+				} else {
+					healthyCount++
+				}
+			case "error", "pending_reauth":
+				errorCount++
+			}
+
+			connID := formatUUID(conn.ID)
+
+			connectionHealth = append(connectionHealth, ConnectionHealthRow{
+				ID:           connID,
+				Name:         name,
+				Provider:     string(conn.Provider),
+				Status:       status,
+				ErrorMessage: errMsg,
+				LastSyncedAt: lastSync,
+				AccountCount: conn.AccountCount,
+				Paused:       conn.Paused,
+				IsStale:      isStale,
+			})
+		}
+
+		// ── Insights: useful aggregate data for the insights card ──
+		type InsightItem struct {
+			Icon    string // Lucide icon name
+			Label   string
+			Value   string
+			Link    string // optional href
+			Color   string // optional: "success", "warning", "error"
+		}
+		var insights []InsightItem
+
+		// Pending reviews insight
+		if reviewPending > 0 {
+			insights = append(insights, InsightItem{
+				Icon:  "clipboard-check",
+				Label: "Pending reviews",
+				Value: fmt.Sprintf("%d", reviewPending),
+				Link:  "/reviews",
+				Color: "warning",
+			})
+		}
+
+		// Active rules count
+		var activeRuleCountVal int64
+		err = a.DB.QueryRow(ctx, "SELECT COUNT(*) FROM transaction_rules WHERE enabled = true AND (expires_at IS NULL OR expires_at > NOW())").Scan(&activeRuleCountVal)
+		if err == nil && activeRuleCountVal > 0 {
+			insights = append(insights, InsightItem{
+				Icon:  "list-filter",
+				Label: "Active rules",
+				Value: fmt.Sprintf("%d", activeRuleCountVal),
+				Link:  "/rules",
+			})
+		}
+
+		// Uncategorized transactions count
+		var uncatCount int64
+		err = a.DB.QueryRow(ctx, "SELECT COUNT(*) FROM transactions WHERE deleted_at IS NULL AND category_id IS NULL AND pending = false").Scan(&uncatCount)
+		if err == nil && uncatCount > 0 {
+			insights = append(insights, InsightItem{
+				Icon:  "help-circle",
+				Label: "Uncategorized",
+				Value: fmt.Sprintf("%d", uncatCount),
+				Link:  "/transactions",
+				Color: "warning",
+			})
+		}
+
+		// Top merchant this month (most frequent)
+		var topMerchant string
+		var topMerchantCount int64
+		err = a.DB.QueryRow(ctx, `
+			SELECT COALESCE(merchant_name, name), COUNT(*) as cnt
+			FROM transactions
+			WHERE deleted_at IS NULL AND date >= $1 AND amount > 0
+			GROUP BY COALESCE(merchant_name, name)
+			ORDER BY cnt DESC
+			LIMIT 1
+		`, monthStart).Scan(&topMerchant, &topMerchantCount)
+		if err == nil && topMerchantCount >= 2 {
+			insights = append(insights, InsightItem{
+				Icon:  "store",
+				Label: "Top merchant",
+				Value: fmt.Sprintf("%s (%dx)", topMerchant, topMerchantCount),
+			})
+		}
+
 		data := map[string]any{
 			"PageTitle":              "Dashboard",
 			"CurrentPage":            "dashboard",
@@ -782,6 +916,13 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"AssetGroups":            assetGroups,
 			"LiabilityGroups":       liabilityGroups,
 			"AllocationSlices":       allocationSlices,
+			// Connection health.
+			"ConnectionHealth":       connectionHealth,
+			"HealthyCount":          healthyCount,
+			"ErrorCount":            errorCount,
+			"StaleCount":            staleCount,
+			// Insights.
+			"Insights":              insights,
 		}
 		tr.Render(w, r, "dashboard.html", data)
 	}
