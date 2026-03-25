@@ -954,3 +954,46 @@ func TestAutoApproveCategorizedReviews_NoneEligible(t *testing.T) {
 		t.Errorf("expected approved=0, got %d", result.Approved)
 	}
 }
+
+func TestAutoApproveCategorizedReviews_SkipsOtherCategories(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_aa_other")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_aa_other", "Checking")
+
+	txnOther := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_aa_other1", "Generic Store", 3000, "2025-01-15")
+	txnSpecific := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_aa_other2", "Whole Foods", 2000, "2025-01-16")
+
+	// Create an _other catch-all category and a specific category
+	catOther := mustCreateCategory(t, queries, "general_merchandise_other", "Other Shopping")
+	catSpecific := mustCreateCategory(t, queries, "food_and_drink_groceries_aa", "Groceries")
+
+	// Assign _other category to txnOther — should NOT be auto-approved
+	_, err := pool.Exec(ctx, "UPDATE transactions SET category_id = $1 WHERE id = $2", catOther.ID, txnOther.ID)
+	if err != nil {
+		t.Fatalf("set other category: %v", err)
+	}
+
+	// Assign specific category to txnSpecific — should be auto-approved
+	_, err = pool.Exec(ctx, "UPDATE transactions SET category_id = $1 WHERE id = $2", catSpecific.ID, txnSpecific.ID)
+	if err != nil {
+		t.Fatalf("set specific category: %v", err)
+	}
+
+	mustEnqueueReview(t, queries, txnOther.ID, "new_transaction")
+	mustEnqueueReview(t, queries, txnSpecific.ID, "new_transaction")
+
+	result, err := svc.AutoApproveCategorizedReviews(ctx, testActor)
+	if err != nil {
+		t.Fatalf("AutoApproveCategorizedReviews: %v", err)
+	}
+	// Only the specific category should be approved, not the _other one
+	if result.Approved != 1 {
+		t.Errorf("expected approved=1 (only specific category), got %d", result.Approved)
+	}
+	if result.Remaining != 1 {
+		t.Errorf("expected remaining=1 (_other category still pending), got %d", result.Remaining)
+	}
+}
