@@ -82,6 +82,26 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"intToFloat": func(a int) float64 {
 				return float64(a)
 			},
+			"subf": func(a, b float64) float64 { return a - b },
+			"mulf": func(a, b float64) float64 { return a * b },
+			"divf": func(a, b float64) float64 {
+				if b == 0 {
+					return 0
+				}
+				return a / b
+			},
+			"minf": func(a, b float64) float64 {
+				if a < b {
+					return a
+				}
+				return b
+			},
+			"absf": func(a float64) float64 {
+				if a < 0 {
+					return -a
+				}
+				return a
+			},
 			"syncDuration": func(start, end time.Time) string {
 				d := end.Sub(start)
 				if d < time.Second {
