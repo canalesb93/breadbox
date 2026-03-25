@@ -778,6 +778,9 @@ func (s *Service) DismissAllPendingReviews(ctx context.Context, actor Actor) (in
 // This bridges the gap between the rules system and the review queue.
 func (s *Service) AutoApproveCategorizedReviews(ctx context.Context, actor Actor) (*AutoApproveResult, error) {
 	// Find pending reviews where the transaction already has a good category.
+	// Exclude catch-all '_other' categories (e.g. general_merchandise_other) because
+	// these are generic defaults that should be reviewed, not auto-approved.
+	// This matches the enqueue logic which suppresses _other categories as suggestions.
 	rows, err := s.Pool.Query(ctx, `
 		SELECT rq.id, t.category_id
 		FROM review_queue rq
@@ -786,6 +789,7 @@ func (s *Service) AutoApproveCategorizedReviews(ctx context.Context, actor Actor
 		WHERE rq.status = 'pending'
 		  AND t.category_id IS NOT NULL
 		  AND c.slug != 'uncategorized'
+		  AND c.slug NOT LIKE '%\_other' ESCAPE '\'
 		  AND t.category_override = FALSE`)
 	if err != nil {
 		return nil, fmt.Errorf("query categorized reviews: %w", err)
