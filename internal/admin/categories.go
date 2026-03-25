@@ -234,6 +234,8 @@ func handleCategoryError(w http.ResponseWriter, err error) {
 		writeCategoryError(w, http.StatusConflict, "UNDELETABLE", "This category cannot be deleted")
 	case errors.Is(err, service.ErrSlugConflict):
 		writeCategoryError(w, http.StatusConflict, "SLUG_CONFLICT", "A category with this name already exists")
+	case errors.Is(err, service.ErrInvalidParameter):
+		writeCategoryError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 	default:
 		writeCategoryError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
 	}
