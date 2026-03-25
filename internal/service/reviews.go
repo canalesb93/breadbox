@@ -600,9 +600,10 @@ func (s *Service) SubmitReview(ctx context.Context, params SubmitReviewParams) (
 		return nil, fmt.Errorf("update review: %w", err)
 	}
 
-	// Apply category override to transaction if applicable
+	// Apply category override to transaction only when approving.
+	// Rejected/skipped reviews should never modify the transaction's category.
 	txnID := formatUUID(existing.TransactionID)
-	if categoryToApply != nil && (params.Decision == "approved" || params.CategoryID != nil) {
+	if categoryToApply != nil && params.Decision == "approved" {
 		if err := s.SetTransactionCategory(ctx, txnID, *categoryToApply); err != nil {
 			s.Logger.Warn("failed to set transaction category from review", "error", err, "transaction_id", txnID)
 		}
