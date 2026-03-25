@@ -549,6 +549,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/reviews.html",
 		"pages/rules.html",
 		"pages/review_instructions.html",
+		"pages/insights.html",
 	}
 
 	// Pages using the wizard layout (login + first-run admin creation).

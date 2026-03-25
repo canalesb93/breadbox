@@ -40,6 +40,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Use(NavBadgesMiddleware(a.Queries, a.Logger))
 
 		r.Get("/", DashboardHandler(a, svc, tr))
+		r.Get("/insights", InsightsHandler(a, svc, tr))
 		r.Post("/onboarding/dismiss", DismissOnboardingHandler(a))
 
 		r.Route("/connections", func(r chi.Router) {
