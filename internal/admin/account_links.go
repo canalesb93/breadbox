@@ -15,6 +15,7 @@ import (
 type AccountForLink struct {
 	ID              string
 	DisplayName     string
+	Mask            string
 	UserName        string
 	InstitutionName string
 }
@@ -39,16 +40,21 @@ func AccountLinksPageHandler(a *app.App, svc *service.Service, sm *scs.SessionMa
 
 		var acctList []AccountForLink
 		for _, acct := range accounts {
-			name := acct.Name
-			if acct.OfficialName != nil && *acct.OfficialName != "" {
-				name = *acct.OfficialName
-			}
+			// Use display name from account detail (respects COALESCE(display_name, name)).
+			displayName := acct.Name
 			userName := ""
-			if acct.UserID != nil {
-				detail, err := svc.GetAccountDetail(ctx, *acct.ConnectionID)
+			if acct.ConnectionID != nil {
+				detail, err := svc.GetAccountDetail(ctx, acct.ID)
 				if err == nil {
+					if detail.DisplayName != nil && *detail.DisplayName != "" {
+						displayName = *detail.DisplayName
+					}
 					userName = detail.UserName
 				}
+			}
+			mask := ""
+			if acct.Mask != nil {
+				mask = *acct.Mask
 			}
 			instName := ""
 			if acct.InstitutionName != nil {
@@ -56,7 +62,8 @@ func AccountLinksPageHandler(a *app.App, svc *service.Service, sm *scs.SessionMa
 			}
 			acctList = append(acctList, AccountForLink{
 				ID:              acct.ID,
-				DisplayName:     name,
+				DisplayName:     displayName,
+				Mask:            mask,
 				UserName:        userName,
 				InstitutionName: instName,
 			})

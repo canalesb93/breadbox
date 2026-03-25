@@ -92,7 +92,7 @@
         <select name="primary_account_id" class="select select-bordered select-sm w-full" required>
           <option value="">Select the primary cardholder's account...</option>
           {{range .Accounts}}
-          <option value="{{.ID}}">{{.DisplayName}} ({{.UserName}} - {{.InstitutionName}})</option>
+          <option value="{{.ID}}">{{.DisplayName}}{{if .Mask}} ••{{.Mask}}{{end}} ({{.UserName}} - {{.InstitutionName}})</option>
           {{end}}
         </select>
       </div>
@@ -101,7 +101,7 @@
         <select name="dependent_account_id" class="select select-bordered select-sm w-full" required>
           <option value="">Select the authorized user's account...</option>
           {{range .Accounts}}
-          <option value="{{.ID}}">{{.DisplayName}} ({{.UserName}} - {{.InstitutionName}})</option>
+          <option value="{{.ID}}">{{.DisplayName}}{{if .Mask}} ••{{.Mask}}{{end}} ({{.UserName}} - {{.InstitutionName}})</option>
           {{end}}
         </select>
       </div>
