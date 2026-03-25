@@ -1,0 +1,92 @@
+{{template "base" .}}
+
+{{define "content"}}
+<div class="bb-page-header">
+  <div>
+    <div class="breadcrumbs text-sm mb-1">
+      <ul><li><a href="/account-links">Account Links</a></li><li>{{.Link.PrimaryAccountName}} &rarr; {{.Link.DependentAccountName}}</li></ul>
+    </div>
+    <h1 class="bb-page-title">Transaction Matches</h1>
+    <p class="text-base-content/60 text-sm mt-1">
+      <span class="font-medium">{{.Link.MatchCount}}</span> matched,
+      <span class="font-medium">{{.Link.UnmatchedDependentCount}}</span> unmatched
+    </p>
+  </div>
+  <form method="POST" action="/-/account-links/{{.Link.ID}}/reconcile" class="inline">
+    <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+    <button type="submit" class="btn btn-primary btn-sm">
+      <i data-lucide="refresh-cw" class="w-4 h-4"></i> Reconcile Now
+    </button>
+  </form>
+</div>
+
+{{if .Matches}}
+<div class="overflow-x-auto mt-6">
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Amount</th>
+        <th>Primary Transaction</th>
+        <th>Dependent Transaction</th>
+        <th>Confidence</th>
+        <th>Matched On</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Matches}}
+      <tr>
+        <td class="whitespace-nowrap">{{.Date}}</td>
+        <td class="whitespace-nowrap bb-amount">{{printf "%.2f" .Amount}}</td>
+        <td>
+          <a href="/transactions/{{.PrimaryTransactionID}}" class="link link-hover">{{.PrimaryTxnName}}</a>
+          {{if .PrimaryTxnMerchant}}<div class="text-xs text-base-content/50">{{.PrimaryTxnMerchant}}</div>{{end}}
+        </td>
+        <td>
+          <a href="/transactions/{{.DependentTransactionID}}" class="link link-hover">{{.DependentTxnName}}</a>
+          {{if .DependentTxnMerchant}}<div class="text-xs text-base-content/50">{{.DependentTxnMerchant}}</div>{{end}}
+        </td>
+        <td>
+          {{if eq .MatchConfidence "confirmed"}}
+          <span class="badge badge-success badge-xs">Confirmed</span>
+          {{else if eq .MatchConfidence "auto"}}
+          <span class="badge badge-info badge-xs">Auto</span>
+          {{else}}
+          <span class="badge badge-ghost badge-xs">{{.MatchConfidence}}</span>
+          {{end}}
+        </td>
+        <td class="text-xs text-base-content/60">{{range .MatchedOn}}{{.}} {{end}}</td>
+        <td>
+          {{if eq .MatchConfidence "auto"}}
+          <div class="flex gap-1">
+            <form method="POST" action="/-/transaction-matches/{{.ID}}/confirm" class="inline">
+              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+              <button type="submit" class="btn btn-ghost btn-xs text-success" title="Confirm match">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i>
+              </button>
+            </form>
+            <form method="POST" action="/-/transaction-matches/{{.ID}}/reject" class="inline">
+              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+              <button type="submit" class="btn btn-ghost btn-xs text-error" title="Reject match">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
+            </form>
+          </div>
+          {{end}}
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{else}}
+<div class="card bg-base-100 shadow-sm border border-base-300 mt-6">
+  <div class="card-body items-center text-center py-12">
+    <i data-lucide="check-circle-2" class="w-12 h-12 text-base-content/20 mb-4"></i>
+    <h3 class="font-semibold text-lg">No Matches Yet</h3>
+    <p class="text-base-content/60">Run reconciliation to find matching transactions between the linked accounts.</p>
+  </div>
+</div>
+{{end}}
+{{end}}

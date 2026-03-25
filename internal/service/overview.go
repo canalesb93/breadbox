@@ -76,14 +76,14 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 	}
 
 	err = s.Pool.QueryRow(ctx,
-		"SELECT COUNT(*), COALESCE(MIN(date)::text, ''), COALESCE(MAX(date)::text, '') FROM transactions WHERE deleted_at IS NULL").
+		"SELECT COUNT(*), COALESCE(MIN(date)::text, ''), COALESCE(MAX(date)::text, '') FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.deleted_at IS NULL AND a.is_dependent_linked = FALSE").
 		Scan(&stats.TransactionCount, &stats.EarliestDate, &stats.LatestDate)
 	if err != nil {
 		return nil, fmt.Errorf("count transactions: %w", err)
 	}
 
 	err = s.Pool.QueryRow(ctx,
-		"SELECT COUNT(*) FROM transactions WHERE deleted_at IS NULL AND pending = true").
+		"SELECT COUNT(*) FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.deleted_at IS NULL AND t.pending = true AND a.is_dependent_linked = FALSE").
 		Scan(&stats.PendingTransactionCount)
 	if err != nil {
 		return nil, fmt.Errorf("count pending: %w", err)
@@ -95,7 +95,7 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 	}
 
 	err = s.Pool.QueryRow(ctx,
-		"SELECT COUNT(*) FROM transactions WHERE category_id IS NULL AND deleted_at IS NULL").
+		"SELECT COUNT(*) FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.category_id IS NULL AND t.deleted_at IS NULL AND a.is_dependent_linked = FALSE").
 		Scan(&stats.UnmappedCount)
 	if err != nil {
 		return nil, fmt.Errorf("count unmapped: %w", err)
@@ -179,9 +179,10 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 	var spendCurrency *string
 	var currencyCount int
 	err = s.Pool.QueryRow(ctx, `
-		SELECT COALESCE(SUM(amount), 0), COUNT(*), COUNT(DISTINCT iso_currency_code)
-		FROM transactions
-		WHERE deleted_at IS NULL AND pending = false AND date >= $1 AND amount > 0`,
+		SELECT COALESCE(SUM(t.amount), 0), COUNT(*), COUNT(DISTINCT t.iso_currency_code)
+		FROM transactions t
+		JOIN accounts a ON t.account_id = a.id
+		WHERE t.deleted_at IS NULL AND t.pending = false AND t.date >= $1 AND t.amount > 0 AND a.is_dependent_linked = FALSE`,
 		thirtyDaysAgo).Scan(&spendTotal, &spendCount, &currencyCount)
 	if err != nil {
 		return nil, fmt.Errorf("spending summary: %w", err)
@@ -189,8 +190,9 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 
 	if spendCount > 0 && currencyCount == 1 {
 		err = s.Pool.QueryRow(ctx, `
-			SELECT iso_currency_code FROM transactions
-			WHERE deleted_at IS NULL AND pending = false AND date >= $1 AND amount > 0 LIMIT 1`,
+			SELECT t.iso_currency_code FROM transactions t
+			JOIN accounts a ON t.account_id = a.id
+			WHERE t.deleted_at IS NULL AND t.pending = false AND t.date >= $1 AND t.amount > 0 AND a.is_dependent_linked = FALSE LIMIT 1`,
 			thirtyDaysAgo).Scan(&spendCurrency)
 		if err != nil {
 			return nil, fmt.Errorf("spending currency: %w", err)
@@ -204,11 +206,12 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 		}
 
 		catRows, err := s.Pool.Query(ctx, `
-			SELECT COALESCE(category_primary, 'UNCATEGORIZED'), SUM(amount), COUNT(*)
-			FROM transactions
-			WHERE deleted_at IS NULL AND pending = false AND date >= $1 AND amount > 0
-			GROUP BY category_primary
-			ORDER BY SUM(amount) DESC
+			SELECT COALESCE(t.category_primary, 'UNCATEGORIZED'), SUM(t.amount), COUNT(*)
+			FROM transactions t
+			JOIN accounts a ON t.account_id = a.id
+			WHERE t.deleted_at IS NULL AND t.pending = false AND t.date >= $1 AND t.amount > 0 AND a.is_dependent_linked = FALSE
+			GROUP BY t.category_primary
+			ORDER BY SUM(t.amount) DESC
 			LIMIT 5`, thirtyDaysAgo)
 		if err != nil {
 			return nil, fmt.Errorf("top categories: %w", err)

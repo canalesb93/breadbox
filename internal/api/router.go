@@ -63,6 +63,9 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/reviews/{id}", GetReviewHandler(svc))
 		r.Get("/rules", ListRulesHandler(svc))
 		r.Get("/rules/{id}", GetRuleHandler(svc))
+		r.Get("/account-links", ListAccountLinksHandler(svc))
+		r.Get("/account-links/{id}", GetAccountLinkHandler(svc))
+		r.Get("/account-links/{id}/matches", ListTransactionMatchesHandler(svc))
 
 		// Write endpoints — full_access API keys only.
 		r.Group(func(r chi.Router) {
@@ -93,6 +96,13 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Post("/rules/preview", PreviewRuleHandler(svc))
 			r.Post("/transactions/batch-categorize", BatchCategorizeHandler(svc))
 			r.Post("/transactions/bulk-recategorize", BulkRecategorizeHandler(svc))
+			r.Post("/account-links", CreateAccountLinkHandler(svc))
+			r.Put("/account-links/{id}", UpdateAccountLinkHandler(svc))
+			r.Delete("/account-links/{id}", DeleteAccountLinkHandler(svc))
+			r.Post("/account-links/{id}/reconcile", ReconcileAccountLinkHandler(svc))
+			r.Post("/transaction-matches/{id}/confirm", ConfirmMatchHandler(svc))
+			r.Post("/transaction-matches/{id}/reject", RejectMatchHandler(svc))
+			r.Post("/transaction-matches/manual", ManualMatchHandler(svc))
 		})
 	})
 

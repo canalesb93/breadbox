@@ -111,6 +111,7 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`, selectCols)
 		query += "\nLEFT JOIN categories cat ON t.category_id = cat.id"
 	}
 	query += "\nWHERE t.deleted_at IS NULL"
+	query += " AND a.is_dependent_linked = FALSE"
 
 	args := []any{}
 	argN := 1
@@ -138,7 +139,7 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`, selectCols)
 	}
 
 	if params.UserID != nil {
-		query += fmt.Sprintf(" AND bc.user_id = $%d", argN)
+		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
 		args = append(args, *params.UserID)
 		argN++
 	}

@@ -72,6 +72,15 @@ TRANSACTION RULES:
 - Use preview_rule to test a condition before creating — shows match count and sample transactions
 - Teller's "general" category is a catch-all — do NOT create a category_primary rule for it, use name patterns instead
 
+ACCOUNT LINKING (Deduplication & Attribution):
+- When two family members connect the same credit card (e.g., primary cardholder + authorized user), transactions appear in both feeds with different IDs
+- Use create_account_link to link the dependent account to the primary account
+- The system auto-matches transactions by date + exact amount, attributes matched primary-side transactions to the dependent user
+- Dependent account transactions are excluded from totals and summaries by default
+- When filtering by user_id, attributed transactions are included — "Ricardo's transactions" includes his own plus those attributed to him on the shared card
+- Use reconcile_account_link to re-run matching after new syncs
+- Use list_transaction_matches to review matched pairs, confirm_match/reject_match to correct errors
+
 RULE CREATION STRATEGY — follow this order:
 1. FIRST, create category_primary rules (highest impact). Look at the category_primary field on transactions — these are raw provider categories like "dining", "groceries", "phone", "accommodation", "fuel", "entertainment". One rule per category_primary covers ALL transactions with that label. Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]} → food_and_drink_restaurant. This single rule handles every dining transaction from Teller.
 2. THEN, create name-pattern rules for transaction types that span merchants: "ATM Withdrawal" → withdrawals, "Wire Transfer" → transfer_out, "Service Charge" → bank_fees, "Cash Deposit" → deposits. Use contains on the name field.
@@ -224,6 +233,27 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("bulk_recategorize", ToolWrite,
 			"Recategorize all transactions matching a filter to a new category. Requires target_category_slug and at least one filter (safety requirement). Sets category_override=true since this is an explicit action. Use this for bulk corrections — e.g., recategorize all transactions currently tagged 'general_merchandise' in a date range to 'groceries'. Returns matched/updated counts.",
 			s.handleBulkRecategorize),
+		makeToolDef("list_account_links", ToolRead,
+			"List account links between primary and dependent/authorized-user accounts. Account links deduplicate transactions that appear in both a primary cardholder and authorized user's bank feeds. Returns link details, match counts, and unmatched transaction counts.",
+			s.handleListAccountLinks),
+		makeToolDef("create_account_link", ToolWrite,
+			"Link a dependent account to a primary account for cross-connection deduplication. When two family members connect the same credit card (e.g., primary cardholder and authorized user), transactions appear in both feeds. This link pairs matching transactions by date+amount, excludes the dependent's copies from totals, and attributes matched primary-side transactions to the dependent user. Automatically runs initial reconciliation after creation.",
+			s.handleCreateAccountLink),
+		makeToolDef("delete_account_link", ToolWrite,
+			"Remove an account link and clear all transaction attribution set by it. Transactions from the dependent account will be included in totals again.",
+			s.handleDeleteAccountLink),
+		makeToolDef("reconcile_account_link", ToolWrite,
+			"Manually trigger match reconciliation for an account link. Finds unmatched dependent transactions and attempts to pair them with primary account transactions by date and exact amount. Sets attributed_user_id on matched primary transactions.",
+			s.handleReconcileAccountLink),
+		makeToolDef("list_transaction_matches", ToolRead,
+			"List matched transaction pairs for an account link. Shows which primary-side transactions have been matched to dependent-side transactions, with match confidence and the fields that matched.",
+			s.handleListTransactionMatches),
+		makeToolDef("confirm_match", ToolWrite,
+			"Confirm an auto-matched transaction pair as correct. Changes match confidence from 'auto' to 'confirmed'.",
+			s.handleConfirmMatch),
+		makeToolDef("reject_match", ToolWrite,
+			"Reject a false auto-match between two transactions. Removes the match record and clears the attributed_user_id on the primary transaction.",
+			s.handleRejectMatch),
 	}
 }
 

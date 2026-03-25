@@ -22,11 +22,13 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		"u.name AS user_name, " +
 		"t.category_id, t.category_override, " +
 		"c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, c.color AS cat_color, " +
-		"pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name " +
+		"pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name, " +
+		"t.attributed_user_id, au.name AS attributed_user_name " +
 		"FROM transactions t " +
 		"JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
 		"LEFT JOIN users u ON bc.user_id = u.id " +
+		"LEFT JOIN users au ON t.attributed_user_id = au.id " +
 		"LEFT JOIN categories c ON t.category_id = c.id " +
 		"LEFT JOIN categories pc ON c.parent_id = pc.id"
 
@@ -43,12 +45,18 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 
 	query += " WHERE t.deleted_at IS NULL"
 
+	// Exclude dependent-linked accounts by default.
+	if !params.IncludeDependent {
+		query += " AND a.is_dependent_linked = FALSE"
+	}
+
 	if params.UserID != nil {
 		uid, err := parseUUID(*params.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid user id: %w", err)
 		}
-		query += fmt.Sprintf(" AND bc.user_id = $%d", argN)
+		// Attribution-aware: use attributed_user_id if set, otherwise connection user.
+		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
 		args = append(args, uid)
 		argN++
 	}
@@ -196,6 +204,8 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			catColor               pgtype.Text
 			catPrimarySlug         pgtype.Text
 			catPrimaryDisplayName  pgtype.Text
+			attributedUserID       pgtype.UUID
+			attributedUserName     pgtype.Text
 		)
 
 		if err := rows.Scan(
@@ -209,6 +219,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			&categoryID, &categoryOverride,
 			&catSlug, &catDisplayName, &catIcon, &catColor,
 			&catPrimarySlug, &catPrimaryDisplayName,
+			&attributedUserID, &attributedUserName,
 		); err != nil {
 			return nil, fmt.Errorf("scan transaction: %w", err)
 		}
@@ -244,6 +255,8 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			AccountID:           uuidPtr(accountID),
 			AccountName:         &accountName,
 			UserName:            textPtr(userName),
+			AttributedUserID:    uuidPtr(attributedUserID),
+			AttributedUserName:  textPtr(attributedUserName),
 			Amount:              amountVal,
 			IsoCurrencyCode:     textPtr(isoCurrencyCode),
 			Date:                dateVal,
@@ -304,12 +317,16 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 
 	query += " WHERE t.deleted_at IS NULL"
 
+	if !params.IncludeDependent {
+		query += " AND a.is_dependent_linked = FALSE"
+	}
+
 	if params.UserID != nil {
 		uid, err := parseUUID(*params.UserID)
 		if err != nil {
 			return 0, fmt.Errorf("invalid user id: %w", err)
 		}
-		query += fmt.Sprintf(" AND bc.user_id = $%d", argN)
+		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
 		args = append(args, uid)
 		argN++
 	}
@@ -410,12 +427,18 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	argN := 1
 	whereClauses := ""
 
+	// Exclude dependent-linked accounts by default.
+	depClause := " AND a.is_dependent_linked = FALSE"
+	query += depClause
+	whereClauses += depClause
+	needAccountJoin = true
+
 	if params.UserID != nil {
 		uid, err := parseUUID(*params.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid user id: %w", err)
 		}
-		clause := fmt.Sprintf(" AND bc.user_id = $%d", argN)
+		clause := fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
 		query += clause
 		whereClauses += clause
 		args = append(args, uid)

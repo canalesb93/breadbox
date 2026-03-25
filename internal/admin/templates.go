@@ -550,6 +550,8 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/rules.html",
 		"pages/review_instructions.html",
 		"pages/insights.html",
+		"pages/account_links.html",
+		"pages/account_link_detail.html",
 	}
 
 	// Pages using the wizard layout (login + first-run admin creation).
