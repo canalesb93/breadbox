@@ -2,6 +2,7 @@ package admin
 
 import (
 	"encoding/json"
+	"errors"
 	"math"
 	"net/http"
 	"net/mail"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -236,6 +238,13 @@ func CreateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 			Email: emailText,
 		})
 		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				writeJSON(w, http.StatusConflict, map[string]any{
+					"error": map[string]string{"code": "DUPLICATE_EMAIL", "message": "A family member with this email already exists"},
+				})
+				return
+			}
 			a.Logger.Error("create user", "error", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create user"})
 			return
@@ -319,6 +328,13 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 			Email: email,
 		})
 		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				writeJSON(w, http.StatusConflict, map[string]any{
+					"error": map[string]string{"code": "DUPLICATE_EMAIL", "message": "A family member with this email already exists"},
+				})
+				return
+			}
 			a.Logger.Error("update user", "error", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update user"})
 			return
