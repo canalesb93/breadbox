@@ -330,11 +330,16 @@ func (s *Service) DeleteCategory(ctx context.Context, id string) (int64, error) 
 	return count, nil
 }
 
-// MergeCategories merges sourceID into targetID:
+// MergeCategories merges sourceID into targetID (in a single transaction):
 // 1. Reassign transactions from source to target
-// 2. Reassign mappings from source to target
-// 3. Delete source category
+// 2. Reassign category mappings from source to target
+// 3. Reassign transaction rules from source to target
+// 4. Delete source category
 func (s *Service) MergeCategories(ctx context.Context, sourceID, targetID string) error {
+	if sourceID == targetID {
+		return fmt.Errorf("%w: cannot merge a category into itself", ErrInvalidParameter)
+	}
+
 	srcUID, err := parseUUID(sourceID)
 	if err != nil {
 		return ErrCategoryNotFound
@@ -344,7 +349,7 @@ func (s *Service) MergeCategories(ctx context.Context, sourceID, targetID string
 		return ErrCategoryNotFound
 	}
 
-	// Verify both exist
+	// Verify both exist before starting the transaction.
 	if _, err := s.Queries.GetCategoryByID(ctx, srcUID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrCategoryNotFound
@@ -358,22 +363,44 @@ func (s *Service) MergeCategories(ctx context.Context, sourceID, targetID string
 		return fmt.Errorf("get target: %w", err)
 	}
 
-	if err := s.Queries.ReassignTransactionsCategory(ctx, db.ReassignTransactionsCategoryParams{
+	// Wrap all reassignments + delete in a single transaction for atomicity.
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := s.Queries.WithTx(tx)
+
+	if err := qtx.ReassignTransactionsCategory(ctx, db.ReassignTransactionsCategoryParams{
 		CategoryID:   srcUID,
 		CategoryID_2: tgtUID,
 	}); err != nil {
 		return fmt.Errorf("reassign transactions: %w", err)
 	}
 
-	if err := s.Queries.ReassignMappingsCategory(ctx, db.ReassignMappingsCategoryParams{
+	if err := qtx.ReassignMappingsCategory(ctx, db.ReassignMappingsCategoryParams{
 		CategoryID:   srcUID,
 		CategoryID_2: tgtUID,
 	}); err != nil {
 		return fmt.Errorf("reassign mappings: %w", err)
 	}
 
-	if err := s.Queries.DeleteCategory(ctx, srcUID); err != nil {
+	// Reassign transaction rules so they are re-pointed to the target category
+	// instead of being silently deleted by the ON DELETE CASCADE FK constraint.
+	if err := qtx.ReassignRulesCategory(ctx, db.ReassignRulesCategoryParams{
+		CategoryID:   srcUID,
+		CategoryID_2: tgtUID,
+	}); err != nil {
+		return fmt.Errorf("reassign rules: %w", err)
+	}
+
+	if err := qtx.DeleteCategory(ctx, srcUID); err != nil {
 		return fmt.Errorf("delete source category: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit merge: %w", err)
 	}
 
 	return nil
