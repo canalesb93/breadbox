@@ -953,6 +953,10 @@ func TestAutoApproveCategorizedReviews_NoneEligible(t *testing.T) {
 	if result.Approved != 0 {
 		t.Errorf("expected approved=0, got %d", result.Approved)
 	}
+	// Remaining should reflect the actual pending count, not 0.
+	if result.Remaining != 1 {
+		t.Errorf("expected remaining=1 (one pending review still in queue), got %d", result.Remaining)
+	}
 }
 
 func TestAutoApproveCategorizedReviews_SkipsOtherCategories(t *testing.T) {
