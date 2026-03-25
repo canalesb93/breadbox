@@ -25,8 +25,9 @@ type UserAccountSummary struct {
 	InstitutionName string
 	BalanceCurrent  float64
 	IsoCurrencyCode string
-	IsLiability     bool
-	HasBalance      bool
+	IsLiability      bool
+	HasBalance       bool
+	ConnectionStatus string // active, error, pending_reauth, disconnected
 }
 
 // EnrichedUser holds a user plus their computed financial summary.
@@ -113,17 +114,19 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 						}
 					}
 
+					connStatus := string(acct.ConnectionStatus)
 					eu.Accounts = append(eu.Accounts, UserAccountSummary{
-						ID:              formatUUID(acct.ID),
-						Name:            displayName,
-						Type:            acct.Type,
-						Subtype:         subtype,
-						Mask:            mask,
-						InstitutionName: institution,
-						BalanceCurrent:  displayBal,
-						IsoCurrencyCode: currency,
-						IsLiability:     isLiability,
-						HasBalance:      hasBal,
+						ID:               formatUUID(acct.ID),
+						Name:             displayName,
+						Type:             acct.Type,
+						Subtype:          subtype,
+						Mask:             mask,
+						InstitutionName:  institution,
+						BalanceCurrent:   displayBal,
+						IsoCurrencyCode:  currency,
+						IsLiability:      isLiability,
+						HasBalance:       hasBal,
+						ConnectionStatus: connStatus,
 					})
 				}
 			}

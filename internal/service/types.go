@@ -19,6 +19,7 @@ type AccountResponse struct {
 	LastBalanceUpdate *string  `json:"last_balance_update"`
 	CreatedAt         string   `json:"created_at"`
 	UpdatedAt         string   `json:"updated_at"`
+	ConnectionStatus  *string  `json:"connection_status,omitempty"`
 }
 
 type TransactionCategoryInfo struct {

@@ -227,7 +227,12 @@
             <i data-lucide="{{accountTypeIcon .Type}}" class="w-4 h-4 text-base-content/40"></i>
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</span>
+              {{if and .ConnectionStatus (ne .ConnectionStatus "active")}}
+              <span class="shrink-0 text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full {{if eq .ConnectionStatus "error"}}bg-error/8 text-error/70{{else if eq .ConnectionStatus "pending_reauth"}}bg-warning/8 text-warning{{else if eq .ConnectionStatus "disconnected"}}bg-base-300/60 text-base-content/40{{end}}">{{if eq .ConnectionStatus "pending_reauth"}}reauth{{else}}{{.ConnectionStatus}}{{end}}</span>
+              {{end}}
+            </div>
             <div class="text-xs text-base-content/40">{{.InstitutionName}}{{if .Mask}} ····{{.Mask}}{{end}}</div>
           </div>
           <div class="flex items-center gap-3 shrink-0">
@@ -270,7 +275,12 @@
             <i data-lucide="{{accountTypeIcon .Type}}" class="w-4 h-4 text-base-content/40"></i>
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</span>
+              {{if and .ConnectionStatus (ne .ConnectionStatus "active")}}
+              <span class="shrink-0 text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full {{if eq .ConnectionStatus "error"}}bg-error/8 text-error/70{{else if eq .ConnectionStatus "pending_reauth"}}bg-warning/8 text-warning{{else if eq .ConnectionStatus "disconnected"}}bg-base-300/60 text-base-content/40{{end}}">{{if eq .ConnectionStatus "pending_reauth"}}reauth{{else}}{{.ConnectionStatus}}{{end}}</span>
+              {{end}}
+            </div>
             <div class="text-xs text-base-content/40">{{.InstitutionName}}{{if .Mask}} ····{{.Mask}}{{end}}</div>
           </div>
           <div class="flex items-center gap-3 shrink-0">
