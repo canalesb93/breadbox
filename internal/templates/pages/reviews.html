@@ -236,6 +236,7 @@
       <span class="text-xs text-base-content/40 tabular-nums">{{.Counts.Pending}} remaining</span>
       {{end}}
     </div>
+    {{if eq .StatusFilter "pending"}}
     <div class="flex items-center gap-2 text-xs text-base-content/30">
       <span class="flex items-center gap-1"><kbd class="bb-kbd">j</kbd><kbd class="bb-kbd">k</kbd> navigate</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">a</kbd> accept</span>
@@ -244,6 +245,7 @@
       <span class="flex items-center gap-1"><kbd class="bb-kbd">n</kbd> note</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">c</kbd> category</span>
     </div>
+    {{end}}
   </div>
 
   <!-- Triage list -->
@@ -404,7 +406,7 @@
               </button>
             </div>
             <div class="flex items-center gap-2">
-              <input type="text" class="input input-bordered input-xs flex-1 rounded-lg" placeholder="Add note..." x-model="triageNote" @keydown.stop>
+              <input type="text" class="input input-bordered input-xs flex-1 rounded-lg" placeholder="Add note..." x-model="triageNote" @keydown.stop @keydown.escape.prevent="$el.blur()">
             </div>
             <div class="flex gap-1.5">
               <button class="btn btn-success btn-sm rounded-xl flex-1 gap-1" :disabled="submitting"

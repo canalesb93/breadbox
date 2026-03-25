@@ -1632,17 +1632,16 @@
 
   .bb-triage-row__name {
     @apply flex flex-col min-w-0 flex-1;
-    max-width: 220px;
   }
 
   .bb-triage-row__account {
-    @apply hidden lg:block min-w-0;
-    width: 130px;
+    @apply hidden lg:block min-w-0 shrink-0;
+    width: 160px;
   }
 
   .bb-triage-row__category {
     @apply hidden md:flex md:items-center min-w-0 shrink-0;
-    width: 120px;
+    width: 160px;
   }
 
   .bb-triage-row__category > span {
