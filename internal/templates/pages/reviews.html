@@ -241,6 +241,7 @@
       <span class="flex items-center gap-1"><kbd class="bb-kbd">a</kbd> accept</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">s</kbd> skip</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">d</kbd> dismiss</span>
+      <span class="flex items-center gap-1"><kbd class="bb-kbd">n</kbd> note</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">c</kbd> category</span>
     </div>
   </div>
@@ -254,7 +255,7 @@
          id="triage-{{$review.ID}}"
          data-review-id="{{$review.ID}}"
          data-idx="{{$idx}}"
-         x-data="{ submitting: false, selectedCatId: '{{if $review.SuggestedCategoryID}}{{$review.SuggestedCategoryID}}{{end}}' }">
+         x-data="{ submitting: false, selectedCatId: '{{if $review.SuggestedCategoryID}}{{$review.SuggestedCategoryID}}{{end}}', triageNote: '' }">
 
       <!-- Main row: always visible -->
       <div class="bb-triage-row__main">
@@ -317,12 +318,12 @@
         <div class="bb-triage-row__actions" @click.stop>
           <button class="bb-triage-action bb-triage-action--accept" title="Accept (a)"
             :disabled="submitting"
-            @click="$dispatch('triage-accept', { id: '{{$review.ID}}', catId: selectedCatId, idx: {{$idx}} })">
+            @click="$dispatch('triage-accept', { id: '{{$review.ID}}', catId: selectedCatId, note: triageNote, idx: {{$idx}} })">
             <i data-lucide="check" class="w-3.5 h-3.5"></i>
           </button>
           <button class="bb-triage-action bb-triage-action--skip" title="Skip (s)"
             :disabled="submitting"
-            @click="$dispatch('triage-skip', { id: '{{$review.ID}}', idx: {{$idx}} })">
+            @click="$dispatch('triage-skip', { id: '{{$review.ID}}', note: triageNote, idx: {{$idx}} })">
             <i data-lucide="fast-forward" class="w-3.5 h-3.5"></i>
           </button>
           <button class="bb-triage-action bb-triage-action--dismiss" title="Dismiss (d)"
@@ -402,14 +403,17 @@
                 <svg class="w-3 h-3 ml-auto opacity-40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
               </button>
             </div>
+            <div class="flex items-center gap-2">
+              <input type="text" class="input input-bordered input-xs flex-1 rounded-lg" placeholder="Add note..." x-model="triageNote" @keydown.stop>
+            </div>
             <div class="flex gap-1.5">
               <button class="btn btn-success btn-sm rounded-xl flex-1 gap-1" :disabled="submitting"
-                @click="$dispatch('triage-accept', { id: '{{$review.ID}}', catId: selectedCatId, idx: {{$idx}} })">
+                @click="$dispatch('triage-accept', { id: '{{$review.ID}}', catId: selectedCatId, note: triageNote, idx: {{$idx}} })">
                 <i data-lucide="check" class="w-3.5 h-3.5"></i>
                 Accept
               </button>
               <button class="btn btn-ghost btn-sm rounded-xl gap-1" :disabled="submitting"
-                @click="$dispatch('triage-skip', { id: '{{$review.ID}}', idx: {{$idx}} })">
+                @click="$dispatch('triage-skip', { id: '{{$review.ID}}', note: triageNote, idx: {{$idx}} })">
                 <i data-lucide="fast-forward" class="w-3.5 h-3.5"></i>
                 Skip
               </button>
@@ -628,10 +632,10 @@ function triageQueue() {
 
       // Listen for triage actions dispatched from child components
       this.$el.addEventListener('triage-accept', (e) => {
-        this.submitTriage(e.detail.id, 'approved', e.detail.catId, e.detail.idx);
+        this.submitTriage(e.detail.id, 'approved', e.detail.catId, e.detail.note, e.detail.idx);
       });
       this.$el.addEventListener('triage-skip', (e) => {
-        this.submitTriage(e.detail.id, 'skipped', null, e.detail.idx);
+        this.submitTriage(e.detail.id, 'skipped', null, e.detail.note, e.detail.idx);
       });
       this.$el.addEventListener('triage-dismiss', (e) => {
         this.dismissTriage(e.detail.id, e.detail.idx);
@@ -670,6 +674,10 @@ function triageQueue() {
           e.preventDefault();
           this.dismissFocused();
           break;
+        case 'n':
+          e.preventDefault();
+          this.focusNoteForFocused();
+          break;
         case 'c':
           e.preventDefault();
           this.openCategoryPickerForFocused();
@@ -694,14 +702,15 @@ function triageQueue() {
       if (!row) return;
       const id = row.dataset.reviewId;
       const data = Alpine.$data(row);
-      this.submitTriage(id, 'approved', data.selectedCatId, this.focusedIdx);
+      this.submitTriage(id, 'approved', data.selectedCatId, data.triageNote, this.focusedIdx);
     },
 
     skipFocused() {
       const row = this.getFocusedRow();
       if (!row) return;
       const id = row.dataset.reviewId;
-      this.submitTriage(id, 'skipped', null, this.focusedIdx);
+      const data = Alpine.$data(row);
+      this.submitTriage(id, 'skipped', null, data.triageNote, this.focusedIdx);
     },
 
     dismissFocused() {
@@ -716,6 +725,13 @@ function triageQueue() {
       if (!row) return;
       const pickerBtn = row.querySelector('.bb-triage-detail .bb-cat-picker button');
       if (pickerBtn) pickerBtn.click();
+    },
+
+    focusNoteForFocused() {
+      const row = this.getFocusedRow();
+      if (!row) return;
+      const noteInput = row.querySelector('.bb-triage-detail input[type="text"]');
+      if (noteInput) noteInput.focus();
     },
 
     removeRow(id, idx) {
@@ -738,7 +754,7 @@ function triageQueue() {
       this.sessionCount++;
     },
 
-    submitTriage(id, decision, categoryId, idx) {
+    submitTriage(id, decision, categoryId, note, idx) {
       const row = document.getElementById('triage-' + id);
       if (!row) return;
       const data = Alpine.$data(row);
@@ -747,6 +763,7 @@ function triageQueue() {
 
       const body = { decision: decision };
       if (categoryId) body.category_id = categoryId;
+      if (note && note.trim()) body.note = note.trim();
 
       fetch('/-/reviews/' + id + '/submit', {
         method: 'POST',

@@ -1641,13 +1641,17 @@
   }
 
   .bb-triage-row__category {
-    @apply hidden md:block min-w-0;
-    width: 140px;
+    @apply hidden md:flex md:items-center min-w-0 shrink-0;
+    width: 120px;
+  }
+
+  .bb-triage-row__category > span {
+    @apply block truncate max-w-full;
   }
 
   .bb-triage-row__date {
     @apply hidden sm:block shrink-0;
-    width: 90px;
+    width: 80px;
   }
 
   .bb-triage-row__amount {
