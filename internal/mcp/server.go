@@ -67,10 +67,11 @@ TRANSACTION RULES:
 - Rules auto-categorize future transactions during sync. Good rules dramatically reduce future review work.
 - Conditions use a flexible JSON tree with AND/OR/NOT logic and operators: eq, contains, matches (regex), gt, gte, lt, lte, in
 - Available fields: name, merchant_name, amount, category_primary (raw provider category), category_detailed, pending, provider, account_id, user_id, user_name (family member name)
-- Set apply_retroactively=true when creating rules to apply them to existing transactions immediately
-- Use apply_rules to apply all rules at once to the backlog, or apply_rules with rule_id for a specific rule
+- Rules apply automatically to new transactions during sync — no manual application needed
+- Set apply_retroactively=true on create_transaction_rule ONLY during initial bulk categorization (first-time setup). For routine work, just create the rule and let it match future syncs.
 - Use preview_rule to test a condition before creating — shows match count and sample transactions
 - Teller's "general" category is a catch-all — do NOT create a category_primary rule for it, use name patterns instead
+- Do NOT call apply_rules during routine reviews. It scans ALL transactions and its impact is hard to predict. Rules are forward-looking by design.
 
 ACCOUNT LINKING (Deduplication & Attribution):
 - When two family members connect the same credit card (e.g., primary cardholder + authorized user), transactions appear in both feeds with different IDs

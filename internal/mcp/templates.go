@@ -12,10 +12,9 @@ STRATEGY:
 3. Create name-pattern rules (also with apply_retroactively=true) for transaction types
    that span merchants: "ATM Withdrawal" → withdrawals, "Wire Transfer" → transfer_out,
    "Service Charge" → bank_fees, "Cash Deposit" → deposits
-4. Use apply_rules to apply all rules at once to remaining uncategorized transactions
-5. Use list_pending_reviews with fields=triage and a high limit (200-500) to see what remains
-6. Use batch_submit_reviews (up to 200) or bulk_recategorize for bulk actions on remaining items
-7. Create per-merchant rules only for merchants that get miscategorized by the broad rules
+4. Use list_pending_reviews with fields=triage and a high limit (200-500) to see what remains
+5. Use batch_submit_reviews (up to 200) or bulk_recategorize for bulk actions on remaining items
+6. Create per-merchant rules only for merchants that get miscategorized by the broad rules
 
 TELLER CATEGORIES:
 Teller's "general" category is a useless catch-all covering 30%+ of transactions. Do NOT
@@ -45,12 +44,12 @@ STRATEGY:
 1. List pending reviews with fields=triage (limit 15-30)
 2. Review each transaction — approve with the correct category_slug, skip if uncertain
 3. Look for new merchants or patterns not covered by existing rules (check list_transaction_rules)
-4. For recurring merchants (seen 2+ times), create a specific rule
+4. For recurring merchants (seen 2+ times), create a specific rule (rules apply to future syncs automatically)
 5. Use batch_submit_reviews (up to 200) for efficiency
-6. If you created new rules, use apply_rules with rule_id to apply them to any remaining backlog
 
 Focus on ACCURACY — take time to categorize correctly since there are fewer transactions.
-Create specific rules for new recurring merchants you encounter. Prefer contains over exact match for merchant names.`
+Create specific rules for new recurring merchants you encounter. Prefer contains over exact match for merchant names.
+Do NOT use apply_rules during routine reviews — rules are designed to match future transactions during sync. Retroactive application is a separate, deliberate action.`
 
 // InstructionTemplate represents a pre-built instruction set.
 type InstructionTemplate struct {
