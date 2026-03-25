@@ -1022,7 +1022,10 @@ func (s *Service) PreviewRule(ctx context.Context, conditions Condition, sampleS
 	result := &RulePreviewResult{}
 	var lastID pgtype.UUID
 
-	// Extended query to also get date and current category slug
+	// Extended query to also get date and current category slug.
+	// Must match the same filters as transactionContextQuery (used by ApplyRuleRetroactively):
+	// - category_override = FALSE (rules don't overwrite manual overrides)
+	// - exclude matched dependent transactions (dedup'd via account links)
 	baseQuery := `SELECT t.id, t.name, COALESCE(t.merchant_name, ''), t.amount,
 		COALESCE(t.category_primary, ''), COALESCE(t.category_detailed, ''),
 		t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
@@ -1032,7 +1035,8 @@ func (s *Service) PreviewRule(ctx context.Context, conditions Condition, sampleS
 		JOIN bank_connections bc ON a.connection_id = bc.id
 		LEFT JOIN users u ON bc.user_id = u.id
 		LEFT JOIN categories c ON t.category_id = c.id
-		WHERE t.deleted_at IS NULL`
+		WHERE t.deleted_at IS NULL AND t.category_override = FALSE
+		AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
 	for {
 		query := baseQuery
