@@ -813,7 +813,8 @@ func (s *Service) AutoApproveCategorizedReviews(ctx context.Context, actor Actor
 	}
 
 	if len(matches) == 0 {
-		return &AutoApproveResult{Approved: 0, Remaining: 0}, nil
+		remaining, _ := s.Queries.CountPendingReviews(ctx)
+		return &AutoApproveResult{Approved: 0, Remaining: remaining}, nil
 	}
 
 	// Bulk approve them.
