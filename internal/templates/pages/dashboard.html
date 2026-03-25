@@ -373,6 +373,187 @@
 </div>
 {{end}}
 
+<!-- Monthly Spending Pace -->
+{{if .HasPaceData}}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8 bb-stagger">
+  <!-- Spending Pace Card -->
+  <div class="bb-card p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm font-semibold text-base-content/70">{{.CurrentMonthName}} Spending Pace</h2>
+      <span class="text-xs text-base-content/30">Day {{.DaysElapsed}} of {{.DaysInMonth}}</span>
+    </div>
+
+    <!-- Month progress bar with pace marker -->
+    <div class="mb-5">
+      <div class="relative">
+        <!-- Background track -->
+        <div class="w-full h-3 bg-base-200/60 rounded-full overflow-hidden">
+          <!-- Spending progress (how much of projected has been spent) -->
+          {{if gt .LastMonthSpending 0.0}}
+          <div class="h-full rounded-full transition-all duration-700 ease-out {{if gt .PacePercent 10.0}}bg-error/50{{else if lt .PacePercent -10.0}}bg-success/50{{else}}bg-primary/40{{end}}"
+            style="width: {{printf "%.1f" .MonthProgress}}%;"></div>
+          {{else}}
+          <div class="h-full rounded-full transition-all duration-700 ease-out bg-primary/40"
+            style="width: {{printf "%.1f" .MonthProgress}}%;"></div>
+          {{end}}
+        </div>
+        <!-- Time marker: where we are in the month -->
+        <div class="absolute top-0 h-3 w-0.5 bg-base-content/30 rounded-full" style="left: {{printf "%.1f" .MonthProgress}}%;">
+          <div class="absolute -top-5 left-1/2 -translate-x-1/2 text-[0.6rem] text-base-content/40 whitespace-nowrap font-medium">today</div>
+        </div>
+      </div>
+      <div class="flex justify-between mt-1.5 text-[0.6rem] text-base-content/30">
+        <span>{{.CurrentMonthName}} 1</span>
+        <span>{{.DaysRemaining}} days left</span>
+      </div>
+    </div>
+
+    <!-- Pace metrics grid -->
+    <div class="grid grid-cols-3 gap-4">
+      <div>
+        <div class="text-xs text-base-content/40 mb-0.5">Spent so far</div>
+        <div class="text-lg font-semibold tabular-nums">{{formatBalance .CurrentMonthSpending}}</div>
+      </div>
+      <div>
+        <div class="text-xs text-base-content/40 mb-0.5">Daily avg</div>
+        <div class="text-lg font-semibold tabular-nums">{{formatBalance .DailyAvgSpending}}</div>
+      </div>
+      <div>
+        <div class="text-xs text-base-content/40 mb-0.5">Projected</div>
+        <div class="flex items-baseline gap-1.5">
+          <span class="text-lg font-semibold tabular-nums">{{formatBalance .ProjectedMonthly}}</span>
+          {{if and (gt .LastMonthSpending 0.0) (ne .PaceVsLastMonth "same")}}
+          <i data-lucide="{{if eq .PaceVsLastMonth "ahead"}}arrow-up-right{{else}}arrow-down-right{{end}}" class="w-3 h-3 {{if eq .PaceVsLastMonth "ahead"}}text-error/60{{else}}text-success/60{{end}}"></i>
+          {{end}}
+        </div>
+      </div>
+    </div>
+
+    <!-- Last month comparison -->
+    {{if gt .LastMonthSpending 0.0}}
+    <div class="mt-4 pt-4 border-t border-base-200/60">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-base-content/40">vs {{.LastMonthName}}</span>
+          <span class="text-xs font-medium tabular-nums text-base-content/50">{{formatBalance .LastMonthSpending}} total</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          {{if ne .PaceVsLastMonth ""}}
+          <div class="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
+            {{if eq .PaceVsLastMonth "ahead"}}bg-error/8 text-error/70
+            {{else if eq .PaceVsLastMonth "behind"}}bg-success/8 text-success/70
+            {{else}}bg-base-200 text-base-content/50{{end}}">
+            {{if eq .PaceVsLastMonth "ahead"}}
+            <i data-lucide="trending-up" class="w-3 h-3"></i>
+            Spending {{printf "%.0f" (absf .PacePercent)}}% more
+            {{else if eq .PaceVsLastMonth "behind"}}
+            <i data-lucide="trending-down" class="w-3 h-3"></i>
+            Spending {{printf "%.0f" (absf .PacePercent)}}% less
+            {{else}}
+            <i data-lucide="minus" class="w-3 h-3"></i>
+            On pace
+            {{end}}
+          </div>
+          {{end}}
+        </div>
+      </div>
+      <!-- Visual comparison bar -->
+      <div class="mt-3 space-y-1.5">
+        <div class="flex items-center gap-3">
+          <span class="text-[0.65rem] text-base-content/35 w-20 shrink-0 text-right">This month</span>
+          <div class="flex-1 h-2 bg-base-200/50 rounded-full overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-700 ease-out bg-primary/40"
+              style="width: {{if gt .LastMonthSpending 0.0}}{{printf "%.1f" (minf (mulf (divf .CurrentMonthSpending .LastMonthSpending) 100.0) 100.0)}}%{{else}}0%{{end}};"></div>
+          </div>
+          <span class="text-[0.65rem] tabular-nums text-base-content/40 w-16 shrink-0">{{formatBalance .CurrentMonthSpending}}</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-[0.65rem] text-base-content/35 w-20 shrink-0 text-right">{{.LastMonthName}}</span>
+          <div class="flex-1 h-2 bg-base-200/50 rounded-full overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-700 ease-out bg-base-content/12" style="width: 100%;"></div>
+          </div>
+          <span class="text-[0.65rem] tabular-nums text-base-content/40 w-16 shrink-0">{{formatBalance .LastMonthSpending}}</span>
+        </div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+
+  <!-- Monthly Income vs Spending Summary -->
+  <div class="bb-card p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm font-semibold text-base-content/70">{{.CurrentMonthName}} Summary</h2>
+    </div>
+
+    <!-- Big number: net for the month -->
+    <div class="text-center mb-5">
+      <div class="text-xs text-base-content/40 mb-1">Month-to-date net</div>
+      <div class="text-3xl font-semibold tabular-nums {{if gt .CurrentMonthIncome .CurrentMonthSpending}}text-success{{else}}text-error{{end}}">
+        {{if gt .CurrentMonthIncome .CurrentMonthSpending}}+{{end}}{{if lt (subf .CurrentMonthIncome .CurrentMonthSpending) 0.0}}-{{end}}{{formatBalance (absf (subf .CurrentMonthIncome .CurrentMonthSpending))}}
+      </div>
+      <div class="text-[0.65rem] text-base-content/30 mt-1">
+        {{if gt .CurrentMonthIncome .CurrentMonthSpending}}saving money{{else}}spending more than earning{{end}}
+      </div>
+    </div>
+
+    <!-- Income vs Spending mini breakdown -->
+    <div class="space-y-3">
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="flex items-center gap-2 text-xs font-medium text-base-content/60">
+            <span class="w-2 h-2 rounded-full shrink-0" style="background: oklch(0.62 0.14 155)"></span>
+            Income
+          </span>
+          <span class="text-sm font-semibold tabular-nums text-success">{{formatBalance .CurrentMonthIncome}}</span>
+        </div>
+        <div class="w-full h-2.5 bg-base-200/50 rounded-full overflow-hidden">
+          <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: 100%; background: oklch(0.62 0.14 155); opacity: 0.5;"></div>
+        </div>
+      </div>
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="flex items-center gap-2 text-xs font-medium text-base-content/60">
+            <span class="w-2 h-2 rounded-full shrink-0 bg-base-content/20"></span>
+            Spending
+          </span>
+          <span class="text-sm font-semibold tabular-nums text-base-content/80">{{formatBalance .CurrentMonthSpending}}</span>
+        </div>
+        <div class="w-full h-2.5 bg-base-200/50 rounded-full overflow-hidden">
+          {{if gt .CurrentMonthIncome 0.0}}
+          <div class="h-full rounded-full transition-all duration-700 ease-out bg-base-content/15"
+            style="width: {{printf "%.1f" (minf (mulf (divf .CurrentMonthSpending .CurrentMonthIncome) 100.0) 100.0)}}%;"></div>
+          {{else}}
+          <div class="h-full rounded-full transition-all duration-700 ease-out bg-base-content/15" style="width: 100%;"></div>
+          {{end}}
+        </div>
+      </div>
+    </div>
+
+    <!-- Key stats row -->
+    <div class="mt-5 pt-4 border-t border-base-200/60 grid grid-cols-2 gap-4">
+      <div>
+        <div class="text-xs text-base-content/40 mb-0.5">Burn rate</div>
+        {{if gt .CurrentMonthIncome 0.0}}
+          {{if gt .CurrentMonthSpending (mulf .CurrentMonthIncome 2.0)}}
+          <div class="text-sm font-semibold text-error/80">High</div>
+          {{else if gt .CurrentMonthSpending .CurrentMonthIncome}}
+          <div class="text-sm font-semibold text-warning">{{printf "%.0f" (mulf (divf .CurrentMonthSpending .CurrentMonthIncome) 100.0)}}% of income</div>
+          {{else}}
+          <div class="text-sm font-semibold text-success/80">{{printf "%.0f" (mulf (divf .CurrentMonthSpending .CurrentMonthIncome) 100.0)}}% of income</div>
+          {{end}}
+        {{else}}
+        <div class="text-sm text-base-content/30">&mdash;</div>
+        {{end}}
+      </div>
+      <div>
+        <div class="text-xs text-base-content/40 mb-0.5">Days remaining</div>
+        <div class="text-sm font-semibold tabular-nums text-base-content/70">{{.DaysRemaining}}</div>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
 <!-- Recent Transactions + Sync Activity -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
   <!-- Recent Transactions -->

@@ -354,6 +354,117 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			}
 		}
 
+		// ── Spending Pace: current month vs last month ──────────────────────
+		// Always computed regardless of date picker selection.
+		today := time.Now()
+		monthStart := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, today.Location())
+		daysElapsed := today.Day()
+		daysInMonth := time.Date(today.Year(), today.Month()+1, 0, 0, 0, 0, 0, today.Location()).Day()
+		daysRemaining := daysInMonth - daysElapsed
+
+		// Current month spending (1st → today).
+		var currentMonthSpending float64
+		currentMonthSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+			GroupBy:      "day",
+			StartDate:    &monthStart,
+			SpendingOnly: true,
+		})
+		if err != nil {
+			a.Logger.Error("current month spending", "error", err)
+		}
+		if currentMonthSummary != nil {
+			for _, row := range currentMonthSummary.Summary {
+				currentMonthSpending += row.TotalAmount
+			}
+		}
+
+		// Current month income.
+		var currentMonthIncome float64
+		currentMonthIncomeSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+			GroupBy:   "day",
+			StartDate: &monthStart,
+		})
+		if err != nil {
+			a.Logger.Error("current month income", "error", err)
+		}
+		if currentMonthIncomeSummary != nil {
+			for _, row := range currentMonthIncomeSummary.Summary {
+				if row.TotalAmount < 0 {
+					currentMonthIncome += -row.TotalAmount
+				}
+			}
+		}
+
+		// Last month total spending.
+		lastMonthStart := time.Date(today.Year(), today.Month()-1, 1, 0, 0, 0, 0, today.Location())
+		lastMonthEnd := monthStart // first of current month
+		var lastMonthSpending float64
+		lastMonthSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+			GroupBy:      "day",
+			StartDate:    &lastMonthStart,
+			EndDate:      &lastMonthEnd,
+			SpendingOnly: true,
+		})
+		if err != nil {
+			a.Logger.Error("last month spending", "error", err)
+		}
+		if lastMonthSummary != nil {
+			for _, row := range lastMonthSummary.Summary {
+				lastMonthSpending += row.TotalAmount
+			}
+		}
+
+		// Last month spending at the same point (1st → same day of last month).
+		lastMonthSameDay := time.Date(today.Year(), today.Month()-1, 1, 0, 0, 0, 0, today.Location())
+		lastMonthDaysInMonth := time.Date(lastMonthSameDay.Year(), lastMonthSameDay.Month()+1, 0, 0, 0, 0, 0, today.Location()).Day()
+		sameDayOfLastMonth := daysElapsed
+		if sameDayOfLastMonth > lastMonthDaysInMonth {
+			sameDayOfLastMonth = lastMonthDaysInMonth
+		}
+		lastMonthSameDayEnd := time.Date(lastMonthSameDay.Year(), lastMonthSameDay.Month(), sameDayOfLastMonth+1, 0, 0, 0, 0, today.Location())
+		var lastMonthPaceSpending float64
+		lastMonthPaceSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+			GroupBy:      "day",
+			StartDate:    &lastMonthSameDay,
+			EndDate:      &lastMonthSameDayEnd,
+			SpendingOnly: true,
+		})
+		if err != nil {
+			a.Logger.Error("last month pace spending", "error", err)
+		}
+		if lastMonthPaceSummary != nil {
+			for _, row := range lastMonthPaceSummary.Summary {
+				lastMonthPaceSpending += row.TotalAmount
+			}
+		}
+
+		// Compute pace metrics.
+		var dailyAvgSpending float64
+		var projectedMonthly float64
+		var pacePercent float64    // How current month compares to last month at same point
+		var hasPaceData bool
+		var paceVsLastMonth string // "ahead", "behind", "same"
+
+		if daysElapsed > 0 && currentMonthSpending > 0 {
+			hasPaceData = true
+			dailyAvgSpending = currentMonthSpending / float64(daysElapsed)
+			projectedMonthly = dailyAvgSpending * float64(daysInMonth)
+
+			if lastMonthPaceSpending > 0 {
+				pacePercent = ((currentMonthSpending - lastMonthPaceSpending) / lastMonthPaceSpending) * 100
+				if pacePercent > 2.0 {
+					paceVsLastMonth = "ahead"
+				} else if pacePercent < -2.0 {
+					paceVsLastMonth = "behind"
+				} else {
+					paceVsLastMonth = "same"
+				}
+			}
+		}
+
+		// Progress through the month (percent).
+		monthProgress := float64(daysElapsed) / float64(daysInMonth) * 100
+
 		// Accounts with balances for the overview section.
 		accounts, err := svc.ListAccounts(ctx, nil)
 		if err != nil {
@@ -557,6 +668,22 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"SavingsRate":            savingsRate,
 			"HasCashFlow":            hasCashFlow,
 			"SpendingRatio":          spendingRatio,
+			// Spending pace data.
+			"HasPaceData":            hasPaceData,
+			"CurrentMonthSpending":   currentMonthSpending,
+			"CurrentMonthIncome":     currentMonthIncome,
+			"LastMonthSpending":      lastMonthSpending,
+			"LastMonthPaceSpending":  lastMonthPaceSpending,
+			"DailyAvgSpending":       dailyAvgSpending,
+			"ProjectedMonthly":       projectedMonthly,
+			"PacePercent":            pacePercent,
+			"PaceVsLastMonth":        paceVsLastMonth,
+			"DaysElapsed":            daysElapsed,
+			"DaysInMonth":            daysInMonth,
+			"DaysRemaining":          daysRemaining,
+			"MonthProgress":          monthProgress,
+			"CurrentMonthName":       today.Format("January"),
+			"LastMonthName":          lastMonthStart.Format("January"),
 		}
 		tr.Render(w, r, "dashboard.html", data)
 	}
