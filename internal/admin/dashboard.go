@@ -579,6 +579,100 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			return dashAccounts[i].Name < dashAccounts[j].Name
 		})
 
+		// Group accounts by asset vs liability for the dashboard layout.
+		type AccountGroup struct {
+			Label    string // "Cash & Savings", "Investments", "Credit Cards", "Loans"
+			Icon     string // Lucide icon name
+			Type     string // "asset" or "liability"
+			Total    float64
+			Accounts []DashboardAccount
+		}
+		accountGroupOrder := []string{"depository", "investment", "credit", "loan"}
+		accountGroupMeta := map[string]struct {
+			Label string
+			Icon  string
+			Type  string
+		}{
+			"depository": {Label: "Cash & Savings", Icon: "landmark", Type: "asset"},
+			"investment": {Label: "Investments", Icon: "trending-up", Type: "asset"},
+			"credit":     {Label: "Credit Cards", Icon: "credit-card", Type: "liability"},
+			"loan":       {Label: "Loans", Icon: "banknote", Type: "liability"},
+		}
+		groupMap := make(map[string]*AccountGroup)
+		for _, acct := range dashAccounts {
+			key := acct.Type
+			if _, ok := accountGroupMeta[key]; !ok {
+				key = "depository" // fallback for unknown types
+			}
+			if g, ok := groupMap[key]; ok {
+				g.Accounts = append(g.Accounts, acct)
+				if acct.IsLiability {
+					g.Total += math.Abs(acct.BalanceCurrent)
+				} else {
+					g.Total += acct.BalanceCurrent
+				}
+			} else {
+				meta := accountGroupMeta[key]
+				bal := acct.BalanceCurrent
+				if acct.IsLiability {
+					bal = math.Abs(bal)
+				}
+				groupMap[key] = &AccountGroup{
+					Label:    meta.Label,
+					Icon:     meta.Icon,
+					Type:     meta.Type,
+					Total:    bal,
+					Accounts: []DashboardAccount{acct},
+				}
+			}
+		}
+		var assetGroups, liabilityGroups []AccountGroup
+		for _, key := range accountGroupOrder {
+			if g, ok := groupMap[key]; ok {
+				if g.Type == "asset" {
+					assetGroups = append(assetGroups, *g)
+				} else {
+					liabilityGroups = append(liabilityGroups, *g)
+				}
+			}
+		}
+
+		// Allocation bar: proportion of total assets in each asset type.
+		type AllocationSlice struct {
+			Label   string
+			Amount  float64
+			Percent float64
+			Color   string // OKLCH color for the bar segment
+		}
+		allocationColors := map[string]string{
+			"depository": "oklch(0.55 0.14 155)", // green
+			"investment": "oklch(0.55 0.12 250)", // blue
+			"credit":     "oklch(0.58 0.12 35)",  // amber
+			"loan":       "oklch(0.55 0.15 25)",  // red-ish
+		}
+		var allocationSlices []AllocationSlice
+		grossTotal := totalAssets + totalLiabilities
+		if grossTotal > 0 {
+			for _, key := range accountGroupOrder {
+				if g, ok := groupMap[key]; ok {
+					pct := (g.Total / grossTotal) * 100
+					if pct < 0.5 {
+						continue // skip tiny slices
+					}
+					color := allocationColors[key]
+					if color == "" {
+						color = "oklch(0.45 0 0)"
+					}
+					allocationSlices = append(allocationSlices, AllocationSlice{
+						Label:   g.Label,
+						Amount:  g.Total,
+						Percent: pct,
+						Color:   color,
+					})
+				}
+			}
+		}
+
 		// Net worth trend: compute daily net worth by working backwards from current balance.
 		// Query all daily transaction totals (net: spending positive, income negative) for chart period.
 		netWorthTrendStart := time.Now().AddDate(0, 0, -chartDays)
@@ -684,6 +778,10 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"MonthProgress":          monthProgress,
 			"CurrentMonthName":       today.Format("January"),
 			"LastMonthName":          lastMonthStart.Format("January"),
+			// Grouped accounts.
+			"AssetGroups":            assetGroups,
+			"LiabilityGroups":       liabilityGroups,
+			"AllocationSlices":       allocationSlices,
 		}
 		tr.Render(w, r, "dashboard.html", data)
 	}
