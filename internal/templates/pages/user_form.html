@@ -74,7 +74,10 @@
     }
 
     var body = {name: name};
-    if (email) {
+    if (isEdit) {
+      // Always send email on edit so clearing the field sets it to null
+      body.email = email || "";
+    } else if (email) {
       body.email = email;
     }
 
