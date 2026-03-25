@@ -51,12 +51,12 @@ UPDATE category_mappings
 SET category_id = $2, updated_at = NOW()
 WHERE category_id = $1;
 
--- name: SetTransactionCategoryOverride :exec
+-- name: SetTransactionCategoryOverride :execrows
 UPDATE transactions
 SET category_id = $2, category_override = TRUE, updated_at = NOW()
 WHERE id = $1;
 
--- name: ClearTransactionCategoryOverride :exec
+-- name: ClearTransactionCategoryOverride :execrows
 UPDATE transactions
 SET category_override = FALSE, updated_at = NOW()
 WHERE id = $1;
