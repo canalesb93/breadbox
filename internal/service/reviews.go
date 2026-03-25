@@ -495,6 +495,14 @@ func (s *Service) GetReview(ctx context.Context, id string) (*ReviewResponse, er
 	}
 
 	resp := s.reviewFromRow(ctx, review)
+
+	// Enrich with full transaction context
+	txnID := formatUUID(review.TransactionID)
+	txn, err := s.GetTransaction(ctx, txnID)
+	if err == nil {
+		resp.Transaction = txn
+	}
+
 	return &resp, nil
 }
 
