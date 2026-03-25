@@ -187,40 +187,112 @@
     <h2 class="text-sm font-semibold text-base-content/70">Accounts</h2>
     <a href="/connections" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
   </div>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bb-stagger">
-    {{range .Accounts}}
-    <a href="/accounts/{{.ID}}" class="bb-card bb-card--interactive p-4 no-underline group">
-      <div class="flex items-center gap-3 mb-2">
-        <div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
-          <i data-lucide="{{accountTypeIcon .Type}}" class="w-4 h-4 text-base-content/40"></i>
+
+  <!-- Allocation Bar -->
+  {{if .AllocationSlices}}
+  <div class="bb-card p-4 mb-4">
+    <div class="flex h-3 rounded-full overflow-hidden gap-0.5">
+      {{range .AllocationSlices}}
+      <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: {{printf "%.1f" .Percent}}%; background: {{safeCSS .Color}}; opacity: 0.7;" title="{{.Label}}: {{formatBalance .Amount}}"></div>
+      {{end}}
+    </div>
+    <div class="flex items-center gap-4 mt-3 flex-wrap">
+      {{range .AllocationSlices}}
+      <span class="flex items-center gap-1.5 text-xs text-base-content/50">
+        <span class="w-2 h-2 rounded-full shrink-0" style="background: {{safeCSS .Color}}; opacity: 0.7;"></span>
+        {{.Label}}
+        <span class="tabular-nums font-medium text-base-content/70">{{formatBalance .Amount}}</span>
+      </span>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+
+  <!-- Asset Groups -->
+  {{if .AssetGroups}}
+  <div class="space-y-3 mb-4 bb-stagger">
+    {{range .AssetGroups}}
+    <div class="bb-card p-0 overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-3 bg-base-200/30 border-b border-base-300/50">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="{{.Icon}}" class="w-4 h-4 text-base-content/40"></i>
+          <span class="text-xs font-semibold text-base-content/60 tracking-wide">{{.Label}}</span>
         </div>
-        <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</div>
-          <div class="text-xs text-base-content/40">{{.InstitutionName}}{{if .Mask}} ····{{.Mask}}{{end}}</div>
-        </div>
+        <span class="text-sm font-semibold tabular-nums text-base-content">{{formatBalance .Total}}</span>
       </div>
-      <div class="flex items-end justify-between gap-3">
-        <div class="flex-1 min-w-0">
-          {{if .SparklineData}}
-          <div class="bb-sparkline" data-values="{{.SparklineData}}" data-liability="{{.IsLiability}}"></div>
-          {{else}}
-          <div class="h-8"></div>
-          {{end}}
-        </div>
-        <div class="text-right shrink-0">
-          <div class="text-sm font-semibold tabular-nums{{if .IsLiability}} text-error/80{{end}}">
-            {{if .IsLiability}}-{{end}}{{formatBalance .BalanceCurrent}}
+      <div class="divide-y divide-base-300/40">
+        {{range .Accounts}}
+        <a href="/accounts/{{.ID}}" class="flex items-center gap-3 px-5 py-3 hover:bg-base-200/40 transition-colors duration-150 no-underline group">
+          <div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+            <i data-lucide="{{accountTypeIcon .Type}}" class="w-4 h-4 text-base-content/40"></i>
           </div>
-          {{if gt .SpendingTotal 0.0}}
-          <div class="text-[0.65rem] text-base-content/40 tabular-nums">{{formatBalance .SpendingTotal}} spent</div>
-          {{else}}
-          <div class="text-xs text-base-content/30">{{accountTypeLabel .Type .Subtype}}</div>
-          {{end}}
-        </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</div>
+            <div class="text-xs text-base-content/40">{{.InstitutionName}}{{if .Mask}} ····{{.Mask}}{{end}}</div>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            {{if .SparklineData}}
+            <div class="bb-sparkline w-20 h-6 hidden sm:block" data-values="{{.SparklineData}}" data-liability="{{.IsLiability}}"></div>
+            {{end}}
+            <div class="text-right">
+              <div class="text-sm font-semibold tabular-nums">{{formatBalance .BalanceCurrent}}</div>
+              {{if gt .SpendingTotal 0.0}}
+              <div class="text-[0.65rem] text-base-content/40 tabular-nums">{{formatBalance .SpendingTotal}} spent</div>
+              {{else}}
+              <div class="text-xs text-base-content/30">{{accountTypeLabel .Type .Subtype}}</div>
+              {{end}}
+            </div>
+          </div>
+        </a>
+        {{end}}
       </div>
-    </a>
+    </div>
     {{end}}
   </div>
+  {{end}}
+
+  <!-- Liability Groups -->
+  {{if .LiabilityGroups}}
+  <div class="space-y-3 bb-stagger">
+    {{range .LiabilityGroups}}
+    <div class="bb-card p-0 overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-3 bg-base-200/30 border-b border-base-300/50">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="{{.Icon}}" class="w-4 h-4 text-base-content/40"></i>
+          <span class="text-xs font-semibold text-base-content/60 tracking-wide">{{.Label}}</span>
+        </div>
+        <span class="text-sm font-semibold tabular-nums text-error/80">-{{formatBalance .Total}}</span>
+      </div>
+      <div class="divide-y divide-base-300/40">
+        {{range .Accounts}}
+        <a href="/accounts/{{.ID}}" class="flex items-center gap-3 px-5 py-3 hover:bg-base-200/40 transition-colors duration-150 no-underline group">
+          <div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+            <i data-lucide="{{accountTypeIcon .Type}}" class="w-4 h-4 text-base-content/40"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</div>
+            <div class="text-xs text-base-content/40">{{.InstitutionName}}{{if .Mask}} ····{{.Mask}}{{end}}</div>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            {{if .SparklineData}}
+            <div class="bb-sparkline w-20 h-6 hidden sm:block" data-values="{{.SparklineData}}" data-liability="{{.IsLiability}}"></div>
+            {{end}}
+            <div class="text-right">
+              <div class="text-sm font-semibold tabular-nums text-error/80">-{{formatBalance .BalanceCurrent}}</div>
+              {{if gt .SpendingTotal 0.0}}
+              <div class="text-[0.65rem] text-base-content/40 tabular-nums">{{formatBalance .SpendingTotal}} spent</div>
+              {{else}}
+              <div class="text-xs text-base-content/30">{{accountTypeLabel .Type .Subtype}}</div>
+              {{end}}
+            </div>
+          </div>
+        </a>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+  {{end}}
 </div>
 {{end}}
 
