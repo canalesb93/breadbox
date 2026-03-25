@@ -325,6 +325,9 @@ func (s *Service) countReviewsFiltered(ctx context.Context, status string, param
 		LEFT JOIN bank_connections bc ON a.connection_id = bc.id
 		WHERE t.deleted_at IS NULL`
 
+	// Exclude reviews for matched dependent transactions.
+	query += " AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))"
+
 	var args []any
 	argN := 1
 
@@ -349,7 +352,7 @@ func (s *Service) countReviewsFiltered(ctx context.Context, status string, param
 
 	if params.UserID != nil {
 		uid, _ := parseUUID(*params.UserID)
-		query += fmt.Sprintf(" AND bc.user_id = $%d", argN)
+		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
 		args = append(args, uid)
 		argN++
 	}

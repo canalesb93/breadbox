@@ -515,7 +515,8 @@ func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecat
 	query := "UPDATE transactions t SET category_id = $1, category_override = TRUE, updated_at = NOW()" +
 		" FROM accounts a" +
 		" LEFT JOIN bank_connections bc ON a.connection_id = bc.id" +
-		" WHERE t.account_id = a.id AND t.deleted_at IS NULL"
+		" WHERE t.account_id = a.id AND t.deleted_at IS NULL" +
+		" AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))"
 
 	args := []any{targetUID}
 	argN := 2
@@ -525,7 +526,7 @@ func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecat
 		if err != nil {
 			return nil, fmt.Errorf("invalid user id: %w", err)
 		}
-		query += fmt.Sprintf(" AND bc.user_id = $%d", argN)
+		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
 		args = append(args, uid)
 		argN++
 	}

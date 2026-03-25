@@ -54,7 +54,7 @@ SELECT * FROM account_links
 WHERE (primary_account_id = $1 OR dependent_account_id = $1) AND enabled = TRUE;
 
 -- name: ListAccountLinksByConnectionID :many
-SELECT al.* FROM account_links al
+SELECT DISTINCT al.* FROM account_links al
 JOIN accounts a ON a.id = al.primary_account_id OR a.id = al.dependent_account_id
 WHERE a.connection_id = $1 AND al.enabled = TRUE;
 

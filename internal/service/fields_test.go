@@ -444,7 +444,7 @@ func strPtr(s string) *string { return &s }
 
 func TestFilterTransactionFields_AllFields(t *testing.T) {
 	// Build a fieldSet with all valid fields
-	fields, err := ParseFields("id,account_id,account_name,user_name,amount,iso_currency_code,date,authorized_date,datetime,authorized_datetime,name,merchant_name,category,category_override,category_primary_raw,category_detailed_raw,category_confidence,payment_channel,pending,created_at,updated_at")
+	fields, err := ParseFields("id,account_id,account_name,user_name,amount,iso_currency_code,date,authorized_date,datetime,authorized_datetime,name,merchant_name,category,category_override,category_primary_raw,category_detailed_raw,category_confidence,payment_channel,pending,created_at,updated_at,attributed_user_id,attributed_user_name")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -455,5 +455,37 @@ func TestFilterTransactionFields_AllFields(t *testing.T) {
 	// Should have all valid field keys
 	if len(result) != len(validFields) {
 		t.Errorf("expected %d fields, got %d", len(validFields), len(result))
+	}
+}
+
+func TestParseFields_AttributedFields(t *testing.T) {
+	fields, err := ParseFields("attributed_user_id,attributed_user_name")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !fields["attributed_user_id"] {
+		t.Error("expected attributed_user_id to be selected")
+	}
+	if !fields["attributed_user_name"] {
+		t.Error("expected attributed_user_name to be selected")
+	}
+}
+
+func TestFilterTransactionFields_AttributedFields(t *testing.T) {
+	uid := "user-123"
+	uname := "Ricardo"
+	txn := TransactionResponse{
+		ID:                 "txn-1",
+		AttributedUserID:   &uid,
+		AttributedUserName: &uname,
+	}
+	fields := map[string]bool{"id": true, "attributed_user_id": true, "attributed_user_name": true}
+	result := FilterTransactionFields(txn, fields)
+
+	if result["attributed_user_id"] != &uid {
+		t.Error("expected attributed_user_id")
+	}
+	if result["attributed_user_name"] != &uname {
+		t.Error("expected attributed_user_name")
 	}
 }

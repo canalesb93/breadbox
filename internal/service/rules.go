@@ -740,7 +740,8 @@ const transactionContextQuery = `SELECT t.id, t.name, COALESCE(t.merchant_name, 
 	JOIN accounts a ON t.account_id = a.id
 	JOIN bank_connections bc ON a.connection_id = bc.id
 	LEFT JOIN users u ON bc.user_id = u.id
-	WHERE t.deleted_at IS NULL AND t.category_override = FALSE`
+	WHERE t.deleted_at IS NULL AND t.category_override = FALSE
+	AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
 // transactionContextRow holds a scanned transaction row for rule evaluation.
 type transactionContextRow struct {

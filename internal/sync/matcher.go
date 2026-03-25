@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"strings"
 
 	"breadbox/internal/db"
@@ -267,30 +266,4 @@ func nameSimilarityScore(depName, depMerchant, priName, priMerchant string) (int
 func buildMatchedOn(depName, depMerchant, priName, priMerchant string) []string {
 	_, fields := nameSimilarityScore(depName, depMerchant, priName, priMerchant)
 	return fields
-}
-
-// numericToFloat64 converts a pgtype.Numeric to float64.
-func numericToFloat64(n pgtype.Numeric) float64 {
-	if !n.Valid || n.Int == nil {
-		return 0
-	}
-	f := new(big.Float).SetInt(n.Int)
-	if n.Exp != 0 {
-		exp := new(big.Float).SetFloat64(1)
-		base := new(big.Float).SetFloat64(10)
-		e := int(n.Exp)
-		if e > 0 {
-			for i := 0; i < e; i++ {
-				exp.Mul(exp, base)
-			}
-		} else {
-			for i := 0; i < -e; i++ {
-				exp.Mul(exp, base)
-			}
-			exp = new(big.Float).Quo(new(big.Float).SetFloat64(1), exp)
-		}
-		f.Mul(f, exp)
-	}
-	result, _ := f.Float64()
-	return result
 }

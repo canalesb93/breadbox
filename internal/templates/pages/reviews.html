@@ -195,7 +195,7 @@
           <select name="account_id" class="select select-sm select-bordered w-full">
             <option value="">All Accounts</option>
             {{range .Accounts}}
-            <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.AccountIDFilter}} selected{{end}}>{{.Name}}</option>
+            <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.AccountIDFilter}} selected{{end}}>{{accountLabel .Name .Mask}}</option>
             {{end}}
           </select>
         </label>

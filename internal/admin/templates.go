@@ -141,6 +141,27 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"formatUUID": func(u pgtype.UUID) string {
 				return formatUUID(u)
 			},
+			"accountLabel": func(name string, mask interface{}) string {
+				// Format an account name with optional last-4 digits for disambiguation.
+				// mask can be *string, string, or pgtype.Text.
+				var m string
+				switch v := mask.(type) {
+				case string:
+					m = v
+				case *string:
+					if v != nil {
+						m = *v
+					}
+				case pgtype.Text:
+					if v.Valid {
+						m = v.String
+					}
+				}
+				if m != "" {
+					return name + " ••" + m
+				}
+				return name
+			},
 			"statusBadge": func(status string) template.HTML {
 				switch status {
 				case "active":

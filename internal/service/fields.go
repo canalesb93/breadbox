@@ -25,10 +25,12 @@ var validFields = map[string]bool{
 	"category_primary_raw": true,
 	"category_detailed_raw": true,
 	"category_confidence":  true,
-	"payment_channel":      true,
-	"pending":              true,
-	"created_at":           true,
-	"updated_at":           true,
+	"payment_channel":       true,
+	"pending":               true,
+	"created_at":            true,
+	"updated_at":            true,
+	"attributed_user_id":   true,
+	"attributed_user_name": true,
 }
 
 // fieldAliases expand shorthand names to groups of fields.
@@ -306,6 +308,12 @@ func FilterTransactionFields(t TransactionResponse, fields map[string]bool) map[
 	}
 	if fields["updated_at"] {
 		m["updated_at"] = t.UpdatedAt
+	}
+	if fields["attributed_user_id"] {
+		m["attributed_user_id"] = t.AttributedUserID
+	}
+	if fields["attributed_user_name"] {
+		m["attributed_user_name"] = t.AttributedUserName
 	}
 	return m
 }
