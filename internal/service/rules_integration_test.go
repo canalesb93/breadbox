@@ -790,6 +790,52 @@ func TestGetAccountLink_MatchCounts(t *testing.T) {
 	}
 }
 
+// --- PreviewRule ---
+
+func TestPreviewRule_ExcludesCategoryOverride(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	// Setup: user, connection, account, category.
+	user := testutil.MustCreateUser(t, queries, "User")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Checking")
+
+	// Create 3 transactions: all named "Amazon".
+	txn1 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_1", "Amazon Purchase", 1500, "2025-06-01")
+	_ = testutil.MustCreateTransaction(t, queries, acct.ID, "txn_2", "Amazon Prime", 1299, "2025-06-02")
+	_ = testutil.MustCreateTransaction(t, queries, acct.ID, "txn_3", "Amazon Fresh", 4500, "2025-06-03")
+
+	// Set category_override=TRUE on one of them (simulating a manual categorization).
+	_, err := pool.Exec(ctx, "UPDATE transactions SET category_override = TRUE WHERE id = $1", txn1.ID)
+	if err != nil {
+		t.Fatalf("set category_override: %v", err)
+	}
+
+	// Preview a rule that matches "Amazon" in name.
+	result, err := svc.PreviewRule(ctx, service.Condition{
+		Field: "name",
+		Op:    "contains",
+		Value: "Amazon",
+	}, 10)
+	if err != nil {
+		t.Fatalf("PreviewRule: %v", err)
+	}
+
+	// Should only match 2 transactions (the non-overridden ones).
+	// Before the fix, this would return 3 because PreviewRule didn't filter category_override.
+	if result.MatchCount != 2 {
+		t.Errorf("match_count: got %d, want 2 (should exclude category_override=TRUE)", result.MatchCount)
+	}
+	if len(result.SampleMatches) != 2 {
+		t.Errorf("sample_matches: got %d, want 2", len(result.SampleMatches))
+	}
+	// TotalScanned should also be 2 (only non-overridden are scanned).
+	if result.TotalScanned != 2 {
+		t.Errorf("total_scanned: got %d, want 2", result.TotalScanned)
+	}
+}
+
 // Verify that InsertCategoryParams works as expected (used by mustCreateCategory).
 func init() {
 	_ = db.InsertCategoryParams{}
