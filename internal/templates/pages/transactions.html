@@ -548,7 +548,7 @@ function quickSetCategory(txId, categoryId) {
       <div class="bb-cat-picker" data-picker-source="tx-cat-{{.ID}}" x-data="categoryPicker({categories: window.__bbCategories, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: '\u2014', allowEmpty: true, emptyLabel: 'Uncategorized'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
         <button type="button" class="btn btn-ghost btn-xs gap-1.5 rounded-lg" @click="openPicker()">
           <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-          <span x-text="displayLabel" class="text-xs truncate max-w-24">{{if .CategoryDisplayName}}{{deref .CategoryDisplayName}}{{else}}&mdash;{{end}}</span>
+          <span x-text="displayLabel" class="text-xs truncate max-w-48">{{if .CategoryDisplayName}}{{deref .CategoryDisplayName}}{{else}}&mdash;{{end}}</span>
         </button>
       </div>
     </div>
