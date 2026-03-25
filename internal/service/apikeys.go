@@ -82,7 +82,19 @@ func (s *Service) RevokeAPIKey(ctx context.Context, id string) error {
 	if err != nil {
 		return ErrNotFound
 	}
-	return s.Queries.RevokeApiKey(ctx, uid)
+
+	// Use Pool.Exec directly to check rows affected, since the generated
+	// sqlc :exec method discards the CommandTag.
+	tag, err := s.Pool.Exec(ctx,
+		"UPDATE api_keys SET revoked_at = NOW() WHERE id = $1 AND revoked_at IS NULL", uid)
+	if err != nil {
+		return fmt.Errorf("revoke api key: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		// Either the key doesn't exist or it's already revoked.
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Service) ValidateAPIKey(ctx context.Context, key string) (*db.ApiKey, error) {
