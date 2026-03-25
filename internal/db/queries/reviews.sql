@@ -29,7 +29,13 @@ DELETE FROM review_queue WHERE id = $1 AND status = 'pending';
 DELETE FROM review_queue WHERE status = 'pending';
 
 -- name: CountPendingReviews :one
-SELECT COUNT(*) FROM review_queue WHERE status = 'pending';
+SELECT COUNT(*) FROM review_queue rq
+JOIN transactions t ON rq.transaction_id = t.id
+JOIN accounts a ON t.account_id = a.id
+WHERE rq.status = 'pending'
+  AND t.deleted_at IS NULL
+  AND (a.is_dependent_linked = FALSE
+       OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id));
 
 -- name: CountReviewsByStatusToday :many
 SELECT status, COUNT(*) as count
