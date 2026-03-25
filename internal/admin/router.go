@@ -70,6 +70,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
 		r.Get("/sync-logs", SyncLogsHandler(a, sm, tr, svc))
 
+		r.Get("/account-links", AccountLinksPageHandler(a, svc, sm, tr))
+		r.Get("/account-links/{id}", AccountLinkDetailHandler(a, svc, sm, tr))
+
 		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
 		r.Get("/review-instructions", ReviewInstructionsPageHandler(sm, tr))
 		r.Get("/rules", RulesPageHandler(svc, sm, tr, a.Config.Version))
@@ -167,6 +170,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Put("/rules/{id}", UpdateRuleAdminHandler(svc, sm))
 		r.Delete("/rules/{id}", DeleteRuleAdminHandler(svc))
 		r.Post("/rules/{id}/toggle", ToggleRuleAdminHandler(svc))
+
+		// Account links
+		r.Post("/account-links", CreateAccountLinkAdminHandler(svc, sm))
+		r.Post("/account-links/{id}/delete", DeleteAccountLinkAdminHandler(svc, sm))
+		r.Post("/account-links/{id}/reconcile", ReconcileAccountLinkAdminHandler(svc, sm))
+		r.Post("/transaction-matches/{id}/confirm", ConfirmMatchAdminHandler(svc, sm))
+		r.Post("/transaction-matches/{id}/reject", RejectMatchAdminHandler(svc, sm))
 	})
 
 	return r

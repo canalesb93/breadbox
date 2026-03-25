@@ -123,6 +123,12 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Batch categorize: `batch_categorize_transactions` MCP tool (ToolWrite, max 200 items) and `POST /api/v1/transactions/batch-categorize`. Takes array of `{transaction_id, category_slug}` pairs. Pre-resolves slugs with cache.
 - Bulk recategorize: `bulk_recategorize` MCP tool (ToolWrite) and `POST /api/v1/transactions/bulk-recategorize`. Server-side UPDATE with dynamic WHERE clause (same filter params as query_transactions) + target category. Requires at least one filter (safety). Sets `category_override=TRUE`.
 - Review field selection: `list_pending_reviews` supports `fields` param. Aliases: `triage` (review id/type/status + transaction name/amount/date/category_primary_raw/account_name/user_name/merchant_name), `review_core` (review metadata only), `transaction_core` (key transaction fields). Implemented in `internal/service/fields.go` via `ParseReviewFields`/`FilterReviewFields`.
+- Account linking: `account_links` table links dependent (authorized user) accounts to primary (cardholder) accounts for cross-connection transaction deduplication. `transaction_matches` table stores matched pairs. `transactions.attributed_user_id` overrides user attribution. `accounts.is_dependent_linked` flag excludes dependent transactions from totals at query time.
+- Account link matching: `internal/sync/matcher.go` matches by date + exact amount. Runs post-sync via `Engine.matcher.ReconcileForConnection()`. Single candidate → auto-match. Multiple candidates → name similarity tiebreaker. Ambiguous → skip for manual review.
+- Attribution-aware filtering: transaction queries use `COALESCE(t.attributed_user_id, bc.user_id)` for user filtering. "Ricardo's transactions" includes his own plus those attributed to him on shared cards. Dependent account transactions excluded from totals via `AND a.is_dependent_linked = FALSE`.
+- Account link MCP tools: `list_account_links`, `create_account_link` (ToolWrite, auto-runs initial reconciliation), `delete_account_link`, `reconcile_account_link`, `list_transaction_matches`, `confirm_match`, `reject_match`.
+- Account link REST API: `/api/v1/account-links` CRUD + `/reconcile` + `/matches`. `/api/v1/transaction-matches/{id}/confirm|reject`. `POST /api/v1/transaction-matches/manual`.
+- Account link admin: `/admin/account-links` page with link list, create modal, match detail view. Nav item with `link-2` Lucide icon between Categories and Family Members.
 
 ## Canonical Enums
 
@@ -140,6 +146,8 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Condition operators (string): `eq`, `neq`, `contains`, `not_contains`, `matches`, `in`
 - Condition operators (numeric): `eq`, `neq`, `gt`, `gte`, `lt`, `lte`
 - Condition operators (bool): `eq`, `neq`
+- Match confidence: `auto`, `confirmed`, `rejected`
+- Match strategy: `date_amount_name`
 
 ## Spec Documents
 

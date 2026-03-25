@@ -25,6 +25,7 @@ type Engine struct {
 	providers map[string]provider.Provider
 	logger    *slog.Logger
 	locks     gosync.Map // connection ID string -> *gosync.Mutex
+	matcher   *Matcher
 }
 
 // NewEngine creates a new sync engine.
@@ -34,6 +35,7 @@ func NewEngine(queries *db.Queries, pool *pgxpool.Pool, providers map[string]pro
 		pool:      pool,
 		providers: providers,
 		logger:    logger,
+		matcher:   NewMatcher(queries, pool, logger.With("component", "matcher")),
 	}
 }
 
@@ -303,6 +305,9 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			}
 		}
 
+		// Reconcile linked account matches (best-effort, non-fatal).
+		e.matcher.ReconcileForConnection(ctx, connectionID)
+
 		// Update connection status to active (clear any previous errors).
 		// Kept outside the transaction as an independent status update.
 		_ = e.db.UpdateBankConnectionStatus(ctx, db.UpdateBankConnectionStatusParams{
@@ -503,6 +508,11 @@ func (e *Engine) SyncAll(ctx context.Context, trigger db.SyncTrigger) error {
 
 	wg.Wait()
 	return nil
+}
+
+// Matcher returns the engine's matcher for external use (e.g., manual reconciliation).
+func (e *Engine) Matcher() *Matcher {
+	return e.matcher
 }
 
 // --- helpers ---
