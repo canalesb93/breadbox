@@ -738,6 +738,96 @@
 </div>
 {{end}}
 
+<!-- Spending Velocity: Cumulative daily curves for last 3 months -->
+{{if .HasVelocityData}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/8">
+        <i data-lucide="activity" class="w-3.5 h-3.5 text-primary/60"></i>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-base-content/70">Spending Velocity</h2>
+        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Cumulative daily spending across months</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="h-64">
+    <canvas id="velocityChart"></canvas>
+  </div>
+
+  <!-- Legend -->
+  <div class="flex items-center gap-5 mt-3 pt-3 border-t border-base-200/60">
+    {{range .VelocityMonths}}
+    <span class="flex items-center gap-1.5 text-xs text-base-content/50">
+      <span class="w-2.5 h-1.5 rounded-sm {{if .IsCurrent}}bg-primary/60{{else}}bg-base-content/15{{end}}"></span>
+      {{.Label}}
+      <span class="text-[0.6rem] text-base-content/30 tabular-nums">{{formatBalance .FinalTotal}}</span>
+    </span>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+<!-- Family Spending Breakdown -->
+{{if .HasFamilyData}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+        <i data-lucide="users" class="w-3.5 h-3.5 text-base-content/50"></i>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-base-content/70">Family Spending</h2>
+        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Per-member breakdown for selected period</p>
+      </div>
+    </div>
+    <span class="text-xs text-base-content/30">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}} period</span>
+  </div>
+
+  <!-- Stacked proportion bar -->
+  <div class="w-full h-4 rounded-full overflow-hidden flex mb-5">
+    {{range .FamilySpending}}
+    <div class="h-full transition-all duration-700 ease-out first:rounded-l-full last:rounded-r-full"
+      style="width: {{printf "%.1f" .Percent}}%; background-color: {{safeCSS .Color}}; opacity: 0.6;"
+      title="{{.UserName}}: {{printf "%.0f" .Percent}}%"></div>
+    {{end}}
+  </div>
+
+  <!-- Member cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-{{if le (len .FamilySpending) 3}}{{len .FamilySpending}}{{else}}3{{end}} gap-3">
+    {{range $i, $fs := .FamilySpending}}
+    <div class="group flex items-center gap-3.5 p-4 rounded-xl border border-base-200/60 bg-base-200/10 hover:bg-base-200/30 hover:border-base-300/60 transition-all duration-200">
+      <!-- Avatar circle with initial -->
+      <div class="flex items-center justify-center w-10 h-10 rounded-full shrink-0 text-sm font-bold text-white/90"
+        style="background-color: {{safeCSS $fs.Color}};">
+        {{slice $fs.UserName 0 1}}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2 mb-1">
+          <span class="text-sm font-semibold text-base-content/80 truncate group-hover:text-base-content transition-colors">{{$fs.UserName}}</span>
+          <span class="text-sm font-semibold tabular-nums text-base-content/80 shrink-0">{{formatAmount $fs.Total}}</span>
+        </div>
+        <!-- Progress bar relative to max -->
+        <div class="w-full h-1.5 bg-base-200/50 rounded-full overflow-hidden mb-1.5">
+          <div class="h-full rounded-full transition-all duration-500 ease-out"
+            style="width: {{printf "%.1f" $fs.Percent}}%; background-color: {{safeCSS $fs.Color}}; opacity: 0.5;"></div>
+        </div>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full bg-base-200/60 text-base-content/40">{{printf "%.0f" $fs.Percent}}%</span>
+            {{if $fs.TopCat}}<span class="text-[0.6rem] text-base-content/25 truncate">{{$fs.TopCat}}</span>{{end}}
+          </div>
+          <span class="text-[0.6rem] text-base-content/30 tabular-nums">{{$fs.TxCount}} txns</span>
+        </div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
 <!-- Chart.js Initialization -->
 {{if .DailyLabels}}
 <script>
@@ -879,6 +969,135 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   }
+});
+</script>
+{{end}}
+
+<!-- Velocity Chart Script -->
+{{if .HasVelocityData}}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  var gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+  var textColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
+
+  var velocityEl = document.getElementById('velocityChart');
+  if (!velocityEl) return;
+
+  var vData = {{.VelocityJSON}};
+  var numMonths = vData.datasets.length;
+
+  // Color palette: older months are more muted, current month is vivid.
+  var lineColors = isDark
+    ? ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.15)', 'oklch(0.70 0.15 250)']
+    : ['rgba(0,0,0,0.06)', 'rgba(0,0,0,0.12)', 'oklch(0.55 0.15 250)'];
+  var fillColors = isDark
+    ? ['transparent', 'transparent', 'oklch(0.70 0.15 250 / 0.08)']
+    : ['transparent', 'transparent', 'oklch(0.55 0.15 250 / 0.06)'];
+  var borderWidths = [1.5, 1.5, 2.5];
+  var borderDashes = [[4, 3], [4, 3], []];
+
+  var datasets = vData.datasets.map(function(ds, i) {
+    var colorIdx = numMonths - 1 - (numMonths - 1 - i);
+    // Filter out trailing zeros for current month (incomplete).
+    var data = ds.data.slice();
+    if (i === numMonths - 1) {
+      // Find last non-zero value and truncate.
+      var lastNonZero = data.length - 1;
+      while (lastNonZero > 0 && data[lastNonZero] === 0) lastNonZero--;
+      data = data.slice(0, lastNonZero + 1);
+    }
+    return {
+      label: ds.label,
+      data: data,
+      borderColor: lineColors[i] || lineColors[lineColors.length - 1],
+      backgroundColor: fillColors[i] || 'transparent',
+      fill: i === numMonths - 1,
+      borderWidth: borderWidths[i] || 2,
+      borderDash: borderDashes[i] || [],
+      pointRadius: 0,
+      pointHoverRadius: i === numMonths - 1 ? 4 : 2,
+      pointHoverBackgroundColor: lineColors[i] || lineColors[lineColors.length - 1],
+      tension: 0.3,
+      order: numMonths - i,
+    };
+  });
+
+  var tooltipStyle = {
+    backgroundColor: isDark ? 'hsl(0 0% 12%)' : 'hsl(0 0% 100%)',
+    titleColor: isDark ? 'hsl(0 0% 93%)' : 'hsl(0 0% 9%)',
+    bodyColor: isDark ? 'hsl(0 0% 64%)' : 'hsl(0 0% 45%)',
+    borderColor: isDark ? 'hsl(0 0% 18%)' : 'hsl(0 0% 90%)',
+    borderWidth: 1,
+    padding: { top: 8, bottom: 8, left: 12, right: 12 },
+    cornerRadius: 8,
+    titleFont: { size: 11, weight: '600' },
+    bodyFont: { size: 12 },
+    displayColors: true,
+    boxWidth: 8,
+    boxHeight: 8,
+    boxPadding: 4,
+    titleMarginBottom: 4,
+  };
+
+  new Chart(velocityEl, {
+    type: 'line',
+    data: {
+      labels: vData.labels,
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: Object.assign({}, tooltipStyle, {
+          callbacks: {
+            title: function(items) {
+              return 'Day ' + items[0].label;
+            },
+            label: function(ctx) {
+              return ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+            }
+          }
+        })
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          border: { display: false },
+          ticks: {
+            color: textColor,
+            font: { size: 10, weight: '500' },
+            maxTicksLimit: 10,
+            callback: function(v, i) { return (i + 1) % 5 === 0 || i === 0 ? (i + 1) : ''; }
+          },
+          title: {
+            display: true,
+            text: 'Day of month',
+            color: textColor,
+            font: { size: 10, weight: '500' },
+          }
+        },
+        y: {
+          grid: { color: gridColor, drawBorder: false },
+          border: { display: false },
+          ticks: {
+            color: textColor,
+            font: { size: 10, weight: '500' },
+            maxTicksLimit: 5,
+            callback: function(v) { return '$' + v.toLocaleString(); }
+          },
+          beginAtZero: true,
+        }
+      },
+      animation: {
+        duration: 600,
+        easing: 'easeOutQuart',
+      }
+    }
+  });
 });
 </script>
 {{end}}

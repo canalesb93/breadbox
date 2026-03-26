@@ -870,6 +870,185 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			}
 		}
 
+		// ── Spending Velocity: cumulative daily spending for last 3 months ──
+		type VelocityMonth struct {
+			Label      string    // "March 2026"
+			ShortLabel string    // "Mar"
+			IsCurrent  bool
+			Days       []float64 // cumulative amount per day (index 0 = day 1)
+			FinalTotal float64
+		}
+		var velocityMonths []VelocityMonth
+		var hasVelocityData bool
+		var velocityMaxDays int
+
+		// Build 3 months: current, previous, two months ago.
+		for mi := 2; mi >= 0; mi-- {
+			mStart := time.Date(today.Year(), today.Month()-time.Month(mi), 1, 0, 0, 0, 0, today.Location())
+			mEnd := time.Date(mStart.Year(), mStart.Month()+1, 1, 0, 0, 0, 0, today.Location())
+			mDaysInMonth := time.Date(mStart.Year(), mStart.Month()+1, 0, 0, 0, 0, 0, today.Location()).Day()
+
+			// For current month, only up to today.
+			maxDay := mDaysInMonth
+			if mi == 0 && daysElapsed < mDaysInMonth {
+				maxDay = daysElapsed
+			}
+
+			vm := VelocityMonth{
+				Label:      mStart.Format("January 2006"),
+				ShortLabel: mStart.Format("Jan"),
+				IsCurrent:  mi == 0,
+				Days:       make([]float64, mDaysInMonth),
+			}
+
+			velocityRows, vErr := a.DB.Query(ctx, `
+				SELECT EXTRACT(DAY FROM date)::int AS day_num, SUM(amount)
+				FROM transactions
+				WHERE deleted_at IS NULL AND date >= $1 AND date < $2 AND amount > 0 AND pending = false
+				GROUP BY EXTRACT(DAY FROM date)::int
+				ORDER BY day_num
+			`, mStart, mEnd)
+			if vErr != nil {
+				a.Logger.Error("velocity query", "error", vErr)
+			} else {
+				for velocityRows.Next() {
+					var dayNum int
+					var dayTotal float64
+					if err := velocityRows.Scan(&dayNum, &dayTotal); err != nil {
+						continue
+					}
+					if dayNum >= 1 && dayNum <= mDaysInMonth {
+						vm.Days[dayNum-1] = dayTotal
+					}
+				}
+				velocityRows.Close()
+			}
+
+			// Convert to cumulative.
+			var cumulative float64
+			for d := 0; d < mDaysInMonth; d++ {
+				cumulative += vm.Days[d]
+				vm.Days[d] = cumulative
+				// For current month, zero out future days.
+				if mi == 0 && d >= maxDay {
+					vm.Days[d] = 0
+				}
+			}
+			vm.FinalTotal = cumulative
+
+			if mDaysInMonth > velocityMaxDays {
+				velocityMaxDays = mDaysInMonth
+			}
+			if cumulative > 0 {
+				hasVelocityData = true
+			}
+			velocityMonths = append(velocityMonths, vm)
+		}
+
+		// JSON-encode velocity data for Chart.js.
+		type velocityDS struct {
+			Label string    `json:"label"`
+			Data  []float64 `json:"data"`
+		}
+		type velocityChartData struct {
+			Labels   []int        `json:"labels"`
+			Datasets []velocityDS `json:"datasets"`
+		}
+		var velocityJSON template.JS
+		if hasVelocityData {
+			vLabels := make([]int, velocityMaxDays)
+			for i := range vLabels {
+				vLabels[i] = i + 1
+			}
+			vData := velocityChartData{Labels: vLabels}
+			for _, vm := range velocityMonths {
+				ds := velocityDS{Label: vm.ShortLabel}
+				// Pad to max days.
+				padded := make([]float64, velocityMaxDays)
+				for i := 0; i < len(vm.Days) && i < velocityMaxDays; i++ {
+					padded[i] = vm.Days[i]
+				}
+				ds.Data = padded
+				vData.Datasets = append(vData.Datasets, ds)
+			}
+			if vb, err := json.Marshal(vData); err == nil {
+				velocityJSON = template.JS(vb)
+			}
+		}
+
+		// ── Family Spending Breakdown ──
+		type FamilyMemberSpend struct {
+			UserID   string
+			UserName string
+			Total    float64
+			Percent  float64
+			TxCount  int
+			TopCat   string
+			Color    string
+		}
+		var familySpending []FamilyMemberSpend
+		var hasFamilyData bool
+		var maxFamilySpend float64
+
+		familyColors := []string{
+			"oklch(0.60 0.15 250)", // blue
+			"oklch(0.58 0.14 160)", // teal
+			"oklch(0.60 0.14 35)",  // amber
+			"oklch(0.55 0.14 300)", // purple
+			"oklch(0.58 0.12 80)",  // olive
+		}
+
+		familyRows, fErr := a.DB.Query(ctx, `
+			SELECT
+				COALESCE(bc.user_id::text, 'unknown') AS uid,
+				COALESCE(u.display_name, u.username, 'Unknown') AS user_name,
+				SUM(t.amount) AS total,
+				COUNT(*)::int AS tx_count,
+				MODE() WITHIN GROUP (ORDER BY COALESCE(t.category_primary, '')) AS top_cat
+			FROM transactions t
+			JOIN accounts a ON t.account_id = a.id
+			LEFT JOIN bank_connections bc ON a.connection_id = bc.id
+			LEFT JOIN users u ON bc.user_id = u.id
+			WHERE t.deleted_at IS NULL AND t.date >= $1 AND t.amount > 0 AND t.pending = false
+				AND COALESCE(a.is_dependent_linked, false) = false
+			GROUP BY bc.user_id, u.display_name, u.username
+			ORDER BY SUM(t.amount) DESC
+		`, chartStart)
+		if fErr != nil {
+			a.Logger.Error("family spending query", "error", fErr)
+		} else {
+			for familyRows.Next() {
+				var fs FamilyMemberSpend
+				var topCat *string
+				if err := familyRows.Scan(&fs.UserID, &fs.UserName, &fs.Total, &fs.TxCount, &topCat); err != nil {
+					a.Logger.Error("family spending scan", "error", err)
+					continue
+				}
+				if topCat != nil && *topCat != "" {
+					fs.TopCat = *topCat
+				}
+				fs.Color = familyColors[len(familySpending)%len(familyColors)]
+				familySpending = append(familySpending, fs)
+				if fs.Total > maxFamilySpend {
+					maxFamilySpend = fs.Total
+				}
+			}
+			familyRows.Close()
+			hasFamilyData = len(familySpending) > 1 // Only show if there are multiple users
+		}
+		// Compute percentages for family spending.
+		if len(familySpending) > 0 {
+			var familyTotal float64
+			for _, fs := range familySpending {
+				familyTotal += fs.Total
+			}
+			if familyTotal > 0 {
+				for i := range familySpending {
+					familySpending[i].Percent = (familySpending[i].Total / familyTotal) * 100
+				}
+			}
+		}
+
 		data := map[string]any{
 			"PageTitle":              "Insights",
 			"CurrentPage":            "insights",
@@ -932,6 +1111,14 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			"MonthlyCompRows":        monthlyCompRows,
 			"MonthlyTotals":          monthlyTotals,
 			"MaxMonthlyTotal":        maxMonthlyTotal,
+			// Spending velocity.
+			"HasVelocityData":        hasVelocityData,
+			"VelocityJSON":           velocityJSON,
+			"VelocityMonths":         velocityMonths,
+			"VelocityMaxDays":        velocityMaxDays,
+			// Family spending breakdown.
+			"HasFamilyData":          hasFamilyData,
+			"FamilySpending":         familySpending,
 		}
 		tr.Render(w, r, "insights.html", data)
 	}
