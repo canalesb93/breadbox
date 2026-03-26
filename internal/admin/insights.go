@@ -128,14 +128,15 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		drilldownRows, drilldownErr := a.DB.Query(ctx, `
 			WITH ranked AS (
 				SELECT
-					COALESCE(category_primary, 'Uncategorized') AS cat,
-					COALESCE(NULLIF(merchant_name, ''), name) AS merchant,
-					SUM(amount) AS total,
+					COALESCE(cat.display_name, t.category_primary, 'Uncategorized') AS cat,
+					COALESCE(NULLIF(t.merchant_name, ''), t.name) AS merchant,
+					SUM(t.amount) AS total,
 					COUNT(*)::int AS tx_count,
-					ROW_NUMBER() OVER (PARTITION BY COALESCE(category_primary, 'Uncategorized') ORDER BY SUM(amount) DESC) AS rn
-				FROM transactions
-				WHERE deleted_at IS NULL AND date >= $1 AND amount > 0 AND pending = false
-				GROUP BY COALESCE(category_primary, 'Uncategorized'), COALESCE(NULLIF(merchant_name, ''), name)
+					ROW_NUMBER() OVER (PARTITION BY COALESCE(cat.display_name, t.category_primary, 'Uncategorized') ORDER BY SUM(t.amount) DESC) AS rn
+				FROM transactions t
+				LEFT JOIN categories cat ON t.category_id = cat.id
+				WHERE t.deleted_at IS NULL AND t.date >= $1 AND t.amount > 0 AND t.pending = false
+				GROUP BY COALESCE(cat.display_name, t.category_primary, 'Uncategorized'), COALESCE(NULLIF(t.merchant_name, ''), t.name)
 			)
 			SELECT cat, merchant, total, tx_count
 			FROM ranked
