@@ -60,7 +60,7 @@ COMMENTS:
 REVIEW QUEUE:
 - Start with review_summary to see pending reviews grouped by raw provider category with counts — much more efficient than listing all reviews
 - Use list_pending_reviews with category_primary_raw filter to process one group at a time. Use fields=triage to reduce response size. Supports limit up to 500.
-- Use submit_review (or batch_submit_reviews, up to 200 at once) to approve with the correct category_slug, or skip if uncertain
+- Use submit_review (or batch_submit_reviews, up to 500 at once) to approve with the correct category_slug, or skip if uncertain
 - For bulk category work: batch_categorize_transactions assigns one category to many transactions; bulk_recategorize moves all transactions from one category to another
 - After creating rules with apply_retroactively=true, call auto_approve_categorized_reviews to clear reviews that rules already handled
 - After reviewing, create transaction rules for patterns you noticed so future transactions are auto-categorized
@@ -231,7 +231,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"Preview/dry-run a rule's conditions against existing transactions without making changes. Returns match_count, total_scanned, and sample_matches with transaction details. Use this to test conditions before creating a rule.",
 			s.handlePreviewRule),
 		makeToolDef("batch_categorize_transactions", ToolWrite,
-			"Categorize multiple transactions at once. Each item needs a transaction_id and category_slug. Max 200 items per request. Sets category_override=true on each transaction. More efficient than calling categorize_transaction repeatedly. Returns succeeded count and any per-item errors.",
+			"Categorize multiple transactions at once. Each item needs a transaction_id and category_slug. Max 500 items per request. Sets category_override=true on each transaction. More efficient than calling categorize_transaction repeatedly. Returns succeeded count and any per-item errors.",
 			s.handleBatchCategorize),
 		makeToolDef("bulk_recategorize", ToolWrite,
 			"Recategorize all transactions matching a filter to a new category. Requires target_category_slug and at least one filter (safety requirement). Sets category_override=true since this is an explicit action. Use this for bulk corrections — e.g., recategorize all transactions currently tagged 'general_merchandise' in a date range to 'groceries'. Returns matched/updated counts.",

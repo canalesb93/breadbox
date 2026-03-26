@@ -715,7 +715,7 @@ type listTransactionRulesInput struct {
 	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
 	Enabled      *bool  `json:"enabled,omitempty" jsonschema:"Filter by enabled status"`
 	Search       string `json:"search,omitempty" jsonschema:"Search by rule name"`
-	Limit        int    `json:"limit,omitempty" jsonschema:"Max results (default 50, max 200)"`
+	Limit        int    `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
 	Cursor       string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
 }
 
@@ -980,8 +980,8 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 	if len(input.Rules) == 0 {
 		return errorResult(fmt.Errorf("rules array is required and must not be empty")), nil, nil
 	}
-	if len(input.Rules) > 50 {
-		return errorResult(fmt.Errorf("maximum 50 rules per batch")), nil, nil
+	if len(input.Rules) > 100 {
+		return errorResult(fmt.Errorf("maximum 100 rules per batch")), nil, nil
 	}
 
 	actor := service.ActorFromContext(ctx)
@@ -1042,7 +1042,7 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 // --- Batch categorize / Bulk recategorize ---
 
 type batchCategorizeInput struct {
-	Items []batchCategorizeItemInput `json:"items" jsonschema:"required,Array of transaction/category pairs (max 200)"`
+	Items []batchCategorizeItemInput `json:"items" jsonschema:"required,Array of transaction/category pairs (max 500)"`
 }
 
 type batchCategorizeItemInput struct {

@@ -471,8 +471,8 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 	if limit <= 0 {
 		limit = 50
 	}
-	if limit > 200 {
-		limit = 200
+	if limit > 500 {
+		limit = 500
 	}
 
 	baseFrom := `FROM transaction_rules tr LEFT JOIN categories c ON tr.category_id = c.id`

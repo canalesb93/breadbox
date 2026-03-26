@@ -1623,7 +1623,7 @@ func TestBatchSetTransactionCategory_MaxLimitExceeded(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	items := make([]service.BatchCategorizeItem, 201)
+	items := make([]service.BatchCategorizeItem, 501)
 	for i := range items {
 		items[i] = service.BatchCategorizeItem{
 			TransactionID: fmt.Sprintf("00000000-0000-0000-0000-%012d", i),
@@ -1633,10 +1633,10 @@ func TestBatchSetTransactionCategory_MaxLimitExceeded(t *testing.T) {
 
 	_, err := svc.BatchSetTransactionCategory(ctx, items)
 	if err == nil {
-		t.Fatal("expected error for > 200 items, got nil")
+		t.Fatal("expected error for > 500 items, got nil")
 	}
-	if !strings.Contains(err.Error(), "maximum 200") {
-		t.Errorf("expected 'maximum 200' error, got: %v", err)
+	if !strings.Contains(err.Error(), "maximum 500") {
+		t.Errorf("expected 'maximum 500' error, got: %v", err)
 	}
 }
 

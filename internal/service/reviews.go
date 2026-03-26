@@ -628,8 +628,8 @@ func (s *Service) BulkSubmitReviews(ctx context.Context, params BulkSubmitReview
 	if len(params.Reviews) == 0 {
 		return nil, fmt.Errorf("%w: reviews array is empty", ErrInvalidParameter)
 	}
-	if len(params.Reviews) > 200 {
-		return nil, fmt.Errorf("%w: maximum 200 reviews per bulk request", ErrInvalidParameter)
+	if len(params.Reviews) > 500 {
+		return nil, fmt.Errorf("%w: maximum 500 reviews per bulk request", ErrInvalidParameter)
 	}
 
 	result := &BulkReviewResult{}

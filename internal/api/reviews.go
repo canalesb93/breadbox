@@ -17,12 +17,12 @@ func ListReviewsHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 
-		// Parse limit (1-200, default 50).
+		// Parse limit (1-500, default 50).
 		limit := 50
 		if v := q.Get("limit"); v != "" {
 			parsed, err := strconv.Atoi(v)
-			if err != nil || parsed < 1 || parsed > 200 {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "limit must be between 1 and 200")
+			if err != nil || parsed < 1 || parsed > 500 {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "limit must be between 1 and 500")
 				return
 			}
 			limit = parsed

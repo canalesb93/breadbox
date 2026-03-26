@@ -14,7 +14,7 @@ STRATEGY:
 4. Call auto_approve_categorized_reviews to clear reviews that rules already handled
 5. Use review_summary again to see what remains, then list_pending_reviews with
    category_primary_raw filter to process one group at a time (fields=triage)
-6. Use batch_submit_reviews (up to 200) or bulk_recategorize for bulk actions on remaining items
+6. Use batch_submit_reviews (up to 500) or bulk_recategorize for bulk actions on remaining items
 7. Create per-merchant rules only for merchants that get miscategorized by the broad rules
 
 TELLER CATEGORIES:
@@ -46,7 +46,7 @@ STRATEGY:
 2. Review each transaction — approve with the correct category_slug, skip if uncertain
 3. Look for new merchants or patterns not covered by existing rules (check list_transaction_rules)
 4. For recurring merchants (seen 2+ times), create a specific rule (rules apply to future syncs automatically)
-5. Use batch_submit_reviews (up to 200) for efficiency
+5. Use batch_submit_reviews (up to 500) for efficiency
 
 Focus on ACCURACY — take time to categorize correctly since there are fewer transactions.
 Create specific rules for new recurring merchants you encounter. Prefer contains over exact match for merchant names.

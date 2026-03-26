@@ -488,8 +488,8 @@ func (s *Service) BatchSetTransactionCategory(ctx context.Context, items []Batch
 	if len(items) == 0 {
 		return nil, fmt.Errorf("%w: items array is empty", ErrInvalidParameter)
 	}
-	if len(items) > 200 {
-		return nil, fmt.Errorf("%w: maximum 200 items per batch", ErrInvalidParameter)
+	if len(items) > 500 {
+		return nil, fmt.Errorf("%w: maximum 500 items per batch", ErrInvalidParameter)
 	}
 
 	// Pre-resolve all unique slugs to category IDs
