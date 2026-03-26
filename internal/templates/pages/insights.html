@@ -2195,4 +2195,101 @@ document.addEventListener('DOMContentLoaded', function() {
   };
 });
 </script>
+
+<!-- Print Styles: clean printable version of insights -->
+<style>
+@media print {
+  /* Hide non-essential UI elements */
+  nav, .drawer-side, .bb-page-header > div:last-child,
+  [x-data] > .flex.items-center.gap-1.border-b,
+  .bb-filter-bar, button, a[href], .cursor-pointer,
+  .navbar, .drawer-toggle, footer { display: none !important; }
+
+  /* Show all tab content at once */
+  [x-show] { display: block !important; opacity: 1 !important; transform: none !important; }
+
+  /* Reset page layout */
+  body { background: white !important; color: #1a1a1a !important; font-size: 11px !important; }
+  .drawer-content { margin-left: 0 !important; padding: 0 !important; }
+  main { padding: 0 !important; max-width: 100% !important; }
+
+  /* Cards: remove shadows, use borders */
+  .bb-card, [class*="bb-card"] {
+    box-shadow: none !important;
+    border: 1px solid #e5e5e5 !important;
+    background: white !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Text colors for print */
+  .text-base-content\/70, .text-base-content\/80, .text-base-content\/85 { color: #333 !important; }
+  .text-base-content\/40, .text-base-content\/50, .text-base-content\/60 { color: #666 !important; }
+  .text-base-content\/25, .text-base-content\/30, .text-base-content\/35 { color: #999 !important; }
+  .text-success, .text-success\/70, .text-success\/80 { color: #16a34a !important; }
+  .text-error, .text-error\/70, .text-error\/80 { color: #dc2626 !important; }
+  .text-warning, .text-warning\/70 { color: #d97706 !important; }
+
+  /* Summary pills: ensure readable */
+  .grid.grid-cols-2.sm\:grid-cols-4 .bb-card { border: 1px solid #ddd !important; }
+
+  /* Charts: set minimum height for print */
+  [id^="echarts"] { min-height: 200px !important; break-inside: avoid; }
+
+  /* Tab section headers for print context */
+  [x-show="tab === 'overview'"]::before {
+    content: "Overview";
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 24px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #1a1a1a;
+  }
+  [x-show="tab === 'analysis'"]::before {
+    content: "Analysis";
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 24px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #1a1a1a;
+  }
+  [x-show="tab === 'trends'"]::before {
+    content: "Trends";
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 24px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #1a1a1a;
+  }
+
+  /* Page title for print */
+  .bb-page-title { font-size: 20px !important; color: #1a1a1a !important; }
+  .bb-page-title + p { color: #666 !important; }
+
+  /* Table readability */
+  table { font-size: 10px !important; }
+  th, td { padding: 4px 8px !important; }
+
+  /* Progress bars: ensure visible */
+  .rounded-full[style*="width:"] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+
+  /* Grid adjustments for narrower print */
+  .lg\:grid-cols-5 { grid-template-columns: repeat(5, 1fr) !important; }
+  .lg\:grid-cols-3 { grid-template-columns: repeat(3, 1fr) !important; }
+  .lg\:grid-cols-2 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Force color printing for colored elements */
+  * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+
+  /* Page breaks */
+  .bb-stagger { page-break-inside: avoid; }
+  h2 { page-break-after: avoid; }
+}
+</style>
 {{end}}
