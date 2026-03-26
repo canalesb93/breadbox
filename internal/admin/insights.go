@@ -498,6 +498,137 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			spendingInsights = spendingInsights[:5]
 		}
 
+		// ── Top Merchants Analysis ──
+		type MerchantSpend struct {
+			Name      string
+			Category  string
+			Total     float64
+			Count     int
+			AvgAmount float64
+			Percent   float64
+		}
+		var topMerchants []MerchantSpend
+		var maxMerchantSpend float64
+
+		merchantRows, err := a.DB.Query(ctx, `
+			SELECT
+				COALESCE(NULLIF(merchant_name, ''), name) AS merchant,
+				COUNT(*)::int AS tx_count,
+				SUM(amount) AS total,
+				AVG(amount) AS avg_amount,
+				MODE() WITHIN GROUP (ORDER BY COALESCE(category_primary, '')) AS top_category
+			FROM transactions
+			WHERE deleted_at IS NULL AND date >= $1 AND amount > 0 AND pending = false
+			GROUP BY COALESCE(NULLIF(merchant_name, ''), name)
+			ORDER BY SUM(amount) DESC
+			LIMIT 10
+		`, chartStart)
+		if err != nil {
+			a.Logger.Error("top merchants query", "error", err)
+		} else {
+			defer merchantRows.Close()
+			for merchantRows.Next() {
+				var m MerchantSpend
+				var cat *string
+				if err := merchantRows.Scan(&m.Name, &m.Count, &m.Total, &m.AvgAmount, &cat); err != nil {
+					a.Logger.Error("top merchants scan", "error", err)
+					continue
+				}
+				if cat != nil && *cat != "" {
+					m.Category = *cat
+				}
+				topMerchants = append(topMerchants, m)
+				if m.Total > maxMerchantSpend {
+					maxMerchantSpend = m.Total
+				}
+			}
+			merchantRows.Close()
+		}
+
+		// Compute merchant bar percentages relative to max.
+		if len(topMerchants) > 0 && maxMerchantSpend > 0 {
+			for i := range topMerchants {
+				topMerchants[i].Percent = (topMerchants[i].Total / maxMerchantSpend) * 100
+			}
+		}
+
+		// ── Day-of-Week Spending Pattern ──
+		type DayOfWeekSpend struct {
+			DayShort  string  // "Mon", "Tue", etc.
+			DayFull   string  // "Monday", "Tuesday", etc.
+			Total     float64
+			Count     int
+			Intensity float64 // 0-1 for heatmap coloring
+		}
+		dowSpending := make([]DayOfWeekSpend, 7)
+		dayNames := []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
+		dayFullNames := []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
+		for i := range dowSpending {
+			dowSpending[i].DayShort = dayNames[i]
+			dowSpending[i].DayFull = dayFullNames[i]
+		}
+
+		var maxDaySpend float64
+		dowRows, err := a.DB.Query(ctx, `
+			SELECT
+				EXTRACT(ISODOW FROM date)::int AS dow,
+				SUM(amount) AS total,
+				COUNT(*)::int AS tx_count
+			FROM transactions
+			WHERE deleted_at IS NULL AND date >= $1 AND amount > 0 AND pending = false
+			GROUP BY EXTRACT(ISODOW FROM date)::int
+			ORDER BY dow
+		`, chartStart)
+		if err != nil {
+			a.Logger.Error("day-of-week query", "error", err)
+		} else {
+			defer dowRows.Close()
+			for dowRows.Next() {
+				var dow int
+				var total float64
+				var count int
+				if err := dowRows.Scan(&dow, &total, &count); err != nil {
+					continue
+				}
+				// ISODOW: 1=Mon, 7=Sun
+				idx := dow - 1
+				if idx >= 0 && idx < 7 {
+					dowSpending[idx].Total = total
+					dowSpending[idx].Count = count
+					if total > maxDaySpend {
+						maxDaySpend = total
+					}
+				}
+			}
+			dowRows.Close()
+		}
+		hasDOWData := maxDaySpend > 0
+		if hasDOWData {
+			for i := range dowSpending {
+				if dowSpending[i].Total > 0 {
+					dowSpending[i].Intensity = dowSpending[i].Total / maxDaySpend
+				}
+			}
+		}
+
+		// Find highest and lowest spending days.
+		var highSpendDay, lowSpendDay string
+		var highSpendDayAmt float64
+		lowSpendDayAmt := math.MaxFloat64
+		for _, d := range dowSpending {
+			if d.Total > highSpendDayAmt {
+				highSpendDayAmt = d.Total
+				highSpendDay = d.DayFull
+			}
+			if d.Total > 0 && d.Total < lowSpendDayAmt {
+				lowSpendDayAmt = d.Total
+				lowSpendDay = d.DayFull
+			}
+		}
+		if lowSpendDayAmt == math.MaxFloat64 {
+			lowSpendDayAmt = 0
+		}
+
 		data := map[string]any{
 			"PageTitle":              "Insights",
 			"CurrentPage":            "insights",
@@ -541,6 +672,15 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			"LastMonthName":          lastMonthStart.Format("January"),
 			// Smart spending insights.
 			"SpendingInsights":       spendingInsights,
+			// Merchant analysis.
+			"TopMerchants":           topMerchants,
+			// Day-of-week spending.
+			"DOWSpending":            dowSpending,
+			"HasDOWData":             hasDOWData,
+			"HighSpendDay":           highSpendDay,
+			"LowSpendDay":            lowSpendDay,
+			"HighSpendDayAmt":        highSpendDayAmt,
+			"LowSpendDayAmt":         lowSpendDayAmt,
 		}
 		tr.Render(w, r, "insights.html", data)
 	}
