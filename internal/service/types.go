@@ -234,6 +234,7 @@ type AdminTransactionRow struct {
 	CategoryOverride    bool
 	Pending             bool
 	AgentReviewed       bool
+	HasPendingReview    bool
 	CreatedAt           string
 	UpdatedAt           string
 }
