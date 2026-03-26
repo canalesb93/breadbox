@@ -191,7 +191,7 @@
         </svg>
         <div class="absolute inset-0 flex flex-col items-center justify-center">
           <span class="text-2xl sm:text-3xl font-bold tabular-nums {{.HealthColorClass}}"
-            data-countup="{{.HealthScore}}" data-decimals="0" data-duration="1200">{{.HealthScore}}</span>
+            data-countup="{{.HealthScore}}" data-prefix="" data-decimals="0" data-duration="1200">{{.HealthScore}}</span>
           <span class="text-[0.55rem] text-base-content/30 font-medium -mt-0.5">/ 100</span>
         </div>
       </div>
@@ -1485,7 +1485,7 @@ document.addEventListener('DOMContentLoaded', function() {
       observer.unobserve(el);
 
       var target = parseFloat(el.getAttribute('data-countup'));
-      var prefix = el.getAttribute('data-prefix') || '$';
+      var prefix = el.hasAttribute('data-prefix') ? el.getAttribute('data-prefix') : '$';
       var suffix = el.getAttribute('data-suffix') || '';
       var decimals = parseInt(el.getAttribute('data-decimals') || '2', 10);
       var duration = 800;
