@@ -372,6 +372,126 @@
   </div>
 </div>
 
+<!-- Merchant Analysis + Day-of-Week Heatmap -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 bb-stagger">
+  <!-- Top Merchants -->
+  {{if .TopMerchants}}
+  <div class="bb-card lg:col-span-2 p-5">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2.5">
+        <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+          <i data-lucide="store" class="w-3.5 h-3.5 text-base-content/50"></i>
+        </div>
+        <h2 class="text-sm font-semibold text-base-content/70">Top Merchants</h2>
+      </div>
+      <span class="text-xs text-base-content/30">by total spend</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="text-[0.65rem] uppercase tracking-wider text-base-content/30 border-b border-base-200/60">
+            <th class="text-left py-2 font-medium">Merchant</th>
+            <th class="text-right py-2 font-medium w-20">Total</th>
+            <th class="text-right py-2 font-medium w-12 hidden sm:table-cell">Txns</th>
+            <th class="text-right py-2 font-medium w-16 hidden sm:table-cell">Avg</th>
+            <th class="text-left py-2 font-medium w-28 pl-3 hidden md:table-cell"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-base-200/40">
+          {{range $i, $m := .TopMerchants}}
+          <tr class="group hover:bg-base-200/20 transition-colors">
+            <td class="py-2.5 pr-3">
+              <div class="flex items-center gap-2.5">
+                <span class="flex items-center justify-center w-6 h-6 rounded-md bg-base-200/50 text-[0.6rem] font-semibold text-base-content/35 shrink-0 tabular-nums">{{add $i 1}}</span>
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-base-content/80 truncate group-hover:text-base-content transition-colors">{{$m.Name}}</div>
+                  {{if $m.Category}}<div class="text-[0.6rem] text-base-content/30 truncate">{{$m.Category}}</div>{{end}}
+                </div>
+              </div>
+            </td>
+            <td class="py-2.5 text-right">
+              <span class="text-sm font-semibold tabular-nums text-base-content/80">{{formatAmount $m.Total}}</span>
+            </td>
+            <td class="py-2.5 text-right hidden sm:table-cell">
+              <span class="text-xs tabular-nums text-base-content/40">{{$m.Count}}</span>
+            </td>
+            <td class="py-2.5 text-right hidden sm:table-cell">
+              <span class="text-xs tabular-nums text-base-content/40">{{formatAmount $m.AvgAmount}}</span>
+            </td>
+            <td class="py-2.5 pl-3 hidden md:table-cell">
+              <div class="w-full h-1.5 bg-base-200/50 rounded-full overflow-hidden">
+                <div class="h-full rounded-full transition-all duration-500 ease-out bg-base-content/12 group-hover:bg-base-content/20"
+                  style="width: {{printf "%.1f" $m.Percent}}%;"></div>
+              </div>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {{end}}
+
+  <!-- Day-of-Week Spending Heatmap -->
+  {{if .HasDOWData}}
+  <div class="bb-card p-5">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2.5">
+        <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+          <i data-lucide="calendar-days" class="w-3.5 h-3.5 text-base-content/50"></i>
+        </div>
+        <h2 class="text-sm font-semibold text-base-content/70">Spending by Day</h2>
+      </div>
+    </div>
+    <div class="space-y-2">
+      {{range .DOWSpending}}
+      <div class="group flex items-center gap-3">
+        <span class="text-[0.65rem] font-medium text-base-content/40 w-7 shrink-0">{{.DayShort}}</span>
+        <div class="flex-1 relative">
+          <div class="w-full h-7 rounded-md transition-all duration-300 flex items-center"
+            style="background-color: oklch(0.55 0.12 250 / {{if gt .Intensity 0.0}}{{printf "%.2f" (mulf .Intensity 0.45)}}{{else}}0.03{{end}});">
+            {{if gt .Total 0.0}}
+            <span class="text-[0.6rem] font-semibold tabular-nums text-base-content/60 pl-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              {{formatAmount .Total}}
+            </span>
+            {{end}}
+          </div>
+        </div>
+        <div class="text-right shrink-0 w-12">
+          {{if gt .Count 0}}
+          <div class="text-xs font-semibold tabular-nums text-base-content/50">{{.Count}}</div>
+          <div class="text-[0.55rem] text-base-content/25">txns</div>
+          {{else}}
+          <div class="text-xs text-base-content/20">&mdash;</div>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+    </div>
+    <!-- Insight text -->
+    {{if .HighSpendDay}}
+    <div class="mt-4 pt-3 border-t border-base-200/60">
+      <p class="text-[0.65rem] text-base-content/35 leading-relaxed">
+        You spend the most on <span class="font-semibold text-base-content/50">{{.HighSpendDay}}s</span> ({{formatAmount .HighSpendDayAmt}}){{if .LowSpendDay}} and least on <span class="font-semibold text-base-content/50">{{.LowSpendDay}}s</span> ({{formatAmount .LowSpendDayAmt}}){{end}}.
+      </p>
+    </div>
+    {{end}}
+    <!-- Legend -->
+    <div class="mt-3 pt-3 border-t border-base-200/60 flex items-center justify-between">
+      <span class="text-[0.6rem] text-base-content/25">Less</span>
+      <div class="flex items-center gap-1">
+        <div class="w-4 h-3 rounded-sm" style="background-color: oklch(0.55 0.12 250 / 0.05);"></div>
+        <div class="w-4 h-3 rounded-sm" style="background-color: oklch(0.55 0.12 250 / 0.12);"></div>
+        <div class="w-4 h-3 rounded-sm" style="background-color: oklch(0.55 0.12 250 / 0.22);"></div>
+        <div class="w-4 h-3 rounded-sm" style="background-color: oklch(0.55 0.12 250 / 0.33);"></div>
+        <div class="w-4 h-3 rounded-sm" style="background-color: oklch(0.55 0.12 250 / 0.45);"></div>
+      </div>
+      <span class="text-[0.6rem] text-base-content/25">More</span>
+    </div>
+  </div>
+  {{end}}
+</div>
+
 <!-- Smart Spending Insights -->
 {{if .SpendingInsights}}
 <div class="bb-card mb-6 p-5 bb-stagger">
