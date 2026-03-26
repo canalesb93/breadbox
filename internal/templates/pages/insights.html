@@ -944,6 +944,45 @@
 </div>
 {{end}}
 
+<!-- Savings Rate Trend -->
+{{if .HasSavingsRateTrend}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-success/8">
+        <i data-lucide="piggy-bank" class="w-3.5 h-3.5 text-success/60"></i>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-base-content/70">Savings Rate Trend</h2>
+        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Monthly (income - spending) / income over time</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="echartsSavingsRateChart" style="width: 100%; height: 300px;"></div>
+
+  <!-- Monthly breakdown cards -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-4 pt-3 border-t border-base-200/60">
+    {{range .SavingsRateTrend}}
+    <div class="text-center p-2.5 rounded-lg {{if gt .Rate 10.0}}bg-success/[0.04]{{else if gt .Rate 0.0}}bg-success/[0.02]{{else if eq .Income 0.0}}bg-base-200/20{{else}}bg-error/[0.03]{{end}}">
+      <div class="text-[0.65rem] text-base-content/35 font-medium mb-1">{{.Month}}</div>
+      {{if gt .Income 0.0}}
+      <div class="text-sm font-bold tabular-nums {{if gt .Rate 10.0}}text-success/80{{else if gt .Rate 0.0}}text-success/60{{else}}text-error/70{{end}}">
+        {{if gt .Rate 0.0}}+{{end}}{{printf "%.0f" .Rate}}%
+      </div>
+      <div class="text-[0.55rem] text-base-content/25 mt-0.5 tabular-nums">
+        {{if gt .Net 0.0}}+{{end}}{{if lt .Net 0.0}}-{{end}}{{formatBalance (absf .Net)}}
+      </div>
+      {{else}}
+      <div class="text-sm text-base-content/20">&mdash;</div>
+      <div class="text-[0.55rem] text-base-content/20 mt-0.5">no income</div>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
 <!-- Family Spending Breakdown -->
 {{if .HasFamilyData}}
 <div class="bb-card mb-6 p-5 bb-stagger">
@@ -1415,6 +1454,185 @@ document.addEventListener('DOMContentLoaded', function() {
     // Listen for tab switches.
     document.addEventListener('click', function() {
       setTimeout(initVelocityChart, 100);
+    });
+  })();
+  {{end}}
+
+  // ── Savings Rate Trend Chart ──
+  {{if .HasSavingsRateTrend}}
+  (function() {
+    var srtInitialized = false;
+    var srtData = {{.SavingsRateTrendJSON}};
+
+    function initSavingsRateChart() {
+      if (srtInitialized) return;
+      var el = document.getElementById('echartsSavingsRateChart');
+      if (!el || el.offsetParent === null) return;
+      srtInitialized = true;
+
+      var chart = echarts.init(el, null, { renderer: 'canvas' });
+
+      var positiveColor = isDark ? 'rgba(100,200,140,0.85)' : 'rgba(46,160,100,0.85)';
+      var negativeColor = isDark ? 'rgba(240,100,100,0.85)' : 'rgba(220,60,60,0.85)';
+      var zeroLineColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
+      var areaPositive = isDark ? 'rgba(100,200,140,0.08)' : 'rgba(46,160,100,0.06)';
+      var areaNegative = isDark ? 'rgba(240,100,100,0.08)' : 'rgba(220,60,60,0.06)';
+
+      // Color each data point based on positive/negative.
+      var rateData = srtData.rates.map(function(r) {
+        return {
+          value: r,
+          itemStyle: { color: r >= 0 ? positiveColor : negativeColor }
+        };
+      });
+
+      var option = {
+        animation: true,
+        animationDuration: 800,
+        animationEasing: 'cubicOut',
+        grid: { top: 40, right: 20, bottom: 36, left: 50 },
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: tooltipBg,
+          borderColor: tooltipBorder,
+          borderWidth: 1,
+          padding: [10, 14],
+          textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
+          extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
+          formatter: function(params) {
+            var idx = params[0].dataIndex;
+            var rate = srtData.rates[idx];
+            var income = srtData.income[idx];
+            var spending = srtData.spending[idx];
+            var net = srtData.net[idx];
+            var rateColor = rate >= 0 ? positiveColor : negativeColor;
+
+            var title = '<div style="font-weight:600;font-size:11px;margin-bottom:8px;color:' + tooltipText + '">' + srtData.labels[idx] + '</div>';
+
+            // Savings rate big number.
+            var rateStr = (rate >= 0 ? '+' : '') + rate.toFixed(1) + '%';
+            var rateLine = '<div style="font-size:18px;font-weight:700;color:' + rateColor + ';margin-bottom:8px;font-variant-numeric:tabular-nums;">' + rateStr + ' <span style="font-size:11px;font-weight:500;color:' + tooltipSubtext + '">savings rate</span></div>';
+
+            var fmt = function(v) { return '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+            var rows = '';
+            rows += '<div style="display:flex;justify-content:space-between;gap:16px;padding:2px 0;"><span style="color:' + tooltipSubtext + ';font-size:12px;">Income</span><span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + fmt(income) + '</span></div>';
+            rows += '<div style="display:flex;justify-content:space-between;gap:16px;padding:2px 0;"><span style="color:' + tooltipSubtext + ';font-size:12px;">Spending</span><span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + fmt(spending) + '</span></div>';
+            rows += '<div style="border-top:1px solid ' + tooltipBorder + ';margin:4px 0;"></div>';
+            rows += '<div style="display:flex;justify-content:space-between;gap:16px;padding:2px 0;"><span style="color:' + tooltipSubtext + ';font-size:12px;">Net</span><span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + (net >= 0 ? positiveColor : negativeColor) + '">' + (net >= 0 ? '+' : '-') + fmt(net) + '</span></div>';
+
+            return title + rateLine + rows;
+          }
+        },
+        xAxis: {
+          type: 'category',
+          data: srtData.labels,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: textColor,
+            fontSize: 11,
+            fontWeight: 600,
+            fontFamily: 'Inter, system-ui, sans-serif'
+          }
+        },
+        yAxis: {
+          type: 'value',
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: textColor,
+            fontSize: 10,
+            fontWeight: 500,
+            fontFamily: 'Inter, system-ui, sans-serif',
+            formatter: function(v) { return v + '%'; }
+          },
+          splitLine: { lineStyle: { color: splitLineColor } },
+          splitNumber: 4
+        },
+        series: [
+          {
+            name: 'Savings Rate',
+            type: 'line',
+            data: rateData,
+            symbol: 'circle',
+            symbolSize: 10,
+            lineStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 1, 0,
+                srtData.rates.map(function(r, i) {
+                  return { offset: i / Math.max(srtData.rates.length - 1, 1), color: r >= 0 ? positiveColor : negativeColor };
+                })
+              ),
+              width: 3
+            },
+            areaStyle: {
+              color: {
+                type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                colorStops: [
+                  { offset: 0, color: areaPositive },
+                  { offset: 0.5, color: 'rgba(0,0,0,0)' },
+                  { offset: 1, color: areaNegative }
+                ]
+              },
+              origin: 0
+            },
+            emphasis: {
+              itemStyle: { borderWidth: 3, borderColor: isDark ? '#222' : '#fff', shadowBlur: 6, shadowColor: 'rgba(0,0,0,0.15)' }
+            },
+            markLine: {
+              silent: true,
+              symbol: 'none',
+              lineStyle: { color: zeroLineColor, type: 'dashed', width: 1.5 },
+              label: {
+                show: true,
+                position: 'insideEndTop',
+                formatter: '0%',
+                color: textColor,
+                fontSize: 9,
+                fontFamily: 'Inter, system-ui, sans-serif'
+              },
+              data: [{ yAxis: 0 }]
+            },
+            smooth: 0.3
+          },
+          // Invisible bar series to show income/spending context.
+          {
+            name: 'Income',
+            type: 'bar',
+            data: srtData.income,
+            barWidth: '30%',
+            itemStyle: {
+              color: isDark ? 'rgba(100,200,140,0.08)' : 'rgba(46,160,100,0.06)',
+              borderRadius: [3, 3, 0, 0]
+            },
+            emphasis: {
+              itemStyle: { color: isDark ? 'rgba(100,200,140,0.15)' : 'rgba(46,160,100,0.12)' }
+            },
+            yAxisIndex: 0,
+            z: 1,
+            // Use a second y-axis for absolute values.
+            silent: true
+          }
+        ]
+      };
+
+      // Add a second y-axis for the bar chart (hidden, auto-scaled).
+      option.yAxis = [option.yAxis, {
+        type: 'value',
+        show: false,
+        // Scale independently.
+      }];
+      option.series[1].yAxisIndex = 1;
+
+      chart.setOption(option);
+      window.addEventListener('resize', function() { chart.resize(); });
+    }
+
+    // Initialize if trends tab is active, otherwise defer.
+    if (new URLSearchParams(window.location.search).get('tab') === 'trends') {
+      setTimeout(initSavingsRateChart, 60);
+    }
+    document.addEventListener('click', function() {
+      setTimeout(initSavingsRateChart, 100);
     });
   })();
   {{end}}
