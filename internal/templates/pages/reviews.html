@@ -309,7 +309,7 @@
 
         <!-- Amount -->
         <div class="bb-triage-row__amount">
-          <span class="text-sm font-semibold tabular-nums{{if lt $review.Transaction.Amount 0.0}} text-error{{end}}">
+          <span class="text-sm font-semibold tabular-nums{{if lt $review.Transaction.Amount 0.0}} text-success{{end}}">
             {{formatAmount $review.Transaction.Amount}}
           </span>
         </div>
@@ -385,7 +385,7 @@
               </div>
               <div>
                 <span class="text-base-content/40">Amount</span>
-                <div class="font-medium tabular-nums{{if lt $review.Transaction.Amount 0.0}} text-error{{end}}">{{formatAmount $review.Transaction.Amount}}</div>
+                <div class="font-medium tabular-nums{{if lt $review.Transaction.Amount 0.0}} text-success{{end}}">{{formatAmount $review.Transaction.Amount}}</div>
               </div>
             </div>
             {{if $review.Transaction.CategoryPrimaryRaw}}
