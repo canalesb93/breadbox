@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"math"
 	"net/http"
+	"sort"
 	"time"
 
 	"breadbox/internal/app"
@@ -732,6 +733,143 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			hasRecurringData = len(recurringCharges) > 0
 		}
 
+		// ── Monthly Category Comparison Table ──
+		// Fetch category_month data for last 4 months to build a comparison grid.
+		type MonthlyCompRow struct {
+			Category      string
+			CategoryColor string
+			Amounts       []float64 // one per month column, aligned with MonthHeaders
+			Total         float64
+			Change        float64 // % change newest vs prior month
+			HasChange     bool
+		}
+		var monthHeaders []string // e.g. ["Dec", "Jan", "Feb", "Mar"]
+		var monthlyCompRows []MonthlyCompRow
+		var monthlyTotals []float64
+		var hasMonthlyComp bool
+
+		compStart := time.Date(today.Year(), today.Month()-3, 1, 0, 0, 0, 0, today.Location())
+		compEnd := time.Now().AddDate(0, 0, 1)
+		compSummary, compErr := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+			GroupBy:      "category_month",
+			StartDate:    &compStart,
+			EndDate:      &compEnd,
+			SpendingOnly: true,
+		})
+		if compErr != nil {
+			a.Logger.Error("monthly comparison summary", "error", compErr)
+		}
+		if compSummary != nil && len(compSummary.Summary) > 0 {
+			// Collect unique months (sorted) and categories.
+			monthSet := make(map[string]bool)
+			catColorMap := make(map[string]string)
+			// Map: category -> month -> amount
+			catMonthMap := make(map[string]map[string]float64)
+
+			for _, row := range compSummary.Summary {
+				cat := "Uncategorized"
+				if row.Category != nil && *row.Category != "" {
+					cat = *row.Category
+				}
+				period := ""
+				if row.Period != nil {
+					period = *row.Period
+				}
+				if period == "" {
+					continue
+				}
+				monthSet[period] = true
+				if row.CategoryColor != nil && *row.CategoryColor != "" {
+					catColorMap[cat] = *row.CategoryColor
+				}
+				if catMonthMap[cat] == nil {
+					catMonthMap[cat] = make(map[string]float64)
+				}
+				catMonthMap[cat][period] += row.TotalAmount
+			}
+
+			// Sort months chronologically.
+			sortedMonths := make([]string, 0, len(monthSet))
+			for m := range monthSet {
+				sortedMonths = append(sortedMonths, m)
+			}
+			sort.Strings(sortedMonths)
+			// Limit to last 4 months.
+			if len(sortedMonths) > 4 {
+				sortedMonths = sortedMonths[len(sortedMonths)-4:]
+			}
+
+			// Build month headers as short names (e.g. "Jan", "Feb").
+			for _, m := range sortedMonths {
+				t, parseErr := time.Parse("2006-01", m)
+				if parseErr == nil {
+					monthHeaders = append(monthHeaders, t.Format("Jan"))
+				} else {
+					monthHeaders = append(monthHeaders, m)
+				}
+			}
+
+			// Build rows: collect total per category across all months, sort by total desc.
+			type catEntry struct {
+				Name  string
+				Color string
+				Total float64
+			}
+			var catEntries []catEntry
+			for cat, months := range catMonthMap {
+				var total float64
+				for _, amt := range months {
+					total += amt
+				}
+				color := catColorMap[cat]
+				if color == "" {
+					color = categoryPalette[len(catEntries)%len(categoryPalette)]
+				}
+				catEntries = append(catEntries, catEntry{Name: cat, Color: color, Total: total})
+			}
+			sort.Slice(catEntries, func(i, j int) bool {
+				return catEntries[i].Total > catEntries[j].Total
+			})
+
+			// Limit to top 10 categories.
+			if len(catEntries) > 10 {
+				catEntries = catEntries[:10]
+			}
+
+			monthlyTotals = make([]float64, len(sortedMonths))
+			for _, ce := range catEntries {
+				row := MonthlyCompRow{
+					Category:      ce.Name,
+					CategoryColor: ce.Color,
+					Amounts:       make([]float64, len(sortedMonths)),
+					Total:         ce.Total,
+				}
+				for j, m := range sortedMonths {
+					amt := catMonthMap[ce.Name][m]
+					row.Amounts[j] = amt
+					monthlyTotals[j] += amt
+				}
+				// Compute % change between the two most recent months.
+				if len(sortedMonths) >= 2 {
+					prev := row.Amounts[len(sortedMonths)-2]
+					curr := row.Amounts[len(sortedMonths)-1]
+					if prev > 10 {
+						row.HasChange = true
+						row.Change = ((curr - prev) / prev) * 100
+					}
+				}
+				monthlyCompRows = append(monthlyCompRows, row)
+			}
+			hasMonthlyComp = len(monthlyCompRows) > 0
+		}
+
+		var maxMonthlyTotal float64
+		for _, t := range monthlyTotals {
+			if t > maxMonthlyTotal {
+				maxMonthlyTotal = t
+			}
+		}
+
 		data := map[string]any{
 			"PageTitle":              "Insights",
 			"CurrentPage":            "insights",
@@ -788,6 +926,12 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			"RecurringCharges":       recurringCharges,
 			"HasRecurringData":       hasRecurringData,
 			"TotalRecurringMonthly":  totalRecurringMonthly,
+			// Monthly category comparison.
+			"HasMonthlyComp":         hasMonthlyComp,
+			"MonthHeaders":           monthHeaders,
+			"MonthlyCompRows":        monthlyCompRows,
+			"MonthlyTotals":          monthlyTotals,
+			"MaxMonthlyTotal":        maxMonthlyTotal,
 		}
 		tr.Render(w, r, "insights.html", data)
 	}
