@@ -408,13 +408,36 @@
     @apply text-right tabular-nums text-success;
   }
 
-  /* ── Sparkline (inline mini charts) ── */
-  .bb-sparkline {
-    @apply h-8 w-full;
+  /* ── Sparkline (inline mini charts in summary pills) ── */
+  svg.bb-sparkline {
+    width: 64px;
+    height: 24px;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    flex-shrink: 0;
   }
 
-  .bb-sparkline svg {
-    display: block;
+  .bb-sparkline-line {
+    vector-effect: non-scaling-stroke;
+  }
+
+  .bb-sparkline-dot {
+    animation: bb-spark-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes bb-spark-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Summary pill hover lift */
+  .bb-summary-pill {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .bb-summary-pill:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
   }
 
   /* ── Info grid (detail pages) ── */
