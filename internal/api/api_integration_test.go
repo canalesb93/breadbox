@@ -289,7 +289,7 @@ func TestAPI_MissingAPIKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	readErrorCode(t, resp, http.StatusUnauthorized, "MISSING_API_KEY")
+	readErrorCode(t, resp, http.StatusUnauthorized, "MISSING_CREDENTIALS")
 }
 
 func TestAPI_InvalidAPIKey(t *testing.T) {
