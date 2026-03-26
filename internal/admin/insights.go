@@ -1493,6 +1493,54 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			hasTransactionAnomalies = len(transactionAnomalies) > 0
 		}
 
+		// ── Category Budget Targets ──
+		// Compare current-period spending per category against historical averages.
+		// Shows top categories as progress bars toward their historical "budget".
+		type BudgetTarget struct {
+			Category    string
+			Color       string
+			Current     float64
+			Target      float64 // historical avg per period
+			Percent     float64 // current / target * 100 (can exceed 100)
+			OverBudget  bool
+			Difference  float64 // positive = over, negative = under
+			DiffPercent float64 // signed % over/under
+		}
+		var budgetTargets []BudgetTarget
+		var hasBudgetTargets bool
+		var budgetOnTrackCount, budgetOverCount int
+
+		// Build budget targets from top categories (use topCategories order).
+		for _, tc := range topCategories {
+			avgAmt, exists := histCatAvg[tc.Name]
+			if !exists || avgAmt < 10 {
+				continue
+			}
+			pct := (tc.Amount / avgAmt) * 100
+			diff := tc.Amount - avgAmt
+			diffPct := 0.0
+			if avgAmt > 0 {
+				diffPct = (diff / avgAmt) * 100
+			}
+			bt := BudgetTarget{
+				Category:    tc.Name,
+				Color:       tc.Color,
+				Current:     tc.Amount,
+				Target:      avgAmt,
+				Percent:     pct,
+				OverBudget:  pct > 105, // 5% tolerance
+				Difference:  diff,
+				DiffPercent: diffPct,
+			}
+			budgetTargets = append(budgetTargets, bt)
+			if bt.OverBudget {
+				budgetOverCount++
+			} else {
+				budgetOnTrackCount++
+			}
+		}
+		hasBudgetTargets = len(budgetTargets) > 0
+
 		data := map[string]any{
 			"PageTitle":              "Insights",
 			"CurrentPage":            "insights",
@@ -1576,6 +1624,11 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			"CategoryAnomalies":         categoryAnomalies,
 			"HasTransactionAnomalies":   hasTransactionAnomalies,
 			"TransactionAnomalies":      transactionAnomalies,
+			// Category budget targets.
+			"HasBudgetTargets":          hasBudgetTargets,
+			"BudgetTargets":             budgetTargets,
+			"BudgetOnTrackCount":        budgetOnTrackCount,
+			"BudgetOverCount":           budgetOverCount,
 		}
 		tr.Render(w, r, "insights.html", data)
 	}
