@@ -2,7 +2,7 @@
 
 <!-- Insights Page with Tabbed Layout -->
 <div x-data="{ tab: (new URLSearchParams(window.location.search).get('tab')) || 'overview' }"
-     x-init="$watch('tab', v => { const u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); })">
+     x-init="$watch('tab', v => { const u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); if (window._onInsightsTabSwitch) window._onInsightsTabSwitch(v); })">
 
 <!-- Insights Page Header with Date Range Picker -->
 <div class="bb-page-header">
@@ -20,33 +20,50 @@
 
 <!-- Summary Pills (always visible) -->
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-  <div class="bb-card p-4">
+  <div class="bb-card p-4 flex flex-col justify-between min-h-[4.5rem]">
     <div class="text-xs text-base-content/40 mb-1">Spending</div>
-    <div class="text-xl font-semibold tabular-nums">{{formatBalance .TotalSpending}}</div>
-    {{if .HasSpendingChange}}
-    <div class="text-[0.65rem] font-medium mt-1 {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
-      {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}% vs prev
+    <div>
+      <div class="text-xl font-semibold tabular-nums">{{formatBalance .TotalSpending}}</div>
+      {{if .HasSpendingChange}}
+      <div class="text-[0.65rem] font-medium mt-1 {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
+        {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}% vs prev
+      </div>
+      {{else}}
+      <div class="text-[0.65rem] mt-1">&nbsp;</div>
+      {{end}}
     </div>
-    {{end}}
   </div>
-  <div class="bb-card p-4">
+  <div class="bb-card p-4 flex flex-col justify-between min-h-[4.5rem]">
     <div class="text-xs text-base-content/40 mb-1">Income</div>
-    <div class="text-xl font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</div>
+    <div>
+      <div class="text-xl font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</div>
+      <div class="text-[0.65rem] mt-1">&nbsp;</div>
+    </div>
   </div>
   {{if .HasCashFlow}}
-  <div class="bb-card p-4">
+  <div class="bb-card p-4 flex flex-col justify-between min-h-[4.5rem]">
     <div class="text-xs text-base-content/40 mb-1">Net Cash Flow</div>
-    <div class="text-xl font-semibold tabular-nums {{if gt .CashFlowNet 0.0}}text-success{{else if lt .CashFlowNet 0.0}}text-error{{end}}">
-      {{if gt .CashFlowNet 0.0}}+{{end}}{{if lt .CashFlowNet 0.0}}-{{end}}{{formatBalance .CashFlowNet}}
+    <div>
+      <div class="text-xl font-semibold tabular-nums {{if gt .CashFlowNet 0.0}}text-success{{else if lt .CashFlowNet 0.0}}text-error{{end}}">
+        {{if gt .CashFlowNet 0.0}}+{{end}}{{if lt .CashFlowNet 0.0}}-{{end}}{{formatBalance .CashFlowNet}}
+      </div>
+      <div class="text-[0.65rem] mt-1">&nbsp;</div>
     </div>
   </div>
-  <div class="bb-card p-4">
+  <div class="bb-card p-4 flex flex-col justify-between min-h-[4.5rem]">
     <div class="text-xs text-base-content/40 mb-1">Savings Rate</div>
-    {{if gt .TotalIncome 0.0}}
-    <div class="text-xl font-semibold tabular-nums {{if gt .SavingsRate 0.0}}text-success{{else}}text-error{{end}}">{{printf "%.0f" .SavingsRate}}%</div>
-    {{else}}
-    <div class="text-xl text-base-content/30">&mdash;</div>
-    {{end}}
+    <div>
+      {{if gt .TotalIncome 0.0}}
+        {{if lt .SavingsRate -100.0}}
+        <div class="text-xl font-semibold tabular-nums text-error">< -100%</div>
+        {{else}}
+        <div class="text-xl font-semibold tabular-nums {{if gt .SavingsRate 0.0}}text-success{{else}}text-error{{end}}">{{printf "%.0f" .SavingsRate}}%</div>
+        {{end}}
+      {{else}}
+      <div class="text-xl text-base-content/30">&mdash;</div>
+      {{end}}
+      <div class="text-[0.65rem] mt-1">&nbsp;</div>
+    </div>
   </div>
   {{end}}
 </div>
@@ -1143,6 +1160,9 @@ document.addEventListener('DOMContentLoaded', function() {
   var incomeColor = isDark ? 'rgba(100,200,140,0.35)' : 'rgba(46,160,100,0.3)';
   var incomeLineColor = isDark ? 'rgba(100,200,140,0.7)' : 'rgba(46,160,100,0.6)';
 
+  // Track all ECharts instances for tab-switch resize
+  var insightCharts = [];
+
   // ── Spending & Income Chart ──
   {{if .DailyLabels}}
   (function() {
@@ -1307,6 +1327,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     chart.setOption(option);
+    insightCharts.push(chart);
     window.addEventListener('resize', function() { chart.resize(); });
   })();
   {{end}}
@@ -1457,6 +1478,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     chart.setOption(buildCategoryOption());
+    insightCharts.push(chart);
 
     // Click handler: drill into category
     chart.on('click', function(params) {
@@ -1678,6 +1700,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     chart.setOption(option);
+    insightCharts.push(chart);
     window.addEventListener('resize', function() { chart.resize(); });
   })();
   {{end}}
@@ -1807,6 +1830,7 @@ document.addEventListener('DOMContentLoaded', function() {
       };
 
       chart.setOption(option);
+      insightCharts.push(chart);
       window.addEventListener('resize', function() { chart.resize(); });
     }
 
@@ -1814,10 +1838,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (new URLSearchParams(window.location.search).get('tab') === 'trends') {
       setTimeout(initVelocityChart, 50);
     }
-    // Listen for tab switches.
-    document.addEventListener('click', function() {
-      setTimeout(initVelocityChart, 100);
-    });
+    // Deferred init registered below in tab-switch handler.
+    window._initVelocityChart = initVelocityChart;
   })();
   {{end}}
 
@@ -1987,6 +2009,7 @@ document.addEventListener('DOMContentLoaded', function() {
       option.series[1].yAxisIndex = 1;
 
       chart.setOption(option);
+      insightCharts.push(chart);
       window.addEventListener('resize', function() { chart.resize(); });
     }
 
@@ -1994,11 +2017,27 @@ document.addEventListener('DOMContentLoaded', function() {
     if (new URLSearchParams(window.location.search).get('tab') === 'trends') {
       setTimeout(initSavingsRateChart, 60);
     }
-    document.addEventListener('click', function() {
-      setTimeout(initSavingsRateChart, 100);
-    });
+    // Deferred init registered below in tab-switch handler.
+    window._initSavingsRateChart = initSavingsRateChart;
   })();
   {{end}}
+
+  // ── Tab-switch handler: init deferred charts + resize all ──
+  // Use Alpine's $watch via a custom event to properly handle tab visibility.
+  window._insightCharts = insightCharts;
+  window._onInsightsTabSwitch = function(newTab) {
+    // Initialize deferred charts when their tab becomes visible.
+    if (newTab === 'trends') {
+      if (window._initVelocityChart) setTimeout(window._initVelocityChart, 50);
+      if (window._initSavingsRateChart) setTimeout(window._initSavingsRateChart, 60);
+    }
+    // Resize all existing chart instances after tab transition completes.
+    setTimeout(function() {
+      insightCharts.forEach(function(c) {
+        try { c.resize(); } catch(e) {}
+      });
+    }, 250);
+  };
 });
 </script>
 
@@ -2058,14 +2097,17 @@ function categoryDrilldown() {
 }
 </script>
 
-<!-- Re-init Lucide icons on tab switch (icons in initially hidden tabs need rendering) -->
+<!-- Re-init Lucide icons and resize charts on tab switch -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  document.addEventListener('click', function() {
+  // Augment the tab-switch handler to also re-render Lucide icons.
+  var originalHandler = window._onInsightsTabSwitch;
+  window._onInsightsTabSwitch = function(newTab) {
+    if (originalHandler) originalHandler(newTab);
     setTimeout(function() {
-      if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+      if (typeof lucide !== 'undefined') lucide.createIcons();
     }, 50);
-  });
+  };
 });
 </script>
 {{end}}
