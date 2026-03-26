@@ -1651,6 +1651,175 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		}
 		hasBudgetTargets = len(budgetTargets) > 0
 
+		// ── CSV Export data (JSON blob for client-side CSV generation) ──
+		type csvExportData struct {
+			PeriodLabel string `json:"periodLabel"`
+			// Summary
+			TotalSpending float64 `json:"totalSpending"`
+			TotalIncome   float64 `json:"totalIncome"`
+			CashFlowNet   float64 `json:"cashFlowNet"`
+			SavingsRate   float64 `json:"savingsRate"`
+			// Categories
+			Categories []struct {
+				Name    string  `json:"name"`
+				Amount  float64 `json:"amount"`
+				Percent float64 `json:"percent"`
+			} `json:"categories"`
+			// Merchants
+			Merchants []struct {
+				Name     string  `json:"name"`
+				Category string  `json:"category"`
+				Total    float64 `json:"total"`
+				Count    int     `json:"count"`
+				Average  float64 `json:"average"`
+			} `json:"merchants"`
+			// Day of week
+			DayOfWeek []struct {
+				Day   string  `json:"day"`
+				Total float64 `json:"total"`
+				Count int     `json:"count"`
+			} `json:"dayOfWeek"`
+			// Recurring
+			Recurring []struct {
+				Name      string  `json:"name"`
+				Amount    float64 `json:"amount"`
+				Frequency string  `json:"frequency"`
+				Category  string  `json:"category"`
+				Monthly   float64 `json:"monthlyEstimate"`
+			} `json:"recurring"`
+			// Monthly comparison
+			MonthHeaders []string `json:"monthHeaders"`
+			MonthlyComp  []struct {
+				Category string    `json:"category"`
+				Amounts  []float64 `json:"amounts"`
+			} `json:"monthlyComparison"`
+			MonthlyTotals []float64 `json:"monthlyTotals"`
+			// Budget targets
+			Budgets []struct {
+				Category string  `json:"category"`
+				Current  float64 `json:"current"`
+				Target   float64 `json:"target"`
+				Percent  float64 `json:"percent"`
+			} `json:"budgets"`
+			// Anomalies
+			CategoryAnomalies []struct {
+				Category   string  `json:"category"`
+				Current    float64 `json:"current"`
+				Historical float64 `json:"historical"`
+				Multiplier float64 `json:"multiplier"`
+			} `json:"categoryAnomalies"`
+			TransactionAnomalies []struct {
+				Name        string  `json:"name"`
+				Amount      float64 `json:"amount"`
+				Date        string  `json:"date"`
+				Category    string  `json:"category"`
+				CategoryAvg float64 `json:"categoryAvg"`
+				Multiplier  float64 `json:"multiplier"`
+			} `json:"transactionAnomalies"`
+			// Savings rate trend
+			SavingsRateTrend []struct {
+				Month    string  `json:"month"`
+				Income   float64 `json:"income"`
+				Spending float64 `json:"spending"`
+				Net      float64 `json:"net"`
+				Rate     float64 `json:"rate"`
+			} `json:"savingsRateTrend"`
+		}
+
+		periodLabel := fmt.Sprintf("%dd", chartDays)
+		if chartDays == 365 {
+			periodLabel = "12m"
+		}
+
+		exportData := csvExportData{
+			PeriodLabel:   periodLabel,
+			TotalSpending: totalSpending,
+			TotalIncome:   totalIncome,
+			CashFlowNet:   cashFlowNet,
+			SavingsRate:   savingsRate,
+			MonthHeaders:  monthHeaders,
+			MonthlyTotals: monthlyTotals,
+		}
+
+		for _, tc := range topCategories {
+			exportData.Categories = append(exportData.Categories, struct {
+				Name    string  `json:"name"`
+				Amount  float64 `json:"amount"`
+				Percent float64 `json:"percent"`
+			}{tc.Name, tc.Amount, tc.Percent})
+		}
+		for _, m := range topMerchants {
+			exportData.Merchants = append(exportData.Merchants, struct {
+				Name     string  `json:"name"`
+				Category string  `json:"category"`
+				Total    float64 `json:"total"`
+				Count    int     `json:"count"`
+				Average  float64 `json:"average"`
+			}{m.Name, m.Category, m.Total, m.Count, m.AvgAmount})
+		}
+		for _, d := range dowSpending {
+			exportData.DayOfWeek = append(exportData.DayOfWeek, struct {
+				Day   string  `json:"day"`
+				Total float64 `json:"total"`
+				Count int     `json:"count"`
+			}{d.DayFull, d.Total, d.Count})
+		}
+		for _, rc := range recurringCharges {
+			exportData.Recurring = append(exportData.Recurring, struct {
+				Name      string  `json:"name"`
+				Amount    float64 `json:"amount"`
+				Frequency string  `json:"frequency"`
+				Category  string  `json:"category"`
+				Monthly   float64 `json:"monthlyEstimate"`
+			}{rc.Name, rc.Amount, rc.Frequency, rc.Category, rc.MonthlyEst})
+		}
+		for _, row := range monthlyCompRows {
+			exportData.MonthlyComp = append(exportData.MonthlyComp, struct {
+				Category string    `json:"category"`
+				Amounts  []float64 `json:"amounts"`
+			}{row.Category, row.Amounts})
+		}
+		for _, bt := range budgetTargets {
+			exportData.Budgets = append(exportData.Budgets, struct {
+				Category string  `json:"category"`
+				Current  float64 `json:"current"`
+				Target   float64 `json:"target"`
+				Percent  float64 `json:"percent"`
+			}{bt.Category, bt.Current, bt.Target, bt.Percent})
+		}
+		for _, ca := range categoryAnomalies {
+			exportData.CategoryAnomalies = append(exportData.CategoryAnomalies, struct {
+				Category   string  `json:"category"`
+				Current    float64 `json:"current"`
+				Historical float64 `json:"historical"`
+				Multiplier float64 `json:"multiplier"`
+			}{ca.Category, ca.Current, ca.Historical, ca.Multiplier})
+		}
+		for _, ta := range transactionAnomalies {
+			exportData.TransactionAnomalies = append(exportData.TransactionAnomalies, struct {
+				Name        string  `json:"name"`
+				Amount      float64 `json:"amount"`
+				Date        string  `json:"date"`
+				Category    string  `json:"category"`
+				CategoryAvg float64 `json:"categoryAvg"`
+				Multiplier  float64 `json:"multiplier"`
+			}{ta.Name, ta.Amount, ta.Date, ta.Category, ta.CategoryAvg, ta.Multiplier})
+		}
+		for _, sr := range savingsRateTrend {
+			exportData.SavingsRateTrend = append(exportData.SavingsRateTrend, struct {
+				Month    string  `json:"month"`
+				Income   float64 `json:"income"`
+				Spending float64 `json:"spending"`
+				Net      float64 `json:"net"`
+				Rate     float64 `json:"rate"`
+			}{sr.Month, sr.Income, sr.Spending, sr.Net, sr.Rate})
+		}
+
+		var exportJSON template.JS
+		if eb, err := json.Marshal(exportData); err == nil {
+			exportJSON = template.JS(eb)
+		}
+
 		data := map[string]any{
 			"PageTitle":              "Insights",
 			"CurrentPage":            "insights",
@@ -1739,6 +1908,8 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			"BudgetTargets":             budgetTargets,
 			"BudgetOnTrackCount":        budgetOnTrackCount,
 			"BudgetOverCount":           budgetOverCount,
+			// CSV Export.
+			"ExportJSON":                exportJSON,
 		}
 		tr.Render(w, r, "insights.html", data)
 	}
