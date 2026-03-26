@@ -285,6 +285,13 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			cashFlowNet = totalIncome - totalSpending
 			if totalIncome > 0 {
 				savingsRate = (cashFlowNet / totalIncome) * 100
+				// Clamp for display — extreme values are not meaningful.
+				if savingsRate < -200 {
+					savingsRate = -200
+				}
+				if savingsRate > 100 {
+					savingsRate = 100
+				}
 			}
 		}
 
