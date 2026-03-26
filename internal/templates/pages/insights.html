@@ -21,11 +21,59 @@
     <h1 class="bb-page-title">Insights</h1>
     <p class="text-sm text-base-content/50 mt-0.5 hidden sm:block">Spending trends, pace, and cash flow analysis</p>
   </div>
-  <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 shrink-0">
-    <a :href="'/insights?days=7&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 7}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">7d</a>
-    <a :href="'/insights?days=30&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 30}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">30d</a>
-    <a :href="'/insights?days=90&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 90}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">90d</a>
-    <a :href="'/insights?days=365&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 365}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">12m</a>
+  <div class="flex items-center gap-2 shrink-0">
+    <!-- CSV Export Dropdown -->
+    <div x-data="{ exportOpen: false }" class="relative">
+      <button @click="exportOpen = !exportOpen" @click.outside="exportOpen = false"
+        class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-base-content/40 hover:text-base-content/60 bg-base-200/40 hover:bg-base-200/60 rounded-lg transition-all duration-150 cursor-pointer border border-transparent hover:border-base-300/40">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+        <span class="hidden sm:inline">Export</span>
+      </button>
+      <div x-show="exportOpen" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95 -translate-y-1" x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+        x-cloak class="absolute right-0 top-full mt-1.5 w-56 bg-base-100 border border-base-200/80 rounded-xl shadow-lg shadow-black/8 z-50 py-1.5 overflow-hidden">
+        <div class="px-3 py-1.5 text-[0.6rem] uppercase tracking-wider text-base-content/30 font-medium">Export as CSV</div>
+        <button @click="window._insightsExportCSV('summary'); exportOpen = false"
+          class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
+          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-base-content/30"></i>
+          Summary &amp; Categories
+        </button>
+        <button @click="window._insightsExportCSV('merchants'); exportOpen = false"
+          class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
+          <i data-lucide="store" class="w-3.5 h-3.5 text-base-content/30"></i>
+          Top Merchants
+        </button>
+        <button @click="window._insightsExportCSV('monthly'); exportOpen = false"
+          class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
+          <i data-lucide="columns-3" class="w-3.5 h-3.5 text-base-content/30"></i>
+          Monthly Comparison
+        </button>
+        <button @click="window._insightsExportCSV('recurring'); exportOpen = false"
+          class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/30"></i>
+          Recurring Charges
+        </button>
+        <button @click="window._insightsExportCSV('anomalies'); exportOpen = false"
+          class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
+          <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-base-content/30"></i>
+          Anomalies
+        </button>
+        <div class="border-t border-base-200/60 mt-1 pt-1">
+          <button @click="window._insightsExportCSV('all'); exportOpen = false"
+            class="w-full text-left px-3 py-2 text-xs font-medium text-base-content/80 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
+            <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-primary/50"></i>
+            Export All Sections
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- Date Range Picker -->
+    <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5">
+      <a :href="'/insights?days=7&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 7}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">7d</a>
+      <a :href="'/insights?days=30&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 30}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">30d</a>
+      <a :href="'/insights?days=90&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 90}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">90d</a>
+      <a :href="'/insights?days=365&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 365}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">12m</a>
+    </div>
   </div>
 </div>
 
@@ -2258,6 +2306,211 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 50);
   };
 });
+</script>
+
+<!-- CSV Export Logic -->
+<script>
+(function() {
+  var exportData = {{if .ExportJSON}}{{.ExportJSON}}{{else}}{}{{end}};
+
+  function csvEscape(val) {
+    if (val == null) return '';
+    var s = String(val);
+    if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  function toCSV(headers, rows) {
+    var lines = [headers.map(csvEscape).join(',')];
+    rows.forEach(function(row) {
+      lines.push(row.map(csvEscape).join(','));
+    });
+    return lines.join('\n');
+  }
+
+  function downloadCSV(filename, csvContent) {
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function fmt(n) { return (Math.round(n * 100) / 100).toFixed(2); }
+
+  function buildSummary() {
+    var headers = ['Section', 'Metric', 'Value'];
+    var rows = [];
+    rows.push(['Summary', 'Period', exportData.periodLabel]);
+    rows.push(['Summary', 'Total Spending', fmt(exportData.totalSpending)]);
+    rows.push(['Summary', 'Total Income', fmt(exportData.totalIncome)]);
+    rows.push(['Summary', 'Net Cash Flow', fmt(exportData.cashFlowNet)]);
+    if (exportData.totalIncome > 0) {
+      rows.push(['Summary', 'Savings Rate', exportData.savingsRate.toFixed(1) + '%']);
+    }
+    rows.push([]);
+    if (exportData.categories && exportData.categories.length > 0) {
+      rows.push(['Categories', 'Category', 'Amount', 'Percent']);
+      exportData.categories.forEach(function(c) {
+        rows.push(['', c.name, fmt(c.amount), c.percent.toFixed(1) + '%']);
+      });
+    }
+    if (exportData.budgets && exportData.budgets.length > 0) {
+      rows.push([]);
+      rows.push(['Budget Targets', 'Category', 'Current', 'Target (Historical Avg)', 'Percent of Target']);
+      exportData.budgets.forEach(function(b) {
+        rows.push(['', b.category, fmt(b.current), fmt(b.target), b.percent.toFixed(1) + '%']);
+      });
+    }
+    if (exportData.dayOfWeek && exportData.dayOfWeek.length > 0) {
+      rows.push([]);
+      rows.push(['Day of Week', 'Day', 'Total', 'Transactions']);
+      exportData.dayOfWeek.forEach(function(d) {
+        rows.push(['', d.day, fmt(d.total), d.count]);
+      });
+    }
+    return toCSV(headers, rows);
+  }
+
+  function buildMerchants() {
+    if (!exportData.merchants || exportData.merchants.length === 0) return null;
+    var headers = ['Rank', 'Merchant', 'Category', 'Total', 'Transactions', 'Average'];
+    var rows = exportData.merchants.map(function(m, i) {
+      return [i + 1, m.name, m.category, fmt(m.total), m.count, fmt(m.average)];
+    });
+    return toCSV(headers, rows);
+  }
+
+  function buildMonthly() {
+    if (!exportData.monthlyComparison || exportData.monthlyComparison.length === 0 || !exportData.monthHeaders) return null;
+    var headers = ['Category'].concat(exportData.monthHeaders);
+    var rows = exportData.monthlyComparison.map(function(row) {
+      return [row.category].concat(row.amounts.map(function(a) { return fmt(a); }));
+    });
+    if (exportData.monthlyTotals && exportData.monthlyTotals.length > 0) {
+      rows.push(['TOTAL'].concat(exportData.monthlyTotals.map(function(t) { return fmt(t); })));
+    }
+    return toCSV(headers, rows);
+  }
+
+  function buildRecurring() {
+    if (!exportData.recurring || exportData.recurring.length === 0) return null;
+    var headers = ['Name', 'Amount', 'Frequency', 'Category', 'Monthly Estimate'];
+    var rows = exportData.recurring.map(function(r) {
+      return [r.name, fmt(r.amount), r.frequency, r.category, fmt(r.monthlyEstimate)];
+    });
+    return toCSV(headers, rows);
+  }
+
+  function buildAnomalies() {
+    var sections = [];
+    if (exportData.categoryAnomalies && exportData.categoryAnomalies.length > 0) {
+      var headers1 = ['Type', 'Category', 'Current', 'Historical Avg', 'Multiplier'];
+      var rows1 = exportData.categoryAnomalies.map(function(a) {
+        return ['Category', a.category, fmt(a.current), fmt(a.historical), a.multiplier.toFixed(1) + 'x'];
+      });
+      sections.push(toCSV(headers1, rows1));
+    }
+    if (exportData.transactionAnomalies && exportData.transactionAnomalies.length > 0) {
+      var headers2 = ['Type', 'Name', 'Amount', 'Date', 'Category', 'Category Avg', 'Multiplier'];
+      var rows2 = exportData.transactionAnomalies.map(function(a) {
+        return ['Transaction', a.name, fmt(a.amount), a.date, a.category, fmt(a.categoryAvg), a.multiplier.toFixed(1) + 'x'];
+      });
+      sections.push(toCSV(headers2, rows2));
+    }
+    if (sections.length === 0) return null;
+    return sections.join('\n\n');
+  }
+
+  function buildAll() {
+    var sections = [];
+    var summary = buildSummary();
+    if (summary) sections.push('=== SUMMARY & CATEGORIES ===\n' + summary);
+
+    var merchants = buildMerchants();
+    if (merchants) sections.push('\n=== TOP MERCHANTS ===\n' + merchants);
+
+    var monthly = buildMonthly();
+    if (monthly) sections.push('\n=== MONTHLY COMPARISON ===\n' + monthly);
+
+    var recurring = buildRecurring();
+    if (recurring) sections.push('\n=== RECURRING CHARGES ===\n' + recurring);
+
+    var anomalies = buildAnomalies();
+    if (anomalies) sections.push('\n=== ANOMALIES ===\n' + anomalies);
+
+    if (exportData.savingsRateTrend && exportData.savingsRateTrend.length > 0) {
+      var sHeaders = ['Month', 'Income', 'Spending', 'Net', 'Savings Rate'];
+      var sRows = exportData.savingsRateTrend.map(function(s) {
+        return [s.month, fmt(s.income), fmt(s.spending), fmt(s.net), s.rate.toFixed(1) + '%'];
+      });
+      sections.push('\n=== SAVINGS RATE TREND ===\n' + toCSV(sHeaders, sRows));
+    }
+
+    return sections.join('\n');
+  }
+
+  window._insightsExportCSV = function(type) {
+    var csv, filename;
+    var period = exportData.periodLabel || '30d';
+    var date = new Date().toISOString().slice(0, 10);
+
+    switch (type) {
+      case 'summary':
+        csv = buildSummary();
+        filename = 'breadbox-insights-summary-' + period + '-' + date + '.csv';
+        break;
+      case 'merchants':
+        csv = buildMerchants();
+        filename = 'breadbox-merchants-' + period + '-' + date + '.csv';
+        break;
+      case 'monthly':
+        csv = buildMonthly();
+        filename = 'breadbox-monthly-comparison-' + date + '.csv';
+        break;
+      case 'recurring':
+        csv = buildRecurring();
+        filename = 'breadbox-recurring-charges-' + date + '.csv';
+        break;
+      case 'anomalies':
+        csv = buildAnomalies();
+        filename = 'breadbox-anomalies-' + period + '-' + date + '.csv';
+        break;
+      case 'all':
+        csv = buildAll();
+        filename = 'breadbox-insights-full-' + period + '-' + date + '.csv';
+        break;
+    }
+
+    if (!csv) {
+      // Show a brief toast-style notification if no data
+      var toast = document.createElement('div');
+      toast.className = 'fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-base-300 text-sm text-base-content shadow-lg';
+      toast.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>No data available for this export';
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2000);
+      setTimeout(function() { document.body.removeChild(toast); }, 2500);
+      return;
+    }
+
+    downloadCSV(filename, csv);
+
+    // Success toast
+    var toast = document.createElement('div');
+    toast.className = 'fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-success/10 border border-success/20 text-sm text-success shadow-lg';
+    toast.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>CSV downloaded';
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2000);
+    setTimeout(function() { document.body.removeChild(toast); }, 2500);
+  };
+})();
 </script>
 
 <!-- Print Styles: clean printable version of insights -->
