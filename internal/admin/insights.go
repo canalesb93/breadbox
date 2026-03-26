@@ -243,6 +243,8 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		var recurringMerchant string
 		var recurringCount int64
 		var recurringTotal float64
+		var sparklineSpending []float64
+		var sparklineIncome []float64
 
 		// 1. Category summary
 		wg.Add(1)
@@ -954,6 +956,40 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 				ORDER BY SUM(amount) DESC
 				LIMIT 1
 			`, chartStart).Scan(&recurringMerchant, &recurringCount, &recurringTotal)
+		}()
+
+		// 23. Sparkline data — last 7 days of daily spending and income for summary pills
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sparkStart := time.Now().AddDate(0, 0, -7)
+			rows, err := a.DB.Query(ctx, `
+				WITH days AS (
+					SELECT generate_series($1::date, CURRENT_DATE, '1 day')::date AS d
+				)
+				SELECT
+					days.d,
+					COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END), 0) AS spending,
+					COALESCE(SUM(CASE WHEN t.amount < 0 THEN -t.amount ELSE 0 END), 0) AS income
+				FROM days
+				LEFT JOIN transactions t ON t.date = days.d AND t.deleted_at IS NULL AND t.pending = false
+				GROUP BY days.d
+				ORDER BY days.d
+			`, sparkStart)
+			if err != nil {
+				a.Logger.Error("sparkline query", "error", err)
+				return
+			}
+			defer rows.Close()
+			for rows.Next() {
+				var d time.Time
+				var spending, income float64
+				if err := rows.Scan(&d, &spending, &income); err != nil {
+					continue
+				}
+				sparklineSpending = append(sparklineSpending, spending)
+				sparklineIncome = append(sparklineIncome, income)
+			}
 		}()
 
 		// Wait for all parallel queries to complete.
@@ -1820,6 +1856,33 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			exportJSON = template.JS(eb)
 		}
 
+		// ── Sparkline data for summary pills ──
+		// Compute net cash flow and savings rate sparklines from spending/income.
+		sparklineNet := make([]float64, len(sparklineSpending))
+		sparklineSavingsRate := make([]float64, len(sparklineSpending))
+		for i := range sparklineSpending {
+			if i < len(sparklineIncome) {
+				sparklineNet[i] = sparklineIncome[i] - sparklineSpending[i]
+				if sparklineIncome[i] > 0 {
+					sparklineSavingsRate[i] = ((sparklineIncome[i] - sparklineSpending[i]) / sparklineIncome[i]) * 100
+				}
+			}
+		}
+
+		var sparkSpendJSON, sparkIncomeJSON, sparkNetJSON, sparkSavingsJSON template.JS
+		if sb, err := json.Marshal(sparklineSpending); err == nil {
+			sparkSpendJSON = template.JS(sb)
+		}
+		if sb, err := json.Marshal(sparklineIncome); err == nil {
+			sparkIncomeJSON = template.JS(sb)
+		}
+		if sb, err := json.Marshal(sparklineNet); err == nil {
+			sparkNetJSON = template.JS(sb)
+		}
+		if sb, err := json.Marshal(sparklineSavingsRate); err == nil {
+			sparkSavingsJSON = template.JS(sb)
+		}
+
 		data := map[string]any{
 			"PageTitle":              "Insights",
 			"CurrentPage":            "insights",
@@ -1910,6 +1973,11 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			"BudgetOverCount":           budgetOverCount,
 			// CSV Export.
 			"ExportJSON":                exportJSON,
+			// Sparkline data for summary pills.
+			"SparkSpending":             sparkSpendJSON,
+			"SparkIncome":               sparkIncomeJSON,
+			"SparkNet":                  sparkNetJSON,
+			"SparkSavings":              sparkSavingsJSON,
 		}
 		tr.Render(w, r, "insights.html", data)
 	}

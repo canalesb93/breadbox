@@ -77,12 +77,15 @@
   </div>
 </div>
 
-<!-- Summary Pills (always visible) -->
+<!-- Summary Pills (always visible) with sparklines + count-up animation -->
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-6">
-  <div class="bb-card p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem]">
-    <div class="text-xs text-base-content/40 mb-1">Spending</div>
+  <div class="bb-card bb-summary-pill p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem] relative overflow-hidden group">
+    <div class="flex items-center justify-between">
+      <div class="text-xs text-base-content/40 mb-1">Spending</div>
+      <svg class="bb-sparkline" data-values="{{.SparkSpending}}" data-color="currentColor" viewBox="0 0 80 24" preserveAspectRatio="none"></svg>
+    </div>
     <div>
-      <div class="text-lg sm:text-xl font-semibold tabular-nums">{{formatBalance .TotalSpending}}</div>
+      <div class="text-lg sm:text-xl font-semibold tabular-nums" data-countup="{{printf "%.2f" .TotalSpending}}" data-prefix="$">{{formatBalance .TotalSpending}}</div>
       {{if .HasSpendingChange}}
       <div class="text-[0.65rem] font-medium mt-1 {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
         {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}% vs prev
@@ -92,31 +95,41 @@
       {{end}}
     </div>
   </div>
-  <div class="bb-card p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem]">
-    <div class="text-xs text-base-content/40 mb-1">Income</div>
+  <div class="bb-card bb-summary-pill p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem] relative overflow-hidden group">
+    <div class="flex items-center justify-between">
+      <div class="text-xs text-base-content/40 mb-1">Income</div>
+      <svg class="bb-sparkline" data-values="{{.SparkIncome}}" data-color="oklch(0.65 0.17 155)" viewBox="0 0 80 24" preserveAspectRatio="none"></svg>
+    </div>
     <div>
-      <div class="text-lg sm:text-xl font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</div>
+      <div class="text-lg sm:text-xl font-semibold tabular-nums text-success" data-countup="{{printf "%.2f" .TotalIncome}}" data-prefix="$">{{formatBalance .TotalIncome}}</div>
       <div class="text-[0.65rem] mt-1">&nbsp;</div>
     </div>
   </div>
   {{if .HasCashFlow}}
-  <div class="bb-card p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem]">
-    <div class="text-xs text-base-content/40 mb-1">Net Cash Flow</div>
+  <div class="bb-card bb-summary-pill p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem] relative overflow-hidden group">
+    <div class="flex items-center justify-between">
+      <div class="text-xs text-base-content/40 mb-1">Net Cash Flow</div>
+      <svg class="bb-sparkline" data-values="{{.SparkNet}}" data-color="{{if gt .CashFlowNet 0.0}}oklch(0.65 0.17 155){{else}}oklch(0.65 0.2 25){{end}}" viewBox="0 0 80 24" preserveAspectRatio="none"></svg>
+    </div>
     <div>
-      <div class="text-lg sm:text-xl font-semibold tabular-nums {{if gt .CashFlowNet 0.0}}text-success{{else if lt .CashFlowNet 0.0}}text-error{{end}}">
+      <div class="text-lg sm:text-xl font-semibold tabular-nums {{if gt .CashFlowNet 0.0}}text-success{{else if lt .CashFlowNet 0.0}}text-error{{end}}"
+        data-countup="{{printf "%.2f" (absf .CashFlowNet)}}" data-prefix="{{if gt .CashFlowNet 0.0}}+${{else if lt .CashFlowNet 0.0}}-${{else}}${{end}}">
         {{if gt .CashFlowNet 0.0}}+{{end}}{{if lt .CashFlowNet 0.0}}-{{end}}{{formatBalance .CashFlowNet}}
       </div>
       <div class="text-[0.65rem] mt-1">&nbsp;</div>
     </div>
   </div>
-  <div class="bb-card p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem]">
-    <div class="text-xs text-base-content/40 mb-1">Savings Rate</div>
+  <div class="bb-card bb-summary-pill p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem] relative overflow-hidden group">
+    <div class="flex items-center justify-between">
+      <div class="text-xs text-base-content/40 mb-1">Savings Rate</div>
+      <svg class="bb-sparkline" data-values="{{.SparkSavings}}" data-color="{{if gt .SavingsRate 0.0}}oklch(0.65 0.17 155){{else}}oklch(0.65 0.2 25){{end}}" viewBox="0 0 80 24" preserveAspectRatio="none"></svg>
+    </div>
     <div>
       {{if gt .TotalIncome 0.0}}
         {{if lt .SavingsRate -100.0}}
-        <div class="text-xl font-semibold tabular-nums text-error">< -100%</div>
+        <div class="text-xl font-semibold tabular-nums text-error" data-countup="100" data-prefix="< -" data-suffix="%" data-decimals="0">< -100%</div>
         {{else}}
-        <div class="text-xl font-semibold tabular-nums {{if gt .SavingsRate 0.0}}text-success{{else}}text-error{{end}}">{{printf "%.0f" .SavingsRate}}%</div>
+        <div class="text-xl font-semibold tabular-nums {{if gt .SavingsRate 0.0}}text-success{{else}}text-error{{end}}" data-countup="{{printf "%.0f" (absf .SavingsRate)}}" data-prefix="{{if lt .SavingsRate 0.0}}-{{end}}" data-suffix="%" data-decimals="0">{{printf "%.0f" .SavingsRate}}%</div>
         {{end}}
       {{else}}
       <div class="text-xl text-base-content/30">&mdash;</div>
@@ -1303,6 +1316,128 @@
 
 <!-- ECharts CDN (loaded only on Insights page) -->
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+<!-- Sparklines + Count-Up Animations -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // ── Sparkline Renderer ──
+  // Draws a tiny polyline + gradient fill in each .bb-sparkline SVG
+  document.querySelectorAll('.bb-sparkline').forEach(function(svg) {
+    var raw = svg.getAttribute('data-values');
+    if (!raw) return;
+    try {
+      var values = JSON.parse(raw);
+      if (!values || !values.length || values.every(function(v) { return v === 0; })) return;
+    } catch(e) { return; }
+
+    var vals = JSON.parse(raw);
+    var color = svg.getAttribute('data-color') || 'currentColor';
+    var w = 80, h = 24, pad = 2;
+    var min = Math.min.apply(null, vals);
+    var max = Math.max.apply(null, vals);
+    var range = max - min || 1;
+
+    var points = vals.map(function(v, i) {
+      var x = pad + (i / (vals.length - 1)) * (w - pad * 2);
+      var y = pad + (1 - (v - min) / range) * (h - pad * 2);
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+
+    // Gradient fill area
+    var gradId = 'sg' + Math.random().toString(36).substr(2, 6);
+    var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    var grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+    grad.setAttribute('id', gradId);
+    grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
+    grad.setAttribute('x2', '0'); grad.setAttribute('y2', '1');
+    var stop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop1.setAttribute('offset', '0%');
+    stop1.setAttribute('stop-color', color);
+    stop1.setAttribute('stop-opacity', '0.15');
+    var stop2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop2.setAttribute('offset', '100%');
+    stop2.setAttribute('stop-color', color);
+    stop2.setAttribute('stop-opacity', '0.02');
+    grad.appendChild(stop1);
+    grad.appendChild(stop2);
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+
+    // Fill polygon (area under curve)
+    var fillPoints = points.join(' ') + ' ' + (w - pad).toFixed(1) + ',' + (h - pad).toFixed(1) + ' ' + pad.toFixed(1) + ',' + (h - pad).toFixed(1);
+    var polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    polygon.setAttribute('points', fillPoints);
+    polygon.setAttribute('fill', 'url(#' + gradId + ')');
+    polygon.setAttribute('class', 'bb-sparkline-area');
+    svg.appendChild(polygon);
+
+    // Polyline (the sparkline itself)
+    var polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    polyline.setAttribute('points', points.join(' '));
+    polyline.setAttribute('fill', 'none');
+    polyline.setAttribute('stroke', color);
+    polyline.setAttribute('stroke-width', '1.5');
+    polyline.setAttribute('stroke-linecap', 'round');
+    polyline.setAttribute('stroke-linejoin', 'round');
+    polyline.setAttribute('class', 'bb-sparkline-line');
+    svg.appendChild(polyline);
+
+    // End dot
+    var lastPt = points[points.length - 1].split(',');
+    var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('cx', lastPt[0]);
+    dot.setAttribute('cy', lastPt[1]);
+    dot.setAttribute('r', '2');
+    dot.setAttribute('fill', color);
+    dot.setAttribute('class', 'bb-sparkline-dot');
+    svg.appendChild(dot);
+
+    svg.style.opacity = '1';
+  });
+
+  // ── Count-Up Animation ──
+  // Animates numbers from 0 to their final value using easeOutExpo
+  var countEls = document.querySelectorAll('[data-countup]');
+  if (!countEls.length) return;
+
+  function easeOutExpo(t) {
+    return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+  }
+
+  function formatNum(val, decimals, prefix, suffix) {
+    prefix = prefix || '';
+    suffix = suffix || '';
+    var parts = val.toFixed(decimals).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return prefix + parts.join('.') + suffix;
+  }
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (!entry.isIntersecting) return;
+      var el = entry.target;
+      observer.unobserve(el);
+
+      var target = parseFloat(el.getAttribute('data-countup'));
+      var prefix = el.getAttribute('data-prefix') || '$';
+      var suffix = el.getAttribute('data-suffix') || '';
+      var decimals = parseInt(el.getAttribute('data-decimals') || '2', 10);
+      var duration = 800;
+      var start = performance.now();
+
+      function tick(now) {
+        var t = Math.min((now - start) / duration, 1);
+        var val = target * easeOutExpo(t);
+        el.textContent = formatNum(val, decimals, prefix, suffix);
+        if (t < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }, { threshold: 0.3 });
+
+  countEls.forEach(function(el) { observer.observe(el); });
+});
+</script>
 
 <!-- ECharts Initialization -->
 <script>
