@@ -1687,6 +1687,207 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		}
 		hasBudgetTargets = len(budgetTargets) > 0
 
+		// ── Financial Health Score (composite 0-100) ──
+		// Five dimensions, each scored 0-20 points:
+		//   1. Savings Rate: higher savings = higher score
+		//   2. Budget Adherence: % of categories on-track
+		//   3. Spending Trend: spending down vs previous period
+		//   4. Cash Flow: positive net = good, negative = bad
+		//   5. Spending Pace: on-track for month vs overshooting
+		type HealthDimension struct {
+			Name        string
+			Score       int
+			MaxScore    int
+			Description string
+			Icon        string
+			Color       string
+		}
+
+		var healthScore int
+		var healthDimensions []HealthDimension
+		var hasHealthScore bool
+
+		// Only compute if we have meaningful data.
+		if totalSpending > 0 || totalIncome > 0 {
+			hasHealthScore = true
+
+			// Dimension 1: Savings Rate (0-20)
+			savingsScore := 0
+			savingsDesc := "No income data"
+			if totalIncome > 0 {
+				sr := savingsRate
+				switch {
+				case sr >= 30:
+					savingsScore = 20
+					savingsDesc = "Excellent savings rate"
+				case sr >= 20:
+					savingsScore = 17
+					savingsDesc = "Strong savings rate"
+				case sr >= 10:
+					savingsScore = 14
+					savingsDesc = "Good savings rate"
+				case sr >= 0:
+					savingsScore = 10
+					savingsDesc = "Break-even or minimal savings"
+				case sr >= -20:
+					savingsScore = 6
+					savingsDesc = "Spending slightly exceeds income"
+				case sr >= -50:
+					savingsScore = 3
+					savingsDesc = "Spending significantly exceeds income"
+				default:
+					savingsScore = 0
+					savingsDesc = "Spending far exceeds income"
+				}
+			}
+			healthDimensions = append(healthDimensions, HealthDimension{
+				Name: "Savings Rate", Score: savingsScore, MaxScore: 20,
+				Description: savingsDesc, Icon: "piggy-bank", Color: "oklch(0.65 0.17 155)",
+			})
+
+			// Dimension 2: Budget Adherence (0-20)
+			budgetScore := 10 // Default if no budget data
+			budgetDesc := "No budget data yet"
+			if len(budgetTargets) > 0 {
+				total := budgetOnTrackCount + budgetOverCount
+				if total > 0 {
+					onTrackRatio := float64(budgetOnTrackCount) / float64(total)
+					budgetScore = int(math.Round(onTrackRatio * 20))
+					switch {
+					case onTrackRatio >= 0.8:
+						budgetDesc = fmt.Sprintf("%d of %d categories on track", budgetOnTrackCount, total)
+					case onTrackRatio >= 0.5:
+						budgetDesc = fmt.Sprintf("%d of %d categories over budget", budgetOverCount, total)
+					default:
+						budgetDesc = fmt.Sprintf("Most categories (%d/%d) over budget", budgetOverCount, total)
+					}
+				}
+			}
+			healthDimensions = append(healthDimensions, HealthDimension{
+				Name: "Budget Adherence", Score: budgetScore, MaxScore: 20,
+				Description: budgetDesc, Icon: "target", Color: "oklch(0.62 0.15 250)",
+			})
+
+			// Dimension 3: Spending Trend (0-20)
+			trendScore := 10 // Default if no comparison data
+			trendDesc := "Not enough history"
+			if hasSpendingChange {
+				pct := spendingChangePercent
+				switch {
+				case pct <= -20:
+					trendScore = 20
+					trendDesc = fmt.Sprintf("Spending down %.0f%% vs previous period", math.Abs(pct))
+				case pct <= -10:
+					trendScore = 17
+					trendDesc = fmt.Sprintf("Spending down %.0f%%", math.Abs(pct))
+				case pct <= -2:
+					trendScore = 14
+					trendDesc = fmt.Sprintf("Spending slightly down %.0f%%", math.Abs(pct))
+				case pct <= 2:
+					trendScore = 12
+					trendDesc = "Spending roughly flat"
+				case pct <= 10:
+					trendScore = 8
+					trendDesc = fmt.Sprintf("Spending up %.0f%%", pct)
+				case pct <= 25:
+					trendScore = 4
+					trendDesc = fmt.Sprintf("Spending up %.0f%%", pct)
+				default:
+					trendScore = 0
+					trendDesc = fmt.Sprintf("Spending up %.0f%% vs previous period", pct)
+				}
+			}
+			healthDimensions = append(healthDimensions, HealthDimension{
+				Name: "Spending Trend", Score: trendScore, MaxScore: 20,
+				Description: trendDesc, Icon: "trending-down", Color: "oklch(0.64 0.16 160)",
+			})
+
+			// Dimension 4: Cash Flow (0-20)
+			cashFlowScore := 10
+			cashFlowDesc := "No cash flow data"
+			if hasCashFlow && totalIncome > 0 {
+				ratio := cashFlowNet / totalIncome
+				switch {
+				case ratio >= 0.3:
+					cashFlowScore = 20
+					cashFlowDesc = "Strong positive cash flow"
+				case ratio >= 0.1:
+					cashFlowScore = 16
+					cashFlowDesc = "Positive cash flow"
+				case ratio >= 0:
+					cashFlowScore = 12
+					cashFlowDesc = "Near break-even"
+				case ratio >= -0.2:
+					cashFlowScore = 6
+					cashFlowDesc = "Negative cash flow"
+				default:
+					cashFlowScore = 0
+					cashFlowDesc = "Significant negative cash flow"
+				}
+			}
+			healthDimensions = append(healthDimensions, HealthDimension{
+				Name: "Cash Flow", Score: cashFlowScore, MaxScore: 20,
+				Description: cashFlowDesc, Icon: "wallet", Color: "oklch(0.66 0.14 35)",
+			})
+
+			// Dimension 5: Spending Pace (0-20)
+			paceScore := 10 // Default
+			paceDesc := "No pace data"
+			if hasPaceData && lastMonthSpending > 0 {
+				switch paceVsLastMonth {
+				case "behind":
+					paceScore = 18
+					paceDesc = fmt.Sprintf("Spending %.0f%% less than last month's pace", math.Abs(pacePercent))
+				case "same":
+					paceScore = 12
+					paceDesc = "On pace with last month"
+				case "ahead":
+					if pacePercent <= 10 {
+						paceScore = 8
+						paceDesc = fmt.Sprintf("Slightly ahead of last month (+%.0f%%)", pacePercent)
+					} else if pacePercent <= 25 {
+						paceScore = 4
+						paceDesc = fmt.Sprintf("Spending faster than last month (+%.0f%%)", pacePercent)
+					} else {
+						paceScore = 0
+						paceDesc = fmt.Sprintf("Spending much faster than last month (+%.0f%%)", pacePercent)
+					}
+				}
+			}
+			healthDimensions = append(healthDimensions, HealthDimension{
+				Name: "Monthly Pace", Score: paceScore, MaxScore: 20,
+				Description: paceDesc, Icon: "gauge", Color: "oklch(0.60 0.16 300)",
+			})
+
+			// Sum up total health score
+			for _, d := range healthDimensions {
+				healthScore += d.Score
+			}
+		}
+
+		// Health score label and color
+		healthLabel := "N/A"
+		healthColorClass := "text-base-content/50"
+		if hasHealthScore {
+			switch {
+			case healthScore >= 80:
+				healthLabel = "Excellent"
+				healthColorClass = "text-success"
+			case healthScore >= 65:
+				healthLabel = "Good"
+				healthColorClass = "text-success/70"
+			case healthScore >= 50:
+				healthLabel = "Fair"
+				healthColorClass = "text-warning"
+			case healthScore >= 35:
+				healthLabel = "Needs Attention"
+				healthColorClass = "text-warning/70"
+			default:
+				healthLabel = "Critical"
+				healthColorClass = "text-error"
+			}
+		}
+
 		// ── CSV Export data (JSON blob for client-side CSV generation) ──
 		type csvExportData struct {
 			PeriodLabel string `json:"periodLabel"`
@@ -1978,6 +2179,12 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			"SparkIncome":               sparkIncomeJSON,
 			"SparkNet":                  sparkNetJSON,
 			"SparkSavings":              sparkSavingsJSON,
+			// Financial health score.
+			"HasHealthScore":            hasHealthScore,
+			"HealthScore":               healthScore,
+			"HealthLabel":               healthLabel,
+			"HealthColorClass":          healthColorClass,
+			"HealthDimensions":          healthDimensions,
 		}
 		tr.Render(w, r, "insights.html", data)
 	}

@@ -609,6 +609,12 @@
     }
   }
 
+  /* ── Financial Health Score ring ── */
+  .bb-health-ring {
+    stroke: currentColor;
+    transition: stroke-dasharray 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
   /* ── Button polish ── */
   .btn {
     transition: background-color 0.15s ease, color 0.15s ease,

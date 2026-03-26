@@ -102,6 +102,9 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return a
 			},
+			"itof": func(a int) float64 {
+				return float64(a)
+			},
 			"syncDuration": func(start, end time.Time) string {
 				d := end.Sub(start)
 				if d < time.Second {
