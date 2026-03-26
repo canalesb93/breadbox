@@ -629,6 +629,109 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			lowSpendDayAmt = 0
 		}
 
+		// ── Recurring / Subscription Detection ──
+		// Find merchants with 2+ transactions at consistent amounts over 90 days.
+		type RecurringCharge struct {
+			Name           string
+			Category       string
+			Amount         float64
+			Frequency      string
+			TxCount        int
+			TotalSpent     float64
+			LastChargeDate string
+			MonthlyEst     float64
+		}
+		var recurringCharges []RecurringCharge
+		var totalRecurringMonthly float64
+		var hasRecurringData bool
+
+		recurringLookback := time.Now().AddDate(0, 0, -90)
+		recurringRows, err := a.DB.Query(ctx, `
+			WITH merchant_stats AS (
+				SELECT
+					COALESCE(NULLIF(merchant_name, ''), name) AS merchant,
+					MODE() WITHIN GROUP (ORDER BY amount) AS typical_amount,
+					MODE() WITHIN GROUP (ORDER BY COALESCE(category_primary, '')) AS top_category,
+					COUNT(*) AS tx_count,
+					SUM(amount) AS total_spent,
+					MAX(date) AS last_date,
+					MIN(date) AS first_date,
+					CASE WHEN AVG(amount) > 0 THEN COALESCE(STDDEV(amount), 0) / AVG(amount) ELSE 1 END AS cv
+				FROM transactions
+				WHERE deleted_at IS NULL
+					AND date >= $1
+					AND amount > 0
+					AND pending = false
+				GROUP BY COALESCE(NULLIF(merchant_name, ''), name)
+				HAVING COUNT(*) >= 2
+			)
+			SELECT
+				merchant,
+				typical_amount,
+				top_category,
+				tx_count,
+				total_spent,
+				TO_CHAR(last_date, 'Mon DD') AS last_charge,
+				(last_date - first_date)::float / NULLIF(tx_count - 1, 0) AS avg_days_between,
+				cv
+			FROM merchant_stats
+			WHERE cv < 0.3
+				AND typical_amount >= 3
+			ORDER BY total_spent DESC
+			LIMIT 12
+		`, recurringLookback)
+		if err != nil {
+			a.Logger.Error("recurring charges query", "error", err)
+		} else {
+			defer recurringRows.Close()
+			for recurringRows.Next() {
+				var rc RecurringCharge
+				var cat *string
+				var avgDaysBetween *float64
+				var cv float64
+				if err := recurringRows.Scan(&rc.Name, &rc.Amount, &cat, &rc.TxCount, &rc.TotalSpent, &rc.LastChargeDate, &avgDaysBetween, &cv); err != nil {
+					a.Logger.Error("recurring charges scan", "error", err)
+					continue
+				}
+				if cat != nil && *cat != "" {
+					rc.Category = *cat
+				}
+				if avgDaysBetween != nil && *avgDaysBetween > 0 {
+					days := *avgDaysBetween
+					switch {
+					case days >= 25 && days <= 35:
+						rc.Frequency = "monthly"
+						rc.MonthlyEst = rc.Amount
+					case days >= 12 && days <= 18:
+						rc.Frequency = "biweekly"
+						rc.MonthlyEst = rc.Amount * 2
+					case days >= 5 && days <= 9:
+						rc.Frequency = "weekly"
+						rc.MonthlyEst = rc.Amount * 4.33
+					case days >= 55 && days <= 65:
+						rc.Frequency = "bimonthly"
+						rc.MonthlyEst = rc.Amount / 2
+					case days >= 80 && days <= 100:
+						rc.Frequency = "quarterly"
+						rc.MonthlyEst = rc.Amount / 3
+					case days >= 350 && days <= 380:
+						rc.Frequency = "yearly"
+						rc.MonthlyEst = rc.Amount / 12
+					default:
+						rc.Frequency = "recurring"
+						rc.MonthlyEst = rc.TotalSpent / 3
+					}
+				} else {
+					rc.Frequency = "recurring"
+					rc.MonthlyEst = rc.TotalSpent / 3
+				}
+				totalRecurringMonthly += rc.MonthlyEst
+				recurringCharges = append(recurringCharges, rc)
+			}
+			recurringRows.Close()
+			hasRecurringData = len(recurringCharges) > 0
+		}
+
 		data := map[string]any{
 			"PageTitle":              "Insights",
 			"CurrentPage":            "insights",
@@ -681,6 +784,10 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			"LowSpendDay":            lowSpendDay,
 			"HighSpendDayAmt":        highSpendDayAmt,
 			"LowSpendDayAmt":         lowSpendDayAmt,
+			// Recurring charges.
+			"RecurringCharges":       recurringCharges,
+			"HasRecurringData":       hasRecurringData,
+			"TotalRecurringMonthly":  totalRecurringMonthly,
 		}
 		tr.Render(w, r, "insights.html", data)
 	}

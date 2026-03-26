@@ -492,6 +492,89 @@
   {{end}}
 </div>
 
+<!-- Recurring & Subscriptions -->
+{{if .HasRecurringData}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-warning/8">
+        <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-warning"></i>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-base-content/70">Recurring & Subscriptions</h2>
+        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Detected from 90-day transaction patterns</p>
+      </div>
+    </div>
+    <div class="text-right">
+      <div class="text-xs text-base-content/35">Est. monthly</div>
+      <div class="text-lg font-semibold tabular-nums text-base-content/80">{{formatBalance .TotalRecurringMonthly}}</div>
+    </div>
+  </div>
+
+  <!-- Recurring charges grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+    {{range .RecurringCharges}}
+    <div class="group flex items-center gap-3 p-3 rounded-xl border border-base-200/60 bg-base-200/10 hover:bg-base-200/30 hover:border-base-300/60 transition-all duration-200">
+      <!-- Frequency icon -->
+      <div class="flex items-center justify-center w-9 h-9 rounded-lg shrink-0
+        {{if eq .Frequency "monthly"}}bg-primary/8
+        {{else if eq .Frequency "weekly"}}bg-warning/8
+        {{else if eq .Frequency "biweekly"}}bg-info/8
+        {{else}}bg-base-200/60{{end}}">
+        <i data-lucide="{{if eq .Frequency "monthly"}}calendar{{else if eq .Frequency "weekly"}}calendar-clock{{else if eq .Frequency "biweekly"}}calendar-range{{else if eq .Frequency "quarterly"}}calendar-check{{else if eq .Frequency "yearly"}}calendar-heart{{else}}repeat{{end}}"
+          class="w-4 h-4
+          {{if eq .Frequency "monthly"}}text-primary/60
+          {{else if eq .Frequency "weekly"}}text-warning/60
+          {{else if eq .Frequency "biweekly"}}text-info/60
+          {{else}}text-base-content/35{{end}}"></i>
+      </div>
+      <!-- Details -->
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-sm font-medium text-base-content/80 truncate group-hover:text-base-content transition-colors">{{.Name}}</span>
+          <span class="text-sm font-semibold tabular-nums text-base-content/80 shrink-0">{{formatAmount .Amount}}</span>
+        </div>
+        <div class="flex items-center justify-between gap-2 mt-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full
+              {{if eq .Frequency "monthly"}}bg-primary/8 text-primary/70
+              {{else if eq .Frequency "weekly"}}bg-warning/8 text-warning/70
+              {{else if eq .Frequency "biweekly"}}bg-info/8 text-info/70
+              {{else}}bg-base-200/80 text-base-content/40{{end}}">{{.Frequency}}</span>
+            {{if .Category}}<span class="text-[0.6rem] text-base-content/25 truncate">{{.Category}}</span>{{end}}
+          </div>
+          <span class="text-[0.6rem] text-base-content/30">{{.TxCount}}x &middot; last {{.LastChargeDate}}</span>
+        </div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+
+  <!-- Summary footer -->
+  <div class="mt-4 pt-3 border-t border-base-200/60 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-primary/40"></span>
+        <span class="text-[0.6rem] text-base-content/30">monthly</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-warning/40"></span>
+        <span class="text-[0.6rem] text-base-content/30">weekly</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-info/40"></span>
+        <span class="text-[0.6rem] text-base-content/30">biweekly</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-base-content/20"></span>
+        <span class="text-[0.6rem] text-base-content/30">other</span>
+      </div>
+    </div>
+    <span class="text-[0.6rem] text-base-content/25">{{len .RecurringCharges}} recurring charges detected</span>
+  </div>
+</div>
+{{end}}
+
 <!-- Smart Spending Insights -->
 {{if .SpendingInsights}}
 <div class="bb-card mb-6 p-5 bb-stagger">
