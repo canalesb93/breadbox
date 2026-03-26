@@ -7,12 +7,72 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
 )
+
+// paymentProcessorPatterns contains ILIKE patterns for merchants that are
+// credit card companies, banks, or payment processors — not real merchants.
+// These are filtered out of Top Merchants and related merchant rankings to
+// avoid showing "American Express" or "Chase" as top spending destinations.
+var paymentProcessorPatterns = []string{
+	// Credit card issuers / banks
+	"american express%", "amex%",
+	"chase%", "jpmorgan%",
+	"capital one%", "capitalone%",
+	"citibank%", "citi card%", "citi %",
+	"discover%",
+	"bank of america%", "bofa%",
+	"wells fargo%",
+	"us bank%", "usbank%",
+	"barclays%",
+	"synchrony%",
+	"td bank%",
+	"pnc bank%",
+	"truist%",
+	"ally bank%",
+	"marcus%goldman%",
+	// Payment processors / transfers
+	"paypal%",
+	"venmo%",
+	"zelle%",
+	"cash app%", "square cash%",
+	"apple cash%",
+	// Credit card payment labels
+	"%payment thank you%",
+	"%autopay%",
+	"%credit card payment%",
+	"%card payment%",
+	"%balance payment%",
+	"%minimum payment%",
+	// Transfers
+	"%transfer to%",
+	"%transfer from%",
+	"%ach transfer%",
+	"%wire transfer%",
+	"%online transfer%",
+}
+
+// buildPaymentProcessorExclusion returns a SQL WHERE clause fragment that
+// excludes payment processors from merchant queries. The merchantExpr should
+// be the SQL expression for the merchant name (e.g., "COALESCE(NULLIF(merchant_name, ''), name)").
+// Returns the clause fragment and the parameter values to append.
+func buildPaymentProcessorExclusion(merchantExpr string, startParam int) (string, []any) {
+	if len(paymentProcessorPatterns) == 0 {
+		return "", nil
+	}
+	var conditions []string
+	var params []any
+	for i, pattern := range paymentProcessorPatterns {
+		conditions = append(conditions, fmt.Sprintf("LOWER(%s) NOT LIKE $%d", merchantExpr, startParam+i))
+		params = append(params, pattern)
+	}
+	return " AND " + strings.Join(conditions, " AND "), params
+}
 
 // InsightsHandler serves GET /admin/insights — the spending insights page.
 func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.HandlerFunc {
@@ -262,10 +322,12 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			categorySummary = result
 		}()
 
-		// 2. Category drilldown
+		// 2. Category drilldown (excludes payment processors)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			drillExcl, drillExclParams := buildPaymentProcessorExclusion("COALESCE(NULLIF(t.merchant_name, ''), t.name)", 2)
+			drillQueryParams := append([]any{chartStart}, drillExclParams...)
 			rows, err := a.DB.Query(ctx, `
 				WITH ranked AS (
 					SELECT
@@ -277,13 +339,14 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 					FROM transactions t
 					LEFT JOIN categories cat ON t.category_id = cat.id
 					WHERE t.deleted_at IS NULL AND t.date >= $1 AND t.amount > 0 AND t.pending = false
+					`+drillExcl+`
 					GROUP BY COALESCE(cat.display_name, t.category_primary, 'Uncategorized'), COALESCE(NULLIF(t.merchant_name, ''), t.name)
 				)
 				SELECT cat, merchant, total, tx_count
 				FROM ranked
 				WHERE rn <= 8
 				ORDER BY cat, total DESC
-			`, chartStart)
+			`, drillQueryParams...)
 			if err != nil {
 				a.Logger.Error("category drilldown query", "error", err)
 				return
@@ -432,10 +495,12 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			lastMonthPaceSummary = result
 		}()
 
-		// 11. Top merchants
+		// 11. Top merchants (excludes payment processors & credit card companies)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			merchantExcl, exclParams := buildPaymentProcessorExclusion("COALESCE(NULLIF(merchant_name, ''), name)", 2)
+			queryParams := append([]any{chartStart}, exclParams...)
 			rows, err := a.DB.Query(ctx, `
 				SELECT
 					COALESCE(NULLIF(merchant_name, ''), name) AS merchant,
@@ -445,10 +510,11 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 					MODE() WITHIN GROUP (ORDER BY COALESCE(category_primary, '')) AS top_category
 				FROM transactions
 				WHERE deleted_at IS NULL AND date >= $1 AND amount > 0 AND pending = false
+				`+merchantExcl+`
 				GROUP BY COALESCE(NULLIF(merchant_name, ''), name)
 				ORDER BY SUM(amount) DESC
 				LIMIT 10
-			`, chartStart)
+			`, queryParams...)
 			if err != nil {
 				a.Logger.Error("top merchants query", "error", err)
 				return
@@ -514,10 +580,12 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			}
 		}()
 
-		// 13. Recurring charges
+		// 13. Recurring charges (excludes payment processors)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			recurExcl, recurExclParams := buildPaymentProcessorExclusion("COALESCE(NULLIF(merchant_name, ''), name)", 2)
+			recurQueryParams := append([]any{recurringLookback}, recurExclParams...)
 			rows, err := a.DB.Query(ctx, `
 				WITH merchant_stats AS (
 					SELECT
@@ -534,6 +602,7 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 						AND date >= $1
 						AND amount > 0
 						AND pending = false
+						`+recurExcl+`
 					GROUP BY COALESCE(NULLIF(merchant_name, ''), name)
 					HAVING COUNT(*) >= 2
 				)
@@ -551,7 +620,7 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 					AND typical_amount >= 3
 				ORDER BY total_spent DESC
 				LIMIT 12
-			`, recurringLookback)
+			`, recurQueryParams...)
 			if err != nil {
 				a.Logger.Error("recurring charges query", "error", err)
 				return
@@ -943,19 +1012,22 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			`, chartStart).Scan(&largestTxName, &largestTxAmount, &largestTxDate)
 		}()
 
-		// 22. Recurring merchant insight
+		// 22. Recurring merchant insight (excludes payment processors)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			rmExcl, rmExclParams := buildPaymentProcessorExclusion("COALESCE(merchant_name, name)", 2)
+			rmQueryParams := append([]any{chartStart}, rmExclParams...)
 			_ = a.DB.QueryRow(ctx, `
 				SELECT COALESCE(merchant_name, name), COUNT(*), SUM(amount)
 				FROM transactions
 				WHERE deleted_at IS NULL AND date >= $1 AND amount > 0 AND pending = false
+				`+rmExcl+`
 				GROUP BY COALESCE(merchant_name, name)
 				HAVING COUNT(*) >= 3
 				ORDER BY SUM(amount) DESC
 				LIMIT 1
-			`, chartStart).Scan(&recurringMerchant, &recurringCount, &recurringTotal)
+			`, rmQueryParams...).Scan(&recurringMerchant, &recurringCount, &recurringTotal)
 		}()
 
 		// 23. Sparkline data — last 7 days of daily spending and income for summary pills
