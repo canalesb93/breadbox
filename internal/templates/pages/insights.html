@@ -1,5 +1,9 @@
 {{define "content"}}
 
+<!-- Insights Page with Tabbed Layout -->
+<div x-data="{ tab: (new URLSearchParams(window.location.search).get('tab')) || 'overview' }"
+     x-init="$watch('tab', v => { const u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); })">
+
 <!-- Insights Page Header with Date Range Picker -->
 <div class="bb-page-header">
   <div>
@@ -7,14 +11,14 @@
     <p class="text-sm text-base-content/50 mt-0.5">Spending trends, pace, and cash flow analysis</p>
   </div>
   <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5">
-    <a href="/insights?days=7" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 7}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">7d</a>
-    <a href="/insights?days=30" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 30}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">30d</a>
-    <a href="/insights?days=90" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 90}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">90d</a>
-    <a href="/insights?days=365" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 365}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">12m</a>
+    <a :href="'/insights?days=7&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 7}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">7d</a>
+    <a :href="'/insights?days=30&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 30}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">30d</a>
+    <a :href="'/insights?days=90&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 90}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">90d</a>
+    <a :href="'/insights?days=365&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 365}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">12m</a>
   </div>
 </div>
 
-<!-- Summary Pills -->
+<!-- Summary Pills (always visible) -->
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
   <div class="bb-card p-4">
     <div class="text-xs text-base-content/40 mb-1">Spending</div>
@@ -46,6 +50,30 @@
   </div>
   {{end}}
 </div>
+
+<!-- Tab Navigation -->
+<div class="flex items-center gap-1 border-b border-base-200/80 mb-6">
+  <button @click="tab = 'overview'" :class="tab === 'overview' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
+    class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer">
+    <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
+    Overview
+  </button>
+  <button @click="tab = 'analysis'" :class="tab === 'analysis' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
+    class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer">
+    <i data-lucide="search" class="w-3.5 h-3.5"></i>
+    Analysis
+  </button>
+  <button @click="tab = 'trends'" :class="tab === 'trends' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
+    class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer">
+    <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+    Trends
+  </button>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- TAB: Overview                                  -->
+<!-- ═══════════════════════════════════════════════ -->
+<div x-show="tab === 'overview'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
 
 <!-- Monthly Spending Pace -->
 {{if .HasPaceData}}
@@ -371,6 +399,14 @@
     {{end}}
   </div>
 </div>
+
+
+</div><!-- /tab: overview -->
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- TAB: Analysis                                  -->
+<!-- ═══════════════════════════════════════════════ -->
+<div x-show="tab === 'analysis'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
 
 <!-- Merchant Analysis + Day-of-Week Heatmap -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 bb-stagger">
@@ -759,6 +795,14 @@
 </div>
 {{end}}
 
+
+</div><!-- /tab: analysis -->
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- TAB: Trends                                    -->
+<!-- ═══════════════════════════════════════════════ -->
+<div x-show="tab === 'trends'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
+
 <!-- Monthly Category Comparison -->
 {{if .HasMonthlyComp}}
 <div class="bb-card mb-6 p-5 bb-stagger">
@@ -965,6 +1009,11 @@
 </div>
 {{end}}
 
+
+</div><!-- /tab: trends -->
+
+</div><!-- /alpine x-data tabs -->
+
 <!-- Chart.js Initialization -->
 {{if .DailyLabels}}
 <script>
@@ -1110,132 +1159,158 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 {{end}}
 
-<!-- Velocity Chart Script -->
+<!-- Velocity Chart Script (deferred: initializes when Trends tab is shown) -->
 {{if .HasVelocityData}}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  var gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
-  var textColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
+(function() {
+  var velocityInitialized = false;
+  var velocityData = {{.VelocityJSON}};
 
-  var velocityEl = document.getElementById('velocityChart');
-  if (!velocityEl) return;
+  function initVelocityChart() {
+    if (velocityInitialized) return;
+    var velocityEl = document.getElementById('velocityChart');
+    if (!velocityEl || velocityEl.offsetParent === null) return;
+    velocityInitialized = true;
 
-  var vData = {{.VelocityJSON}};
-  var numMonths = vData.datasets.length;
+    var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+    var textColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
 
-  // Color palette: older months are more muted, current month is vivid.
-  var lineColors = isDark
-    ? ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.15)', 'oklch(0.70 0.15 250)']
-    : ['rgba(0,0,0,0.06)', 'rgba(0,0,0,0.12)', 'oklch(0.55 0.15 250)'];
-  var fillColors = isDark
-    ? ['transparent', 'transparent', 'oklch(0.70 0.15 250 / 0.08)']
-    : ['transparent', 'transparent', 'oklch(0.55 0.15 250 / 0.06)'];
-  var borderWidths = [1.5, 1.5, 2.5];
-  var borderDashes = [[4, 3], [4, 3], []];
+    var vData = velocityData;
+    var numMonths = vData.datasets.length;
 
-  var datasets = vData.datasets.map(function(ds, i) {
-    var colorIdx = numMonths - 1 - (numMonths - 1 - i);
-    // Filter out trailing zeros for current month (incomplete).
-    var data = ds.data.slice();
-    if (i === numMonths - 1) {
-      // Find last non-zero value and truncate.
-      var lastNonZero = data.length - 1;
-      while (lastNonZero > 0 && data[lastNonZero] === 0) lastNonZero--;
-      data = data.slice(0, lastNonZero + 1);
-    }
-    return {
-      label: ds.label,
-      data: data,
-      borderColor: lineColors[i] || lineColors[lineColors.length - 1],
-      backgroundColor: fillColors[i] || 'transparent',
-      fill: i === numMonths - 1,
-      borderWidth: borderWidths[i] || 2,
-      borderDash: borderDashes[i] || [],
-      pointRadius: 0,
-      pointHoverRadius: i === numMonths - 1 ? 4 : 2,
-      pointHoverBackgroundColor: lineColors[i] || lineColors[lineColors.length - 1],
-      tension: 0.3,
-      order: numMonths - i,
+    var lineColors = isDark
+      ? ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.15)', 'oklch(0.70 0.15 250)']
+      : ['rgba(0,0,0,0.06)', 'rgba(0,0,0,0.12)', 'oklch(0.55 0.15 250)'];
+    var fillColors = isDark
+      ? ['transparent', 'transparent', 'oklch(0.70 0.15 250 / 0.08)']
+      : ['transparent', 'transparent', 'oklch(0.55 0.15 250 / 0.06)'];
+    var borderWidths = [1.5, 1.5, 2.5];
+    var borderDashes = [[4, 3], [4, 3], []];
+
+    var datasets = vData.datasets.map(function(ds, i) {
+      var data = ds.data.slice();
+      if (i === numMonths - 1) {
+        var lastNonZero = data.length - 1;
+        while (lastNonZero > 0 && data[lastNonZero] === 0) lastNonZero--;
+        data = data.slice(0, lastNonZero + 1);
+      }
+      return {
+        label: ds.label,
+        data: data,
+        borderColor: lineColors[i] || lineColors[lineColors.length - 1],
+        backgroundColor: fillColors[i] || 'transparent',
+        fill: i === numMonths - 1,
+        borderWidth: borderWidths[i] || 2,
+        borderDash: borderDashes[i] || [],
+        pointRadius: 0,
+        pointHoverRadius: i === numMonths - 1 ? 4 : 2,
+        pointHoverBackgroundColor: lineColors[i] || lineColors[lineColors.length - 1],
+        tension: 0.3,
+        order: numMonths - i,
+      };
+    });
+
+    var tooltipStyle = {
+      backgroundColor: isDark ? 'hsl(0 0% 12%)' : 'hsl(0 0% 100%)',
+      titleColor: isDark ? 'hsl(0 0% 93%)' : 'hsl(0 0% 9%)',
+      bodyColor: isDark ? 'hsl(0 0% 64%)' : 'hsl(0 0% 45%)',
+      borderColor: isDark ? 'hsl(0 0% 18%)' : 'hsl(0 0% 90%)',
+      borderWidth: 1,
+      padding: { top: 8, bottom: 8, left: 12, right: 12 },
+      cornerRadius: 8,
+      titleFont: { size: 11, weight: '600' },
+      bodyFont: { size: 12 },
+      displayColors: true,
+      boxWidth: 8,
+      boxHeight: 8,
+      boxPadding: 4,
+      titleMarginBottom: 4,
     };
-  });
 
-  var tooltipStyle = {
-    backgroundColor: isDark ? 'hsl(0 0% 12%)' : 'hsl(0 0% 100%)',
-    titleColor: isDark ? 'hsl(0 0% 93%)' : 'hsl(0 0% 9%)',
-    bodyColor: isDark ? 'hsl(0 0% 64%)' : 'hsl(0 0% 45%)',
-    borderColor: isDark ? 'hsl(0 0% 18%)' : 'hsl(0 0% 90%)',
-    borderWidth: 1,
-    padding: { top: 8, bottom: 8, left: 12, right: 12 },
-    cornerRadius: 8,
-    titleFont: { size: 11, weight: '600' },
-    bodyFont: { size: 12 },
-    displayColors: true,
-    boxWidth: 8,
-    boxHeight: 8,
-    boxPadding: 4,
-    titleMarginBottom: 4,
-  };
-
-  new Chart(velocityEl, {
-    type: 'line',
-    data: {
-      labels: vData.labels,
-      datasets: datasets
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: Object.assign({}, tooltipStyle, {
-          callbacks: {
-            title: function(items) {
-              return 'Day ' + items[0].label;
-            },
-            label: function(ctx) {
-              return ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
-            }
-          }
-        })
+    new Chart(velocityEl, {
+      type: 'line',
+      data: {
+        labels: vData.labels,
+        datasets: datasets
       },
-      scales: {
-        x: {
-          grid: { display: false },
-          border: { display: false },
-          ticks: {
-            color: textColor,
-            font: { size: 10, weight: '500' },
-            maxTicksLimit: 10,
-            callback: function(v, i) { return (i + 1) % 5 === 0 || i === 0 ? (i + 1) : ''; }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: Object.assign({}, tooltipStyle, {
+            callbacks: {
+              title: function(items) {
+                return 'Day ' + items[0].label;
+              },
+              label: function(ctx) {
+                return ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+              }
+            }
+          })
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: {
+              color: textColor,
+              font: { size: 10, weight: '500' },
+              maxTicksLimit: 10,
+              callback: function(v, i) { return (i + 1) % 5 === 0 || i === 0 ? (i + 1) : ''; }
+            },
+            title: {
+              display: true,
+              text: 'Day of month',
+              color: textColor,
+              font: { size: 10, weight: '500' },
+            }
           },
-          title: {
-            display: true,
-            text: 'Day of month',
-            color: textColor,
-            font: { size: 10, weight: '500' },
+          y: {
+            grid: { color: gridColor, drawBorder: false },
+            border: { display: false },
+            ticks: {
+              color: textColor,
+              font: { size: 10, weight: '500' },
+              maxTicksLimit: 5,
+              callback: function(v) { return '$' + v.toLocaleString(); }
+            },
+            beginAtZero: true,
           }
         },
-        y: {
-          grid: { color: gridColor, drawBorder: false },
-          border: { display: false },
-          ticks: {
-            color: textColor,
-            font: { size: 10, weight: '500' },
-            maxTicksLimit: 5,
-            callback: function(v) { return '$' + v.toLocaleString(); }
-          },
-          beginAtZero: true,
+        animation: {
+          duration: 600,
+          easing: 'easeOutQuart',
         }
-      },
-      animation: {
-        duration: 600,
-        easing: 'easeOutQuart',
       }
+    });
+  }
+
+  // Initialize on DOMContentLoaded if tab is already 'trends', otherwise defer.
+  document.addEventListener('DOMContentLoaded', function() {
+    if (new URLSearchParams(window.location.search).get('tab') === 'trends') {
+      setTimeout(initVelocityChart, 50);
     }
+  });
+  // Listen for tab switches — Alpine dispatches this after x-show updates.
+  document.addEventListener('click', function() {
+    setTimeout(initVelocityChart, 100);
+  });
+})();
+</script>
+{{end}}
+
+<!-- Re-init Lucide icons on tab switch (icons in initially hidden tabs need rendering) -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // After any click (which may be a tab switch), re-create icons after Alpine updates DOM.
+  document.addEventListener('click', function() {
+    setTimeout(function() {
+      if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+    }, 50);
   });
 });
 </script>
-{{end}}
 {{end}}
