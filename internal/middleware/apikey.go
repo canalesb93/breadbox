@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
+	"breadbox/internal/db"
 	"breadbox/internal/service"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -18,14 +20,53 @@ func formatUUID(u pgtype.UUID) string {
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
-// APIKeyAuth returns middleware that validates the X-API-Key header against
-// the database using the service layer.
+// APIKeyAuth returns middleware that validates either the X-API-Key header or
+// an Authorization: Bearer token against the database using the service layer.
+// Bearer tokens are OAuth 2.1 access tokens; API keys are the existing bb_* keys.
 func APIKeyAuth(svc *service.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Try Bearer token first (OAuth 2.1).
+			if token := extractBearerToken(r); token != "" {
+				accessToken, err := svc.ValidateBearerToken(r.Context(), token)
+				if err != nil {
+					if errors.Is(err, service.ErrInvalidBearerToken) {
+						writeWWWAuthenticate(w, http.StatusUnauthorized, "invalid_token", "The access token is invalid")
+					} else if errors.Is(err, service.ErrExpiredBearerToken) {
+						writeWWWAuthenticate(w, http.StatusUnauthorized, "invalid_token", "The access token has expired")
+					} else if errors.Is(err, service.ErrRevokedBearerToken) {
+						writeWWWAuthenticate(w, http.StatusUnauthorized, "invalid_token", "The access token has been revoked")
+					} else {
+						WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to validate token")
+					}
+					return
+				}
+
+				// Create a synthetic API key record so existing scope checks work.
+				syntheticKey := &db.ApiKey{
+					ID:    accessToken.ID,
+					Name:  "oauth:" + accessToken.ClientID,
+					Scope: accessToken.Scope,
+				}
+
+				keyID := formatUUID(accessToken.ID)
+				ctx := service.ContextWithAPIKey(r.Context(), keyID, syntheticKey.Name)
+				ctx = SetAPIKey(ctx, syntheticKey)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+
+			// Fall back to X-API-Key header.
 			key := r.Header.Get("X-API-Key")
 			if key == "" {
-				WriteError(w, http.StatusUnauthorized, "MISSING_API_KEY", "X-API-Key header is required")
+				// Return 401 with WWW-Authenticate to trigger OAuth flow for MCP clients.
+				scheme := "https"
+				if r.TLS == nil && r.Header.Get("X-Forwarded-Proto") != "https" {
+					scheme = "http"
+				}
+				resourceMetadata := fmt.Sprintf("%s://%s/.well-known/oauth-protected-resource", scheme, r.Host)
+				w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer resource_metadata="%s"`, resourceMetadata))
+				WriteError(w, http.StatusUnauthorized, "MISSING_CREDENTIALS", "API key or Bearer token is required")
 				return
 			}
 
@@ -41,12 +82,23 @@ func APIKeyAuth(svc *service.Service) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Store API key identity in context for actor resolution.
 			keyID := formatUUID(apiKey.ID)
 			ctx := service.ContextWithAPIKey(r.Context(), keyID, apiKey.Name)
-			// Store full API key record for scope checks.
 			ctx = SetAPIKey(ctx, apiKey)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+func extractBearerToken(r *http.Request) string {
+	auth := r.Header.Get("Authorization")
+	if strings.HasPrefix(auth, "Bearer ") {
+		return strings.TrimPrefix(auth, "Bearer ")
+	}
+	return ""
+}
+
+func writeWWWAuthenticate(w http.ResponseWriter, status int, errorCode, description string) {
+	w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer error="%s", error_description="%s"`, errorCode, description))
+	WriteError(w, status, "INVALID_TOKEN", description)
 }

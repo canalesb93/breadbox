@@ -1,0 +1,73 @@
+{{define "content"}}
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">OAuth Clients</h1>
+    <p class="text-sm text-base-content/50 mt-1">Manage OAuth clients for external connector access (e.g., Claude)</p>
+  </div>
+  <a href="/oauth-clients/new" class="btn btn-primary btn-sm rounded-xl">
+    <i data-lucide="plus" class="w-4 h-4"></i>
+    Create Client
+  </a>
+</div>
+
+{{if .Clients}}
+<div class="space-y-3 bb-stagger">
+  {{range .Clients}}
+  <div class="bb-card p-5 flex items-center justify-between gap-4 flex-wrap" x-data="{ confirming: false }">
+    <div class="flex items-center gap-4 min-w-0">
+      <div class="flex items-center justify-center w-10 h-10 rounded-xl shrink-0
+        {{if .RevokedAt}}bg-base-200/40{{else if eq .Scope "read_only"}}bg-warning/8{{else}}bg-secondary/8{{end}}">
+        <i data-lucide="fingerprint" class="w-5 h-5 {{if .RevokedAt}}text-base-content/25{{else if eq .Scope "read_only"}}text-warning{{else}}text-secondary{{end}}"></i>
+      </div>
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="font-semibold text-sm {{if .RevokedAt}}text-base-content/40 line-through{{end}}">{{.Name}}</span>
+          {{if eq .Scope "read_only"}}
+          <span class="badge badge-soft badge-warning badge-xs">Read Only</span>
+          {{else}}
+          <span class="badge badge-soft badge-primary badge-xs">Full Access</span>
+          {{end}}
+          {{if .RevokedAt}}
+          <span class="badge badge-soft badge-error badge-xs">Revoked</span>
+          {{end}}
+        </div>
+        <div class="flex items-center gap-3 mt-0.5 text-xs text-base-content/40">
+          <code class="font-mono bg-base-200/50 px-1.5 py-0.5 rounded">{{.ClientIDPrefix}}...</code>
+          <span>Created {{formatDateTime .CreatedAt}}</span>
+        </div>
+      </div>
+    </div>
+
+    {{if not .RevokedAt}}
+    <div class="shrink-0">
+      <form method="POST" action="/oauth-clients/{{.ID}}/revoke" class="inline">
+        <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+        <button type="button" class="btn btn-ghost btn-sm text-base-content/50 hover:text-error" x-show="!confirming" @click="confirming = true">
+          Revoke
+        </button>
+        <span x-show="confirming" x-cloak class="flex items-center gap-1.5">
+          <button type="submit" class="btn btn-error btn-sm btn-soft rounded-xl">Confirm</button>
+          <button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="confirming = false">Cancel</button>
+        </span>
+      </form>
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+{{else}}
+<div class="bb-card p-12 text-center">
+  <div class="flex flex-col items-center">
+    <div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
+      <i data-lucide="fingerprint" class="w-8 h-8 text-base-content/25"></i>
+    </div>
+    <h3 class="text-lg font-semibold mb-1">No OAuth clients yet</h3>
+    <p class="text-sm text-base-content/50 mb-5 max-w-sm">Create an OAuth client to connect external services like Claude as a connector to your Breadbox MCP server.</p>
+    <a href="/oauth-clients/new" class="btn btn-primary btn-sm rounded-xl">
+      <i data-lucide="plus" class="w-4 h-4"></i>
+      Create your first client
+    </a>
+  </div>
+</div>
+{{end}}
+{{end}}

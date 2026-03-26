@@ -1,0 +1,51 @@
+{{define "content"}}
+{{template "breadcrumb" .}}
+
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Create OAuth Client</h1>
+    <p class="text-sm text-base-content/50 mt-1">Generate credentials for an external connector (e.g., Claude)</p>
+  </div>
+  <a href="/oauth-clients" class="btn btn-sm btn-ghost rounded-xl gap-2">
+    <i data-lucide="arrow-left" class="w-4 h-4"></i> OAuth Clients
+  </a>
+</div>
+
+<div class="bb-card p-8 max-w-lg">
+  <div class="flex items-center gap-3 mb-6">
+    <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-secondary/8">
+      <i data-lucide="fingerprint" class="w-5 h-5 text-secondary"></i>
+    </div>
+    <div>
+      <h2 class="text-base font-semibold">Client Details</h2>
+      <p class="text-xs text-base-content/45">Configure your new OAuth client</p>
+    </div>
+  </div>
+
+  <form method="POST" action="/oauth-clients/new">
+    <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+
+    <fieldset class="fieldset mb-5">
+      <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="name">Name</label>
+      <input type="text" id="name" name="name" class="input w-full bg-base-200/50 border-base-300 focus:border-primary rounded-xl" placeholder="e.g., Claude Connector, Scheduled Agent" required autofocus>
+      <p class="text-xs text-base-content/40 mt-2">A descriptive name shown on the consent screen when authorizing.</p>
+    </fieldset>
+
+    <fieldset class="fieldset mb-6">
+      <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="scope">Scope</label>
+      <select id="scope" name="scope" class="select w-full bg-base-200/50 border-base-300 focus:border-primary rounded-xl">
+        <option value="full_access">Full Access &mdash; read and write via MCP</option>
+        <option value="read_only">Read Only &mdash; query data only</option>
+      </select>
+      <p class="text-xs text-base-content/40 mt-2">Controls what the connected service can do. Full access allows transaction categorization, rule management, and write MCP tools.</p>
+    </fieldset>
+
+    <div class="flex gap-3 pt-2">
+      <button type="submit" class="btn btn-primary btn-sm rounded-xl">
+        <i data-lucide="plus" class="w-4 h-4"></i> Create OAuth Client
+      </button>
+      <a href="/oauth-clients" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
+    </div>
+  </form>
+</div>
+{{end}}

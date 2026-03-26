@@ -573,12 +573,16 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/insights.html",
 		"pages/account_links.html",
 		"pages/account_link_detail.html",
+		"pages/oauth_clients.html",
+		"pages/oauth_client_new.html",
+		"pages/oauth_client_created.html",
 	}
 
-	// Pages using the wizard layout (login + first-run admin creation).
+	// Pages using the wizard layout (login + first-run admin creation + OAuth consent).
 	wizardPages := []string{
 		"pages/login.html",
 		"pages/setup_create_admin.html",
+		"pages/oauth_authorize.html",
 	}
 
 	for _, page := range basePages {
