@@ -8,9 +8,9 @@
 <div class="bb-page-header">
   <div>
     <h1 class="bb-page-title">Insights</h1>
-    <p class="text-sm text-base-content/50 mt-0.5">Spending trends, pace, and cash flow analysis</p>
+    <p class="text-sm text-base-content/50 mt-0.5 hidden sm:block">Spending trends, pace, and cash flow analysis</p>
   </div>
-  <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5">
+  <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 shrink-0">
     <a :href="'/insights?days=7&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 7}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">7d</a>
     <a :href="'/insights?days=30&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 30}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">30d</a>
     <a :href="'/insights?days=90&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 90}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">90d</a>
@@ -19,11 +19,11 @@
 </div>
 
 <!-- Summary Pills (always visible) -->
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-  <div class="bb-card p-4 flex flex-col justify-between min-h-[4.5rem]">
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-6">
+  <div class="bb-card p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem]">
     <div class="text-xs text-base-content/40 mb-1">Spending</div>
     <div>
-      <div class="text-xl font-semibold tabular-nums">{{formatBalance .TotalSpending}}</div>
+      <div class="text-lg sm:text-xl font-semibold tabular-nums">{{formatBalance .TotalSpending}}</div>
       {{if .HasSpendingChange}}
       <div class="text-[0.65rem] font-medium mt-1 {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
         {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}% vs prev
@@ -33,24 +33,24 @@
       {{end}}
     </div>
   </div>
-  <div class="bb-card p-4 flex flex-col justify-between min-h-[4.5rem]">
+  <div class="bb-card p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem]">
     <div class="text-xs text-base-content/40 mb-1">Income</div>
     <div>
-      <div class="text-xl font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</div>
+      <div class="text-lg sm:text-xl font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</div>
       <div class="text-[0.65rem] mt-1">&nbsp;</div>
     </div>
   </div>
   {{if .HasCashFlow}}
-  <div class="bb-card p-4 flex flex-col justify-between min-h-[4.5rem]">
+  <div class="bb-card p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem]">
     <div class="text-xs text-base-content/40 mb-1">Net Cash Flow</div>
     <div>
-      <div class="text-xl font-semibold tabular-nums {{if gt .CashFlowNet 0.0}}text-success{{else if lt .CashFlowNet 0.0}}text-error{{end}}">
+      <div class="text-lg sm:text-xl font-semibold tabular-nums {{if gt .CashFlowNet 0.0}}text-success{{else if lt .CashFlowNet 0.0}}text-error{{end}}">
         {{if gt .CashFlowNet 0.0}}+{{end}}{{if lt .CashFlowNet 0.0}}-{{end}}{{formatBalance .CashFlowNet}}
       </div>
       <div class="text-[0.65rem] mt-1">&nbsp;</div>
     </div>
   </div>
-  <div class="bb-card p-4 flex flex-col justify-between min-h-[4.5rem]">
+  <div class="bb-card p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem]">
     <div class="text-xs text-base-content/40 mb-1">Savings Rate</div>
     <div>
       {{if gt .TotalIncome 0.0}}
@@ -69,20 +69,20 @@
 </div>
 
 <!-- Tab Navigation -->
-<div class="flex items-center gap-1 border-b border-base-200/80 mb-6">
+<div class="flex items-center gap-0 sm:gap-1 border-b border-base-200/80 mb-6 overflow-x-auto">
   <button @click="tab = 'overview'" :class="tab === 'overview' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
-    class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer">
-    <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
+    class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap">
+    <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 hidden sm:block"></i>
     Overview
   </button>
   <button @click="tab = 'analysis'" :class="tab === 'analysis' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
-    class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer">
-    <i data-lucide="search" class="w-3.5 h-3.5"></i>
+    class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap">
+    <i data-lucide="search" class="w-3.5 h-3.5 hidden sm:block"></i>
     Analysis
   </button>
   <button @click="tab = 'trends'" :class="tab === 'trends' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
-    class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer">
-    <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+    class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap">
+    <i data-lucide="trending-up" class="w-3.5 h-3.5 hidden sm:block"></i>
     Trends
   </button>
 </div>
@@ -217,13 +217,13 @@
       <div>
         <div class="flex items-center justify-between mb-1.5">
           <span class="flex items-center gap-2 text-xs font-medium text-base-content/60">
-            <span class="w-2 h-2 rounded-full shrink-0" style="background: oklch(0.62 0.14 155)"></span>
+            <span class="w-2 h-2 rounded-full shrink-0" style="background: var(--bb-chart-income-bar)"></span>
             Income
           </span>
           <span class="text-sm font-semibold tabular-nums text-success">{{formatBalance .CurrentMonthIncome}}</span>
         </div>
         <div class="w-full h-2.5 bg-base-200/50 rounded-full overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: 100%; background: oklch(0.62 0.14 155); opacity: 0.5;"></div>
+          <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: 100%; background: var(--bb-chart-income-bar); opacity: 0.5;"></div>
         </div>
       </div>
       <div>
@@ -284,13 +284,13 @@
       <div class="group">
         <div class="flex items-center justify-between mb-1.5">
           <span class="flex items-center gap-2 text-xs font-medium text-base-content/60">
-            <span class="w-2 h-2 rounded-full shrink-0" style="background: oklch(0.62 0.14 155)"></span>
+            <span class="w-2 h-2 rounded-full shrink-0" style="background: var(--bb-chart-income-bar)"></span>
             Income
           </span>
           <span class="text-sm font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</span>
         </div>
         <div class="w-full h-3 bg-base-200/60 rounded-full overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: 100%; background: oklch(0.62 0.14 155); opacity: 0.6;"></div>
+          <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: 100%; background: var(--bb-chart-income-bar); opacity: 0.6;"></div>
         </div>
       </div>
 
@@ -402,7 +402,7 @@
         Spending
       </span>
       <span class="flex items-center gap-1.5 text-xs text-base-content/50">
-        <span class="w-2.5 h-1.5 rounded-sm" style="background: oklch(0.62 0.14 155 / 0.35)"></span>
+        <span class="w-2.5 h-1.5 rounded-sm" style="background: color-mix(in oklch, var(--bb-chart-income-bar) 35%, transparent)"></span>
         Income
       </span>
     </div>
@@ -660,7 +660,7 @@
         <span class="text-[0.65rem] font-medium text-base-content/40 w-7 shrink-0">{{.DayShort}}</span>
         <div class="flex-1 relative">
           <div class="w-full h-7 rounded-md transition-all duration-300 flex items-center"
-            style="background-color: oklch(0.55 0.12 250 / {{if gt .Intensity 0.0}}{{printf "%.2f" (mulf .Intensity 0.45)}}{{else}}0.03{{end}});">
+            style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) {{if gt .Intensity 0.0}}{{printf "%.0f" (mulf .Intensity 45.0)}}%{{else}}3%{{end}}, transparent);">
             {{if gt .Total 0.0}}
             <span class="text-[0.6rem] font-semibold tabular-nums text-base-content/60 pl-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
               {{formatAmount .Total}}
@@ -691,11 +691,11 @@
     <div class="mt-3 pt-3 border-t border-base-200/60 flex items-center justify-between">
       <span class="text-[0.6rem] text-base-content/25">Less</span>
       <div class="flex items-center gap-1">
-        <div class="w-4 h-3 rounded-sm" style="background-color: oklch(0.55 0.12 250 / 0.05);"></div>
-        <div class="w-4 h-3 rounded-sm" style="background-color: oklch(0.55 0.12 250 / 0.12);"></div>
-        <div class="w-4 h-3 rounded-sm" style="background-color: oklch(0.55 0.12 250 / 0.22);"></div>
-        <div class="w-4 h-3 rounded-sm" style="background-color: oklch(0.55 0.12 250 / 0.33);"></div>
-        <div class="w-4 h-3 rounded-sm" style="background-color: oklch(0.55 0.12 250 / 0.45);"></div>
+        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 5%, transparent);"></div>
+        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 12%, transparent);"></div>
+        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 22%, transparent);"></div>
+        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 33%, transparent);"></div>
+        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 45%, transparent);"></div>
       </div>
       <span class="text-[0.6rem] text-base-content/25">More</span>
     </div>
@@ -723,7 +723,7 @@
   </div>
 
   <!-- Recurring charges grid -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-2.5">
     {{range .RecurringCharges}}
     <div class="group flex items-center gap-3 p-3 rounded-xl border border-base-200/60 bg-base-200/10 hover:bg-base-200/30 hover:border-base-300/60 transition-all duration-200">
       <!-- Frequency icon -->
@@ -798,7 +798,7 @@
     </div>
     <span class="text-xs text-base-content/30">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}} vs prev</span>
   </div>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 sm:gap-3">
     {{range .SpendingInsights}}
     <div class="group relative p-4 rounded-xl border transition-all duration-200
       {{if eq .Sentiment "negative"}}border-error/15 bg-error/3 hover:bg-error/5 hover:border-error/25
@@ -1142,7 +1142,7 @@
   <div id="echartsSavingsRateChart" style="width: 100%; height: 300px;"></div>
 
   <!-- Monthly breakdown cards -->
-  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-4 pt-3 border-t border-base-200/60">
+  <div class="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 mt-4 pt-3 border-t border-base-200/60">
     {{range .SavingsRateTrend}}
     <div class="text-center p-2.5 rounded-lg {{if gt .Rate 10.0}}bg-success/[0.04]{{else if gt .Rate 0.0}}bg-success/[0.02]{{else if eq .Income 0.0}}bg-base-200/20{{else}}bg-error/[0.03]{{end}}">
       <div class="text-[0.65rem] text-base-content/35 font-medium mb-1">{{.Month}}</div>
@@ -1189,7 +1189,7 @@
   </div>
 
   <!-- Member cards -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-{{if le (len .FamilySpending) 3}}{{len .FamilySpending}}{{else}}3{{end}} gap-3">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-{{if le (len .FamilySpending) 3}}{{len .FamilySpending}}{{else}}3{{end}} gap-2 sm:gap-3">
     {{range $i, $fs := .FamilySpending}}
     <div class="group flex items-center gap-3.5 p-4 rounded-xl border border-base-200/60 bg-base-200/10 hover:bg-base-200/30 hover:border-base-300/60 transition-all duration-200">
       <!-- Avatar circle with initial -->
@@ -1233,17 +1233,19 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  var textColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
-  var splitLineColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
-  var tooltipBg = isDark ? 'rgba(20,20,20,0.95)' : 'rgba(255,255,255,0.98)';
-  var tooltipBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
-  var tooltipText = isDark ? '#e5e5e5' : '#1a1a1a';
-  var tooltipSubtext = isDark ? '#999' : '#666';
+  // Read theme-aware colors from CSS custom properties
+  var cs = getComputedStyle(document.documentElement);
+  var textColor = cs.getPropertyValue('--bb-chart-text').trim();
+  var splitLineColor = cs.getPropertyValue('--bb-chart-grid').trim();
+  var tooltipBg = cs.getPropertyValue('--bb-chart-tooltip-bg').trim();
+  var tooltipBorder = cs.getPropertyValue('--bb-chart-tooltip-border').trim();
+  var tooltipText = cs.getPropertyValue('--bb-chart-tooltip-text').trim();
+  var tooltipSubtext = cs.getPropertyValue('--bb-chart-tooltip-sub').trim();
 
-  var spendColor = isDark ? 'rgba(160,160,160,0.35)' : 'rgba(30,30,30,0.15)';
-  var spendHoverColor = isDark ? 'rgba(180,180,180,0.55)' : 'rgba(30,30,30,0.3)';
-  var incomeColor = isDark ? 'rgba(100,200,140,0.35)' : 'rgba(46,160,100,0.3)';
-  var incomeLineColor = isDark ? 'rgba(100,200,140,0.7)' : 'rgba(46,160,100,0.6)';
+  var spendColor = cs.getPropertyValue('--bb-chart-spend').trim();
+  var spendHoverColor = cs.getPropertyValue('--bb-chart-spend-hover').trim();
+  var incomeColor = cs.getPropertyValue('--bb-chart-income').trim();
+  var incomeLineColor = cs.getPropertyValue('--bb-chart-income-line').trim();
 
   // Track all ECharts instances for tab-switch resize
   var insightCharts = [];
@@ -1481,7 +1483,7 @@ document.addEventListener('DOMContentLoaded', function() {
               return '{total|$' + totalSpending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '}\n{label|total spending}';
             },
             rich: {
-              total: { fontSize: 20, fontWeight: 700, fontFamily: 'Inter, system-ui, sans-serif', color: isDark ? '#e5e5e5' : '#1a1a1a', padding: [0, 0, 4, 0] },
+              total: { fontSize: 20, fontWeight: 700, fontFamily: 'Inter, system-ui, sans-serif', color: tooltipText, padding: [0, 0, 4, 0] },
               label: { fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif', color: textColor }
             }
           },
@@ -1549,7 +1551,7 @@ document.addEventListener('DOMContentLoaded', function() {
               return '{total|$' + catTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '}\n{label|' + categoryName + '}';
             },
             rich: {
-              total: { fontSize: 20, fontWeight: 700, fontFamily: 'Inter, system-ui, sans-serif', color: isDark ? '#e5e5e5' : '#1a1a1a', padding: [0, 0, 4, 0] },
+              total: { fontSize: 20, fontWeight: 700, fontFamily: 'Inter, system-ui, sans-serif', color: tooltipText, padding: [0, 0, 4, 0] },
               label: { fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif', color: textColor }
             }
           },
@@ -1610,10 +1612,10 @@ document.addEventListener('DOMContentLoaded', function() {
     var fData = {{.ForecastJSON}};
     var daysElapsed = fData.daysElapsed;
 
-    var positiveColor = isDark ? 'rgba(100,200,140,0.85)' : 'rgba(46,160,100,0.85)';
-    var negativeColor = isDark ? 'rgba(240,100,100,0.85)' : 'rgba(220,60,60,0.85)';
-    var projColor = isDark ? 'rgba(100,140,230,0.5)' : 'rgba(70,100,200,0.45)';
-    var projAreaColor = isDark ? 'rgba(100,140,230,0.06)' : 'rgba(70,100,200,0.04)';
+    var positiveColor = cs.getPropertyValue('--bb-chart-positive').trim();
+    var negativeColor = cs.getPropertyValue('--bb-chart-negative').trim();
+    var projColor = cs.getPropertyValue('--bb-chart-proj').trim();
+    var projAreaColor = cs.getPropertyValue('--bb-chart-proj-area').trim();
 
     // Actual line: only actual days (past).
     var actualData = fData.actual.slice();
@@ -1700,16 +1702,16 @@ document.addEventListener('DOMContentLoaded', function() {
             return params.dataIndex === daysElapsed - 1 ? 8 : 0;
           },
           lineStyle: {
-            color: isDark ? 'rgba(100,140,230,0.9)' : 'rgba(70,100,200,0.85)',
+            color: cs.getPropertyValue('--bb-chart-accent').trim(),
             width: 2.5
           },
           areaStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: isDark ? 'rgba(100,140,230,0.12)' : 'rgba(70,100,200,0.08)' },
+              { offset: 0, color: cs.getPropertyValue('--bb-chart-accent-area').trim() },
               { offset: 1, color: 'rgba(70,100,200,0.01)' }
             ])
           },
-          itemStyle: { color: isDark ? 'rgba(100,140,230,0.9)' : 'rgba(70,100,200,0.85)' },
+          itemStyle: { color: cs.getPropertyValue('--bb-chart-accent').trim() },
           emphasis: {
             itemStyle: { borderWidth: 2, borderColor: isDark ? '#222' : '#fff', shadowBlur: 4 }
           },
@@ -1806,9 +1808,11 @@ document.addEventListener('DOMContentLoaded', function() {
       var vData = velocityData;
       var numMonths = vData.datasets.length;
 
-      var lineColors = isDark
-        ? ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.2)', 'rgba(100,140,230,0.9)']
-        : ['rgba(0,0,0,0.08)', 'rgba(0,0,0,0.15)', 'rgba(70,100,200,0.85)'];
+      var lineColors = [
+        cs.getPropertyValue('--bb-chart-velocity-old1').trim(),
+        cs.getPropertyValue('--bb-chart-velocity-old2').trim(),
+        cs.getPropertyValue('--bb-chart-velocity-current').trim()
+      ];
       var lineWidths = [1.5, 1.5, 2.5];
       var lineDashes = [[5, 4], [5, 4], [0, 0]];
 
@@ -1842,7 +1846,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (i === numMonths - 1) {
           s.areaStyle = {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: isDark ? 'rgba(100,140,230,0.12)' : 'rgba(70,100,200,0.08)' },
+              { offset: 0, color: cs.getPropertyValue('--bb-chart-accent-area').trim() },
               { offset: 1, color: 'rgba(70,100,200,0.01)' }
             ])
           };
@@ -1942,11 +1946,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
       var chart = echarts.init(el, null, { renderer: 'canvas' });
 
-      var positiveColor = isDark ? 'rgba(100,200,140,0.85)' : 'rgba(46,160,100,0.85)';
-      var negativeColor = isDark ? 'rgba(240,100,100,0.85)' : 'rgba(220,60,60,0.85)';
+      var positiveColor = cs.getPropertyValue('--bb-chart-positive').trim();
+      var negativeColor = cs.getPropertyValue('--bb-chart-negative').trim();
       var zeroLineColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
-      var areaPositive = isDark ? 'rgba(100,200,140,0.08)' : 'rgba(46,160,100,0.06)';
-      var areaNegative = isDark ? 'rgba(240,100,100,0.08)' : 'rgba(220,60,60,0.06)';
+      var areaPositive = isDark ? 'rgba(100,210,150,0.08)' : 'rgba(46,160,100,0.06)';
+      var areaNegative = isDark ? 'rgba(250,110,110,0.08)' : 'rgba(220,60,60,0.06)';
 
       // Color each data point based on positive/negative.
       var rateData = srtData.rates.map(function(r) {
@@ -2071,11 +2075,11 @@ document.addEventListener('DOMContentLoaded', function() {
             data: srtData.income,
             barWidth: '30%',
             itemStyle: {
-              color: isDark ? 'rgba(100,200,140,0.08)' : 'rgba(46,160,100,0.06)',
+              color: isDark ? 'rgba(100,210,150,0.08)' : 'rgba(46,160,100,0.06)',
               borderRadius: [3, 3, 0, 0]
             },
             emphasis: {
-              itemStyle: { color: isDark ? 'rgba(100,200,140,0.15)' : 'rgba(46,160,100,0.12)' }
+              itemStyle: { color: isDark ? 'rgba(100,210,150,0.15)' : 'rgba(46,160,100,0.12)' }
             },
             yAxisIndex: 0,
             z: 1,

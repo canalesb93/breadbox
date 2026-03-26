@@ -36,16 +36,18 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		chartStart := time.Now().AddDate(0, 0, -chartDays)
 
 		// ── Shared palette and time constants ──
+		// Category palette: oklch colors balanced for both light and dark mode.
+		// Lightness ~0.62-0.68 gives good contrast on white and dark backgrounds.
 		categoryPalette := []string{
-			"oklch(0.55 0.12 250)", // blue
-			"oklch(0.55 0.14 160)", // teal
-			"oklch(0.58 0.12 35)",  // warm amber
-			"oklch(0.52 0.14 300)", // purple
-			"oklch(0.58 0.10 80)",  // olive
-			"oklch(0.50 0.12 200)", // slate blue
-			"oklch(0.55 0.12 120)", // green
-			"oklch(0.48 0.10 350)", // rose
-			"oklch(0.45 0 0)",      // gray (for "Other")
+			"oklch(0.62 0.15 250)", // blue
+			"oklch(0.64 0.16 160)", // teal
+			"oklch(0.66 0.14 35)",  // warm amber
+			"oklch(0.60 0.16 300)", // purple
+			"oklch(0.66 0.12 80)",  // olive
+			"oklch(0.58 0.14 200)", // slate blue
+			"oklch(0.64 0.14 120)", // green
+			"oklch(0.60 0.13 350)", // rose
+			"oklch(0.55 0 0)",      // gray (for "Other")
 		}
 
 		today := time.Now()
