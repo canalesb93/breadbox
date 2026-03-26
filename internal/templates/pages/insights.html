@@ -127,7 +127,7 @@
     <div>
       {{if gt .TotalIncome 0.0}}
         {{if lt .SavingsRate -100.0}}
-        <div class="text-xl font-semibold tabular-nums text-error" data-countup="100" data-prefix="< -" data-suffix="%">< -100%</div>
+        <div class="text-xl font-semibold tabular-nums text-error" data-countup="100" data-prefix="< -" data-suffix="%" data-decimals="0">< -100%</div>
         {{else}}
         <div class="text-xl font-semibold tabular-nums {{if gt .SavingsRate 0.0}}text-success{{else}}text-error{{end}}" data-countup="{{printf "%.0f" (absf .SavingsRate)}}" data-prefix="{{if lt .SavingsRate 0.0}}-{{end}}" data-suffix="%" data-decimals="0">{{printf "%.0f" .SavingsRate}}%</div>
         {{end}}
