@@ -736,13 +736,13 @@ func TestBatchSetTransactionCategory_EmptyItems(t *testing.T) {
 
 func TestBatchSetTransactionCategory_TooManyItems(t *testing.T) {
 	svc, _, _ := newService(t)
-	items := make([]service.BatchCategorizeItem, 201)
+	items := make([]service.BatchCategorizeItem, 501)
 	for i := range items {
 		items[i] = service.BatchCategorizeItem{TransactionID: "x", CategorySlug: "y"}
 	}
 	_, err := svc.BatchSetTransactionCategory(context.Background(), items)
 	if err == nil {
-		t.Error("expected error for >200 items")
+		t.Error("expected error for >500 items")
 	}
 }
 

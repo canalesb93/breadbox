@@ -1026,7 +1026,7 @@ func TestAPI_ListRules_InvalidLimit(t *testing.T) {
 func TestAPI_ListRules_LimitTooHigh(t *testing.T) {
 	env := setupTestEnv(t)
 
-	resp := env.doGet(t, "/api/v1/rules?limit=201")
+	resp := env.doGet(t, "/api/v1/rules?limit=501")
 	readErrorCode(t, resp, http.StatusBadRequest, "INVALID_PARAMETER")
 }
 
@@ -1193,7 +1193,7 @@ func TestAPI_ListReviews_Empty(t *testing.T) {
 func TestAPI_ListReviews_InvalidLimit(t *testing.T) {
 	env := setupTestEnv(t)
 
-	resp := env.doGet(t, "/api/v1/reviews?limit=201")
+	resp := env.doGet(t, "/api/v1/reviews?limit=501")
 	readErrorCode(t, resp, http.StatusBadRequest, "INVALID_PARAMETER")
 }
 

@@ -958,4 +958,3 @@ func TestAutoApproveCategorizedReviews_NoneEligible(t *testing.T) {
 		t.Errorf("expected remaining=1 (one pending review still in queue), got %d", result.Remaining)
 	}
 }
-}
