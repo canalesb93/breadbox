@@ -22,6 +22,12 @@ Go 1.24+ single binary. PostgreSQL, chi/v5 router, pgx/v5 + sqlc, goose migratio
 
 One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), MCP server (`/mcp`), admin dashboard (`/admin/...`), webhooks (`/webhooks/:provider`). Bank data providers are abstracted behind a `Provider` Go interface (Plaid first, Teller + CSV later).
 
+## Migrations
+
+- **Timestamp-based naming**: New migrations use `YYYYMMDDHHMMSS_description.sql` format (e.g., `20260325153000_add_oauth.sql`). This prevents conflicts when parallel branches each need a migration. Existing sequential migrations (`00001`–`00029`) remain as-is — goose sorts by numeric prefix so timestamps (larger numbers) always run after them.
+- **Creating a migration**: Use the current UTC timestamp as the prefix. Example: `date -u +%Y%m%d%H%M%S` gives `20260325153000`.
+- **After adding a migration**: Run `sqlc generate` to regenerate Go code, then `go build ./...` to verify.
+
 ## Key Design Decisions
 
 - REST API is the core data layer; MCP tools and dashboard consume the service layer directly (no HTTP round-trip)
