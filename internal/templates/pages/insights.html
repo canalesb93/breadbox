@@ -328,13 +328,13 @@
 </div>
 {{end}}
 
-<!-- Charts Row: Spending Chart + Top Categories -->
+<!-- Charts Row: Spending Chart + Category Donut (ECharts) -->
 <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6 bb-stagger">
   <!-- Spending & Income Chart -->
   <div class="bb-card lg:col-span-3 p-5">
     <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-3">
-        <h2 class="text-sm font-semibold text-base-content/70">Spending</h2>
+        <h2 class="text-sm font-semibold text-base-content/70">Spending & Income</h2>
         {{if .HasSpendingChange}}
         <span class="text-xs font-medium {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
           {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}% vs prev
@@ -343,10 +343,8 @@
       </div>
     </div>
     {{if .DailyLabels}}
-    <div class="h-56">
-      <canvas id="spendingTrendChart"></canvas>
-    </div>
-    <div class="flex items-center gap-5 mt-3 pt-3 border-t border-base-200">
+    <div id="echartsSpendingChart" style="width: 100%; height: 240px;"></div>
+    <div class="flex items-center gap-5 mt-3 pt-3 border-t border-base-200/60">
       <span class="flex items-center gap-1.5 text-xs text-base-content/50">
         <span class="w-2.5 h-1.5 rounded-sm bg-base-content/15"></span>
         Spending
@@ -357,7 +355,7 @@
       </span>
     </div>
     {{else}}
-    <div class="flex items-center justify-center h-56 text-base-content/40">
+    <div class="flex items-center justify-center h-60 text-base-content/40">
       <div class="text-center">
         <i data-lucide="bar-chart-3" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
         <p class="text-sm">No spending data yet</p>
@@ -366,31 +364,28 @@
     {{end}}
   </div>
 
-  <!-- Top Spending Categories -->
+  <!-- Category Donut Chart -->
   <div class="bb-card lg:col-span-2 p-5">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-sm font-semibold text-base-content/70">Top Categories</h2>
       <a href="/categories" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
     </div>
     {{if .TopCategories}}
-    <div class="space-y-3">
+    <div id="echartsCategoryDonut" style="width: 100%; height: 240px;"></div>
+    <!-- Category list below donut -->
+    <div class="mt-3 pt-3 border-t border-base-200/60 space-y-1.5">
       {{range .TopCategories}}
-      <div class="group">
-        <div class="flex items-center justify-between mb-1">
-          <span class="flex items-center gap-2 text-xs font-medium text-base-content/70 group-hover:text-base-content transition-colors truncate">
-            <span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{safeCSS .Color}}"></span>
-            <span class="truncate">{{.Name}}</span>
-          </span>
-          <span class="text-xs font-semibold tabular-nums text-base-content/80 shrink-0 ml-3">{{formatAmount .Amount}}</span>
-        </div>
-        <div class="w-full h-2 bg-base-200/80 rounded-full overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-500 ease-out" style="width: {{printf "%.1f" .Percent}}%; background-color: {{safeCSS .Color}}; opacity: 0.7;"></div>
-        </div>
+      <div class="flex items-center justify-between">
+        <span class="flex items-center gap-2 text-xs text-base-content/60 truncate">
+          <span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{safeCSS .Color}}"></span>
+          <span class="truncate">{{.Name}}</span>
+        </span>
+        <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0 ml-2">{{formatAmount .Amount}}</span>
       </div>
       {{end}}
     </div>
     {{else}}
-    <div class="flex items-center justify-center h-48 text-base-content/40">
+    <div class="flex items-center justify-center h-60 text-base-content/40">
       <div class="text-center">
         <i data-lucide="bar-chart-2" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
         <p class="text-sm">No category data yet</p>
@@ -934,9 +929,7 @@
     </div>
   </div>
 
-  <div class="h-64">
-    <canvas id="velocityChart"></canvas>
-  </div>
+  <div id="echartsVelocityChart" style="width: 100%; height: 280px;"></div>
 
   <!-- Legend -->
   <div class="flex items-center gap-5 mt-3 pt-3 border-t border-base-200/60">
@@ -1014,32 +1007,32 @@
 
 </div><!-- /alpine x-data tabs -->
 
-<!-- Chart.js Initialization -->
-{{if .DailyLabels}}
+<!-- ECharts CDN (loaded only on Insights page) -->
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+<!-- ECharts Initialization -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  var gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
   var textColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
+  var splitLineColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+  var tooltipBg = isDark ? 'rgba(20,20,20,0.95)' : 'rgba(255,255,255,0.98)';
+  var tooltipBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  var tooltipText = isDark ? '#e5e5e5' : '#1a1a1a';
+  var tooltipSubtext = isDark ? '#999' : '#666';
 
-  Chart.defaults.font.family = 'Inter, system-ui, -apple-system, sans-serif';
+  var spendColor = isDark ? 'rgba(160,160,160,0.35)' : 'rgba(30,30,30,0.15)';
+  var spendHoverColor = isDark ? 'rgba(180,180,180,0.55)' : 'rgba(30,30,30,0.3)';
+  var incomeColor = isDark ? 'rgba(100,200,140,0.35)' : 'rgba(46,160,100,0.3)';
+  var incomeLineColor = isDark ? 'rgba(100,200,140,0.7)' : 'rgba(46,160,100,0.6)';
 
-  var tooltipStyle = {
-    backgroundColor: isDark ? 'hsl(0 0% 12%)' : 'hsl(0 0% 100%)',
-    titleColor: isDark ? 'hsl(0 0% 93%)' : 'hsl(0 0% 9%)',
-    bodyColor: isDark ? 'hsl(0 0% 64%)' : 'hsl(0 0% 45%)',
-    borderColor: isDark ? 'hsl(0 0% 18%)' : 'hsl(0 0% 90%)',
-    borderWidth: 1,
-    padding: { top: 8, bottom: 8, left: 12, right: 12 },
-    cornerRadius: 8,
-    titleFont: { size: 11, weight: '600' },
-    bodyFont: { size: 12 },
-    displayColors: false,
-    titleMarginBottom: 4,
-  };
+  // ── Spending & Income Chart ──
+  {{if .DailyLabels}}
+  (function() {
+    var el = document.getElementById('echartsSpendingChart');
+    if (!el) return;
+    var chart = echarts.init(el, null, { renderer: 'canvas' });
 
-  var trendCtx = document.getElementById('spendingTrendChart');
-  if (trendCtx) {
     var dailyLabels = {{.DailyLabels}};
     var dailyData = {{.DailyAmounts}};
     var incomeData = {{.DailyIncomeAmounts}};
@@ -1052,260 +1045,385 @@ document.addEventListener('DOMContentLoaded', function() {
         return mdate.toLocaleDateString('en-US', { month: 'short' });
       }
       var date = new Date(d + 'T00:00:00');
-      if (chartDays <= 7) {
-        return date.toLocaleDateString('en-US', { weekday: 'short' });
-      }
+      if (chartDays <= 7) return date.toLocaleDateString('en-US', { weekday: 'short' });
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     });
 
-    var barPct = chartDays <= 7 ? 0.6 : chartDays <= 30 ? 0.65 : 0.75;
-    var catPct = chartDays <= 7 ? 0.7 : chartDays <= 30 ? 0.8 : 0.9;
-
-    var spendBg = isDark ? 'oklch(0.65 0 0 / 0.3)' : 'oklch(0.15 0 0 / 0.12)';
-    var spendHover = isDark ? 'oklch(0.65 0 0 / 0.5)' : 'oklch(0.15 0 0 / 0.22)';
-    var incomeBg = isDark ? 'oklch(0.70 0.14 155 / 0.3)' : 'oklch(0.62 0.14 155 / 0.25)';
-    var incomeHover = isDark ? 'oklch(0.70 0.14 155 / 0.5)' : 'oklch(0.62 0.14 155 / 0.4)';
+    var fullLabels = dailyLabels.map(function(d) {
+      if (chartDays === 365) {
+        var parts = d.split('-');
+        var mdate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+        return mdate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      }
+      var date = new Date(d + 'T00:00:00');
+      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    });
 
     var hasIncome = incomeData && incomeData.some(function(v) { return v > 0; });
+    var barWidth = chartDays <= 7 ? '50%' : chartDays <= 30 ? '60%' : '70%';
 
-    var datasets = [{
-      label: 'Spending',
+    var series = [{
+      name: 'Spending',
+      type: 'bar',
       data: dailyData,
-      backgroundColor: spendBg,
-      hoverBackgroundColor: spendHover,
-      borderRadius: { topLeft: 4, topRight: 4 },
-      borderSkipped: false,
-      barPercentage: barPct,
-      categoryPercentage: catPct,
-      order: 1,
+      itemStyle: {
+        color: spendColor,
+        borderRadius: [3, 3, 0, 0]
+      },
+      emphasis: {
+        itemStyle: { color: spendHoverColor }
+      },
+      barWidth: barWidth,
+      z: 2
     }];
 
     if (hasIncome) {
-      datasets.push({
-        label: 'Income',
+      series.push({
+        name: 'Income',
+        type: 'line',
         data: incomeData,
-        backgroundColor: incomeBg,
-        hoverBackgroundColor: incomeHover,
-        borderRadius: { topLeft: 4, topRight: 4 },
-        borderSkipped: false,
-        barPercentage: barPct,
-        categoryPercentage: catPct,
-        order: 2,
+        symbol: 'circle',
+        symbolSize: 0,
+        lineStyle: { color: incomeLineColor, width: 2.5 },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: incomeColor },
+            { offset: 1, color: 'rgba(46,160,100,0.01)' }
+          ])
+        },
+        itemStyle: { color: incomeLineColor },
+        emphasis: {
+          itemStyle: { borderWidth: 2, borderColor: '#fff', shadowBlur: 4 },
+          lineStyle: { width: 3 }
+        },
+        smooth: 0.3,
+        z: 3
       });
     }
 
     var maxTicks = chartDays <= 7 ? 7 : chartDays <= 30 ? 8 : chartDays <= 90 ? 10 : 12;
 
-    new Chart(trendCtx, {
-      type: 'bar',
-      data: { labels: shortLabels, datasets: datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: Object.assign({}, tooltipStyle, {
-            callbacks: {
-              title: function(items) {
-                var idx = items[0].dataIndex;
-                var d = dailyLabels[idx];
-                if (chartDays === 365) {
-                  var parts = d.split('-');
-                  var mdate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
-                  return mdate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                }
-                var tdate = new Date(d + 'T00:00:00');
-                return tdate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-              },
-              label: function(ctx) {
-                var prefix = ctx.dataset.label === 'Income' ? '+ ' : '';
-                return prefix + '$' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-              }
-            }
-          })
-        },
-        scales: {
-          x: {
-            grid: { display: false },
-            border: { display: false },
-            ticks: {
-              color: textColor,
-              font: { size: 10, weight: '500' },
-              maxTicksLimit: maxTicks,
-              maxRotation: 0,
-            }
-          },
-          y: {
-            grid: { color: gridColor, drawBorder: false },
-            border: { display: false },
-            ticks: {
-              color: textColor,
-              font: { size: 10, weight: '500' },
-              maxTicksLimit: 5,
-              callback: function(v) { return '$' + v.toLocaleString(); }
-            },
-            beginAtZero: true,
-          }
-        },
-        animation: {
-          duration: 400,
-          easing: 'easeOutQuart',
+    var option = {
+      animation: true,
+      animationDuration: 600,
+      animationEasing: 'cubicOut',
+      grid: { top: 12, right: 12, bottom: (chartDays >= 90 ? 52 : 28), left: 50 },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow', shadowStyle: { color: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' } },
+        backgroundColor: tooltipBg,
+        borderColor: tooltipBorder,
+        borderWidth: 1,
+        padding: [10, 14],
+        textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
+        extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
+        formatter: function(params) {
+          var idx = params[0].dataIndex;
+          var title = '<div style="font-weight:600;font-size:11px;margin-bottom:6px;color:' + tooltipText + '">' + fullLabels[idx] + '</div>';
+          var items = '';
+          params.forEach(function(p) {
+            var dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + p.color + ';margin-right:8px;vertical-align:middle;"></span>';
+            var val = '$' + p.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            items += '<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:2px 0;">' +
+              '<span style="color:' + tooltipSubtext + ';font-size:12px;">' + dot + p.seriesName + '</span>' +
+              '<span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + val + '</span></div>';
+          });
+          return title + items;
         }
-      }
-    });
-  }
-});
-</script>
-{{end}}
-
-<!-- Velocity Chart Script (deferred: initializes when Trends tab is shown) -->
-{{if .HasVelocityData}}
-<script>
-(function() {
-  var velocityInitialized = false;
-  var velocityData = {{.VelocityJSON}};
-
-  function initVelocityChart() {
-    if (velocityInitialized) return;
-    var velocityEl = document.getElementById('velocityChart');
-    if (!velocityEl || velocityEl.offsetParent === null) return;
-    velocityInitialized = true;
-
-    var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    var gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
-    var textColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
-
-    var vData = velocityData;
-    var numMonths = vData.datasets.length;
-
-    var lineColors = isDark
-      ? ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.15)', 'oklch(0.70 0.15 250)']
-      : ['rgba(0,0,0,0.06)', 'rgba(0,0,0,0.12)', 'oklch(0.55 0.15 250)'];
-    var fillColors = isDark
-      ? ['transparent', 'transparent', 'oklch(0.70 0.15 250 / 0.08)']
-      : ['transparent', 'transparent', 'oklch(0.55 0.15 250 / 0.06)'];
-    var borderWidths = [1.5, 1.5, 2.5];
-    var borderDashes = [[4, 3], [4, 3], []];
-
-    var datasets = vData.datasets.map(function(ds, i) {
-      var data = ds.data.slice();
-      if (i === numMonths - 1) {
-        var lastNonZero = data.length - 1;
-        while (lastNonZero > 0 && data[lastNonZero] === 0) lastNonZero--;
-        data = data.slice(0, lastNonZero + 1);
-      }
-      return {
-        label: ds.label,
-        data: data,
-        borderColor: lineColors[i] || lineColors[lineColors.length - 1],
-        backgroundColor: fillColors[i] || 'transparent',
-        fill: i === numMonths - 1,
-        borderWidth: borderWidths[i] || 2,
-        borderDash: borderDashes[i] || [],
-        pointRadius: 0,
-        pointHoverRadius: i === numMonths - 1 ? 4 : 2,
-        pointHoverBackgroundColor: lineColors[i] || lineColors[lineColors.length - 1],
-        tension: 0.3,
-        order: numMonths - i,
-      };
-    });
-
-    var tooltipStyle = {
-      backgroundColor: isDark ? 'hsl(0 0% 12%)' : 'hsl(0 0% 100%)',
-      titleColor: isDark ? 'hsl(0 0% 93%)' : 'hsl(0 0% 9%)',
-      bodyColor: isDark ? 'hsl(0 0% 64%)' : 'hsl(0 0% 45%)',
-      borderColor: isDark ? 'hsl(0 0% 18%)' : 'hsl(0 0% 90%)',
-      borderWidth: 1,
-      padding: { top: 8, bottom: 8, left: 12, right: 12 },
-      cornerRadius: 8,
-      titleFont: { size: 11, weight: '600' },
-      bodyFont: { size: 12 },
-      displayColors: true,
-      boxWidth: 8,
-      boxHeight: 8,
-      boxPadding: 4,
-      titleMarginBottom: 4,
+      },
+      xAxis: {
+        type: 'category',
+        data: shortLabels,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: textColor,
+          fontSize: 10,
+          fontWeight: 500,
+          fontFamily: 'Inter, system-ui, sans-serif',
+          interval: Math.max(0, Math.floor(shortLabels.length / maxTicks) - 1)
+        },
+        splitLine: { show: false }
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: textColor,
+          fontSize: 10,
+          fontWeight: 500,
+          fontFamily: 'Inter, system-ui, sans-serif',
+          formatter: function(v) { return '$' + v.toLocaleString(); }
+        },
+        splitLine: { lineStyle: { color: splitLineColor } },
+        splitNumber: 4
+      },
+      series: series
     };
 
-    new Chart(velocityEl, {
-      type: 'line',
-      data: {
-        labels: vData.labels,
-        datasets: datasets
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: Object.assign({}, tooltipStyle, {
-            callbacks: {
-              title: function(items) {
-                return 'Day ' + items[0].label;
-              },
-              label: function(ctx) {
-                return ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
-              }
-            }
-          })
+    // Add dataZoom slider for 90d and 12m views
+    if (chartDays >= 90) {
+      option.dataZoom = [{
+        type: 'slider',
+        show: true,
+        height: 18,
+        bottom: 4,
+        borderColor: 'transparent',
+        backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+        fillerColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        handleIcon: 'path://M10,0A10,10,0,1,1,0,10,10,10,0,0,1,10,0Z',
+        handleSize: '60%',
+        handleStyle: { color: isDark ? '#555' : '#ccc', borderColor: isDark ? '#666' : '#bbb' },
+        textStyle: { color: textColor, fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif' },
+        dataBackground: {
+          lineStyle: { color: 'transparent' },
+          areaStyle: { color: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }
         },
-        scales: {
-          x: {
-            grid: { display: false },
-            border: { display: false },
-            ticks: {
-              color: textColor,
-              font: { size: 10, weight: '500' },
-              maxTicksLimit: 10,
-              callback: function(v, i) { return (i + 1) % 5 === 0 || i === 0 ? (i + 1) : ''; }
-            },
-            title: {
-              display: true,
-              text: 'Day of month',
-              color: textColor,
-              font: { size: 10, weight: '500' },
-            }
+        selectedDataBackground: {
+          lineStyle: { color: 'transparent' },
+          areaStyle: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }
+        },
+        start: chartDays === 365 ? 50 : 30,
+        end: 100
+      }];
+    }
+
+    chart.setOption(option);
+    window.addEventListener('resize', function() { chart.resize(); });
+  })();
+  {{end}}
+
+  // ── Category Donut Chart ──
+  {{if .CategoryLabels}}
+  (function() {
+    var el = document.getElementById('echartsCategoryDonut');
+    if (!el) return;
+    var chart = echarts.init(el, null, { renderer: 'canvas' });
+
+    var labels = {{.CategoryLabels}};
+    var amounts = {{.CategoryAmounts}};
+    var colors = {{.CategoryColors}};
+    var totalSpending = {{printf "%.2f" .TotalSpending}};
+
+    var data = labels.map(function(name, i) {
+      return { value: amounts[i], name: name, itemStyle: { color: colors[i] } };
+    });
+
+    var option = {
+      animation: true,
+      animationDuration: 800,
+      animationEasing: 'cubicOut',
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: tooltipBg,
+        borderColor: tooltipBorder,
+        borderWidth: 1,
+        padding: [10, 14],
+        extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
+        formatter: function(params) {
+          var pct = (params.value / totalSpending * 100).toFixed(1);
+          var val = '$' + params.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          return '<div style="font-family:Inter,system-ui,sans-serif">' +
+            '<div style="font-weight:600;font-size:12px;margin-bottom:4px;color:' + tooltipText + '">' + params.name + '</div>' +
+            '<div style="display:flex;justify-content:space-between;gap:16px;align-items:center;">' +
+            '<span style="color:' + tooltipSubtext + ';font-size:12px">' + pct + '% of total</span>' +
+            '<span style="font-weight:600;font-size:13px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + val + '</span></div></div>';
+        }
+      },
+      series: [{
+        type: 'pie',
+        radius: ['52%', '78%'],
+        center: ['50%', '50%'],
+        avoidLabelOverlap: false,
+        padAngle: 2,
+        itemStyle: {
+          borderRadius: 4,
+          borderColor: isDark ? '#1a1a1a' : '#ffffff',
+          borderWidth: 2
+        },
+        label: {
+          show: true,
+          position: 'center',
+          formatter: function() {
+            return '{total|$' + totalSpending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '}\n{label|total spending}';
           },
-          y: {
-            grid: { color: gridColor, drawBorder: false },
-            border: { display: false },
-            ticks: {
-              color: textColor,
-              font: { size: 10, weight: '500' },
-              maxTicksLimit: 5,
-              callback: function(v) { return '$' + v.toLocaleString(); }
+          rich: {
+            total: {
+              fontSize: 20,
+              fontWeight: 700,
+              fontFamily: 'Inter, system-ui, sans-serif',
+              color: isDark ? '#e5e5e5' : '#1a1a1a',
+              padding: [0, 0, 4, 0]
             },
-            beginAtZero: true,
+            label: {
+              fontSize: 10,
+              fontFamily: 'Inter, system-ui, sans-serif',
+              color: textColor
+            }
           }
         },
-        animation: {
-          duration: 600,
-          easing: 'easeOutQuart',
-        }
-      }
-    });
-  }
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 12,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.15)'
+          },
+          label: { show: true }
+        },
+        data: data
+      }]
+    };
 
-  // Initialize on DOMContentLoaded if tab is already 'trends', otherwise defer.
-  document.addEventListener('DOMContentLoaded', function() {
+    chart.setOption(option);
+    window.addEventListener('resize', function() { chart.resize(); });
+  })();
+  {{end}}
+
+  // ── Velocity Chart (ECharts) ──
+  {{if .HasVelocityData}}
+  (function() {
+    var velocityInitialized = false;
+    var velocityData = {{.VelocityJSON}};
+
+    function initVelocityChart() {
+      if (velocityInitialized) return;
+      var el = document.getElementById('echartsVelocityChart');
+      if (!el || el.offsetParent === null) return;
+      velocityInitialized = true;
+
+      var chart = echarts.init(el, null, { renderer: 'canvas' });
+      var vData = velocityData;
+      var numMonths = vData.datasets.length;
+
+      var lineColors = isDark
+        ? ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.2)', 'rgba(100,140,230,0.9)']
+        : ['rgba(0,0,0,0.08)', 'rgba(0,0,0,0.15)', 'rgba(70,100,200,0.85)'];
+      var lineWidths = [1.5, 1.5, 2.5];
+      var lineDashes = [[5, 4], [5, 4], [0, 0]];
+
+      var series = vData.datasets.map(function(ds, i) {
+        var data = ds.data.slice();
+        // For current month, trim trailing zeroes
+        if (i === numMonths - 1) {
+          var lastNonZero = data.length - 1;
+          while (lastNonZero > 0 && data[lastNonZero] === 0) lastNonZero--;
+          // Set trailing zeroes to null so line stops
+          for (var k = lastNonZero + 1; k < data.length; k++) data[k] = null;
+        }
+        var s = {
+          name: ds.label,
+          type: 'line',
+          data: data,
+          symbol: 'none',
+          smooth: 0.3,
+          lineStyle: {
+            color: lineColors[i],
+            width: lineWidths[i],
+            type: lineDashes[i][0] > 0 ? 'dashed' : 'solid'
+          },
+          itemStyle: { color: lineColors[i] },
+          emphasis: {
+            lineStyle: { width: lineWidths[i] + 1 }
+          },
+          z: i + 1
+        };
+        // Fill area for current month only
+        if (i === numMonths - 1) {
+          s.areaStyle = {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: isDark ? 'rgba(100,140,230,0.12)' : 'rgba(70,100,200,0.08)' },
+              { offset: 1, color: 'rgba(70,100,200,0.01)' }
+            ])
+          };
+        }
+        return s;
+      });
+
+      var option = {
+        animation: true,
+        animationDuration: 800,
+        animationEasing: 'cubicOut',
+        grid: { top: 12, right: 12, bottom: 36, left: 50 },
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: tooltipBg,
+          borderColor: tooltipBorder,
+          borderWidth: 1,
+          padding: [10, 14],
+          textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
+          extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
+          formatter: function(params) {
+            var title = '<div style="font-weight:600;font-size:11px;margin-bottom:6px;color:' + tooltipText + '">Day ' + params[0].axisValue + '</div>';
+            var items = '';
+            params.forEach(function(p) {
+              if (p.value == null) return;
+              var dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + p.color + ';margin-right:8px;vertical-align:middle;"></span>';
+              var val = '$' + p.value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+              items += '<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:2px 0;">' +
+                '<span style="color:' + tooltipSubtext + ';font-size:12px;">' + dot + p.seriesName + '</span>' +
+                '<span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + val + '</span></div>';
+            });
+            return title + items;
+          }
+        },
+        xAxis: {
+          type: 'category',
+          data: vData.labels,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: textColor,
+            fontSize: 10,
+            fontWeight: 500,
+            fontFamily: 'Inter, system-ui, sans-serif',
+            formatter: function(v) {
+              var n = parseInt(v);
+              return (n === 1 || n % 5 === 0) ? n : '';
+            }
+          },
+          name: 'Day of month',
+          nameLocation: 'middle',
+          nameGap: 22,
+          nameTextStyle: { color: textColor, fontSize: 10, fontWeight: 500, fontFamily: 'Inter, system-ui, sans-serif' }
+        },
+        yAxis: {
+          type: 'value',
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: textColor,
+            fontSize: 10,
+            fontWeight: 500,
+            fontFamily: 'Inter, system-ui, sans-serif',
+            formatter: function(v) { return '$' + v.toLocaleString(); }
+          },
+          splitLine: { lineStyle: { color: splitLineColor } },
+          splitNumber: 4
+        },
+        series: series
+      };
+
+      chart.setOption(option);
+      window.addEventListener('resize', function() { chart.resize(); });
+    }
+
+    // Initialize on DOMContentLoaded if tab is already 'trends', otherwise defer.
     if (new URLSearchParams(window.location.search).get('tab') === 'trends') {
       setTimeout(initVelocityChart, 50);
     }
-  });
-  // Listen for tab switches — Alpine dispatches this after x-show updates.
-  document.addEventListener('click', function() {
-    setTimeout(initVelocityChart, 100);
-  });
-})();
+    // Listen for tab switches.
+    document.addEventListener('click', function() {
+      setTimeout(initVelocityChart, 100);
+    });
+  })();
+  {{end}}
+});
 </script>
-{{end}}
 
 <!-- Re-init Lucide icons on tab switch (icons in initially hidden tabs need rendering) -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // After any click (which may be a tab switch), re-create icons after Alpine updates DOM.
   document.addEventListener('click', function() {
     setTimeout(function() {
       if (typeof lucide !== 'undefined') { lucide.createIcons(); }
