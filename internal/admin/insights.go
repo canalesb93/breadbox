@@ -1049,6 +1049,184 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			}
 		}
 
+		// ── Anomaly Detection ──
+		// Find categories where current period spending is significantly above
+		// the historical per-period average, and individual large transactions
+		// that are outliers within their category.
+		type CategoryAnomaly struct {
+			Category    string
+			Color       string
+			Current     float64
+			Historical  float64 // average per-period
+			Multiplier  float64 // current / historical
+			Percentile  float64 // 0-100, how extreme this is
+			TopTxName   string
+			TopTxAmount float64
+			TopTxDate   string
+		}
+		var categoryAnomalies []CategoryAnomaly
+		var hasCategoryAnomalies bool
+
+		type TransactionAnomaly struct {
+			Name           string
+			Amount         float64
+			Date           string
+			Category       string
+			CategoryColor  string
+			CategoryAvg    float64
+			Multiplier     float64
+			AccountName    string
+		}
+		var transactionAnomalies []TransactionAnomaly
+		var hasTransactionAnomalies bool
+
+		// We need historical category averages. Use 90 days of history,
+		// broken into periods matching the current chartDays window.
+		historyDays := 90
+		if chartDays >= 90 {
+			historyDays = 365
+		}
+		histStart := time.Now().AddDate(0, 0, -historyDays)
+		numPeriods := float64(historyDays) / float64(chartDays)
+		if numPeriods < 1 {
+			numPeriods = 1
+		}
+
+		// Get historical category spending totals.
+		histCatSummary, histErr := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+			GroupBy:      "category",
+			StartDate:    &histStart,
+			SpendingOnly: true,
+		})
+		if histErr != nil {
+			a.Logger.Error("anomaly historical summary", "error", histErr)
+		}
+
+		histCatAvg := make(map[string]float64) // category -> avg per period
+		histCatColor := make(map[string]string)
+		if histCatSummary != nil {
+			for i, row := range histCatSummary.Summary {
+				label := "Uncategorized"
+				if row.Category != nil && *row.Category != "" {
+					label = *row.Category
+				}
+				avgPerPeriod := row.TotalAmount / numPeriods
+				histCatAvg[label] = avgPerPeriod
+				color := ""
+				if row.CategoryColor != nil && *row.CategoryColor != "" {
+					color = *row.CategoryColor
+				} else {
+					color = categoryPalette[i%len(categoryPalette)]
+				}
+				histCatColor[label] = color
+			}
+		}
+
+		// Compare current period vs historical averages.
+		for cat, curAmt := range currentCatMap {
+			avgAmt, exists := histCatAvg[cat]
+			if !exists || avgAmt < 20 {
+				continue
+			}
+			multiplier := curAmt / avgAmt
+			// Flag if spending is 1.8x or more of the historical average.
+			if multiplier >= 1.8 && curAmt >= 50 {
+				pctl := math.Min((multiplier-1)*50, 99)
+				ca := CategoryAnomaly{
+					Category:   cat,
+					Color:      histCatColor[cat],
+					Current:    curAmt,
+					Historical: avgAmt,
+					Multiplier: multiplier,
+					Percentile: pctl,
+				}
+
+				// Find the largest transaction in this category for the period.
+				var txName *string
+				var txAmt *float64
+				var txDate *string
+				_ = a.DB.QueryRow(ctx, `
+					SELECT COALESCE(NULLIF(merchant_name, ''), name), amount, TO_CHAR(date, 'Mon DD')
+					FROM transactions
+					WHERE deleted_at IS NULL AND date >= $1 AND amount > 0
+						AND pending = false AND COALESCE(category_primary, '') = $2
+					ORDER BY amount DESC LIMIT 1
+				`, chartStart, cat).Scan(&txName, &txAmt, &txDate)
+				if txName != nil {
+					ca.TopTxName = *txName
+				}
+				if txAmt != nil {
+					ca.TopTxAmount = *txAmt
+				}
+				if txDate != nil {
+					ca.TopTxDate = *txDate
+				}
+
+				categoryAnomalies = append(categoryAnomalies, ca)
+			}
+		}
+
+		// Sort by multiplier descending (most extreme first).
+		sort.Slice(categoryAnomalies, func(i, j int) bool {
+			return categoryAnomalies[i].Multiplier > categoryAnomalies[j].Multiplier
+		})
+		if len(categoryAnomalies) > 6 {
+			categoryAnomalies = categoryAnomalies[:6]
+		}
+		hasCategoryAnomalies = len(categoryAnomalies) > 0
+
+		// ── Individual transaction anomalies ──
+		// Find transactions that are significantly larger than the average for
+		// their category (3x or more).
+		anomalyTxRows, atxErr := a.DB.Query(ctx, `
+			WITH cat_stats AS (
+				SELECT
+					COALESCE(category_primary, '') AS cat,
+					AVG(amount) AS avg_amount,
+					STDDEV(amount) AS std_amount,
+					COUNT(*) AS tx_count
+				FROM transactions
+				WHERE deleted_at IS NULL AND date >= $1 AND amount > 0 AND pending = false
+				GROUP BY COALESCE(category_primary, '')
+				HAVING COUNT(*) >= 3 AND AVG(amount) > 5
+			)
+			SELECT
+				COALESCE(NULLIF(t.merchant_name, ''), t.name) AS tx_name,
+				t.amount,
+				TO_CHAR(t.date, 'Mon DD') AS tx_date,
+				COALESCE(t.category_primary, 'Uncategorized') AS category,
+				cs.avg_amount AS cat_avg,
+				t.amount / cs.avg_amount AS multiplier,
+				COALESCE(a.display_name, a.name, '') AS account_name
+			FROM transactions t
+			JOIN cat_stats cs ON COALESCE(t.category_primary, '') = cs.cat
+			LEFT JOIN accounts a ON t.account_id = a.id
+			WHERE t.deleted_at IS NULL AND t.date >= $2 AND t.amount > 0 AND t.pending = false
+				AND t.amount >= cs.avg_amount * 1.5
+				AND t.amount >= 50
+			ORDER BY t.amount / cs.avg_amount DESC
+			LIMIT 8
+		`, histStart, chartStart)
+		if atxErr != nil {
+			a.Logger.Error("transaction anomaly query", "error", atxErr)
+		} else {
+			defer anomalyTxRows.Close()
+			for anomalyTxRows.Next() {
+				var ta TransactionAnomaly
+				if err := anomalyTxRows.Scan(&ta.Name, &ta.Amount, &ta.Date, &ta.Category, &ta.CategoryAvg, &ta.Multiplier, &ta.AccountName); err != nil {
+					a.Logger.Error("transaction anomaly scan", "error", err)
+					continue
+				}
+				ta.CategoryColor = histCatColor[ta.Category]
+				if ta.CategoryColor == "" {
+					ta.CategoryColor = categoryPalette[len(transactionAnomalies)%len(categoryPalette)]
+				}
+				transactionAnomalies = append(transactionAnomalies, ta)
+			}
+			anomalyTxRows.Close()
+			hasTransactionAnomalies = len(transactionAnomalies) > 0
+		}
+
 		data := map[string]any{
 			"PageTitle":              "Insights",
 			"CurrentPage":            "insights",
@@ -1119,6 +1297,11 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			// Family spending breakdown.
 			"HasFamilyData":          hasFamilyData,
 			"FamilySpending":         familySpending,
+			// Anomaly detection.
+			"HasCategoryAnomalies":      hasCategoryAnomalies,
+			"CategoryAnomalies":         categoryAnomalies,
+			"HasTransactionAnomalies":   hasTransactionAnomalies,
+			"TransactionAnomalies":      transactionAnomalies,
 		}
 		tr.Render(w, r, "insights.html", data)
 	}
