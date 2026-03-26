@@ -6,8 +6,8 @@
 <!-- Hero: Transaction name + amount -->
 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
   <div class="flex items-center gap-4">
-    <div class="w-12 h-12 rounded-xl {{if lt .Transaction.Amount 0.0}}bg-error/10{{else}}bg-success/10{{end}} flex items-center justify-center shrink-0">
-      <i data-lucide="{{if lt .Transaction.Amount 0.0}}arrow-up-right{{else}}arrow-down-left{{end}}" class="w-6 h-6 {{if lt .Transaction.Amount 0.0}}text-error{{else}}text-success{{end}}"></i>
+    <div class="w-12 h-12 rounded-xl {{if lt .Transaction.Amount 0.0}}bg-success/10{{else}}bg-error/10{{end}} flex items-center justify-center shrink-0">
+      <i data-lucide="{{if lt .Transaction.Amount 0.0}}arrow-down-left{{else}}arrow-up-right{{end}}" class="w-6 h-6 {{if lt .Transaction.Amount 0.0}}text-success{{else}}text-error{{end}}"></i>
     </div>
     <div>
       <h1 class="bb-page-title">{{.Transaction.Name}}</h1>
@@ -22,7 +22,7 @@
     </div>
   </div>
   <div class="text-right sm:text-right">
-    <p class="text-3xl font-semibold tabular-nums{{if lt .Transaction.Amount 0.0}} text-error{{end}}">
+    <p class="text-3xl font-semibold tabular-nums{{if lt .Transaction.Amount 0.0}} text-success{{end}}">
       {{formatAmount .Transaction.Amount}}
     </p>
     {{if .Transaction.IsoCurrencyCode}}<p class="text-xs text-base-content/30 mt-0.5">{{deref .Transaction.IsoCurrencyCode}}</p>{{end}}
