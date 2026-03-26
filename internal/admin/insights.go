@@ -1137,6 +1137,125 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			}
 		}
 
+		// ── Cash Flow Forecast ──
+		// Build a day-by-day chart: actual income-spending for past days,
+		// projected for remaining days of the month based on daily averages.
+		type ForecastPoint struct {
+			Day       int     `json:"day"`
+			DateLabel string  `json:"dateLabel"` // "Mar 1", "Mar 2", ...
+			Actual    float64 `json:"actual"`    // cumulative net (income - spending), 0 for future
+			Forecast  float64 `json:"forecast"`  // projected cumulative net, 0 for past-only days
+			IsActual  bool    `json:"isActual"`
+		}
+		var forecastPoints []ForecastPoint
+		var hasForecastData bool
+		var forecastJSON template.JS
+
+		// We need daily income and spending for the current month.
+		type dailyFlow struct {
+			Income   float64
+			Spending float64
+		}
+		dailyFlows := make(map[int]dailyFlow)
+
+		flowRows, flowErr := a.DB.Query(ctx, `
+			SELECT EXTRACT(DAY FROM date)::int AS day_num, amount
+			FROM transactions
+			WHERE deleted_at IS NULL
+				AND date >= $1
+				AND date < $2
+				AND pending = false
+		`, monthStart, time.Date(today.Year(), today.Month()+1, 1, 0, 0, 0, 0, today.Location()))
+		if flowErr != nil {
+			a.Logger.Error("forecast flow query", "error", flowErr)
+		} else {
+			for flowRows.Next() {
+				var dayNum int
+				var amt float64
+				if err := flowRows.Scan(&dayNum, &amt); err != nil {
+					continue
+				}
+				df := dailyFlows[dayNum]
+				if amt > 0 {
+					df.Spending += amt
+				} else {
+					df.Income += -amt
+				}
+				dailyFlows[dayNum] = df
+			}
+			flowRows.Close()
+		}
+
+		if len(dailyFlows) > 0 && daysElapsed > 0 {
+			hasForecastData = true
+
+			// Calculate average daily income and spending from actual data.
+			var totalDailyIncome, totalDailySpending float64
+			for d := 1; d <= daysElapsed; d++ {
+				df := dailyFlows[d]
+				totalDailyIncome += df.Income
+				totalDailySpending += df.Spending
+			}
+			avgDailyIncome := totalDailyIncome / float64(daysElapsed)
+			avgDailySpending := totalDailySpending / float64(daysElapsed)
+
+			// Build the forecast points.
+			var cumulativeNet float64
+			for d := 1; d <= daysInMonth; d++ {
+				pt := ForecastPoint{
+					Day:       d,
+					DateLabel: time.Date(today.Year(), today.Month(), d, 0, 0, 0, 0, today.Location()).Format("Jan 2"),
+				}
+
+				if d <= daysElapsed {
+					// Actual data.
+					df := dailyFlows[d]
+					dayNet := df.Income - df.Spending
+					cumulativeNet += dayNet
+					pt.Actual = math.Round(cumulativeNet*100) / 100
+					pt.Forecast = math.Round(cumulativeNet*100) / 100 // forecast matches actual for past days
+					pt.IsActual = true
+				} else {
+					// Projected: use daily averages.
+					projectedDayNet := avgDailyIncome - avgDailySpending
+					cumulativeNet += projectedDayNet
+					pt.Forecast = math.Round(cumulativeNet*100) / 100
+					pt.IsActual = false
+				}
+				forecastPoints = append(forecastPoints, pt)
+			}
+
+			// JSON-encode.
+			type forecastChartData struct {
+				Labels        []string  `json:"labels"`
+				Actual        []any     `json:"actual"`   // float64 or null
+				Forecast      []float64 `json:"forecast"`
+				DaysElapsed   int       `json:"daysElapsed"`
+				AvgDailyNet   float64   `json:"avgDailyNet"`
+				ProjectedEOM  float64   `json:"projectedEOM"`
+			}
+			fcd := forecastChartData{
+				DaysElapsed: daysElapsed,
+				AvgDailyNet: math.Round((avgDailyIncome-avgDailySpending)*100) / 100,
+			}
+			for _, pt := range forecastPoints {
+				fcd.Labels = append(fcd.Labels, pt.DateLabel)
+				if pt.IsActual {
+					fcd.Actual = append(fcd.Actual, pt.Actual)
+				} else {
+					fcd.Actual = append(fcd.Actual, nil)
+				}
+				fcd.Forecast = append(fcd.Forecast, pt.Forecast)
+			}
+			if len(forecastPoints) > 0 {
+				fcd.ProjectedEOM = forecastPoints[len(forecastPoints)-1].Forecast
+			}
+
+			if fb, err := json.Marshal(fcd); err == nil {
+				forecastJSON = template.JS(fb)
+			}
+		}
+
 		// ── Anomaly Detection ──
 		// Find categories where current period spending is significantly above
 		// the historical per-period average, and individual large transactions
@@ -1389,6 +1508,9 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			"HasSavingsRateTrend":       hasSavingsRateTrend,
 			"SavingsRateTrend":          savingsRateTrend,
 			"SavingsRateTrendJSON":      savingsRateTrendJSON,
+			// Cash flow forecast.
+			"HasForecastData":           hasForecastData,
+			"ForecastJSON":              forecastJSON,
 			// Anomaly detection.
 			"HasCategoryAnomalies":      hasCategoryAnomalies,
 			"CategoryAnomalies":         categoryAnomalies,
