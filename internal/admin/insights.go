@@ -115,6 +115,58 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			}
 		}
 
+		// ── Category Drill-Down Data ──
+		// Query top merchants per category for interactive donut drill-down.
+		type CategoryMerchant struct {
+			Name   string  `json:"name"`
+			Amount float64 `json:"amount"`
+			Count  int     `json:"count"`
+		}
+		categoryDrilldown := make(map[string][]CategoryMerchant)
+		var categoryDrilldownJSON template.JS
+
+		drilldownRows, drilldownErr := a.DB.Query(ctx, `
+			WITH ranked AS (
+				SELECT
+					COALESCE(cat.display_name, t.category_primary, 'Uncategorized') AS cat,
+					COALESCE(NULLIF(t.merchant_name, ''), t.name) AS merchant,
+					SUM(t.amount) AS total,
+					COUNT(*)::int AS tx_count,
+					ROW_NUMBER() OVER (PARTITION BY COALESCE(cat.display_name, t.category_primary, 'Uncategorized') ORDER BY SUM(t.amount) DESC) AS rn
+				FROM transactions t
+				LEFT JOIN categories cat ON t.category_id = cat.id
+				WHERE t.deleted_at IS NULL AND t.date >= $1 AND t.amount > 0 AND t.pending = false
+				GROUP BY COALESCE(cat.display_name, t.category_primary, 'Uncategorized'), COALESCE(NULLIF(t.merchant_name, ''), t.name)
+			)
+			SELECT cat, merchant, total, tx_count
+			FROM ranked
+			WHERE rn <= 8
+			ORDER BY cat, total DESC
+		`, chartStart)
+		if drilldownErr != nil {
+			a.Logger.Error("category drilldown query", "error", drilldownErr)
+		} else {
+			for drilldownRows.Next() {
+				var cat, merchant string
+				var total float64
+				var count int
+				if err := drilldownRows.Scan(&cat, &merchant, &total, &count); err != nil {
+					continue
+				}
+				categoryDrilldown[cat] = append(categoryDrilldown[cat], CategoryMerchant{
+					Name:   merchant,
+					Amount: total,
+					Count:  count,
+				})
+			}
+			drilldownRows.Close()
+		}
+		if len(categoryDrilldown) > 0 {
+			if db, err := json.Marshal(categoryDrilldown); err == nil {
+				categoryDrilldownJSON = template.JS(db)
+			}
+		}
+
 		// ── Daily spending trend ──
 		chartGroupBy := "day"
 		if chartDays == 365 {
@@ -1448,6 +1500,7 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			"DailyIncomeAmounts":     dailyIncomeAmountsJSON,
 			"TopCategories":          topCategories,
 			"MaxCategorySpend":       maxCategorySpend,
+			"CategoryDrilldownJSON":  categoryDrilldownJSON,
 			// Totals.
 			"TotalSpending":          totalSpending,
 			"TotalIncome":            totalIncome,
