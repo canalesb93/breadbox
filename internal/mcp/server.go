@@ -91,7 +91,13 @@ RULE CREATION STRATEGY — follow this order:
 
 - ALWAYS check list_transaction_rules before creating to avoid duplicates
 - Use batch_create_rules to create multiple rules efficiently
-- Before creating rules, query some transactions to see what category_primary values exist — use query_transactions with fields=core,category`
+- Before creating rules, query some transactions to see what category_primary values exist — use query_transactions with fields=core,category
+
+AGENT REPORTS:
+- Use submit_report at the end of a review session to summarize what you did and flag anything needing human attention
+- The report title should be a short summary (e.g., "Weekly Review: 45 transactions categorized")
+- The body supports markdown. Reference specific transactions with links: [Transaction Name](/transactions/TRANSACTION_ID)
+- Reports appear on the family's dashboard — use them to communicate findings, flag suspicious transactions, or suggest actions`
 
 // ToolClassification indicates whether a tool is read-only or performs writes.
 type ToolClassification string
@@ -263,6 +269,9 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("auto_approve_categorized_reviews", ToolWrite,
 			"Bulk-approve all pending reviews whose transactions already have a category (e.g., from rules). This bridges the gap between rules and reviews — after creating rules with apply_retroactively=true, call this to clear the review queue of transactions that rules already handled. Returns count of approved reviews and remaining pending count.",
 			s.handleAutoApproveCategorized),
+		makeToolDef("submit_report", ToolWrite,
+			"Submit a report to the family dashboard summarizing your work, flagging transactions, or raising issues. Reports appear in the dashboard for the family to review. Use this at the end of a review session to summarize what you did, what you found, and any items needing human attention. The body supports markdown — reference specific transactions with [Transaction Name](/transactions/TRANSACTION_ID) links so the family can click through to see details.",
+			s.handleSubmitReport),
 	}
 }
 

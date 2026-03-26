@@ -129,6 +129,8 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Account link MCP tools: `list_account_links`, `create_account_link` (ToolWrite, auto-runs initial reconciliation), `delete_account_link`, `reconcile_account_link`, `list_transaction_matches`, `confirm_match`, `reject_match`.
 - Account link REST API: `/api/v1/account-links` CRUD + `/reconcile` + `/matches`. `/api/v1/transaction-matches/{id}/confirm|reject`. `POST /api/v1/transaction-matches/manual`.
 - Account link admin: `/admin/account-links` page with link list, create modal, match detail view. Nav item with `link-2` Lucide icon between Categories and Family Members.
+- Agent reports: `agent_reports` table for agents to submit summaries and flag transactions. `submit_report` MCP tool (ToolWrite) with title + markdown body. Dashboard widget shows unread reports with markdown rendering (marked.js CDN). Transaction deep-links via `[Name](/transactions/ID)` in markdown. Mark read/dismiss via admin API. Nav badge shows unread count.
+- Agent report REST API: `GET /api/v1/reports`, `POST /api/v1/reports`, `GET /api/v1/reports/unread-count`, `PATCH /api/v1/reports/{id}/read`. Admin API: `POST /-/reports/{id}/read`, `POST /-/reports/read-all`.
 
 ## Canonical Enums
 

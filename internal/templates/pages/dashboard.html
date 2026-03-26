@@ -306,6 +306,49 @@
 </div>
 {{end}}
 
+<!-- Agent Reports -->
+{{if .AgentReports}}
+<div class="bb-card mb-6 bb-stagger" x-data="agentReports()">
+  <div class="p-5">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <i data-lucide="bot" class="w-4 h-4 text-primary"></i>
+        <h2 class="text-sm font-semibold text-base-content/70">Agent Reports</h2>
+        <span class="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{{len .AgentReports}} new</span>
+      </div>
+      <button class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors"
+        @click="markAllRead()">
+        Mark all read
+      </button>
+    </div>
+    <div class="space-y-3">
+      {{range .AgentReports}}
+      <div class="rounded-xl border border-base-300/60 p-4 transition-all duration-300"
+        :class="dismissed.has('{{.ID}}') ? 'opacity-0 scale-95 h-0 !p-0 !m-0 overflow-hidden border-0' : ''"
+        id="report-{{.ID}}">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-sm font-semibold">{{.Title}}</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-base-content/40 mb-2">
+              <span>{{.CreatedByName}}</span>
+              <span>&middot;</span>
+              <span>{{.CreatedAt}}</span>
+            </div>
+            <div class="bb-report-body text-sm text-base-content/70 leading-relaxed" data-markdown="{{.Body}}"></div>
+          </div>
+          <button class="btn btn-ghost btn-xs shrink-0 rounded-lg" @click="markRead('{{.ID}}')" title="Dismiss">
+            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
 <!-- Recent Transactions + Connection Health -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
   <!-- Recent Transactions -->
@@ -608,6 +651,58 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 });
+</script>
+{{end}}
+
+<!-- Agent Reports: markdown rendering + dismiss logic -->
+{{if .AgentReports}}
+<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Render markdown in report bodies.
+  document.querySelectorAll('.bb-report-body').forEach(function(el) {
+    var md = el.getAttribute('data-markdown');
+    if (md) {
+      el.innerHTML = marked.parse(md);
+      // Style rendered content.
+      el.querySelectorAll('a').forEach(function(a) {
+        a.classList.add('link', 'link-primary');
+        // Open external links in new tab, keep internal links in same tab.
+        if (a.href && !a.href.startsWith(window.location.origin) && !a.getAttribute('href').startsWith('/')) {
+          a.setAttribute('target', '_blank');
+          a.setAttribute('rel', 'noopener');
+        }
+      });
+      el.querySelectorAll('ul, ol').forEach(function(list) {
+        list.classList.add('list-disc', 'pl-4', 'space-y-0.5');
+      });
+      el.querySelectorAll('p').forEach(function(p) {
+        p.classList.add('mb-1');
+      });
+      el.querySelectorAll('strong').forEach(function(s) {
+        s.classList.add('text-base-content');
+      });
+    }
+  });
+});
+
+function agentReports() {
+  return {
+    dismissed: new Set(),
+    markRead(id) {
+      this.dismissed.add(id);
+      fetch('/-/reports/' + id + '/read', { method: 'POST' });
+    },
+    markAllRead() {
+      var self = this;
+      document.querySelectorAll('[id^="report-"]').forEach(function(el) {
+        var id = el.id.replace('report-', '');
+        self.dismissed.add(id);
+      });
+      fetch('/-/reports/read-all', { method: 'POST' });
+    }
+  };
+}
 </script>
 {{end}}
 

@@ -1145,6 +1145,28 @@ func (s *MCPServer) handleBulkRecategorize(ctx context.Context, _ *mcpsdk.CallTo
 	return jsonResult(result)
 }
 
+// --- Agent Reports ---
+
+type submitReportInput struct {
+	Title string `json:"title" jsonschema:"required,Short title summarizing the report (e.g. 'Weekly Review Complete' or 'Suspicious Transactions Found')"`
+	Body  string `json:"body" jsonschema:"required,Detailed report content in markdown format. To reference specific transactions use markdown links: [Transaction Name](/transactions/TRANSACTION_ID). These will be rendered as clickable deep-links in the dashboard."`
+}
+
+func (s *MCPServer) handleSubmitReport(reqCtx context.Context, _ *mcpsdk.CallToolRequest, input submitReportInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+
+	if err := s.checkWritePermission(reqCtx); err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	actor := service.ActorFromContext(reqCtx)
+	report, err := s.svc.CreateAgentReport(ctx, input.Title, input.Body, actor)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(report)
+}
+
 // --- Helpers ---
 
 // parseConditions converts a map[string]any (from MCP input) to a service.Condition.

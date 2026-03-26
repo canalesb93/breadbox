@@ -67,6 +67,8 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/account-links", ListAccountLinksHandler(svc))
 		r.Get("/account-links/{id}", GetAccountLinkHandler(svc))
 		r.Get("/account-links/{id}/matches", ListTransactionMatchesHandler(svc))
+		r.Get("/reports", ListReportsHandler(svc))
+		r.Get("/reports/unread-count", UnreadReportCountHandler(svc))
 
 		// Write endpoints — full_access API keys only.
 		r.Group(func(r chi.Router) {
@@ -105,6 +107,8 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Post("/transaction-matches/{id}/confirm", ConfirmMatchHandler(svc))
 			r.Post("/transaction-matches/{id}/reject", RejectMatchHandler(svc))
 			r.Post("/transaction-matches/manual", ManualMatchHandler(svc))
+			r.Post("/reports", CreateReportHandler(svc))
+			r.Patch("/reports/{id}/read", MarkReportReadHandler(svc))
 		})
 	})
 
