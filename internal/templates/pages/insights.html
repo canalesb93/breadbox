@@ -1,8 +1,19 @@
 {{define "content"}}
 
 <!-- Insights Page with Tabbed Layout -->
-<div x-data="{ tab: (new URLSearchParams(window.location.search).get('tab')) || 'overview' }"
-     x-init="$watch('tab', v => { const u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); if (window._onInsightsTabSwitch) window._onInsightsTabSwitch(v); })">
+<div x-data="{ tab: (new URLSearchParams(window.location.search).get('tab')) || 'overview', highlightedCategory: '' }"
+     x-init="$watch('tab', v => { const u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); if (window._onInsightsTabSwitch) window._onInsightsTabSwitch(v); })"
+     @keydown.window="
+       if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.isContentEditable) return;
+       const tabs = ['overview', 'analysis', 'trends'];
+       const idx = tabs.indexOf(tab);
+       if (event.key === 'ArrowRight' && idx < tabs.length - 1) { event.preventDefault(); tab = tabs[idx + 1]; }
+       else if (event.key === 'ArrowLeft' && idx > 0) { event.preventDefault(); tab = tabs[idx - 1]; }
+       else if (event.key === '1') { tab = 'overview'; }
+       else if (event.key === '2') { tab = 'analysis'; }
+       else if (event.key === '3') { tab = 'trends'; }
+       else if (event.key === 'Escape') { highlightedCategory = ''; $dispatch('insights-drill-up'); }
+     ">
 
 <!-- Insights Page Header with Date Range Picker -->
 <div class="bb-page-header">
@@ -74,17 +85,25 @@
     class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap">
     <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 hidden sm:block"></i>
     Overview
+    <kbd class="hidden lg:inline-block text-[0.55rem] font-normal text-base-content/20 bg-base-200/50 px-1 py-0.5 rounded ml-1">1</kbd>
   </button>
   <button @click="tab = 'analysis'" :class="tab === 'analysis' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
     class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap">
     <i data-lucide="search" class="w-3.5 h-3.5 hidden sm:block"></i>
     Analysis
+    <kbd class="hidden lg:inline-block text-[0.55rem] font-normal text-base-content/20 bg-base-200/50 px-1 py-0.5 rounded ml-1">2</kbd>
   </button>
   <button @click="tab = 'trends'" :class="tab === 'trends' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
     class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap">
     <i data-lucide="trending-up" class="w-3.5 h-3.5 hidden sm:block"></i>
     Trends
+    <kbd class="hidden lg:inline-block text-[0.55rem] font-normal text-base-content/20 bg-base-200/50 px-1 py-0.5 rounded ml-1">3</kbd>
   </button>
+  <span class="hidden lg:flex items-center gap-1 ml-auto text-[0.55rem] text-base-content/20 shrink-0 pr-1">
+    <kbd class="bg-base-200/50 px-1 py-0.5 rounded">&larr;</kbd>
+    <kbd class="bg-base-200/50 px-1 py-0.5 rounded">&rarr;</kbd>
+    <span class="ml-0.5">to navigate</span>
+  </span>
 </div>
 
 <!-- ═══════════════════════════════════════════════ -->
@@ -417,7 +436,7 @@
   </div>
 
   <!-- Category Donut Chart with Drill-Down -->
-  <div class="bb-card lg:col-span-2 p-5" x-data="categoryDrilldown()">
+  <div class="bb-card lg:col-span-2 p-5" x-data="categoryDrilldown()" @insights-drill-up.window="if (isDrilledDown) drillUp()">
     <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-2">
         <button x-show="isDrilledDown" @click="drillUp()" x-transition
@@ -444,11 +463,15 @@
       <template x-if="!isDrilledDown">
         <div class="space-y-1.5">
           {{range .TopCategories}}
-          <div class="flex items-center justify-between group cursor-pointer hover:bg-base-200/30 -mx-2 px-2 py-0.5 rounded-md transition-colors"
-            @click="drillInto('{{.Name}}', '{{safeCSS .Color}}')">
+          <div class="flex items-center justify-between group cursor-pointer hover:bg-base-200/30 -mx-2 px-2 py-0.5 rounded-md transition-all duration-150"
+            :class="highlightedCategory === '{{.Name}}' ? 'bg-base-200/40 ring-1 ring-base-300/60 scale-[1.01]' : ''"
+            data-category="{{.Name}}"
+            @click="drillInto('{{.Name}}', '{{safeCSS .Color}}')"
+            @mouseenter="highlightedCategory = '{{.Name}}'; if (window._insightsHighlightDonut) window._insightsHighlightDonut('{{.Name}}')"
+            @mouseleave="highlightedCategory = ''; if (window._insightsDownplayDonut) window._insightsDownplayDonut()">
             <span class="flex items-center gap-2 text-xs text-base-content/60 truncate">
-              <span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{safeCSS .Color}}"></span>
-              <span class="truncate group-hover:text-base-content/80 transition-colors">{{.Name}}</span>
+              <span class="w-2 h-2 rounded-full shrink-0 transition-transform duration-150" :class="highlightedCategory === '{{.Name}}' ? 'scale-150' : ''" style="background-color: {{safeCSS .Color}}"></span>
+              <span class="truncate transition-colors duration-150" :class="highlightedCategory === '{{.Name}}' ? 'text-base-content/90 font-medium' : 'group-hover:text-base-content/80'">{{.Name}}</span>
             </span>
             <span class="flex items-center gap-1.5">
               <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0">{{formatAmount .Amount}}</span>
@@ -522,11 +545,15 @@
 
   <div class="space-y-3">
     {{range .BudgetTargets}}
-    <div class="group">
+    <div class="group transition-all duration-150 -mx-2 px-2 py-0.5 rounded-lg"
+      :class="highlightedCategory === '{{.Category}}' ? 'bg-base-200/40 ring-1 ring-base-300/60' : ''"
+      data-category="{{.Category}}"
+      @mouseenter="highlightedCategory = '{{.Category}}'; if (window._insightsHighlightDonut) window._insightsHighlightDonut('{{.Category}}')"
+      @mouseleave="highlightedCategory = ''; if (window._insightsDownplayDonut) window._insightsDownplayDonut()">
       <div class="flex items-center justify-between mb-1.5">
         <div class="flex items-center gap-2 min-w-0">
-          <span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{safeCSS .Color}}"></span>
-          <span class="text-xs font-medium text-base-content/70 truncate group-hover:text-base-content transition-colors">{{.Category}}</span>
+          <span class="w-2 h-2 rounded-full shrink-0 transition-transform duration-150" :class="highlightedCategory === '{{.Category}}' ? 'scale-150' : ''" style="background-color: {{safeCSS .Color}}"></span>
+          <span class="text-xs font-medium truncate transition-colors duration-150" :class="highlightedCategory === '{{.Category}}' ? 'text-base-content font-semibold' : 'text-base-content/70 group-hover:text-base-content'">{{.Category}}</span>
         </div>
         <div class="flex items-center gap-2.5 shrink-0">
           <span class="text-xs tabular-nums font-semibold text-base-content/80">{{formatAmount .Current}}</span>
@@ -1597,6 +1624,39 @@ document.addEventListener('DOMContentLoaded', function() {
     window._categoryDonutCategoryOption = buildCategoryOption;
     window._categoryDonutMerchantOption = buildMerchantOption;
     window._categoryDrilldownData = drilldownData;
+
+    // ── Linked chart-list highlighting ──
+    // When hovering a donut segment, update Alpine highlightedCategory state.
+    chart.on('mouseover', function(params) {
+      if (params.componentType !== 'series') return;
+      var pageEl = document.querySelector('[x-data]');
+      if (pageEl && window.Alpine) {
+        try {
+          var data = Alpine.evaluate(pageEl, '$data');
+          if (data && !data.isDrilledDown) data.highlightedCategory = params.name;
+        } catch(e) {}
+      }
+    });
+    chart.on('mouseout', function(params) {
+      if (params.componentType !== 'series') return;
+      var pageEl = document.querySelector('[x-data]');
+      if (pageEl && window.Alpine) {
+        try {
+          var data = Alpine.evaluate(pageEl, '$data');
+          if (data) data.highlightedCategory = '';
+        } catch(e) {}
+      }
+    });
+
+    // Expose highlight/downplay for list -> chart interaction.
+    window._insightsHighlightDonut = function(categoryName) {
+      if (!chart || chart.isDisposed()) return;
+      chart.dispatchAction({ type: 'highlight', seriesIndex: 0, name: categoryName });
+    };
+    window._insightsDownplayDonut = function() {
+      if (!chart || chart.isDisposed()) return;
+      chart.dispatchAction({ type: 'downplay', seriesIndex: 0 });
+    };
 
     window.addEventListener('resize', function() { chart.resize(); });
   })();
