@@ -1049,6 +1049,94 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			}
 		}
 
+		// ── Savings Rate Trend (last 6 months) ──
+		type SavingsRatePoint struct {
+			Month       string  // "Jan", "Feb", ...
+			MonthFull   string  // "January 2026"
+			Income      float64
+			Spending    float64
+			Net         float64
+			Rate        float64 // savings rate %
+		}
+		var savingsRateTrend []SavingsRatePoint
+		var hasSavingsRateTrend bool
+		var savingsRateTrendJSON template.JS
+
+		for mi := 5; mi >= 0; mi-- {
+			mStart := time.Date(today.Year(), today.Month()-time.Month(mi), 1, 0, 0, 0, 0, today.Location())
+			mEnd := time.Date(mStart.Year(), mStart.Month()+1, 1, 0, 0, 0, 0, today.Location())
+
+			// Get all transactions for this month (both income and spending).
+			var mIncome, mSpending float64
+			srtRows, srtErr := a.DB.Query(ctx, `
+				SELECT amount
+				FROM transactions
+				WHERE deleted_at IS NULL AND date >= $1 AND date < $2 AND pending = false
+			`, mStart, mEnd)
+			if srtErr != nil {
+				a.Logger.Error("savings rate trend query", "error", srtErr)
+				continue
+			}
+			for srtRows.Next() {
+				var amt float64
+				if err := srtRows.Scan(&amt); err != nil {
+					continue
+				}
+				if amt > 0 {
+					mSpending += amt
+				} else {
+					mIncome += -amt
+				}
+			}
+			srtRows.Close()
+
+			net := mIncome - mSpending
+			rate := 0.0
+			if mIncome > 0 {
+				rate = (net / mIncome) * 100
+			}
+			// Clamp rate for display purposes.
+			if rate < -200 {
+				rate = -200
+			}
+			if rate > 100 {
+				rate = 100
+			}
+
+			savingsRateTrend = append(savingsRateTrend, SavingsRatePoint{
+				Month:     mStart.Format("Jan"),
+				MonthFull: mStart.Format("January 2006"),
+				Income:    mIncome,
+				Spending:  mSpending,
+				Net:       net,
+				Rate:      rate,
+			})
+			if mIncome > 0 || mSpending > 0 {
+				hasSavingsRateTrend = true
+			}
+		}
+
+		if hasSavingsRateTrend {
+			type srtJSON struct {
+				Labels   []string  `json:"labels"`
+				Rates    []float64 `json:"rates"`
+				Income   []float64 `json:"income"`
+				Spending []float64 `json:"spending"`
+				Net      []float64 `json:"net"`
+			}
+			srtData := srtJSON{}
+			for _, pt := range savingsRateTrend {
+				srtData.Labels = append(srtData.Labels, pt.Month)
+				srtData.Rates = append(srtData.Rates, math.Round(pt.Rate*10)/10)
+				srtData.Income = append(srtData.Income, math.Round(pt.Income*100)/100)
+				srtData.Spending = append(srtData.Spending, math.Round(pt.Spending*100)/100)
+				srtData.Net = append(srtData.Net, math.Round(pt.Net*100)/100)
+			}
+			if sb, err := json.Marshal(srtData); err == nil {
+				savingsRateTrendJSON = template.JS(sb)
+			}
+		}
+
 		// ── Anomaly Detection ──
 		// Find categories where current period spending is significantly above
 		// the historical per-period average, and individual large transactions
@@ -1297,6 +1385,10 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			// Family spending breakdown.
 			"HasFamilyData":          hasFamilyData,
 			"FamilySpending":         familySpending,
+			// Savings rate trend.
+			"HasSavingsRateTrend":       hasSavingsRateTrend,
+			"SavingsRateTrend":          savingsRateTrend,
+			"SavingsRateTrendJSON":      savingsRateTrendJSON,
 			// Anomaly detection.
 			"HasCategoryAnomalies":      hasCategoryAnomalies,
 			"CategoryAnomalies":         categoryAnomalies,
