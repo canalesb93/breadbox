@@ -124,6 +124,14 @@ func NewRouter(a *app.App, version string) http.Handler {
 	// Webhook handler — no auth (verified via JWT in provider).
 	r.Post("/webhooks/{provider}", webhook.NewHandler(a.Providers, a.SyncEngine, a.Queries, a.Logger))
 
+	// OAuth 2.1 discovery endpoints — no auth required.
+	r.Get("/.well-known/oauth-authorization-server", admin.OAuthMetadataHandler())
+	r.Get("/.well-known/oauth-protected-resource", admin.OAuthProtectedResourceHandler())
+
+	// OAuth 2.1 token + registration endpoints — no session required.
+	r.Post("/oauth/token", admin.OAuthTokenHandler(svc))
+	r.Post("/oauth/register", admin.OAuthRegisterHandler(svc))
+
 	// Admin dashboard: session manager + template renderer + admin router.
 	isSecure := a.Config.Environment == "production" || a.Config.Environment == "docker"
 	sm := admin.NewSessionManager(a.DB, isSecure)
