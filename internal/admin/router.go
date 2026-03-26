@@ -177,6 +177,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/account-links/{id}/reconcile", ReconcileAccountLinkAdminHandler(svc, sm))
 		r.Post("/transaction-matches/{id}/confirm", ConfirmMatchAdminHandler(svc, sm))
 		r.Post("/transaction-matches/{id}/reject", RejectMatchAdminHandler(svc, sm))
+
+		// Agent reports
+		r.Post("/reports/{id}/read", MarkReportReadAdminHandler(svc))
+		r.Post("/reports/read-all", MarkAllReportsReadAdminHandler(svc))
 	})
 
 	return r

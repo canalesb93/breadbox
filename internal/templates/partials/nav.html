@@ -2,7 +2,11 @@
 <nav class="bb-sidebar-nav">
   <div class="bb-sidebar-section">Data</div>
   <a href="/" class="bb-sidebar-link{{if eq .CurrentPage "dashboard"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="layout-dashboard"></i> Dashboard
+    <i data-lucide="layout-dashboard"></i>
+    <span class="flex-1">Dashboard</span>
+    {{if and .NavBadges (gt .NavBadges.UnreadReports 0)}}
+    <span class="bb-nav-badge">{{.NavBadges.UnreadReports}}</span>
+    {{end}}
   </a>
   <a href="/insights" class="bb-sidebar-link{{if eq .CurrentPage "insights"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="lightbulb"></i> Insights

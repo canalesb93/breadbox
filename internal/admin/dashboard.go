@@ -1007,6 +1007,30 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			spendingInsights = spendingInsights[:5]
 		}
 
+		// Agent reports: load recent unread reports for the dashboard widget.
+		type DashboardReport struct {
+			ID            string
+			Title         string
+			Body          string
+			CreatedByName string
+			CreatedAt     string // relative time
+		}
+		var agentReports []DashboardReport
+		rawReports, err := svc.ListUnreadAgentReports(ctx, 5)
+		if err != nil {
+			a.Logger.Error("list unread agent reports", "error", err)
+		}
+		for _, r := range rawReports {
+			t, _ := time.Parse(time.RFC3339, r.CreatedAt)
+			agentReports = append(agentReports, DashboardReport{
+				ID:            r.ID,
+				Title:         r.Title,
+				Body:          r.Body,
+				CreatedByName: r.CreatedByName,
+				CreatedAt:     relativeTime(t),
+			})
+		}
+
 		data := map[string]any{
 			"PageTitle":              "Dashboard",
 			"CurrentPage":            "dashboard",
@@ -1079,6 +1103,8 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"Insights":              insights,
 			// Smart spending insights.
 			"SpendingInsights":      spendingInsights,
+			// Agent reports.
+			"AgentReports":          agentReports,
 		}
 		tr.Render(w, r, "dashboard.html", data)
 	}
