@@ -187,6 +187,7 @@ type SyncLogRow struct {
 	AddedCount           int32
 	ModifiedCount        int32
 	RemovedCount         int32
+	UnchangedCount       int32
 	ErrorMessage         *string // raw technical error for debugging
 	FriendlyErrorMessage *string // human-friendly error for display
 	StartedAt            *string
@@ -198,25 +199,27 @@ type SyncLogRow struct {
 
 // SyncLogAccountRow represents a per-account breakdown within a sync log.
 type SyncLogAccountRow struct {
-	ID            string
-	SyncLogID     string
-	AccountID     *string
-	AccountName   string
-	AddedCount    int32
-	ModifiedCount int32
-	RemovedCount  int32
+	ID             string
+	SyncLogID      string
+	AccountID      *string
+	AccountName    string
+	AddedCount     int32
+	ModifiedCount  int32
+	RemovedCount   int32
+	UnchangedCount int32
 }
 
 // SyncLogStats contains aggregate statistics about sync logs.
 type SyncLogStats struct {
-	TotalSyncs    int64
-	SuccessCount  int64
-	ErrorCount    int64
-	SuccessRate   float64 // 0-100 percentage
-	AvgDurationMs float64 // average duration in milliseconds
-	TotalAdded    int64
-	TotalModified int64
-	TotalRemoved  int64
+	TotalSyncs      int64
+	SuccessCount    int64
+	ErrorCount      int64
+	SuccessRate     float64 // 0-100 percentage
+	AvgDurationMs   float64 // average duration in milliseconds
+	TotalAdded      int64
+	TotalModified   int64
+	TotalRemoved    int64
+	TotalUnchanged  int64
 }
 
 // SyncHealthSummary contains a dashboard-oriented overview of sync health.

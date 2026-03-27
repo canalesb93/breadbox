@@ -174,7 +174,8 @@
           {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
           {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
           {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
-          {{if and (not .AddedCount) (not .ModifiedCount) (not .RemovedCount)}}
+          {{if .UnchangedCount}}<span class="text-base-content/30 font-medium" title="{{.UnchangedCount}} unchanged transactions">={{.UnchangedCount}}</span>{{end}}
+          {{if and (not .AddedCount) (not .ModifiedCount) (not .RemovedCount) (not .UnchangedCount)}}
           <span class="text-base-content/20 text-xs">No changes</span>
           {{end}}
         </div>

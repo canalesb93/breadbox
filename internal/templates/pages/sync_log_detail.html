@@ -28,7 +28,7 @@
 </div>
 
 <!-- Summary Stats -->
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+<div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
   <div class="bb-card p-4">
     <div class="flex items-center gap-3">
       <div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
@@ -59,6 +59,17 @@
       <div>
         <div class="text-2xl font-semibold tabular-nums leading-none text-error">{{.Log.RemovedCount}}</div>
         <div class="text-xs text-base-content/40 mt-0.5">Removed</div>
+      </div>
+    </div>
+  </div>
+  <div class="bb-card p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+        <i data-lucide="equal" class="w-4 h-4 text-base-content/30"></i>
+      </div>
+      <div>
+        <div class="text-2xl font-semibold tabular-nums leading-none text-base-content/40">{{.Log.UnchangedCount}}</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Unchanged</div>
       </div>
     </div>
   </div>
@@ -149,6 +160,11 @@
         {{if .RemovedCount}}
         <span class="text-error font-medium flex items-center gap-1">
           <i data-lucide="minus" class="w-3 h-3"></i>{{.RemovedCount}}
+        </span>
+        {{end}}
+        {{if .UnchangedCount}}
+        <span class="text-base-content/30 font-medium flex items-center gap-1" title="Unchanged">
+          <i data-lucide="equal" class="w-3 h-3"></i>{{.UnchangedCount}}
         </span>
         {{end}}
       </div>
