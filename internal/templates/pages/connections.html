@@ -119,7 +119,7 @@
               {{if .DisplayName.Valid}}{{.DisplayName.String}}{{else}}{{.Name}}{{end}}
             </div>
             <div class="text-xs text-base-content/40">
-              {{if .Subtype.Valid}}<span class="capitalize">{{.Subtype.String}}</span>{{end}}
+              {{if .Subtype.Valid}}<span class="capitalize">{{humanize .Subtype.String}}</span>{{end}}
               {{if .Mask.Valid}}<span class="text-base-content/25">&middot;</span> ····{{.Mask.String}}{{end}}
               {{if .Excluded}} <span class="text-base-content/25">&middot;</span> <span class="text-warning">Excluded</span>{{end}}
             </div>
