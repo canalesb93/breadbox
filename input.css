@@ -108,8 +108,8 @@
   --bb-chart-tooltip-border: rgba(0,0,0,0.06);
   --bb-chart-tooltip-text: #1a1a1a;
   --bb-chart-tooltip-sub: #666;
-  --bb-chart-spend: rgba(30,30,30,0.15);
-  --bb-chart-spend-hover: rgba(30,30,30,0.3);
+  --bb-chart-spend: rgba(30,30,30,0.35);
+  --bb-chart-spend-hover: rgba(30,30,30,0.5);
   --bb-chart-income: rgba(46,160,100,0.3);
   --bb-chart-income-line: rgba(46,160,100,0.6);
   --bb-chart-income-bar: oklch(0.62 0.14 155);
@@ -120,8 +120,8 @@
   --bb-chart-negative: rgba(220,60,60,0.85);
   --bb-chart-proj: rgba(70,100,200,0.45);
   --bb-chart-proj-area: rgba(70,100,200,0.04);
-  --bb-chart-velocity-old1: rgba(0,0,0,0.08);
-  --bb-chart-velocity-old2: rgba(0,0,0,0.15);
+  --bb-chart-velocity-old1: rgba(0,0,0,0.15);
+  --bb-chart-velocity-old2: rgba(0,0,0,0.25);
   --bb-chart-velocity-current: rgba(70,100,200,0.85);
 }
 
