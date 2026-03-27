@@ -331,10 +331,9 @@ func (s *Service) DeleteCategory(ctx context.Context, id string) (int64, error) 
 }
 
 // MergeCategories merges sourceID into targetID (in a single transaction):
-// 1. Reassign transactions from source to target
-// 2. Reassign category mappings from source to target
-// 3. Reassign transaction rules from source to target
-// 4. Delete source category
+// 1. Reassign transactions, mappings, and rules from source's children to target
+// 2. Reassign transactions, mappings, and rules from source to target
+// 3. Delete source category (CASCADE deletes children)
 func (s *Service) MergeCategories(ctx context.Context, sourceID, targetID string) error {
 	if sourceID == targetID {
 		return fmt.Errorf("%w: cannot merge a category into itself", ErrInvalidParameter)
@@ -371,6 +370,34 @@ func (s *Service) MergeCategories(ctx context.Context, sourceID, targetID string
 	defer tx.Rollback(ctx)
 
 	qtx := s.Queries.WithTx(tx)
+
+	// Reassign children first: if the source is a parent category, its children
+	// would be CASCADE-deleted when the source is deleted. We must reassign their
+	// transactions, mappings, and rules to the target before that happens.
+	childIDs, err := qtx.ListChildCategoryIDs(ctx, srcUID)
+	if err != nil {
+		return fmt.Errorf("list child categories: %w", err)
+	}
+	for _, childUID := range childIDs {
+		if err := qtx.ReassignTransactionsCategory(ctx, db.ReassignTransactionsCategoryParams{
+			CategoryID:   childUID,
+			CategoryID_2: tgtUID,
+		}); err != nil {
+			return fmt.Errorf("reassign child transactions: %w", err)
+		}
+		if err := qtx.ReassignMappingsCategory(ctx, db.ReassignMappingsCategoryParams{
+			CategoryID:   childUID,
+			CategoryID_2: tgtUID,
+		}); err != nil {
+			return fmt.Errorf("reassign child mappings: %w", err)
+		}
+		if err := qtx.ReassignRulesCategory(ctx, db.ReassignRulesCategoryParams{
+			CategoryID:   childUID,
+			CategoryID_2: tgtUID,
+		}); err != nil {
+			return fmt.Errorf("reassign child rules: %w", err)
+		}
+	}
 
 	if err := qtx.ReassignTransactionsCategory(ctx, db.ReassignTransactionsCategoryParams{
 		CategoryID:   srcUID,
