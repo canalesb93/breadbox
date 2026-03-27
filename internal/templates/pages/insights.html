@@ -711,7 +711,7 @@
 </div>
 {{end}}
 
-<!-- Charts Row: Spending Chart + Category Bars -->
+<!-- Charts Row: Spending Chart + Category Donut (ECharts) -->
 <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6 bb-stagger">
   <!-- Spending & Income Chart -->
   <div class="bb-card lg:col-span-3 p-5">
@@ -747,7 +747,7 @@
     {{end}}
   </div>
 
-  <!-- Category Horizontal Bars with Drill-Down -->
+  <!-- Category Donut Chart with Drill-Down -->
   <div class="bb-card lg:col-span-2 p-5" x-data="categoryDrilldown()" @insights-drill-up.window="if (isDrilledDown) drillUp()">
     <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-2">
@@ -757,76 +757,63 @@
         </button>
         <h2 class="text-sm font-semibold text-base-content/70">
           <span x-show="!isDrilledDown">Top Categories</span>
-          <span x-show="isDrilledDown" x-text="'Merchants in ' + activeCategoryName" x-cloak></span>
+          <span x-show="isDrilledDown" x-text="'Top Merchants in ' + activeCategoryName" x-cloak></span>
         </h2>
       </div>
       <div class="flex items-center gap-2">
+        <span x-show="isDrilledDown" x-cloak class="text-[0.6rem] text-base-content/30">click chart or</span>
         <a x-show="!isDrilledDown" href="/categories" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
         <button x-show="isDrilledDown" @click="drillUp()" x-cloak
-          class="text-xs text-primary/60 hover:text-primary/80 transition-colors cursor-pointer bg-transparent flex items-center gap-1">
-          <i data-lucide="arrow-left" class="w-3 h-3"></i> all categories</button>
+          class="text-xs text-primary/60 hover:text-primary/80 transition-colors cursor-pointer bg-transparent">back to categories</button>
       </div>
     </div>
     {{if .TopCategories}}
-    <!-- Total spending header -->
-    <div class="mb-4 pb-3 border-b border-base-200/60">
-      <div class="text-lg font-bold tabular-nums text-base-content/90">{{formatAmount .TotalSpending}}</div>
-      <div class="text-[0.6rem] text-base-content/30 mt-0.5">total spending</div>
-    </div>
-    <!-- Category bars view -->
-    <template x-if="!isDrilledDown">
-      <div class="space-y-3">
-        {{range .TopCategories}}
-        <div class="group cursor-pointer rounded-lg -mx-1 px-1 py-0.5 transition-all duration-150 hover:bg-base-200/20"
-          :class="highlightedCategory === '{{.Name}}' ? 'bg-base-200/30' : ''"
-          data-category="{{.Name}}"
-          @click="drillInto('{{.Name}}', '{{safeCSS .Color}}')"
-          @mouseenter="highlightedCategory = '{{.Name}}'"
-          @mouseleave="highlightedCategory = ''">
-          <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-medium text-base-content/70 truncate group-hover:text-base-content/90 transition-colors flex items-center gap-1.5">
-              <span class="truncate">{{.Name}}</span>
-              <i data-lucide="chevron-right" class="w-3 h-3 text-base-content/20 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"></i>
+    <div id="echartsCategoryDonut" style="width: 100%; height: 240px;"></div>
+    <!-- Category/merchant list below donut -->
+    <div class="mt-3 pt-3 border-t border-base-200/60 space-y-1.5">
+      <!-- Category view -->
+      <template x-if="!isDrilledDown">
+        <div class="space-y-1.5">
+          {{range .TopCategories}}
+          <div class="flex items-center justify-between group cursor-pointer hover:bg-base-200/30 -mx-2 px-2 py-0.5 rounded-md transition-all duration-150"
+            :class="highlightedCategory === '{{.Name}}' ? 'bg-base-200/40 ring-1 ring-base-300/60 scale-[1.01]' : ''"
+            data-category="{{.Name}}"
+            @click="drillInto('{{.Name}}', '{{safeCSS .Color}}')"
+            @mouseenter="highlightedCategory = '{{.Name}}'; if (window._insightsHighlightDonut) window._insightsHighlightDonut('{{.Name}}')"
+            @mouseleave="highlightedCategory = ''; if (window._insightsDownplayDonut) window._insightsDownplayDonut()">
+            <span class="flex items-center gap-2 text-xs text-base-content/60 truncate">
+              <span class="w-2 h-2 rounded-full shrink-0 transition-transform duration-150" :class="highlightedCategory === '{{.Name}}' ? 'scale-150' : ''" style="background-color: {{safeCSS .Color}}"></span>
+              <span class="truncate transition-colors duration-150" :class="highlightedCategory === '{{.Name}}' ? 'text-base-content/90 font-medium' : 'group-hover:text-base-content/80'">{{.Name}}</span>
             </span>
-            <span class="flex items-center gap-2 shrink-0">
-              <span class="text-[0.6rem] tabular-nums text-base-content/30">{{printf "%.0f" .Percent}}%</span>
-              <span class="text-xs font-semibold tabular-nums text-base-content/80">{{formatAmount .Amount}}</span>
+            <span class="flex items-center gap-1.5">
+              <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0">{{formatAmount .Amount}}</span>
+              <i data-lucide="chevron-right" class="w-3 h-3 text-base-content/20 opacity-0 group-hover:opacity-100 transition-opacity"></i>
             </span>
           </div>
-          <div class="w-full h-2 bg-base-200/40 rounded-full overflow-hidden">
-            <div class="h-full rounded-full transition-all duration-700 ease-out"
-              style="width: {{printf "%.1f" .Percent}}%; background-color: {{safeCSS .Color}}; opacity: 0.7;"
-              :style="highlightedCategory === '{{.Name}}' ? 'width: {{printf "%.1f" .Percent}}%; background-color: {{safeCSS .Color}}; opacity: 1;' : 'width: {{printf "%.1f" .Percent}}%; background-color: {{safeCSS .Color}}; opacity: 0.7;'"></div>
-          </div>
+          {{end}}
         </div>
-        {{end}}
-      </div>
-    </template>
-    <!-- Merchant drill-down view with bars -->
-    <template x-if="isDrilledDown">
-      <div class="space-y-3">
-        <template x-for="(m, i) in activeMerchants" :key="i">
-          <div class="rounded-lg -mx-1 px-1 py-0.5">
-            <div class="flex items-center justify-between mb-1">
-              <span class="flex items-center gap-2 text-xs text-base-content/70 truncate min-w-0">
-                <span class="w-4 h-4 rounded flex items-center justify-center text-[0.5rem] font-bold tabular-nums shrink-0 bg-base-200/60 text-base-content/40"
+      </template>
+      <!-- Merchant drill-down view -->
+      <template x-if="isDrilledDown">
+        <div class="space-y-1.5">
+          <template x-for="(m, i) in activeMerchants" :key="i">
+            <div class="flex items-center justify-between -mx-2 px-2 py-0.5">
+              <span class="flex items-center gap-2 text-xs text-base-content/60 truncate">
+                <span class="w-5 h-5 rounded-md flex items-center justify-center text-[0.55rem] font-semibold tabular-nums shrink-0"
+                  :style="'background-color: ' + merchantColors[i % merchantColors.length] + '; opacity: 0.15; color: ' + merchantColors[i % merchantColors.length]"
                   x-text="i + 1"></span>
                 <span class="truncate" x-text="m.name"></span>
               </span>
-              <span class="flex items-center gap-2 shrink-0">
+              <span class="flex items-center gap-2">
                 <span class="text-[0.6rem] text-base-content/30 tabular-nums" x-text="m.count + ' txns'"></span>
-                <span class="text-xs font-semibold tabular-nums text-base-content/80"
+                <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0"
                   x-text="'$' + m.amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
               </span>
             </div>
-            <div class="w-full h-2 bg-base-200/40 rounded-full overflow-hidden">
-              <div class="h-full rounded-full transition-all duration-500 ease-out"
-                :style="'width: ' + (activeMerchants.length > 0 ? (m.amount / activeMerchants[0].amount * 100) : 0) + '%; background-color: ' + activeCategoryColor + '; opacity: ' + (0.8 - i * 0.08) + ';'"></div>
-            </div>
-          </div>
-        </template>
-      </div>
-    </template>
+          </template>
+        </div>
+      </template>
+    </div>
     {{else}}
     <div class="flex items-center justify-center h-60 text-base-content/40">
       <div class="text-center">
@@ -873,8 +860,8 @@
     <div class="group transition-all duration-150 -mx-2 px-2 py-0.5 rounded-lg"
       :class="highlightedCategory === '{{.Category}}' ? 'bg-base-200/40 ring-1 ring-base-300/60' : ''"
       data-category="{{.Category}}"
-      @mouseenter="highlightedCategory = '{{.Category}}'"
-      @mouseleave="highlightedCategory = ''"
+      @mouseenter="highlightedCategory = '{{.Category}}'; if (window._insightsHighlightDonut) window._insightsHighlightDonut('{{.Category}}')"
+      @mouseleave="highlightedCategory = ''; if (window._insightsDownplayDonut) window._insightsDownplayDonut()">
       <div class="flex items-center justify-between mb-1.5">
         <div class="flex items-center gap-2 min-w-0">
           <span class="w-2 h-2 rounded-full shrink-0 transition-transform duration-150" :class="highlightedCategory === '{{.Category}}' ? 'scale-150' : ''" style="background-color: {{safeCSS .Color}}"></span>
@@ -2000,10 +1987,219 @@ document.addEventListener('DOMContentLoaded', function() {
   })();
   {{end}}
 
-  // ── Category Drilldown Data (for Alpine component) ──
+  // ── Category Donut Chart with Drill-Down ──
   {{if .CategoryLabels}}
   (function() {
-    window._categoryDrilldownData = {{if .CategoryDrilldownJSON}}{{.CategoryDrilldownJSON}}{{else}}{}{{end}};
+    var el = document.getElementById('echartsCategoryDonut');
+    if (!el) return;
+    var chart = echarts.init(el, null, { renderer: 'canvas' });
+
+    var labels = {{.CategoryLabels}};
+    var amounts = {{.CategoryAmounts}};
+    var colors = {{.CategoryColors}};
+    var totalSpending = {{printf "%.2f" .TotalSpending}};
+    var drilldownData = {{if .CategoryDrilldownJSON}}{{.CategoryDrilldownJSON}}{{else}}{}{{end}};
+
+    // Merchant sub-colors: generate shades from parent color
+    var merchantPalette = [
+      'oklch(0.55 0.12 250)', 'oklch(0.60 0.10 250)', 'oklch(0.50 0.14 250)',
+      'oklch(0.58 0.08 250)', 'oklch(0.52 0.11 250)', 'oklch(0.63 0.07 250)',
+      'oklch(0.48 0.13 250)', 'oklch(0.65 0.06 250)'
+    ];
+
+    var categoryData = labels.map(function(name, i) {
+      return { value: amounts[i], name: name, itemStyle: { color: colors[i] } };
+    });
+
+    function buildCategoryOption() {
+      return {
+        animation: true,
+        animationDuration: 800,
+        animationEasing: 'cubicOut',
+        tooltip: {
+          trigger: 'item',
+          backgroundColor: tooltipBg,
+          borderColor: tooltipBorder,
+          borderWidth: 1,
+          padding: [10, 14],
+          extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
+          formatter: function(params) {
+            var pct = (params.value / totalSpending * 100).toFixed(1);
+            var val = '$' + params.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return '<div style="font-family:Inter,system-ui,sans-serif">' +
+              '<div style="font-weight:600;font-size:12px;margin-bottom:4px;color:' + tooltipText + '">' + params.name + '</div>' +
+              '<div style="display:flex;justify-content:space-between;gap:16px;align-items:center;">' +
+              '<span style="color:' + tooltipSubtext + ';font-size:12px">' + pct + '% of total</span>' +
+              '<span style="font-weight:600;font-size:13px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + val + '</span></div></div>';
+          }
+        },
+        series: [{
+          type: 'pie',
+          radius: ['52%', '78%'],
+          center: ['50%', '50%'],
+          avoidLabelOverlap: false,
+          padAngle: 2,
+          itemStyle: {
+            borderRadius: 4,
+            borderColor: isDark ? '#1a1a1a' : '#ffffff',
+            borderWidth: 2
+          },
+          label: {
+            show: true,
+            position: 'center',
+            formatter: function() {
+              return '{total|$' + totalSpending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '}\n{label|total spending}';
+            },
+            rich: {
+              total: { fontSize: 20, fontWeight: 700, fontFamily: 'Inter, system-ui, sans-serif', color: tooltipText, padding: [0, 0, 4, 0] },
+              label: { fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif', color: textColor }
+            }
+          },
+          emphasis: {
+            itemStyle: { shadowBlur: 12, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.15)' },
+            label: { show: true }
+          },
+          data: categoryData
+        }]
+      };
+    }
+
+    function buildMerchantOption(categoryName, parentColor, merchants) {
+      var catTotal = 0;
+      merchants.forEach(function(m) { catTotal += m.amount; });
+      // Generate color shades from parent
+      var hueMatch = parentColor.match(/oklch\([\d.]+ [\d.]+ ([\d.]+)\)/);
+      var baseHue = hueMatch ? parseFloat(hueMatch[1]) : 250;
+      var mColors = merchants.map(function(_, i) {
+        var l = 0.58 - (i * 0.03);
+        var c = 0.12 - (i * 0.008);
+        if (l < 0.38) l = 0.38;
+        if (c < 0.04) c = 0.04;
+        return 'oklch(' + l.toFixed(2) + ' ' + c.toFixed(2) + ' ' + baseHue.toFixed(0) + ')';
+      });
+      var mData = merchants.map(function(m, i) {
+        return { value: m.amount, name: m.name, itemStyle: { color: mColors[i] } };
+      });
+      return {
+        animation: true,
+        animationDuration: 600,
+        animationEasing: 'cubicOut',
+        tooltip: {
+          trigger: 'item',
+          backgroundColor: tooltipBg,
+          borderColor: tooltipBorder,
+          borderWidth: 1,
+          padding: [10, 14],
+          extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
+          formatter: function(params) {
+            var pct = (params.value / catTotal * 100).toFixed(1);
+            var val = '$' + params.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return '<div style="font-family:Inter,system-ui,sans-serif">' +
+              '<div style="font-weight:600;font-size:12px;margin-bottom:4px;color:' + tooltipText + '">' + params.name + '</div>' +
+              '<div style="display:flex;justify-content:space-between;gap:16px;align-items:center;">' +
+              '<span style="color:' + tooltipSubtext + ';font-size:12px">' + pct + '% of ' + categoryName + '</span>' +
+              '<span style="font-weight:600;font-size:13px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + val + '</span></div></div>';
+          }
+        },
+        series: [{
+          type: 'pie',
+          radius: ['52%', '78%'],
+          center: ['50%', '50%'],
+          avoidLabelOverlap: false,
+          padAngle: 2,
+          itemStyle: {
+            borderRadius: 4,
+            borderColor: isDark ? '#1a1a1a' : '#ffffff',
+            borderWidth: 2
+          },
+          label: {
+            show: true,
+            position: 'center',
+            formatter: function() {
+              return '{total|$' + catTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '}\n{label|' + categoryName + '}';
+            },
+            rich: {
+              total: { fontSize: 20, fontWeight: 700, fontFamily: 'Inter, system-ui, sans-serif', color: tooltipText, padding: [0, 0, 4, 0] },
+              label: { fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif', color: textColor }
+            }
+          },
+          emphasis: {
+            itemStyle: { shadowBlur: 12, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.15)' },
+            label: { show: true }
+          },
+          data: mData
+        }]
+      };
+    }
+
+    chart.setOption(buildCategoryOption());
+    insightCharts.push(chart);
+
+    // Click handler: drill into category
+    chart.on('click', function(params) {
+      if (params.componentType !== 'series') return;
+      var categoryName = params.name;
+      var parentColor = params.color || 'oklch(0.55 0.12 250)';
+      var merchants = drilldownData[categoryName];
+      if (!merchants || merchants.length === 0) return;
+
+      // Update Alpine state
+      var alpineEl = el.closest('[x-data]');
+      if (alpineEl && alpineEl.__x) {
+        alpineEl.__x.$data.isDrilledDown = true;
+        alpineEl.__x.$data.activeCategoryName = categoryName;
+        alpineEl.__x.$data.activeCategoryColor = parentColor;
+        alpineEl.__x.$data.activeMerchants = merchants;
+      } else if (alpineEl && window.Alpine) {
+        Alpine.evaluate(alpineEl, '$data').isDrilledDown = true;
+        Alpine.evaluate(alpineEl, '$data').activeCategoryName = categoryName;
+        Alpine.evaluate(alpineEl, '$data').activeCategoryColor = parentColor;
+        Alpine.evaluate(alpineEl, '$data').activeMerchants = merchants;
+      }
+
+      chart.setOption(buildMerchantOption(categoryName, parentColor, merchants), true);
+    });
+
+    // Expose chart for Alpine drill-up
+    window._categoryDonutChart = chart;
+    window._categoryDonutCategoryOption = buildCategoryOption;
+    window._categoryDonutMerchantOption = buildMerchantOption;
+    window._categoryDrilldownData = drilldownData;
+
+    // ── Linked chart-list highlighting ──
+    // When hovering a donut segment, update Alpine highlightedCategory state.
+    chart.on('mouseover', function(params) {
+      if (params.componentType !== 'series') return;
+      var pageEl = document.querySelector('[x-data]');
+      if (pageEl && window.Alpine) {
+        try {
+          var data = Alpine.evaluate(pageEl, '$data');
+          if (data && !data.isDrilledDown) data.highlightedCategory = params.name;
+        } catch(e) {}
+      }
+    });
+    chart.on('mouseout', function(params) {
+      if (params.componentType !== 'series') return;
+      var pageEl = document.querySelector('[x-data]');
+      if (pageEl && window.Alpine) {
+        try {
+          var data = Alpine.evaluate(pageEl, '$data');
+          if (data) data.highlightedCategory = '';
+        } catch(e) {}
+      }
+    });
+
+    // Expose highlight/downplay for list -> chart interaction.
+    window._insightsHighlightDonut = function(categoryName) {
+      if (!chart || chart.isDisposed()) return;
+      chart.dispatchAction({ type: 'highlight', seriesIndex: 0, name: categoryName });
+    };
+    window._insightsDownplayDonut = function() {
+      if (!chart || chart.isDisposed()) return;
+      chart.dispatchAction({ type: 'downplay', seriesIndex: 0 });
+    };
+
+    window.addEventListener('resize', function() { chart.resize(); });
   })();
   {{end}}
 
@@ -2569,6 +2765,11 @@ function categoryDrilldown() {
     activeCategoryName: '',
     activeCategoryColor: '',
     activeMerchants: [],
+    merchantColors: [
+      'oklch(0.55 0.12 250)', 'oklch(0.60 0.10 250)', 'oklch(0.50 0.14 250)',
+      'oklch(0.58 0.08 250)', 'oklch(0.52 0.11 250)', 'oklch(0.63 0.07 250)',
+      'oklch(0.48 0.13 250)', 'oklch(0.65 0.06 250)'
+    ],
     drillInto: function(categoryName, parentColor) {
       var drilldownData = window._categoryDrilldownData || {};
       var merchants = drilldownData[categoryName];
@@ -2579,6 +2780,13 @@ function categoryDrilldown() {
       this.activeCategoryColor = parentColor;
       this.activeMerchants = merchants;
 
+      // Update chart
+      var chart = window._categoryDonutChart;
+      var buildMerchant = window._categoryDonutMerchantOption;
+      if (chart && buildMerchant) {
+        chart.setOption(buildMerchant(categoryName, parentColor, merchants), true);
+      }
+
       // Re-render lucide icons
       this.$nextTick(function() {
         if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -2588,6 +2796,13 @@ function categoryDrilldown() {
       this.isDrilledDown = false;
       this.activeCategoryName = '';
       this.activeMerchants = [];
+
+      // Reset chart
+      var chart = window._categoryDonutChart;
+      var buildCategory = window._categoryDonutCategoryOption;
+      if (chart && buildCategory) {
+        chart.setOption(buildCategory(), true);
+      }
 
       // Re-render lucide icons
       this.$nextTick(function() {
