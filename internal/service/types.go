@@ -218,6 +218,18 @@ type SyncLogStats struct {
 	TotalRemoved  int64
 }
 
+// SyncHealthSummary contains a dashboard-oriented overview of sync health.
+type SyncHealthSummary struct {
+	LastSyncTime      *string // relative time of most recent completed sync (any status)
+	LastSyncStatus    string  // status of the most recent sync: "success", "error", or ""
+	RecentSyncCount   int64   // total syncs in the last 24h
+	RecentSuccessRate float64 // 0-100 success rate over last 24h
+	RecentErrorCount  int64   // error syncs in the last 24h
+	ConnectionErrors  int64   // count of connections currently in error/pending_reauth status
+	NextSyncTime      string  // human-readable time until next scheduled sync
+	OverallHealth     string  // "healthy", "degraded", or "unhealthy"
+}
+
 type AdminTransactionListParams struct {
 	Page          int
 	PageSize      int
