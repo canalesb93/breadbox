@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"breadbox/internal/service"
+	bsync "breadbox/internal/sync"
 	"breadbox/internal/templates"
 
 	"github.com/alexedwards/scs/v2"
@@ -216,6 +217,9 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return msg
 				}
 				return code
+			},
+			"syncFriendlyError": func(rawErr string) string {
+				return bsync.FriendlyError(rawErr)
 			},
 			"configSource": func(sources map[string]string, key string) template.HTML {
 				source := sources[key]

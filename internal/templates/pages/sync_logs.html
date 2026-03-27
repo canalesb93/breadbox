@@ -197,8 +197,16 @@
       <div class="flex items-start gap-2.5 px-4 py-3 ml-12">
         <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-error/60 shrink-0 mt-0.5"></i>
         <div class="min-w-0">
+          {{if .FriendlyErrorMessage}}
+          <p class="text-xs text-error/80 font-medium leading-relaxed">{{deref .FriendlyErrorMessage}}</p>
+          <details class="mt-1.5">
+            <summary class="text-[0.65rem] text-base-content/30 cursor-pointer hover:text-base-content/50 transition-colors select-none">Technical details</summary>
+            <p class="text-[0.65rem] text-base-content/35 font-mono break-all leading-relaxed mt-1">{{deref .ErrorMessage}}</p>
+          </details>
+          {{else}}
           <div class="text-xs font-medium text-error/80 mb-0.5">Error Details</div>
           <p class="text-xs text-base-content/50 font-mono break-all leading-relaxed">{{deref .ErrorMessage}}</p>
+          {{end}}
         </div>
       </div>
     </div>

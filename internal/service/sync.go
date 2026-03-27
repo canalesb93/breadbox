@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
+	bsync "breadbox/internal/sync"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -223,7 +224,7 @@ func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListP
 			instName = institutionName.String
 		}
 
-		logs = append(logs, SyncLogRow{
+		row := SyncLogRow{
 			ID:              formatUUID(id),
 			ConnectionID:    formatUUID(connectionID),
 			InstitutionName: instName,
@@ -237,7 +238,13 @@ func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListP
 			CompletedAt:     timestampStr(completedAt),
 			Duration:        duration,
 			DurationMs:      durationMsPtr,
-		})
+		}
+		if errorMessage.Valid {
+			if friendly := bsync.FriendlyError(errorMessage.String); friendly != "" {
+				row.FriendlyErrorMessage = &friendly
+			}
+		}
+		logs = append(logs, row)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate sync logs: %w", err)
