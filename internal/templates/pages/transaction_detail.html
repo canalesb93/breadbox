@@ -47,7 +47,7 @@
         {{end}}
         {{if .AccountType}}
         <span class="text-xs text-base-content/30">&middot;</span>
-        <span class="text-xs text-base-content/40 capitalize">{{.AccountType}}</span>
+        <span class="text-xs text-base-content/40">{{accountTypeLabel .AccountType ""}}</span>
         {{end}}
         {{if .UserName}}
         <span class="text-xs text-base-content/30">&middot;</span>

@@ -12,7 +12,7 @@
     <div>
       <h1 class="bb-page-title">{{if .Account.DisplayName}}{{.Account.DisplayName}}{{else}}{{.Account.Name}}{{end}}</h1>
       <div class="flex items-center gap-2 mt-0.5">
-        <span class="text-xs text-base-content/40 capitalize">{{.Account.Type}}{{if .Account.Subtype}} &middot; {{humanize .Account.Subtype}}{{end}}</span>
+        <span class="text-xs text-base-content/40">{{accountTypeLabel .Account.Type ""}}{{if .Account.Subtype}} &middot; {{humanize .Account.Subtype}}{{end}}</span>
         {{if .Account.Mask}}<span class="text-xs text-base-content/30">&bull;&bull;&bull;&bull;{{.Account.Mask}}</span>{{end}}
         {{if .Account.Excluded}}<span class="badge badge-ghost badge-xs">Excluded</span>{{end}}
         {{if and .Account.ConnectionStatus (ne (deref .Account.ConnectionStatus) "active")}}
