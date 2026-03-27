@@ -15,6 +15,12 @@ const (
 	sessionKeyAdminUsername = "admin_username"
 )
 
+// dummyHash is a pre-computed bcrypt hash used for constant-time login responses.
+// When a username is not found, we still run bcrypt.CompareHashAndPassword against
+// this dummy hash so that the response time is indistinguishable from a valid-user
+// wrong-password attempt. This prevents username enumeration via timing side channels.
+var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("dummy-password-for-timing"), 12)
+
 // LoginHandler returns an http.HandlerFunc that handles GET and POST /login.
 func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -47,6 +53,10 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRende
 
 		admin, err := queries.GetAdminAccountByUsername(r.Context(), username)
 		if err != nil {
+			// Run a dummy bcrypt comparison to prevent timing-based username enumeration.
+			// Without this, an attacker can distinguish "user not found" (~0ms) from
+			// "wrong password" (~200ms bcrypt) by measuring response time.
+			bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
 			data := map[string]any{
 				"PageTitle": "Sign In",
 				"CSRFToken": GenerateCSRFToken(r.Context(), sm),
