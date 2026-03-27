@@ -543,6 +543,102 @@ func TestMergeCategories_SelfMerge(t *testing.T) {
 	}
 }
 
+func TestMergeCategories_ParentWithChildren(t *testing.T) {
+	svc, q, pool := newService(t)
+	ctx := context.Background()
+
+	// Create parent with two children.
+	parent := mustCreateCategoryViaService(t, svc, "merge_parent", "Parent", nil)
+	child1 := mustCreateCategoryViaService(t, svc, "merge_child1", "Child 1", &parent.ID)
+	child2 := mustCreateCategoryViaService(t, svc, "merge_child2", "Child 2", &parent.ID)
+
+	// Create a target category.
+	target := mustCreateCategoryViaService(t, svc, "merge_parent_target", "Target", nil)
+
+	// Create transactions in parent and each child.
+	acctID := seedTxnFixture(t, q)
+	parentUID, _ := parseUUIDForTest(parent.ID)
+	child1UID, _ := parseUUIDForTest(child1.ID)
+	child2UID, _ := parseUUIDForTest(child2.ID)
+	tgtUID, _ := parseUUIDForTest(target.ID)
+
+	mustCreateTransactionWithCategory(t, q, acctID, parentUID, "txn_parent", "Parent Txn", 1000, "2025-01-10")
+	mustCreateTransactionWithCategory(t, q, acctID, child1UID, "txn_child1", "Child 1 Txn", 2000, "2025-01-11")
+	mustCreateTransactionWithCategory(t, q, acctID, child2UID, "txn_child2", "Child 2 Txn", 3000, "2025-01-12")
+
+	// Create mappings pointing to parent and child1.
+	_, err := svc.CreateMapping(ctx, "plaid", "PARENT_CAT", parent.ID)
+	if err != nil {
+		t.Fatalf("create parent mapping: %v", err)
+	}
+	_, err = svc.CreateMapping(ctx, "plaid", "CHILD1_CAT", child1.ID)
+	if err != nil {
+		t.Fatalf("create child1 mapping: %v", err)
+	}
+
+	// Create a rule pointing to child2.
+	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:         "Child Rule",
+		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "child"},
+		CategorySlug: "merge_child2",
+		Priority:     10,
+		Actor:        service.Actor{Type: "system", Name: "test"},
+	})
+	if err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+
+	// Merge parent (with children) into target.
+	err = svc.MergeCategories(ctx, parent.ID, target.ID)
+	if err != nil {
+		t.Fatalf("MergeCategories: %v", err)
+	}
+
+	// All three categories should be deleted.
+	for _, slug := range []string{"merge_parent", "merge_child1", "merge_child2"} {
+		_, err := svc.GetCategoryBySlug(ctx, slug)
+		if !errors.Is(err, service.ErrCategoryNotFound) {
+			t.Errorf("expected %s to be deleted, got err: %v", slug, err)
+		}
+	}
+
+	// All three transactions should be reassigned to target.
+	for _, extID := range []string{"txn_parent", "txn_child1", "txn_child2"} {
+		var gotCatID pgtype.UUID
+		err := pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE external_transaction_id = $1", extID).Scan(&gotCatID)
+		if err != nil {
+			t.Fatalf("query %s: %v", extID, err)
+		}
+		if gotCatID != tgtUID {
+			t.Errorf("transaction %s should be reassigned to target category", extID)
+		}
+	}
+
+	// Mappings should all point to target.
+	mappings, err := svc.ListMappings(ctx, nil)
+	if err != nil {
+		t.Fatalf("list mappings: %v", err)
+	}
+	for _, m := range mappings {
+		if m.CategoryID != target.ID {
+			t.Errorf("mapping %s should point to target, got %s", m.ProviderCategory, m.CategoryID)
+		}
+	}
+
+	// Rule should still exist and point to target.
+	gotRule, err := svc.GetTransactionRule(ctx, rule.ID)
+	if err != nil {
+		t.Fatalf("rule should still exist after merge, got error: %v", err)
+	}
+	if gotRule.CategorySlug == nil || *gotRule.CategorySlug != "merge_parent_target" {
+		got := "<nil>"
+		if gotRule.CategorySlug != nil {
+			got = *gotRule.CategorySlug
+		}
+		t.Errorf("rule should be reassigned to target slug; got %q, want %q", got, "merge_parent_target")
+	}
+}
+
 // --- SetTransactionCategory ---
 
 func TestSetTransactionCategory_Success(t *testing.T) {
