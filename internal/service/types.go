@@ -144,6 +144,8 @@ type SyncLogResponse struct {
 	ErrorMessage  *string `json:"error_message"`
 	StartedAt     *string `json:"started_at"`
 	CompletedAt   *string `json:"completed_at"`
+	DurationMs    *int32  `json:"duration_ms,omitempty"`
+	Duration      *string `json:"duration,omitempty"`
 }
 
 type APIKeyResponse struct {
@@ -177,18 +179,32 @@ type SyncLogListResult struct {
 }
 
 type SyncLogRow struct {
-	ID              string
-	ConnectionID    string
-	InstitutionName string
-	Trigger         string
-	Status          string
-	AddedCount      int32
-	ModifiedCount   int32
-	RemovedCount    int32
-	ErrorMessage    *string
-	StartedAt       *string
-	CompletedAt     *string
-	Duration        *string
+	ID                   string
+	ConnectionID         string
+	InstitutionName      string
+	Trigger              string
+	Status               string
+	AddedCount           int32
+	ModifiedCount        int32
+	RemovedCount         int32
+	ErrorMessage         *string // raw technical error for debugging
+	FriendlyErrorMessage *string // human-friendly error for display
+	StartedAt            *string
+	CompletedAt          *string
+	Duration             *string
+	DurationMs           *int32
+	AccountsAffected     int64 // number of accounts with activity in this sync
+}
+
+// SyncLogAccountRow represents a per-account breakdown within a sync log.
+type SyncLogAccountRow struct {
+	ID            string
+	SyncLogID     string
+	AccountID     *string
+	AccountName   string
+	AddedCount    int32
+	ModifiedCount int32
+	RemovedCount  int32
 }
 
 // SyncLogStats contains aggregate statistics about sync logs.
@@ -201,6 +217,18 @@ type SyncLogStats struct {
 	TotalAdded    int64
 	TotalModified int64
 	TotalRemoved  int64
+}
+
+// SyncHealthSummary contains a dashboard-oriented overview of sync health.
+type SyncHealthSummary struct {
+	LastSyncTime      *string // relative time of most recent completed sync (any status)
+	LastSyncStatus    string  // status of the most recent sync: "success", "error", or ""
+	RecentSyncCount   int64   // total syncs in the last 24h
+	RecentSuccessRate float64 // 0-100 success rate over last 24h
+	RecentErrorCount  int64   // error syncs in the last 24h
+	ConnectionErrors  int64   // count of connections currently in error/pending_reauth status
+	NextSyncTime      string  // human-readable time until next scheduled sync
+	OverallHealth     string  // "healthy", "degraded", or "unhealthy"
 }
 
 type AdminTransactionListParams struct {

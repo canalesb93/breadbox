@@ -52,3 +52,6 @@ WHERE id = $1 RETURNING *;
 
 -- name: ListExcludedAccountIDsByConnection :many
 SELECT id FROM accounts WHERE connection_id = $1 AND excluded = true;
+
+-- name: GetAccountDisplayNameByID :one
+SELECT COALESCE(display_name, name) AS display_name FROM accounts WHERE id = $1;

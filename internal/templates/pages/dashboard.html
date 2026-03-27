@@ -389,6 +389,107 @@
       {{end}}
     </div>
 
+    <!-- Sync Health Summary -->
+    {{if .SyncHealth}}
+    <div class="bb-card p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <h2 class="text-sm font-semibold text-base-content/70">Sync Health</h2>
+          {{if eq .SyncHealth.OverallHealth "healthy"}}
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[0.6rem] font-medium bg-success/10 text-success">
+            <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
+            Healthy
+          </span>
+          {{else if eq .SyncHealth.OverallHealth "degraded"}}
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[0.6rem] font-medium bg-warning/10 text-warning">
+            <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse"></span>
+            Degraded
+          </span>
+          {{else if eq .SyncHealth.OverallHealth "unhealthy"}}
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[0.6rem] font-medium bg-error/10 text-error">
+            <span class="w-1.5 h-1.5 rounded-full bg-error animate-pulse"></span>
+            Unhealthy
+          </span>
+          {{end}}
+        </div>
+        <a href="/sync-logs" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">Logs</a>
+      </div>
+
+      <div class="space-y-2.5">
+        <!-- Last Sync -->
+        <div class="flex items-center justify-between">
+          <span class="flex items-center gap-2 text-xs text-base-content/50">
+            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+            Last sync
+          </span>
+          <span class="text-xs font-medium tabular-nums {{if .SyncHealth.LastSyncTime}}{{if eq .SyncHealth.LastSyncStatus "error"}}text-error/80{{else}}text-base-content/70{{end}}{{else}}text-base-content/40{{end}}">
+            {{if .SyncHealth.LastSyncTime}}{{deref .SyncHealth.LastSyncTime}}{{else}}Never{{end}}
+          </span>
+        </div>
+
+        <!-- Success Rate (24h) -->
+        <div class="flex items-center justify-between">
+          <span class="flex items-center gap-2 text-xs text-base-content/50">
+            <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>
+            24h success rate
+          </span>
+          {{if gt .SyncHealth.RecentSyncCount 0}}
+          <span class="text-xs font-medium tabular-nums {{if ge .SyncHealth.RecentSuccessRate 90.0}}text-success{{else if ge .SyncHealth.RecentSuccessRate 50.0}}text-warning{{else}}text-error/80{{end}}">
+            {{printf "%.0f" .SyncHealth.RecentSuccessRate}}%
+            <span class="text-base-content/30 font-normal">({{.SyncHealth.RecentSyncCount}} syncs)</span>
+          </span>
+          {{else}}
+          <span class="text-xs text-base-content/40">No syncs</span>
+          {{end}}
+        </div>
+
+        <!-- Errors (24h) -->
+        {{if gt .SyncHealth.RecentErrorCount 0}}
+        <div class="flex items-center justify-between">
+          <span class="flex items-center gap-2 text-xs text-base-content/50">
+            <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-error/60"></i>
+            Failed syncs (24h)
+          </span>
+          <span class="text-xs font-medium tabular-nums text-error/80">{{.SyncHealth.RecentErrorCount}}</span>
+        </div>
+        {{end}}
+
+        <!-- Connection Errors -->
+        {{if gt .SyncHealth.ConnectionErrors 0}}
+        <div class="flex items-center justify-between">
+          <span class="flex items-center gap-2 text-xs text-base-content/50">
+            <i data-lucide="unplug" class="w-3.5 h-3.5 text-error/60"></i>
+            Connections with issues
+          </span>
+          <a href="/connections" class="text-xs font-medium tabular-nums text-error/80 hover:text-error transition-colors">{{.SyncHealth.ConnectionErrors}}</a>
+        </div>
+        {{end}}
+
+        <!-- Next Sync -->
+        {{if .SyncHealth.NextSyncTime}}
+        <div class="flex items-center justify-between">
+          <span class="flex items-center gap-2 text-xs text-base-content/50">
+            <i data-lucide="timer" class="w-3.5 h-3.5"></i>
+            Next sync
+          </span>
+          <span class="text-xs font-medium text-base-content/60">{{.SyncHealth.NextSyncTime}}</span>
+        </div>
+        {{end}}
+      </div>
+
+      <!-- Success rate mini bar -->
+      {{if gt .SyncHealth.RecentSyncCount 0}}
+      <div class="mt-3 pt-3 border-t border-base-200/60">
+        <div class="flex h-1.5 rounded-full overflow-hidden bg-base-200/60">
+          {{if gt .SyncHealth.RecentSuccessRate 0.0}}
+          <div class="h-full rounded-full {{if ge .SyncHealth.RecentSuccessRate 90.0}}bg-success/60{{else if ge .SyncHealth.RecentSuccessRate 50.0}}bg-warning/60{{else}}bg-error/60{{end}} transition-all duration-700" style="width: {{printf "%.0f" .SyncHealth.RecentSuccessRate}}%;"></div>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+    </div>
+    {{end}}
+
     <!-- Quick Actions -->
     <div class="bb-card p-4">
       <div class="flex gap-2">
