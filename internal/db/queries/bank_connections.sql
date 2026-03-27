@@ -87,5 +87,15 @@ FROM bank_connections
 WHERE status != 'disconnected'
 GROUP BY user_id;
 
+-- name: IncrementConsecutiveFailures :exec
+UPDATE bank_connections
+SET consecutive_failures = consecutive_failures + 1, last_error_at = NOW(), updated_at = NOW()
+WHERE id = $1;
+
+-- name: ResetConsecutiveFailures :exec
+UPDATE bank_connections
+SET consecutive_failures = 0, updated_at = NOW()
+WHERE id = $1;
+
 -- name: CountConnections :one
 SELECT count(*) FROM bank_connections WHERE status != 'disconnected';
