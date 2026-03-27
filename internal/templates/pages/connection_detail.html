@@ -15,6 +15,18 @@
 </div>
 {{end}}
 
+{{if and (ge .Connection.ConsecutiveFailures 3) (not (or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")))}}
+<div class="bb-card border-warning/30 bg-warning/5 p-5 mb-6 flex items-start gap-4">
+  <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
+    <i data-lucide="alert-triangle" class="w-5 h-5 text-warning"></i>
+  </div>
+  <div class="flex-1 min-w-0">
+    <p class="font-semibold text-sm">This connection has failed {{.Connection.ConsecutiveFailures}} syncs in a row</p>
+    <p class="text-sm text-base-content/60 mt-0.5">Recent syncs have been failing consistently. Check the sync history below for error details.{{if .Connection.LastErrorAt.Valid}} Last error was {{relativeTime .Connection.LastErrorAt.Time}}.{{end}}</p>
+  </div>
+</div>
+{{end}}
+
 <!-- Header with actions -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
   <div class="flex items-center gap-4">
@@ -167,6 +179,16 @@
         <p class="text-xs text-base-content/40 mb-1">Last Synced</p>
         <p class="text-sm font-medium">{{if .Connection.LastSyncedAt.Valid}}{{relativeTime .Connection.LastSyncedAt.Time}}{{else}}<span class="text-base-content/30">Never</span>{{end}}</p>
       </div>
+      {{if gt .Connection.ConsecutiveFailures 0}}
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Consecutive Failures</p>
+        <p class="text-sm font-semibold text-warning">{{.Connection.ConsecutiveFailures}}</p>
+      </div>
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Last Error</p>
+        <p class="text-sm font-medium">{{if .Connection.LastErrorAt.Valid}}{{relativeTime .Connection.LastErrorAt.Time}}{{else}}<span class="text-base-content/30">&mdash;</span>{{end}}</p>
+      </div>
+      {{end}}
     </div>
   </div>
 
@@ -295,7 +317,9 @@
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-sm font-medium capitalize">{{.Trigger}}</span>
             <span class="text-xs text-base-content/40">{{relativeTime .StartedAt}}</span>
-            {{if and .StartedAt.Valid .CompletedAt.Valid}}
+            {{if .DurationMs.Valid}}
+            <span class="text-[0.65rem] text-base-content/25 tabular-nums">{{formatDurationMs .DurationMs.Int32}}</span>
+            {{else if and .StartedAt.Valid .CompletedAt.Valid}}
             <span class="text-[0.65rem] text-base-content/25 tabular-nums">{{syncDuration .StartedAt.Time .CompletedAt.Time}}</span>
             {{end}}
           </div>

@@ -18,6 +18,15 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// accountSyncCounts tracks per-account transaction counts during a sync.
+type accountSyncCounts struct {
+	AccountID   pgtype.UUID
+	AccountName string
+	Added       int
+	Modified    int
+	Removed     int
+}
+
 // Engine orchestrates transaction syncing across all bank connections.
 type Engine struct {
 	db        *db.Queries
@@ -64,15 +73,23 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 	}
 
 	// Run the sync and capture results.
-	added, modified, removed, syncErr := e.runSync(ctx, connectionID, logger)
+	added, modified, removed, perAccount, syncErr := e.runSync(ctx, connectionID, logger)
 
 	// Update sync_log with final status.
-	now := pgtype.Timestamptz{Time: time.Now(), Valid: true}
+	completedAt := time.Now()
+	now := pgtype.Timestamptz{Time: completedAt, Valid: true}
 	status := db.SyncStatusSuccess
 	var errMsg pgtype.Text
 	if syncErr != nil {
 		status = db.SyncStatusError
 		errMsg = pgtype.Text{String: syncErr.Error(), Valid: true}
+	}
+
+	// Compute duration in milliseconds from started_at.
+	var durationMs pgtype.Int4
+	if syncLog.StartedAt.Valid {
+		ms := completedAt.Sub(syncLog.StartedAt.Time).Milliseconds()
+		durationMs = pgtype.Int4{Int32: int32(ms), Valid: true}
 	}
 
 	if err := e.db.UpdateSyncLog(ctx, db.UpdateSyncLogParams{
@@ -83,36 +100,51 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 		ModifiedCount: int32(modified),
 		RemovedCount:  int32(removed),
 		ErrorMessage:  errMsg,
+		DurationMs:    durationMs,
 	}); err != nil {
 		logger.Error("failed to update sync log", "error", err)
 	}
 
+	// Save per-account breakdown (best-effort, non-fatal).
+	e.saveSyncLogAccounts(ctx, syncLog.ID, perAccount, logger)
+
+	// Update consecutive failure tracking on the connection.
 	if syncErr != nil {
+		if err := e.db.IncrementConsecutiveFailures(ctx, connectionID); err != nil {
+			logger.Error("failed to increment consecutive failures", "error", err)
+		}
 		return fmt.Errorf("sync connection %s: %w", connIDStr, syncErr)
+	}
+
+	if err := e.db.ResetConsecutiveFailures(ctx, connectionID); err != nil {
+		logger.Error("failed to reset consecutive failures", "error", err)
 	}
 
 	logger.Info("sync completed", "added", added, "modified", modified, "removed", removed)
 	return nil
 }
 
-// runSync performs the actual sync loop for a connection. Returns counts and any error.
-func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *slog.Logger) (added, modified, removed int, err error) {
+// runSync performs the actual sync loop for a connection. Returns counts, per-account breakdown, and any error.
+func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *slog.Logger) (added, modified, removed int, perAccount map[string]*accountSyncCounts, err error) {
+	// Initialize per-account tracking map.
+	perAccount = make(map[string]*accountSyncCounts)
+
 	// Load connection from DB.
 	conn, err := e.db.GetBankConnectionForSync(ctx, connectionID)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("load connection: %w", err)
+		return 0, 0, 0, nil, fmt.Errorf("load connection: %w", err)
 	}
 
 	// Look up the provider.
 	prov, ok := e.providers[string(conn.Provider)]
 	if !ok {
-		return 0, 0, 0, fmt.Errorf("unknown provider: %s", conn.Provider)
+		return 0, 0, 0, nil, fmt.Errorf("unknown provider: %s", conn.Provider)
 	}
 
 	// Fetch excluded account IDs for this connection.
 	excludedIDs, err := e.db.ListExcludedAccountIDsByConnection(ctx, connectionID)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("list excluded accounts: %w", err)
+		return 0, 0, 0, nil, fmt.Errorf("list excluded accounts: %w", err)
 	}
 	excludedSet := make(map[pgtype.UUID]bool, len(excludedIDs))
 	for _, id := range excludedIDs {
@@ -166,8 +198,9 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		}
 	}
 
-	// Account ID cache to avoid repeated lookups.
+	// Account ID + name caches to avoid repeated lookups.
 	accountIDCache := make(map[string]pgtype.UUID)
+	accountNameCache := make(map[string]string) // account UUID string -> display name
 
 	// Buffer writes so we can discard them on ErrMutationDuringPagination.
 	var pendingRemovals []string
@@ -194,9 +227,9 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 					ErrorCode:    pgtype.Text{String: "ITEM_LOGIN_REQUIRED", Valid: true},
 					ErrorMessage: pgtype.Text{String: "Re-authentication required by institution", Valid: true},
 				})
-				return 0, 0, 0, syncErr
+				return 0, 0, 0, nil, syncErr
 			}
-			return 0, 0, 0, syncErr
+			return 0, 0, 0, nil, syncErr
 		}
 
 		// Buffer results — don't write to DB until pagination is complete.
@@ -214,7 +247,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		// Start transaction for all data writes.
 		tx, err := e.pool.Begin(ctx)
 		if err != nil {
-			return 0, 0, 0, fmt.Errorf("begin transaction: %w", err)
+			return 0, 0, 0, nil, fmt.Errorf("begin transaction: %w", err)
 		}
 		defer tx.Rollback(ctx)
 
@@ -250,6 +283,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				e.enqueueForReview(ctx, txQueries, txnResult, isNew, confidenceThreshold, resolver)
 			}
 			added++
+			e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "added")
 		}
 
 		// Process modified transactions (skip excluded accounts).
@@ -272,6 +306,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				e.enqueueForReview(ctx, txQueries, txnResult, false, confidenceThreshold, resolver)
 			}
 			modified++
+			e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "modified")
 		}
 
 		if skipped > 0 {
@@ -289,7 +324,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			ID:         connectionID,
 			SyncCursor: pgtype.Text{String: result.Cursor, Valid: true},
 		}); err != nil {
-			return added, modified, removed, fmt.Errorf("update cursor: %w", err)
+			return added, modified, removed, perAccount, fmt.Errorf("update cursor: %w", err)
 		}
 
 		// Fetch and update balances.
@@ -299,7 +334,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		}
 
 		if err := tx.Commit(ctx); err != nil {
-			return 0, 0, 0, fmt.Errorf("commit transaction: %w", err)
+			return 0, 0, 0, nil, fmt.Errorf("commit transaction: %w", err)
 		}
 
 		// Flush rule hit counts after commit (best-effort, non-fatal).
@@ -322,7 +357,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		break
 	}
 
-	return added, modified, removed, nil
+	return added, modified, removed, perAccount, nil
 }
 
 // upsertTransaction resolves the account ID and upserts a single transaction.
@@ -517,6 +552,67 @@ func (e *Engine) SyncAll(ctx context.Context, trigger db.SyncTrigger) error {
 // Matcher returns the engine's matcher for external use (e.g., manual reconciliation).
 func (e *Engine) Matcher() *Matcher {
 	return e.matcher
+}
+
+// trackAccountCount increments the per-account counter for the given operation type.
+func (e *Engine) trackAccountCount(ctx context.Context, perAccount map[string]*accountSyncCounts, accountID pgtype.UUID, nameCache map[string]string, op string) {
+	key := formatUUID(accountID)
+	if key == "" {
+		return
+	}
+
+	counts, ok := perAccount[key]
+	if !ok {
+		// Resolve account display name (best-effort).
+		name, exists := nameCache[key]
+		if !exists {
+			displayName, err := e.db.GetAccountDisplayNameByID(ctx, accountID)
+			if err != nil {
+				name = "Unknown"
+			} else {
+				name = displayName
+			}
+			nameCache[key] = name
+		}
+		counts = &accountSyncCounts{
+			AccountID:   accountID,
+			AccountName: name,
+		}
+		perAccount[key] = counts
+	}
+
+	switch op {
+	case "added":
+		counts.Added++
+	case "modified":
+		counts.Modified++
+	case "removed":
+		counts.Removed++
+	}
+}
+
+// saveSyncLogAccounts persists per-account sync breakdown (best-effort, non-fatal).
+func (e *Engine) saveSyncLogAccounts(ctx context.Context, syncLogID pgtype.UUID, perAccount map[string]*accountSyncCounts, logger *slog.Logger) {
+	if len(perAccount) == 0 {
+		return
+	}
+
+	for _, counts := range perAccount {
+		if err := e.db.InsertSyncLogAccount(ctx, db.InsertSyncLogAccountParams{
+			SyncLogID:     syncLogID,
+			AccountID:     counts.AccountID,
+			AccountName:   counts.AccountName,
+			AddedCount:    int32(counts.Added),
+			ModifiedCount: int32(counts.Modified),
+			RemovedCount:  int32(counts.Removed),
+		}); err != nil {
+			logger.Warn("failed to insert sync log account breakdown",
+				"account_name", counts.AccountName,
+				"error", err)
+		}
+	}
+
+	logger.Debug("saved per-account sync breakdown", "accounts", len(perAccount))
 }
 
 // --- helpers ---
