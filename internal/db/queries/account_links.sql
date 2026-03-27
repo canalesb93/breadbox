@@ -58,6 +58,12 @@ SELECT DISTINCT al.* FROM account_links al
 JOIN accounts a ON a.id = al.primary_account_id OR a.id = al.dependent_account_id
 WHERE a.connection_id = $1 AND al.enabled = TRUE;
 
+-- name: AccountLinkExists :one
+SELECT EXISTS(
+    SELECT 1 FROM account_links
+    WHERE primary_account_id = $1 AND dependent_account_id = $2
+) AS exists;
+
 -- name: UpdateAccountDependentLinked :exec
 UPDATE accounts SET is_dependent_linked = $2, updated_at = NOW() WHERE id = $1;
 
