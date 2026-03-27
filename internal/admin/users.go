@@ -172,14 +172,14 @@ func EditUserHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 
 		var userID pgtype.UUID
 		if err := userID.Scan(idStr); err != nil {
-			http.Error(w, "Invalid user ID", http.StatusBadRequest)
+			tr.RenderNotFound(w, r)
 			return
 		}
 
 		user, err := a.Queries.GetUser(ctx, userID)
 		if err != nil {
 			a.Logger.Error("get user", "error", err)
-			http.NotFound(w, r)
+			tr.RenderNotFound(w, r)
 			return
 		}
 

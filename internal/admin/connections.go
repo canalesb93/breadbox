@@ -307,14 +307,14 @@ func ConnectionDetailHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 
 		var connID pgtype.UUID
 		if err := connID.Scan(idStr); err != nil {
-			http.Error(w, "Invalid connection ID", http.StatusBadRequest)
+			tr.RenderNotFound(w, r)
 			return
 		}
 
 		conn, err := a.Queries.GetBankConnection(ctx, connID)
 		if err != nil {
 			a.Logger.Error("get bank connection", "error", err)
-			http.NotFound(w, r)
+			tr.RenderNotFound(w, r)
 			return
 		}
 
@@ -490,14 +490,14 @@ func ConnectionReauthHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 
 		var connID pgtype.UUID
 		if err := connID.Scan(idStr); err != nil {
-			http.Error(w, "Invalid connection ID", http.StatusBadRequest)
+			tr.RenderNotFound(w, r)
 			return
 		}
 
 		conn, err := a.Queries.GetBankConnection(ctx, connID)
 		if err != nil {
 			a.Logger.Error("get bank connection for reauth", "error", err)
-			http.NotFound(w, r)
+			tr.RenderNotFound(w, r)
 			return
 		}
 
