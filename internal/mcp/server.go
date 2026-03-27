@@ -39,19 +39,23 @@ CATEGORY SYSTEM:
 - To simplify/consolidate categories: export categories, then set the merge_into column to a target slug for categories you want to merge. All transactions and mappings from the source are moved to the target. This preserves categorization history while reducing complexity
 
 TOKEN EFFICIENCY:
-- Use the fields parameter on query_transactions to request only needed fields (e.g., fields=core,category). Aliases: core (id,date,amount,name,iso_currency_code), category (category,category_primary_raw,category_detailed_raw), timestamps (created_at,updated_at,datetime,authorized_datetime)
+- Use the fields parameter on query_transactions to request only needed fields. Supports individual field names (e.g., fields=name,amount,date,account_name) and aliases: minimal (name,amount,date — smallest useful set), core (id,date,amount,name,iso_currency_code), category (category,category_primary_raw,category_detailed_raw), timestamps (created_at,updated_at,datetime,authorized_datetime). id is always included.
 - Use fields=triage on list_pending_reviews to get only fields needed for categorization decisions — dramatically reduces response size
 - Use transaction_summary for aggregated spending analysis instead of paginating through individual transactions. Supports group_by: category, month, week, day, category_month
+- Use merchant_summary to get a compact index of all merchants with transaction counts, totals, and date ranges — much more efficient than paginating through raw transactions to identify spending patterns or recurring charges
+- Transaction responses include account_name and user_name — no need to cross-reference list_accounts for "which card?" questions
 - The breadbox://overview resource includes users, connections, accounts by type, and 30-day spending summary — often eliminates the need for separate list_users + list_accounts calls
 
 RECOMMENDED QUERY PATTERNS:
 1. Read breadbox://overview first for dataset context (users, connections, accounts, spending)
 2. Use transaction_summary for spending analysis (group by category, month, etc.)
-3. Use query_transactions with fields=core,category for browsing individual transactions
-4. Use list_categories to understand the category taxonomy
-5. Use count_transactions to get totals before paginating
-6. Check get_sync_status to verify data freshness
-7. Use list_unmapped_categories to identify categorization gaps
+3. Use merchant_summary to scan for recurring charges or spending patterns (set min_count=2 for recurring, min_count=3 for subscriptions)
+4. Use query_transactions with fields=core,category for browsing individual transactions
+5. Use list_categories to understand the category taxonomy
+6. Use count_transactions to get totals before paginating
+7. Check get_sync_status to verify data freshness
+8. Use list_unmapped_categories to identify categorization gaps
+- Use exclude_search on query_transactions to filter out known merchants when hunting for unknown charges
 
 COMMENTS:
 - Use add_transaction_comment to explain your reasoning when recategorizing transactions
@@ -182,6 +186,9 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("transaction_summary", ToolRead,
 			"Get aggregated transaction totals grouped by category and/or time period. Replaces the need to paginate through thousands of individual transactions for spending analysis. Amounts follow the convention: positive = money out (debit), negative = money in (credit). Only includes non-deleted, non-pending transactions by default.",
 			s.handleTransactionSummary),
+		makeToolDef("merchant_summary", ToolRead,
+			"List distinct merchants with aggregated stats: transaction count, total spent, average amount, and date range. Returns a compact merchant-level index — use this to scan for recurring charges, identify top merchants, or find unknown subscriptions. Then drill into specific merchants with query_transactions using the search filter. Default date range: 90 days. Set min_count=2 to find recurring charges, min_count=3 for likely subscriptions.",
+			s.handleMerchantSummary),
 		makeToolDef("export_categories", ToolRead,
 			"Export all category definitions as TSV text. The returned format can be edited externally (in a text editor, by an AI agent, etc.) and re-imported via import_categories. Columns: slug, display_name, parent_slug, icon, color, sort_order, hidden, merge_into. Slugs are immutable identifiers; display_name and other fields can be changed. The merge_into column is empty on export.",
 			s.handleExportCategories),

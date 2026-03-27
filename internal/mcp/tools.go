@@ -18,32 +18,34 @@ type listAccountsInput struct {
 }
 
 type queryTransactionsInput struct {
-	StartDate    string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
-	EndDate      string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
-	AccountID    string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
-	UserID       string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
-	CategorySlug string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug (parent slug includes all children). Use list_categories to find slugs."`
-	MinAmount    *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount (positive=debit, negative=credit)"`
-	MaxAmount    *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount (positive=debit, negative=credit)"`
-	Pending      *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
-	Search       string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant"`
-	Limit        int      `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
-	Cursor       string   `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
-	SortBy       string   `json:"sort_by,omitempty" jsonschema:"Sort: date (default), amount, name"`
-	SortOrder    string   `json:"sort_order,omitempty" jsonschema:"Sort direction: desc (default) or asc"`
-	Fields       string   `json:"fields,omitempty" jsonschema:"Comma-separated list of fields to include in response. Aliases: core (id,date,amount,name,iso_currency_code), category (category,category_primary_raw,category_detailed_raw), timestamps (created_at,updated_at,datetime,authorized_datetime). Default: all fields. id is always included."`
+	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
+	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
+	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
+	UserID        string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
+	CategorySlug  string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug (parent slug includes all children). Use list_categories to find slugs."`
+	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount (positive=debit, negative=credit)"`
+	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount (positive=debit, negative=credit)"`
+	Pending       *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
+	Search        string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant"`
+	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions whose name or merchant matches this text (ILIKE). Use to filter out known merchants when hunting for unknown charges."`
+	Limit         int      `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
+	Cursor        string   `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
+	SortBy        string   `json:"sort_by,omitempty" jsonschema:"Sort: date (default), amount, name"`
+	SortOrder     string   `json:"sort_order,omitempty" jsonschema:"Sort direction: desc (default) or asc"`
+	Fields        string   `json:"fields,omitempty" jsonschema:"Comma-separated list of fields to include in response. Aliases: minimal (name,amount,date), core (id,date,amount,name,iso_currency_code), category (category,category_primary_raw,category_detailed_raw), timestamps (created_at,updated_at,datetime,authorized_datetime). Default: all fields. id is always included."`
 }
 
 type countTransactionsInput struct {
-	StartDate    string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
-	EndDate      string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
-	AccountID    string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
-	UserID       string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
-	CategorySlug string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
-	MinAmount    *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount"`
-	MaxAmount    *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount"`
-	Pending      *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
-	Search       string   `json:"search,omitempty" jsonschema:"Search name or merchant"`
+	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
+	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
+	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
+	UserID        string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
+	CategorySlug  string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
+	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount"`
+	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount"`
+	Pending       *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
+	Search        string   `json:"search,omitempty" jsonschema:"Search name or merchant"`
+	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions matching this text"`
 }
 
 type triggerSyncInput struct {
@@ -76,6 +78,20 @@ type transactionSummaryInput struct {
 	UserID         string `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
 	Category       string `json:"category,omitempty" jsonschema:"Filter by primary category before aggregating"`
 	IncludePending *bool  `json:"include_pending,omitempty" jsonschema:"Include pending transactions (default false)"`
+}
+
+type merchantSummaryInput struct {
+	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive. Defaults to 90 days ago."`
+	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive. Defaults to today."`
+	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
+	UserID        string   `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
+	CategorySlug  string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
+	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum transaction amount"`
+	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum transaction amount"`
+	Search        string   `json:"search,omitempty" jsonschema:"Search merchant/transaction names (ILIKE)"`
+	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude merchants matching this text (ILIKE). Use to filter out known merchants when hunting for unknowns."`
+	MinCount      int      `json:"min_count,omitempty" jsonschema:"Minimum transaction count to include a merchant (default 1). Set to 2+ to find recurring charges."`
+	SpendingOnly  *bool    `json:"spending_only,omitempty" jsonschema:"Only include spending (positive amounts). Default false."`
 }
 
 type listPendingReviewsInput struct {
@@ -192,6 +208,9 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 	if input.Search != "" {
 		params.Search = &input.Search
 	}
+	if input.ExcludeSearch != "" {
+		params.ExcludeSearch = &input.ExcludeSearch
+	}
 	if input.SortBy != "" {
 		params.SortBy = &input.SortBy
 	}
@@ -263,6 +282,9 @@ func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToo
 	}
 	if input.Search != "" {
 		params.Search = &input.Search
+	}
+	if input.ExcludeSearch != "" {
+		params.ExcludeSearch = &input.ExcludeSearch
 	}
 
 	count, err := s.svc.CountTransactionsFiltered(ctx, params)
@@ -438,6 +460,60 @@ func (s *MCPServer) handleTransactionSummary(_ context.Context, _ *mcpsdk.CallTo
 	}
 
 	result, err := s.svc.GetTransactionSummary(ctx, params)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	return jsonResult(result)
+}
+
+func (s *MCPServer) handleMerchantSummary(_ context.Context, _ *mcpsdk.CallToolRequest, input merchantSummaryInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+
+	params := service.MerchantSummaryParams{
+		MinCount: input.MinCount,
+	}
+
+	if input.StartDate != "" {
+		t, err := time.Parse("2006-01-02", input.StartDate)
+		if err != nil {
+			return errorResult(fmt.Errorf("invalid start_date: %w", err)), nil, nil
+		}
+		params.StartDate = &t
+	}
+	if input.EndDate != "" {
+		t, err := time.Parse("2006-01-02", input.EndDate)
+		if err != nil {
+			return errorResult(fmt.Errorf("invalid end_date: %w", err)), nil, nil
+		}
+		params.EndDate = &t
+	}
+	if input.AccountID != "" {
+		params.AccountID = &input.AccountID
+	}
+	if input.UserID != "" {
+		params.UserID = &input.UserID
+	}
+	if input.CategorySlug != "" {
+		params.CategorySlug = &input.CategorySlug
+	}
+	if input.MinAmount != nil {
+		params.MinAmount = input.MinAmount
+	}
+	if input.MaxAmount != nil {
+		params.MaxAmount = input.MaxAmount
+	}
+	if input.Search != "" {
+		params.Search = &input.Search
+	}
+	if input.ExcludeSearch != "" {
+		params.ExcludeSearch = &input.ExcludeSearch
+	}
+	if input.SpendingOnly != nil && *input.SpendingOnly {
+		params.SpendingOnly = true
+	}
+
+	result, err := s.svc.GetMerchantSummary(ctx, params)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
@@ -1148,8 +1224,11 @@ func (s *MCPServer) handleBulkRecategorize(ctx context.Context, _ *mcpsdk.CallTo
 // --- Agent Reports ---
 
 type submitReportInput struct {
-	Title string `json:"title" jsonschema:"required,Short title summarizing the report (e.g. 'Weekly Review Complete' or 'Suspicious Transactions Found')"`
-	Body  string `json:"body" jsonschema:"required,Detailed report content in markdown format. To reference specific transactions use markdown links: [Transaction Name](/transactions/TRANSACTION_ID). These will be rendered as clickable deep-links in the dashboard."`
+	Title    string   `json:"title" jsonschema:"required,Short title summarizing the report (e.g. 'Weekly Review Complete' or 'Suspicious Transactions Found')"`
+	Body     string   `json:"body" jsonschema:"required,Detailed report content in markdown format. To reference specific transactions use markdown links: [Transaction Name](/transactions/TRANSACTION_ID). These will be rendered as clickable deep-links in the dashboard."`
+	Priority string   `json:"priority" jsonschema:"enum=info,enum=warning,enum=critical,default=info,Severity level: info (routine updates and summaries), warning (needs attention soon), critical (urgent action required)"`
+	Tags     []string `json:"tags" jsonschema:"Short labels for categorizing reports (e.g. 'weekly-review' or 'anomaly'). Max 10 tags."`
+	Author   string   `json:"author" jsonschema:"Custom author name to sign this report with. Overrides the API key name for display (e.g. 'Review Agent' or 'Budget Monitor')."`
 }
 
 func (s *MCPServer) handleSubmitReport(reqCtx context.Context, _ *mcpsdk.CallToolRequest, input submitReportInput) (*mcpsdk.CallToolResult, any, error) {
@@ -1160,7 +1239,7 @@ func (s *MCPServer) handleSubmitReport(reqCtx context.Context, _ *mcpsdk.CallToo
 	}
 
 	actor := service.ActorFromContext(reqCtx)
-	report, err := s.svc.CreateAgentReport(ctx, input.Title, input.Body, actor)
+	report, err := s.svc.CreateAgentReport(ctx, input.Title, input.Body, actor, input.Priority, input.Tags, input.Author)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
