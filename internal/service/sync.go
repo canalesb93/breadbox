@@ -57,7 +57,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 
 	query := "SELECT sl.id, sl.connection_id, bc.institution_name, sl.trigger, sl.status, " +
 		"sl.added_count, sl.modified_count, sl.removed_count, sl.error_message, " +
-		"sl.started_at, sl.completed_at " +
+		"sl.started_at, sl.completed_at, sl.warning_message " +
 		"FROM sync_logs sl " +
 		"JOIN bank_connections bc ON sl.connection_id = bc.id " +
 		"WHERE sl.id = $1"
@@ -74,12 +74,13 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 		errorMessage    pgtype.Text
 		startedAt       pgtype.Timestamptz
 		completedAt     pgtype.Timestamptz
+		warningMessage  pgtype.Text
 	)
 
 	if err := s.Pool.QueryRow(ctx, query, uid).Scan(
 		&id, &connectionID, &institutionName, &trigger, &status,
 		&addedCount, &modifiedCount, &removedCount, &errorMessage,
-		&startedAt, &completedAt,
+		&startedAt, &completedAt, &warningMessage,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -111,6 +112,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 		ModifiedCount:    modifiedCount,
 		RemovedCount:     removedCount,
 		ErrorMessage:     textPtr(errorMessage),
+		WarningMessage:   textPtr(warningMessage),
 		StartedAt:        timestampStr(startedAt),
 		CompletedAt:      timestampStr(completedAt),
 		Duration:         duration,
@@ -121,7 +123,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListParams) (*SyncLogListResult, error) {
 	query := "SELECT sl.id, sl.connection_id, bc.institution_name, sl.trigger, sl.status, " +
 		"sl.added_count, sl.modified_count, sl.removed_count, sl.error_message, " +
-		"sl.started_at, sl.completed_at, sl.duration_ms " +
+		"sl.started_at, sl.completed_at, sl.duration_ms, sl.warning_message " +
 		"FROM sync_logs sl " +
 		"JOIN bank_connections bc ON sl.connection_id = bc.id " +
 		"WHERE 1=1"
@@ -192,12 +194,13 @@ func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListP
 			startedAt       pgtype.Timestamptz
 			completedAt     pgtype.Timestamptz
 			durationMs      pgtype.Int4
+			warningMessage  pgtype.Text
 		)
 
 		if err := rows.Scan(
 			&id, &connectionID, &institutionName, &trigger, &status,
 			&addedCount, &modifiedCount, &removedCount, &errorMessage,
-			&startedAt, &completedAt, &durationMs,
+			&startedAt, &completedAt, &durationMs, &warningMessage,
 		); err != nil {
 			return nil, fmt.Errorf("scan sync log: %w", err)
 		}
@@ -235,6 +238,7 @@ func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListP
 			ModifiedCount:   modifiedCount,
 			RemovedCount:    removedCount,
 			ErrorMessage:    textPtr(errorMessage),
+			WarningMessage:  textPtr(warningMessage),
 			StartedAt:       timestampStr(startedAt),
 			CompletedAt:     timestampStr(completedAt),
 			Duration:        duration,
@@ -321,6 +325,7 @@ func (s *Service) SyncLogStats(ctx context.Context, params SyncLogListParams) (*
 		COUNT(*) AS total,
 		COUNT(*) FILTER (WHERE sl.status = 'success') AS success_count,
 		COUNT(*) FILTER (WHERE sl.status = 'error') AS error_count,
+		COUNT(*) FILTER (WHERE sl.warning_message IS NOT NULL AND sl.warning_message != '') AS warning_count,
 		COALESCE(AVG(COALESCE(sl.duration_ms, EXTRACT(MILLISECONDS FROM (sl.completed_at - sl.started_at))::INTEGER)) FILTER (WHERE sl.completed_at IS NOT NULL), 0) AS avg_duration_ms,
 		COALESCE(SUM(sl.added_count), 0) AS total_added,
 		COALESCE(SUM(sl.modified_count), 0) AS total_modified,
@@ -352,6 +357,7 @@ func (s *Service) SyncLogStats(ctx context.Context, params SyncLogListParams) (*
 		&stats.TotalSyncs,
 		&stats.SuccessCount,
 		&stats.ErrorCount,
+		&stats.WarningCount,
 		&stats.AvgDurationMs,
 		&stats.TotalAdded,
 		&stats.TotalModified,

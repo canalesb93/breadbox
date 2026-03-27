@@ -189,6 +189,7 @@ type SyncLogRow struct {
 	RemovedCount         int32
 	ErrorMessage         *string // raw technical error for debugging
 	FriendlyErrorMessage *string // human-friendly error for display
+	WarningMessage       *string // non-fatal warning (e.g., balance fetch issues)
 	StartedAt            *string
 	CompletedAt          *string
 	Duration             *string
@@ -212,6 +213,7 @@ type SyncLogStats struct {
 	TotalSyncs    int64
 	SuccessCount  int64
 	ErrorCount    int64
+	WarningCount  int64   // syncs that succeeded with warnings
 	SuccessRate   float64 // 0-100 percentage
 	AvgDurationMs float64 // average duration in milliseconds
 	TotalAdded    int64
