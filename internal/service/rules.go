@@ -79,9 +79,13 @@ func validateConditionDepth(c Condition, depth int) error {
 				return fmt.Errorf("%w: operator %q not valid for string field %q", ErrInvalidParameter, c.Op, c.Field)
 			}
 			if c.Op == "in" {
-				// Value should be an array
-				if _, ok := toStringSlice(c.Value); !ok {
+				// Value should be a non-empty array
+				vals, ok := toStringSlice(c.Value)
+				if !ok {
 					return fmt.Errorf("%w: 'in' operator requires an array value for field %q", ErrInvalidParameter, c.Field)
+				}
+				if len(vals) == 0 {
+					return fmt.Errorf("%w: 'in' operator requires a non-empty array for field %q", ErrInvalidParameter, c.Field)
 				}
 			} else if c.Op == "matches" {
 				s, ok := c.Value.(string)

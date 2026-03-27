@@ -80,6 +80,16 @@ func TestValidateCondition_Simple(t *testing.T) {
 			cond:    Condition{Field: "name", Value: "test"},
 			wantErr: true,
 		},
+		{
+			name:    "in operator with empty array",
+			cond:    Condition{Field: "name", Op: "in", Value: []interface{}{}},
+			wantErr: true,
+		},
+		{
+			name:    "in operator with empty string array",
+			cond:    Condition{Field: "provider", Op: "in", Value: []string{}},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
