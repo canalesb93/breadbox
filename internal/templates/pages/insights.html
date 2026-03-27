@@ -71,13 +71,6 @@
         </div>
       </div>
     </div>
-    <!-- Date Range Picker -->
-    <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5">
-      <a :href="'/insights?days=7&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 7}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">7d</a>
-      <a :href="'/insights?days=30&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 30}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">30d</a>
-      <a :href="'/insights?days=90&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 90}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">90d</a>
-      <a :href="'/insights?days=365&tab=' + tab" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 365}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">12m</a>
-    </div>
   </div>
 </div>
 
@@ -300,11 +293,13 @@
     Trends
     <kbd class="hidden lg:inline-block text-[0.55rem] font-normal text-base-content/20 bg-base-200/50 px-1 py-0.5 rounded ml-1">3</kbd>
   </button>
-  <span class="hidden lg:flex items-center gap-1 ml-auto text-[0.55rem] text-base-content/20 shrink-0 pr-1">
-    <kbd class="bg-base-200/50 px-1 py-0.5 rounded">&larr;</kbd>
-    <kbd class="bg-base-200/50 px-1 py-0.5 rounded">&rarr;</kbd>
-    <span class="ml-0.5">to navigate</span>
-  </span>
+  <!-- Date Range Picker -->
+  <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 ml-auto shrink-0">
+    <a :href="'/insights?days=7&tab=' + tab" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 7}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">7d</a>
+    <a :href="'/insights?days=30&tab=' + tab" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 30}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">30d</a>
+    <a :href="'/insights?days=90&tab=' + tab" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 90}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">90d</a>
+    <a :href="'/insights?days=365&tab=' + tab" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 365}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">12m</a>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════ -->
@@ -1713,9 +1708,8 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- ECharts Initialization -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // Clear stale flags from previous page loads (SPA-style navigations).
+  // Reset flag for this page load.
   window._insightsChartsLoaded = false;
-  window._setInsightsReady = null;
 
   var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   // Read theme-aware colors from CSS custom properties
@@ -2540,17 +2534,29 @@ document.addEventListener('DOMContentLoaded', function() {
   };
 
   // ── Signal to Alpine that insights content is ready ──
-  // Two race conditions handled:
-  // 1. This runs before Alpine x-init: set flag, x-init will pick it up.
-  // 2. This runs after Alpine x-init: call _setInsightsReady directly.
+  // Race condition: DOMContentLoaded may fire before or after Alpine x-init.
+  // 1. Set flag so x-init picks it up if it runs later.
+  // 2. Try calling _setInsightsReady now (works if x-init already ran).
+  // 3. Retry after a short delay to catch Alpine finishing after us.
   window._insightsChartsLoaded = true;
-  if (window._setInsightsReady) {
-    window._setInsightsReady();
-    setTimeout(function() {
-      insightCharts.forEach(function(c) {
-        try { c.resize(); } catch(e) {}
-      });
-    }, 150);
+  function activateInsights() {
+    if (typeof window._setInsightsReady === 'function') {
+      window._setInsightsReady();
+      setTimeout(function() {
+        insightCharts.forEach(function(c) {
+          try { c.resize(); } catch(e) {}
+        });
+      }, 150);
+      return true;
+    }
+    return false;
+  }
+  if (!activateInsights()) {
+    // Alpine x-init hasn't run yet; retry until it does.
+    var retries = 0;
+    var retryInterval = setInterval(function() {
+      if (activateInsights() || ++retries > 50) clearInterval(retryInterval);
+    }, 30);
   }
 });
 </script>

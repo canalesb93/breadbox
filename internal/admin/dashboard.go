@@ -21,20 +21,8 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// Parse chart date range from query param (default 30 days).
+		// Dashboard always shows 30-day charts.
 		chartDays := 30
-		if d := r.URL.Query().Get("days"); d != "" {
-			switch d {
-			case "7":
-				chartDays = 7
-			case "30":
-				chartDays = 30
-			case "90":
-				chartDays = 90
-			case "365":
-				chartDays = 365
-			}
-		}
 		chartStart := time.Now().AddDate(0, 0, -chartDays)
 
 		accountCount, err := a.Queries.CountAccounts(ctx)
@@ -1007,7 +995,6 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"DailyLabels":            dailyLabelsJSON,
 			"DailyAmounts":           dailyAmountsJSON,
 			"DailyIncomeAmounts":     dailyIncomeAmountsJSON,
-			"ChartDays":              chartDays,
 			"RecentTransactions":     recentTransactions,
 			"Categories":            categoryTree,
 			"TotalSpending":          totalSpending,
