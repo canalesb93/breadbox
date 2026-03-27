@@ -122,6 +122,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 	// Admin API (authenticated, JSON responses).
 	r.Route("/-", func(r chi.Router) {
 		r.Use(RequireAuth(sm))
+		r.Use(CSRFMiddleware(sm))
 
 		r.Post("/link-token", LinkTokenHandler(a))
 		r.Post("/exchange-token", ExchangeTokenHandler(a))
