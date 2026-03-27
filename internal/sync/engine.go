@@ -67,12 +67,20 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 	added, modified, removed, syncErr := e.runSync(ctx, connectionID, logger)
 
 	// Update sync_log with final status.
-	now := pgtype.Timestamptz{Time: time.Now(), Valid: true}
+	completedAt := time.Now()
+	now := pgtype.Timestamptz{Time: completedAt, Valid: true}
 	status := db.SyncStatusSuccess
 	var errMsg pgtype.Text
 	if syncErr != nil {
 		status = db.SyncStatusError
 		errMsg = pgtype.Text{String: syncErr.Error(), Valid: true}
+	}
+
+	// Compute duration in milliseconds from started_at.
+	var durationMs pgtype.Int4
+	if syncLog.StartedAt.Valid {
+		ms := completedAt.Sub(syncLog.StartedAt.Time).Milliseconds()
+		durationMs = pgtype.Int4{Int32: int32(ms), Valid: true}
 	}
 
 	if err := e.db.UpdateSyncLog(ctx, db.UpdateSyncLogParams{
@@ -83,6 +91,7 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 		ModifiedCount: int32(modified),
 		RemovedCount:  int32(removed),
 		ErrorMessage:  errMsg,
+		DurationMs:    durationMs,
 	}); err != nil {
 		logger.Error("failed to update sync log", "error", err)
 	}

@@ -101,7 +101,7 @@ func (s *Service) GetConnectionStatus(ctx context.Context, id string) (*Connecti
 		// No sync log found, that's fine
 	} else {
 		resp.LastAttemptedSyncAt = timestampStr(syncLog.StartedAt)
-		resp.LastSyncLog = &SyncLogResponse{
+		slResp := SyncLogResponse{
 			ID:            formatUUID(syncLog.ID),
 			ConnectionID:  formatUUID(syncLog.ConnectionID),
 			Trigger:       string(syncLog.Trigger),
@@ -113,6 +113,17 @@ func (s *Service) GetConnectionStatus(ctx context.Context, id string) (*Connecti
 			StartedAt:     timestampStr(syncLog.StartedAt),
 			CompletedAt:   timestampStr(syncLog.CompletedAt),
 		}
+		if syncLog.DurationMs.Valid {
+			slResp.DurationMs = &syncLog.DurationMs.Int32
+			d := formatDurationMs(int64(syncLog.DurationMs.Int32))
+			slResp.Duration = &d
+		} else if syncLog.StartedAt.Valid && syncLog.CompletedAt.Valid {
+			ms := int32(syncLog.CompletedAt.Time.Sub(syncLog.StartedAt.Time).Milliseconds())
+			slResp.DurationMs = &ms
+			d := formatDurationMs(int64(ms))
+			slResp.Duration = &d
+		}
+		resp.LastSyncLog = &slResp
 	}
 
 	return resp, nil

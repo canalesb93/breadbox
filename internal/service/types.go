@@ -144,6 +144,8 @@ type SyncLogResponse struct {
 	ErrorMessage  *string `json:"error_message"`
 	StartedAt     *string `json:"started_at"`
 	CompletedAt   *string `json:"completed_at"`
+	DurationMs    *int32  `json:"duration_ms,omitempty"`
+	Duration      *string `json:"duration,omitempty"`
 }
 
 type APIKeyResponse struct {
@@ -189,6 +191,7 @@ type SyncLogRow struct {
 	StartedAt       *string
 	CompletedAt     *string
 	Duration        *string
+	DurationMs      *int32
 }
 
 // SyncLogStats contains aggregate statistics about sync logs.

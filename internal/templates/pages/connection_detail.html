@@ -295,7 +295,9 @@
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-sm font-medium capitalize">{{.Trigger}}</span>
             <span class="text-xs text-base-content/40">{{relativeTime .StartedAt}}</span>
-            {{if and .StartedAt.Valid .CompletedAt.Valid}}
+            {{if .DurationMs.Valid}}
+            <span class="text-[0.65rem] text-base-content/25 tabular-nums">{{formatDurationMs .DurationMs.Int32}}</span>
+            {{else if and .StartedAt.Valid .CompletedAt.Valid}}
             <span class="text-[0.65rem] text-base-content/25 tabular-nums">{{syncDuration .StartedAt.Time .CompletedAt.Time}}</span>
             {{end}}
           </div>
