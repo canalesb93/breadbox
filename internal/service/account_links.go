@@ -70,6 +70,10 @@ type MatchReconciliationResult struct {
 
 // CreateAccountLink establishes a link between a primary and dependent account.
 func (s *Service) CreateAccountLink(ctx context.Context, params CreateAccountLinkParams) (*AccountLinkResponse, error) {
+	if params.PrimaryAccountID == params.DependentAccountID {
+		return nil, fmt.Errorf("%w: cannot link an account to itself", ErrInvalidParameter)
+	}
+
 	primaryID, err := parseUUID(params.PrimaryAccountID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid primary account id", ErrInvalidParameter)
@@ -77,6 +81,19 @@ func (s *Service) CreateAccountLink(ctx context.Context, params CreateAccountLin
 	dependentID, err := parseUUID(params.DependentAccountID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid dependent account id", ErrInvalidParameter)
+	}
+
+	// Check for reverse link (B→A when creating A→B) to prevent circular links.
+	// Circular links would mark both accounts as dependent, excluding both from totals.
+	reverseExists, err := s.Queries.AccountLinkExists(ctx, db.AccountLinkExistsParams{
+		PrimaryAccountID:   dependentID,
+		DependentAccountID: primaryID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("check reverse link: %w", err)
+	}
+	if reverseExists {
+		return nil, fmt.Errorf("%w: a link already exists in the opposite direction (circular links are not allowed)", ErrInvalidParameter)
 	}
 
 	// Verify both accounts exist.

@@ -189,6 +189,62 @@ func TestCreateAccountLink_DuplicateLink(t *testing.T) {
 	}
 }
 
+func TestCreateAccountLink_SelfLink(t *testing.T) {
+	svc, queries, _ := newService(t)
+	user := testutil.MustCreateUser(t, queries, "User")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Acct")
+
+	acctID := formatUUIDForTest(acct.ID)
+	_, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
+		PrimaryAccountID:   acctID,
+		DependentAccountID: acctID,
+	})
+	if err == nil {
+		t.Fatal("expected error for self-link")
+	}
+	if !errors.Is(err, service.ErrInvalidParameter) {
+		t.Errorf("expected ErrInvalidParameter, got: %v", err)
+	}
+}
+
+func TestCreateAccountLink_CircularLinkRejected(t *testing.T) {
+	svc, queries, _ := newService(t)
+	user1 := testutil.MustCreateUser(t, queries, "User A")
+	conn1 := testutil.MustCreateConnection(t, queries, user1.ID, "item_a")
+	acctA := testutil.MustCreateAccount(t, queries, conn1.ID, "ext_a", "Account A")
+
+	user2 := testutil.MustCreateUser(t, queries, "User B")
+	conn2 := testutil.MustCreateConnection(t, queries, user2.ID, "item_b")
+	acctB := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_b", "Account B")
+
+	acctAID := formatUUIDForTest(acctA.ID)
+	acctBID := formatUUIDForTest(acctB.ID)
+
+	// Create A→B link (A is primary, B is dependent).
+	_, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
+		PrimaryAccountID:   acctAID,
+		DependentAccountID: acctBID,
+	})
+	if err != nil {
+		t.Fatalf("first CreateAccountLink: %v", err)
+	}
+
+	// Attempt to create reverse B→A link (B is primary, A is dependent).
+	// This would create a circular dependency where both accounts are marked
+	// as dependent, excluding both from totals.
+	_, err = svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
+		PrimaryAccountID:   acctBID,
+		DependentAccountID: acctAID,
+	})
+	if err == nil {
+		t.Fatal("expected error for circular link (reverse direction)")
+	}
+	if !errors.Is(err, service.ErrInvalidParameter) {
+		t.Errorf("expected ErrInvalidParameter, got: %v", err)
+	}
+}
+
 // --- GetAccountLink ---
 
 func TestGetAccountLink_Success(t *testing.T) {
