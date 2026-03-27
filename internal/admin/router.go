@@ -92,6 +92,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
 		r.Get("/sync-logs", SyncLogsHandler(a, sm, tr, svc))
 		r.Get("/sync-logs/{id}", SyncLogDetailHandler(a, sm, tr, svc))
+		r.Get("/webhook-events", WebhookEventsHandler(a, sm, tr, svc))
 
 		r.Get("/account-links", AccountLinksPageHandler(a, svc, sm, tr))
 		r.Get("/account-links/{id}", AccountLinkDetailHandler(a, svc, sm, tr))
