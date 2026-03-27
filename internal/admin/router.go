@@ -116,6 +116,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		r.Get("/settings", SettingsGetHandler(a, sm, tr))
 		r.Post("/settings/sync", SettingsSyncPostHandler(a, sm))
+		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
 		r.Post("/settings/password", ChangePasswordHandler(a, sm))
 	})
 

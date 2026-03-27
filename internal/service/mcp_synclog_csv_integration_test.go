@@ -1074,6 +1074,175 @@ func TestGetOverviewStats_WithConnections(t *testing.T) {
 	}
 }
 
+// ===================== Sync Log Retention Tests =====================
+
+func TestCountSyncLogs(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	// Count should be 0 with no logs.
+	count, err := svc.CountSyncLogs(ctx)
+	if err != nil {
+		t.Fatalf("CountSyncLogs failed: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("count = %d, want 0", count)
+	}
+
+	// Create a sync log.
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "conn_count_test")
+	now := time.Now()
+	_, err = queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerManual,
+		Status:       db.SyncStatusSuccess,
+		StartedAt:    pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true},
+		CompletedAt:  pgtype.Timestamptz{Time: now, Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("CreateSyncLog failed: %v", err)
+	}
+
+	count, err = svc.CountSyncLogs(ctx)
+	if err != nil {
+		t.Fatalf("CountSyncLogs failed: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("count = %d, want 1", count)
+	}
+}
+
+func TestCleanupSyncLogs_DeletesOldLogs(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "conn_cleanup_test")
+
+	// Create an old log (100 days ago).
+	oldTime := time.Now().AddDate(0, 0, -100)
+	_, err := queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerCron,
+		Status:       db.SyncStatusSuccess,
+		StartedAt:    pgtype.Timestamptz{Time: oldTime, Valid: true},
+		CompletedAt:  pgtype.Timestamptz{Time: oldTime.Add(time.Second), Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("CreateSyncLog (old) failed: %v", err)
+	}
+
+	// Create a recent log (1 day ago).
+	recentTime := time.Now().AddDate(0, 0, -1)
+	_, err = queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerManual,
+		Status:       db.SyncStatusSuccess,
+		StartedAt:    pgtype.Timestamptz{Time: recentTime, Valid: true},
+		CompletedAt:  pgtype.Timestamptz{Time: recentTime.Add(time.Second), Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("CreateSyncLog (recent) failed: %v", err)
+	}
+
+	// Cleanup with 90-day retention should delete the old log.
+	deleted, err := svc.CleanupSyncLogs(ctx, 90)
+	if err != nil {
+		t.Fatalf("CleanupSyncLogs failed: %v", err)
+	}
+	if deleted != 1 {
+		t.Errorf("deleted = %d, want 1", deleted)
+	}
+
+	// Should have 1 log remaining.
+	count, err := svc.CountSyncLogs(ctx)
+	if err != nil {
+		t.Fatalf("CountSyncLogs failed: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("remaining count = %d, want 1", count)
+	}
+}
+
+func TestCleanupSyncLogs_SkipsInProgress(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "conn_cleanup_inprog")
+
+	// Create an old in_progress log (should not be deleted).
+	oldTime := time.Now().AddDate(0, 0, -100)
+	_, err := queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerCron,
+		Status:       db.SyncStatusInProgress,
+		StartedAt:    pgtype.Timestamptz{Time: oldTime, Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("CreateSyncLog (in_progress) failed: %v", err)
+	}
+
+	deleted, err := svc.CleanupSyncLogs(ctx, 90)
+	if err != nil {
+		t.Fatalf("CleanupSyncLogs failed: %v", err)
+	}
+	if deleted != 0 {
+		t.Errorf("deleted = %d, want 0 (in_progress should be skipped)", deleted)
+	}
+}
+
+func TestCleanupSyncLogs_InvalidRetention(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	_, err := svc.CleanupSyncLogs(ctx, 0)
+	if err == nil {
+		t.Fatal("expected error for retention_days=0, got nil")
+	}
+
+	_, err = svc.CleanupSyncLogs(ctx, -5)
+	if err == nil {
+		t.Fatal("expected error for negative retention_days, got nil")
+	}
+}
+
+func TestGetSyncLogRetentionDays_Default(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	days, err := svc.GetSyncLogRetentionDays(ctx)
+	if err != nil {
+		t.Fatalf("GetSyncLogRetentionDays failed: %v", err)
+	}
+	if days != 90 {
+		t.Errorf("retention_days = %d, want 90 (default)", days)
+	}
+}
+
+func TestGetSyncLogRetentionDays_Configured(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	// Set a custom retention period.
+	err := queries.SetAppConfig(ctx, db.SetAppConfigParams{
+		Key:   "sync_log_retention_days",
+		Value: pgtype.Text{String: "30", Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("SetAppConfig failed: %v", err)
+	}
+
+	days, err := svc.GetSyncLogRetentionDays(ctx)
+	if err != nil {
+		t.Fatalf("GetSyncLogRetentionDays failed: %v", err)
+	}
+	if days != 30 {
+		t.Errorf("retention_days = %d, want 30", days)
+	}
+}
+
 // ===================== Helpers =====================
 
 func parseUUIDForCSVTest(s string) (pgtype.UUID, error) {

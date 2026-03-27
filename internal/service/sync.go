@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"time"
 
 	"breadbox/internal/db"
@@ -251,4 +252,46 @@ func (s *Service) SyncLogStats(ctx context.Context, params SyncLogListParams) (*
 	}
 
 	return &stats, nil
+}
+
+// CountSyncLogs returns the total number of sync log entries.
+func (s *Service) CountSyncLogs(ctx context.Context) (int64, error) {
+	return s.Queries.CountSyncLogs(ctx)
+}
+
+// CleanupSyncLogs deletes sync logs older than the given number of days.
+// It skips in_progress logs for safety. Returns the number of deleted rows.
+func (s *Service) CleanupSyncLogs(ctx context.Context, retentionDays int) (int64, error) {
+	if retentionDays <= 0 {
+		return 0, fmt.Errorf("retention days must be positive, got %d", retentionDays)
+	}
+
+	cutoff := time.Now().AddDate(0, 0, -retentionDays)
+	result, err := s.Queries.DeleteSyncLogsOlderThan(ctx, pgtype.Timestamptz{
+		Time:  cutoff,
+		Valid: true,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("delete old sync logs: %w", err)
+	}
+
+	return result.RowsAffected(), nil
+}
+
+// GetSyncLogRetentionDays reads the sync_log_retention_days setting from app_config.
+// Returns 90 (default) if not set.
+func (s *Service) GetSyncLogRetentionDays(ctx context.Context) (int, error) {
+	row, err := s.Queries.GetAppConfig(ctx, "sync_log_retention_days")
+	if err != nil {
+		return 90, nil // default if not found
+	}
+	if !row.Value.Valid || row.Value.String == "" {
+		return 90, nil
+	}
+
+	days, err := strconv.Atoi(row.Value.String)
+	if err != nil || days <= 0 {
+		return 90, nil
+	}
+	return days, nil
 }

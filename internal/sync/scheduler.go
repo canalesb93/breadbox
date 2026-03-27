@@ -3,10 +3,12 @@ package sync
 import (
 	"context"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"breadbox/internal/db"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/robfig/cron/v3"
 )
 
@@ -32,6 +34,7 @@ func NewScheduler(engine *Engine, queries *db.Queries, logger *slog.Logger, sync
 
 // Start begins the cron scheduler. Cron fires every 15 minutes (the minimum
 // supported interval) and checks each connection's staleness individually.
+// It also schedules a daily sync log cleanup job.
 func (s *Scheduler) Start(globalIntervalMinutes int) {
 	_, err := s.cron.AddFunc("@every 15m", func() {
 		ctx := context.Background()
@@ -43,6 +46,16 @@ func (s *Scheduler) Start(globalIntervalMinutes int) {
 		s.logger.Error("failed to add cron job", "error", err)
 		return
 	}
+
+	// Daily sync log cleanup at 3:00 AM.
+	_, err = s.cron.AddFunc("0 3 * * *", func() {
+		ctx := context.Background()
+		s.cleanupSyncLogs(ctx)
+	})
+	if err != nil {
+		s.logger.Error("failed to add sync log cleanup job", "error", err)
+	}
+
 	s.cron.Start()
 	s.logger.Info("scheduler started", "check_interval", "15m", "global_sync_interval_minutes", globalIntervalMinutes)
 }
@@ -170,4 +183,43 @@ func (s *Scheduler) RunStartupSync(ctx context.Context, globalIntervalMinutes in
 	}
 
 	s.logger.Info("startup sync completed", "total", len(connections), "stale_synced", staleCount)
+}
+
+// defaultRetentionDays is used when sync_log_retention_days is not configured.
+const defaultRetentionDays = 90
+
+// cleanupSyncLogs deletes sync logs older than the configured retention period.
+// Reads sync_log_retention_days from app_config (default: 90 days).
+// A value of 0 disables cleanup.
+func (s *Scheduler) cleanupSyncLogs(ctx context.Context) {
+	retentionDays := defaultRetentionDays
+
+	row, err := s.queries.GetAppConfig(ctx, "sync_log_retention_days")
+	if err == nil && row.Value.Valid && row.Value.String != "" {
+		if days, parseErr := strconv.Atoi(row.Value.String); parseErr == nil && days >= 0 {
+			retentionDays = days
+		}
+	}
+
+	if retentionDays == 0 {
+		s.logger.Debug("sync log cleanup disabled (retention_days=0)")
+		return
+	}
+
+	cutoff := time.Now().AddDate(0, 0, -retentionDays)
+	result, err := s.queries.DeleteSyncLogsOlderThan(ctx, pgtype.Timestamptz{
+		Time:  cutoff,
+		Valid: true,
+	})
+	if err != nil {
+		s.logger.Error("sync log cleanup failed", "error", err)
+		return
+	}
+
+	deleted := result.RowsAffected()
+	if deleted > 0 {
+		s.logger.Info("sync log cleanup completed", "deleted", deleted, "retention_days", retentionDays)
+	} else {
+		s.logger.Debug("sync log cleanup completed, no old logs to delete", "retention_days", retentionDays)
+	}
 }
