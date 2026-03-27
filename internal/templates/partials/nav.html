@@ -18,9 +18,23 @@
   <a href="/transactions" class="bb-sidebar-link{{if eq .CurrentPage "transactions"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="receipt"></i> Transactions
   </a>
+  <a href="/rules" class="bb-sidebar-link{{if eq .CurrentPage "rules"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="list-filter"></i> Rules
+  </a>
+  <a href="/categories" class="bb-sidebar-link{{if eq .CurrentPage "categories"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="tag"></i> Categories
+  </a>
+  <a href="/account-links" class="bb-sidebar-link{{if eq .CurrentPage "account-links"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="link-2"></i> Account Links
+  </a>
+  <a href="/users" class="bb-sidebar-link{{if eq .CurrentPage "users"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="users"></i> Family Members
+  </a>
+
+  <div class="bb-sidebar-section">Agents</div>
   <a href="/reviews" class="bb-sidebar-link{{if eq .CurrentPage "reviews"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="clipboard-check"></i>
-    <span class="flex-1">Reviews</span>
+    <span class="flex-1">Review Queue</span>
     {{if and .NavBadges (gt .NavBadges.PendingReviews 0)}}
     <span class="bb-nav-badge">{{.NavBadges.PendingReviews}}</span>
     {{end}}
@@ -34,18 +48,6 @@
     {{if and .NavBadges (gt .NavBadges.UnreadReports 0)}}
     <span class="bb-nav-badge">{{.NavBadges.UnreadReports}}</span>
     {{end}}
-  </a>
-  <a href="/rules" class="bb-sidebar-link{{if eq .CurrentPage "rules"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="list-filter"></i> Rules
-  </a>
-  <a href="/categories" class="bb-sidebar-link{{if eq .CurrentPage "categories"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="tag"></i> Categories
-  </a>
-  <a href="/account-links" class="bb-sidebar-link{{if eq .CurrentPage "account-links"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="link-2"></i> Account Links
-  </a>
-  <a href="/users" class="bb-sidebar-link{{if eq .CurrentPage "users"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="users"></i> Family Members
   </a>
 
   <div class="bb-sidebar-section">System</div>
