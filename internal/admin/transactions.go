@@ -164,7 +164,7 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 		result, err := svc.ListTransactionsAdmin(ctx, params)
 		if err != nil {
 			a.Logger.Error("list admin transactions", "error", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			tr.RenderError(w, r)
 			return
 		}
 
@@ -263,14 +263,14 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 
 		var accountID pgtype.UUID
 		if err := accountID.Scan(idStr); err != nil {
-			http.Error(w, "Invalid account ID", http.StatusBadRequest)
+			tr.RenderNotFound(w, r)
 			return
 		}
 
 		detail, err := svc.GetAccountDetail(ctx, idStr)
 		if err != nil {
 			a.Logger.Error("get account detail", "error", err)
-			http.NotFound(w, r)
+			tr.RenderNotFound(w, r)
 			return
 		}
 
@@ -574,11 +574,11 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 		txn, err := svc.GetTransaction(ctx, idStr)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				http.NotFound(w, r)
+				tr.RenderNotFound(w, r)
 				return
 			}
 			a.Logger.Error("get transaction detail", "error", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			tr.RenderError(w, r)
 			return
 		}
 

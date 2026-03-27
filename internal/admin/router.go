@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"net/http"
+
 	"breadbox/internal/app"
 	breadboxmcp "breadbox/internal/mcp"
 	"breadbox/internal/service"
@@ -20,6 +22,11 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 	// Setup detection — redirect to wizard if no admin account exists.
 	r.Use(SetupDetection(a.Queries))
+
+	// Custom 404 handler — render styled error page instead of plain text.
+	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		tr.RenderNotFound(w, r)
+	})
 
 	// Unauthenticated routes.
 	r.Group(func(r chi.Router) {

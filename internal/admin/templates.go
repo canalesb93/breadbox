@@ -688,6 +688,20 @@ func BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage, page
 	}
 }
 
+// RenderNotFound renders the styled 404 page within the app layout.
+func (tr *TemplateRenderer) RenderNotFound(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
+	data := BaseTemplateData(r, tr.sm, "", "Page Not Found")
+	tr.Render(w, r, "404.html", data)
+}
+
+// RenderError renders the styled 500 page within the app layout.
+func (tr *TemplateRenderer) RenderError(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusInternalServerError)
+	data := BaseTemplateData(r, tr.sm, "", "Error")
+	tr.Render(w, r, "500.html", data)
+}
+
 // SetVersion sets the application version for auto-injection into template data.
 func (tr *TemplateRenderer) SetVersion(v string) {
 	tr.version = v
