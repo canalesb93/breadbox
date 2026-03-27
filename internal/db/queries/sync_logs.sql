@@ -32,3 +32,11 @@ SELECT * FROM sync_logs WHERE connection_id = $1 ORDER BY started_at DESC LIMIT 
 -- name: CleanupOrphanedSyncLogs :execresult
 UPDATE sync_logs SET status = 'error', error_message = 'interrupted by server restart', completed_at = NOW()
 WHERE status = 'in_progress';
+
+-- name: DeleteSyncLogsOlderThan :execresult
+DELETE FROM sync_logs
+WHERE started_at < $1
+  AND status != 'in_progress';
+
+-- name: CountSyncLogs :one
+SELECT COUNT(*) FROM sync_logs;

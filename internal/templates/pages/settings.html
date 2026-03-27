@@ -49,6 +49,54 @@
     </form>
   </div>
 
+  <!-- Sync Log Retention -->
+  <div class="bb-card p-6">
+    <div class="flex items-center gap-3 mb-5">
+      <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-warning/8">
+        <i data-lucide="archive" class="w-5 h-5 text-warning"></i>
+      </div>
+      <div>
+        <h2 class="text-base font-semibold">Sync Log Retention</h2>
+        <p class="text-xs text-base-content/45">Auto-delete old sync logs to save storage</p>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 mb-5">
+      <div class="flex items-center gap-2.5">
+        <i data-lucide="database" class="w-4 h-4 text-base-content/50"></i>
+        <span class="text-sm font-medium">Total Sync Logs</span>
+      </div>
+      <span class="text-sm font-semibold tabular-nums">{{.SyncLogCount}}</span>
+    </div>
+
+    <form method="POST" action="/settings/retention">
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+
+      <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="sync_log_retention_days">
+        Retention Period
+      </label>
+      <select id="sync_log_retention_days" name="sync_log_retention_days" class="select select-sm select-bordered w-full rounded-xl">
+        <option value="7"{{if eq .SyncLogRetentionDays 7}} selected{{end}}>7 days</option>
+        <option value="14"{{if eq .SyncLogRetentionDays 14}} selected{{end}}>14 days</option>
+        <option value="30"{{if eq .SyncLogRetentionDays 30}} selected{{end}}>30 days</option>
+        <option value="60"{{if eq .SyncLogRetentionDays 60}} selected{{end}}>60 days</option>
+        <option value="90"{{if eq .SyncLogRetentionDays 90}} selected{{end}}>90 days (default)</option>
+        <option value="180"{{if eq .SyncLogRetentionDays 180}} selected{{end}}>180 days</option>
+        <option value="365"{{if eq .SyncLogRetentionDays 365}} selected{{end}}>1 year</option>
+        <option value="0"{{if eq .SyncLogRetentionDays 0}} selected{{end}}>Keep forever</option>
+      </select>
+
+      <p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
+        <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+        Cleanup runs daily at 3:00 AM
+      </p>
+
+      <div class="mt-5 pt-4 border-t border-base-300">
+        <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Retention</button>
+      </div>
+    </form>
+  </div>
+
   <!-- Security -->
   <div class="bb-card p-6">
     <div class="flex items-center gap-3 mb-5">
