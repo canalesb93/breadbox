@@ -54,7 +54,7 @@
         <!-- Actions -->
         <div class="flex items-center gap-1 shrink-0">
           {{if not .IsRead}}
-          <button @click.stop="markRead('{{.ID}}')" class="text-base-content/40 hover:text-success transition-colors cursor-pointer p-1 rounded-lg hover:bg-success/10" title="Mark as read">
+          <button @click.stop="markRead('{{.ID}}')" class="btn btn-success btn-ghost btn-xs rounded-lg cursor-pointer" title="Mark as read">
             <i data-lucide="check" class="w-4 h-4"></i>
           </button>
           {{end}}

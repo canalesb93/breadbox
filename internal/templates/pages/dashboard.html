@@ -430,7 +430,7 @@
       :class="dismissed.has('{{.ID}}') ? 'opacity-0 h-0 overflow-hidden' : ''"
       id="report-{{.ID}}">
       <!-- Message card -->
-      <div class="px-5 py-3.5 hover:bg-base-200/20 transition-colors">
+      <div class="px-5 py-3.5 hover:bg-base-200/20 transition-colors cursor-pointer" @click="toggle('{{.ID}}')">
         <div class="flex items-start gap-3">
           <!-- Priority dot -->
           <span class="w-2 h-2 rounded-full shrink-0 mt-1.5 {{if eq .Priority "critical"}}bg-error{{else if eq .Priority "warning"}}bg-warning{{else}}bg-base-content/20{{end}}"></span>
@@ -447,12 +447,10 @@
             <p class="text-sm text-base-content/70 leading-relaxed">{{.Title}}</p>
           </div>
           <!-- Actions -->
-          <div class="flex items-center gap-1 shrink-0">
-            <button @click="toggle('{{.ID}}')" class="text-base-content/25 hover:text-base-content/50 transition-colors cursor-pointer p-0.5" title="Show details">
-              <i data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform duration-200"
-                :class="expanded.has('{{.ID}}') ? 'rotate-180' : ''"></i>
-            </button>
-            <button @click="markRead('{{.ID}}')" class="text-base-content/40 hover:text-success transition-colors shrink-0 cursor-pointer p-1 rounded-lg hover:bg-success/10" title="Mark as read">
+          <div class="flex items-center gap-1.5 shrink-0">
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-base-content/25 transition-transform duration-200"
+              :class="expanded.has('{{.ID}}') ? 'rotate-180' : ''"></i>
+            <button @click.stop="markRead('{{.ID}}')" class="btn btn-success btn-ghost btn-xs rounded-lg cursor-pointer" title="Mark as read">
               <i data-lucide="check" class="w-4 h-4"></i>
             </button>
           </div>
