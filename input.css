@@ -837,14 +837,7 @@
 
   /* ── View Toggle (pill buttons) ── */
   .bb-view-toggle {
-    @apply inline-flex items-center rounded-lg border border-base-300 p-0.5 gap-0;
-    background: oklch(0.97 0 0);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .bb-view-toggle {
-      background: oklch(0.18 0 0);
-    }
+    @apply inline-flex items-center rounded-lg border border-base-300 p-0.5 gap-0 bg-base-200;
   }
 
   .bb-view-toggle__btn {
@@ -859,12 +852,6 @@
 
   .bb-view-toggle__btn--active {
     @apply bg-base-100 text-base-content shadow-sm;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .bb-view-toggle__btn--active {
-      @apply bg-base-300/50 text-base-content;
-    }
   }
 
   /* ── Consistent filter toggle button ── */
