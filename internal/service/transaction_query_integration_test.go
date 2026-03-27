@@ -1378,6 +1378,63 @@ func TestCountTransactions_ExcludeSearch(t *testing.T) {
 	}
 }
 
+func TestListTransactions_ExcludeSearch_WithPagination(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	// Create enough transactions to test pagination with exclude_search.
+	// This regression test ensures exclude_search doesn't double-append SQL
+	// parameters, which would corrupt the positional $N numbering for the
+	// cursor clause that follows.
+	testutil.MustCreateTransaction(t, queries, acctID, "ep1", "STARBUCKS #1234", 550, "2025-01-05")
+	testutil.MustCreateTransaction(t, queries, acctID, "ep2", "AMAZON PURCHASE", 2999, "2025-01-08")
+	testutil.MustCreateTransaction(t, queries, acctID, "ep3", "TARGET #123", 4250, "2025-01-10")
+	testutil.MustCreateTransaction(t, queries, acctID, "ep4", "WALMART GROCERIES", 3500, "2025-01-15")
+	testutil.MustCreateTransaction(t, queries, acctID, "ep5", "COSTCO WHOLESALE", 8900, "2025-01-20")
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+	exclude := "starbucks"
+
+	// First page with limit=2.
+	result, err := svc.ListTransactions(ctx, service.TransactionListParams{
+		Limit: 2, StartDate: &start, EndDate: &end, ExcludeSearch: &exclude,
+	})
+	if err != nil {
+		t.Fatalf("page 1 unexpected error: %v", err)
+	}
+	if !result.HasMore {
+		t.Fatal("expected HasMore=true on first page")
+	}
+	if result.NextCursor == "" {
+		t.Fatal("expected non-empty cursor on first page")
+	}
+
+	// Second page using cursor from first page.
+	result2, err := svc.ListTransactions(ctx, service.TransactionListParams{
+		Limit: 2, StartDate: &start, EndDate: &end, ExcludeSearch: &exclude,
+		Cursor: result.NextCursor,
+	})
+	if err != nil {
+		t.Fatalf("page 2 unexpected error: %v", err)
+	}
+	if len(result2.Transactions) == 0 {
+		t.Fatal("expected transactions on second page")
+	}
+
+	// Verify no duplicates across pages.
+	seen := make(map[string]bool)
+	for _, txn := range result.Transactions {
+		seen[txn.ID] = true
+	}
+	for _, txn := range result2.Transactions {
+		if seen[txn.ID] {
+			t.Errorf("duplicate transaction %s across pages", txn.ID)
+		}
+	}
+}
+
 // --- Search Modes ---
 
 func TestListTransactions_SearchMode_Words(t *testing.T) {

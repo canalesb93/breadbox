@@ -138,12 +138,6 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		argN = ec.ArgN
 	}
 
-	if params.ExcludeSearch != nil {
-		query += fmt.Sprintf(" AND t.name NOT ILIKE '%%' || $%d || '%%' AND (t.merchant_name IS NULL OR t.merchant_name NOT ILIKE '%%' || $%d || '%%')", argN, argN)
-		args = append(args, *params.ExcludeSearch)
-		argN++
-	}
-
 	if params.Cursor != "" {
 		cursorDate, cursorID, err := DecodeCursor(params.Cursor)
 		if err != nil {
@@ -426,12 +420,6 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 		argN = ec.ArgN
 	}
 
-	if params.ExcludeSearch != nil {
-		query += fmt.Sprintf(" AND t.name NOT ILIKE '%%' || $%d || '%%' AND (t.merchant_name IS NULL OR t.merchant_name NOT ILIKE '%%' || $%d || '%%')", argN, argN)
-		args = append(args, *params.ExcludeSearch)
-		argN++
-	}
-
 	var count int64
 	err := s.Pool.QueryRow(ctx, query, args...).Scan(&count)
 	if err != nil {
@@ -590,14 +578,6 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		whereClauses += ec.SQL
 		args = append(args, ec.Args...)
 		argN = ec.ArgN
-	}
-
-	if params.ExcludeSearch != nil {
-		clause := fmt.Sprintf(" AND t.name NOT ILIKE '%%' || $%d || '%%' AND (t.merchant_name IS NULL OR t.merchant_name NOT ILIKE '%%' || $%d || '%%')", argN, argN)
-		query += clause
-		whereClauses += clause
-		args = append(args, *params.ExcludeSearch)
-		argN++
 	}
 
 	// Build a minimal count query with only the JOINs needed for WHERE filters.
