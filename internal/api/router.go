@@ -47,6 +47,7 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/transactions", ListTransactionsHandler(svc))
 		r.Get("/transactions/count", CountTransactionsHandler(svc))
 		r.Get("/transactions/summary", TransactionSummaryHandler(svc))
+		r.Get("/transactions/merchants", MerchantSummaryHandler(svc))
 		r.Get("/transactions/{id}", GetTransactionHandler(svc))
 		r.Get("/categories", ListCategoriesHandler(svc))
 		r.Get("/categories/unmapped", ListUnmappedCategoriesHandler(svc))
@@ -67,6 +68,8 @@ func NewRouter(a *app.App, version string) http.Handler {
 		r.Get("/account-links", ListAccountLinksHandler(svc))
 		r.Get("/account-links/{id}", GetAccountLinkHandler(svc))
 		r.Get("/account-links/{id}/matches", ListTransactionMatchesHandler(svc))
+		r.Get("/reports", ListReportsHandler(svc))
+		r.Get("/reports/unread-count", UnreadReportCountHandler(svc))
 
 		// Write endpoints — full_access API keys only.
 		r.Group(func(r chi.Router) {
@@ -105,6 +108,8 @@ func NewRouter(a *app.App, version string) http.Handler {
 			r.Post("/transaction-matches/{id}/confirm", ConfirmMatchHandler(svc))
 			r.Post("/transaction-matches/{id}/reject", RejectMatchHandler(svc))
 			r.Post("/transaction-matches/manual", ManualMatchHandler(svc))
+			r.Post("/reports", CreateReportHandler(svc))
+			r.Patch("/reports/{id}/read", MarkReportReadHandler(svc))
 		})
 	})
 
@@ -119,6 +124,14 @@ func NewRouter(a *app.App, version string) http.Handler {
 
 	// Webhook handler — no auth (verified via JWT in provider).
 	r.Post("/webhooks/{provider}", webhook.NewHandler(a.Providers, a.SyncEngine, a.Queries, a.Logger))
+
+	// OAuth 2.1 discovery endpoints — no auth required.
+	r.Get("/.well-known/oauth-authorization-server", admin.OAuthMetadataHandler())
+	r.Get("/.well-known/oauth-protected-resource", admin.OAuthProtectedResourceHandler())
+
+	// OAuth 2.1 token + registration endpoints — no session required.
+	r.Post("/oauth/token", admin.OAuthTokenHandler(svc))
+	r.Post("/oauth/register", admin.OAuthRegisterHandler(svc))
 
 	// Admin dashboard: session manager + template renderer + admin router.
 	isSecure := a.Config.Environment == "production" || a.Config.Environment == "docker"

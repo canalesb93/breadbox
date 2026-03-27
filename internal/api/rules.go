@@ -20,8 +20,8 @@ func ListRulesHandler(svc *service.Service) http.HandlerFunc {
 		limit := 50
 		if v := q.Get("limit"); v != "" {
 			parsed, err := strconv.Atoi(v)
-			if err != nil || parsed < 1 || parsed > 200 {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "limit must be between 1 and 200")
+			if err != nil || parsed < 1 || parsed > 500 {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "limit must be between 1 and 500")
 				return
 			}
 			limit = parsed

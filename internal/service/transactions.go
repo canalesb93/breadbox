@@ -121,8 +121,26 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	}
 
 	if params.Search != nil {
-		query += fmt.Sprintf(" AND (t.name ILIKE '%%' || $%d || '%%' OR t.merchant_name ILIKE '%%' || $%d || '%%')", argN, argN)
-		args = append(args, *params.Search)
+		mode := ""
+		if params.SearchMode != nil {
+			mode = *params.SearchMode
+		}
+		sc := BuildSearchClause(*params.Search, mode, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += sc.SQL
+		args = append(args, sc.Args...)
+		argN = sc.ArgN
+	}
+
+	if params.ExcludeSearch != nil {
+		ec := BuildExcludeSearchClause(*params.ExcludeSearch, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += ec.SQL
+		args = append(args, ec.Args...)
+		argN = ec.ArgN
+	}
+
+	if params.ExcludeSearch != nil {
+		query += fmt.Sprintf(" AND t.name NOT ILIKE '%%' || $%d || '%%' AND (t.merchant_name IS NULL OR t.merchant_name NOT ILIKE '%%' || $%d || '%%')", argN, argN)
+		args = append(args, *params.ExcludeSearch)
 		argN++
 	}
 
@@ -391,8 +409,26 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 	}
 
 	if params.Search != nil {
-		query += fmt.Sprintf(" AND (t.name ILIKE '%%' || $%d || '%%' OR t.merchant_name ILIKE '%%' || $%d || '%%')", argN, argN)
-		args = append(args, *params.Search)
+		mode := ""
+		if params.SearchMode != nil {
+			mode = *params.SearchMode
+		}
+		sc := BuildSearchClause(*params.Search, mode, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += sc.SQL
+		args = append(args, sc.Args...)
+		argN = sc.ArgN
+	}
+
+	if params.ExcludeSearch != nil {
+		ec := BuildExcludeSearchClause(*params.ExcludeSearch, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += ec.SQL
+		args = append(args, ec.Args...)
+		argN = ec.ArgN
+	}
+
+	if params.ExcludeSearch != nil {
+		query += fmt.Sprintf(" AND t.name NOT ILIKE '%%' || $%d || '%%' AND (t.merchant_name IS NULL OR t.merchant_name NOT ILIKE '%%' || $%d || '%%')", argN, argN)
+		args = append(args, *params.ExcludeSearch)
 		argN++
 	}
 
@@ -411,6 +447,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
 		"t.category_override, t.pending, " +
 		"EXISTS(SELECT 1 FROM review_queue rq WHERE rq.transaction_id = t.id AND rq.reviewer_type = 'agent' AND rq.status IN ('approved', 'rejected')) AS agent_reviewed, " +
+		"EXISTS(SELECT 1 FROM review_queue rq WHERE rq.transaction_id = t.id AND rq.status = 'pending') AS has_pending_review, " +
 		"t.created_at, t.updated_at "
 	fromClause := "FROM transactions t " +
 		"LEFT JOIN accounts a ON t.account_id = a.id " +
@@ -536,10 +573,30 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	}
 
 	if params.Search != nil {
-		clause := fmt.Sprintf(" AND (t.name ILIKE '%%' || $%d || '%%' OR t.merchant_name ILIKE '%%' || $%d || '%%')", argN, argN)
+		mode := ""
+		if params.SearchMode != nil {
+			mode = *params.SearchMode
+		}
+		sc := BuildSearchClause(*params.Search, mode, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += sc.SQL
+		whereClauses += sc.SQL
+		args = append(args, sc.Args...)
+		argN = sc.ArgN
+	}
+
+	if params.ExcludeSearch != nil {
+		ec := BuildExcludeSearchClause(*params.ExcludeSearch, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += ec.SQL
+		whereClauses += ec.SQL
+		args = append(args, ec.Args...)
+		argN = ec.ArgN
+	}
+
+	if params.ExcludeSearch != nil {
+		clause := fmt.Sprintf(" AND t.name NOT ILIKE '%%' || $%d || '%%' AND (t.merchant_name IS NULL OR t.merchant_name NOT ILIKE '%%' || $%d || '%%')", argN, argN)
 		query += clause
 		whereClauses += clause
-		args = append(args, *params.Search)
+		args = append(args, *params.ExcludeSearch)
 		argN++
 	}
 
@@ -612,6 +669,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			categoryOverride bool
 			pending          bool
 			agentReviewed    bool
+			hasPendingReview bool
 			createdAt        pgtype.Timestamptz
 			updatedAt        pgtype.Timestamptz
 		)
@@ -621,7 +679,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			&institutionName, &userName,
 			&date, &name, &merchantName, &amount, &isoCurrencyCode,
 			&categoryID, &catDisplayName, &catSlug, &catIcon, &catColor,
-			&categoryOverride, &pending, &agentReviewed, &createdAt, &updatedAt,
+			&categoryOverride, &pending, &agentReviewed, &hasPendingReview, &createdAt, &updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan admin transaction: %w", err)
 		}
@@ -661,6 +719,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			CategoryOverride:    categoryOverride,
 			Pending:             pending,
 			AgentReviewed:       agentReviewed,
+			HasPendingReview:    hasPendingReview,
 			CreatedAt:           createdAt.Time.UTC().Format(time.RFC3339),
 			UpdatedAt:           updatedAt.Time.UTC().Format(time.RFC3339),
 		})

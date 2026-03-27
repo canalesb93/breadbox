@@ -77,6 +77,8 @@ type TransactionListParams struct {
 	MaxAmount        *float64
 	Pending          *bool
 	Search           *string
+	SearchMode       *string // contains (default), words, fuzzy
+	ExcludeSearch    *string
 	SortBy           *string
 	SortOrder        *string
 	IncludeDependent bool
@@ -92,6 +94,8 @@ type TransactionCountParams struct {
 	MaxAmount        *float64
 	Pending          *bool
 	Search           *string
+	SearchMode       *string
+	ExcludeSearch    *string
 	IncludeDependent bool
 }
 
@@ -200,19 +204,21 @@ type SyncLogStats struct {
 }
 
 type AdminTransactionListParams struct {
-	Page         int
-	PageSize     int
-	StartDate    *time.Time
-	EndDate      *time.Time
-	AccountID    *string
-	UserID       *string
-	ConnectionID *string
-	CategorySlug *string
-	MinAmount    *float64
-	MaxAmount    *float64
-	Pending      *bool
-	Search       *string
-	SortOrder    string // "desc" (default) or "asc"
+	Page          int
+	PageSize      int
+	StartDate     *time.Time
+	EndDate       *time.Time
+	AccountID     *string
+	UserID        *string
+	ConnectionID  *string
+	CategorySlug  *string
+	MinAmount     *float64
+	MaxAmount     *float64
+	Pending       *bool
+	Search        *string
+	SearchMode    *string
+	ExcludeSearch *string
+	SortOrder     string // "desc" (default) or "asc"
 }
 
 type AdminTransactionRow struct {
@@ -234,6 +240,7 @@ type AdminTransactionRow struct {
 	CategoryOverride    bool
 	Pending             bool
 	AgentReviewed       bool
+	HasPendingReview    bool
 	CreatedAt           string
 	UpdatedAt           string
 }
@@ -404,6 +411,7 @@ type TransactionRuleListParams struct {
 	CategorySlug *string
 	Enabled      *bool
 	Search       *string
+	SearchMode   *string
 	Limit        int
 	Cursor       string
 }
@@ -469,4 +477,50 @@ type BulkRecategorizeParams struct {
 type BulkRecategorizeResult struct {
 	MatchedCount int64 `json:"matched_count"`
 	UpdatedCount int64 `json:"updated_count"`
+}
+
+// Merchant summary types
+
+type MerchantSummaryParams struct {
+	StartDate     *time.Time
+	EndDate       *time.Time
+	AccountID     *string
+	UserID        *string
+	CategorySlug  *string
+	MinAmount     *float64
+	MaxAmount     *float64
+	Search        *string
+	SearchMode    *string
+	ExcludeSearch *string
+	MinCount      int  // minimum transaction count to include (default 1)
+	SpendingOnly  bool // only positive amounts
+}
+
+type MerchantSummaryRow struct {
+	Merchant         string  `json:"merchant"`
+	TransactionCount int64   `json:"transaction_count"`
+	TotalAmount      float64 `json:"total_amount"`
+	AvgAmount        float64 `json:"avg_amount"`
+	FirstDate        string  `json:"first_date"`
+	LastDate         string  `json:"last_date"`
+	IsoCurrencyCode  string  `json:"iso_currency_code"`
+}
+
+type MerchantSummaryResult struct {
+	Merchants []MerchantSummaryRow  `json:"merchants"`
+	Totals    MerchantSummaryTotals `json:"totals"`
+	Filters   MerchantSummaryFilters `json:"filters"`
+}
+
+type MerchantSummaryTotals struct {
+	MerchantCount    int64    `json:"merchant_count"`
+	TransactionCount int64    `json:"transaction_count"`
+	TotalAmount      *float64 `json:"total_amount,omitempty"`
+	Note             string   `json:"note,omitempty"`
+}
+
+type MerchantSummaryFilters struct {
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
+	MinCount  int    `json:"min_count"`
 }

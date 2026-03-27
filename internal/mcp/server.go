@@ -39,19 +39,30 @@ CATEGORY SYSTEM:
 - To simplify/consolidate categories: export categories, then set the merge_into column to a target slug for categories you want to merge. All transactions and mappings from the source are moved to the target. This preserves categorization history while reducing complexity
 
 TOKEN EFFICIENCY:
-- Use the fields parameter on query_transactions to request only needed fields (e.g., fields=core,category). Aliases: core (id,date,amount,name,iso_currency_code), category (category,category_primary_raw,category_detailed_raw), timestamps (created_at,updated_at,datetime,authorized_datetime)
+- Use the fields parameter on query_transactions to request only needed fields. Supports individual field names (e.g., fields=name,amount,date,account_name) and aliases: minimal (name,amount,date — smallest useful set), core (id,date,amount,name,iso_currency_code), category (category,category_primary_raw,category_detailed_raw), timestamps (created_at,updated_at,datetime,authorized_datetime). id is always included.
 - Use fields=triage on list_pending_reviews to get only fields needed for categorization decisions — dramatically reduces response size
 - Use transaction_summary for aggregated spending analysis instead of paginating through individual transactions. Supports group_by: category, month, week, day, category_month
+- Use merchant_summary to get a compact index of all merchants with transaction counts, totals, and date ranges — much more efficient than paginating through raw transactions to identify spending patterns or recurring charges
+- Transaction responses include account_name and user_name — no need to cross-reference list_accounts for "which card?" questions
 - The breadbox://overview resource includes users, connections, accounts by type, and 30-day spending summary — often eliminates the need for separate list_users + list_accounts calls
 
 RECOMMENDED QUERY PATTERNS:
 1. Read breadbox://overview first for dataset context (users, connections, accounts, spending)
 2. Use transaction_summary for spending analysis (group by category, month, etc.)
-3. Use query_transactions with fields=core,category for browsing individual transactions
-4. Use list_categories to understand the category taxonomy
-5. Use count_transactions to get totals before paginating
-6. Check get_sync_status to verify data freshness
-7. Use list_unmapped_categories to identify categorization gaps
+3. Use merchant_summary to scan for recurring charges or spending patterns (set min_count=2 for recurring, min_count=3 for subscriptions)
+4. Use query_transactions with fields=core,category for browsing individual transactions
+5. Use list_categories to understand the category taxonomy
+6. Use count_transactions to get totals before paginating
+7. Check get_sync_status to verify data freshness
+8. Use list_unmapped_categories to identify categorization gaps
+- Use exclude_search on query_transactions to filter out known merchants when hunting for unknown charges
+
+SEARCH MODES:
+- The search parameter supports three modes via search_mode: contains (default, substring match), words (all words must match — good for multi-word names like "Century Link" matching "CenturyLink"), fuzzy (typo-tolerant via trigram similarity — "starbuks" matches "Starbucks")
+- Comma-separated values in search are automatically ORed in all modes: search=starbucks,amazon matches either merchant
+- Available on: query_transactions, count_transactions, merchant_summary, list_transaction_rules
+- Use search_mode=words when you know the merchant name but not the exact formatting
+- Use search_mode=fuzzy when dealing with mangled bank feed names or uncertain spellings
 
 COMMENTS:
 - Use add_transaction_comment to explain your reasoning when recategorizing transactions
@@ -60,7 +71,7 @@ COMMENTS:
 REVIEW QUEUE:
 - Start with review_summary to see pending reviews grouped by raw provider category with counts — much more efficient than listing all reviews
 - Use list_pending_reviews with category_primary_raw filter to process one group at a time. Use fields=triage to reduce response size. Supports limit up to 500.
-- Use submit_review (or batch_submit_reviews, up to 200 at once) to approve with the correct category_slug, or skip if uncertain
+- Use submit_review (or batch_submit_reviews, up to 500 at once) to approve with the correct category_slug, or skip if uncertain
 - For bulk category work: batch_categorize_transactions assigns one category to many transactions; bulk_recategorize moves all transactions from one category to another
 - After creating rules with apply_retroactively=true, call auto_approve_categorized_reviews to clear reviews that rules already handled
 - After reviewing, create transaction rules for patterns you noticed so future transactions are auto-categorized
@@ -91,7 +102,14 @@ RULE CREATION STRATEGY — follow this order:
 
 - ALWAYS check list_transaction_rules before creating to avoid duplicates
 - Use batch_create_rules to create multiple rules efficiently
-- Before creating rules, query some transactions to see what category_primary values exist — use query_transactions with fields=core,category`
+- Before creating rules, query some transactions to see what category_primary values exist — use query_transactions with fields=core,category
+
+AGENT REPORTS:
+- Use submit_report to communicate with the family — think of the title as a notification message they'll read on their dashboard
+- The title should be a concise 1-2 sentence summary that's self-contained and informative (e.g., "Reviewed 47 transactions this week — 3 recategorized, no suspicious activity found.")
+- The body is the detailed breakdown shown when they tap to expand — use markdown with headers, bullets, and transaction links: [Name](/transactions/ID)
+- Set priority to 'warning' or 'critical' when something needs attention, 'info' for routine updates
+- Sign reports with an author name that identifies your role (e.g., "Review Agent", "Budget Monitor")`
 
 // ToolClassification indicates whether a tool is read-only or performs writes.
 type ToolClassification string
@@ -176,6 +194,9 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("transaction_summary", ToolRead,
 			"Get aggregated transaction totals grouped by category and/or time period. Replaces the need to paginate through thousands of individual transactions for spending analysis. Amounts follow the convention: positive = money out (debit), negative = money in (credit). Only includes non-deleted, non-pending transactions by default.",
 			s.handleTransactionSummary),
+		makeToolDef("merchant_summary", ToolRead,
+			"List distinct merchants with aggregated stats: transaction count, total spent, average amount, and date range. Returns a compact merchant-level index — use this to scan for recurring charges, identify top merchants, or find unknown subscriptions. Then drill into specific merchants with query_transactions using the search filter. Default date range: 90 days. Set min_count=2 to find recurring charges, min_count=3 for likely subscriptions.",
+			s.handleMerchantSummary),
 		makeToolDef("export_categories", ToolRead,
 			"Export all category definitions as TSV text. The returned format can be edited externally (in a text editor, by an AI agent, etc.) and re-imported via import_categories. Columns: slug, display_name, parent_slug, icon, color, sort_order, hidden, merge_into. Slugs are immutable identifiers; display_name and other fields can be changed. The merge_into column is empty on export.",
 			s.handleExportCategories),
@@ -231,7 +252,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"Preview/dry-run a rule's conditions against existing transactions without making changes. Returns match_count, total_scanned, and sample_matches with transaction details. Use this to test conditions before creating a rule.",
 			s.handlePreviewRule),
 		makeToolDef("batch_categorize_transactions", ToolWrite,
-			"Categorize multiple transactions at once. Each item needs a transaction_id and category_slug. Max 200 items per request. Sets category_override=true on each transaction. More efficient than calling categorize_transaction repeatedly. Returns succeeded count and any per-item errors.",
+			"Categorize multiple transactions at once. Each item needs a transaction_id and category_slug. Max 500 items per request. Sets category_override=true on each transaction. More efficient than calling categorize_transaction repeatedly. Returns succeeded count and any per-item errors.",
 			s.handleBatchCategorize),
 		makeToolDef("bulk_recategorize", ToolWrite,
 			"Recategorize all transactions matching a filter to a new category. Requires target_category_slug and at least one filter (safety requirement). Sets category_override=true since this is an explicit action. Use this for bulk corrections — e.g., recategorize all transactions currently tagged 'general_merchandise' in a date range to 'groceries'. Returns matched/updated counts.",
@@ -263,6 +284,9 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("auto_approve_categorized_reviews", ToolWrite,
 			"Bulk-approve all pending reviews whose transactions already have a category (e.g., from rules). This bridges the gap between rules and reviews — after creating rules with apply_retroactively=true, call this to clear the review queue of transactions that rules already handled. Returns count of approved reviews and remaining pending count.",
 			s.handleAutoApproveCategorized),
+		makeToolDef("submit_report", ToolWrite,
+			"Send a message to the family's dashboard. The title is the main message — write it as a concise, self-contained 1-2 sentence summary the family can understand at a glance without expanding. The body provides the detailed breakdown (markdown with headers, bullets, transaction links). Use priority to signal urgency and author to identify your role.",
+			s.handleSubmitReport),
 	}
 }
 

@@ -2,7 +2,8 @@
 <nav class="bb-sidebar-nav">
   <div class="bb-sidebar-section">Data</div>
   <a href="/" class="bb-sidebar-link{{if eq .CurrentPage "dashboard"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="layout-dashboard"></i> Dashboard
+    <i data-lucide="layout-dashboard"></i>
+    <span class="flex-1">Dashboard</span>
   </a>
   <a href="/insights" class="bb-sidebar-link{{if eq .CurrentPage "insights"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="lightbulb"></i> Insights
@@ -17,16 +18,6 @@
   <a href="/transactions" class="bb-sidebar-link{{if eq .CurrentPage "transactions"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="receipt"></i> Transactions
   </a>
-  <a href="/reviews" class="bb-sidebar-link{{if eq .CurrentPage "reviews"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="clipboard-check"></i>
-    <span class="flex-1">Reviews</span>
-    {{if and .NavBadges (gt .NavBadges.PendingReviews 0)}}
-    <span class="bb-nav-badge">{{.NavBadges.PendingReviews}}</span>
-    {{end}}
-  </a>
-  <a href="/review-instructions" class="bb-sidebar-link{{if eq .CurrentPage "review-instructions"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="message-square-code"></i> Review Agent
-  </a>
   <a href="/rules" class="bb-sidebar-link{{if eq .CurrentPage "rules"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="list-filter"></i> Rules
   </a>
@@ -40,12 +31,34 @@
     <i data-lucide="users"></i> Family Members
   </a>
 
+  <div class="bb-sidebar-section">Agents</div>
+  <a href="/reviews" class="bb-sidebar-link{{if eq .CurrentPage "reviews"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="clipboard-check"></i>
+    <span class="flex-1">Review Queue</span>
+    {{if and .NavBadges (gt .NavBadges.PendingReviews 0)}}
+    <span class="bb-nav-badge">{{.NavBadges.PendingReviews}}</span>
+    {{end}}
+  </a>
+  <a href="/review-instructions" class="bb-sidebar-link{{if eq .CurrentPage "review-instructions"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="message-square-code"></i> Review Agent
+  </a>
+  <a href="/reports" class="bb-sidebar-link{{if eq .CurrentPage "reports"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="file-text"></i>
+    <span class="flex-1">Reports</span>
+    {{if and .NavBadges (gt .NavBadges.UnreadReports 0)}}
+    <span class="bb-nav-badge">{{.NavBadges.UnreadReports}}</span>
+    {{end}}
+  </a>
+
   <div class="bb-sidebar-section">System</div>
   <a href="/providers" class="bb-sidebar-link{{if eq .CurrentPage "providers"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="plug"></i> Providers
   </a>
   <a href="/api-keys" class="bb-sidebar-link{{if eq .CurrentPage "api-keys"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="key"></i> API Keys
+  </a>
+  <a href="/oauth-clients" class="bb-sidebar-link{{if eq .CurrentPage "oauth-clients"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="fingerprint"></i> OAuth Clients
   </a>
   <a href="/mcp-settings" class="bb-sidebar-link{{if eq .CurrentPage "mcp"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="bot"></i> MCP

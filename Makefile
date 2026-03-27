@@ -9,6 +9,9 @@ TAILWIND_BIN := ./tailwindcss-extra
 generate: sqlc css
 
 dev: generate
+	@-pkill -f 'go run ./cmd/breadbox serve' 2>/dev/null
+	@-pkill -f '/breadbox serve' 2>/dev/null
+	@sleep 0.5
 	go run ./cmd/breadbox serve
 
 build: generate

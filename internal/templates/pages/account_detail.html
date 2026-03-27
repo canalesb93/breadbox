@@ -276,10 +276,15 @@
         <tr @click="expanded = !expanded" class="cursor-pointer hover:bg-base-200/40 transition-colors duration-150">
           <td class="text-sm text-base-content/60 whitespace-nowrap">{{formatDate .Date}}</td>
           <td>
-            <a href="/transactions/{{.ID}}" @click.stop class="font-medium text-sm hover:text-primary transition-colors no-underline">{{.Name}}</a>
-            {{if .MerchantName}}<span class="text-xs text-base-content/40 ml-1">{{.MerchantName}}</span>{{end}}
+            <div class="flex items-center gap-2">
+              {{if .HasPendingReview}}<span class="inline-block w-2 h-2 rounded-full bg-info shrink-0" title="Pending review"></span>{{end}}
+              <span>
+                <a href="/transactions/{{.ID}}" @click.stop class="font-medium text-sm hover:text-primary transition-colors no-underline">{{.Name}}</a>
+                {{if .MerchantName}}<span class="text-xs text-base-content/40 ml-1">{{.MerchantName}}</span>{{end}}
+              </span>
+            </div>
           </td>
-          <td class="text-right tabular-nums text-sm font-semibold{{if lt .Amount 0.0}} text-error{{end}}">
+          <td class="text-right tabular-nums text-sm font-semibold{{if lt .Amount 0.0}} text-success{{end}}">
             {{formatAmount .Amount}}
           </td>
           <td @click.stop>

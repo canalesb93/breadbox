@@ -92,91 +92,10 @@
 </div>
 {{end}}
 
-<!-- Dashboard Page Header with Global Date Range Picker -->
+<!-- Dashboard Page Header -->
 <div class="bb-page-header">
   <div>
     <h1 class="bb-page-title">Dashboard</h1>
-  </div>
-  <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5">
-    <a href="/?days=7" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 7}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">7d</a>
-    <a href="/?days=30" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 30}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">30d</a>
-    <a href="/?days=90" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 90}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">90d</a>
-    <a href="/?days=365" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 365}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">12m</a>
-  </div>
-</div>
-
-<!-- Net Worth Hero with Trend Chart -->
-<div class="bb-card mb-6 bb-stagger">
-  <div class="p-6 pb-0">
-    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-      <!-- Left: Net Worth -->
-      <div>
-        <div class="text-xs font-medium text-base-content/50 mb-1">Net Worth</div>
-        <div class="text-4xl font-semibold tabular-nums tracking-tight leading-none">
-          {{formatBalance .NetWorth}}
-        </div>
-        <div class="flex items-center gap-4 mt-3 text-xs text-base-content/50">
-          <span class="flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-base-content/30"></span>
-            Assets {{formatBalance .TotalAssets}}
-          </span>
-          <span class="flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-error/50"></span>
-            Liabilities {{formatBalance .TotalLiabilities}}
-          </span>
-        </div>
-      </div>
-      <!-- Right: Spending + Income summary pills -->
-      <div class="flex items-center gap-3 sm:gap-4">
-        <div class="flex flex-col items-end">
-          <div class="text-xs text-base-content/40 mb-0.5">Spending <span class="text-base-content/25">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}}</span></div>
-          <div class="flex items-baseline gap-1.5">
-            <span class="text-lg font-semibold tabular-nums">{{formatBalance .TotalSpending}}</span>
-            {{if .HasSpendingChange}}
-            <span class="text-[0.65rem] font-medium {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
-              {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}%
-            </span>
-            {{end}}
-          </div>
-        </div>
-        <div class="w-px h-8 bg-base-300"></div>
-        <div class="flex flex-col items-end">
-          <div class="text-xs text-base-content/40 mb-0.5">Income <span class="text-base-content/25">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}}</span></div>
-          <span class="text-lg font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</span>
-        </div>
-      </div>
-    </div>
-  </div>
-  <!-- Net Worth Trend Chart -->
-  {{if .NetWorthLabels}}
-  <div class="px-2 pt-2 pb-2">
-    <div class="h-40">
-      <canvas id="netWorthTrendChart"></canvas>
-    </div>
-  </div>
-  {{end}}
-  <!-- Footer row with quick stats -->
-  <div class="px-6 py-3 border-t border-base-200 flex items-center gap-6 text-xs text-base-content/50">
-    <a href="/transactions" class="flex items-center gap-1.5 hover:text-base-content transition-colors">
-      <i data-lucide="receipt" class="w-3 h-3"></i>
-      {{.TxCount}} transactions
-    </a>
-    <span class="flex items-center gap-1.5">
-      <i data-lucide="clock" class="w-3 h-3"></i>
-      Synced {{.LastSync}}
-    </span>
-    {{if gt .ReviewPending 0}}
-    <a href="/reviews" class="flex items-center gap-1.5 hover:text-base-content transition-colors">
-      <i data-lucide="clipboard-check" class="w-3 h-3"></i>
-      {{.ReviewPending}} pending reviews
-    </a>
-    {{end}}
-    {{if gt .NeedsAttention 0}}
-    <a href="/connections" class="flex items-center gap-1.5 text-warning hover:text-warning/80 transition-colors">
-      <i data-lucide="alert-triangle" class="w-3 h-3"></i>
-      {{.NeedsAttention}} need attention
-    </a>
-    {{end}}
   </div>
 </div>
 
@@ -319,6 +238,7 @@
       {{range .RecentTransactions}}
       <a href="/transactions/{{.ID}}" class="flex items-center justify-between py-2.5 px-1 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline">
         <div class="flex items-center gap-3 min-w-0">
+          {{if .HasPendingReview}}<span class="inline-block w-2 h-2 rounded-full bg-info shrink-0" title="Pending review"></span>{{end}}
           {{if .CategoryIcon}}
           <div class="bb-tx-avatar bb-tx-avatar--sm" style="--avatar-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}oklch(0.65 0 0){{end}}">
             <i data-lucide="{{deref .CategoryIcon}}" class="w-3.5 h-3.5"></i>
@@ -485,128 +405,123 @@
   </div>
 </div>
 
-<!-- Net Worth Trend Chart -->
-{{if .NetWorthLabels}}
+<!-- Agent Reports -->
+{{if .AgentReports}}
+<div class="bb-card mb-6 bb-stagger" x-data="agentReports()">
+  <div class="px-5 pt-4 pb-2">
+    <div class="flex items-center justify-between mb-2">
+      <div class="flex items-center gap-2">
+        <i data-lucide="bot" class="w-4 h-4 text-primary"></i>
+        <h2 class="text-sm font-semibold text-base-content/70">Agent Reports</h2>
+        <span class="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{{len .AgentReports}} new</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <button class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors cursor-pointer"
+          @click="markAllRead()">
+          Mark all read
+        </button>
+        <a href="/reports" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
+      </div>
+    </div>
+  </div>
+  <div class="divide-y divide-base-200/60">
+    {{range .AgentReports}}
+    <div class="transition-all duration-300"
+      :class="dismissed.has('{{.ID}}') ? 'opacity-0 h-0 overflow-hidden' : ''"
+      id="report-{{.ID}}">
+      <!-- Message card -->
+      <div class="px-5 py-3.5 hover:bg-base-200/20 transition-colors cursor-pointer" @click="toggle('{{.ID}}')">
+        <div class="flex items-start gap-3">
+          <!-- Priority dot -->
+          <span class="w-2 h-2 rounded-full shrink-0 mt-1.5 {{if eq .Priority "critical"}}bg-error{{else if eq .Priority "warning"}}bg-warning{{else}}bg-base-content/20{{end}}"></span>
+          <!-- Message content -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 text-xs mb-1">
+              <span class="font-semibold text-base-content/70">{{.DisplayAuthor}}</span>
+              <span class="text-base-content/30">&middot;</span>
+              <span class="text-base-content/30">{{.CreatedAt}}</span>
+              {{range .Tags}}
+              <span class="text-[0.6rem] px-1.5 py-0.5 rounded-full bg-base-200/80 text-base-content/40 hidden sm:inline">{{.}}</span>
+              {{end}}
+            </div>
+            <p class="text-sm text-base-content/70 leading-relaxed">{{.Title}}</p>
+          </div>
+          <!-- Actions -->
+          <div class="flex items-center gap-1.5 shrink-0">
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-base-content/25 transition-transform duration-200"
+              :class="expanded.has('{{.ID}}') ? 'rotate-180' : ''"></i>
+            <button @click.stop="markRead('{{.ID}}')" class="btn btn-success btn-ghost btn-xs rounded-lg cursor-pointer" title="Mark as read">
+              <i data-lucide="check" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+        <!-- Expanded detail -->
+        <div x-show="expanded.has('{{.ID}}')" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+          x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+          x-cloak class="mt-3 ml-5 pl-3 border-l-2 border-base-200/60">
+          <div class="bb-report-body text-sm text-base-content/60 leading-relaxed" data-markdown="{{.Body}}"></div>
+        </div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+<!-- Agent Reports: markdown rendering + dismiss logic -->
+{{if .AgentReports}}
+<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  var nwCtx = document.getElementById('netWorthTrendChart');
-  if (!nwCtx) return;
-
-  var labels = {{.NetWorthLabels}};
-  var values = {{.NetWorthValues}};
-  var chartDays = {{.ChartDays}};
-
-  Chart.defaults.font.family = 'Inter, system-ui, -apple-system, sans-serif';
-
-  var first = values[0], last = values[values.length - 1];
-  var trendUp = last >= first;
-  var lineColor, gradTop, gradBot;
-  if (trendUp) {
-    lineColor = isDark ? 'oklch(0.70 0.14 155)' : 'oklch(0.55 0.14 155)';
-    gradTop = isDark ? 'oklch(0.70 0.14 155 / 0.15)' : 'oklch(0.55 0.14 155 / 0.12)';
-    gradBot = isDark ? 'oklch(0.70 0.14 155 / 0.01)' : 'oklch(0.55 0.14 155 / 0.01)';
-  } else {
-    lineColor = isDark ? 'oklch(0.70 0.15 25)' : 'oklch(0.55 0.15 25)';
-    gradTop = isDark ? 'oklch(0.70 0.15 25 / 0.15)' : 'oklch(0.55 0.15 25 / 0.12)';
-    gradBot = isDark ? 'oklch(0.70 0.15 25 / 0.01)' : 'oklch(0.55 0.15 25 / 0.01)';
-  }
-
-  var shortLabels = labels.map(function(d) {
-    var date = new Date(d + 'T00:00:00');
-    if (chartDays <= 7) return date.toLocaleDateString('en-US', { weekday: 'short' });
-    if (chartDays <= 30) return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  });
-
-  var tooltipStyle = {
-    backgroundColor: isDark ? 'hsl(0 0% 12%)' : 'hsl(0 0% 100%)',
-    titleColor: isDark ? 'hsl(0 0% 93%)' : 'hsl(0 0% 9%)',
-    bodyColor: isDark ? 'hsl(0 0% 64%)' : 'hsl(0 0% 45%)',
-    borderColor: isDark ? 'hsl(0 0% 18%)' : 'hsl(0 0% 90%)',
-    borderWidth: 1,
-    padding: { top: 8, bottom: 8, left: 12, right: 12 },
-    cornerRadius: 8,
-    titleFont: { size: 11, weight: '600' },
-    bodyFont: { size: 13, weight: '600' },
-    displayColors: false,
-    titleMarginBottom: 4,
-  };
-
-  new Chart(nwCtx, {
-    type: 'line',
-    data: {
-      labels: shortLabels,
-      datasets: [{
-        data: values,
-        borderColor: lineColor,
-        borderWidth: 2,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        pointHoverBackgroundColor: lineColor,
-        pointHoverBorderColor: isDark ? 'hsl(0 0% 15%)' : 'hsl(0 0% 100%)',
-        pointHoverBorderWidth: 2,
-        tension: 0.35,
-        fill: true,
-        backgroundColor: function(context) {
-          var chart = context.chart;
-          var ctx2 = chart.ctx;
-          var area = chart.chartArea;
-          if (!area) return gradTop;
-          var gradient = ctx2.createLinearGradient(0, area.top, 0, area.bottom);
-          gradient.addColorStop(0, gradTop);
-          gradient.addColorStop(1, gradBot);
-          return gradient;
-        },
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: Object.assign({}, tooltipStyle, {
-          callbacks: {
-            title: function(items) {
-              var idx = items[0].dataIndex;
-              var d = labels[idx];
-              var tdate = new Date(d + 'T00:00:00');
-              return tdate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-            },
-            label: function(ctx) {
-              return '$' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            }
-          }
-        })
-      },
-      scales: {
-        x: {
-          grid: { display: false },
-          border: { display: false },
-          ticks: {
-            color: isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.25)',
-            font: { size: 10, weight: '500' },
-            maxTicksLimit: chartDays <= 7 ? 7 : chartDays <= 30 ? 6 : 8,
-            maxRotation: 0,
-          }
-        },
-        y: {
-          grid: { display: false },
-          border: { display: false },
-          ticks: { display: false },
+  document.querySelectorAll('.bb-report-body').forEach(function(el) {
+    var md = el.getAttribute('data-markdown');
+    if (md) {
+      el.innerHTML = marked.parse(md);
+      el.querySelectorAll('a').forEach(function(a) {
+        a.classList.add('link', 'link-primary');
+        if (a.href && !a.href.startsWith(window.location.origin) && !a.getAttribute('href').startsWith('/')) {
+          a.setAttribute('target', '_blank');
+          a.setAttribute('rel', 'noopener');
         }
-      },
-      layout: {
-        padding: { left: 8, right: 8, top: 4, bottom: 0 }
-      },
-      animation: {
-        duration: 600,
-        easing: 'easeOutQuart',
-      }
+      });
+      el.querySelectorAll('ul, ol').forEach(function(list) {
+        list.classList.add('list-disc', 'pl-4', 'space-y-0.5');
+      });
+      el.querySelectorAll('p').forEach(function(p) {
+        p.classList.add('mb-1');
+      });
+      el.querySelectorAll('strong').forEach(function(s) {
+        s.classList.add('text-base-content');
+      });
     }
   });
 });
+
+function agentReports() {
+  return {
+    dismissed: new Set(),
+    expanded: new Set(),
+    toggle(id) {
+      if (this.expanded.has(id)) {
+        this.expanded.delete(id);
+      } else {
+        this.expanded.add(id);
+      }
+    },
+    markRead(id) {
+      this.dismissed.add(id);
+      fetch('/-/reports/' + id + '/read', { method: 'POST' });
+    },
+    markAllRead() {
+      var self = this;
+      document.querySelectorAll('[id^="report-"]').forEach(function(el) {
+        var id = el.id.replace('report-', '');
+        self.dismissed.add(id);
+      });
+      fetch('/-/reports/read-all', { method: 'POST' });
+    }
+  };
+}
 </script>
 {{end}}
 

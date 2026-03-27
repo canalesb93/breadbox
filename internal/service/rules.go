@@ -471,8 +471,8 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 	if limit <= 0 {
 		limit = 50
 	}
-	if limit > 200 {
-		limit = 200
+	if limit > 500 {
+		limit = 500
 	}
 
 	baseFrom := `FROM transaction_rules tr LEFT JOIN categories c ON tr.category_id = c.id`
@@ -494,9 +494,17 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 	}
 
 	if params.Search != nil && *params.Search != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf("tr.name ILIKE $%d", argN))
-		args = append(args, "%"+*params.Search+"%")
-		argN++
+		mode := ""
+		if params.SearchMode != nil {
+			mode = *params.SearchMode
+		}
+		sc := BuildSearchClause(*params.Search, mode, RuleSearchColumns, RuleNullableColumns, argN)
+		if sc.SQL != "" {
+			// Strip leading " AND " since this builder uses a slice, not concatenation.
+			whereClauses = append(whereClauses, sc.SQL[5:])
+			args = append(args, sc.Args...)
+			argN = sc.ArgN
+		}
 	}
 
 	filterWhereSQL := ""

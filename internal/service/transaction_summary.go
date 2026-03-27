@@ -218,3 +218,185 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`, selectCols)
 
 	return result, nil
 }
+
+// GetMerchantSummary returns aggregated merchant-level statistics.
+func (s *Service) GetMerchantSummary(ctx context.Context, params MerchantSummaryParams) (*MerchantSummaryResult, error) {
+	// Default date range: 90 days ago to tomorrow (exclusive end).
+	now := time.Now()
+	if params.StartDate == nil {
+		t := now.AddDate(0, 0, -90)
+		params.StartDate = &t
+	}
+	if params.EndDate == nil {
+		t := now.AddDate(0, 0, 1)
+		params.EndDate = &t
+	}
+
+	if params.MinCount < 1 {
+		params.MinCount = 1
+	}
+
+	query := `SELECT COALESCE(t.merchant_name, t.name) AS merchant,
+		COUNT(*) AS transaction_count,
+		SUM(t.amount) AS total_amount,
+		AVG(t.amount) AS avg_amount,
+		MIN(t.date)::text AS first_date,
+		MAX(t.date)::text AS last_date,
+		t.iso_currency_code
+FROM transactions t
+JOIN accounts a ON t.account_id = a.id
+LEFT JOIN bank_connections bc ON a.connection_id = bc.id`
+
+	joinCategories := false
+	if params.CategorySlug != nil {
+		joinCategories = true
+	}
+	if joinCategories {
+		query += "\nLEFT JOIN categories c ON t.category_id = c.id"
+	}
+
+	query += "\nWHERE t.deleted_at IS NULL"
+	query += " AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))"
+	query += " AND t.pending = false"
+
+	args := []any{}
+	argN := 1
+
+	if params.SpendingOnly {
+		query += " AND t.amount > 0"
+	}
+
+	query += fmt.Sprintf(" AND t.date >= $%d", argN)
+	args = append(args, *params.StartDate)
+	argN++
+
+	query += fmt.Sprintf(" AND t.date < $%d", argN)
+	args = append(args, *params.EndDate)
+	argN++
+
+	if params.AccountID != nil {
+		aid, err := parseUUID(*params.AccountID)
+		if err != nil {
+			return nil, fmt.Errorf("%w: invalid account_id", ErrInvalidParameter)
+		}
+		query += fmt.Sprintf(" AND t.account_id = $%d", argN)
+		args = append(args, aid)
+		argN++
+	}
+
+	if params.UserID != nil {
+		uid, err := parseUUID(*params.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("%w: invalid user_id", ErrInvalidParameter)
+		}
+		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
+		args = append(args, uid)
+		argN++
+	}
+
+	if params.CategorySlug != nil {
+		catRow, err := s.Queries.GetCategoryBySlug(ctx, *params.CategorySlug)
+		if err != nil {
+			// Unknown slug — no results
+			return &MerchantSummaryResult{Merchants: []MerchantSummaryRow{}, Totals: MerchantSummaryTotals{}, Filters: MerchantSummaryFilters{MinCount: params.MinCount}}, nil
+		}
+		if !catRow.ParentID.Valid {
+			query += fmt.Sprintf(" AND (c.id = $%d OR c.parent_id = $%d)", argN, argN)
+			args = append(args, catRow.ID)
+			argN++
+		} else {
+			query += fmt.Sprintf(" AND t.category_id = $%d", argN)
+			args = append(args, catRow.ID)
+			argN++
+		}
+	}
+
+	if params.MinAmount != nil {
+		query += fmt.Sprintf(" AND t.amount >= $%d", argN)
+		args = append(args, *params.MinAmount)
+		argN++
+	}
+
+	if params.MaxAmount != nil {
+		query += fmt.Sprintf(" AND t.amount <= $%d", argN)
+		args = append(args, *params.MaxAmount)
+		argN++
+	}
+
+	if params.Search != nil {
+		mode := ""
+		if params.SearchMode != nil {
+			mode = *params.SearchMode
+		}
+		sc := BuildSearchClause(*params.Search, mode, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += sc.SQL
+		args = append(args, sc.Args...)
+		argN = sc.ArgN
+	}
+
+	if params.ExcludeSearch != nil {
+		ec := BuildExcludeSearchClause(*params.ExcludeSearch, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += ec.SQL
+		args = append(args, ec.Args...)
+		argN = ec.ArgN
+	}
+
+	query += " GROUP BY COALESCE(t.merchant_name, t.name), t.iso_currency_code"
+	query += fmt.Sprintf(" HAVING COUNT(*) >= $%d", argN)
+	args = append(args, params.MinCount)
+	argN++ //nolint:ineffassign // kept for consistency with other filters
+
+	query += " ORDER BY COUNT(*) DESC LIMIT 500"
+
+	rows, err := s.Pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("merchant summary query: %w", err)
+	}
+	defer rows.Close()
+
+	var merchants []MerchantSummaryRow
+	currencies := map[string]bool{}
+	var grandTotal float64
+	var grandCount int64
+
+	for rows.Next() {
+		var row MerchantSummaryRow
+		err = rows.Scan(&row.Merchant, &row.TransactionCount, &row.TotalAmount, &row.AvgAmount, &row.FirstDate, &row.LastDate, &row.IsoCurrencyCode)
+		if err != nil {
+			return nil, fmt.Errorf("scan merchant summary row: %w", err)
+		}
+		merchants = append(merchants, row)
+		currencies[row.IsoCurrencyCode] = true
+		grandTotal += row.TotalAmount
+		grandCount += row.TransactionCount
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("merchant summary rows: %w", err)
+	}
+
+	totals := MerchantSummaryTotals{
+		MerchantCount:    int64(len(merchants)),
+		TransactionCount: grandCount,
+	}
+	if len(currencies) <= 1 {
+		totals.TotalAmount = &grandTotal
+	} else {
+		totals.Note = "Multiple currencies — see per-row totals."
+	}
+
+	result := &MerchantSummaryResult{
+		Merchants: merchants,
+		Totals:    totals,
+		Filters: MerchantSummaryFilters{
+			StartDate: params.StartDate.Format("2006-01-02"),
+			EndDate:   params.EndDate.Format("2006-01-02"),
+			MinCount:  params.MinCount,
+		},
+	}
+
+	if result.Merchants == nil {
+		result.Merchants = []MerchantSummaryRow{}
+	}
+
+	return result, nil
+}

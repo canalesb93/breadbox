@@ -16,6 +16,7 @@ const navBadgesKey contextKey = "navBadges"
 type NavBadges struct {
 	PendingReviews       int64
 	ConnectionsAttention int64
+	UnreadReports        int64
 }
 
 // NavBadgesMiddleware fetches sidebar notification badge counts and stores them
@@ -36,6 +37,12 @@ func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Han
 				badges.ConnectionsAttention = attn
 			} else {
 				logger.Debug("nav badges: count connections needing attention", "error", err)
+			}
+
+			if unread, err := queries.CountUnreadAgentReports(ctx); err == nil {
+				badges.UnreadReports = unread
+			} else {
+				logger.Debug("nav badges: count unread agent reports", "error", err)
 			}
 
 			ctx = context.WithValue(ctx, navBadgesKey, badges)

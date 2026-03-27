@@ -48,7 +48,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 		}
 	}
 
-	// Determine sort order: pending = oldest first (FIFO), resolved = newest first
+	// Determine sort order: pending = newest transaction first, resolved = newest review first
 	isPending := status == "pending"
 
 	// Build the dynamic query with transaction context
@@ -131,16 +131,17 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			return nil, ErrInvalidCursor
 		}
 		if isPending {
-			query += fmt.Sprintf(" AND (rq.created_at, rq.id) > ($%d, $%d)", argN, argN+1)
+			query += fmt.Sprintf(" AND (t.date, rq.id) < ($%d, $%d)", argN, argN+1)
+			args = append(args, pgtype.Date{Time: cursorTime, Valid: true}, cursorUUID)
 		} else {
 			query += fmt.Sprintf(" AND (rq.reviewed_at, rq.id) < ($%d, $%d)", argN, argN+1)
+			args = append(args, pgtype.Timestamptz{Time: cursorTime, Valid: true}, cursorUUID)
 		}
-		args = append(args, pgtype.Timestamptz{Time: cursorTime, Valid: true}, cursorUUID)
 		argN += 2
 	}
 
 	if isPending {
-		query += " ORDER BY rq.created_at ASC, rq.id ASC"
+		query += " ORDER BY t.date DESC, rq.id DESC"
 	} else {
 		query += " ORDER BY rq.reviewed_at DESC, rq.id DESC"
 	}
@@ -284,7 +285,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 
 		var cursorTs time.Time
 		if isPending {
-			cursorTs = rCreatedAt.Time.UTC()
+			cursorTs = tDate.Time.UTC()
 		} else {
 			cursorTs = rReviewedAt.Time.UTC()
 		}
@@ -628,8 +629,8 @@ func (s *Service) BulkSubmitReviews(ctx context.Context, params BulkSubmitReview
 	if len(params.Reviews) == 0 {
 		return nil, fmt.Errorf("%w: reviews array is empty", ErrInvalidParameter)
 	}
-	if len(params.Reviews) > 200 {
-		return nil, fmt.Errorf("%w: maximum 200 reviews per bulk request", ErrInvalidParameter)
+	if len(params.Reviews) > 500 {
+		return nil, fmt.Errorf("%w: maximum 500 reviews per bulk request", ErrInvalidParameter)
 	}
 
 	result := &BulkReviewResult{}

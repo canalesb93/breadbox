@@ -49,6 +49,14 @@ jobs:
       - name: Build CSS
         run: make css
 
+      - name: Check for duplicate migration versions
+        run: |
+          dupes=$(ls internal/db/migrations/*.sql | sed 's/.*\///' | sed 's/_.*//' | sort | uniq -d)
+          if [ -n "$dupes" ]; then
+            echo "::error::Duplicate migration version(s): $dupes"
+            exit 1
+          fi
+
       - name: Run go vet
         run: go vet ./...
 

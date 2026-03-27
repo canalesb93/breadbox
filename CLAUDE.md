@@ -22,6 +22,12 @@ Go 1.24+ single binary. PostgreSQL, chi/v5 router, pgx/v5 + sqlc, goose migratio
 
 One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), MCP server (`/mcp`), admin dashboard (`/admin/...`), webhooks (`/webhooks/:provider`). Bank data providers are abstracted behind a `Provider` Go interface (Plaid first, Teller + CSV later).
 
+## Migrations
+
+- **Timestamp-based naming**: New migrations use `YYYYMMDDHHMMSS_description.sql` format (e.g., `20260325153000_add_oauth.sql`). This prevents conflicts when parallel branches each need a migration. Existing sequential migrations (`00001`–`00029`) remain as-is — goose sorts by numeric prefix so timestamps (larger numbers) always run after them.
+- **Creating a migration**: Use the current UTC timestamp as the prefix. Example: `date -u +%Y%m%d%H%M%S` gives `20260325153000`.
+- **After adding a migration**: Run `sqlc generate` to regenerate Go code, then `go build ./...` to verify.
+
 ## Key Design Decisions
 
 - REST API is the core data layer; MCP tools and dashboard consume the service layer directly (no HTTP round-trip)
@@ -84,8 +90,11 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Category API: transaction responses include structured `category` object; raw fields renamed to `category_primary_raw`/`category_detailed_raw`. Filter by `category_slug` param.
 - `ListDistinctCategories` returns `[]CategoryPair{Primary, Detailed}` (not `[]string`). Will be replaced by `ListCategories` returning full taxonomy tree (Phase 20B).
 - MCP `min_amount`/`max_amount` use `*float64` (not `float64`) to allow filtering by zero values
-- Field selection: `?fields=` param on `GET /api/v1/transactions`, `GET /api/v1/transactions/{id}`, and MCP `query_transactions`. Aliases: `core` (id,date,amount,name,iso_currency_code), `category` (category,category_primary_raw,category_detailed_raw), `timestamps` (created_at,updated_at,datetime,authorized_datetime). `id` always included. Filtering happens in handlers, not service layer.
+- Field selection: `?fields=` param on `GET /api/v1/transactions`, `GET /api/v1/transactions/{id}`, and MCP `query_transactions`. Supports individual field names (e.g., `fields=name,amount,date,account_name`) and aliases: `minimal` (name,amount,date — smallest useful set), `core` (id,date,amount,name,iso_currency_code), `category` (category,category_primary_raw,category_detailed_raw), `timestamps` (created_at,updated_at,datetime,authorized_datetime). `id` always included. Filtering happens in handlers, not service layer.
 - Transaction summary: `GET /api/v1/transactions/summary` and MCP `transaction_summary` tool. Server-side aggregation with `group_by`: category, month, week, day, category_month. Multi-currency handled per-row. Default date range: 30 days.
+- Merchant summary: `GET /api/v1/transactions/merchants` and MCP `merchant_summary` tool. Server-side GROUP BY on `COALESCE(merchant_name, name)` returning distinct merchants with transaction_count, total_amount, avg_amount, first_date, last_date, iso_currency_code. Supports same filters as transaction queries plus `min_count` (HAVING COUNT >= N) and `spending_only`. Default date range: 90 days. Limit 500.
+- Exclude search: `exclude_search` param on `query_transactions`, `count_transactions`, and `merchant_summary`. Adds `NOT ILIKE` clause on name and merchant_name. Minimum 2 characters (REST API validation). Used to filter out known merchants when hunting for unknown charges.
+- Search modes: `search_mode` param on `query_transactions`, `count_transactions`, `merchant_summary`, `list_transaction_rules`. Values: `contains` (default, substring ILIKE), `words` (split on spaces, AND all words — handles formatting differences like "Century Link" vs "CenturyLink"), `fuzzy` (pg_trgm similarity for typo tolerance). Comma-separated values in `search` are auto-ORed in all modes. Shared implementation in `internal/service/search.go` via `BuildSearchClause`/`BuildExcludeSearchClause`.
 - Category mapping MCP tools: `list_category_mappings`, `create_category_mapping`, `update_category_mapping`, `delete_category_mapping`. Accept category slugs (not IDs). Lookup by ID or (provider, provider_category) pair.
 - Enhanced overview resource: `breadbox://overview` includes users list, accounts_by_type, connections with account counts, 30-day spending summary with top 5 categories, pending transaction count.
 - CSS framework: DaisyUI 5 + Tailwind CSS v4 via `tailwindcss-extra` standalone CLI binary. No Node.js. Replaces Pico CSS.
@@ -109,7 +118,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Review sync hook: `Engine.enqueueForReview()` called after each upsert inside the sync transaction. Priority: uncategorized > low_confidence > new_transaction. Skips `category_override=true` transactions. ON CONFLICT DO NOTHING for idempotency.
 - Review service: `ListReviews` uses dynamic SQL with transaction JOINs and cursor pagination (ASC for pending FIFO, DESC for resolved). `SubmitReview` handles category override + comment creation. `BulkSubmitReviews` iterates individually.
 - Review admin page: `/admin/reviews` with filter bar (status, type, account, user), card-based review queue with inline approve/reject/skip/dismiss, Alpine.js `reviewQueue()` for AJAX actions with card fade-out animation.
-- Review MCP tools: `list_pending_reviews` (ToolRead, supports `fields` param with aliases: `triage`, `review_core`, `transaction_core`), `submit_review` (ToolWrite), `batch_submit_reviews` (ToolWrite, max 200) in `internal/mcp/tools.go`. Limits: `list_pending_reviews` max 500, `batch_submit_reviews` max 200.
+- Review MCP tools: `list_pending_reviews` (ToolRead, supports `fields` param with aliases: `triage`, `review_core`, `transaction_core`), `submit_review` (ToolWrite), `batch_submit_reviews` (ToolWrite, max 500) in `internal/mcp/tools.go`. Limits: `list_pending_reviews` max 500, `batch_submit_reviews` max 500.
 - Review REST API: read endpoints at `/api/v1/reviews`, `/api/v1/reviews/counts`, `/api/v1/reviews/{id}`; write endpoints at `POST /reviews/{id}/submit`, `POST /reviews/bulk`, `POST /reviews/enqueue`, `DELETE /reviews/{id}`.
 - Transaction rules: `transaction_rules` table with recursive JSON condition tree (`conditions JSONB`). Rules auto-categorize future transactions during sync by matching conditions on transaction fields. Priority-ordered (higher wins). Support AND/OR/NOT logic with operators: eq, neq, contains, not_contains, matches (regex), gt, gte, lt, lte, in. Available fields: name, merchant_name, amount, category_primary, category_detailed, pending, provider, account_id, user_id, user_name.
 - Transaction rules service: `internal/service/rules.go` — `ValidateCondition` (recursive validation), `CompileCondition` (pre-compile regexes), `EvaluateCondition` (short-circuit evaluation). CRUD via dynamic SQL with cursor pagination. `ruleRow` struct with `scanDest()`/`toResponse()` eliminates scan variable duplication.
@@ -120,7 +129,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Rule creator tracking: `created_by_type` (user/agent/system), `created_by_id`, `created_by_name` — uses Actor pattern from request context.
 - Rule expiry: optional `expires_at` timestamp. `expires_in` param on create accepts duration strings (24h, 30d, 1w). Expired rules excluded from sync but remain visible.
 - Rule hit tracking: `hit_count` and `last_hit_at` updated by `BatchIncrementHitCounts` during sync.
-- Batch categorize: `batch_categorize_transactions` MCP tool (ToolWrite, max 200 items) and `POST /api/v1/transactions/batch-categorize`. Takes array of `{transaction_id, category_slug}` pairs. Pre-resolves slugs with cache.
+- Batch categorize: `batch_categorize_transactions` MCP tool (ToolWrite, max 500 items) and `POST /api/v1/transactions/batch-categorize`. Takes array of `{transaction_id, category_slug}` pairs. Pre-resolves slugs with cache.
 - Bulk recategorize: `bulk_recategorize` MCP tool (ToolWrite) and `POST /api/v1/transactions/bulk-recategorize`. Server-side UPDATE with dynamic WHERE clause (same filter params as query_transactions) + target category. Requires at least one filter (safety). Sets `category_override=TRUE`.
 - Review field selection: `list_pending_reviews` supports `fields` param. Aliases: `triage` (review id/type/status + transaction name/amount/date/category_primary_raw/account_name/user_name/merchant_name), `review_core` (review metadata only), `transaction_core` (key transaction fields). Implemented in `internal/service/fields.go` via `ParseReviewFields`/`FilterReviewFields`.
 - Account linking: `account_links` table links dependent (authorized user) accounts to primary (cardholder) accounts for cross-connection transaction deduplication. `transaction_matches` table stores matched pairs. `transactions.attributed_user_id` overrides user attribution. `accounts.is_dependent_linked` flag excludes dependent transactions from totals at query time.
@@ -129,6 +138,8 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Account link MCP tools: `list_account_links`, `create_account_link` (ToolWrite, auto-runs initial reconciliation), `delete_account_link`, `reconcile_account_link`, `list_transaction_matches`, `confirm_match`, `reject_match`.
 - Account link REST API: `/api/v1/account-links` CRUD + `/reconcile` + `/matches`. `/api/v1/transaction-matches/{id}/confirm|reject`. `POST /api/v1/transaction-matches/manual`.
 - Account link admin: `/admin/account-links` page with link list, create modal, match detail view. Nav item with `link-2` Lucide icon between Categories and Family Members.
+- Agent reports: `agent_reports` table for agents to submit summaries and flag transactions. `submit_report` MCP tool (ToolWrite) with title + markdown body. Dashboard widget shows unread reports with markdown rendering (marked.js CDN). Transaction deep-links via `[Name](/transactions/ID)` in markdown. Mark read/dismiss via admin API. Nav badge shows unread count.
+- Agent report REST API: `GET /api/v1/reports`, `POST /api/v1/reports`, `GET /api/v1/reports/unread-count`, `PATCH /api/v1/reports/{id}/read`. Admin API: `POST /-/reports/{id}/read`, `POST /-/reports/read-all`.
 
 ## Canonical Enums
 

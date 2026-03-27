@@ -14,7 +14,7 @@ STRATEGY:
 4. Call auto_approve_categorized_reviews to clear reviews that rules already handled
 5. Use review_summary again to see what remains, then list_pending_reviews with
    category_primary_raw filter to process one group at a time (fields=triage)
-6. Use batch_submit_reviews (up to 200) or bulk_recategorize for bulk actions on remaining items
+6. Use batch_submit_reviews (up to 500) or bulk_recategorize for bulk actions on remaining items
 7. Create per-merchant rules only for merchants that get miscategorized by the broad rules
 
 TELLER CATEGORIES:
@@ -36,7 +36,14 @@ Always use fields=triage on list_pending_reviews — it returns only the fields 
 categorization decisions and dramatically reduces response size.
 
 Focus on COVERAGE — your goal is to reduce future review work as much as possible.
-Prioritize rules that match the most transactions. Check list_transaction_rules before creating to avoid duplicates.`
+Prioritize rules that match the most transactions. Check list_transaction_rules before creating to avoid duplicates.
+
+WRAP-UP:
+When finished, call submit_report with a summary of what you did. Include:
+- How many transactions/reviews you processed
+- Rules you created and their expected coverage
+- Any transactions or patterns that need human attention (link them: [Name](/transactions/ID))
+- Remaining items you skipped or couldn't categorize`
 
 // RecurringReviewInstructions provides guidance for routine daily/weekly reviews.
 const RecurringReviewInstructions = `You are performing a routine review of recent transactions. Review pending transactions, categorize them, and create rules for any new patterns you notice.
@@ -46,11 +53,18 @@ STRATEGY:
 2. Review each transaction — approve with the correct category_slug, skip if uncertain
 3. Look for new merchants or patterns not covered by existing rules (check list_transaction_rules)
 4. For recurring merchants (seen 2+ times), create a specific rule (rules apply to future syncs automatically)
-5. Use batch_submit_reviews (up to 200) for efficiency
+5. Use batch_submit_reviews (up to 500) for efficiency
 
 Focus on ACCURACY — take time to categorize correctly since there are fewer transactions.
 Create specific rules for new recurring merchants you encounter. Prefer contains over exact match for merchant names.
-Do NOT use apply_rules during routine reviews — rules are designed to match future transactions during sync. Retroactive application is a separate, deliberate action.`
+Do NOT use apply_rules during routine reviews — rules are designed to match future transactions during sync. Retroactive application is a separate, deliberate action.
+
+WRAP-UP:
+When finished, call submit_report with a brief summary. Include:
+- Number of reviews processed (approved/skipped)
+- Any new rules created
+- Transactions flagged for human attention (link them: [Name](/transactions/ID))
+- Anything unusual or noteworthy`
 
 // InstructionTemplate represents a pre-built instruction set.
 type InstructionTemplate struct {

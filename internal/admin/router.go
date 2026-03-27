@@ -22,9 +22,16 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 	r.Use(SetupDetection(a.Queries))
 
 	// Unauthenticated routes.
-	r.Get("/login", LoginHandler(sm, a.Queries, tr))
-	r.Post("/login", LoginHandler(sm, a.Queries, tr))
+	r.Group(func(r chi.Router) {
+		r.Use(OAuthLoginReturnMiddleware(sm))
+		r.Get("/login", LoginHandler(sm, a.Queries, tr))
+		r.Post("/login", LoginHandler(sm, a.Queries, tr))
+	})
 	r.Post("/logout", LogoutHandler(sm))
+
+	// OAuth 2.1 authorize flow (needs session for consent screen).
+	r.Get("/oauth/authorize", OAuthAuthorizeHandler(svc, sm, tr))
+	r.Post("/oauth/authorize", OAuthAuthorizeSubmitHandler(svc, sm))
 
 	// First-run admin creation (unauthenticated).
 	r.Get("/setup", CreateAdminHandler(a.Queries, sm, tr))
@@ -65,6 +72,14 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/{id}/revoke", APIKeyRevokePageHandler(svc, sm))
 		})
 
+		r.Route("/oauth-clients", func(r chi.Router) {
+			r.Get("/", OAuthClientsListPageHandler(svc, sm, tr))
+			r.Get("/new", OAuthClientNewPageHandler(tr))
+			r.Post("/new", OAuthClientCreatePageHandler(svc, sm, tr))
+			r.Get("/{id}/created", OAuthClientCreatedPageHandler(sm, tr))
+			r.Post("/{id}/revoke", OAuthClientRevokePageHandler(svc, sm))
+		})
+
 		r.Get("/transactions", TransactionListHandler(a, sm, tr, svc))
 		r.Get("/transactions/{id}", TransactionDetailHandler(a, sm, tr, svc))
 		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
@@ -73,6 +88,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/account-links", AccountLinksPageHandler(a, svc, sm, tr))
 		r.Get("/account-links/{id}", AccountLinkDetailHandler(a, svc, sm, tr))
 
+		r.Get("/reports", ReportsPageHandler(a, svc, sm, tr))
 		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
 		r.Get("/review-instructions", ReviewInstructionsPageHandler(sm, tr))
 		r.Get("/rules", RulesPageHandler(svc, sm, tr, a.Config.Version))
@@ -121,6 +137,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/api-keys", ListAPIKeysHandler(svc))
 		r.Post("/api-keys", CreateAPIKeyHandler(svc))
 		r.Delete("/api-keys/{id}", RevokeAPIKeyHandler(svc))
+
+		r.Get("/oauth-clients", ListOAuthClientsHandler(svc))
+		r.Post("/oauth-clients", CreateOAuthClientHandler(svc))
+		r.Delete("/oauth-clients/{id}", RevokeOAuthClientHandler(svc))
 
 		r.Post("/update/dismiss", DismissUpdateHandler(a))
 		r.Post("/update", TriggerUpdateHandler(a))
@@ -177,6 +197,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/account-links/{id}/reconcile", ReconcileAccountLinkAdminHandler(svc, sm))
 		r.Post("/transaction-matches/{id}/confirm", ConfirmMatchAdminHandler(svc, sm))
 		r.Post("/transaction-matches/{id}/reject", RejectMatchAdminHandler(svc, sm))
+
+		// Agent reports
+		r.Post("/reports/{id}/read", MarkReportReadAdminHandler(svc))
+		r.Post("/reports/read-all", MarkAllReportsReadAdminHandler(svc))
 	})
 
 	return r

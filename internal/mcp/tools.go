@@ -18,32 +18,36 @@ type listAccountsInput struct {
 }
 
 type queryTransactionsInput struct {
-	StartDate    string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
-	EndDate      string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
-	AccountID    string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
-	UserID       string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
-	CategorySlug string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug (parent slug includes all children). Use list_categories to find slugs."`
-	MinAmount    *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount (positive=debit, negative=credit)"`
-	MaxAmount    *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount (positive=debit, negative=credit)"`
-	Pending      *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
-	Search       string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant"`
-	Limit        int      `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
-	Cursor       string   `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
-	SortBy       string   `json:"sort_by,omitempty" jsonschema:"Sort: date (default), amount, name"`
-	SortOrder    string   `json:"sort_order,omitempty" jsonschema:"Sort direction: desc (default) or asc"`
-	Fields       string   `json:"fields,omitempty" jsonschema:"Comma-separated list of fields to include in response. Aliases: core (id,date,amount,name,iso_currency_code), category (category,category_primary_raw,category_detailed_raw), timestamps (created_at,updated_at,datetime,authorized_datetime). Default: all fields. id is always included."`
+	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
+	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
+	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
+	UserID        string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
+	CategorySlug  string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug (parent slug includes all children). Use list_categories to find slugs."`
+	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount (positive=debit, negative=credit)"`
+	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount (positive=debit, negative=credit)"`
+	Pending       *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
+	Search        string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant. Comma-separated values are ORed (e.g. starbucks,amazon matches either)."`
+	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"How to match the search term: contains (default, substring match), words (all words must match, good for multi-word queries), fuzzy (typo-tolerant via trigram similarity)"`
+	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions whose name or merchant matches this text. Comma-separated values are ORed. Use to filter out known merchants."`
+	Limit         int      `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
+	Cursor        string   `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
+	SortBy        string   `json:"sort_by,omitempty" jsonschema:"Sort: date (default), amount, name"`
+	SortOrder     string   `json:"sort_order,omitempty" jsonschema:"Sort direction: desc (default) or asc"`
+	Fields        string   `json:"fields,omitempty" jsonschema:"Comma-separated list of fields to include in response. Aliases: minimal (name,amount,date), core (id,date,amount,name,iso_currency_code), category (category,category_primary_raw,category_detailed_raw), timestamps (created_at,updated_at,datetime,authorized_datetime). Default: all fields. id is always included."`
 }
 
 type countTransactionsInput struct {
-	StartDate    string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
-	EndDate      string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
-	AccountID    string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
-	UserID       string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
-	CategorySlug string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
-	MinAmount    *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount"`
-	MaxAmount    *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount"`
-	Pending      *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
-	Search       string   `json:"search,omitempty" jsonschema:"Search name or merchant"`
+	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
+	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
+	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
+	UserID        string   `json:"user_id,omitempty" jsonschema:"Filter by user ID"`
+	CategorySlug  string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
+	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount"`
+	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount"`
+	Pending       *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
+	Search        string   `json:"search,omitempty" jsonschema:"Search name or merchant. Comma-separated values are ORed."`
+	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy"`
+	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions matching this text"`
 }
 
 type triggerSyncInput struct {
@@ -76,6 +80,21 @@ type transactionSummaryInput struct {
 	UserID         string `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
 	Category       string `json:"category,omitempty" jsonschema:"Filter by primary category before aggregating"`
 	IncludePending *bool  `json:"include_pending,omitempty" jsonschema:"Include pending transactions (default false)"`
+}
+
+type merchantSummaryInput struct {
+	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive. Defaults to 90 days ago."`
+	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive. Defaults to today."`
+	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
+	UserID        string   `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
+	CategorySlug  string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
+	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum transaction amount"`
+	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum transaction amount"`
+	Search        string   `json:"search,omitempty" jsonschema:"Search merchant/transaction names. Comma-separated values are ORed."`
+	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy"`
+	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude merchants matching this text. Comma-separated values are ORed."`
+	MinCount      int      `json:"min_count,omitempty" jsonschema:"Minimum transaction count to include a merchant (default 1). Set to 2+ to find recurring charges."`
+	SpendingOnly  *bool    `json:"spending_only,omitempty" jsonschema:"Only include spending (positive amounts). Default false."`
 }
 
 type listPendingReviewsInput struct {
@@ -192,6 +211,15 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 	if input.Search != "" {
 		params.Search = &input.Search
 	}
+	if input.SearchMode != "" {
+		if !service.ValidateSearchMode(input.SearchMode) {
+			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
+		}
+		params.SearchMode = &input.SearchMode
+	}
+	if input.ExcludeSearch != "" {
+		params.ExcludeSearch = &input.ExcludeSearch
+	}
 	if input.SortBy != "" {
 		params.SortBy = &input.SortBy
 	}
@@ -263,6 +291,15 @@ func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToo
 	}
 	if input.Search != "" {
 		params.Search = &input.Search
+	}
+	if input.SearchMode != "" {
+		if !service.ValidateSearchMode(input.SearchMode) {
+			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
+		}
+		params.SearchMode = &input.SearchMode
+	}
+	if input.ExcludeSearch != "" {
+		params.ExcludeSearch = &input.ExcludeSearch
 	}
 
 	count, err := s.svc.CountTransactionsFiltered(ctx, params)
@@ -438,6 +475,66 @@ func (s *MCPServer) handleTransactionSummary(_ context.Context, _ *mcpsdk.CallTo
 	}
 
 	result, err := s.svc.GetTransactionSummary(ctx, params)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	return jsonResult(result)
+}
+
+func (s *MCPServer) handleMerchantSummary(_ context.Context, _ *mcpsdk.CallToolRequest, input merchantSummaryInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+
+	params := service.MerchantSummaryParams{
+		MinCount: input.MinCount,
+	}
+
+	if input.StartDate != "" {
+		t, err := time.Parse("2006-01-02", input.StartDate)
+		if err != nil {
+			return errorResult(fmt.Errorf("invalid start_date: %w", err)), nil, nil
+		}
+		params.StartDate = &t
+	}
+	if input.EndDate != "" {
+		t, err := time.Parse("2006-01-02", input.EndDate)
+		if err != nil {
+			return errorResult(fmt.Errorf("invalid end_date: %w", err)), nil, nil
+		}
+		params.EndDate = &t
+	}
+	if input.AccountID != "" {
+		params.AccountID = &input.AccountID
+	}
+	if input.UserID != "" {
+		params.UserID = &input.UserID
+	}
+	if input.CategorySlug != "" {
+		params.CategorySlug = &input.CategorySlug
+	}
+	if input.MinAmount != nil {
+		params.MinAmount = input.MinAmount
+	}
+	if input.MaxAmount != nil {
+		params.MaxAmount = input.MaxAmount
+	}
+	if input.Search != "" {
+		params.Search = &input.Search
+	}
+	if input.SearchMode != "" {
+		if !service.ValidateSearchMode(input.SearchMode) {
+			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
+		}
+		params.SearchMode = &input.SearchMode
+	}
+	if input.ExcludeSearch != "" {
+		params.ExcludeSearch = &input.ExcludeSearch
+	}
+	if input.SpendingOnly != nil && *input.SpendingOnly {
+		params.SpendingOnly = true
+	}
+
+	result, err := s.svc.GetMerchantSummary(ctx, params)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
@@ -714,8 +811,9 @@ type createTransactionRuleInput struct {
 type listTransactionRulesInput struct {
 	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
 	Enabled      *bool  `json:"enabled,omitempty" jsonschema:"Filter by enabled status"`
-	Search       string `json:"search,omitempty" jsonschema:"Search by rule name"`
-	Limit        int    `json:"limit,omitempty" jsonschema:"Max results (default 50, max 200)"`
+	Search       string `json:"search,omitempty" jsonschema:"Search by rule name. Comma-separated values are ORed."`
+	SearchMode   string `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy"`
+	Limit        int    `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
 	Cursor       string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
 }
 
@@ -824,6 +922,12 @@ func (s *MCPServer) handleListTransactionRules(_ context.Context, _ *mcpsdk.Call
 	}
 	if input.Search != "" {
 		params.Search = &input.Search
+	}
+	if input.SearchMode != "" {
+		if !service.ValidateSearchMode(input.SearchMode) {
+			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
+		}
+		params.SearchMode = &input.SearchMode
 	}
 
 	result, err := s.svc.ListTransactionRules(ctx, params)
@@ -980,8 +1084,8 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 	if len(input.Rules) == 0 {
 		return errorResult(fmt.Errorf("rules array is required and must not be empty")), nil, nil
 	}
-	if len(input.Rules) > 50 {
-		return errorResult(fmt.Errorf("maximum 50 rules per batch")), nil, nil
+	if len(input.Rules) > 100 {
+		return errorResult(fmt.Errorf("maximum 100 rules per batch")), nil, nil
 	}
 
 	actor := service.ActorFromContext(ctx)
@@ -1042,7 +1146,7 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 // --- Batch categorize / Bulk recategorize ---
 
 type batchCategorizeInput struct {
-	Items []batchCategorizeItemInput `json:"items" jsonschema:"required,Array of transaction/category pairs (max 200)"`
+	Items []batchCategorizeItemInput `json:"items" jsonschema:"required,Array of transaction/category pairs (max 500)"`
 }
 
 type batchCategorizeItemInput struct {
@@ -1143,6 +1247,31 @@ func (s *MCPServer) handleBulkRecategorize(ctx context.Context, _ *mcpsdk.CallTo
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(result)
+}
+
+// --- Agent Reports ---
+
+type submitReportInput struct {
+	Title    string   `json:"title" jsonschema:"required,A concise 1-2 sentence summary that reads like a notification or message. This is the primary thing the family sees on their dashboard — make it informative and self-contained. Good: 'Reviewed 47 transactions this week — 3 recategorized and no suspicious activity found.' Bad: 'Weekly Review Complete' (too vague to be useful without opening the full report)."`
+	Body     string   `json:"body" jsonschema:"required,Detailed breakdown in markdown format with supporting data. This is shown when the user expands the report for more detail. Use headers and bullet points and transaction links: [Transaction Name](/transactions/TRANSACTION_ID)."`
+	Priority string   `json:"priority" jsonschema:"enum=info,enum=warning,enum=critical,default=info,Severity level: info (routine updates and summaries), warning (needs attention soon), critical (urgent action required)"`
+	Tags     []string `json:"tags" jsonschema:"Short labels for categorizing reports (e.g. 'weekly-review' or 'anomaly'). Max 10 tags."`
+	Author   string   `json:"author" jsonschema:"Custom author name to sign this report with. Overrides the API key name for display (e.g. 'Review Agent' or 'Budget Monitor')."`
+}
+
+func (s *MCPServer) handleSubmitReport(reqCtx context.Context, _ *mcpsdk.CallToolRequest, input submitReportInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+
+	if err := s.checkWritePermission(reqCtx); err != nil {
+		return errorResult(err), nil, nil
+	}
+
+	actor := service.ActorFromContext(reqCtx)
+	report, err := s.svc.CreateAgentReport(ctx, input.Title, input.Body, actor, input.Priority, input.Tags, input.Author)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(report)
 }
 
 // --- Helpers ---

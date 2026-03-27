@@ -1,51 +1,427 @@
 {{define "content"}}
 
+<!-- Insights Page with Tabbed Layout -->
+<div x-data="{ tab: (new URLSearchParams(window.location.search).get('tab')) || 'overview', highlightedCategory: '', insightsReady: false }"
+     x-init="
+       $watch('tab', v => { const u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); if (window._onInsightsTabSwitch) window._onInsightsTabSwitch(v); });
+       window._setInsightsReady = () => { insightsReady = true; };
+       if (window._insightsChartsLoaded) { insightsReady = true; setTimeout(() => { if (window._insightCharts) window._insightCharts.forEach(c => { try { c.resize(); } catch(e) {} }); }, 150); }
+     "
+     @keydown.window="
+       if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.isContentEditable) return;
+       const tabs = ['overview', 'analysis', 'trends'];
+       const idx = tabs.indexOf(tab);
+       if (event.key === 'ArrowRight' && idx < tabs.length - 1) { event.preventDefault(); tab = tabs[idx + 1]; }
+       else if (event.key === 'ArrowLeft' && idx > 0) { event.preventDefault(); tab = tabs[idx - 1]; }
+       else if (event.key === '1') { tab = 'overview'; }
+       else if (event.key === '2') { tab = 'analysis'; }
+       else if (event.key === '3') { tab = 'trends'; }
+       else if (event.key === 'Escape') { highlightedCategory = ''; $dispatch('insights-drill-up'); }
+     ">
+
 <!-- Insights Page Header with Date Range Picker -->
 <div class="bb-page-header">
   <div>
     <h1 class="bb-page-title">Insights</h1>
-    <p class="text-sm text-base-content/50 mt-0.5">Spending trends, pace, and cash flow analysis</p>
+    <p class="text-sm text-base-content/50 mt-0.5 hidden sm:block">Spending trends, pace, and cash flow analysis</p>
   </div>
-  <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5">
-    <a href="/insights?days=7" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 7}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">7d</a>
-    <a href="/insights?days=30" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 30}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">30d</a>
-    <a href="/insights?days=90" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 90}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">90d</a>
-    <a href="/insights?days=365" class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 365}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">12m</a>
+  <div class="flex items-center gap-2 shrink-0">
+    <!-- CSV Export Dropdown -->
+    <div x-data="{ exportOpen: false }" class="relative">
+      <button @click="exportOpen = !exportOpen" @click.outside="exportOpen = false"
+        class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-base-content/40 hover:text-base-content/60 bg-base-200/40 hover:bg-base-200/60 rounded-lg transition-all duration-150 cursor-pointer border border-transparent hover:border-base-300/40">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+        <span class="hidden sm:inline">Export</span>
+      </button>
+      <div x-show="exportOpen" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95 -translate-y-1" x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+        x-cloak class="absolute right-0 top-full mt-1.5 w-56 bg-base-100 border border-base-200/80 rounded-xl shadow-lg shadow-black/8 z-50 py-1.5 overflow-hidden">
+        <div class="px-3 py-1.5 text-[0.6rem] uppercase tracking-wider text-base-content/30 font-medium">Export as CSV</div>
+        <button @click="window._insightsExportCSV('summary'); exportOpen = false"
+          class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
+          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-base-content/30"></i>
+          Summary &amp; Categories
+        </button>
+        <button @click="window._insightsExportCSV('merchants'); exportOpen = false"
+          class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
+          <i data-lucide="store" class="w-3.5 h-3.5 text-base-content/30"></i>
+          Top Merchants
+        </button>
+        <button @click="window._insightsExportCSV('monthly'); exportOpen = false"
+          class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
+          <i data-lucide="columns-3" class="w-3.5 h-3.5 text-base-content/30"></i>
+          Monthly Comparison
+        </button>
+        <button @click="window._insightsExportCSV('recurring'); exportOpen = false"
+          class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/30"></i>
+          Recurring Charges
+        </button>
+        <button @click="window._insightsExportCSV('anomalies'); exportOpen = false"
+          class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
+          <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-base-content/30"></i>
+          Anomalies
+        </button>
+        <div class="border-t border-base-200/60 mt-1 pt-1">
+          <button @click="window._insightsExportCSV('all'); exportOpen = false"
+            class="w-full text-left px-3 py-2 text-xs font-medium text-base-content/80 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
+            <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-primary/50"></i>
+            Export All Sections
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- Summary Pills -->
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-  <div class="bb-card p-4">
-    <div class="text-xs text-base-content/40 mb-1">Spending</div>
-    <div class="text-xl font-semibold tabular-nums">{{formatBalance .TotalSpending}}</div>
-    {{if .HasSpendingChange}}
-    <div class="text-[0.65rem] font-medium mt-1 {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
-      {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}% vs prev
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SKELETON LOADING STATE                        -->
+<!-- ═══════════════════════════════════════════════ -->
+<div x-show="!insightsReady" x-transition:leave="transition ease-in duration-300" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="bb-page-skeleton" aria-hidden="true" role="presentation">
+  <!-- Skeleton Summary Pills -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-6">
+    <div class="bb-skeleton--card !p-3 sm:!p-4 min-h-[4.5rem]">
+      <div class="bb-skeleton bb-skeleton--text-xs mb-3" style="width: 55px;"></div>
+      <div class="bb-skeleton bb-skeleton--amount mb-1.5"></div>
+      <div class="bb-skeleton bb-skeleton--text-xs" style="width: 65px;"></div>
     </div>
-    {{end}}
+    <div class="bb-skeleton--card !p-3 sm:!p-4 min-h-[4.5rem]">
+      <div class="bb-skeleton bb-skeleton--text-xs mb-3" style="width: 48px;"></div>
+      <div class="bb-skeleton bb-skeleton--amount mb-1.5"></div>
+      <div class="bb-skeleton bb-skeleton--text-xs" style="width: 0;"></div>
+    </div>
+    <div class="bb-skeleton--card !p-3 sm:!p-4 min-h-[4.5rem]">
+      <div class="bb-skeleton bb-skeleton--text-xs mb-3" style="width: 80px;"></div>
+      <div class="bb-skeleton bb-skeleton--amount mb-1.5"></div>
+      <div class="bb-skeleton bb-skeleton--text-xs" style="width: 0;"></div>
+    </div>
+    <div class="bb-skeleton--card !p-3 sm:!p-4 min-h-[4.5rem]">
+      <div class="bb-skeleton bb-skeleton--text-xs mb-3" style="width: 72px;"></div>
+      <div class="bb-skeleton bb-skeleton--amount mb-1.5"></div>
+      <div class="bb-skeleton bb-skeleton--text-xs" style="width: 0;"></div>
+    </div>
   </div>
-  <div class="bb-card p-4">
-    <div class="text-xs text-base-content/40 mb-1">Income</div>
-    <div class="text-xl font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</div>
+
+  <!-- Skeleton Tab Bar -->
+  <div class="flex items-center gap-1 border-b border-base-200/80 mb-6">
+    <div class="px-4 py-2.5 border-b-2 border-primary/30">
+      <div class="bb-skeleton" style="width: 64px; height: 14px;"></div>
+    </div>
+    <div class="px-4 py-2.5">
+      <div class="bb-skeleton" style="width: 56px; height: 14px;"></div>
+    </div>
+    <div class="px-4 py-2.5">
+      <div class="bb-skeleton" style="width: 48px; height: 14px;"></div>
+    </div>
+  </div>
+
+  <!-- Skeleton Health Score Card -->
+  <div class="bb-skeleton--card mb-6 !p-5">
+    <div class="flex flex-col lg:flex-row items-start lg:items-center gap-6">
+      <div class="flex items-center gap-5 shrink-0">
+        <div class="bb-skeleton rounded-full" style="width: 112px; height: 112px;"></div>
+        <div class="lg:hidden">
+          <div class="bb-skeleton" style="width: 100px; height: 16px; margin-bottom: 6px;"></div>
+          <div class="bb-skeleton bb-skeleton--text-xs" style="width: 120px;"></div>
+        </div>
+      </div>
+      <div class="flex-1 w-full">
+        <div class="hidden lg:flex items-center gap-2.5 mb-4">
+          <div class="bb-skeleton" style="width: 120px; height: 16px;"></div>
+          <div class="bb-skeleton bb-skeleton--badge"></div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-5 gap-2 sm:gap-3">
+          <div class="bb-skeleton--card !p-3"><div class="bb-skeleton bb-skeleton--circle-sm mb-2"></div><div class="bb-skeleton bb-skeleton--text-xs mb-1.5"></div><div class="bb-skeleton" style="width: 100%; height: 6px;"></div></div>
+          <div class="bb-skeleton--card !p-3"><div class="bb-skeleton bb-skeleton--circle-sm mb-2"></div><div class="bb-skeleton bb-skeleton--text-xs mb-1.5"></div><div class="bb-skeleton" style="width: 100%; height: 6px;"></div></div>
+          <div class="bb-skeleton--card !p-3"><div class="bb-skeleton bb-skeleton--circle-sm mb-2"></div><div class="bb-skeleton bb-skeleton--text-xs mb-1.5"></div><div class="bb-skeleton" style="width: 100%; height: 6px;"></div></div>
+          <div class="bb-skeleton--card !p-3"><div class="bb-skeleton bb-skeleton--circle-sm mb-2"></div><div class="bb-skeleton bb-skeleton--text-xs mb-1.5"></div><div class="bb-skeleton" style="width: 100%; height: 6px;"></div></div>
+          <div class="bb-skeleton--card !p-3"><div class="bb-skeleton bb-skeleton--circle-sm mb-2"></div><div class="bb-skeleton bb-skeleton--text-xs mb-1.5"></div><div class="bb-skeleton" style="width: 100%; height: 6px;"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Skeleton Pace + Summary Row -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+    <div class="bb-skeleton--card !p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div class="bb-skeleton" style="width: 160px; height: 16px;"></div>
+        <div class="bb-skeleton bb-skeleton--text-xs" style="width: 72px;"></div>
+      </div>
+      <div class="bb-skeleton mb-5" style="width: 100%; height: 12px; border-radius: 9999px;"></div>
+      <div class="grid grid-cols-3 gap-4">
+        <div><div class="bb-skeleton bb-skeleton--text-xs mb-2" style="width: 60px;"></div><div class="bb-skeleton bb-skeleton--amount"></div></div>
+        <div><div class="bb-skeleton bb-skeleton--text-xs mb-2" style="width: 50px;"></div><div class="bb-skeleton bb-skeleton--amount"></div></div>
+        <div><div class="bb-skeleton bb-skeleton--text-xs mb-2" style="width: 56px;"></div><div class="bb-skeleton bb-skeleton--amount"></div></div>
+      </div>
+    </div>
+    <div class="bb-skeleton--card !p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div class="bb-skeleton" style="width: 130px; height: 16px;"></div>
+      </div>
+      <div class="flex flex-col items-center mb-5">
+        <div class="bb-skeleton bb-skeleton--text-xs mb-2" style="width: 90px;"></div>
+        <div class="bb-skeleton" style="width: 140px; height: 28px;"></div>
+      </div>
+      <div class="space-y-3">
+        <div class="bb-skeleton" style="width: 100%; height: 10px; border-radius: 9999px;"></div>
+        <div class="bb-skeleton" style="width: 100%; height: 10px; border-radius: 9999px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Skeleton Charts Row -->
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
+    <div class="bb-skeleton--card lg:col-span-3 !p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div class="bb-skeleton" style="width: 140px; height: 16px;"></div>
+        <div class="bb-skeleton bb-skeleton--badge"></div>
+      </div>
+      <div class="bb-skeleton" style="width: 100%; height: 240px; border-radius: 8px;"></div>
+    </div>
+    <div class="bb-skeleton--card lg:col-span-2 !p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div class="bb-skeleton" style="width: 110px; height: 16px;"></div>
+      </div>
+      <div class="flex items-center justify-center" style="height: 240px;">
+        <div class="bb-skeleton rounded-full" style="width: 180px; height: 180px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Skeleton Budget Targets -->
+  <div class="bb-skeleton--card !p-5">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2.5">
+        <div class="bb-skeleton" style="width: 28px; height: 28px; border-radius: 8px;"></div>
+        <div class="bb-skeleton" style="width: 120px; height: 16px;"></div>
+      </div>
+    </div>
+    <div class="space-y-3">
+      <div><div class="flex items-center justify-between mb-1.5"><div class="bb-skeleton bb-skeleton--text-xs" style="width: 100px;"></div><div class="bb-skeleton bb-skeleton--text-xs" style="width: 80px;"></div></div><div class="bb-skeleton" style="width: 100%; height: 10px; border-radius: 9999px;"></div></div>
+      <div><div class="flex items-center justify-between mb-1.5"><div class="bb-skeleton bb-skeleton--text-xs" style="width: 90px;"></div><div class="bb-skeleton bb-skeleton--text-xs" style="width: 75px;"></div></div><div class="bb-skeleton" style="width: 100%; height: 10px; border-radius: 9999px;"></div></div>
+      <div><div class="flex items-center justify-between mb-1.5"><div class="bb-skeleton bb-skeleton--text-xs" style="width: 110px;"></div><div class="bb-skeleton bb-skeleton--text-xs" style="width: 70px;"></div></div><div class="bb-skeleton" style="width: 100%; height: 10px; border-radius: 9999px;"></div></div>
+      <div><div class="flex items-center justify-between mb-1.5"><div class="bb-skeleton bb-skeleton--text-xs" style="width: 85px;"></div><div class="bb-skeleton bb-skeleton--text-xs" style="width: 65px;"></div></div><div class="bb-skeleton" style="width: 100%; height: 10px; border-radius: 9999px;"></div></div>
+      <div><div class="flex items-center justify-between mb-1.5"><div class="bb-skeleton bb-skeleton--text-xs" style="width: 95px;"></div><div class="bb-skeleton bb-skeleton--text-xs" style="width: 82px;"></div></div><div class="bb-skeleton" style="width: 100%; height: 10px; border-radius: 9999px;"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Real Insights Content (hidden until ready) -->
+<div x-show="insightsReady" x-transition:enter="transition ease-out duration-400" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-cloak>
+
+<!-- Summary Pills (always visible) with sparklines + count-up animation -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-6">
+  <div class="bb-card bb-summary-pill p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem] relative overflow-hidden group">
+    <div class="flex items-center justify-between">
+      <div class="text-xs text-base-content/40 mb-1">Spending</div>
+      <svg class="bb-sparkline" data-values="{{.SparkSpending}}" data-color="currentColor" viewBox="0 0 80 24" preserveAspectRatio="none"></svg>
+    </div>
+    <div>
+      <div class="text-lg sm:text-xl font-semibold tabular-nums" data-countup="{{printf "%.2f" .TotalSpending}}" data-prefix="$">{{formatBalance .TotalSpending}}</div>
+      {{if .HasSpendingChange}}
+      <div class="text-[0.65rem] font-medium mt-1 {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
+        {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}% vs prev
+      </div>
+      {{else}}
+      <div class="text-[0.65rem] mt-1">&nbsp;</div>
+      {{end}}
+    </div>
+  </div>
+  <div class="bb-card bb-summary-pill p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem] relative overflow-hidden group">
+    <div class="flex items-center justify-between">
+      <div class="text-xs text-base-content/40 mb-1">Income</div>
+      <svg class="bb-sparkline" data-values="{{.SparkIncome}}" data-color="oklch(0.65 0.17 155)" viewBox="0 0 80 24" preserveAspectRatio="none"></svg>
+    </div>
+    <div>
+      <div class="text-lg sm:text-xl font-semibold tabular-nums text-success" data-countup="{{printf "%.2f" .TotalIncome}}" data-prefix="$">{{formatBalance .TotalIncome}}</div>
+      <div class="text-[0.65rem] mt-1">&nbsp;</div>
+    </div>
   </div>
   {{if .HasCashFlow}}
-  <div class="bb-card p-4">
-    <div class="text-xs text-base-content/40 mb-1">Net Cash Flow</div>
-    <div class="text-xl font-semibold tabular-nums {{if gt .CashFlowNet 0.0}}text-success{{else if lt .CashFlowNet 0.0}}text-error{{end}}">
-      {{if gt .CashFlowNet 0.0}}+{{end}}{{if lt .CashFlowNet 0.0}}-{{end}}{{formatBalance .CashFlowNet}}
+  <div class="bb-card bb-summary-pill p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem] relative overflow-hidden group">
+    <div class="flex items-center justify-between">
+      <div class="text-xs text-base-content/40 mb-1">Net Cash Flow</div>
+      <svg class="bb-sparkline" data-values="{{.SparkNet}}" data-color="{{if gt .CashFlowNet 0.0}}oklch(0.65 0.17 155){{else}}oklch(0.65 0.2 25){{end}}" viewBox="0 0 80 24" preserveAspectRatio="none"></svg>
+    </div>
+    <div>
+      <div class="text-lg sm:text-xl font-semibold tabular-nums {{if gt .CashFlowNet 0.0}}text-success{{else if lt .CashFlowNet 0.0}}text-error{{end}}"
+        data-countup="{{printf "%.2f" (absf .CashFlowNet)}}" data-prefix="{{if gt .CashFlowNet 0.0}}+${{else if lt .CashFlowNet 0.0}}-${{else}}${{end}}">
+        {{if gt .CashFlowNet 0.0}}+{{end}}{{if lt .CashFlowNet 0.0}}-{{end}}{{formatBalance .CashFlowNet}}
+      </div>
+      <div class="text-[0.65rem] mt-1">&nbsp;</div>
     </div>
   </div>
-  <div class="bb-card p-4">
-    <div class="text-xs text-base-content/40 mb-1">Savings Rate</div>
-    {{if gt .TotalIncome 0.0}}
-    <div class="text-xl font-semibold tabular-nums {{if gt .SavingsRate 0.0}}text-success{{else}}text-error{{end}}">{{printf "%.0f" .SavingsRate}}%</div>
-    {{else}}
-    <div class="text-xl text-base-content/30">&mdash;</div>
-    {{end}}
+  <div class="bb-card bb-summary-pill p-3 sm:p-4 flex flex-col justify-between min-h-[4.5rem] relative overflow-hidden group">
+    <div class="flex items-center justify-between">
+      <div class="text-xs text-base-content/40 mb-1">Savings Rate</div>
+      <svg class="bb-sparkline" data-values="{{.SparkSavings}}" data-color="{{if gt .SavingsRate 0.0}}oklch(0.65 0.17 155){{else}}oklch(0.65 0.2 25){{end}}" viewBox="0 0 80 24" preserveAspectRatio="none"></svg>
+    </div>
+    <div>
+      {{if gt .TotalIncome 0.0}}
+        {{if lt .SavingsRate -100.0}}
+        <div class="text-xl font-semibold tabular-nums text-error" data-countup="100" data-prefix="< -" data-suffix="%" data-decimals="0">< -100%</div>
+        {{else}}
+        <div class="text-xl font-semibold tabular-nums {{if gt .SavingsRate 0.0}}text-success{{else}}text-error{{end}}" data-countup="{{printf "%.0f" (absf .SavingsRate)}}" data-prefix="{{if lt .SavingsRate 0.0}}-{{end}}" data-suffix="%" data-decimals="0">{{printf "%.0f" .SavingsRate}}%</div>
+        {{end}}
+      {{else}}
+      <div class="text-xl text-base-content/30">&mdash;</div>
+      {{end}}
+      <div class="text-[0.65rem] mt-1">&nbsp;</div>
+    </div>
   </div>
   {{end}}
 </div>
+
+<!-- Tab Navigation -->
+<div class="flex items-center gap-0 sm:gap-1 border-b border-base-200/80 mb-6 overflow-x-auto">
+  <button @click="tab = 'overview'" :class="tab === 'overview' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
+    class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap">
+    <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 hidden sm:block"></i>
+    Overview
+    <kbd class="hidden lg:inline-block text-[0.55rem] font-normal text-base-content/20 bg-base-200/50 px-1 py-0.5 rounded ml-1">1</kbd>
+  </button>
+  <button @click="tab = 'analysis'" :class="tab === 'analysis' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
+    class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap">
+    <i data-lucide="search" class="w-3.5 h-3.5 hidden sm:block"></i>
+    Analysis
+    <kbd class="hidden lg:inline-block text-[0.55rem] font-normal text-base-content/20 bg-base-200/50 px-1 py-0.5 rounded ml-1">2</kbd>
+  </button>
+  <button @click="tab = 'trends'" :class="tab === 'trends' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
+    class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap">
+    <i data-lucide="trending-up" class="w-3.5 h-3.5 hidden sm:block"></i>
+    Trends
+    <kbd class="hidden lg:inline-block text-[0.55rem] font-normal text-base-content/20 bg-base-200/50 px-1 py-0.5 rounded ml-1">3</kbd>
+  </button>
+  <!-- Date Range Picker -->
+  <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 ml-auto shrink-0">
+    <a :href="'/insights?days=7&tab=' + tab" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 7}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">7d</a>
+    <a :href="'/insights?days=30&tab=' + tab" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 30}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">30d</a>
+    <a :href="'/insights?days=90&tab=' + tab" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 90}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">90d</a>
+    <a :href="'/insights?days=365&tab=' + tab" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 365}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">12m</a>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- TAB: Overview                                  -->
+<!-- ═══════════════════════════════════════════════ -->
+<div x-show="tab === 'overview'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
+
+<!-- Net Worth Hero with Trend Chart -->
+<div class="bb-card mb-6 bb-stagger">
+  <div class="p-6 pb-0">
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <!-- Left: Net Worth -->
+      <div>
+        <div class="text-xs font-medium text-base-content/50 mb-1">Net Worth</div>
+        <div class="text-4xl font-semibold tabular-nums tracking-tight leading-none">
+          {{formatBalance .NetWorth}}
+        </div>
+        <div class="flex items-center gap-4 mt-3 text-xs text-base-content/50">
+          <span class="flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-base-content/30"></span>
+            Assets {{formatBalance .TotalAssets}}
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-error/50"></span>
+            Liabilities {{formatBalance .TotalLiabilities}}
+          </span>
+        </div>
+      </div>
+      <!-- Right: Spending + Income summary pills -->
+      <div class="flex items-center gap-3 sm:gap-4">
+        <div class="flex flex-col items-end">
+          <div class="text-xs text-base-content/40 mb-0.5">Spending <span class="text-base-content/25">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}}</span></div>
+          <div class="flex items-baseline gap-1.5">
+            <span class="text-lg font-semibold tabular-nums">{{formatBalance .TotalSpending}}</span>
+            {{if .HasSpendingChange}}
+            <span class="text-[0.65rem] font-medium {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
+              {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}%
+            </span>
+            {{end}}
+          </div>
+        </div>
+        <div class="w-px h-8 bg-base-300"></div>
+        <div class="flex flex-col items-end">
+          <div class="text-xs text-base-content/40 mb-0.5">Income <span class="text-base-content/25">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}}</span></div>
+          <span class="text-lg font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Net Worth Trend Chart -->
+  {{if .NetWorthLabels}}
+  <div class="px-2 pt-2 pb-2">
+    <div id="echartsNetWorthChart" style="width: 100%; height: 160px;"></div>
+  </div>
+  {{end}}
+</div>
+
+<!-- Financial Health Score -->
+{{if .HasHealthScore}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex flex-col lg:flex-row items-start lg:items-center gap-6">
+    <!-- Score Ring -->
+    <div class="flex items-center gap-5 shrink-0">
+      <div class="relative w-24 h-24 sm:w-28 sm:h-28">
+        <svg viewBox="0 0 120 120" class="w-full h-full -rotate-90">
+          <!-- Background ring -->
+          <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" stroke-width="8"
+            class="text-base-200/60" />
+          <!-- Score arc -->
+          <circle cx="60" cy="60" r="52" fill="none" stroke-width="8" stroke-linecap="round"
+            class="bb-health-ring {{.HealthColorClass}}"
+            stroke-dasharray="{{printf "%.1f" (mulf (divf (itof .HealthScore) 100.0) 326.7)}} 326.7"
+            style="transition: stroke-dasharray 1.2s cubic-bezier(0.4, 0, 0.2, 1);" />
+        </svg>
+        <div class="absolute inset-0 flex flex-col items-center justify-center">
+          <span class="text-2xl sm:text-3xl font-bold tabular-nums {{.HealthColorClass}}"
+            data-countup="{{.HealthScore}}" data-prefix="" data-decimals="0" data-duration="1200">{{.HealthScore}}</span>
+          <span class="text-[0.55rem] text-base-content/30 font-medium -mt-0.5">/ 100</span>
+        </div>
+      </div>
+      <div class="lg:hidden">
+        <div class="text-sm font-semibold {{.HealthColorClass}}">{{.HealthLabel}}</div>
+        <div class="text-[0.65rem] text-base-content/35 mt-0.5">Financial Health Score</div>
+      </div>
+    </div>
+
+    <!-- Dimension Breakdown -->
+    <div class="flex-1 w-full">
+      <div class="hidden lg:flex items-center gap-2.5 mb-4">
+        <h2 class="text-sm font-semibold text-base-content/70">Financial Health</h2>
+        <span class="text-xs font-semibold {{.HealthColorClass}}">{{.HealthLabel}}</span>
+        <span class="text-[0.6rem] text-base-content/25 ml-auto">Based on 5 dimensions, scored 0-20 each</span>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-5 gap-2 sm:gap-3">
+        {{range .HealthDimensions}}
+        <div class="group flex sm:flex-col items-center sm:items-start gap-3 sm:gap-0 p-2.5 sm:p-3 rounded-xl border border-base-200/50 bg-base-200/[0.03] hover:bg-base-200/20 hover:border-base-300/50 transition-all duration-200">
+          <div class="flex items-center gap-2 sm:mb-2 shrink-0">
+            <div class="flex items-center justify-center w-6 h-6 rounded-md" style="background-color: {{safeCSS .Color}}; opacity: 0.12;">
+              <i data-lucide="{{.Icon}}" class="w-3 h-3" style="color: {{safeCSS .Color}};"></i>
+            </div>
+            <span class="text-[0.65rem] font-medium text-base-content/50 sm:hidden">{{.Name}}</span>
+          </div>
+          <div class="flex-1 sm:flex-initial w-full min-w-0">
+            <div class="hidden sm:block text-[0.6rem] font-medium text-base-content/45 mb-1.5 truncate">{{.Name}}</div>
+            <!-- Score bar -->
+            <div class="w-full h-1.5 bg-base-200/60 rounded-full overflow-hidden mb-1.5">
+              <div class="h-full rounded-full transition-all duration-700 ease-out"
+                style="width: {{printf "%.0f" (mulf (divf (itof .Score) (itof .MaxScore)) 100.0)}}%; background-color: {{safeCSS .Color}}; opacity: 0.6;"></div>
+            </div>
+            <div class="flex items-center justify-between gap-1">
+              <span class="text-[0.55rem] text-base-content/30 truncate hidden sm:inline">{{.Description}}</span>
+              <span class="text-[0.6rem] font-semibold tabular-nums text-base-content/50 shrink-0">{{.Score}}/{{.MaxScore}}</span>
+            </div>
+            <span class="text-[0.55rem] text-base-content/30 sm:hidden">{{.Description}}</span>
+          </div>
+        </div>
+        {{end}}
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
 
 <!-- Monthly Spending Pace -->
 {{if .HasPaceData}}
@@ -172,13 +548,13 @@
       <div>
         <div class="flex items-center justify-between mb-1.5">
           <span class="flex items-center gap-2 text-xs font-medium text-base-content/60">
-            <span class="w-2 h-2 rounded-full shrink-0" style="background: oklch(0.62 0.14 155)"></span>
+            <span class="w-2 h-2 rounded-full shrink-0" style="background: var(--bb-chart-income-bar)"></span>
             Income
           </span>
           <span class="text-sm font-semibold tabular-nums text-success">{{formatBalance .CurrentMonthIncome}}</span>
         </div>
         <div class="w-full h-2.5 bg-base-200/50 rounded-full overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: 100%; background: oklch(0.62 0.14 155); opacity: 0.5;"></div>
+          <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: 100%; background: var(--bb-chart-income-bar); opacity: 0.5;"></div>
         </div>
       </div>
       <div>
@@ -239,13 +615,13 @@
       <div class="group">
         <div class="flex items-center justify-between mb-1.5">
           <span class="flex items-center gap-2 text-xs font-medium text-base-content/60">
-            <span class="w-2 h-2 rounded-full shrink-0" style="background: oklch(0.62 0.14 155)"></span>
+            <span class="w-2 h-2 rounded-full shrink-0" style="background: var(--bb-chart-income-bar)"></span>
             Income
           </span>
           <span class="text-sm font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</span>
         </div>
         <div class="w-full h-3 bg-base-200/60 rounded-full overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: 100%; background: oklch(0.62 0.14 155); opacity: 0.6;"></div>
+          <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: 100%; background: var(--bb-chart-income-bar); opacity: 0.6;"></div>
         </div>
       </div>
 
@@ -300,13 +676,48 @@
 </div>
 {{end}}
 
-<!-- Charts Row: Spending Chart + Top Categories -->
+<!-- Cash Flow Forecast -->
+{{if .HasForecastData}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-info/8">
+        <i data-lucide="chart-line" class="w-3.5 h-3.5 text-info/60"></i>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-base-content/70">{{.CurrentMonthName}} Cash Flow Forecast</h2>
+        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Actual net cash flow + projection through end of month</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="echartsForecastChart" style="width: 100%; height: 260px;"></div>
+
+  <!-- Legend -->
+  <div class="flex items-center gap-5 mt-3 pt-3 border-t border-base-200/60">
+    <span class="flex items-center gap-1.5 text-xs text-base-content/50">
+      <span class="w-2.5 h-1.5 rounded-sm bg-primary/60"></span>
+      Actual
+    </span>
+    <span class="flex items-center gap-1.5 text-xs text-base-content/50">
+      <span class="w-2.5 h-1.5 rounded-sm bg-primary/25 border border-dashed border-primary/40"></span>
+      Projected
+    </span>
+    <span class="flex items-center gap-1.5 text-xs text-base-content/50">
+      <span class="w-2.5 h-0.5 rounded-sm bg-base-content/20"></span>
+      Break-even
+    </span>
+  </div>
+</div>
+{{end}}
+
+<!-- Charts Row: Spending Chart + Category Donut (ECharts) -->
 <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6 bb-stagger">
   <!-- Spending & Income Chart -->
   <div class="bb-card lg:col-span-3 p-5">
     <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-3">
-        <h2 class="text-sm font-semibold text-base-content/70">Spending</h2>
+        <h2 class="text-sm font-semibold text-base-content/70">Spending & Income</h2>
         {{if .HasSpendingChange}}
         <span class="text-xs font-medium {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
           {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}% vs prev
@@ -315,21 +726,19 @@
       </div>
     </div>
     {{if .DailyLabels}}
-    <div class="h-56">
-      <canvas id="spendingTrendChart"></canvas>
-    </div>
-    <div class="flex items-center gap-5 mt-3 pt-3 border-t border-base-200">
+    <div id="echartsSpendingChart" style="width: 100%; height: 240px;"></div>
+    <div class="flex items-center gap-5 mt-3 pt-3 border-t border-base-200/60">
       <span class="flex items-center gap-1.5 text-xs text-base-content/50">
         <span class="w-2.5 h-1.5 rounded-sm bg-base-content/15"></span>
         Spending
       </span>
       <span class="flex items-center gap-1.5 text-xs text-base-content/50">
-        <span class="w-2.5 h-1.5 rounded-sm" style="background: oklch(0.62 0.14 155 / 0.35)"></span>
+        <span class="w-2.5 h-1.5 rounded-sm" style="background: color-mix(in oklch, var(--bb-chart-income-bar) 35%, transparent)"></span>
         Income
       </span>
     </div>
     {{else}}
-    <div class="flex items-center justify-center h-56 text-base-content/40">
+    <div class="flex items-center justify-center h-60 text-base-content/40">
       <div class="text-center">
         <i data-lucide="bar-chart-3" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
         <p class="text-sm">No spending data yet</p>
@@ -338,31 +747,75 @@
     {{end}}
   </div>
 
-  <!-- Top Spending Categories -->
-  <div class="bb-card lg:col-span-2 p-5">
+  <!-- Category Donut Chart with Drill-Down -->
+  <div class="bb-card lg:col-span-2 p-5" x-data="categoryDrilldown()" @insights-drill-up.window="if (isDrilledDown) drillUp()">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-sm font-semibold text-base-content/70">Top Categories</h2>
-      <a href="/categories" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
+      <div class="flex items-center gap-2">
+        <button x-show="isDrilledDown" @click="drillUp()" x-transition
+          class="flex items-center justify-center w-6 h-6 rounded-md bg-base-200/60 hover:bg-base-200 transition-colors cursor-pointer">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5 text-base-content/50"></i>
+        </button>
+        <h2 class="text-sm font-semibold text-base-content/70">
+          <span x-show="!isDrilledDown">Top Categories</span>
+          <span x-show="isDrilledDown" x-text="'Top Merchants in ' + activeCategoryName" x-cloak></span>
+        </h2>
+      </div>
+      <div class="flex items-center gap-2">
+        <span x-show="isDrilledDown" x-cloak class="text-[0.6rem] text-base-content/30">click chart or</span>
+        <a x-show="!isDrilledDown" href="/categories" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
+        <button x-show="isDrilledDown" @click="drillUp()" x-cloak
+          class="text-xs text-primary/60 hover:text-primary/80 transition-colors cursor-pointer bg-transparent">back to categories</button>
+      </div>
     </div>
     {{if .TopCategories}}
-    <div class="space-y-3">
-      {{range .TopCategories}}
-      <div class="group">
-        <div class="flex items-center justify-between mb-1">
-          <span class="flex items-center gap-2 text-xs font-medium text-base-content/70 group-hover:text-base-content transition-colors truncate">
-            <span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{safeCSS .Color}}"></span>
-            <span class="truncate">{{.Name}}</span>
-          </span>
-          <span class="text-xs font-semibold tabular-nums text-base-content/80 shrink-0 ml-3">{{formatAmount .Amount}}</span>
+    <div id="echartsCategoryDonut" style="width: 100%; height: 240px;"></div>
+    <!-- Category/merchant list below donut -->
+    <div class="mt-3 pt-3 border-t border-base-200/60 space-y-1.5">
+      <!-- Category view -->
+      <template x-if="!isDrilledDown">
+        <div class="space-y-1.5">
+          {{range .TopCategories}}
+          <div class="flex items-center justify-between group cursor-pointer hover:bg-base-200/30 -mx-2 px-2 py-0.5 rounded-md transition-all duration-150"
+            :class="highlightedCategory === '{{.Name}}' ? 'bg-base-200/40 ring-1 ring-base-300/60 scale-[1.01]' : ''"
+            data-category="{{.Name}}"
+            @click="drillInto('{{.Name}}', '{{safeCSS .Color}}')"
+            @mouseenter="highlightedCategory = '{{.Name}}'; if (window._insightsHighlightDonut) window._insightsHighlightDonut('{{.Name}}')"
+            @mouseleave="highlightedCategory = ''; if (window._insightsDownplayDonut) window._insightsDownplayDonut()">
+            <span class="flex items-center gap-2 text-xs text-base-content/60 truncate">
+              <span class="w-2 h-2 rounded-full shrink-0 transition-transform duration-150" :class="highlightedCategory === '{{.Name}}' ? 'scale-150' : ''" style="background-color: {{safeCSS .Color}}"></span>
+              <span class="truncate transition-colors duration-150" :class="highlightedCategory === '{{.Name}}' ? 'text-base-content/90 font-medium' : 'group-hover:text-base-content/80'">{{.Name}}</span>
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0">{{formatAmount .Amount}}</span>
+              <i data-lucide="chevron-right" class="w-3 h-3 text-base-content/20 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+            </span>
+          </div>
+          {{end}}
         </div>
-        <div class="w-full h-2 bg-base-200/80 rounded-full overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-500 ease-out" style="width: {{printf "%.1f" .Percent}}%; background-color: {{safeCSS .Color}}; opacity: 0.7;"></div>
+      </template>
+      <!-- Merchant drill-down view -->
+      <template x-if="isDrilledDown">
+        <div class="space-y-1.5">
+          <template x-for="(m, i) in activeMerchants" :key="i">
+            <div class="flex items-center justify-between -mx-2 px-2 py-0.5">
+              <span class="flex items-center gap-2 text-xs text-base-content/60 truncate">
+                <span class="w-5 h-5 rounded-md flex items-center justify-center text-[0.55rem] font-semibold tabular-nums shrink-0"
+                  :style="'background-color: ' + merchantColors[i % merchantColors.length] + '; opacity: 0.15; color: ' + merchantColors[i % merchantColors.length]"
+                  x-text="i + 1"></span>
+                <span class="truncate" x-text="m.name"></span>
+              </span>
+              <span class="flex items-center gap-2">
+                <span class="text-[0.6rem] text-base-content/30 tabular-nums" x-text="m.count + ' txns'"></span>
+                <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0"
+                  x-text="'$' + m.amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+              </span>
+            </div>
+          </template>
         </div>
-      </div>
-      {{end}}
+      </template>
     </div>
     {{else}}
-    <div class="flex items-center justify-center h-48 text-base-content/40">
+    <div class="flex items-center justify-center h-60 text-base-content/40">
       <div class="text-center">
         <i data-lucide="bar-chart-2" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
         <p class="text-sm">No category data yet</p>
@@ -371,6 +824,306 @@
     {{end}}
   </div>
 </div>
+
+
+<!-- Category Budget Targets: current spending vs historical averages -->
+{{if .HasBudgetTargets}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/8">
+        <i data-lucide="target" class="w-3.5 h-3.5 text-primary/60"></i>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-base-content/70">Category Targets</h2>
+        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Spending vs historical average for this period</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      {{if gt .BudgetOnTrackCount 0}}
+      <span class="flex items-center gap-1 text-[0.65rem] font-medium text-success/70">
+        <i data-lucide="check-circle" class="w-3 h-3"></i>
+        {{.BudgetOnTrackCount}} on track
+      </span>
+      {{end}}
+      {{if gt .BudgetOverCount 0}}
+      <span class="flex items-center gap-1 text-[0.65rem] font-medium text-error/70">
+        <i data-lucide="alert-circle" class="w-3 h-3"></i>
+        {{.BudgetOverCount}} over
+      </span>
+      {{end}}
+    </div>
+  </div>
+
+  <div class="space-y-3">
+    {{range .BudgetTargets}}
+    <div class="group transition-all duration-150 -mx-2 px-2 py-0.5 rounded-lg"
+      :class="highlightedCategory === '{{.Category}}' ? 'bg-base-200/40 ring-1 ring-base-300/60' : ''"
+      data-category="{{.Category}}"
+      @mouseenter="highlightedCategory = '{{.Category}}'; if (window._insightsHighlightDonut) window._insightsHighlightDonut('{{.Category}}')"
+      @mouseleave="highlightedCategory = ''; if (window._insightsDownplayDonut) window._insightsDownplayDonut()">
+      <div class="flex items-center justify-between mb-1.5">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="w-2 h-2 rounded-full shrink-0 transition-transform duration-150" :class="highlightedCategory === '{{.Category}}' ? 'scale-150' : ''" style="background-color: {{safeCSS .Color}}"></span>
+          <span class="text-xs font-medium truncate transition-colors duration-150" :class="highlightedCategory === '{{.Category}}' ? 'text-base-content font-semibold' : 'text-base-content/70 group-hover:text-base-content'">{{.Category}}</span>
+        </div>
+        <div class="flex items-center gap-2.5 shrink-0">
+          <span class="text-xs tabular-nums font-semibold text-base-content/80">{{formatAmount .Current}}</span>
+          <span class="text-[0.6rem] text-base-content/25">/</span>
+          <span class="text-[0.6rem] tabular-nums text-base-content/35">{{formatAmount .Target}} avg</span>
+          {{if .OverBudget}}
+          <span class="text-[0.6rem] font-semibold tabular-nums px-1.5 py-0.5 rounded-full bg-error/8 text-error/70">+{{printf "%.0f" .DiffPercent}}%</span>
+          {{else if gt .Percent 80.0}}
+          <span class="text-[0.6rem] font-semibold tabular-nums px-1.5 py-0.5 rounded-full bg-warning/8 text-warning/70">{{printf "%.0f" .Percent}}%</span>
+          {{else}}
+          <span class="text-[0.6rem] font-semibold tabular-nums px-1.5 py-0.5 rounded-full bg-success/8 text-success/70">{{printf "%.0f" .Percent}}%</span>
+          {{end}}
+        </div>
+      </div>
+      <!-- Progress bar -->
+      <div class="relative">
+        <div class="w-full h-2.5 bg-base-200/50 rounded-full overflow-hidden">
+          {{if .OverBudget}}
+          <div class="h-full rounded-full transition-all duration-700 ease-out bg-error/40"
+            style="width: 100%;"></div>
+          {{else if gt .Percent 80.0}}
+          <div class="h-full rounded-full transition-all duration-700 ease-out bg-warning/40"
+            style="width: {{printf "%.1f" (minf .Percent 100.0)}}%;"></div>
+          {{else}}
+          <div class="h-full rounded-full transition-all duration-700 ease-out"
+            style="width: {{printf "%.1f" (minf .Percent 100.0)}}%; background-color: {{safeCSS .Color}}; opacity: 0.4;"></div>
+          {{end}}
+        </div>
+        {{if and .OverBudget (lt .Percent 200.0)}}
+        <!-- Target marker showing where 100% would be -->
+        <div class="absolute top-0 h-2.5 w-0.5 bg-base-content/25 rounded-full"
+          style="left: {{printf "%.1f" (divf 10000.0 .Percent)}}%;">
+        </div>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+
+  <!-- Summary footer -->
+  <div class="mt-4 pt-3 border-t border-base-200/60 flex items-center gap-3">
+    <i data-lucide="info" class="w-3 h-3 text-base-content/25 shrink-0"></i>
+    <p class="text-[0.6rem] text-base-content/30 leading-relaxed">
+      Targets are based on your historical average spending per category for {{if eq .ChartDays 365}}12-month{{else}}{{.ChartDays}}-day{{end}} periods. Categories exceeding 105% are flagged as over budget.
+    </p>
+  </div>
+</div>
+{{end}}
+
+</div><!-- /tab: overview -->
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- TAB: Analysis                                  -->
+<!-- ═══════════════════════════════════════════════ -->
+<div x-show="tab === 'analysis'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
+
+<!-- Merchant Analysis + Day-of-Week Heatmap -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 bb-stagger">
+  <!-- Top Merchants -->
+  {{if .TopMerchants}}
+  <div class="bb-card lg:col-span-2 p-5">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2.5">
+        <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+          <i data-lucide="store" class="w-3.5 h-3.5 text-base-content/50"></i>
+        </div>
+        <h2 class="text-sm font-semibold text-base-content/70">Top Merchants</h2>
+      </div>
+      <span class="text-xs text-base-content/30">by total spend</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="text-[0.65rem] uppercase tracking-wider text-base-content/30 border-b border-base-200/60">
+            <th class="text-left py-2 font-medium">Merchant</th>
+            <th class="text-right py-2 font-medium w-20">Total</th>
+            <th class="text-right py-2 font-medium w-12 hidden sm:table-cell">Txns</th>
+            <th class="text-right py-2 font-medium w-16 hidden sm:table-cell">Avg</th>
+            <th class="text-left py-2 font-medium w-28 pl-3 hidden md:table-cell"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-base-200/40">
+          {{range $i, $m := .TopMerchants}}
+          <tr class="group hover:bg-base-200/20 transition-colors">
+            <td class="py-2.5 pr-3">
+              <div class="flex items-center gap-2.5">
+                <span class="flex items-center justify-center w-6 h-6 rounded-md bg-base-200/50 text-[0.6rem] font-semibold text-base-content/35 shrink-0 tabular-nums">{{add $i 1}}</span>
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-base-content/80 truncate group-hover:text-base-content transition-colors">{{$m.Name}}</div>
+                  {{if $m.Category}}<div class="text-[0.6rem] text-base-content/30 truncate">{{$m.Category}}</div>{{end}}
+                </div>
+              </div>
+            </td>
+            <td class="py-2.5 text-right">
+              <span class="text-sm font-semibold tabular-nums text-base-content/80">{{formatAmount $m.Total}}</span>
+            </td>
+            <td class="py-2.5 text-right hidden sm:table-cell">
+              <span class="text-xs tabular-nums text-base-content/40">{{$m.Count}}</span>
+            </td>
+            <td class="py-2.5 text-right hidden sm:table-cell">
+              <span class="text-xs tabular-nums text-base-content/40">{{formatAmount $m.AvgAmount}}</span>
+            </td>
+            <td class="py-2.5 pl-3 hidden md:table-cell">
+              <div class="w-full h-1.5 bg-base-200/50 rounded-full overflow-hidden">
+                <div class="h-full rounded-full transition-all duration-500 ease-out bg-base-content/12 group-hover:bg-base-content/20"
+                  style="width: {{printf "%.1f" $m.Percent}}%;"></div>
+              </div>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {{end}}
+
+  <!-- Day-of-Week Spending Heatmap -->
+  {{if .HasDOWData}}
+  <div class="bb-card p-5">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2.5">
+        <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+          <i data-lucide="calendar-days" class="w-3.5 h-3.5 text-base-content/50"></i>
+        </div>
+        <h2 class="text-sm font-semibold text-base-content/70">Spending by Day</h2>
+      </div>
+    </div>
+    <div class="space-y-2">
+      {{range .DOWSpending}}
+      <div class="group flex items-center gap-3">
+        <span class="text-[0.65rem] font-medium text-base-content/40 w-7 shrink-0">{{.DayShort}}</span>
+        <div class="flex-1 relative">
+          <div class="w-full h-7 rounded-md transition-all duration-300 flex items-center"
+            style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) {{if gt .Intensity 0.0}}{{printf "%.0f" (mulf .Intensity 45.0)}}%{{else}}3%{{end}}, transparent);">
+            {{if gt .Total 0.0}}
+            <span class="text-[0.6rem] font-semibold tabular-nums text-base-content/60 pl-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              {{formatAmount .Total}}
+            </span>
+            {{end}}
+          </div>
+        </div>
+        <div class="text-right shrink-0 w-12">
+          {{if gt .Count 0}}
+          <div class="text-xs font-semibold tabular-nums text-base-content/50">{{.Count}}</div>
+          <div class="text-[0.55rem] text-base-content/25">txns</div>
+          {{else}}
+          <div class="text-xs text-base-content/20">&mdash;</div>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+    </div>
+    <!-- Insight text -->
+    {{if .HighSpendDay}}
+    <div class="mt-4 pt-3 border-t border-base-200/60">
+      <p class="text-[0.65rem] text-base-content/35 leading-relaxed">
+        You spend the most on <span class="font-semibold text-base-content/50">{{.HighSpendDay}}s</span> ({{formatAmount .HighSpendDayAmt}}){{if .LowSpendDay}} and least on <span class="font-semibold text-base-content/50">{{.LowSpendDay}}s</span> ({{formatAmount .LowSpendDayAmt}}){{end}}.
+      </p>
+    </div>
+    {{end}}
+    <!-- Legend -->
+    <div class="mt-3 pt-3 border-t border-base-200/60 flex items-center justify-between">
+      <span class="text-[0.6rem] text-base-content/25">Less</span>
+      <div class="flex items-center gap-1">
+        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 5%, transparent);"></div>
+        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 12%, transparent);"></div>
+        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 22%, transparent);"></div>
+        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 33%, transparent);"></div>
+        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 45%, transparent);"></div>
+      </div>
+      <span class="text-[0.6rem] text-base-content/25">More</span>
+    </div>
+  </div>
+  {{end}}
+</div>
+
+<!-- Recurring & Subscriptions -->
+{{if .HasRecurringData}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-warning/8">
+        <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-warning"></i>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-base-content/70">Recurring & Subscriptions</h2>
+        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Detected from 90-day transaction patterns</p>
+      </div>
+    </div>
+    <div class="text-right">
+      <div class="text-xs text-base-content/35">Est. monthly</div>
+      <div class="text-lg font-semibold tabular-nums text-base-content/80">{{formatBalance .TotalRecurringMonthly}}</div>
+    </div>
+  </div>
+
+  <!-- Recurring charges grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-2.5">
+    {{range .RecurringCharges}}
+    <div class="group flex items-center gap-3 p-3 rounded-xl border border-base-200/60 bg-base-200/10 hover:bg-base-200/30 hover:border-base-300/60 transition-all duration-200">
+      <!-- Frequency icon -->
+      <div class="flex items-center justify-center w-9 h-9 rounded-lg shrink-0
+        {{if eq .Frequency "monthly"}}bg-primary/8
+        {{else if eq .Frequency "weekly"}}bg-warning/8
+        {{else if eq .Frequency "biweekly"}}bg-info/8
+        {{else}}bg-base-200/60{{end}}">
+        <i data-lucide="{{if eq .Frequency "monthly"}}calendar{{else if eq .Frequency "weekly"}}calendar-clock{{else if eq .Frequency "biweekly"}}calendar-range{{else if eq .Frequency "quarterly"}}calendar-check{{else if eq .Frequency "yearly"}}calendar-heart{{else}}repeat{{end}}"
+          class="w-4 h-4
+          {{if eq .Frequency "monthly"}}text-primary/60
+          {{else if eq .Frequency "weekly"}}text-warning/60
+          {{else if eq .Frequency "biweekly"}}text-info/60
+          {{else}}text-base-content/35{{end}}"></i>
+      </div>
+      <!-- Details -->
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-sm font-medium text-base-content/80 truncate group-hover:text-base-content transition-colors">{{.Name}}</span>
+          <span class="text-sm font-semibold tabular-nums text-base-content/80 shrink-0">{{formatAmount .Amount}}</span>
+        </div>
+        <div class="flex items-center justify-between gap-2 mt-0.5">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full
+              {{if eq .Frequency "monthly"}}bg-primary/8 text-primary/70
+              {{else if eq .Frequency "weekly"}}bg-warning/8 text-warning/70
+              {{else if eq .Frequency "biweekly"}}bg-info/8 text-info/70
+              {{else}}bg-base-200/80 text-base-content/40{{end}}">{{.Frequency}}</span>
+            {{if .Category}}<span class="text-[0.6rem] text-base-content/25 truncate">{{.Category}}</span>{{end}}
+          </div>
+          <span class="text-[0.6rem] text-base-content/30">{{.TxCount}}x &middot; last {{.LastChargeDate}}</span>
+        </div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+
+  <!-- Summary footer -->
+  <div class="mt-4 pt-3 border-t border-base-200/60 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-primary/40"></span>
+        <span class="text-[0.6rem] text-base-content/30">monthly</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-warning/40"></span>
+        <span class="text-[0.6rem] text-base-content/30">weekly</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-info/40"></span>
+        <span class="text-[0.6rem] text-base-content/30">biweekly</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-base-content/20"></span>
+        <span class="text-[0.6rem] text-base-content/30">other</span>
+      </div>
+    </div>
+    <span class="text-[0.6rem] text-base-content/25">{{len .RecurringCharges}} recurring charges detected</span>
+  </div>
+</div>
+{{end}}
 
 <!-- Smart Spending Insights -->
 {{if .SpendingInsights}}
@@ -384,7 +1137,7 @@
     </div>
     <span class="text-xs text-base-content/30">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}} vs prev</span>
   </div>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 sm:gap-3">
     {{range .SpendingInsights}}
     <div class="group relative p-4 rounded-xl border transition-all duration-200
       {{if eq .Sentiment "negative"}}border-error/15 bg-error/3 hover:bg-error/5 hover:border-error/25
@@ -419,32 +1172,659 @@
 </div>
 {{end}}
 
-<!-- Chart.js Initialization -->
-{{if .DailyLabels}}
+<!-- Anomaly Detection: Unusual Activity -->
+{{if or .HasCategoryAnomalies .HasTransactionAnomalies}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-error/8">
+        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-error/60"></i>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-base-content/70">Unusual Activity</h2>
+        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Spending patterns that differ significantly from your history</p>
+      </div>
+    </div>
+    <span class="text-xs text-base-content/30">vs historical avg</span>
+  </div>
+
+  {{if .HasCategoryAnomalies}}
+  <!-- Category Anomalies -->
+  <div class="mb-5">
+    <div class="text-[0.65rem] uppercase tracking-wider text-base-content/30 font-medium mb-3">Category Outliers</div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+      {{range .CategoryAnomalies}}
+      <div class="group relative p-4 rounded-xl border border-error/10 bg-error/[0.02] hover:bg-error/[0.04] hover:border-error/20 transition-all duration-200">
+        <!-- Severity indicator -->
+        <div class="absolute top-3 right-3">
+          <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[0.6rem] font-bold tabular-nums
+            {{if ge .Multiplier 3.0}}bg-error/12 text-error/80
+            {{else if ge .Multiplier 2.0}}bg-warning/12 text-warning/80
+            {{else}}bg-warning/8 text-warning/60{{end}}">
+            {{printf "%.1f" .Multiplier}}x
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 mb-2.5">
+          <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {{safeCSS .Color}}"></span>
+          <span class="text-sm font-semibold text-base-content/80 truncate pr-10">{{.Category}}</span>
+        </div>
+
+        <!-- Amount comparison -->
+        <div class="flex items-baseline gap-2 mb-3">
+          <span class="text-lg font-bold tabular-nums text-base-content/85">{{formatAmount .Current}}</span>
+          <span class="text-xs text-base-content/30">vs avg {{formatAmount .Historical}}</span>
+        </div>
+
+        <!-- Visual bar showing current vs average -->
+        <div class="relative mb-2.5">
+          <div class="w-full h-2 bg-base-200/50 rounded-full overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-700 ease-out bg-error/30"
+              style="width: 100%;"></div>
+          </div>
+          <!-- Average marker -->
+          <div class="absolute top-0 h-2 w-0.5 bg-base-content/40 rounded-full"
+            style="left: {{if gt .Multiplier 0.0}}{{printf "%.0f" (divf 100.0 .Multiplier)}}%{{else}}0%{{end}};">
+            <div class="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[0.5rem] text-base-content/30 whitespace-nowrap font-medium">avg</div>
+          </div>
+        </div>
+
+        <!-- Top transaction in this category -->
+        {{if .TopTxName}}
+        <div class="mt-4 pt-2.5 border-t border-error/8">
+          <div class="flex items-center justify-between">
+            <span class="text-[0.65rem] text-base-content/40 truncate">{{.TopTxName}}</span>
+            <span class="text-[0.65rem] font-semibold tabular-nums text-base-content/50 shrink-0 ml-2">{{formatAmount .TopTxAmount}} &middot; {{.TopTxDate}}</span>
+          </div>
+        </div>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+
+  {{if .HasTransactionAnomalies}}
+  <!-- Individual Transaction Anomalies -->
+  <div>
+    <div class="text-[0.65rem] uppercase tracking-wider text-base-content/30 font-medium mb-3">Unusually Large Transactions</div>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="text-[0.65rem] uppercase tracking-wider text-base-content/30 border-b border-base-200/60">
+            <th class="text-left py-2 font-medium">Transaction</th>
+            <th class="text-right py-2 font-medium w-20">Amount</th>
+            <th class="text-right py-2 font-medium w-20 hidden sm:table-cell">Cat. Avg</th>
+            <th class="text-right py-2 font-medium w-14">Factor</th>
+            <th class="text-left py-2 font-medium w-20 pl-3 hidden md:table-cell">Date</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-base-200/40">
+          {{range .TransactionAnomalies}}
+          <tr class="group hover:bg-error/[0.02] transition-colors">
+            <td class="py-2.5 pr-3">
+              <div class="flex items-center gap-2.5">
+                <div class="flex items-center justify-center w-6 h-6 rounded-md shrink-0"
+                  style="background-color: {{safeCSS .CategoryColor}}; opacity: 0.15;">
+                  <i data-lucide="alert-circle" class="w-3 h-3" style="color: {{safeCSS .CategoryColor}};"></i>
+                </div>
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-base-content/80 truncate group-hover:text-base-content transition-colors">{{.Name}}</div>
+                  <div class="text-[0.6rem] text-base-content/30 truncate">{{.Category}}{{if .AccountName}} &middot; {{.AccountName}}{{end}}</div>
+                </div>
+              </div>
+            </td>
+            <td class="py-2.5 text-right">
+              <span class="text-sm font-semibold tabular-nums text-error/80">{{formatAmount .Amount}}</span>
+            </td>
+            <td class="py-2.5 text-right hidden sm:table-cell">
+              <span class="text-xs tabular-nums text-base-content/35">{{formatAmount .CategoryAvg}}</span>
+            </td>
+            <td class="py-2.5 text-right">
+              <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[0.65rem] font-bold tabular-nums
+                {{if ge .Multiplier 5.0}}bg-error/12 text-error/80
+                {{else if ge .Multiplier 3.0}}bg-warning/12 text-warning/80
+                {{else}}bg-warning/8 text-warning/60{{end}}">
+                {{printf "%.1f" .Multiplier}}x
+              </span>
+            </td>
+            <td class="py-2.5 pl-3 hidden md:table-cell">
+              <span class="text-xs text-base-content/40">{{.Date}}</span>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {{end}}
+
+  <!-- Explanation footer -->
+  <div class="mt-4 pt-3 border-t border-base-200/60 flex items-center gap-3">
+    <i data-lucide="info" class="w-3 h-3 text-base-content/25 shrink-0"></i>
+    <p class="text-[0.6rem] text-base-content/30 leading-relaxed">
+      Categories flagged when spending exceeds 1.8x historical average. Transactions flagged when 1.5x or more above their category average.
+    </p>
+  </div>
+</div>
+{{end}}
+
+
+</div><!-- /tab: analysis -->
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- TAB: Trends                                    -->
+<!-- ═══════════════════════════════════════════════ -->
+<div x-show="tab === 'trends'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
+
+<!-- Monthly Category Comparison -->
+{{if .HasMonthlyComp}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+        <i data-lucide="columns-3" class="w-3.5 h-3.5 text-base-content/50"></i>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-base-content/70">Monthly Comparison</h2>
+        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Category spending across recent months</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="overflow-x-auto -mx-1">
+    <table class="w-full min-w-[480px]">
+      <thead>
+        <tr class="text-[0.65rem] uppercase tracking-wider text-base-content/30 border-b border-base-200/80">
+          <th class="text-left py-2.5 font-medium pl-1 w-[30%]">Category</th>
+          {{range .MonthHeaders}}
+          <th class="text-right py-2.5 font-medium w-[15%] px-2">{{.}}</th>
+          {{end}}
+          <th class="text-right py-2.5 font-medium w-[10%] pr-1">Trend</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-base-200/30">
+        {{range $row := .MonthlyCompRows}}
+        <tr class="group hover:bg-base-200/20 transition-colors">
+          <td class="py-2.5 pl-1 pr-2">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{safeCSS $row.CategoryColor}}"></span>
+              <span class="text-xs font-medium text-base-content/70 truncate group-hover:text-base-content transition-colors">{{$row.Category}}</span>
+            </div>
+          </td>
+          {{range $j, $amt := $row.Amounts}}
+          <td class="py-2.5 text-right px-2">
+            {{if gt $amt 0.0}}
+            <span class="text-xs tabular-nums font-medium text-base-content/65">{{formatAmount $amt}}</span>
+            {{else}}
+            <span class="text-xs text-base-content/15">&mdash;</span>
+            {{end}}
+          </td>
+          {{end}}
+          <td class="py-2.5 text-right pr-1">
+            {{if $row.HasChange}}
+            <span class="inline-flex items-center gap-0.5 text-[0.65rem] font-semibold tabular-nums
+              {{if gt $row.Change 15.0}}text-error/70
+              {{else if lt $row.Change -15.0}}text-success/70
+              {{else}}text-base-content/35{{end}}">
+              {{if gt $row.Change 0.0}}
+              <i data-lucide="trending-up" class="w-3 h-3"></i>
+              +{{printf "%.0f" $row.Change}}%
+              {{else if lt $row.Change 0.0}}
+              <i data-lucide="trending-down" class="w-3 h-3"></i>
+              {{printf "%.0f" $row.Change}}%
+              {{else}}
+              <i data-lucide="minus" class="w-2.5 h-2.5"></i>
+              {{end}}
+            </span>
+            {{else}}
+            <span class="text-xs text-base-content/15">&mdash;</span>
+            {{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+      <tfoot>
+        <tr class="border-t border-base-200/80">
+          <td class="py-2.5 pl-1">
+            <span class="text-xs font-semibold text-base-content/50">Total</span>
+          </td>
+          {{range .MonthlyTotals}}
+          <td class="py-2.5 text-right px-2">
+            <span class="text-xs font-semibold tabular-nums text-base-content/70">{{formatAmount .}}</span>
+          </td>
+          {{end}}
+          <td class="py-2.5 text-right pr-1">
+            {{if ge (len $.MonthlyTotals) 2}}
+            {{$prev := index $.MonthlyTotals (sub (len $.MonthlyTotals) 2)}}
+            {{$curr := index $.MonthlyTotals (sub (len $.MonthlyTotals) 1)}}
+            {{if gt $prev 0.0}}
+            {{$pct := mulf (divf (subf $curr $prev) $prev) 100.0}}
+            <span class="inline-flex items-center gap-0.5 text-[0.65rem] font-semibold tabular-nums
+              {{if gt $pct 5.0}}text-error/70
+              {{else if lt $pct -5.0}}text-success/70
+              {{else}}text-base-content/35{{end}}">
+              {{if gt $pct 0.0}}+{{end}}{{printf "%.0f" $pct}}%
+            </span>
+            {{end}}
+            {{end}}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <!-- Mini bar chart showing month-over-month totals -->
+  {{if ge (len .MonthlyTotals) 2}}
+  <div class="mt-4 pt-3 border-t border-base-200/60">
+    <div class="flex items-end gap-1.5 h-12">
+      {{range $i, $total := $.MonthlyTotals}}
+      <div class="flex-1 flex flex-col items-center gap-1">
+        <div class="w-full rounded-t-sm transition-all duration-500 ease-out
+          {{if eq $i (sub (len $.MonthlyTotals) 1)}}bg-primary/30{{else}}bg-base-content/8{{end}}"
+          style="height: {{if gt $.MaxMonthlyTotal 0.0}}{{printf "%.0f" (mulf (divf $total $.MaxMonthlyTotal) 100.0)}}%{{else}}0%{{end}}; min-height: 2px;">
+        </div>
+        <span class="text-[0.55rem] text-base-content/30 font-medium">{{index $.MonthHeaders $i}}</span>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+<!-- Spending Velocity: Cumulative daily curves for last 3 months -->
+{{if .HasVelocityData}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/8">
+        <i data-lucide="activity" class="w-3.5 h-3.5 text-primary/60"></i>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-base-content/70">Spending Velocity</h2>
+        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Cumulative daily spending across months</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="echartsVelocityChart" style="width: 100%; height: 280px;"></div>
+
+  <!-- Legend -->
+  <div class="flex items-center gap-5 mt-3 pt-3 border-t border-base-200/60">
+    {{range .VelocityMonths}}
+    <span class="flex items-center gap-1.5 text-xs text-base-content/50">
+      <span class="w-2.5 h-1.5 rounded-sm {{if .IsCurrent}}bg-primary/60{{else}}bg-base-content/15{{end}}"></span>
+      {{.Label}}
+      <span class="text-[0.6rem] text-base-content/30 tabular-nums">{{formatBalance .FinalTotal}}</span>
+    </span>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+<!-- Savings Rate Trend -->
+{{if .HasSavingsRateTrend}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-success/8">
+        <i data-lucide="piggy-bank" class="w-3.5 h-3.5 text-success/60"></i>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-base-content/70">Savings Rate Trend</h2>
+        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Monthly (income - spending) / income over time</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="echartsSavingsRateChart" style="width: 100%; height: 300px;"></div>
+
+  <!-- Monthly breakdown cards -->
+  <div class="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 mt-4 pt-3 border-t border-base-200/60">
+    {{range .SavingsRateTrend}}
+    <div class="text-center p-2.5 rounded-lg {{if gt .Rate 10.0}}bg-success/[0.04]{{else if gt .Rate 0.0}}bg-success/[0.02]{{else if eq .Income 0.0}}bg-base-200/20{{else}}bg-error/[0.03]{{end}}">
+      <div class="text-[0.65rem] text-base-content/35 font-medium mb-1">{{.Month}}</div>
+      {{if gt .Income 0.0}}
+      <div class="text-sm font-bold tabular-nums {{if gt .Rate 10.0}}text-success/80{{else if gt .Rate 0.0}}text-success/60{{else}}text-error/70{{end}}">
+        {{if gt .Rate 0.0}}+{{end}}{{printf "%.0f" .Rate}}%
+      </div>
+      <div class="text-[0.55rem] text-base-content/25 mt-0.5 tabular-nums">
+        {{if gt .Net 0.0}}+{{end}}{{if lt .Net 0.0}}-{{end}}{{formatBalance (absf .Net)}}
+      </div>
+      {{else}}
+      <div class="text-sm text-base-content/20">&mdash;</div>
+      <div class="text-[0.55rem] text-base-content/20 mt-0.5">no income</div>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+<!-- Family Spending Breakdown -->
+{{if .HasFamilyData}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+        <i data-lucide="users" class="w-3.5 h-3.5 text-base-content/50"></i>
+      </div>
+      <div>
+        <h2 class="text-sm font-semibold text-base-content/70">Family Spending</h2>
+        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Per-member breakdown for selected period</p>
+      </div>
+    </div>
+    <span class="text-xs text-base-content/30">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}} period</span>
+  </div>
+
+  <!-- Stacked proportion bar -->
+  <div class="w-full h-4 rounded-full overflow-hidden flex mb-5">
+    {{range .FamilySpending}}
+    <div class="h-full transition-all duration-700 ease-out first:rounded-l-full last:rounded-r-full"
+      style="width: {{printf "%.1f" .Percent}}%; background-color: {{safeCSS .Color}}; opacity: 0.6;"
+      title="{{.UserName}}: {{printf "%.0f" .Percent}}%"></div>
+    {{end}}
+  </div>
+
+  <!-- Member cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-{{if le (len .FamilySpending) 3}}{{len .FamilySpending}}{{else}}3{{end}} gap-2 sm:gap-3">
+    {{range $i, $fs := .FamilySpending}}
+    <div class="group flex items-center gap-3.5 p-4 rounded-xl border border-base-200/60 bg-base-200/10 hover:bg-base-200/30 hover:border-base-300/60 transition-all duration-200">
+      <!-- Avatar circle with initial -->
+      <div class="flex items-center justify-center w-10 h-10 rounded-full shrink-0 text-sm font-bold text-white/90"
+        style="background-color: {{safeCSS $fs.Color}};">
+        {{slice $fs.UserName 0 1}}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2 mb-1">
+          <span class="text-sm font-semibold text-base-content/80 truncate group-hover:text-base-content transition-colors">{{$fs.UserName}}</span>
+          <span class="text-sm font-semibold tabular-nums text-base-content/80 shrink-0">{{formatAmount $fs.Total}}</span>
+        </div>
+        <!-- Progress bar relative to max -->
+        <div class="w-full h-1.5 bg-base-200/50 rounded-full overflow-hidden mb-1.5">
+          <div class="h-full rounded-full transition-all duration-500 ease-out"
+            style="width: {{printf "%.1f" $fs.Percent}}%; background-color: {{safeCSS $fs.Color}}; opacity: 0.5;"></div>
+        </div>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full bg-base-200/60 text-base-content/40">{{printf "%.0f" $fs.Percent}}%</span>
+            {{if $fs.TopCat}}<span class="text-[0.6rem] text-base-content/25 truncate">{{$fs.TopCat}}</span>{{end}}
+          </div>
+          <span class="text-[0.6rem] text-base-content/30 tabular-nums">{{$fs.TxCount}} txns</span>
+        </div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+
+</div><!-- /tab: trends -->
+
+</div><!-- /x-show insightsReady wrapper -->
+
+</div><!-- /alpine x-data tabs -->
+
+<!-- ECharts CDN (loaded only on Insights page) -->
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+<!-- Sparklines + Count-Up Animations -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // ── Sparkline Renderer ──
+  // Draws a tiny polyline + gradient fill in each .bb-sparkline SVG
+  document.querySelectorAll('.bb-sparkline').forEach(function(svg) {
+    var raw = svg.getAttribute('data-values');
+    if (!raw) return;
+    try {
+      var values = JSON.parse(raw);
+      if (!values || !values.length || values.every(function(v) { return v === 0; })) return;
+    } catch(e) { return; }
+
+    var vals = JSON.parse(raw);
+    var color = svg.getAttribute('data-color') || 'currentColor';
+    var w = 80, h = 24, pad = 2;
+    var min = Math.min.apply(null, vals);
+    var max = Math.max.apply(null, vals);
+    var range = max - min || 1;
+
+    var points = vals.map(function(v, i) {
+      var x = pad + (i / (vals.length - 1)) * (w - pad * 2);
+      var y = pad + (1 - (v - min) / range) * (h - pad * 2);
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+
+    // Gradient fill area
+    var gradId = 'sg' + Math.random().toString(36).substr(2, 6);
+    var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    var grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+    grad.setAttribute('id', gradId);
+    grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
+    grad.setAttribute('x2', '0'); grad.setAttribute('y2', '1');
+    var stop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop1.setAttribute('offset', '0%');
+    stop1.setAttribute('stop-color', color);
+    stop1.setAttribute('stop-opacity', '0.15');
+    var stop2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop2.setAttribute('offset', '100%');
+    stop2.setAttribute('stop-color', color);
+    stop2.setAttribute('stop-opacity', '0.02');
+    grad.appendChild(stop1);
+    grad.appendChild(stop2);
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+
+    // Fill polygon (area under curve)
+    var fillPoints = points.join(' ') + ' ' + (w - pad).toFixed(1) + ',' + (h - pad).toFixed(1) + ' ' + pad.toFixed(1) + ',' + (h - pad).toFixed(1);
+    var polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    polygon.setAttribute('points', fillPoints);
+    polygon.setAttribute('fill', 'url(#' + gradId + ')');
+    polygon.setAttribute('class', 'bb-sparkline-area');
+    svg.appendChild(polygon);
+
+    // Polyline (the sparkline itself)
+    var polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    polyline.setAttribute('points', points.join(' '));
+    polyline.setAttribute('fill', 'none');
+    polyline.setAttribute('stroke', color);
+    polyline.setAttribute('stroke-width', '1.5');
+    polyline.setAttribute('stroke-linecap', 'round');
+    polyline.setAttribute('stroke-linejoin', 'round');
+    polyline.setAttribute('class', 'bb-sparkline-line');
+    svg.appendChild(polyline);
+
+    // End dot
+    var lastPt = points[points.length - 1].split(',');
+    var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('cx', lastPt[0]);
+    dot.setAttribute('cy', lastPt[1]);
+    dot.setAttribute('r', '2');
+    dot.setAttribute('fill', color);
+    dot.setAttribute('class', 'bb-sparkline-dot');
+    svg.appendChild(dot);
+
+    svg.style.opacity = '1';
+  });
+
+  // ── Count-Up Animation ──
+  // Animates numbers from 0 to their final value using easeOutExpo
+  var countEls = document.querySelectorAll('[data-countup]');
+  if (!countEls.length) return;
+
+  function easeOutExpo(t) {
+    return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+  }
+
+  function formatNum(val, decimals, prefix, suffix) {
+    prefix = prefix || '';
+    suffix = suffix || '';
+    var parts = val.toFixed(decimals).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return prefix + parts.join('.') + suffix;
+  }
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (!entry.isIntersecting) return;
+      var el = entry.target;
+      observer.unobserve(el);
+
+      var target = parseFloat(el.getAttribute('data-countup'));
+      var prefix = el.hasAttribute('data-prefix') ? el.getAttribute('data-prefix') : '$';
+      var suffix = el.getAttribute('data-suffix') || '';
+      var decimals = parseInt(el.getAttribute('data-decimals') || '2', 10);
+      var duration = 800;
+      var start = performance.now();
+
+      function tick(now) {
+        var t = Math.min((now - start) / duration, 1);
+        var val = target * easeOutExpo(t);
+        el.textContent = formatNum(val, decimals, prefix, suffix);
+        if (t < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }, { threshold: 0.3 });
+
+  countEls.forEach(function(el) { observer.observe(el); });
+});
+</script>
+
+<!-- ECharts Initialization -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Reset flag for this page load.
+  window._insightsChartsLoaded = false;
+
   var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  var gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
-  var textColor = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
+  // Read theme-aware colors from CSS custom properties
+  var cs = getComputedStyle(document.documentElement);
+  var textColor = cs.getPropertyValue('--bb-chart-text').trim();
+  var splitLineColor = cs.getPropertyValue('--bb-chart-grid').trim();
+  var tooltipBg = cs.getPropertyValue('--bb-chart-tooltip-bg').trim();
+  var tooltipBorder = cs.getPropertyValue('--bb-chart-tooltip-border').trim();
+  var tooltipText = cs.getPropertyValue('--bb-chart-tooltip-text').trim();
+  var tooltipSubtext = cs.getPropertyValue('--bb-chart-tooltip-sub').trim();
 
-  Chart.defaults.font.family = 'Inter, system-ui, -apple-system, sans-serif';
+  var spendColor = cs.getPropertyValue('--bb-chart-spend').trim();
+  var spendHoverColor = cs.getPropertyValue('--bb-chart-spend-hover').trim();
+  var incomeColor = cs.getPropertyValue('--bb-chart-income').trim();
+  var incomeLineColor = cs.getPropertyValue('--bb-chart-income-line').trim();
 
-  var tooltipStyle = {
-    backgroundColor: isDark ? 'hsl(0 0% 12%)' : 'hsl(0 0% 100%)',
-    titleColor: isDark ? 'hsl(0 0% 93%)' : 'hsl(0 0% 9%)',
-    bodyColor: isDark ? 'hsl(0 0% 64%)' : 'hsl(0 0% 45%)',
-    borderColor: isDark ? 'hsl(0 0% 18%)' : 'hsl(0 0% 90%)',
-    borderWidth: 1,
-    padding: { top: 8, bottom: 8, left: 12, right: 12 },
-    cornerRadius: 8,
-    titleFont: { size: 11, weight: '600' },
-    bodyFont: { size: 12 },
-    displayColors: false,
-    titleMarginBottom: 4,
-  };
+  // Track all ECharts instances for tab-switch resize
+  var insightCharts = [];
 
-  var trendCtx = document.getElementById('spendingTrendChart');
-  if (trendCtx) {
+  // ── Net Worth Trend Chart ──
+  {{if .NetWorthLabels}}
+  (function() {
+    var el = document.getElementById('echartsNetWorthChart');
+    if (!el) return;
+    var chart = echarts.init(el, null, { renderer: 'canvas' });
+    insightCharts.push(chart);
+
+    var labels = {{.NetWorthLabels}};
+    var values = {{.NetWorthValues}};
+    var chartDays = {{.ChartDays}};
+
+    var first = values[0], last = values[values.length - 1];
+    var trendUp = last >= first;
+    var lineColor, gradTop, gradBot;
+    if (trendUp) {
+      lineColor = isDark ? 'oklch(0.70 0.14 155)' : 'oklch(0.55 0.14 155)';
+      gradTop = isDark ? 'oklch(0.70 0.14 155 / 0.15)' : 'oklch(0.55 0.14 155 / 0.12)';
+      gradBot = isDark ? 'oklch(0.70 0.14 155 / 0.01)' : 'oklch(0.55 0.14 155 / 0.01)';
+    } else {
+      lineColor = isDark ? 'oklch(0.70 0.15 25)' : 'oklch(0.55 0.15 25)';
+      gradTop = isDark ? 'oklch(0.70 0.15 25 / 0.15)' : 'oklch(0.55 0.15 25 / 0.12)';
+      gradBot = isDark ? 'oklch(0.70 0.15 25 / 0.01)' : 'oklch(0.55 0.15 25 / 0.01)';
+    }
+
+    var shortLabels = labels.map(function(d) {
+      var date = new Date(d + 'T00:00:00');
+      if (chartDays <= 7) return date.toLocaleDateString('en-US', { weekday: 'short' });
+      if (chartDays <= 30) return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+
+    chart.setOption({
+      grid: { left: 8, right: 8, top: 8, bottom: 24 },
+      xAxis: {
+        type: 'category',
+        data: shortLabels,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.25)',
+          fontSize: 10,
+          fontWeight: 500,
+          interval: function(idx) {
+            var maxTicks = chartDays <= 7 ? 7 : chartDays <= 30 ? 6 : 8;
+            var step = Math.max(1, Math.floor(shortLabels.length / maxTicks));
+            return idx % step === 0;
+          }
+        }
+      },
+      yAxis: {
+        type: 'value',
+        show: false
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: tooltipBg,
+        borderColor: tooltipBorder,
+        borderWidth: 1,
+        padding: [8, 12],
+        textStyle: { color: tooltipText, fontSize: 13, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif' },
+        formatter: function(params) {
+          var idx = params[0].dataIndex;
+          var d = labels[idx];
+          var tdate = new Date(d + 'T00:00:00');
+          var title = tdate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+          var val = '$' + params[0].value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+          return '<div style="font-size:11px;font-weight:600;color:' + tooltipSubtext + ';margin-bottom:4px">' + title + '</div>' + val;
+        }
+      },
+      series: [{
+        type: 'line',
+        data: values,
+        smooth: 0.35,
+        symbol: 'none',
+        lineStyle: { color: lineColor, width: 2 },
+        areaStyle: {
+          color: {
+            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: gradTop },
+              { offset: 1, color: gradBot }
+            ]
+          }
+        },
+        emphasis: {
+          itemStyle: {
+            color: lineColor,
+            borderColor: isDark ? 'hsl(0 0% 15%)' : 'hsl(0 0% 100%)',
+            borderWidth: 2
+          }
+        }
+      }],
+      animation: true,
+      animationDuration: 600,
+      animationEasing: 'cubicOut'
+    });
+
+    window.addEventListener('resize', function() { chart.resize(); });
+  })();
+  {{end}}
+
+  // ── Spending & Income Chart ──
+  {{if .DailyLabels}}
+  (function() {
+    var el = document.getElementById('echartsSpendingChart');
+    if (!el) return;
+    var chart = echarts.init(el, null, { renderer: 'canvas' });
+
     var dailyLabels = {{.DailyLabels}};
     var dailyData = {{.DailyAmounts}};
     var incomeData = {{.DailyIncomeAmounts}};
@@ -457,110 +1837,1295 @@ document.addEventListener('DOMContentLoaded', function() {
         return mdate.toLocaleDateString('en-US', { month: 'short' });
       }
       var date = new Date(d + 'T00:00:00');
-      if (chartDays <= 7) {
-        return date.toLocaleDateString('en-US', { weekday: 'short' });
-      }
+      if (chartDays <= 7) return date.toLocaleDateString('en-US', { weekday: 'short' });
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     });
 
-    var barPct = chartDays <= 7 ? 0.6 : chartDays <= 30 ? 0.65 : 0.75;
-    var catPct = chartDays <= 7 ? 0.7 : chartDays <= 30 ? 0.8 : 0.9;
-
-    var spendBg = isDark ? 'oklch(0.65 0 0 / 0.3)' : 'oklch(0.15 0 0 / 0.12)';
-    var spendHover = isDark ? 'oklch(0.65 0 0 / 0.5)' : 'oklch(0.15 0 0 / 0.22)';
-    var incomeBg = isDark ? 'oklch(0.70 0.14 155 / 0.3)' : 'oklch(0.62 0.14 155 / 0.25)';
-    var incomeHover = isDark ? 'oklch(0.70 0.14 155 / 0.5)' : 'oklch(0.62 0.14 155 / 0.4)';
+    var fullLabels = dailyLabels.map(function(d) {
+      if (chartDays === 365) {
+        var parts = d.split('-');
+        var mdate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+        return mdate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      }
+      var date = new Date(d + 'T00:00:00');
+      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    });
 
     var hasIncome = incomeData && incomeData.some(function(v) { return v > 0; });
+    var barWidth = chartDays <= 7 ? '50%' : chartDays <= 30 ? '60%' : '70%';
 
-    var datasets = [{
-      label: 'Spending',
+    var series = [{
+      name: 'Spending',
+      type: 'bar',
       data: dailyData,
-      backgroundColor: spendBg,
-      hoverBackgroundColor: spendHover,
-      borderRadius: { topLeft: 4, topRight: 4 },
-      borderSkipped: false,
-      barPercentage: barPct,
-      categoryPercentage: catPct,
-      order: 1,
+      itemStyle: {
+        color: spendColor,
+        borderRadius: [3, 3, 0, 0]
+      },
+      emphasis: {
+        itemStyle: { color: spendHoverColor }
+      },
+      barWidth: barWidth,
+      z: 2
     }];
 
     if (hasIncome) {
-      datasets.push({
-        label: 'Income',
+      series.push({
+        name: 'Income',
+        type: 'line',
         data: incomeData,
-        backgroundColor: incomeBg,
-        hoverBackgroundColor: incomeHover,
-        borderRadius: { topLeft: 4, topRight: 4 },
-        borderSkipped: false,
-        barPercentage: barPct,
-        categoryPercentage: catPct,
-        order: 2,
+        symbol: 'circle',
+        symbolSize: 0,
+        lineStyle: { color: incomeLineColor, width: 2.5 },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: incomeColor },
+            { offset: 1, color: 'rgba(46,160,100,0.01)' }
+          ])
+        },
+        itemStyle: { color: incomeLineColor },
+        emphasis: {
+          itemStyle: { borderWidth: 2, borderColor: '#fff', shadowBlur: 4 },
+          lineStyle: { width: 3 }
+        },
+        smooth: 0.3,
+        z: 3
       });
     }
 
     var maxTicks = chartDays <= 7 ? 7 : chartDays <= 30 ? 8 : chartDays <= 90 ? 10 : 12;
 
-    new Chart(trendCtx, {
-      type: 'bar',
-      data: { labels: shortLabels, datasets: datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: Object.assign({}, tooltipStyle, {
-            callbacks: {
-              title: function(items) {
-                var idx = items[0].dataIndex;
-                var d = dailyLabels[idx];
-                if (chartDays === 365) {
-                  var parts = d.split('-');
-                  var mdate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
-                  return mdate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                }
-                var tdate = new Date(d + 'T00:00:00');
-                return tdate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-              },
-              label: function(ctx) {
-                var prefix = ctx.dataset.label === 'Income' ? '+ ' : '';
-                return prefix + '$' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-              }
-            }
-          })
+    var option = {
+      animation: true,
+      animationDuration: 600,
+      animationEasing: 'cubicOut',
+      grid: { top: 12, right: 12, bottom: (chartDays >= 90 ? 52 : 28), left: 50 },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow', shadowStyle: { color: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' } },
+        backgroundColor: tooltipBg,
+        borderColor: tooltipBorder,
+        borderWidth: 1,
+        padding: [10, 14],
+        textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
+        extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
+        formatter: function(params) {
+          var idx = params[0].dataIndex;
+          var title = '<div style="font-weight:600;font-size:11px;margin-bottom:6px;color:' + tooltipText + '">' + fullLabels[idx] + '</div>';
+          var items = '';
+          params.forEach(function(p) {
+            var dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + p.color + ';margin-right:8px;vertical-align:middle;"></span>';
+            var val = '$' + p.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            items += '<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:2px 0;">' +
+              '<span style="color:' + tooltipSubtext + ';font-size:12px;">' + dot + p.seriesName + '</span>' +
+              '<span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + val + '</span></div>';
+          });
+          return title + items;
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: shortLabels,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: textColor,
+          fontSize: 10,
+          fontWeight: 500,
+          fontFamily: 'Inter, system-ui, sans-serif',
+          interval: Math.max(0, Math.floor(shortLabels.length / maxTicks) - 1)
         },
-        scales: {
-          x: {
-            grid: { display: false },
-            border: { display: false },
-            ticks: {
-              color: textColor,
-              font: { size: 10, weight: '500' },
-              maxTicksLimit: maxTicks,
-              maxRotation: 0,
-            }
-          },
-          y: {
-            grid: { color: gridColor, drawBorder: false },
-            border: { display: false },
-            ticks: {
-              color: textColor,
-              font: { size: 10, weight: '500' },
-              maxTicksLimit: 5,
-              callback: function(v) { return '$' + v.toLocaleString(); }
-            },
-            beginAtZero: true,
+        splitLine: { show: false }
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: textColor,
+          fontSize: 10,
+          fontWeight: 500,
+          fontFamily: 'Inter, system-ui, sans-serif',
+          formatter: function(v) { return '$' + v.toLocaleString(); }
+        },
+        splitLine: { lineStyle: { color: splitLineColor } },
+        splitNumber: 4
+      },
+      series: series
+    };
+
+    // Add dataZoom slider for 90d and 12m views
+    if (chartDays >= 90) {
+      option.dataZoom = [{
+        type: 'slider',
+        show: true,
+        height: 18,
+        bottom: 4,
+        borderColor: 'transparent',
+        backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+        fillerColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        handleIcon: 'path://M10,0A10,10,0,1,1,0,10,10,10,0,0,1,10,0Z',
+        handleSize: '60%',
+        handleStyle: { color: isDark ? '#555' : '#ccc', borderColor: isDark ? '#666' : '#bbb' },
+        textStyle: { color: textColor, fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif' },
+        dataBackground: {
+          lineStyle: { color: 'transparent' },
+          areaStyle: { color: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }
+        },
+        selectedDataBackground: {
+          lineStyle: { color: 'transparent' },
+          areaStyle: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }
+        },
+        start: chartDays === 365 ? 50 : 30,
+        end: 100
+      }];
+    }
+
+    chart.setOption(option);
+    insightCharts.push(chart);
+    window.addEventListener('resize', function() { chart.resize(); });
+  })();
+  {{end}}
+
+  // ── Category Donut Chart with Drill-Down ──
+  {{if .CategoryLabels}}
+  (function() {
+    var el = document.getElementById('echartsCategoryDonut');
+    if (!el) return;
+    var chart = echarts.init(el, null, { renderer: 'canvas' });
+
+    var labels = {{.CategoryLabels}};
+    var amounts = {{.CategoryAmounts}};
+    var colors = {{.CategoryColors}};
+    var totalSpending = {{printf "%.2f" .TotalSpending}};
+    var drilldownData = {{if .CategoryDrilldownJSON}}{{.CategoryDrilldownJSON}}{{else}}{}{{end}};
+
+    // Merchant sub-colors: generate shades from parent color
+    var merchantPalette = [
+      'oklch(0.55 0.12 250)', 'oklch(0.60 0.10 250)', 'oklch(0.50 0.14 250)',
+      'oklch(0.58 0.08 250)', 'oklch(0.52 0.11 250)', 'oklch(0.63 0.07 250)',
+      'oklch(0.48 0.13 250)', 'oklch(0.65 0.06 250)'
+    ];
+
+    var categoryData = labels.map(function(name, i) {
+      return { value: amounts[i], name: name, itemStyle: { color: colors[i] } };
+    });
+
+    function buildCategoryOption() {
+      return {
+        animation: true,
+        animationDuration: 800,
+        animationEasing: 'cubicOut',
+        tooltip: {
+          trigger: 'item',
+          backgroundColor: tooltipBg,
+          borderColor: tooltipBorder,
+          borderWidth: 1,
+          padding: [10, 14],
+          extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
+          formatter: function(params) {
+            var pct = (params.value / totalSpending * 100).toFixed(1);
+            var val = '$' + params.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return '<div style="font-family:Inter,system-ui,sans-serif">' +
+              '<div style="font-weight:600;font-size:12px;margin-bottom:4px;color:' + tooltipText + '">' + params.name + '</div>' +
+              '<div style="display:flex;justify-content:space-between;gap:16px;align-items:center;">' +
+              '<span style="color:' + tooltipSubtext + ';font-size:12px">' + pct + '% of total</span>' +
+              '<span style="font-weight:600;font-size:13px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + val + '</span></div></div>';
           }
         },
-        animation: {
-          duration: 400,
-          easing: 'easeOutQuart',
-        }
+        series: [{
+          type: 'pie',
+          radius: ['52%', '78%'],
+          center: ['50%', '50%'],
+          avoidLabelOverlap: false,
+          padAngle: 2,
+          itemStyle: {
+            borderRadius: 4,
+            borderColor: isDark ? '#1a1a1a' : '#ffffff',
+            borderWidth: 2
+          },
+          label: {
+            show: true,
+            position: 'center',
+            formatter: function() {
+              return '{total|$' + totalSpending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '}\n{label|total spending}';
+            },
+            rich: {
+              total: { fontSize: 20, fontWeight: 700, fontFamily: 'Inter, system-ui, sans-serif', color: tooltipText, padding: [0, 0, 4, 0] },
+              label: { fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif', color: textColor }
+            }
+          },
+          emphasis: {
+            itemStyle: { shadowBlur: 12, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.15)' },
+            label: { show: true }
+          },
+          data: categoryData
+        }]
+      };
+    }
+
+    function buildMerchantOption(categoryName, parentColor, merchants) {
+      var catTotal = 0;
+      merchants.forEach(function(m) { catTotal += m.amount; });
+      // Generate color shades from parent
+      var hueMatch = parentColor.match(/oklch\([\d.]+ [\d.]+ ([\d.]+)\)/);
+      var baseHue = hueMatch ? parseFloat(hueMatch[1]) : 250;
+      var mColors = merchants.map(function(_, i) {
+        var l = 0.58 - (i * 0.03);
+        var c = 0.12 - (i * 0.008);
+        if (l < 0.38) l = 0.38;
+        if (c < 0.04) c = 0.04;
+        return 'oklch(' + l.toFixed(2) + ' ' + c.toFixed(2) + ' ' + baseHue.toFixed(0) + ')';
+      });
+      var mData = merchants.map(function(m, i) {
+        return { value: m.amount, name: m.name, itemStyle: { color: mColors[i] } };
+      });
+      return {
+        animation: true,
+        animationDuration: 600,
+        animationEasing: 'cubicOut',
+        tooltip: {
+          trigger: 'item',
+          backgroundColor: tooltipBg,
+          borderColor: tooltipBorder,
+          borderWidth: 1,
+          padding: [10, 14],
+          extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
+          formatter: function(params) {
+            var pct = (params.value / catTotal * 100).toFixed(1);
+            var val = '$' + params.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return '<div style="font-family:Inter,system-ui,sans-serif">' +
+              '<div style="font-weight:600;font-size:12px;margin-bottom:4px;color:' + tooltipText + '">' + params.name + '</div>' +
+              '<div style="display:flex;justify-content:space-between;gap:16px;align-items:center;">' +
+              '<span style="color:' + tooltipSubtext + ';font-size:12px">' + pct + '% of ' + categoryName + '</span>' +
+              '<span style="font-weight:600;font-size:13px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + val + '</span></div></div>';
+          }
+        },
+        series: [{
+          type: 'pie',
+          radius: ['52%', '78%'],
+          center: ['50%', '50%'],
+          avoidLabelOverlap: false,
+          padAngle: 2,
+          itemStyle: {
+            borderRadius: 4,
+            borderColor: isDark ? '#1a1a1a' : '#ffffff',
+            borderWidth: 2
+          },
+          label: {
+            show: true,
+            position: 'center',
+            formatter: function() {
+              return '{total|$' + catTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '}\n{label|' + categoryName + '}';
+            },
+            rich: {
+              total: { fontSize: 20, fontWeight: 700, fontFamily: 'Inter, system-ui, sans-serif', color: tooltipText, padding: [0, 0, 4, 0] },
+              label: { fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif', color: textColor }
+            }
+          },
+          emphasis: {
+            itemStyle: { shadowBlur: 12, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.15)' },
+            label: { show: true }
+          },
+          data: mData
+        }]
+      };
+    }
+
+    chart.setOption(buildCategoryOption());
+    insightCharts.push(chart);
+
+    // Click handler: drill into category
+    chart.on('click', function(params) {
+      if (params.componentType !== 'series') return;
+      var categoryName = params.name;
+      var parentColor = params.color || 'oklch(0.55 0.12 250)';
+      var merchants = drilldownData[categoryName];
+      if (!merchants || merchants.length === 0) return;
+
+      // Update Alpine state
+      var alpineEl = el.closest('[x-data]');
+      if (alpineEl && alpineEl.__x) {
+        alpineEl.__x.$data.isDrilledDown = true;
+        alpineEl.__x.$data.activeCategoryName = categoryName;
+        alpineEl.__x.$data.activeCategoryColor = parentColor;
+        alpineEl.__x.$data.activeMerchants = merchants;
+      } else if (alpineEl && window.Alpine) {
+        Alpine.evaluate(alpineEl, '$data').isDrilledDown = true;
+        Alpine.evaluate(alpineEl, '$data').activeCategoryName = categoryName;
+        Alpine.evaluate(alpineEl, '$data').activeCategoryColor = parentColor;
+        Alpine.evaluate(alpineEl, '$data').activeMerchants = merchants;
+      }
+
+      chart.setOption(buildMerchantOption(categoryName, parentColor, merchants), true);
+    });
+
+    // Expose chart for Alpine drill-up
+    window._categoryDonutChart = chart;
+    window._categoryDonutCategoryOption = buildCategoryOption;
+    window._categoryDonutMerchantOption = buildMerchantOption;
+    window._categoryDrilldownData = drilldownData;
+
+    // ── Linked chart-list highlighting ──
+    // When hovering a donut segment, update Alpine highlightedCategory state.
+    chart.on('mouseover', function(params) {
+      if (params.componentType !== 'series') return;
+      var pageEl = document.querySelector('[x-data]');
+      if (pageEl && window.Alpine) {
+        try {
+          var data = Alpine.evaluate(pageEl, '$data');
+          if (data && !data.isDrilledDown) data.highlightedCategory = params.name;
+        } catch(e) {}
       }
     });
+    chart.on('mouseout', function(params) {
+      if (params.componentType !== 'series') return;
+      var pageEl = document.querySelector('[x-data]');
+      if (pageEl && window.Alpine) {
+        try {
+          var data = Alpine.evaluate(pageEl, '$data');
+          if (data) data.highlightedCategory = '';
+        } catch(e) {}
+      }
+    });
+
+    // Expose highlight/downplay for list -> chart interaction.
+    window._insightsHighlightDonut = function(categoryName) {
+      if (!chart || chart.isDisposed()) return;
+      chart.dispatchAction({ type: 'highlight', seriesIndex: 0, name: categoryName });
+    };
+    window._insightsDownplayDonut = function() {
+      if (!chart || chart.isDisposed()) return;
+      chart.dispatchAction({ type: 'downplay', seriesIndex: 0 });
+    };
+
+    window.addEventListener('resize', function() { chart.resize(); });
+  })();
+  {{end}}
+
+  // ── Cash Flow Forecast Chart ──
+  {{if .HasForecastData}}
+  (function() {
+    var el = document.getElementById('echartsForecastChart');
+    if (!el) return;
+    var chart = echarts.init(el, null, { renderer: 'canvas' });
+
+    var fData = {{.ForecastJSON}};
+    var daysElapsed = fData.daysElapsed;
+
+    var positiveColor = cs.getPropertyValue('--bb-chart-positive').trim();
+    var negativeColor = cs.getPropertyValue('--bb-chart-negative').trim();
+    var projColor = cs.getPropertyValue('--bb-chart-proj').trim();
+    var projAreaColor = cs.getPropertyValue('--bb-chart-proj-area').trim();
+
+    // Actual line: only actual days (past).
+    var actualData = fData.actual.slice();
+
+    // Forecast line: starts from last actual day and continues.
+    var forecastData = fData.forecast.map(function(v, i) {
+      if (i < daysElapsed - 1) return null;
+      return v;
+    });
+
+    var projectedEOM = fData.projectedEOM;
+    var eomColor = projectedEOM >= 0 ? positiveColor : negativeColor;
+
+    var option = {
+      animation: true,
+      animationDuration: 800,
+      animationEasing: 'cubicOut',
+      grid: { top: 28, right: 70, bottom: 28, left: 50 },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: tooltipBg,
+        borderColor: tooltipBorder,
+        borderWidth: 1,
+        padding: [10, 14],
+        textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
+        extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
+        formatter: function(params) {
+          var idx = params[0].dataIndex;
+          var label = fData.labels[idx];
+          var isActual = idx < daysElapsed;
+          var title = '<div style="font-weight:600;font-size:11px;margin-bottom:6px;color:' + tooltipText + '">' + label + (isActual ? '' : ' (projected)') + '</div>';
+          var items = '';
+          params.forEach(function(p) {
+            if (p.value == null) return;
+            var dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + p.color + ';margin-right:8px;vertical-align:middle;"></span>';
+            var val = (p.value >= 0 ? '+' : '-') + '$' + Math.abs(p.value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            var valColor = p.value >= 0 ? positiveColor : negativeColor;
+            items += '<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:2px 0;">' +
+              '<span style="color:' + tooltipSubtext + ';font-size:12px;">' + dot + p.seriesName + '</span>' +
+              '<span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + valColor + '">' + val + '</span></div>';
+          });
+          return title + items;
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: fData.labels,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: textColor,
+          fontSize: 10,
+          fontWeight: 500,
+          fontFamily: 'Inter, system-ui, sans-serif',
+          interval: function(index) {
+            return index === 0 || (index + 1) % 5 === 0 || index === fData.labels.length - 1;
+          }
+        }
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: textColor,
+          fontSize: 10,
+          fontWeight: 500,
+          fontFamily: 'Inter, system-ui, sans-serif',
+          formatter: function(v) {
+            var prefix = v >= 0 ? '$' : '-$';
+            return prefix + Math.abs(v).toLocaleString();
+          }
+        },
+        splitLine: { lineStyle: { color: splitLineColor } },
+        splitNumber: 4
+      },
+      series: [
+        {
+          name: 'Actual',
+          type: 'line',
+          data: actualData,
+          symbol: 'circle',
+          symbolSize: function(value, params) {
+            return params.dataIndex === daysElapsed - 1 ? 8 : 0;
+          },
+          lineStyle: {
+            color: cs.getPropertyValue('--bb-chart-accent').trim(),
+            width: 2.5
+          },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: cs.getPropertyValue('--bb-chart-accent-area').trim() },
+              { offset: 1, color: 'rgba(70,100,200,0.01)' }
+            ])
+          },
+          itemStyle: { color: cs.getPropertyValue('--bb-chart-accent').trim() },
+          emphasis: {
+            itemStyle: { borderWidth: 2, borderColor: isDark ? '#222' : '#fff', shadowBlur: 4 }
+          },
+          smooth: 0.3,
+          z: 3,
+          connectNulls: false,
+          markLine: {
+            silent: true,
+            symbol: 'none',
+            lineStyle: { color: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)', type: 'dashed', width: 1 },
+            label: {
+              show: true,
+              position: 'insideEndTop',
+              formatter: '$0',
+              color: textColor,
+              fontSize: 9,
+              fontFamily: 'Inter, system-ui, sans-serif'
+            },
+            data: [{ yAxis: 0 }]
+          }
+        },
+        {
+          name: 'Projected',
+          type: 'line',
+          data: forecastData,
+          symbol: 'none',
+          lineStyle: {
+            color: projColor,
+            width: 2,
+            type: 'dashed'
+          },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: projAreaColor },
+              { offset: 1, color: 'rgba(70,100,200,0.005)' }
+            ])
+          },
+          itemStyle: { color: projColor },
+          smooth: 0.3,
+          z: 2,
+          connectNulls: false,
+          markPoint: {
+            symbol: 'circle',
+            symbolSize: 40,
+            label: {
+              show: true,
+              formatter: function(params) {
+                var v = params.value;
+                var prefix = v >= 0 ? '+$' : '-$';
+                var abs = Math.abs(v);
+                if (abs >= 1000) return prefix + (abs / 1000).toFixed(1) + 'k';
+                return prefix + abs.toFixed(0);
+              },
+              color: eomColor,
+              fontSize: 10,
+              fontWeight: 700,
+              fontFamily: 'Inter, system-ui, sans-serif'
+            },
+            itemStyle: {
+              color: isDark ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.95)',
+              borderColor: eomColor,
+              borderWidth: 2,
+              shadowBlur: 8,
+              shadowColor: 'rgba(0,0,0,0.1)'
+            },
+            data: [{
+              coord: [fData.labels.length - 1, projectedEOM],
+              value: projectedEOM
+            }]
+          }
+        }
+      ]
+    };
+
+    chart.setOption(option);
+    insightCharts.push(chart);
+    window.addEventListener('resize', function() { chart.resize(); });
+  })();
+  {{end}}
+
+  // ── Velocity Chart (ECharts) ──
+  {{if .HasVelocityData}}
+  (function() {
+    var velocityInitialized = false;
+    var velocityData = {{.VelocityJSON}};
+
+    function initVelocityChart() {
+      if (velocityInitialized) return;
+      var el = document.getElementById('echartsVelocityChart');
+      if (!el || el.offsetParent === null) return;
+      velocityInitialized = true;
+
+      var chart = echarts.init(el, null, { renderer: 'canvas' });
+      var vData = velocityData;
+      var numMonths = vData.datasets.length;
+
+      var lineColors = [
+        cs.getPropertyValue('--bb-chart-velocity-old1').trim(),
+        cs.getPropertyValue('--bb-chart-velocity-old2').trim(),
+        cs.getPropertyValue('--bb-chart-velocity-current').trim()
+      ];
+      var lineWidths = [1.5, 1.5, 2.5];
+      var lineDashes = [[5, 4], [5, 4], [0, 0]];
+
+      var series = vData.datasets.map(function(ds, i) {
+        var data = ds.data.slice();
+        // For current month, trim trailing zeroes
+        if (i === numMonths - 1) {
+          var lastNonZero = data.length - 1;
+          while (lastNonZero > 0 && data[lastNonZero] === 0) lastNonZero--;
+          // Set trailing zeroes to null so line stops
+          for (var k = lastNonZero + 1; k < data.length; k++) data[k] = null;
+        }
+        var s = {
+          name: ds.label,
+          type: 'line',
+          data: data,
+          symbol: 'none',
+          smooth: 0.3,
+          lineStyle: {
+            color: lineColors[i],
+            width: lineWidths[i],
+            type: lineDashes[i][0] > 0 ? 'dashed' : 'solid'
+          },
+          itemStyle: { color: lineColors[i] },
+          emphasis: {
+            lineStyle: { width: lineWidths[i] + 1 }
+          },
+          z: i + 1
+        };
+        // Fill area for current month only
+        if (i === numMonths - 1) {
+          s.areaStyle = {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: cs.getPropertyValue('--bb-chart-accent-area').trim() },
+              { offset: 1, color: 'rgba(70,100,200,0.01)' }
+            ])
+          };
+        }
+        return s;
+      });
+
+      var option = {
+        animation: true,
+        animationDuration: 800,
+        animationEasing: 'cubicOut',
+        grid: { top: 12, right: 12, bottom: 36, left: 50 },
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: tooltipBg,
+          borderColor: tooltipBorder,
+          borderWidth: 1,
+          padding: [10, 14],
+          textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
+          extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
+          formatter: function(params) {
+            var title = '<div style="font-weight:600;font-size:11px;margin-bottom:6px;color:' + tooltipText + '">Day ' + params[0].axisValue + '</div>';
+            var items = '';
+            params.forEach(function(p) {
+              if (p.value == null) return;
+              var dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + p.color + ';margin-right:8px;vertical-align:middle;"></span>';
+              var val = '$' + p.value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+              items += '<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:2px 0;">' +
+                '<span style="color:' + tooltipSubtext + ';font-size:12px;">' + dot + p.seriesName + '</span>' +
+                '<span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + val + '</span></div>';
+            });
+            return title + items;
+          }
+        },
+        xAxis: {
+          type: 'category',
+          data: vData.labels,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: textColor,
+            fontSize: 10,
+            fontWeight: 500,
+            fontFamily: 'Inter, system-ui, sans-serif',
+            formatter: function(v) {
+              var n = parseInt(v);
+              return (n === 1 || n % 5 === 0) ? n : '';
+            }
+          },
+          name: 'Day of month',
+          nameLocation: 'middle',
+          nameGap: 22,
+          nameTextStyle: { color: textColor, fontSize: 10, fontWeight: 500, fontFamily: 'Inter, system-ui, sans-serif' }
+        },
+        yAxis: {
+          type: 'value',
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: textColor,
+            fontSize: 10,
+            fontWeight: 500,
+            fontFamily: 'Inter, system-ui, sans-serif',
+            formatter: function(v) { return '$' + v.toLocaleString(); }
+          },
+          splitLine: { lineStyle: { color: splitLineColor } },
+          splitNumber: 4
+        },
+        series: series
+      };
+
+      chart.setOption(option);
+      insightCharts.push(chart);
+      window.addEventListener('resize', function() { chart.resize(); });
+    }
+
+    // Initialize on DOMContentLoaded if tab is already 'trends', otherwise defer.
+    if (new URLSearchParams(window.location.search).get('tab') === 'trends') {
+      setTimeout(initVelocityChart, 50);
+    }
+    // Deferred init registered below in tab-switch handler.
+    window._initVelocityChart = initVelocityChart;
+  })();
+  {{end}}
+
+  // ── Savings Rate Trend Chart ──
+  {{if .HasSavingsRateTrend}}
+  (function() {
+    var srtInitialized = false;
+    var srtData = {{.SavingsRateTrendJSON}};
+
+    function initSavingsRateChart() {
+      if (srtInitialized) return;
+      var el = document.getElementById('echartsSavingsRateChart');
+      if (!el || el.offsetParent === null) return;
+      srtInitialized = true;
+
+      var chart = echarts.init(el, null, { renderer: 'canvas' });
+
+      var positiveColor = cs.getPropertyValue('--bb-chart-positive').trim();
+      var negativeColor = cs.getPropertyValue('--bb-chart-negative').trim();
+      var zeroLineColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
+      var areaPositive = isDark ? 'rgba(100,210,150,0.08)' : 'rgba(46,160,100,0.06)';
+      var areaNegative = isDark ? 'rgba(250,110,110,0.08)' : 'rgba(220,60,60,0.06)';
+
+      // Color each data point based on positive/negative.
+      var rateData = srtData.rates.map(function(r) {
+        return {
+          value: r,
+          itemStyle: { color: r >= 0 ? positiveColor : negativeColor }
+        };
+      });
+
+      var option = {
+        animation: true,
+        animationDuration: 800,
+        animationEasing: 'cubicOut',
+        grid: { top: 40, right: 20, bottom: 36, left: 50 },
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: tooltipBg,
+          borderColor: tooltipBorder,
+          borderWidth: 1,
+          padding: [10, 14],
+          textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
+          extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
+          formatter: function(params) {
+            var idx = params[0].dataIndex;
+            var rate = srtData.rates[idx];
+            var income = srtData.income[idx];
+            var spending = srtData.spending[idx];
+            var net = srtData.net[idx];
+            var rateColor = rate >= 0 ? positiveColor : negativeColor;
+
+            var title = '<div style="font-weight:600;font-size:11px;margin-bottom:8px;color:' + tooltipText + '">' + srtData.labels[idx] + '</div>';
+
+            // Savings rate big number.
+            var rateStr = (rate >= 0 ? '+' : '') + rate.toFixed(1) + '%';
+            var rateLine = '<div style="font-size:18px;font-weight:700;color:' + rateColor + ';margin-bottom:8px;font-variant-numeric:tabular-nums;">' + rateStr + ' <span style="font-size:11px;font-weight:500;color:' + tooltipSubtext + '">savings rate</span></div>';
+
+            var fmt = function(v) { return '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+            var rows = '';
+            rows += '<div style="display:flex;justify-content:space-between;gap:16px;padding:2px 0;"><span style="color:' + tooltipSubtext + ';font-size:12px;">Income</span><span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + fmt(income) + '</span></div>';
+            rows += '<div style="display:flex;justify-content:space-between;gap:16px;padding:2px 0;"><span style="color:' + tooltipSubtext + ';font-size:12px;">Spending</span><span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + fmt(spending) + '</span></div>';
+            rows += '<div style="border-top:1px solid ' + tooltipBorder + ';margin:4px 0;"></div>';
+            rows += '<div style="display:flex;justify-content:space-between;gap:16px;padding:2px 0;"><span style="color:' + tooltipSubtext + ';font-size:12px;">Net</span><span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + (net >= 0 ? positiveColor : negativeColor) + '">' + (net >= 0 ? '+' : '-') + fmt(net) + '</span></div>';
+
+            return title + rateLine + rows;
+          }
+        },
+        xAxis: {
+          type: 'category',
+          data: srtData.labels,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: textColor,
+            fontSize: 11,
+            fontWeight: 600,
+            fontFamily: 'Inter, system-ui, sans-serif'
+          }
+        },
+        yAxis: {
+          type: 'value',
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: textColor,
+            fontSize: 10,
+            fontWeight: 500,
+            fontFamily: 'Inter, system-ui, sans-serif',
+            formatter: function(v) { return v + '%'; }
+          },
+          splitLine: { lineStyle: { color: splitLineColor } },
+          splitNumber: 4
+        },
+        series: [
+          {
+            name: 'Savings Rate',
+            type: 'line',
+            data: rateData,
+            symbol: 'circle',
+            symbolSize: 10,
+            lineStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 1, 0,
+                srtData.rates.map(function(r, i) {
+                  return { offset: i / Math.max(srtData.rates.length - 1, 1), color: r >= 0 ? positiveColor : negativeColor };
+                })
+              ),
+              width: 3
+            },
+            areaStyle: {
+              color: {
+                type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                colorStops: [
+                  { offset: 0, color: areaPositive },
+                  { offset: 0.5, color: 'rgba(0,0,0,0)' },
+                  { offset: 1, color: areaNegative }
+                ]
+              },
+              origin: 0
+            },
+            emphasis: {
+              itemStyle: { borderWidth: 3, borderColor: isDark ? '#222' : '#fff', shadowBlur: 6, shadowColor: 'rgba(0,0,0,0.15)' }
+            },
+            markLine: {
+              silent: true,
+              symbol: 'none',
+              lineStyle: { color: zeroLineColor, type: 'dashed', width: 1.5 },
+              label: {
+                show: true,
+                position: 'insideEndTop',
+                formatter: '0%',
+                color: textColor,
+                fontSize: 9,
+                fontFamily: 'Inter, system-ui, sans-serif'
+              },
+              data: [{ yAxis: 0 }]
+            },
+            smooth: 0.3
+          },
+          // Invisible bar series to show income/spending context.
+          {
+            name: 'Income',
+            type: 'bar',
+            data: srtData.income,
+            barWidth: '30%',
+            itemStyle: {
+              color: isDark ? 'rgba(100,210,150,0.08)' : 'rgba(46,160,100,0.06)',
+              borderRadius: [3, 3, 0, 0]
+            },
+            emphasis: {
+              itemStyle: { color: isDark ? 'rgba(100,210,150,0.15)' : 'rgba(46,160,100,0.12)' }
+            },
+            yAxisIndex: 0,
+            z: 1,
+            // Use a second y-axis for absolute values.
+            silent: true
+          }
+        ]
+      };
+
+      // Add a second y-axis for the bar chart (hidden, auto-scaled).
+      option.yAxis = [option.yAxis, {
+        type: 'value',
+        show: false,
+        // Scale independently.
+      }];
+      option.series[1].yAxisIndex = 1;
+
+      chart.setOption(option);
+      insightCharts.push(chart);
+      window.addEventListener('resize', function() { chart.resize(); });
+    }
+
+    // Initialize if trends tab is active, otherwise defer.
+    if (new URLSearchParams(window.location.search).get('tab') === 'trends') {
+      setTimeout(initSavingsRateChart, 60);
+    }
+    // Deferred init registered below in tab-switch handler.
+    window._initSavingsRateChart = initSavingsRateChart;
+  })();
+  {{end}}
+
+  // ── Tab-switch handler: init deferred charts + resize all ──
+  // Use Alpine's $watch via a custom event to properly handle tab visibility.
+  window._insightCharts = insightCharts;
+  window._onInsightsTabSwitch = function(newTab) {
+    // Initialize deferred charts when their tab becomes visible.
+    if (newTab === 'trends') {
+      if (window._initVelocityChart) setTimeout(window._initVelocityChart, 50);
+      if (window._initSavingsRateChart) setTimeout(window._initSavingsRateChart, 60);
+    }
+    // Resize all existing chart instances after tab transition completes.
+    setTimeout(function() {
+      insightCharts.forEach(function(c) {
+        try { c.resize(); } catch(e) {}
+      });
+    }, 250);
+  };
+
+  // ── Signal to Alpine that insights content is ready ──
+  // Race condition: DOMContentLoaded may fire before or after Alpine x-init.
+  // 1. Set flag so x-init picks it up if it runs later.
+  // 2. Try calling _setInsightsReady now (works if x-init already ran).
+  // 3. Retry after a short delay to catch Alpine finishing after us.
+  window._insightsChartsLoaded = true;
+  function activateInsights() {
+    if (typeof window._setInsightsReady === 'function') {
+      window._setInsightsReady();
+      setTimeout(function() {
+        insightCharts.forEach(function(c) {
+          try { c.resize(); } catch(e) {}
+        });
+      }, 150);
+      return true;
+    }
+    return false;
+  }
+  if (!activateInsights()) {
+    // Alpine x-init hasn't run yet; retry until it does.
+    var retries = 0;
+    var retryInterval = setInterval(function() {
+      if (activateInsights() || ++retries > 50) clearInterval(retryInterval);
+    }, 30);
   }
 });
 </script>
-{{end}}
+
+<!-- Alpine: Category Drill-Down Component -->
+<script>
+function categoryDrilldown() {
+  return {
+    isDrilledDown: false,
+    activeCategoryName: '',
+    activeCategoryColor: '',
+    activeMerchants: [],
+    merchantColors: [
+      'oklch(0.55 0.12 250)', 'oklch(0.60 0.10 250)', 'oklch(0.50 0.14 250)',
+      'oklch(0.58 0.08 250)', 'oklch(0.52 0.11 250)', 'oklch(0.63 0.07 250)',
+      'oklch(0.48 0.13 250)', 'oklch(0.65 0.06 250)'
+    ],
+    drillInto: function(categoryName, parentColor) {
+      var drilldownData = window._categoryDrilldownData || {};
+      var merchants = drilldownData[categoryName];
+      if (!merchants || merchants.length === 0) return;
+
+      this.isDrilledDown = true;
+      this.activeCategoryName = categoryName;
+      this.activeCategoryColor = parentColor;
+      this.activeMerchants = merchants;
+
+      // Update chart
+      var chart = window._categoryDonutChart;
+      var buildMerchant = window._categoryDonutMerchantOption;
+      if (chart && buildMerchant) {
+        chart.setOption(buildMerchant(categoryName, parentColor, merchants), true);
+      }
+
+      // Re-render lucide icons
+      this.$nextTick(function() {
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      });
+    },
+    drillUp: function() {
+      this.isDrilledDown = false;
+      this.activeCategoryName = '';
+      this.activeMerchants = [];
+
+      // Reset chart
+      var chart = window._categoryDonutChart;
+      var buildCategory = window._categoryDonutCategoryOption;
+      if (chart && buildCategory) {
+        chart.setOption(buildCategory(), true);
+      }
+
+      // Re-render lucide icons
+      this.$nextTick(function() {
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      });
+    }
+  };
+}
+</script>
+
+<!-- Re-init Lucide icons and resize charts on tab switch -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Augment the tab-switch handler to also re-render Lucide icons.
+  var originalHandler = window._onInsightsTabSwitch;
+  window._onInsightsTabSwitch = function(newTab) {
+    if (originalHandler) originalHandler(newTab);
+    setTimeout(function() {
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }, 50);
+  };
+});
+</script>
+
+<!-- CSV Export Logic -->
+<script>
+(function() {
+  var exportData = {{if .ExportJSON}}{{.ExportJSON}}{{else}}{}{{end}};
+
+  function csvEscape(val) {
+    if (val == null) return '';
+    var s = String(val);
+    if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  function toCSV(headers, rows) {
+    var lines = [headers.map(csvEscape).join(',')];
+    rows.forEach(function(row) {
+      lines.push(row.map(csvEscape).join(','));
+    });
+    return lines.join('\n');
+  }
+
+  function downloadCSV(filename, csvContent) {
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function fmt(n) { return (Math.round(n * 100) / 100).toFixed(2); }
+
+  function buildSummary() {
+    var headers = ['Section', 'Metric', 'Value'];
+    var rows = [];
+    rows.push(['Summary', 'Period', exportData.periodLabel]);
+    rows.push(['Summary', 'Total Spending', fmt(exportData.totalSpending)]);
+    rows.push(['Summary', 'Total Income', fmt(exportData.totalIncome)]);
+    rows.push(['Summary', 'Net Cash Flow', fmt(exportData.cashFlowNet)]);
+    if (exportData.totalIncome > 0) {
+      rows.push(['Summary', 'Savings Rate', exportData.savingsRate.toFixed(1) + '%']);
+    }
+    rows.push([]);
+    if (exportData.categories && exportData.categories.length > 0) {
+      rows.push(['Categories', 'Category', 'Amount', 'Percent']);
+      exportData.categories.forEach(function(c) {
+        rows.push(['', c.name, fmt(c.amount), c.percent.toFixed(1) + '%']);
+      });
+    }
+    if (exportData.budgets && exportData.budgets.length > 0) {
+      rows.push([]);
+      rows.push(['Budget Targets', 'Category', 'Current', 'Target (Historical Avg)', 'Percent of Target']);
+      exportData.budgets.forEach(function(b) {
+        rows.push(['', b.category, fmt(b.current), fmt(b.target), b.percent.toFixed(1) + '%']);
+      });
+    }
+    if (exportData.dayOfWeek && exportData.dayOfWeek.length > 0) {
+      rows.push([]);
+      rows.push(['Day of Week', 'Day', 'Total', 'Transactions']);
+      exportData.dayOfWeek.forEach(function(d) {
+        rows.push(['', d.day, fmt(d.total), d.count]);
+      });
+    }
+    return toCSV(headers, rows);
+  }
+
+  function buildMerchants() {
+    if (!exportData.merchants || exportData.merchants.length === 0) return null;
+    var headers = ['Rank', 'Merchant', 'Category', 'Total', 'Transactions', 'Average'];
+    var rows = exportData.merchants.map(function(m, i) {
+      return [i + 1, m.name, m.category, fmt(m.total), m.count, fmt(m.average)];
+    });
+    return toCSV(headers, rows);
+  }
+
+  function buildMonthly() {
+    if (!exportData.monthlyComparison || exportData.monthlyComparison.length === 0 || !exportData.monthHeaders) return null;
+    var headers = ['Category'].concat(exportData.monthHeaders);
+    var rows = exportData.monthlyComparison.map(function(row) {
+      return [row.category].concat(row.amounts.map(function(a) { return fmt(a); }));
+    });
+    if (exportData.monthlyTotals && exportData.monthlyTotals.length > 0) {
+      rows.push(['TOTAL'].concat(exportData.monthlyTotals.map(function(t) { return fmt(t); })));
+    }
+    return toCSV(headers, rows);
+  }
+
+  function buildRecurring() {
+    if (!exportData.recurring || exportData.recurring.length === 0) return null;
+    var headers = ['Name', 'Amount', 'Frequency', 'Category', 'Monthly Estimate'];
+    var rows = exportData.recurring.map(function(r) {
+      return [r.name, fmt(r.amount), r.frequency, r.category, fmt(r.monthlyEstimate)];
+    });
+    return toCSV(headers, rows);
+  }
+
+  function buildAnomalies() {
+    var sections = [];
+    if (exportData.categoryAnomalies && exportData.categoryAnomalies.length > 0) {
+      var headers1 = ['Type', 'Category', 'Current', 'Historical Avg', 'Multiplier'];
+      var rows1 = exportData.categoryAnomalies.map(function(a) {
+        return ['Category', a.category, fmt(a.current), fmt(a.historical), a.multiplier.toFixed(1) + 'x'];
+      });
+      sections.push(toCSV(headers1, rows1));
+    }
+    if (exportData.transactionAnomalies && exportData.transactionAnomalies.length > 0) {
+      var headers2 = ['Type', 'Name', 'Amount', 'Date', 'Category', 'Category Avg', 'Multiplier'];
+      var rows2 = exportData.transactionAnomalies.map(function(a) {
+        return ['Transaction', a.name, fmt(a.amount), a.date, a.category, fmt(a.categoryAvg), a.multiplier.toFixed(1) + 'x'];
+      });
+      sections.push(toCSV(headers2, rows2));
+    }
+    if (sections.length === 0) return null;
+    return sections.join('\n\n');
+  }
+
+  function buildAll() {
+    var sections = [];
+    var summary = buildSummary();
+    if (summary) sections.push('=== SUMMARY & CATEGORIES ===\n' + summary);
+
+    var merchants = buildMerchants();
+    if (merchants) sections.push('\n=== TOP MERCHANTS ===\n' + merchants);
+
+    var monthly = buildMonthly();
+    if (monthly) sections.push('\n=== MONTHLY COMPARISON ===\n' + monthly);
+
+    var recurring = buildRecurring();
+    if (recurring) sections.push('\n=== RECURRING CHARGES ===\n' + recurring);
+
+    var anomalies = buildAnomalies();
+    if (anomalies) sections.push('\n=== ANOMALIES ===\n' + anomalies);
+
+    if (exportData.savingsRateTrend && exportData.savingsRateTrend.length > 0) {
+      var sHeaders = ['Month', 'Income', 'Spending', 'Net', 'Savings Rate'];
+      var sRows = exportData.savingsRateTrend.map(function(s) {
+        return [s.month, fmt(s.income), fmt(s.spending), fmt(s.net), s.rate.toFixed(1) + '%'];
+      });
+      sections.push('\n=== SAVINGS RATE TREND ===\n' + toCSV(sHeaders, sRows));
+    }
+
+    return sections.join('\n');
+  }
+
+  window._insightsExportCSV = function(type) {
+    var csv, filename;
+    var period = exportData.periodLabel || '30d';
+    var date = new Date().toISOString().slice(0, 10);
+
+    switch (type) {
+      case 'summary':
+        csv = buildSummary();
+        filename = 'breadbox-insights-summary-' + period + '-' + date + '.csv';
+        break;
+      case 'merchants':
+        csv = buildMerchants();
+        filename = 'breadbox-merchants-' + period + '-' + date + '.csv';
+        break;
+      case 'monthly':
+        csv = buildMonthly();
+        filename = 'breadbox-monthly-comparison-' + date + '.csv';
+        break;
+      case 'recurring':
+        csv = buildRecurring();
+        filename = 'breadbox-recurring-charges-' + date + '.csv';
+        break;
+      case 'anomalies':
+        csv = buildAnomalies();
+        filename = 'breadbox-anomalies-' + period + '-' + date + '.csv';
+        break;
+      case 'all':
+        csv = buildAll();
+        filename = 'breadbox-insights-full-' + period + '-' + date + '.csv';
+        break;
+    }
+
+    if (!csv) {
+      // Show a brief toast-style notification if no data
+      var toast = document.createElement('div');
+      toast.className = 'fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-base-300 text-sm text-base-content shadow-lg';
+      toast.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>No data available for this export';
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2000);
+      setTimeout(function() { document.body.removeChild(toast); }, 2500);
+      return;
+    }
+
+    downloadCSV(filename, csv);
+
+    // Success toast
+    var toast = document.createElement('div');
+    toast.className = 'fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-success/10 border border-success/20 text-sm text-success shadow-lg';
+    toast.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>CSV downloaded';
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2000);
+    setTimeout(function() { document.body.removeChild(toast); }, 2500);
+  };
+})();
+</script>
+
+<!-- Print Styles: clean printable version of insights -->
+<style>
+@media print {
+  /* Hide non-essential UI elements */
+  nav, .drawer-side, .bb-page-header > div:last-child,
+  [x-data] > .flex.items-center.gap-1.border-b,
+  .bb-filter-bar, button, a[href], .cursor-pointer,
+  .navbar, .drawer-toggle, footer { display: none !important; }
+
+  /* Show all tab content at once */
+  [x-show] { display: block !important; opacity: 1 !important; transform: none !important; }
+
+  /* Reset page layout */
+  body { background: white !important; color: #1a1a1a !important; font-size: 11px !important; }
+  .drawer-content { margin-left: 0 !important; padding: 0 !important; }
+  main { padding: 0 !important; max-width: 100% !important; }
+
+  /* Cards: remove shadows, use borders */
+  .bb-card, [class*="bb-card"] {
+    box-shadow: none !important;
+    border: 1px solid #e5e5e5 !important;
+    background: white !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Text colors for print */
+  .text-base-content\/70, .text-base-content\/80, .text-base-content\/85 { color: #333 !important; }
+  .text-base-content\/40, .text-base-content\/50, .text-base-content\/60 { color: #666 !important; }
+  .text-base-content\/25, .text-base-content\/30, .text-base-content\/35 { color: #999 !important; }
+  .text-success, .text-success\/70, .text-success\/80 { color: #16a34a !important; }
+  .text-error, .text-error\/70, .text-error\/80 { color: #dc2626 !important; }
+  .text-warning, .text-warning\/70 { color: #d97706 !important; }
+
+  /* Summary pills: ensure readable */
+  .grid.grid-cols-2.sm\:grid-cols-4 .bb-card { border: 1px solid #ddd !important; }
+
+  /* Charts: set minimum height for print */
+  [id^="echarts"] { min-height: 200px !important; break-inside: avoid; }
+
+  /* Tab section headers for print context */
+  [x-show="tab === 'overview'"]::before {
+    content: "Overview";
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 24px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #1a1a1a;
+  }
+  [x-show="tab === 'analysis'"]::before {
+    content: "Analysis";
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 24px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #1a1a1a;
+  }
+  [x-show="tab === 'trends'"]::before {
+    content: "Trends";
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 24px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #1a1a1a;
+  }
+
+  /* Page title for print */
+  .bb-page-title { font-size: 20px !important; color: #1a1a1a !important; }
+  .bb-page-title + p { color: #666 !important; }
+
+  /* Table readability */
+  table { font-size: 10px !important; }
+  th, td { padding: 4px 8px !important; }
+
+  /* Progress bars: ensure visible */
+  .rounded-full[style*="width:"] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+
+  /* Grid adjustments for narrower print */
+  .lg\:grid-cols-5 { grid-template-columns: repeat(5, 1fr) !important; }
+  .lg\:grid-cols-3 { grid-template-columns: repeat(3, 1fr) !important; }
+  .lg\:grid-cols-2 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Force color printing for colored elements */
+  * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+
+  /* Page breaks */
+  .bb-stagger { page-break-inside: avoid; }
+  h2 { page-break-after: avoid; }
+}
+</style>
 {{end}}

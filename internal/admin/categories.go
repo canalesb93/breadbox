@@ -316,8 +316,8 @@ func BatchSetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerF
 			writeCategoryError(w, http.StatusBadRequest, "VALIDATION_ERROR", "items array is required")
 			return
 		}
-		if len(req.Items) > 200 {
-			writeCategoryError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Maximum 200 items per batch")
+		if len(req.Items) > 500 {
+			writeCategoryError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Maximum 500 items per batch")
 			return
 		}
 
