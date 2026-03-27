@@ -23,7 +23,7 @@ LIMIT $2 OFFSET $3;
 
 -- name: UpdateSyncLog :exec
 UPDATE sync_logs
-SET status = $2, completed_at = $3, added_count = $4, modified_count = $5, removed_count = $6, error_message = $7
+SET status = $2, completed_at = $3, added_count = $4, modified_count = $5, removed_count = $6, error_message = $7, duration_ms = $8
 WHERE id = $1;
 
 -- name: GetMostRecentSyncLog :one
@@ -32,3 +32,11 @@ SELECT * FROM sync_logs WHERE connection_id = $1 ORDER BY started_at DESC LIMIT 
 -- name: CleanupOrphanedSyncLogs :execresult
 UPDATE sync_logs SET status = 'error', error_message = 'interrupted by server restart', completed_at = NOW()
 WHERE status = 'in_progress';
+
+-- name: DeleteSyncLogsOlderThan :execresult
+DELETE FROM sync_logs
+WHERE started_at < $1
+  AND status != 'in_progress';
+
+-- name: CountSyncLogs :one
+SELECT COUNT(*) FROM sync_logs;

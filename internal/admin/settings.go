@@ -36,12 +36,19 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		var pgVersion string
 		_ = a.DB.QueryRow(ctx, "SELECT version()").Scan(&pgVersion)
 
+		// Sync log retention.
+		retentionDays, _ := a.Service.GetSyncLogRetentionDays(ctx)
+		syncLogCount, _ := a.Service.CountSyncLogs(ctx)
+
 		data := map[string]any{
 			"PageTitle":           "Settings",
 			"CurrentPage":         "settings",
 			"CSRFToken":           GetCSRFToken(r),
 			"Flash":               GetFlash(ctx, sm),
 			"SyncIntervalMinutes": a.Config.SyncIntervalMinutes,
+			// Sync log retention
+			"SyncLogRetentionDays": retentionDays,
+			"SyncLogCount":         syncLogCount,
 			// System info
 			"Version":         a.Config.Version,
 			"GoVersion":       runtime.Version(),
@@ -159,6 +166,38 @@ func ChangePasswordHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 		}
 
 		SetFlash(ctx, sm, "success", "Password updated successfully.")
+		http.Redirect(w, r, "/settings", http.StatusSeeOther)
+	}
+}
+
+// SettingsRetentionPostHandler serves POST /admin/settings/retention.
+func SettingsRetentionPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		retentionStr := r.FormValue("sync_log_retention_days")
+		retentionDays, err := strconv.Atoi(retentionStr)
+		if err != nil || retentionDays < 0 || retentionDays > 3650 {
+			SetFlash(ctx, sm, "error", "Invalid retention period. Must be 0-3650 days.")
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
+			return
+		}
+
+		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
+			Key:   "sync_log_retention_days",
+			Value: pgtype.Text{String: fmt.Sprintf("%d", retentionDays), Valid: true},
+		}); err != nil {
+			a.Logger.Error("save sync log retention", "error", err)
+			SetFlash(ctx, sm, "error", "Failed to save retention setting.")
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
+			return
+		}
+
+		if retentionDays == 0 {
+			SetFlash(ctx, sm, "success", "Sync log cleanup disabled.")
+		} else {
+			SetFlash(ctx, sm, "success", fmt.Sprintf("Sync log retention set to %d days.", retentionDays))
+		}
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 	}
 }

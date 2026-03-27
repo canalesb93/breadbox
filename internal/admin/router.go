@@ -91,6 +91,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/transactions/{id}", TransactionDetailHandler(a, sm, tr, svc))
 		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
 		r.Get("/sync-logs", SyncLogsHandler(a, sm, tr, svc))
+		r.Get("/sync-logs/{id}", SyncLogDetailHandler(a, sm, tr, svc))
 
 		r.Get("/account-links", AccountLinksPageHandler(a, svc, sm, tr))
 		r.Get("/account-links/{id}", AccountLinkDetailHandler(a, svc, sm, tr))
@@ -116,6 +117,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		r.Get("/settings", SettingsGetHandler(a, sm, tr))
 		r.Post("/settings/sync", SettingsSyncPostHandler(a, sm))
+		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
 		r.Post("/settings/password", ChangePasswordHandler(a, sm))
 	})
 

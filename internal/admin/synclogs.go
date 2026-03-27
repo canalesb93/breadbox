@@ -8,6 +8,7 @@ import (
 	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
+	"github.com/go-chi/chi/v5"
 )
 
 // SyncLogsHandler serves GET /admin/sync-logs.
@@ -91,6 +92,47 @@ func SyncLogsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, s
 			"InProgressCount":  inProgressCount,
 		}
 		tr.Render(w, r, "sync_logs.html", data)
+	}
+}
+
+// SyncLogDetailHandler serves GET /admin/sync-logs/{id}.
+func SyncLogDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		syncLogID := chi.URLParam(r, "id")
+		if syncLogID == "" {
+			http.Error(w, "Missing sync log ID", http.StatusBadRequest)
+			return
+		}
+
+		// Fetch the sync log details.
+		syncLog, err := svc.GetSyncLog(ctx, syncLogID)
+		if err != nil {
+			a.Logger.Error("get sync log", "id", syncLogID, "error", err)
+			http.Error(w, "Sync log not found", http.StatusNotFound)
+			return
+		}
+
+		// Fetch per-account breakdown.
+		accounts, err := svc.ListSyncLogAccounts(ctx, syncLogID)
+		if err != nil {
+			a.Logger.Error("list sync log accounts", "id", syncLogID, "error", err)
+			accounts = nil // graceful fallback
+		}
+
+		data := map[string]any{
+			"PageTitle":   "Sync Log Detail",
+			"CurrentPage": "sync-logs",
+			"CSRFToken":   GetCSRFToken(r),
+			"Flash":       GetFlash(ctx, sm),
+			"Log":         syncLog,
+			"Accounts":    accounts,
+			"Breadcrumbs": []Breadcrumb{
+				{Label: "Sync Logs", Href: "/sync-logs"},
+				{Label: syncLog.InstitutionName},
+			},
+		}
+		tr.Render(w, r, "sync_log_detail.html", data)
 	}
 }
 

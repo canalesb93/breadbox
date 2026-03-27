@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"breadbox/internal/service"
+	bsync "breadbox/internal/sync"
 	"breadbox/internal/templates"
 
 	"github.com/alexedwards/scs/v2"
@@ -115,6 +116,20 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return fmt.Sprintf("%.0fm", d.Minutes())
 			},
+			"formatDurationMs": func(ms int32) string {
+				if ms < 1000 {
+					return fmt.Sprintf("%dms", ms)
+				}
+				if ms < 60000 {
+					return fmt.Sprintf("%.1fs", float64(ms)/1000)
+				}
+				mins := ms / 60000
+				secs := (ms % 60000) / 1000
+				if secs == 0 {
+					return fmt.Sprintf("%dm", mins)
+				}
+				return fmt.Sprintf("%dm %ds", mins, secs)
+			},
 			"relativeTime": func(t interface{}) string {
 				switch v := t.(type) {
 				case time.Time:
@@ -202,6 +217,9 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return msg
 				}
 				return code
+			},
+			"syncFriendlyError": func(rawErr string) string {
+				return bsync.FriendlyError(rawErr)
 			},
 			"configSource": func(sources map[string]string, key string) template.HTML {
 				source := sources[key]

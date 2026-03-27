@@ -728,6 +728,23 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			})
 		}
 
+		// ── Sync Health Summary ──────────────────────────────────────
+		syncHealth, err := svc.GetSyncHealthSummary(ctx)
+		if err != nil {
+			a.Logger.Error("sync health summary", "error", err)
+		}
+		// Enrich with connection-level errors (already computed above) and next sync time.
+		if syncHealth != nil {
+			syncHealth.ConnectionErrors = int64(errorCount)
+			if a.Scheduler != nil {
+				syncHealth.NextSyncTime = formatNextSync(a.Scheduler.NextRun())
+			}
+			// Override health if connections have errors.
+			if errorCount > 0 && syncHealth.OverallHealth == "healthy" {
+				syncHealth.OverallHealth = "degraded"
+			}
+		}
+
 		// ── Insights: useful aggregate data for the insights card ──
 		type InsightItem struct {
 			Icon    string // Lucide icon name
@@ -1042,6 +1059,8 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"HealthyCount":          healthyCount,
 			"ErrorCount":            errorCount,
 			"StaleCount":            staleCount,
+			// Sync health summary.
+			"SyncHealth":            syncHealth,
 			// Insights.
 			"Insights":              insights,
 			// Smart spending insights.

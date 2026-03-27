@@ -165,6 +165,35 @@ func TestDateStrInvalid(t *testing.T) {
 	}
 }
 
+func TestFormatDurationMs(t *testing.T) {
+	tests := []struct {
+		ms   int64
+		want string
+	}{
+		{0, "0ms"},
+		{42, "42ms"},
+		{999, "999ms"},
+		{1000, "1.0s"},
+		{1500, "1.5s"},
+		{5250, "5.2s"},
+		{59999, "60.0s"},
+		{60000, "1m"},
+		{90000, "1m 30s"},
+		{120000, "2m"},
+		{125000, "2m 5s"},
+		{300000, "5m"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			got := formatDurationMs(tt.ms)
+			if got != tt.want {
+				t.Errorf("formatDurationMs(%d) = %q, want %q", tt.ms, got, tt.want)
+			}
+		})
+	}
+}
+
 func ptrFloat(f float64) *float64 {
 	return &f
 }
