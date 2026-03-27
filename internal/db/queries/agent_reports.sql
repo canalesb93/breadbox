@@ -1,6 +1,6 @@
 -- name: CreateAgentReport :one
-INSERT INTO agent_reports (title, body, created_by_type, created_by_id, created_by_name)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO agent_reports (title, body, created_by_type, created_by_id, created_by_name, priority, tags, author)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: GetAgentReport :one

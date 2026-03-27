@@ -11,17 +11,24 @@ import (
 
 // AgentReportResponse is the API response type for agent reports.
 type AgentReportResponse struct {
-	ID            string  `json:"id"`
-	Title         string  `json:"title"`
-	Body          string  `json:"body"`
-	CreatedByType string  `json:"created_by_type"`
-	CreatedByID   *string `json:"created_by_id"`
-	CreatedByName string  `json:"created_by_name"`
-	ReadAt        *string `json:"read_at"`
-	CreatedAt     string  `json:"created_at"`
+	ID            string   `json:"id"`
+	Title         string   `json:"title"`
+	Body          string   `json:"body"`
+	CreatedByType string   `json:"created_by_type"`
+	CreatedByID   *string  `json:"created_by_id"`
+	CreatedByName string   `json:"created_by_name"`
+	Priority      string   `json:"priority"`
+	Tags          []string `json:"tags"`
+	Author        *string  `json:"author,omitempty"`
+	ReadAt        *string  `json:"read_at"`
+	CreatedAt     string   `json:"created_at"`
 }
 
 func agentReportFromRow(r db.AgentReport) AgentReportResponse {
+	tags := r.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	return AgentReportResponse{
 		ID:            formatUUID(r.ID),
 		Title:         r.Title,
@@ -29,18 +36,45 @@ func agentReportFromRow(r db.AgentReport) AgentReportResponse {
 		CreatedByType: r.CreatedByType,
 		CreatedByID:   textPtr(r.CreatedByID),
 		CreatedByName: r.CreatedByName,
+		Priority:      r.Priority,
+		Tags:          tags,
+		Author:        textPtr(r.Author),
 		ReadAt:        timestampStr(r.ReadAt),
 		CreatedAt:     r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
 
+// ValidReportPriorities lists allowed priority values.
+var ValidReportPriorities = map[string]bool{
+	"info":     true,
+	"warning":  true,
+	"critical": true,
+}
+
 // CreateAgentReport creates a new agent report.
-func (s *Service) CreateAgentReport(ctx context.Context, title, body string, actor Actor) (AgentReportResponse, error) {
+func (s *Service) CreateAgentReport(ctx context.Context, title, body string, actor Actor, priority string, tags []string, author string) (AgentReportResponse, error) {
 	if title == "" {
 		return AgentReportResponse{}, fmt.Errorf("%w: title is required", ErrInvalidParameter)
 	}
 	if body == "" {
 		return AgentReportResponse{}, fmt.Errorf("%w: body is required", ErrInvalidParameter)
+	}
+	if priority == "" {
+		priority = "info"
+	}
+	if !ValidReportPriorities[priority] {
+		return AgentReportResponse{}, fmt.Errorf("%w: priority must be info, warning, or critical", ErrInvalidParameter)
+	}
+	if tags == nil {
+		tags = []string{}
+	}
+	if len(tags) > 10 {
+		return AgentReportResponse{}, fmt.Errorf("%w: maximum 10 tags allowed", ErrInvalidParameter)
+	}
+
+	createdByName := actor.Name
+	if author != "" {
+		createdByName = author
 	}
 
 	report, err := s.Queries.CreateAgentReport(ctx, db.CreateAgentReportParams{
@@ -48,7 +82,10 @@ func (s *Service) CreateAgentReport(ctx context.Context, title, body string, act
 		Body:          body,
 		CreatedByType: actor.Type,
 		CreatedByID:   pgtype.Text{String: actor.ID, Valid: actor.ID != ""},
-		CreatedByName: actor.Name,
+		CreatedByName: createdByName,
+		Priority:      priority,
+		Tags:          tags,
+		Author:        pgtype.Text{String: author, Valid: author != ""},
 	})
 	if err != nil {
 		return AgentReportResponse{}, fmt.Errorf("create agent report: %w", err)

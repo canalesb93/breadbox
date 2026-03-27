@@ -4,9 +4,6 @@
   <a href="/" class="bb-sidebar-link{{if eq .CurrentPage "dashboard"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="layout-dashboard"></i>
     <span class="flex-1">Dashboard</span>
-    {{if and .NavBadges (gt .NavBadges.UnreadReports 0)}}
-    <span class="bb-nav-badge">{{.NavBadges.UnreadReports}}</span>
-    {{end}}
   </a>
   <a href="/insights" class="bb-sidebar-link{{if eq .CurrentPage "insights"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="lightbulb"></i> Insights
@@ -44,6 +41,13 @@
   </a>
   <a href="/review-instructions" class="bb-sidebar-link{{if eq .CurrentPage "review-instructions"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="message-square-code"></i> Review Agent
+  </a>
+  <a href="/reports" class="bb-sidebar-link{{if eq .CurrentPage "reports"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="file-text"></i>
+    <span class="flex-1">Reports</span>
+    {{if and .NavBadges (gt .NavBadges.UnreadReports 0)}}
+    <span class="bb-nav-badge">{{.NavBadges.UnreadReports}}</span>
+    {{end}}
   </a>
 
   <div class="bb-sidebar-section">System</div>

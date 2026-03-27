@@ -38,8 +38,11 @@ func UnreadReportCountHandler(svc *service.Service) http.HandlerFunc {
 func CreateReportHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Title string `json:"title"`
-			Body  string `json:"body"`
+			Title    string   `json:"title"`
+			Body     string   `json:"body"`
+			Priority string   `json:"priority"`
+			Tags     []string `json:"tags"`
+			Author   string   `json:"author"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			mw.WriteError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid JSON body")
@@ -47,7 +50,7 @@ func CreateReportHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		actor := service.ActorFromContext(r.Context())
-		report, err := svc.CreateAgentReport(r.Context(), req.Title, req.Body, actor)
+		report, err := svc.CreateAgentReport(r.Context(), req.Title, req.Body, actor, req.Priority, req.Tags, req.Author)
 		if err != nil {
 			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return

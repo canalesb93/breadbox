@@ -35,6 +35,7 @@ var validFields = map[string]bool{
 
 // fieldAliases expand shorthand names to groups of fields.
 var fieldAliases = map[string][]string{
+	"minimal":    {"name", "amount", "date"},
 	"core":       {"id", "date", "amount", "name", "iso_currency_code"},
 	"category":   {"category", "category_primary_raw", "category_detailed_raw"},
 	"timestamps": {"created_at", "updated_at", "datetime", "authorized_datetime"},

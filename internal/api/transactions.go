@@ -156,20 +156,30 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			}
 		}
 
+		var excludeSearch *string
+		if v := q.Get("exclude_search"); v != "" {
+			if len(v) < 2 {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "exclude_search must be at least 2 characters")
+				return
+			}
+			excludeSearch = &v
+		}
+
 		params := service.TransactionListParams{
-			Cursor:       cursor,
-			Limit:        limit,
-			StartDate:    startDate,
-			EndDate:      endDate,
-			AccountID:    accountID,
-			UserID:       userID,
-			CategorySlug: categorySlug,
-			MinAmount:    minAmount,
-			MaxAmount:    maxAmount,
-			Pending:      pending,
-			Search:       search,
-			SortBy:       sortBy,
-			SortOrder:    sortOrder,
+			Cursor:        cursor,
+			Limit:         limit,
+			StartDate:     startDate,
+			EndDate:       endDate,
+			AccountID:     accountID,
+			UserID:        userID,
+			CategorySlug:  categorySlug,
+			MinAmount:     minAmount,
+			MaxAmount:     maxAmount,
+			Pending:       pending,
+			Search:        search,
+			ExcludeSearch: excludeSearch,
+			SortBy:        sortBy,
+			SortOrder:     sortOrder,
 		}
 
 		// Parse fields for field selection.
@@ -301,16 +311,26 @@ func CountTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			search = &v
 		}
 
+		var excludeSearch *string
+		if es := q.Get("exclude_search"); es != "" {
+			if len(es) < 2 {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "exclude_search must be at least 2 characters")
+				return
+			}
+			excludeSearch = &es
+		}
+
 		params := service.TransactionCountParams{
-			StartDate:    startDate,
-			EndDate:      endDate,
-			AccountID:    accountID,
-			UserID:       userID,
-			CategorySlug: categorySlug,
-			MinAmount:    minAmount,
-			MaxAmount:    maxAmount,
-			Pending:      pending,
-			Search:       search,
+			StartDate:     startDate,
+			EndDate:       endDate,
+			AccountID:     accountID,
+			UserID:        userID,
+			CategorySlug:  categorySlug,
+			MinAmount:     minAmount,
+			MaxAmount:     maxAmount,
+			Pending:       pending,
+			Search:        search,
+			ExcludeSearch: excludeSearch,
 		}
 
 		count, err := svc.CountTransactionsFiltered(r.Context(), params)
@@ -406,6 +426,97 @@ func TransactionSummaryHandler(svc *service.Service) http.HandlerFunc {
 				return
 			}
 			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get transaction summary")
+			return
+		}
+
+		writeData(w, result)
+	}
+}
+
+// MerchantSummaryHandler returns aggregated merchant-level statistics.
+func MerchantSummaryHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+
+		params := service.MerchantSummaryParams{}
+
+		if v := q.Get("start_date"); v != "" {
+			t, err := time.Parse("2006-01-02", v)
+			if err != nil {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be in YYYY-MM-DD format")
+				return
+			}
+			params.StartDate = &t
+		}
+
+		if v := q.Get("end_date"); v != "" {
+			t, err := time.Parse("2006-01-02", v)
+			if err != nil {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "end_date must be in YYYY-MM-DD format")
+				return
+			}
+			params.EndDate = &t
+		}
+
+		if v := q.Get("account_id"); v != "" {
+			params.AccountID = &v
+		}
+		if v := q.Get("user_id"); v != "" {
+			params.UserID = &v
+		}
+		if v := q.Get("category_slug"); v != "" {
+			params.CategorySlug = &v
+		}
+
+		if v := q.Get("min_amount"); v != "" {
+			f, err := strconv.ParseFloat(v, 64)
+			if err != nil {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "min_amount must be a valid number")
+				return
+			}
+			params.MinAmount = &f
+		}
+
+		if v := q.Get("max_amount"); v != "" {
+			f, err := strconv.ParseFloat(v, 64)
+			if err != nil {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "max_amount must be a valid number")
+				return
+			}
+			params.MaxAmount = &f
+		}
+
+		if v := q.Get("search"); v != "" {
+			params.Search = &v
+		}
+		if v := q.Get("exclude_search"); v != "" {
+			if len(v) < 2 {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "exclude_search must be at least 2 characters")
+				return
+			}
+			params.ExcludeSearch = &v
+		}
+
+		if v := q.Get("min_count"); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 1 {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "min_count must be a positive integer")
+				return
+			}
+			params.MinCount = n
+		}
+
+		if q.Get("spending_only") == "true" {
+			params.SpendingOnly = true
+		}
+
+		result, err := svc.GetMerchantSummary(r.Context(), params)
+		if err != nil {
+			if errors.Is(err, service.ErrInvalidParameter) {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				return
+			}
+			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get merchant summary")
 			return
 		}
 

@@ -952,20 +952,30 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			Title         string
 			Body          string
 			CreatedByName string
+			Priority      string
+			Tags          []string
+			DisplayAuthor string
 			CreatedAt     string // relative time
 		}
 		var agentReports []DashboardReport
-		rawReports, err := svc.ListUnreadAgentReports(ctx, 5)
+		rawReports, err := svc.ListUnreadAgentReports(ctx, 10)
 		if err != nil {
 			a.Logger.Error("list unread agent reports", "error", err)
 		}
 		for _, r := range rawReports {
 			t, _ := time.Parse(time.RFC3339, r.CreatedAt)
+			displayAuthor := r.CreatedByName
+			if r.Author != nil && *r.Author != "" {
+				displayAuthor = *r.Author
+			}
 			agentReports = append(agentReports, DashboardReport{
 				ID:            r.ID,
 				Title:         r.Title,
 				Body:          r.Body,
 				CreatedByName: r.CreatedByName,
+				Priority:      r.Priority,
+				Tags:          r.Tags,
+				DisplayAuthor: displayAuthor,
 				CreatedAt:     relativeTime(t),
 			})
 		}
