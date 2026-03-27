@@ -119,7 +119,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListParams) (*SyncLogListResult, error) {
 	query := "SELECT sl.id, sl.connection_id, bc.institution_name, sl.trigger, sl.status, " +
 		"sl.added_count, sl.modified_count, sl.removed_count, sl.error_message, " +
-		"sl.started_at, sl.completed_at " +
+		"sl.started_at, sl.completed_at, sl.duration_ms " +
 		"FROM sync_logs sl " +
 		"JOIN bank_connections bc ON sl.connection_id = bc.id " +
 		"WHERE 1=1"
@@ -189,20 +189,33 @@ func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListP
 			errorMessage    pgtype.Text
 			startedAt       pgtype.Timestamptz
 			completedAt     pgtype.Timestamptz
+			durationMs      pgtype.Int4
 		)
 
 		if err := rows.Scan(
 			&id, &connectionID, &institutionName, &trigger, &status,
 			&addedCount, &modifiedCount, &removedCount, &errorMessage,
-			&startedAt, &completedAt,
+			&startedAt, &completedAt, &durationMs,
 		); err != nil {
 			return nil, fmt.Errorf("scan sync log: %w", err)
 		}
 
 		var duration *string
-		if startedAt.Valid && completedAt.Valid {
-			d := completedAt.Time.Sub(startedAt.Time).Round(time.Millisecond).String()
+		if durationMs.Valid {
+			d := formatDurationMs(int64(durationMs.Int32))
 			duration = &d
+		} else if startedAt.Valid && completedAt.Valid {
+			// Fallback for logs before the duration_ms column was backfilled.
+			d := formatDurationMs(completedAt.Time.Sub(startedAt.Time).Milliseconds())
+			duration = &d
+		}
+
+		var durationMsPtr *int32
+		if durationMs.Valid {
+			durationMsPtr = &durationMs.Int32
+		} else if startedAt.Valid && completedAt.Valid {
+			ms := int32(completedAt.Time.Sub(startedAt.Time).Milliseconds())
+			durationMsPtr = &ms
 		}
 
 		instName := ""
@@ -223,6 +236,7 @@ func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListP
 			StartedAt:       timestampStr(startedAt),
 			CompletedAt:     timestampStr(completedAt),
 			Duration:        duration,
+			DurationMs:      durationMsPtr,
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -299,7 +313,7 @@ func (s *Service) SyncLogStats(ctx context.Context, params SyncLogListParams) (*
 		COUNT(*) AS total,
 		COUNT(*) FILTER (WHERE sl.status = 'success') AS success_count,
 		COUNT(*) FILTER (WHERE sl.status = 'error') AS error_count,
-		COALESCE(AVG(EXTRACT(MILLISECONDS FROM (sl.completed_at - sl.started_at))) FILTER (WHERE sl.completed_at IS NOT NULL), 0) AS avg_duration_ms,
+		COALESCE(AVG(COALESCE(sl.duration_ms, EXTRACT(MILLISECONDS FROM (sl.completed_at - sl.started_at))::INTEGER)) FILTER (WHERE sl.completed_at IS NOT NULL), 0) AS avg_duration_ms,
 		COALESCE(SUM(sl.added_count), 0) AS total_added,
 		COALESCE(SUM(sl.modified_count), 0) AS total_modified,
 		COALESCE(SUM(sl.removed_count), 0) AS total_removed
