@@ -438,6 +438,9 @@ func TransactionSummaryHandler(svc *service.Service) http.HandlerFunc {
 		if q.Get("include_pending") == "true" {
 			params.IncludePending = true
 		}
+		if q.Get("spending_only") == "true" {
+			params.SpendingOnly = true
+		}
 
 		result, err := svc.GetTransactionSummary(r.Context(), params)
 		if err != nil {

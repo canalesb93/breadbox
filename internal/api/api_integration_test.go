@@ -668,6 +668,55 @@ func TestAPI_TransactionSummary_InvalidGroupBy(t *testing.T) {
 	readErrorCode(t, resp, http.StatusBadRequest, "INVALID_PARAMETER")
 }
 
+func TestAPI_TransactionSummary_SpendingOnly(t *testing.T) {
+	env := setupTestEnv(t)
+	user := testutil.MustCreateUser(t, env.Queries, "Alice")
+	conn := testutil.MustCreateConnection(t, env.Queries, user.ID, "item_spending")
+	acct := testutil.MustCreateAccount(t, env.Queries, conn.ID, "ext_acct_spending", "Checking")
+
+	// Create a spending transaction (positive amount = debit) and an income transaction (negative amount = credit).
+	testutil.MustCreateTransaction(t, env.Queries, acct.ID, "ext_spend_1", "Coffee Shop", 1500, "2025-03-10")
+	testutil.MustCreateTransaction(t, env.Queries, acct.ID, "ext_income_1", "Payroll", -300000, "2025-03-10")
+
+	// Without spending_only: both transactions should appear.
+	resp := env.doGet(t, "/api/v1/transactions/summary?group_by=month&start_date=2025-03-01&end_date=2025-04-01")
+	assertStatus(t, resp, http.StatusOK)
+	var allResult struct {
+		Summary []struct {
+			TotalAmount float64 `json:"total_amount"`
+		} `json:"summary"`
+	}
+	parseJSON(t, resp, &allResult)
+	if len(allResult.Summary) == 0 {
+		t.Fatal("expected at least one summary row without spending_only")
+	}
+
+	// With spending_only=true: only the positive (spending) transaction should appear.
+	resp2 := env.doGet(t, "/api/v1/transactions/summary?group_by=month&start_date=2025-03-01&end_date=2025-04-01&spending_only=true")
+	assertStatus(t, resp2, http.StatusOK)
+	var spendResult struct {
+		Summary []struct {
+			TotalAmount float64 `json:"total_amount"`
+		} `json:"summary"`
+	}
+	parseJSON(t, resp2, &spendResult)
+	if len(spendResult.Summary) == 0 {
+		t.Fatal("expected at least one summary row with spending_only=true")
+	}
+
+	// The spending-only total should be positive and smaller in magnitude than the unfiltered total
+	// (which includes the large negative income transaction).
+	spendTotal := spendResult.Summary[0].TotalAmount
+	if spendTotal <= 0 {
+		t.Errorf("spending_only total should be positive (spending), got %f", spendTotal)
+	}
+	// The income transaction is -3000.00 and spend is 15.00; without the filter the sum would be negative.
+	allTotal := allResult.Summary[0].TotalAmount
+	if allTotal >= spendTotal {
+		t.Errorf("unfiltered total (%f) should be less than spending-only total (%f) due to income offset", allTotal, spendTotal)
+	}
+}
+
 // ============================================================
 // Category CRUD Handler Tests
 // ============================================================
