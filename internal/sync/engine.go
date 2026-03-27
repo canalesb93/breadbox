@@ -96,8 +96,16 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 		logger.Error("failed to update sync log", "error", err)
 	}
 
+	// Update consecutive failure tracking on the connection.
 	if syncErr != nil {
+		if err := e.db.IncrementConsecutiveFailures(ctx, connectionID); err != nil {
+			logger.Error("failed to increment consecutive failures", "error", err)
+		}
 		return fmt.Errorf("sync connection %s: %w", connIDStr, syncErr)
+	}
+
+	if err := e.db.ResetConsecutiveFailures(ctx, connectionID); err != nil {
+		logger.Error("failed to reset consecutive failures", "error", err)
 	}
 
 	logger.Info("sync completed", "added", added, "modified", modified, "removed", removed)

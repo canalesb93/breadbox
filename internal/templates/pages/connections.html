@@ -57,6 +57,12 @@
               <h3 class="font-semibold text-base group-hover:text-primary transition-colors truncate">{{.InstitutionName.String}}</h3>
               {{statusBadge (printf "%s" .Status)}}
               {{if .Paused}}<span class="badge badge-ghost badge-xs">Paused</span>{{end}}
+              {{if gt .ConsecutiveFailures 0}}
+              <span class="badge badge-warning badge-xs gap-1" title="{{.ConsecutiveFailures}} consecutive sync failure{{if ne .ConsecutiveFailures 1}}s{{end}}{{if .LastErrorAt.Valid}} — last error {{relativeTime .LastErrorAt.Time}}{{end}}">
+                <i data-lucide="alert-triangle" class="w-2.5 h-2.5"></i>
+                {{.ConsecutiveFailures}} fail{{if ne .ConsecutiveFailures 1}}s{{end}}
+              </span>
+              {{end}}
             </div>
             <div class="flex items-center gap-3 text-xs text-base-content/50 mt-0.5">
               <span>{{.UserName.String}}</span>
