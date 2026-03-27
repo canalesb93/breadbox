@@ -193,7 +193,16 @@ type SyncLogRow struct {
 	CompletedAt          *string
 	Duration             *string
 	DurationMs           *int32
-	AccountsAffected     int64 // number of accounts with activity in this sync
+	AccountsAffected     int64          // number of accounts with activity in this sync
+	RuleHits             []RuleHitEntry // per-rule hit counts from this sync run
+	TotalRuleHits        int            // sum of all rule hits
+}
+
+// RuleHitEntry represents a single rule's hit count within a sync run.
+type RuleHitEntry struct {
+	RuleID   string
+	RuleName string
+	Count    int
 }
 
 // SyncLogAccountRow represents a per-account breakdown within a sync log.

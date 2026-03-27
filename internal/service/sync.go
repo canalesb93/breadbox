@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"time"
 
@@ -57,7 +59,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 
 	query := "SELECT sl.id, sl.connection_id, bc.institution_name, sl.trigger, sl.status, " +
 		"sl.added_count, sl.modified_count, sl.removed_count, sl.error_message, " +
-		"sl.started_at, sl.completed_at " +
+		"sl.started_at, sl.completed_at, sl.rule_hits " +
 		"FROM sync_logs sl " +
 		"JOIN bank_connections bc ON sl.connection_id = bc.id " +
 		"WHERE sl.id = $1"
@@ -74,12 +76,13 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 		errorMessage    pgtype.Text
 		startedAt       pgtype.Timestamptz
 		completedAt     pgtype.Timestamptz
+		ruleHitsJSON    []byte
 	)
 
 	if err := s.Pool.QueryRow(ctx, query, uid).Scan(
 		&id, &connectionID, &institutionName, &trigger, &status,
 		&addedCount, &modifiedCount, &removedCount, &errorMessage,
-		&startedAt, &completedAt,
+		&startedAt, &completedAt, &ruleHitsJSON,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
@@ -101,7 +104,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 	// Get account count.
 	accountCount, _ := s.Queries.CountAffectedAccountsBySyncLog(ctx, uid)
 
-	return &SyncLogRow{
+	row := &SyncLogRow{
 		ID:               formatUUID(id),
 		ConnectionID:     formatUUID(connectionID),
 		InstitutionName:  instName,
@@ -115,7 +118,12 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 		CompletedAt:      timestampStr(completedAt),
 		Duration:         duration,
 		AccountsAffected: accountCount,
-	}, nil
+	}
+
+	// Parse and resolve rule hits.
+	row.RuleHits, row.TotalRuleHits = s.parseRuleHits(ctx, ruleHitsJSON)
+
+	return row, nil
 }
 
 func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListParams) (*SyncLogListResult, error) {
@@ -535,4 +543,59 @@ func (s *Service) ListSyncLogAccounts(ctx context.Context, syncLogID string) ([]
 		result = append(result, r)
 	}
 	return result, nil
+}
+
+// parseRuleHits parses the JSONB rule_hits column and resolves rule names.
+// Returns the entries sorted by hit count descending, and the total hit count.
+func (s *Service) parseRuleHits(ctx context.Context, ruleHitsJSON []byte) ([]RuleHitEntry, int) {
+	if len(ruleHitsJSON) == 0 {
+		return nil, 0
+	}
+
+	var hitMap map[string]int
+	if err := json.Unmarshal(ruleHitsJSON, &hitMap); err != nil {
+		s.Logger.Warn("failed to parse rule_hits JSON", "error", err)
+		return nil, 0
+	}
+
+	if len(hitMap) == 0 {
+		return nil, 0
+	}
+
+	// Batch-fetch rule names for all rule IDs.
+	ruleNames := make(map[string]string, len(hitMap))
+	for ruleID := range hitMap {
+		uid, err := parseUUID(ruleID)
+		if err != nil {
+			continue
+		}
+		var name string
+		err = s.Pool.QueryRow(ctx, "SELECT name FROM transaction_rules WHERE id = $1", uid).Scan(&name)
+		if err != nil {
+			name = "Deleted rule"
+		}
+		ruleNames[ruleID] = name
+	}
+
+	entries := make([]RuleHitEntry, 0, len(hitMap))
+	total := 0
+	for ruleID, count := range hitMap {
+		name := ruleNames[ruleID]
+		entries = append(entries, RuleHitEntry{
+			RuleID:   ruleID,
+			RuleName: name,
+			Count:    count,
+		})
+		total += count
+	}
+
+	// Sort by hit count descending, then by rule name for stability.
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Count != entries[j].Count {
+			return entries[i].Count > entries[j].Count
+		}
+		return entries[i].RuleName < entries[j].RuleName
+	})
+
+	return entries, total
 }
