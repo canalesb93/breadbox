@@ -55,21 +55,11 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			return
 		}
 
-		// Build connection count map keyed by formatted UUID.
-		connectionCounts := make(map[string]int64)
-		counts, err := a.Queries.CountConnectionsByUserID(ctx)
-		if err == nil {
-			for _, c := range counts {
-				connectionCounts[formatUUID(c.UserID)] = c.ConnectionCount
-			}
-		}
-
 		// Enrich each user with account data and financial summary.
 		enrichedUsers := make([]EnrichedUser, 0, len(users))
 		for _, u := range users {
 			eu := EnrichedUser{
-				User:            u,
-				ConnectionCount: connectionCounts[formatUUID(u.ID)],
+				User: u,
 			}
 
 			accounts, err := a.Queries.ListAccountsByUser(ctx, u.ID)
@@ -77,6 +67,15 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 				a.Logger.Error("list accounts for user", "error", err, "user_id", formatUUID(u.ID))
 			} else {
 				eu.AccountCount = len(accounts)
+				// Count distinct connections from displayed accounts so the
+				// count matches regardless of connection status.
+				connSet := make(map[string]struct{})
+				for _, acct := range accounts {
+					if acct.ConnectionID.Valid {
+						connSet[formatUUID(acct.ConnectionID)] = struct{}{}
+					}
+				}
+				eu.ConnectionCount = int64(len(connSet))
 				for _, acct := range accounts {
 					bal, err := numericToFloat(acct.BalanceCurrent)
 					hasBal := err == nil
