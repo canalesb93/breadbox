@@ -252,3 +252,99 @@ func (s *Service) SyncLogStats(ctx context.Context, params SyncLogListParams) (*
 
 	return &stats, nil
 }
+
+// GetSyncHealthSummary returns a dashboard-oriented summary of recent sync health.
+// It queries the last 24 hours of sync activity.
+func (s *Service) GetSyncHealthSummary(ctx context.Context) (*SyncHealthSummary, error) {
+	query := `SELECT
+		COUNT(*) AS total_syncs,
+		COUNT(*) FILTER (WHERE status = 'success') AS success_count,
+		COUNT(*) FILTER (WHERE status = 'error') AS error_count,
+		MAX(COALESCE(completed_at, started_at)) AS last_sync_time,
+		(SELECT status FROM sync_logs ORDER BY started_at DESC LIMIT 1) AS last_status
+	FROM sync_logs
+	WHERE started_at >= NOW() - INTERVAL '24 hours'`
+
+	var (
+		totalSyncs   int64
+		successCount int64
+		errorCount   int64
+		lastSyncTime pgtype.Timestamptz
+		lastStatus   pgtype.Text
+	)
+
+	err := s.Pool.QueryRow(ctx, query).Scan(
+		&totalSyncs,
+		&successCount,
+		&errorCount,
+		&lastSyncTime,
+		&lastStatus,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("sync health summary: %w", err)
+	}
+
+	summary := &SyncHealthSummary{
+		RecentSyncCount:  totalSyncs,
+		RecentErrorCount: errorCount,
+	}
+
+	if totalSyncs > 0 {
+		summary.RecentSuccessRate = float64(successCount) / float64(totalSyncs) * 100
+	}
+
+	if lastSyncTime.Valid {
+		t := relativeTimeStr(lastSyncTime.Time)
+		summary.LastSyncTime = &t
+	}
+
+	if lastStatus.Valid {
+		summary.LastSyncStatus = lastStatus.String
+	}
+
+	// Determine overall health: healthy, degraded, or unhealthy.
+	// - unhealthy: success rate < 50% with 2+ syncs, or all recent syncs failed
+	// - degraded: success rate < 100% or no syncs in 24h
+	// - healthy: everything ok
+	switch {
+	case totalSyncs == 0:
+		summary.OverallHealth = "degraded" // no recent syncs
+	case summary.RecentSuccessRate < 50 && totalSyncs >= 2:
+		summary.OverallHealth = "unhealthy"
+	case errorCount == totalSyncs && totalSyncs > 0:
+		summary.OverallHealth = "unhealthy"
+	case errorCount > 0:
+		summary.OverallHealth = "degraded"
+	default:
+		summary.OverallHealth = "healthy"
+	}
+
+	return summary, nil
+}
+
+// relativeTimeStr converts a time to a human-readable relative string.
+func relativeTimeStr(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		mins := int(d.Minutes())
+		if mins == 1 {
+			return "1 minute ago"
+		}
+		return fmt.Sprintf("%d minutes ago", mins)
+	case d < 24*time.Hour:
+		hours := int(d.Hours())
+		if hours == 1 {
+			return "1 hour ago"
+		}
+		return fmt.Sprintf("%d hours ago", hours)
+	default:
+		days := int(d.Hours() / 24)
+		if days == 1 {
+			return "1 day ago"
+		}
+		return fmt.Sprintf("%d days ago", days)
+	}
+}
