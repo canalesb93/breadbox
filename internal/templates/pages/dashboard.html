@@ -471,12 +471,13 @@
 <!-- Agent Reports: markdown rendering + dismiss logic -->
 {{if .AgentReports}}
 <script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.bb-report-body').forEach(function(el) {
     var md = el.getAttribute('data-markdown');
     if (md) {
-      el.innerHTML = marked.parse(md);
+      el.innerHTML = DOMPurify.sanitize(marked.parse(md));
       el.querySelectorAll('a').forEach(function(a) {
         a.classList.add('link', 'link-primary');
         if (a.href && !a.href.startsWith(window.location.origin) && !a.getAttribute('href').startsWith('/')) {
