@@ -471,6 +471,24 @@ func TestParseFields_AttributedFields(t *testing.T) {
 	}
 }
 
+func TestParseFields_MinimalAlias(t *testing.T) {
+	fields, err := ParseFields("minimal")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, f := range []string{"id", "name", "amount", "date"} {
+		if !fields[f] {
+			t.Errorf("minimal alias should include %s", f)
+		}
+	}
+	// Should NOT include other core fields
+	for _, f := range []string{"iso_currency_code", "account_id", "merchant_name"} {
+		if fields[f] {
+			t.Errorf("minimal alias should not include %s", f)
+		}
+	}
+}
+
 func TestFilterTransactionFields_AttributedFields(t *testing.T) {
 	uid := "user-123"
 	uname := "Ricardo"

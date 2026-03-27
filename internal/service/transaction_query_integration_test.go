@@ -1213,3 +1213,398 @@ func formatTestUUID(u pgtype.UUID) string {
 	b := u.Bytes
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
+
+func upsertTxnWithMerchant(t *testing.T, q *db.Queries, acctID pgtype.UUID, extID, name, merchant string, amountCents int64, date string) db.Transaction {
+	t.Helper()
+	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
+		AccountID:             acctID,
+		ExternalTransactionID: extID,
+		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
+		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
+		Date:                  pgtype.Date{Time: testutil.MustParseDate(date), Valid: true},
+		Name:                  name,
+		MerchantName:          pgtype.Text{String: merchant, Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("upsertTxnWithMerchant(%q): %v", name, err)
+	}
+	return txn
+}
+
+// --- Merchant Summary ---
+
+func TestGetMerchantSummary_Basic(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	// Create 3 transactions for "Starbucks", 2 for "Amazon", 1 for "Target"
+	upsertTxnWithMerchant(t, queries, acctID, "ms1", "STARBUCKS #1234", "Starbucks", 550, "2025-01-05")
+	upsertTxnWithMerchant(t, queries, acctID, "ms2", "STARBUCKS #5678", "Starbucks", 650, "2025-01-10")
+	upsertTxnWithMerchant(t, queries, acctID, "ms3", "STARBUCKS #9012", "Starbucks", 475, "2025-01-15")
+	upsertTxnWithMerchant(t, queries, acctID, "ms4", "AMZN*1234", "Amazon", 2999, "2025-01-08")
+	upsertTxnWithMerchant(t, queries, acctID, "ms5", "AMZN*5678", "Amazon", 1599, "2025-01-12")
+	testutil.MustCreateTransaction(t, queries, acctID, "ms6", "TARGET #123", 4250, "2025-01-20")
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+	result, err := svc.GetMerchantSummary(ctx, service.MerchantSummaryParams{
+		StartDate: &start,
+		EndDate:   &end,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Merchants) != 3 {
+		t.Fatalf("expected 3 merchants, got %d", len(result.Merchants))
+	}
+
+	// Ordered by count DESC: Starbucks (3), Amazon (2), Target (1)
+	if result.Merchants[0].Merchant != "Starbucks" {
+		t.Errorf("expected first merchant to be Starbucks, got %s", result.Merchants[0].Merchant)
+	}
+	if result.Merchants[0].TransactionCount != 3 {
+		t.Errorf("expected 3 Starbucks transactions, got %d", result.Merchants[0].TransactionCount)
+	}
+	// 5.50 + 6.50 + 4.75 = 16.75
+	if result.Merchants[0].TotalAmount != 16.75 {
+		t.Errorf("expected Starbucks total 16.75, got %f", result.Merchants[0].TotalAmount)
+	}
+	if result.Merchants[0].FirstDate != "2025-01-05" {
+		t.Errorf("expected first_date 2025-01-05, got %s", result.Merchants[0].FirstDate)
+	}
+	if result.Merchants[0].LastDate != "2025-01-15" {
+		t.Errorf("expected last_date 2025-01-15, got %s", result.Merchants[0].LastDate)
+	}
+
+	if result.Merchants[1].Merchant != "Amazon" {
+		t.Errorf("expected second merchant to be Amazon, got %s", result.Merchants[1].Merchant)
+	}
+	if result.Merchants[1].TransactionCount != 2 {
+		t.Errorf("expected 2 Amazon transactions, got %d", result.Merchants[1].TransactionCount)
+	}
+
+	// Totals
+	if result.Totals.MerchantCount != 3 {
+		t.Errorf("expected 3 total merchants, got %d", result.Totals.MerchantCount)
+	}
+	if result.Totals.TransactionCount != 6 {
+		t.Errorf("expected 6 total transactions, got %d", result.Totals.TransactionCount)
+	}
+	if result.Totals.TotalAmount == nil {
+		t.Error("expected total amount to be set (single currency)")
+	}
+}
+
+func TestGetMerchantSummary_MinCount(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	// 3x Starbucks, 2x Amazon, 1x Target
+	upsertTxnWithMerchant(t, queries, acctID, "mc1", "SB1", "Starbucks", 550, "2025-01-05")
+	upsertTxnWithMerchant(t, queries, acctID, "mc2", "SB2", "Starbucks", 650, "2025-01-10")
+	upsertTxnWithMerchant(t, queries, acctID, "mc3", "SB3", "Starbucks", 475, "2025-01-15")
+	upsertTxnWithMerchant(t, queries, acctID, "mc4", "AZ1", "Amazon", 2999, "2025-01-08")
+	upsertTxnWithMerchant(t, queries, acctID, "mc5", "AZ2", "Amazon", 1599, "2025-01-12")
+	testutil.MustCreateTransaction(t, queries, acctID, "mc6", "TARGET #123", 4250, "2025-01-20")
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+
+	// min_count=2 should exclude Target (1 transaction)
+	result, err := svc.GetMerchantSummary(ctx, service.MerchantSummaryParams{
+		StartDate: &start,
+		EndDate:   &end,
+		MinCount:  2,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Merchants) != 2 {
+		t.Fatalf("expected 2 merchants with min_count=2, got %d", len(result.Merchants))
+	}
+
+	// min_count=3 should only return Starbucks
+	result, err = svc.GetMerchantSummary(ctx, service.MerchantSummaryParams{
+		StartDate: &start,
+		EndDate:   &end,
+		MinCount:  3,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Merchants) != 1 {
+		t.Fatalf("expected 1 merchant with min_count=3, got %d", len(result.Merchants))
+	}
+	if result.Merchants[0].Merchant != "Starbucks" {
+		t.Errorf("expected Starbucks, got %s", result.Merchants[0].Merchant)
+	}
+}
+
+func TestGetMerchantSummary_FallsBackToName(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	// Transactions without merchant_name should group by name
+	testutil.MustCreateTransaction(t, queries, acctID, "fn1", "NETFLIX.COM", 1599, "2025-01-05")
+	testutil.MustCreateTransaction(t, queries, acctID, "fn2", "NETFLIX.COM", 1599, "2025-01-06")
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+	result, err := svc.GetMerchantSummary(ctx, service.MerchantSummaryParams{
+		StartDate: &start,
+		EndDate:   &end,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Merchants) != 1 {
+		t.Fatalf("expected 1 merchant, got %d", len(result.Merchants))
+	}
+	if result.Merchants[0].Merchant != "NETFLIX.COM" {
+		t.Errorf("expected NETFLIX.COM, got %s", result.Merchants[0].Merchant)
+	}
+	if result.Merchants[0].TransactionCount != 2 {
+		t.Errorf("expected 2 transactions, got %d", result.Merchants[0].TransactionCount)
+	}
+}
+
+func TestGetMerchantSummary_SpendingOnly(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	upsertTxnWithMerchant(t, queries, acctID, "so1", "Purchase", "Amazon", 5000, "2025-01-05")
+	upsertTxnWithMerchant(t, queries, acctID, "so2", "Refund", "Amazon", -2000, "2025-01-10")
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+
+	// Without spending_only: should include both
+	result, err := svc.GetMerchantSummary(ctx, service.MerchantSummaryParams{
+		StartDate: &start,
+		EndDate:   &end,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Merchants) != 1 {
+		t.Fatalf("expected 1 merchant, got %d", len(result.Merchants))
+	}
+	if result.Merchants[0].TransactionCount != 2 {
+		t.Errorf("expected 2 transactions, got %d", result.Merchants[0].TransactionCount)
+	}
+
+	// With spending_only: should only include positive amounts
+	result, err = svc.GetMerchantSummary(ctx, service.MerchantSummaryParams{
+		StartDate:    &start,
+		EndDate:      &end,
+		SpendingOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Merchants) != 1 {
+		t.Fatalf("expected 1 merchant, got %d", len(result.Merchants))
+	}
+	if result.Merchants[0].TransactionCount != 1 {
+		t.Errorf("expected 1 transaction with spending_only, got %d", result.Merchants[0].TransactionCount)
+	}
+}
+
+func TestGetMerchantSummary_SearchFilter(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	upsertTxnWithMerchant(t, queries, acctID, "sf1", "SB1", "Starbucks", 550, "2025-01-05")
+	upsertTxnWithMerchant(t, queries, acctID, "sf2", "AZ1", "Amazon", 2999, "2025-01-08")
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+	search := "star"
+	result, err := svc.GetMerchantSummary(ctx, service.MerchantSummaryParams{
+		StartDate: &start,
+		EndDate:   &end,
+		Search:    &search,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Merchants) != 1 {
+		t.Fatalf("expected 1 merchant with search=star, got %d", len(result.Merchants))
+	}
+	if result.Merchants[0].Merchant != "Starbucks" {
+		t.Errorf("expected Starbucks, got %s", result.Merchants[0].Merchant)
+	}
+}
+
+func TestGetMerchantSummary_ExcludeSearchFilter(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	upsertTxnWithMerchant(t, queries, acctID, "es1", "SB1", "Starbucks", 550, "2025-01-05")
+	upsertTxnWithMerchant(t, queries, acctID, "es2", "AZ1", "Amazon", 2999, "2025-01-08")
+	testutil.MustCreateTransaction(t, queries, acctID, "es3", "TARGET #123", 4250, "2025-01-20")
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+	exclude := "star"
+	result, err := svc.GetMerchantSummary(ctx, service.MerchantSummaryParams{
+		StartDate:     &start,
+		EndDate:       &end,
+		ExcludeSearch: &exclude,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should exclude Starbucks, return Amazon and Target
+	if len(result.Merchants) != 2 {
+		t.Fatalf("expected 2 merchants with exclude_search=star, got %d", len(result.Merchants))
+	}
+	for _, m := range result.Merchants {
+		if m.Merchant == "Starbucks" {
+			t.Error("Starbucks should be excluded")
+		}
+	}
+}
+
+func TestGetMerchantSummary_EmptyResult(t *testing.T) {
+	svc, _, _ := newService(t)
+	ctx := context.Background()
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+	result, err := svc.GetMerchantSummary(ctx, service.MerchantSummaryParams{
+		StartDate: &start,
+		EndDate:   &end,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Merchants) != 0 {
+		t.Errorf("expected 0 merchants, got %d", len(result.Merchants))
+	}
+	if result.Totals.MerchantCount != 0 {
+		t.Errorf("expected 0 merchant count, got %d", result.Totals.MerchantCount)
+	}
+}
+
+func TestGetMerchantSummary_DefaultDateRange(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	// Create a transaction today — should be included in default 90-day range
+	today := time.Now().Format("2006-01-02")
+	testutil.MustCreateTransaction(t, queries, acctID, "ddr1", "Today Store", 1000, today)
+
+	result, err := svc.GetMerchantSummary(ctx, service.MerchantSummaryParams{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Merchants) != 1 {
+		t.Fatalf("expected 1 merchant in default range, got %d", len(result.Merchants))
+	}
+}
+
+// --- ExcludeSearch on ListTransactions ---
+
+func TestListTransactions_ExcludeSearch(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	testutil.MustCreateTransaction(t, queries, acctID, "le1", "STARBUCKS #1234", 550, "2025-01-05")
+	testutil.MustCreateTransaction(t, queries, acctID, "le2", "AMAZON PURCHASE", 2999, "2025-01-08")
+	testutil.MustCreateTransaction(t, queries, acctID, "le3", "TARGET #123", 4250, "2025-01-20")
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+	exclude := "starbucks"
+
+	result, err := svc.ListTransactions(ctx, service.TransactionListParams{
+		StartDate:     &start,
+		EndDate:       &end,
+		ExcludeSearch: &exclude,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Transactions) != 2 {
+		t.Fatalf("expected 2 transactions after excluding starbucks, got %d", len(result.Transactions))
+	}
+	for _, txn := range result.Transactions {
+		if txn.Name == "STARBUCKS #1234" {
+			t.Error("STARBUCKS transaction should be excluded")
+		}
+	}
+}
+
+func TestListTransactions_ExcludeSearchByMerchantName(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	upsertTxnWithMerchant(t, queries, acctID, "em1", "SB #1234", "Starbucks", 550, "2025-01-05")
+	testutil.MustCreateTransaction(t, queries, acctID, "em2", "AMAZON PURCHASE", 2999, "2025-01-08")
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+	exclude := "starbucks"
+
+	result, err := svc.ListTransactions(ctx, service.TransactionListParams{
+		StartDate:     &start,
+		EndDate:       &end,
+		ExcludeSearch: &exclude,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Transactions) != 1 {
+		t.Fatalf("expected 1 transaction after excluding starbucks merchant, got %d", len(result.Transactions))
+	}
+	if result.Transactions[0].Name != "AMAZON PURCHASE" {
+		t.Errorf("expected AMAZON PURCHASE, got %s", result.Transactions[0].Name)
+	}
+}
+
+func TestCountTransactions_ExcludeSearch(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+	acctID := seedTxnFixture(t, queries)
+
+	testutil.MustCreateTransaction(t, queries, acctID, "ce1", "STARBUCKS #1234", 550, "2025-01-05")
+	testutil.MustCreateTransaction(t, queries, acctID, "ce2", "AMAZON PURCHASE", 2999, "2025-01-08")
+	testutil.MustCreateTransaction(t, queries, acctID, "ce3", "TARGET #123", 4250, "2025-01-20")
+
+	start := testutil.MustParseDate("2025-01-01")
+	end := testutil.MustParseDate("2025-02-01")
+	exclude := "starbucks"
+
+	count, err := svc.CountTransactionsFiltered(ctx, service.TransactionCountParams{
+		StartDate:     &start,
+		EndDate:       &end,
+		ExcludeSearch: &exclude,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if count != 2 {
+		t.Errorf("expected count 2 after excluding starbucks, got %d", count)
+	}
+}
