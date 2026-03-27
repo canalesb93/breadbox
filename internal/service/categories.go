@@ -633,9 +633,10 @@ func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecat
 	}
 
 	if params.Search != nil {
-		query += fmt.Sprintf(" AND (t.name ILIKE '%%' || $%d || '%%' OR t.merchant_name ILIKE '%%' || $%d || '%%')", argN, argN)
-		args = append(args, *params.Search)
-		argN++
+		sc := BuildSearchClause(*params.Search, "", TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += sc.SQL
+		args = append(args, sc.Args...)
+		argN = sc.ArgN
 	}
 
 	if params.NameContains != nil {

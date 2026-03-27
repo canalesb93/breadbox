@@ -57,6 +57,13 @@ RECOMMENDED QUERY PATTERNS:
 8. Use list_unmapped_categories to identify categorization gaps
 - Use exclude_search on query_transactions to filter out known merchants when hunting for unknown charges
 
+SEARCH MODES:
+- The search parameter supports three modes via search_mode: contains (default, substring match), words (all words must match — good for multi-word names like "Century Link" matching "CenturyLink"), fuzzy (typo-tolerant via trigram similarity — "starbuks" matches "Starbucks")
+- Comma-separated values in search are automatically ORed in all modes: search=starbucks,amazon matches either merchant
+- Available on: query_transactions, count_transactions, merchant_summary, list_transaction_rules
+- Use search_mode=words when you know the merchant name but not the exact formatting
+- Use search_mode=fuzzy when dealing with mangled bank feed names or uncertain spellings
+
 COMMENTS:
 - Use add_transaction_comment to explain your reasoning when recategorizing transactions
 - Check list_transaction_comments before modifying a transaction to see prior context

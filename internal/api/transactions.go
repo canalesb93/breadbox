@@ -156,6 +156,15 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			}
 		}
 
+		var searchMode *string
+		if v := q.Get("search_mode"); v != "" {
+			if !service.ValidateSearchMode(v) {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "search_mode must be one of: contains, words, fuzzy")
+				return
+			}
+			searchMode = &v
+		}
+
 		var excludeSearch *string
 		if v := q.Get("exclude_search"); v != "" {
 			if len(v) < 2 {
@@ -177,6 +186,7 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			MaxAmount:     maxAmount,
 			Pending:       pending,
 			Search:        search,
+			SearchMode:    searchMode,
 			ExcludeSearch: excludeSearch,
 			SortBy:        sortBy,
 			SortOrder:     sortOrder,
@@ -311,6 +321,15 @@ func CountTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			search = &v
 		}
 
+		var searchMode *string
+		if v := q.Get("search_mode"); v != "" {
+			if !service.ValidateSearchMode(v) {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "search_mode must be one of: contains, words, fuzzy")
+				return
+			}
+			searchMode = &v
+		}
+
 		var excludeSearch *string
 		if es := q.Get("exclude_search"); es != "" {
 			if len(es) < 2 {
@@ -330,6 +349,7 @@ func CountTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			MaxAmount:     maxAmount,
 			Pending:       pending,
 			Search:        search,
+			SearchMode:    searchMode,
 			ExcludeSearch: excludeSearch,
 		}
 
@@ -488,6 +508,13 @@ func MerchantSummaryHandler(svc *service.Service) http.HandlerFunc {
 
 		if v := q.Get("search"); v != "" {
 			params.Search = &v
+		}
+		if v := q.Get("search_mode"); v != "" {
+			if !service.ValidateSearchMode(v) {
+				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "search_mode must be one of: contains, words, fuzzy")
+				return
+			}
+			params.SearchMode = &v
 		}
 		if v := q.Get("exclude_search"); v != "" {
 			if len(v) < 2 {

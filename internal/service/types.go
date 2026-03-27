@@ -77,6 +77,7 @@ type TransactionListParams struct {
 	MaxAmount        *float64
 	Pending          *bool
 	Search           *string
+	SearchMode       *string // contains (default), words, fuzzy
 	ExcludeSearch    *string
 	SortBy           *string
 	SortOrder        *string
@@ -93,6 +94,7 @@ type TransactionCountParams struct {
 	MaxAmount        *float64
 	Pending          *bool
 	Search           *string
+	SearchMode       *string
 	ExcludeSearch    *string
 	IncludeDependent bool
 }
@@ -214,6 +216,7 @@ type AdminTransactionListParams struct {
 	MaxAmount     *float64
 	Pending       *bool
 	Search        *string
+	SearchMode    *string
 	ExcludeSearch *string
 	SortOrder     string // "desc" (default) or "asc"
 }
@@ -408,6 +411,7 @@ type TransactionRuleListParams struct {
 	CategorySlug *string
 	Enabled      *bool
 	Search       *string
+	SearchMode   *string
 	Limit        int
 	Cursor       string
 }
@@ -486,6 +490,7 @@ type MerchantSummaryParams struct {
 	MinAmount     *float64
 	MaxAmount     *float64
 	Search        *string
+	SearchMode    *string
 	ExcludeSearch *string
 	MinCount      int  // minimum transaction count to include (default 1)
 	SpendingOnly  bool // only positive amounts
