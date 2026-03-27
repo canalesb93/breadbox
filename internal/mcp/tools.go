@@ -26,8 +26,9 @@ type queryTransactionsInput struct {
 	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount (positive=debit, negative=credit)"`
 	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount (positive=debit, negative=credit)"`
 	Pending       *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
-	Search        string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant"`
-	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions whose name or merchant matches this text (ILIKE). Use to filter out known merchants when hunting for unknown charges."`
+	Search        string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant. Comma-separated values are ORed (e.g. starbucks,amazon matches either)."`
+	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"How to match the search term: contains (default, substring match), words (all words must match, good for multi-word queries), fuzzy (typo-tolerant via trigram similarity)"`
+	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions whose name or merchant matches this text. Comma-separated values are ORed. Use to filter out known merchants."`
 	Limit         int      `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
 	Cursor        string   `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
 	SortBy        string   `json:"sort_by,omitempty" jsonschema:"Sort: date (default), amount, name"`
@@ -44,7 +45,8 @@ type countTransactionsInput struct {
 	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount"`
 	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount"`
 	Pending       *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
-	Search        string   `json:"search,omitempty" jsonschema:"Search name or merchant"`
+	Search        string   `json:"search,omitempty" jsonschema:"Search name or merchant. Comma-separated values are ORed."`
+	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy"`
 	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions matching this text"`
 }
 
@@ -88,8 +90,9 @@ type merchantSummaryInput struct {
 	CategorySlug  string   `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
 	MinAmount     *float64 `json:"min_amount,omitempty" jsonschema:"Minimum transaction amount"`
 	MaxAmount     *float64 `json:"max_amount,omitempty" jsonschema:"Maximum transaction amount"`
-	Search        string   `json:"search,omitempty" jsonschema:"Search merchant/transaction names (ILIKE)"`
-	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude merchants matching this text (ILIKE). Use to filter out known merchants when hunting for unknowns."`
+	Search        string   `json:"search,omitempty" jsonschema:"Search merchant/transaction names. Comma-separated values are ORed."`
+	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy"`
+	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude merchants matching this text. Comma-separated values are ORed."`
 	MinCount      int      `json:"min_count,omitempty" jsonschema:"Minimum transaction count to include a merchant (default 1). Set to 2+ to find recurring charges."`
 	SpendingOnly  *bool    `json:"spending_only,omitempty" jsonschema:"Only include spending (positive amounts). Default false."`
 }
@@ -208,6 +211,12 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 	if input.Search != "" {
 		params.Search = &input.Search
 	}
+	if input.SearchMode != "" {
+		if !service.ValidateSearchMode(input.SearchMode) {
+			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
+		}
+		params.SearchMode = &input.SearchMode
+	}
 	if input.ExcludeSearch != "" {
 		params.ExcludeSearch = &input.ExcludeSearch
 	}
@@ -282,6 +291,12 @@ func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToo
 	}
 	if input.Search != "" {
 		params.Search = &input.Search
+	}
+	if input.SearchMode != "" {
+		if !service.ValidateSearchMode(input.SearchMode) {
+			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
+		}
+		params.SearchMode = &input.SearchMode
 	}
 	if input.ExcludeSearch != "" {
 		params.ExcludeSearch = &input.ExcludeSearch
@@ -505,6 +520,12 @@ func (s *MCPServer) handleMerchantSummary(_ context.Context, _ *mcpsdk.CallToolR
 	}
 	if input.Search != "" {
 		params.Search = &input.Search
+	}
+	if input.SearchMode != "" {
+		if !service.ValidateSearchMode(input.SearchMode) {
+			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
+		}
+		params.SearchMode = &input.SearchMode
 	}
 	if input.ExcludeSearch != "" {
 		params.ExcludeSearch = &input.ExcludeSearch
@@ -790,7 +811,8 @@ type createTransactionRuleInput struct {
 type listTransactionRulesInput struct {
 	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
 	Enabled      *bool  `json:"enabled,omitempty" jsonschema:"Filter by enabled status"`
-	Search       string `json:"search,omitempty" jsonschema:"Search by rule name"`
+	Search       string `json:"search,omitempty" jsonschema:"Search by rule name. Comma-separated values are ORed."`
+	SearchMode   string `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy"`
 	Limit        int    `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
 	Cursor       string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
 }
@@ -900,6 +922,12 @@ func (s *MCPServer) handleListTransactionRules(_ context.Context, _ *mcpsdk.Call
 	}
 	if input.Search != "" {
 		params.Search = &input.Search
+	}
+	if input.SearchMode != "" {
+		if !service.ValidateSearchMode(input.SearchMode) {
+			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
+		}
+		params.SearchMode = &input.SearchMode
 	}
 
 	result, err := s.svc.ListTransactionRules(ctx, params)

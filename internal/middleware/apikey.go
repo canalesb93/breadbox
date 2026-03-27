@@ -42,10 +42,16 @@ func APIKeyAuth(svc *service.Service) func(http.Handler) http.Handler {
 					return
 				}
 
+				// Look up OAuth client name for display purposes.
+				clientName := accessToken.ClientID
+				if client, err := svc.Queries.GetOAuthClientByClientID(r.Context(), accessToken.ClientID); err == nil {
+					clientName = client.Name
+				}
+
 				// Create a synthetic API key record so existing scope checks work.
 				syntheticKey := &db.ApiKey{
 					ID:    accessToken.ID,
-					Name:  "oauth:" + accessToken.ClientID,
+					Name:  clientName,
 					Scope: accessToken.Scope,
 				}
 

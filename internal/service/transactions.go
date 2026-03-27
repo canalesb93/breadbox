@@ -121,9 +121,21 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	}
 
 	if params.Search != nil {
-		query += fmt.Sprintf(" AND (t.name ILIKE '%%' || $%d || '%%' OR t.merchant_name ILIKE '%%' || $%d || '%%')", argN, argN)
-		args = append(args, *params.Search)
-		argN++
+		mode := ""
+		if params.SearchMode != nil {
+			mode = *params.SearchMode
+		}
+		sc := BuildSearchClause(*params.Search, mode, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += sc.SQL
+		args = append(args, sc.Args...)
+		argN = sc.ArgN
+	}
+
+	if params.ExcludeSearch != nil {
+		ec := BuildExcludeSearchClause(*params.ExcludeSearch, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += ec.SQL
+		args = append(args, ec.Args...)
+		argN = ec.ArgN
 	}
 
 	if params.ExcludeSearch != nil {
@@ -397,9 +409,21 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 	}
 
 	if params.Search != nil {
-		query += fmt.Sprintf(" AND (t.name ILIKE '%%' || $%d || '%%' OR t.merchant_name ILIKE '%%' || $%d || '%%')", argN, argN)
-		args = append(args, *params.Search)
-		argN++
+		mode := ""
+		if params.SearchMode != nil {
+			mode = *params.SearchMode
+		}
+		sc := BuildSearchClause(*params.Search, mode, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += sc.SQL
+		args = append(args, sc.Args...)
+		argN = sc.ArgN
+	}
+
+	if params.ExcludeSearch != nil {
+		ec := BuildExcludeSearchClause(*params.ExcludeSearch, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += ec.SQL
+		args = append(args, ec.Args...)
+		argN = ec.ArgN
 	}
 
 	if params.ExcludeSearch != nil {
@@ -549,11 +573,23 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	}
 
 	if params.Search != nil {
-		clause := fmt.Sprintf(" AND (t.name ILIKE '%%' || $%d || '%%' OR t.merchant_name ILIKE '%%' || $%d || '%%')", argN, argN)
-		query += clause
-		whereClauses += clause
-		args = append(args, *params.Search)
-		argN++
+		mode := ""
+		if params.SearchMode != nil {
+			mode = *params.SearchMode
+		}
+		sc := BuildSearchClause(*params.Search, mode, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += sc.SQL
+		whereClauses += sc.SQL
+		args = append(args, sc.Args...)
+		argN = sc.ArgN
+	}
+
+	if params.ExcludeSearch != nil {
+		ec := BuildExcludeSearchClause(*params.ExcludeSearch, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += ec.SQL
+		whereClauses += ec.SQL
+		args = append(args, ec.Args...)
+		argN = ec.ArgN
 	}
 
 	if params.ExcludeSearch != nil {

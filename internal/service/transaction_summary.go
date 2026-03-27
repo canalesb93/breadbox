@@ -324,15 +324,21 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`
 	}
 
 	if params.Search != nil {
-		query += fmt.Sprintf(" AND (t.name ILIKE '%%' || $%d || '%%' OR t.merchant_name ILIKE '%%' || $%d || '%%')", argN, argN)
-		args = append(args, *params.Search)
-		argN++
+		mode := ""
+		if params.SearchMode != nil {
+			mode = *params.SearchMode
+		}
+		sc := BuildSearchClause(*params.Search, mode, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += sc.SQL
+		args = append(args, sc.Args...)
+		argN = sc.ArgN
 	}
 
 	if params.ExcludeSearch != nil {
-		query += fmt.Sprintf(" AND t.name NOT ILIKE '%%' || $%d || '%%' AND (t.merchant_name IS NULL OR t.merchant_name NOT ILIKE '%%' || $%d || '%%')", argN, argN)
-		args = append(args, *params.ExcludeSearch)
-		argN++
+		ec := BuildExcludeSearchClause(*params.ExcludeSearch, TransactionSearchColumns, TransactionNullableColumns, argN)
+		query += ec.SQL
+		args = append(args, ec.Args...)
+		argN = ec.ArgN
 	}
 
 	query += " GROUP BY COALESCE(t.merchant_name, t.name), t.iso_currency_code"

@@ -494,9 +494,17 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 	}
 
 	if params.Search != nil && *params.Search != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf("tr.name ILIKE $%d", argN))
-		args = append(args, "%"+*params.Search+"%")
-		argN++
+		mode := ""
+		if params.SearchMode != nil {
+			mode = *params.SearchMode
+		}
+		sc := BuildSearchClause(*params.Search, mode, RuleSearchColumns, RuleNullableColumns, argN)
+		if sc.SQL != "" {
+			// Strip leading " AND " since this builder uses a slice, not concatenation.
+			whereClauses = append(whereClauses, sc.SQL[5:])
+			args = append(args, sc.Args...)
+			argN = sc.ArgN
+		}
 	}
 
 	filterWhereSQL := ""
