@@ -1224,8 +1224,11 @@ func (s *MCPServer) handleBulkRecategorize(ctx context.Context, _ *mcpsdk.CallTo
 // --- Agent Reports ---
 
 type submitReportInput struct {
-	Title string `json:"title" jsonschema:"required,Short title summarizing the report (e.g. 'Weekly Review Complete' or 'Suspicious Transactions Found')"`
-	Body  string `json:"body" jsonschema:"required,Detailed report content in markdown format. To reference specific transactions use markdown links: [Transaction Name](/transactions/TRANSACTION_ID). These will be rendered as clickable deep-links in the dashboard."`
+	Title    string   `json:"title" jsonschema:"required,Short title summarizing the report (e.g. 'Weekly Review Complete' or 'Suspicious Transactions Found')"`
+	Body     string   `json:"body" jsonschema:"required,Detailed report content in markdown format. To reference specific transactions use markdown links: [Transaction Name](/transactions/TRANSACTION_ID). These will be rendered as clickable deep-links in the dashboard."`
+	Priority string   `json:"priority" jsonschema:"enum=info,enum=warning,enum=critical,default=info,Severity level: info (routine updates and summaries), warning (needs attention soon), critical (urgent action required)"`
+	Tags     []string `json:"tags" jsonschema:"Short labels for categorizing reports (e.g. 'weekly-review' or 'anomaly'). Max 10 tags."`
+	Author   string   `json:"author" jsonschema:"Custom author name to sign this report with. Overrides the API key name for display (e.g. 'Review Agent' or 'Budget Monitor')."`
 }
 
 func (s *MCPServer) handleSubmitReport(reqCtx context.Context, _ *mcpsdk.CallToolRequest, input submitReportInput) (*mcpsdk.CallToolResult, any, error) {
@@ -1236,7 +1239,7 @@ func (s *MCPServer) handleSubmitReport(reqCtx context.Context, _ *mcpsdk.CallToo
 	}
 
 	actor := service.ActorFromContext(reqCtx)
-	report, err := s.svc.CreateAgentReport(ctx, input.Title, input.Body, actor)
+	report, err := s.svc.CreateAgentReport(ctx, input.Title, input.Body, actor, input.Priority, input.Tags, input.Author)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}

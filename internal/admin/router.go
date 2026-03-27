@@ -88,6 +88,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/account-links", AccountLinksPageHandler(a, svc, sm, tr))
 		r.Get("/account-links/{id}", AccountLinkDetailHandler(a, svc, sm, tr))
 
+		r.Get("/reports", ReportsPageHandler(a, svc, sm, tr))
 		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
 		r.Get("/review-instructions", ReviewInstructionsPageHandler(sm, tr))
 		r.Get("/rules", RulesPageHandler(svc, sm, tr, a.Config.Version))
