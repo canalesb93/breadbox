@@ -300,7 +300,12 @@
             {{end}}
           </div>
           {{if and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid}}
+          {{$friendly := syncFriendlyError .ErrorMessage.String}}
+          {{if $friendly}}
+          <p class="text-xs text-error/70 mt-0.5 max-w-md truncate" title="{{.ErrorMessage.String}}">{{$friendly}}</p>
+          {{else}}
           <p class="text-xs text-error/70 mt-0.5 max-w-md truncate" title="{{.ErrorMessage.String}}">{{.ErrorMessage.String}}</p>
+          {{end}}
           {{end}}
         </div>
       </div>
