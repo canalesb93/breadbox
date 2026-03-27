@@ -5,6 +5,7 @@
      x-init="
        $watch('tab', v => { const u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); if (window._onInsightsTabSwitch) window._onInsightsTabSwitch(v); });
        window._setInsightsReady = () => { insightsReady = true; };
+       if (window._insightsChartsLoaded) { insightsReady = true; setTimeout(() => { if (window._insightCharts) window._insightCharts.forEach(c => { try { c.resize(); } catch(e) {} }); }, 150); }
      "
      @keydown.window="
        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.isContentEditable) return;
@@ -1712,6 +1713,10 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- ECharts Initialization -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // Clear stale flags from previous page loads (SPA-style navigations).
+  window._insightsChartsLoaded = false;
+  window._setInsightsReady = null;
+
   var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   // Read theme-aware colors from CSS custom properties
   var cs = getComputedStyle(document.documentElement);
@@ -2535,12 +2540,18 @@ document.addEventListener('DOMContentLoaded', function() {
   };
 
   // ── Signal to Alpine that insights content is ready ──
-  // Dismiss the skeleton loading state after charts are initialized.
-  requestAnimationFrame(function() {
+  // Two race conditions handled:
+  // 1. This runs before Alpine x-init: set flag, x-init will pick it up.
+  // 2. This runs after Alpine x-init: call _setInsightsReady directly.
+  window._insightsChartsLoaded = true;
+  if (window._setInsightsReady) {
+    window._setInsightsReady();
     setTimeout(function() {
-      if (window._setInsightsReady) window._setInsightsReady();
-    }, 80);
-  });
+      insightCharts.forEach(function(c) {
+        try { c.resize(); } catch(e) {}
+      });
+    }, 150);
+  }
 });
 </script>
 
