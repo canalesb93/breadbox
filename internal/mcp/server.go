@@ -105,10 +105,11 @@ RULE CREATION STRATEGY — follow this order:
 - Before creating rules, query some transactions to see what category_primary values exist — use query_transactions with fields=core,category
 
 AGENT REPORTS:
-- Use submit_report at the end of a review session to summarize what you did and flag anything needing human attention
-- The report title should be a short summary (e.g., "Weekly Review: 45 transactions categorized")
-- The body supports markdown. Reference specific transactions with links: [Transaction Name](/transactions/TRANSACTION_ID)
-- Reports appear on the family's dashboard — use them to communicate findings, flag suspicious transactions, or suggest actions`
+- Use submit_report to communicate with the family — think of the title as a notification message they'll read on their dashboard
+- The title should be a concise 1-2 sentence summary that's self-contained and informative (e.g., "Reviewed 47 transactions this week — 3 recategorized, no suspicious activity found.")
+- The body is the detailed breakdown shown when they tap to expand — use markdown with headers, bullets, and transaction links: [Name](/transactions/ID)
+- Set priority to 'warning' or 'critical' when something needs attention, 'info' for routine updates
+- Sign reports with an author name that identifies your role (e.g., "Review Agent", "Budget Monitor")`
 
 // ToolClassification indicates whether a tool is read-only or performs writes.
 type ToolClassification string
@@ -284,7 +285,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"Bulk-approve all pending reviews whose transactions already have a category (e.g., from rules). This bridges the gap between rules and reviews — after creating rules with apply_retroactively=true, call this to clear the review queue of transactions that rules already handled. Returns count of approved reviews and remaining pending count.",
 			s.handleAutoApproveCategorized),
 		makeToolDef("submit_report", ToolWrite,
-			"Submit a report to the family dashboard summarizing your work, flagging transactions, or raising issues. Reports appear in the dashboard for the family to review. Use this at the end of a review session to summarize what you did, what you found, and any items needing human attention. The body supports markdown — reference specific transactions with [Transaction Name](/transactions/TRANSACTION_ID) links so the family can click through to see details.",
+			"Send a message to the family's dashboard. The title is the main message — write it as a concise, self-contained 1-2 sentence summary the family can understand at a glance without expanding. The body provides the detailed breakdown (markdown with headers, bullets, transaction links). Use priority to signal urgency and author to identify your role.",
 			s.handleSubmitReport),
 	}
 }
