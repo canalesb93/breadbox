@@ -646,6 +646,34 @@
     transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease !important;
   }
 
+  /* ── Select dropdown popup (base-select appearance) ── */
+  /* DaisyUI 5 uses appearance: base-select which renders a custom dropdown popup.
+     In dark mode the popup and option backgrounds default to transparent,
+     causing content behind to bleed through. Fix by setting explicit backgrounds. */
+  @media (prefers-color-scheme: dark) {
+    .select::picker(select) {
+      background-color: oklch(0.205 0 0);
+      border: 1px solid oklch(0.35 0 0);
+      border-radius: 0.75rem;
+      box-shadow: 0 8px 32px oklch(0 0 0 / 0.5);
+      padding: 0.25rem;
+    }
+
+    .select option {
+      color: oklch(0.985 0 0);
+      border-radius: 0.5rem;
+      padding: 0.375rem 0.75rem;
+    }
+
+    .select option:hover {
+      background-color: oklch(0.269 0 0);
+    }
+
+    .select option:checked {
+      background-color: oklch(0.269 0 0);
+    }
+  }
+
   /* ── Modal backdrop smooth ── */
   .modal-backdrop {
     transition: opacity 0.2s ease !important;
