@@ -243,7 +243,9 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			txnResult, err := e.upsertTransaction(ctx, txQueries, &pendingAdded[i], accountIDCache, string(conn.Provider), resolver, conn.UserID, userName, logger)
 			if err != nil {
 				logger.Error("upsert added transaction", "external_id", pendingAdded[i].ExternalID, "error", err)
-			} else if reviewAutoEnqueue {
+				continue
+			}
+			if reviewAutoEnqueue {
 				isNew := txnResult.CreatedAt.Time.Equal(txnResult.UpdatedAt.Time)
 				e.enqueueForReview(ctx, txQueries, txnResult, isNew, confidenceThreshold, resolver)
 			}
@@ -264,7 +266,9 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			txnResult, err := e.upsertTransaction(ctx, txQueries, &pendingModified[i], accountIDCache, string(conn.Provider), resolver, conn.UserID, userName, logger)
 			if err != nil {
 				logger.Error("upsert modified transaction", "external_id", pendingModified[i].ExternalID, "error", err)
-			} else if reviewAutoEnqueue {
+				continue
+			}
+			if reviewAutoEnqueue {
 				e.enqueueForReview(ctx, txQueries, txnResult, false, confidenceThreshold, resolver)
 			}
 			modified++
