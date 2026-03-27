@@ -383,13 +383,19 @@ func ConnectionDetailHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 				errorSyncs++
 			}
 
-			// Calculate duration.
-			if log.StartedAt.Valid && log.CompletedAt.Valid {
-				dur := log.CompletedAt.Time.Sub(log.StartedAt.Time).Seconds()
-				if dur >= 0 && dur < 600 { // sanity check: under 10 min
-					avgDurationSec += dur
-					durationCount++
-				}
+			// Calculate duration (prefer stored duration_ms, fall back to timestamps).
+			var durSec float64
+			var hasDur bool
+			if log.DurationMs.Valid {
+				durSec = float64(log.DurationMs.Int32) / 1000.0
+				hasDur = true
+			} else if log.StartedAt.Valid && log.CompletedAt.Valid {
+				durSec = log.CompletedAt.Time.Sub(log.StartedAt.Time).Seconds()
+				hasDur = true
+			}
+			if hasDur && durSec >= 0 && durSec < 600 { // sanity check: under 10 min
+				avgDurationSec += durSec
+				durationCount++
 			}
 
 			// Populate day map.
