@@ -262,6 +262,10 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		removed = len(pendingRemovals)
 
 		// Process added transactions (skip excluded accounts).
+		// Note: providers like Teller return ALL transactions as "Added" on every
+		// sync (date-range polling). The upsert handles this correctly (ON CONFLICT
+		// DO UPDATE), but we need to count accurately: only truly new rows count as
+		// "added"; existing rows that got upserted count as "modified".
 		var skipped int
 		for i := range pendingAdded {
 			accountID, err := e.resolveAccountID(ctx, pendingAdded[i].AccountExternalID, accountIDCache)
@@ -278,12 +282,23 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				logger.Error("upsert added transaction", "external_id", pendingAdded[i].ExternalID, "error", err)
 				continue
 			}
+			// Determine if this was truly new or an upsert of an existing row.
+			// The DB sets created_at on INSERT and updated_at=NOW() on both INSERT
+			// and UPDATE. If they're equal (within 1s tolerance), it's a new row.
+			isNew := txnResult.CreatedAt.Time.Sub(txnResult.UpdatedAt.Time).Abs() < time.Second
+			if isNew {
+				added++
+			} else {
+				modified++
+			}
 			if reviewAutoEnqueue {
-				isNew := txnResult.CreatedAt.Time.Equal(txnResult.UpdatedAt.Time)
 				e.enqueueForReview(ctx, txQueries, txnResult, isNew, confidenceThreshold, resolver)
 			}
-			added++
-			e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "added")
+			if isNew {
+				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "added")
+			} else {
+				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "modified")
+			}
 		}
 
 		// Process modified transactions (skip excluded accounts).
@@ -302,10 +317,10 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				logger.Error("upsert modified transaction", "external_id", pendingModified[i].ExternalID, "error", err)
 				continue
 			}
+			modified++
 			if reviewAutoEnqueue {
 				e.enqueueForReview(ctx, txQueries, txnResult, false, confidenceThreshold, resolver)
 			}
-			modified++
 			e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "modified")
 		}
 
