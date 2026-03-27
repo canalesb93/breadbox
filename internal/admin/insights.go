@@ -884,7 +884,7 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			rows, fErr := a.DB.Query(ctx, `
 				SELECT
 					COALESCE(bc.user_id::text, 'unknown') AS uid,
-					COALESCE(u.display_name, u.username, 'Unknown') AS user_name,
+					COALESCE(u.name, 'Unknown') AS user_name,
 					SUM(t.amount) AS total,
 					COUNT(*)::int AS tx_count,
 					MODE() WITHIN GROUP (ORDER BY COALESCE(t.category_primary, '')) AS top_cat
@@ -894,7 +894,7 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 				LEFT JOIN users u ON bc.user_id = u.id
 				WHERE t.deleted_at IS NULL AND t.date >= $1 AND t.amount > 0 AND t.pending = false
 					AND COALESCE(a.is_dependent_linked, false) = false
-				GROUP BY bc.user_id, u.display_name, u.username
+				GROUP BY bc.user_id, u.name
 				ORDER BY SUM(t.amount) DESC
 			`, chartStart)
 			if fErr != nil {
