@@ -177,18 +177,30 @@ type SyncLogListResult struct {
 }
 
 type SyncLogRow struct {
-	ID              string
-	ConnectionID    string
-	InstitutionName string
-	Trigger         string
-	Status          string
-	AddedCount      int32
-	ModifiedCount   int32
-	RemovedCount    int32
-	ErrorMessage    *string
-	StartedAt       *string
-	CompletedAt     *string
-	Duration        *string
+	ID               string
+	ConnectionID     string
+	InstitutionName  string
+	Trigger          string
+	Status           string
+	AddedCount       int32
+	ModifiedCount    int32
+	RemovedCount     int32
+	ErrorMessage     *string
+	StartedAt        *string
+	CompletedAt      *string
+	Duration         *string
+	AccountsAffected int64 // number of accounts with activity in this sync
+}
+
+// SyncLogAccountRow represents a per-account breakdown within a sync log.
+type SyncLogAccountRow struct {
+	ID            string
+	SyncLogID     string
+	AccountID     *string
+	AccountName   string
+	AddedCount    int32
+	ModifiedCount int32
+	RemovedCount  int32
 }
 
 // SyncLogStats contains aggregate statistics about sync logs.

@@ -46,6 +46,76 @@ func (s *Service) TriggerSync(ctx context.Context, connectionID *string) error {
 	return nil
 }
 
+// GetSyncLog returns a single sync log with connection info.
+func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow, error) {
+	uid, err := parseUUID(syncLogID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid sync log id: %w", err)
+	}
+
+	query := "SELECT sl.id, sl.connection_id, bc.institution_name, sl.trigger, sl.status, " +
+		"sl.added_count, sl.modified_count, sl.removed_count, sl.error_message, " +
+		"sl.started_at, sl.completed_at " +
+		"FROM sync_logs sl " +
+		"JOIN bank_connections bc ON sl.connection_id = bc.id " +
+		"WHERE sl.id = $1"
+
+	var (
+		id              pgtype.UUID
+		connectionID    pgtype.UUID
+		institutionName pgtype.Text
+		trigger         string
+		status          string
+		addedCount      int32
+		modifiedCount   int32
+		removedCount    int32
+		errorMessage    pgtype.Text
+		startedAt       pgtype.Timestamptz
+		completedAt     pgtype.Timestamptz
+	)
+
+	if err := s.Pool.QueryRow(ctx, query, uid).Scan(
+		&id, &connectionID, &institutionName, &trigger, &status,
+		&addedCount, &modifiedCount, &removedCount, &errorMessage,
+		&startedAt, &completedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get sync log: %w", err)
+	}
+
+	var duration *string
+	if startedAt.Valid && completedAt.Valid {
+		d := completedAt.Time.Sub(startedAt.Time).Round(time.Millisecond).String()
+		duration = &d
+	}
+
+	instName := ""
+	if institutionName.Valid {
+		instName = institutionName.String
+	}
+
+	// Get account count.
+	accountCount, _ := s.Queries.CountAffectedAccountsBySyncLog(ctx, uid)
+
+	return &SyncLogRow{
+		ID:               formatUUID(id),
+		ConnectionID:     formatUUID(connectionID),
+		InstitutionName:  instName,
+		Trigger:          trigger,
+		Status:           status,
+		AddedCount:       addedCount,
+		ModifiedCount:    modifiedCount,
+		RemovedCount:     removedCount,
+		ErrorMessage:     textPtr(errorMessage),
+		StartedAt:        timestampStr(startedAt),
+		CompletedAt:      timestampStr(completedAt),
+		Duration:         duration,
+		AccountsAffected: accountCount,
+	}, nil
+}
+
 func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListParams) (*SyncLogListResult, error) {
 	query := "SELECT sl.id, sl.connection_id, bc.institution_name, sl.trigger, sl.status, " +
 		"sl.added_count, sl.modified_count, sl.removed_count, sl.error_message, " +
@@ -159,6 +229,29 @@ func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListP
 		return nil, fmt.Errorf("iterate sync logs: %w", err)
 	}
 
+	// Batch-fetch per-account counts for the returned sync log IDs.
+	if len(logs) > 0 {
+		syncLogIDs := make([]pgtype.UUID, 0, len(logs))
+		for _, l := range logs {
+			uid, err := parseUUID(l.ID)
+			if err == nil {
+				syncLogIDs = append(syncLogIDs, uid)
+			}
+		}
+		accountCounts, err := s.Queries.CountAffectedAccountsBySyncLogIDs(ctx, syncLogIDs)
+		if err == nil {
+			countMap := make(map[string]int64, len(accountCounts))
+			for _, ac := range accountCounts {
+				countMap[formatUUID(ac.SyncLogID)] = ac.AccountCount
+			}
+			for i := range logs {
+				if c, ok := countMap[logs[i].ID]; ok {
+					logs[i].AccountsAffected = c
+				}
+			}
+		}
+	}
+
 	totalPages := int(math.Ceil(float64(total) / float64(params.PageSize)))
 
 	return &SyncLogListResult{
@@ -251,4 +344,35 @@ func (s *Service) SyncLogStats(ctx context.Context, params SyncLogListParams) (*
 	}
 
 	return &stats, nil
+}
+
+// ListSyncLogAccounts returns the per-account breakdown for a specific sync log.
+func (s *Service) ListSyncLogAccounts(ctx context.Context, syncLogID string) ([]SyncLogAccountRow, error) {
+	uid, err := parseUUID(syncLogID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid sync log id: %w", err)
+	}
+
+	rows, err := s.Queries.ListSyncLogAccounts(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("list sync log accounts: %w", err)
+	}
+
+	result := make([]SyncLogAccountRow, 0, len(rows))
+	for _, row := range rows {
+		r := SyncLogAccountRow{
+			ID:            formatUUID(row.ID),
+			SyncLogID:     formatUUID(row.SyncLogID),
+			AccountName:   row.AccountName,
+			AddedCount:    row.AddedCount,
+			ModifiedCount: row.ModifiedCount,
+			RemovedCount:  row.RemovedCount,
+		}
+		if row.AccountID.Valid {
+			id := formatUUID(row.AccountID)
+			r.AccountID = &id
+		}
+		result = append(result, r)
+	}
+	return result, nil
 }
