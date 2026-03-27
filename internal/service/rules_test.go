@@ -375,6 +375,11 @@ func TestParseDuration(t *testing.T) {
 		{"abc", true},
 		{"", true},
 		{"30x", true},
+		{"-5d", true},
+		{"-1h", true},
+		{"0d", true},
+		{"0h", true},
+		{"-0w", true},
 	}
 
 	for _, tt := range tests {
