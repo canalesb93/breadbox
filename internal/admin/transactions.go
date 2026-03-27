@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"math"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -747,7 +748,7 @@ func buildPaginationBase(r *http.Request) string {
 	qs := make([]string, 0, len(paginationParams))
 	for _, key := range paginationParams {
 		if v := q.Get(key); v != "" {
-			qs = append(qs, key+"="+v)
+			qs = append(qs, key+"="+url.QueryEscape(v))
 		}
 	}
 	base := "/transactions?page="
@@ -768,12 +769,12 @@ func buildExportURL(r *http.Request) string {
 	qs := make([]string, 0, len(exportParams))
 	for _, key := range exportParams {
 		if v := q.Get(key); v != "" {
-			qs = append(qs, key+"="+v)
+			qs = append(qs, key+"="+url.QueryEscape(v))
 		}
 	}
-	url := "/-/transactions/export-csv"
+	exportURL := "/-/transactions/export-csv"
 	if len(qs) > 0 {
-		url += "?" + strings.Join(qs, "&")
+		exportURL += "?" + strings.Join(qs, "&")
 	}
-	return url
+	return exportURL
 }
