@@ -35,14 +35,11 @@
         <span class="w-2.5 h-2.5 rounded-full shrink-0 mt-1.5 {{if eq .Priority "critical"}}bg-error{{else if eq .Priority "warning"}}bg-warning{{else}}bg-base-content/20{{end}}"></span>
         <!-- Message content -->
         <div class="flex-1 min-w-0">
-          <p class="text-sm text-base-content/80 leading-relaxed">
-            {{.Title}}
-            {{if not .IsRead}}<span class="inline-block w-1.5 h-1.5 rounded-full bg-primary ml-1 align-middle"></span>{{end}}
-          </p>
-          <div class="flex items-center flex-wrap gap-2 mt-1.5 text-xs text-base-content/40">
-            <span>{{.DisplayAuthor}}</span>
-            <span>&middot;</span>
-            <span>{{.CreatedAt}}</span>
+          <div class="flex items-center flex-wrap gap-2 text-xs mb-1">
+            <span class="font-semibold text-base-content/70">{{.DisplayAuthor}}</span>
+            <span class="text-base-content/30">&middot;</span>
+            <span class="text-base-content/30">{{.CreatedAt}}</span>
+            {{if not .IsRead}}<span class="w-1.5 h-1.5 rounded-full bg-primary shrink-0"></span>{{end}}
             {{if eq .Priority "critical"}}
             <span class="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full bg-error/10 text-error/80">critical</span>
             {{else if eq .Priority "warning"}}
@@ -52,6 +49,7 @@
             <span class="text-[0.6rem] px-1.5 py-0.5 rounded-full bg-base-200/80 text-base-content/40">{{.}}</span>
             {{end}}
           </div>
+          <p class="text-sm text-base-content/70 leading-relaxed">{{.Title}}</p>
         </div>
         <!-- Actions -->
         <div class="flex items-center gap-1 shrink-0">
