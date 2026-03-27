@@ -69,6 +69,22 @@ func (s *Scheduler) Stop() {
 	s.logger.Info("scheduler stopped")
 }
 
+// backoffInterval returns an adjusted sync interval in minutes based on
+// consecutive failures. Uses exponential backoff (base * 2^failures) capped
+// at 16x the base interval so a persistently failing connection doesn't
+// retry every 15 minutes indefinitely.
+func backoffInterval(baseMinutes int, consecutiveFailures int32) int {
+	if consecutiveFailures <= 0 {
+		return baseMinutes
+	}
+	// Cap the exponent at 4 so max multiplier is 2^4 = 16.
+	exp := int(consecutiveFailures)
+	if exp > 4 {
+		exp = 4
+	}
+	return baseMinutes * (1 << exp)
+}
+
 // syncAllScheduled syncs all active, unpaused connections that are stale
 // according to their effective interval (per-connection override or global).
 func (s *Scheduler) syncAllScheduled(ctx context.Context, globalIntervalMinutes int) (synced, skipped int) {
@@ -91,11 +107,12 @@ func (s *Scheduler) syncAllScheduled(ctx context.Context, globalIntervalMinutes 
 	done := make(chan result, len(connections))
 
 	for _, conn := range connections {
-		// Compute effective interval.
-		effectiveMinutes := globalIntervalMinutes
+		// Compute effective interval with backoff for consecutive failures.
+		baseMinutes := globalIntervalMinutes
 		if conn.SyncIntervalOverrideMinutes.Valid {
-			effectiveMinutes = int(conn.SyncIntervalOverrideMinutes.Int32)
+			baseMinutes = int(conn.SyncIntervalOverrideMinutes.Int32)
 		}
+		effectiveMinutes := backoffInterval(baseMinutes, conn.ConsecutiveFailures)
 
 		// Skip if not stale.
 		if conn.LastSyncedAt.Valid {
@@ -150,10 +167,11 @@ func (s *Scheduler) RunStartupSync(ctx context.Context, globalIntervalMinutes in
 	var staleCount int
 
 	for _, conn := range connections {
-		effectiveMinutes := globalIntervalMinutes
+		baseMinutes := globalIntervalMinutes
 		if conn.SyncIntervalOverrideMinutes.Valid {
-			effectiveMinutes = int(conn.SyncIntervalOverrideMinutes.Int32)
+			baseMinutes = int(conn.SyncIntervalOverrideMinutes.Int32)
 		}
+		effectiveMinutes := backoffInterval(baseMinutes, conn.ConsecutiveFailures)
 
 		threshold := now.Add(-time.Duration(effectiveMinutes) * time.Minute)
 		if !conn.LastSyncedAt.Valid || conn.LastSyncedAt.Time.Before(threshold) {
