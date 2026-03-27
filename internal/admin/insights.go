@@ -305,6 +305,72 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		var recurringTotal float64
 		var sparklineSpending []float64
 		var sparklineIncome []float64
+		var netWorth, totalAssets, totalLiabilities float64
+		var netWorthLabelsJSON, netWorthValuesJSON template.JS
+
+		// 0. Net worth: fetch accounts and compute balances + trend
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			accounts, err := svc.ListAccounts(ctx, nil)
+			if err != nil {
+				a.Logger.Error("list accounts for insights net worth", "error", err)
+				return
+			}
+			for _, acct := range accounts {
+				if acct.BalanceCurrent == nil {
+					continue
+				}
+				bal := *acct.BalanceCurrent
+				isLiability := acct.Type == "credit" || acct.Type == "loan"
+				if isLiability {
+					totalLiabilities += math.Abs(bal)
+					netWorth -= math.Abs(bal)
+				} else {
+					totalAssets += bal
+					netWorth += bal
+				}
+			}
+			// Net worth trend: work backwards from current balance using daily transaction totals.
+			netWorthTrendStart := time.Now().AddDate(0, 0, -chartDays)
+			dailyNetSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+				GroupBy:   "day",
+				StartDate: &netWorthTrendStart,
+			})
+			if err != nil {
+				a.Logger.Error("daily net summary for net worth trend", "error", err)
+				return
+			}
+			dailyNetMap := make(map[string]float64)
+			if dailyNetSummary != nil {
+				for _, row := range dailyNetSummary.Summary {
+					if row.Period != nil {
+						dailyNetMap[*row.Period] = row.TotalAmount
+					}
+				}
+			}
+			now := time.Now()
+			nwDays := chartDays
+			if nwDays > 90 {
+				nwDays = 90
+			}
+			nwLabels := make([]string, nwDays+1)
+			nwValues := make([]float64, nwDays+1)
+			nwValues[nwDays] = netWorth
+			nwLabels[nwDays] = now.Format("2006-01-02")
+			for i := nwDays - 1; i >= 0; i-- {
+				day := now.AddDate(0, 0, -(nwDays - i))
+				nwLabels[i] = day.Format("2006-01-02")
+				nextDayStr := now.AddDate(0, 0, -(nwDays - i - 1)).Format("2006-01-02")
+				nwValues[i] = nwValues[i+1] + dailyNetMap[nextDayStr]
+			}
+			if lb, err := json.Marshal(nwLabels); err == nil {
+				netWorthLabelsJSON = template.JS(lb)
+			}
+			if vb, err := json.Marshal(nwValues); err == nil {
+				netWorthValuesJSON = template.JS(vb)
+			}
+		}()
 
 		// 1. Category summary
 		wg.Add(1)
@@ -2257,6 +2323,12 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			"HealthLabel":               healthLabel,
 			"HealthColorClass":          healthColorClass,
 			"HealthDimensions":          healthDimensions,
+			// Net worth.
+			"NetWorth":                  netWorth,
+			"TotalAssets":               totalAssets,
+			"TotalLiabilities":          totalLiabilities,
+			"NetWorthLabels":            netWorthLabelsJSON,
+			"NetWorthValues":            netWorthValuesJSON,
 		}
 		tr.Render(w, r, "insights.html", data)
 	}

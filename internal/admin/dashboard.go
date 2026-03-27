@@ -477,9 +477,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			a.Logger.Error("list accounts for dashboard", "error", err)
 		}
 
-		// Compute net worth and group by type.
-		var netWorth float64
-		var totalAssets, totalLiabilities float64
+		// Group accounts by type for display.
 		type DashboardAccount struct {
 			ID              string
 			Name            string
@@ -518,13 +516,6 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			}
 
 			isLiability := acct.Type == "credit" || acct.Type == "loan"
-			if isLiability {
-				totalLiabilities += math.Abs(bal)
-				netWorth -= math.Abs(bal)
-			} else {
-				totalAssets += bal
-				netWorth += bal
-			}
 
 			// Fetch per-account daily spending for sparkline.
 			acctID := acct.ID
@@ -591,6 +582,16 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			return dashAccounts[i].Name < dashAccounts[j].Name
 		})
 
+		// Compute asset/liability totals for allocation bar.
+		var totalAssets, totalLiabilities float64
+		for _, acct := range dashAccounts {
+			if acct.IsLiability {
+				totalLiabilities += math.Abs(acct.BalanceCurrent)
+			} else {
+				totalAssets += acct.BalanceCurrent
+			}
+		}
+
 		// Allocation bar: group totals by type for the proportion bar.
 		accountGroupOrder := []string{"depository", "investment", "credit", "loan"}
 		accountGroupLabels := map[string]string{
@@ -650,56 +651,6 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 					Color:   color,
 				})
 			}
-		}
-
-		// Net worth trend: compute daily net worth by working backwards from current balance.
-		// Query all daily transaction totals (spending=positive, income=negative) for chart period.
-		// Going backwards: past_nw = current_nw + daily_net (positive spending means higher past balance).
-		netWorthTrendStart := time.Now().AddDate(0, 0, -chartDays)
-		dailyNetSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
-			GroupBy:   "day",
-			StartDate: &netWorthTrendStart,
-		})
-		if err != nil {
-			a.Logger.Error("daily net summary for net worth trend", "error", err)
-		}
-		// Build map of date -> net amount (positive = money out, negative = money in).
-		dailyNetMap := make(map[string]float64)
-		if dailyNetSummary != nil {
-			for _, row := range dailyNetSummary.Summary {
-				if row.Period != nil {
-					dailyNetMap[*row.Period] = row.TotalAmount
-				}
-			}
-		}
-		// Build net worth series: start from today's net worth, walk backwards.
-		now := time.Now()
-		nwDays := chartDays
-		if nwDays > 90 {
-			nwDays = 90 // Cap at 90 days for readability
-		}
-		nwLabels := make([]string, nwDays+1)
-		nwValues := make([]float64, nwDays+1)
-		nwValues[nwDays] = netWorth
-		nwLabels[nwDays] = now.Format("2006-01-02")
-		for i := nwDays - 1; i >= 0; i-- {
-			day := now.AddDate(0, 0, -(nwDays - i))
-			dayStr := day.Format("2006-01-02")
-			nwLabels[i] = dayStr
-			// Net worth on day[i] = net worth on day[i+1] + net_transactions on day[i+1].
-			// Positive transactions = spending (reduce net worth going forward),
-			// so going backwards: previous day = current day + spending that day.
-			// Negative transactions = income (increase net worth going forward),
-			// so going backwards: previous day = current day + (negative income) = lower.
-			nextDayStr := now.AddDate(0, 0, -(nwDays - i - 1)).Format("2006-01-02")
-			nwValues[i] = nwValues[i+1] + dailyNetMap[nextDayStr]
-		}
-		var netWorthLabelsJSON, netWorthValuesJSON template.JS
-		if lb, err := json.Marshal(nwLabels); err == nil {
-			netWorthLabelsJSON = template.JS(lb)
-		}
-		if vb, err := json.Marshal(nwValues); err == nil {
-			netWorthValuesJSON = template.JS(vb)
 		}
 
 		// ── Connection Health: per-connection status for dashboard panel ──
@@ -1062,16 +1013,11 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"TotalSpending":          totalSpending,
 			"TotalIncome":            totalIncome,
 			"Accounts":               dashAccounts,
-			"NetWorth":               netWorth,
-			"TotalAssets":            totalAssets,
-			"TotalLiabilities":       totalLiabilities,
 			"TopCategories":          topCategories,
 			"MaxCategorySpend":       maxCategorySpend,
 			"PrevTotalSpending":      prevTotalSpending,
 			"SpendingChangePercent":  spendingChangePercent,
 			"HasSpendingChange":      hasSpendingChange,
-			"NetWorthLabels":         netWorthLabelsJSON,
-			"NetWorthValues":         netWorthValuesJSON,
 			"CashFlowNet":            cashFlowNet,
 			"SavingsRate":            savingsRate,
 			"HasCashFlow":            hasCashFlow,
