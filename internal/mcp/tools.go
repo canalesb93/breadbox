@@ -1254,7 +1254,7 @@ func (s *MCPServer) handleBulkRecategorize(ctx context.Context, _ *mcpsdk.CallTo
 type submitReportInput struct {
 	Title    string   `json:"title" jsonschema:"required,A concise 1-2 sentence summary that reads like a notification or message. This is the primary thing the family sees on their dashboard — make it informative and self-contained. Good: 'Reviewed 47 transactions this week — 3 recategorized and no suspicious activity found.' Bad: 'Weekly Review Complete' (too vague to be useful without opening the full report)."`
 	Body     string   `json:"body" jsonschema:"required,Detailed breakdown in markdown format with supporting data. This is shown when the user expands the report for more detail. Use headers and bullet points and transaction links: [Transaction Name](/transactions/TRANSACTION_ID)."`
-	Priority string   `json:"priority" jsonschema:"enum=info,enum=warning,enum=critical,default=info,Severity level: info (routine updates and summaries), warning (needs attention soon), critical (urgent action required)"`
+	Priority string   `json:"priority" jsonschema:"Severity level. Valid values: info (default — routine updates and summaries), warning (needs attention soon), critical (urgent action required)"`
 	Tags     []string `json:"tags" jsonschema:"Short labels for categorizing reports (e.g. 'weekly-review' or 'anomaly'). Max 10 tags."`
 	Author   string   `json:"author" jsonschema:"Custom author name to sign this report with. Overrides the API key name for display (e.g. 'Review Agent' or 'Budget Monitor')."`
 }
