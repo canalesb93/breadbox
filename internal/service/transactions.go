@@ -317,6 +317,16 @@ func (s *Service) CountTransactions(ctx context.Context) (int64, error) {
 	return s.Queries.CountTransactions(ctx)
 }
 
+// CountUncategorizedTransactions returns the number of non-deleted transactions
+// with no category assigned and no manual override.
+func (s *Service) CountUncategorizedTransactions(ctx context.Context) (int64, error) {
+	var count int64
+	err := s.Pool.QueryRow(ctx,
+		"SELECT COUNT(*) FROM transactions WHERE deleted_at IS NULL AND category_id IS NULL AND category_override = FALSE").
+		Scan(&count)
+	return count, err
+}
+
 func (s *Service) CountTransactionsFiltered(ctx context.Context, params TransactionCountParams) (int64, error) {
 	query := "SELECT COUNT(*) FROM transactions t " +
 		"JOIN accounts a ON t.account_id = a.id " +
