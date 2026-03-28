@@ -709,6 +709,11 @@
 
         onInput() {
           this.activeIndex = 0;
+          var self = this;
+          setTimeout(function() {
+            var dialog = document.querySelector('.bb-cmdk-dialog');
+            if (dialog) lucide.createIcons({ nodes: [dialog] });
+          }, 10);
         },
 
         moveDown() {
