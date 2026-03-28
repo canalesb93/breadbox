@@ -218,13 +218,13 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"statusBadge": func(status string) template.HTML {
 				switch status {
 				case "active":
-					return `<span class="badge badge-success badge-sm">Active</span>`
+					return `<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-success/10 text-success">Active</span>`
 				case "pending_reauth":
-					return `<span class="badge badge-warning badge-sm">Re-auth Needed</span>`
+					return `<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-warning/10 text-warning">Re-auth Needed</span>`
 				case "error":
-					return `<span class="badge badge-error badge-sm">Error</span>`
+					return `<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-error/10 text-error">Error</span>`
 				default:
-					return `<span class="badge badge-ghost badge-sm">Disconnected</span>`
+					return `<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-base-content/5 text-base-content/40">Disconnected</span>`
 				}
 			},
 			"syncBadge": func(status string) template.HTML {
