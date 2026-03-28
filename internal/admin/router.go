@@ -202,6 +202,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/transaction-matches/{id}/confirm", ConfirmMatchAdminHandler(svc, sm))
 		r.Post("/transaction-matches/{id}/reject", RejectMatchAdminHandler(svc, sm))
 
+		// Quick search (command palette)
+		r.Get("/search/transactions", QuickSearchTransactionsHandler(svc))
+
 		// Agent reports
 		r.Post("/reports/{id}/read", MarkReportReadAdminHandler(svc))
 		r.Post("/reports/read-all", MarkAllReportsReadAdminHandler(svc))

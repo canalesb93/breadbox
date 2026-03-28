@@ -260,18 +260,8 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"safeCSS": func(s string) template.CSS {
 				return template.CSS(s)
 			},
-			"conditionSummary": func(c any) string {
-				switch v := c.(type) {
-				case service.Condition:
-					return service.ConditionSummary(v)
-				case *service.Condition:
-					if v == nil {
-						return ""
-					}
-					return service.ConditionSummary(*v)
-				default:
-					return ""
-				}
+			"conditionSummary": func(c service.Condition) string {
+				return service.ConditionSummary(c)
 			},
 			"deref": func(s *string) string {
 				if s == nil {
