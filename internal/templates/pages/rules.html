@@ -124,9 +124,18 @@
         {{end}}
       </div>
       <div class="text-xs text-base-content/40 mt-0.5 font-mono truncate" title="{{conditionSummary .Conditions}}">{{conditionSummary .Conditions}}</div>
+      <!-- Mobile-only: category + stats inline -->
+      <div class="flex items-center gap-2 mt-1.5 sm:hidden flex-wrap">
+        {{if .CategoryName}}
+        <span class="badge badge-outline badge-xs rounded-lg">{{deref .CategoryName}}</span>
+        {{end}}
+        <span class="text-xs text-base-content/40 tabular-nums">{{.HitCount}} hits</span>
+        <span class="text-xs text-base-content/30">&middot;</span>
+        <span class="text-xs text-base-content/40 tabular-nums">p{{.Priority}}</span>
+      </div>
     </div>
 
-    <!-- Category -->
+    <!-- Category (tablet+) -->
     <div class="hidden sm:flex flex-col items-end gap-0.5 flex-shrink-0">
       {{if .CategoryName}}
       <span class="badge badge-outline badge-sm rounded-lg">{{deref .CategoryName}}</span>
@@ -135,7 +144,7 @@
       {{end}}
     </div>
 
-    <!-- Stats -->
+    <!-- Stats (desktop+) -->
     <div class="hidden md:flex items-center gap-4 text-xs text-base-content/40 flex-shrink-0">
       <div class="text-center">
         <div class="font-semibold text-sm text-base-content/70 tabular-nums">{{.HitCount}}</div>
@@ -147,7 +156,7 @@
       </div>
     </div>
 
-    <!-- Creator badge -->
+    <!-- Creator badge (large desktop+) -->
     <div class="hidden lg:block flex-shrink-0">
       <span class="badge badge-ghost badge-xs rounded-lg">{{.CreatedByType}}</span>
     </div>
