@@ -368,9 +368,11 @@ func toStringSlice(v interface{}) ([]string, bool) {
 const ruleSelectQuery = `SELECT tr.id, tr.name, tr.conditions, tr.category_id, tr.priority, tr.enabled,
 	tr.expires_at, tr.created_by_type, tr.created_by_id, tr.created_by_name,
 	tr.hit_count, tr.last_hit_at, tr.created_at, tr.updated_at,
-	c.slug AS category_slug, c.display_name AS category_display_name
+	c.slug AS category_slug, c.display_name AS category_display_name,
+	COALESCE(c.icon, cp.icon) AS category_icon, COALESCE(c.color, cp.color) AS category_color
 	FROM transaction_rules tr
-	LEFT JOIN categories c ON tr.category_id = c.id`
+	LEFT JOIN categories c ON tr.category_id = c.id
+	LEFT JOIN categories cp ON c.parent_id = cp.id`
 
 // CreateTransactionRule creates a new transaction rule.
 func (s *Service) CreateTransactionRule(ctx context.Context, params CreateTransactionRuleParams) (*TransactionRuleResponse, error) {
@@ -479,7 +481,7 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 		limit = 500
 	}
 
-	baseFrom := `FROM transaction_rules tr LEFT JOIN categories c ON tr.category_id = c.id`
+	baseFrom := `FROM transaction_rules tr LEFT JOIN categories c ON tr.category_id = c.id LEFT JOIN categories cp ON c.parent_id = cp.id`
 
 	var whereClauses []string
 	var args []any
@@ -550,7 +552,8 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 	selectCols := `SELECT tr.id, tr.name, tr.conditions, tr.category_id, tr.priority, tr.enabled,
 		tr.expires_at, tr.created_by_type, tr.created_by_id, tr.created_by_name,
 		tr.hit_count, tr.last_hit_at, tr.created_at, tr.updated_at,
-		c.slug AS category_slug, c.display_name AS category_display_name `
+		c.slug AS category_slug, c.display_name AS category_display_name,
+		COALESCE(c.icon, cp.icon) AS category_icon, COALESCE(c.color, cp.color) AS category_color `
 
 	orderBy := " ORDER BY tr.created_at DESC, tr.id DESC"
 	limitClause := fmt.Sprintf(" LIMIT $%d", argN)
@@ -1157,8 +1160,10 @@ type ruleRow struct {
 	lastHitAt       pgtype.Timestamptz
 	createdAt       pgtype.Timestamptz
 	updatedAt       pgtype.Timestamptz
-	categorySlug    pgtype.Text
+	categorySlug     pgtype.Text
 	categoryDispName pgtype.Text
+	categoryIcon     pgtype.Text
+	categoryColor    pgtype.Text
 }
 
 // scanDest returns a slice of pointers for use with rows.Scan.
@@ -1167,7 +1172,7 @@ func (r *ruleRow) scanDest() []any {
 		&r.id, &r.name, &r.conditions, &r.categoryID, &r.priority, &r.enabled,
 		&r.expiresAt, &r.createdByType, &r.createdByID, &r.createdByName,
 		&r.hitCount, &r.lastHitAt, &r.createdAt, &r.updatedAt,
-		&r.categorySlug, &r.categoryDispName,
+		&r.categorySlug, &r.categoryDispName, &r.categoryIcon, &r.categoryColor,
 	}
 }
 
@@ -1183,6 +1188,8 @@ func (r *ruleRow) toResponse() TransactionRuleResponse {
 		CategoryID:    uuidPtr(r.categoryID),
 		CategorySlug:  textPtr(r.categorySlug),
 		CategoryName:  textPtr(r.categoryDispName),
+		CategoryIcon:  textPtr(r.categoryIcon),
+		CategoryColor: textPtr(r.categoryColor),
 		Priority:      int(r.priority),
 		Enabled:       r.enabled,
 		ExpiresAt:     timestampStr(r.expiresAt),
