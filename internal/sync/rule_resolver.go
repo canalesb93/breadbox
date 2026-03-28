@@ -303,6 +303,27 @@ func (r *RuleResolver) resolveMappings(provider, detailed, primary string) pgtyp
 	return r.uncategorizedID
 }
 
+// HitCountsJSON returns the per-rule hit counts from this sync run as JSON bytes
+// suitable for storing in the sync_logs.rule_hits JSONB column.
+// Returns nil if no rules matched.
+func (r *RuleResolver) HitCountsJSON() []byte {
+	if len(r.hitCounts) == 0 {
+		return nil
+	}
+
+	result := make(map[string]int, len(r.hitCounts))
+	for uuidBytes, count := range r.hitCounts {
+		id := pgtype.UUID{Bytes: uuidBytes, Valid: true}
+		result[formatUUID(id)] = count
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		return nil
+	}
+	return data
+}
+
 // FlushHitCounts updates hit_count and last_hit_at for all rules that matched
 // during this sync run. Should be called after the sync transaction commits.
 func (r *RuleResolver) FlushHitCounts(ctx context.Context, pool *pgxpool.Pool) error {

@@ -74,7 +74,7 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 	}
 
 	// Run the sync and capture results.
-	added, modified, removed, unchanged, perAccount, syncErr := e.runSync(ctx, connectionID, logger)
+	added, modified, removed, unchanged, perAccount, ruleHits, syncErr := e.runSync(ctx, connectionID, logger)
 
 	// Update sync_log with final status.
 	completedAt := time.Now()
@@ -103,6 +103,7 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 		UnchangedCount: int32(unchanged),
 		ErrorMessage:   errMsg,
 		DurationMs:     durationMs,
+		RuleHits:       ruleHits,
 	}); err != nil {
 		logger.Error("failed to update sync log", "error", err)
 	}
@@ -126,27 +127,27 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 	return nil
 }
 
-// runSync performs the actual sync loop for a connection. Returns counts, per-account breakdown, and any error.
-func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *slog.Logger) (added, modified, removed, unchanged int, perAccount map[string]*accountSyncCounts, err error) {
+// runSync performs the actual sync loop for a connection. Returns counts, per-account breakdown, rule hit counts JSON, and any error.
+func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *slog.Logger) (added, modified, removed, unchanged int, perAccount map[string]*accountSyncCounts, ruleHits []byte, err error) {
 	// Initialize per-account tracking map.
 	perAccount = make(map[string]*accountSyncCounts)
 
 	// Load connection from DB.
 	conn, err := e.db.GetBankConnectionForSync(ctx, connectionID)
 	if err != nil {
-		return 0, 0, 0, 0, nil, fmt.Errorf("load connection: %w", err)
+		return 0, 0, 0, 0, nil, nil, fmt.Errorf("load connection: %w", err)
 	}
 
 	// Look up the provider.
 	prov, ok := e.providers[string(conn.Provider)]
 	if !ok {
-		return 0, 0, 0, 0, nil, fmt.Errorf("unknown provider: %s", conn.Provider)
+		return 0, 0, 0, 0, nil, nil, fmt.Errorf("unknown provider: %s", conn.Provider)
 	}
 
 	// Fetch excluded account IDs for this connection.
 	excludedIDs, err := e.db.ListExcludedAccountIDsByConnection(ctx, connectionID)
 	if err != nil {
-		return 0, 0, 0, 0, nil, fmt.Errorf("list excluded accounts: %w", err)
+		return 0, 0, 0, 0, nil, nil, fmt.Errorf("list excluded accounts: %w", err)
 	}
 	excludedSet := make(map[pgtype.UUID]bool, len(excludedIDs))
 	for _, id := range excludedIDs {
@@ -200,9 +201,27 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		}
 	}
 
-	// Account ID + name caches to avoid repeated lookups.
+	// Pre-fetch all account IDs and display names for this connection in one query.
+	// This eliminates per-transaction DB lookups during the sync loop. The caches
+	// still work as lazy fallbacks if a new account appears mid-sync.
 	accountIDCache := make(map[string]pgtype.UUID)
 	accountNameCache := make(map[string]string) // account UUID string -> display name
+
+	connAccounts, err := e.db.ListAccountsByConnection(ctx, connectionID)
+	if err != nil {
+		logger.Warn("failed to pre-fetch accounts, will resolve lazily", "error", err)
+	} else {
+		for _, acct := range connAccounts {
+			accountIDCache[acct.ExternalAccountID] = acct.ID
+			key := formatUUID(acct.ID)
+			if acct.DisplayName.Valid && acct.DisplayName.String != "" {
+				accountNameCache[key] = acct.DisplayName.String
+			} else {
+				accountNameCache[key] = acct.Name
+			}
+		}
+		logger.Debug("pre-fetched account caches", "accounts", len(connAccounts))
+	}
 
 	// Buffer writes so we can discard them on ErrMutationDuringPagination.
 	var pendingRemovals []string
@@ -229,9 +248,9 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 					ErrorCode:    pgtype.Text{String: "ITEM_LOGIN_REQUIRED", Valid: true},
 					ErrorMessage: pgtype.Text{String: "Re-authentication required by institution", Valid: true},
 				})
-				return 0, 0, 0, 0, nil, syncErr
+				return 0, 0, 0, 0, nil, nil, syncErr
 			}
-			return 0, 0, 0, 0, nil, syncErr
+			return 0, 0, 0, 0, nil, nil, syncErr
 		}
 
 		// Buffer results — don't write to DB until pagination is complete.
@@ -249,7 +268,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		// Start transaction for all data writes.
 		tx, err := e.pool.Begin(ctx)
 		if err != nil {
-			return 0, 0, 0, 0, nil, fmt.Errorf("begin transaction: %w", err)
+			return 0, 0, 0, 0, nil, nil, fmt.Errorf("begin transaction: %w", err)
 		}
 		defer tx.Rollback(ctx)
 
@@ -356,7 +375,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			ID:         connectionID,
 			SyncCursor: pgtype.Text{String: result.Cursor, Valid: true},
 		}); err != nil {
-			return added, modified, removed, unchanged, perAccount, fmt.Errorf("update cursor: %w", err)
+			return added, modified, removed, unchanged, perAccount, nil, fmt.Errorf("update cursor: %w", err)
 		}
 
 		// Fetch and update balances.
@@ -366,7 +385,12 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		}
 
 		if err := tx.Commit(ctx); err != nil {
-			return 0, 0, 0, 0, nil, fmt.Errorf("commit transaction: %w", err)
+			return 0, 0, 0, 0, nil, nil, fmt.Errorf("commit transaction: %w", err)
+		}
+
+		// Capture rule hit counts for the sync log before flushing.
+		if resolver != nil {
+			ruleHits = resolver.HitCountsJSON()
 		}
 
 		// Flush rule hit counts after commit (best-effort, non-fatal).
@@ -389,7 +413,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		break
 	}
 
-	return added, modified, removed, unchanged, perAccount, nil
+	return added, modified, removed, unchanged, perAccount, ruleHits, nil
 }
 
 // upsertTransaction resolves the account ID and upserts a single transaction.
