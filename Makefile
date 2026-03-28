@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev build test test-integration lint generate migrate-up migrate-down migrate-create sqlc seed docker-up docker-down css css-watch css-install
+.PHONY: dev dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc seed docker-up docker-down css css-watch css-install
 
 PORT ?= 8080
 
@@ -18,6 +18,15 @@ dev: generate
 		exit 1; \
 	fi
 	SERVER_PORT=$(PORT) go run ./cmd/breadbox serve
+
+dev-stop:
+	@pids=$$(pgrep -f 'go run ./cmd/breadbox serve' 2>/dev/null || true); \
+	if [ -z "$$pids" ]; then \
+		echo "No dev instances running."; \
+	else \
+		echo "$$pids" | xargs kill 2>/dev/null; \
+		echo "Stopped dev instances: $$pids"; \
+	fi
 
 build: generate
 	go build -o breadbox ./cmd/breadbox
