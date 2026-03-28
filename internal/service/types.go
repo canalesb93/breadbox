@@ -193,6 +193,7 @@ type SyncLogRow struct {
 	UnchangedCount       int32
 	ErrorMessage         *string // raw technical error for debugging
 	FriendlyErrorMessage *string // human-friendly error for display
+	WarningMessage       *string // non-fatal warning (e.g., balance fetch issues)
 	StartedAt            *string
 	CompletedAt          *string
 	Duration             *string
@@ -223,15 +224,16 @@ type SyncLogAccountRow struct {
 
 // SyncLogStats contains aggregate statistics about sync logs.
 type SyncLogStats struct {
-	TotalSyncs      int64
-	SuccessCount    int64
-	ErrorCount      int64
-	SuccessRate     float64 // 0-100 percentage
-	AvgDurationMs   float64 // average duration in milliseconds
-	TotalAdded      int64
-	TotalModified   int64
-	TotalRemoved    int64
-	TotalUnchanged  int64
+	TotalSyncs     int64
+	SuccessCount   int64
+	ErrorCount     int64
+	WarningCount   int64   // syncs that succeeded with warnings
+	SuccessRate    float64 // 0-100 percentage
+	AvgDurationMs  float64 // average duration in milliseconds
+	TotalAdded     int64
+	TotalModified  int64
+	TotalRemoved   int64
+	TotalUnchanged int64
 }
 
 // SyncHealthSummary contains a dashboard-oriented overview of sync health.

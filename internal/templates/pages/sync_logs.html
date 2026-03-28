@@ -8,7 +8,7 @@
 
 <!-- Summary Stats Cards -->
 {{if .Stats}}
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 bb-stagger">
+<div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6 bb-stagger">
   <!-- Total Syncs -->
   <div class="bb-card p-4">
     <div class="flex items-center gap-3">
@@ -37,6 +37,19 @@
       <div>
         <div class="text-2xl font-semibold tabular-nums leading-none {{if gt .Stats.SuccessRate 80.0}}text-success{{else if gt .Stats.SuccessRate 50.0}}text-warning{{else}}text-error{{end}}">{{printf "%.0f" .Stats.SuccessRate}}%</div>
         <div class="text-xs text-base-content/40 mt-0.5">Success rate</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Warnings -->
+  <div class="bb-card p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 {{if gt .Stats.WarningCount 0}}bg-warning/10{{else}}bg-base-200/60{{end}}">
+        <i data-lucide="alert-triangle" class="w-4 h-4 {{if gt .Stats.WarningCount 0}}text-warning/70{{else}}text-base-content/40{{end}}"></i>
+      </div>
+      <div>
+        <div class="text-2xl font-semibold tabular-nums leading-none {{if gt .Stats.WarningCount 0}}text-warning{{end}}">{{.Stats.WarningCount}}</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Warnings</div>
       </div>
     </div>
   </div>
@@ -236,9 +249,16 @@
         <!-- Status badge -->
         {{syncBadge .Status}}
 
-        <!-- Error expand button -->
-        {{if .ErrorMessage}}
-        <button @click.prevent="open = !open" class="btn btn-ghost btn-xs btn-circle text-error/50 hover:text-error hover:bg-error/10 transition-colors">
+        <!-- Warning badge -->
+        {{if .WarningMessage}}
+        <span class="badge badge-warning badge-sm gap-1">
+          <i data-lucide="alert-triangle" class="w-3 h-3"></i>warning
+        </span>
+        {{end}}
+
+        <!-- Error/Warning expand button -->
+        {{if or .ErrorMessage .WarningMessage}}
+        <button @click.prevent="open = !open" class="btn btn-ghost btn-xs btn-circle {{if .ErrorMessage}}text-error/50 hover:text-error hover:bg-error/10{{else}}text-warning/50 hover:text-warning hover:bg-warning/10{{end}} transition-colors">
           <i data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
         </button>
         {{end}}
@@ -261,6 +281,19 @@
           <div class="text-xs font-medium text-error/80 mb-0.5">Error Details</div>
           <p class="text-xs text-base-content/50 font-mono break-all leading-relaxed">{{deref .ErrorMessage}}</p>
           {{end}}
+        </div>
+      </div>
+    </div>
+    {{end}}
+
+    <!-- Expandable warning detail -->
+    {{if and .WarningMessage (not .ErrorMessage)}}
+    <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="border-t border-base-200">
+      <div class="flex items-start gap-2.5 px-4 py-3 ml-12">
+        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-warning/60 shrink-0 mt-0.5"></i>
+        <div class="min-w-0">
+          <div class="text-xs font-medium text-warning/80 mb-0.5">Warning</div>
+          <p class="text-xs text-base-content/50 leading-relaxed">{{deref .WarningMessage}}</p>
         </div>
       </div>
     </div>

@@ -122,6 +122,7 @@ func SyncLogsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, s
 			"SuccessCount":       successCount,
 			"ErrorCount":         errorCount,
 			"InProgressCount":    inProgressCount,
+			"WarningCount":       stats.WarningCount,
 		}
 		tr.Render(w, r, "sync_logs.html", data)
 	}

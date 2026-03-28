@@ -30,22 +30,24 @@ type accountSyncCounts struct {
 
 // Engine orchestrates transaction syncing across all bank connections.
 type Engine struct {
-	db        *db.Queries
-	pool      *pgxpool.Pool
-	providers map[string]provider.Provider
-	logger    *slog.Logger
-	locks     gosync.Map // connection ID string -> *gosync.Mutex
-	matcher   *Matcher
+	db                *db.Queries
+	pool              *pgxpool.Pool
+	providers         map[string]provider.Provider
+	logger            *slog.Logger
+	locks             gosync.Map // connection ID string -> *gosync.Mutex
+	matcher           *Matcher
+	balanceRetryDelay time.Duration // delay between balance fetch retries (default 2s)
 }
 
 // NewEngine creates a new sync engine.
 func NewEngine(queries *db.Queries, pool *pgxpool.Pool, providers map[string]provider.Provider, logger *slog.Logger) *Engine {
 	return &Engine{
-		db:        queries,
-		pool:      pool,
-		providers: providers,
-		logger:    logger,
-		matcher:   NewMatcher(queries, pool, logger.With("component", "matcher")),
+		db:                queries,
+		pool:              pool,
+		providers:         providers,
+		logger:            logger,
+		matcher:           NewMatcher(queries, pool, logger.With("component", "matcher")),
+		balanceRetryDelay: 2 * time.Second,
 	}
 }
 
@@ -74,7 +76,7 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 	}
 
 	// Run the sync and capture results.
-	added, modified, removed, unchanged, perAccount, ruleHits, syncErr := e.runSync(ctx, connectionID, logger)
+	added, modified, removed, unchanged, perAccount, ruleHits, warningMsg, syncErr := e.runSync(ctx, connectionID, logger)
 
 	// Update sync_log with final status.
 	completedAt := time.Now()
@@ -84,6 +86,11 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 	if syncErr != nil {
 		status = db.SyncStatusError
 		errMsg = pgtype.Text{String: syncErr.Error(), Valid: true}
+	}
+
+	var warnMsg pgtype.Text
+	if warningMsg != "" {
+		warnMsg = pgtype.Text{String: warningMsg, Valid: true}
 	}
 
 	// Compute duration in milliseconds from started_at.
@@ -104,6 +111,7 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 		ErrorMessage:   errMsg,
 		DurationMs:     durationMs,
 		RuleHits:       ruleHits,
+		WarningMessage: warnMsg,
 	}); err != nil {
 		logger.Error("failed to update sync log", "error", err)
 	}
@@ -127,27 +135,27 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 	return nil
 }
 
-// runSync performs the actual sync loop for a connection. Returns counts, per-account breakdown, rule hit counts JSON, and any error.
-func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *slog.Logger) (added, modified, removed, unchanged int, perAccount map[string]*accountSyncCounts, ruleHits []byte, err error) {
+// runSync performs the actual sync loop for a connection. Returns counts, per-account breakdown, rule hit counts JSON, warning message, and any error.
+func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *slog.Logger) (added, modified, removed, unchanged int, perAccount map[string]*accountSyncCounts, ruleHits []byte, warning string, err error) {
 	// Initialize per-account tracking map.
 	perAccount = make(map[string]*accountSyncCounts)
 
 	// Load connection from DB.
 	conn, err := e.db.GetBankConnectionForSync(ctx, connectionID)
 	if err != nil {
-		return 0, 0, 0, 0, nil, nil, fmt.Errorf("load connection: %w", err)
+		return 0, 0, 0, 0, nil, nil, "", fmt.Errorf("load connection: %w", err)
 	}
 
 	// Look up the provider.
 	prov, ok := e.providers[string(conn.Provider)]
 	if !ok {
-		return 0, 0, 0, 0, nil, nil, fmt.Errorf("unknown provider: %s", conn.Provider)
+		return 0, 0, 0, 0, nil, nil, "", fmt.Errorf("unknown provider: %s", conn.Provider)
 	}
 
 	// Fetch excluded account IDs for this connection.
 	excludedIDs, err := e.db.ListExcludedAccountIDsByConnection(ctx, connectionID)
 	if err != nil {
-		return 0, 0, 0, 0, nil, nil, fmt.Errorf("list excluded accounts: %w", err)
+		return 0, 0, 0, 0, nil, nil, "", fmt.Errorf("list excluded accounts: %w", err)
 	}
 	excludedSet := make(map[pgtype.UUID]bool, len(excludedIDs))
 	for _, id := range excludedIDs {
@@ -248,9 +256,9 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 					ErrorCode:    pgtype.Text{String: "ITEM_LOGIN_REQUIRED", Valid: true},
 					ErrorMessage: pgtype.Text{String: "Re-authentication required by institution", Valid: true},
 				})
-				return 0, 0, 0, 0, nil, nil, syncErr
+				return 0, 0, 0, 0, nil, nil, "", syncErr
 			}
-			return 0, 0, 0, 0, nil, nil, syncErr
+			return 0, 0, 0, 0, nil, nil, "", syncErr
 		}
 
 		// Buffer results — don't write to DB until pagination is complete.
@@ -268,7 +276,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		// Start transaction for all data writes.
 		tx, err := e.pool.Begin(ctx)
 		if err != nil {
-			return 0, 0, 0, 0, nil, nil, fmt.Errorf("begin transaction: %w", err)
+			return 0, 0, 0, 0, nil, nil, "", fmt.Errorf("begin transaction: %w", err)
 		}
 		defer tx.Rollback(ctx)
 
@@ -375,17 +383,16 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			ID:         connectionID,
 			SyncCursor: pgtype.Text{String: result.Cursor, Valid: true},
 		}); err != nil {
-			return added, modified, removed, unchanged, perAccount, nil, fmt.Errorf("update cursor: %w", err)
+			return added, modified, removed, unchanged, perAccount, nil, "", fmt.Errorf("update cursor: %w", err)
 		}
 
-		// Fetch and update balances.
-		if err := e.updateBalances(ctx, txQueries, prov, provConn, logger); err != nil {
-			logger.Error("update balances failed", "error", err)
-			// Non-fatal: balances are best-effort.
+		// Fetch and update balances with retry.
+		if balanceWarn := e.updateBalancesWithRetry(ctx, txQueries, prov, provConn, logger); balanceWarn != "" {
+			warning = balanceWarn
 		}
 
 		if err := tx.Commit(ctx); err != nil {
-			return 0, 0, 0, 0, nil, nil, fmt.Errorf("commit transaction: %w", err)
+			return 0, 0, 0, 0, nil, nil, "", fmt.Errorf("commit transaction: %w", err)
 		}
 
 		// Capture rule hit counts for the sync log before flushing.
@@ -413,7 +420,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		break
 	}
 
-	return added, modified, removed, unchanged, perAccount, ruleHits, nil
+	return added, modified, removed, unchanged, perAccount, ruleHits, warning, nil
 }
 
 // upsertTransaction resolves the account ID and upserts a single transaction.
@@ -468,6 +475,37 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 	}
 
 	return q.UpsertTransaction(ctx, params)
+}
+
+// updateBalancesWithRetry fetches balances with 1 retry on transient errors.
+// Returns a warning message if the retry succeeded (partial success) or if
+// all attempts failed (non-fatal warning). Returns empty string on clean success.
+func (e *Engine) updateBalancesWithRetry(ctx context.Context, q *db.Queries, prov provider.Provider, conn provider.Connection, logger *slog.Logger) string {
+	err := e.updateBalances(ctx, q, prov, conn, logger)
+	if err == nil {
+		return ""
+	}
+
+	// First attempt failed. Log and retry once after a short delay.
+	delay := e.balanceRetryDelay
+	if delay <= 0 {
+		delay = 2 * time.Second
+	}
+	logger.Warn("balance fetch failed, retrying", "error", err, "retry_delay", delay)
+	time.Sleep(delay)
+
+	retryErr := e.updateBalances(ctx, q, prov, conn, logger)
+	if retryErr == nil {
+		// Retry succeeded — record a warning that the first attempt failed.
+		msg := fmt.Sprintf("Balance fetch succeeded on retry (first attempt: %s)", err.Error())
+		logger.Info("balance fetch retry succeeded", "original_error", err)
+		return msg
+	}
+
+	// Both attempts failed. Non-fatal: transaction sync data is still committed.
+	msg := fmt.Sprintf("Balance fetch failed after retry: %s", retryErr.Error())
+	logger.Error("balance fetch failed after retry", "original_error", err, "retry_error", retryErr)
+	return msg
 }
 
 // updateBalances fetches current balances from the provider and updates the DB.
