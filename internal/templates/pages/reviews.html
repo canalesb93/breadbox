@@ -298,7 +298,7 @@
           {{else if $review.Transaction.Category}}
           <span class="text-xs text-base-content/50 truncate">{{$review.Transaction.Category.DisplayName}}</span>
           {{else}}
-          <span class="text-xs text-base-content/25 italic">none</span>
+          <span class="text-xs text-base-content/30">Uncategorized</span>
           {{end}}
         </div>
 
@@ -532,7 +532,7 @@
         <span class="text-base-content/50">Category:</span>
         <span class="font-medium">{{.Transaction.Category.DisplayName}}</span>
         {{else}}
-        <span class="text-base-content/40 italic">No category assigned</span>
+        <span class="text-base-content/40">Uncategorized</span>
         {{end}}
       </div>
       {{end}}
