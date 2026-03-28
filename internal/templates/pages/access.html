@@ -1,0 +1,147 @@
+{{define "content"}}
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Access</h1>
+    <p class="text-sm text-base-content/50 mt-1">Manage API keys and OAuth clients for external access</p>
+  </div>
+</div>
+
+<!-- API Keys Section -->
+<div class="mb-8">
+  <div class="flex items-center justify-between mb-3">
+    <div class="flex items-center gap-2">
+      <i data-lucide="key" class="w-4 h-4 text-primary"></i>
+      <h2 class="text-sm font-semibold">API Keys</h2>
+      <span class="text-xs text-base-content/40">Direct REST API and MCP access</span>
+    </div>
+    <a href="/api-keys/new" class="btn btn-primary btn-sm btn-soft rounded-xl">
+      <i data-lucide="plus" class="w-4 h-4"></i>
+      Create Key
+    </a>
+  </div>
+
+  {{if .Keys}}
+  <div class="space-y-2">
+    {{range .Keys}}
+    <div class="bb-card px-5 py-3.5" x-data="{ confirming: false }">
+      <div class="flex items-center gap-3">
+        <div class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0
+          {{if .RevokedAt}}bg-base-200/40{{else if eq .Scope "read_only"}}bg-warning/8{{else}}bg-primary/8{{end}}">
+          <i data-lucide="key" class="w-4 h-4 {{if .RevokedAt}}text-base-content/25{{else if eq .Scope "read_only"}}text-warning{{else}}text-primary{{end}}"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-semibold text-sm {{if .RevokedAt}}text-base-content/40 line-through{{end}}">{{.Name}}</span>
+            {{if eq .Scope "read_only"}}
+            <span class="badge badge-soft badge-warning badge-xs">Read Only</span>
+            {{else}}
+            <span class="badge badge-soft badge-primary badge-xs">Full Access</span>
+            {{end}}
+            {{if .RevokedAt}}
+            <span class="badge badge-soft badge-error badge-xs">Revoked</span>
+            {{end}}
+          </div>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-xs text-base-content/40">
+            <code class="font-mono bg-base-200/50 px-1 py-0.5 rounded text-[0.65rem]">{{.KeyPrefix}}...</code>
+            <span>Created {{formatDateShort .CreatedAt}}</span>
+            {{if .LastUsedAt}}<span>Last used {{relativeTime .LastUsedAt}}</span>{{end}}
+          </div>
+        </div>
+        {{if not .RevokedAt}}
+        <div class="shrink-0">
+          <form method="POST" action="/api-keys/{{.ID}}/revoke" class="inline">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <button type="button" class="btn btn-ghost btn-xs text-base-content/40 hover:text-error" x-show="!confirming" @click="confirming = true">
+              Revoke
+            </button>
+            <span x-show="confirming" x-cloak class="flex items-center gap-1.5">
+              <button type="submit" class="btn btn-error btn-xs btn-soft rounded-xl">Confirm</button>
+              <button type="button" class="btn btn-ghost btn-xs rounded-xl" @click="confirming = false">Cancel</button>
+            </span>
+          </form>
+        </div>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="bb-card px-5 py-8 text-center">
+    <p class="text-sm text-base-content/40 mb-3">No API keys yet</p>
+    <a href="/api-keys/new" class="btn btn-primary btn-sm btn-soft rounded-xl">
+      <i data-lucide="plus" class="w-4 h-4"></i>
+      Create your first key
+    </a>
+  </div>
+  {{end}}
+</div>
+
+<!-- OAuth Clients Section -->
+<div>
+  <div class="flex items-center justify-between mb-3">
+    <div class="flex items-center gap-2">
+      <i data-lucide="fingerprint" class="w-4 h-4 text-base-content/50"></i>
+      <h2 class="text-sm font-semibold">OAuth Clients</h2>
+      <span class="text-xs text-base-content/40">External connector access (e.g., Claude)</span>
+    </div>
+    <a href="/oauth-clients/new" class="btn btn-neutral btn-sm btn-soft rounded-xl">
+      <i data-lucide="plus" class="w-4 h-4"></i>
+      Create Client
+    </a>
+  </div>
+
+  {{if .Clients}}
+  <div class="space-y-2">
+    {{range .Clients}}
+    <div class="bb-card px-5 py-3.5" x-data="{ confirming: false }">
+      <div class="flex items-center gap-3">
+        <div class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0
+          {{if .RevokedAt}}bg-base-200/40{{else if eq .Scope "read_only"}}bg-warning/8{{else}}bg-base-200/60{{end}}">
+          <i data-lucide="fingerprint" class="w-4 h-4 {{if .RevokedAt}}text-base-content/25{{else if eq .Scope "read_only"}}text-warning{{else}}text-base-content/50{{end}}"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-semibold text-sm {{if .RevokedAt}}text-base-content/40 line-through{{end}}">{{.Name}}</span>
+            {{if eq .Scope "read_only"}}
+            <span class="badge badge-soft badge-warning badge-xs">Read Only</span>
+            {{else}}
+            <span class="badge badge-soft badge-primary badge-xs">Full Access</span>
+            {{end}}
+            {{if .RevokedAt}}
+            <span class="badge badge-soft badge-error badge-xs">Revoked</span>
+            {{end}}
+          </div>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-xs text-base-content/40">
+            <code class="font-mono bg-base-200/50 px-1 py-0.5 rounded text-[0.65rem]">{{.ClientIDPrefix}}...</code>
+            <span>Created {{formatDateShort .CreatedAt}}</span>
+          </div>
+        </div>
+        {{if not .RevokedAt}}
+        <div class="shrink-0">
+          <form method="POST" action="/oauth-clients/{{.ID}}/revoke" class="inline">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <button type="button" class="btn btn-ghost btn-xs text-base-content/40 hover:text-error" x-show="!confirming" @click="confirming = true">
+              Revoke
+            </button>
+            <span x-show="confirming" x-cloak class="flex items-center gap-1.5">
+              <button type="submit" class="btn btn-error btn-xs btn-soft rounded-xl">Confirm</button>
+              <button type="button" class="btn btn-ghost btn-xs rounded-xl" @click="confirming = false">Cancel</button>
+            </span>
+          </form>
+        </div>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="bb-card px-5 py-8 text-center">
+    <p class="text-sm text-base-content/40 mb-3">No OAuth clients yet</p>
+    <a href="/oauth-clients/new" class="btn btn-neutral btn-sm btn-soft rounded-xl">
+      <i data-lucide="plus" class="w-4 h-4"></i>
+      Create your first client
+    </a>
+  </div>
+  {{end}}
+</div>
+{{end}}
