@@ -57,7 +57,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 		return nil, fmt.Errorf("invalid sync log id: %w", err)
 	}
 
-	query := "SELECT sl.id, sl.connection_id, bc.institution_name, sl.trigger, sl.status, " +
+	query := "SELECT sl.id, sl.connection_id, bc.institution_name, bc.provider, sl.trigger, sl.status, " +
 		"sl.added_count, sl.modified_count, sl.removed_count, sl.unchanged_count, sl.error_message, " +
 		"sl.started_at, sl.completed_at, sl.rule_hits, sl.warning_message " +
 		"FROM sync_logs sl " +
@@ -68,6 +68,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 		id              pgtype.UUID
 		connectionID    pgtype.UUID
 		institutionName pgtype.Text
+		providerType    string
 		trigger         string
 		status          string
 		addedCount      int32
@@ -82,7 +83,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 	)
 
 	if err := s.Pool.QueryRow(ctx, query, uid).Scan(
-		&id, &connectionID, &institutionName, &trigger, &status,
+		&id, &connectionID, &institutionName, &providerType, &trigger, &status,
 		&addedCount, &modifiedCount, &removedCount, &unchangedCount, &errorMessage,
 		&startedAt, &completedAt, &ruleHitsJSON, &warningMessage,
 	); err != nil {
@@ -110,6 +111,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 		ID:               formatUUID(id),
 		ConnectionID:     formatUUID(connectionID),
 		InstitutionName:  instName,
+		Provider:         providerType,
 		Trigger:          trigger,
 		Status:           status,
 		AddedCount:       addedCount,

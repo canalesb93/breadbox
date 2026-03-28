@@ -185,6 +185,7 @@ type SyncLogRow struct {
 	ID                   string
 	ConnectionID         string
 	InstitutionName      string
+	Provider             string
 	Trigger              string
 	Status               string
 	AddedCount           int32
