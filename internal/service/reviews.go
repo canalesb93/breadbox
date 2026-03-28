@@ -14,6 +14,19 @@ import (
 
 const maxReviewNoteLength = 2000
 
+// buildCategoryDisplayName builds a human-readable category display name
+// with optional parent prefix (e.g., "Food & Drink › Restaurants").
+func buildCategoryDisplayName(displayName, parentDisplayName pgtype.Text) *string {
+	if !displayName.Valid {
+		return nil
+	}
+	if parentDisplayName.Valid {
+		s := parentDisplayName.String + " › " + displayName.String
+		return &s
+	}
+	return &displayName.String
+}
+
 // ListReviews returns review queue items with filters and pagination.
 func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*ReviewListResult, error) {
 	limit := params.Limit
@@ -56,7 +69,8 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 		rq.suggested_category_id, rq.confidence_score,
 		rq.reviewer_type, rq.reviewer_id, rq.reviewer_name, rq.review_note,
 		rq.resolved_category_id, rq.created_at, rq.reviewed_at,
-		sc.slug AS suggested_slug, rc.slug AS resolved_slug,
+		sc.slug AS suggested_slug, sc.display_name AS suggested_display_name, scp.display_name AS suggested_parent_display_name,
+		rc.slug AS resolved_slug, rc.display_name AS resolved_display_name, rcp.display_name AS resolved_parent_display_name,
 		t.amount, t.iso_currency_code, t.date, t.name, t.merchant_name,
 		t.category_primary, t.category_detailed, t.pending, t.created_at AS t_created_at, t.updated_at AS t_updated_at,
 		t.account_id, COALESCE(a.display_name, a.name) AS account_name,
@@ -71,7 +85,9 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 		LEFT JOIN bank_connections bc ON a.connection_id = bc.id
 		LEFT JOIN users u ON bc.user_id = u.id
 		LEFT JOIN categories sc ON rq.suggested_category_id = sc.id
+		LEFT JOIN categories scp ON sc.parent_id = scp.id
 		LEFT JOIN categories rc ON rq.resolved_category_id = rc.id
+		LEFT JOIN categories rcp ON rc.parent_id = rcp.id
 		LEFT JOIN categories c ON t.category_id = c.id
 		LEFT JOIN categories pc ON c.parent_id = pc.id`
 
@@ -177,8 +193,12 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			rResolvedCategoryID   pgtype.UUID
 			rCreatedAt            pgtype.Timestamptz
 			rReviewedAt           pgtype.Timestamptz
-			suggestedSlug         pgtype.Text
-			resolvedSlug          pgtype.Text
+			suggestedSlug              pgtype.Text
+			suggestedDisplayName       pgtype.Text
+			suggestedParentDisplayName pgtype.Text
+			resolvedSlug               pgtype.Text
+			resolvedDisplayName        pgtype.Text
+			resolvedParentDisplayName  pgtype.Text
 			tAmount               pgtype.Numeric
 			tIsoCurrencyCode      pgtype.Text
 			tDate                 pgtype.Date
@@ -208,7 +228,8 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			&rSuggestedCategoryID, &rConfidenceScore,
 			&rReviewerType, &rReviewerID, &rReviewerName, &rReviewNote,
 			&rResolvedCategoryID, &rCreatedAt, &rReviewedAt,
-			&suggestedSlug, &resolvedSlug,
+			&suggestedSlug, &suggestedDisplayName, &suggestedParentDisplayName,
+			&resolvedSlug, &resolvedDisplayName, &resolvedParentDisplayName,
 			&tAmount, &tIsoCurrencyCode, &tDate, &tName, &tMerchantName,
 			&tCategoryPrimary, &tCategoryDetailed, &tPending, &tCreatedAt, &tUpdatedAt,
 			&tAccountID, &accountName, &userName,
@@ -264,23 +285,25 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 		}
 
 		review := ReviewResponse{
-			ID:                  formatUUID(rID),
-			TransactionID:       formatUUID(rTransactionID),
-			ReviewType:          rReviewType,
-			Status:              rStatus,
-			Provider:            textPtr(connectionProvider),
-			SuggestedCategoryID: uuidPtr(rSuggestedCategoryID),
-			SuggestedCategory:   textPtr(suggestedSlug),
-			ConfidenceScore:     numericFloat(rConfidenceScore),
-			ReviewerType:        textPtr(rReviewerType),
-			ReviewerID:          textPtr(rReviewerID),
-			ReviewerName:        textPtr(rReviewerName),
-			ReviewNote:          textPtr(rReviewNote),
-			ResolvedCategoryID:  uuidPtr(rResolvedCategoryID),
-			ResolvedCategory:    textPtr(resolvedSlug),
-			CreatedAt:           rCreatedAt.Time.UTC().Format(time.RFC3339),
-			ReviewedAt:          timestampStr(rReviewedAt),
-			Transaction:         txnResp,
+			ID:                           formatUUID(rID),
+			TransactionID:                formatUUID(rTransactionID),
+			ReviewType:                   rReviewType,
+			Status:                       rStatus,
+			Provider:                     textPtr(connectionProvider),
+			SuggestedCategoryID:          uuidPtr(rSuggestedCategoryID),
+			SuggestedCategory:            textPtr(suggestedSlug),
+			SuggestedCategoryDisplayName: buildCategoryDisplayName(suggestedDisplayName, suggestedParentDisplayName),
+			ConfidenceScore:              numericFloat(rConfidenceScore),
+			ReviewerType:                 textPtr(rReviewerType),
+			ReviewerID:                   textPtr(rReviewerID),
+			ReviewerName:                 textPtr(rReviewerName),
+			ReviewNote:                   textPtr(rReviewNote),
+			ResolvedCategoryID:           uuidPtr(rResolvedCategoryID),
+			ResolvedCategory:             textPtr(resolvedSlug),
+			ResolvedCategoryDisplayName:  buildCategoryDisplayName(resolvedDisplayName, resolvedParentDisplayName),
+			CreatedAt:                    rCreatedAt.Time.UTC().Format(time.RFC3339),
+			ReviewedAt:                   timestampStr(rReviewedAt),
+			Transaction:                  txnResp,
 		}
 
 		var cursorTs time.Time
@@ -457,17 +480,33 @@ func (s *Service) ListReviewsByTransactionID(ctx context.Context, transactionID 
 			review.ReviewedAt = &s
 		}
 
-		// Resolve category slugs.
+		// Resolve category slugs and display names.
 		if rSuggestedCatID.Valid {
 			if cat, err := s.Queries.GetCategoryByID(ctx, rSuggestedCatID); err == nil {
 				slug := cat.Slug
 				review.SuggestedCategory = &slug
+				dn := pgtype.Text{String: cat.DisplayName, Valid: true}
+				var pdn pgtype.Text
+				if cat.ParentID.Valid {
+					if parent, err := s.Queries.GetCategoryByID(ctx, cat.ParentID); err == nil {
+						pdn = pgtype.Text{String: parent.DisplayName, Valid: true}
+					}
+				}
+				review.SuggestedCategoryDisplayName = buildCategoryDisplayName(dn, pdn)
 			}
 		}
 		if rResolvedCatID.Valid {
 			if cat, err := s.Queries.GetCategoryByID(ctx, rResolvedCatID); err == nil {
 				slug := cat.Slug
 				review.ResolvedCategory = &slug
+				dn := pgtype.Text{String: cat.DisplayName, Valid: true}
+				var pdn pgtype.Text
+				if cat.ParentID.Valid {
+					if parent, err := s.Queries.GetCategoryByID(ctx, cat.ParentID); err == nil {
+						pdn = pgtype.Text{String: parent.DisplayName, Valid: true}
+					}
+				}
+				review.ResolvedCategoryDisplayName = buildCategoryDisplayName(dn, pdn)
 			}
 		}
 
@@ -942,15 +981,31 @@ func (s *Service) reviewFromRow(ctx context.Context, r db.ReviewQueue) ReviewRes
 		ReviewedAt:          timestampStr(r.ReviewedAt),
 	}
 
-	// Enrich with category slugs
+	// Enrich with category slugs and display names
 	if r.SuggestedCategoryID.Valid {
 		if cat, err := s.Queries.GetCategoryByID(ctx, r.SuggestedCategoryID); err == nil {
 			resp.SuggestedCategory = &cat.Slug
+			dn := pgtype.Text{String: cat.DisplayName, Valid: true}
+			var pdn pgtype.Text
+			if cat.ParentID.Valid {
+				if parent, err := s.Queries.GetCategoryByID(ctx, cat.ParentID); err == nil {
+					pdn = pgtype.Text{String: parent.DisplayName, Valid: true}
+				}
+			}
+			resp.SuggestedCategoryDisplayName = buildCategoryDisplayName(dn, pdn)
 		}
 	}
 	if r.ResolvedCategoryID.Valid {
 		if cat, err := s.Queries.GetCategoryByID(ctx, r.ResolvedCategoryID); err == nil {
 			resp.ResolvedCategory = &cat.Slug
+			dn := pgtype.Text{String: cat.DisplayName, Valid: true}
+			var pdn pgtype.Text
+			if cat.ParentID.Valid {
+				if parent, err := s.Queries.GetCategoryByID(ctx, cat.ParentID); err == nil {
+					pdn = pgtype.Text{String: parent.DisplayName, Valid: true}
+				}
+			}
+			resp.ResolvedCategoryDisplayName = buildCategoryDisplayName(dn, pdn)
 		}
 	}
 

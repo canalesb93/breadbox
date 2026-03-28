@@ -199,6 +199,9 @@ func FilterReviewFields(r ReviewResponse, fields map[string]bool) map[string]any
 	if fields["suggested_category_slug"] {
 		m["suggested_category_slug"] = r.SuggestedCategory
 	}
+	if fields["suggested_category_display_name"] {
+		m["suggested_category_display_name"] = r.SuggestedCategoryDisplayName
+	}
 	if fields["confidence_score"] {
 		m["confidence_score"] = r.ConfidenceScore
 	}
