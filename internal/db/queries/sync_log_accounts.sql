@@ -1,14 +1,15 @@
 -- name: InsertSyncLogAccount :exec
-INSERT INTO sync_log_accounts (sync_log_id, account_id, account_name, added_count, modified_count, removed_count)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO sync_log_accounts (sync_log_id, account_id, account_name, added_count, modified_count, removed_count, unchanged_count)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (sync_log_id, account_id) DO UPDATE SET
     added_count = sync_log_accounts.added_count + EXCLUDED.added_count,
     modified_count = sync_log_accounts.modified_count + EXCLUDED.modified_count,
-    removed_count = sync_log_accounts.removed_count + EXCLUDED.removed_count;
+    removed_count = sync_log_accounts.removed_count + EXCLUDED.removed_count,
+    unchanged_count = sync_log_accounts.unchanged_count + EXCLUDED.unchanged_count;
 
 -- name: ListSyncLogAccounts :many
 SELECT sla.id, sla.sync_log_id, sla.account_id, sla.account_name,
-       sla.added_count, sla.modified_count, sla.removed_count
+       sla.added_count, sla.modified_count, sla.removed_count, sla.unchanged_count
 FROM sync_log_accounts sla
 WHERE sla.sync_log_id = $1
 ORDER BY (sla.added_count + sla.modified_count + sla.removed_count) DESC, sla.account_name;

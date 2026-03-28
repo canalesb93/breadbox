@@ -25,6 +25,7 @@ type accountSyncCounts struct {
 	Added       int
 	Modified    int
 	Removed     int
+	Unchanged   int
 }
 
 // Engine orchestrates transaction syncing across all bank connections.
@@ -73,7 +74,7 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 	}
 
 	// Run the sync and capture results.
-	added, modified, removed, perAccount, ruleHits, syncErr := e.runSync(ctx, connectionID, logger)
+	added, modified, removed, unchanged, perAccount, ruleHits, syncErr := e.runSync(ctx, connectionID, logger)
 
 	// Update sync_log with final status.
 	completedAt := time.Now()
@@ -93,15 +94,16 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 	}
 
 	if err := e.db.UpdateSyncLog(ctx, db.UpdateSyncLogParams{
-		ID:            syncLog.ID,
-		Status:        status,
-		CompletedAt:   now,
-		AddedCount:    int32(added),
-		ModifiedCount: int32(modified),
-		RemovedCount:  int32(removed),
-		ErrorMessage:  errMsg,
-		DurationMs:    durationMs,
-		RuleHits:      ruleHits,
+		ID:             syncLog.ID,
+		Status:         status,
+		CompletedAt:    now,
+		AddedCount:     int32(added),
+		ModifiedCount:  int32(modified),
+		RemovedCount:   int32(removed),
+		UnchangedCount: int32(unchanged),
+		ErrorMessage:   errMsg,
+		DurationMs:     durationMs,
+		RuleHits:       ruleHits,
 	}); err != nil {
 		logger.Error("failed to update sync log", "error", err)
 	}
@@ -121,31 +123,31 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 		logger.Error("failed to reset consecutive failures", "error", err)
 	}
 
-	logger.Info("sync completed", "added", added, "modified", modified, "removed", removed)
+	logger.Info("sync completed", "added", added, "modified", modified, "removed", removed, "unchanged", unchanged)
 	return nil
 }
 
 // runSync performs the actual sync loop for a connection. Returns counts, per-account breakdown, rule hit counts JSON, and any error.
-func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *slog.Logger) (added, modified, removed int, perAccount map[string]*accountSyncCounts, ruleHits []byte, err error) {
+func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *slog.Logger) (added, modified, removed, unchanged int, perAccount map[string]*accountSyncCounts, ruleHits []byte, err error) {
 	// Initialize per-account tracking map.
 	perAccount = make(map[string]*accountSyncCounts)
 
 	// Load connection from DB.
 	conn, err := e.db.GetBankConnectionForSync(ctx, connectionID)
 	if err != nil {
-		return 0, 0, 0, nil, nil, fmt.Errorf("load connection: %w", err)
+		return 0, 0, 0, 0, nil, nil, fmt.Errorf("load connection: %w", err)
 	}
 
 	// Look up the provider.
 	prov, ok := e.providers[string(conn.Provider)]
 	if !ok {
-		return 0, 0, 0, nil, nil, fmt.Errorf("unknown provider: %s", conn.Provider)
+		return 0, 0, 0, 0, nil, nil, fmt.Errorf("unknown provider: %s", conn.Provider)
 	}
 
 	// Fetch excluded account IDs for this connection.
 	excludedIDs, err := e.db.ListExcludedAccountIDsByConnection(ctx, connectionID)
 	if err != nil {
-		return 0, 0, 0, nil, nil, fmt.Errorf("list excluded accounts: %w", err)
+		return 0, 0, 0, 0, nil, nil, fmt.Errorf("list excluded accounts: %w", err)
 	}
 	excludedSet := make(map[pgtype.UUID]bool, len(excludedIDs))
 	for _, id := range excludedIDs {
@@ -246,9 +248,9 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 					ErrorCode:    pgtype.Text{String: "ITEM_LOGIN_REQUIRED", Valid: true},
 					ErrorMessage: pgtype.Text{String: "Re-authentication required by institution", Valid: true},
 				})
-				return 0, 0, 0, nil, nil, syncErr
+				return 0, 0, 0, 0, nil, nil, syncErr
 			}
-			return 0, 0, 0, nil, nil, syncErr
+			return 0, 0, 0, 0, nil, nil, syncErr
 		}
 
 		// Buffer results — don't write to DB until pagination is complete.
@@ -266,7 +268,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		// Start transaction for all data writes.
 		tx, err := e.pool.Begin(ctx)
 		if err != nil {
-			return 0, 0, 0, nil, nil, fmt.Errorf("begin transaction: %w", err)
+			return 0, 0, 0, 0, nil, nil, fmt.Errorf("begin transaction: %w", err)
 		}
 		defer tx.Rollback(ctx)
 
@@ -284,7 +286,15 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		// Note: providers like Teller return ALL transactions as "Added" on every
 		// sync (date-range polling). The upsert handles this correctly (ON CONFLICT
 		// DO UPDATE), but we need to count accurately: only truly new rows count as
-		// "added"; existing rows that got upserted count as "modified".
+		// "added"; existing rows that got upserted count as "modified" or "unchanged".
+		//
+		// Classification logic uses timestamps from the upserted row:
+		// - New: created_at ~= updated_at (within 1s) — row was just inserted.
+		// - Modified: existing row where updated_at was bumped to NOW() by the
+		//   conditional CASE in the upsert (key fields actually changed).
+		// - Unchanged: existing row where updated_at was NOT bumped (all key
+		//   fields identical to what was already stored).
+		upsertStart := time.Now()
 		var skipped int
 		for i := range pendingAdded {
 			accountID, err := e.resolveAccountID(ctx, pendingAdded[i].AccountExternalID, accountIDCache)
@@ -301,22 +311,23 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				logger.Error("upsert added transaction", "external_id", pendingAdded[i].ExternalID, "error", err)
 				continue
 			}
-			// Determine if this was truly new or an upsert of an existing row.
-			// The DB sets created_at on INSERT and updated_at=NOW() on both INSERT
-			// and UPDATE. If they're equal (within 1s tolerance), it's a new row.
-			isNew := txnResult.CreatedAt.Time.Sub(txnResult.UpdatedAt.Time).Abs() < time.Second
+			isNew, isChanged := classifyUpsertResult(txnResult, upsertStart)
 			if isNew {
 				added++
-			} else {
+			} else if isChanged {
 				modified++
+			} else {
+				unchanged++
 			}
 			if reviewAutoEnqueue {
 				e.enqueueForReview(ctx, txQueries, txnResult, isNew, confidenceThreshold, resolver)
 			}
 			if isNew {
 				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "added")
-			} else {
+			} else if isChanged {
 				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "modified")
+			} else {
+				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "unchanged")
 			}
 		}
 
@@ -336,11 +347,17 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				logger.Error("upsert modified transaction", "external_id", pendingModified[i].ExternalID, "error", err)
 				continue
 			}
-			modified++
+			_, isChanged := classifyUpsertResult(txnResult, upsertStart)
+			if isChanged {
+				modified++
+				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "modified")
+			} else {
+				unchanged++
+				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "unchanged")
+			}
 			if reviewAutoEnqueue {
 				e.enqueueForReview(ctx, txQueries, txnResult, false, confidenceThreshold, resolver)
 			}
-			e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "modified")
 		}
 
 		if skipped > 0 {
@@ -358,7 +375,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			ID:         connectionID,
 			SyncCursor: pgtype.Text{String: result.Cursor, Valid: true},
 		}); err != nil {
-			return added, modified, removed, perAccount, nil, fmt.Errorf("update cursor: %w", err)
+			return added, modified, removed, unchanged, perAccount, nil, fmt.Errorf("update cursor: %w", err)
 		}
 
 		// Fetch and update balances.
@@ -368,7 +385,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		}
 
 		if err := tx.Commit(ctx); err != nil {
-			return 0, 0, 0, nil, nil, fmt.Errorf("commit transaction: %w", err)
+			return 0, 0, 0, 0, nil, nil, fmt.Errorf("commit transaction: %w", err)
 		}
 
 		// Capture rule hit counts for the sync log before flushing.
@@ -396,7 +413,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		break
 	}
 
-	return added, modified, removed, perAccount, ruleHits, nil
+	return added, modified, removed, unchanged, perAccount, ruleHits, nil
 }
 
 // upsertTransaction resolves the account ID and upserts a single transaction.
@@ -627,6 +644,8 @@ func (e *Engine) trackAccountCount(ctx context.Context, perAccount map[string]*a
 		counts.Modified++
 	case "removed":
 		counts.Removed++
+	case "unchanged":
+		counts.Unchanged++
 	}
 }
 
@@ -638,12 +657,13 @@ func (e *Engine) saveSyncLogAccounts(ctx context.Context, syncLogID pgtype.UUID,
 
 	for _, counts := range perAccount {
 		if err := e.db.InsertSyncLogAccount(ctx, db.InsertSyncLogAccountParams{
-			SyncLogID:     syncLogID,
-			AccountID:     counts.AccountID,
-			AccountName:   counts.AccountName,
-			AddedCount:    int32(counts.Added),
-			ModifiedCount: int32(counts.Modified),
-			RemovedCount:  int32(counts.Removed),
+			SyncLogID:      syncLogID,
+			AccountID:      counts.AccountID,
+			AccountName:    counts.AccountName,
+			AddedCount:     int32(counts.Added),
+			ModifiedCount:  int32(counts.Modified),
+			RemovedCount:   int32(counts.Removed),
+			UnchangedCount: int32(counts.Unchanged),
 		}); err != nil {
 			logger.Warn("failed to insert sync log account breakdown",
 				"account_name", counts.AccountName,
@@ -652,6 +672,27 @@ func (e *Engine) saveSyncLogAccounts(ctx context.Context, syncLogID pgtype.UUID,
 	}
 
 	logger.Debug("saved per-account sync breakdown", "accounts", len(perAccount))
+}
+
+// classifyUpsertResult determines whether an upserted transaction row is new,
+// actually modified, or unchanged. It relies on the conditional updated_at in
+// the UpsertTransaction SQL: updated_at is only set to NOW() when key fields
+// actually changed. For new rows, created_at and updated_at are both set to
+// NOW() by the INSERT.
+//
+// Returns (isNew, isChanged):
+//   - (true, true):   newly inserted row
+//   - (false, true):  existing row with changed values
+//   - (false, false): existing row with identical values (unchanged)
+func classifyUpsertResult(txn db.Transaction, upsertStart time.Time) (isNew bool, isChanged bool) {
+	// New row: created_at ~= updated_at (both set to NOW() on INSERT).
+	if txn.CreatedAt.Time.Sub(txn.UpdatedAt.Time).Abs() < time.Second {
+		return true, true
+	}
+	// Existing row: if updated_at was bumped to NOW() (>= upsertStart with
+	// some tolerance), values actually changed. Otherwise unchanged.
+	isChanged = txn.UpdatedAt.Time.After(upsertStart.Add(-2 * time.Second))
+	return false, isChanged
 }
 
 // --- helpers ---
