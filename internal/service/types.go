@@ -206,9 +206,10 @@ type SyncLogRow struct {
 
 // RuleHitEntry represents a single rule's hit count within a sync run.
 type RuleHitEntry struct {
-	RuleID   string
-	RuleName string
-	Count    int
+	RuleID     string
+	RuleName   string
+	Count      int
+	Conditions *Condition
 }
 
 // SyncLogAccountRow represents a per-account breakdown within a sync log.

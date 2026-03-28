@@ -524,29 +524,43 @@ func (s *Service) parseRuleHits(ctx context.Context, ruleHitsJSON []byte) ([]Rul
 		return nil, 0
 	}
 
-	// Batch-fetch rule names for all rule IDs.
-	ruleNames := make(map[string]string, len(hitMap))
+	// Batch-fetch rule names and conditions for all rule IDs.
+	type ruleInfo struct {
+		name       string
+		conditions *Condition
+	}
+	ruleInfoMap := make(map[string]ruleInfo, len(hitMap))
 	for ruleID := range hitMap {
 		uid, err := parseUUID(ruleID)
 		if err != nil {
 			continue
 		}
 		var name string
-		err = s.Pool.QueryRow(ctx, "SELECT name FROM transaction_rules WHERE id = $1", uid).Scan(&name)
+		var condJSON []byte
+		err = s.Pool.QueryRow(ctx, "SELECT name, conditions FROM transaction_rules WHERE id = $1", uid).Scan(&name, &condJSON)
 		if err != nil {
-			name = "Deleted rule"
+			ruleInfoMap[ruleID] = ruleInfo{name: "Deleted rule"}
+			continue
 		}
-		ruleNames[ruleID] = name
+		info := ruleInfo{name: name}
+		if len(condJSON) > 0 {
+			var cond Condition
+			if json.Unmarshal(condJSON, &cond) == nil {
+				info.conditions = &cond
+			}
+		}
+		ruleInfoMap[ruleID] = info
 	}
 
 	entries := make([]RuleHitEntry, 0, len(hitMap))
 	total := 0
 	for ruleID, count := range hitMap {
-		name := ruleNames[ruleID]
+		info := ruleInfoMap[ruleID]
 		entries = append(entries, RuleHitEntry{
-			RuleID:   ruleID,
-			RuleName: name,
-			Count:    count,
+			RuleID:     ruleID,
+			RuleName:   info.name,
+			Count:      count,
+			Conditions: info.conditions,
 		})
 		total += count
 	}

@@ -185,7 +185,7 @@
       </div>
       <div class="flex-1 min-w-0">
         <span class="text-sm font-medium truncate block">{{.RuleName}}</span>
-        <span class="text-xs text-base-content/30 font-mono">{{.RuleID}}</span>
+        {{if .Conditions}}<div class="text-xs text-base-content/40 mt-0.5 font-mono truncate" title="{{conditionSummary .Conditions}}">{{conditionSummary .Conditions}}</div>{{end}}
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
         <span class="badge badge-ghost badge-sm tabular-nums font-semibold">{{.Count}} hit{{if ne .Count 1}}s{{end}}</span>
