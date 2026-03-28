@@ -8,8 +8,9 @@
 
 <div class="grid gap-6 bb-stagger">
 
-  <!-- Card 1: Server Instructions (most frequently edited) -->
+  <!-- Card 1: Server Instructions -->
   <div id="instructions" class="bb-card p-0 overflow-hidden" x-data="{
+    expanded: location.hash === '#instructions',
     instructions: {{.Instructions | printf `%q`}},
     defaultInstructions: {{.DefaultInstructions | printf `%q`}},
     async resetToDefaults() {
@@ -19,105 +20,115 @@
       }
     }
   }">
-    <div class="px-4 sm:px-6 py-5 border-b border-base-300 flex items-center gap-3">
+    <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
       <!-- NOTE: Avoid bg-secondary/10 + text-secondary for card header icons —
            the secondary color has almost no contrast against the light background,
            making the icon look transparent/ghostly. Use info or primary instead. -->
       <div class="w-10 h-10 rounded-xl bg-info/10 flex items-center justify-center flex-shrink-0">
         <i data-lucide="scroll-text" class="w-5 h-5 text-info"></i>
       </div>
-      <div class="min-w-0">
+      <div class="min-w-0 flex-1">
         <h2 class="font-semibold">Server Instructions</h2>
-        <p class="text-xs text-base-content/40">Instructions sent to agents when they connect via MCP</p>
+        <p class="text-xs text-base-content/40" x-show="!expanded">Custom instructions sent to agents when they connect via MCP</p>
+        <p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Instructions sent to agents when they connect via MCP</p>
       </div>
+      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
     </div>
-    <div class="px-4 sm:px-6 py-5">
-      <div class="alert alert-warning alert-soft mb-4 text-xs rounded-xl">
-        <i data-lucide="triangle-alert" class="w-4 h-4"></i>
-        <span>These instructions guide how agents understand your data model, query patterns, and available tools. Editing may cause agents to misuse tools or produce incorrect results.</span>
+    <div x-show="expanded" x-collapse>
+      <div class="px-4 sm:px-6 py-5">
+        <div class="alert alert-warning alert-soft mb-4 text-xs rounded-xl">
+          <i data-lucide="triangle-alert" class="w-4 h-4"></i>
+          <span>These instructions guide how agents understand your data model, query patterns, and available tools. Editing may cause agents to misuse tools or produce incorrect results.</span>
+        </div>
+        <form method="POST" action="/mcp-settings/instructions">
+          <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+
+          <div class="form-control mb-4">
+            <textarea name="instructions" class="textarea textarea-bordered font-mono text-xs leading-relaxed w-full rounded-xl" style="min-height: 24rem" maxlength="20000" x-model="instructions" placeholder="Server instructions for MCP agents..."></textarea>
+            <label class="label">
+              <span class="label-text-alt text-base-content/40" x-text="instructions.length + '/20000'"></span>
+            </label>
+          </div>
+
+          <div class="flex flex-wrap gap-2 items-center">
+            <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Instructions</button>
+            <button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="resetToDefaults()">Reset to Defaults</button>
+          </div>
+        </form>
       </div>
-      <form method="POST" action="/mcp-settings/instructions">
-        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-
-        <div class="form-control mb-4">
-          <textarea name="instructions" class="textarea textarea-bordered font-mono text-xs leading-relaxed w-full rounded-xl" style="min-height: 24rem" maxlength="20000" x-model="instructions" placeholder="Server instructions for MCP agents..."></textarea>
-          <label class="label">
-            <span class="label-text-alt text-base-content/40" x-text="instructions.length + '/20000'"></span>
-          </label>
-        </div>
-
-        <div class="flex flex-wrap gap-2 items-center">
-          <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Instructions</button>
-          <button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="resetToDefaults()">Reset to Defaults</button>
-        </div>
-      </form>
     </div>
   </div>
 
   <!-- Card 2: Tools Enabled -->
-  <div class="bb-card p-0 overflow-hidden">
-    <div class="px-4 sm:px-6 py-5 border-b border-base-300 flex items-center gap-3">
+  <div id="tools" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#tools' }">
+    <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
       <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
         <i data-lucide="wrench" class="w-5 h-5 text-primary"></i>
       </div>
-      <div class="min-w-0">
+      <div class="min-w-0 flex-1">
         <h2 class="font-semibold">Tools Enabled</h2>
-        <p class="text-xs text-base-content/40">Enable or disable individual MCP tools</p>
+        <p class="text-xs text-base-content/40" x-show="!expanded">{{.ToolsEnabledCount}} of {{.ToolsTotalCount}} tools enabled{{if gt .ToolsDisabledCount 0}} · {{.ToolsDisabledCount}} disabled{{end}}</p>
+        <p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Enable or disable individual MCP tools</p>
       </div>
+      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
     </div>
-    <div class="px-4 sm:px-6 py-5">
-      <p class="text-sm text-base-content/50 mb-4">Disabled tools are hidden from all agents. Read-only API keys cannot invoke write tools regardless of this setting.</p>
-      <form method="POST" action="/mcp-settings/tools">
-        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-        <div class="space-y-1">
-          {{range .Tools}}
-          <div class="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl hover:bg-base-200/50 transition-colors duration-150">
-            <input type="checkbox" name="enabled_tools" value="{{.Name}}" class="toggle toggle-sm toggle-primary mt-0.5 flex-shrink-0" {{if .Enabled}}checked{{end}}>
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2 flex-wrap">
-                <span class="font-mono text-xs sm:text-sm break-all sm:break-normal">{{.Name}}</span>
-                {{if eq .Classification "write"}}
-                  <span class="badge badge-soft badge-warning badge-xs rounded-lg font-medium">write</span>
-                {{else}}
-                  <span class="badge badge-soft badge-success badge-xs rounded-lg font-medium">read</span>
-                {{end}}
+    <div x-show="expanded" x-collapse x-cloak>
+      <div class="px-4 sm:px-6 py-5">
+        <p class="text-sm text-base-content/50 mb-4">Disabled tools are hidden from all agents. Read-only API keys cannot invoke write tools regardless of this setting.</p>
+        <form method="POST" action="/mcp-settings/tools">
+          <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+          <div class="space-y-1">
+            {{range .Tools}}
+            <div class="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl hover:bg-base-200/50 transition-colors duration-150">
+              <input type="checkbox" name="enabled_tools" value="{{.Name}}" class="toggle toggle-sm toggle-primary mt-0.5 flex-shrink-0" {{if .Enabled}}checked{{end}}>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-mono text-xs sm:text-sm break-all sm:break-normal">{{.Name}}</span>
+                  {{if eq .Classification "write"}}
+                    <span class="badge badge-soft badge-warning badge-xs rounded-lg font-medium">write</span>
+                  {{else}}
+                    <span class="badge badge-soft badge-success badge-xs rounded-lg font-medium">read</span>
+                  {{end}}
+                </div>
+                <div class="text-xs text-base-content/40 mt-0.5 line-clamp-2 sm:line-clamp-1">{{.Description}}</div>
               </div>
-              <div class="text-xs text-base-content/40 mt-0.5 line-clamp-2 sm:line-clamp-1">{{.Description}}</div>
             </div>
+            {{end}}
           </div>
-          {{end}}
-        </div>
-        <div class="mt-5">
-          <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Tools</button>
-        </div>
-      </form>
+          <div class="mt-5">
+            <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Tools</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 
   <!-- Card 3: MCP Connection -->
-  <div class="bb-card p-0 overflow-hidden" x-data="{ copiedConfig: false }">
-    <div class="px-4 sm:px-6 py-5 border-b border-base-300 flex items-center gap-3">
+  <div id="connection" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#connection', copiedConfig: false }">
+    <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
       <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center flex-shrink-0">
         <i data-lucide="plug" class="w-5 h-5 text-warning"></i>
       </div>
-      <div class="min-w-0">
+      <div class="min-w-0 flex-1">
         <h2 class="font-semibold">Connection</h2>
-        <p class="text-xs text-base-content/40">Connect MCP agents to your Breadbox server</p>
+        <p class="text-xs text-base-content/40">Endpoints and config for connecting MCP agents</p>
       </div>
+      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
     </div>
-    <div class="px-4 sm:px-6 py-5 space-y-5">
-      <div>
-        <h3 class="font-medium text-sm mb-2 text-base-content/60">HTTP Endpoint</h3>
-        <div class="bg-base-200 rounded-xl p-3 font-mono text-sm break-all text-base-content/70">https://&lt;host&gt;/mcp</div>
-      </div>
-      <div>
-        <h3 class="font-medium text-sm mb-2 text-base-content/60">Stdio Command</h3>
-        <div class="bg-base-200 rounded-xl p-3 font-mono text-sm text-base-content/70">docker exec -i breadbox-app-1 /app/breadbox mcp-stdio</div>
-      </div>
-      <div>
-        <h3 class="font-medium text-sm mb-2 text-base-content/60">Claude Desktop Config (stdio)</h3>
-        <div class="relative">
-          <pre class="bg-base-200 rounded-xl p-4 text-sm font-mono overflow-auto text-base-content/70">{
+    <div x-show="expanded" x-collapse x-cloak>
+      <div class="px-4 sm:px-6 py-5 space-y-5">
+        <div>
+          <h3 class="font-medium text-sm mb-2 text-base-content/60">HTTP Endpoint</h3>
+          <div class="bg-base-200 rounded-xl p-3 font-mono text-sm break-all text-base-content/70">https://&lt;host&gt;/mcp</div>
+        </div>
+        <div>
+          <h3 class="font-medium text-sm mb-2 text-base-content/60">Stdio Command</h3>
+          <div class="bg-base-200 rounded-xl p-3 font-mono text-sm text-base-content/70">docker exec -i breadbox-app-1 /app/breadbox mcp-stdio</div>
+        </div>
+        <div>
+          <h3 class="font-medium text-sm mb-2 text-base-content/60">Claude Desktop Config (stdio)</h3>
+          <div class="relative">
+            <pre class="bg-base-200 rounded-xl p-4 text-sm font-mono overflow-auto text-base-content/70">{
   "mcpServers": {
     "breadbox": {
       "command": "docker",
@@ -125,25 +136,26 @@
     }
   }
 }</pre>
-          <button
-            class="btn btn-sm btn-ghost rounded-xl absolute top-2 right-2"
-            @click="navigator.clipboard.writeText(JSON.stringify({mcpServers:{breadbox:{command:'docker',args:['exec','-i','breadbox-app-1','/app/breadbox','mcp-stdio']}}}, null, 2)).then(() => { copiedConfig = true; setTimeout(() => copiedConfig = false, 2000) })"
-          >
-            <template x-if="!copiedConfig">
-              <span class="flex items-center gap-1"><i data-lucide="copy" class="w-4 h-4"></i> Copy</span>
-            </template>
-            <template x-if="copiedConfig">
-              <span class="flex items-center gap-1 text-success"><i data-lucide="check" class="w-4 h-4"></i> Copied!</span>
-            </template>
-          </button>
+            <button
+              class="btn btn-sm btn-ghost rounded-xl absolute top-2 right-2"
+              @click.stop="navigator.clipboard.writeText(JSON.stringify({mcpServers:{breadbox:{command:'docker',args:['exec','-i','breadbox-app-1','/app/breadbox','mcp-stdio']}}}, null, 2)).then(() => { copiedConfig = true; setTimeout(() => copiedConfig = false, 2000) })"
+            >
+              <template x-if="!copiedConfig">
+                <span class="flex items-center gap-1"><i data-lucide="copy" class="w-4 h-4"></i> Copy</span>
+              </template>
+              <template x-if="copiedConfig">
+                <span class="flex items-center gap-1 text-success"><i data-lucide="check" class="w-4 h-4"></i> Copied!</span>
+              </template>
+            </button>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Card 3: Review Agent Instructions -->
-  <div class="bb-card p-0 overflow-hidden" x-data="{ expanded: false }">
-    <div class="px-4 sm:px-6 py-5 border-b border-base-300 flex items-center gap-3 cursor-pointer" @click="expanded = !expanded">
+  <!-- Card 4: Review Agent Instructions [Deprecated] -->
+  <div id="review-instructions" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#review-instructions' }">
+    <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
       <div class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center flex-shrink-0">
         <i data-lucide="clipboard-check" class="w-5 h-5 text-base-content/40"></i>
       </div>
@@ -166,7 +178,7 @@
           <p class="text-xs text-base-content/50 mb-3">Use when a new account is synced and you have many uncategorized transactions.</p>
           <div class="relative">
             <pre class="bg-base-200 rounded-xl p-4 text-xs whitespace-pre-wrap overflow-auto max-h-60 font-mono text-base-content/70">{{.InitialReviewInstructions}}</pre>
-            <button class="btn btn-xs btn-ghost rounded-lg absolute top-2 right-2" @click="navigator.clipboard.writeText({{.InitialReviewInstructions | printf `%q`}}).then(() => { copied = true; setTimeout(() => copied = false, 2000) })">
+            <button class="btn btn-xs btn-ghost rounded-lg absolute top-2 right-2" @click.stop="navigator.clipboard.writeText({{.InitialReviewInstructions | printf `%q`}}).then(() => { copied = true; setTimeout(() => copied = false, 2000) })">
               <template x-if="!copied"><span class="flex items-center gap-1"><i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy</span></template>
               <template x-if="copied"><span class="flex items-center gap-1 text-success"><i data-lucide="check" class="w-3.5 h-3.5"></i> Copied!</span></template>
             </button>
@@ -183,7 +195,7 @@
           <p class="text-xs text-base-content/50 mb-3">Use for routine review of incoming transactions. Reviews a small batch with more attention per transaction.</p>
           <div class="relative">
             <pre class="bg-base-200 rounded-xl p-4 text-xs whitespace-pre-wrap overflow-auto max-h-60 font-mono text-base-content/70">{{.RecurringReviewInstructions}}</pre>
-            <button class="btn btn-xs btn-ghost rounded-lg absolute top-2 right-2" @click="navigator.clipboard.writeText({{.RecurringReviewInstructions | printf `%q`}}).then(() => { copied = true; setTimeout(() => copied = false, 2000) })">
+            <button class="btn btn-xs btn-ghost rounded-lg absolute top-2 right-2" @click.stop="navigator.clipboard.writeText({{.RecurringReviewInstructions | printf `%q`}}).then(() => { copied = true; setTimeout(() => copied = false, 2000) })">
               <template x-if="!copied"><span class="flex items-center gap-1"><i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy</span></template>
               <template x-if="copied"><span class="flex items-center gap-1 text-success"><i data-lucide="check" class="w-3.5 h-3.5"></i> Copied!</span></template>
             </button>
@@ -195,4 +207,13 @@
   </div>
 
 </div>
+
+<script>
+// Deep-link: scroll to and auto-expand the targeted section
+(function() {
+  if (!location.hash) return;
+  var el = document.querySelector(location.hash);
+  if (el) setTimeout(function() { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+})();
+</script>
 {{end}}

@@ -48,9 +48,19 @@ func MCPSettingsGetHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServe
 			instructions = breadboxmcp.DefaultInstructions
 		}
 
+		enabledCount := 0
+		for _, t := range tools {
+			if t.Enabled {
+				enabledCount++
+			}
+		}
+
 		data := BaseTemplateData(r, sm, "mcp", "MCP Settings")
 		data["MCPConfig"] = cfg
 		data["Tools"] = tools
+		data["ToolsEnabledCount"] = enabledCount
+		data["ToolsDisabledCount"] = len(tools) - enabledCount
+		data["ToolsTotalCount"] = len(tools)
 		data["Instructions"] = instructions
 		data["DefaultInstructions"] = breadboxmcp.DefaultInstructions
 		data["InitialReviewInstructions"] = breadboxmcp.InitialReviewInstructions
