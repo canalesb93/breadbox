@@ -141,50 +141,7 @@
     </div>
   </div>
 
-  <!-- Card 3: Server Instructions -->
-  <div id="instructions" class="bb-card p-0 overflow-hidden" x-data="{
-    instructions: {{.Instructions | printf `%q`}},
-    defaultInstructions: {{.DefaultInstructions | printf `%q`}},
-    async resetToDefaults() {
-      const ok = await bbConfirm({title:'Reset to defaults?',message:'Your current instructions will be replaced with the default server instructions.',confirmLabel:'Reset',variant:'warning'});
-      if (ok) {
-        this.instructions = this.defaultInstructions;
-      }
-    }
-  }">
-    <div class="px-4 sm:px-6 py-5 border-b border-base-300 flex items-center gap-3">
-      <div class="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center flex-shrink-0">
-        <i data-lucide="scroll-text" class="w-5 h-5 text-secondary"></i>
-      </div>
-      <div class="min-w-0">
-        <h2 class="font-semibold">Server Instructions</h2>
-        <p class="text-xs text-base-content/40">Instructions sent to agents when they connect via MCP</p>
-      </div>
-    </div>
-    <div class="px-4 sm:px-6 py-5">
-      <div class="alert alert-warning alert-soft mb-4 text-xs rounded-xl">
-        <i data-lucide="triangle-alert" class="w-4 h-4"></i>
-        <span>These instructions guide how agents understand your data model, query patterns, and available tools. Editing may cause agents to misuse tools or produce incorrect results.</span>
-      </div>
-      <form method="POST" action="/mcp-settings/instructions">
-        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-
-        <div class="form-control mb-4">
-          <textarea name="instructions" class="textarea textarea-bordered font-mono text-xs leading-relaxed w-full rounded-xl" style="min-height: 24rem" maxlength="20000" x-model="instructions" placeholder="Server instructions for MCP agents..."></textarea>
-          <label class="label">
-            <span class="label-text-alt text-base-content/40" x-text="instructions.length + '/20000'"></span>
-          </label>
-        </div>
-
-        <div class="flex flex-wrap gap-2 items-center">
-          <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Instructions</button>
-          <button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="resetToDefaults()">Reset to Defaults</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Card 4: Review Agent Instructions -->
+  <!-- Card 3: Review Agent Instructions -->
   <div class="bb-card p-0 overflow-hidden" x-data="{ expanded: false }">
     <div class="px-4 sm:px-6 py-5 border-b border-base-300 flex items-center gap-3 cursor-pointer" @click="expanded = !expanded">
       <div class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center flex-shrink-0">
