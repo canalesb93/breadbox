@@ -661,6 +661,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/oauth_client_new.html",
 		"pages/oauth_client_created.html",
 		"pages/agent_wizard.html",
+		"pages/mcp_guide.html",
 		"pages/prompt_builder.html",
 	}
 

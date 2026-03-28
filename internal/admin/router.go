@@ -110,6 +110,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/review-instructions", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/mcp-settings", http.StatusMovedPermanently)
 		})
+		r.Get("/mcp-getting-started", MCPGuideHandler(svc, sm, tr))
 		r.Get("/agent-wizard", AgentWizardHandler(sm, tr))
 		r.Get("/agent-wizard/{type}", PromptBuilderHandler(sm, tr))
 		r.Get("/rules", RulesPageHandler(svc, sm, tr, a.Config.Version))
