@@ -1,6 +1,9 @@
 -- name: EnqueueReview :one
 INSERT INTO review_queue (transaction_id, review_type, suggested_category_id, confidence_score)
-VALUES ($1, $2, $3, $4)
+SELECT $1, $2, $3, $4
+WHERE NOT EXISTS (
+  SELECT 1 FROM review_queue WHERE transaction_id = $1
+)
 ON CONFLICT (transaction_id) WHERE status = 'pending' DO NOTHING
 RETURNING *;
 

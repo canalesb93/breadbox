@@ -327,7 +327,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			} else {
 				unchanged++
 			}
-			if reviewAutoEnqueue {
+			if reviewAutoEnqueue && (isNew || isChanged) {
 				e.enqueueForReview(ctx, txQueries, txnResult, isNew, confidenceThreshold, resolver)
 			}
 			if isNew {
@@ -363,7 +363,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				unchanged++
 				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "unchanged")
 			}
-			if reviewAutoEnqueue {
+			if reviewAutoEnqueue && isChanged {
 				e.enqueueForReview(ctx, txQueries, txnResult, false, confidenceThreshold, resolver)
 			}
 		}
@@ -451,7 +451,16 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		if txn.CategoryDetailed != nil {
 			tctx.CategoryDetailed = *txn.CategoryDetailed
 		}
-		categoryID = resolver.ResolveWithContext(providerName, tctx)
+		resolved := resolver.ResolveWithContext(providerName, tctx)
+		// Only pass the category_id when a rule explicitly matched.
+		// When no rule matches, the resolver returns uncategorizedID — pass nil
+		// instead so the upsert SQL preserves the existing category for
+		// existing rows (avoids overwriting categories set by reviews/agents).
+		// New rows will get NULL category_id, which enqueueForReview catches
+		// and flags as "uncategorized" for review.
+		if resolved != resolver.UncategorizedID() {
+			categoryID = resolved
+		}
 	}
 
 	params := db.UpsertTransactionParams{
