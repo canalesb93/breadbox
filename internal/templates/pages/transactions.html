@@ -95,7 +95,7 @@
           </select>
         </label>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <label class="bb-filter-label">
           Category
           <div class="bb-cat-picker" data-picker-source="tx-filter-cat" x-data="categoryPicker({categories: window.__bbCategories, mode: 'filter', initial: '{{.FilterCategory}}', allowEmpty: true, emptyLabel: 'All categories'})" @category-change="$refs.catInput.value = selectedSlug">
@@ -122,11 +122,41 @@
             <option value="false"{{if eq .FilterPending "false"}} selected{{end}}>No</option>
           </select>
         </label>
-        <label class="bb-filter-label">
-          Search
-          <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Name or merchant" class="input input-sm input-bordered w-full">
-        </label>
       </div>
+
+      <!-- Advanced Search -->
+      <div class="border-t border-base-200 pt-4 mb-4" x-data="{ mode: '{{if .FilterSearchMode}}{{.FilterSearchMode}}{{else}}contains{{end}}' }">
+        <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1">
+          <!-- Labels row -->
+          <div class="text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2 hidden sm:flex">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-base-content/40"></i>
+            Advanced Search
+          </div>
+          <div class="text-[0.65rem] text-base-content/40 hidden sm:block">Search in</div>
+          <div class="text-[0.65rem] text-base-content/40 hidden sm:block">Match type</div>
+          <!-- Mobile label -->
+          <div class="text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2 sm:hidden mb-1">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-base-content/40"></i>
+            Advanced Search
+          </div>
+          <!-- Inputs row -->
+          <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Search transactions..." class="input input-sm input-bordered w-full">
+          <select name="search_field" class="select select-sm select-bordered">
+            <option value="all"{{if or (eq .FilterSearchField "all") (not .FilterSearchField)}} selected{{end}}>Name &amp; Merchant</option>
+            <option value="name"{{if eq .FilterSearchField "name"}} selected{{end}}>Name only</option>
+            <option value="merchant"{{if eq .FilterSearchField "merchant"}} selected{{end}}>Merchant only</option>
+          </select>
+          <select name="search_mode" class="select select-sm select-bordered" x-model="mode">
+            <option value="contains">Contains</option>
+            <option value="words">All words</option>
+            <option value="fuzzy">Fuzzy match</option>
+          </select>
+        </div>
+        <p class="text-[0.65rem] text-base-content/30 mt-2" x-show="mode === 'contains'" x-cloak>Substring match — finds transactions containing the exact text</p>
+        <p class="text-[0.65rem] text-base-content/30 mt-2" x-show="mode === 'words'" x-cloak>Matches each word independently — "Century Link" finds "CenturyLink"</p>
+        <p class="text-[0.65rem] text-base-content/30 mt-2" x-show="mode === 'fuzzy'" x-cloak>Typo-tolerant similarity — finds close matches even with misspellings</p>
+      </div>
+
       <div class="bb-filter-actions">
         <a href="/transactions" class="btn btn-sm btn-ghost rounded-xl">Reset</a>
         <button type="submit" class="btn btn-sm btn-primary rounded-xl">
@@ -141,7 +171,7 @@
 {{if .Transactions}}
 
 <div x-data class="space-y-1">
-  <!-- Select all header -->
+  <!-- Select all + quick search header -->
   <div class="flex items-center gap-3 px-2 pb-2">
     <label class="flex items-center cursor-pointer" @click.stop>
       <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
@@ -150,8 +180,32 @@
         @change="$store.bulk.toggleAll()">
     </label>
     <span class="text-xs text-base-content/40">Select all</span>
+    <div class="flex-1"></div>
+    <div class="relative" x-data="quickSearch()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10 transition-colors duration-150"
+        :class="searching ? 'text-primary/50' : 'text-base-content/30'">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+      </svg>
+      <input type="text" placeholder="Search all transactions..."
+        class="input input-sm input-bordered pl-9 pr-9 w-56 sm:w-64 rounded-xl text-xs bg-base-100 border-base-300 focus:border-primary/40 transition-all duration-200"
+        x-ref="searchInput"
+        :value="query"
+        @input.debounce.400ms="doSearch($event.target.value)"
+        @keydown.escape="clear()"
+        @focus="$el.select()">
+      <div class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+        <span x-show="searching" x-cloak class="loading loading-spinner loading-xs text-primary/50"></span>
+        <button type="button" x-show="query && !searching" x-cloak
+          class="text-base-content/30 hover:text-base-content/60 transition-colors"
+          @click="clear()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+    </div>
   </div>
 
+  <div id="bb-tx-results">
   <!-- ═══ GROUPED VIEW ═══ -->
   <template x-if="$store.txView.mode === 'grouped'">
     <div class="space-y-1 bb-stagger">
@@ -262,6 +316,7 @@
     </div>
   </div>
   {{end}}
+  </div><!-- /bb-tx-results -->
 </div>
 
 {{else}}
@@ -291,6 +346,66 @@ window.__bbTxMeta = [
   { id: '{{.ID}}', hasCat: {{if .CategoryID}}true{{else}}false{{end}} },
   {{end}}
 ];
+
+/* ── Quick Search (server-side fetch + swap) ── */
+function quickSearch() {
+  return {
+    query: new URLSearchParams(window.location.search).get('search') || '',
+    searching: false,
+    _abortCtrl: null,
+    doSearch(val) {
+      this.query = val;
+      if (this._abortCtrl) this._abortCtrl.abort();
+      if (!val.trim()) {
+        // Clear search: reload without search param
+        const url = new URL(window.location);
+        url.searchParams.delete('search');
+        url.searchParams.delete('search_mode');
+        url.searchParams.set('page', '1');
+        window.location = url.toString();
+        return;
+      }
+      this.searching = true;
+      this._abortCtrl = new AbortController();
+      const url = new URL(window.location);
+      url.searchParams.set('search', val);
+      url.searchParams.set('search_mode', 'words');
+      url.searchParams.set('page', '1');
+      fetch(url.toString(), { signal: this._abortCtrl.signal })
+        .then(r => r.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          const newResults = doc.getElementById('bb-tx-results');
+          const current = document.getElementById('bb-tx-results');
+          if (newResults && current) {
+            current.innerHTML = newResults.innerHTML;
+            // Update total badge
+            const newBadge = doc.querySelector('.badge.badge-ghost.badge-sm.tabular-nums');
+            const curBadge = document.querySelector('.badge.badge-ghost.badge-sm.tabular-nums');
+            if (newBadge && curBadge) curBadge.textContent = newBadge.textContent;
+            // Re-init icons and Alpine
+            if (window.lucide) lucide.createIcons();
+          }
+          // Update URL without reload
+          window.history.replaceState({}, '', url.toString());
+          this.searching = false;
+        })
+        .catch(e => {
+          if (e.name !== 'AbortError') this.searching = false;
+        });
+    },
+    clear() {
+      this.query = '';
+      this.$refs.searchInput.value = '';
+      const url = new URL(window.location);
+      url.searchParams.delete('search');
+      url.searchParams.delete('search_mode');
+      url.searchParams.set('page', '1');
+      window.location = url.toString();
+    }
+  };
+}
 
 /* ── View Toggle (Alpine store for shared state) ── */
 document.addEventListener('alpine:init', function() {

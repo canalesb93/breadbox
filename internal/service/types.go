@@ -262,6 +262,7 @@ type AdminTransactionListParams struct {
 	Pending       *bool
 	Search        *string
 	SearchMode    *string
+	SearchField   *string // "all" (default), "name", "merchant"
 	ExcludeSearch *string
 	SortOrder     string // "desc" (default) or "asc"
 }

@@ -269,6 +269,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return *s
 			},
+			"lower": strings.ToLower,
 			"syncLogFilterQuery": func(status, connID, trigger, dateFrom, dateTo string) template.URL {
 				params := url.Values{}
 				if status != "" {
