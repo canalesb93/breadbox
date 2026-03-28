@@ -280,19 +280,54 @@ function quickSearch() {
         }
       });
 
+      // Append skeleton rows to hint that server results are loading
+      var skeletonRow = '<div class="flex items-center gap-3 px-4 py-3 animate-pulse">'
+        + '<div class="w-5 h-5 bg-base-300/30 rounded shrink-0"></div>'
+        + '<div class="w-9 h-9 bg-base-300/30 rounded-xl shrink-0"></div>'
+        + '<div class="flex-1 space-y-1.5"><div class="h-3 bg-base-300/30 rounded w-2/5"></div><div class="h-2.5 bg-base-300/20 rounded w-1/4"></div></div>'
+        + '<div class="h-3 bg-base-300/30 rounded w-20 hidden sm:block"></div>'
+        + '<div class="h-3 bg-base-300/20 rounded w-14 hidden sm:block"></div>'
+        + '<div class="h-3.5 bg-base-300/30 rounded w-16"></div>'
+        + '</div>';
+      var skeletonEl = document.getElementById('bb-search-skeleton');
+      if (skeletonEl) skeletonEl.remove();
+      var skeleton = document.createElement('div');
+      skeleton.id = 'bb-search-skeleton';
+      var mode = (window.Alpine && Alpine.store('txView')) ? Alpine.store('txView').mode : 'grouped';
+      if (mode === 'grouped') {
+        var groups = '';
+        for (var g = 0; g < 3; g++) {
+          groups += '<div class="animate-pulse">'
+            + '<div class="flex items-center justify-between px-2 pt-4 pb-2">'
+            + '<div class="flex items-center gap-3"><div class="h-3 bg-base-300/30 rounded w-24"></div><div class="h-2.5 bg-base-300/20 rounded w-12"></div></div>'
+            + '<div class="h-3 bg-base-300/20 rounded w-14"></div>'
+            + '</div>'
+            + '<div class="bb-card overflow-hidden divide-y divide-base-300/30">' + skeletonRow + '</div>'
+            + '</div>';
+        }
+        skeleton.innerHTML = '<div class="space-y-1">' + groups + '</div>';
+      } else {
+        var rows = '';
+        for (var i = 0; i < 3; i++) {
+          rows += skeletonRow;
+          if (i < 2) rows += '<div class="border-t border-base-300/20"></div>';
+        }
+        skeleton.innerHTML = '<div class="bb-card overflow-hidden"><div class="divide-y divide-base-300/30">' + rows + '</div></div>';
+      }
+      var resultsEl = document.getElementById('bb-tx-results');
+      var paginatorEl = document.getElementById('bb-tx-paginator');
+      if (paginatorEl) paginatorEl.style.display = 'none';
+      if (resultsEl) {
+        if (paginatorEl) resultsEl.insertBefore(skeleton, paginatorEl);
+        else resultsEl.appendChild(skeleton);
+      }
+
       // Phase 2: Server fetch for full results (debounced 500ms)
       var self = this;
       this._fetchTimer = setTimeout(function() { self._serverFetch(val); }, 500);
     },
 
     _serverFetch(val) {
-      // Dim current results while loading
-      var results = document.getElementById('bb-tx-results');
-      if (results) {
-        results.style.opacity = '0.4';
-        results.style.pointerEvents = 'none';
-        results.style.transition = 'opacity 0.15s ease';
-      }
       this.searching = true;
       this._abortCtrl = new AbortController();
       var searchUrl = new URL(window.location.origin + '/transactions/search');
@@ -310,11 +345,22 @@ function quickSearch() {
         .then(function(html) {
           var results = document.getElementById('bb-tx-results');
           if (results) {
-            results.innerHTML = html.replace(/bb-stagger/g, '');
+            // Check if response has any transaction rows
+            var hasResults = html.indexOf('bb-tx-row') !== -1;
+            if (hasResults) {
+              results.innerHTML = html.replace(/bb-stagger/g, '');
+              Alpine.initTree(results);
+              if (window.lucide) lucide.createIcons();
+            } else {
+              results.innerHTML = '<div class="bb-card">'
+                + '<div class="flex flex-col items-center text-center py-12 px-6">'
+                + '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-base-content/15 mb-3"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="m15 8-6 6"/></svg>'
+                + '<h3 class="text-sm font-semibold text-base-content/60 mb-1">No results found</h3>'
+                + '<p class="text-xs text-base-content/40">No transactions match "<strong>' + val.replace(/</g, '&lt;') + '</strong>". Try a different search term or check your filters.</p>'
+                + '</div></div>';
+            }
             results.style.opacity = '1';
             results.style.pointerEvents = '';
-            Alpine.initTree(results);
-            if (window.lucide) lucide.createIcons();
           }
           // Update total badge from response
           var m = html.match(/Showing\s+\d+/);
@@ -338,7 +384,13 @@ function quickSearch() {
 
     _restoreOriginal() {
       if (this._abortCtrl) this._abortCtrl.abort();
+      clearTimeout(this._fetchTimer);
       this.searching = false;
+      // Remove any skeleton and restore pagination
+      var skel = document.getElementById('bb-search-skeleton');
+      if (skel) skel.remove();
+      var pag = document.getElementById('bb-tx-paginator');
+      if (pag) pag.style.display = '';
       // Show all client-side hidden rows and restore counts
       document.querySelectorAll('.bb-tx-row').forEach(function(r) { r.style.display = ''; });
       document.querySelectorAll('[data-date-group]').forEach(function(g) {

@@ -53,7 +53,7 @@
 
   <!-- ═══ PAGINATION ═══ -->
   {{if gt .TotalPages 1}}
-  <div class="bb-paginator">
+  <div class="bb-paginator" id="bb-tx-paginator">
     <div class="bb-paginator__info">
       <span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
         Showing {{.ShowingStart}}&ndash;{{.ShowingEnd}} of {{.Total}}
