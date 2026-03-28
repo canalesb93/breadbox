@@ -87,7 +87,7 @@
 
 <!-- Sync Health Stats -->
 {{if gt .TotalSyncs 0}}
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 bb-stagger">
+<div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6 bb-stagger">
   <div class="bb-card p-4">
     <div class="text-xs font-medium text-base-content/40 mb-1">Success Rate</div>
     <div class="flex items-baseline gap-1.5">
@@ -99,6 +99,17 @@
     <div class="text-xs font-medium text-base-content/40 mb-1">Last Successful</div>
     <div class="text-sm font-semibold truncate">{{if .LastSuccessRelative}}{{.LastSuccessRelative}}{{else}}<span class="text-base-content/30">Never</span>{{end}}</div>
     {{if .LastSuccessTime}}<div class="text-[0.65rem] text-base-content/30 mt-1 truncate" title="{{.LastSuccessTime}}">{{.LastSuccessTime}}</div>{{end}}
+  </div>
+  <div class="bb-card p-4">
+    <div class="text-xs font-medium text-base-content/40 mb-1">Next Sync</div>
+    <div class="text-sm font-semibold truncate {{if .NextSync.IsOverdue}}text-info{{end}}">
+      {{if .NextSync.IsDisconnected}}<span class="text-base-content/30">N/A</span>
+      {{else if .NextSync.IsPaused}}<span class="text-base-content/30">Paused</span>
+      {{else}}{{.NextSync.Label}}{{end}}
+    </div>
+    {{if and (not .NextSync.IsDisconnected) (not .NextSync.IsPaused)}}
+    <div class="text-[0.65rem] text-base-content/30 mt-1 tabular-nums">every {{formatIntervalMinutes .NextSync.EffectiveIntervalMinutes}}</div>
+    {{end}}
   </div>
   <div class="bb-card p-4">
     <div class="text-xs font-medium text-base-content/40 mb-1">Transactions Synced</div>

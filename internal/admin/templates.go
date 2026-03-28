@@ -160,6 +160,26 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"formatUUID": func(u pgtype.UUID) string {
 				return formatUUID(u)
 			},
+			"formatIntervalMinutes": func(minutes int) string {
+				// Render a sync interval in human-readable form (e.g., "12h", "4h", "30m", "1d").
+				if minutes <= 0 {
+					return "N/A"
+				}
+				if minutes >= 1440 && minutes%1440 == 0 {
+					d := minutes / 1440
+					if d == 1 {
+						return "24h"
+					}
+					return fmt.Sprintf("%dd", d)
+				}
+				if minutes >= 60 && minutes%60 == 0 {
+					return fmt.Sprintf("%dh", minutes/60)
+				}
+				if minutes >= 60 {
+					return fmt.Sprintf("%dh %dm", minutes/60, minutes%60)
+				}
+				return fmt.Sprintf("%dm", minutes)
+			},
 			"accountLabel": func(name string, mask interface{}) string {
 				// Format an account name with optional last-4 digits for disambiguation.
 				// mask can be *string, string, or pgtype.Text.
