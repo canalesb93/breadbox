@@ -641,6 +641,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/oauth_clients.html",
 		"pages/oauth_client_new.html",
 		"pages/oauth_client_created.html",
+		"pages/agent_wizard.html",
 	}
 
 	// Pages using the wizard layout (login + first-run admin creation + OAuth consent).

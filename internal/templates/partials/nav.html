@@ -32,6 +32,9 @@
   </a>
 
   <div class="bb-sidebar-section">Agents</div>
+  <a href="/agent-wizard" class="bb-sidebar-link{{if eq .CurrentPage "agent-wizard"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="wand-sparkles"></i> Agent Wizard
+  </a>
   <a href="/reviews" class="bb-sidebar-link{{if eq .CurrentPage "reviews"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="clipboard-check"></i>
     <span class="flex-1">Review Queue</span>
