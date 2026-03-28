@@ -49,6 +49,21 @@ func MCPGuideHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateR
 		data["HasAPIKeys"] = hasAPIKeys
 		data["HasOAuthClients"] = hasOAuthClients
 
+		// Step 3 contextual data: pending reviews, uncategorized count, rule count.
+		var pendingReviews, uncategorizedCount, ruleCount int64
+		if counts, err := svc.GetReviewCounts(ctx); err == nil {
+			pendingReviews = counts.Pending
+		}
+		if cnt, err := svc.CountUncategorizedTransactions(ctx); err == nil {
+			uncategorizedCount = cnt
+		}
+		if result, err := svc.ListTransactionRules(ctx, service.TransactionRuleListParams{Limit: 1}); err == nil {
+			ruleCount = int64(result.Total)
+		}
+		data["PendingReviews"] = pendingReviews
+		data["UncategorizedCount"] = uncategorizedCount
+		data["RuleCount"] = ruleCount
+
 		tr.Render(w, r, "mcp_guide.html", data)
 	}
 }
