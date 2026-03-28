@@ -10,35 +10,33 @@
 
   <!-- Card 1: Tools Enabled -->
   <div class="bb-card p-0 overflow-hidden">
-    <div class="px-6 py-5 border-b border-base-300 flex items-center gap-3">
-      <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+    <div class="px-4 sm:px-6 py-5 border-b border-base-300 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
         <i data-lucide="wrench" class="w-5 h-5 text-primary"></i>
       </div>
-      <div>
+      <div class="min-w-0">
         <h2 class="font-semibold">Tools Enabled</h2>
         <p class="text-xs text-base-content/40">Enable or disable individual MCP tools</p>
       </div>
     </div>
-    <div class="px-6 py-5">
+    <div class="px-4 sm:px-6 py-5">
       <p class="text-sm text-base-content/50 mb-4">Disabled tools are hidden from all agents. Read-only API keys cannot invoke write tools regardless of this setting.</p>
       <form method="POST" action="/mcp-settings/tools">
         <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
         <div class="space-y-1">
           {{range .Tools}}
-          <div class="flex items-center justify-between p-3 rounded-xl hover:bg-base-200/50 transition-colors duration-150">
-            <div class="flex items-center gap-3 min-w-0">
-              <input type="checkbox" name="enabled_tools" value="{{.Name}}" class="toggle toggle-sm toggle-primary" {{if .Enabled}}checked{{end}}>
-              <div class="min-w-0">
-                <div class="font-mono text-sm">{{.Name}}</div>
-                <div class="text-xs text-base-content/40 truncate max-w-md">{{.Description}}</div>
+          <div class="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl hover:bg-base-200/50 transition-colors duration-150">
+            <input type="checkbox" name="enabled_tools" value="{{.Name}}" class="toggle toggle-sm toggle-primary mt-0.5 flex-shrink-0" {{if .Enabled}}checked{{end}}>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-mono text-xs sm:text-sm break-all sm:break-normal">{{.Name}}</span>
+                {{if eq .Classification "write"}}
+                  <span class="badge badge-soft badge-warning badge-xs rounded-lg font-medium">write</span>
+                {{else}}
+                  <span class="badge badge-soft badge-success badge-xs rounded-lg font-medium">read</span>
+                {{end}}
               </div>
-            </div>
-            <div class="flex-shrink-0 ml-3">
-              {{if eq .Classification "write"}}
-                <span class="badge badge-soft badge-warning badge-xs rounded-lg font-medium">write</span>
-              {{else}}
-                <span class="badge badge-soft badge-success badge-xs rounded-lg font-medium">read</span>
-              {{end}}
+              <div class="text-xs text-base-content/40 mt-0.5 line-clamp-2 sm:line-clamp-1">{{.Description}}</div>
             </div>
           </div>
           {{end}}
@@ -61,16 +59,16 @@
       }
     }
   }">
-    <div class="px-6 py-5 border-b border-base-300 flex items-center gap-3">
-      <div class="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center">
+    <div class="px-4 sm:px-6 py-5 border-b border-base-300 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center flex-shrink-0">
         <i data-lucide="scroll-text" class="w-5 h-5 text-secondary"></i>
       </div>
-      <div>
+      <div class="min-w-0">
         <h2 class="font-semibold">Server Instructions</h2>
         <p class="text-xs text-base-content/40">Instructions sent to agents when they connect via MCP</p>
       </div>
     </div>
-    <div class="px-6 py-5">
+    <div class="px-4 sm:px-6 py-5">
       <div class="alert alert-warning alert-soft mb-4 text-xs rounded-xl">
         <i data-lucide="triangle-alert" class="w-4 h-4"></i>
         <span>These instructions guide how agents understand your data model, query patterns, and available tools. Editing may cause agents to misuse tools or produce incorrect results.</span>
@@ -85,7 +83,7 @@
           </label>
         </div>
 
-        <div class="flex gap-2 items-center">
+        <div class="flex flex-wrap gap-2 items-center">
           <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Instructions</button>
           <button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="resetToDefaults()">Reset to Defaults</button>
         </div>
