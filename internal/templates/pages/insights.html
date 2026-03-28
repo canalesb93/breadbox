@@ -1713,6 +1713,19 @@ document.addEventListener('DOMContentLoaded', function() {
   var incomeColor = cs.getPropertyValue('--bb-chart-income').trim();
   var incomeLineColor = cs.getPropertyValue('--bb-chart-income-line').trim();
 
+  // Mobile-aware chart sizing
+  var isMobile = window.innerWidth < 640;
+
+  // Compact dollar formatter for Y-axis labels (abbreviates on mobile)
+  function formatAxisDollar(v) {
+    var abs = Math.abs(v);
+    var prefix = v < 0 ? '-$' : '$';
+    if (isMobile && abs >= 1000) {
+      return prefix + (abs / 1000).toFixed(abs % 1000 === 0 ? 0 : 1) + 'k';
+    }
+    return prefix + abs.toLocaleString();
+  }
+
   // Track all ECharts instances for tab-switch resize
   var insightCharts = [];
 
@@ -1893,13 +1906,15 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
 
-    var maxTicks = chartDays <= 7 ? 7 : chartDays <= 30 ? 8 : chartDays <= 90 ? 10 : 12;
+    var maxTicks = isMobile
+      ? (chartDays <= 7 ? 7 : chartDays <= 30 ? 5 : chartDays <= 90 ? 5 : 6)
+      : (chartDays <= 7 ? 7 : chartDays <= 30 ? 8 : chartDays <= 90 ? 10 : 12);
 
     var option = {
       animation: true,
       animationDuration: 600,
       animationEasing: 'cubicOut',
-      grid: { top: 12, right: 12, bottom: (chartDays >= 90 ? 52 : 28), left: 50 },
+      grid: { top: 12, right: 12, bottom: (chartDays >= 90 ? 52 : 28), left: isMobile ? 8 : 50, containLabel: true },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow', shadowStyle: { color: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' } },
@@ -1946,7 +1961,7 @@ document.addEventListener('DOMContentLoaded', function() {
           fontSize: 10,
           fontWeight: 500,
           fontFamily: 'Inter, system-ui, sans-serif',
-          formatter: function(v) { return '$' + v.toLocaleString(); }
+          formatter: formatAxisDollar
         },
         splitLine: { lineStyle: { color: splitLineColor } },
         splitNumber: 4
@@ -2051,8 +2066,8 @@ document.addEventListener('DOMContentLoaded', function() {
               return '{total|$' + totalSpending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '}\n{label|total spending}';
             },
             rich: {
-              total: { fontSize: 20, fontWeight: 700, fontFamily: 'Inter, system-ui, sans-serif', color: tooltipText, padding: [0, 0, 4, 0] },
-              label: { fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif', color: textColor }
+              total: { fontSize: isMobile ? 15 : 20, fontWeight: 700, fontFamily: 'Inter, system-ui, sans-serif', color: tooltipText, padding: [0, 0, 4, 0] },
+              label: { fontSize: isMobile ? 9 : 10, fontFamily: 'Inter, system-ui, sans-serif', color: textColor }
             }
           },
           emphasis: {
@@ -2119,8 +2134,8 @@ document.addEventListener('DOMContentLoaded', function() {
               return '{total|$' + catTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '}\n{label|' + categoryName + '}';
             },
             rich: {
-              total: { fontSize: 20, fontWeight: 700, fontFamily: 'Inter, system-ui, sans-serif', color: tooltipText, padding: [0, 0, 4, 0] },
-              label: { fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif', color: textColor }
+              total: { fontSize: isMobile ? 15 : 20, fontWeight: 700, fontFamily: 'Inter, system-ui, sans-serif', color: tooltipText, padding: [0, 0, 4, 0] },
+              label: { fontSize: isMobile ? 9 : 10, fontFamily: 'Inter, system-ui, sans-serif', color: textColor }
             }
           },
           emphasis: {
@@ -2234,7 +2249,7 @@ document.addEventListener('DOMContentLoaded', function() {
       animation: true,
       animationDuration: 800,
       animationEasing: 'cubicOut',
-      grid: { top: 28, right: 70, bottom: 28, left: 50 },
+      grid: { top: 28, right: isMobile ? 50 : 70, bottom: 28, left: isMobile ? 8 : 50, containLabel: true },
       tooltip: {
         trigger: 'axis',
         backgroundColor: tooltipBg,
@@ -2272,7 +2287,8 @@ document.addEventListener('DOMContentLoaded', function() {
           fontWeight: 500,
           fontFamily: 'Inter, system-ui, sans-serif',
           interval: function(index) {
-            return index === 0 || (index + 1) % 5 === 0 || index === fData.labels.length - 1;
+            var step = isMobile ? 7 : 5;
+            return index === 0 || (index + 1) % step === 0 || index === fData.labels.length - 1;
           }
         }
       },
@@ -2285,10 +2301,7 @@ document.addEventListener('DOMContentLoaded', function() {
           fontSize: 10,
           fontWeight: 500,
           fontFamily: 'Inter, system-ui, sans-serif',
-          formatter: function(v) {
-            var prefix = v >= 0 ? '$' : '-$';
-            return prefix + Math.abs(v).toLocaleString();
-          }
+          formatter: formatAxisDollar
         },
         splitLine: { lineStyle: { color: splitLineColor } },
         splitNumber: 4
@@ -2459,7 +2472,7 @@ document.addEventListener('DOMContentLoaded', function() {
         animation: true,
         animationDuration: 800,
         animationEasing: 'cubicOut',
-        grid: { top: 12, right: 12, bottom: 36, left: 50 },
+        grid: { top: 12, right: 12, bottom: 36, left: isMobile ? 8 : 50, containLabel: true },
         tooltip: {
           trigger: 'axis',
           backgroundColor: tooltipBg,
@@ -2494,7 +2507,8 @@ document.addEventListener('DOMContentLoaded', function() {
             fontFamily: 'Inter, system-ui, sans-serif',
             formatter: function(v) {
               var n = parseInt(v);
-              return (n === 1 || n % 5 === 0) ? n : '';
+              var step = isMobile ? 7 : 5;
+              return (n === 1 || n % step === 0) ? n : '';
             }
           },
           name: 'Day of month',
@@ -2511,7 +2525,7 @@ document.addEventListener('DOMContentLoaded', function() {
             fontSize: 10,
             fontWeight: 500,
             fontFamily: 'Inter, system-ui, sans-serif',
-            formatter: function(v) { return '$' + v.toLocaleString(); }
+            formatter: formatAxisDollar
           },
           splitLine: { lineStyle: { color: splitLineColor } },
           splitNumber: 4
@@ -2565,7 +2579,7 @@ document.addEventListener('DOMContentLoaded', function() {
         animation: true,
         animationDuration: 800,
         animationEasing: 'cubicOut',
-        grid: { top: 40, right: 20, bottom: 36, left: 50 },
+        grid: { top: 40, right: 20, bottom: 36, left: isMobile ? 8 : 50, containLabel: true },
         tooltip: {
           trigger: 'axis',
           backgroundColor: tooltipBg,
