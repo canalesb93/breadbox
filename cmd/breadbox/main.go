@@ -332,16 +332,16 @@ func runMCPStdio() error {
 	if err != nil {
 		logger.Warn("failed to load MCP config, using defaults", "error", err)
 		mcpCfg = &service.MCPConfig{
-			Mode:          "read_only",
+			Mode:          "read_write",
 			DisabledTools: []string{},
 		}
 	}
 
 	server := mcpServer.BuildServer(breadboxmcp.MCPServerConfig{
-		Mode:               mcpCfg.Mode,
-		DisabledTools:      mcpCfg.DisabledTools,
-		CustomInstructions: mcpCfg.CustomInstructions,
-		APIKeyScope:        "full_access", // stdio has no API key
+		Mode:          mcpCfg.Mode,
+		DisabledTools: mcpCfg.DisabledTools,
+		Instructions:  mcpCfg.Instructions,
+		APIKeyScope:   "full_access", // stdio has no API key
 	})
 
 	// Graceful shutdown on SIGINT/SIGTERM.

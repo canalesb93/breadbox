@@ -25,17 +25,14 @@ func TestGetMCPConfig_Defaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetMCPConfig failed: %v", err)
 	}
-	if cfg.Mode != "read_only" {
-		t.Errorf("default mode = %q, want %q", cfg.Mode, "read_only")
+	if cfg.Mode != "read_write" {
+		t.Errorf("default mode = %q, want %q", cfg.Mode, "read_write")
 	}
 	if len(cfg.DisabledTools) != 0 {
 		t.Errorf("default disabled_tools should be empty, got %v", cfg.DisabledTools)
 	}
-	if cfg.CustomInstructions != "" {
-		t.Errorf("default custom_instructions should be empty, got %q", cfg.CustomInstructions)
-	}
-	if cfg.InstructionTemplate != "" {
-		t.Errorf("default instruction_template should be empty, got %q", cfg.InstructionTemplate)
+	if cfg.Instructions != "" {
+		t.Errorf("default instructions should be empty, got %q", cfg.Instructions)
 	}
 }
 
@@ -129,8 +126,8 @@ func TestSaveMCPInstructions_RoundTrip(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	instructions := "# Custom Instructions\nAnalyze spending by category monthly."
-	if err := svc.SaveMCPInstructions(ctx, instructions, "spend_review"); err != nil {
+	instructions := "# Server Instructions\nAnalyze spending by category monthly."
+	if err := svc.SaveMCPInstructions(ctx, instructions); err != nil {
 		t.Fatalf("SaveMCPInstructions failed: %v", err)
 	}
 
@@ -138,11 +135,8 @@ func TestSaveMCPInstructions_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetMCPConfig failed: %v", err)
 	}
-	if cfg.CustomInstructions != instructions {
-		t.Errorf("custom_instructions mismatch")
-	}
-	if cfg.InstructionTemplate != "spend_review" {
-		t.Errorf("instruction_template = %q, want %q", cfg.InstructionTemplate, "spend_review")
+	if cfg.Instructions != instructions {
+		t.Errorf("instructions mismatch: got %q", cfg.Instructions)
 	}
 }
 
@@ -150,14 +144,14 @@ func TestSaveMCPInstructions_TooLong(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	// 10001 characters should fail
-	longStr := make([]byte, 10001)
+	// 20001 characters should fail
+	longStr := make([]byte, 20001)
 	for i := range longStr {
 		longStr[i] = 'a'
 	}
-	err := svc.SaveMCPInstructions(ctx, string(longStr), "")
+	err := svc.SaveMCPInstructions(ctx, string(longStr))
 	if err == nil {
-		t.Fatal("expected error for instructions > 10000 chars, got nil")
+		t.Fatal("expected error for instructions > 20000 chars, got nil")
 	}
 }
 
@@ -172,7 +166,7 @@ func TestMCPConfig_FullRoundTrip(t *testing.T) {
 	if err := svc.SaveMCPDisabledTools(ctx, []string{"tool_a", "tool_b"}); err != nil {
 		t.Fatalf("SaveMCPDisabledTools: %v", err)
 	}
-	if err := svc.SaveMCPInstructions(ctx, "Test instructions", "monthly_analysis"); err != nil {
+	if err := svc.SaveMCPInstructions(ctx, "Test instructions"); err != nil {
 		t.Fatalf("SaveMCPInstructions: %v", err)
 	}
 
@@ -186,11 +180,8 @@ func TestMCPConfig_FullRoundTrip(t *testing.T) {
 	if len(cfg.DisabledTools) != 2 {
 		t.Errorf("disabled_tools = %v", cfg.DisabledTools)
 	}
-	if cfg.CustomInstructions != "Test instructions" {
-		t.Errorf("custom_instructions = %q", cfg.CustomInstructions)
-	}
-	if cfg.InstructionTemplate != "monthly_analysis" {
-		t.Errorf("instruction_template = %q", cfg.InstructionTemplate)
+	if cfg.Instructions != "Test instructions" {
+		t.Errorf("instructions = %q", cfg.Instructions)
 	}
 }
 
