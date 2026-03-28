@@ -1,0 +1,113 @@
+{{define "tx-results-partial"}}
+  <!-- ═══ GROUPED VIEW ═══ -->
+  <template x-if="$store.txView.mode === 'grouped'">
+    <div class="space-y-1 bb-stagger">
+      {{range .DateGroups}}
+      <div class="bb-date-group" data-date-group="{{.Date}}">
+        <!-- Date Header -->
+        <div class="flex items-center justify-between px-2 pt-4 pb-2">
+          <div class="flex items-center gap-3">
+            <h3 class="text-xs font-semibold text-base-content/50 tracking-wide">{{.Label}}</h3>
+            <span class="text-xs text-base-content/30 tabular-nums" data-txn-count="{{len .Transactions}}">{{len .Transactions}} txn{{if gt (len .Transactions) 1}}s{{end}}</span>
+          </div>
+          <div class="flex items-center gap-3 text-xs tabular-nums">
+            <span class="text-base-content/50" data-day-spending="{{printf "%.2f" .DaySpending}}"{{if not (gt .DaySpending 0.0)}} style="display:none"{{end}}>{{formatAmount .DaySpending}}</span>
+            <span class="text-success/70" data-day-income="{{printf "%.2f" .DayIncome}}"{{if not (gt .DayIncome 0.0)}} style="display:none"{{end}}>-{{formatAmount .DayIncome}}</span>
+          </div>
+        </div>
+
+        <!-- Transaction Rows -->
+        <div class="bb-card overflow-hidden divide-y divide-base-300/50">
+          {{range .Transactions}}
+          {{template "tx-row" .}}
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </template>
+
+  <!-- ═══ LIST VIEW ═══ -->
+  <template x-if="$store.txView.mode === 'list'">
+    <div>
+      <div class="bb-card overflow-hidden">
+        <!-- Table Header -->
+        <div class="bb-table-header">
+          <div class="w-5"></div>
+          <div class="w-9"></div>
+          <div class="flex-1 min-w-0">Name</div>
+          <div class="hidden sm:block shrink-0">Category</div>
+          <div class="w-20 text-right hidden sm:block">Date</div>
+          <div class="w-24 text-right pl-3">Amount</div>
+          <div class="w-4 hidden sm:block"></div>
+        </div>
+        <!-- Table Body -->
+        <div class="divide-y divide-base-300/50">
+          {{range .Transactions}}
+          {{template "tx-row" .}}
+          {{end}}
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- ═══ PAGINATION ═══ -->
+  {{if gt .TotalPages 1}}
+  <div class="bb-paginator">
+    <div class="bb-paginator__info">
+      <span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
+        Showing {{.ShowingStart}}&ndash;{{.ShowingEnd}} of {{.Total}}
+      </span>
+      <div class="bb-paginator__per-page">
+        <label class="text-xs text-base-content/40 whitespace-nowrap">Per page</label>
+        <select class="select select-xs select-bordered rounded-lg tabular-nums" onchange="bbSetPerPage(this.value)">
+          <option value="25"{{if eq .PageSize 25}} selected{{end}}>25</option>
+          <option value="50"{{if eq .PageSize 50}} selected{{end}}>50</option>
+          <option value="100"{{if eq .PageSize 100}} selected{{end}}>100</option>
+        </select>
+      </div>
+    </div>
+    <div class="bb-paginator__nav">
+      <!-- First -->
+      {{if gt .Page 2}}
+      <a href="{{printf "%s%d" $.PaginationBase 1}}" class="bb-paginator__btn" title="First page">
+        <i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
+      </a>
+      {{end}}
+      <!-- Previous -->
+      {{if gt .Page 1}}
+      <a href="{{printf "%s%d" $.PaginationBase (sub $.Page 1)}}" class="bb-paginator__btn" title="Previous page">
+        <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+      </a>
+      {{end}}
+      <!-- Page numbers -->
+      {{range pageRange .Page .TotalPages}}
+      {{if eq . 0}}
+      <span class="bb-paginator__ellipsis">&hellip;</span>
+      {{else if eq . $.Page}}
+      <span class="bb-paginator__btn bb-paginator__btn--active">{{.}}</span>
+      {{else}}
+      <a href="{{printf "%s%d" $.PaginationBase .}}" class="bb-paginator__btn">{{.}}</a>
+      {{end}}
+      {{end}}
+      <!-- Next -->
+      {{if lt .Page .TotalPages}}
+      <a href="{{printf "%s%d" $.PaginationBase (add $.Page 1)}}" class="bb-paginator__btn" title="Next page">
+        <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+      </a>
+      {{end}}
+      <!-- Last -->
+      {{if lt .Page (sub .TotalPages 1)}}
+      <a href="{{printf "%s%d" $.PaginationBase $.TotalPages}}" class="bb-paginator__btn" title="Last page">
+        <i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
+      </a>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+
+<script>
+window.__bbTxMeta = [{{range .Transactions}}{ id: '{{.ID}}', hasCat: {{if .CategoryID}}true{{else}}false{{end}} },{{end}}];
+if (window.Alpine && Alpine.store('bulk')) Alpine.store('bulk').clear();
+</script>
+{{end}}

@@ -264,6 +264,116 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 	}
 }
 
+// TransactionSearchHandler serves GET /admin/transactions/search.
+// Returns an HTML fragment (tx-results-partial) for AJAX swap by quickSearch().
+func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		if page < 1 {
+			page = 1
+		}
+
+		pageSize := 50
+		if v, err := strconv.Atoi(r.URL.Query().Get("per_page")); err == nil {
+			switch v {
+			case 25, 50, 100:
+				pageSize = v
+			}
+		}
+
+		params := service.AdminTransactionListParams{
+			Page:     page,
+			PageSize: pageSize,
+		}
+
+		if v := r.URL.Query().Get("start_date"); v != "" {
+			if t, err := time.Parse("2006-01-02", v); err == nil {
+				params.StartDate = &t
+			}
+		}
+		if v := r.URL.Query().Get("end_date"); v != "" {
+			if t, err := time.Parse("2006-01-02", v); err == nil {
+				t = t.AddDate(0, 0, 1)
+				params.EndDate = &t
+			}
+		}
+		if v := r.URL.Query().Get("account_id"); v != "" {
+			params.AccountID = &v
+		}
+		if v := r.URL.Query().Get("user_id"); v != "" {
+			params.UserID = &v
+		}
+		if v := r.URL.Query().Get("connection_id"); v != "" {
+			params.ConnectionID = &v
+		}
+		if v := r.URL.Query().Get("category"); v != "" {
+			params.CategorySlug = &v
+		}
+		if v := r.URL.Query().Get("min_amount"); v != "" {
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				params.MinAmount = &f
+			}
+		}
+		if v := r.URL.Query().Get("max_amount"); v != "" {
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				params.MaxAmount = &f
+			}
+		}
+		if v := r.URL.Query().Get("pending"); v != "" {
+			b := v == "true"
+			params.Pending = &b
+		}
+		if v := r.URL.Query().Get("search"); v != "" {
+			params.Search = &v
+		}
+		if v := r.URL.Query().Get("search_mode"); v != "" && service.ValidateSearchMode(v) {
+			params.SearchMode = &v
+		}
+		if v := r.URL.Query().Get("search_field"); v != "" && service.ValidateSearchField(v) {
+			params.SearchField = &v
+		}
+		if v := r.URL.Query().Get("sort"); v == "asc" {
+			params.SortOrder = "asc"
+		}
+
+		result, err := svc.ListTransactionsAdmin(ctx, params)
+		if err != nil {
+			a.Logger.Error("search admin transactions", "error", err)
+			http.Error(w, "search error", http.StatusInternalServerError)
+			return
+		}
+
+		// Load category tree for category pickers in the partial.
+		categoryTree, err := svc.ListCategoryTree(ctx)
+		if err != nil {
+			a.Logger.Error("list categories for transaction search", "error", err)
+		}
+
+		paginationBase := buildPaginationBase(r)
+		dateGroups := groupTransactionsByDate(result.Transactions)
+
+		data := map[string]any{
+			"Transactions":    result.Transactions,
+			"DateGroups":      dateGroups,
+			"Categories":      categoryTree,
+			"Page":            result.Page,
+			"PageSize":        result.PageSize,
+			"TotalPages":      result.TotalPages,
+			"Total":           result.Total,
+			"PaginationBase":  paginationBase,
+			"ShowingStart":    (result.Page-1)*result.PageSize + 1,
+			"ShowingEnd":      min(int64(result.Page*result.PageSize), result.Total),
+			"CSRFToken":       GetCSRFToken(r),
+			"FilterSearch":    r.URL.Query().Get("search"),
+			"FilterSearchMode": r.URL.Query().Get("search_mode"),
+		}
+
+		tr.RenderPartial(w, r, "transactions.html", "tx-results-partial", data)
+	}
+}
+
 // AccountDetailHandler serves GET /admin/accounts/{id}.
 func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

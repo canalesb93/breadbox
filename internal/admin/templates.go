@@ -602,6 +602,8 @@ var templatePartials = []string{
 	"partials/category_picker.html",
 	"partials/skeletons.html",
 	"partials/breadcrumb.html",
+	"partials/tx_row.html",
+	"partials/tx_results.html",
 }
 
 func (tr *TemplateRenderer) parseTemplates() error {
@@ -731,6 +733,23 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
+		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// RenderPartial renders a named block from a template without the layout wrapper.
+// name is the template key (e.g. "transactions.html"), block is the define name
+// (e.g. "tx-results-partial"). Used for HTML fragment responses (AJAX swap).
+func (tr *TemplateRenderer) RenderPartial(w http.ResponseWriter, r *http.Request, name, block string, data interface{}) {
+	tr.mu.RLock()
+	t, ok := tr.templates[name]
+	tr.mu.RUnlock()
+	if !ok {
+		http.Error(w, "template not found: "+name, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := t.ExecuteTemplate(w, block, data); err != nil {
 		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
 	}
 }

@@ -37,7 +37,7 @@
 </div>
 
 <!-- Filters Card -->
-<div class="bb-card mb-6" x-data="{ filtersOpen: {{if or .FilterStartDate .FilterEndDate .FilterAccountID .FilterUserID .FilterConnID .FilterCategory .FilterMinAmount .FilterMaxAmount .FilterPending .FilterSearch}}true{{else}}false{{end}} }">
+<div class="bb-card mb-6" x-data="{ filtersOpen: localStorage.getItem('bb-tx-filters-open') === 'true' || {{if or .FilterStartDate .FilterEndDate .FilterAccountID .FilterUserID .FilterConnID .FilterCategory .FilterMinAmount .FilterMaxAmount .FilterPending}}true{{else}}false{{end}} }" x-init="$watch('filtersOpen', v => localStorage.setItem('bb-tx-filters-open', v))">
   <div class="p-0">
     <button type="button" class="bb-filter-toggle" @click="filtersOpen = !filtersOpen">
       <div class="flex items-center gap-2">
@@ -191,7 +191,7 @@
         class="input input-sm input-bordered pl-9 pr-9 w-56 sm:w-64 rounded-xl text-xs bg-base-100 border-base-300 focus:border-primary/40 transition-all duration-200"
         x-ref="searchInput"
         :value="query"
-        @input.debounce.400ms="doSearch($event.target.value)"
+        @input="doSearch($event.target.value)"
         @keydown.escape="clear()"
         @focus="$el.select()">
       <div class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -206,116 +206,7 @@
   </div>
 
   <div id="bb-tx-results">
-  <!-- ═══ GROUPED VIEW ═══ -->
-  <template x-if="$store.txView.mode === 'grouped'">
-    <div class="space-y-1 bb-stagger">
-      {{range .DateGroups}}
-      <div class="bb-date-group">
-        <!-- Date Header -->
-        <div class="flex items-center justify-between px-2 pt-4 pb-2">
-          <div class="flex items-center gap-3">
-            <h3 class="text-xs font-semibold text-base-content/50 tracking-wide">{{.Label}}</h3>
-            <span class="text-xs text-base-content/30 tabular-nums">{{len .Transactions}} txn{{if gt (len .Transactions) 1}}s{{end}}</span>
-          </div>
-          <div class="flex items-center gap-3 text-xs tabular-nums">
-            {{if gt .DaySpending 0.0}}
-            <span class="text-base-content/50">{{formatAmount .DaySpending}}</span>
-            {{end}}
-            {{if gt .DayIncome 0.0}}
-            <span class="text-success/70">-{{formatAmount .DayIncome}}</span>
-            {{end}}
-          </div>
-        </div>
-
-        <!-- Transaction Rows -->
-        <div class="bb-card overflow-hidden divide-y divide-base-300/50">
-          {{range .Transactions}}
-          {{template "tx-row" .}}
-          {{end}}
-        </div>
-      </div>
-      {{end}}
-    </div>
-  </template>
-
-  <!-- ═══ LIST VIEW ═══ -->
-  <template x-if="$store.txView.mode === 'list'">
-    <div>
-      <div class="bb-card overflow-hidden">
-        <!-- Table Header -->
-        <div class="bb-table-header">
-          <div class="w-5"></div>
-          <div class="w-9"></div>
-          <div class="flex-1 min-w-0">Name</div>
-          <div class="hidden sm:block shrink-0">Category</div>
-          <div class="w-20 text-right hidden sm:block">Date</div>
-          <div class="w-24 text-right pl-3">Amount</div>
-          <div class="w-4 hidden sm:block"></div>
-        </div>
-        <!-- Table Body -->
-        <div class="divide-y divide-base-300/50">
-          {{range .Transactions}}
-          {{template "tx-row" .}}
-          {{end}}
-        </div>
-      </div>
-    </div>
-  </template>
-
-  <!-- ═══ PAGINATION ═══ -->
-  {{if gt .TotalPages 1}}
-  <div class="bb-paginator">
-    <div class="bb-paginator__info">
-      <span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
-        Showing {{.ShowingStart}}&ndash;{{.ShowingEnd}} of {{.Total}}
-      </span>
-      <div class="bb-paginator__per-page">
-        <label class="text-xs text-base-content/40 whitespace-nowrap">Per page</label>
-        <select class="select select-xs select-bordered rounded-lg tabular-nums" onchange="bbSetPerPage(this.value)">
-          <option value="25"{{if eq .PageSize 25}} selected{{end}}>25</option>
-          <option value="50"{{if eq .PageSize 50}} selected{{end}}>50</option>
-          <option value="100"{{if eq .PageSize 100}} selected{{end}}>100</option>
-        </select>
-      </div>
-    </div>
-    <div class="bb-paginator__nav">
-      <!-- First -->
-      {{if gt .Page 2}}
-      <a href="{{printf "%s%d" $.PaginationBase 1}}" class="bb-paginator__btn" title="First page">
-        <i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
-      </a>
-      {{end}}
-      <!-- Previous -->
-      {{if gt .Page 1}}
-      <a href="{{printf "%s%d" $.PaginationBase (sub $.Page 1)}}" class="bb-paginator__btn" title="Previous page">
-        <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
-      </a>
-      {{end}}
-      <!-- Page numbers -->
-      {{range pageRange .Page .TotalPages}}
-      {{if eq . 0}}
-      <span class="bb-paginator__ellipsis">&hellip;</span>
-      {{else if eq . $.Page}}
-      <span class="bb-paginator__btn bb-paginator__btn--active">{{.}}</span>
-      {{else}}
-      <a href="{{printf "%s%d" $.PaginationBase .}}" class="bb-paginator__btn">{{.}}</a>
-      {{end}}
-      {{end}}
-      <!-- Next -->
-      {{if lt .Page .TotalPages}}
-      <a href="{{printf "%s%d" $.PaginationBase (add $.Page 1)}}" class="bb-paginator__btn" title="Next page">
-        <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
-      </a>
-      {{end}}
-      <!-- Last -->
-      {{if lt .Page (sub .TotalPages 1)}}
-      <a href="{{printf "%s%d" $.PaginationBase $.TotalPages}}" class="bb-paginator__btn" title="Last page">
-        <i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
-      </a>
-      {{end}}
-    </div>
-  </div>
-  {{end}}
+  {{template "tx-results-partial" .}}
   </div><!-- /bb-tx-results -->
 </div>
 
@@ -340,69 +231,172 @@
 <script>
 window.__bbCategories = {{toJSON .Categories}};
 
-/* Transaction metadata for bulk operations */
-window.__bbTxMeta = [
-  {{range .Transactions}}
-  { id: '{{.ID}}', hasCat: {{if .CategoryID}}true{{else}}false{{end}} },
-  {{end}}
-];
-
-/* ── Quick Search (server-side fetch + swap) ── */
+/* ── Hybrid Quick Search (Phase 1: instant client-side, Phase 2: server fetch) ── */
 function quickSearch() {
   return {
     query: new URLSearchParams(window.location.search).get('search') || '',
     searching: false,
     _abortCtrl: null,
+    _fetchTimer: null,
+
     doSearch(val) {
       this.query = val;
       if (this._abortCtrl) this._abortCtrl.abort();
+      clearTimeout(this._fetchTimer);
+
       if (!val.trim()) {
-        // Clear search: reload without search param
-        const url = new URL(window.location);
-        url.searchParams.delete('search');
-        url.searchParams.delete('search_mode');
-        url.searchParams.set('page', '1');
-        window.location = url.toString();
+        this._restoreOriginal();
         return;
+      }
+
+      // Phase 1: Instant client-side filter on visible rows (no debounce)
+      var terms = val.toLowerCase().trim().split(/\s+/);
+      document.querySelectorAll('.bb-tx-row').forEach(function(row) {
+        var hay = (row.dataset.txName || '') + ' ' + (row.dataset.txMerchant || '') + ' ' + (row.dataset.txAccount || '');
+        row.style.display = terms.every(function(t) { return hay.includes(t); }) ? '' : 'none';
+      });
+      document.querySelectorAll('[data-date-group]').forEach(function(group) {
+        var visible = group.querySelectorAll('.bb-tx-row:not([style*="display: none"])');
+        var count = visible.length;
+        group.style.display = count ? '' : 'none';
+        // Update transaction count
+        var countEl = group.querySelector('[data-txn-count]');
+        if (countEl) countEl.textContent = count + ' txn' + (count !== 1 ? 's' : '');
+        // Recalculate spending/income from visible rows
+        var spending = 0, income = 0;
+        visible.forEach(function(row) {
+          var amt = parseFloat(row.dataset.txAmount) || 0;
+          if (amt > 0) spending += amt; else income += Math.abs(amt);
+        });
+        var spendEl = group.querySelector('[data-day-spending]');
+        if (spendEl) {
+          spendEl.textContent = spending > 0 ? '$' + spending.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+          spendEl.style.display = spending > 0 ? '' : 'none';
+        }
+        var incomeEl = group.querySelector('[data-day-income]');
+        if (incomeEl) {
+          incomeEl.textContent = income > 0 ? '-$' + income.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+          incomeEl.style.display = income > 0 ? '' : 'none';
+        }
+      });
+
+      // Phase 2: Server fetch for full results (debounced 500ms)
+      var self = this;
+      this._fetchTimer = setTimeout(function() { self._serverFetch(val); }, 500);
+    },
+
+    _serverFetch(val) {
+      // Dim current results while loading
+      var results = document.getElementById('bb-tx-results');
+      if (results) {
+        results.style.opacity = '0.4';
+        results.style.pointerEvents = 'none';
+        results.style.transition = 'opacity 0.15s ease';
       }
       this.searching = true;
       this._abortCtrl = new AbortController();
-      const url = new URL(window.location);
-      url.searchParams.set('search', val);
-      url.searchParams.set('search_mode', 'words');
-      url.searchParams.set('page', '1');
-      fetch(url.toString(), { signal: this._abortCtrl.signal })
-        .then(r => r.text())
-        .then(html => {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, 'text/html');
-          const newResults = doc.getElementById('bb-tx-results');
-          const current = document.getElementById('bb-tx-results');
-          if (newResults && current) {
-            current.innerHTML = newResults.innerHTML;
-            // Update total badge
-            const newBadge = doc.querySelector('.badge.badge-ghost.badge-sm.tabular-nums');
-            const curBadge = document.querySelector('.badge.badge-ghost.badge-sm.tabular-nums');
-            if (newBadge && curBadge) curBadge.textContent = newBadge.textContent;
-            // Re-init icons and Alpine
+      var searchUrl = new URL(window.location.origin + '/transactions/search');
+      // Preserve existing filters
+      new URLSearchParams(window.location.search).forEach(function(v, k) {
+        if (k !== 'search' && k !== 'search_mode' && k !== 'page') searchUrl.searchParams.set(k, v);
+      });
+      searchUrl.searchParams.set('search', val);
+      searchUrl.searchParams.set('search_mode', 'words');
+      searchUrl.searchParams.set('page', '1');
+
+      var self = this;
+      fetch(searchUrl.toString(), { signal: this._abortCtrl.signal })
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+          var results = document.getElementById('bb-tx-results');
+          if (results) {
+            results.innerHTML = html.replace(/bb-stagger/g, '');
+            results.style.opacity = '1';
+            results.style.pointerEvents = '';
+            Alpine.initTree(results);
             if (window.lucide) lucide.createIcons();
           }
+          // Update total badge from response
+          var m = html.match(/Showing\s+\d+/);
+          var totalBadge = document.querySelector('.badge.badge-ghost.badge-sm.tabular-nums');
+          if (totalBadge) {
+            var countMatch = html.match(/ of (\d+)/);
+            if (countMatch) totalBadge.textContent = countMatch[1] + ' total';
+          }
           // Update URL without reload
-          window.history.replaceState({}, '', url.toString());
-          this.searching = false;
+          var displayUrl = new URL(window.location);
+          displayUrl.searchParams.set('search', val);
+          displayUrl.searchParams.set('search_mode', 'words');
+          displayUrl.searchParams.set('page', '1');
+          window.history.replaceState({}, '', displayUrl.toString());
+          self.searching = false;
         })
-        .catch(e => {
-          if (e.name !== 'AbortError') this.searching = false;
+        .catch(function(e) {
+          if (e.name !== 'AbortError') self.searching = false;
         });
     },
+
+    _restoreOriginal() {
+      if (this._abortCtrl) this._abortCtrl.abort();
+      this.searching = false;
+      // Show all client-side hidden rows and restore counts
+      document.querySelectorAll('.bb-tx-row').forEach(function(r) { r.style.display = ''; });
+      document.querySelectorAll('[data-date-group]').forEach(function(g) {
+        g.style.display = '';
+        var countEl = g.querySelector('[data-txn-count]');
+        if (countEl) {
+          var orig = parseInt(countEl.dataset.txnCount, 10);
+          countEl.textContent = orig + ' txn' + (orig !== 1 ? 's' : '');
+        }
+        var spendEl = g.querySelector('[data-day-spending]');
+        if (spendEl) {
+          var origSpend = parseFloat(spendEl.dataset.daySpending) || 0;
+          spendEl.textContent = origSpend > 0 ? '$' + origSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+          spendEl.style.display = origSpend > 0 ? '' : 'none';
+        }
+        var incomeEl = g.querySelector('[data-day-income]');
+        if (incomeEl) {
+          var origIncome = parseFloat(incomeEl.dataset.dayIncome) || 0;
+          incomeEl.textContent = origIncome > 0 ? '-$' + origIncome.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+          incomeEl.style.display = origIncome > 0 ? '' : 'none';
+        }
+      });
+      // If URL has search params, fetch original results without reload
+      if (new URLSearchParams(window.location.search).has('search')) {
+        var url = new URL(window.location.origin + '/transactions/search');
+        new URLSearchParams(window.location.search).forEach(function(v, k) {
+          if (k !== 'search' && k !== 'search_mode' && k !== 'page') url.searchParams.set(k, v);
+        });
+        url.searchParams.set('page', '1');
+        var self = this;
+        self.searching = true;
+        fetch(url.toString())
+          .then(function(r) { return r.text(); })
+          .then(function(html) {
+            var results = document.getElementById('bb-tx-results');
+            if (results) {
+              results.innerHTML = html.replace(/bb-stagger/g, '');
+              Alpine.initTree(results);
+              if (window.lucide) lucide.createIcons();
+            }
+            var displayUrl = new URL(window.location);
+            displayUrl.searchParams.delete('search');
+            displayUrl.searchParams.delete('search_mode');
+            displayUrl.searchParams.set('page', '1');
+            window.history.replaceState({}, '', displayUrl.toString());
+            self.searching = false;
+          })
+          .catch(function() { self.searching = false; });
+      }
+    },
+
     clear() {
       this.query = '';
+      if (this._abortCtrl) this._abortCtrl.abort();
       this.$refs.searchInput.value = '';
-      const url = new URL(window.location);
-      url.searchParams.delete('search');
-      url.searchParams.delete('search_mode');
-      url.searchParams.set('page', '1');
-      window.location = url.toString();
+      this._restoreOriginal();
+      var input = this.$refs.searchInput;
+      setTimeout(function() { input.focus(); }, 50);
     }
   };
 }
@@ -607,123 +601,3 @@ function quickSetCategory(txId, categoryId) {
 </script>
 {{end}}
 
-{{define "tx-row"}}
-<div class="bb-tx-row group" x-data="{ expanded: false }"
-  :class="$store.bulk.isIn('{{.ID}}') && 'bg-primary/5'">
-  <!-- Main Row -->
-  <div class="flex items-center gap-3 px-4 py-3 cursor-pointer" @click="expanded = !expanded">
-    <!-- Checkbox -->
-    <label class="flex items-center shrink-0 cursor-pointer" @click.stop>
-      <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
-        :checked="$store.bulk.isIn('{{.ID}}')"
-        @change="$store.bulk.toggle('{{.ID}}')">
-    </label>
-
-    <!-- Category Icon / Merchant Avatar -->
-    <div class="relative shrink-0">
-      {{if .CategoryIcon}}
-      <div class="bb-tx-avatar" style="--avatar-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}oklch(0.65 0 0){{end}}">
-        <i data-lucide="{{deref .CategoryIcon}}" class="w-4 h-4"></i>
-      </div>
-      {{else}}
-      <div class="bb-tx-avatar bb-tx-avatar--letter">
-        <span>{{firstChar .Name}}</span>
-      </div>
-      {{end}}
-      {{if .HasPendingReview}}<span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-info ring-2 ring-base-100" title="Pending review"></span>{{end}}
-    </div>
-
-    <!-- Description + Details -->
-    <div class="flex-1 min-w-0">
-      <div class="flex items-center gap-2">
-        <a href="/transactions/{{.ID}}" @click.stop class="font-medium text-sm hover:text-primary transition-colors truncate">{{.Name}}</a>
-        {{if .Pending}}<span class="text-[0.6rem] font-medium text-warning/80 bg-warning/10 px-1.5 py-0.5 rounded-full leading-none">Pending</span>{{end}}
-      </div>
-      <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40">
-        {{if .UserName}}
-        <span class="w-4 h-4 rounded-full bg-primary/10 inline-flex items-center justify-center shrink-0" title="{{.UserName}}">
-          <span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{{firstChar .UserName}}</span>
-        </span>
-        {{end}}
-        <span class="truncate">{{.AccountName}}</span>
-        {{if .MerchantName}}
-        <span class="text-base-content/20 hidden sm:inline">&middot;</span>
-        <span class="text-base-content/40 truncate hidden sm:inline">{{deref .MerchantName}}</span>
-        {{end}}
-        {{if .CategoryDisplayName}}
-        <span class="text-base-content/20 sm:hidden">&middot;</span>
-        <span class="inline-flex items-center gap-1 sm:hidden">
-          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}{{safeCSS "oklch(0.65 0 0)"}}{{end}}"></span>
-          <span class="text-base-content/50 truncate">{{deref .CategoryDisplayName}}</span>
-        </span>
-        {{end}}
-        {{if .AgentReviewed}}
-        <span class="text-base-content/20">&middot;</span>
-        <span class="inline-flex items-center gap-0.5 text-primary/60" title="Categorized by AI agent">
-          <i data-lucide="bot" class="w-3 h-3"></i>
-        </span>
-        {{end}}
-      </div>
-    </div>
-
-    <!-- Category Picker (inline column) -->
-    <div class="shrink-0 hidden sm:block" @click.stop>
-      <div class="bb-cat-picker" data-picker-source="tx-cat-{{.ID}}" x-data="categoryPicker({categories: window.__bbCategories, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: '\u2014', allowEmpty: true, emptyLabel: 'Uncategorized'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
-        <button type="button" class="btn btn-ghost btn-xs gap-1.5 rounded-lg" @click="openPicker()">
-          <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-          <span x-text="displayLabel" class="text-xs">{{if .CategoryDisplayName}}{{deref .CategoryDisplayName}}{{else}}&mdash;{{end}}</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Date (visible in list mode, hidden in grouped since it's in header) -->
-    <div class="text-xs text-base-content/40 tabular-nums shrink-0 hidden sm:block w-20 text-right bb-tx-date">
-      {{.Date}}
-    </div>
-
-    <!-- Amount -->
-    <div class="w-24 text-right shrink-0 pl-3">
-      <span class="bb-tx-amount tabular-nums{{if lt .Amount 0.0}} bb-tx-amount--income{{end}}">
-        {{formatAmount .Amount}}
-      </span>
-    </div>
-
-    <!-- Expand chevron (desktop only) -->
-    <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/20 shrink-0 transition-transform duration-200 hidden sm:block" :class="expanded ? 'rotate-180' : ''"></i>
-  </div>
-
-  <!-- Expanded Detail Panel -->
-  <div x-show="expanded" x-cloak
-    x-transition:enter="transition ease-out duration-150"
-    x-transition:enter-start="opacity-0"
-    x-transition:enter-end="opacity-100"
-    x-transition:leave="transition ease-in duration-100"
-    x-transition:leave-start="opacity-100"
-    x-transition:leave-end="opacity-0"
-    class="border-t border-base-300/50 bg-base-200/20 px-4 py-3">
-    <div class="flex flex-col sm:flex-row sm:items-start gap-4">
-      <!-- Detail Fields -->
-      <div class="flex flex-wrap gap-x-6 gap-y-2 text-xs">
-        {{if .MerchantName}}
-        <div>
-          <span class="text-base-content/30">Merchant</span>
-          <span class="text-base-content/60 ml-1.5">{{deref .MerchantName}}</span>
-        </div>
-        {{end}}
-        <div>
-          <span class="text-base-content/30">Account</span>
-          <span class="text-base-content/60 ml-1.5">{{.AccountName}} ({{.InstitutionName}})</span>
-        </div>
-        <div>
-          <span class="text-base-content/30">Member</span>
-          <span class="text-base-content/60 ml-1.5">{{if .UserName}}{{.UserName}}{{else}}&mdash;{{end}}</span>
-        </div>
-        <div>
-          <span class="text-base-content/30">ID</span>
-          <code class="font-mono text-[0.65rem] bg-base-200 px-1.5 py-0.5 rounded ml-1.5">{{.ID}}</code>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-{{end}}
