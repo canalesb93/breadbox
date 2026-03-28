@@ -209,6 +209,33 @@ var TransactionSearchColumns = []string{"t.name", "t.merchant_name"}
 // TransactionNullableColumns marks which transaction search columns are nullable.
 var TransactionNullableColumns = map[string]bool{"t.merchant_name": true}
 
+// validSearchFields lists recognized search_field values.
+var validSearchFields = map[string]bool{
+	"all":      true,
+	"name":     true,
+	"merchant": true,
+}
+
+// ValidateSearchField returns true if the given field is valid.
+func ValidateSearchField(field string) bool {
+	return validSearchFields[field]
+}
+
+// resolveSearchField returns the columns and nullable map for a given search field.
+func resolveSearchField(field *string) ([]string, map[string]bool) {
+	if field == nil || *field == "" || *field == "all" {
+		return TransactionSearchColumns, TransactionNullableColumns
+	}
+	switch *field {
+	case "name":
+		return []string{"t.name"}, map[string]bool{}
+	case "merchant":
+		return []string{"t.merchant_name"}, map[string]bool{"t.merchant_name": true}
+	default:
+		return TransactionSearchColumns, TransactionNullableColumns
+	}
+}
+
 // RuleSearchColumns are the columns searched for transaction rules.
 var RuleSearchColumns = []string{"tr.name"}
 

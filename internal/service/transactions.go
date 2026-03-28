@@ -565,7 +565,8 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		if params.SearchMode != nil {
 			mode = *params.SearchMode
 		}
-		sc := BuildSearchClause(*params.Search, mode, TransactionSearchColumns, TransactionNullableColumns, argN)
+		cols, nullCols := resolveSearchField(params.SearchField)
+		sc := BuildSearchClause(*params.Search, mode, cols, nullCols, argN)
 		query += sc.SQL
 		whereClauses += sc.SQL
 		args = append(args, sc.Args...)
