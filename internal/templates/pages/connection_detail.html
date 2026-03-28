@@ -28,32 +28,40 @@
 {{end}}
 
 <!-- Header with actions -->
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
   <div class="flex items-center gap-4">
-    <div class="w-12 h-12 rounded-xl bg-base-200 flex items-center justify-center">
+    <div class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0
+      {{if eq (printf "%s" .Connection.Provider) "plaid"}}bg-info/10
+      {{else if eq (printf "%s" .Connection.Provider) "teller"}}bg-success/10
+      {{else}}bg-warning/10{{end}}">
       {{if eq (printf "%s" .Connection.Provider) "plaid"}}
-      <i data-lucide="building-2" class="w-6 h-6 text-info"></i>
+      <i data-lucide="building-2" class="w-5 h-5 text-info"></i>
       {{else if eq (printf "%s" .Connection.Provider) "teller"}}
-      <i data-lucide="landmark" class="w-6 h-6 text-success"></i>
+      <i data-lucide="landmark" class="w-5 h-5 text-success"></i>
       {{else}}
-      <i data-lucide="file-spreadsheet" class="w-6 h-6 text-warning"></i>
+      <i data-lucide="file-spreadsheet" class="w-5 h-5 text-warning"></i>
       {{end}}
     </div>
     <div>
-      <h1 class="bb-page-title">{{.Connection.InstitutionName.String}}</h1>
-      <div class="flex items-center gap-2 mt-0.5">
+      <div class="flex items-center gap-2.5">
+        <h1 class="bb-page-title">{{.Connection.InstitutionName.String}}</h1>
         {{statusBadge (printf "%s" .Connection.Status)}}
         {{if .Connection.Paused}}<span class="badge badge-ghost badge-sm">Paused</span>{{end}}
-        <span class="text-xs text-base-content/40">&middot;</span>
-        <span class="text-xs text-base-content/40 capitalize">{{printf "%s" .Connection.Provider}}</span>
+      </div>
+      <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40">
+        <span class="capitalize">{{printf "%s" .Connection.Provider}}</span>
         {{if .Connection.UserName.Valid}}
-        <span class="text-xs text-base-content/40">&middot;</span>
-        <span class="text-xs text-base-content/40">{{.Connection.UserName.String}}</span>
+        <span>&middot;</span>
+        <span>{{.Connection.UserName.String}}</span>
+        {{end}}
+        {{if .Connection.LastSyncedAt.Valid}}
+        <span>&middot;</span>
+        <span>Synced {{relativeTime .Connection.LastSyncedAt.Time}}</span>
         {{end}}
       </div>
     </div>
   </div>
-  <div class="flex items-center gap-2 flex-wrap">
+  <div class="flex items-center gap-2 flex-wrap shrink-0">
     {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
     <a href="/connections/{{.ConnID}}/reauth" class="btn btn-sm btn-outline rounded-xl">Re-authenticate</a>
     {{end}}
@@ -87,83 +95,86 @@
 
 <!-- Sync Health Stats -->
 {{if gt .TotalSyncs 0}}
-<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6 bb-stagger">
-  <div class="bb-card p-4">
-    <div class="text-xs font-medium text-base-content/40 mb-1">Success Rate</div>
-    <div class="flex items-baseline gap-1.5">
-      <span class="text-2xl font-semibold tabular-nums{{if ge .SuccessRate 90.0}} text-success{{else if ge .SuccessRate 50.0}} text-warning{{else}} text-error{{end}}">{{printf "%.0f" .SuccessRate}}%</span>
+<div class="bb-card p-0 mb-6 overflow-hidden">
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-base-300/40">
+    <div class="p-4">
+      <div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Success Rate</div>
+      <div class="flex items-baseline gap-1">
+        <span class="text-xl font-bold tabular-nums{{if ge .SuccessRate 90.0}} text-success{{else if ge .SuccessRate 50.0}} text-warning{{else}} text-error{{end}}">{{printf "%.0f" .SuccessRate}}%</span>
+        <span class="text-[0.6rem] text-base-content/30 tabular-nums">{{.SuccessSyncs}}/{{.TotalSyncs}}</span>
+      </div>
     </div>
-    <div class="text-[0.65rem] text-base-content/30 mt-1 tabular-nums">{{.SuccessSyncs}}/{{.TotalSyncs}} syncs</div>
-  </div>
-  <div class="bb-card p-4">
-    <div class="text-xs font-medium text-base-content/40 mb-1">Last Successful</div>
-    <div class="text-sm font-semibold truncate">{{if .LastSuccessRelative}}{{.LastSuccessRelative}}{{else}}<span class="text-base-content/30">Never</span>{{end}}</div>
-    {{if .LastSuccessTime}}<div class="text-[0.65rem] text-base-content/30 mt-1 truncate" title="{{.LastSuccessTime}}">{{.LastSuccessTime}}</div>{{end}}
-  </div>
-  <div class="bb-card p-4">
-    <div class="text-xs font-medium text-base-content/40 mb-1">Next Sync</div>
-    <div class="text-sm font-semibold truncate {{if .NextSync.IsOverdue}}text-info{{end}}">
-      {{if .NextSync.IsDisconnected}}<span class="text-base-content/30">N/A</span>
-      {{else if .NextSync.IsPaused}}<span class="text-base-content/30">Paused</span>
-      {{else}}{{.NextSync.Label}}{{end}}
+    <div class="p-4">
+      <div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Last Sync</div>
+      <div class="text-sm font-semibold truncate">{{if .LastSuccessRelative}}{{.LastSuccessRelative}}{{else}}<span class="text-base-content/30">Never</span>{{end}}</div>
+      {{if .LastSuccessTime}}<div class="text-[0.6rem] text-base-content/30 mt-0.5 truncate" title="{{.LastSuccessTime}}">{{.LastSuccessTime}}</div>{{end}}
     </div>
-    {{if and (not .NextSync.IsDisconnected) (not .NextSync.IsPaused)}}
-    <div class="text-[0.65rem] text-base-content/30 mt-1 tabular-nums">every {{formatIntervalMinutes .NextSync.EffectiveIntervalMinutes}}</div>
-    {{end}}
-  </div>
-  <div class="bb-card p-4">
-    <div class="text-xs font-medium text-base-content/40 mb-1">Transactions Synced</div>
-    <div class="text-2xl font-semibold tabular-nums">{{.TotalAdded}}</div>
-    <div class="text-[0.65rem] text-base-content/30 mt-1 tabular-nums">
-      {{if gt .TotalModified 0}}{{.TotalModified}} modified{{end}}
-      {{if gt .TotalRemoved 0}} &middot; {{.TotalRemoved}} removed{{end}}
-      {{if and (eq .TotalModified 0) (eq .TotalRemoved 0)}}total added{{end}}
+    <div class="p-4">
+      <div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Next Sync</div>
+      <div class="text-sm font-semibold truncate {{if .NextSync.IsOverdue}}text-info{{end}}">
+        {{if .NextSync.IsDisconnected}}<span class="text-base-content/30">N/A</span>
+        {{else if .NextSync.IsPaused}}<span class="text-base-content/30">Paused</span>
+        {{else}}{{.NextSync.Label}}{{end}}
+      </div>
+      {{if and (not .NextSync.IsDisconnected) (not .NextSync.IsPaused)}}
+      <div class="text-[0.6rem] text-base-content/30 mt-0.5 tabular-nums">every {{formatIntervalMinutes .NextSync.EffectiveIntervalMinutes}}</div>
+      {{end}}
     </div>
-  </div>
-  <div class="bb-card p-4">
-    <div class="text-xs font-medium text-base-content/40 mb-1">Avg Duration</div>
-    <div class="text-2xl font-semibold tabular-nums">
-      {{if gt .AvgDurationSec 60.0}}{{printf "%.0f" (divFloat .AvgDurationSec 60.0)}}m{{else if gt .AvgDurationSec 1.0}}{{printf "%.1f" .AvgDurationSec}}s{{else if gt .AvgDurationSec 0.0}}{{printf "%.0f" (mulFloatRaw .AvgDurationSec 1000.0)}}ms{{else}}<span class="text-base-content/30">&mdash;</span>{{end}}
+    <div class="p-4">
+      <div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Transactions</div>
+      <div class="text-xl font-bold tabular-nums">{{.TotalAdded}}</div>
+      <div class="text-[0.6rem] text-base-content/30 mt-0.5 tabular-nums">
+        {{if gt .TotalModified 0}}{{.TotalModified}} mod{{end}}
+        {{if gt .TotalRemoved 0}} &middot; {{.TotalRemoved}} del{{end}}
+        {{if and (eq .TotalModified 0) (eq .TotalRemoved 0)}}total synced{{end}}
+      </div>
     </div>
-    <div class="text-[0.65rem] text-base-content/30 mt-1">per sync</div>
+    <div class="p-4">
+      <div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Avg Duration</div>
+      <div class="text-xl font-bold tabular-nums">
+        {{if gt .AvgDurationSec 60.0}}{{printf "%.0f" (divFloat .AvgDurationSec 60.0)}}m{{else if gt .AvgDurationSec 1.0}}{{printf "%.1f" .AvgDurationSec}}s{{else if gt .AvgDurationSec 0.0}}{{printf "%.0f" (mulFloatRaw .AvgDurationSec 1000.0)}}ms{{else}}<span class="text-base-content/30">&mdash;</span>{{end}}
+      </div>
+      <div class="text-[0.6rem] text-base-content/30 mt-0.5">per sync</div>
+    </div>
   </div>
 </div>
 
 <!-- Sync Timeline (14 days) -->
 <div class="bb-card p-5 mb-6">
-  <div class="flex items-center justify-between mb-3">
-    <h2 class="text-sm font-semibold text-base-content/70">Sync Activity</h2>
-    <span class="text-xs text-base-content/30">Last 14 days</span>
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-3">
+      <h2 class="text-sm font-semibold text-base-content/70">Sync Activity</h2>
+      <div class="flex items-center gap-3 text-[0.6rem] text-base-content/35">
+        <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-success/60"></span>Success</span>
+        <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-error/60"></span>Error</span>
+      </div>
+    </div>
+    <span class="text-xs text-base-content/30">14 days</span>
   </div>
-  <div class="flex items-end gap-1" style="height: 56px;">
+  <div class="flex items-end gap-1.5" style="height: 72px;">
     {{range .DaySyncs}}
-    <div class="flex-1 flex flex-col items-center gap-0.5 group relative">
+    <div class="flex-1 flex flex-col items-center gap-1 group relative">
       {{if gt .Total 0}}
-      <div class="flex flex-col-reverse gap-px w-full" style="height: 40px;">
+      <div class="flex flex-col-reverse gap-px w-full rounded-md overflow-hidden" style="height: 52px;">
         {{if gt .Success 0}}
-        <div class="w-full rounded-sm bg-success/60 transition-colors group-hover:bg-success/80" style="height: {{if gt .Error 0}}{{printf "%.0f" (divFloat (mulFloatRaw (intToFloat .Success) 40.0) (intToFloat .Total))}}px{{else}}40px{{end}}; min-height: 4px;"></div>
+        <div class="w-full bg-success/50 transition-all duration-200 group-hover:bg-success/70" style="height: {{if gt .Error 0}}{{printf "%.0f" (divFloat (mulFloatRaw (intToFloat .Success) 52.0) (intToFloat .Total))}}px{{else}}52px{{end}}; min-height: 4px;"></div>
         {{end}}
         {{if gt .Error 0}}
-        <div class="w-full rounded-sm bg-error/60 transition-colors group-hover:bg-error/80" style="height: {{if gt .Success 0}}{{printf "%.0f" (divFloat (mulFloatRaw (intToFloat .Error) 40.0) (intToFloat .Total))}}px{{else}}40px{{end}}; min-height: 4px;"></div>
+        <div class="w-full bg-error/50 transition-all duration-200 group-hover:bg-error/70" style="height: {{if gt .Success 0}}{{printf "%.0f" (divFloat (mulFloatRaw (intToFloat .Error) 52.0) (intToFloat .Total))}}px{{else}}52px{{end}}; min-height: 4px;"></div>
         {{end}}
       </div>
       {{else}}
-      <div class="w-full h-[40px] flex items-end">
-        <div class="w-full h-1 rounded-sm bg-base-300/50"></div>
+      <div class="w-full flex items-end" style="height: 52px;">
+        <div class="w-full h-[3px] rounded-full bg-base-300/30"></div>
       </div>
       {{end}}
-      <div class="text-[0.5rem] text-base-content/25 tabular-nums leading-none">{{.ShortLabel}}</div>
+      <div class="text-[0.5rem] text-base-content/25 tabular-nums leading-none select-none">{{.ShortLabel}}</div>
       <!-- Tooltip -->
-      <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-base-content text-base-100 text-[0.6rem] px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 tabular-nums">
+      <div class="absolute -top-9 left-1/2 -translate-x-1/2 bg-base-content text-base-100 text-[0.6rem] px-2 py-1 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 tabular-nums shadow-sm">
         {{.Label}}: {{.Total}} sync{{if ne .Total 1}}s{{end}}{{if gt .Error 0}} ({{.Error}} err){{end}}
       </div>
     </div>
     {{end}}
-  </div>
-  <div class="flex items-center gap-4 mt-3 text-[0.65rem] text-base-content/40">
-    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-success/60"></span> Success</span>
-    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-error/60"></span> Error</span>
-    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-base-300/50"></span> No syncs</span>
   </div>
 </div>
 {{end}}
@@ -173,30 +184,30 @@
   <!-- Connection Details Card -->
   <div class="bb-card p-5 lg:col-span-2">
     <h2 class="text-sm font-semibold text-base-content/50 mb-4">Connection Details</h2>
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-5">
+    <div class="bb-info-grid">
       <div>
-        <p class="text-xs text-base-content/40 mb-1">Family Member</p>
+        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Family Member</p>
         <p class="text-sm font-medium">{{pgtext .Connection.UserName}}</p>
       </div>
       <div>
-        <p class="text-xs text-base-content/40 mb-1">Provider</p>
+        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Provider</p>
         <p class="text-sm font-medium capitalize">{{.Connection.Provider}}</p>
       </div>
       <div>
-        <p class="text-xs text-base-content/40 mb-1">Connected</p>
+        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Connected</p>
         <p class="text-sm font-medium">{{if .Connection.CreatedAt.Valid}}{{.Connection.CreatedAt.Time.Format "Jan 2, 2006"}}{{else}}&mdash;{{end}}</p>
       </div>
       <div>
-        <p class="text-xs text-base-content/40 mb-1">Last Synced</p>
+        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Last Synced</p>
         <p class="text-sm font-medium">{{if .Connection.LastSyncedAt.Valid}}{{relativeTime .Connection.LastSyncedAt.Time}}{{else}}<span class="text-base-content/30">Never</span>{{end}}</p>
       </div>
       {{if gt .Connection.ConsecutiveFailures 0}}
       <div>
-        <p class="text-xs text-base-content/40 mb-1">Consecutive Failures</p>
+        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Consecutive Failures</p>
         <p class="text-sm font-semibold text-warning">{{.Connection.ConsecutiveFailures}}</p>
       </div>
       <div>
-        <p class="text-xs text-base-content/40 mb-1">Last Error</p>
+        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Last Error</p>
         <p class="text-sm font-medium">{{if .Connection.LastErrorAt.Valid}}{{relativeTime .Connection.LastErrorAt.Time}}{{else}}<span class="text-base-content/30">&mdash;</span>{{end}}</p>
       </div>
       {{end}}
@@ -207,7 +218,7 @@
   <div class="bb-card p-5">
     <h2 class="text-sm font-semibold text-base-content/50 mb-4">Sync Settings</h2>
     <div>
-      <label class="text-xs text-base-content/40 mb-1.5 block">Sync Interval</label>
+      <label class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1.5 block">Sync Interval</label>
       <select id="sync-interval" onchange="updateSyncInterval(this.value)" class="select select-sm select-bordered w-full rounded-xl">
         <option value=""{{if not .Connection.SyncIntervalOverrideMinutes.Valid}} selected{{end}}>Use global default</option>
         <option value="15"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 15)}} selected{{end}}>Every 15 minutes</option>
@@ -232,53 +243,74 @@
   </div>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bb-stagger">
     {{range .Accounts}}
-    <div class="bb-card p-4{{if .Excluded}} opacity-50{{end}}">
-      <div class="flex items-start justify-between gap-2 mb-3">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
-            <i data-lucide="{{accountTypeIcon .Type}}" class="w-4 h-4 text-base-content/40"></i>
-          </div>
-          <div class="min-w-0">
-            <a href="/accounts/{{formatUUID .ID}}" class="text-sm font-medium hover:text-primary transition-colors no-underline block truncate">
-              {{.Name}}
-            </a>
-            <div class="text-xs text-base-content/40">
-              {{accountTypeLabel .Type (pgtext .Subtype)}}
-              {{if .Mask.Valid}} &middot; ····{{.Mask.String}}{{end}}
+    <div class="bb-card p-0 overflow-hidden{{if .Excluded}} opacity-50{{end}}">
+      <div class="flex h-full">
+        <!-- Colored accent bar by account type -->
+        <div class="w-1 shrink-0
+          {{if eq .Type "depository"}}bg-info/50
+          {{else if eq .Type "credit"}}bg-warning/50
+          {{else if eq .Type "loan"}}bg-error/40
+          {{else if eq .Type "investment"}}bg-success/50
+          {{else}}bg-base-300/50{{end}}"></div>
+        <div class="flex-1 p-4">
+          <div class="flex items-start justify-between gap-2 mb-3">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0
+                {{if eq .Type "depository"}}bg-info/8
+                {{else if eq .Type "credit"}}bg-warning/8
+                {{else if eq .Type "loan"}}bg-error/8
+                {{else if eq .Type "investment"}}bg-success/8
+                {{else}}bg-base-200/60{{end}}">
+                <i data-lucide="{{accountTypeIcon .Type}}" class="w-4 h-4
+                  {{if eq .Type "depository"}}text-info/60
+                  {{else if eq .Type "credit"}}text-warning/70
+                  {{else if eq .Type "loan"}}text-error/60
+                  {{else if eq .Type "investment"}}text-success/60
+                  {{else}}text-base-content/40{{end}}"></i>
+              </div>
+              <div class="min-w-0">
+                <a href="/accounts/{{formatUUID .ID}}" class="text-sm font-medium hover:text-primary transition-colors no-underline block truncate">
+                  {{.Name}}
+                </a>
+                <div class="text-xs text-base-content/40">
+                  {{accountTypeLabel .Type (pgtext .Subtype)}}
+                  {{if .Mask.Valid}} &middot; ····{{.Mask.String}}{{end}}
+                </div>
+              </div>
             </div>
+            {{if .Excluded}}
+            <span class="badge badge-ghost badge-xs shrink-0">Excluded</span>
+            {{end}}
+          </div>
+          <!-- Balances -->
+          <div class="flex items-end justify-between gap-3">
+            <div class="min-w-0">
+              {{if .BalanceCurrent.Valid}}
+              <div class="text-[0.6rem] text-base-content/35 uppercase tracking-wider mb-0.5">Current</div>
+              <div class="text-lg font-bold tabular-nums{{if eq .Type "credit"}} text-warning/80{{else if eq .Type "loan"}} text-error/80{{end}}">{{formatNumeric .BalanceCurrent}}</div>
+              {{else}}
+              <div class="text-xs text-base-content/30">No balance data</div>
+              {{end}}
+            </div>
+            {{if .BalanceAvailable.Valid}}
+            <div class="text-right">
+              <div class="text-[0.6rem] text-base-content/35 uppercase tracking-wider mb-0.5">Available</div>
+              <div class="text-sm font-medium tabular-nums text-base-content/60">{{formatNumeric .BalanceAvailable}}</div>
+            </div>
+            {{end}}
+          </div>
+          <!-- Inline actions -->
+          <div class="flex items-center gap-2 mt-3 pt-3 border-t border-base-300/40">
+            <input type="text" value="{{.DisplayName.String}}" placeholder="Display name..."
+              onchange="updateDisplayName('{{formatUUID .ID}}', this.value)"
+              class="input input-xs input-ghost flex-1 hover:input-bordered focus:input-bordered transition-all rounded-lg text-xs">
+            <label class="flex items-center gap-1.5 text-xs text-base-content/40 cursor-pointer shrink-0" title="Exclude from sync">
+              <input type="checkbox" class="checkbox checkbox-xs" {{if .Excluded}}checked{{end}}
+                onchange="toggleExcluded('{{formatUUID .ID}}', this.checked)">
+              <span>Exclude</span>
+            </label>
           </div>
         </div>
-        {{if .Excluded}}
-        <span class="badge badge-ghost badge-xs shrink-0">Excluded</span>
-        {{end}}
-      </div>
-      <!-- Balances -->
-      <div class="flex items-end justify-between gap-3">
-        <div class="min-w-0">
-          {{if .BalanceCurrent.Valid}}
-          <div class="text-xs text-base-content/40 mb-0.5">Current</div>
-          <div class="text-lg font-semibold tabular-nums">{{formatNumeric .BalanceCurrent}}</div>
-          {{else}}
-          <div class="text-xs text-base-content/30">No balance data</div>
-          {{end}}
-        </div>
-        {{if .BalanceAvailable.Valid}}
-        <div class="text-right">
-          <div class="text-xs text-base-content/40 mb-0.5">Available</div>
-          <div class="text-sm font-medium tabular-nums text-base-content/60">{{formatNumeric .BalanceAvailable}}</div>
-        </div>
-        {{end}}
-      </div>
-      <!-- Inline actions -->
-      <div class="flex items-center gap-2 mt-3 pt-3 border-t border-base-300/50">
-        <input type="text" value="{{.DisplayName.String}}" placeholder="Display name..."
-          onchange="updateDisplayName('{{formatUUID .ID}}', this.value)"
-          class="input input-xs input-ghost flex-1 hover:input-bordered focus:input-bordered transition-all rounded-lg text-xs">
-        <label class="flex items-center gap-1.5 text-xs text-base-content/40 cursor-pointer shrink-0" title="Exclude from sync">
-          <input type="checkbox" class="checkbox checkbox-xs" {{if .Excluded}}checked{{end}}
-            onchange="toggleExcluded('{{formatUUID .ID}}', this.checked)">
-          <span>Exclude</span>
-        </label>
       </div>
     </div>
     {{end}}
@@ -315,41 +347,51 @@
   </div>
   <div id="sync-history-content">
   {{if .SyncLogs}}
-  <div class="px-5 pb-5 space-y-1.5">
+  <div class="px-5 pb-4">
     {{range .SyncLogs}}
-    <div class="flex items-center justify-between p-3 rounded-xl bg-base-200/30 hover:bg-base-200/60 transition-colors duration-150">
-      <div class="flex items-center gap-3 min-w-0">
-        <div class="w-8 h-8 rounded-lg {{if eq (printf "%s" .Status) "success"}}bg-success/10{{else if eq (printf "%s" .Status) "error"}}bg-error/10{{else}}bg-base-200{{end}} flex items-center justify-center shrink-0">
-          {{if eq (printf "%s" .Status) "success"}}<i data-lucide="check" class="w-4 h-4 text-success"></i>
-          {{else if eq (printf "%s" .Status) "error"}}<i data-lucide="x" class="w-4 h-4 text-error"></i>
-          {{else}}<i data-lucide="loader" class="w-4 h-4 text-base-content/40 animate-spin"></i>{{end}}
+    <div class="flex gap-3 py-3 border-b border-base-300/30 last:border-0">
+      <!-- Timeline dot -->
+      <div class="flex flex-col items-center shrink-0 pt-0.5">
+        <div class="w-6 h-6 rounded-full flex items-center justify-center
+          {{if eq (printf "%s" .Status) "success"}}bg-success/12
+          {{else if eq (printf "%s" .Status) "error"}}bg-error/12
+          {{else}}bg-base-200{{end}}">
+          {{if eq (printf "%s" .Status) "success"}}<i data-lucide="check" class="w-3 h-3 text-success"></i>
+          {{else if eq (printf "%s" .Status) "error"}}<i data-lucide="x" class="w-3 h-3 text-error"></i>
+          {{else}}<i data-lucide="loader" class="w-3 h-3 text-base-content/40 animate-spin"></i>{{end}}
         </div>
+      </div>
+      <!-- Content -->
+      <div class="flex-1 min-w-0 flex items-center justify-between gap-2">
         <div class="min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-sm font-medium capitalize">{{.Trigger}}</span>
-            <span class="text-xs text-base-content/40">{{relativeTime .StartedAt}}</span>
+            <span class="text-xs text-base-content/35 tabular-nums">{{relativeTime .StartedAt}}</span>
             {{if .DurationMs.Valid}}
-            <span class="text-[0.65rem] text-base-content/25 tabular-nums">{{formatDurationMs .DurationMs.Int32}}</span>
+            <span class="text-[0.6rem] text-base-content/25 tabular-nums bg-base-200/50 px-1.5 py-0.5 rounded-full">{{formatDurationMs .DurationMs.Int32}}</span>
             {{else if and .StartedAt.Valid .CompletedAt.Valid}}
-            <span class="text-[0.65rem] text-base-content/25 tabular-nums">{{syncDuration .StartedAt.Time .CompletedAt.Time}}</span>
+            <span class="text-[0.6rem] text-base-content/25 tabular-nums bg-base-200/50 px-1.5 py-0.5 rounded-full">{{syncDuration .StartedAt.Time .CompletedAt.Time}}</span>
             {{end}}
           </div>
           {{if and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid}}
           {{$friendly := syncFriendlyError .ErrorMessage.String}}
           {{if $friendly}}
-          <p class="text-xs text-error/70 mt-0.5 max-w-md truncate" title="{{.ErrorMessage.String}}">{{$friendly}}</p>
+          <p class="text-xs text-error/60 mt-0.5 max-w-md truncate" title="{{.ErrorMessage.String}}">{{$friendly}}</p>
           {{else}}
-          <p class="text-xs text-error/70 mt-0.5 max-w-md truncate" title="{{.ErrorMessage.String}}">{{.ErrorMessage.String}}</p>
+          <p class="text-xs text-error/60 mt-0.5 max-w-md truncate" title="{{.ErrorMessage.String}}">{{.ErrorMessage.String}}</p>
           {{end}}
           {{end}}
         </div>
-      </div>
-      <div class="flex items-center gap-3 tabular-nums text-xs shrink-0">
-        {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
-        {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
-        {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
-        {{if .UnchangedCount}}<span class="text-base-content/30 font-medium" title="{{.UnchangedCount}} unchanged">={{.UnchangedCount}}</span>{{end}}
-        {{syncBadge (printf "%s" .Status)}}
+        <div class="flex items-center gap-2.5 tabular-nums text-xs shrink-0">
+          {{if or .AddedCount .ModifiedCount .RemovedCount}}
+          <div class="flex items-center gap-1.5">
+            {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
+            {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
+            {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
+          </div>
+          {{end}}
+          {{if .UnchangedCount}}<span class="text-base-content/25 text-[0.6rem]" title="{{.UnchangedCount}} unchanged">={{.UnchangedCount}}</span>{{end}}
+        </div>
       </div>
     </div>
     {{end}}
