@@ -616,26 +616,28 @@
     // Command Palette Alpine component
     function commandPalette() {
       var allItems = [
-        // Navigation
-        { id: 'nav-dashboard', group: 'Navigation', title: 'Dashboard', desc: 'Overview and stats', icon: 'layout-dashboard', href: '/', keywords: 'home overview net worth' },
-        { id: 'nav-insights', group: 'Navigation', title: 'Insights', desc: 'Spending trends and analysis', icon: 'lightbulb', href: '/insights', keywords: 'charts trends spending income analysis pace' },
-        { id: 'nav-transactions', group: 'Navigation', title: 'Transactions', desc: 'View all transactions', icon: 'receipt', href: '/transactions', keywords: 'payments expenses spending' },
-        { id: 'nav-connections', group: 'Navigation', title: 'Connections', desc: 'Bank connections', icon: 'link', href: '/connections', keywords: 'banks accounts linked' },
-        { id: 'nav-reviews', group: 'Navigation', title: 'Reviews', desc: 'Transaction review queue', icon: 'clipboard-check', href: '/reviews', keywords: 'pending approve categorize' },
-        { id: 'nav-rules', group: 'Navigation', title: 'Rules', desc: 'Auto-categorization rules', icon: 'list-filter', href: '/rules', keywords: 'automation patterns categorize' },
-        { id: 'nav-categories', group: 'Navigation', title: 'Categories', desc: 'Category taxonomy', icon: 'tag', href: '/categories', keywords: 'tags labels organize' },
-        { id: 'nav-account-links', group: 'Navigation', title: 'Account Links', desc: 'Cross-account deduplication', icon: 'link-2', href: '/account-links', keywords: 'linked accounts dedup matching' },
-        { id: 'nav-users', group: 'Navigation', title: 'Family Members', desc: 'Manage family members', icon: 'users', href: '/users', keywords: 'people household members' },
-        { id: 'nav-reports', group: 'Navigation', title: 'Reports', desc: 'Agent reports and findings', icon: 'file-text', href: '/reports', keywords: 'agent summaries notifications' },
+        // Data
+        { id: 'nav-dashboard', group: 'Data', title: 'Dashboard', desc: 'Overview and stats', icon: 'layout-dashboard', href: '/', keywords: 'home overview net worth' },
+        { id: 'nav-insights', group: 'Data', title: 'Insights', desc: 'Spending trends and analysis', icon: 'lightbulb', href: '/insights', keywords: 'charts trends spending income analysis pace' },
+        { id: 'nav-connections', group: 'Data', title: 'Connections', desc: 'Bank connections', icon: 'link', href: '/connections', keywords: 'banks accounts linked' },
+        { id: 'nav-transactions', group: 'Data', title: 'Transactions', desc: 'View all transactions', icon: 'receipt', href: '/transactions', keywords: 'payments expenses spending' },
+        { id: 'nav-rules', group: 'Data', title: 'Rules', desc: 'Auto-categorization rules', icon: 'list-filter', href: '/rules', keywords: 'automation patterns categorize' },
+        { id: 'nav-categories', group: 'Data', title: 'Categories', desc: 'Category taxonomy', icon: 'tag', href: '/categories', keywords: 'tags labels organize' },
+        { id: 'nav-account-links', group: 'Data', title: 'Account Links', desc: 'Cross-account deduplication', icon: 'link-2', href: '/account-links', keywords: 'linked accounts dedup matching' },
+        { id: 'nav-users', group: 'Data', title: 'Family Members', desc: 'Manage family members', icon: 'users', href: '/users', keywords: 'people household members' },
+        // Agents
+        { id: 'agent-reviews', group: 'Agents', title: 'Review Queue', desc: 'Transaction review queue', icon: 'clipboard-check', href: '/reviews', keywords: 'pending approve categorize' },
+        { id: 'agent-review-instructions', group: 'Agents', title: 'Review Agent', desc: 'Review agent instructions', icon: 'message-square-code', href: '/review-instructions', keywords: 'agent instructions prompts' },
+        { id: 'agent-reports', group: 'Agents', title: 'Reports', desc: 'Agent reports and findings', icon: 'file-text', href: '/reports', keywords: 'agent summaries notifications' },
+        { id: 'agent-mcp', group: 'Agents', title: 'MCP Settings', desc: 'Tools and server instructions', icon: 'bot', href: '/mcp-settings', keywords: 'mcp tools permissions instructions' },
         // System
         { id: 'sys-providers', group: 'System', title: 'Providers', desc: 'Configure Plaid, Teller, CSV', icon: 'plug', href: '/providers', keywords: 'plaid teller csv bank setup' },
         { id: 'sys-api-keys', group: 'System', title: 'API Keys', desc: 'Manage API access keys', icon: 'key', href: '/api-keys', keywords: 'tokens authentication' },
         { id: 'sys-oauth-clients', group: 'System', title: 'OAuth Clients', desc: 'External connector access', icon: 'fingerprint', href: '/oauth-clients', keywords: 'oauth connector claude' },
-        { id: 'sys-mcp', group: 'System', title: 'MCP Settings', desc: 'AI agent configuration', icon: 'bot', href: '/mcp-settings', keywords: 'agent tools permissions' },
         { id: 'sys-sync-logs', group: 'System', title: 'Sync Logs', desc: 'Sync history and status', icon: 'refresh-cw', href: '/sync-logs', keywords: 'history errors status' },
+        { id: 'sys-webhooks', group: 'System', title: 'Webhooks', desc: 'Webhook event history', icon: 'webhook', href: '/webhook-events', keywords: 'events plaid teller notifications' },
         { id: 'sys-settings', group: 'System', title: 'Settings', desc: 'Sync schedule, security, system', icon: 'settings', href: '/settings', keywords: 'schedule password encryption' },
-        { id: 'sys-review-agent', group: 'System', title: 'Review Agent', desc: 'MCP review instructions', icon: 'message-square-code', href: '/review-instructions', keywords: 'agent instructions prompts' },
-        // Actions
+        // Quick Actions
         { id: 'act-connect', group: 'Quick Actions', title: 'Connect a Bank', desc: 'Add a new bank connection', icon: 'plus-circle', href: '/connections/new', keywords: 'add new link' },
         { id: 'act-import', group: 'Quick Actions', title: 'Import CSV', desc: 'Import transactions from CSV', icon: 'upload', href: '/connections/import-csv', keywords: 'upload file' },
         { id: 'act-api-key', group: 'Quick Actions', title: 'Create API Key', desc: 'Generate a new API key', icon: 'key-round', href: '/api-keys/new', keywords: 'new token' },

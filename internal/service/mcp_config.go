@@ -12,16 +12,15 @@ import (
 
 // MCPConfig represents the MCP permission and instruction settings.
 type MCPConfig struct {
-	Mode                string   `json:"mode"`                 // "read_only" or "read_write"
-	DisabledTools       []string `json:"disabled_tools"`       // tool names
-	CustomInstructions  string   `json:"custom_instructions"`  // markdown
-	InstructionTemplate string   `json:"instruction_template"` // template slug
+	Mode          string   `json:"mode"`          // "read_only" or "read_write"
+	DisabledTools []string `json:"disabled_tools"` // tool names
+	Instructions  string   `json:"instructions"`   // full server instructions
 }
 
 // GetMCPConfig loads MCP configuration from app_config.
 func (s *Service) GetMCPConfig(ctx context.Context) (*MCPConfig, error) {
 	cfg := &MCPConfig{
-		Mode:          "read_only",
+		Mode:          "read_write",
 		DisabledTools: []string{},
 	}
 
@@ -42,13 +41,9 @@ func (s *Service) GetMCPConfig(ctx context.Context) (*MCPConfig, error) {
 					cfg.DisabledTools = []string{}
 				}
 			}
-		case "mcp_custom_instructions":
+		case "mcp_instructions":
 			if row.Value.Valid {
-				cfg.CustomInstructions = row.Value.String
-			}
-		case "mcp_instruction_template":
-			if row.Value.Valid {
-				cfg.InstructionTemplate = row.Value.String
+				cfg.Instructions = row.Value.String
 			}
 		}
 	}
@@ -82,19 +77,13 @@ func (s *Service) SaveMCPDisabledTools(ctx context.Context, tools []string) erro
 	})
 }
 
-// SaveMCPInstructions saves custom instructions and the template slug.
-func (s *Service) SaveMCPInstructions(ctx context.Context, instructions string, templateSlug string) error {
-	if len(instructions) > 10000 {
-		return fmt.Errorf("instructions exceed maximum length of 10,000 characters")
-	}
-	if err := s.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
-		Key:   "mcp_custom_instructions",
-		Value: pgtype.Text{String: instructions, Valid: true},
-	}); err != nil {
-		return fmt.Errorf("save custom instructions: %w", err)
+// SaveMCPInstructions saves server instructions.
+func (s *Service) SaveMCPInstructions(ctx context.Context, instructions string) error {
+	if len(instructions) > 20000 {
+		return fmt.Errorf("instructions exceed maximum length of 20,000 characters")
 	}
 	return s.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
-		Key:   "mcp_instruction_template",
-		Value: pgtype.Text{String: templateSlug, Valid: true},
+		Key:   "mcp_instructions",
+		Value: pgtype.Text{String: instructions, Valid: true},
 	})
 }

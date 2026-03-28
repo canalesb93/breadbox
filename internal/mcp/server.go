@@ -11,8 +11,9 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// BuiltInInstructions contains the default MCP server instructions.
-const BuiltInInstructions = `Breadbox is a self-hosted financial data aggregation server for families. It syncs bank data from Plaid, Teller, and CSV imports into a unified PostgreSQL database.
+// DefaultInstructions contains the default MCP server instructions.
+// These are used when no custom instructions have been saved.
+const DefaultInstructions = `Breadbox is a self-hosted financial data aggregation server for families. It syncs bank data from Plaid, Teller, and CSV imports into a unified PostgreSQL database.
 
 DATA MODEL:
 - Users: family members who own bank connections
@@ -129,10 +130,10 @@ type ToolDef struct {
 
 // MCPServerConfig holds runtime MCP permissions loaded from app_config + API key.
 type MCPServerConfig struct {
-	Mode              string   // "read_only" or "read_write"
-	DisabledTools     []string // tool names to suppress
-	CustomInstructions string  // markdown appended to built-in instructions
-	APIKeyScope       string   // "full_access" or "read_only" — from request context
+	Mode          string   // "read_only" or "read_write"
+	DisabledTools []string // tool names to suppress
+	Instructions  string   // full server instructions (uses DefaultInstructions if empty)
+	APIKeyScope   string   // "full_access" or "read_only" — from request context
 }
 
 // MCPServer wraps the MCP SDK server and the breadbox service layer.
@@ -288,9 +289,9 @@ func makeToolDef[T any](name string, classification ToolClassification, descript
 
 // BuildServer creates a filtered *mcpsdk.Server for the given config.
 func (s *MCPServer) BuildServer(cfg MCPServerConfig) *mcpsdk.Server {
-	instructions := BuiltInInstructions
-	if cfg.CustomInstructions != "" {
-		instructions += "\n\nCUSTOM INSTRUCTIONS:\n" + cfg.CustomInstructions
+	instructions := cfg.Instructions
+	if instructions == "" {
+		instructions = DefaultInstructions
 	}
 
 	server := mcpsdk.NewServer(
@@ -307,7 +308,7 @@ func (s *MCPServer) BuildServer(cfg MCPServerConfig) *mcpsdk.Server {
 		if disabledSet[td.Tool.Name] {
 			continue
 		}
-		if td.Classification == ToolWrite && (cfg.Mode == "read_only" || cfg.APIKeyScope == "read_only") {
+		if td.Classification == ToolWrite && cfg.APIKeyScope == "read_only" {
 			continue
 		}
 		td.register(server)
@@ -349,7 +350,7 @@ func NewHTTPHandler(s *MCPServer, svc *service.Service) http.Handler {
 			if err != nil {
 				// Fall back to defaults on error.
 				mcpCfg = &service.MCPConfig{
-					Mode:          "read_only",
+					Mode:          "read_write",
 					DisabledTools: []string{},
 				}
 			}
@@ -361,10 +362,10 @@ func NewHTTPHandler(s *MCPServer, svc *service.Service) http.Handler {
 			}
 
 			return s.BuildServer(MCPServerConfig{
-				Mode:               mcpCfg.Mode,
-				DisabledTools:      mcpCfg.DisabledTools,
-				CustomInstructions: mcpCfg.CustomInstructions,
-				APIKeyScope:        apiKeyScope,
+				Mode:          mcpCfg.Mode,
+				DisabledTools: mcpCfg.DisabledTools,
+				Instructions:  mcpCfg.Instructions,
+				APIKeyScope:   apiKeyScope,
 			})
 		},
 		nil,
@@ -378,13 +379,6 @@ func NewHTTPHandler(s *MCPServer, svc *service.Service) http.Handler {
 func (s *MCPServer) checkWritePermission(ctx context.Context) error {
 	if apiKey := mw.GetAPIKey(ctx); apiKey != nil && apiKey.Scope == "read_only" {
 		return fmt.Errorf("this API key has read-only access and cannot perform write operations")
-	}
-	mcpCfg, err := s.svc.GetMCPConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("unable to verify MCP permissions")
-	}
-	if mcpCfg.Mode == "read_only" {
-		return fmt.Errorf("MCP server is in read-only mode")
 	}
 	return nil
 }

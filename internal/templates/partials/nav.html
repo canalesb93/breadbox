@@ -49,6 +49,9 @@
     <span class="bb-nav-badge">{{.NavBadges.UnreadReports}}</span>
     {{end}}
   </a>
+  <a href="/mcp-settings" class="bb-sidebar-link{{if eq .CurrentPage "mcp"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="bot"></i> MCP Settings
+  </a>
 
   <div class="bb-sidebar-section">System</div>
   <a href="/providers" class="bb-sidebar-link{{if eq .CurrentPage "providers"}} bb-sidebar-link--active{{end}}">
@@ -59,9 +62,6 @@
   </a>
   <a href="/oauth-clients" class="bb-sidebar-link{{if eq .CurrentPage "oauth-clients"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="fingerprint"></i> OAuth Clients
-  </a>
-  <a href="/mcp-settings" class="bb-sidebar-link{{if eq .CurrentPage "mcp"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="bot"></i> MCP
   </a>
   <a href="/sync-logs" class="bb-sidebar-link{{if eq .CurrentPage "sync-logs"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="refresh-cw"></i> Sync Logs

@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -26,7 +25,6 @@ func MCPSettingsGetHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServe
 			Description    string
 			Classification string
 			Enabled        bool
-			WriteLocked    bool // true when global mode is read-only and tool is write
 		}
 		disabledSet := make(map[string]bool)
 		for _, t := range cfg.DisabledTools {
@@ -36,42 +34,25 @@ func MCPSettingsGetHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServe
 		var tools []toolInfo
 		for _, td := range mcpServer.AllToolDefs() {
 			enabled := !disabledSet[td.Tool.Name]
-			writeLocked := string(td.Classification) == "write" && cfg.Mode == "read_only"
 			tools = append(tools, toolInfo{
 				Name:           td.Tool.Name,
 				Description:    td.Tool.Description,
 				Classification: string(td.Classification),
 				Enabled:        enabled,
-				WriteLocked:    writeLocked,
 			})
 		}
 
-		// Count API keys by scope.
-		keys, _ := svc.ListAPIKeys(r.Context())
-		fullAccessCount := 0
-		readOnlyCount := 0
-		for _, k := range keys {
-			if k.RevokedAt != nil {
-				continue
-			}
-			if k.Scope == "read_only" {
-				readOnlyCount++
-			} else {
-				fullAccessCount++
-			}
+		// If no saved instructions, show the defaults.
+		instructions := cfg.Instructions
+		if instructions == "" {
+			instructions = breadboxmcp.DefaultInstructions
 		}
-
-		// Serialize templates as JSON for Alpine.js.
-		templatesJSON, _ := json.Marshal(breadboxmcp.InstructionTemplates)
 
 		data := BaseTemplateData(r, sm, "mcp", "MCP Settings")
 		data["MCPConfig"] = cfg
 		data["Tools"] = tools
-		data["Templates"] = breadboxmcp.InstructionTemplates
-		data["TemplatesJSON"] = string(templatesJSON)
-		data["FullAccessCount"] = fullAccessCount
-		data["ReadOnlyCount"] = readOnlyCount
-		data["BuiltInInstructions"] = breadboxmcp.BuiltInInstructions
+		data["Instructions"] = instructions
+		data["DefaultInstructions"] = breadboxmcp.DefaultInstructions
 
 		tr.Render(w, r, "mcp_settings.html", data)
 	}
@@ -106,22 +87,8 @@ func MCPSaveToolsHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer,
 			enabledSet[name] = true
 		}
 
-		// Load current mode so we can skip write tools when in read-only mode.
-		// Write tools are mode-locked (disabled checkboxes don't submit), so they
-		// should not be added to the disabled list — otherwise switching to
-		// read-write later would leave them stuck as disabled.
-		mcpCfg, err := svc.GetMCPConfig(r.Context())
-		if err != nil {
-			SetFlash(r.Context(), sm, "error", "Failed to load MCP config")
-			http.Redirect(w, r, "/mcp-settings", http.StatusSeeOther)
-			return
-		}
-
 		var disabled []string
 		for _, td := range mcpServer.AllToolDefs() {
-			if mcpCfg.Mode == "read_only" && td.Classification == breadboxmcp.ToolWrite {
-				continue // skip — write tools are suppressed by mode, not per-tool disable
-			}
 			if !enabledSet[td.Tool.Name] {
 				disabled = append(disabled, td.Tool.Name)
 			}
@@ -132,7 +99,7 @@ func MCPSaveToolsHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer,
 			http.Redirect(w, r, "/mcp-settings", http.StatusSeeOther)
 			return
 		}
-		SetFlash(r.Context(), sm, "success", "Tool access updated.")
+		SetFlash(r.Context(), sm, "success", "Tool settings updated.")
 		http.Redirect(w, r, "/mcp-settings", http.StatusSeeOther)
 	}
 }
@@ -141,9 +108,8 @@ func MCPSaveToolsHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer,
 func MCPSaveInstructionsHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		instructions := strings.TrimSpace(r.FormValue("instructions"))
-		templateSlug := r.FormValue("template")
 
-		if err := svc.SaveMCPInstructions(r.Context(), instructions, templateSlug); err != nil {
+		if err := svc.SaveMCPInstructions(r.Context(), instructions); err != nil {
 			SetFlash(r.Context(), sm, "error", err.Error())
 			http.Redirect(w, r, "/mcp-settings", http.StatusSeeOther)
 			return
