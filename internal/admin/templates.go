@@ -629,6 +629,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/api_key_new.html",
 		"pages/api_key_created.html",
 		"pages/sync_logs.html",
+		"pages/sync_log_detail.html",
 		"pages/settings.html",
 		"pages/providers.html",
 		"pages/csv_import.html",
