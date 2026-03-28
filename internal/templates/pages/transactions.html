@@ -37,7 +37,7 @@
 </div>
 
 <!-- Filters Card -->
-<div class="bb-card mb-6" x-data="{ filtersOpen: {{if or .FilterStartDate .FilterEndDate .FilterAccountID .FilterUserID .FilterConnID .FilterCategory .FilterMinAmount .FilterMaxAmount .FilterPending .FilterSearch}}true{{else}}false{{end}} }">
+<div class="bb-card mb-6" x-data="{ filtersOpen: localStorage.getItem('bb-tx-filters-open') === 'true' || {{if or .FilterStartDate .FilterEndDate .FilterAccountID .FilterUserID .FilterConnID .FilterCategory .FilterMinAmount .FilterMaxAmount .FilterPending}}true{{else}}false{{end}} }" x-init="$watch('filtersOpen', v => localStorage.setItem('bb-tx-filters-open', v))">
   <div class="p-0">
     <button type="button" class="bb-filter-toggle" @click="filtersOpen = !filtersOpen">
       <div class="flex items-center gap-2">
@@ -171,7 +171,7 @@
 {{if .Transactions}}
 
 <div x-data class="space-y-1">
-  <!-- Select all header -->
+  <!-- Select all + quick search header -->
   <div class="flex items-center gap-3 px-2 pb-2">
     <label class="flex items-center cursor-pointer" @click.stop>
       <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
@@ -180,118 +180,34 @@
         @change="$store.bulk.toggleAll()">
     </label>
     <span class="text-xs text-base-content/40">Select all</span>
+    <div class="flex-1"></div>
+    <div class="relative" x-data="quickSearch()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10 transition-colors duration-150"
+        :class="searching ? 'text-primary/50' : 'text-base-content/30'">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+      </svg>
+      <input type="text" placeholder="Search all transactions..."
+        class="input input-sm input-bordered pl-9 pr-9 w-56 sm:w-64 rounded-xl text-xs bg-base-100 border-base-300 focus:border-primary/40 transition-all duration-200"
+        x-ref="searchInput"
+        :value="query"
+        @input="doSearch($event.target.value)"
+        @keydown.escape="clear()"
+        @focus="$el.select()">
+      <div class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+        <span x-show="searching" x-cloak class="loading loading-spinner loading-xs text-primary/50"></span>
+        <button type="button" x-show="query && !searching" x-cloak
+          class="text-base-content/30 hover:text-base-content/60 transition-colors"
+          @click="clear()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+    </div>
   </div>
 
-  <!-- ═══ GROUPED VIEW ═══ -->
-  <template x-if="$store.txView.mode === 'grouped'">
-    <div class="space-y-1 bb-stagger">
-      {{range .DateGroups}}
-      <div class="bb-date-group">
-        <!-- Date Header -->
-        <div class="flex items-center justify-between px-2 pt-4 pb-2">
-          <div class="flex items-center gap-3">
-            <h3 class="text-xs font-semibold text-base-content/50 tracking-wide">{{.Label}}</h3>
-            <span class="text-xs text-base-content/30 tabular-nums">{{len .Transactions}} txn{{if gt (len .Transactions) 1}}s{{end}}</span>
-          </div>
-          <div class="flex items-center gap-3 text-xs tabular-nums">
-            {{if gt .DaySpending 0.0}}
-            <span class="text-base-content/50">{{formatAmount .DaySpending}}</span>
-            {{end}}
-            {{if gt .DayIncome 0.0}}
-            <span class="text-success/70">-{{formatAmount .DayIncome}}</span>
-            {{end}}
-          </div>
-        </div>
-
-        <!-- Transaction Rows -->
-        <div class="bb-card overflow-hidden divide-y divide-base-300/50">
-          {{range .Transactions}}
-          {{template "tx-row" .}}
-          {{end}}
-        </div>
-      </div>
-      {{end}}
-    </div>
-  </template>
-
-  <!-- ═══ LIST VIEW ═══ -->
-  <template x-if="$store.txView.mode === 'list'">
-    <div>
-      <div class="bb-card overflow-hidden">
-        <!-- Table Header -->
-        <div class="bb-table-header">
-          <div class="w-5"></div>
-          <div class="w-9"></div>
-          <div class="flex-1 min-w-0">Name</div>
-          <div class="hidden sm:block shrink-0">Category</div>
-          <div class="w-20 text-right hidden sm:block">Date</div>
-          <div class="w-24 text-right pl-3">Amount</div>
-          <div class="w-4 hidden sm:block"></div>
-        </div>
-        <!-- Table Body -->
-        <div class="divide-y divide-base-300/50">
-          {{range .Transactions}}
-          {{template "tx-row" .}}
-          {{end}}
-        </div>
-      </div>
-    </div>
-  </template>
-
-  <!-- ═══ PAGINATION ═══ -->
-  {{if gt .TotalPages 1}}
-  <div class="bb-paginator">
-    <div class="bb-paginator__info">
-      <span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
-        Showing {{.ShowingStart}}&ndash;{{.ShowingEnd}} of {{.Total}}
-      </span>
-      <div class="bb-paginator__per-page">
-        <label class="text-xs text-base-content/40 whitespace-nowrap">Per page</label>
-        <select class="select select-xs select-bordered rounded-lg tabular-nums" onchange="bbSetPerPage(this.value)">
-          <option value="25"{{if eq .PageSize 25}} selected{{end}}>25</option>
-          <option value="50"{{if eq .PageSize 50}} selected{{end}}>50</option>
-          <option value="100"{{if eq .PageSize 100}} selected{{end}}>100</option>
-        </select>
-      </div>
-    </div>
-    <div class="bb-paginator__nav">
-      <!-- First -->
-      {{if gt .Page 2}}
-      <a href="{{printf "%s%d" $.PaginationBase 1}}" class="bb-paginator__btn" title="First page">
-        <i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
-      </a>
-      {{end}}
-      <!-- Previous -->
-      {{if gt .Page 1}}
-      <a href="{{printf "%s%d" $.PaginationBase (sub $.Page 1)}}" class="bb-paginator__btn" title="Previous page">
-        <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
-      </a>
-      {{end}}
-      <!-- Page numbers -->
-      {{range pageRange .Page .TotalPages}}
-      {{if eq . 0}}
-      <span class="bb-paginator__ellipsis">&hellip;</span>
-      {{else if eq . $.Page}}
-      <span class="bb-paginator__btn bb-paginator__btn--active">{{.}}</span>
-      {{else}}
-      <a href="{{printf "%s%d" $.PaginationBase .}}" class="bb-paginator__btn">{{.}}</a>
-      {{end}}
-      {{end}}
-      <!-- Next -->
-      {{if lt .Page .TotalPages}}
-      <a href="{{printf "%s%d" $.PaginationBase (add $.Page 1)}}" class="bb-paginator__btn" title="Next page">
-        <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
-      </a>
-      {{end}}
-      <!-- Last -->
-      {{if lt .Page (sub .TotalPages 1)}}
-      <a href="{{printf "%s%d" $.PaginationBase $.TotalPages}}" class="bb-paginator__btn" title="Last page">
-        <i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
-      </a>
-      {{end}}
-    </div>
-  </div>
-  {{end}}
+  <div id="bb-tx-results">
+  {{template "tx-results-partial" .}}
+  </div><!-- /bb-tx-results -->
 </div>
 
 {{else}}
@@ -315,12 +231,227 @@
 <script>
 window.__bbCategories = {{toJSON .Categories}};
 
-/* Transaction metadata for bulk operations */
-window.__bbTxMeta = [
-  {{range .Transactions}}
-  { id: '{{.ID}}', hasCat: {{if .CategoryID}}true{{else}}false{{end}} },
-  {{end}}
-];
+/* ── Hybrid Quick Search (Phase 1: instant client-side, Phase 2: server fetch) ── */
+function quickSearch() {
+  return {
+    query: new URLSearchParams(window.location.search).get('search') || '',
+    searching: false,
+    _abortCtrl: null,
+    _fetchTimer: null,
+
+    doSearch(val) {
+      this.query = val;
+      if (this._abortCtrl) this._abortCtrl.abort();
+      clearTimeout(this._fetchTimer);
+
+      if (!val.trim()) {
+        this._restoreOriginal();
+        return;
+      }
+
+      // Phase 1: Instant client-side filter on visible rows (no debounce)
+      var terms = val.toLowerCase().trim().split(/\s+/);
+      document.querySelectorAll('.bb-tx-row').forEach(function(row) {
+        var hay = (row.dataset.txName || '') + ' ' + (row.dataset.txMerchant || '') + ' ' + (row.dataset.txAccount || '');
+        row.style.display = terms.every(function(t) { return hay.includes(t); }) ? '' : 'none';
+      });
+      document.querySelectorAll('[data-date-group]').forEach(function(group) {
+        var visible = group.querySelectorAll('.bb-tx-row:not([style*="display: none"])');
+        var count = visible.length;
+        group.style.display = count ? '' : 'none';
+        // Update transaction count
+        var countEl = group.querySelector('[data-txn-count]');
+        if (countEl) countEl.textContent = count + ' txn' + (count !== 1 ? 's' : '');
+        // Recalculate spending/income from visible rows
+        var spending = 0, income = 0;
+        visible.forEach(function(row) {
+          var amt = parseFloat(row.dataset.txAmount) || 0;
+          if (amt > 0) spending += amt; else income += Math.abs(amt);
+        });
+        var spendEl = group.querySelector('[data-day-spending]');
+        if (spendEl) {
+          spendEl.textContent = spending > 0 ? '$' + spending.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+          spendEl.style.display = spending > 0 ? '' : 'none';
+        }
+        var incomeEl = group.querySelector('[data-day-income]');
+        if (incomeEl) {
+          incomeEl.textContent = income > 0 ? '-$' + income.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+          incomeEl.style.display = income > 0 ? '' : 'none';
+        }
+      });
+
+      // Append skeleton rows to hint that server results are loading
+      var skeletonRow = '<div class="flex items-center gap-3 px-4 py-3 animate-pulse">'
+        + '<div class="w-5 h-5 bg-base-300/30 rounded shrink-0"></div>'
+        + '<div class="w-9 h-9 bg-base-300/30 rounded-xl shrink-0"></div>'
+        + '<div class="flex-1 space-y-1.5"><div class="h-3 bg-base-300/30 rounded w-2/5"></div><div class="h-2.5 bg-base-300/20 rounded w-1/4"></div></div>'
+        + '<div class="h-3 bg-base-300/30 rounded w-20 hidden sm:block"></div>'
+        + '<div class="h-3 bg-base-300/20 rounded w-14 hidden sm:block"></div>'
+        + '<div class="h-3.5 bg-base-300/30 rounded w-16"></div>'
+        + '</div>';
+      var skeletonEl = document.getElementById('bb-search-skeleton');
+      if (skeletonEl) skeletonEl.remove();
+      var skeleton = document.createElement('div');
+      skeleton.id = 'bb-search-skeleton';
+      var mode = (window.Alpine && Alpine.store('txView')) ? Alpine.store('txView').mode : 'grouped';
+      if (mode === 'grouped') {
+        var groups = '';
+        for (var g = 0; g < 3; g++) {
+          groups += '<div class="animate-pulse">'
+            + '<div class="flex items-center justify-between px-2 pt-4 pb-2">'
+            + '<div class="flex items-center gap-3"><div class="h-3 bg-base-300/30 rounded w-24"></div><div class="h-2.5 bg-base-300/20 rounded w-12"></div></div>'
+            + '<div class="h-3 bg-base-300/20 rounded w-14"></div>'
+            + '</div>'
+            + '<div class="bb-card overflow-hidden divide-y divide-base-300/30">' + skeletonRow + '</div>'
+            + '</div>';
+        }
+        skeleton.innerHTML = '<div class="space-y-1">' + groups + '</div>';
+      } else {
+        var rows = '';
+        for (var i = 0; i < 3; i++) {
+          rows += skeletonRow;
+          if (i < 2) rows += '<div class="border-t border-base-300/20"></div>';
+        }
+        skeleton.innerHTML = '<div class="bb-card overflow-hidden"><div class="divide-y divide-base-300/30">' + rows + '</div></div>';
+      }
+      var resultsEl = document.getElementById('bb-tx-results');
+      var paginatorEl = document.getElementById('bb-tx-paginator');
+      if (paginatorEl) paginatorEl.style.display = 'none';
+      if (resultsEl) {
+        if (paginatorEl) resultsEl.insertBefore(skeleton, paginatorEl);
+        else resultsEl.appendChild(skeleton);
+      }
+
+      // Phase 2: Server fetch for full results (debounced 500ms)
+      var self = this;
+      this._fetchTimer = setTimeout(function() { self._serverFetch(val); }, 500);
+    },
+
+    _serverFetch(val) {
+      this.searching = true;
+      this._abortCtrl = new AbortController();
+      var searchUrl = new URL(window.location.origin + '/transactions/search');
+      // Preserve existing filters
+      new URLSearchParams(window.location.search).forEach(function(v, k) {
+        if (k !== 'search' && k !== 'search_mode' && k !== 'page') searchUrl.searchParams.set(k, v);
+      });
+      searchUrl.searchParams.set('search', val);
+      searchUrl.searchParams.set('search_mode', 'words');
+      searchUrl.searchParams.set('page', '1');
+
+      var self = this;
+      fetch(searchUrl.toString(), { signal: this._abortCtrl.signal })
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+          var results = document.getElementById('bb-tx-results');
+          if (results) {
+            // Check if response has any transaction rows
+            var hasResults = html.indexOf('bb-tx-row') !== -1;
+            if (hasResults) {
+              results.innerHTML = html.replace(/bb-stagger/g, '');
+              Alpine.initTree(results);
+              if (window.lucide) lucide.createIcons();
+            } else {
+              results.innerHTML = '<div class="bb-card">'
+                + '<div class="flex flex-col items-center text-center py-12 px-6">'
+                + '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-base-content/15 mb-3"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="m15 8-6 6"/></svg>'
+                + '<h3 class="text-sm font-semibold text-base-content/60 mb-1">No results found</h3>'
+                + '<p class="text-xs text-base-content/40">No transactions match "<strong>' + val.replace(/</g, '&lt;') + '</strong>". Try a different search term or check your filters.</p>'
+                + '</div></div>';
+            }
+            results.style.opacity = '1';
+            results.style.pointerEvents = '';
+          }
+          // Update total badge from response
+          var m = html.match(/Showing\s+\d+/);
+          var totalBadge = document.querySelector('.badge.badge-ghost.badge-sm.tabular-nums');
+          if (totalBadge) {
+            var countMatch = html.match(/ of (\d+)/);
+            if (countMatch) totalBadge.textContent = countMatch[1] + ' total';
+          }
+          // Update URL without reload
+          var displayUrl = new URL(window.location);
+          displayUrl.searchParams.set('search', val);
+          displayUrl.searchParams.set('search_mode', 'words');
+          displayUrl.searchParams.set('page', '1');
+          window.history.replaceState({}, '', displayUrl.toString());
+          self.searching = false;
+        })
+        .catch(function(e) {
+          if (e.name !== 'AbortError') self.searching = false;
+        });
+    },
+
+    _restoreOriginal() {
+      if (this._abortCtrl) this._abortCtrl.abort();
+      clearTimeout(this._fetchTimer);
+      this.searching = false;
+      // Remove any skeleton and restore pagination
+      var skel = document.getElementById('bb-search-skeleton');
+      if (skel) skel.remove();
+      var pag = document.getElementById('bb-tx-paginator');
+      if (pag) pag.style.display = '';
+      // Show all client-side hidden rows and restore counts
+      document.querySelectorAll('.bb-tx-row').forEach(function(r) { r.style.display = ''; });
+      document.querySelectorAll('[data-date-group]').forEach(function(g) {
+        g.style.display = '';
+        var countEl = g.querySelector('[data-txn-count]');
+        if (countEl) {
+          var orig = parseInt(countEl.dataset.txnCount, 10);
+          countEl.textContent = orig + ' txn' + (orig !== 1 ? 's' : '');
+        }
+        var spendEl = g.querySelector('[data-day-spending]');
+        if (spendEl) {
+          var origSpend = parseFloat(spendEl.dataset.daySpending) || 0;
+          spendEl.textContent = origSpend > 0 ? '$' + origSpend.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+          spendEl.style.display = origSpend > 0 ? '' : 'none';
+        }
+        var incomeEl = g.querySelector('[data-day-income]');
+        if (incomeEl) {
+          var origIncome = parseFloat(incomeEl.dataset.dayIncome) || 0;
+          incomeEl.textContent = origIncome > 0 ? '-$' + origIncome.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '';
+          incomeEl.style.display = origIncome > 0 ? '' : 'none';
+        }
+      });
+      // If URL has search params, fetch original results without reload
+      if (new URLSearchParams(window.location.search).has('search')) {
+        var url = new URL(window.location.origin + '/transactions/search');
+        new URLSearchParams(window.location.search).forEach(function(v, k) {
+          if (k !== 'search' && k !== 'search_mode' && k !== 'page') url.searchParams.set(k, v);
+        });
+        url.searchParams.set('page', '1');
+        var self = this;
+        self.searching = true;
+        fetch(url.toString())
+          .then(function(r) { return r.text(); })
+          .then(function(html) {
+            var results = document.getElementById('bb-tx-results');
+            if (results) {
+              results.innerHTML = html.replace(/bb-stagger/g, '');
+              Alpine.initTree(results);
+              if (window.lucide) lucide.createIcons();
+            }
+            var displayUrl = new URL(window.location);
+            displayUrl.searchParams.delete('search');
+            displayUrl.searchParams.delete('search_mode');
+            displayUrl.searchParams.set('page', '1');
+            window.history.replaceState({}, '', displayUrl.toString());
+            self.searching = false;
+          })
+          .catch(function() { self.searching = false; });
+      }
+    },
+
+    clear() {
+      this.query = '';
+      if (this._abortCtrl) this._abortCtrl.abort();
+      this.$refs.searchInput.value = '';
+      this._restoreOriginal();
+      var input = this.$refs.searchInput;
+      setTimeout(function() { input.focus(); }, 50);
+    }
+  };
+}
 
 /* ── View Toggle (Alpine store for shared state) ── */
 document.addEventListener('alpine:init', function() {
@@ -522,123 +653,3 @@ function quickSetCategory(txId, categoryId) {
 </script>
 {{end}}
 
-{{define "tx-row"}}
-<div class="bb-tx-row group" x-data="{ expanded: false }"
-  :class="$store.bulk.isIn('{{.ID}}') && 'bg-primary/5'">
-  <!-- Main Row -->
-  <div class="flex items-center gap-3 px-4 py-3 cursor-pointer" @click="expanded = !expanded">
-    <!-- Checkbox -->
-    <label class="flex items-center shrink-0 cursor-pointer" @click.stop>
-      <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
-        :checked="$store.bulk.isIn('{{.ID}}')"
-        @change="$store.bulk.toggle('{{.ID}}')">
-    </label>
-
-    <!-- Category Icon / Merchant Avatar -->
-    <div class="relative shrink-0">
-      {{if .CategoryIcon}}
-      <div class="bb-tx-avatar" style="--avatar-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}oklch(0.65 0 0){{end}}">
-        <i data-lucide="{{deref .CategoryIcon}}" class="w-4 h-4"></i>
-      </div>
-      {{else}}
-      <div class="bb-tx-avatar bb-tx-avatar--letter">
-        <span>{{firstChar .Name}}</span>
-      </div>
-      {{end}}
-      {{if .HasPendingReview}}<span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-info ring-2 ring-base-100" title="Pending review"></span>{{end}}
-    </div>
-
-    <!-- Description + Details -->
-    <div class="flex-1 min-w-0">
-      <div class="flex items-center gap-2">
-        <a href="/transactions/{{.ID}}" @click.stop class="font-medium text-sm hover:text-primary transition-colors truncate">{{.Name}}</a>
-        {{if .Pending}}<span class="text-[0.6rem] font-medium text-warning/80 bg-warning/10 px-1.5 py-0.5 rounded-full leading-none">Pending</span>{{end}}
-      </div>
-      <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40">
-        {{if .UserName}}
-        <span class="w-4 h-4 rounded-full bg-primary/10 inline-flex items-center justify-center shrink-0" title="{{.UserName}}">
-          <span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{{firstChar .UserName}}</span>
-        </span>
-        {{end}}
-        <span class="truncate">{{.AccountName}}</span>
-        {{if .MerchantName}}
-        <span class="text-base-content/20 hidden sm:inline">&middot;</span>
-        <span class="text-base-content/40 truncate hidden sm:inline">{{deref .MerchantName}}</span>
-        {{end}}
-        {{if .CategoryDisplayName}}
-        <span class="text-base-content/20 sm:hidden">&middot;</span>
-        <span class="inline-flex items-center gap-1 sm:hidden">
-          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}{{safeCSS "oklch(0.65 0 0)"}}{{end}}"></span>
-          <span class="text-base-content/50 truncate">{{deref .CategoryDisplayName}}</span>
-        </span>
-        {{end}}
-        {{if .AgentReviewed}}
-        <span class="text-base-content/20">&middot;</span>
-        <span class="inline-flex items-center gap-0.5 text-primary/60" title="Categorized by AI agent">
-          <i data-lucide="bot" class="w-3 h-3"></i>
-        </span>
-        {{end}}
-      </div>
-    </div>
-
-    <!-- Category Picker (inline column) -->
-    <div class="shrink-0 hidden sm:block" @click.stop>
-      <div class="bb-cat-picker" data-picker-source="tx-cat-{{.ID}}" x-data="categoryPicker({categories: window.__bbCategories, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: '\u2014', allowEmpty: true, emptyLabel: 'Uncategorized'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
-        <button type="button" class="btn btn-ghost btn-xs gap-1.5 rounded-lg" @click="openPicker()">
-          <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-          <span x-text="displayLabel" class="text-xs">{{if .CategoryDisplayName}}{{deref .CategoryDisplayName}}{{else}}&mdash;{{end}}</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Date (visible in list mode, hidden in grouped since it's in header) -->
-    <div class="text-xs text-base-content/40 tabular-nums shrink-0 hidden sm:block w-20 text-right bb-tx-date">
-      {{.Date}}
-    </div>
-
-    <!-- Amount -->
-    <div class="w-24 text-right shrink-0 pl-3">
-      <span class="bb-tx-amount tabular-nums{{if lt .Amount 0.0}} bb-tx-amount--income{{end}}">
-        {{formatAmount .Amount}}
-      </span>
-    </div>
-
-    <!-- Expand chevron (desktop only) -->
-    <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/20 shrink-0 transition-transform duration-200 hidden sm:block" :class="expanded ? 'rotate-180' : ''"></i>
-  </div>
-
-  <!-- Expanded Detail Panel -->
-  <div x-show="expanded" x-cloak
-    x-transition:enter="transition ease-out duration-150"
-    x-transition:enter-start="opacity-0"
-    x-transition:enter-end="opacity-100"
-    x-transition:leave="transition ease-in duration-100"
-    x-transition:leave-start="opacity-100"
-    x-transition:leave-end="opacity-0"
-    class="border-t border-base-300/50 bg-base-200/20 px-4 py-3">
-    <div class="flex flex-col sm:flex-row sm:items-start gap-4">
-      <!-- Detail Fields -->
-      <div class="flex flex-wrap gap-x-6 gap-y-2 text-xs">
-        {{if .MerchantName}}
-        <div>
-          <span class="text-base-content/30">Merchant</span>
-          <span class="text-base-content/60 ml-1.5">{{deref .MerchantName}}</span>
-        </div>
-        {{end}}
-        <div>
-          <span class="text-base-content/30">Account</span>
-          <span class="text-base-content/60 ml-1.5">{{.AccountName}} ({{.InstitutionName}})</span>
-        </div>
-        <div>
-          <span class="text-base-content/30">Member</span>
-          <span class="text-base-content/60 ml-1.5">{{if .UserName}}{{.UserName}}{{else}}&mdash;{{end}}</span>
-        </div>
-        <div>
-          <span class="text-base-content/30">ID</span>
-          <code class="font-mono text-[0.65rem] bg-base-200 px-1.5 py-0.5 rounded ml-1.5">{{.ID}}</code>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-{{end}}
