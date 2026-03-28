@@ -119,52 +119,25 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 }
 
 func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListParams) (*SyncLogListResult, error) {
+	whereClause, args, argN, err := s.buildSyncLogWhereClause(params)
+	if err != nil {
+		return nil, err
+	}
+
 	query := "SELECT sl.id, sl.connection_id, bc.institution_name, sl.trigger, sl.status, " +
 		"sl.added_count, sl.modified_count, sl.removed_count, sl.error_message, " +
 		"sl.started_at, sl.completed_at, sl.duration_ms " +
 		"FROM sync_logs sl " +
 		"JOIN bank_connections bc ON sl.connection_id = bc.id " +
-		"WHERE 1=1"
-	args := []any{}
-	argN := 1
-
-	if params.ConnectionID != nil {
-		uid, err := parseUUID(*params.ConnectionID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid connection id: %w", err)
-		}
-		query += fmt.Sprintf(" AND sl.connection_id = $%d", argN)
-		args = append(args, uid)
-		argN++
-	}
-
-	if params.Status != nil {
-		query += fmt.Sprintf(" AND sl.status = $%d::sync_status", argN)
-		args = append(args, *params.Status)
-		argN++
-	}
+		whereClause
 
 	// Get total count with same filters.
 	countQuery := "SELECT COUNT(*) FROM sync_logs sl " +
 		"JOIN bank_connections bc ON sl.connection_id = bc.id " +
-		"WHERE 1=1"
-	countArgs := []any{}
-	countArgN := 1
-
-	if params.ConnectionID != nil {
-		uid, _ := parseUUID(*params.ConnectionID) // already validated above
-		countQuery += fmt.Sprintf(" AND sl.connection_id = $%d", countArgN)
-		countArgs = append(countArgs, uid)
-		countArgN++
-	}
-	if params.Status != nil {
-		countQuery += fmt.Sprintf(" AND sl.status = $%d::sync_status", countArgN)
-		countArgs = append(countArgs, *params.Status)
-		countArgN++
-	}
+		whereClause
 
 	var total int64
-	if err := s.Pool.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+	if err := s.Pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, fmt.Errorf("count sync logs: %w", err)
 	}
 
@@ -286,27 +259,14 @@ func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListP
 }
 
 func (s *Service) CountSyncLogsFiltered(ctx context.Context, params SyncLogListParams) (int64, error) {
+	whereClause, args, _, err := s.buildSyncLogWhereClause(params)
+	if err != nil {
+		return 0, err
+	}
+
 	query := "SELECT COUNT(*) FROM sync_logs sl " +
 		"JOIN bank_connections bc ON sl.connection_id = bc.id " +
-		"WHERE 1=1"
-	args := []any{}
-	argN := 1
-
-	if params.ConnectionID != nil {
-		uid, err := parseUUID(*params.ConnectionID)
-		if err != nil {
-			return 0, fmt.Errorf("invalid connection id: %w", err)
-		}
-		query += fmt.Sprintf(" AND sl.connection_id = $%d", argN)
-		args = append(args, uid)
-		argN++
-	}
-
-	if params.Status != nil {
-		query += fmt.Sprintf(" AND sl.status = $%d::sync_status", argN)
-		args = append(args, *params.Status)
-		argN++
-	}
+		whereClause
 
 	var count int64
 	if err := s.Pool.QueryRow(ctx, query, args...).Scan(&count); err != nil {
@@ -317,6 +277,11 @@ func (s *Service) CountSyncLogsFiltered(ctx context.Context, params SyncLogListP
 
 // SyncLogStats returns aggregate statistics about sync logs, optionally filtered.
 func (s *Service) SyncLogStats(ctx context.Context, params SyncLogListParams) (*SyncLogStats, error) {
+	whereClause, args, _, err := s.buildSyncLogWhereClause(params)
+	if err != nil {
+		return nil, err
+	}
+
 	query := `SELECT
 		COUNT(*) AS total,
 		COUNT(*) FILTER (WHERE sl.status = 'success') AS success_count,
@@ -327,28 +292,10 @@ func (s *Service) SyncLogStats(ctx context.Context, params SyncLogListParams) (*
 		COALESCE(SUM(sl.removed_count), 0) AS total_removed
 	FROM sync_logs sl
 	JOIN bank_connections bc ON sl.connection_id = bc.id
-	WHERE 1=1`
-	args := []any{}
-	argN := 1
-
-	if params.ConnectionID != nil {
-		uid, err := parseUUID(*params.ConnectionID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid connection id: %w", err)
-		}
-		query += fmt.Sprintf(" AND sl.connection_id = $%d", argN)
-		args = append(args, uid)
-		argN++
-	}
-
-	if params.Status != nil {
-		query += fmt.Sprintf(" AND sl.status = $%d::sync_status", argN)
-		args = append(args, *params.Status)
-		argN++
-	}
+	` + whereClause
 
 	var stats SyncLogStats
-	err := s.Pool.QueryRow(ctx, query, args...).Scan(
+	err = s.Pool.QueryRow(ctx, query, args...).Scan(
 		&stats.TotalSyncs,
 		&stats.SuccessCount,
 		&stats.ErrorCount,
@@ -535,4 +482,48 @@ func (s *Service) ListSyncLogAccounts(ctx context.Context, syncLogID string) ([]
 		result = append(result, r)
 	}
 	return result, nil
+}
+
+// buildSyncLogWhereClause constructs a WHERE clause and args from SyncLogListParams.
+// Returns the clause string (starting with "WHERE 1=1"), the args slice, and the next argN.
+func (s *Service) buildSyncLogWhereClause(params SyncLogListParams) (string, []any, int, error) {
+	where := "WHERE 1=1"
+	args := []any{}
+	argN := 1
+
+	if params.ConnectionID != nil {
+		uid, err := parseUUID(*params.ConnectionID)
+		if err != nil {
+			return "", nil, 0, fmt.Errorf("invalid connection id: %w", err)
+		}
+		where += fmt.Sprintf(" AND sl.connection_id = $%d", argN)
+		args = append(args, uid)
+		argN++
+	}
+
+	if params.Status != nil {
+		where += fmt.Sprintf(" AND sl.status = $%d::sync_status", argN)
+		args = append(args, *params.Status)
+		argN++
+	}
+
+	if params.Trigger != nil {
+		where += fmt.Sprintf(" AND sl.trigger = $%d::sync_trigger", argN)
+		args = append(args, *params.Trigger)
+		argN++
+	}
+
+	if params.DateFrom != nil {
+		where += fmt.Sprintf(" AND sl.started_at >= $%d", argN)
+		args = append(args, *params.DateFrom)
+		argN++
+	}
+
+	if params.DateTo != nil {
+		where += fmt.Sprintf(" AND sl.started_at < $%d", argN)
+		args = append(args, *params.DateTo)
+		argN++
+	}
+
+	return where, args, argN, nil
 }
