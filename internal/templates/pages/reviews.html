@@ -7,17 +7,6 @@
     <p class="text-sm text-base-content/50 mt-1">Review and categorize transactions flagged during sync</p>
   </div>
   <div class="flex items-center gap-2">
-    <!-- View toggle -->
-    <div class="flex items-center bg-base-200 rounded-lg p-0.5">
-      <a href="/reviews?view=triage&status={{.StatusFilter}}{{if .ReviewTypeFilter}}&review_type={{.ReviewTypeFilter}}{{end}}{{if .AccountIDFilter}}&account_id={{.AccountIDFilter}}{{end}}{{if .UserIDFilter}}&user_id={{.UserIDFilter}}{{end}}"
-        class="px-3 py-1 text-xs font-medium rounded-md transition-all duration-150 {{if eq .ViewMode "triage"}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/50 hover:text-base-content/70{{end}}">
-        Triage
-      </a>
-      <a href="/reviews?view=cards&status={{.StatusFilter}}{{if .ReviewTypeFilter}}&review_type={{.ReviewTypeFilter}}{{end}}{{if .AccountIDFilter}}&account_id={{.AccountIDFilter}}{{end}}{{if .UserIDFilter}}&user_id={{.UserIDFilter}}{{end}}"
-        class="px-3 py-1 text-xs font-medium rounded-md transition-all duration-150 {{if eq .ViewMode "cards"}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/50 hover:text-base-content/70{{end}}">
-        Cards
-      </a>
-    </div>
     {{if and (eq .StatusFilter "pending") .Counts (gt .Counts.Pending 0)}}
     <div x-data="{ dismissing: false, confirmOpen: false }">
       <button class="btn btn-sm btn-error btn-outline rounded-xl gap-1" @click="confirmOpen = true" :disabled="dismissing">
@@ -168,7 +157,6 @@
       x-transition:leave-start="opacity-100 translate-y-0"
       x-transition:leave-end="opacity-0 -translate-y-2"
       class="bb-filter-form">
-      <input type="hidden" name="view" value="{{.ViewMode}}">
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4 pt-3">
         <label class="bb-filter-label">
           Status
@@ -210,7 +198,7 @@
         </label>
       </div>
       <div class="bb-filter-actions">
-        <a href="/reviews?view={{.ViewMode}}" class="btn btn-sm btn-ghost rounded-xl">Reset</a>
+        <a href="/reviews" class="btn btn-sm btn-ghost rounded-xl">Reset</a>
         <button type="submit" class="btn btn-sm btn-primary rounded-xl">
           <i data-lucide="search" class="w-3.5 h-3.5"></i>
           Filter
@@ -220,14 +208,12 @@
   </div>
 </div>
 
-{{if eq .ViewMode "triage"}}
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- TRIAGE MODE: Compact, keyboard-driven review workflow  -->
-<!-- ═══════════════════════════════════════════════════════ -->
+<!-- Triage: Compact, keyboard-driven review workflow -->
 <div x-data="triageQueue()" @keydown.window="handleKey($event)" class="space-y-0">
 
   {{if .Reviews}}
-  <!-- Triage toolbar -->
+  <!-- Triage toolbar (only shown for pending reviews) -->
+  {{if eq .StatusFilter "pending"}}
   <div class="flex items-center justify-between mb-3">
     <div class="flex items-center gap-3">
       <span class="text-xs text-base-content/40 tabular-nums" x-text="sessionCount + ' reviewed this session'"></span>
@@ -236,7 +222,6 @@
       <span class="text-xs text-base-content/40 tabular-nums">{{.Counts.Pending}} remaining</span>
       {{end}}
     </div>
-    {{if eq .StatusFilter "pending"}}
     <div class="hidden sm:flex items-center gap-2 text-xs text-base-content/30">
       <span class="flex items-center gap-1"><kbd class="bb-kbd">j</kbd><kbd class="bb-kbd">k</kbd> navigate</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">a</kbd> accept</span>
@@ -245,8 +230,8 @@
       <span class="flex items-center gap-1"><kbd class="bb-kbd">n</kbd> note</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">c</kbd> category</span>
     </div>
-    {{end}}
   </div>
+  {{end}}
 
   <!-- Triage list -->
   <div class="bb-card overflow-hidden">
@@ -298,7 +283,7 @@
           {{else if $review.Transaction.Category}}
           <span class="text-xs text-base-content/50 truncate">{{$review.Transaction.Category.DisplayName}}</span>
           {{else}}
-          <span class="text-xs text-base-content/25 italic">none</span>
+          <span class="text-xs text-base-content/30">Uncategorized</span>
           {{end}}
         </div>
 
@@ -435,7 +420,7 @@
   <!-- Pagination -->
   {{if .HasMore}}
   <div class="flex justify-center mt-6">
-    <a href="/reviews?view=triage&cursor={{.NextCursor}}&status={{.StatusFilter}}{{if .ReviewTypeFilter}}&review_type={{.ReviewTypeFilter}}{{end}}{{if .AccountIDFilter}}&account_id={{.AccountIDFilter}}{{end}}{{if .UserIDFilter}}&user_id={{.UserIDFilter}}{{end}}" class="btn btn-outline btn-sm rounded-xl">
+    <a href="/reviews?cursor={{.NextCursor}}&status={{.StatusFilter}}{{if .ReviewTypeFilter}}&review_type={{.ReviewTypeFilter}}{{end}}{{if .AccountIDFilter}}&account_id={{.AccountIDFilter}}{{end}}{{if .UserIDFilter}}&user_id={{.UserIDFilter}}{{end}}" class="btn btn-outline btn-sm rounded-xl">
       Load More
     </a>
   </div>
@@ -444,177 +429,24 @@
   {{else}}
   <div class="bb-card">
     <div class="flex flex-col items-center text-center py-16 px-6">
+      {{if eq .StatusFilter "pending"}}
       <div class="w-16 h-16 rounded-xl bg-success/10 flex items-center justify-center mb-4">
         <i data-lucide="check-circle" class="w-8 h-8 text-success"></i>
       </div>
       <h2 class="text-lg font-semibold mb-1">All caught up!</h2>
-      <p class="text-base-content/50 text-sm">No {{.StatusFilter}} reviews to show.</p>
+      <p class="text-base-content/50 text-sm">No pending reviews in the queue.</p>
+      {{else}}
+      <div class="w-16 h-16 rounded-xl bg-base-200 flex items-center justify-center mb-4">
+        <i data-lucide="inbox" class="w-8 h-8 text-base-content/30"></i>
+      </div>
+      <h2 class="text-lg font-semibold mb-1">No results</h2>
+      <p class="text-base-content/50 text-sm">No {{.StatusFilter}} reviews to show.{{if .Counts}} {{.Counts.Pending}} pending review{{if ne .Counts.Pending 1}}s{{end}} remaining.{{end}}</p>
+      {{end}}
     </div>
   </div>
   {{end}}
 </div>
 
-{{else}}
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- CARDS MODE: Original detailed card layout              -->
-<!-- ═══════════════════════════════════════════════════════ -->
-<div x-data="reviewQueue()" class="space-y-4">
-  {{if .Reviews}}
-  {{range .Reviews}}
-  <div class="bb-card bb-card--interactive p-0 review-card" x-data="{ submitting: false, selectedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', suggestedCatId: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', feedback: '', pickerShake: false }" id="review-{{.ID}}">
-    <div class="p-6">
-      <!-- Header row: badges + timestamp -->
-      <div class="flex items-center justify-between flex-wrap gap-2">
-        <div class="flex items-center gap-2 flex-wrap">
-          {{if eq .ReviewType "new_transaction"}}
-          <span class="badge badge-soft badge-info badge-sm rounded-lg">New Transaction</span>
-          {{else if eq .ReviewType "uncategorized"}}
-          <span class="badge badge-soft badge-warning badge-sm rounded-lg">Uncategorized</span>
-          {{else if eq .ReviewType "low_confidence"}}
-          <span class="badge badge-soft badge-error badge-sm rounded-lg">Low Confidence{{if .ConfidenceScore}} ({{printf "%.0f" (mulFloat .ConfidenceScore 100.0)}}%){{end}}</span>
-          {{else if eq .ReviewType "manual"}}
-          <span class="badge badge-soft badge-neutral badge-sm rounded-lg">Manual</span>
-          {{end}}
-          {{if .Provider}}
-          <span class="badge badge-ghost badge-xs rounded-lg">{{.Provider}}</span>
-          {{end}}
-          {{if eq .Status "approved"}}
-          <span class="badge badge-success badge-sm rounded-lg">Approved</span>
-          {{else if eq .Status "rejected"}}
-          <span class="badge badge-error badge-sm rounded-lg">Rejected</span>
-          {{else if eq .Status "skipped"}}
-          <span class="badge badge-ghost badge-sm rounded-lg">Skipped</span>
-          {{end}}
-        </div>
-        <span class="text-xs text-base-content/40">{{relativeTime .CreatedAt}}</span>
-      </div>
-
-      <!-- Transaction info -->
-      {{if .Transaction}}
-      <div class="flex items-start justify-between mt-4 gap-4">
-        <div class="min-w-0">
-          <a href="/transactions/{{.TransactionID}}" class="text-base font-semibold link link-hover">{{.Transaction.Name}}</a>
-          {{if .Transaction.MerchantName}}<div class="text-sm text-base-content/60 mt-0.5">{{.Transaction.MerchantName}}</div>{{end}}
-          <div class="text-xs text-base-content/40 mt-1">
-            {{if .Transaction.AccountName}}{{.Transaction.AccountName}}{{end}}
-            {{if .Transaction.UserName}} &middot; {{.Transaction.UserName}}{{end}}
-          </div>
-        </div>
-        <div class="text-right flex-shrink-0">
-          <div class="text-xl font-bold tabular-nums{{if lt .Transaction.Amount 0.0}} text-error{{end}}">
-            {{formatAmount .Transaction.Amount}}
-          </div>
-          <div class="text-xs text-base-content/40 mt-0.5">
-            {{formatDate .Transaction.Date}}
-          </div>
-        </div>
-      </div>
-
-      <!-- Category info with inline thumbs for suggestions -->
-      <div class="text-sm mt-3">
-        {{if .SuggestedCategoryDisplayName}}
-        <div class="flex items-center gap-2">
-          <span class="text-base-content/50">Suggested:</span>
-          <span class="font-medium">{{.SuggestedCategoryDisplayName}}</span>
-          {{if eq .Status "pending"}}
-          <div class="flex items-center gap-1 ml-auto">
-            <button class="btn btn-xs btn-circle" :class="feedback === 'up' ? 'btn-success' : 'btn-ghost text-base-content/30'" @click="feedback = feedback === 'up' ? '' : 'up'">
-              <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
-            </button>
-            <button class="btn btn-xs btn-circle" :class="feedback === 'down' ? 'btn-error' : 'btn-ghost text-base-content/30'"
-              @click="if (feedback === 'down') { feedback = ''; } else { feedback = 'down'; if (selectedCatId === suggestedCatId) { pickerShake = true; setTimeout(() => pickerShake = false, 600); } }">
-              <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>
-            </button>
-          </div>
-          {{end}}
-        </div>
-        {{else if .Transaction.Category}}
-        <span class="text-base-content/50">Category:</span>
-        <span class="font-medium">{{.Transaction.Category.DisplayName}}</span>
-        {{else}}
-        <span class="text-base-content/40 italic">No category assigned</span>
-        {{end}}
-      </div>
-      {{end}}
-
-      {{if eq .Status "pending"}}
-      <!-- Action bar for pending reviews -->
-      <div class="border-t border-base-300 pt-4 mt-4">
-        <!-- Category picker -->
-        <div class="form-control" :class="{ 'bb-picker-shake': pickerShake }">
-          <label class="label label-text text-xs text-base-content/40 py-0.5">
-            {{if .SuggestedCategoryID}}Correct category{{else}}Assign category{{end}}
-          </label>
-          <div class="bb-cat-picker" data-picker-source="review-{{.ID}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if .SuggestedCategoryID}}{{.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current'})" @category-change="selectedCatId = $event.detail.id; if (selectedCatId !== suggestedCatId && suggestedCatId) { feedback = 'down'; }">
-            <button type="button" class="btn btn-sm btn-ghost gap-2 w-full justify-start border border-base-300 rounded-xl" @click="openPicker()">
-              <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-              <span x-text="displayLabel" class="text-sm truncate"></span>
-              <svg class="w-3 h-3 ml-auto opacity-40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-            </button>
-          </div>
-        </div>
-        <!-- Note -->
-        <div class="form-control mt-3">
-          <label class="label label-text text-xs text-base-content/40 py-0.5">Note <span class="text-base-content/30">(optional)</span></label>
-          <input type="text" class="input input-bordered input-sm w-full rounded-xl" placeholder="Add context for future reference..." id="note-{{.ID}}">
-        </div>
-        <!-- Action buttons -->
-        <div class="flex gap-2 flex-wrap mt-4 items-center">
-          <button class="btn btn-success btn-sm rounded-xl gap-1" :disabled="submitting"
-            @click="if (feedback === 'down' && selectedCatId === suggestedCatId) { pickerShake = true; setTimeout(() => pickerShake = false, 600); } else { submitReview('{{.ID}}', 'approved', selectedCatId, feedback); }">
-            <span x-show="!submitting" class="flex items-center gap-1">
-              <i data-lucide="check" class="w-4 h-4"></i>
-              Accept
-            </span>
-            <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-          </button>
-          <button class="btn btn-ghost btn-sm rounded-xl gap-1" :disabled="submitting"
-            @click="submitReview('{{.ID}}', 'skipped', null, '')">
-            <span x-show="!submitting" class="flex items-center gap-1">
-              <i data-lucide="skip-forward" class="w-4 h-4"></i>
-              Skip
-            </span>
-            <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-          </button>
-          <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30" :disabled="submitting"
-            @click="dismissReview('{{.ID}}')">
-            <i data-lucide="trash-2" class="w-4 h-4"></i>
-          </button>
-        </div>
-      </div>
-      {{else if .ReviewerName}}
-      <!-- Resolved info -->
-      <div class="border-t border-base-300 pt-3 mt-4 text-xs text-base-content/40">
-        Reviewed by {{.ReviewerName}} {{if .ReviewedAt}} &middot; {{relativeTime .ReviewedAt}}{{end}}
-        {{if .ReviewNote}}<br>Note: {{.ReviewNote}}{{end}}
-      </div>
-      {{end}}
-    </div>
-  </div>
-  {{end}}
-
-  <!-- Pagination -->
-  {{if .HasMore}}
-  <div class="flex justify-center mt-8">
-    <a href="/reviews?view=cards&cursor={{.NextCursor}}&status={{.StatusFilter}}{{if .ReviewTypeFilter}}&review_type={{.ReviewTypeFilter}}{{end}}{{if .AccountIDFilter}}&account_id={{.AccountIDFilter}}{{end}}{{if .UserIDFilter}}&user_id={{.UserIDFilter}}{{end}}" class="btn btn-outline btn-sm rounded-xl">
-      Load More
-    </a>
-  </div>
-  {{end}}
-
-  {{else}}
-  <div class="bb-card">
-    <div class="flex flex-col items-center text-center py-16 px-6">
-      <div class="w-16 h-16 rounded-xl bg-success/10 flex items-center justify-center mb-4">
-        <i data-lucide="check-circle" class="w-8 h-8 text-success"></i>
-      </div>
-      <h2 class="text-lg font-semibold mb-1">All caught up!</h2>
-      <p class="text-base-content/50 text-sm">No {{.StatusFilter}} reviews to show.</p>
-    </div>
-  </div>
-  {{end}}
-</div>
-{{end}}
 
 {{template "category-picker-script" .}}
 <script>
@@ -817,89 +649,5 @@ function triageQueue() {
   }
 }
 
-// Cards mode controller (original)
-function reviewQueue() {
-  return {
-    submitReview(id, decision, categoryId, feedback) {
-      const card = document.getElementById('review-' + id);
-      const noteInput = document.getElementById('note-' + id);
-      const cardData = Alpine.$data(card);
-      cardData.submitting = true;
-
-      const body = { decision: decision };
-      if (categoryId) {
-        body.category_id = categoryId;
-      }
-
-      let noteParts = [];
-      if (feedback === 'up') {
-        noteParts.push('[suggestion accepted]');
-      } else if (feedback === 'down') {
-        noteParts.push('[suggestion corrected]');
-      }
-      if (noteInput && noteInput.value.trim()) {
-        noteParts.push(noteInput.value.trim());
-      }
-      if (noteParts.length > 0) {
-        body.note = noteParts.join(' ');
-      }
-
-      fetch('/-/reviews/' + id + '/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify(body)
-      })
-      .then(r => r.json())
-      .then(data => {
-        if (data.error) {
-          window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: data.error, type:'error'}}));
-          cardData.submitting = false;
-        } else {
-          card.style.transition = 'opacity 0.3s, max-height 0.3s, margin 0.3s';
-          card.style.opacity = '0';
-          card.style.maxHeight = '0';
-          card.style.overflow = 'hidden';
-          card.style.marginBottom = '0';
-          setTimeout(() => card.remove(), 300);
-          window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Review ' + decision, type:'success'}}));
-        }
-      })
-      .catch(() => {
-        window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Network error', type:'error'}}));
-        cardData.submitting = false;
-      });
-    },
-
-    dismissReview(id) {
-      const card = document.getElementById('review-' + id);
-      const cardData = Alpine.$data(card);
-      cardData.submitting = true;
-
-      fetch('/-/reviews/' + id + '/dismiss', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }
-      })
-      .then(r => r.json())
-      .then(data => {
-        if (data.error) {
-          window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: data.error, type:'error'}}));
-          cardData.submitting = false;
-        } else {
-          card.style.transition = 'opacity 0.3s, max-height 0.3s, margin 0.3s';
-          card.style.opacity = '0';
-          card.style.maxHeight = '0';
-          card.style.overflow = 'hidden';
-          card.style.marginBottom = '0';
-          setTimeout(() => card.remove(), 300);
-          window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Review dismissed', type:'info'}}));
-        }
-      })
-      .catch(() => {
-        window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Network error', type:'error'}}));
-        cardData.submitting = false;
-      });
-    }
-  }
-}
 </script>
 {{end}}

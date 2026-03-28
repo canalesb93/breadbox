@@ -107,9 +107,27 @@
     <a href="/connections" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
   </div>
 
-  <!-- Allocation Bar -->
+  <!-- Net Worth + Allocation Bar -->
   {{if .AllocationSlices}}
   <div class="bb-card p-4 mb-4">
+    <!-- Net Worth Summary -->
+    <div class="flex items-baseline justify-between mb-3">
+      <div>
+        <div class="text-xs text-base-content/40 mb-0.5">Net Worth</div>
+        <div class="text-2xl font-bold tabular-nums tracking-tight">{{formatBalance .NetWorth}}</div>
+      </div>
+      <div class="flex items-center gap-4 text-right">
+        <div>
+          <div class="text-[0.65rem] text-base-content/35 uppercase tracking-wider">Assets</div>
+          <div class="text-sm font-semibold tabular-nums text-success/80">{{formatBalance .TotalAssets}}</div>
+        </div>
+        <div>
+          <div class="text-[0.65rem] text-base-content/35 uppercase tracking-wider">Liabilities</div>
+          <div class="text-sm font-semibold tabular-nums text-error/70">{{formatBalance .TotalLiabilities}}</div>
+        </div>
+      </div>
+    </div>
+    <!-- Allocation Bar -->
     <div class="flex h-3 rounded-full overflow-hidden gap-0.5">
       {{range .AllocationSlices}}
       <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: {{printf "%.1f" .Percent}}%; background: {{safeCSS .Color}}; opacity: 0.7;" title="{{.Label}}: {{formatBalance .Amount}}"></div>

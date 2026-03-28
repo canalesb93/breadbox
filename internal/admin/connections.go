@@ -48,6 +48,7 @@ type ConnectionWithAccounts struct {
 	TotalBalance float64
 	HasBalance   bool
 	NextSync     NextSyncInfo
+	IsStale      bool
 }
 
 // ConnectionsListHandler serves GET /admin/connections.
@@ -102,10 +103,16 @@ func ConnectionsListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 
 		netWorth := totalAssets - totalLiabilities
 
-		// Compute per-connection display total from display-ready balances
-		// and next-sync schedule.
+		// Compute per-connection display total from display-ready balances,
+		// next-sync schedule, and staleness.
 		now := time.Now()
 		globalInterval := a.Config.SyncIntervalMinutes
+		// Default staleness threshold: 2x the global sync interval (or 24h minimum).
+		globalSyncInterval := time.Duration(globalInterval) * time.Minute
+		defaultStaleThreshold := globalSyncInterval * 2
+		if defaultStaleThreshold < 24*time.Hour {
+			defaultStaleThreshold = 24 * time.Hour
+		}
 		for i := range enriched {
 			if enriched[i].HasBalance {
 				total := 0.0
@@ -124,6 +131,25 @@ func ConnectionsListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 				ConsecutiveFailures:         enriched[i].ConsecutiveFailures,
 				LastSyncedAt:                enriched[i].LastSyncedAt,
 			}, globalInterval, now)
+
+			// Compute staleness (same logic as dashboard Connection Health).
+			if string(enriched[i].Status) != "disconnected" {
+				staleThreshold := defaultStaleThreshold
+				if enriched[i].SyncIntervalOverrideMinutes.Valid {
+					connInterval := time.Duration(enriched[i].SyncIntervalOverrideMinutes.Int32) * time.Minute
+					staleThreshold = connInterval * 2
+					if staleThreshold < time.Hour {
+						staleThreshold = time.Hour
+					}
+				}
+				if enriched[i].LastSyncedAt.Valid {
+					if now.Sub(enriched[i].LastSyncedAt.Time) > staleThreshold {
+						enriched[i].IsStale = true
+					}
+				} else {
+					enriched[i].IsStale = true
+				}
+			}
 		}
 
 		data := map[string]any{
@@ -729,6 +755,26 @@ func SyncConnectionHandler(a *app.App) http.HandlerFunc {
 		}()
 
 		writeJSON(w, http.StatusAccepted, map[string]string{"status": "sync_triggered"})
+	}
+}
+
+// SyncAllConnectionsHandler serves POST /-/connections/sync-all.
+// It triggers a manual sync for all active, non-CSV connections.
+func SyncAllConnectionsHandler(a *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if a.SyncEngine == nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Sync engine not initialized"})
+			return
+		}
+
+		go func() {
+			ctx := context.Background()
+			if err := a.SyncEngine.SyncAll(ctx, db.SyncTriggerManual); err != nil {
+				a.Logger.Error("manual sync-all failed", "error", err)
+			}
+		}()
+
+		writeJSON(w, http.StatusAccepted, map[string]string{"status": "sync_all_triggered"})
 	}
 }
 

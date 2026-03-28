@@ -3,10 +3,10 @@
 
 <!-- Page Header -->
 <div class="bb-page-header">
-  <div class="flex items-center gap-3">
+  <div class="flex items-baseline gap-3">
     <h1 class="bb-page-title">Transactions</h1>
     {{if .Total}}
-    <span class="badge badge-ghost badge-sm tabular-nums">{{.Total}} total</span>
+    <span class="text-sm text-base-content/40 tabular-nums">{{.Total}} transaction{{if ne .Total 1}}s{{end}}</span>
     {{end}}
   </div>
   <div class="flex items-center gap-2">

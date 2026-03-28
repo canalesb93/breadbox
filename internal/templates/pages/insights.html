@@ -5,7 +5,7 @@
      x-init="
        $watch('tab', v => { const u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); if (window._onInsightsTabSwitch) window._onInsightsTabSwitch(v); });
        window._setInsightsReady = () => { insightsReady = true; };
-       if (window._insightsChartsLoaded) { insightsReady = true; setTimeout(() => { if (window._insightCharts) window._insightCharts.forEach(c => { try { c.resize(); } catch(e) {} }); }, 150); }
+       if (window._insightsChartsLoaded) { insightsReady = true; setTimeout(() => { if (window._insightCharts) window._insightCharts.forEach(c => { try { c.resize(); } catch(e) {} }); }, 450); setTimeout(() => { if (window._insightCharts) window._insightCharts.forEach(c => { try { c.resize(); } catch(e) {} }); }, 800); }
      "
      @keydown.window="
        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.isContentEditable) return;
@@ -208,7 +208,7 @@
 </div>
 
 <!-- Real Insights Content (hidden until ready) -->
-<div x-show="insightsReady" x-transition:enter="transition ease-out duration-400" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-cloak>
+<div id="insightsContent" x-show="insightsReady" x-transition:enter="transition ease-out duration-400" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-cloak>
 
 <!-- Summary Pills (always visible) with sparklines + count-up animation -->
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-6">
@@ -829,14 +829,14 @@
 <!-- Category Budget Targets: current spending vs historical averages -->
 {{if .HasBudgetTargets}}
 <div class="bb-card mb-6 p-5 bb-stagger">
-  <div class="flex items-center justify-between mb-4">
+  <div class="flex flex-wrap items-center justify-between gap-y-2 mb-4">
     <div class="flex items-center gap-2.5">
       <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/8">
         <i data-lucide="target" class="w-3.5 h-3.5 text-primary/60"></i>
       </div>
       <div>
         <h2 class="text-sm font-semibold text-base-content/70">Category Targets</h2>
-        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Spending vs historical average for this period</p>
+        <p class="text-[0.6rem] text-base-content/30 mt-0.5 hidden sm:block">Spending vs historical average for this period</p>
       </div>
     </div>
     <div class="flex items-center gap-3">
@@ -862,15 +862,15 @@
       data-category="{{.Category}}"
       @mouseenter="highlightedCategory = '{{.Category}}'; if (window._insightsHighlightDonut) window._insightsHighlightDonut('{{.Category}}')"
       @mouseleave="highlightedCategory = ''; if (window._insightsDownplayDonut) window._insightsDownplayDonut()">
-      <div class="flex items-center justify-between mb-1.5">
-        <div class="flex items-center gap-2 min-w-0">
+      <div class="flex items-center justify-between gap-2 mb-1.5">
+        <div class="flex items-center gap-2 min-w-0 flex-1">
           <span class="w-2 h-2 rounded-full shrink-0 transition-transform duration-150" :class="highlightedCategory === '{{.Category}}' ? 'scale-150' : ''" style="background-color: {{safeCSS .Color}}"></span>
-          <span class="text-xs font-medium truncate transition-colors duration-150" :class="highlightedCategory === '{{.Category}}' ? 'text-base-content font-semibold' : 'text-base-content/70 group-hover:text-base-content'">{{.Category}}</span>
+          <span class="text-xs font-medium transition-colors duration-150 sm:truncate" :class="highlightedCategory === '{{.Category}}' ? 'text-base-content font-semibold' : 'text-base-content/70 group-hover:text-base-content'">{{.Category}}</span>
         </div>
-        <div class="flex items-center gap-2.5 shrink-0">
+        <div class="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           <span class="text-xs tabular-nums font-semibold text-base-content/80">{{formatAmount .Current}}</span>
-          <span class="text-[0.6rem] text-base-content/25">/</span>
-          <span class="text-[0.6rem] tabular-nums text-base-content/35">{{formatAmount .Target}} avg</span>
+          <span class="text-[0.6rem] text-base-content/25 hidden sm:inline">/</span>
+          <span class="text-[0.6rem] tabular-nums text-base-content/35 hidden sm:inline">{{formatAmount .Target}} avg</span>
           {{if .OverBudget}}
           <span class="text-[0.6rem] font-semibold tabular-nums px-1.5 py-0.5 rounded-full bg-error/8 text-error/70">+{{printf "%.0f" .DiffPercent}}%</span>
           {{else if gt .Percent 80.0}}
@@ -1743,15 +1743,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var first = values[0], last = values[values.length - 1];
     var trendUp = last >= first;
+    // ECharts 5.x canvas renderer cannot parse oklch() — use rgba for gradients
     var lineColor, gradTop, gradBot;
     if (trendUp) {
-      lineColor = isDark ? 'oklch(0.70 0.14 155)' : 'oklch(0.55 0.14 155)';
-      gradTop = isDark ? 'oklch(0.70 0.14 155 / 0.15)' : 'oklch(0.55 0.14 155 / 0.12)';
-      gradBot = isDark ? 'oklch(0.70 0.14 155 / 0.01)' : 'oklch(0.55 0.14 155 / 0.01)';
+      lineColor = isDark ? 'rgba(74, 222, 128, 1)' : 'rgba(22, 163, 74, 1)';
+      gradTop = isDark ? 'rgba(74, 222, 128, 0.15)' : 'rgba(22, 163, 74, 0.12)';
+      gradBot = isDark ? 'rgba(74, 222, 128, 0.01)' : 'rgba(22, 163, 74, 0.01)';
     } else {
-      lineColor = isDark ? 'oklch(0.70 0.15 25)' : 'oklch(0.55 0.15 25)';
-      gradTop = isDark ? 'oklch(0.70 0.15 25 / 0.15)' : 'oklch(0.55 0.15 25 / 0.12)';
-      gradBot = isDark ? 'oklch(0.70 0.15 25 / 0.01)' : 'oklch(0.55 0.15 25 / 0.01)';
+      lineColor = isDark ? 'rgba(248, 113, 113, 1)' : 'rgba(220, 38, 38, 1)';
+      gradTop = isDark ? 'rgba(248, 113, 113, 0.15)' : 'rgba(220, 38, 38, 0.12)';
+      gradBot = isDark ? 'rgba(248, 113, 113, 0.01)' : 'rgba(220, 38, 38, 0.01)';
     }
 
     var shortLabels = labels.map(function(d) {
@@ -1790,6 +1791,10 @@ document.addEventListener('DOMContentLoaded', function() {
         borderWidth: 1,
         padding: [8, 12],
         textStyle: { color: tooltipText, fontSize: 13, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif' },
+        axisPointer: {
+          type: 'line',
+          lineStyle: { color: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)', width: 1, type: 'dashed' }
+        },
         formatter: function(params) {
           var idx = params[0].dataIndex;
           var d = labels[idx];
@@ -1803,8 +1808,11 @@ document.addEventListener('DOMContentLoaded', function() {
         type: 'line',
         data: values,
         smooth: 0.35,
-        symbol: 'none',
+        symbol: 'emptyCircle',
+        showSymbol: false,
+        symbolSize: 8,
         lineStyle: { color: lineColor, width: 2 },
+        itemStyle: { color: lineColor, borderColor: lineColor, borderWidth: 2 },
         areaStyle: {
           color: {
             type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
@@ -1815,16 +1823,14 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         },
         emphasis: {
-          itemStyle: {
-            color: lineColor,
-            borderColor: isDark ? 'hsl(0 0% 15%)' : 'hsl(0 0% 100%)',
-            borderWidth: 2
-          }
+          disabled: false,
+          scale: false
         }
       }],
       animation: true,
       animationDuration: 600,
-      animationEasing: 'cubicOut'
+      animationEasing: 'cubicOut',
+      animationDurationUpdate: 0
     });
 
     window.addEventListener('resize', function() { chart.resize(); });
@@ -2749,14 +2755,29 @@ document.addEventListener('DOMContentLoaded', function() {
   // 2. Try calling _setInsightsReady now (works if x-init already ran).
   // 3. Retry after a short delay to catch Alpine finishing after us.
   window._insightsChartsLoaded = true;
+  function resizeAllCharts() {
+    insightCharts.forEach(function(c) {
+      try { c.resize(); } catch(e) {}
+    });
+  }
   function activateInsights() {
     if (typeof window._setInsightsReady === 'function') {
       window._setInsightsReady();
-      setTimeout(function() {
-        insightCharts.forEach(function(c) {
-          try { c.resize(); } catch(e) {}
-        });
-      }, 150);
+      // The content div has a 400ms enter transition (display:none → visible).
+      // Charts initialized while hidden get 100px default width.
+      // Resize aggressively: after transition, and watch the wrapper for layout changes.
+      var wrapper = document.getElementById('insightsContent');
+      function doResize() { resizeAllCharts(); }
+      setTimeout(doResize, 50);
+      setTimeout(doResize, 200);
+      setTimeout(doResize, 450);
+      setTimeout(doResize, 800);
+      // Watch the content wrapper — when it transitions from display:none to visible,
+      // its dimensions change and we resize all charts inside it.
+      if (wrapper && typeof ResizeObserver !== 'undefined') {
+        var ro = new ResizeObserver(doResize);
+        ro.observe(wrapper);
+      }
       return true;
     }
     return false;

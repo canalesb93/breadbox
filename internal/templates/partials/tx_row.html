@@ -54,15 +54,25 @@
           <i data-lucide="bot" class="w-3 h-3"></i>
         </span>
         {{end}}
+        <!-- Mobile category label (hidden on desktop where the picker column shows) -->
+        <span class="sm:hidden text-base-content/20">&middot;</span>
+        {{if .CategoryDisplayName}}
+        <span class="sm:hidden inline-flex items-center gap-1 shrink-0 min-w-0">
+          {{if .CategoryColor}}<span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {{safeCSS (deref .CategoryColor)}}"></span>{{end}}
+          <span class="text-base-content/50 truncate max-w-24">{{deref .CategoryDisplayName}}</span>
+        </span>
+        {{else}}
+        <span class="sm:hidden text-base-content/25 truncate shrink-0">Uncategorized</span>
+        {{end}}
       </div>
     </div>
 
     <!-- Category Picker (inline column) -->
     <div class="shrink-0 hidden sm:block" @click.stop>
-      <div class="bb-cat-picker" data-picker-source="tx-cat-{{.ID}}" x-data="categoryPicker({categories: window.__bbCategories, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: '\u2014', allowEmpty: true, emptyLabel: 'Uncategorized'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
+      <div class="bb-cat-picker" data-picker-source="tx-cat-{{.ID}}" x-data="categoryPicker({categories: window.__bbCategories, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
         <button type="button" class="btn btn-ghost btn-xs gap-1.5 rounded-lg" @click="openPicker()">
           <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-          <span x-text="displayLabel" class="text-xs">{{if .CategoryDisplayName}}{{deref .CategoryDisplayName}}{{else}}&mdash;{{end}}</span>
+          <span x-text="displayLabel" class="text-xs" :class="!selectedId && 'text-base-content/30'">{{if .CategoryDisplayName}}{{deref .CategoryDisplayName}}{{else}}Uncategorized{{end}}</span>
         </button>
       </div>
     </div>

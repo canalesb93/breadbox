@@ -51,11 +51,29 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 		// Load category tree for the category picker.
 		categories, _ := svc.ListCategoryTree(ctx)
 
+		// Compute summary stats from the returned rules.
+		var activeCount, disabledCount, totalHits, agentCreated int
+		for _, rule := range result.Rules {
+			if rule.Enabled {
+				activeCount++
+			} else {
+				disabledCount++
+			}
+			totalHits += rule.HitCount
+			if rule.CreatedByType == "agent" {
+				agentCreated++
+			}
+		}
+
 		data := BaseTemplateData(r, sm, "rules", "Transaction Rules")
 		data["Rules"] = result.Rules
 		data["HasMore"] = result.HasMore
 		data["NextCursor"] = result.NextCursor
 		data["Total"] = result.Total
+		data["ActiveCount"] = activeCount
+		data["DisabledCount"] = disabledCount
+		data["TotalHits"] = totalHits
+		data["AgentCreated"] = agentCreated
 		data["SearchFilter"] = r.URL.Query().Get("search")
 		data["CategoryFilter"] = r.URL.Query().Get("category_slug")
 		data["EnabledFilter"] = r.URL.Query().Get("enabled")

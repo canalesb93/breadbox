@@ -66,6 +66,20 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 		funcMap: template.FuncMap{
 			"sub": func(a, b int) int { return a - b },
 			"add": func(a, b int) int { return a + b },
+			"commaInt": func(n int) string {
+				s := fmt.Sprintf("%d", n)
+				if len(s) <= 3 {
+					return s
+				}
+				result := ""
+				for i, c := range s {
+					if i > 0 && (len(s)-i)%3 == 0 {
+						result += ","
+					}
+					result += string(c)
+				}
+				return result
+			},
 			"mulFloat": func(a *float64, b float64) float64 {
 				if a == nil {
 					return 0
@@ -204,13 +218,13 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"statusBadge": func(status string) template.HTML {
 				switch status {
 				case "active":
-					return `<span class="badge badge-success badge-sm">Active</span>`
+					return `<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-success/10 text-success">Active</span>`
 				case "pending_reauth":
-					return `<span class="badge badge-warning badge-sm">Re-auth Needed</span>`
+					return `<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-warning/10 text-warning">Re-auth Needed</span>`
 				case "error":
-					return `<span class="badge badge-error badge-sm">Error</span>`
+					return `<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-error/10 text-error">Error</span>`
 				default:
-					return `<span class="badge badge-ghost badge-sm">Disconnected</span>`
+					return `<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-base-content/5 text-base-content/40">Disconnected</span>`
 				}
 			},
 			"syncBadge": func(status string) template.HTML {

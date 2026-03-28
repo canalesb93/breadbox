@@ -1052,7 +1052,10 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"MonthProgress":          monthProgress,
 			"CurrentMonthName":       today.Format("January"),
 			"LastMonthName":          lastMonthStart.Format("January"),
-			// Account allocation bar.
+			// Account totals & allocation bar.
+			"TotalAssets":            totalAssets,
+			"TotalLiabilities":      totalLiabilities,
+			"NetWorth":              totalAssets - totalLiabilities,
 			"AllocationSlices":       allocationSlices,
 			// Connection health.
 			"ConnectionHealth":       connectionHealth,
