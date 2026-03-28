@@ -1675,7 +1675,7 @@
   }
 
   .bb-triage-row__main {
-    @apply flex items-center gap-3 px-4 py-2.5;
+    @apply flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5;
     min-height: 2.75rem;
   }
 
@@ -1764,11 +1764,17 @@
 
   .bb-triage-row__amount {
     @apply shrink-0 text-right;
-    width: 90px;
+    width: 80px;
+  }
+
+  @media (min-width: 640px) {
+    .bb-triage-row__amount {
+      width: 90px;
+    }
   }
 
   .bb-triage-row__actions {
-    @apply flex items-center gap-1 shrink-0 ml-2;
+    @apply hidden sm:flex items-center gap-1 shrink-0 ml-2;
     opacity: 0;
     transition: opacity 0.15s ease;
   }
@@ -1845,7 +1851,7 @@
 
   /* Triage detail panel */
   .bb-triage-detail {
-    @apply px-6 py-4 border-t;
+    @apply px-3 sm:px-6 py-4 border-t;
     border-color: oklch(0.94 0 0);
     background: oklch(0.985 0 0);
   }
