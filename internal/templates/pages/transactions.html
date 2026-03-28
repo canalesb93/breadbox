@@ -63,14 +63,14 @@
       x-transition:leave="transition ease-in duration-150"
       x-transition:leave-start="opacity-100 translate-x-0"
       x-transition:leave-end="opacity-0 -translate-x-4"
-      class="flex-1 relative">
+      class="relative flex-1">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
         class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10 transition-colors duration-150"
         :class="searching ? 'text-primary/50' : 'text-base-content/30'">
         <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
       </svg>
       <input type="text" id="bb-quick-search" placeholder="Search transactions..."
-        class="input input-sm input-bordered pl-9 pr-9 w-full rounded-xl text-sm bg-base-100 border-base-300 focus:border-primary/40 transition-all duration-200"
+        class="input input-bordered pl-9 pr-9 w-full rounded-xl text-sm bg-base-100 border-base-300 focus:border-primary/40 transition-all duration-200 h-10"
         x-ref="searchInput"
         :value="query"
         @input="doSearch($event.target.value)"
@@ -87,7 +87,7 @@
     </div>
 
     <!-- Filter toggle button (always pinned right) -->
-    <button type="button" class="btn btn-sm rounded-xl gap-2 shrink-0 ml-auto"
+    <button type="button" class="btn rounded-xl gap-2 shrink-0 ml-auto h-10 min-h-0 px-4"
       :class="filtersOpen ? 'btn-primary' : 'btn-ghost'"
       @click="filtersOpen = !filtersOpen">
       <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
@@ -217,15 +217,27 @@
 {{if .Transactions}}
 
 <div x-data class="space-y-1">
-  <!-- Select all (visible in selection mode) -->
-  <div x-show="$store.bulk.selecting" x-cloak class="flex items-center gap-3 px-2 pb-2">
-    <label class="flex items-center gap-2 cursor-pointer" @click.stop>
-      <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
-        :checked="$store.bulk.sel.length === window.__bbTxMeta.length && window.__bbTxMeta.length > 0"
-        :indeterminate="$store.bulk.sel.length > 0 && $store.bulk.sel.length < window.__bbTxMeta.length"
-        @change="$store.bulk.toggleAll()">
-      <span class="text-xs text-base-content/40">Select all</span>
-    </label>
+  <!-- Toolbar: select-all + keyboard hints -->
+  <div class="flex items-center gap-3 px-2 pb-2">
+    <!-- Select all (visible in selection mode) -->
+    <div x-show="$store.bulk.selecting" x-cloak>
+      <label class="flex items-center gap-2 cursor-pointer" @click.stop>
+        <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+          :checked="$store.bulk.sel.length === window.__bbTxMeta.length && window.__bbTxMeta.length > 0"
+          :indeterminate="$store.bulk.sel.length > 0 && $store.bulk.sel.length < window.__bbTxMeta.length"
+          @change="$store.bulk.toggleAll()">
+        <span class="text-xs text-base-content/40">Select all</span>
+      </label>
+    </div>
+    <div class="flex-1"></div>
+    <!-- Keyboard shortcuts (desktop only) -->
+    <div class="hidden sm:flex items-center gap-2 text-xs text-base-content/30">
+      <span class="flex items-center gap-1"><kbd class="bb-kbd">j</kbd><kbd class="bb-kbd">k</kbd> navigate</span>
+      <span class="flex items-center gap-1"><kbd class="bb-kbd">Enter</kbd> open</span>
+      <span class="flex items-center gap-1"><kbd class="bb-kbd">c</kbd> category</span>
+      <span class="flex items-center gap-1"><kbd class="bb-kbd">e</kbd> expand</span>
+      <span class="flex items-center gap-1"><kbd class="bb-kbd">x</kbd> select</span>
+    </div>
   </div>
 
   <div id="bb-tx-results">
@@ -660,6 +672,99 @@ document.addEventListener('alpine:init', function() {
         self.processing = false;
         window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Network error', type:'error'}}));
       });
+    }
+  });
+
+  /* ── Alpine Store: Keyboard Navigation ── */
+  Alpine.store('txNav', {
+    focusedIdx: -1,
+
+    _getRows() {
+      return Array.from(document.querySelectorAll('.bb-tx-row:not([style*="display: none"])'));
+    },
+
+    _updateFocus(oldIdx) {
+      var rows = this._getRows();
+      if (oldIdx >= 0 && rows[oldIdx]) rows[oldIdx].classList.remove('bb-tx-row--focused');
+      if (this.focusedIdx >= 0 && rows[this.focusedIdx]) {
+        rows[this.focusedIdx].classList.add('bb-tx-row--focused');
+        rows[this.focusedIdx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    },
+
+    next() {
+      var rows = this._getRows();
+      if (!rows.length) return;
+      var old = this.focusedIdx;
+      this.focusedIdx = Math.min(this.focusedIdx + 1, rows.length - 1);
+      this._updateFocus(old);
+    },
+
+    prev() {
+      var rows = this._getRows();
+      if (!rows.length) return;
+      var old = this.focusedIdx;
+      this.focusedIdx = Math.max(this.focusedIdx - 1, 0);
+      this._updateFocus(old);
+    },
+
+    openDetail() {
+      var row = this._getRows()[this.focusedIdx];
+      if (!row) return;
+      var link = row.querySelector('a[href*="/transactions/"]');
+      if (link) window.location.href = link.href;
+    },
+
+    openCategorize() {
+      var row = this._getRows()[this.focusedIdx];
+      if (!row) return;
+      var btn = row.querySelector('.bb-cat-picker button');
+      if (btn) btn.click();
+    },
+
+    toggleExpand() {
+      var row = this._getRows()[this.focusedIdx];
+      if (!row) return;
+      var main = row.querySelector('.cursor-pointer');
+      if (main) main.click();
+    },
+
+    toggleSelect() {
+      var row = this._getRows()[this.focusedIdx];
+      if (!row) return;
+      var link = row.querySelector('a[href*="/transactions/"]');
+      if (!link) return;
+      var id = link.href.split('/').pop();
+      if (!Alpine.store('bulk').selecting) Alpine.store('bulk').toggleMode();
+      Alpine.store('bulk').toggle(id);
+    },
+
+    clearFocus() {
+      var rows = this._getRows();
+      if (this.focusedIdx >= 0 && rows[this.focusedIdx]) {
+        rows[this.focusedIdx].classList.remove('bb-tx-row--focused');
+      }
+      this.focusedIdx = -1;
+    }
+  });
+
+  // Keyboard handler
+  document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if (document.querySelector('.bb-cat-overlay[style*="block"]')) return;
+
+    var nav = Alpine.store('txNav');
+    switch(e.key) {
+      case 'j': e.preventDefault(); nav.next(); break;
+      case 'k': e.preventDefault(); nav.prev(); break;
+      case 'Enter': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.openDetail(); } break;
+      case 'c': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.openCategorize(); } break;
+      case 'e': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.toggleExpand(); } break;
+      case 'x': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.toggleSelect(); } break;
+      case 'Escape':
+        if (nav.focusedIdx >= 0) { nav.clearFocus(); }
+        else if (Alpine.store('bulk').selecting) { Alpine.store('bulk').toggleMode(); }
+        break;
     }
   });
 });
