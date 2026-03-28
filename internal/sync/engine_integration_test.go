@@ -148,7 +148,7 @@ func seedCategories(t *testing.T, queries *db.Queries) db.Category {
 	return uncat
 }
 
-func seedCategoriesWithMappings(t *testing.T, queries *db.Queries) (uncat db.Category, food db.Category) {
+func seedCategoriesWithFood(t *testing.T, queries *db.Queries) (uncat db.Category, food db.Category) {
 	t.Helper()
 	ctx := context.Background()
 	uncat = seedCategories(t, queries)
@@ -157,12 +157,6 @@ func seedCategoriesWithMappings(t *testing.T, queries *db.Queries) (uncat db.Cat
 	})
 	if err != nil {
 		t.Fatalf("create food category: %v", err)
-	}
-	_, err = queries.InsertCategoryMapping(ctx, db.InsertCategoryMappingParams{
-		Provider: db.ProviderTypePlaid, ProviderCategory: "FOOD_AND_DRINK", CategoryID: food.ID,
-	})
-	if err != nil {
-		t.Fatalf("insert food mapping: %v", err)
 	}
 	return uncat, food
 }
@@ -634,11 +628,18 @@ func TestSync_DisconnectedConnection_Errors(t *testing.T) {
 	}
 }
 
-func TestSync_CategoryMappingDuringSync(t *testing.T) {
+func TestSync_RuleCategoryDuringSync(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
 	ctx := context.Background()
 
-	_, food := seedCategoriesWithMappings(t, queries)
+	_, food := seedCategoriesWithFood(t, queries)
+
+	// Create a transaction rule that matches "Restaurant" → food_and_drink.
+	_, err := pool.Exec(ctx, `INSERT INTO transaction_rules (name, conditions, category_id, priority, enabled, created_by_type, created_by_name)
+		VALUES ('Food Rule', '{"field":"name","op":"contains","value":"Restaurant"}', $1, 100, true, 'system', 'test')`, food.ID)
+	if err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
@@ -669,9 +670,9 @@ func TestSync_CategoryMappingDuringSync(t *testing.T) {
 		t.Fatalf("Sync() error: %v", err)
 	}
 
-	// Verify category was resolved.
+	// Verify category was resolved via transaction rule.
 	var categoryID pgtype.UUID
-	err := pool.QueryRow(ctx,
+	err = pool.QueryRow(ctx,
 		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_food'",
 	).Scan(&categoryID)
 	if err != nil {
@@ -1375,7 +1376,7 @@ func TestSync_LowConfidenceReviewType(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
 	ctx := context.Background()
 
-	_, food := seedCategoriesWithMappings(t, queries)
+	_, food := seedCategoriesWithFood(t, queries)
 	_ = food
 
 	// Enable review auto-enqueue with high confidence threshold.
