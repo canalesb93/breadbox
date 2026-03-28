@@ -27,7 +27,11 @@ ON CONFLICT (external_transaction_id) DO UPDATE SET
   category_confidence = EXCLUDED.category_confidence,
   payment_channel = EXCLUDED.payment_channel,
   pending = EXCLUDED.pending,
-  category_id = CASE WHEN transactions.category_override THEN transactions.category_id ELSE EXCLUDED.category_id END,
+  category_id = CASE
+    WHEN transactions.category_override THEN transactions.category_id
+    WHEN EXCLUDED.category_id IS NOT NULL THEN EXCLUDED.category_id
+    ELSE transactions.category_id
+  END,
   deleted_at = NULL,
   updated_at = CASE
     WHEN transactions.amount IS DISTINCT FROM EXCLUDED.amount

@@ -83,7 +83,10 @@ func (q *Queries) DeleteReview(ctx context.Context, id pgtype.UUID) error {
 
 const enqueueReview = `-- name: EnqueueReview :one
 INSERT INTO review_queue (transaction_id, review_type, suggested_category_id, confidence_score)
-VALUES ($1, $2, $3, $4)
+SELECT $1, $2, $3, $4
+WHERE NOT EXISTS (
+  SELECT 1 FROM review_queue WHERE transaction_id = $1
+)
 ON CONFLICT (transaction_id) WHERE status = 'pending' DO NOTHING
 RETURNING id, transaction_id, review_type, status, suggested_category_id, confidence_score, reviewer_type, reviewer_id, reviewer_name, review_note, resolved_category_id, created_at, reviewed_at
 `
