@@ -71,8 +71,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Get("/{id}/edit", EditUserHandler(a, tr))
 		})
 
+		// Combined Access page (API Keys + OAuth Clients)
+		r.Get("/access", AccessPageHandler(svc, sm, tr))
+
 		r.Route("/api-keys", func(r chi.Router) {
-			r.Get("/", APIKeysListPageHandler(svc, sm, tr))
+			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, "/access", http.StatusMovedPermanently)
+			})
 			r.Get("/new", APIKeyNewPageHandler(tr))
 			r.Post("/new", APIKeyCreatePageHandler(svc, sm, tr))
 			r.Get("/{id}/created", APIKeyCreatedPageHandler(sm, tr))
@@ -80,7 +85,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		})
 
 		r.Route("/oauth-clients", func(r chi.Router) {
-			r.Get("/", OAuthClientsListPageHandler(svc, sm, tr))
+			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, "/access", http.StatusMovedPermanently)
+			})
 			r.Get("/new", OAuthClientNewPageHandler(tr))
 			r.Post("/new", OAuthClientCreatePageHandler(svc, sm, tr))
 			r.Get("/{id}/created", OAuthClientCreatedPageHandler(sm, tr))

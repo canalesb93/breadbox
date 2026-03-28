@@ -350,35 +350,17 @@ func (rw *oauthRedirectInterceptor) WriteHeader(code int) {
 
 // --- Admin handlers for OAuth client management ---
 
-// OAuthClientsListPageHandler serves GET /admin/oauth-clients.
-func OAuthClientsListPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		clients, err := svc.ListOAuthClients(r.Context())
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-		data := map[string]any{
-			"PageTitle":   "OAuth Clients",
-			"CurrentPage": "oauth-clients",
-			"Clients":     clients,
-			"Flash":       GetFlash(r.Context(), sm),
-			"CSRFToken":   GetCSRFToken(r),
-		}
-		tr.Render(w, r, "oauth_clients.html", data)
-	}
-}
 
 // OAuthClientNewPageHandler serves GET /admin/oauth-clients/new.
 func OAuthClientNewPageHandler(tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data := map[string]any{
 			"PageTitle":   "Create OAuth Client",
-			"CurrentPage": "oauth-clients",
+			"CurrentPage": "access",
 			"CSRFToken":   GetCSRFToken(r),
 			"Breadcrumbs": []Breadcrumb{
-				{Label: "OAuth Clients", Href: "/oauth-clients"},
-				{Label: "Create"},
+				{Label: "Access", Href: "/access"},
+				{Label: "Create OAuth Client"},
 			},
 		}
 		tr.Render(w, r, "oauth_client_new.html", data)
@@ -418,18 +400,18 @@ func OAuthClientCreatedPageHandler(sm *scs.SessionManager, tr *TemplateRenderer)
 		clientSecret := sm.PopString(r.Context(), "created_oauth_client_secret")
 		name := sm.PopString(r.Context(), "created_oauth_client_name")
 		if clientID == "" {
-			http.Redirect(w, r, "/oauth-clients", http.StatusSeeOther)
+			http.Redirect(w, r, "/access", http.StatusSeeOther)
 			return
 		}
 		data := map[string]any{
 			"PageTitle":    "OAuth Client Created",
-			"CurrentPage":  "oauth-clients",
+			"CurrentPage":  "access",
 			"ClientID":     clientID,
 			"ClientSecret": clientSecret,
 			"ClientName":   name,
 			"CSRFToken":    GetCSRFToken(r),
 			"Breadcrumbs": []Breadcrumb{
-				{Label: "OAuth Clients", Href: "/oauth-clients"},
+				{Label: "Access", Href: "/access"},
 				{Label: "Client Created"},
 			},
 		}
@@ -446,7 +428,7 @@ func OAuthClientRevokePageHandler(svc *service.Service, sm *scs.SessionManager) 
 		} else {
 			SetFlash(r.Context(), sm, "success", "OAuth client revoked successfully")
 		}
-		http.Redirect(w, r, "/oauth-clients", http.StatusSeeOther)
+		http.Redirect(w, r, "/access", http.StatusSeeOther)
 	}
 }
 
