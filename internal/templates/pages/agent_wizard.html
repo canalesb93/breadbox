@@ -1,4 +1,5 @@
 {{define "content"}}
+{{$stats := .Stats}}
 <div class="bb-page-header">
   <div>
     <h1 class="bb-page-title">Agent Wizard</h1>
@@ -13,72 +14,84 @@
 
 <div class="space-y-8 bb-stagger">
 
-  <!-- Section: Essential -->
+  <!-- Section: Bulk Reviews -->
   <div>
     <div class="flex items-center gap-2 mb-3">
       <h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wider">Bulk Reviews</h2>
+      {{if gt $stats.PendingReviews 0}}
+      <span class="badge badge-primary badge-sm font-mono">{{$stats.PendingReviews}} pending</span>
+      {{end}}
     </div>
-    <div class="space-y-2">
-      <a href="/agent-wizard/initial-setup" class="bb-card p-0 overflow-hidden hover:bg-base-200/50 transition-colors duration-150 cursor-pointer group no-underline flex items-center">
-        <div class="px-5 py-4 flex items-center gap-4 flex-1 min-w-0">
-          <div class="relative flex-shrink-0">
-            <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+
+      <!-- Initial Setup -->
+      <a href="/agent-wizard/initial-setup" class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group no-underline flex flex-col border-l-4 border-l-primary">
+        <div class="px-5 pt-4 pb-3 flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors flex-shrink-0">
               <i data-lucide="sparkles" class="w-5 h-5 text-primary"></i>
             </div>
-            <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-base-100 border border-base-300 flex items-center justify-center">
-              <i data-lucide="bot" class="w-2.5 h-2.5 text-base-content/50"></i>
-            </div>
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
+            <div>
               <h3 class="font-semibold text-sm text-base-content group-hover:text-primary transition-colors">Initial Setup</h3>
               <span class="badge badge-soft badge-primary badge-xs rounded-lg">First run</span>
             </div>
-            <p class="text-xs text-base-content/50 mt-0.5">Establish rules and categories after connecting a new account or importing a CSV</p>
           </div>
-          <i data-lucide="chevron-right" class="w-4 h-4 text-base-content/20 flex-shrink-0 group-hover:text-base-content/40 group-hover:translate-x-0.5 transition-all"></i>
+          <p class="text-xs text-base-content/50 mt-2 leading-relaxed">Establish rules and categories after connecting a new account or importing a CSV.</p>
+        </div>
+        <div class="px-5 py-2.5 bg-base-200/30 border-t border-base-200 flex items-center justify-between">
+          <span class="text-xs text-base-content/40">Creates rules + categorizes</span>
+          <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-base-content/20 group-hover:text-primary group-hover:translate-x-0.5 transition-all"></i>
         </div>
       </a>
-      <a href="/agent-wizard/bulk-review" class="bb-card p-0 overflow-hidden hover:bg-base-200/50 transition-colors duration-150 cursor-pointer group no-underline flex items-center">
-        <div class="px-5 py-4 flex items-center gap-4 flex-1 min-w-0">
-          <div class="relative flex-shrink-0">
-            <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
+
+      <!-- Bulk Review -->
+      <a href="/agent-wizard/bulk-review" class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group no-underline flex flex-col border-l-4 border-l-primary">
+        <div class="px-5 pt-4 pb-3 flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors flex-shrink-0">
               <i data-lucide="layers" class="w-5 h-5 text-primary"></i>
             </div>
-            <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-base-100 border border-base-300 flex items-center justify-center">
-              <i data-lucide="bot" class="w-2.5 h-2.5 text-base-content/50"></i>
-            </div>
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
+            <div>
               <h3 class="font-semibold text-sm text-base-content group-hover:text-primary transition-colors">Bulk Review</h3>
               <span class="badge badge-soft badge-primary badge-xs rounded-lg">Thorough</span>
             </div>
-            <p class="text-xs text-base-content/50 mt-0.5">Review a large queue of pending transactions with careful categorization and rule creation</p>
           </div>
-          <i data-lucide="chevron-right" class="w-4 h-4 text-base-content/20 flex-shrink-0 group-hover:text-base-content/40 group-hover:translate-x-0.5 transition-all"></i>
+          <p class="text-xs text-base-content/50 mt-2 leading-relaxed">Review a large queue of pending transactions with careful categorization and rule creation.</p>
+        </div>
+        <div class="px-5 py-2.5 bg-base-200/30 border-t border-base-200 flex items-center justify-between">
+          {{if gt $stats.PendingReviews 0}}
+          <span class="text-xs text-primary font-medium">{{$stats.PendingReviews}} reviews waiting</span>
+          {{else}}
+          <span class="text-xs text-base-content/40">Review queue empty</span>
+          {{end}}
+          <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-base-content/20 group-hover:text-primary group-hover:translate-x-0.5 transition-all"></i>
         </div>
       </a>
-      <a href="/agent-wizard/quick-review" class="bb-card p-0 overflow-hidden hover:bg-base-200/50 transition-colors duration-150 cursor-pointer group no-underline flex items-center">
-        <div class="px-5 py-4 flex items-center gap-4 flex-1 min-w-0">
-          <div class="relative flex-shrink-0">
-            <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
+
+      <!-- Quick Review -->
+      <a href="/agent-wizard/quick-review" class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group no-underline flex flex-col border-l-4 border-l-primary">
+        <div class="px-5 pt-4 pb-3 flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors flex-shrink-0">
               <i data-lucide="zap" class="w-5 h-5 text-primary"></i>
             </div>
-            <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-base-100 border border-base-300 flex items-center justify-center">
-              <i data-lucide="bot" class="w-2.5 h-2.5 text-base-content/50"></i>
-            </div>
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
+            <div>
               <h3 class="font-semibold text-sm text-base-content group-hover:text-primary transition-colors">Quick Review</h3>
               <span class="badge badge-soft badge-primary badge-xs rounded-lg">Fast</span>
             </div>
-            <p class="text-xs text-base-content/50 mt-0.5">Rapidly clear a large queue using broad rules and batch actions for maximum efficiency</p>
           </div>
-          <i data-lucide="chevron-right" class="w-4 h-4 text-base-content/20 flex-shrink-0 group-hover:text-base-content/40 group-hover:translate-x-0.5 transition-all"></i>
+          <p class="text-xs text-base-content/50 mt-2 leading-relaxed">Rapidly clear a large queue using broad rules and batch actions for maximum efficiency.</p>
+        </div>
+        <div class="px-5 py-2.5 bg-base-200/30 border-t border-base-200 flex items-center justify-between">
+          {{if gt $stats.PendingReviews 50}}
+          <span class="text-xs text-primary font-medium">Best for 50+ reviews</span>
+          {{else}}
+          <span class="text-xs text-base-content/40">Uses batch operations</span>
+          {{end}}
+          <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-base-content/20 group-hover:text-primary group-hover:translate-x-0.5 transition-all"></i>
         </div>
       </a>
+
     </div>
   </div>
 
@@ -87,47 +100,56 @@
     <div class="flex items-center gap-2 mb-3">
       <h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wider">Routine</h2>
     </div>
-    <div class="space-y-2">
-      <a href="/agent-wizard/routine-review" class="bb-card p-0 overflow-hidden hover:bg-base-200/50 transition-colors duration-150 cursor-pointer group no-underline flex items-center">
-        <div class="px-5 py-4 flex items-center gap-4 flex-1 min-w-0">
-          <div class="relative flex-shrink-0">
-            <div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center group-hover:bg-success/15 transition-colors">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+
+      <!-- Routine Review -->
+      <a href="/agent-wizard/routine-review" class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group no-underline flex flex-col border-l-4 border-l-success">
+        <div class="px-5 pt-4 pb-3 flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center group-hover:bg-success/15 transition-colors flex-shrink-0">
               <i data-lucide="repeat" class="w-5 h-5 text-success"></i>
             </div>
-            <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-base-100 border border-base-300 flex items-center justify-center">
-              <i data-lucide="bot" class="w-2.5 h-2.5 text-base-content/50"></i>
-            </div>
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
+            <div>
               <h3 class="font-semibold text-sm text-base-content group-hover:text-success transition-colors">Routine Review</h3>
               <span class="badge badge-soft badge-success badge-xs rounded-lg">Recurring</span>
             </div>
-            <p class="text-xs text-base-content/50 mt-0.5">Review and categorize new transactions on a daily or weekly schedule</p>
           </div>
-          <i data-lucide="chevron-right" class="w-4 h-4 text-base-content/20 flex-shrink-0 group-hover:text-base-content/40 group-hover:translate-x-0.5 transition-all"></i>
+          <p class="text-xs text-base-content/50 mt-2 leading-relaxed">Review and categorize new transactions on a daily or weekly schedule. Best after initial setup is complete.</p>
+        </div>
+        <div class="px-5 py-2.5 bg-base-200/30 border-t border-base-200 flex items-center justify-between">
+          {{if gt $stats.TotalRules 0}}
+          <span class="text-xs text-base-content/40">{{$stats.TotalRules}} active rule{{if ne $stats.TotalRules 1}}s{{end}} in place</span>
+          {{else}}
+          <span class="text-xs text-warning font-medium">No rules yet — run Initial Setup first</span>
+          {{end}}
+          <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-base-content/20 group-hover:text-success group-hover:translate-x-0.5 transition-all"></i>
         </div>
       </a>
-      <a href="/agent-wizard/spending-report" class="bb-card p-0 overflow-hidden hover:bg-base-200/50 transition-colors duration-150 cursor-pointer group no-underline flex items-center">
-        <div class="px-5 py-4 flex items-center gap-4 flex-1 min-w-0">
-          <div class="relative flex-shrink-0">
-            <div class="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/15 transition-colors">
+
+      <!-- Spending Report -->
+      <a href="/agent-wizard/spending-report" class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group no-underline flex flex-col border-l-4 border-l-violet-500">
+        <div class="px-5 pt-4 pb-3 flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/15 transition-colors flex-shrink-0">
               <i data-lucide="bar-chart-3" class="w-5 h-5 text-violet-500"></i>
             </div>
-            <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-base-100 border border-base-300 flex items-center justify-center">
-              <i data-lucide="bot" class="w-2.5 h-2.5 text-base-content/50"></i>
-            </div>
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
+            <div>
               <h3 class="font-semibold text-sm text-base-content group-hover:text-violet-500 transition-colors">Spending Report</h3>
               <span class="badge badge-xs rounded-lg bg-violet-500/15 text-violet-600 border-0">Recurring</span>
             </div>
-            <p class="text-xs text-base-content/50 mt-0.5">Weekly or monthly summary of spending by category with trend analysis</p>
           </div>
-          <i data-lucide="chevron-right" class="w-4 h-4 text-base-content/20 flex-shrink-0 group-hover:text-base-content/40 group-hover:translate-x-0.5 transition-all"></i>
+          <p class="text-xs text-base-content/50 mt-2 leading-relaxed">Weekly or monthly summary of spending by category with trend analysis and anomaly callouts.</p>
+        </div>
+        <div class="px-5 py-2.5 bg-base-200/30 border-t border-base-200 flex items-center justify-between">
+          {{if gt $stats.TotalAccounts 0}}
+          <span class="text-xs text-base-content/40">Across {{$stats.TotalAccounts}} account{{if ne $stats.TotalAccounts 1}}s{{end}}</span>
+          {{else}}
+          <span class="text-xs text-base-content/40">Generates markdown report</span>
+          {{end}}
+          <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-base-content/20 group-hover:text-violet-500 group-hover:translate-x-0.5 transition-all"></i>
         </div>
       </a>
+
     </div>
   </div>
 
@@ -136,46 +158,47 @@
     <div class="flex items-center gap-2 mb-3">
       <h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wider">Recommended</h2>
     </div>
-    <div class="space-y-2">
-      <a href="/agent-wizard/anomaly-detection" class="bb-card p-0 overflow-hidden hover:bg-base-200/50 transition-colors duration-150 cursor-pointer group no-underline flex items-center">
-        <div class="px-5 py-4 flex items-center gap-4 flex-1 min-w-0">
-          <div class="relative flex-shrink-0">
-            <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center group-hover:bg-warning/15 transition-colors">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+
+      <!-- Anomaly Detection -->
+      <a href="/agent-wizard/anomaly-detection" class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group no-underline flex flex-col border-l-4 border-l-warning">
+        <div class="px-5 pt-4 pb-3 flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center group-hover:bg-warning/15 transition-colors flex-shrink-0">
               <i data-lucide="shield-alert" class="w-5 h-5 text-warning"></i>
             </div>
-            <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-base-100 border border-base-300 flex items-center justify-center">
-              <i data-lucide="bot" class="w-2.5 h-2.5 text-base-content/50"></i>
-            </div>
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
+            <div>
               <h3 class="font-semibold text-sm text-base-content group-hover:text-warning transition-colors">Anomaly Detection</h3>
               <span class="badge badge-soft badge-warning badge-xs rounded-lg">Monitoring</span>
             </div>
-            <p class="text-xs text-base-content/50 mt-0.5">Watch for unusual charges, duplicate transactions, or unexpected spending spikes</p>
           </div>
-          <i data-lucide="chevron-right" class="w-4 h-4 text-base-content/20 flex-shrink-0 group-hover:text-base-content/40 group-hover:translate-x-0.5 transition-all"></i>
+          <p class="text-xs text-base-content/50 mt-2 leading-relaxed">Watch for unusual charges, duplicate transactions, or unexpected spending spikes across all accounts.</p>
+        </div>
+        <div class="px-5 py-2.5 bg-base-200/30 border-t border-base-200 flex items-center justify-between">
+          <span class="text-xs text-base-content/40">Flags suspicious activity</span>
+          <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-base-content/20 group-hover:text-warning group-hover:translate-x-0.5 transition-all"></i>
         </div>
       </a>
-      <a href="/agent-wizard/custom" class="bb-card p-0 overflow-hidden hover:bg-base-200/50 transition-colors duration-150 cursor-pointer group no-underline flex items-center border-dashed border-2">
-        <div class="px-5 py-4 flex items-center gap-4 flex-1 min-w-0">
-          <div class="relative flex-shrink-0">
-            <div class="w-10 h-10 rounded-xl bg-base-300/50 flex items-center justify-center group-hover:bg-base-300/70 transition-colors">
+
+      <!-- Custom Agent -->
+      <a href="/agent-wizard/custom" class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group no-underline flex flex-col border-l-4 border-l-base-300 border-dashed">
+        <div class="px-5 pt-4 pb-3 flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-base-300/50 flex items-center justify-center group-hover:bg-base-300/70 transition-colors flex-shrink-0">
               <i data-lucide="plus" class="w-5 h-5 text-base-content/40"></i>
             </div>
-            <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-base-100 border border-base-300 flex items-center justify-center">
-              <i data-lucide="bot" class="w-2.5 h-2.5 text-base-content/50"></i>
-            </div>
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
+            <div>
               <h3 class="font-semibold text-sm text-base-content/70 group-hover:text-base-content transition-colors">Custom Agent</h3>
             </div>
-            <p class="text-xs text-base-content/50 mt-0.5">Start from scratch with your own goals, filters, and output format</p>
           </div>
-          <i data-lucide="chevron-right" class="w-4 h-4 text-base-content/20 flex-shrink-0 group-hover:text-base-content/40 group-hover:translate-x-0.5 transition-all"></i>
+          <p class="text-xs text-base-content/50 mt-2 leading-relaxed">Start from scratch with your own goals, filters, and output format. Full access to all prompt blocks.</p>
+        </div>
+        <div class="px-5 py-2.5 bg-base-200/30 border-t border-base-200 flex items-center justify-between">
+          <span class="text-xs text-base-content/40">Build your own</span>
+          <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-base-content/20 group-hover:text-base-content/40 group-hover:translate-x-0.5 transition-all"></i>
         </div>
       </a>
+
     </div>
   </div>
 
