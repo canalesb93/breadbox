@@ -107,7 +107,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		r.Get("/reports", ReportsPageHandler(a, svc, sm, tr))
 		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
-		r.Get("/review-instructions", ReviewInstructionsPageHandler(sm, tr))
+		r.Get("/review-instructions", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/mcp-settings", http.StatusMovedPermanently)
+		})
 		r.Get("/agent-wizard", AgentWizardHandler(sm, tr))
 		r.Get("/agent-wizard/{type}", PromptBuilderHandler(sm, tr))
 		r.Get("/rules", RulesPageHandler(svc, sm, tr, a.Config.Version))

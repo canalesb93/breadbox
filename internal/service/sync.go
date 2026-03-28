@@ -57,7 +57,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 		return nil, fmt.Errorf("invalid sync log id: %w", err)
 	}
 
-	query := "SELECT sl.id, sl.connection_id, bc.institution_name, sl.trigger, sl.status, " +
+	query := "SELECT sl.id, sl.connection_id, bc.institution_name, bc.provider, sl.trigger, sl.status, " +
 		"sl.added_count, sl.modified_count, sl.removed_count, sl.unchanged_count, sl.error_message, " +
 		"sl.started_at, sl.completed_at, sl.rule_hits, sl.warning_message " +
 		"FROM sync_logs sl " +
@@ -68,6 +68,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 		id              pgtype.UUID
 		connectionID    pgtype.UUID
 		institutionName pgtype.Text
+		providerType    string
 		trigger         string
 		status          string
 		addedCount      int32
@@ -82,7 +83,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 	)
 
 	if err := s.Pool.QueryRow(ctx, query, uid).Scan(
-		&id, &connectionID, &institutionName, &trigger, &status,
+		&id, &connectionID, &institutionName, &providerType, &trigger, &status,
 		&addedCount, &modifiedCount, &removedCount, &unchangedCount, &errorMessage,
 		&startedAt, &completedAt, &ruleHitsJSON, &warningMessage,
 	); err != nil {
@@ -110,6 +111,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 		ID:               formatUUID(id),
 		ConnectionID:     formatUUID(connectionID),
 		InstitutionName:  instName,
+		Provider:         providerType,
 		Trigger:          trigger,
 		Status:           status,
 		AddedCount:       addedCount,
@@ -522,29 +524,43 @@ func (s *Service) parseRuleHits(ctx context.Context, ruleHitsJSON []byte) ([]Rul
 		return nil, 0
 	}
 
-	// Batch-fetch rule names for all rule IDs.
-	ruleNames := make(map[string]string, len(hitMap))
+	// Batch-fetch rule names and conditions for all rule IDs.
+	type ruleInfo struct {
+		name       string
+		conditions *Condition
+	}
+	ruleInfoMap := make(map[string]ruleInfo, len(hitMap))
 	for ruleID := range hitMap {
 		uid, err := parseUUID(ruleID)
 		if err != nil {
 			continue
 		}
 		var name string
-		err = s.Pool.QueryRow(ctx, "SELECT name FROM transaction_rules WHERE id = $1", uid).Scan(&name)
+		var condJSON []byte
+		err = s.Pool.QueryRow(ctx, "SELECT name, conditions FROM transaction_rules WHERE id = $1", uid).Scan(&name, &condJSON)
 		if err != nil {
-			name = "Deleted rule"
+			ruleInfoMap[ruleID] = ruleInfo{name: "Deleted rule"}
+			continue
 		}
-		ruleNames[ruleID] = name
+		info := ruleInfo{name: name}
+		if len(condJSON) > 0 {
+			var cond Condition
+			if json.Unmarshal(condJSON, &cond) == nil {
+				info.conditions = &cond
+			}
+		}
+		ruleInfoMap[ruleID] = info
 	}
 
 	entries := make([]RuleHitEntry, 0, len(hitMap))
 	total := 0
 	for ruleID, count := range hitMap {
-		name := ruleNames[ruleID]
+		info := ruleInfoMap[ruleID]
 		entries = append(entries, RuleHitEntry{
-			RuleID:   ruleID,
-			RuleName: name,
-			Count:    count,
+			RuleID:     ruleID,
+			RuleName:   info.name,
+			Count:      count,
+			Conditions: info.conditions,
 		})
 		total += count
 	}
