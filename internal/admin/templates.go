@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/url"
 	"path"
 	"strings"
 	"sync"
@@ -247,6 +248,25 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return ""
 				}
 				return *s
+			},
+			"syncLogFilterQuery": func(status, connID, trigger, dateFrom, dateTo string) template.URL {
+				params := url.Values{}
+				if status != "" {
+					params.Set("status", status)
+				}
+				if connID != "" {
+					params.Set("connection_id", connID)
+				}
+				if trigger != "" {
+					params.Set("trigger", trigger)
+				}
+				if dateFrom != "" {
+					params.Set("date_from", dateFrom)
+				}
+				if dateTo != "" {
+					params.Set("date_to", dateTo)
+				}
+				return template.URL(params.Encode())
 			},
 			"derefFloat": func(f *float64) float64 {
 				if f == nil {

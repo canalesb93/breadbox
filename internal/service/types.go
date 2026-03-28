@@ -168,6 +168,9 @@ type SyncLogListParams struct {
 	PageSize     int
 	ConnectionID *string
 	Status       *string
+	Trigger      *string
+	DateFrom     *time.Time
+	DateTo       *time.Time
 }
 
 type SyncLogListResult struct {
