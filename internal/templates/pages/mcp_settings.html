@@ -51,7 +51,7 @@
   </div>
 
   <!-- Card 2: Server Instructions -->
-  <div class="bb-card p-0 overflow-hidden" x-data="{
+  <div id="instructions" class="bb-card p-0 overflow-hidden" x-data="{
     instructions: {{.Instructions | printf `%q`}},
     defaultInstructions: {{.DefaultInstructions | printf `%q`}},
     async resetToDefaults() {

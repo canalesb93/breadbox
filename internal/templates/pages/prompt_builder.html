@@ -1,0 +1,595 @@
+{{define "content"}}
+<div class="bb-page-header">
+  <div>
+    <div class="flex items-center gap-2 text-sm text-base-content/50 mb-1">
+      <a href="/agent-wizard" class="hover:text-base-content transition-colors">Agent Wizard</a>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      <span class="text-base-content/70">Prompt Builder</span>
+    </div>
+    <h1 class="bb-page-title">{{.AgentLabel}}</h1>
+    <p class="text-sm text-base-content/50 mt-1">{{.AgentDescription}}</p>
+  </div>
+</div>
+
+<div x-data="promptBuilder({{.BlocksJSON}})" @keydown.window="handleKeyboard($event)" class="space-y-5">
+
+  <!-- How it works -->
+  <div class="rounded-xl bg-base-100 border border-base-300 px-5 py-4 shadow-sm">
+    <h3 class="text-xs font-semibold text-base-content/70 uppercase tracking-wider mb-2.5">How it works</h3>
+    <ul class="space-y-1.5 text-xs text-base-content/50 leading-relaxed list-none">
+      <li class="flex items-start gap-2">
+        <span class="text-base-content/25 mt-px">1.</span>
+        <span>Make sure your agent is connected to the Breadbox MCP server</span>
+      </li>
+      <li class="flex items-start gap-2">
+        <span class="text-base-content/25 mt-px">2.</span>
+        <span>Toggle, reorder, and edit blocks to build your prompt</span>
+      </li>
+      <li class="flex items-start gap-2">
+        <span class="text-base-content/25 mt-px">3.</span>
+        <span>Preview the result, then copy and paste into your agent</span>
+      </li>
+    </ul>
+    <p class="text-[11px] text-base-content/35 mt-3 leading-relaxed"><span class="font-semibold text-base-content/45">Note:</span> Agents connected via MCP automatically receive the <a href="/mcp-settings#instructions" class="text-primary hover:underline">server instructions</a> — this prompt is in addition to those.</p>
+  </div>
+
+  <!-- Block pills (top) -->
+  <div class="flex flex-wrap gap-1.5">
+    <!-- Core blocks (locked) -->
+    <template x-for="block in coreBlocks" :key="block.id">
+      <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-primary/5 text-primary/50 border border-primary/20 cursor-default">
+        <span x-html="getBlockIcon(block.id)" class="flex-shrink-0 flex items-center"></span>
+        <span x-text="block.title"></span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0 opacity-50"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </span>
+    </template>
+    <!-- Toggleable blocks -->
+    <template x-for="block in allToggleableBlocks" :key="block.id">
+      <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150"
+              :class="block.enabled
+                ? 'bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15'
+                : 'bg-base-200/50 text-base-content/40 border border-base-300 hover:text-base-content/60 hover:border-base-content/20'"
+              @click="toggleBlock(block.id)">
+        <span x-html="getBlockIcon(block.id)" class="flex-shrink-0 flex items-center"></span>
+        <span x-text="block.title"></span>
+        <svg x-show="block.enabled" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M20 6 9 17l-5-5"/></svg>
+        <svg x-show="!block.enabled" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+      </button>
+    </template>
+    <!-- Custom instructions -->
+    <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-base-200/50 text-base-content/40 border border-dashed border-base-300 hover:text-base-content/60 hover:border-base-content/20 transition-all duration-150"
+            @click="addCustomBlock()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/></svg>
+      Custom Instructions
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+    </button>
+  </div>
+
+  <!-- Unified block editor -->
+  <div class="rounded-xl border border-base-300 overflow-hidden bg-base-100">
+    <template x-for="(block, index) in activeBlocks" :key="block.id">
+      <div :class="{ 'border-t border-base-300': index > 0 }"
+           @dragover.prevent="handleDragOver($event, index)"
+           @drop.prevent="handleDrop()"
+           :data-block-id="block.id"
+           class="group/block relative"
+>
+
+        <!-- Block header -->
+        <div class="flex items-center gap-2 px-3 py-2.5 select-none cursor-pointer transition-colors duration-100"
+             :class="draggingId ? (draggingId === block.id ? 'opacity-30 bg-base-200/50' : 'bg-base-200/50') : 'bg-base-200/50 hover:bg-base-300/70'"
+             draggable="true"
+             @dragstart="handleDragStart($event, index, block.id)"
+             @dragend="handleDragEnd()"
+             @click="toggleCollapse(block.id)"
+             :style="draggingId ? 'cursor:grabbing' : ''">
+
+          <!-- Drag handle -->
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-base-content/25 flex-shrink-0"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>
+
+          <!-- Collapse toggle + Title -->
+          <div class="flex items-center gap-1.5 flex-1 min-w-0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 class="text-base-content/30 flex-shrink-0 transition-transform duration-200"
+                 :style="isCollapsed(block.id) ? '' : 'transform:rotate(90deg)'"><path d="m9 18 6-6-6-6"/></svg>
+            <span class="text-sm font-semibold text-base-content/60 truncate" x-text="block.title"></span>
+            <span x-show="block.content !== block.originalContent && !block.isCustom" class="badge badge-soft badge-warning badge-xs rounded-lg flex-shrink-0">Modified</span>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex items-center gap-0.5 flex-shrink-0">
+            <!-- Copy block -->
+            <button class="p-1.5 rounded-lg text-base-content/25 hover:text-base-content/60 hover:bg-base-300/50 transition-colors opacity-0 group-hover/block:opacity-100"
+                    @click.stop="copyBlock(block.id)" :title="copiedBlockId === block.id ? 'Copied!' : 'Copy block'">
+              <svg x-show="copiedBlockId !== block.id" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              <svg x-show="copiedBlockId === block.id" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-success"><path d="M20 6 9 17l-5-5"/></svg>
+            </button>
+            <!-- Reset -->
+            <template x-if="block.content !== block.originalContent && !block.isCustom">
+              <button class="p-1.5 rounded-lg text-base-content/25 hover:text-warning hover:bg-warning/10 transition-colors"
+                      @click.stop="resetBlock(block.id)" title="Reset to default">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+              </button>
+            </template>
+            <!-- Remove -->
+            <template x-if="block.role !== 'core'">
+              <button class="p-1.5 rounded-lg text-base-content/25 hover:text-error hover:bg-error/10 transition-colors"
+                      @click.stop="block.isCustom ? removeCustomBlock(block.id) : toggleBlock(block.id)"
+                      title="Remove block">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Block content -->
+        <div class="relative overflow-hidden transition-[max-height] duration-300 ease-in-out group/content"
+             :style="(isCollapsed(block.id) || draggingId) ? (draggingId ? 'max-height:2rem' : 'max-height:3rem') : 'max-height:' + getBlockHeight(block.id) + 'px'"
+             @click="(isCollapsed(block.id) || draggingId) && !draggingId ? toggleCollapse(block.id) : null"
+             :class="(isCollapsed(block.id) || draggingId) ? 'cursor-pointer' : ''">
+          <div class="px-4 py-2.5">
+            <textarea
+              class="w-full bg-transparent font-mono text-xs leading-relaxed resize-none outline-none transition-colors duration-200"
+              :class="(isCollapsed(block.id) || draggingId) ? 'text-base-content/30 pointer-events-none' : 'text-base-content/70'"
+              x-model="block.content"
+              @input="autoResize($el); updateBlockHeight(block.id, $el)"
+              @focus="focusedBlock = block.id"
+              @blur="focusedBlock = null"
+              @keydown.escape="$el.blur()"
+              x-init="$nextTick(() => { autoResize($el); updateBlockHeight(block.id, $el); })"
+              :placeholder="block.isCustom ? 'Add your custom instructions here...' : ''"
+              spellcheck="false"
+              rows="1"
+              :tabindex="(isCollapsed(block.id) || draggingId) ? -1 : 0"
+            ></textarea>
+          </div>
+          <!-- Fade + expand hint overlay when collapsed -->
+          <div class="absolute inset-x-0 bottom-0 pointer-events-none transition-opacity duration-300 flex flex-col items-center justify-end"
+               :class="(isCollapsed(block.id) || draggingId) ? 'opacity-100' : 'opacity-0'"
+               style="height: 1.25rem; background: linear-gradient(to bottom, transparent, var(--color-base-100))">
+            <div class="pb-1 transition-opacity duration-200"
+                 :class="(isCollapsed(block.id) && !draggingId) ? 'opacity-0 group-hover/content:opacity-100' : 'opacity-0'">
+              <span class="text-[10px] text-base-content/40 flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                Click to expand
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Empty state -->
+    <template x-if="activeBlocks.length === 0">
+      <div class="px-6 py-12 text-center text-base-content/40">
+        <p class="text-sm">No blocks enabled. Toggle blocks above to start building your prompt.</p>
+      </div>
+    </template>
+  </div>
+
+  <!-- Markdown format note -->
+  <p class="text-[11px] text-base-content/30 leading-relaxed text-center">Prompts use <a href="https://www.markdownguide.org/cheat-sheet/" target="_blank" rel="noopener" class="text-primary hover:underline">Markdown format</a> — headers, lists, and emphasis are all supported.</p>
+
+  <!-- Spacer for floating bar -->
+  <div class="h-20"></div>
+
+  <!-- Teleport floating elements to body to avoid drawer transform breaking position:fixed -->
+  <template x-teleport="body">
+  <div>
+
+  <!-- Toast notification -->
+  <div x-show="toast" x-cloak
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0 translate-y-2"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0 translate-y-2"
+       class="fixed bottom-24 left-1/2 z-50 -translate-x-1/2">
+    <div class="bg-base-100 border border-base-300 rounded-xl shadow-lg px-4 py-2.5 flex items-center gap-2">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-success"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="text-sm font-medium" x-text="toast"></span>
+    </div>
+  </div>
+
+  <!-- Floating bottom bar -->
+  <div class="fixed bottom-6 left-1/2 z-40 -translate-x-1/2">
+    <div class="flex items-center gap-3 bg-base-100 border border-base-300 rounded-2xl shadow-lg px-5 py-3">
+      <span class="text-xs font-medium text-base-content/60">{{.AgentLabel}}</span>
+      <div class="w-px h-4 bg-base-300"></div>
+      <span class="text-xs text-base-content/40 tabular-nums" x-text="activeBlocks.length + ' blocks · ' + preview.length.toLocaleString() + ' chars'"></span>
+      <div class="w-px h-4 bg-base-300"></div>
+      <button class="btn btn-ghost btn-sm rounded-xl gap-1.5 text-xs" @click="openPreview()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        Preview
+        <span class="ml-1 text-[10px] opacity-50 border border-current/30 rounded px-1 leading-none py-0.5">P</span>
+      </button>
+      <button class="btn btn-primary btn-sm rounded-xl gap-1.5 text-xs relative overflow-hidden" style="min-width:8rem" @click="copyPrompt()">
+        <span class="flex items-center gap-1.5 transition-all duration-200"
+              :class="copied ? 'opacity-0 scale-75' : 'opacity-100 scale-100'">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+          Copy Prompt
+          <span class="ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">C</span>
+        </span>
+        <span class="absolute inset-0 flex items-center justify-center gap-1.5 transition-all duration-200"
+              :class="copied ? 'opacity-100 scale-100' : 'opacity-0 scale-75'">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          Copied!
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Preview modal (full screen) -->
+  <div x-show="showPreview" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       @keydown.escape.window="closePreview()">
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+         @click="closePreview()"
+         x-show="showPreview"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"></div>
+    <!-- Modal -->
+    <div class="relative bg-base-100 rounded-2xl shadow-2xl border border-base-300 w-full max-w-5xl max-h-[90vh] mx-4 flex flex-col"
+         x-show="showPreview"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95 translate-y-4"
+         x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95 translate-y-4">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-base-300 flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <h3 class="font-semibold">Prompt Preview</h3>
+          <span class="text-xs text-base-content/40 tabular-nums" x-text="preview.length.toLocaleString() + ' chars'"></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-sm btn-primary rounded-xl gap-1.5 text-xs relative overflow-hidden" style="min-width:6.5rem" @click="copyPrompt()">
+            <span class="flex items-center gap-1.5 transition-all duration-200"
+                  :class="copied ? 'opacity-0 scale-75' : 'opacity-100 scale-100'">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              Copy
+              <span class="ml-0.5 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">C</span>
+            </span>
+            <span class="absolute inset-0 flex items-center justify-center gap-1.5 transition-all duration-200"
+                  :class="copied ? 'opacity-100 scale-100' : 'opacity-0 scale-75'">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              Copied!
+            </span>
+          </button>
+          <button class="btn btn-ghost btn-sm btn-square rounded-xl" @click="closePreview()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <!-- Rendered markdown content -->
+      <div class="overflow-auto flex-1 px-6 py-5">
+        <div class="bb-markdown" x-html="renderMarkdown(preview)"></div>
+      </div>
+      <style>
+        .bb-markdown { font-size: 0.875rem; line-height: 1.7; color: var(--color-base-content); }
+        .bb-markdown h1 { font-size: 1.5rem; font-weight: 700; margin: 1.5rem 0 0.75rem; border-bottom: 1px solid oklch(var(--bc) / 0.1); padding-bottom: 0.5rem; }
+        .bb-markdown h2 { font-size: 1.15rem; font-weight: 700; margin: 1.5rem 0 0.5rem; color: oklch(var(--bc) / 0.8); }
+        .bb-markdown h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.5rem; }
+        .bb-markdown p { margin: 0.5rem 0; }
+        .bb-markdown ul { list-style-type: disc; padding-left: 1.5rem; margin: 0.5rem 0; }
+        .bb-markdown ol { list-style-type: decimal; padding-left: 1.5rem; margin: 0.5rem 0; }
+        .bb-markdown li { margin: 0.25rem 0; }
+        .bb-markdown li > p { margin: 0; display: inline; }
+        .bb-markdown code { font-size: 0.8em; background: oklch(var(--bc) / 0.06); padding: 0.15rem 0.35rem; border-radius: 0.25rem; font-family: ui-monospace, monospace; }
+        .bb-markdown pre { background: oklch(var(--bc) / 0.04); border: 1px solid oklch(var(--bc) / 0.08); border-radius: 0.5rem; padding: 0.75rem 1rem; overflow-x: auto; margin: 0.75rem 0; }
+        .bb-markdown pre code { background: none; padding: 0; font-size: 0.8rem; }
+        .bb-markdown strong { font-weight: 600; }
+        .bb-markdown hr { border: none; border-top: 1px solid oklch(var(--bc) / 0.1); margin: 1.5rem 0; }
+        .bb-markdown blockquote { border-left: 3px solid oklch(var(--p)); padding-left: 1rem; margin: 0.75rem 0; color: oklch(var(--bc) / 0.6); }
+        .bb-markdown ul ul, .bb-markdown ol ul { margin: 0.15rem 0; }
+      </style>
+    </div>
+  </div>
+
+  </div>
+  </template><!-- /x-teleport -->
+
+</div>
+
+<script>
+function promptBuilder(initialBlocks) {
+  var customCounter = 0;
+
+  return {
+    blocks: initialBlocks.map(function(b) {
+      b.isCustom = false;
+      return b;
+    }),
+    copied: false,
+    copiedBlockId: null,
+    showPreview: false,
+    toast: null,
+    draggingId: null,
+    focusedBlock: null,
+    collapsedBlocks: {},
+    blockHeights: {},
+
+    getBlockHeight: function(id) {
+      return this.blockHeights[id] || 2000;
+    },
+
+    updateBlockHeight: function(id, el) {
+      var wrapper = el.closest('.px-4');
+      if (wrapper) {
+        this.blockHeights[id] = wrapper.scrollHeight + 20;
+      }
+    },
+
+    isCollapsed: function(id) {
+      return !!this.collapsedBlocks[id];
+    },
+
+    toggleCollapse: function(id) {
+      this.collapsedBlocks[id] = !this.collapsedBlocks[id];
+      if (!this.collapsedBlocks[id]) {
+        var self = this;
+        this.$nextTick(function() {
+          var el = self.$el.querySelector('[data-block-id="' + id + '"] textarea');
+          if (el) {
+            self.autoResize(el);
+            self.updateBlockHeight(id, el);
+          }
+        });
+      }
+    },
+
+    get activeBlocks() {
+      return this.blocks.filter(function(b) { return b.enabled; });
+    },
+
+    // All non-core, non-custom blocks (for the pill toggles at top)
+    get coreBlocks() {
+      return this.blocks.filter(function(b) { return b.role === 'core'; });
+    },
+
+    get allToggleableBlocks() {
+      return this.blocks.filter(function(b) { return b.role !== 'core' && !b.isCustom; });
+    },
+
+    get preview() {
+      return this.blocks
+        .filter(function(b) { return b.enabled; })
+        .map(function(b) { return b.content; })
+        .join('\n\n');
+    },
+
+    getBlockIcon: function(id) {
+      var icons = {
+        'base-context': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>',
+        'strategy-initial-setup': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.288L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.288Z"/></svg>',
+        'strategy-bulk-review': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>',
+        'strategy-quick-review': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+        'strategy-routine-review': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2.1a4 4 0 0 1 4-4h12.8M7 21.9l-4-4 4-4"/><path d="M21 11.8v2.1a4 4 0 0 1-4 4H4.2"/></svg>',
+        'strategy-spending-report': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>',
+        'strategy-anomaly-detection': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>',
+        'tool-reference': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+        'category-system': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>',
+        'rule-creation': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>',
+        'report-submission': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>',
+        'account-linking': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>',
+        'teller-categories': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>',
+        'token-efficiency': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+        'scale-guidance': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>',
+        'gmail-integration': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="12" viewBox="0 0 256 193"><path fill="#4285F4" d="M58.182 192.05V93.14L27.507 65.077 0 49.504v125.091c0 9.658 7.825 17.455 17.455 17.455z"/><path fill="#34A853" d="M197.818 192.05h40.727c9.659 0 17.455-7.826 17.455-17.455V49.505l-31.156 17.837-27.026 25.798z"/><path fill="#EA4335" d="m58.182 93.14-4.174-38.647 4.174-36.989L128 69.868l69.818-52.364 4.669 34.992-4.669 40.644L128 145.504z"/><path fill="#FBBC04" d="M197.818 17.504V93.14L256 49.504V26.231c0-21.585-24.64-33.89-41.89-20.945z"/><path fill="#C5221F" d="M0 49.504l26.759 20.07L58.182 93.14V17.504L41.89 5.286C24.61-7.66 0 4.646 0 26.23z"/></svg>',
+        'sync-management': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>',
+        'transaction-comments': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></svg>',
+        'merchant-analysis': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/></svg>'
+      };
+      return icons[id] || '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>';
+    },
+
+    autoResize: function(el) {
+      el.style.height = '0';
+      el.style.height = el.scrollHeight + 'px';
+    },
+
+    // --- Drag & drop ---
+    handleDragStart: function(e, index, id) {
+      this.draggingId = id;
+      this.focusedBlock = null;
+      // Blur any focused textarea
+      if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
+        document.activeElement.blur();
+      }
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', id);
+      var el = e.currentTarget;
+      if (el) {
+        var rect = el.getBoundingClientRect();
+        var offsetX = e.clientX - rect.left;
+        var offsetY = e.clientY - rect.top;
+        e.dataTransfer.setDragImage(el, offsetX, offsetY);
+      }
+    },
+
+    handleDragOver: function(e, toIndex) {
+      if (this.draggingId === null) return;
+
+      var activeIds = this.activeBlocks.map(function(b) { return b.id; });
+      var fromActiveIdx = activeIds.indexOf(this.draggingId);
+      if (fromActiveIdx === -1 || fromActiveIdx === toIndex) return;
+
+      var el = e.currentTarget;
+      var rect = el.getBoundingClientRect();
+      var midY = rect.top + rect.height / 2;
+      var insertBefore = e.clientY < midY;
+
+      var targetActiveIdx = insertBefore ? toIndex : toIndex + 1;
+      if (targetActiveIdx === fromActiveIdx || targetActiveIdx === fromActiveIdx + 1) return;
+
+      var enabled = [];
+      for (var i = 0; i < this.blocks.length; i++) {
+        if (this.blocks[i].enabled) enabled.push(i);
+      }
+
+      var fromBlockIdx = enabled[fromActiveIdx];
+      var toBlockIdx = targetActiveIdx < enabled.length ? enabled[targetActiveIdx] : this.blocks.length;
+
+      var item = this.blocks.splice(fromBlockIdx, 1)[0];
+      if (fromBlockIdx < toBlockIdx) toBlockIdx--;
+      this.blocks.splice(toBlockIdx, 0, item);
+    },
+
+    handleDragEnd: function() {
+      this.draggingId = null;
+      this.resizeAllTextareas();
+    },
+
+    handleDrop: function() {
+      this.draggingId = null;
+      this.resizeAllTextareas();
+    },
+
+    resizeAllTextareas: function() {
+      var self = this;
+      this.$nextTick(function() {
+        setTimeout(function() {
+          self.$el.querySelectorAll('textarea').forEach(function(ta) {
+            self.autoResize(ta);
+            var blockEl = ta.closest('[data-block-id]');
+            if (blockEl) {
+              self.updateBlockHeight(blockEl.dataset.blockId, ta);
+            }
+          });
+        }, 50);
+      });
+    },
+
+    toggleBlock: function(id) {
+      var block = this.blocks.find(function(b) { return b.id === id; });
+      if (block && block.role !== 'core') {
+        block.enabled = !block.enabled;
+        if (block.enabled) {
+          delete this.collapsedBlocks[id];
+          this.resizeAllTextareas();
+        }
+      }
+    },
+
+    addCustomBlock: function() {
+      customCounter++;
+      var id = 'custom-' + customCounter;
+      this.blocks.push({
+        id: id,
+        title: 'Custom Instructions',
+        description: 'Your own instructions — edit freely',
+        content: '',
+        originalContent: '',
+        role: 'optional',
+        enabled: true,
+        isCustom: true
+      });
+      var self = this;
+      this.$nextTick(function() {
+        var el = self.$el.querySelector('[data-block-id="' + id + '"] textarea');
+        if (el) el.focus();
+      });
+    },
+
+    removeCustomBlock: function(id) {
+      this.blocks = this.blocks.filter(function(b) { return b.id !== id; });
+      delete this.collapsedBlocks[id];
+    },
+
+    resetBlock: function(id) {
+      var block = this.blocks.find(function(b) { return b.id === id; });
+      if (block) {
+        block.content = block.originalContent;
+        // Reset stored height so it recalculates
+        delete this.blockHeights[id];
+        var self = this;
+        this.$nextTick(function() {
+          var el = self.$el.querySelector('[data-block-id="' + id + '"] textarea');
+          if (el) {
+            self.autoResize(el);
+            // Double-nextTick to ensure DOM has updated with new content
+            self.$nextTick(function() {
+              self.autoResize(el);
+              self.updateBlockHeight(id, el);
+            });
+          }
+        });
+      }
+    },
+
+    copyBlock: function(id) {
+      var block = this.blocks.find(function(b) { return b.id === id; });
+      if (!block) return;
+      var self = this;
+      navigator.clipboard.writeText(block.content).then(function() {
+        self.copiedBlockId = id;
+        setTimeout(function() { self.copiedBlockId = null; }, 2000);
+      });
+    },
+
+    openPreview: function() {
+      this.showPreview = true;
+      document.body.style.overflow = 'hidden';
+    },
+
+    closePreview: function() {
+      this.showPreview = false;
+      document.body.style.overflow = '';
+    },
+
+    renderMarkdown: function(text) {
+      if (typeof marked === 'undefined') {
+        return '<pre style="white-space:pre-wrap">' + text.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</pre>';
+      }
+      // Preprocess: convert "ALL CAPS HEADER:" lines to markdown ## headers
+      var processed = text.replace(/^([A-Z][A-Z _&\/()\-\u2014]+):[ ]*$/gm, function(match, header) {
+        var clean = header.trim();
+        var titled = clean.toLowerCase().replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+        return '\n## ' + titled + '\n';
+      });
+      // Ensure blank lines before list items (marked requires them)
+      processed = processed.replace(/([^\n])\n(- )/g, '$1\n\n$2');
+      // Ensure blank lines before numbered list items
+      processed = processed.replace(/([^\n])\n(\d+\. )/g, '$1\n\n$2');
+      return marked.parse(processed);
+    },
+
+    showToast: function(msg) {
+      this.toast = msg;
+      var self = this;
+      setTimeout(function() { self.toast = null; }, 2000);
+    },
+
+    copyPrompt: function() {
+      var self = this;
+      navigator.clipboard.writeText(this.preview).then(function() {
+        self.copied = true;
+        self.showToast('Prompt copied to clipboard');
+        setTimeout(function() { self.copied = false; }, 2000);
+      });
+    },
+
+    handleKeyboard: function(e) {
+      // Don't trigger shortcuts when typing in a textarea or input
+      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+      // Don't trigger if modal is open (except Escape which is handled separately)
+      if (e.key === 'c' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        this.copyPrompt();
+      } else if (e.key === 'p' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        this.showPreview ? this.closePreview() : this.openPreview();
+      }
+    }
+  };
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+{{end}}
