@@ -63,6 +63,9 @@
                 {{.ConsecutiveFailures}} fail{{if ne .ConsecutiveFailures 1}}s{{end}}
               </span>
               {{end}}
+              {{if .IsStale}}
+              <span class="text-[0.6rem] font-medium text-warning/70 bg-warning/8 px-1.5 py-0.5 rounded-full" title="This connection hasn't synced recently">stale</span>
+              {{end}}
             </div>
             <div class="flex items-center gap-2 sm:gap-3 text-xs text-base-content/50 mt-0.5 flex-wrap">
               <span>{{.UserName.String}}</span>
