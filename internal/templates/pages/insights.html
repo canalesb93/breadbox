@@ -1803,8 +1803,11 @@ document.addEventListener('DOMContentLoaded', function() {
         type: 'line',
         data: values,
         smooth: 0.35,
-        symbol: 'none',
+        symbol: 'circle',
+        showSymbol: false,
+        symbolSize: 6,
         lineStyle: { color: lineColor, width: 2 },
+        itemStyle: { color: lineColor },
         areaStyle: {
           color: {
             type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
@@ -1815,10 +1818,13 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         },
         emphasis: {
+          focus: 'none',
           itemStyle: {
             color: lineColor,
             borderColor: isDark ? 'hsl(0 0% 15%)' : 'hsl(0 0% 100%)',
-            borderWidth: 2
+            borderWidth: 2,
+            shadowBlur: 4,
+            shadowColor: 'rgba(0,0,0,0.15)'
           }
         }
       }],
