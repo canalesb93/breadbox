@@ -31,13 +31,13 @@
       <p class="text-sm text-base-content/50 mb-4">Configured via environment variables (read-only).</p>
       <dl class="bb-info-grid">
         <dt>Client ID {{configSource .ConfigSources "plaid_client_id"}}</dt>
-        <dd><code class="font-mono text-xs">{{.PlaidClientID}}</code></dd>
+        <dd><code class="font-mono text-xs break-all">{{.PlaidClientID}}</code></dd>
         <dt>Secret</dt>
         <dd><code class="font-mono text-xs">********</code></dd>
         <dt>Environment {{configSource .ConfigSources "plaid_env"}}</dt>
         <dd>{{.PlaidEnv}}</dd>
         <dt>Webhook URL</dt>
-        <dd>{{if .WebhookURL}}<code class="font-mono text-xs">{{.WebhookURL}}</code>{{else}}<span class="text-base-content/40">Not set</span>{{end}}</dd>
+        <dd>{{if .WebhookURL}}<code class="font-mono text-xs break-all">{{.WebhookURL}}</code>{{else}}<span class="text-base-content/40">Not set</span>{{end}}</dd>
       </dl>
       {{else}}
       <form method="POST" action="/providers/plaid" autocomplete="off" class="space-y-4">
@@ -59,7 +59,7 @@
           <label class="label label-text text-sm font-medium" for="plaid_env">
             Environment {{configSource .ConfigSources "plaid_env"}}
           </label>
-          <select id="plaid_env" name="plaid_env" class="select select-sm select-bordered w-full max-w-xs rounded-xl">
+          <select id="plaid_env" name="plaid_env" class="select select-sm select-bordered w-full sm:max-w-xs rounded-xl">
             <option value="sandbox"{{if eq .PlaidEnv "sandbox"}} selected{{end}}>Sandbox</option>
             <option value="development"{{if eq .PlaidEnv "development"}} selected{{end}}>Development</option>
             <option value="production"{{if eq .PlaidEnv "production"}} selected{{end}}>Production</option>
@@ -82,9 +82,9 @@
       {{end}}
 
       {{if .PlaidConfigured}}
-      <div class="mt-5 flex items-center gap-3 border-t border-base-300 pt-4">
+      <div class="mt-5 flex flex-wrap items-center gap-3 border-t border-base-300 pt-4">
         <button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick="testProvider('plaid')" id="test-plaid-btn">Test Connection</button>
-        <span id="test-plaid-result" class="text-sm"></span>
+        <span id="test-plaid-result" class="text-sm min-w-0 break-words"></span>
       </div>
       <div class="mt-4 border-t border-base-300 pt-4">
         <h3 class="text-sm font-medium mb-2 flex items-center gap-1.5">
@@ -92,7 +92,7 @@
           Webhook Setup
         </h3>
         <p class="text-xs text-base-content/50 mb-2">Plaid can push real-time transaction updates via webhooks. Set the webhook URL above, then configure Plaid to send events to:</p>
-        <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all">https://&lt;your-domain&gt;/webhooks/plaid</code>
+        <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all">https://&lt;your-domain&gt;/webhooks/plaid</code>
         <p class="text-xs text-base-content/40 mt-2">Plaid automatically sends webhooks when you set the URL during link token creation. No additional configuration needed in the Plaid dashboard.</p>
       </div>
       {{end}}
@@ -122,7 +122,7 @@
       <p class="text-sm text-base-content/50 mb-4">Configured via environment variables (read-only).</p>
       <dl class="bb-info-grid">
         <dt>App ID {{configSource .ConfigSources "teller_app_id"}}</dt>
-        <dd><code class="font-mono text-xs">{{.TellerAppID}}</code></dd>
+        <dd><code class="font-mono text-xs break-all">{{.TellerAppID}}</code></dd>
         <dt>Certificate</dt>
         <dd>{{if .TellerCertConfigured}}Configured{{else}}Not configured{{end}}</dd>
         <dt>Environment {{configSource .ConfigSources "teller_env"}}</dt>
@@ -141,7 +141,7 @@
 
         <div class="form-control">
           <label class="label label-text text-sm font-medium" for="teller_env">Environment</label>
-          <select id="teller_env" name="teller_env" class="select select-sm select-bordered w-full max-w-xs rounded-xl">
+          <select id="teller_env" name="teller_env" class="select select-sm select-bordered w-full sm:max-w-xs rounded-xl">
             <option value="sandbox"{{if eq .TellerEnv "sandbox"}} selected{{end}}>Sandbox</option>
             <option value="development"{{if eq .TellerEnv "development"}} selected{{end}}>Development</option>
             <option value="production"{{if eq .TellerEnv "production"}} selected{{end}}>Production</option>
@@ -190,9 +190,9 @@
       {{end}}
 
       {{if .TellerConfigured}}
-      <div class="mt-5 flex items-center gap-3 border-t border-base-300 pt-4">
+      <div class="mt-5 flex flex-wrap items-center gap-3 border-t border-base-300 pt-4">
         <button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick="testProvider('teller')" id="test-teller-btn">Test Connection</button>
-        <span id="test-teller-result" class="text-sm"></span>
+        <span id="test-teller-result" class="text-sm min-w-0 break-words"></span>
       </div>
       <div class="mt-4 border-t border-base-300 pt-4">
         <h3 class="text-sm font-medium mb-2 flex items-center gap-1.5">
@@ -204,7 +204,7 @@
           <li>Go to the <strong>Teller dashboard</strong> and navigate to your application settings</li>
           <li>Set the webhook URL to:</li>
         </ol>
-        <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all">https://&lt;your-domain&gt;/webhooks/teller</code>
+        <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all">https://&lt;your-domain&gt;/webhooks/teller</code>
         <ol class="text-xs text-base-content/50 space-y-1.5 mt-2 list-decimal list-inside" start="3">
           <li>Copy the <strong>webhook signing secret</strong> from Teller and paste it in the Webhook Secret field above</li>
           <li>Breadbox verifies webhook signatures using this secret to ensure authenticity</li>
