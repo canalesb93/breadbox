@@ -5,7 +5,7 @@
      x-init="
        $watch('tab', v => { const u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); if (window._onInsightsTabSwitch) window._onInsightsTabSwitch(v); });
        window._setInsightsReady = () => { insightsReady = true; };
-       if (window._insightsChartsLoaded) { insightsReady = true; setTimeout(() => { if (window._insightCharts) window._insightCharts.forEach(c => { try { c.resize(); } catch(e) {} }); }, 150); }
+       if (window._insightsChartsLoaded) { insightsReady = true; setTimeout(() => { if (window._insightCharts) window._insightCharts.forEach(c => { try { c.resize(); } catch(e) {} }); }, 450); setTimeout(() => { if (window._insightCharts) window._insightCharts.forEach(c => { try { c.resize(); } catch(e) {} }); }, 800); }
      "
      @keydown.window="
        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.isContentEditable) return;
@@ -2749,14 +2749,33 @@ document.addEventListener('DOMContentLoaded', function() {
   // 2. Try calling _setInsightsReady now (works if x-init already ran).
   // 3. Retry after a short delay to catch Alpine finishing after us.
   window._insightsChartsLoaded = true;
+  function resizeAllCharts() {
+    insightCharts.forEach(function(c) {
+      try { c.resize(); } catch(e) {}
+    });
+  }
   function activateInsights() {
     if (typeof window._setInsightsReady === 'function') {
       window._setInsightsReady();
-      setTimeout(function() {
+      // The content div has a 400ms enter transition. Resize after it completes,
+      // with a secondary fallback to catch any late layout shifts.
+      setTimeout(resizeAllCharts, 450);
+      setTimeout(resizeAllCharts, 800);
+      // Use ResizeObserver for a robust catch-all: resize charts whenever their
+      // container dimensions change (covers transitions, lazy layout, etc.).
+      if (typeof ResizeObserver !== 'undefined') {
+        var observed = new Set();
         insightCharts.forEach(function(c) {
-          try { c.resize(); } catch(e) {}
+          var dom = c.getDom && c.getDom();
+          if (dom && !observed.has(dom)) {
+            observed.add(dom);
+            var ro = new ResizeObserver(function() {
+              try { c.resize(); } catch(e) {}
+            });
+            ro.observe(dom);
+          }
         });
-      }, 150);
+      }
       return true;
     }
     return false;
