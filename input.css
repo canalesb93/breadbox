@@ -711,13 +711,25 @@
     80% { transform: translateX(3px); }
   }
 
-  /* ── Transaction row hover (date-grouped list) ── */
+  /* ── Transaction row hover + keyboard focus ── */
   .bb-tx-row {
     transition: background-color 0.12s ease;
   }
 
   .bb-tx-row:hover {
     @apply bg-base-200/40;
+  }
+
+  .bb-tx-row--focused {
+    @apply bg-primary/5;
+    box-shadow: inset 3px 0 0 oklch(0.55 0.15 250);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-tx-row--focused {
+      @apply bg-primary/10;
+      box-shadow: inset 3px 0 0 oklch(0.65 0.15 250);
+    }
   }
 
   /* ── Transaction category avatar ── */

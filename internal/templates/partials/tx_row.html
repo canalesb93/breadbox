@@ -7,8 +7,8 @@
   :class="$store.bulk.isIn('{{.ID}}') && 'bg-primary/5'">
   <!-- Main Row -->
   <div class="flex items-center gap-3 px-4 py-3 cursor-pointer" @click="expanded = !expanded">
-    <!-- Checkbox -->
-    <label class="flex items-center shrink-0 cursor-pointer" @click.stop>
+    <!-- Checkbox (selection mode only) -->
+    <label x-show="$store.bulk.selecting" x-cloak class="flex items-center shrink-0 cursor-pointer" @click.stop>
       <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
         :checked="$store.bulk.isIn('{{.ID}}')"
         @change="$store.bulk.toggle('{{.ID}}')">
