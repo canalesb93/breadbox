@@ -5,14 +5,19 @@ TAILWIND_BIN := ./tailwindcss-extra
 
 .PHONY: dev build test test-integration lint generate migrate-up migrate-down migrate-create sqlc seed docker-up docker-down css css-watch css-install
 
+PORT ?= 8080
+
 # generate runs sqlc + css so all gitignored build artifacts exist
 generate: sqlc css
 
 dev: generate
-	@-pkill -f 'go run ./cmd/breadbox serve' 2>/dev/null
-	@-pkill -f '/breadbox serve' 2>/dev/null
-	@sleep 0.5
-	go run ./cmd/breadbox serve
+	@if lsof -ti:$(PORT) >/dev/null 2>&1; then \
+		echo "Error: port $(PORT) is already in use."; \
+		echo "  - Run on another port:  make dev PORT=8081"; \
+		echo "  - Or kill the existing process:  kill $$(lsof -ti:$(PORT))"; \
+		exit 1; \
+	fi
+	SERVER_PORT=$(PORT) go run ./cmd/breadbox serve
 
 build: generate
 	go build -o breadbox ./cmd/breadbox
