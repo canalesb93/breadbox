@@ -233,6 +233,11 @@
             <span>{{.AccountsAffected}} account{{if ne .AccountsAffected 1}}s{{end}}</span>
             {{end}}
           </div>
+          {{if and (eq .Status "error") .FriendlyErrorMessage}}
+          <div class="mt-1 text-xs text-error/60 truncate max-w-md" x-show="!open">{{deref .FriendlyErrorMessage}}</div>
+          {{else if and (eq .Status "error") .ErrorMessage}}
+          <div class="mt-1 text-xs text-error/60 truncate max-w-md font-mono" x-show="!open">{{deref .ErrorMessage}}</div>
+          {{end}}
         </div>
       </div>
 
