@@ -168,6 +168,9 @@ type SyncLogListParams struct {
 	PageSize     int
 	ConnectionID *string
 	Status       *string
+	Trigger      *string
+	DateFrom     *time.Time
+	DateTo       *time.Time
 }
 
 type SyncLogListResult struct {
@@ -187,36 +190,48 @@ type SyncLogRow struct {
 	AddedCount           int32
 	ModifiedCount        int32
 	RemovedCount         int32
+	UnchangedCount       int32
 	ErrorMessage         *string // raw technical error for debugging
 	FriendlyErrorMessage *string // human-friendly error for display
 	StartedAt            *string
 	CompletedAt          *string
 	Duration             *string
 	DurationMs           *int32
-	AccountsAffected     int64 // number of accounts with activity in this sync
+	AccountsAffected     int64          // number of accounts with activity in this sync
+	RuleHits             []RuleHitEntry // per-rule hit counts from this sync run
+	TotalRuleHits        int            // sum of all rule hits
+}
+
+// RuleHitEntry represents a single rule's hit count within a sync run.
+type RuleHitEntry struct {
+	RuleID   string
+	RuleName string
+	Count    int
 }
 
 // SyncLogAccountRow represents a per-account breakdown within a sync log.
 type SyncLogAccountRow struct {
-	ID            string
-	SyncLogID     string
-	AccountID     *string
-	AccountName   string
-	AddedCount    int32
-	ModifiedCount int32
-	RemovedCount  int32
+	ID             string
+	SyncLogID      string
+	AccountID      *string
+	AccountName    string
+	AddedCount     int32
+	ModifiedCount  int32
+	RemovedCount   int32
+	UnchangedCount int32
 }
 
 // SyncLogStats contains aggregate statistics about sync logs.
 type SyncLogStats struct {
-	TotalSyncs    int64
-	SuccessCount  int64
-	ErrorCount    int64
-	SuccessRate   float64 // 0-100 percentage
-	AvgDurationMs float64 // average duration in milliseconds
-	TotalAdded    int64
-	TotalModified int64
-	TotalRemoved  int64
+	TotalSyncs      int64
+	SuccessCount    int64
+	ErrorCount      int64
+	SuccessRate     float64 // 0-100 percentage
+	AvgDurationMs   float64 // average duration in milliseconds
+	TotalAdded      int64
+	TotalModified   int64
+	TotalRemoved    int64
+	TotalUnchanged  int64
 }
 
 // SyncHealthSummary contains a dashboard-oriented overview of sync health.

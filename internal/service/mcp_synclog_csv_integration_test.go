@@ -514,6 +514,289 @@ func TestSyncLogStats_FilterByConnection(t *testing.T) {
 	}
 }
 
+// ===================== Sync Log Filter by Trigger Tests =====================
+
+func TestListSyncLogsPaginated_FilterByTrigger(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_trig_f1")
+
+	now := time.Now().UTC()
+	// Create logs with different triggers.
+	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerManual,
+		Status:       db.SyncStatusSuccess,
+		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+	})
+	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerCron,
+		Status:       db.SyncStatusSuccess,
+		StartedAt:    pgtype.Timestamptz{Time: now.Add(time.Minute), Valid: true},
+	})
+	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerCron,
+		Status:       db.SyncStatusError,
+		StartedAt:    pgtype.Timestamptz{Time: now.Add(2 * time.Minute), Valid: true},
+	})
+
+	// Filter by manual trigger.
+	trigger := "manual"
+	result, err := svc.ListSyncLogsPaginated(ctx, service.SyncLogListParams{
+		Page:     1,
+		PageSize: 10,
+		Trigger:  &trigger,
+	})
+	if err != nil {
+		t.Fatalf("ListSyncLogsPaginated(trigger=manual): %v", err)
+	}
+	if result.Total != 1 {
+		t.Errorf("total = %d, want 1", result.Total)
+	}
+	if len(result.Logs) != 1 || result.Logs[0].Trigger != "manual" {
+		t.Errorf("expected 1 manual log, got %d logs", len(result.Logs))
+	}
+
+	// Filter by cron trigger.
+	trigger = "cron"
+	result, err = svc.ListSyncLogsPaginated(ctx, service.SyncLogListParams{
+		Page:     1,
+		PageSize: 10,
+		Trigger:  &trigger,
+	})
+	if err != nil {
+		t.Fatalf("ListSyncLogsPaginated(trigger=cron): %v", err)
+	}
+	if result.Total != 2 {
+		t.Errorf("total = %d, want 2", result.Total)
+	}
+}
+
+func TestCountSyncLogsFiltered_ByTrigger(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_trig_c1")
+
+	now := time.Now().UTC()
+	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerManual,
+		Status:       db.SyncStatusSuccess,
+		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+	})
+	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerWebhook,
+		Status:       db.SyncStatusSuccess,
+		StartedAt:    pgtype.Timestamptz{Time: now.Add(time.Minute), Valid: true},
+	})
+
+	trigger := "webhook"
+	count, err := svc.CountSyncLogsFiltered(ctx, service.SyncLogListParams{
+		Trigger: &trigger,
+	})
+	if err != nil {
+		t.Fatalf("CountSyncLogsFiltered(trigger=webhook): %v", err)
+	}
+	if count != 1 {
+		t.Errorf("count = %d, want 1", count)
+	}
+}
+
+// ===================== Sync Log Filter by Date Range Tests =====================
+
+func TestListSyncLogsPaginated_FilterByDateRange(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_date_f1")
+
+	// Create logs at specific dates.
+	day1 := time.Date(2025, 3, 1, 10, 0, 0, 0, time.UTC)
+	day2 := time.Date(2025, 3, 15, 10, 0, 0, 0, time.UTC)
+	day3 := time.Date(2025, 3, 25, 10, 0, 0, 0, time.UTC)
+
+	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerManual,
+		Status:       db.SyncStatusSuccess,
+		StartedAt:    pgtype.Timestamptz{Time: day1, Valid: true},
+	})
+	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerCron,
+		Status:       db.SyncStatusSuccess,
+		StartedAt:    pgtype.Timestamptz{Time: day2, Valid: true},
+	})
+	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerManual,
+		Status:       db.SyncStatusError,
+		StartedAt:    pgtype.Timestamptz{Time: day3, Valid: true},
+	})
+
+	// Filter: from March 10 onward — should return day2 and day3.
+	dateFrom := time.Date(2025, 3, 10, 0, 0, 0, 0, time.UTC)
+	result, err := svc.ListSyncLogsPaginated(ctx, service.SyncLogListParams{
+		Page:     1,
+		PageSize: 10,
+		DateFrom: &dateFrom,
+	})
+	if err != nil {
+		t.Fatalf("ListSyncLogsPaginated(date_from): %v", err)
+	}
+	if result.Total != 2 {
+		t.Errorf("total = %d, want 2 (from March 10 onward)", result.Total)
+	}
+
+	// Filter: up to March 20 — should return day1 and day2.
+	dateTo := time.Date(2025, 3, 20, 0, 0, 0, 0, time.UTC)
+	result, err = svc.ListSyncLogsPaginated(ctx, service.SyncLogListParams{
+		Page:     1,
+		PageSize: 10,
+		DateTo:   &dateTo,
+	})
+	if err != nil {
+		t.Fatalf("ListSyncLogsPaginated(date_to): %v", err)
+	}
+	if result.Total != 2 {
+		t.Errorf("total = %d, want 2 (before March 20)", result.Total)
+	}
+
+	// Filter: March 10 to March 20 — should return only day2.
+	result, err = svc.ListSyncLogsPaginated(ctx, service.SyncLogListParams{
+		Page:     1,
+		PageSize: 10,
+		DateFrom: &dateFrom,
+		DateTo:   &dateTo,
+	})
+	if err != nil {
+		t.Fatalf("ListSyncLogsPaginated(date range): %v", err)
+	}
+	if result.Total != 1 {
+		t.Errorf("total = %d, want 1 (March 10-20)", result.Total)
+	}
+}
+
+func TestListSyncLogsPaginated_CombinedFilters(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_combo_f1")
+
+	day1 := time.Date(2025, 6, 1, 10, 0, 0, 0, time.UTC)
+	day2 := time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC)
+
+	// Manual success on day1.
+	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerManual,
+		Status:       db.SyncStatusSuccess,
+		StartedAt:    pgtype.Timestamptz{Time: day1, Valid: true},
+	})
+	// Cron success on day1.
+	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerCron,
+		Status:       db.SyncStatusSuccess,
+		StartedAt:    pgtype.Timestamptz{Time: day1.Add(time.Hour), Valid: true},
+	})
+	// Manual error on day2.
+	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerManual,
+		Status:       db.SyncStatusError,
+		StartedAt:    pgtype.Timestamptz{Time: day2, Valid: true},
+	})
+
+	// Filter: manual + success + day1 range — should return 1.
+	trigger := "manual"
+	status := "success"
+	dateFrom := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	dateTo := time.Date(2025, 6, 2, 0, 0, 0, 0, time.UTC)
+
+	result, err := svc.ListSyncLogsPaginated(ctx, service.SyncLogListParams{
+		Page:     1,
+		PageSize: 10,
+		Status:   &status,
+		Trigger:  &trigger,
+		DateFrom: &dateFrom,
+		DateTo:   &dateTo,
+	})
+	if err != nil {
+		t.Fatalf("ListSyncLogsPaginated(combined): %v", err)
+	}
+	if result.Total != 1 {
+		t.Errorf("total = %d, want 1 (manual + success + day1)", result.Total)
+	}
+	if len(result.Logs) == 1 {
+		if result.Logs[0].Trigger != "manual" {
+			t.Errorf("trigger = %q, want manual", result.Logs[0].Trigger)
+		}
+		if result.Logs[0].Status != "success" {
+			t.Errorf("status = %q, want success", result.Logs[0].Status)
+		}
+	}
+}
+
+func TestSyncLogStats_FilterByTriggerAndDate(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_stats_td")
+
+	day1 := time.Date(2025, 4, 1, 10, 0, 0, 0, time.UTC)
+	day2 := time.Date(2025, 4, 15, 10, 0, 0, 0, time.UTC)
+
+	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerManual,
+		Status:       db.SyncStatusSuccess,
+		StartedAt:    pgtype.Timestamptz{Time: day1, Valid: true},
+	})
+	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
+		ConnectionID: conn.ID,
+		Trigger:      db.SyncTriggerCron,
+		Status:       db.SyncStatusSuccess,
+		StartedAt:    pgtype.Timestamptz{Time: day2, Valid: true},
+	})
+
+	// Stats for manual trigger only.
+	trigger := "manual"
+	stats, err := svc.SyncLogStats(ctx, service.SyncLogListParams{
+		Trigger: &trigger,
+	})
+	if err != nil {
+		t.Fatalf("SyncLogStats(trigger=manual): %v", err)
+	}
+	if stats.TotalSyncs != 1 {
+		t.Errorf("total_syncs = %d, want 1", stats.TotalSyncs)
+	}
+
+	// Stats for date range covering only day1.
+	dateFrom := time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC)
+	dateTo := time.Date(2025, 4, 2, 0, 0, 0, 0, time.UTC)
+	stats, err = svc.SyncLogStats(ctx, service.SyncLogListParams{
+		DateFrom: &dateFrom,
+		DateTo:   &dateTo,
+	})
+	if err != nil {
+		t.Fatalf("SyncLogStats(date range): %v", err)
+	}
+	if stats.TotalSyncs != 1 {
+		t.Errorf("total_syncs = %d, want 1 (day1 only)", stats.TotalSyncs)
+	}
+}
+
 // ===================== Connection/Account Edge Cases =====================
 
 func TestGetConnectionStatus_WithSyncLog(t *testing.T) {

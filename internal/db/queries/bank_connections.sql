@@ -11,9 +11,24 @@ WHERE bc.id = $1;
 
 -- name: ListBankConnections :many
 SELECT bc.*, u.name as user_name,
-  (SELECT COUNT(*) FROM accounts a WHERE a.connection_id = bc.id) as account_count
+  (SELECT COUNT(*) FROM accounts a WHERE a.connection_id = bc.id) as account_count,
+  COALESCE(ls.status::text, '')::text as last_sync_status,
+  COALESCE(ls.trigger::text, '')::text as last_sync_trigger,
+  COALESCE(ls.duration_ms, 0) as last_sync_duration_ms,
+  ls.started_at as last_sync_started_at,
+  COALESCE(ls.added_count, 0) as last_sync_added,
+  COALESCE(ls.modified_count, 0) as last_sync_modified,
+  COALESCE(ls.removed_count, 0) as last_sync_removed
 FROM bank_connections bc
 LEFT JOIN users u ON bc.user_id = u.id
+LEFT JOIN LATERAL (
+  SELECT sl.status, sl.trigger, sl.duration_ms, sl.started_at,
+         sl.added_count, sl.modified_count, sl.removed_count
+  FROM sync_logs sl
+  WHERE sl.connection_id = bc.id
+  ORDER BY sl.started_at DESC
+  LIMIT 1
+) ls ON true
 ORDER BY bc.created_at DESC;
 
 -- name: UpdateBankConnectionStatus :exec
