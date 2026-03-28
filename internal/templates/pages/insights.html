@@ -829,14 +829,14 @@
 <!-- Category Budget Targets: current spending vs historical averages -->
 {{if .HasBudgetTargets}}
 <div class="bb-card mb-6 p-5 bb-stagger">
-  <div class="flex items-center justify-between mb-4">
+  <div class="flex flex-wrap items-center justify-between gap-y-2 mb-4">
     <div class="flex items-center gap-2.5">
       <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/8">
         <i data-lucide="target" class="w-3.5 h-3.5 text-primary/60"></i>
       </div>
       <div>
         <h2 class="text-sm font-semibold text-base-content/70">Category Targets</h2>
-        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Spending vs historical average for this period</p>
+        <p class="text-[0.6rem] text-base-content/30 mt-0.5 hidden sm:block">Spending vs historical average for this period</p>
       </div>
     </div>
     <div class="flex items-center gap-3">
@@ -862,15 +862,15 @@
       data-category="{{.Category}}"
       @mouseenter="highlightedCategory = '{{.Category}}'; if (window._insightsHighlightDonut) window._insightsHighlightDonut('{{.Category}}')"
       @mouseleave="highlightedCategory = ''; if (window._insightsDownplayDonut) window._insightsDownplayDonut()">
-      <div class="flex items-center justify-between mb-1.5">
-        <div class="flex items-center gap-2 min-w-0">
+      <div class="flex items-center justify-between gap-2 mb-1.5">
+        <div class="flex items-center gap-2 min-w-0 flex-1">
           <span class="w-2 h-2 rounded-full shrink-0 transition-transform duration-150" :class="highlightedCategory === '{{.Category}}' ? 'scale-150' : ''" style="background-color: {{safeCSS .Color}}"></span>
-          <span class="text-xs font-medium truncate transition-colors duration-150" :class="highlightedCategory === '{{.Category}}' ? 'text-base-content font-semibold' : 'text-base-content/70 group-hover:text-base-content'">{{.Category}}</span>
+          <span class="text-xs font-medium transition-colors duration-150 sm:truncate" :class="highlightedCategory === '{{.Category}}' ? 'text-base-content font-semibold' : 'text-base-content/70 group-hover:text-base-content'">{{.Category}}</span>
         </div>
-        <div class="flex items-center gap-2.5 shrink-0">
+        <div class="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           <span class="text-xs tabular-nums font-semibold text-base-content/80">{{formatAmount .Current}}</span>
-          <span class="text-[0.6rem] text-base-content/25">/</span>
-          <span class="text-[0.6rem] tabular-nums text-base-content/35">{{formatAmount .Target}} avg</span>
+          <span class="text-[0.6rem] text-base-content/25 hidden sm:inline">/</span>
+          <span class="text-[0.6rem] tabular-nums text-base-content/35 hidden sm:inline">{{formatAmount .Target}} avg</span>
           {{if .OverBudget}}
           <span class="text-[0.6rem] font-semibold tabular-nums px-1.5 py-0.5 rounded-full bg-error/8 text-error/70">+{{printf "%.0f" .DiffPercent}}%</span>
           {{else if gt .Percent 80.0}}
