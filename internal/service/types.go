@@ -341,15 +341,17 @@ type ReviewResponse struct {
 	ReviewType          string               `json:"review_type"`
 	Status              string               `json:"status"`
 	Provider            *string              `json:"provider,omitempty"`
-	SuggestedCategoryID *string              `json:"suggested_category_id,omitempty"`
-	SuggestedCategory   *string              `json:"suggested_category_slug,omitempty"`
-	ConfidenceScore     *float64             `json:"confidence_score,omitempty"`
-	ReviewerType        *string              `json:"reviewer_type,omitempty"`
-	ReviewerID          *string              `json:"reviewer_id,omitempty"`
-	ReviewerName        *string              `json:"reviewer_name,omitempty"`
-	ReviewNote          *string              `json:"review_note,omitempty"`
-	ResolvedCategoryID  *string              `json:"resolved_category_id,omitempty"`
-	ResolvedCategory    *string              `json:"resolved_category_slug,omitempty"`
+	SuggestedCategoryID          *string              `json:"suggested_category_id,omitempty"`
+	SuggestedCategory            *string              `json:"suggested_category_slug,omitempty"`
+	SuggestedCategoryDisplayName *string              `json:"suggested_category_display_name,omitempty"`
+	ConfidenceScore              *float64             `json:"confidence_score,omitempty"`
+	ReviewerType                 *string              `json:"reviewer_type,omitempty"`
+	ReviewerID                   *string              `json:"reviewer_id,omitempty"`
+	ReviewerName                 *string              `json:"reviewer_name,omitempty"`
+	ReviewNote                   *string              `json:"review_note,omitempty"`
+	ResolvedCategoryID           *string              `json:"resolved_category_id,omitempty"`
+	ResolvedCategory             *string              `json:"resolved_category_slug,omitempty"`
+	ResolvedCategoryDisplayName  *string              `json:"resolved_category_display_name,omitempty"`
 	CreatedAt           string               `json:"created_at"`
 	ReviewedAt          *string              `json:"reviewed_at,omitempty"`
 	Transaction         *TransactionResponse `json:"transaction,omitempty"`

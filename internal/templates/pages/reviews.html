@@ -293,8 +293,8 @@
 
         <!-- Category (suggested) -->
         <div class="bb-triage-row__category">
-          {{if $review.SuggestedCategory}}
-          <span class="text-xs text-base-content/50 truncate">{{$review.SuggestedCategory}}</span>
+          {{if $review.SuggestedCategoryDisplayName}}
+          <span class="text-xs text-base-content/50 truncate">{{$review.SuggestedCategoryDisplayName}}</span>
           {{else if $review.Transaction.Category}}
           <span class="text-xs text-base-content/50 truncate">{{$review.Transaction.Category.DisplayName}}</span>
           {{else}}
@@ -512,10 +512,10 @@
 
       <!-- Category info with inline thumbs for suggestions -->
       <div class="text-sm mt-3">
-        {{if .SuggestedCategory}}
+        {{if .SuggestedCategoryDisplayName}}
         <div class="flex items-center gap-2">
           <span class="text-base-content/50">Suggested:</span>
-          <span class="font-medium">{{.SuggestedCategory}}</span>
+          <span class="font-medium">{{.SuggestedCategoryDisplayName}}</span>
           {{if eq .Status "pending"}}
           <div class="flex items-center gap-1 ml-auto">
             <button class="btn btn-xs btn-circle" :class="feedback === 'up' ? 'btn-success' : 'btn-ghost text-base-content/30'" @click="feedback = feedback === 'up' ? '' : 'up'">
