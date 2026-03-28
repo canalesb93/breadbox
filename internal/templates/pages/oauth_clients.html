@@ -16,8 +16,8 @@
   <div class="bb-card p-5 flex items-center justify-between gap-4 flex-wrap" x-data="{ confirming: false }">
     <div class="flex items-center gap-4 min-w-0">
       <div class="flex items-center justify-center w-10 h-10 rounded-xl shrink-0
-        {{if .RevokedAt}}bg-base-200/40{{else if eq .Scope "read_only"}}bg-warning/8{{else}}bg-secondary/8{{end}}">
-        <i data-lucide="fingerprint" class="w-5 h-5 {{if .RevokedAt}}text-base-content/25{{else if eq .Scope "read_only"}}text-warning{{else}}text-secondary{{end}}"></i>
+        {{if .RevokedAt}}bg-base-200/40{{else if eq .Scope "read_only"}}bg-warning/8{{else}}bg-primary/10{{end}}">
+        <i data-lucide="fingerprint" class="w-5 h-5 {{if .RevokedAt}}text-base-content/25{{else if eq .Scope "read_only"}}text-warning{{else}}text-primary{{end}}"></i>
       </div>
       <div class="min-w-0">
         <div class="flex items-center gap-2 flex-wrap">
