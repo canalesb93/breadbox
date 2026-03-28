@@ -59,6 +59,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Alpine.js v3 for admin UI interactivity (CDN, no build step). Replaces `alert()`/`confirm()` with inline patterns.
 - Dark mode: DaisyUI `light`/`dark` themes with `prefers-color-scheme` auto-switch (no hardcoded `data-theme`). Badge/flash colors use DaisyUI semantic classes.
 - Badge rendering: `statusBadge()` and `syncBadge()` template functions replace copy-pasted if-chains.
+- **Select element backgrounds**: Never use `bg-base-200/50` (or any `/opacity` modifier) on `<select>` elements — the alpha transparency renders as fully transparent in browsers. Use solid `bg-base-200` instead. `<input>` elements handle `bg-base-200/50` fine; `<select>` does not.
 - CSS spacing tokens: `--bb-gap-xs` (0.25rem) through `--bb-gap-xl` (2rem) in `:root`. Use these instead of hardcoded spacing values.
 - Template data helper: `BaseTemplateData(r, sm, currentPage, pageTitle)` returns `map[string]any` with common fields. Handlers can extend the returned map.
 - First-run: `CountAdminAccounts == 0` → redirect to `/admin/setup` (single-page admin creation form). No `setup_complete` flag. Wizard layout, no step indicator.

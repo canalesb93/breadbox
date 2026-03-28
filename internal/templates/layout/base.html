@@ -390,7 +390,7 @@
 
       <!-- Results list -->
       <div class="bb-cmdk-list" x-ref="cmdkList">
-        <template x-if="filteredItems.length === 0 && query.length > 0">
+        <template x-if="filteredItems.length === 0 && !_txLoading && query.length > 0">
           <div class="bb-cmdk-empty">
             <i data-lucide="search-x"></i>
             <span class="text-sm">No results found</span>
@@ -399,6 +399,24 @@
         <template x-for="(group, gi) in filteredGroups" :key="group.label">
           <div class="bb-cmdk-group">
             <div class="bb-cmdk-group-label" x-text="group.label"></div>
+            <!-- Skeleton loaders for transaction search -->
+            <template x-if="group._loading">
+              <div>
+                <div class="bb-cmdk-item" style="pointer-events:none">
+                  <div class="bb-cmdk-item-icon"><div class="w-4 h-4 bg-base-300/40 rounded animate-pulse"></div></div>
+                  <div class="bb-cmdk-item-label"><div class="h-3.5 bg-base-300/40 rounded w-36 animate-pulse"></div><div class="h-2.5 bg-base-300/30 rounded w-48 mt-1.5 animate-pulse"></div></div>
+                </div>
+                <div class="bb-cmdk-item" style="pointer-events:none">
+                  <div class="bb-cmdk-item-icon"><div class="w-4 h-4 bg-base-300/40 rounded animate-pulse"></div></div>
+                  <div class="bb-cmdk-item-label"><div class="h-3.5 bg-base-300/40 rounded w-44 animate-pulse"></div><div class="h-2.5 bg-base-300/30 rounded w-40 mt-1.5 animate-pulse"></div></div>
+                </div>
+                <div class="bb-cmdk-item" style="pointer-events:none">
+                  <div class="bb-cmdk-item-icon"><div class="w-4 h-4 bg-base-300/40 rounded animate-pulse"></div></div>
+                  <div class="bb-cmdk-item-label"><div class="h-3.5 bg-base-300/40 rounded w-32 animate-pulse"></div><div class="h-2.5 bg-base-300/30 rounded w-52 mt-1.5 animate-pulse"></div></div>
+                </div>
+              </div>
+            </template>
+            <!-- Real items -->
             <template x-for="(item, ii) in group.items" :key="item.id">
               <div class="bb-cmdk-item"
                    :data-active="activeIndex === item._flatIndex"
@@ -633,8 +651,7 @@
         { id: 'agent-mcp', group: 'Agents', title: 'MCP Settings', desc: 'Tools and server instructions', icon: 'bot', href: '/mcp-settings', keywords: 'mcp tools permissions instructions' },
         // System
         { id: 'sys-providers', group: 'System', title: 'Providers', desc: 'Configure Plaid, Teller, CSV', icon: 'plug', href: '/providers', keywords: 'plaid teller csv bank setup' },
-        { id: 'sys-api-keys', group: 'System', title: 'API Keys', desc: 'Manage API access keys', icon: 'key', href: '/api-keys', keywords: 'tokens authentication' },
-        { id: 'sys-oauth-clients', group: 'System', title: 'OAuth Clients', desc: 'External connector access', icon: 'fingerprint', href: '/oauth-clients', keywords: 'oauth connector claude' },
+        { id: 'sys-access', group: 'System', title: 'Access', desc: 'API keys and OAuth clients', icon: 'shield-check', href: '/access', keywords: 'tokens authentication api keys oauth connector claude' },
         { id: 'sys-sync-logs', group: 'System', title: 'Sync Logs', desc: 'Sync history and status', icon: 'refresh-cw', href: '/sync-logs', keywords: 'history errors status' },
         { id: 'sys-webhooks', group: 'System', title: 'Webhooks', desc: 'Webhook event history', icon: 'webhook', href: '/webhook-events', keywords: 'events plaid teller notifications' },
         { id: 'sys-settings', group: 'System', title: 'Settings', desc: 'Sync schedule, security, system', icon: 'settings', href: '/settings', keywords: 'schedule password encryption' },
@@ -650,15 +667,24 @@
         query: '',
         activeIndex: 0,
         _allItems: allItems,
+        _txResults: [],
+        _txLoading: false,
+        _txTimer: null,
+        _txAbort: null,
 
         get filteredItems() {
-          if (!this.query.trim()) return this._allItems;
-          var q = this.query.toLowerCase().trim();
-          var terms = q.split(/\s+/);
-          return this._allItems.filter(function(item) {
-            var haystack = (item.title + ' ' + (item.desc || '') + ' ' + (item.keywords || '')).toLowerCase();
-            return terms.every(function(term) { return haystack.indexOf(term) !== -1; });
-          });
+          var commandItems;
+          if (!this.query.trim()) {
+            commandItems = this._allItems;
+          } else {
+            var q = this.query.toLowerCase().trim();
+            var terms = q.split(/\s+/);
+            commandItems = this._allItems.filter(function(item) {
+              var haystack = (item.title + ' ' + (item.desc || '') + ' ' + (item.keywords || '')).toLowerCase();
+              return terms.every(function(term) { return haystack.indexOf(term) !== -1; });
+            });
+          }
+          return commandItems.concat(this._txResults);
         },
 
         get filteredGroups() {
@@ -675,6 +701,10 @@
             seen[item.group].items.push(clone);
             flatIndex++;
           });
+          // Add skeleton group while loading
+          if (this._txLoading && !seen['Transactions']) {
+            groups.push({ label: 'Transactions', items: [], _loading: true });
+          }
           return groups;
         },
 
@@ -682,6 +712,8 @@
           this.open = true;
           this.query = '';
           this.activeIndex = 0;
+          this._txResults = [];
+          this._txLoading = false;
           var self = this;
           setTimeout(function() {
             if (self.$refs.cmdkInput) {
@@ -694,6 +726,10 @@
         closePalette() {
           this.open = false;
           this.query = '';
+          this._txResults = [];
+          this._txLoading = false;
+          if (this._txTimer) clearTimeout(this._txTimer);
+          if (this._txAbort) this._txAbort.abort();
         },
 
         handleGlobalKey(e) {
@@ -714,6 +750,59 @@
             var dialog = document.querySelector('.bb-cmdk-dialog');
             if (dialog) lucide.createIcons({ nodes: [dialog] });
           }, 10);
+
+          // Debounced transaction search
+          if (this._txTimer) clearTimeout(this._txTimer);
+          if (this._txAbort) this._txAbort.abort();
+
+          var q = this.query.trim();
+          if (q.length < 2) {
+            this._txResults = [];
+            this._txLoading = false;
+            return;
+          }
+
+          this._txLoading = true;
+          this._txTimer = setTimeout(function() {
+            self._fetchTransactions(q);
+          }, 300);
+        },
+
+        _fetchTransactions(q) {
+          var self = this;
+          var controller = new AbortController();
+          this._txAbort = controller;
+
+          fetch('/-/search/transactions?q=' + encodeURIComponent(q), { signal: controller.signal })
+            .then(function(res) { return res.json(); })
+            .then(function(items) {
+              self._txLoading = false;
+              self._txResults = items.map(function(tx) {
+                var sign = tx.amount >= 0 ? '-' : '+';
+                var abs = Math.abs(tx.amount).toFixed(2);
+                var desc = sign + '$' + abs + '  ·  ' + tx.date;
+                if (tx.account) desc += '  ·  ' + tx.account;
+                return {
+                  id: 'tx-' + tx.id,
+                  group: 'Transactions',
+                  title: tx.name,
+                  desc: desc,
+                  icon: tx.pending ? 'clock' : 'receipt',
+                  href: '/transactions/' + tx.id,
+                  keywords: ''
+                };
+              });
+              setTimeout(function() {
+                var dialog = document.querySelector('.bb-cmdk-dialog');
+                if (dialog) lucide.createIcons({ nodes: [dialog] });
+              }, 10);
+            })
+            .catch(function(err) {
+              if (err.name !== 'AbortError') {
+                self._txLoading = false;
+                self._txResults = [];
+              }
+            });
         },
 
         moveDown() {
@@ -913,7 +1002,7 @@
         s: '/settings',
         p: '/providers',
         m: '/mcp-settings',
-        k: '/api-keys',
+        k: '/access',
         f: '/users'
       };
 

@@ -59,7 +59,7 @@
       {{else}}
       <fieldset class="fieldset mb-5">
         <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="csv-user-id">Family Member</label>
-        <select id="csv-user-id" class="select w-full bg-base-200/50 border-base-300 focus:border-primary rounded-xl" required>
+        <select id="csv-user-id" class="select w-full bg-base-200 border-base-300 focus:border-primary rounded-xl" required>
           <option value="" disabled selected>Select a member...</option>
           {{range .Users}}
           <option value="{{formatUUID .ID}}">{{.Name}}</option>
@@ -101,31 +101,31 @@
           <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-date">
             Date Column <span class="text-xs text-base-content/30">(required)</span>
           </label>
-          <select id="map-date" class="select w-full bg-base-200/50 border-base-300 rounded-xl"></select>
+          <select id="map-date" class="select w-full bg-base-200 border-base-300 rounded-xl"></select>
         </fieldset>
         <fieldset class="fieldset">
           <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-amount">
             Amount Column <span class="text-xs text-base-content/30">(required)</span>
           </label>
-          <select id="map-amount" class="select w-full bg-base-200/50 border-base-300 rounded-xl"></select>
+          <select id="map-amount" class="select w-full bg-base-200 border-base-300 rounded-xl"></select>
         </fieldset>
         <fieldset class="fieldset">
           <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-description">
             Description Column <span class="text-xs text-base-content/30">(required)</span>
           </label>
-          <select id="map-description" class="select w-full bg-base-200/50 border-base-300 rounded-xl"></select>
+          <select id="map-description" class="select w-full bg-base-200 border-base-300 rounded-xl"></select>
         </fieldset>
         <fieldset class="fieldset">
           <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-category">
             Category Column <span class="text-xs text-base-content/30">(optional)</span>
           </label>
-          <select id="map-category" class="select w-full bg-base-200/50 border-base-300 rounded-xl"></select>
+          <select id="map-category" class="select w-full bg-base-200 border-base-300 rounded-xl"></select>
         </fieldset>
         <fieldset class="fieldset">
           <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-merchant">
             Merchant Column <span class="text-xs text-base-content/30">(optional)</span>
           </label>
-          <select id="map-merchant" class="select w-full bg-base-200/50 border-base-300 rounded-xl"></select>
+          <select id="map-merchant" class="select w-full bg-base-200 border-base-300 rounded-xl"></select>
         </fieldset>
       </div>
 

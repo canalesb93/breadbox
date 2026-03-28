@@ -69,22 +69,28 @@ func RevokeAPIKeyHandler(svc *service.Service) http.HandlerFunc {
 
 // --- HTML page handlers (admin dashboard) ---
 
-// APIKeysListPageHandler serves GET /admin/api-keys.
-func APIKeysListPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+// AccessPageHandler serves GET /admin/access — combined API Keys + OAuth Clients page.
+func AccessPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		keys, err := svc.ListAPIKeys(r.Context())
 		if err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
+		clients, err := svc.ListOAuthClients(r.Context())
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
 		data := map[string]any{
-			"PageTitle":   "API Keys",
-			"CurrentPage": "api-keys",
+			"PageTitle":   "Access",
+			"CurrentPage": "access",
 			"Keys":        keys,
+			"Clients":     clients,
 			"Flash":       GetFlash(r.Context(), sm),
 			"CSRFToken":   GetCSRFToken(r),
 		}
-		tr.Render(w, r, "api_keys.html", data)
+		tr.Render(w, r, "access.html", data)
 	}
 }
 
@@ -93,11 +99,11 @@ func APIKeyNewPageHandler(tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data := map[string]any{
 			"PageTitle":   "Create API Key",
-			"CurrentPage": "api-keys",
+			"CurrentPage": "access",
 			"CSRFToken":   GetCSRFToken(r),
 			"Breadcrumbs": []Breadcrumb{
-				{Label: "API Keys", Href: "/api-keys"},
-				{Label: "Create"},
+				{Label: "Access", Href: "/access"},
+				{Label: "Create API Key"},
 			},
 		}
 		tr.Render(w, r, "api_key_new.html", data)
@@ -139,17 +145,17 @@ func APIKeyCreatedPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http
 		name := sm.PopString(r.Context(), "created_api_key_name")
 		if key == "" {
 			// Key already shown or session expired — redirect to list.
-			http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
+			http.Redirect(w, r, "/access", http.StatusSeeOther)
 			return
 		}
 		data := map[string]any{
 			"PageTitle":    "API Key Created",
-			"CurrentPage":  "api-keys",
+			"CurrentPage":  "access",
 			"PlaintextKey": key,
 			"KeyName":      name,
 			"CSRFToken":    GetCSRFToken(r),
 			"Breadcrumbs": []Breadcrumb{
-				{Label: "API Keys", Href: "/api-keys"},
+				{Label: "Access", Href: "/access"},
 				{Label: "Key Created"},
 			},
 		}
@@ -166,6 +172,6 @@ func APIKeyRevokePageHandler(svc *service.Service, sm *scs.SessionManager) http.
 		} else {
 			SetFlash(r.Context(), sm, "success", "API key revoked successfully")
 		}
-		http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
+		http.Redirect(w, r, "/access", http.StatusSeeOther)
 	}
 }
