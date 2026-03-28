@@ -162,6 +162,46 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 
 Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Teller-specific details are in `docs/teller-integration.md`. CSV import details are in `docs/csv-import.md`. Design system (CSS framework, components, icons) is in `docs/design-system.md`. Implementation order is in `docs/ROADMAP.md`.
 
+## Local Dev & Git Worktrees
+
+### Database
+
+PostgreSQL runs locally (Homebrew `postgresql@15`), **not** in Docker. Credentials: `breadbox:breadbox`. All worktrees and dev server instances share the same database.
+
+- **Dev database**: `postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable`
+- **Test database**: `postgres://breadbox:breadbox@localhost:5432/breadbox_test?sslmode=disable`
+- **Shared state warning**: Multiple agents/worktrees may run simultaneously against the same `breadbox` database. Avoid destructive schema changes (DROP TABLE, DROP COLUMN, ALTER TYPE) without coordinating — another agent's running server will break. Additive migrations (ADD COLUMN, CREATE TABLE, CREATE INDEX) are safe.
+
+### Required Environment Variables
+
+The app requires these env vars when Plaid or Teller providers are configured in the DB:
+
+- `DATABASE_URL` — pgx falls back to Unix socket with current OS user if unset, which may not work in all contexts (e.g., worktrees spawned by agents). Always set it explicitly.
+- `ENCRYPTION_KEY` — 64-char hex (32-byte AES-256-GCM key). Required at startup if any provider is configured. To find the key from a running breadbox process: `ps eww -p $(pgrep -f "breadbox serve" | head -1) | tr ' ' '\n' | grep ENCRYPTION_KEY`
+
+### Setting Up a Git Worktree
+
+Worktrees get a clean checkout but **not** gitignored build artifacts. You must copy or regenerate them:
+
+1. **Create the worktree**: `git worktree add -b <branch-name> /tmp/breadbox-<name>`
+2. **Copy the Tailwind binary**: `cp /path/to/main/repo/tailwindcss-extra /tmp/breadbox-<name>/`
+3. **Build CSS**: `cd /tmp/breadbox-<name> && make css` (or copy `static/css/styles.css` from main repo)
+4. **Copy sqlc generated files**: `cp /path/to/main/repo/internal/db/*.go /tmp/breadbox-<name>/internal/db/` (or run `sqlc generate` if sqlc is installed)
+5. **Verify build**: `cd /tmp/breadbox-<name> && go build ./...`
+6. **Start dev server on a unique port**:
+   ```
+   DATABASE_URL="postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable" \
+   ENCRYPTION_KEY="$(ps eww -p $(pgrep -f 'breadbox serve' | head -1) 2>/dev/null | tr ' ' '\n' | grep ENCRYPTION_KEY | cut -d= -f2)" \
+   PORT=8082 make dev
+   ```
+7. **Port convention**: main repo uses 8080, first worktree 8081, second 8082, etc. Check `lsof -i :PORT` before starting.
+
+### Cleanup
+
+- Remove worktree: `git worktree remove /tmp/breadbox-<name>`
+- If changes were committed, push the branch first
+- Kill any running dev server: `kill $(lsof -ti:<PORT>)`
+
 ## Workflow Rules
 
 > If you are a subagent or teammate executing a specific task, ignore this section — just do your work. These rules are for the top-level orchestrating agent only.
