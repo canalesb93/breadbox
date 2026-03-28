@@ -19,7 +19,7 @@
 <div>
     {{if .Categories}}
     <div class="text-sm text-base-content/40 mb-4 px-1">{{len .Categories}} top-level categories</div>
-    <div class="space-y-3">
+    <div class="space-y-3 bb-stagger">
       {{range .Categories}}
       <div class="bb-card overflow-hidden group" x-data="{open: false}">
         <!-- Parent row -->
