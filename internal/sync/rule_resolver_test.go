@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -743,5 +744,91 @@ func TestStringInList(t *testing.T) {
 	// Single value (not a list)
 	if !stringInList("hello", "Hello") {
 		t.Error("expected single value match")
+	}
+}
+
+func TestHitCountsJSON_Empty(t *testing.T) {
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+	}
+
+	result := r.HitCountsJSON()
+	if result != nil {
+		t.Errorf("expected nil for empty hit counts, got %s", string(result))
+	}
+}
+
+func TestHitCountsJSON_WithHits(t *testing.T) {
+	ruleA := testUUID(10)
+	ruleB := testUUID(20)
+
+	r := &RuleResolver{
+		hitCounts: map[[16]byte]int{
+			ruleA.Bytes: 5,
+			ruleB.Bytes: 3,
+		},
+	}
+
+	result := r.HitCountsJSON()
+	if result == nil {
+		t.Fatal("expected non-nil JSON, got nil")
+	}
+
+	var parsed map[string]int
+	if err := json.Unmarshal(result, &parsed); err != nil {
+		t.Fatalf("failed to unmarshal hit counts JSON: %v", err)
+	}
+
+	if len(parsed) != 2 {
+		t.Errorf("expected 2 entries, got %d", len(parsed))
+	}
+
+	ruleAID := formatUUID(ruleA)
+	ruleBID := formatUUID(ruleB)
+
+	if parsed[ruleAID] != 5 {
+		t.Errorf("expected 5 hits for rule A, got %d", parsed[ruleAID])
+	}
+	if parsed[ruleBID] != 3 {
+		t.Errorf("expected 3 hits for rule B, got %d", parsed[ruleBID])
+	}
+}
+
+func TestHitCountsJSON_IntegrationWithResolveWithContext(t *testing.T) {
+	ruleID := testUUID(10)
+	catA := testUUID(1)
+
+	r := &RuleResolver{
+		mappings:  make(map[string]pgtype.UUID),
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:         ruleID,
+				categoryID: catA,
+				condition:  mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	// Trigger hits.
+	tctx := TransactionContext{Name: "Coffee Shop", Provider: "plaid"}
+	r.ResolveWithContext("plaid", tctx)
+	r.ResolveWithContext("plaid", tctx)
+	r.ResolveWithContext("plaid", tctx)
+
+	result := r.HitCountsJSON()
+	if result == nil {
+		t.Fatal("expected non-nil JSON after resolving")
+	}
+
+	var parsed map[string]int
+	if err := json.Unmarshal(result, &parsed); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	ruleIDStr := formatUUID(ruleID)
+	if parsed[ruleIDStr] != 3 {
+		t.Errorf("expected 3 hits, got %d", parsed[ruleIDStr])
 	}
 }
