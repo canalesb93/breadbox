@@ -11,35 +11,60 @@
   </button>
 </div>
 
-<!-- Filter bar -->
-<div class="bb-card px-4 sm:px-6 py-4 mb-6">
-  <form method="GET" class="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4 sm:flex-wrap">
-    <div class="form-control">
-      <label class="label label-text text-xs text-base-content/50 pb-1">Search</label>
-      <input type="text" name="search" placeholder="Search by name..." value="{{.SearchFilter}}" class="input input-bordered input-sm w-full sm:w-48 rounded-xl" />
-    </div>
-    <div class="form-control">
-      <label class="label label-text text-xs text-base-content/50 pb-1">Category</label>
-      <select name="category_slug" class="select select-bordered select-sm rounded-xl" onchange="this.form.submit()">
-        <option value="">All Categories</option>
-        {{range .FlatCategories}}
-        <option value="{{.Slug}}"{{if eq $.CategoryFilter .Slug}} selected{{end}}>{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
+<!-- Filters Card -->
+<div class="bb-card mb-6" x-data="{ filtersOpen: {{if or .SearchFilter .CategoryFilter .EnabledFilter}}true{{else}}false{{end}} }">
+  <div class="p-0">
+    <button type="button" class="bb-filter-toggle" @click="filtersOpen = !filtersOpen">
+      <div class="flex items-center gap-2">
+        <i data-lucide="sliders-horizontal" class="w-4 h-4 text-base-content/60"></i>
+        <span>Filters</span>
+        {{if or .SearchFilter .CategoryFilter .EnabledFilter}}
+        <span class="badge badge-primary badge-xs">Active</span>
         {{end}}
-      </select>
-    </div>
-    <div class="form-control">
-      <label class="label label-text text-xs text-base-content/50 pb-1">Status</label>
-      <select name="enabled" class="select select-bordered select-sm rounded-xl" onchange="this.form.submit()">
-        <option value="">All</option>
-        <option value="true"{{if eq .EnabledFilter "true"}} selected{{end}}>Enabled</option>
-        <option value="false"{{if eq .EnabledFilter "false"}} selected{{end}}>Disabled</option>
-      </select>
-    </div>
-    <div class="flex gap-2">
-      <button type="submit" class="btn btn-sm btn-ghost rounded-xl">Filter</button>
-      {{if or .SearchFilter .CategoryFilter .EnabledFilter}}<a href="/rules" class="btn btn-sm btn-ghost rounded-xl">Clear</a>{{end}}
-    </div>
-  </form>
+      </div>
+      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/40 transition-transform duration-200" :class="filtersOpen ? 'rotate-180' : ''"></i>
+    </button>
+
+    <form method="GET" action="/rules" x-show="filtersOpen" x-cloak
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0 -translate-y-2"
+      x-transition:enter-end="opacity-100 translate-y-0"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-start="opacity-100 translate-y-0"
+      x-transition:leave-end="opacity-0 -translate-y-2"
+      class="bb-filter-form px-4 pb-4 pt-2">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+        <label class="bb-filter-label">
+          Search
+          <input type="text" name="search" placeholder="Search by name..." value="{{.SearchFilter}}" class="input input-sm input-bordered w-full">
+        </label>
+        <label class="bb-filter-label">
+          Category
+          <select name="category_slug" class="select select-sm select-bordered w-full">
+            <option value="">All Categories</option>
+            {{range .FlatCategories}}
+            <option value="{{.Slug}}"{{if eq $.CategoryFilter .Slug}} selected{{end}}>{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label class="bb-filter-label">
+          Status
+          <select name="enabled" class="select select-sm select-bordered w-full">
+            <option value="">All</option>
+            <option value="true"{{if eq .EnabledFilter "true"}} selected{{end}}>Enabled</option>
+            <option value="false"{{if eq .EnabledFilter "false"}} selected{{end}}>Disabled</option>
+          </select>
+        </label>
+      </div>
+      <div class="bb-filter-actions">
+        {{if or .SearchFilter .CategoryFilter .EnabledFilter}}<a href="/rules" class="btn btn-sm btn-ghost rounded-xl">Reset</a>{{end}}
+        <button type="submit" class="btn btn-sm btn-primary rounded-xl">
+          <i data-lucide="search" class="w-3.5 h-3.5"></i>
+          Apply Filters
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- Rules count -->
