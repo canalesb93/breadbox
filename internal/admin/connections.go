@@ -25,12 +25,29 @@ type ConnectionAccount struct {
 	HasBalance   bool
 }
 
+// NextSyncInfo holds computed next-sync schedule information for a connection.
+type NextSyncInfo struct {
+	// NextSyncAt is when the connection will next be eligible for cron sync.
+	NextSyncAt time.Time
+	// Label is a human-readable string like "in 2h 15m" or "overdue".
+	Label string
+	// IsOverdue is true when the connection is past its scheduled sync time.
+	IsOverdue bool
+	// IsPaused is true when the connection is paused (no scheduled sync).
+	IsPaused bool
+	// IsDisconnected is true when the connection is disconnected or CSV.
+	IsDisconnected bool
+	// EffectiveIntervalMinutes is the sync interval including backoff.
+	EffectiveIntervalMinutes int
+}
+
 // ConnectionWithAccounts pairs a connection row with its accounts and computed totals.
 type ConnectionWithAccounts struct {
 	db.ListBankConnectionsRow
 	Accounts     []ConnectionAccount
 	TotalBalance float64
 	HasBalance   bool
+	NextSync     NextSyncInfo
 }
 
 // ConnectionsListHandler serves GET /admin/connections.
@@ -85,7 +102,10 @@ func ConnectionsListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 
 		netWorth := totalAssets - totalLiabilities
 
-		// Compute per-connection display total from display-ready balances.
+		// Compute per-connection display total from display-ready balances
+		// and next-sync schedule.
+		now := time.Now()
+		globalInterval := a.Config.SyncIntervalMinutes
 		for i := range enriched {
 			if enriched[i].HasBalance {
 				total := 0.0
@@ -96,6 +116,14 @@ func ConnectionsListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 				}
 				enriched[i].TotalBalance = total
 			}
+			enriched[i].NextSync = computeNextSync(syncScheduleParams{
+				Status:                      enriched[i].Status,
+				Provider:                    enriched[i].Provider,
+				Paused:                      enriched[i].Paused,
+				SyncIntervalOverrideMinutes: enriched[i].SyncIntervalOverrideMinutes,
+				ConsecutiveFailures:         enriched[i].ConsecutiveFailures,
+				LastSyncedAt:                enriched[i].LastSyncedAt,
+			}, globalInterval, now)
 		}
 
 		data := map[string]any{
@@ -444,6 +472,16 @@ func ConnectionDetailHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 			}
 		}
 
+		// Compute next sync schedule.
+		nextSync := computeNextSync(syncScheduleParams{
+			Status:                      conn.Status,
+			Provider:                    conn.Provider,
+			Paused:                      conn.Paused,
+			SyncIntervalOverrideMinutes: conn.SyncIntervalOverrideMinutes,
+			ConsecutiveFailures:         conn.ConsecutiveFailures,
+			LastSyncedAt:                conn.LastSyncedAt,
+		}, a.Config.SyncIntervalMinutes, now)
+
 		data := map[string]any{
 			"PageTitle":            conn.InstitutionName.String,
 			"CurrentPage":         "connections",
@@ -471,6 +509,8 @@ func ConnectionDetailHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 			// Account totals
 			"TotalBalance":        totalBalance,
 			"HasBalance":          hasBalance,
+			// Next sync schedule
+			"NextSync":            nextSync,
 		}
 		tr.Render(w, r, "connection_detail.html", data)
 	}
@@ -831,6 +871,103 @@ func UpdateConnectionSyncIntervalHandler(a *app.App, sm *scs.SessionManager) htt
 		}
 
 		writeJSON(w, http.StatusOK, conn)
+	}
+}
+
+// syncScheduleParams holds the fields needed to compute next-sync info.
+// Works with both ListBankConnectionsRow and GetBankConnectionRow.
+type syncScheduleParams struct {
+	Status                      db.ConnectionStatus
+	Provider                    db.ProviderType
+	Paused                      bool
+	SyncIntervalOverrideMinutes pgtype.Int4
+	ConsecutiveFailures         int32
+	LastSyncedAt                pgtype.Timestamptz
+}
+
+// computeNextSync calculates when a connection will next be eligible for cron
+// sync, using the same staleness logic as the scheduler. This mirrors the logic
+// in internal/sync/scheduler.go syncAllScheduled.
+func computeNextSync(p syncScheduleParams, globalIntervalMinutes int, now time.Time) NextSyncInfo {
+	// Disconnected or CSV connections don't sync on a schedule.
+	if string(p.Status) == "disconnected" || string(p.Provider) == "csv" {
+		return NextSyncInfo{IsDisconnected: true, Label: "No schedule"}
+	}
+
+	// Paused connections don't sync on a schedule.
+	if p.Paused {
+		return NextSyncInfo{IsPaused: true, Label: "Paused"}
+	}
+
+	// Compute effective interval with backoff (mirrors scheduler.go backoffInterval).
+	baseMinutes := globalIntervalMinutes
+	if p.SyncIntervalOverrideMinutes.Valid {
+		baseMinutes = int(p.SyncIntervalOverrideMinutes.Int32)
+	}
+	effectiveMinutes := syncBackoffInterval(baseMinutes, p.ConsecutiveFailures)
+
+	info := NextSyncInfo{
+		EffectiveIntervalMinutes: effectiveMinutes,
+	}
+
+	// Never synced — eligible immediately on next cron tick.
+	if !p.LastSyncedAt.Valid {
+		info.IsOverdue = true
+		info.Label = "Pending first sync"
+		return info
+	}
+
+	nextSyncAt := p.LastSyncedAt.Time.Add(time.Duration(effectiveMinutes) * time.Minute)
+	info.NextSyncAt = nextSyncAt
+
+	if nextSyncAt.Before(now) || nextSyncAt.Equal(now) {
+		info.IsOverdue = true
+		info.Label = "Due now"
+		return info
+	}
+
+	info.Label = relativeTimeUntil(nextSyncAt, now)
+	return info
+}
+
+// syncBackoffInterval returns an adjusted sync interval in minutes based on
+// consecutive failures. Mirrors internal/sync/scheduler.go backoffInterval.
+func syncBackoffInterval(baseMinutes int, consecutiveFailures int32) int {
+	if consecutiveFailures <= 0 {
+		return baseMinutes
+	}
+	exp := int(consecutiveFailures)
+	if exp > 4 {
+		exp = 4
+	}
+	return baseMinutes * (1 << exp)
+}
+
+// relativeTimeUntil formats a future time as a human-readable duration string
+// like "in 2h 15m", "in 45m", "in 3d".
+func relativeTimeUntil(target, now time.Time) string {
+	d := target.Sub(now)
+	if d <= 0 {
+		return "now"
+	}
+
+	days := int(d.Hours() / 24)
+	hours := int(d.Hours()) % 24
+	mins := int(d.Minutes()) % 60
+
+	switch {
+	case days > 0 && hours > 0:
+		return fmt.Sprintf("in %dd %dh", days, hours)
+	case days > 0:
+		return fmt.Sprintf("in %dd", days)
+	case hours > 0 && mins > 0:
+		return fmt.Sprintf("in %dh %dm", hours, mins)
+	case hours > 0:
+		return fmt.Sprintf("in %dh", hours)
+	case mins > 1:
+		return fmt.Sprintf("in %dm", mins)
+	default:
+		return "in <1m"
 	}
 }
 
