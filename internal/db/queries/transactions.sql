@@ -29,7 +29,17 @@ ON CONFLICT (external_transaction_id) DO UPDATE SET
   pending = EXCLUDED.pending,
   category_id = CASE WHEN transactions.category_override THEN transactions.category_id ELSE EXCLUDED.category_id END,
   deleted_at = NULL,
-  updated_at = NOW()
+  updated_at = CASE
+    WHEN transactions.amount IS DISTINCT FROM EXCLUDED.amount
+      OR transactions.name IS DISTINCT FROM EXCLUDED.name
+      OR transactions.pending IS DISTINCT FROM EXCLUDED.pending
+      OR transactions.merchant_name IS DISTINCT FROM EXCLUDED.merchant_name
+      OR transactions.category_primary IS DISTINCT FROM EXCLUDED.category_primary
+      OR transactions.category_detailed IS DISTINCT FROM EXCLUDED.category_detailed
+      OR transactions.deleted_at IS NOT NULL
+    THEN NOW()
+    ELSE transactions.updated_at
+  END
 RETURNING *;
 
 -- name: SoftDeleteTransactionByExternalID :exec

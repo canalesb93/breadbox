@@ -348,6 +348,7 @@
         {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
         {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
         {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
+        {{if .UnchangedCount}}<span class="text-base-content/30 font-medium" title="{{.UnchangedCount}} unchanged">={{.UnchangedCount}}</span>{{end}}
         {{syncBadge (printf "%s" .Status)}}
       </div>
     </div>
