@@ -194,8 +194,8 @@
           <div class="w-9"></div>
           <div class="flex-1 min-w-0">Name</div>
           <div class="hidden sm:block shrink-0">Category</div>
-          <div class="w-24 text-right hidden sm:block">Date</div>
-          <div class="text-right shrink-0 pl-3">Amount</div>
+          <div class="w-20 text-right hidden sm:block">Date</div>
+          <div class="w-24 text-right pl-3">Amount</div>
           <div class="w-4 hidden sm:block"></div>
         </div>
         <!-- Table Body -->
@@ -216,7 +216,7 @@
         Showing {{.ShowingStart}}&ndash;{{.ShowingEnd}} of {{.Total}}
       </span>
       <div class="bb-paginator__per-page">
-        <label class="text-xs text-base-content/40">Per page</label>
+        <label class="text-xs text-base-content/40 whitespace-nowrap">Per page</label>
         <select class="select select-xs select-bordered rounded-lg tabular-nums" onchange="bbSetPerPage(this.value)">
           <option value="25"{{if eq .PageSize 25}} selected{{end}}>25</option>
           <option value="50"{{if eq .PageSize 50}} selected{{end}}>50</option>
@@ -522,9 +522,14 @@ function quickSetCategory(txId, categoryId) {
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
         <a href="/transactions/{{.ID}}" @click.stop class="font-medium text-sm hover:text-primary transition-colors truncate">{{.Name}}</a>
-        {{if .Pending}}<span class="badge badge-warning badge-xs">Pending</span>{{end}}
+        {{if .Pending}}<span class="text-[0.6rem] font-medium text-warning/80 bg-warning/10 px-1.5 py-0.5 rounded-full leading-none">Pending</span>{{end}}
       </div>
       <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40">
+        {{if .UserName}}
+        <span class="w-4 h-4 rounded-full bg-primary/10 inline-flex items-center justify-center shrink-0" title="{{.UserName}}">
+          <span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{{firstChar .UserName}}</span>
+        </span>
+        {{end}}
         <span class="truncate">{{.AccountName}}</span>
         {{if .MerchantName}}
         <span class="text-base-content/20 hidden sm:inline">&middot;</span>
@@ -551,19 +556,19 @@ function quickSetCategory(txId, categoryId) {
       <div class="bb-cat-picker" data-picker-source="tx-cat-{{.ID}}" x-data="categoryPicker({categories: window.__bbCategories, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: '\u2014', allowEmpty: true, emptyLabel: 'Uncategorized'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
         <button type="button" class="btn btn-ghost btn-xs gap-1.5 rounded-lg" @click="openPicker()">
           <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-          <span x-text="displayLabel" class="text-xs truncate max-w-48">{{if .CategoryDisplayName}}{{deref .CategoryDisplayName}}{{else}}&mdash;{{end}}</span>
+          <span x-text="displayLabel" class="text-xs">{{if .CategoryDisplayName}}{{deref .CategoryDisplayName}}{{else}}&mdash;{{end}}</span>
         </button>
       </div>
     </div>
 
     <!-- Date (visible in list mode, hidden in grouped since it's in header) -->
-    <div class="text-xs text-base-content/40 tabular-nums shrink-0 hidden sm:block w-24 text-right bb-tx-date">
+    <div class="text-xs text-base-content/40 tabular-nums shrink-0 hidden sm:block w-20 text-right bb-tx-date">
       {{.Date}}
     </div>
 
     <!-- Amount -->
-    <div class="text-right shrink-0 pl-3">
-      <span class="bb-tx-amount{{if lt .Amount 0.0}} bb-tx-amount--income{{end}}">
+    <div class="w-24 text-right shrink-0 pl-3">
+      <span class="bb-tx-amount tabular-nums{{if lt .Amount 0.0}} bb-tx-amount--income{{end}}">
         {{formatAmount .Amount}}
       </span>
     </div>
@@ -582,20 +587,6 @@ function quickSetCategory(txId, categoryId) {
     x-transition:leave-end="opacity-0"
     class="border-t border-base-300/50 bg-base-200/20 px-4 py-3">
     <div class="flex flex-col sm:flex-row sm:items-start gap-4">
-      <!-- Category Picker -->
-      <div class="flex items-center gap-2" @click.stop>
-        <span class="text-xs text-base-content/40 font-medium shrink-0">Category</span>
-        <div class="bb-cat-picker" data-picker-source="tx-cat-{{.ID}}" x-data="categoryPicker({categories: window.__bbCategories, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: '\u2014', allowEmpty: true, emptyLabel: 'Uncategorized'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
-          <button type="button" class="btn btn-ghost btn-xs gap-1.5 -ml-1" @click="openPicker()">
-            {{if .CategoryColor}}
-            <span class="bb-cat-dot" x-show="!displayColor" style="background-color: {{safeCSS (deref .CategoryColor)}}"></span>
-            {{end}}
-            <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-            <span x-text="displayLabel" class="text-sm">{{if .CategoryDisplayName}}{{deref .CategoryDisplayName}}{{else}}&mdash;{{end}}</span>
-            {{if .CategoryOverride}}<span class="badge badge-outline badge-xs">override</span>{{end}}
-          </button>
-        </div>
-      </div>
       <!-- Detail Fields -->
       <div class="flex flex-wrap gap-x-6 gap-y-2 text-xs">
         {{if .MerchantName}}

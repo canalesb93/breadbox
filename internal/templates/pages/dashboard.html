@@ -251,8 +251,16 @@
             {{if .HasPendingReview}}<span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-info ring-2 ring-base-100 group-hover:ring-base-200/40" title="Pending review"></span>{{end}}
           </div>
           <div class="min-w-0">
-            <div class="text-sm font-medium truncate max-w-64">{{.Name}}</div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-sm font-medium truncate max-w-64">{{.Name}}</span>
+              {{if .Pending}}<span class="text-[0.6rem] font-medium text-warning/80 bg-warning/10 px-1.5 py-0.5 rounded-full leading-none">Pending</span>{{end}}
+            </div>
             <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40">
+              {{if .UserName}}
+              <span class="w-4 h-4 rounded-full bg-primary/10 inline-flex items-center justify-center shrink-0" title="{{.UserName}}">
+                <span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{{firstChar .UserName}}</span>
+              </span>
+              {{end}}
               <span>{{.AccountName}} · {{formatDate .Date}}</span>
               {{if .CategoryDisplayName}}
               <span class="text-base-content/20">&middot;</span>
