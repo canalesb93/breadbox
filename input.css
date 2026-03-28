@@ -1764,7 +1764,7 @@
 
   .bb-triage-row__amount {
     @apply shrink-0 text-right;
-    width: 80px;
+    width: 68px;
   }
 
   @media (min-width: 640px) {
@@ -1774,14 +1774,19 @@
   }
 
   .bb-triage-row__actions {
-    @apply hidden sm:flex items-center gap-1 shrink-0 ml-2;
-    opacity: 0;
+    @apply flex items-center gap-1 shrink-0 ml-1 sm:ml-2;
+    opacity: 1;
     transition: opacity 0.15s ease;
   }
 
-  .bb-triage-row:hover .bb-triage-row__actions,
-  .bb-triage-row--focused .bb-triage-row__actions {
-    opacity: 1;
+  @media (min-width: 640px) {
+    .bb-triage-row__actions {
+      opacity: 0;
+    }
+    .bb-triage-row:hover .bb-triage-row__actions,
+    .bb-triage-row--focused .bb-triage-row__actions {
+      opacity: 1;
+    }
   }
 
   .bb-triage-row__resolved {
@@ -1789,11 +1794,30 @@
   }
 
   .bb-triage-action {
-    @apply inline-flex items-center justify-center w-7 h-7 rounded-lg
+    @apply inline-flex items-center justify-center w-8 h-8 sm:w-7 sm:h-7 rounded-lg
            border border-transparent cursor-pointer;
     transition: all 0.1s ease;
     background: transparent;
     color: oklch(0.5 0 0);
+  }
+
+  /* On mobile, show colored backgrounds so actions are tappable without hover */
+  @media (max-width: 639px) {
+    .bb-triage-action--accept {
+      color: oklch(0.55 0.14 155);
+      background: oklch(0.62 0.14 155 / 0.08);
+      border-color: oklch(0.62 0.14 155 / 0.2);
+    }
+    .bb-triage-action--skip {
+      color: oklch(0.45 0 0);
+      background: oklch(0.5 0 0 / 0.05);
+      border-color: oklch(0.5 0 0 / 0.12);
+    }
+    .bb-triage-action--dismiss {
+      color: oklch(0.55 0.2 27);
+      background: oklch(0.577 0.245 27.325 / 0.06);
+      border-color: oklch(0.577 0.245 27.325 / 0.15);
+    }
   }
 
   .bb-triage-action:hover {
@@ -1841,6 +1865,25 @@
       color: oklch(0.75 0.17 22);
       border-color: oklch(0.704 0.191 22.216 / 0.3);
       background: oklch(0.704 0.191 22.216 / 0.1);
+    }
+  }
+
+  /* Dark mode mobile action buttons */
+  @media (prefers-color-scheme: dark) and (max-width: 639px) {
+    .bb-triage-action--accept {
+      color: oklch(0.75 0.14 155);
+      background: oklch(0.70 0.14 155 / 0.1);
+      border-color: oklch(0.70 0.14 155 / 0.2);
+    }
+    .bb-triage-action--skip {
+      color: oklch(0.7 0 0);
+      background: oklch(0.5 0 0 / 0.08);
+      border-color: oklch(0.5 0 0 / 0.15);
+    }
+    .bb-triage-action--dismiss {
+      color: oklch(0.75 0.17 22);
+      background: oklch(0.704 0.191 22.216 / 0.08);
+      border-color: oklch(0.704 0.191 22.216 / 0.15);
     }
   }
 
