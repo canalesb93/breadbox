@@ -95,7 +95,7 @@
           </select>
         </label>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <label class="bb-filter-label">
           Category
           <div class="bb-cat-picker" data-picker-source="tx-filter-cat" x-data="categoryPicker({categories: window.__bbCategories, mode: 'filter', initial: '{{.FilterCategory}}', allowEmpty: true, emptyLabel: 'All categories'})" @category-change="$refs.catInput.value = selectedSlug">
@@ -122,11 +122,41 @@
             <option value="false"{{if eq .FilterPending "false"}} selected{{end}}>No</option>
           </select>
         </label>
-        <label class="bb-filter-label">
-          Search
-          <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Name or merchant" class="input input-sm input-bordered w-full">
-        </label>
       </div>
+
+      <!-- Advanced Search -->
+      <div class="border-t border-base-200 pt-4 mb-4" x-data="{ mode: '{{if .FilterSearchMode}}{{.FilterSearchMode}}{{else}}contains{{end}}' }">
+        <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1">
+          <!-- Labels row -->
+          <div class="text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2 hidden sm:flex">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-base-content/40"></i>
+            Advanced Search
+          </div>
+          <div class="text-[0.65rem] text-base-content/40 hidden sm:block">Search in</div>
+          <div class="text-[0.65rem] text-base-content/40 hidden sm:block">Match type</div>
+          <!-- Mobile label -->
+          <div class="text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2 sm:hidden mb-1">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-base-content/40"></i>
+            Advanced Search
+          </div>
+          <!-- Inputs row -->
+          <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Search transactions..." class="input input-sm input-bordered w-full">
+          <select name="search_field" class="select select-sm select-bordered">
+            <option value="all"{{if or (eq .FilterSearchField "all") (not .FilterSearchField)}} selected{{end}}>Name &amp; Merchant</option>
+            <option value="name"{{if eq .FilterSearchField "name"}} selected{{end}}>Name only</option>
+            <option value="merchant"{{if eq .FilterSearchField "merchant"}} selected{{end}}>Merchant only</option>
+          </select>
+          <select name="search_mode" class="select select-sm select-bordered" x-model="mode">
+            <option value="contains">Contains</option>
+            <option value="words">All words</option>
+            <option value="fuzzy">Fuzzy match</option>
+          </select>
+        </div>
+        <p class="text-[0.65rem] text-base-content/30 mt-2" x-show="mode === 'contains'" x-cloak>Substring match — finds transactions containing the exact text</p>
+        <p class="text-[0.65rem] text-base-content/30 mt-2" x-show="mode === 'words'" x-cloak>Matches each word independently — "Century Link" finds "CenturyLink"</p>
+        <p class="text-[0.65rem] text-base-content/30 mt-2" x-show="mode === 'fuzzy'" x-cloak>Typo-tolerant similarity — finds close matches even with misspellings</p>
+      </div>
+
       <div class="bb-filter-actions">
         <a href="/transactions" class="btn btn-sm btn-ghost rounded-xl">Reset</a>
         <button type="submit" class="btn btn-sm btn-primary rounded-xl">

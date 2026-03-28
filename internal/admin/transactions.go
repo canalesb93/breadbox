@@ -158,6 +158,12 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 		if v := r.URL.Query().Get("search"); v != "" {
 			params.Search = &v
 		}
+		if v := r.URL.Query().Get("search_mode"); v != "" && service.ValidateSearchMode(v) {
+			params.SearchMode = &v
+		}
+		if v := r.URL.Query().Get("search_field"); v != "" && service.ValidateSearchField(v) {
+			params.SearchField = &v
+		}
 		if v := r.URL.Query().Get("sort"); v == "asc" {
 			params.SortOrder = "asc"
 		}
@@ -249,8 +255,10 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			"FilterMinAmount":  stringOrEmpty(floatParamPtr(r, "min_amount")),
 			"FilterMaxAmount":  stringOrEmpty(floatParamPtr(r, "max_amount")),
 			"FilterPending":    r.URL.Query().Get("pending"),
-			"FilterSearch":     r.URL.Query().Get("search"),
-			"FilterSort":       r.URL.Query().Get("sort"),
+			"FilterSearch":      r.URL.Query().Get("search"),
+			"FilterSearchMode":  r.URL.Query().Get("search_mode"),
+			"FilterSearchField": r.URL.Query().Get("search_field"),
+			"FilterSort":        r.URL.Query().Get("sort"),
 		}
 		tr.Render(w, r, "transactions.html", data)
 	}
@@ -742,7 +750,7 @@ func buildPaginationBase(r *http.Request) string {
 	paginationParams := []string{
 		"start_date", "end_date", "account_id", "user_id",
 		"connection_id", "category", "min_amount", "max_amount",
-		"pending", "search", "sort", "per_page",
+		"pending", "search", "search_mode", "search_field", "sort", "per_page",
 	}
 	q := r.URL.Query()
 	qs := make([]string, 0, len(paginationParams))
@@ -763,7 +771,7 @@ func buildExportURL(r *http.Request) string {
 	exportParams := []string{
 		"start_date", "end_date", "account_id", "user_id",
 		"connection_id", "category", "min_amount", "max_amount",
-		"pending", "search", "sort",
+		"pending", "search", "search_mode", "search_field", "sort",
 	}
 	q := r.URL.Query()
 	qs := make([]string, 0, len(exportParams))
