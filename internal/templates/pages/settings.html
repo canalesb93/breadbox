@@ -165,25 +165,25 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-      <div class="p-3.5 rounded-xl bg-base-200/40">
-        <div class="text-xs font-medium text-base-content/40 mb-1">Version</div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div class="flex items-center justify-between gap-3 sm:block p-3.5 rounded-xl bg-base-200/40">
+        <div class="text-xs font-medium text-base-content/40 shrink-0 sm:mb-1">Version</div>
         <div class="text-sm font-semibold tabular-nums">{{.Version}}</div>
       </div>
-      <div class="p-3.5 rounded-xl bg-base-200/40">
-        <div class="text-xs font-medium text-base-content/40 mb-1">Go Runtime</div>
+      <div class="flex items-center justify-between gap-3 sm:block p-3.5 rounded-xl bg-base-200/40">
+        <div class="text-xs font-medium text-base-content/40 shrink-0 sm:mb-1">Go Runtime</div>
         <div class="text-sm font-semibold">{{.GoVersion}}</div>
       </div>
-      <div class="p-3.5 rounded-xl bg-base-200/40">
-        <div class="text-xs font-medium text-base-content/40 mb-1">PostgreSQL</div>
-        <div class="text-sm font-semibold truncate" title="{{.PostgresVersion}}">{{.PostgresVersion}}</div>
+      <div class="flex items-center justify-between gap-3 sm:block p-3.5 rounded-xl bg-base-200/40 min-w-0">
+        <div class="text-xs font-medium text-base-content/40 shrink-0 sm:mb-1">PostgreSQL</div>
+        <div class="text-sm font-semibold truncate min-w-0" title="{{.PostgresVersion}}">{{.PostgresVersion}}</div>
       </div>
-      <div class="p-3.5 rounded-xl bg-base-200/40">
-        <div class="text-xs font-medium text-base-content/40 mb-1">Uptime</div>
+      <div class="flex items-center justify-between gap-3 sm:block p-3.5 rounded-xl bg-base-200/40">
+        <div class="text-xs font-medium text-base-content/40 shrink-0 sm:mb-1">Uptime</div>
         <div class="text-sm font-semibold">{{.Uptime}}</div>
       </div>
-      <div class="p-3.5 rounded-xl bg-base-200/40">
-        <div class="text-xs font-medium text-base-content/40 mb-1">Providers</div>
+      <div class="flex items-center justify-between gap-3 sm:block p-3.5 rounded-xl bg-base-200/40">
+        <div class="text-xs font-medium text-base-content/40 shrink-0 sm:mb-1">Providers</div>
         <div class="text-sm font-semibold">{{.ProviderCount}} configured</div>
       </div>
     </div>

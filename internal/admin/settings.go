@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"breadbox/internal/app"
@@ -35,6 +36,7 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		// System info.
 		var pgVersion string
 		_ = a.DB.QueryRow(ctx, "SELECT version()").Scan(&pgVersion)
+		pgVersion = strings.TrimPrefix(pgVersion, "PostgreSQL ")
 
 		// Sync log retention.
 		retentionDays, _ := a.Service.GetSyncLogRetentionDays(ctx)
