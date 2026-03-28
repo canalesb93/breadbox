@@ -504,19 +504,19 @@ function quickSetCategory(txId, categoryId) {
         @change="$store.bulk.toggle('{{.ID}}')">
     </label>
 
-    <!-- Pending Review Indicator -->
-    {{if .HasPendingReview}}<span class="inline-block w-2 h-2 rounded-full bg-info shrink-0" title="Pending review"></span>{{end}}
-
     <!-- Category Icon / Merchant Avatar -->
-    {{if .CategoryIcon}}
-    <div class="bb-tx-avatar" style="--avatar-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}oklch(0.65 0 0){{end}}">
-      <i data-lucide="{{deref .CategoryIcon}}" class="w-4 h-4"></i>
+    <div class="relative shrink-0">
+      {{if .CategoryIcon}}
+      <div class="bb-tx-avatar" style="--avatar-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}oklch(0.65 0 0){{end}}">
+        <i data-lucide="{{deref .CategoryIcon}}" class="w-4 h-4"></i>
+      </div>
+      {{else}}
+      <div class="bb-tx-avatar bb-tx-avatar--letter">
+        <span>{{firstChar .Name}}</span>
+      </div>
+      {{end}}
+      {{if .HasPendingReview}}<span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-info ring-2 ring-base-100" title="Pending review"></span>{{end}}
     </div>
-    {{else}}
-    <div class="bb-tx-avatar bb-tx-avatar--letter">
-      <span>{{firstChar .Name}}</span>
-    </div>
-    {{end}}
 
     <!-- Description + Details -->
     <div class="flex-1 min-w-0">

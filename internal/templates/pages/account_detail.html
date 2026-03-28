@@ -277,8 +277,8 @@
           <td class="text-sm text-base-content/60 whitespace-nowrap">{{formatDate .Date}}</td>
           <td>
             <div class="flex items-center gap-2">
-              {{if .HasPendingReview}}<span class="inline-block w-2 h-2 rounded-full bg-info shrink-0" title="Pending review"></span>{{end}}
-              <span>
+              <span class="relative">
+                {{if .HasPendingReview}}<span class="absolute -left-2.5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-info" title="Pending review"></span>{{end}}
                 <a href="/transactions/{{.ID}}" @click.stop class="font-medium text-sm hover:text-primary transition-colors no-underline">{{.Name}}</a>
                 {{if .MerchantName}}<span class="text-xs text-base-content/40 ml-1">{{.MerchantName}}</span>{{end}}
               </span>

@@ -238,16 +238,18 @@
       {{range .RecentTransactions}}
       <a href="/transactions/{{.ID}}" class="flex items-center justify-between py-2.5 px-1 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline">
         <div class="flex items-center gap-3 min-w-0">
-          {{if .HasPendingReview}}<span class="inline-block w-2 h-2 rounded-full bg-info shrink-0" title="Pending review"></span>{{end}}
-          {{if .CategoryIcon}}
-          <div class="bb-tx-avatar bb-tx-avatar--sm" style="--avatar-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}oklch(0.65 0 0){{end}}">
-            <i data-lucide="{{deref .CategoryIcon}}" class="w-3.5 h-3.5"></i>
+          <div class="relative shrink-0">
+            {{if .CategoryIcon}}
+            <div class="bb-tx-avatar bb-tx-avatar--sm" style="--avatar-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}oklch(0.65 0 0){{end}}">
+              <i data-lucide="{{deref .CategoryIcon}}" class="w-3.5 h-3.5"></i>
+            </div>
+            {{else}}
+            <div class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--letter">
+              <span>{{firstChar .Name}}</span>
+            </div>
+            {{end}}
+            {{if .HasPendingReview}}<span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-info ring-2 ring-base-100 group-hover:ring-base-200/40" title="Pending review"></span>{{end}}
           </div>
-          {{else}}
-          <div class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--letter">
-            <span>{{firstChar .Name}}</span>
-          </div>
-          {{end}}
           <div class="min-w-0">
             <div class="text-sm font-medium truncate max-w-64">{{.Name}}</div>
             <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40">
