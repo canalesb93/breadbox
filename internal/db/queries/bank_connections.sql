@@ -18,12 +18,13 @@ SELECT bc.*, u.name as user_name,
   ls.started_at as last_sync_started_at,
   COALESCE(ls.added_count, 0) as last_sync_added,
   COALESCE(ls.modified_count, 0) as last_sync_modified,
-  COALESCE(ls.removed_count, 0) as last_sync_removed
+  COALESCE(ls.removed_count, 0) as last_sync_removed,
+  ls.error_message as last_sync_error_message
 FROM bank_connections bc
 LEFT JOIN users u ON bc.user_id = u.id
 LEFT JOIN LATERAL (
   SELECT sl.status, sl.trigger, sl.duration_ms, sl.started_at,
-         sl.added_count, sl.modified_count, sl.removed_count
+         sl.added_count, sl.modified_count, sl.removed_count, sl.error_message
   FROM sync_logs sl
   WHERE sl.connection_id = bc.id
   ORDER BY sl.started_at DESC

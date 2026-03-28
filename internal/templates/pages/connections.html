@@ -160,11 +160,19 @@
       </div>
     </a>
 
-    <!-- Error message if any -->
+    <!-- Connection-level error message (e.g. reauth needed) -->
     {{if .ErrorMessage.Valid}}
     <div class="mx-6 mb-4 flex items-start gap-2 text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
       <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
       <span>{{errorMessage .ErrorCode.String}}</span>
+    </div>
+    {{end}}
+
+    <!-- Last sync error message (only for active connections without a connection-level error) -->
+    {{if and (eq .LastSyncStatus "error") .LastSyncErrorMessage.Valid (not .ErrorMessage.Valid) (ne (printf "%s" .Status) "disconnected")}}
+    <div class="mx-4 sm:mx-6 mb-4 flex items-start gap-2 text-xs text-error/80 bg-error/5 rounded-lg px-3 py-2">
+      <i data-lucide="x-circle" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
+      <span class="line-clamp-2">Last sync failed: {{.LastSyncErrorMessage.String}}</span>
     </div>
     {{end}}
 
