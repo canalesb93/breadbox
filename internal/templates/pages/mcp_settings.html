@@ -187,12 +187,12 @@
   <!-- Card 4: Review Agent Instructions -->
   <div class="bb-card p-0 overflow-hidden" x-data="{ expanded: false }">
     <div class="px-4 sm:px-6 py-5 border-b border-base-300 flex items-center gap-3 cursor-pointer" @click="expanded = !expanded">
-      <div class="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center flex-shrink-0">
-        <i data-lucide="clipboard-check" class="w-5 h-5 text-accent"></i>
+      <div class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center flex-shrink-0">
+        <i data-lucide="clipboard-check" class="w-5 h-5 text-base-content/40"></i>
       </div>
       <div class="min-w-0 flex-1">
-        <h2 class="font-semibold">Review Agent Instructions</h2>
-        <p class="text-xs text-base-content/40">Pre-built instruction blocks for agents doing transaction review</p>
+        <h2 class="font-semibold">Review Agent Instructions <span class="badge badge-soft badge-warning badge-xs ml-1">Deprecated</span></h2>
+        <p class="text-xs text-base-content/40">Pre-built instruction blocks — being replaced by Agent Wizard prompt builder</p>
       </div>
       <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
     </div>
