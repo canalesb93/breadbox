@@ -356,6 +356,13 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return strings.ToUpper(string([]rune(s)[0]))
 			},
+			"firstWord": func(s string) string {
+				if s == "" {
+					return ""
+				}
+				parts := strings.Fields(s)
+				return parts[0]
+			},
 			"expired": func(s *string) bool {
 				if s == nil {
 					return false

@@ -36,21 +36,17 @@
       </div>
       <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40">
         {{if .UserName}}
-        <span class="w-4 h-4 rounded-full bg-primary/10 inline-flex items-center justify-center shrink-0" title="{{.UserName}}">
+        <!-- Mobile: show short name; Desktop: show initial avatar -->
+        <span class="sm:hidden text-base-content/50 shrink-0">{{firstWord .UserName}}</span>
+        <span class="hidden sm:inline-flex w-4 h-4 rounded-full bg-primary/10 items-center justify-center shrink-0" title="{{.UserName}}">
           <span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{{firstChar .UserName}}</span>
         </span>
+        <span class="text-base-content/20">&middot;</span>
         {{end}}
         <span class="truncate">{{.AccountName}}</span>
         {{if .MerchantName}}
         <span class="text-base-content/20 hidden sm:inline">&middot;</span>
         <span class="text-base-content/40 truncate hidden sm:inline">{{deref .MerchantName}}</span>
-        {{end}}
-        {{if .CategoryDisplayName}}
-        <span class="text-base-content/20 sm:hidden">&middot;</span>
-        <span class="inline-flex items-center gap-1 sm:hidden">
-          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}{{safeCSS "oklch(0.65 0 0)"}}{{end}}"></span>
-          <span class="text-base-content/50 truncate">{{deref .CategoryDisplayName}}</span>
-        </span>
         {{end}}
         {{if .AgentReviewed}}
         <span class="text-base-content/20">&middot;</span>
@@ -77,7 +73,7 @@
     </div>
 
     <!-- Amount -->
-    <div class="w-24 text-right shrink-0 pl-3">
+    <div class="w-20 sm:w-24 text-right shrink-0 pl-2 sm:pl-3">
       <span class="bb-tx-amount tabular-nums{{if lt .Amount 0.0}} bb-tx-amount--income{{end}}">
         {{formatAmount .Amount}}
       </span>
