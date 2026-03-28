@@ -17,7 +17,8 @@ dev: generate
 		echo "  - Or kill the existing process:  kill $$(lsof -ti:$(PORT))"; \
 		exit 1; \
 	fi
-	SERVER_PORT=$(PORT) go run ./cmd/breadbox serve
+	@echo $(PORT) > .breadbox-port
+	SERVER_PORT=$(PORT) go run ./cmd/breadbox serve; rm -f .breadbox-port
 
 dev-stop:
 	@pids=$$(pgrep -f 'go run ./cmd/breadbox serve' 2>/dev/null || true); \

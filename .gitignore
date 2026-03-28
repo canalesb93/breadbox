@@ -8,6 +8,9 @@ static/css/styles.css
 
 # Environment files
 .local.env
+
+# Dev server port marker (written by make dev)
+.breadbox-port
 .docker.env
 
 # Go
