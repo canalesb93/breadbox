@@ -198,9 +198,27 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		}
 	}
 
-	// Account ID + name caches to avoid repeated lookups.
+	// Pre-fetch all account IDs and display names for this connection in one query.
+	// This eliminates per-transaction DB lookups during the sync loop. The caches
+	// still work as lazy fallbacks if a new account appears mid-sync.
 	accountIDCache := make(map[string]pgtype.UUID)
 	accountNameCache := make(map[string]string) // account UUID string -> display name
+
+	connAccounts, err := e.db.ListAccountsByConnection(ctx, connectionID)
+	if err != nil {
+		logger.Warn("failed to pre-fetch accounts, will resolve lazily", "error", err)
+	} else {
+		for _, acct := range connAccounts {
+			accountIDCache[acct.ExternalAccountID] = acct.ID
+			key := formatUUID(acct.ID)
+			if acct.DisplayName.Valid && acct.DisplayName.String != "" {
+				accountNameCache[key] = acct.DisplayName.String
+			} else {
+				accountNameCache[key] = acct.Name
+			}
+		}
+		logger.Debug("pre-fetched account caches", "accounts", len(connAccounts))
+	}
 
 	// Buffer writes so we can discard them on ErrMutationDuringPagination.
 	var pendingRemovals []string
