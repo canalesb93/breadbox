@@ -94,17 +94,39 @@
             </div>
           </div>
         </div>
-        <!-- Connection total balance -->
-        {{if .HasBalance}}
-        <div class="text-right shrink-0">
-          <div class="text-lg font-semibold tabular-nums tracking-tight">{{formatAmount .TotalBalance}}</div>
-          <div class="text-xs text-base-content/40">{{.AccountCount}} account{{if ne .AccountCount 1}}s{{end}}</div>
+        <div class="flex items-center gap-3 shrink-0">
+          <!-- Sync Now button (non-CSV active connections only) -->
+          {{if and (ne (printf "%s" .Provider) "csv") (eq (printf "%s" .Status) "active")}}
+          <div x-data="syncBtn('{{formatUUID .ID}}')" @click.prevent.stop>
+            <button class="btn btn-ghost btn-xs rounded-lg gap-1 text-base-content/40 hover:text-primary"
+                    :disabled="state !== 'idle'"
+                    @click="triggerSync()"
+                    :title="state === 'syncing' ? 'Syncing...' : 'Sync Now'">
+              <template x-if="state === 'idle'">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              </template>
+              <template x-if="state === 'syncing'">
+                <span class="loading loading-spinner loading-xs"></span>
+              </template>
+              <template x-if="state === 'done'">
+                <i data-lucide="check" class="w-3.5 h-3.5 text-success"></i>
+              </template>
+              <span class="hidden sm:inline text-xs" x-text="state === 'syncing' ? 'Syncing...' : state === 'done' ? 'Synced!' : 'Sync'"></span>
+            </button>
+          </div>
+          {{end}}
+          <!-- Connection total balance -->
+          {{if .HasBalance}}
+          <div class="text-right">
+            <div class="text-lg font-semibold tabular-nums tracking-tight">{{formatAmount .TotalBalance}}</div>
+            <div class="text-xs text-base-content/40">{{.AccountCount}} account{{if ne .AccountCount 1}}s{{end}}</div>
+          </div>
+          {{else}}
+          <div class="text-right">
+            <div class="text-xs text-base-content/40">{{.AccountCount}} account{{if ne .AccountCount 1}}s{{end}}</div>
+          </div>
+          {{end}}
         </div>
-        {{else}}
-        <div class="text-right shrink-0">
-          <div class="text-xs text-base-content/40">{{.AccountCount}} account{{if ne .AccountCount 1}}s{{end}}</div>
-        </div>
-        {{end}}
       </div>
     </a>
 
@@ -183,4 +205,37 @@
   </div>
 </div>
 {{end}}
+
+<script>
+function syncBtn(connId) {
+  return {
+    state: 'idle',
+    triggerSync() {
+      if (this.state !== 'idle') return;
+      this.state = 'syncing';
+      var self = this;
+      fetch('/-/connections/' + connId + '/sync', { method: 'POST' })
+        .then(function(res) {
+          if (res.ok) {
+            self.state = 'done';
+            self.$nextTick(function() { lucide.createIcons(); });
+            window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Sync triggered for this connection.', type: 'success' } }));
+            setTimeout(function() { self.state = 'idle'; self.$nextTick(function() { lucide.createIcons(); }); }, 5000);
+          } else {
+            return res.json().then(function(data) {
+              window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: data.error || 'Failed to trigger sync.', type: 'error' } }));
+              self.state = 'idle';
+              self.$nextTick(function() { lucide.createIcons(); });
+            });
+          }
+        })
+        .catch(function() {
+          window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Network error. Please try again.', type: 'error' } }));
+          self.state = 'idle';
+          self.$nextTick(function() { lucide.createIcons(); });
+        });
+    }
+  };
+}
+</script>
 {{end}}
