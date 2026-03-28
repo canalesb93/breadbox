@@ -629,7 +629,7 @@ function triageQueue() {
 
     init() {
       this.$nextTick(() => {
-        if (typeof lucide !== 'undefined') lucide.createIcons();
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [this.$el] });
       });
 
       // Listen for triage actions dispatched from child components
