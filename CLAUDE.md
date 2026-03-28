@@ -82,20 +82,18 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Transaction responses include denormalized `account_name` and `user_name` (JOIN in dynamic query builder)
 - MCP tool descriptions: domain-rich with amount conventions, filter docs, pagination behavior (not generic)
 - MCP server instructions: domain-rich onboarding text (data model, amount convention, category system, recommended query patterns)
-- Teller category mapping: raw Teller category strings (e.g., `dining`, `groceries`) are stored directly in `category_primary`. DB-backed `category_mappings` table resolves `(teller, dining)` → `category_id` during sync (Phase 20A).
+- Teller categories: raw Teller category strings (e.g., `dining`, `groceries`) are stored directly in `category_primary`. Transaction rules handle categorization during sync.
 - Teller SHOPPING fix: historical migration corrected `SHOPPING*` to `GENERAL_MERCHANDISE*`. No longer relevant since raw Teller categories are now stored directly.
 - Transaction sort options: `sort_by` (date/amount/name) + `sort_order` (asc/desc). Cursor pagination only works with date sort.
-- Category system: `categories` table (UUID PK, slug, display_name, parent_id for 2-level hierarchy, icon, color). `category_mappings` table maps `(provider, provider_category)` → `category_id`. Transactions have `category_id` FK (SET NULL) + `category_override` boolean. Raw provider strings kept in `category_primary`/`category_detailed` for auditability. Resolution: detailed match → primary match → NULL. In-memory cache during sync. Spec: `docs/category-mapping.md`.
+- Category system: `categories` table (UUID PK, slug, display_name, parent_id for 2-level hierarchy, icon, color). Transactions have `category_id` FK (SET NULL) + `category_override` boolean. Raw provider strings kept in `category_primary`/`category_detailed` for auditability. Transaction rules handle categorization during sync.
 - Category slugs: `lowercase_with_underscores` format (e.g., `food_and_drink_groceries`). Immutable after creation. Display names are mutable.
 - Category API: transaction responses include structured `category` object; raw fields renamed to `category_primary_raw`/`category_detailed_raw`. Filter by `category_slug` param.
-- `ListDistinctCategories` returns `[]CategoryPair{Primary, Detailed}` (not `[]string`). Will be replaced by `ListCategories` returning full taxonomy tree (Phase 20B).
 - MCP `min_amount`/`max_amount` use `*float64` (not `float64`) to allow filtering by zero values
 - Field selection: `?fields=` param on `GET /api/v1/transactions`, `GET /api/v1/transactions/{id}`, and MCP `query_transactions`. Supports individual field names (e.g., `fields=name,amount,date,account_name`) and aliases: `minimal` (name,amount,date — smallest useful set), `core` (id,date,amount,name,iso_currency_code), `category` (category,category_primary_raw,category_detailed_raw), `timestamps` (created_at,updated_at,datetime,authorized_datetime). `id` always included. Filtering happens in handlers, not service layer.
 - Transaction summary: `GET /api/v1/transactions/summary` and MCP `transaction_summary` tool. Server-side aggregation with `group_by`: category, month, week, day, category_month. Multi-currency handled per-row. Default date range: 30 days.
 - Merchant summary: `GET /api/v1/transactions/merchants` and MCP `merchant_summary` tool. Server-side GROUP BY on `COALESCE(merchant_name, name)` returning distinct merchants with transaction_count, total_amount, avg_amount, first_date, last_date, iso_currency_code. Supports same filters as transaction queries plus `min_count` (HAVING COUNT >= N) and `spending_only`. Default date range: 90 days. Limit 500.
 - Exclude search: `exclude_search` param on `query_transactions`, `count_transactions`, and `merchant_summary`. Adds `NOT ILIKE` clause on name and merchant_name. Minimum 2 characters (REST API validation). Used to filter out known merchants when hunting for unknown charges.
 - Search modes: `search_mode` param on `query_transactions`, `count_transactions`, `merchant_summary`, `list_transaction_rules`. Values: `contains` (default, substring ILIKE), `words` (split on spaces, AND all words — handles formatting differences like "Century Link" vs "CenturyLink"), `fuzzy` (pg_trgm similarity for typo tolerance). Comma-separated values in `search` are auto-ORed in all modes. Shared implementation in `internal/service/search.go` via `BuildSearchClause`/`BuildExcludeSearchClause`.
-- Category mapping MCP tools: `list_category_mappings`, `create_category_mapping`, `update_category_mapping`, `delete_category_mapping`. Accept category slugs (not IDs). Lookup by ID or (provider, provider_category) pair.
 - Enhanced overview resource: `breadbox://overview` includes users list, accounts_by_type, connections with account counts, 30-day spending summary with top 5 categories, pending transaction count.
 - CSS framework: DaisyUI 5 + Tailwind CSS v4 via `tailwindcss-extra` standalone CLI binary. No Node.js. Replaces Pico CSS.
 - CSS build: `make css` compiles `input.css` → `static/css/styles.css`. `make css-watch` for dev. Dockerfile runs `make css` in build stage.
@@ -162,7 +160,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 
 ## Spec Documents
 
-Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Teller-specific details are in `docs/teller-integration.md`. CSV import details are in `docs/csv-import.md`. Design system (CSS framework, components, icons) is in `docs/design-system.md`. Category mapping system is in `docs/category-mapping.md`. Implementation order is in `docs/ROADMAP.md`.
+Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Teller-specific details are in `docs/teller-integration.md`. CSV import details are in `docs/csv-import.md`. Design system (CSS framework, components, icons) is in `docs/design-system.md`. Implementation order is in `docs/ROADMAP.md`.
 
 ## Workflow Rules
 

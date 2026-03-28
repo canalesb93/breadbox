@@ -183,8 +183,7 @@ func mapTellerTransaction(txn tellerTransaction, currencyMap map[string]string, 
 		ISOCurrencyCode:   currencyMap[txn.AccountID],
 	}
 
-	// Category: store the raw Teller category string so the category resolver
-	// can match it against category_mappings entries (e.g., "teller:dining").
+	// Category: store the raw Teller category string for transaction rules to match against.
 	if txn.Details.Category != "" {
 		raw := txn.Details.Category
 		t.CategoryPrimary = &raw

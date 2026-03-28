@@ -424,13 +424,7 @@ func TestMergeCategories_Success(t *testing.T) {
 	srcUID, _ := parseUUIDForTest(source.ID)
 	mustCreateTransactionWithCategory(t, q, acctID, srcUID, "txn_merge", "Merge Txn", 2000, "2025-01-15")
 
-	// Create a mapping pointing to source
-	_, err := svc.CreateMapping(ctx, "plaid", "MERGE_TEST", source.ID)
-	if err != nil {
-		t.Fatalf("create mapping: %v", err)
-	}
-
-	err = svc.MergeCategories(ctx, source.ID, target.ID)
+	err := svc.MergeCategories(ctx, source.ID, target.ID)
 	if err != nil {
 		t.Fatalf("MergeCategories: %v", err)
 	}
@@ -450,18 +444,6 @@ func TestMergeCategories_Success(t *testing.T) {
 	}
 	if gotCatID != tgtUID {
 		t.Errorf("transaction should be reassigned to target category")
-	}
-
-	// Mapping should point to target
-	mappings, err := svc.ListMappings(ctx, nil)
-	if err != nil {
-		t.Fatalf("list mappings: %v", err)
-	}
-	if len(mappings) != 1 {
-		t.Fatalf("expected 1 mapping, got %d", len(mappings))
-	}
-	if mappings[0].CategoryID != target.ID {
-		t.Errorf("mapping should point to target category, got %s", mappings[0].CategoryID)
 	}
 }
 
@@ -566,16 +548,6 @@ func TestMergeCategories_ParentWithChildren(t *testing.T) {
 	mustCreateTransactionWithCategory(t, q, acctID, child1UID, "txn_child1", "Child 1 Txn", 2000, "2025-01-11")
 	mustCreateTransactionWithCategory(t, q, acctID, child2UID, "txn_child2", "Child 2 Txn", 3000, "2025-01-12")
 
-	// Create mappings pointing to parent and child1.
-	_, err := svc.CreateMapping(ctx, "plaid", "PARENT_CAT", parent.ID)
-	if err != nil {
-		t.Fatalf("create parent mapping: %v", err)
-	}
-	_, err = svc.CreateMapping(ctx, "plaid", "CHILD1_CAT", child1.ID)
-	if err != nil {
-		t.Fatalf("create child1 mapping: %v", err)
-	}
-
 	// Create a rule pointing to child2.
 	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name:         "Child Rule",
@@ -589,7 +561,7 @@ func TestMergeCategories_ParentWithChildren(t *testing.T) {
 	}
 
 	// Merge parent (with children) into target.
-	err = svc.MergeCategories(ctx, parent.ID, target.ID)
+	err := svc.MergeCategories(ctx, parent.ID, target.ID)
 	if err != nil {
 		t.Fatalf("MergeCategories: %v", err)
 	}
@@ -611,17 +583,6 @@ func TestMergeCategories_ParentWithChildren(t *testing.T) {
 		}
 		if gotCatID != tgtUID {
 			t.Errorf("transaction %s should be reassigned to target category", extID)
-		}
-	}
-
-	// Mappings should all point to target.
-	mappings, err := svc.ListMappings(ctx, nil)
-	if err != nil {
-		t.Fatalf("list mappings: %v", err)
-	}
-	for _, m := range mappings {
-		if m.CategoryID != target.ID {
-			t.Errorf("mapping %s should point to target, got %s", m.ProviderCategory, m.CategoryID)
 		}
 	}
 
@@ -699,62 +660,6 @@ func TestSetTransactionCategory_InvalidCategory(t *testing.T) {
 
 // --- ResetTransactionCategory ---
 
-func TestResetTransactionCategory_ResolvesFromMappings(t *testing.T) {
-	svc, q, pool := newService(t)
-	ctx := context.Background()
-
-	uncat := mustSeedUncategorized(t, q)
-	groceries := mustCreateCategoryViaService(t, svc, "groceries_reset", "Groceries", nil)
-
-	acctID := seedTxnFixture(t, q)
-
-	// Create a transaction with a detailed category, manually overridden to uncategorized
-	_, err := q.UpsertTransaction(ctx, db.UpsertTransactionParams{
-		AccountID:             acctID,
-		ExternalTransactionID: "txn_reset",
-		Amount:                pgtype.Numeric{Int: big.NewInt(2000), Exp: -2, Valid: true},
-		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
-		Date:                  pgtype.Date{Time: testutil.MustParseDate("2025-02-01"), Valid: true},
-		Name:                  "Reset Txn",
-		CategoryPrimary:       pgtype.Text{String: "FOOD_AND_DRINK", Valid: true},
-		CategoryDetailed:      pgtype.Text{String: "FOOD_AND_DRINK_GROCERIES", Valid: true},
-		CategoryID:            uncat.ID,
-	})
-	if err != nil {
-		t.Fatalf("create transaction: %v", err)
-	}
-
-	// Set manual override
-	pool.Exec(ctx, "UPDATE transactions SET category_override = TRUE WHERE external_transaction_id = 'txn_reset'")
-
-	// Create mapping so reset can resolve
-	_, err = svc.CreateMapping(ctx, "plaid", "FOOD_AND_DRINK_GROCERIES", groceries.ID)
-	if err != nil {
-		t.Fatalf("create mapping: %v", err)
-	}
-
-	// Get the transaction ID
-	var txnID pgtype.UUID
-	pool.QueryRow(ctx, "SELECT id FROM transactions WHERE external_transaction_id = 'txn_reset'").Scan(&txnID)
-
-	err = svc.ResetTransactionCategory(ctx, formatUUID(txnID))
-	if err != nil {
-		t.Fatalf("ResetTransactionCategory: %v", err)
-	}
-
-	// Should be resolved to groceries now via mapping
-	var gotCatID pgtype.UUID
-	var override bool
-	pool.QueryRow(ctx, "SELECT category_id, category_override FROM transactions WHERE id = $1", txnID).Scan(&gotCatID, &override)
-
-	grocUID, _ := parseUUIDForTest(groceries.ID)
-	if gotCatID != grocUID {
-		t.Errorf("expected resolved to groceries, got %v", gotCatID)
-	}
-	if override {
-		t.Errorf("category_override should be false after reset")
-	}
-}
 
 func TestResetTransactionCategory_NotFound(t *testing.T) {
 	svc, _, _ := newService(t)
@@ -901,283 +806,6 @@ func TestBulkRecategorizeByFilter_InvalidTargetCategory(t *testing.T) {
 	})
 	if err == nil {
 		t.Error("expected error for invalid target category")
-	}
-}
-
-// --- Mapping CRUD ---
-
-func TestListMappings_Empty(t *testing.T) {
-	svc, _, _ := newService(t)
-	mappings, err := svc.ListMappings(context.Background(), nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(mappings) != 0 {
-		t.Errorf("expected 0 mappings, got %d", len(mappings))
-	}
-}
-
-func TestListMappings_FilterByProvider(t *testing.T) {
-	svc, _, _ := newService(t)
-	ctx := context.Background()
-
-	cat := mustCreateCategoryViaService(t, svc, "map_filter_cat", "Cat", nil)
-	_, err := svc.CreateMapping(ctx, "plaid", "FOOD_AND_DRINK", cat.ID)
-	if err != nil {
-		t.Fatalf("create plaid mapping: %v", err)
-	}
-	_, err = svc.CreateMapping(ctx, "teller", "dining", cat.ID)
-	if err != nil {
-		t.Fatalf("create teller mapping: %v", err)
-	}
-
-	plaid := "plaid"
-	mappings, err := svc.ListMappings(ctx, &plaid)
-	if err != nil {
-		t.Fatalf("list mappings: %v", err)
-	}
-	if len(mappings) != 1 {
-		t.Fatalf("expected 1 plaid mapping, got %d", len(mappings))
-	}
-	if mappings[0].Provider != "plaid" {
-		t.Errorf("expected provider plaid, got %s", mappings[0].Provider)
-	}
-}
-
-func TestCreateMappingBySlug_Success(t *testing.T) {
-	svc, _, _ := newService(t)
-	ctx := context.Background()
-
-	mustCreateCategoryViaService(t, svc, "slug_map_cat", "SlugCat", nil)
-
-	mapping, err := svc.CreateMappingBySlug(ctx, "plaid", "FOOD_AND_DRINK_GROCERIES", "slug_map_cat")
-	if err != nil {
-		t.Fatalf("CreateMappingBySlug: %v", err)
-	}
-	if mapping.Provider != "plaid" {
-		t.Errorf("provider mismatch: got %s", mapping.Provider)
-	}
-	if mapping.ProviderCategory != "FOOD_AND_DRINK_GROCERIES" {
-		t.Errorf("provider category mismatch")
-	}
-	if mapping.CategorySlug != "slug_map_cat" {
-		t.Errorf("category slug mismatch: got %s", mapping.CategorySlug)
-	}
-}
-
-func TestCreateMappingBySlug_InvalidSlug(t *testing.T) {
-	svc, _, _ := newService(t)
-	_, err := svc.CreateMappingBySlug(context.Background(), "plaid", "TEST", "nonexistent_slug")
-	if err == nil {
-		t.Error("expected error for invalid slug")
-	}
-}
-
-func TestCreateMappingBySlug_DuplicateMapping(t *testing.T) {
-	svc, _, _ := newService(t)
-	ctx := context.Background()
-
-	mustCreateCategoryViaService(t, svc, "dup_map_cat", "DupCat", nil)
-
-	_, err := svc.CreateMappingBySlug(ctx, "plaid", "DUP_TEST", "dup_map_cat")
-	if err != nil {
-		t.Fatalf("first create: %v", err)
-	}
-
-	_, err = svc.CreateMappingBySlug(ctx, "plaid", "DUP_TEST", "dup_map_cat")
-	if err == nil {
-		t.Error("expected error for duplicate mapping")
-	}
-	if !strings.Contains(err.Error(), "already exists") {
-		t.Errorf("error should mention 'already exists', got: %v", err)
-	}
-}
-
-func TestUpdateMappingBySlug_ByID(t *testing.T) {
-	svc, _, _ := newService(t)
-	ctx := context.Background()
-
-	mustCreateCategoryViaService(t, svc, "upd_map_cat1", "Cat1", nil)
-	mustCreateCategoryViaService(t, svc, "upd_map_cat2", "Cat2", nil)
-
-	mapping, err := svc.CreateMappingBySlug(ctx, "plaid", "UPD_TEST", "upd_map_cat1")
-	if err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	if mapping.CategorySlug != "upd_map_cat1" {
-		t.Fatalf("initial slug mismatch")
-	}
-
-	updated, err := svc.UpdateMappingBySlug(ctx, &mapping.ID, nil, nil, "upd_map_cat2")
-	if err != nil {
-		t.Fatalf("UpdateMappingBySlug: %v", err)
-	}
-	if updated.CategorySlug != "upd_map_cat2" {
-		t.Errorf("expected updated slug upd_map_cat2, got %s", updated.CategorySlug)
-	}
-}
-
-func TestUpdateMappingBySlug_ByProviderCategory(t *testing.T) {
-	svc, _, _ := newService(t)
-	ctx := context.Background()
-
-	mustCreateCategoryViaService(t, svc, "upd_map_pc1", "PC1", nil)
-	mustCreateCategoryViaService(t, svc, "upd_map_pc2", "PC2", nil)
-
-	_, err := svc.CreateMappingBySlug(ctx, "teller", "groceries_update", "upd_map_pc1")
-	if err != nil {
-		t.Fatalf("create: %v", err)
-	}
-
-	prov := "teller"
-	provCat := "groceries_update"
-	updated, err := svc.UpdateMappingBySlug(ctx, nil, &prov, &provCat, "upd_map_pc2")
-	if err != nil {
-		t.Fatalf("UpdateMappingBySlug: %v", err)
-	}
-	if updated.CategorySlug != "upd_map_pc2" {
-		t.Errorf("expected slug upd_map_pc2, got %s", updated.CategorySlug)
-	}
-}
-
-func TestUpdateMappingBySlug_NotFound(t *testing.T) {
-	svc, _, _ := newService(t)
-	mustCreateCategoryViaService(t, svc, "upd_map_nf", "NF", nil)
-
-	badID := "00000000-0000-0000-0000-000000000000"
-	_, err := svc.UpdateMappingBySlug(context.Background(), &badID, nil, nil, "upd_map_nf")
-	if !errors.Is(err, service.ErrMappingNotFound) {
-		t.Errorf("expected ErrMappingNotFound, got: %v", err)
-	}
-}
-
-func TestDeleteMappingByLookup_ByID(t *testing.T) {
-	svc, _, _ := newService(t)
-	ctx := context.Background()
-
-	mustCreateCategoryViaService(t, svc, "del_map_cat", "Cat", nil)
-	mapping, err := svc.CreateMappingBySlug(ctx, "plaid", "DEL_BY_ID", "del_map_cat")
-	if err != nil {
-		t.Fatalf("create: %v", err)
-	}
-
-	prov, provCat, err := svc.DeleteMappingByLookup(ctx, &mapping.ID, nil, nil)
-	if err != nil {
-		t.Fatalf("DeleteMappingByLookup: %v", err)
-	}
-	if prov != "plaid" || provCat != "DEL_BY_ID" {
-		t.Errorf("returned provider info mismatch: %s/%s", prov, provCat)
-	}
-
-	// Verify it's deleted
-	mappings, err := svc.ListMappings(ctx, nil)
-	if err != nil {
-		t.Fatalf("list: %v", err)
-	}
-	if len(mappings) != 0 {
-		t.Errorf("expected 0 mappings after delete, got %d", len(mappings))
-	}
-}
-
-func TestDeleteMappingByLookup_ByProviderCategory(t *testing.T) {
-	svc, _, _ := newService(t)
-	ctx := context.Background()
-
-	mustCreateCategoryViaService(t, svc, "del_map_pc", "Cat", nil)
-	_, err := svc.CreateMappingBySlug(ctx, "teller", "del_by_pc", "del_map_pc")
-	if err != nil {
-		t.Fatalf("create: %v", err)
-	}
-
-	prov := "teller"
-	provCat := "del_by_pc"
-	_, _, err = svc.DeleteMappingByLookup(ctx, nil, &prov, &provCat)
-	if err != nil {
-		t.Fatalf("DeleteMappingByLookup: %v", err)
-	}
-}
-
-func TestDeleteMappingByLookup_NotFound(t *testing.T) {
-	svc, _, _ := newService(t)
-	badID := "00000000-0000-0000-0000-000000000000"
-	_, _, err := svc.DeleteMappingByLookup(context.Background(), &badID, nil, nil)
-	if !errors.Is(err, service.ErrMappingNotFound) {
-		t.Errorf("expected ErrMappingNotFound, got: %v", err)
-	}
-}
-
-func TestDeleteMappingByLookup_NoIdentifier(t *testing.T) {
-	svc, _, _ := newService(t)
-	_, _, err := svc.DeleteMappingByLookup(context.Background(), nil, nil, nil)
-	if err == nil {
-		t.Error("expected error when no identifier provided")
-	}
-}
-
-// --- BulkUpsertMappings ---
-
-func TestBulkUpsertMappings_CreatesNew(t *testing.T) {
-	svc, _, _ := newService(t)
-	ctx := context.Background()
-
-	cat := mustCreateCategoryViaService(t, svc, "bulk_upsert_cat", "BulkCat", nil)
-
-	count, err := svc.BulkUpsertMappings(ctx, []service.BulkMappingEntry{
-		{Provider: "plaid", ProviderCategory: "BULK_1", CategoryID: cat.ID},
-		{Provider: "plaid", ProviderCategory: "BULK_2", CategoryID: cat.ID},
-	})
-	if err != nil {
-		t.Fatalf("BulkUpsertMappings: %v", err)
-	}
-	if count != 2 {
-		t.Errorf("expected 2, got %d", count)
-	}
-
-	mappings, err := svc.ListMappings(ctx, nil)
-	if err != nil {
-		t.Fatalf("list: %v", err)
-	}
-	if len(mappings) != 2 {
-		t.Errorf("expected 2 mappings, got %d", len(mappings))
-	}
-}
-
-func TestBulkUpsertMappings_UpdatesExisting(t *testing.T) {
-	svc, _, _ := newService(t)
-	ctx := context.Background()
-
-	cat1 := mustCreateCategoryViaService(t, svc, "bulk_upsert_1", "Cat1", nil)
-	cat2 := mustCreateCategoryViaService(t, svc, "bulk_upsert_2", "Cat2", nil)
-
-	// Create initial mapping
-	_, err := svc.BulkUpsertMappings(ctx, []service.BulkMappingEntry{
-		{Provider: "plaid", ProviderCategory: "UPSERT_TEST", CategoryID: cat1.ID},
-	})
-	if err != nil {
-		t.Fatalf("initial upsert: %v", err)
-	}
-
-	// Upsert with different category
-	count, err := svc.BulkUpsertMappings(ctx, []service.BulkMappingEntry{
-		{Provider: "plaid", ProviderCategory: "UPSERT_TEST", CategoryID: cat2.ID},
-	})
-	if err != nil {
-		t.Fatalf("second upsert: %v", err)
-	}
-	if count != 1 {
-		t.Errorf("expected 1, got %d", count)
-	}
-
-	// Should still be 1 mapping total, not 2
-	mappings, err := svc.ListMappings(ctx, nil)
-	if err != nil {
-		t.Fatalf("list: %v", err)
-	}
-	if len(mappings) != 1 {
-		t.Errorf("expected 1 mapping after upsert, got %d", len(mappings))
-	}
-	if mappings[0].CategoryID != cat2.ID {
-		t.Errorf("mapping should point to cat2")
 	}
 }
 

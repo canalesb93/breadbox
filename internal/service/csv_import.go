@@ -9,7 +9,6 @@ import (
 
 	"breadbox/internal/db"
 	csvpkg "breadbox/internal/provider/csv"
-	bsync "breadbox/internal/sync"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
@@ -130,10 +129,11 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 		TotalRows:    len(params.Rows),
 	}
 
-	// Load category resolver for CSV provider
-	csvResolver, err := bsync.NewCategoryResolver(ctx, s.Pool, "csv")
-	if err != nil {
-		s.Logger.Warn("failed to load CSV category resolver", "error", err)
+	// Load uncategorized category ID for CSV imports.
+	// Transaction rules will categorize on next sync if matching rules exist.
+	var uncategorizedID pgtype.UUID
+	if err := s.Pool.QueryRow(ctx, "SELECT id FROM categories WHERE slug = 'uncategorized'").Scan(&uncategorizedID); err != nil {
+		s.Logger.Warn("failed to load uncategorized category for CSV import", "error", err)
 	}
 
 	dateCol := params.ColumnMapping["date"]
@@ -220,14 +220,8 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 		var amountNumeric pgtype.Numeric
 		_ = amountNumeric.Scan(amount.String())
 
-		// Resolve category from CSV mapping table
-		var categoryID pgtype.UUID
-		if csvResolver != nil && category != "" {
-			categoryID = csvResolver.Resolve("csv", &category, nil)
-		} else if csvResolver != nil {
-			// No category in CSV → uncategorized
-			categoryID = csvResolver.Resolve("csv", nil, nil)
-		}
+		// Set to uncategorized — transaction rules will categorize on next sync.
+		categoryID := uncategorizedID
 
 		txn, err := s.Queries.UpsertTransaction(ctx, db.UpsertTransactionParams{
 			AccountID:             accountID,

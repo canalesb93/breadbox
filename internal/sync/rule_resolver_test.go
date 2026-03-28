@@ -414,7 +414,6 @@ func TestResolveWithContext_PriorityOrdering(t *testing.T) {
 	catB := testUUID(2)
 
 	r := &RuleResolver{
-		mappings:  make(map[string]pgtype.UUID),
 		hitCounts: make(map[[16]byte]int),
 		rules: []compiledRule{
 			{
@@ -439,13 +438,8 @@ func TestResolveWithContext_PriorityOrdering(t *testing.T) {
 	}
 }
 
-func TestResolveWithContext_FallbackToMappings(t *testing.T) {
-	catMapped := testUUID(5)
-
+func TestResolveWithContext_NoRuleMatchFallsBackToUncategorized(t *testing.T) {
 	r := &RuleResolver{
-		mappings: map[string]pgtype.UUID{
-			"plaid:FOOD_AND_DRINK": catMapped,
-		},
 		hitCounts: make(map[[16]byte]int),
 		rules: []compiledRule{
 			{
@@ -457,15 +451,15 @@ func TestResolveWithContext_FallbackToMappings(t *testing.T) {
 		uncategorizedID: testUUID(99),
 	}
 
-	// Rule doesn't match, should fall back to mapping.
+	// Rule doesn't match, should fall back to uncategorized.
 	tctx := TransactionContext{
 		Name:            "Grocery Store",
 		CategoryPrimary: "FOOD_AND_DRINK",
 		Provider:        "plaid",
 	}
 	result := r.ResolveWithContext("plaid", tctx)
-	if result != catMapped {
-		t.Errorf("expected fallback to mapping, got %v", result)
+	if result != testUUID(99) {
+		t.Errorf("expected uncategorized fallback, got %v", result)
 	}
 }
 
@@ -473,7 +467,6 @@ func TestResolveWithContext_FallbackToUncategorized(t *testing.T) {
 	uncatID := testUUID(99)
 
 	r := &RuleResolver{
-		mappings:        make(map[string]pgtype.UUID),
 		hitCounts:       make(map[[16]byte]int),
 		rules:           nil, // no rules
 		uncategorizedID: uncatID,
@@ -494,7 +487,6 @@ func TestResolveWithContext_HitCountTracking(t *testing.T) {
 	catA := testUUID(1)
 
 	r := &RuleResolver{
-		mappings:  make(map[string]pgtype.UUID),
 		hitCounts: make(map[[16]byte]int),
 		rules: []compiledRule{
 			{
@@ -516,48 +508,6 @@ func TestResolveWithContext_HitCountTracking(t *testing.T) {
 	}
 }
 
-func TestResolve_LegacyMethod(t *testing.T) {
-	catMapped := testUUID(5)
-	uncatID := testUUID(99)
-
-	r := &RuleResolver{
-		mappings: map[string]pgtype.UUID{
-			"plaid:FOOD_AND_DRINK_GROCERIES": catMapped,
-		},
-		uncategorizedID: uncatID,
-	}
-
-	detailed := "FOOD_AND_DRINK_GROCERIES"
-	primary := "FOOD_AND_DRINK"
-
-	// Detailed match
-	result := r.Resolve("plaid", &detailed, &primary)
-	if result != catMapped {
-		t.Errorf("expected detailed match, got %v", result)
-	}
-
-	// Primary match (no detailed mapping)
-	catPrimary := testUUID(6)
-	r.mappings["plaid:FOOD_AND_DRINK"] = catPrimary
-	unknownDetailed := "UNKNOWN"
-	result = r.Resolve("plaid", &unknownDetailed, &primary)
-	if result != catPrimary {
-		t.Errorf("expected primary match, got %v", result)
-	}
-
-	// No match -> uncategorized
-	unknownPrimary := "UNKNOWN"
-	result = r.Resolve("plaid", &unknownDetailed, &unknownPrimary)
-	if result != uncatID {
-		t.Errorf("expected uncategorized fallback, got %v", result)
-	}
-
-	// Nil pointers
-	result = r.Resolve("plaid", nil, nil)
-	if result != uncatID {
-		t.Errorf("expected uncategorized for nil pointers, got %v", result)
-	}
-}
 
 func TestCompileCondition_InvalidRegex(t *testing.T) {
 	_, err := compileCondition(&Condition{
@@ -611,55 +561,6 @@ func TestEvaluateCondition_OrShortCircuit(t *testing.T) {
 	}
 }
 
-func TestResolveWithContext_MappingDetailedBeforePrimary(t *testing.T) {
-	catDetailed := testUUID(5)
-	catPrimary := testUUID(6)
-
-	r := &RuleResolver{
-		mappings: map[string]pgtype.UUID{
-			"plaid:FOOD_AND_DRINK_GROCERIES": catDetailed,
-			"plaid:FOOD_AND_DRINK":           catPrimary,
-		},
-		hitCounts:       make(map[[16]byte]int),
-		uncategorizedID: testUUID(99),
-	}
-
-	tctx := TransactionContext{
-		Name:             "Grocery Store",
-		CategoryDetailed: "FOOD_AND_DRINK_GROCERIES",
-		CategoryPrimary:  "FOOD_AND_DRINK",
-		Provider:         "plaid",
-	}
-
-	result := r.ResolveWithContext("plaid", tctx)
-	if result != catDetailed {
-		t.Errorf("expected detailed mapping to take priority over primary, got %v", result)
-	}
-}
-
-func TestResolveWithContext_NoRulesUseMappings(t *testing.T) {
-	catMapped := testUUID(5)
-
-	r := &RuleResolver{
-		mappings: map[string]pgtype.UUID{
-			"teller:dining": catMapped,
-		},
-		hitCounts:       make(map[[16]byte]int),
-		rules:           nil, // no rules loaded (table doesn't exist)
-		uncategorizedID: testUUID(99),
-	}
-
-	tctx := TransactionContext{
-		Name:            "Restaurant",
-		CategoryPrimary: "dining",
-		Provider:        "teller",
-	}
-
-	result := r.ResolveWithContext("teller", tctx)
-	if result != catMapped {
-		t.Errorf("expected mapping match when no rules exist, got %v", result)
-	}
-}
 
 func TestToString(t *testing.T) {
 	tests := []struct {
@@ -799,7 +700,6 @@ func TestHitCountsJSON_IntegrationWithResolveWithContext(t *testing.T) {
 	catA := testUUID(1)
 
 	r := &RuleResolver{
-		mappings:  make(map[string]pgtype.UUID),
 		hitCounts: make(map[[16]byte]int),
 		rules: []compiledRule{
 			{

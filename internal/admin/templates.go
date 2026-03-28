@@ -625,7 +625,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/transactions.html",
 		"pages/account_detail.html",
 		"pages/categories.html",
-		"pages/category_mappings.html",
 		"pages/transaction_detail.html",
 		"pages/mcp_settings.html",
 		"pages/reviews.html",
