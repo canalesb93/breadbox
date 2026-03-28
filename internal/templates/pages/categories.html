@@ -23,7 +23,7 @@
       {{range .Categories}}
       <div class="bb-card overflow-hidden group" x-data="{open: false}">
         <!-- Parent row -->
-        <div role="button" tabindex="0" class="w-full flex items-center gap-4 px-6 py-4 hover:bg-base-200/30 transition-colors duration-150 text-left cursor-pointer select-none"
+        <div role="button" tabindex="0" class="w-full flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4 hover:bg-base-200/30 transition-colors duration-150 text-left cursor-pointer select-none"
           @click="open = !open" @keydown.enter="open = !open" @keydown.space.prevent="open = !open">
           <div class="flex items-center justify-center w-10 h-10 rounded-xl shrink-0"
             style="{{if .Color}}background-color: {{safeCSS .Color}}15{{else}}background-color: {{safeCSS "oklch(48% 0.17 265 / 0.08)"}}{{end}}">
@@ -38,16 +38,16 @@
               {{if .IsSystem}}<span class="badge badge-info badge-xs">System</span>{{end}}
             </div>
             <div class="flex items-center gap-3 mt-0.5">
-              <span class="text-xs text-base-content/35 font-mono">{{.Slug}}</span>
+              <span class="text-xs text-base-content/35 font-mono hidden sm:inline">{{.Slug}}</span>
               {{if .Children}}<span class="text-xs text-base-content/40">{{len .Children}} subcategories</span>{{end}}
             </div>
           </div>
-          <div class="flex items-center gap-2" @click.stop>
-            <button class="btn btn-ghost btn-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+          <div class="flex items-center gap-1 sm:gap-2" @click.stop>
+            <button class="btn btn-ghost btn-xs rounded-lg sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
               data-id="{{.ID}}" data-display-name="{{.DisplayName}}" data-icon="{{if .Icon}}{{.Icon}}{{end}}" data-color="{{if .Color}}{{.Color}}{{end}}" data-sort-order="{{.SortOrder}}" data-hidden="{{.Hidden}}"
               @click.prevent="$dispatch('edit-category', {id: $el.dataset.id, displayName: $el.dataset.displayName, icon: $el.dataset.icon, color: $el.dataset.color, sortOrder: parseInt($el.dataset.sortOrder) || 0, hidden: $el.dataset.hidden === 'true'})"
               title="Edit"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
-            {{if not .IsSystem}}<button class="btn btn-ghost btn-xs rounded-lg text-error opacity-0 group-hover:opacity-100 transition-opacity"
+            {{if not .IsSystem}}<button class="btn btn-ghost btn-xs rounded-lg text-error sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
               data-id="{{.ID}}" data-name="{{.DisplayName}}"
               @click.prevent="$dispatch('delete-category', {id: $el.dataset.id, name: $el.dataset.name})"
               title="Delete"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>{{end}}
