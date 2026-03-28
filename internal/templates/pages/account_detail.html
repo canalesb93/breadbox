@@ -221,20 +221,20 @@
     </div>
 
     <!-- Filters -->
-    <form method="GET" action="/accounts/{{.AccountID}}" class="flex flex-wrap items-end gap-3 pb-4 border-b border-base-300" x-data>
+    <form method="GET" action="/accounts/{{.AccountID}}" class="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-3 pb-4 border-b border-base-300" x-data>
       <label class="flex flex-col gap-1">
         <span class="text-xs text-base-content/40">Start Date</span>
-        <input type="date" name="start_date" value="{{.FilterStartDate}}" class="input input-sm input-bordered">
+        <input type="date" name="start_date" value="{{.FilterStartDate}}" class="input input-sm input-bordered w-full">
       </label>
       <label class="flex flex-col gap-1">
         <span class="text-xs text-base-content/40">End Date</span>
-        <input type="date" name="end_date" value="{{.FilterEndDate}}" class="input input-sm input-bordered">
+        <input type="date" name="end_date" value="{{.FilterEndDate}}" class="input input-sm input-bordered w-full">
       </label>
       <label class="flex flex-col gap-1">
         <span class="text-xs text-base-content/40">Category</span>
         <div class="bb-cat-picker" data-picker-source="acct-filter-cat" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'filter', initial: '{{.FilterCategory}}', allowEmpty: true, emptyLabel: 'All categories'})" @category-change="$refs.catInput.value = selectedSlug">
           <input type="hidden" name="category" x-ref="catInput" value="{{.FilterCategory}}">
-          <button type="button" class="select select-sm select-bordered w-auto min-w-[8rem] text-left flex items-center gap-2" @click="openPicker()">
+          <button type="button" class="select select-sm select-bordered w-full sm:w-auto min-w-[8rem] text-left flex items-center gap-2" @click="openPicker()">
             <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
             <span x-text="displayLabel" class="text-sm truncate"></span>
           </button>
@@ -242,25 +242,57 @@
       </label>
       <label class="flex flex-col gap-1">
         <span class="text-xs text-base-content/40">Status</span>
-        <select name="pending" class="select select-sm select-bordered">
+        <select name="pending" class="select select-sm select-bordered w-full">
           <option value="">All</option>
           <option value="true"{{if eq .FilterPending "true"}} selected{{end}}>Pending</option>
           <option value="false"{{if eq .FilterPending "false"}} selected{{end}}>Posted</option>
         </select>
       </label>
-      <label class="flex flex-col gap-1">
+      <label class="flex flex-col gap-1 col-span-2">
         <span class="text-xs text-base-content/40">Search</span>
-        <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Name or merchant" class="input input-sm input-bordered">
+        <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Name or merchant" class="input input-sm input-bordered w-full">
       </label>
-      <button type="submit" class="btn btn-sm btn-primary rounded-xl">Filter</button>
-      {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
-      <a href="/accounts/{{.AccountID}}" class="btn btn-sm btn-ghost rounded-xl">Clear</a>
-      {{end}}
+      <div class="flex items-center gap-2 col-span-2 sm:col-span-1">
+        <button type="submit" class="btn btn-sm btn-primary rounded-xl flex-1 sm:flex-none">Filter</button>
+        {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
+        <a href="/accounts/{{.AccountID}}" class="btn btn-sm btn-ghost rounded-xl">Clear</a>
+        {{end}}
+      </div>
     </form>
   </div>
 
   {{if .Transactions}}
-  <div class="overflow-x-auto">
+  <!-- Mobile transaction list (< sm) -->
+  <div class="sm:hidden divide-y divide-base-300">
+    {{range .Transactions}}
+    <a href="/transactions/{{.ID}}" class="flex items-center justify-between gap-3 px-6 py-3.5 hover:bg-base-200/40 transition-colors no-underline">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-1.5">
+          {{if .HasPendingReview}}<span class="w-2 h-2 rounded-full bg-info shrink-0" title="Pending review"></span>{{end}}
+          <span class="text-sm font-medium truncate">{{.Name}}</span>
+          {{if .Pending}}<span class="badge badge-warning badge-xs shrink-0">Pending</span>{{end}}
+        </div>
+        <div class="flex items-center gap-1.5 mt-1 text-xs text-base-content/40">
+          <span>{{formatDate .Date}}</span>
+          {{if .CategoryDisplayName}}
+          <span class="text-base-content/20">&middot;</span>
+          <span class="inline-flex items-center gap-1 truncate">
+            {{if .CategoryColor}}<span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {{safeCSS (deref .CategoryColor)}}"></span>{{end}}
+            <span class="truncate">{{deref .CategoryDisplayName}}</span>
+          </span>
+          {{end}}
+          {{if .CategoryOverride}}<span class="text-[0.6rem] text-base-content/30">override</span>{{end}}
+        </div>
+      </div>
+      <span class="text-sm font-semibold tabular-nums shrink-0{{if lt .Amount 0.0}} text-success{{end}}">
+        {{formatAmount .Amount}}
+      </span>
+    </a>
+    {{end}}
+  </div>
+
+  <!-- Desktop transaction table (>= sm) -->
+  <div class="overflow-x-auto hidden sm:block">
     <table class="table table-sm">
       <thead>
         <tr class="text-xs text-base-content/50 border-b border-base-300">
