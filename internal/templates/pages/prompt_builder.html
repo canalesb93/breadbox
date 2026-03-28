@@ -13,22 +13,50 @@
 
 <div x-data="promptBuilder({{.BlocksJSON}})" @keydown.window="handleKeyboard($event)" class="space-y-5">
 
-  <!-- Block pills (top) — shows all toggleable blocks with selected state -->
+  <!-- How it works -->
+  <div class="rounded-xl bg-base-100 border border-base-300 px-5 py-4 shadow-sm">
+    <h3 class="text-xs font-semibold text-base-content/70 uppercase tracking-wider mb-2.5">How it works</h3>
+    <ul class="space-y-1.5 text-xs text-base-content/50 leading-relaxed list-none">
+      <li class="flex items-start gap-2">
+        <span class="text-base-content/25 mt-px">1.</span>
+        <span>Make sure your agent is connected to the Breadbox MCP server</span>
+      </li>
+      <li class="flex items-start gap-2">
+        <span class="text-base-content/25 mt-px">2.</span>
+        <span>Toggle, reorder, and edit blocks to build your prompt</span>
+      </li>
+      <li class="flex items-start gap-2">
+        <span class="text-base-content/25 mt-px">3.</span>
+        <span>Preview the result, then copy and paste into your agent</span>
+      </li>
+    </ul>
+    <p class="text-[11px] text-base-content/35 mt-3 leading-relaxed"><span class="font-semibold text-base-content/45">Note:</span> Agents connected via MCP automatically receive the <a href="/mcp-settings#instructions" class="text-primary hover:underline">server instructions</a> — this prompt is in addition to those.</p>
+  </div>
+
+  <!-- Block pills (top) -->
   <div class="flex flex-wrap gap-1.5">
+    <!-- Core blocks (locked) -->
+    <template x-for="block in coreBlocks" :key="block.id">
+      <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-primary/5 text-primary/50 border border-primary/20 cursor-default">
+        <span x-html="getBlockIcon(block.id)" class="flex-shrink-0 flex items-center"></span>
+        <span x-text="block.title"></span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0 opacity-50"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </span>
+    </template>
+    <!-- Toggleable blocks -->
     <template x-for="block in allToggleableBlocks" :key="block.id">
       <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150"
               :class="block.enabled
                 ? 'bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15'
                 : 'bg-base-200/50 text-base-content/40 border border-base-300 hover:text-base-content/60 hover:border-base-content/20'"
               @click="toggleBlock(block.id)">
-        <!-- Left icon (block type) -->
         <span x-html="getBlockIcon(block.id)" class="flex-shrink-0 flex items-center"></span>
         <span x-text="block.title"></span>
-        <!-- Right icon (state) -->
         <svg x-show="block.enabled" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M20 6 9 17l-5-5"/></svg>
         <svg x-show="!block.enabled" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
       </button>
     </template>
+    <!-- Custom instructions -->
     <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-base-200/50 text-base-content/40 border border-dashed border-base-300 hover:text-base-content/60 hover:border-base-content/20 transition-all duration-150"
             @click="addCustomBlock()">
       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/></svg>
@@ -139,6 +167,9 @@
     </template>
   </div>
 
+  <!-- Markdown format note -->
+  <p class="text-[11px] text-base-content/30 leading-relaxed text-center">Prompts use <a href="https://www.markdownguide.org/cheat-sheet/" target="_blank" rel="noopener" class="text-primary hover:underline">Markdown format</a> — headers, lists, and emphasis are all supported.</p>
+
   <!-- Spacer for floating bar -->
   <div class="h-20"></div>
 
@@ -192,10 +223,10 @@
   <!-- Preview modal (full screen) -->
   <div x-show="showPreview" x-cloak
        class="fixed inset-0 z-50 flex items-center justify-center"
-       @keydown.escape.window="showPreview = false">
+       @keydown.escape.window="closePreview()">
     <!-- Backdrop -->
     <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"
-         @click="showPreview = false"
+         @click="closePreview()"
          x-show="showPreview"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
@@ -232,7 +263,7 @@
               Copied!
             </span>
           </button>
-          <button class="btn btn-ghost btn-sm btn-square rounded-xl" @click="showPreview = false">
+          <button class="btn btn-ghost btn-sm btn-square rounded-xl" @click="closePreview()">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
         </div>
@@ -319,6 +350,10 @@ function promptBuilder(initialBlocks) {
     },
 
     // All non-core, non-custom blocks (for the pill toggles at top)
+    get coreBlocks() {
+      return this.blocks.filter(function(b) { return b.role === 'core'; });
+    },
+
     get allToggleableBlocks() {
       return this.blocks.filter(function(b) { return b.role !== 'core' && !b.isCustom; });
     },
@@ -332,6 +367,13 @@ function promptBuilder(initialBlocks) {
 
     getBlockIcon: function(id) {
       var icons = {
+        'base-context': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>',
+        'strategy-initial-setup': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.288L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.288Z"/></svg>',
+        'strategy-bulk-review': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>',
+        'strategy-quick-review': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+        'strategy-routine-review': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2.1a4 4 0 0 1 4-4h12.8M7 21.9l-4-4 4-4"/><path d="M21 11.8v2.1a4 4 0 0 1-4 4H4.2"/></svg>',
+        'strategy-spending-report': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>',
+        'strategy-anomaly-detection': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>',
         'tool-reference': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
         'category-system': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>',
         'rule-creation': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>',
@@ -494,6 +536,12 @@ function promptBuilder(initialBlocks) {
 
     openPreview: function() {
       this.showPreview = true;
+      document.body.style.overflow = 'hidden';
+    },
+
+    closePreview: function() {
+      this.showPreview = false;
+      document.body.style.overflow = '';
     },
 
     renderMarkdown: function(text) {
@@ -537,7 +585,7 @@ function promptBuilder(initialBlocks) {
         this.copyPrompt();
       } else if (e.key === 'p' && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
-        this.showPreview ? (this.showPreview = false) : this.openPreview();
+        this.showPreview ? this.closePreview() : this.openPreview();
       }
     }
   };
