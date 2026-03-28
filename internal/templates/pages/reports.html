@@ -23,7 +23,7 @@
 
 <!-- Reports List -->
 {{if .Reports}}
-<div class="space-y-4" x-data="reportsPage()">
+<div class="space-y-4 bb-stagger" x-data="reportsPage()">
   {{range .Reports}}
   <div class="bb-card transition-all duration-300 {{if not .IsRead}}border-l-2 border-l-primary/40{{end}}"
     :class="dismissed.has('{{.ID}}') ? 'opacity-0 h-0 overflow-hidden !p-0 !m-0 !border-0' : ''"

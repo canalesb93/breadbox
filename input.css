@@ -559,16 +559,31 @@
   .bb-stagger > * {
     animation: bb-card-enter 0.35s ease-out both;
   }
-  .bb-stagger > *:nth-child(1) { animation-delay: 0ms; }
-  .bb-stagger > *:nth-child(2) { animation-delay: 50ms; }
-  .bb-stagger > *:nth-child(3) { animation-delay: 100ms; }
-  .bb-stagger > *:nth-child(4) { animation-delay: 150ms; }
-  .bb-stagger > *:nth-child(5) { animation-delay: 200ms; }
-  .bb-stagger > *:nth-child(6) { animation-delay: 250ms; }
-  .bb-stagger > *:nth-child(7) { animation-delay: 300ms; }
-  .bb-stagger > *:nth-child(8) { animation-delay: 350ms; }
-  .bb-stagger > *:nth-child(9) { animation-delay: 400ms; }
-  .bb-stagger > *:nth-child(10) { animation-delay: 450ms; }
+  .bb-stagger > *:nth-child(1)  { animation-delay: 0ms; }
+  .bb-stagger > *:nth-child(2)  { animation-delay: 30ms; }
+  .bb-stagger > *:nth-child(3)  { animation-delay: 60ms; }
+  .bb-stagger > *:nth-child(4)  { animation-delay: 90ms; }
+  .bb-stagger > *:nth-child(5)  { animation-delay: 120ms; }
+  .bb-stagger > *:nth-child(6)  { animation-delay: 150ms; }
+  .bb-stagger > *:nth-child(7)  { animation-delay: 180ms; }
+  .bb-stagger > *:nth-child(8)  { animation-delay: 210ms; }
+  .bb-stagger > *:nth-child(9)  { animation-delay: 240ms; }
+  .bb-stagger > *:nth-child(10) { animation-delay: 270ms; }
+  .bb-stagger > *:nth-child(11) { animation-delay: 300ms; }
+  .bb-stagger > *:nth-child(12) { animation-delay: 330ms; }
+  .bb-stagger > *:nth-child(13) { animation-delay: 360ms; }
+  .bb-stagger > *:nth-child(14) { animation-delay: 390ms; }
+  .bb-stagger > *:nth-child(15) { animation-delay: 420ms; }
+  .bb-stagger > *:nth-child(16) { animation-delay: 450ms; }
+  .bb-stagger > *:nth-child(17) { animation-delay: 480ms; }
+  .bb-stagger > *:nth-child(18) { animation-delay: 510ms; }
+  .bb-stagger > *:nth-child(19) { animation-delay: 540ms; }
+  .bb-stagger > *:nth-child(20) { animation-delay: 570ms; }
+  .bb-stagger > *:nth-child(21) { animation-delay: 600ms; }
+  .bb-stagger > *:nth-child(22) { animation-delay: 630ms; }
+  .bb-stagger > *:nth-child(23) { animation-delay: 660ms; }
+  .bb-stagger > *:nth-child(24) { animation-delay: 690ms; }
+  .bb-stagger > *:nth-child(25) { animation-delay: 720ms; }
 
   @keyframes bb-card-enter {
     from {
