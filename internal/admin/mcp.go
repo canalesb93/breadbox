@@ -53,6 +53,8 @@ func MCPSettingsGetHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServe
 		data["Tools"] = tools
 		data["Instructions"] = instructions
 		data["DefaultInstructions"] = breadboxmcp.DefaultInstructions
+		data["InitialReviewInstructions"] = breadboxmcp.InitialReviewInstructions
+		data["RecurringReviewInstructions"] = breadboxmcp.RecurringReviewInstructions
 
 		tr.Render(w, r, "mcp_settings.html", data)
 	}
