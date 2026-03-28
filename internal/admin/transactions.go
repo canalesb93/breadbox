@@ -896,3 +896,62 @@ func buildExportURL(r *http.Request) string {
 	}
 	return exportURL
 }
+
+// QuickSearchTransactionsHandler serves GET /-/search/transactions.
+// Returns a lightweight JSON array for the command palette.
+func QuickSearchTransactionsHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := strings.TrimSpace(r.URL.Query().Get("q"))
+		if len(q) < 2 {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte("[]"))
+			return
+		}
+
+		searchMode := "words"
+		params := service.AdminTransactionListParams{
+			Page:       1,
+			PageSize:   8,
+			Search:     &q,
+			SearchMode: &searchMode,
+			SortOrder:  "desc",
+		}
+
+		result, err := svc.ListTransactionsAdmin(r.Context(), params)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte("[]"))
+			return
+		}
+
+		type txResult struct {
+			ID            string  `json:"id"`
+			Name          string  `json:"name"`
+			Amount        float64 `json:"amount"`
+			Date          string  `json:"date"`
+			Account       string  `json:"account"`
+			Merchant      *string `json:"merchant,omitempty"`
+			Pending       bool    `json:"pending,omitempty"`
+			CategoryIcon  *string `json:"category_icon,omitempty"`
+			CategoryColor *string `json:"category_color,omitempty"`
+		}
+
+		items := make([]txResult, 0, len(result.Transactions))
+		for _, tx := range result.Transactions {
+			items = append(items, txResult{
+				ID:            tx.ID,
+				Name:          tx.Name,
+				Amount:        tx.Amount,
+				Date:          tx.Date,
+				Account:       tx.AccountName,
+				Merchant:      tx.MerchantName,
+				Pending:       tx.Pending,
+				CategoryIcon:  tx.CategoryIcon,
+				CategoryColor: tx.CategoryColor,
+			})
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(items)
+	}
+}
