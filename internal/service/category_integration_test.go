@@ -561,7 +561,7 @@ func TestMergeCategories_ParentWithChildren(t *testing.T) {
 	}
 
 	// Merge parent (with children) into target.
-	err := svc.MergeCategories(ctx, parent.ID, target.ID)
+	err = svc.MergeCategories(ctx, parent.ID, target.ID)
 	if err != nil {
 		t.Fatalf("MergeCategories: %v", err)
 	}
