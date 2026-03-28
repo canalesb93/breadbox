@@ -306,6 +306,16 @@ function mcpGuide(mcpURL) {
       {id:'windsurf', label:'Windsurf', icon:'wind'},
       {id:'other', label:'Other', icon:'puzzle'}
     ],
+    init() {
+      // Render Lucide icons in all tab panels after Alpine hydrates.
+      var self = this;
+      setTimeout(function() {
+        self.tabs.forEach(function(t) {
+          var panel = self.$refs['panel-' + t.id];
+          if (panel) lucide.createIcons({nodes: [panel]});
+        });
+      }, 50);
+    },
     switchTab(id) {
       this.tab = id;
       var self = this;
