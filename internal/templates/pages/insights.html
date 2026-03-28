@@ -208,7 +208,7 @@
 </div>
 
 <!-- Real Insights Content (hidden until ready) -->
-<div x-show="insightsReady" x-transition:enter="transition ease-out duration-400" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-cloak>
+<div id="insightsContent" x-show="insightsReady" x-transition:enter="transition ease-out duration-400" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-cloak>
 
 <!-- Summary Pills (always visible) with sparklines + count-up animation -->
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-6">
@@ -1743,15 +1743,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var first = values[0], last = values[values.length - 1];
     var trendUp = last >= first;
+    // ECharts 5.x canvas renderer cannot parse oklch() — use rgba for gradients
     var lineColor, gradTop, gradBot;
     if (trendUp) {
-      lineColor = isDark ? 'oklch(0.70 0.14 155)' : 'oklch(0.55 0.14 155)';
-      gradTop = isDark ? 'oklch(0.70 0.14 155 / 0.15)' : 'oklch(0.55 0.14 155 / 0.12)';
-      gradBot = isDark ? 'oklch(0.70 0.14 155 / 0.01)' : 'oklch(0.55 0.14 155 / 0.01)';
+      lineColor = isDark ? 'rgba(74, 222, 128, 1)' : 'rgba(22, 163, 74, 1)';
+      gradTop = isDark ? 'rgba(74, 222, 128, 0.15)' : 'rgba(22, 163, 74, 0.12)';
+      gradBot = isDark ? 'rgba(74, 222, 128, 0.01)' : 'rgba(22, 163, 74, 0.01)';
     } else {
-      lineColor = isDark ? 'oklch(0.70 0.15 25)' : 'oklch(0.55 0.15 25)';
-      gradTop = isDark ? 'oklch(0.70 0.15 25 / 0.15)' : 'oklch(0.55 0.15 25 / 0.12)';
-      gradBot = isDark ? 'oklch(0.70 0.15 25 / 0.01)' : 'oklch(0.55 0.15 25 / 0.01)';
+      lineColor = isDark ? 'rgba(248, 113, 113, 1)' : 'rgba(220, 38, 38, 1)';
+      gradTop = isDark ? 'rgba(248, 113, 113, 0.15)' : 'rgba(220, 38, 38, 0.12)';
+      gradBot = isDark ? 'rgba(248, 113, 113, 0.01)' : 'rgba(220, 38, 38, 0.01)';
     }
 
     var shortLabels = labels.map(function(d) {
@@ -1790,6 +1791,10 @@ document.addEventListener('DOMContentLoaded', function() {
         borderWidth: 1,
         padding: [8, 12],
         textStyle: { color: tooltipText, fontSize: 13, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif' },
+        axisPointer: {
+          type: 'line',
+          lineStyle: { color: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)', width: 1, type: 'dashed' }
+        },
         formatter: function(params) {
           var idx = params[0].dataIndex;
           var d = labels[idx];
@@ -1803,11 +1808,11 @@ document.addEventListener('DOMContentLoaded', function() {
         type: 'line',
         data: values,
         smooth: 0.35,
-        symbol: 'circle',
+        symbol: 'emptyCircle',
         showSymbol: false,
-        symbolSize: 6,
+        symbolSize: 8,
         lineStyle: { color: lineColor, width: 2 },
-        itemStyle: { color: lineColor },
+        itemStyle: { color: lineColor, borderColor: lineColor, borderWidth: 2 },
         areaStyle: {
           color: {
             type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
@@ -1818,19 +1823,14 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         },
         emphasis: {
-          focus: 'none',
-          itemStyle: {
-            color: lineColor,
-            borderColor: isDark ? 'hsl(0 0% 15%)' : 'hsl(0 0% 100%)',
-            borderWidth: 2,
-            shadowBlur: 4,
-            shadowColor: 'rgba(0,0,0,0.15)'
-          }
+          disabled: false,
+          scale: false
         }
       }],
       animation: true,
       animationDuration: 600,
-      animationEasing: 'cubicOut'
+      animationEasing: 'cubicOut',
+      animationDurationUpdate: 0
     });
 
     window.addEventListener('resize', function() { chart.resize(); });
@@ -2763,24 +2763,20 @@ document.addEventListener('DOMContentLoaded', function() {
   function activateInsights() {
     if (typeof window._setInsightsReady === 'function') {
       window._setInsightsReady();
-      // The content div has a 400ms enter transition. Resize after it completes,
-      // with a secondary fallback to catch any late layout shifts.
-      setTimeout(resizeAllCharts, 450);
-      setTimeout(resizeAllCharts, 800);
-      // Use ResizeObserver for a robust catch-all: resize charts whenever their
-      // container dimensions change (covers transitions, lazy layout, etc.).
-      if (typeof ResizeObserver !== 'undefined') {
-        var observed = new Set();
-        insightCharts.forEach(function(c) {
-          var dom = c.getDom && c.getDom();
-          if (dom && !observed.has(dom)) {
-            observed.add(dom);
-            var ro = new ResizeObserver(function() {
-              try { c.resize(); } catch(e) {}
-            });
-            ro.observe(dom);
-          }
-        });
+      // The content div has a 400ms enter transition (display:none → visible).
+      // Charts initialized while hidden get 100px default width.
+      // Resize aggressively: after transition, and watch the wrapper for layout changes.
+      var wrapper = document.getElementById('insightsContent');
+      function doResize() { resizeAllCharts(); }
+      setTimeout(doResize, 50);
+      setTimeout(doResize, 200);
+      setTimeout(doResize, 450);
+      setTimeout(doResize, 800);
+      // Watch the content wrapper — when it transitions from display:none to visible,
+      // its dimensions change and we resize all charts inside it.
+      if (wrapper && typeof ResizeObserver !== 'undefined') {
+        var ro = new ResizeObserver(doResize);
+        ro.observe(wrapper);
       }
       return true;
     }

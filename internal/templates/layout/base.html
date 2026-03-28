@@ -925,6 +925,9 @@
 
       // Intercept navigation clicks (sidebar links, breadcrumbs, any internal link)
       document.addEventListener('click', function(e) {
+        // Don't intercept if the event was already handled (e.g. Alpine @click.prevent)
+        if (e.defaultPrevented) return;
+
         var link = e.target.closest('a[href]');
         if (!link) return;
 

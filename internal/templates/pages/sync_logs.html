@@ -196,7 +196,7 @@
 <!-- Timeline view -->
 <div class="space-y-1 bb-stagger">
   {{range .Logs}}
-  <div class="bb-card bb-card--interactive group transition-all duration-150 {{if eq .Status "error"}}border-error/20 hover:border-error/30{{end}}" x-data="{ open: false }">
+  <div class="bb-card bb-card--interactive group transition-all duration-150 {{if eq .Status "error"}}border-error/20 hover:border-error/30{{end}}">
     <a href="/sync-logs/{{.ID}}" class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 py-3 px-4 no-underline">
       <!-- Top row: status icon + main content + (desktop) changes -->
       <div class="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
@@ -234,9 +234,9 @@
             {{end}}
           </div>
           {{if and (eq .Status "error") .FriendlyErrorMessage}}
-          <div class="mt-1 text-xs text-error/60 truncate max-w-md" x-show="!open">{{deref .FriendlyErrorMessage}}</div>
+          <div class="mt-1 text-xs text-error/60 truncate max-w-md">{{deref .FriendlyErrorMessage}}</div>
           {{else if and (eq .Status "error") .ErrorMessage}}
-          <div class="mt-1 text-xs text-error/60 truncate max-w-md font-mono" x-show="!open">{{deref .ErrorMessage}}</div>
+          <div class="mt-1 text-xs text-error/60 truncate max-w-md font-mono">{{deref .ErrorMessage}}</div>
           {{end}}
         </div>
       </div>
@@ -264,48 +264,8 @@
         </span>
         {{end}}
 
-        <!-- Error/Warning expand button -->
-        {{if or .ErrorMessage .WarningMessage}}
-        <button @click.prevent="open = !open" class="btn btn-ghost btn-xs btn-circle {{if .ErrorMessage}}text-error/50 hover:text-error hover:bg-error/10{{else}}text-warning/50 hover:text-warning hover:bg-warning/10{{end}} transition-colors">
-          <i data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
-        </button>
-        {{end}}
       </div>
     </a>
-
-    <!-- Expandable error detail -->
-    {{if .ErrorMessage}}
-    <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="border-t border-base-200">
-      <div class="flex items-start gap-2.5 px-4 py-3 ml-11 sm:ml-12">
-        <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-error/60 shrink-0 mt-0.5"></i>
-        <div class="min-w-0">
-          {{if .FriendlyErrorMessage}}
-          <p class="text-xs text-error/80 font-medium leading-relaxed">{{deref .FriendlyErrorMessage}}</p>
-          <details class="mt-1.5">
-            <summary class="text-[0.65rem] text-base-content/30 cursor-pointer hover:text-base-content/50 transition-colors select-none">Technical details</summary>
-            <p class="text-[0.65rem] text-base-content/35 font-mono break-all leading-relaxed mt-1">{{deref .ErrorMessage}}</p>
-          </details>
-          {{else}}
-          <div class="text-xs font-medium text-error/80 mb-0.5">Error Details</div>
-          <p class="text-xs text-base-content/50 font-mono break-all leading-relaxed">{{deref .ErrorMessage}}</p>
-          {{end}}
-        </div>
-      </div>
-    </div>
-    {{end}}
-
-    <!-- Expandable warning detail -->
-    {{if and .WarningMessage (not .ErrorMessage)}}
-    <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="border-t border-base-200">
-      <div class="flex items-start gap-2.5 px-4 py-3 ml-11 sm:ml-12">
-        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-warning/60 shrink-0 mt-0.5"></i>
-        <div class="min-w-0">
-          <div class="text-xs font-medium text-warning/80 mb-0.5">Warning</div>
-          <p class="text-xs text-base-content/50 leading-relaxed">{{deref .WarningMessage}}</p>
-        </div>
-      </div>
-    </div>
-    {{end}}
   </div>
   {{end}}
 </div>
