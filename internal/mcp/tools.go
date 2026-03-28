@@ -118,38 +118,7 @@ type submitReviewInput struct {
 type exportCategoriesInput struct{}
 
 type importCategoriesInput struct {
-	Content string `json:"content" jsonschema:"required,TSV content with category definitions. Columns: slug, display_name, parent_slug, icon, color, sort_order, hidden, merge_into. The merge_into column is optional — set to a target slug to merge the source category into the target (transactions and mappings reassigned then source deleted)."`
-}
-
-type exportCategoryMappingsInput struct{}
-
-type importCategoryMappingsInput struct {
-	Content            string `json:"content" jsonschema:"required,TSV content with category mappings. Columns: provider, provider_category, category_slug"`
-	ApplyRetroactively bool   `json:"apply_retroactively,omitempty" jsonschema:"Apply mapping changes to ALL matching non-overridden transactions not just uncategorized. Default false."`
-}
-
-type listCategoryMappingsInput struct {
-	Provider     string `json:"provider,omitempty" jsonschema:"Filter by provider: plaid, teller, or csv"`
-	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Filter by target category slug (e.g. food_and_drink_restaurant). Use list_categories to find valid slugs."`
-}
-
-type createCategoryMappingInput struct {
-	Provider         string `json:"provider" jsonschema:"required,Provider type: plaid, teller, or csv"`
-	ProviderCategory string `json:"provider_category" jsonschema:"required,Raw category string from the provider (e.g. FOOD_AND_DRINK_GROCERIES for Plaid or dining for Teller)"`
-	CategorySlug     string `json:"category_slug" jsonschema:"required,Slug of the target user category (e.g. food_and_drink_restaurant). Use list_categories to find valid slugs."`
-}
-
-type updateCategoryMappingInput struct {
-	ID               string `json:"id,omitempty" jsonschema:"Mapping ID to update (alternative to provider + provider_category)"`
-	Provider         string `json:"provider,omitempty" jsonschema:"Provider type (required if not using id)"`
-	ProviderCategory string `json:"provider_category,omitempty" jsonschema:"Raw provider category string (required if not using id)"`
-	CategorySlug     string `json:"category_slug" jsonschema:"required,New target category slug"`
-}
-
-type deleteCategoryMappingInput struct {
-	ID               string `json:"id,omitempty" jsonschema:"Mapping ID to delete (alternative to provider + provider_category)"`
-	Provider         string `json:"provider,omitempty" jsonschema:"Provider type (required if not using id)"`
-	ProviderCategory string `json:"provider_category,omitempty" jsonschema:"Raw provider category string (required if not using id)"`
+	Content string `json:"content" jsonschema:"required,TSV content with category definitions. Columns: slug, display_name, parent_slug, icon, color, sort_order, hidden, merge_into. The merge_into column is optional — set to a target slug to merge the source category into the target (transactions reassigned then source deleted)."`
 }
 
 // --- Handlers ---
@@ -401,15 +370,6 @@ func (s *MCPServer) handleResetTransactionCategory(ctx context.Context, _ *mcpsd
 	}, nil, nil
 }
 
-func (s *MCPServer) handleListUnmappedCategories(_ context.Context, _ *mcpsdk.CallToolRequest, _ any) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-	unmapped, err := s.svc.ListUnmappedCategories(ctx)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(unmapped)
-}
-
 func (s *MCPServer) handleAddTransactionComment(ctx context.Context, _ *mcpsdk.CallToolRequest, input addTransactionCommentInput) (*mcpsdk.CallToolResult, any, error) {
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
@@ -542,116 +502,6 @@ func (s *MCPServer) handleMerchantSummary(_ context.Context, _ *mcpsdk.CallToolR
 	return jsonResult(result)
 }
 
-func (s *MCPServer) handleListCategoryMappings(_ context.Context, _ *mcpsdk.CallToolRequest, input listCategoryMappingsInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-
-	var provider *string
-	if input.Provider != "" {
-		provider = &input.Provider
-	}
-
-	mappings, err := s.svc.ListMappings(ctx, provider, input.CategorySlug)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	return jsonResult(map[string]any{
-		"mappings": mappings,
-		"count":    len(mappings),
-	})
-}
-
-func (s *MCPServer) handleCreateCategoryMapping(ctx context.Context, _ *mcpsdk.CallToolRequest, input createCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	ctx = context.Background()
-
-	if input.Provider == "" || input.ProviderCategory == "" || input.CategorySlug == "" {
-		return errorResult(fmt.Errorf("provider, provider_category, and category_slug are required")), nil, nil
-	}
-
-	switch input.Provider {
-	case "plaid", "teller", "csv":
-	default:
-		return errorResult(fmt.Errorf("invalid provider '%s'. Must be plaid, teller, or csv", input.Provider)), nil, nil
-	}
-
-	mapping, err := s.svc.CreateMappingBySlug(ctx, input.Provider, input.ProviderCategory, input.CategorySlug)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	return jsonResult(mapping)
-}
-
-func (s *MCPServer) handleUpdateCategoryMapping(ctx context.Context, _ *mcpsdk.CallToolRequest, input updateCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	ctx = context.Background()
-
-	if input.CategorySlug == "" {
-		return errorResult(fmt.Errorf("category_slug is required")), nil, nil
-	}
-	if input.ID == "" && (input.Provider == "" || input.ProviderCategory == "") {
-		return errorResult(fmt.Errorf("either id or (provider, provider_category) is required")), nil, nil
-	}
-
-	var id, provider, providerCategory *string
-	if input.ID != "" {
-		id = &input.ID
-	}
-	if input.Provider != "" {
-		provider = &input.Provider
-	}
-	if input.ProviderCategory != "" {
-		providerCategory = &input.ProviderCategory
-	}
-
-	mapping, err := s.svc.UpdateMappingBySlug(ctx, id, provider, providerCategory, input.CategorySlug)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	return jsonResult(mapping)
-}
-
-func (s *MCPServer) handleDeleteCategoryMapping(ctx context.Context, _ *mcpsdk.CallToolRequest, input deleteCategoryMappingInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	ctx = context.Background()
-
-	if input.ID == "" && (input.Provider == "" || input.ProviderCategory == "") {
-		return errorResult(fmt.Errorf("either id or (provider, provider_category) is required")), nil, nil
-	}
-
-	var id, provider, providerCategory *string
-	if input.ID != "" {
-		id = &input.ID
-	}
-	if input.Provider != "" {
-		provider = &input.Provider
-	}
-	if input.ProviderCategory != "" {
-		providerCategory = &input.ProviderCategory
-	}
-
-	prov, provCat, err := s.svc.DeleteMappingByLookup(ctx, id, provider, providerCategory)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	return jsonResult(map[string]any{
-		"deleted":           true,
-		"provider":          prov,
-		"provider_category": provCat,
-	})
-}
-
-// --- Bulk export/import ---
-
 func (s *MCPServer) handleExportCategories(_ context.Context, _ *mcpsdk.CallToolRequest, _ exportCategoriesInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
 	tsv, err := s.svc.ExportCategoriesTSV(ctx)
@@ -673,33 +523,6 @@ func (s *MCPServer) handleImportCategories(ctx context.Context, _ *mcpsdk.CallTo
 		return errorResult(fmt.Errorf("content is required")), nil, nil
 	}
 	result, err := s.svc.ImportCategoriesTSV(context.Background(), input.Content, false)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(result)
-}
-
-func (s *MCPServer) handleExportCategoryMappings(_ context.Context, _ *mcpsdk.CallToolRequest, _ exportCategoryMappingsInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-	tsv, err := s.svc.ExportMappingsTSV(ctx)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return &mcpsdk.CallToolResult{
-		Content: []mcpsdk.Content{
-			&mcpsdk.TextContent{Text: tsv},
-		},
-	}, nil, nil
-}
-
-func (s *MCPServer) handleImportCategoryMappings(ctx context.Context, _ *mcpsdk.CallToolRequest, input importCategoryMappingsInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if input.Content == "" {
-		return errorResult(fmt.Errorf("content is required")), nil, nil
-	}
-	result, err := s.svc.ImportMappingsTSV(context.Background(), input.Content, input.ApplyRetroactively, false)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}

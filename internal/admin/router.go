@@ -103,7 +103,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/rules", RulesPageHandler(svc, sm, tr, a.Config.Version))
 
 		r.Get("/categories", CategoriesPageHandler(svc, sm, tr))
-		r.Get("/categories/mappings", MappingsPageHandler(svc, sm, tr))
 
 		r.Route("/mcp-settings", func(r chi.Router) {
 			r.Get("/", MCPSettingsGetHandler(svc, mcpServer, sm, tr))
@@ -165,15 +164,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Category bulk export/import (TSV)
 		r.Get("/categories/export-tsv", ExportCategoriesTSVAdminHandler(svc))
 		r.Post("/categories/import-tsv", ImportCategoriesTSVAdminHandler(svc))
-
-		// Category mapping CRUD
-		r.Post("/category-mappings", CreateMappingAdminHandler(svc))
-		r.Put("/category-mappings/{id}", UpdateMappingAdminHandler(svc))
-		r.Delete("/category-mappings/{id}", DeleteMappingAdminHandler(svc))
-		r.Put("/category-mappings/bulk", BulkUpsertMappingsAdminHandler(svc))
-		r.Get("/category-mappings/export", ExportMappingsAdminHandler(svc))
-		r.Get("/category-mappings/export-tsv", ExportMappingsTSVAdminHandler(svc))
-		r.Post("/category-mappings/import-tsv", ImportMappingsTSVAdminHandler(svc))
 
 		// Transaction CSV export
 		r.Get("/transactions/export-csv", ExportTransactionsCSVHandler(a, svc))

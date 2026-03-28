@@ -34,8 +34,8 @@ CATEGORY SYSTEM:
 - For bulk category changes: use batch_categorize_transactions (multiple transactions, one category) or bulk_recategorize (change all transactions from one category to another)
 - Use reset_transaction_category to undo a manual override
 - Use list_unmapped_categories to find raw provider categories without mappings
-- Use list_category_mappings, create_category_mapping, update_category_mapping, delete_category_mapping to manage how provider category strings map to user categories
-- For bulk editing: use export_categories / import_categories and export_category_mappings / import_category_mappings to export TSV text, edit it, and re-import. Set apply_retroactively=true on import_category_mappings to update ALL matching transactions (not just uncategorized)
+- Use transaction rules to automatically categorize transactions based on conditions (name, amount, provider, etc). Rules are evaluated during sync in priority order.
+- For bulk editing categories: use export_categories / import_categories to export TSV text, edit it, and re-import
 - To simplify/consolidate categories: export categories, then set the merge_into column to a target slug for categories you want to merge. All transactions and mappings from the source are moved to the target. This preserves categorization history while reducing complexity
 
 TOKEN EFFICIENCY:
@@ -182,9 +182,6 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("reset_transaction_category", ToolWrite,
 			"Remove a manual category override from a transaction and re-resolve its category from the automatic mapping rules. Use this to undo a categorize_transaction action.",
 			s.handleResetTransactionCategory),
-		makeToolDef("list_unmapped_categories", ToolRead,
-			"List distinct raw provider category strings from transactions that currently have no category mapping. These are transactions the system couldn't automatically categorize. Results show the raw primary and detailed category strings from the provider.",
-			s.handleListUnmappedCategories),
 		makeToolDef("add_transaction_comment", ToolWrite,
 			"Add a comment to a transaction. Use this to explain categorization decisions, flag unusual transactions, or leave notes for the family. Comments are visible on the transaction detail page and to other agents. Supports markdown formatting.",
 			s.handleAddTransactionComment),
@@ -203,24 +200,6 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("import_categories", ToolWrite,
 			"Import category definitions from TSV text. Existing slugs are updated (display_name, icon, color, sort_order, hidden). New slugs are created. Missing slugs are NOT deleted. Parents must appear before children. Use export_categories to get the current state, edit it, then import the modified version. To merge/consolidate categories, set the merge_into column to the target category slug — all transactions and mappings from the source are reassigned to the target, then the source is deleted. This is useful for simplifying a complex taxonomy without losing transaction categorization.",
 			s.handleImportCategories),
-		makeToolDef("export_category_mappings", ToolRead,
-			"Export all category mappings as TSV text. Columns: provider, provider_category, category_slug. The returned format can be edited and re-imported via import_category_mappings. Use this for bulk editing of how provider category strings map to user categories.",
-			s.handleExportCategoryMappings),
-		makeToolDef("import_category_mappings", ToolWrite,
-			"Import category mappings from TSV text. Existing (provider, provider_category) pairs are updated. New pairs are created. Missing pairs are NOT deleted. Set apply_retroactively=true to re-categorize ALL matching non-overridden transactions (not just uncategorized). Without it, only uncategorized transactions are updated.",
-			s.handleImportCategoryMappings),
-		makeToolDef("list_category_mappings", ToolRead,
-			"List category mappings that translate provider-specific category strings to user categories. Filter by provider to see mappings for a specific bank data source. Returns the provider, raw provider category string, and the mapped user category slug and display name.",
-			s.handleListCategoryMappings),
-		makeToolDef("create_category_mapping", ToolWrite,
-			"Create a new category mapping that tells the system how to translate a provider's raw category string to a user category. For example, map Teller's 'dining' to your 'food_and_drink_restaurant' category. The mapping takes effect on the next sync — existing transactions are not retroactively updated.",
-			s.handleCreateCategoryMapping),
-		makeToolDef("update_category_mapping", ToolWrite,
-			"Update an existing category mapping to point to a different user category. Identified by mapping ID or by the (provider, provider_category) pair. Does not retroactively update transactions — wait for next sync.",
-			s.handleUpdateCategoryMapping),
-		makeToolDef("delete_category_mapping", ToolWrite,
-			"Delete a category mapping. After deletion, transactions with this provider category string will fall back to 'uncategorized' on next sync. Identified by mapping ID or by (provider, provider_category) pair.",
-			s.handleDeleteCategoryMapping),
 		makeToolDef("list_pending_reviews", ToolRead,
 			"List pending transaction reviews in the review queue. Reviews are created automatically during sync for new, uncategorized, or low-confidence transactions. Use limit to control batch size — review 10-20 at a time unless instructed otherwise. Filter by review_type (new_transaction, uncategorized, low_confidence, manual) and account_id. Each review includes the full transaction details and suggested category.",
 			s.handleListPendingReviews),

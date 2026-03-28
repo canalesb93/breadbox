@@ -3,6 +3,7 @@ package admin
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -14,7 +15,6 @@ import (
 )
 
 // CategoriesPageHandler serves GET /admin/categories.
-// Serves the combined categories + mappings page with tabs.
 func CategoriesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -23,29 +23,6 @@ func CategoriesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		if err != nil {
 			http.Error(w, "Failed to load categories", http.StatusInternalServerError)
 			return
-		}
-
-		unmapped, err := svc.ListUnmappedCategories(ctx)
-		if err != nil {
-			http.Error(w, "Failed to load unmapped categories", http.StatusInternalServerError)
-			return
-		}
-
-		// Parse optional provider filter for mappings tab.
-		var providerPtr *string
-		if p := r.URL.Query().Get("provider"); p == "plaid" || p == "teller" || p == "csv" {
-			providerPtr = &p
-		}
-
-		mappings, err := svc.ListMappings(ctx, providerPtr)
-		if err != nil {
-			http.Error(w, "Failed to load mappings", http.StatusInternalServerError)
-			return
-		}
-
-		filterProvider := ""
-		if providerPtr != nil {
-			filterProvider = *providerPtr
 		}
 
 		// Parse date range for spending data (default 30 days).
@@ -105,10 +82,6 @@ func CategoriesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 
 		data := BaseTemplateData(r, sm, "categories", "Categories")
 		data["Categories"] = categories
-		data["UnmappedCount"] = len(unmapped)
-		data["UnmappedCategories"] = unmapped
-		data["Mappings"] = mappings
-		data["FilterProvider"] = filterProvider
 		data["SpendingByCategory"] = spendingByCategory
 		data["TotalSpending"] = totalSpending
 		data["MaxCategorySpend"] = maxCategorySpend
@@ -341,5 +314,57 @@ func BatchSetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerF
 			"failed":    failed,
 			"total":     len(req.Items),
 		})
+	}
+}
+
+// flattenCategories converts a category tree into a flat list suitable for dropdown selects.
+func flattenCategories(tree []service.CategoryResponse) []service.CategoryResponse {
+	var flat []service.CategoryResponse
+	for _, parent := range tree {
+		flat = append(flat, parent)
+		for _, child := range parent.Children {
+			flat = append(flat, child)
+		}
+	}
+	return flat
+}
+
+// ExportCategoriesTSVAdminHandler handles GET /admin/api/categories/export-tsv.
+func ExportCategoriesTSVAdminHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tsv, err := svc.ExportCategoriesTSV(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to export categories"})
+			return
+		}
+		w.Header().Set("Content-Type", "text/tab-separated-values")
+		w.Header().Set("Content-Disposition", "attachment; filename=categories.tsv")
+		w.Write([]byte(tsv))
+	}
+}
+
+// ImportCategoriesTSVAdminHandler handles POST /admin/api/categories/import-tsv.
+func ImportCategoriesTSVAdminHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
+			return
+		}
+		if len(body) == 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Request body is empty"})
+			return
+		}
+
+		replaceMode := r.URL.Query().Get("replace") == "true"
+
+		result, err := svc.ImportCategoriesTSV(r.Context(), string(body), replaceMode)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"error": map[string]string{"code": "IMPORT_ERROR", "message": err.Error()},
+			})
+			return
+		}
+		writeJSON(w, http.StatusOK, result)
 	}
 }

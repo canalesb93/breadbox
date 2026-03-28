@@ -46,11 +46,6 @@ UPDATE transactions
 SET category_id = $2, updated_at = NOW()
 WHERE category_id = $1 AND deleted_at IS NULL;
 
--- name: ReassignMappingsCategory :exec
-UPDATE category_mappings
-SET category_id = $2, updated_at = NOW()
-WHERE category_id = $1;
-
 -- name: SetTransactionCategoryOverride :execrows
 UPDATE transactions
 SET category_id = $2, category_override = TRUE, updated_at = NOW()
@@ -66,13 +61,3 @@ UPDATE transaction_rules
 SET category_id = $2, updated_at = NOW()
 WHERE category_id = $1;
 
--- name: ListUnmappedCategories :many
-SELECT DISTINCT bc.provider, t.category_primary, t.category_detailed
-FROM transactions t
-JOIN accounts a ON t.account_id = a.id
-JOIN bank_connections bc ON a.connection_id = bc.id
-WHERE t.category_id = (SELECT id FROM categories WHERE slug = 'uncategorized')
-  AND t.category_override = FALSE
-  AND t.deleted_at IS NULL
-  AND (t.category_primary IS NOT NULL OR t.category_detailed IS NOT NULL)
-ORDER BY bc.provider, t.category_primary, t.category_detailed;

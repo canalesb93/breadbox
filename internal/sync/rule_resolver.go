@@ -36,12 +36,11 @@ type TransactionContext struct {
 	UserName         string  // family member name
 }
 
-// RuleResolver loads transaction rules and category mappings, evaluating them during sync.
-// Rules are checked first (by priority), then category mappings as fallback.
+// RuleResolver loads transaction rules and evaluates them during sync.
+// If no rule matches, the transaction is assigned the "uncategorized" category.
 type RuleResolver struct {
 	rules           []compiledRule
-	mappings        map[string]pgtype.UUID // "provider:category" -> UUID
-	slugCache       map[[16]byte]string    // category UUID bytes -> slug
+	slugCache       map[[16]byte]string // category UUID bytes -> slug
 	uncategorizedID pgtype.UUID
 	hitCounts       map[[16]byte]int // rule UUID bytes -> hit count accumulator
 }
@@ -69,11 +68,10 @@ type ruleRow struct {
 	conditions []byte
 }
 
-// NewRuleResolver creates a resolver pre-loaded with rules and mappings for the given provider.
-// If the transaction_rules table does not exist, it logs a warning and proceeds with mappings only.
+// NewRuleResolver creates a resolver pre-loaded with transaction rules.
+// If the transaction_rules table does not exist, it logs a warning and proceeds with no rules.
 func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, logger *slog.Logger) (*RuleResolver, error) {
 	r := &RuleResolver{
-		mappings:  make(map[string]pgtype.UUID),
 		slugCache: make(map[[16]byte]string),
 		hitCounts: make(map[[16]byte]int),
 	}
@@ -81,30 +79,9 @@ func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, l
 	// Load transaction rules. Gracefully handle missing table.
 	rules, err := loadRules(ctx, pool, logger)
 	if err != nil {
-		// Non-fatal: table may not exist yet. Log and continue with empty rules.
-		logger.Warn("failed to load transaction rules, proceeding with category mappings only", "error", err)
+		logger.Warn("failed to load transaction rules", "error", err)
 	} else {
 		r.rules = rules
-	}
-
-	// Load category mappings for this provider (same logic as CategoryResolver).
-	rows, err := pool.Query(ctx,
-		"SELECT provider_category, category_id FROM category_mappings WHERE provider = $1", provider)
-	if err != nil {
-		return nil, fmt.Errorf("load category mappings for %s: %w", provider, err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var providerCategory string
-		var categoryID pgtype.UUID
-		if err := rows.Scan(&providerCategory, &categoryID); err != nil {
-			return nil, fmt.Errorf("scan category mapping: %w", err)
-		}
-		r.mappings[provider+":"+providerCategory] = categoryID
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate category mappings: %w", err)
 	}
 
 	// Load the uncategorized category ID.
@@ -259,45 +236,14 @@ func (r *RuleResolver) CategorySlug(id pgtype.UUID) string {
 	return r.slugCache[id.Bytes]
 }
 
-// Resolve does a mapping-only lookup (no rules). Backward-compatible with CategoryResolver.
-// Resolution chain: detailed -> primary -> uncategorized.
-func (r *RuleResolver) Resolve(provider string, detailed, primary *string) pgtype.UUID {
-	var d, p string
-	if detailed != nil {
-		d = *detailed
-	}
-	if primary != nil {
-		p = *primary
-	}
-	return r.resolveMappings(provider, d, p)
-}
-
-// ResolveWithContext evaluates transaction rules first, then falls back to mappings.
-// The first matching rule (by priority order) wins.
+// ResolveWithContext evaluates transaction rules in priority order.
+// The first matching rule wins. If no rule matches, returns uncategorizedID.
 func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionContext) pgtype.UUID {
-	// Evaluate rules in priority order.
 	for i := range r.rules {
 		rule := &r.rules[i]
 		if evaluateCondition(rule.condition, txn) {
 			r.hitCounts[rule.id.Bytes]++
 			return rule.categoryID
-		}
-	}
-
-	// Fall back to mapping lookup.
-	return r.resolveMappings(providerName, txn.CategoryDetailed, txn.CategoryPrimary)
-}
-
-// resolveMappings does the detailed -> primary -> uncategorized mapping chain.
-func (r *RuleResolver) resolveMappings(provider, detailed, primary string) pgtype.UUID {
-	if detailed != "" {
-		if id, ok := r.mappings[provider+":"+detailed]; ok {
-			return id
-		}
-	}
-	if primary != "" {
-		if id, ok := r.mappings[provider+":"+primary]; ok {
-			return id
 		}
 	}
 	return r.uncategorizedID
