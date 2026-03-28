@@ -423,7 +423,7 @@
                    :data-cmdk-idx="item._flatIndex"
                    @click="go(item)"
                    @mouseenter="activeIndex = item._flatIndex">
-                <div class="bb-cmdk-item-icon">
+                <div class="bb-cmdk-item-icon" :style="item.iconColor ? 'background-color: color-mix(in oklch, ' + item.iconColor + ' 15%, transparent); color: ' + item.iconColor : ''">
                   <i :data-lucide="item.icon"></i>
                 </div>
                 <div class="bb-cmdk-item-label">
@@ -701,7 +701,6 @@
             seen[item.group].items.push(clone);
             flatIndex++;
           });
-          // Add skeleton group while loading
           if (this._txLoading && !seen['Transactions']) {
             groups.push({ label: 'Transactions', items: [], _loading: true });
           }
@@ -751,7 +750,6 @@
             if (dialog) lucide.createIcons({ nodes: [dialog] });
           }, 10);
 
-          // Debounced transaction search
           if (this._txTimer) clearTimeout(this._txTimer);
           if (this._txAbort) this._txAbort.abort();
 
@@ -787,7 +785,8 @@
                   group: 'Transactions',
                   title: tx.name,
                   desc: desc,
-                  icon: tx.pending ? 'clock' : 'receipt',
+                  icon: tx.pending ? 'clock' : (tx.category_icon || 'receipt'),
+                  iconColor: tx.category_color || null,
                   href: '/transactions/' + tx.id,
                   keywords: ''
                 };
