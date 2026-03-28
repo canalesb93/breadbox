@@ -1,0 +1,513 @@
+{{define "content"}}
+<div class="bb-page-header">
+  <div>
+    <div class="flex items-center gap-2 text-sm text-base-content/50 mb-1">
+      <a href="/agent-wizard" class="hover:text-base-content transition-colors">Agent Wizard</a>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      <span class="text-base-content/70">{{.AgentLabel}}</span>
+    </div>
+    <h1 class="bb-page-title">{{.AgentLabel}}</h1>
+    <p class="text-sm text-base-content/50 mt-1">{{.AgentDescription}}</p>
+  </div>
+</div>
+
+<div x-data="promptBuilder({{.BlocksJSON}})" @keydown.window="handleKeyboard($event)" class="space-y-5">
+
+  <!-- Block pills (top) — shows all toggleable blocks with selected state -->
+  <div class="flex flex-wrap gap-1.5">
+    <template x-for="block in allToggleableBlocks" :key="block.id">
+      <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150"
+              :class="block.enabled
+                ? 'bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15'
+                : 'bg-base-200/50 text-base-content/40 border border-base-300 hover:text-base-content/60 hover:border-base-content/20'"
+              @click="toggleBlock(block.id)">
+        <!-- Checkmark when enabled -->
+        <svg x-show="block.enabled" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        <!-- Plus when disabled -->
+        <svg x-show="!block.enabled" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+        <span x-text="block.title"></span>
+      </button>
+    </template>
+    <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-base-200/50 text-base-content/40 border border-dashed border-base-300 hover:text-base-content/60 hover:border-base-content/20 transition-all duration-150"
+            @click="addCustomBlock()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+      Custom Instructions
+    </button>
+  </div>
+
+  <!-- Unified block editor -->
+  <div class="rounded-xl border border-base-300 overflow-hidden bg-base-100">
+    <template x-for="(block, index) in activeBlocks" :key="block.id">
+      <div :class="{ 'border-t border-base-300': index > 0 }"
+           @dragover.prevent="handleDragOver($event, index)"
+           @drop.prevent="handleDrop()"
+           :data-block-id="block.id"
+           class="group/block relative"
+           :style="focusedBlock === block.id ? 'box-shadow: inset 3px 0 0 oklch(var(--p))' : ''">
+
+        <!-- Block header -->
+        <div class="flex items-center gap-2 px-3 py-2.5 select-none cursor-pointer transition-colors duration-100"
+             :class="[
+               draggingId === block.id ? 'opacity-30' : '',
+               focusedBlock === block.id ? 'bg-primary/8' : 'bg-base-200/50 hover:bg-base-200/80'
+             ]"
+             draggable="true"
+             @dragstart="handleDragStart($event, index, block.id)"
+             @dragend="handleDragEnd()"
+             @click="toggleCollapse(block.id)"
+             :style="draggingId ? 'cursor:grabbing' : ''">
+
+          <!-- Drag handle -->
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-base-content/25 flex-shrink-0"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>
+
+          <!-- Collapse toggle + Title -->
+          <div class="flex items-center gap-1.5 flex-1 min-w-0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 class="text-base-content/30 flex-shrink-0 transition-transform duration-200"
+                 :style="isCollapsed(block.id) ? '' : 'transform:rotate(90deg)'"><path d="m9 18 6-6-6-6"/></svg>
+            <span class="text-sm font-semibold text-base-content/60 truncate" x-text="block.title"></span>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex items-center gap-0.5 flex-shrink-0">
+            <!-- Copy block -->
+            <button class="p-1.5 rounded-lg text-base-content/25 hover:text-base-content/60 hover:bg-base-300/50 transition-colors opacity-0 group-hover/block:opacity-100"
+                    @click.stop="copyBlock(block.id)" :title="copiedBlockId === block.id ? 'Copied!' : 'Copy block'">
+              <svg x-show="copiedBlockId !== block.id" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              <svg x-show="copiedBlockId === block.id" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-success"><path d="M20 6 9 17l-5-5"/></svg>
+            </button>
+            <!-- Reset -->
+            <template x-if="block.content !== block.originalContent && !block.isCustom">
+              <button class="p-1.5 rounded-lg text-base-content/25 hover:text-warning hover:bg-warning/10 transition-colors"
+                      @click.stop="resetBlock(block.id)" title="Reset to default">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+              </button>
+            </template>
+            <!-- Remove -->
+            <template x-if="block.role !== 'core'">
+              <button class="p-1.5 rounded-lg text-base-content/25 hover:text-error hover:bg-error/10 transition-colors"
+                      @click.stop="block.isCustom ? removeCustomBlock(block.id) : toggleBlock(block.id)"
+                      title="Remove block">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Block content -->
+        <div class="relative overflow-hidden transition-[max-height,background-color] duration-300 ease-in-out"
+             :style="(isCollapsed(block.id) || draggingId) ? (draggingId ? 'max-height:2.5rem' : 'max-height:3.5rem') : 'max-height:' + getBlockHeight(block.id) + 'px'"
+             @click="(isCollapsed(block.id) || draggingId) && !draggingId ? toggleCollapse(block.id) : null"
+             :class="(isCollapsed(block.id) || draggingId) ? 'cursor-pointer hover:bg-base-200/30' : ''">
+          <div class="px-4 py-2.5">
+            <textarea
+              class="w-full bg-transparent font-mono text-xs leading-relaxed resize-none outline-none transition-colors duration-200"
+              :class="(isCollapsed(block.id) || draggingId) ? 'text-base-content/40 pointer-events-none' : 'text-base-content/70'"
+              x-model="block.content"
+              @input="autoResize($el); updateBlockHeight(block.id, $el)"
+              @focus="focusedBlock = block.id"
+              @blur="focusedBlock = null"
+              @keydown.escape="$el.blur()"
+              x-init="$nextTick(() => { autoResize($el); updateBlockHeight(block.id, $el); })"
+              :placeholder="block.isCustom ? 'Add your custom instructions here...' : ''"
+              spellcheck="false"
+              rows="1"
+              :tabindex="(isCollapsed(block.id) || draggingId) ? -1 : 0"
+            ></textarea>
+          </div>
+          <!-- Fade overlay when collapsed -->
+          <div class="absolute bottom-0 left-0 right-0 h-8 pointer-events-none transition-opacity duration-300"
+               :class="(isCollapsed(block.id) || draggingId) ? 'opacity-100' : 'opacity-0'"
+               style="background: linear-gradient(to bottom, transparent, var(--color-base-100))"></div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Empty state -->
+    <template x-if="activeBlocks.length === 0">
+      <div class="px-6 py-12 text-center text-base-content/40">
+        <p class="text-sm">No blocks enabled. Toggle blocks above to start building your prompt.</p>
+      </div>
+    </template>
+  </div>
+
+  <!-- Spacer for floating bar -->
+  <div class="h-20"></div>
+
+  <!-- Teleport floating elements to body to avoid drawer transform breaking position:fixed -->
+  <template x-teleport="body">
+  <div>
+
+  <!-- Toast notification -->
+  <div x-show="toast" x-cloak
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0 translate-y-2"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0 translate-y-2"
+       class="fixed bottom-24 left-1/2 z-50 -translate-x-1/2">
+    <div class="bg-base-100 border border-base-300 rounded-xl shadow-lg px-4 py-2.5 flex items-center gap-2">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-success"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="text-sm font-medium" x-text="toast"></span>
+    </div>
+  </div>
+
+  <!-- Floating bottom bar -->
+  <div class="fixed bottom-6 left-1/2 z-40 -translate-x-1/2">
+    <div class="flex items-center gap-3 bg-base-100 border border-base-300 rounded-2xl shadow-lg px-5 py-3">
+      <span class="text-xs text-base-content/40 tabular-nums" x-text="activeBlocks.length + ' blocks · ' + preview.length.toLocaleString() + ' chars'"></span>
+      <div class="w-px h-6 bg-base-300"></div>
+      <button class="btn btn-ghost btn-sm rounded-xl gap-1.5 text-xs" @click="openPreview()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        Preview
+        <span class="ml-1 text-[10px] opacity-50 border border-current/30 rounded px-1 leading-none py-0.5">P</span>
+      </button>
+      <button class="btn btn-primary btn-sm rounded-xl gap-1.5 text-xs relative overflow-hidden" style="min-width:8rem" @click="copyPrompt()">
+        <span class="flex items-center gap-1.5 transition-all duration-200"
+              :class="copied ? 'opacity-0 scale-75' : 'opacity-100 scale-100'">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+          Copy Prompt
+          <span class="ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">C</span>
+        </span>
+        <span class="absolute inset-0 flex items-center justify-center gap-1.5 transition-all duration-200"
+              :class="copied ? 'opacity-100 scale-100' : 'opacity-0 scale-75'">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          Copied!
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Preview modal (full screen) -->
+  <div x-show="showPreview" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       @keydown.escape.window="showPreview = false">
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+         @click="showPreview = false"
+         x-show="showPreview"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"></div>
+    <!-- Modal -->
+    <div class="relative bg-base-100 rounded-2xl shadow-2xl border border-base-300 w-full max-w-5xl max-h-[90vh] mx-4 flex flex-col"
+         x-show="showPreview"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95 translate-y-4"
+         x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95 translate-y-4">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-base-300 flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <h3 class="font-semibold">Prompt Preview</h3>
+          <span class="text-xs text-base-content/40 tabular-nums" x-text="preview.length.toLocaleString() + ' chars'"></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-sm btn-primary rounded-xl gap-1.5 text-xs relative overflow-hidden" style="min-width:5.5rem" @click="copyPrompt()">
+            <span class="flex items-center gap-1.5 transition-all duration-200"
+                  :class="copied ? 'opacity-0 scale-75' : 'opacity-100 scale-100'">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              Copy
+            </span>
+            <span class="absolute inset-0 flex items-center justify-center gap-1.5 transition-all duration-200"
+                  :class="copied ? 'opacity-100 scale-100' : 'opacity-0 scale-75'">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              Copied!
+            </span>
+          </button>
+          <button class="btn btn-ghost btn-sm btn-square rounded-xl" @click="showPreview = false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <!-- Rendered markdown content -->
+      <div class="overflow-auto flex-1 px-6 py-5">
+        <div class="bb-markdown" x-html="renderMarkdown(preview)"></div>
+      </div>
+      <style>
+        .bb-markdown { font-size: 0.875rem; line-height: 1.7; color: var(--color-base-content); }
+        .bb-markdown h1 { font-size: 1.5rem; font-weight: 700; margin: 1.5rem 0 0.75rem; border-bottom: 1px solid oklch(var(--bc) / 0.1); padding-bottom: 0.5rem; }
+        .bb-markdown h2 { font-size: 1.15rem; font-weight: 700; margin: 1.5rem 0 0.5rem; color: oklch(var(--bc) / 0.8); }
+        .bb-markdown h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.5rem; }
+        .bb-markdown p { margin: 0.5rem 0; }
+        .bb-markdown ul { list-style-type: disc; padding-left: 1.5rem; margin: 0.5rem 0; }
+        .bb-markdown ol { list-style-type: decimal; padding-left: 1.5rem; margin: 0.5rem 0; }
+        .bb-markdown li { margin: 0.25rem 0; }
+        .bb-markdown li > p { margin: 0; display: inline; }
+        .bb-markdown code { font-size: 0.8em; background: oklch(var(--bc) / 0.06); padding: 0.15rem 0.35rem; border-radius: 0.25rem; font-family: ui-monospace, monospace; }
+        .bb-markdown pre { background: oklch(var(--bc) / 0.04); border: 1px solid oklch(var(--bc) / 0.08); border-radius: 0.5rem; padding: 0.75rem 1rem; overflow-x: auto; margin: 0.75rem 0; }
+        .bb-markdown pre code { background: none; padding: 0; font-size: 0.8rem; }
+        .bb-markdown strong { font-weight: 600; }
+        .bb-markdown hr { border: none; border-top: 1px solid oklch(var(--bc) / 0.1); margin: 1.5rem 0; }
+        .bb-markdown blockquote { border-left: 3px solid oklch(var(--p)); padding-left: 1rem; margin: 0.75rem 0; color: oklch(var(--bc) / 0.6); }
+        .bb-markdown ul ul, .bb-markdown ol ul { margin: 0.15rem 0; }
+      </style>
+    </div>
+  </div>
+
+  </div>
+  </template><!-- /x-teleport -->
+
+</div>
+
+<script>
+function promptBuilder(initialBlocks) {
+  var customCounter = 0;
+
+  return {
+    blocks: initialBlocks.map(function(b) {
+      b.isCustom = false;
+      return b;
+    }),
+    copied: false,
+    copiedBlockId: null,
+    showPreview: false,
+    toast: null,
+    draggingId: null,
+    focusedBlock: null,
+    collapsedBlocks: {},
+    blockHeights: {},
+
+    getBlockHeight: function(id) {
+      return this.blockHeights[id] || 2000;
+    },
+
+    updateBlockHeight: function(id, el) {
+      var wrapper = el.closest('.px-4');
+      if (wrapper) {
+        this.blockHeights[id] = wrapper.scrollHeight + 20;
+      }
+    },
+
+    isCollapsed: function(id) {
+      return !!this.collapsedBlocks[id];
+    },
+
+    toggleCollapse: function(id) {
+      this.collapsedBlocks[id] = !this.collapsedBlocks[id];
+      if (!this.collapsedBlocks[id]) {
+        var self = this;
+        this.$nextTick(function() {
+          var el = self.$el.querySelector('[data-block-id="' + id + '"] textarea');
+          if (el) {
+            self.autoResize(el);
+            self.updateBlockHeight(id, el);
+          }
+        });
+      }
+    },
+
+    get activeBlocks() {
+      return this.blocks.filter(function(b) { return b.enabled; });
+    },
+
+    // All non-core, non-custom blocks (for the pill toggles at top)
+    get allToggleableBlocks() {
+      return this.blocks.filter(function(b) { return b.role !== 'core' && !b.isCustom; });
+    },
+
+    get preview() {
+      return this.blocks
+        .filter(function(b) { return b.enabled; })
+        .map(function(b) { return b.content; })
+        .join('\n\n');
+    },
+
+    autoResize: function(el) {
+      el.style.height = '0';
+      el.style.height = el.scrollHeight + 'px';
+    },
+
+    // --- Drag & drop ---
+    handleDragStart: function(e, index, id) {
+      this.draggingId = id;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', id);
+      var el = e.currentTarget;
+      if (el) {
+        var rect = el.getBoundingClientRect();
+        var offsetX = e.clientX - rect.left;
+        var offsetY = e.clientY - rect.top;
+        e.dataTransfer.setDragImage(el, offsetX, offsetY);
+      }
+    },
+
+    handleDragOver: function(e, toIndex) {
+      if (this.draggingId === null) return;
+
+      var activeIds = this.activeBlocks.map(function(b) { return b.id; });
+      var fromActiveIdx = activeIds.indexOf(this.draggingId);
+      if (fromActiveIdx === -1 || fromActiveIdx === toIndex) return;
+
+      var el = e.currentTarget;
+      var rect = el.getBoundingClientRect();
+      var midY = rect.top + rect.height / 2;
+      var insertBefore = e.clientY < midY;
+
+      var targetActiveIdx = insertBefore ? toIndex : toIndex + 1;
+      if (targetActiveIdx === fromActiveIdx || targetActiveIdx === fromActiveIdx + 1) return;
+
+      var enabled = [];
+      for (var i = 0; i < this.blocks.length; i++) {
+        if (this.blocks[i].enabled) enabled.push(i);
+      }
+
+      var fromBlockIdx = enabled[fromActiveIdx];
+      var toBlockIdx = targetActiveIdx < enabled.length ? enabled[targetActiveIdx] : this.blocks.length;
+
+      var item = this.blocks.splice(fromBlockIdx, 1)[0];
+      if (fromBlockIdx < toBlockIdx) toBlockIdx--;
+      this.blocks.splice(toBlockIdx, 0, item);
+    },
+
+    handleDragEnd: function() {
+      this.draggingId = null;
+      this.resizeAllTextareas();
+    },
+
+    handleDrop: function() {
+      this.draggingId = null;
+      this.resizeAllTextareas();
+    },
+
+    resizeAllTextareas: function() {
+      var self = this;
+      this.$nextTick(function() {
+        setTimeout(function() {
+          self.$el.querySelectorAll('textarea').forEach(function(ta) {
+            self.autoResize(ta);
+            var blockEl = ta.closest('[data-block-id]');
+            if (blockEl) {
+              self.updateBlockHeight(blockEl.dataset.blockId, ta);
+            }
+          });
+        }, 50);
+      });
+    },
+
+    toggleBlock: function(id) {
+      var block = this.blocks.find(function(b) { return b.id === id; });
+      if (block && block.role !== 'core') {
+        block.enabled = !block.enabled;
+        if (block.enabled) {
+          delete this.collapsedBlocks[id];
+          this.resizeAllTextareas();
+        }
+      }
+    },
+
+    addCustomBlock: function() {
+      customCounter++;
+      var id = 'custom-' + customCounter;
+      this.blocks.push({
+        id: id,
+        title: 'Custom Instructions',
+        description: 'Your own instructions — edit freely',
+        content: '',
+        originalContent: '',
+        role: 'optional',
+        enabled: true,
+        isCustom: true
+      });
+      var self = this;
+      this.$nextTick(function() {
+        var el = self.$el.querySelector('[data-block-id="' + id + '"] textarea');
+        if (el) el.focus();
+      });
+    },
+
+    removeCustomBlock: function(id) {
+      this.blocks = this.blocks.filter(function(b) { return b.id !== id; });
+      delete this.collapsedBlocks[id];
+    },
+
+    resetBlock: function(id) {
+      var block = this.blocks.find(function(b) { return b.id === id; });
+      if (block) {
+        block.content = block.originalContent;
+        // Reset stored height so it recalculates
+        delete this.blockHeights[id];
+        var self = this;
+        this.$nextTick(function() {
+          var el = self.$el.querySelector('[data-block-id="' + id + '"] textarea');
+          if (el) {
+            self.autoResize(el);
+            // Double-nextTick to ensure DOM has updated with new content
+            self.$nextTick(function() {
+              self.autoResize(el);
+              self.updateBlockHeight(id, el);
+            });
+          }
+        });
+      }
+    },
+
+    copyBlock: function(id) {
+      var block = this.blocks.find(function(b) { return b.id === id; });
+      if (!block) return;
+      var self = this;
+      navigator.clipboard.writeText(block.content).then(function() {
+        self.copiedBlockId = id;
+        setTimeout(function() { self.copiedBlockId = null; }, 2000);
+      });
+    },
+
+    openPreview: function() {
+      this.showPreview = true;
+    },
+
+    renderMarkdown: function(text) {
+      if (typeof marked === 'undefined') {
+        return '<pre style="white-space:pre-wrap">' + text.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</pre>';
+      }
+      // Preprocess: convert "ALL CAPS HEADER:" lines to markdown ## headers
+      var processed = text.replace(/^([A-Z][A-Z _&\/()\-\u2014]+):[ ]*$/gm, function(match, header) {
+        var clean = header.trim();
+        var titled = clean.toLowerCase().replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+        return '\n## ' + titled + '\n';
+      });
+      // Ensure blank lines before list items (marked requires them)
+      processed = processed.replace(/([^\n])\n(- )/g, '$1\n\n$2');
+      // Ensure blank lines before numbered list items
+      processed = processed.replace(/([^\n])\n(\d+\. )/g, '$1\n\n$2');
+      return marked.parse(processed);
+    },
+
+    showToast: function(msg) {
+      this.toast = msg;
+      var self = this;
+      setTimeout(function() { self.toast = null; }, 2000);
+    },
+
+    copyPrompt: function() {
+      var self = this;
+      navigator.clipboard.writeText(this.preview).then(function() {
+        self.copied = true;
+        self.showToast('Prompt copied to clipboard');
+        setTimeout(function() { self.copied = false; }, 2000);
+      });
+    },
+
+    handleKeyboard: function(e) {
+      // Don't trigger shortcuts when typing in a textarea or input
+      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+      // Don't trigger if modal is open (except Escape which is handled separately)
+      if (e.key === 'c' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        this.copyPrompt();
+      } else if (e.key === 'p' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        this.showPreview ? (this.showPreview = false) : this.openPreview();
+      }
+    }
+  };
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+{{end}}

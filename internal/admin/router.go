@@ -102,6 +102,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
 		r.Get("/review-instructions", ReviewInstructionsPageHandler(sm, tr))
 		r.Get("/agent-wizard", AgentWizardHandler(sm, tr))
+		r.Get("/agent-wizard/{type}", PromptBuilderHandler(sm, tr))
 		r.Get("/rules", RulesPageHandler(svc, sm, tr, a.Config.Version))
 
 		r.Get("/categories", CategoriesPageHandler(svc, sm, tr))
