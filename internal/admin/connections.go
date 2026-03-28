@@ -758,6 +758,26 @@ func SyncConnectionHandler(a *app.App) http.HandlerFunc {
 	}
 }
 
+// SyncAllConnectionsHandler serves POST /-/connections/sync-all.
+// It triggers a manual sync for all active, non-CSV connections.
+func SyncAllConnectionsHandler(a *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if a.SyncEngine == nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Sync engine not initialized"})
+			return
+		}
+
+		go func() {
+			ctx := context.Background()
+			if err := a.SyncEngine.SyncAll(ctx, db.SyncTriggerManual); err != nil {
+				a.Logger.Error("manual sync-all failed", "error", err)
+			}
+		}()
+
+		writeJSON(w, http.StatusAccepted, map[string]string{"status": "sync_all_triggered"})
+	}
+}
+
 // UpdateAccountExcludedHandler serves POST /admin/api/accounts/{id}/excluded.
 func UpdateAccountExcludedHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

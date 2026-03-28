@@ -134,6 +134,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/connections/{id}/reauth", ConnectionReauthAPIHandler(a))
 		r.Post("/connections/{id}/reauth-complete", ConnectionReauthCompleteHandler(a))
 		r.Post("/connections/{id}/sync", SyncConnectionHandler(a))
+		r.Post("/connections/sync-all", SyncAllConnectionsHandler(a))
 		r.Post("/connections/{id}/paused", UpdateConnectionPausedHandler(a, sm))
 		r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(a, sm))
 		r.Delete("/connections/{id}", DeleteConnectionHandler(a, sm))

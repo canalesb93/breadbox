@@ -7,10 +7,31 @@
     <span class="badge badge-ghost badge-sm">{{len .Connections}}</span>
     {{end}}
   </div>
-  <a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">
-    <i data-lucide="plus" class="w-4 h-4"></i>
-    Connect Bank
-  </a>
+  <div class="flex items-center gap-2">
+    {{if .Connections}}
+    <div x-data="syncAllBtn()">
+      <button class="btn btn-ghost btn-sm rounded-xl gap-1.5 text-base-content/50 hover:text-primary"
+              :disabled="state !== 'idle'"
+              @click="triggerSyncAll()"
+              :title="state === 'syncing' ? 'Syncing all connections...' : 'Sync all connections now'">
+        <template x-if="state === 'idle'">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </template>
+        <template x-if="state === 'syncing'">
+          <span class="loading loading-spinner loading-xs"></span>
+        </template>
+        <template x-if="state === 'done'">
+          <i data-lucide="check" class="w-4 h-4 text-success"></i>
+        </template>
+        <span class="hidden sm:inline" x-text="state === 'syncing' ? 'Syncing...' : state === 'done' ? 'Triggered!' : 'Sync All'"></span>
+      </button>
+    </div>
+    {{end}}
+    <a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">
+      <i data-lucide="plus" class="w-4 h-4"></i>
+      Connect Bank
+    </a>
+  </div>
 </div>
 
 {{if .Connections}}
@@ -216,6 +237,37 @@
 {{end}}
 
 <script>
+function syncAllBtn() {
+  return {
+    state: 'idle',
+    triggerSyncAll() {
+      if (this.state !== 'idle') return;
+      this.state = 'syncing';
+      var self = this;
+      fetch('/-/connections/sync-all', { method: 'POST' })
+        .then(function(res) {
+          if (res.ok) {
+            self.state = 'done';
+            self.$nextTick(function() { lucide.createIcons(); });
+            window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Sync triggered for all connections.', type: 'success' } }));
+            setTimeout(function() { self.state = 'idle'; self.$nextTick(function() { lucide.createIcons(); }); }, 8000);
+          } else {
+            return res.json().then(function(data) {
+              window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: data.error || 'Failed to trigger sync.', type: 'error' } }));
+              self.state = 'idle';
+              self.$nextTick(function() { lucide.createIcons(); });
+            });
+          }
+        })
+        .catch(function() {
+          window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Network error. Please try again.', type: 'error' } }));
+          self.state = 'idle';
+          self.$nextTick(function() { lucide.createIcons(); });
+        });
+    }
+  };
+}
+
 function syncBtn(connId) {
   return {
     state: 'idle',
