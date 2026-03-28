@@ -445,6 +445,8 @@ type TransactionRuleResponse struct {
 	CategoryID    *string   `json:"category_id,omitempty"`
 	CategorySlug  *string   `json:"category_slug,omitempty"`
 	CategoryName  *string   `json:"category_display_name,omitempty"`
+	CategoryIcon  *string   `json:"category_icon,omitempty"`
+	CategoryColor *string   `json:"category_color,omitempty"`
 	Priority      int       `json:"priority"`
 	Enabled       bool      `json:"enabled"`
 	ExpiresAt     *string   `json:"expires_at,omitempty"`
