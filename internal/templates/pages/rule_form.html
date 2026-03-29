@@ -371,6 +371,7 @@ function ruleForm() {
         } catch (e) {
           this.formError = 'Invalid JSON in conditions: ' + e.message;
           this.submitting = false;
+          this.restorePageState();
           return;
         }
       } else {
@@ -378,6 +379,7 @@ function ruleForm() {
         if (!conditions || Object.keys(conditions).length === 0) {
           this.formError = 'At least one condition with a value is required';
           this.submitting = false;
+          this.restorePageState();
           return;
         }
       }
@@ -387,6 +389,7 @@ function ruleForm() {
       if (actions.length === 0) {
         this.formError = 'At least one action is required';
         this.submitting = false;
+        this.restorePageState();
         return;
       }
 
