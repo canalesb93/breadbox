@@ -217,19 +217,15 @@
 
       <!-- Changes + Status (wraps to second line on mobile) -->
       <div class="flex items-center gap-3 sm:gap-4 shrink-0 pl-11 sm:pl-0">
-        <!-- Transaction changes -->
+        <!-- Transaction changes (only shown when there are actual changes) -->
+        {{if or .AddedCount .ModifiedCount .RemovedCount .UnchangedCount}}
         <div class="flex items-center gap-2 text-xs tabular-nums">
           {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
           {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
           {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
           {{if .UnchangedCount}}<span class="text-base-content/30 font-medium" title="{{.UnchangedCount}} unchanged transactions">={{.UnchangedCount}}</span>{{end}}
-          {{if and (not .AddedCount) (not .ModifiedCount) (not .RemovedCount) (not .UnchangedCount)}}
-          <span class="text-base-content/20 text-xs">No changes</span>
-          {{end}}
         </div>
-
-        <!-- Status badge -->
-        {{syncBadge .Status}}
+        {{end}}
 
         <!-- Warning badge -->
         {{if .WarningMessage}}
