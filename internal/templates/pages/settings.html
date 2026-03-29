@@ -16,7 +16,7 @@
       </div>
       <div class="min-w-0 flex-1">
         <h2 class="font-semibold">Sync Schedule</h2>
-        <p class="text-xs text-base-content/40" x-show="!expanded">Every {{.SyncIntervalMinutes}} minutes{{if ne .NextSyncTime ""}} · Next: {{.NextSyncTime}}{{end}}</p>
+        <p class="text-xs text-base-content/40" x-show="!expanded">Every {{formatIntervalMinutes .SyncIntervalMinutes}}{{if ne .NextSyncTime ""}} · Next: {{.NextSyncTime}}{{end}}</p>
         <p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Automatic bank data sync interval</p>
       </div>
       <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
