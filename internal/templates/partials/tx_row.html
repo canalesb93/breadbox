@@ -46,7 +46,7 @@
         <span class="truncate">{{.AccountName}}</span>
         {{if .MerchantName}}
         <span class="text-base-content/20 hidden sm:inline">&middot;</span>
-        <span class="text-base-content/40 truncate hidden sm:inline">{{deref .MerchantName}}</span>
+        <span class="text-base-content/40 truncate hidden sm:inline">{{titleCase (deref .MerchantName)}}</span>
         {{end}}
         {{if .AgentReviewed}}
         <span class="text-base-content/20">&middot;</span>
@@ -108,7 +108,7 @@
         {{if .MerchantName}}
         <div>
           <span class="text-base-content/30">Merchant</span>
-          <span class="text-base-content/60 ml-1.5">{{deref .MerchantName}}</span>
+          <span class="text-base-content/60 ml-1.5">{{titleCase (deref .MerchantName)}}</span>
         </div>
         {{end}}
         <div>
