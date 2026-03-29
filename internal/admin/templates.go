@@ -301,6 +301,12 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return ""
 				}
 			},
+			"badgeCount": func(n int64) string {
+				if n > 99 {
+					return "99+"
+				}
+				return fmt.Sprintf("%d", n)
+			},
 			"deref": func(s *string) string {
 				if s == nil {
 					return ""
