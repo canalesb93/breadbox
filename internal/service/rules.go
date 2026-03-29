@@ -362,13 +362,75 @@ func toStringSlice(v interface{}) ([]string, bool) {
 	return nil, false
 }
 
+// --- Action validation ---
+
+// validActionFields lists fields that rule actions can set.
+var validActionFields = map[string]bool{
+	"category": true,
+	// future: "merchant_name", "notes", etc.
+}
+
+// ValidateActions validates a slice of rule actions.
+func (s *Service) ValidateActions(ctx context.Context, actions []RuleAction) error {
+	if len(actions) == 0 {
+		return fmt.Errorf("%w: at least one action is required", ErrInvalidParameter)
+	}
+	seen := make(map[string]bool, len(actions))
+	for _, a := range actions {
+		if !validActionFields[a.Field] {
+			return fmt.Errorf("%w: unknown action field %q", ErrInvalidParameter, a.Field)
+		}
+		if seen[a.Field] {
+			return fmt.Errorf("%w: duplicate action field %q", ErrInvalidParameter, a.Field)
+		}
+		seen[a.Field] = true
+
+		if a.Value == "" {
+			return fmt.Errorf("%w: action value is required for field %q", ErrInvalidParameter, a.Field)
+		}
+
+		switch a.Field {
+		case "category":
+			if _, err := s.GetCategoryBySlug(ctx, a.Value); err != nil {
+				return fmt.Errorf("%w: category slug %q not found", ErrInvalidParameter, a.Value)
+			}
+		}
+	}
+	return nil
+}
+
+// resolveActionsToCategory extracts the category action from actions and resolves it to a UUID.
+// Returns a valid pgtype.UUID if a category action exists, invalid UUID otherwise.
+func (s *Service) resolveActionsToCategory(ctx context.Context, actions []RuleAction) (pgtype.UUID, error) {
+	for _, a := range actions {
+		if a.Field == "category" {
+			cat, err := s.GetCategoryBySlug(ctx, a.Value)
+			if err != nil {
+				return pgtype.UUID{}, fmt.Errorf("%w: category slug %q not found", ErrInvalidParameter, a.Value)
+			}
+			return parseUUID(cat.ID)
+		}
+	}
+	return pgtype.UUID{}, nil
+}
+
+// categoryActionSlug returns the value of the category action, or empty string.
+func categoryActionSlug(actions []RuleAction) string {
+	for _, a := range actions {
+		if a.Field == "category" {
+			return a.Value
+		}
+	}
+	return ""
+}
+
 // --- Service methods ---
 
 // ruleSelectQuery is the base SELECT for transaction rules with category JOIN.
 const ruleSelectQuery = `SELECT tr.id, tr.name, tr.conditions, tr.category_id, tr.priority, tr.enabled,
 	tr.expires_at, tr.created_by_type, tr.created_by_id, tr.created_by_name,
 	tr.hit_count, tr.last_hit_at, tr.created_at, tr.updated_at,
-	c.slug AS category_slug, c.display_name AS category_display_name
+	tr.actions, c.slug AS category_slug, c.display_name AS category_display_name
 	FROM transaction_rules tr
 	LEFT JOIN categories c ON tr.category_id = c.id`
 
@@ -379,20 +441,32 @@ func (s *Service) CreateTransactionRule(ctx context.Context, params CreateTransa
 		return nil, err
 	}
 
-	// Resolve category slug to ID
-	cat, err := s.GetCategoryBySlug(ctx, params.CategorySlug)
-	if err != nil {
-		return nil, fmt.Errorf("%w: category slug %q not found", ErrInvalidParameter, params.CategorySlug)
+	// Resolve actions: Actions takes precedence, CategorySlug is sugar
+	actions := params.Actions
+	if len(actions) > 0 {
+		if err := s.ValidateActions(ctx, actions); err != nil {
+			return nil, err
+		}
+	} else if params.CategorySlug != "" {
+		actions = []RuleAction{{Field: "category", Value: params.CategorySlug}}
+	} else {
+		return nil, fmt.Errorf("%w: either actions or category_slug is required", ErrInvalidParameter)
 	}
 
-	catID, err := parseUUID(cat.ID)
+	// Derive category_id from category action (denormalized cache)
+	catID, err := s.resolveActionsToCategory(ctx, actions)
 	if err != nil {
-		return nil, fmt.Errorf("parse category id: %w", err)
+		return nil, err
 	}
 
 	conditionsJSON, err := json.Marshal(params.Conditions)
 	if err != nil {
 		return nil, fmt.Errorf("marshal conditions: %w", err)
+	}
+
+	actionsJSON, err := json.Marshal(actions)
+	if err != nil {
+		return nil, fmt.Errorf("marshal actions: %w", err)
 	}
 
 	priority := params.Priority
@@ -422,28 +496,35 @@ func (s *Service) CreateTransactionRule(ctx context.Context, params CreateTransa
 		createdByID = pgtype.Text{String: params.Actor.ID, Valid: true}
 	}
 
-	query := `INSERT INTO transaction_rules (name, conditions, category_id, priority, enabled, expires_at, created_by_type, created_by_id, created_by_name)
-		VALUES ($1, $2, $3, $4, TRUE, $5, $6, $7, $8)
-		RETURNING id, name, conditions, category_id, priority, enabled, expires_at, created_by_type, created_by_id, created_by_name, hit_count, last_hit_at, created_at, updated_at`
+	query := `INSERT INTO transaction_rules (name, conditions, category_id, actions, priority, enabled, expires_at, created_by_type, created_by_id, created_by_name)
+		VALUES ($1, $2, $3, $4, $5, TRUE, $6, $7, $8, $9)
+		RETURNING id, name, conditions, category_id, priority, enabled, expires_at, created_by_type, created_by_id, created_by_name, hit_count, last_hit_at, created_at, updated_at, actions`
 
 	var row ruleRow
 	scanDest := row.scanDest()
-	// INSERT RETURNING doesn't include JOINed category columns, so scan only the first 14
+	// INSERT RETURNING doesn't include JOINed category columns, so scan only the first 15
 	err = s.Pool.QueryRow(ctx, query,
 		params.Name,
 		conditionsJSON,
 		catID,
+		actionsJSON,
 		priority,
 		expiresAt,
 		createdByType,
 		createdByID,
 		createdByName,
-	).Scan(scanDest[:14]...)
+	).Scan(scanDest[:15]...)
 	if err != nil {
 		return nil, fmt.Errorf("insert transaction rule: %w", err)
 	}
-	row.categorySlug = pgtype.Text{String: cat.Slug, Valid: true}
-	row.categoryDispName = pgtype.Text{String: cat.DisplayName, Valid: true}
+
+	// Set category slug/name for response if there's a category action
+	if slug := categoryActionSlug(actions); slug != "" {
+		if cat, err := s.GetCategoryBySlug(ctx, slug); err == nil {
+			row.categorySlug = pgtype.Text{String: cat.Slug, Valid: true}
+			row.categoryDispName = pgtype.Text{String: cat.DisplayName, Valid: true}
+		}
+	}
 
 	resp := row.toResponse()
 	return &resp, nil
@@ -550,7 +631,7 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 	selectCols := `SELECT tr.id, tr.name, tr.conditions, tr.category_id, tr.priority, tr.enabled,
 		tr.expires_at, tr.created_by_type, tr.created_by_id, tr.created_by_name,
 		tr.hit_count, tr.last_hit_at, tr.created_at, tr.updated_at,
-		c.slug AS category_slug, c.display_name AS category_display_name `
+		tr.actions, c.slug AS category_slug, c.display_name AS category_display_name `
 
 	orderBy := " ORDER BY tr.created_at DESC, tr.id DESC"
 	limitClause := fmt.Sprintf(" LIMIT $%d", argN)
@@ -627,17 +708,33 @@ func (s *Service) UpdateTransactionRule(ctx context.Context, id string, params U
 		conditions = *params.Conditions
 	}
 
-	var categoryID pgtype.UUID
-	if params.CategorySlug != nil {
-		cat, err := s.GetCategoryBySlug(ctx, *params.CategorySlug)
-		if err != nil {
-			return nil, fmt.Errorf("%w: category slug %q not found", ErrInvalidParameter, *params.CategorySlug)
+	// Resolve actions
+	actions := existing.Actions
+	if params.Actions != nil {
+		// Explicit actions replacement
+		if err := s.ValidateActions(ctx, *params.Actions); err != nil {
+			return nil, err
 		}
-		uid, _ := parseUUID(cat.ID)
-		categoryID = uid
-	} else if existing.CategoryID != nil {
-		uid, _ := parseUUID(*existing.CategoryID)
-		categoryID = uid
+		actions = *params.Actions
+	} else if params.CategorySlug != nil {
+		// Sugar: replace/add category action, keep other actions
+		newActions := make([]RuleAction, 0, len(actions))
+		for _, a := range actions {
+			if a.Field != "category" {
+				newActions = append(newActions, a)
+			}
+		}
+		newActions = append(newActions, RuleAction{Field: "category", Value: *params.CategorySlug})
+		if err := s.ValidateActions(ctx, newActions); err != nil {
+			return nil, err
+		}
+		actions = newActions
+	}
+
+	// Derive category_id from category action
+	catID, err := s.resolveActionsToCategory(ctx, actions)
+	if err != nil {
+		return nil, err
 	}
 
 	priority := int32(existing.Priority)
@@ -672,17 +769,22 @@ func (s *Service) UpdateTransactionRule(ctx context.Context, id string, params U
 		return nil, fmt.Errorf("marshal conditions: %w", err)
 	}
 
+	actionsJSON, err := json.Marshal(actions)
+	if err != nil {
+		return nil, fmt.Errorf("marshal actions: %w", err)
+	}
+
 	ruleID, _ := parseUUID(id) // already validated by GetTransactionRule above
 
 	query := `UPDATE transaction_rules
-		SET name = $2, conditions = $3, category_id = $4, priority = $5, enabled = $6, expires_at = $7, updated_at = NOW()
+		SET name = $2, conditions = $3, category_id = $4, actions = $5, priority = $6, enabled = $7, expires_at = $8, updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, name, conditions, category_id, priority, enabled, expires_at, created_by_type, created_by_id, created_by_name, hit_count, last_hit_at, created_at, updated_at`
+		RETURNING id, name, conditions, category_id, priority, enabled, expires_at, created_by_type, created_by_id, created_by_name, hit_count, last_hit_at, created_at, updated_at, actions`
 
 	var row ruleRow
 	err = s.Pool.QueryRow(ctx, query,
-		ruleID, name, conditionsJSON, categoryID, priority, enabled, expiresAt,
-	).Scan(row.scanDest()[:14]...)
+		ruleID, name, conditionsJSON, catID, actionsJSON, priority, enabled, expiresAt,
+	).Scan(row.scanDest()[:15]...)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrNotFound
@@ -794,8 +896,8 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 			return 0, fmt.Errorf("%w: rule is expired", ErrInvalidParameter)
 		}
 	}
-	if rule.CategoryID == nil {
-		return 0, fmt.Errorf("%w: rule has no category", ErrInvalidParameter)
+	if len(rule.Actions) == 0 {
+		return 0, fmt.Errorf("%w: rule has no actions", ErrInvalidParameter)
 	}
 
 	compiled, err := CompileCondition(rule.Conditions)
@@ -803,9 +905,13 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 		return 0, fmt.Errorf("compile rule conditions: %w", err)
 	}
 
-	catID, err := parseUUID(*rule.CategoryID)
+	// Build SET clause from actions
+	setClauses, setArgs, err := s.buildActionSetClause(ctx, rule.Actions)
 	if err != nil {
-		return 0, fmt.Errorf("parse category id: %w", err)
+		return 0, fmt.Errorf("build action set clause: %w", err)
+	}
+	if len(setClauses) == 0 {
+		return 0, fmt.Errorf("%w: rule has no applicable actions", ErrInvalidParameter)
 	}
 
 	var totalAffected int64
@@ -854,10 +960,17 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 
 		// Bulk update matching transactions
 		if len(matchIDs) > 0 {
-			tag, err := s.Pool.Exec(ctx,
-				`UPDATE transactions SET category_id = $1, updated_at = NOW()
-				WHERE id = ANY($2) AND category_override = FALSE AND deleted_at IS NULL`,
-				catID, matchIDs)
+			// Build: UPDATE transactions SET <actions>, updated_at = NOW() WHERE id = ANY($N) AND ...
+			updateArgs := make([]any, len(setArgs))
+			copy(updateArgs, setArgs)
+			idsArgN := len(updateArgs) + 1
+			updateArgs = append(updateArgs, matchIDs)
+
+			updateSQL := fmt.Sprintf(`UPDATE transactions SET %s, updated_at = NOW()
+				WHERE id = ANY($%d) AND category_override = FALSE AND deleted_at IS NULL`,
+				strings.Join(setClauses, ", "), idsArgN)
+
+			tag, err := s.Pool.Exec(ctx, updateSQL, updateArgs...)
 			if err != nil {
 				return totalAffected, fmt.Errorf("update transactions: %w", err)
 			}
@@ -879,7 +992,8 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 }
 
 // ApplyAllRulesRetroactively applies all active rules (priority DESC) to existing transactions.
-// First match wins per transaction. Returns a map of rule_id → match_count.
+// Multiple rules can match — actions are merged (first rule to set a field wins).
+// Returns a map of rule_id → match_count.
 func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]int64, error) {
 	rules, err := s.ListActiveRulesForSync(ctx)
 	if err != nil {
@@ -892,23 +1006,19 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 	// Compile all rules
 	type compiledRule struct {
 		id       string
-		catID    pgtype.UUID
+		actions  []RuleAction
 		compiled *CompiledCondition
 	}
 	var compiled []compiledRule
 	for _, r := range rules {
-		if r.CategoryID == nil {
+		if len(r.Actions) == 0 {
 			continue
 		}
 		cc, err := CompileCondition(r.Conditions)
 		if err != nil {
 			continue
 		}
-		catID, err := parseUUID(*r.CategoryID)
-		if err != nil {
-			continue
-		}
-		compiled = append(compiled, compiledRule{id: r.ID, catID: catID, compiled: cc})
+		compiled = append(compiled, compiledRule{id: r.ID, actions: r.Actions, compiled: cc})
 	}
 	if len(compiled) == 0 {
 		return map[string]int64{}, nil
@@ -936,10 +1046,11 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 			return hitCounts, fmt.Errorf("query transactions: %w", err)
 		}
 
-		// Map category_id → list of transaction IDs to update
-		updates := make(map[pgtype.UUID][]pgtype.UUID)
-		// Map category_id → rule_id (for hit count tracking)
-		catToRule := make(map[pgtype.UUID]string)
+		// Per transaction: merge actions from all matching rules, keyed by category_id for batching
+		type txnUpdate struct {
+			catID pgtype.UUID
+		}
+		updates := make(map[pgtype.UUID][]pgtype.UUID)  // category_id → transaction IDs
 		rowCount := 0
 
 		for rows.Next() {
@@ -952,14 +1063,25 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 			}
 			lastID = r.id
 
-			// First matching rule wins (rules already sorted by priority DESC)
+			// Merge actions from all matching rules (first to set a field wins)
+			var mergedCatID pgtype.UUID
 			for _, cr := range compiled {
 				if EvaluateCondition(cr.compiled, r.tctx) {
-					updates[cr.catID] = append(updates[cr.catID], r.id)
-					catToRule[cr.catID] = cr.id
 					hitCounts[cr.id]++
-					break
+					// Merge category action (first wins)
+					if !mergedCatID.Valid {
+						if slug := categoryActionSlug(cr.actions); slug != "" {
+							if catID, err := s.resolveActionsToCategory(ctx, cr.actions); err == nil && catID.Valid {
+								mergedCatID = catID
+							}
+						}
+					}
+					// future: merge other action fields here
 				}
+			}
+
+			if mergedCatID.Valid {
+				updates[mergedCatID] = append(updates[mergedCatID], r.id)
 			}
 		}
 		rows.Close()
@@ -1143,21 +1265,22 @@ func (s *Service) BatchIncrementHitCounts(ctx context.Context, hits map[string]i
 
 // ruleRow holds the scanned columns for a transaction rule row.
 type ruleRow struct {
-	id              pgtype.UUID
-	name            string
-	conditions      []byte
-	categoryID      pgtype.UUID
-	priority        int32
-	enabled         bool
-	expiresAt       pgtype.Timestamptz
-	createdByType   string
-	createdByID     pgtype.Text
-	createdByName   string
-	hitCount        int32
-	lastHitAt       pgtype.Timestamptz
-	createdAt       pgtype.Timestamptz
-	updatedAt       pgtype.Timestamptz
-	categorySlug    pgtype.Text
+	id               pgtype.UUID
+	name             string
+	conditions       []byte
+	categoryID       pgtype.UUID
+	priority         int32
+	enabled          bool
+	expiresAt        pgtype.Timestamptz
+	createdByType    string
+	createdByID      pgtype.Text
+	createdByName    string
+	hitCount         int32
+	lastHitAt        pgtype.Timestamptz
+	createdAt        pgtype.Timestamptz
+	updatedAt        pgtype.Timestamptz
+	actions          []byte
+	categorySlug     pgtype.Text
 	categoryDispName pgtype.Text
 }
 
@@ -1167,7 +1290,7 @@ func (r *ruleRow) scanDest() []any {
 		&r.id, &r.name, &r.conditions, &r.categoryID, &r.priority, &r.enabled,
 		&r.expiresAt, &r.createdByType, &r.createdByID, &r.createdByName,
 		&r.hitCount, &r.lastHitAt, &r.createdAt, &r.updatedAt,
-		&r.categorySlug, &r.categoryDispName,
+		&r.actions, &r.categorySlug, &r.categoryDispName,
 	}
 }
 
@@ -1176,10 +1299,17 @@ func (r *ruleRow) toResponse() TransactionRuleResponse {
 	var cond Condition
 	_ = json.Unmarshal(r.conditions, &cond)
 
+	var actions []RuleAction
+	_ = json.Unmarshal(r.actions, &actions)
+	if actions == nil {
+		actions = []RuleAction{}
+	}
+
 	return TransactionRuleResponse{
 		ID:            formatUUID(r.id),
 		Name:          r.name,
 		Conditions:    cond,
+		Actions:       actions,
 		CategoryID:    uuidPtr(r.categoryID),
 		CategorySlug:  textPtr(r.categorySlug),
 		CategoryName:  textPtr(r.categoryDispName),
@@ -1194,6 +1324,32 @@ func (r *ruleRow) toResponse() TransactionRuleResponse {
 		CreatedAt:     r.createdAt.Time.UTC().Format(time.RFC3339),
 		UpdatedAt:     r.updatedAt.Time.UTC().Format(time.RFC3339),
 	}
+}
+
+// buildActionSetClause converts rule actions into SQL SET clause components.
+// Returns setClauses (e.g., ["category_id = $1"]), args, and error.
+func (s *Service) buildActionSetClause(ctx context.Context, actions []RuleAction) ([]string, []any, error) {
+	var setClauses []string
+	var args []any
+	argN := 1
+
+	for _, a := range actions {
+		switch a.Field {
+		case "category":
+			catID, err := s.resolveActionsToCategory(ctx, []RuleAction{a})
+			if err != nil {
+				return nil, nil, err
+			}
+			if catID.Valid {
+				setClauses = append(setClauses, fmt.Sprintf("category_id = $%d", argN))
+				args = append(args, catID)
+				argN++
+			}
+		// future: case "merchant_name": ...
+		}
+	}
+
+	return setClauses, args, nil
 }
 
 // parseDuration parses a duration string like "30d", "24h", "1w".

@@ -415,6 +415,12 @@ type ReviewCountsResponse struct {
 
 // Transaction rule types
 
+// RuleAction represents a single action a rule performs when matched.
+type RuleAction struct {
+	Field string `json:"field"`
+	Value string `json:"value"`
+}
+
 type Condition struct {
 	Field string      `json:"field,omitempty"`
 	Op    string      `json:"op,omitempty"`
@@ -439,22 +445,23 @@ type TransactionContext struct {
 }
 
 type TransactionRuleResponse struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Conditions    Condition `json:"conditions"`
-	CategoryID    *string   `json:"category_id,omitempty"`
-	CategorySlug  *string   `json:"category_slug,omitempty"`
-	CategoryName  *string   `json:"category_display_name,omitempty"`
-	Priority      int       `json:"priority"`
-	Enabled       bool      `json:"enabled"`
-	ExpiresAt     *string   `json:"expires_at,omitempty"`
-	CreatedByType string    `json:"created_by_type"`
-	CreatedByID   *string   `json:"created_by_id,omitempty"`
-	CreatedByName string    `json:"created_by_name"`
-	HitCount      int       `json:"hit_count"`
-	LastHitAt     *string   `json:"last_hit_at,omitempty"`
-	CreatedAt     string    `json:"created_at"`
-	UpdatedAt     string    `json:"updated_at"`
+	ID            string       `json:"id"`
+	Name          string       `json:"name"`
+	Conditions    Condition    `json:"conditions"`
+	Actions       []RuleAction `json:"actions"`
+	CategoryID    *string      `json:"category_id,omitempty"`
+	CategorySlug  *string      `json:"category_slug,omitempty"`
+	CategoryName  *string      `json:"category_display_name,omitempty"`
+	Priority      int          `json:"priority"`
+	Enabled       bool         `json:"enabled"`
+	ExpiresAt     *string      `json:"expires_at,omitempty"`
+	CreatedByType string       `json:"created_by_type"`
+	CreatedByID   *string      `json:"created_by_id,omitempty"`
+	CreatedByName string       `json:"created_by_name"`
+	HitCount      int          `json:"hit_count"`
+	LastHitAt     *string      `json:"last_hit_at,omitempty"`
+	CreatedAt     string       `json:"created_at"`
+	UpdatedAt     string       `json:"updated_at"`
 }
 
 type TransactionRuleListParams struct {
@@ -476,7 +483,8 @@ type TransactionRuleListResult struct {
 type CreateTransactionRuleParams struct {
 	Name         string
 	Conditions   Condition
-	CategorySlug string
+	Actions      []RuleAction // if set, takes precedence over CategorySlug
+	CategorySlug string       // sugar for actions: [{"field": "category", "value": slug}]
 	Priority     int
 	ExpiresIn    string // e.g., "30d", "24h"
 	Actor        Actor
@@ -485,7 +493,8 @@ type CreateTransactionRuleParams struct {
 type UpdateTransactionRuleParams struct {
 	Name         *string
 	Conditions   *Condition
-	CategorySlug *string
+	Actions      *[]RuleAction // if set, replaces actions entirely
+	CategorySlug *string       // sugar: replaces category action, keeps others
 	Priority     *int
 	Enabled      *bool
 	ExpiresAt    *string // ISO timestamp or empty to clear

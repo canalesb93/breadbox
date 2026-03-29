@@ -623,12 +623,13 @@ func (s *MCPServer) handleSubmitReview(ctx context.Context, _ *mcpsdk.CallToolRe
 // --- Transaction Rules ---
 
 type createTransactionRuleInput struct {
-	Name               string         `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
-	CategorySlug       string         `json:"category_slug" jsonschema:"required,Category slug to assign when this rule matches (e.g. food_and_drink_restaurant). Use list_categories to find slugs."`
-	Conditions         map[string]any `json:"conditions" jsonschema:"required,JSON condition object. Simple: {\"field\": \"name\", \"op\": \"contains\", \"value\": \"uber\"}. AND: {\"and\": [{...}, {...}]}. OR: {\"or\": [{...}, {...}]}. NOT: {\"not\": {...}}. Fields: name merchant_name amount category_primary category_detailed pending provider account_id user_id user_name. Ops: eq neq contains not_contains matches(regex) gt gte lt lte in."`
-	Priority           int            `json:"priority,omitempty" jsonschema:"Priority (higher wins when multiple rules match). Default 10."`
-	ExpiresIn          string         `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
-	ApplyRetroactively bool           `json:"apply_retroactively,omitempty" jsonschema:"If true, immediately apply this rule to all existing non-overridden transactions after creation."`
+	Name               string              `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
+	Conditions         map[string]any      `json:"conditions" jsonschema:"required,JSON condition object. Simple: {\"field\": \"name\", \"op\": \"contains\", \"value\": \"uber\"}. AND: {\"and\": [{...}, {...}]}. OR: {\"or\": [{...}, {...}]}. NOT: {\"not\": {...}}. Fields: name merchant_name amount category_primary category_detailed pending provider account_id user_id user_name. Ops: eq neq contains not_contains matches(regex) gt gte lt lte in."`
+	Actions            []map[string]string `json:"actions,omitempty" jsonschema:"Array of actions to perform when rule matches. Each action: {\"field\": \"category\", \"value\": \"food_and_drink_restaurant\"}. Supported fields: category. If omitted, use category_slug instead."`
+	CategorySlug       string              `json:"category_slug,omitempty" jsonschema:"Shorthand for actions: [{\"field\": \"category\", \"value\": \"<slug>\"}]. Either actions or category_slug is required."`
+	Priority           int                 `json:"priority,omitempty" jsonschema:"Priority (higher wins when multiple rules set the same field). Default 10."`
+	ExpiresIn          string              `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
+	ApplyRetroactively bool                `json:"apply_retroactively,omitempty" jsonschema:"If true, immediately apply this rule to all existing non-overridden transactions after creation."`
 }
 
 type listTransactionRulesInput struct {
@@ -641,13 +642,14 @@ type listTransactionRulesInput struct {
 }
 
 type updateTransactionRuleInput struct {
-	ID           string           `json:"id" jsonschema:"required,UUID of the rule to update"`
-	Name         *string          `json:"name,omitempty" jsonschema:"New name for the rule"`
-	Conditions   map[string]any `json:"conditions,omitempty" jsonschema:"New condition tree (same format as create)"`
-	CategorySlug *string          `json:"category_slug,omitempty" jsonschema:"New category slug"`
-	Priority     *int             `json:"priority,omitempty" jsonschema:"New priority"`
-	Enabled      *bool            `json:"enabled,omitempty" jsonschema:"Enable or disable the rule"`
-	ExpiresAt    *string          `json:"expires_at,omitempty" jsonschema:"New expiry timestamp (RFC3339) or empty string to clear"`
+	ID           string               `json:"id" jsonschema:"required,UUID of the rule to update"`
+	Name         *string              `json:"name,omitempty" jsonschema:"New name for the rule"`
+	Conditions   map[string]any       `json:"conditions,omitempty" jsonschema:"New condition tree (same format as create)"`
+	Actions      *[]map[string]string `json:"actions,omitempty" jsonschema:"Replace actions array. Each action: {\"field\": \"category\", \"value\": \"slug\"}. Supported fields: category."`
+	CategorySlug *string              `json:"category_slug,omitempty" jsonschema:"Shorthand: replace the category action. Other actions are kept."`
+	Priority     *int                 `json:"priority,omitempty" jsonschema:"New priority"`
+	Enabled      *bool                `json:"enabled,omitempty" jsonschema:"Enable or disable the rule"`
+	ExpiresAt    *string              `json:"expires_at,omitempty" jsonschema:"New expiry timestamp (RFC3339) or empty string to clear"`
 }
 
 type deleteTransactionRuleInput struct {
@@ -659,11 +661,12 @@ type batchCreateRulesInput struct {
 }
 
 type batchRuleItem struct {
-	Name         string          `json:"name" jsonschema:"required,Human-readable rule name"`
-	CategorySlug string          `json:"category_slug" jsonschema:"required,Category slug to assign"`
-	Conditions   map[string]any `json:"conditions" jsonschema:"required,Condition tree as JSON object"`
-	Priority     int             `json:"priority,omitempty" jsonschema:"Priority (default 10)"`
-	ExpiresIn    string          `json:"expires_in,omitempty" jsonschema:"Optional expiry duration"`
+	Name         string              `json:"name" jsonschema:"required,Human-readable rule name"`
+	Actions      []map[string]string `json:"actions,omitempty" jsonschema:"Actions array (same format as create_transaction_rule)"`
+	CategorySlug string              `json:"category_slug,omitempty" jsonschema:"Shorthand for category action. Either actions or category_slug required."`
+	Conditions   map[string]any      `json:"conditions" jsonschema:"required,Condition tree as JSON object"`
+	Priority     int                 `json:"priority,omitempty" jsonschema:"Priority (default 10)"`
+	ExpiresIn    string              `json:"expires_in,omitempty" jsonschema:"Optional expiry duration"`
 }
 
 type applyRulesInput struct {
@@ -691,8 +694,11 @@ func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.C
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
-	if input.Name == "" || input.CategorySlug == "" {
-		return errorResult(fmt.Errorf("name and category_slug are required")), nil, nil
+	if input.Name == "" {
+		return errorResult(fmt.Errorf("name is required")), nil, nil
+	}
+	if len(input.Actions) == 0 && input.CategorySlug == "" {
+		return errorResult(fmt.Errorf("either actions or category_slug is required")), nil, nil
 	}
 
 	conditions, err := parseConditions(input.Conditions)
@@ -709,6 +715,7 @@ func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.C
 	rule, err := s.svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name:         input.Name,
 		Conditions:   conditions,
+		Actions:      convertMCPActions(input.Actions),
 		CategorySlug: input.CategorySlug,
 		Priority:     priority,
 		ExpiresIn:    input.ExpiresIn,
@@ -777,9 +784,16 @@ func (s *MCPServer) handleUpdateTransactionRule(ctx context.Context, _ *mcpsdk.C
 		conditionsPtr = &c
 	}
 
+	var actionsPtr *[]service.RuleAction
+	if input.Actions != nil {
+		converted := convertMCPActions(*input.Actions)
+		actionsPtr = &converted
+	}
+
 	rule, err := s.svc.UpdateTransactionRule(ctx, input.ID, service.UpdateTransactionRuleParams{
 		Name:         input.Name,
 		Conditions:   conditionsPtr,
+		Actions:      actionsPtr,
 		CategorySlug: input.CategorySlug,
 		Priority:     input.Priority,
 		Enabled:      input.Enabled,
@@ -916,10 +930,10 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 	var errors []map[string]string
 
 	for i, r := range input.Rules {
-		if r.Name == "" || r.CategorySlug == "" || len(r.Conditions) == 0 {
+		if r.Name == "" || (len(r.Actions) == 0 && r.CategorySlug == "") || len(r.Conditions) == 0 {
 			errors = append(errors, map[string]string{
 				"index": fmt.Sprintf("%d", i),
-				"error": "name, category_slug, and conditions are required",
+				"error": "name, conditions, and either actions or category_slug are required",
 			})
 			continue
 		}
@@ -942,6 +956,7 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 		rule, err := s.svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 			Name:         r.Name,
 			Conditions:   conditions,
+			Actions:      convertMCPActions(r.Actions),
 			CategorySlug: r.CategorySlug,
 			Priority:     priority,
 			ExpiresIn:    r.ExpiresIn,
@@ -1100,6 +1115,18 @@ func (s *MCPServer) handleSubmitReport(reqCtx context.Context, _ *mcpsdk.CallToo
 // --- Helpers ---
 
 // parseConditions converts a map[string]any (from MCP input) to a service.Condition.
+// convertMCPActions converts MCP action maps to service RuleAction slice.
+func convertMCPActions(actions []map[string]string) []service.RuleAction {
+	if len(actions) == 0 {
+		return nil
+	}
+	result := make([]service.RuleAction, len(actions))
+	for i, a := range actions {
+		result[i] = service.RuleAction{Field: a["field"], Value: a["value"]}
+	}
+	return result
+}
+
 func parseConditions(m map[string]any) (service.Condition, error) {
 	data, err := json.Marshal(m)
 	if err != nil {

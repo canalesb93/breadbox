@@ -451,15 +451,17 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		if txn.CategoryDetailed != nil {
 			tctx.CategoryDetailed = *txn.CategoryDetailed
 		}
-		resolved := resolver.ResolveWithContext(providerName, tctx)
-		// Only pass the category_id when a rule explicitly matched.
-		// When no rule matches, the resolver returns uncategorizedID — pass nil
-		// instead so the upsert SQL preserves the existing category for
+		result := resolver.ResolveWithContext(providerName, tctx)
+		// Only set fields when rules explicitly matched.
+		// When no rule matches (nil), preserve existing values for
 		// existing rows (avoids overwriting categories set by reviews/agents).
 		// New rows will get NULL category_id, which enqueueForReview catches
 		// and flags as "uncategorized" for review.
-		if resolved != resolver.UncategorizedID() {
-			categoryID = resolved
+		if result != nil {
+			if result.CategoryID.Valid {
+				categoryID = result.CategoryID
+			}
+			// future: apply other action fields from result
 		}
 	}
 

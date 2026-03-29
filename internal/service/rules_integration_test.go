@@ -836,6 +836,255 @@ func TestPreviewRule_ExcludesCategoryOverride(t *testing.T) {
 	}
 }
 
+// --- Actions ---
+
+func TestCreateTransactionRule_WithActions(t *testing.T) {
+	svc, queries, _ := newService(t)
+	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+
+	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
+		Name: "Actions rule",
+		Actions: []service.RuleAction{
+			{Field: "category", Value: cat.Slug},
+		},
+		Conditions: service.Condition{Field: "name", Op: "contains", Value: "coffee"},
+		Priority:   10,
+		Actor:      service.Actor{Type: "user", Name: "Test"},
+	})
+	if err != nil {
+		t.Fatalf("CreateTransactionRule with actions: %v", err)
+	}
+
+	if len(rule.Actions) != 1 {
+		t.Fatalf("expected 1 action, got %d", len(rule.Actions))
+	}
+	if rule.Actions[0].Field != "category" || rule.Actions[0].Value != "food_and_drink" {
+		t.Errorf("action mismatch: %+v", rule.Actions[0])
+	}
+	// category_id should also be set (denormalized)
+	if rule.CategorySlug == nil || *rule.CategorySlug != "food_and_drink" {
+		t.Errorf("category_slug not populated from actions")
+	}
+	if rule.CategoryID == nil {
+		t.Error("category_id not populated from actions")
+	}
+}
+
+func TestCreateTransactionRule_CategorySlugBackfillsActions(t *testing.T) {
+	svc, queries, _ := newService(t)
+	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+
+	// Create using legacy category_slug param (no actions)
+	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
+		Name:         "Legacy create",
+		CategorySlug: cat.Slug,
+		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	// Verify actions were populated from category_slug
+	if len(rule.Actions) != 1 {
+		t.Fatalf("expected 1 action from category_slug, got %d", len(rule.Actions))
+	}
+	if rule.Actions[0].Field != "category" || rule.Actions[0].Value != "food_and_drink" {
+		t.Errorf("action mismatch: %+v", rule.Actions[0])
+	}
+}
+
+func TestCreateTransactionRule_ActionsOverCategorySlug(t *testing.T) {
+	svc, queries, _ := newService(t)
+	cat1 := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat2 := mustCreateCategory(t, queries, "transportation", "Transportation")
+
+	// Both actions and category_slug provided — actions wins
+	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
+		Name:         "Precedence test",
+		Actions:      []service.RuleAction{{Field: "category", Value: cat1.Slug}},
+		CategorySlug: cat2.Slug,
+		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	if len(rule.Actions) != 1 || rule.Actions[0].Value != "food_and_drink" {
+		t.Errorf("expected actions to take precedence, got: %+v", rule.Actions)
+	}
+}
+
+func TestCreateTransactionRule_NoActionsNoCategorySlug(t *testing.T) {
+	svc, _, _ := newService(t)
+
+	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
+		Name:       "No actions",
+		Conditions: service.Condition{Field: "name", Op: "eq", Value: "test"},
+	})
+	if err == nil {
+		t.Fatal("expected error when neither actions nor category_slug provided")
+	}
+	if !errors.Is(err, service.ErrInvalidParameter) {
+		t.Errorf("expected ErrInvalidParameter, got: %v", err)
+	}
+}
+
+func TestCreateTransactionRule_InvalidActionField(t *testing.T) {
+	svc, _, _ := newService(t)
+
+	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
+		Name:       "Bad field",
+		Actions:    []service.RuleAction{{Field: "nonexistent", Value: "test"}},
+		Conditions: service.Condition{Field: "name", Op: "eq", Value: "test"},
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid action field")
+	}
+	if !errors.Is(err, service.ErrInvalidParameter) {
+		t.Errorf("expected ErrInvalidParameter, got: %v", err)
+	}
+}
+
+func TestCreateTransactionRule_DuplicateActionField(t *testing.T) {
+	svc, queries, _ := newService(t)
+	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+
+	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
+		Name: "Dup field",
+		Actions: []service.RuleAction{
+			{Field: "category", Value: cat.Slug},
+			{Field: "category", Value: cat.Slug},
+		},
+		Conditions: service.Condition{Field: "name", Op: "eq", Value: "test"},
+	})
+	if err == nil {
+		t.Fatal("expected error for duplicate action field")
+	}
+	if !errors.Is(err, service.ErrInvalidParameter) {
+		t.Errorf("expected ErrInvalidParameter, got: %v", err)
+	}
+}
+
+func TestUpdateTransactionRule_ChangeActions(t *testing.T) {
+	svc, queries, _ := newService(t)
+	cat1 := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat2 := mustCreateCategory(t, queries, "transportation", "Transportation")
+
+	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
+		Name:       "Original",
+		Actions:    []service.RuleAction{{Field: "category", Value: cat1.Slug}},
+		Conditions: service.Condition{Field: "name", Op: "eq", Value: "test"},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	// Update actions
+	newActions := []service.RuleAction{{Field: "category", Value: cat2.Slug}}
+	updated, err := svc.UpdateTransactionRule(context.Background(), created.ID, service.UpdateTransactionRuleParams{
+		Actions: &newActions,
+	})
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	if len(updated.Actions) != 1 || updated.Actions[0].Value != "transportation" {
+		t.Errorf("actions not updated: %+v", updated.Actions)
+	}
+	if updated.CategorySlug == nil || *updated.CategorySlug != "transportation" {
+		t.Error("category_id not updated from new actions")
+	}
+}
+
+func TestUpdateTransactionRule_CategorySlugUpdatesSynthesizedActions(t *testing.T) {
+	svc, queries, _ := newService(t)
+	cat1 := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat2 := mustCreateCategory(t, queries, "transportation", "Transportation")
+
+	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
+		Name:       "Original",
+		Actions:    []service.RuleAction{{Field: "category", Value: cat1.Slug}},
+		Conditions: service.Condition{Field: "name", Op: "eq", Value: "test"},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	// Update via category_slug sugar
+	newSlug := cat2.Slug
+	updated, err := svc.UpdateTransactionRule(context.Background(), created.ID, service.UpdateTransactionRuleParams{
+		CategorySlug: &newSlug,
+	})
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	if len(updated.Actions) != 1 || updated.Actions[0].Value != "transportation" {
+		t.Errorf("actions not updated from category_slug: %+v", updated.Actions)
+	}
+}
+
+func TestGetTransactionRule_IncludesActions(t *testing.T) {
+	svc, queries, _ := newService(t)
+	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+
+	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
+		Name:       "Test",
+		Actions:    []service.RuleAction{{Field: "category", Value: cat.Slug}},
+		Conditions: service.Condition{Field: "name", Op: "eq", Value: "test"},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	got, err := svc.GetTransactionRule(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+
+	if len(got.Actions) != 1 {
+		t.Fatalf("expected 1 action, got %d", len(got.Actions))
+	}
+	if got.Actions[0].Field != "category" || got.Actions[0].Value != "food_and_drink" {
+		t.Errorf("action mismatch: %+v", got.Actions[0])
+	}
+}
+
+func TestListTransactionRules_IncludesActions(t *testing.T) {
+	svc, queries, _ := newService(t)
+	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+
+	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
+		Name:       "List test",
+		Actions:    []service.RuleAction{{Field: "category", Value: cat.Slug}},
+		Conditions: service.Condition{Field: "name", Op: "eq", Value: "test"},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	result, err := svc.ListTransactionRules(context.Background(), service.TransactionRuleListParams{})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	if len(result.Rules) < 1 {
+		t.Fatal("expected at least 1 rule")
+	}
+	found := false
+	for _, r := range result.Rules {
+		if r.Name == "List test" {
+			found = true
+			if len(r.Actions) != 1 || r.Actions[0].Field != "category" {
+				t.Errorf("actions missing from list response: %+v", r.Actions)
+			}
+		}
+	}
+	if !found {
+		t.Error("created rule not found in list")
+	}
+}
+
 // Verify that InsertCategoryParams works as expected (used by mustCreateCategory).
 func init() {
 	_ = db.InsertCategoryParams{}
