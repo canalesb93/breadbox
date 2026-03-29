@@ -275,6 +275,7 @@ function ruleForm() {
     restorePageState() {
       const main = document.querySelector('main');
       if (main) { main.style.opacity = ''; main.style.filter = ''; main.style.pointerEvents = ''; }
+      if (window.bbProgress) window.bbProgress.finish();
     },
 
     insertArrow() {
