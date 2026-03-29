@@ -314,6 +314,8 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				return *s
 			},
 			"lower": strings.ToLower,
+			"eqFold": strings.EqualFold,
+			"titleCase": titleCaseMerchant,
 			"syncLogFilterQuery": func(status, connID, trigger, dateFrom, dateTo string) template.URL {
 				params := url.Values{}
 				if status != "" {
@@ -569,6 +571,29 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return t.Format("Jan 2, 2006")
 				}
 				return s
+			},
+			"relativeDate": func(s string) string {
+				t, err := time.Parse("2006-01-02", s)
+				if err != nil {
+					return s
+				}
+				now := time.Now()
+				today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+				d := t.In(now.Location())
+				dateOnly := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, now.Location())
+				days := int(today.Sub(dateOnly).Hours() / 24)
+				switch {
+				case days == 0:
+					return "Today"
+				case days == 1:
+					return "Yesterday"
+				case days >= 2 && days <= 6:
+					return fmt.Sprintf("%d days ago", days)
+				case days >= 7 && days <= 13:
+					return "1 week ago"
+				default:
+					return t.Format("Jan 2, 2006")
+				}
 			},
 			"formatNumeric": func(n pgtype.Numeric) string {
 				if !n.Valid {
@@ -859,6 +884,55 @@ func formatCurrency(abs float64) string {
 		s = result
 	}
 	return fmt.Sprintf("$%s.%02d", s, cents)
+}
+
+// titleCaseMerchant converts ALL-CAPS merchant names from bank feeds into
+// readable Title Case. Mixed-case input is returned as-is to avoid mangling
+// names that are already properly cased.
+func titleCaseMerchant(s string) string {
+	if s == "" {
+		return s
+	}
+	// Only transform if the string appears to be ALL CAPS or all lowercase.
+	// Mixed-case strings like "McDonald's" are left alone.
+	upper := strings.ToUpper(s)
+	lower := strings.ToLower(s)
+	if s != upper && s != lower {
+		return s // already mixed case — leave it alone
+	}
+
+	// Small words that should stay lowercase (unless first word).
+	smallWords := map[string]bool{
+		"a": true, "an": true, "and": true, "as": true, "at": true,
+		"by": true, "for": true, "in": true, "of": true, "on": true,
+		"or": true, "the": true, "to": true, "vs": true, "via": true,
+	}
+
+	words := strings.Fields(lower)
+	for i, w := range words {
+		// Abbreviations with periods (e.g., "h.e." → "H.E."): uppercase all parts.
+		if strings.Contains(w, ".") {
+			parts := strings.Split(w, ".")
+			for j, p := range parts {
+				if len(p) > 0 {
+					parts[j] = strings.ToUpper(p)
+				}
+			}
+			words[i] = strings.Join(parts, ".")
+			continue
+		}
+		// Short words (2 letters or less) that aren't articles: keep uppercase
+		// (likely abbreviations like "AB", "US", "ATM").
+		if len(w) <= 2 && !smallWords[w] {
+			words[i] = strings.ToUpper(w)
+			continue
+		}
+		// Always capitalize the first word; small words stay lowercase otherwise.
+		if i == 0 || !smallWords[w] {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	return strings.Join(words, " ")
 }
 
 // AdminUsername returns the admin username from the session for use in template data maps.

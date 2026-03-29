@@ -15,7 +15,7 @@
         <span class="text-xs text-base-content/40">{{formatDate .Transaction.Date}}</span>
         {{if .Transaction.MerchantName}}
         <span class="text-xs text-base-content/30">&middot;</span>
-        <span class="text-xs text-base-content/40">{{deref .Transaction.MerchantName}}</span>
+        <span class="text-xs text-base-content/40">{{titleCase (deref .Transaction.MerchantName)}}</span>
         {{end}}
         {{if .Transaction.Pending}}<span class="badge badge-warning badge-xs ml-1">Pending</span>{{end}}
       </div>
@@ -81,7 +81,7 @@
       {{if .Transaction.MerchantName}}
       <div>
         <p class="text-xs text-base-content/40 mb-1">Merchant</p>
-        <p class="text-sm font-medium">{{deref .Transaction.MerchantName}}</p>
+        <p class="text-sm font-medium">{{titleCase (deref .Transaction.MerchantName)}}</p>
       </div>
       {{end}}
       {{if .AccountName}}

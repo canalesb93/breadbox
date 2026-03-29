@@ -312,7 +312,7 @@
               <span class="relative">
                 {{if .HasPendingReview}}<span class="absolute -left-2.5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-info" title="Pending review"></span>{{end}}
                 <a href="/transactions/{{.ID}}" @click.stop class="font-medium text-sm hover:text-primary transition-colors no-underline">{{.Name}}</a>
-                {{if .MerchantName}}<span class="text-xs text-base-content/40 ml-1">{{.MerchantName}}</span>{{end}}
+                {{if .MerchantName}}<span class="text-xs text-base-content/40 ml-1">{{titleCase (deref .MerchantName)}}</span>{{end}}
               </span>
             </div>
           </td>
@@ -333,7 +333,7 @@
         <tr x-show="expanded" x-cloak>
           <td colspan="5" class="bg-base-200/30 px-6 py-3">
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-              {{if .MerchantName}}<div><span class="text-xs text-base-content/40 block">Merchant</span>{{.MerchantName}}</div>{{end}}
+              {{if .MerchantName}}<div><span class="text-xs text-base-content/40 block">Merchant</span>{{titleCase (deref .MerchantName)}}</div>{{end}}
               <div><span class="text-xs text-base-content/40 block">Transaction ID</span><code class="font-mono text-xs text-base-content/50">{{.ID}}</code></div>
               <div><span class="text-xs text-base-content/40 block">Created</span>{{formatDateTime .CreatedAt}}</div>
               <div><span class="text-xs text-base-content/40 block">Updated</span>{{formatDateTime .UpdatedAt}}</div>

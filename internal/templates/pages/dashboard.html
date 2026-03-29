@@ -278,7 +278,7 @@
               <span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{{firstChar .UserName}}</span>
             </span>
             {{end}}
-            <span class="truncate shrink min-w-0">{{.AccountName}} · {{formatDate .Date}}</span>
+            <span class="truncate shrink min-w-0">{{.AccountName}} · {{relativeDate .Date}}</span>
             {{if .CategoryDisplayName}}
             <span class="text-base-content/20 shrink-0 hidden sm:inline">&middot;</span>
             <span class="items-center gap-1 shrink-0 hidden sm:inline-flex">

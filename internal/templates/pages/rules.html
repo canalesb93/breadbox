@@ -194,6 +194,10 @@
         <span class="text-xs text-base-content/40 tabular-nums">{{.HitCount}} hits</span>
         <span class="text-xs text-base-content/30">&middot;</span>
         <span class="text-xs text-base-content/40 tabular-nums">p{{.Priority}}</span>
+        {{if .LastHitAt}}
+        <span class="text-xs text-base-content/30">&middot;</span>
+        <span class="text-xs text-base-content/40">{{relativeTime .LastHitAt}}</span>
+        {{end}}
       </div>
     </div>
 
@@ -219,6 +223,12 @@
         <div class="font-semibold text-sm text-base-content/50 tabular-nums">{{.Priority}}</div>
         <div>priority</div>
       </div>
+      {{if .LastHitAt}}
+      <div class="text-center min-w-16">
+        <div class="font-medium text-xs text-base-content/50">{{relativeTime .LastHitAt}}</div>
+        <div>last active</div>
+      </div>
+      {{end}}
     </div>
 
     <!-- Creator badge (large desktop+) -->
