@@ -1725,7 +1725,7 @@
   }
 
   .bb-triage-row__indicator {
-    @apply w-0.5 h-6 rounded-full shrink-0 transition-all duration-150;
+    @apply hidden sm:block w-0.5 h-6 rounded-full shrink-0 transition-all duration-150;
     background: transparent;
   }
 
@@ -1740,7 +1740,7 @@
   }
 
   .bb-triage-row__type {
-    @apply shrink-0 w-12;
+    @apply hidden sm:block shrink-0 w-12;
   }
 
   .bb-triage-badge {
@@ -1939,7 +1939,7 @@
 
   /* Triage detail panel */
   .bb-triage-detail {
-    @apply px-3 sm:px-6 py-4 border-t;
+    @apply px-3 sm:px-6 py-2.5 border-t;
     border-color: oklch(0.94 0 0);
     background: oklch(0.985 0 0);
   }

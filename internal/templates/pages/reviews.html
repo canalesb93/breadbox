@@ -51,45 +51,21 @@
   </div>
 </div>
 
-<!-- Stat Cards -->
+<!-- Compact Stats Bar -->
 {{if .Counts}}
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 bb-stagger">
-  <div class="bb-stat-card">
-    <div class="bb-stat-card__icon text-warning">
-      <i data-lucide="clock" class="w-5 h-5"></i>
-    </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value{{if gt .Counts.Pending 0}} text-warning{{end}}">{{.Counts.Pending}}</span>
-      <span class="bb-stat-card__label">Pending</span>
-    </div>
-  </div>
-  <div class="bb-stat-card">
-    <div class="bb-stat-card__icon text-success">
-      <i data-lucide="check-circle" class="w-5 h-5"></i>
-    </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value text-success">{{.Counts.ApprovedToday}}</span>
-      <span class="bb-stat-card__label">Approved Today</span>
-    </div>
-  </div>
-  <div class="bb-stat-card">
-    <div class="bb-stat-card__icon text-error">
-      <i data-lucide="x-circle" class="w-5 h-5"></i>
-    </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value text-error">{{.Counts.RejectedToday}}</span>
-      <span class="bb-stat-card__label">Rejected Today</span>
-    </div>
-  </div>
-  <div class="bb-stat-card">
-    <div class="bb-stat-card__icon text-base-content/40">
-      <i data-lucide="skip-forward" class="w-5 h-5"></i>
-    </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value">{{.Counts.SkippedToday}}</span>
-      <span class="bb-stat-card__label">Skipped Today</span>
-    </div>
-  </div>
+<div class="flex items-center gap-3 mb-4 text-sm flex-wrap">
+  <span class="inline-flex items-center gap-1.5 font-semibold{{if gt .Counts.Pending 0}} text-warning{{else}} text-base-content/50{{end}}">
+    <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+    {{.Counts.Pending}} pending
+  </span>
+  <span class="text-base-content/20">|</span>
+  <span class="inline-flex items-center gap-1 text-base-content/50 text-xs">
+    <span class="text-success font-medium">{{.Counts.ApprovedToday}}</span> approved
+  </span>
+  <span class="inline-flex items-center gap-1 text-base-content/50 text-xs">
+    <span class="font-medium">{{.Counts.SkippedToday}}</span> skipped
+  </span>
+  <span class="text-base-content/30 text-xs">today</span>
 </div>
 {{end}}
 
@@ -163,7 +139,6 @@
           <select name="status" class="select select-sm select-bordered w-full">
             <option value="pending"{{if eq .StatusFilter "pending"}} selected{{end}}>Pending</option>
             <option value="approved"{{if eq .StatusFilter "approved"}} selected{{end}}>Approved</option>
-            <option value="rejected"{{if eq .StatusFilter "rejected"}} selected{{end}}>Rejected</option>
             <option value="skipped"{{if eq .StatusFilter "skipped"}} selected{{end}}>Skipped</option>
             <option value="all"{{if eq .StatusFilter "all"}} selected{{end}}>All</option>
           </select>
@@ -215,18 +190,11 @@
   <!-- Triage toolbar (only shown for pending reviews) -->
   {{if eq .StatusFilter "pending"}}
   <div class="flex items-center justify-between mb-3">
-    <div class="flex items-center gap-3">
-      <span class="text-xs text-base-content/40 tabular-nums" x-text="sessionCount + ' reviewed this session'"></span>
-      {{if .Counts}}
-      <span class="text-xs text-base-content/30">&middot;</span>
-      <span class="text-xs text-base-content/40 tabular-nums">{{.Counts.Pending}} remaining</span>
-      {{end}}
-    </div>
-    <div class="hidden sm:flex items-center gap-2 text-xs text-base-content/30">
+    <span class="text-xs text-base-content/40 tabular-nums" x-text="sessionCount + ' reviewed this session'"></span>
+    <div class="hidden lg:flex items-center gap-2 text-xs text-base-content/30">
       <span class="flex items-center gap-1"><kbd class="bb-kbd">j</kbd><kbd class="bb-kbd">k</kbd> navigate</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">a</kbd> accept</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">s</kbd> skip</span>
-      <span class="flex items-center gap-1"><kbd class="bb-kbd">d</kbd> dismiss</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">n</kbd> note</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">c</kbd> category</span>
     </div>
@@ -313,18 +281,11 @@
             @click="$dispatch('triage-skip', { id: '{{$review.ID}}', note: triageNote, idx: {{$idx}} })">
             <i data-lucide="fast-forward" class="w-3.5 h-3.5"></i>
           </button>
-          <button class="bb-triage-action bb-triage-action--dismiss" title="Dismiss (d)"
-            :disabled="submitting"
-            @click="$dispatch('triage-dismiss', { id: '{{$review.ID}}', idx: {{$idx}} })">
-            <i data-lucide="x" class="w-3.5 h-3.5"></i>
-          </button>
         </div>
         {{else}}
         <div class="bb-triage-row__resolved">
           {{if eq $review.Status "approved"}}
           <span class="badge badge-success badge-xs">Approved</span>
-          {{else if eq $review.Status "rejected"}}
-          <span class="badge badge-error badge-xs">Rejected</span>
           {{else if eq $review.Status "skipped"}}
           <span class="badge badge-ghost badge-xs">Skipped</span>
           {{end}}
@@ -345,70 +306,48 @@
            x-transition:leave-end="opacity-0"
            @click.stop>
 
-        <div class="flex items-start gap-6 flex-wrap">
-          <!-- Transaction detail -->
-          <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-3 flex-wrap">
+          <!-- Context: link + raw category -->
+          <div class="flex items-center gap-2 flex-1 min-w-0">
             {{if $review.Transaction}}
-            <div class="flex items-center gap-2 mb-2">
-              <a href="/transactions/{{$review.TransactionID}}" class="text-sm font-semibold link link-hover">{{$review.Transaction.Name}}</a>
-              {{if $review.Transaction.Pending}}
-              <span class="badge badge-warning badge-xs">Pending</span>
-              {{end}}
-            </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 text-xs">
-              <div>
-                <span class="text-base-content/40">Merchant</span>
-                <div class="font-medium">{{if $review.Transaction.MerchantName}}{{$review.Transaction.MerchantName}}{{else}}&mdash;{{end}}</div>
-              </div>
-              <div>
-                <span class="text-base-content/40">Account</span>
-                <div class="font-medium">{{if $review.Transaction.AccountName}}{{$review.Transaction.AccountName}}{{else}}&mdash;{{end}}</div>
-              </div>
-              <div>
-                <span class="text-base-content/40">Date</span>
-                <div class="font-medium">{{formatDate $review.Transaction.Date}}</div>
-              </div>
-              <div>
-                <span class="text-base-content/40">Amount</span>
-                <div class="font-medium tabular-nums{{if lt $review.Transaction.Amount 0.0}} text-success{{end}}">{{formatAmount $review.Transaction.Amount}}</div>
-              </div>
-            </div>
+            <a href="/transactions/{{$review.TransactionID}}" class="text-xs link link-hover text-base-content/50 shrink-0">
+              <i data-lucide="external-link" class="w-3 h-3 inline"></i>
+              View
+            </a>
+            {{if $review.Transaction.Pending}}
+            <span class="badge badge-warning badge-xs">Pending</span>
+            {{end}}
             {{if $review.Transaction.CategoryPrimaryRaw}}
-            <div class="text-xs text-base-content/40 mt-2">
-              Raw category: <span class="font-mono text-base-content/50">{{$review.Transaction.CategoryPrimaryRaw}}{{if $review.Transaction.CategoryDetailedRaw}} / {{$review.Transaction.CategoryDetailedRaw}}{{end}}</span>
-            </div>
+            <span class="text-xs text-base-content/30">|</span>
+            <span class="text-xs text-base-content/40 truncate">Raw: <span class="font-mono text-base-content/50">{{$review.Transaction.CategoryPrimaryRaw}}{{if $review.Transaction.CategoryDetailedRaw}} / {{$review.Transaction.CategoryDetailedRaw}}{{end}}</span></span>
             {{end}}
             {{end}}
           </div>
 
-          <!-- Category picker + actions -->
-          <div class="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[220px]">
-            <div class="bb-cat-picker" data-picker-source="triage-{{$review.ID}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if $review.SuggestedCategoryID}}{{$review.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current', sourceId: 'triage-{{$review.ID}}'})" @category-change="selectedCatId = $event.detail.id">
-              <button type="button" class="btn btn-sm btn-ghost gap-2 w-full justify-start border border-base-300 rounded-xl" @click="openPicker()">
-                <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-                <span x-text="displayLabel" class="text-xs truncate"></span>
-                <svg class="w-3 h-3 ml-auto opacity-40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-              </button>
-            </div>
-            <div class="flex items-center gap-2">
-              <input type="text" class="input input-bordered input-xs flex-1 rounded-lg" placeholder="Add note..." x-model="triageNote" @keydown.stop @keydown.escape.prevent="$el.blur()">
-            </div>
-            <div class="flex gap-1.5">
-              <button class="btn btn-success btn-sm rounded-xl flex-1 gap-1" :disabled="submitting"
-                @click="$dispatch('triage-accept', { id: '{{$review.ID}}', catId: selectedCatId, note: triageNote, idx: {{$idx}} })">
-                <i data-lucide="check" class="w-3.5 h-3.5"></i>
-                Accept
-              </button>
-              <button class="btn btn-ghost btn-sm rounded-xl gap-1" :disabled="submitting"
-                @click="$dispatch('triage-skip', { id: '{{$review.ID}}', note: triageNote, idx: {{$idx}} })">
-                <i data-lucide="fast-forward" class="w-3.5 h-3.5"></i>
-                Skip
-              </button>
-              <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30" :disabled="submitting"
-                @click="$dispatch('triage-dismiss', { id: '{{$review.ID}}', idx: {{$idx}} })">
-                <i data-lucide="x" class="w-3.5 h-3.5"></i>
-              </button>
-            </div>
+          <!-- Category picker -->
+          <div class="bb-cat-picker shrink-0" data-picker-source="triage-{{$review.ID}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if $review.SuggestedCategoryID}}{{$review.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current'})" @category-change="selectedCatId = $event.detail.id">
+            <button type="button" class="btn btn-xs btn-ghost gap-1.5 justify-start border border-base-300 rounded-lg" @click="openPicker()">
+              <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
+              <span x-text="displayLabel" class="text-xs truncate max-w-[120px]"></span>
+              <svg class="w-3 h-3 opacity-40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+          </div>
+
+          <!-- Note -->
+          <input type="text" class="input input-bordered input-xs rounded-lg w-36 shrink-0" placeholder="Note..." x-model="triageNote" @keydown.stop @keydown.escape.prevent="$el.blur()">
+
+          <!-- Actions -->
+          <div class="flex gap-1 shrink-0">
+            <button class="btn btn-success btn-xs rounded-lg gap-1" :disabled="submitting"
+              @click="$dispatch('triage-accept', { id: '{{$review.ID}}', catId: selectedCatId, note: triageNote, idx: {{$idx}} })">
+              <i data-lucide="check" class="w-3 h-3"></i>
+              Accept
+            </button>
+            <button class="btn btn-ghost btn-xs rounded-lg gap-1" :disabled="submitting"
+              @click="$dispatch('triage-skip', { id: '{{$review.ID}}', note: triageNote, idx: {{$idx}} })">
+              <i data-lucide="fast-forward" class="w-3 h-3"></i>
+              Skip
+            </button>
           </div>
         </div>
       </div>
@@ -471,9 +410,6 @@ function triageQueue() {
       this.$el.addEventListener('triage-skip', (e) => {
         this.submitTriage(e.detail.id, 'skipped', null, e.detail.note, e.detail.idx);
       });
-      this.$el.addEventListener('triage-dismiss', (e) => {
-        this.dismissTriage(e.detail.id, e.detail.idx);
-      });
     },
 
     handleKey(e) {
@@ -503,10 +439,6 @@ function triageQueue() {
         case 's':
           e.preventDefault();
           this.skipFocused();
-          break;
-        case 'd':
-          e.preventDefault();
-          this.dismissFocused();
           break;
         case 'n':
           e.preventDefault();
@@ -545,13 +477,6 @@ function triageQueue() {
       const id = row.dataset.reviewId;
       const data = Alpine.$data(row);
       this.submitTriage(id, 'skipped', null, data.triageNote, this.focusedIdx);
-    },
-
-    dismissFocused() {
-      const row = this.getFocusedRow();
-      if (!row) return;
-      const id = row.dataset.reviewId;
-      this.dismissTriage(id, this.focusedIdx);
     },
 
     openCategoryPickerForFocused() {
@@ -612,33 +537,6 @@ function triageQueue() {
         } else {
           this.removeRow(id, idx);
           window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Review ' + decision, type:'success'}}));
-        }
-      })
-      .catch(() => {
-        window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Network error', type:'error'}}));
-        data.submitting = false;
-      });
-    },
-
-    dismissTriage(id, idx) {
-      const row = document.getElementById('triage-' + id);
-      if (!row) return;
-      const data = Alpine.$data(row);
-      if (data.submitting) return;
-      data.submitting = true;
-
-      fetch('/-/reviews/' + id + '/dismiss', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }
-      })
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) {
-          window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error, type:'error'}}));
-          data.submitting = false;
-        } else {
-          this.removeRow(id, idx);
-          window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Review dismissed', type:'info'}}));
         }
       })
       .catch(() => {
