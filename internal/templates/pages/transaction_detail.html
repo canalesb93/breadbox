@@ -198,7 +198,7 @@
         </template>
       </button>
     </div>
-    <div class="flex items-center mt-1.5">
+    <div class="flex items-center mt-1.5 pl-1">
       <label class="flex items-center gap-1.5 {{if .HasPendingReview}}opacity-40 cursor-not-allowed{{else}}cursor-pointer{{end}}">
         <input type="checkbox" class="checkbox checkbox-xs rounded" :class="enqueueMode ? 'checkbox-info' : ''" x-model="enqueueMode" {{if .HasPendingReview}}disabled{{end}}>
         <span class="text-xs" :class="enqueueMode ? 'text-info font-medium' : 'text-base-content/40'">Send to review queue</span>
