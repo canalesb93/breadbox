@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -712,6 +713,24 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			a.Logger.Error("list transaction reviews", "error", err)
 		}
 
+		// Fetch rule applications for this transaction.
+		ruleApps, err := svc.ListRuleApplicationsByTransactionID(ctx, idStr)
+		if err != nil {
+			a.Logger.Error("list transaction rule applications", "error", err)
+		}
+
+		// Build unified activity timeline.
+		activity := buildActivityTimeline(reviews, comments, ruleApps)
+
+		// Check if there's a pending review (to disable re-enqueue)
+		hasPendingReview := false
+		for _, r := range reviews {
+			if r.Status == "pending" {
+				hasPendingReview = true
+				break
+			}
+		}
+
 		// Fetch account context for richer detail display.
 		var accountID, accountName, userName string
 		var institutionName, accountMask, accountType, connectionID string
@@ -785,13 +804,124 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			"AccountType":     accountType,
 			"ConnectionID":    connectionID,
 			"Account":         account,
-			"Comments":        comments,
-			"Reviews":         reviews,
+			"Activity":          activity,
+			"HasPendingReview":  hasPendingReview,
 			"Categories":      categoryTree,
 			"Breadcrumbs":     breadcrumbs,
 		}
 		tr.Render(w, r, "transaction_detail.html", data)
 	}
+}
+
+// buildActivityTimeline merges reviews, comments, and rule applications into a sorted timeline.
+func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.CommentResponse, ruleApps []service.TransactionRuleApplicationDetail) []service.ActivityEntry {
+	var entries []service.ActivityEntry
+
+	// Convert reviews — for resolved reviews, emit both the enqueue and resolution events
+	for _, r := range reviews {
+		// Always emit the "enqueued" event (using CreatedAt)
+		var enqueueReason string
+		switch r.ReviewType {
+		case "uncategorized":
+			enqueueReason = "Uncategorized transaction"
+		case "low_confidence":
+			enqueueReason = "Low confidence categorization"
+		case "new_transaction":
+			enqueueReason = "New transaction"
+		case "re_review":
+			enqueueReason = "Sent back for review"
+		case "manual":
+			enqueueReason = "Manually flagged"
+		default:
+			enqueueReason = "Flagged for review"
+		}
+		entries = append(entries, service.ActivityEntry{
+			Type:         "review",
+			Timestamp:    r.CreatedAt,
+			ActorName:    "System",
+			ActorType:    "system",
+			Summary:      enqueueReason,
+			Detail:       "Added to review queue",
+			ReviewStatus: "pending",
+		})
+
+		// For resolved reviews, also emit the resolution event
+		if r.Status != "pending" && r.ReviewedAt != nil {
+			e := service.ActivityEntry{
+				Type:      "review",
+				Timestamp: *r.ReviewedAt,
+			}
+			if r.ReviewerName != nil {
+				e.ActorName = *r.ReviewerName
+			}
+			if r.ReviewerType != nil {
+				e.ActorType = *r.ReviewerType
+			}
+			switch r.Status {
+			case "approved":
+				e.ReviewStatus = "approved"
+				e.Summary = "Approved"
+				if r.ResolvedCategoryDisplayName != nil {
+					e.Summary = "Approved as " + *r.ResolvedCategoryDisplayName
+					e.CategoryName = *r.ResolvedCategoryDisplayName
+				}
+			case "rejected":
+				e.ReviewStatus = "rejected"
+				e.Summary = "Rejected"
+			case "skipped":
+				e.ReviewStatus = "skipped"
+				e.Summary = "Skipped"
+			}
+			if r.ReviewNote != nil && *r.ReviewNote != "" {
+				e.Detail = *r.ReviewNote
+			}
+			entries = append(entries, e)
+		}
+	}
+
+	// Convert comments (filter out [Review: ...] duplicates from legacy data)
+	for _, c := range comments {
+		if strings.HasPrefix(c.Content, "[Review: ") {
+			continue
+		}
+		entries = append(entries, service.ActivityEntry{
+			Type:      "comment",
+			Timestamp: c.CreatedAt,
+			ActorName: c.AuthorName,
+			ActorType: c.AuthorType,
+			Detail:    c.Content,
+			CommentID: c.ID,
+		})
+	}
+
+	// Convert rule applications
+	for _, ra := range ruleApps {
+		summary := "Rule \"" + ra.RuleName + "\" set category"
+		if ra.CategoryDisplayName != "" {
+			summary = "Rule \"" + ra.RuleName + "\" set category to " + ra.CategoryDisplayName
+		}
+		how := "during sync"
+		if ra.AppliedBy == "retroactive" {
+			how = "retroactively"
+		}
+		entries = append(entries, service.ActivityEntry{
+			Type:      "rule",
+			Timestamp: ra.AppliedAt,
+			ActorName: how,
+			ActorType: "system",
+			Summary:   summary,
+			RuleName:  ra.RuleName,
+			RuleID:    ra.RuleID,
+			CategoryName: ra.CategoryDisplayName,
+		})
+	}
+
+	// Sort by timestamp descending (newest first)
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Timestamp > entries[j].Timestamp
+	})
+
+	return entries
 }
 
 // CreateTransactionCommentHandler serves POST /admin/api/transactions/{id}/comments.

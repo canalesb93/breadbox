@@ -36,8 +36,23 @@ type TransactionContext struct {
 	UserName         string  // family member name
 }
 
+// RuleActionSource tracks which rule contributed which action.
+type RuleActionSource struct {
+	RuleID      pgtype.UUID
+	ActionField string // e.g., "category"
+	ActionValue string // e.g., "food_and_drink_coffee"
+}
+
+// RuleActions holds the merged actions to apply to a transaction.
+type RuleActions struct {
+	CategoryID pgtype.UUID
+	// future: MerchantName pgtype.Text, etc.
+
+	Sources []RuleActionSource // tracks which rule set which field
+}
+
 // RuleResolver loads transaction rules and evaluates them during sync.
-// If no rule matches, the transaction is assigned the "uncategorized" category.
+// All matching rules contribute actions (merge non-conflicting).
 type RuleResolver struct {
 	rules           []compiledRule
 	slugCache       map[[16]byte]string // category UUID bytes -> slug
@@ -46,9 +61,9 @@ type RuleResolver struct {
 }
 
 type compiledRule struct {
-	id         pgtype.UUID
-	categoryID pgtype.UUID
-	condition  *compiledCondition
+	id        pgtype.UUID
+	actions   RuleActions
+	condition *compiledCondition
 }
 
 type compiledCondition struct {
@@ -152,9 +167,9 @@ func loadRules(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) ([]
 		}
 
 		compiled = append(compiled, compiledRule{
-			id:         rr.id,
-			categoryID: rr.categoryID,
-			condition:  cc,
+			id:        rr.id,
+			actions:   RuleActions{CategoryID: rr.categoryID},
+			condition: cc,
 		})
 	}
 
@@ -236,17 +251,32 @@ func (r *RuleResolver) CategorySlug(id pgtype.UUID) string {
 	return r.slugCache[id.Bytes]
 }
 
-// ResolveWithContext evaluates transaction rules in priority order.
-// The first matching rule wins. If no rule matches, returns uncategorizedID.
-func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionContext) pgtype.UUID {
+// ResolveWithContext evaluates all transaction rules in priority order.
+// All matching rules contribute actions — first rule to set a field wins.
+// Returns nil when no rule matches.
+func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionContext) *RuleActions {
+	var result *RuleActions
 	for i := range r.rules {
 		rule := &r.rules[i]
 		if evaluateCondition(rule.condition, txn) {
 			r.hitCounts[rule.id.Bytes]++
-			return rule.categoryID
+			if result == nil {
+				result = &RuleActions{}
+			}
+			// Merge: first rule to set a field wins
+			if !result.CategoryID.Valid && rule.actions.CategoryID.Valid {
+				result.CategoryID = rule.actions.CategoryID
+				slug := r.CategorySlug(rule.actions.CategoryID)
+				result.Sources = append(result.Sources, RuleActionSource{
+					RuleID:      rule.id,
+					ActionField: "category",
+					ActionValue: slug,
+				})
+			}
+			// future: same pattern for other fields
 		}
 	}
-	return r.uncategorizedID
+	return result
 }
 
 // HitCountsJSON returns the per-rule hit counts from this sync run as JSON bytes

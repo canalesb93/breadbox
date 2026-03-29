@@ -719,25 +719,28 @@ func TestGetReviewCounts_WithData(t *testing.T) {
 	}
 }
 
-// --- GetReviewSummary ---
+// --- GetPendingReviewsOverview ---
 
-func TestGetReviewSummary_Empty(t *testing.T) {
+func TestGetPendingReviewsOverview_Empty(t *testing.T) {
 	svc, _, _ := newService(t)
 	ctx := context.Background()
 
-	summary, err := svc.GetReviewSummary(ctx)
+	overview, err := svc.GetPendingReviewsOverview(ctx)
 	if err != nil {
-		t.Fatalf("GetReviewSummary: %v", err)
+		t.Fatalf("GetPendingReviewsOverview: %v", err)
 	}
-	if summary.TotalPending != 0 {
-		t.Errorf("expected total_pending=0, got %d", summary.TotalPending)
+	if overview.TotalPending != 0 {
+		t.Errorf("expected total_pending=0, got %d", overview.TotalPending)
 	}
-	if len(summary.Groups) != 0 {
-		t.Errorf("expected 0 groups, got %d", len(summary.Groups))
+	if len(overview.CountsByType) != 0 {
+		t.Errorf("expected 0 type counts, got %d", len(overview.CountsByType))
+	}
+	if len(overview.CategoryGroups) != 0 {
+		t.Errorf("expected 0 category groups, got %d", len(overview.CategoryGroups))
 	}
 }
 
-func TestGetReviewSummary_GroupsByCategory(t *testing.T) {
+func TestGetPendingReviewsOverview_GroupsByCategoryAndType(t *testing.T) {
 	svc, queries, pool := newService(t)
 	ctx := context.Background()
 
@@ -764,25 +767,39 @@ func TestGetReviewSummary_GroupsByCategory(t *testing.T) {
 	}
 
 	mustEnqueueReview(t, queries, txn1.ID, "new_transaction")
-	mustEnqueueReview(t, queries, txn2.ID, "new_transaction")
+	mustEnqueueReview(t, queries, txn2.ID, "uncategorized")
 	mustEnqueueReview(t, queries, txn3.ID, "new_transaction")
 
-	summary, err := svc.GetReviewSummary(ctx)
+	overview, err := svc.GetPendingReviewsOverview(ctx)
 	if err != nil {
-		t.Fatalf("GetReviewSummary: %v", err)
+		t.Fatalf("GetPendingReviewsOverview: %v", err)
 	}
-	if summary.TotalPending != 3 {
-		t.Errorf("expected total_pending=3, got %d", summary.TotalPending)
+	if overview.TotalPending != 3 {
+		t.Errorf("expected total_pending=3, got %d", overview.TotalPending)
 	}
-	if len(summary.Groups) != 2 {
-		t.Errorf("expected 2 groups, got %d", len(summary.Groups))
+
+	// Check counts by type
+	if len(overview.CountsByType) != 2 {
+		t.Errorf("expected 2 type counts, got %d", len(overview.CountsByType))
+	}
+	// new_transaction should come first (count=2 > count=1)
+	if len(overview.CountsByType) >= 1 && overview.CountsByType[0].ReviewType != "new_transaction" {
+		t.Errorf("expected first type=new_transaction, got %s", overview.CountsByType[0].ReviewType)
+	}
+	if len(overview.CountsByType) >= 1 && overview.CountsByType[0].Count != 2 {
+		t.Errorf("expected new_transaction count=2, got %d", overview.CountsByType[0].Count)
+	}
+
+	// Check category groups
+	if len(overview.CategoryGroups) != 2 {
+		t.Errorf("expected 2 category groups, got %d", len(overview.CategoryGroups))
 	}
 	// FOOD_AND_DRINK group should come first (count=2 > count=1)
-	if len(summary.Groups) >= 1 && summary.Groups[0].CategoryPrimaryRaw != "FOOD_AND_DRINK" {
-		t.Errorf("expected first group=FOOD_AND_DRINK, got %s", summary.Groups[0].CategoryPrimaryRaw)
+	if len(overview.CategoryGroups) >= 1 && overview.CategoryGroups[0].CategoryPrimaryRaw != "FOOD_AND_DRINK" {
+		t.Errorf("expected first group=FOOD_AND_DRINK, got %s", overview.CategoryGroups[0].CategoryPrimaryRaw)
 	}
-	if len(summary.Groups) >= 1 && summary.Groups[0].Count != 2 {
-		t.Errorf("expected first group count=2, got %d", summary.Groups[0].Count)
+	if len(overview.CategoryGroups) >= 1 && overview.CategoryGroups[0].Count != 2 {
+		t.Errorf("expected first group count=2, got %d", overview.CategoryGroups[0].Count)
 	}
 }
 

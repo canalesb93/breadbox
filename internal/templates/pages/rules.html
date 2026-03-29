@@ -6,9 +6,9 @@
     <h1 class="bb-page-title">Transaction Rules</h1>
     <p class="text-sm text-base-content/50 mt-1">Auto-categorize future transactions based on pattern matching</p>
   </div>
-  <button class="btn btn-primary btn-sm rounded-xl" @click="showCreateModal = true">
+  <a href="/rules/new" class="btn btn-primary btn-sm rounded-xl">
     <i data-lucide="plus" class="w-4 h-4"></i> New Rule
-  </button>
+  </a>
 </div>
 
 <!-- Summary Stats Cards -->
@@ -138,16 +138,16 @@
     </div>
     <h2 class="text-lg font-semibold mb-1">No rules yet</h2>
     <p class="text-base-content/50 text-sm mb-4">Create a rule to start auto-categorizing transactions.</p>
-    <button class="btn btn-primary btn-sm rounded-xl" @click="showCreateModal = true">
+    <a href="/rules/new" class="btn btn-primary btn-sm rounded-xl">
       <i data-lucide="plus" class="w-4 h-4"></i> Create Rule
-    </button>
+    </a>
   </div>
 </div>
 {{end}}
 
 <div class="space-y-3 bb-stagger">
 {{range .Rules}}
-<div class="bb-card p-0 overflow-hidden{{if not .Enabled}} opacity-60{{end}}" x-data="{deleting: false}">
+<div class="bb-card p-0 overflow-hidden cursor-pointer hover:shadow-md transition-shadow{{if not .Enabled}} opacity-60{{end}}" x-data="{deleting: false}" @click="window.location.href='/rules/{{.ID}}'">
   <div class="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4">
     <!-- Category avatar -->
     <div class="flex-shrink-0">
@@ -246,9 +246,9 @@
       <button class="btn btn-ghost btn-xs btn-square rounded-lg" title="{{if .Enabled}}Disable{{else}}Enable{{end}}" @click.stop="toggleRule('{{.ID}}')">
         {{if .Enabled}}<i data-lucide="pause" class="w-3.5 h-3.5 pointer-events-none"></i>{{else}}<i data-lucide="play" class="w-3.5 h-3.5 pointer-events-none"></i>{{end}}
       </button>
-      <button class="btn btn-ghost btn-xs btn-square rounded-lg" title="Edit" @click.stop="editRule({{toJSON .}})">
+      <a href="/rules/{{.ID}}/edit" class="btn btn-ghost btn-xs btn-square rounded-lg" title="Edit" @click.stop>
         <i data-lucide="pencil" class="w-3.5 h-3.5 pointer-events-none"></i>
-      </button>
+      </a>
       <button class="btn btn-ghost btn-xs btn-square rounded-lg text-error/60" title="Delete" :disabled="deleting" @click.stop="deleteRule('{{.ID}}', $el)">
         <i data-lucide="trash-2" class="w-3.5 h-3.5 pointer-events-none"></i>
       </button>
@@ -265,158 +265,11 @@
 </div>
 {{end}}
 
-<!-- Create/Edit Rule Modal -->
-<dialog id="rules-modal" class="modal" x-ref="rulesModal"
-  x-effect="(showCreateModal || showEditModal) ? $refs.rulesModal?.showModal() : $refs.rulesModal?.close()">
-  <div class="modal-box max-w-lg rounded-xl">
-    <h3 class="font-bold text-lg mb-6" x-text="showEditModal ? 'Edit Rule' : 'Create Rule'"></h3>
-    <form @submit.prevent="submitRule()">
-      <div class="form-control mb-4">
-        <label class="label"><span class="label-text text-sm font-medium">Name</span></label>
-        <input type="text" x-model="form.name" class="input input-bordered input-sm rounded-xl" placeholder="e.g., Uber Eats transactions" required />
-      </div>
-
-      <div class="form-control mb-4">
-        <label class="label"><span class="label-text text-sm font-medium">Category</span></label>
-        <select x-model="form.category_slug" class="select select-bordered select-sm rounded-xl" required>
-          <option value="">Select category...</option>
-          {{range .FlatCategories}}
-          <option value="{{.Slug}}">{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
-          {{end}}
-        </select>
-      </div>
-
-      <div class="form-control mb-4">
-        <label class="label"><span class="label-text text-sm font-medium">Priority</span></label>
-        <input type="number" x-model.number="form.priority" class="input input-bordered input-sm w-24 rounded-xl" min="0" max="1000" />
-        <label class="label"><span class="label-text-alt text-base-content/40">Higher priority rules are evaluated first (default: 10)</span></label>
-      </div>
-
-      <div class="form-control mb-4">
-        <label class="label"><span class="label-text text-sm font-medium">Conditions (JSON)</span></label>
-        <textarea x-model="form.conditions_json" class="textarea textarea-bordered textarea-sm font-mono text-xs rounded-xl" rows="6" placeholder='{"field": "name", "op": "contains", "value": "uber eats"}' required></textarea>
-        <label class="label">
-          <span class="label-text-alt text-base-content/40">
-            Fields: name, merchant_name, amount, category_primary, category_detailed, pending, provider, account_id, user_id.
-            Operators: eq, neq, contains, not_contains, matches, gt, gte, lt, lte, in.
-          </span>
-        </label>
-      </div>
-
-      <div class="form-control mb-4" x-show="!showEditModal">
-        <label class="label"><span class="label-text text-sm font-medium">Expires In</span> <span class="text-base-content/40 text-xs">(optional)</span></label>
-        <input type="text" x-model="form.expires_in" class="input input-bordered input-sm w-32 rounded-xl" placeholder="e.g., 30d" />
-        <label class="label"><span class="label-text-alt text-base-content/40">Duration: 24h, 7d, 4w. Leave empty for no expiry.</span></label>
-      </div>
-
-      <div x-show="formError" class="alert alert-error text-sm mb-4 rounded-xl">
-        <span x-text="formError"></span>
-      </div>
-
-      <div class="modal-action">
-        <button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="closeModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm rounded-xl" :disabled="submitting">
-          <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-          <span x-text="showEditModal ? 'Save' : 'Create'"></span>
-        </button>
-      </div>
-    </form>
-  </div>
-  <form method="dialog" class="modal-backdrop" @click="closeModal()"><button>close</button></form>
-</dialog>
-
 </div>
 
 <script>
 function rulesPage() {
   return {
-    showCreateModal: false,
-    showEditModal: false,
-    editingId: '',
-    submitting: false,
-    formError: '',
-    form: {
-      name: '',
-      category_slug: '',
-      priority: 10,
-      conditions_json: '',
-      expires_in: ''
-    },
-    editRule(rule) {
-      this.editingId = rule.id;
-      this.form.name = rule.name;
-      this.form.category_slug = rule.category_slug || '';
-      this.form.priority = rule.priority;
-      this.form.conditions_json = JSON.stringify(rule.conditions, null, 2);
-      this.form.expires_in = '';
-      this.formError = '';
-      this.showEditModal = true;
-    },
-    closeModal() {
-      this.showCreateModal = false;
-      this.showEditModal = false;
-      this.editingId = '';
-      this.formError = '';
-      this.form = { name: '', category_slug: '', priority: 10, conditions_json: '', expires_in: '' };
-    },
-    async submitRule() {
-      this.formError = '';
-      this.submitting = true;
-
-      let conditions;
-      try {
-        conditions = JSON.parse(this.form.conditions_json);
-      } catch (e) {
-        this.formError = 'Invalid JSON in conditions: ' + e.message;
-        this.submitting = false;
-        return;
-      }
-
-      try {
-        if (this.showEditModal) {
-          const body = {
-            name: this.form.name,
-            conditions: conditions,
-            category_slug: this.form.category_slug,
-            priority: this.form.priority
-          };
-          const resp = await fetch('/-/rules/' + this.editingId, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(body)
-          });
-          if (!resp.ok) {
-            const data = await resp.json();
-            this.formError = data.error || 'Failed to update rule';
-            this.submitting = false;
-            return;
-          }
-        } else {
-          const body = {
-            name: this.form.name,
-            conditions: conditions,
-            category_slug: this.form.category_slug,
-            priority: this.form.priority,
-            expires_in: this.form.expires_in || undefined
-          };
-          const resp = await fetch('/-/rules', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(body)
-          });
-          if (!resp.ok) {
-            const data = await resp.json();
-            this.formError = data.error || 'Failed to create rule';
-            this.submitting = false;
-            return;
-          }
-        }
-        location.reload();
-      } catch (e) {
-        this.formError = 'Network error: ' + e.message;
-        this.submitting = false;
-      }
-    },
     async toggleRule(id) {
       try {
         const resp = await fetch('/-/rules/' + id + '/toggle', { method: 'POST' });

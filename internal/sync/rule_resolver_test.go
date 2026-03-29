@@ -418,23 +418,23 @@ func TestResolveWithContext_PriorityOrdering(t *testing.T) {
 		rules: []compiledRule{
 			{
 				id:         testUUID(10),
-				categoryID: catA,
+				actions: RuleActions{CategoryID: catA},
 				condition:  mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
 			},
 			{
 				id:         testUUID(11),
-				categoryID: catB,
+				actions: RuleActions{CategoryID: catB},
 				condition:  mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
 			},
 		},
 		uncategorizedID: testUUID(99),
 	}
 
-	// Both rules match, but the first (higher priority) wins.
+	// Both rules match; first (higher priority) sets category.
 	tctx := TransactionContext{Name: "Coffee Shop", Provider: "plaid"}
 	result := r.ResolveWithContext("plaid", tctx)
-	if result != catA {
-		t.Errorf("expected higher priority rule to win, got %v", result)
+	if result == nil || result.CategoryID != catA {
+		t.Errorf("expected higher priority rule's category to win, got %v", result)
 	}
 }
 
@@ -444,22 +444,22 @@ func TestResolveWithContext_NoRuleMatchFallsBackToUncategorized(t *testing.T) {
 		rules: []compiledRule{
 			{
 				id:         testUUID(10),
-				categoryID: testUUID(1),
+				actions: RuleActions{CategoryID: testUUID(1)},
 				condition:  mustCompile(t, &Condition{Field: "name", Op: "eq", Value: "Starbucks"}),
 			},
 		},
 		uncategorizedID: testUUID(99),
 	}
 
-	// Rule doesn't match, should fall back to uncategorized.
+	// Rule doesn't match, should return nil.
 	tctx := TransactionContext{
 		Name:            "Grocery Store",
 		CategoryPrimary: "FOOD_AND_DRINK",
 		Provider:        "plaid",
 	}
 	result := r.ResolveWithContext("plaid", tctx)
-	if result != testUUID(99) {
-		t.Errorf("expected uncategorized fallback, got %v", result)
+	if result != nil {
+		t.Errorf("expected nil for no match, got %v", result)
 	}
 }
 
@@ -477,8 +477,8 @@ func TestResolveWithContext_FallbackToUncategorized(t *testing.T) {
 		Provider: "plaid",
 	}
 	result := r.ResolveWithContext("plaid", tctx)
-	if result != uncatID {
-		t.Errorf("expected uncategorized fallback, got %v", result)
+	if result != nil {
+		t.Errorf("expected nil for no match, got %v", result)
 	}
 }
 
@@ -491,7 +491,7 @@ func TestResolveWithContext_HitCountTracking(t *testing.T) {
 		rules: []compiledRule{
 			{
 				id:         ruleID,
-				categoryID: catA,
+				actions: RuleActions{CategoryID: catA},
 				condition:  mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
 			},
 		},
@@ -508,6 +508,89 @@ func TestResolveWithContext_HitCountTracking(t *testing.T) {
 	}
 }
 
+func TestResolveWithContext_MergeNonConflictingActions(t *testing.T) {
+	catA := testUUID(1)
+	catB := testUUID(2)
+	ruleAID := testUUID(10)
+	ruleBID := testUUID(11)
+
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        ruleAID,
+				actions:   RuleActions{CategoryID: catA},
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+			},
+			{
+				// Lower priority rule with same field — category already set by rule A
+				id:        ruleBID,
+				actions:   RuleActions{CategoryID: catB},
+				condition: mustCompile(t, &Condition{Field: "provider", Op: "eq", Value: "plaid"}),
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	tctx := TransactionContext{Name: "Coffee Shop", Provider: "plaid"}
+	result := r.ResolveWithContext("plaid", tctx)
+
+	// Both rules match — first to set category wins
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if result.CategoryID != catA {
+		t.Errorf("expected category from higher priority rule, got %v", result.CategoryID)
+	}
+	// Both rules should get hit counts
+	if r.hitCounts[ruleAID.Bytes] != 1 {
+		t.Errorf("expected 1 hit for rule A, got %d", r.hitCounts[ruleAID.Bytes])
+	}
+	if r.hitCounts[ruleBID.Bytes] != 1 {
+		t.Errorf("expected 1 hit for rule B, got %d", r.hitCounts[ruleBID.Bytes])
+	}
+}
+
+func TestResolveWithContext_NoShortCircuit(t *testing.T) {
+	catA := testUUID(1)
+	ruleAID := testUUID(10)
+	ruleBID := testUUID(11)
+
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        ruleAID,
+				actions:   RuleActions{CategoryID: catA},
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+			},
+			{
+				// Rule B matches but has no category (future: could set another field)
+				id:        ruleBID,
+				actions:   RuleActions{}, // no category action
+				condition: mustCompile(t, &Condition{Field: "provider", Op: "eq", Value: "plaid"}),
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	tctx := TransactionContext{Name: "Coffee Shop", Provider: "plaid"}
+	result := r.ResolveWithContext("plaid", tctx)
+
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if result.CategoryID != catA {
+		t.Errorf("expected category from rule A, got %v", result.CategoryID)
+	}
+	// Both rules matched and got hits (no short-circuit)
+	if r.hitCounts[ruleAID.Bytes] != 1 {
+		t.Errorf("expected 1 hit for rule A, got %d", r.hitCounts[ruleAID.Bytes])
+	}
+	if r.hitCounts[ruleBID.Bytes] != 1 {
+		t.Errorf("expected 1 hit for rule B, got %d", r.hitCounts[ruleBID.Bytes])
+	}
+}
 
 func TestCompileCondition_InvalidRegex(t *testing.T) {
 	_, err := compileCondition(&Condition{
@@ -704,7 +787,7 @@ func TestHitCountsJSON_IntegrationWithResolveWithContext(t *testing.T) {
 		rules: []compiledRule{
 			{
 				id:         ruleID,
-				categoryID: catA,
+				actions: RuleActions{CategoryID: catA},
 				condition:  mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
 			},
 		},

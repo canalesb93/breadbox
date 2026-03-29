@@ -65,11 +65,12 @@ func ListRulesHandler(svc *service.Service) http.HandlerFunc {
 func CreateRuleHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var input struct {
-			Name         string            `json:"name"`
-			Conditions   service.Condition `json:"conditions"`
-			CategorySlug string            `json:"category_slug"`
-			Priority     int               `json:"priority"`
-			ExpiresIn    string            `json:"expires_in"`
+			Name         string               `json:"name"`
+			Conditions   service.Condition     `json:"conditions"`
+			Actions      []service.RuleAction  `json:"actions"`
+			CategorySlug string                `json:"category_slug"`
+			Priority     int                   `json:"priority"`
+			ExpiresIn    string                `json:"expires_in"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
@@ -80,8 +81,8 @@ func CreateRuleHandler(svc *service.Service) http.HandlerFunc {
 			mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "name is required")
 			return
 		}
-		if input.CategorySlug == "" {
-			mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "category_slug is required")
+		if len(input.Actions) == 0 && input.CategorySlug == "" {
+			mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "either actions or category_slug is required")
 			return
 		}
 
@@ -90,6 +91,7 @@ func CreateRuleHandler(svc *service.Service) http.HandlerFunc {
 		rule, err := svc.CreateTransactionRule(r.Context(), service.CreateTransactionRuleParams{
 			Name:         input.Name,
 			Conditions:   input.Conditions,
+			Actions:      input.Actions,
 			CategorySlug: input.CategorySlug,
 			Priority:     input.Priority,
 			ExpiresIn:    input.ExpiresIn,
@@ -137,12 +139,13 @@ func UpdateRuleHandler(svc *service.Service) http.HandlerFunc {
 		id := chi.URLParam(r, "id")
 
 		var input struct {
-			Name         *string            `json:"name,omitempty"`
-			Conditions   *service.Condition `json:"conditions,omitempty"`
-			CategorySlug *string            `json:"category_slug,omitempty"`
-			Priority     *int               `json:"priority,omitempty"`
-			Enabled      *bool              `json:"enabled,omitempty"`
-			ExpiresAt    *string            `json:"expires_at,omitempty"`
+			Name         *string               `json:"name,omitempty"`
+			Conditions   *service.Condition     `json:"conditions,omitempty"`
+			Actions      *[]service.RuleAction  `json:"actions,omitempty"`
+			CategorySlug *string                `json:"category_slug,omitempty"`
+			Priority     *int                   `json:"priority,omitempty"`
+			Enabled      *bool                  `json:"enabled,omitempty"`
+			ExpiresAt    *string                `json:"expires_at,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
@@ -152,6 +155,7 @@ func UpdateRuleHandler(svc *service.Service) http.HandlerFunc {
 		rule, err := svc.UpdateTransactionRule(r.Context(), id, service.UpdateTransactionRuleParams{
 			Name:         input.Name,
 			Conditions:   input.Conditions,
+			Actions:      input.Actions,
 			CategorySlug: input.CategorySlug,
 			Priority:     input.Priority,
 			Enabled:      input.Enabled,

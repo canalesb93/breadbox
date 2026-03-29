@@ -304,6 +304,15 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		//   fields identical to what was already stored).
 		upsertStart := time.Now()
 		var skipped int
+		// Accumulate rule applications to batch-insert after the transaction loop.
+		type pendingApplication struct {
+			txnID       pgtype.UUID
+			ruleID      pgtype.UUID
+			actionField string
+			actionValue string
+		}
+		var ruleApplications []pendingApplication
+
 		for i := range pendingAdded {
 			accountID, err := e.resolveAccountID(ctx, pendingAdded[i].AccountExternalID, accountIDCache)
 			if err != nil {
@@ -314,12 +323,12 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				skipped++
 				continue
 			}
-			txnResult, err := e.upsertTransaction(ctx, txQueries, &pendingAdded[i], accountIDCache, string(conn.Provider), resolver, conn.UserID, userName, logger)
+			ur, err := e.upsertTransaction(ctx, txQueries, &pendingAdded[i], accountIDCache, string(conn.Provider), resolver, conn.UserID, userName, logger)
 			if err != nil {
 				logger.Error("upsert added transaction", "external_id", pendingAdded[i].ExternalID, "error", err)
 				continue
 			}
-			isNew, isChanged := classifyUpsertResult(txnResult, upsertStart)
+			isNew, isChanged := classifyUpsertResult(ur.Txn, upsertStart)
 			if isNew {
 				added++
 			} else if isChanged {
@@ -328,7 +337,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				unchanged++
 			}
 			if reviewAutoEnqueue && (isNew || isChanged) {
-				e.enqueueForReview(ctx, txQueries, txnResult, isNew, confidenceThreshold, resolver)
+				e.enqueueForReview(ctx, txQueries, ur.Txn, isNew, confidenceThreshold, resolver)
 			}
 			if isNew {
 				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "added")
@@ -336,6 +345,11 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "modified")
 			} else {
 				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "unchanged")
+			}
+			for _, src := range ur.Sources {
+				ruleApplications = append(ruleApplications, pendingApplication{
+					txnID: ur.Txn.ID, ruleID: src.RuleID, actionField: src.ActionField, actionValue: src.ActionValue,
+				})
 			}
 		}
 
@@ -350,12 +364,12 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				skipped++
 				continue
 			}
-			txnResult, err := e.upsertTransaction(ctx, txQueries, &pendingModified[i], accountIDCache, string(conn.Provider), resolver, conn.UserID, userName, logger)
+			ur, err := e.upsertTransaction(ctx, txQueries, &pendingModified[i], accountIDCache, string(conn.Provider), resolver, conn.UserID, userName, logger)
 			if err != nil {
 				logger.Error("upsert modified transaction", "external_id", pendingModified[i].ExternalID, "error", err)
 				continue
 			}
-			_, isChanged := classifyUpsertResult(txnResult, upsertStart)
+			_, isChanged := classifyUpsertResult(ur.Txn, upsertStart)
 			if isChanged {
 				modified++
 				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "modified")
@@ -364,8 +378,22 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "unchanged")
 			}
 			if reviewAutoEnqueue && isChanged {
-				e.enqueueForReview(ctx, txQueries, txnResult, false, confidenceThreshold, resolver)
+				e.enqueueForReview(ctx, txQueries, ur.Txn, false, confidenceThreshold, resolver)
 			}
+			for _, src := range ur.Sources {
+				ruleApplications = append(ruleApplications, pendingApplication{
+					txnID: ur.Txn.ID, ruleID: src.RuleID, actionField: src.ActionField, actionValue: src.ActionValue,
+				})
+			}
+		}
+
+		// Batch-insert rule application records.
+		for _, app := range ruleApplications {
+			_, _ = e.pool.Exec(ctx,
+				`INSERT INTO transaction_rule_applications (transaction_id, rule_id, action_field, action_value, applied_by)
+				VALUES ($1, $2, $3, $4, 'sync')
+				ON CONFLICT (transaction_id, rule_id, action_field) DO UPDATE SET applied_at = NOW(), action_value = EXCLUDED.action_value`,
+				app.txnID, app.ruleID, app.actionField, app.actionValue)
 		}
 
 		if skipped > 0 {
@@ -423,15 +451,22 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 	return added, modified, removed, unchanged, perAccount, ruleHits, warning, nil
 }
 
+// upsertResult holds the result of upserting a transaction plus any rule sources that applied.
+type upsertResult struct {
+	Txn     db.Transaction
+	Sources []RuleActionSource // which rules applied which actions
+}
+
 // upsertTransaction resolves the account ID and upserts a single transaction.
-func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *provider.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *RuleResolver, userID pgtype.UUID, userName string, logger *slog.Logger) (db.Transaction, error) {
+func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *provider.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *RuleResolver, userID pgtype.UUID, userName string, logger *slog.Logger) (upsertResult, error) {
 	accountID, err := e.resolveAccountID(ctx, txn.AccountExternalID, cache)
 	if err != nil {
-		return db.Transaction{}, fmt.Errorf("resolve account %s: %w", txn.AccountExternalID, err)
+		return upsertResult{}, fmt.Errorf("resolve account %s: %w", txn.AccountExternalID, err)
 	}
 
 	// Resolve category ID using rules first, then category mappings as fallback.
 	var categoryID pgtype.UUID
+	var sources []RuleActionSource
 	if resolver != nil {
 		tctx := TransactionContext{
 			Name:       txn.Name,
@@ -451,15 +486,18 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		if txn.CategoryDetailed != nil {
 			tctx.CategoryDetailed = *txn.CategoryDetailed
 		}
-		resolved := resolver.ResolveWithContext(providerName, tctx)
-		// Only pass the category_id when a rule explicitly matched.
-		// When no rule matches, the resolver returns uncategorizedID — pass nil
-		// instead so the upsert SQL preserves the existing category for
+		result := resolver.ResolveWithContext(providerName, tctx)
+		// Only set fields when rules explicitly matched.
+		// When no rule matches (nil), preserve existing values for
 		// existing rows (avoids overwriting categories set by reviews/agents).
 		// New rows will get NULL category_id, which enqueueForReview catches
 		// and flags as "uncategorized" for review.
-		if resolved != resolver.UncategorizedID() {
-			categoryID = resolved
+		if result != nil {
+			if result.CategoryID.Valid {
+				categoryID = result.CategoryID
+			}
+			sources = result.Sources
+			// future: apply other action fields from result
 		}
 	}
 
@@ -483,7 +521,11 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		CategoryID:            categoryID,
 	}
 
-	return q.UpsertTransaction(ctx, params)
+	dbTxn, err := q.UpsertTransaction(ctx, params)
+	if err != nil {
+		return upsertResult{}, err
+	}
+	return upsertResult{Txn: dbTxn, Sources: sources}, nil
 }
 
 // updateBalancesWithRetry fetches balances with 1 retry on transient errors.
