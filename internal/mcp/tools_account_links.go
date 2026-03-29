@@ -39,9 +39,7 @@ type rejectMatchInput struct {
 	MatchID string `json:"match_id" jsonschema:"The transaction match ID to reject"`
 }
 
-type reviewSummaryInput struct{}
-
-type autoApproveCategorizedInput struct{}
+type pendingReviewsOverviewInput struct{}
 
 // --- Handlers ---
 
@@ -139,22 +137,9 @@ func (s *MCPServer) handleRejectMatch(ctx context.Context, _ *mcpsdk.CallToolReq
 	return jsonResult(map[string]string{"status": "rejected"})
 }
 
-func (s *MCPServer) handleReviewSummary(_ context.Context, _ *mcpsdk.CallToolRequest, _ reviewSummaryInput) (*mcpsdk.CallToolResult, any, error) {
+func (s *MCPServer) handlePendingReviewsOverview(_ context.Context, _ *mcpsdk.CallToolRequest, _ pendingReviewsOverviewInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
-	result, err := s.svc.GetReviewSummary(ctx)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(result)
-}
-
-func (s *MCPServer) handleAutoApproveCategorized(ctx context.Context, _ *mcpsdk.CallToolRequest, _ autoApproveCategorizedInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	ctx = context.Background()
-	actor := service.Actor{Type: "agent", Name: "mcp"}
-	result, err := s.svc.AutoApproveCategorizedReviews(ctx, actor)
+	result, err := s.svc.GetPendingReviewsOverview(ctx)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}

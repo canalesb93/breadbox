@@ -208,10 +208,10 @@ func EnqueueReviewHandler(svc *service.Service) http.HandlerFunc {
 	}
 }
 
-// ReviewSummaryHandler returns pending reviews grouped by category_primary_raw.
+// ReviewSummaryHandler returns a pending reviews overview with type counts and category groups.
 func ReviewSummaryHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		result, err := svc.GetReviewSummary(r.Context())
+		result, err := svc.GetPendingReviewsOverview(r.Context())
 		if err != nil {
 			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get review summary")
 			return

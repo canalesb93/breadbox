@@ -901,10 +901,17 @@ type ReviewSummaryRow struct {
 	SampleNames        []string `json:"sample_names"`
 }
 
-// ReviewSummaryResult is the response for the review summary endpoint.
-type ReviewSummaryResult struct {
-	TotalPending int64              `json:"total_pending"`
-	Groups       []ReviewSummaryRow `json:"groups"`
+// ReviewTypeCount is a count of pending reviews for a specific review type.
+type ReviewTypeCount struct {
+	ReviewType string `json:"review_type"`
+	Count      int64  `json:"count"`
+}
+
+// PendingReviewsOverviewResult is the response for the pending reviews overview.
+type PendingReviewsOverviewResult struct {
+	TotalPending   int64              `json:"total_pending"`
+	CountsByType   []ReviewTypeCount  `json:"counts_by_type"`
+	CategoryGroups []ReviewSummaryRow `json:"category_groups"`
 }
 
 // AutoApproveResult is the response for auto-approving categorized reviews.
@@ -913,10 +920,44 @@ type AutoApproveResult struct {
 	Remaining int64 `json:"remaining"`
 }
 
-// GetReviewSummary returns pending reviews grouped by category_primary_raw with counts
-// and sample transaction names. Avoids token-heavy full review listings.
-func (s *Service) GetReviewSummary(ctx context.Context) (*ReviewSummaryResult, error) {
-	rows, err := s.Pool.Query(ctx, `
+// GetPendingReviewsOverview returns a comprehensive overview of the pending review queue:
+// total count, breakdown by review type, and groups by raw provider category.
+func (s *Service) GetPendingReviewsOverview(ctx context.Context) (*PendingReviewsOverviewResult, error) {
+	// Query 1: counts by review type
+	typeRows, err := s.Pool.Query(ctx, `
+		SELECT rq.review_type, COUNT(*) AS cnt
+		FROM review_queue rq
+		JOIN transactions t ON rq.transaction_id = t.id
+		JOIN accounts a ON t.account_id = a.id
+		WHERE rq.status = 'pending'
+		  AND t.deleted_at IS NULL
+		  AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))
+		GROUP BY rq.review_type
+		ORDER BY COUNT(*) DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("review type counts query: %w", err)
+	}
+	defer typeRows.Close()
+
+	var typeCounts []ReviewTypeCount
+	var total int64
+	for typeRows.Next() {
+		var tc ReviewTypeCount
+		if err := typeRows.Scan(&tc.ReviewType, &tc.Count); err != nil {
+			return nil, fmt.Errorf("scan type count: %w", err)
+		}
+		typeCounts = append(typeCounts, tc)
+		total += tc.Count
+	}
+	if err := typeRows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate type counts: %w", err)
+	}
+	if typeCounts == nil {
+		typeCounts = []ReviewTypeCount{}
+	}
+
+	// Query 2: groups by raw provider category
+	catRows, err := s.Pool.Query(ctx, `
 		SELECT COALESCE(t.category_primary, 'NONE') AS cat_raw,
 		       COUNT(*) AS cnt,
 		       array_agg(DISTINCT LEFT(t.name, 40) ORDER BY LEFT(t.name, 40)) FILTER (WHERE t.name IS NOT NULL) AS sample_names
@@ -929,38 +970,34 @@ func (s *Service) GetReviewSummary(ctx context.Context) (*ReviewSummaryResult, e
 		GROUP BY COALESCE(t.category_primary, 'NONE')
 		ORDER BY COUNT(*) DESC`)
 	if err != nil {
-		return nil, fmt.Errorf("review summary query: %w", err)
+		return nil, fmt.Errorf("review category groups query: %w", err)
 	}
-	defer rows.Close()
+	defer catRows.Close()
 
 	var groups []ReviewSummaryRow
-	var total int64
-
-	for rows.Next() {
+	for catRows.Next() {
 		var row ReviewSummaryRow
 		var sampleNames []string
-		if err := rows.Scan(&row.CategoryPrimaryRaw, &row.Count, &sampleNames); err != nil {
-			return nil, fmt.Errorf("scan summary: %w", err)
+		if err := catRows.Scan(&row.CategoryPrimaryRaw, &row.Count, &sampleNames); err != nil {
+			return nil, fmt.Errorf("scan category group: %w", err)
 		}
-		// Limit sample names to 5
 		if len(sampleNames) > 5 {
 			sampleNames = sampleNames[:5]
 		}
 		row.SampleNames = sampleNames
 		groups = append(groups, row)
-		total += row.Count
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate summary: %w", err)
+	if err := catRows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate category groups: %w", err)
 	}
-
 	if groups == nil {
 		groups = []ReviewSummaryRow{}
 	}
 
-	return &ReviewSummaryResult{
-		TotalPending: total,
-		Groups:       groups,
+	return &PendingReviewsOverviewResult{
+		TotalPending:   total,
+		CountsByType:   typeCounts,
+		CategoryGroups: groups,
 	}, nil
 }
 

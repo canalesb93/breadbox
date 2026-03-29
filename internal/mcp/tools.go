@@ -98,7 +98,7 @@ type merchantSummaryInput struct {
 }
 
 type listPendingReviewsInput struct {
-	ReviewType         string `json:"review_type,omitempty" jsonschema:"Filter by review type: new_transaction, uncategorized, low_confidence, manual"`
+	ReviewType         string `json:"review_type,omitempty" jsonschema:"Filter by review type: new_transaction, uncategorized, low_confidence, manual, re_review"`
 	AccountID          string `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
 	UserID             string `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
 	CategoryPrimaryRaw string `json:"category_primary_raw,omitempty" jsonschema:"Filter by raw provider category (e.g., dining, groceries, general). Useful for batch processing reviews by category."`

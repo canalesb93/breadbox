@@ -791,6 +791,45 @@
     }
   }
 
+  /* ── Rule category badge ── */
+  .bb-rule-cat-badge {
+    @apply inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full;
+    --cat-color: oklch(0.55 0 0);
+    background: color-mix(in oklch, var(--cat-color) 10%, transparent);
+    color: var(--cat-color);
+  }
+
+  .bb-rule-cat-dot {
+    @apply w-1.5 h-1.5 rounded-full shrink-0;
+    background: var(--cat-color);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-rule-cat-badge {
+      background: color-mix(in oklch, var(--cat-color) 15%, transparent);
+    }
+  }
+
+  /* ── Rule creator badge ── */
+  .bb-rule-creator-badge {
+    @apply inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded-full;
+    @apply bg-base-200 text-base-content/50;
+  }
+
+  .bb-rule-creator-badge--agent {
+    @apply bg-primary/8 text-primary/70;
+  }
+
+  .bb-rule-creator-badge--user {
+    @apply bg-base-content/6 text-base-content/50;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-rule-creator-badge--agent {
+      @apply bg-primary/12 text-primary/80;
+    }
+  }
+
   /* ── Mobile transaction cards ── */
   .bb-tx-card {
     @apply overflow-hidden;

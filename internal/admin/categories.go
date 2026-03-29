@@ -47,7 +47,7 @@ func CategoriesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 			TransactionCount int64
 			Percent          float64 // percentage of total spending
 		}
-		spendingByCategory := make(map[string]CategorySpending)
+		spendingByCategory := make(map[string]CategorySpending) // keyed by display name
 		var totalSpending float64
 		var maxCategorySpend float64
 
@@ -58,24 +58,49 @@ func CategoriesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		})
 		if err == nil && catSummary != nil {
 			for _, row := range catSummary.Summary {
-				slug := "uncategorized"
+				name := "Uncategorized"
 				if row.Category != nil && *row.Category != "" {
-					slug = *row.Category
+					name = *row.Category
 				}
-				spendingByCategory[slug] = CategorySpending{
+				spendingByCategory[name] = CategorySpending{
 					Amount:           row.TotalAmount,
 					TransactionCount: row.TransactionCount,
 				}
 				totalSpending += row.TotalAmount
-				if row.TotalAmount > maxCategorySpend {
-					maxCategorySpend = row.TotalAmount
+			}
+
+			// Aggregate child spending into parent totals.
+			for _, parent := range categories {
+				var parentAmount float64
+				var parentCount int64
+				// Add direct parent spending if any.
+				if ps, ok := spendingByCategory[parent.DisplayName]; ok {
+					parentAmount += ps.Amount
+					parentCount += ps.TransactionCount
+				}
+				// Add children spending.
+				for _, child := range parent.Children {
+					if cs, ok := spendingByCategory[child.DisplayName]; ok {
+						parentAmount += cs.Amount
+						parentCount += cs.TransactionCount
+					}
+				}
+				if parentAmount > 0 || parentCount > 0 {
+					spendingByCategory[parent.DisplayName] = CategorySpending{
+						Amount:           parentAmount,
+						TransactionCount: parentCount,
+					}
+				}
+				if parentAmount > maxCategorySpend {
+					maxCategorySpend = parentAmount
 				}
 			}
+
 			// Calculate percentages.
 			if totalSpending > 0 {
-				for slug, cs := range spendingByCategory {
+				for name, cs := range spendingByCategory {
 					cs.Percent = (cs.Amount / totalSpending) * 100
-					spendingByCategory[slug] = cs
+					spendingByCategory[name] = cs
 				}
 			}
 		}

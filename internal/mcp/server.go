@@ -70,11 +70,11 @@ COMMENTS:
 - Check list_transaction_comments before modifying a transaction to see prior context
 
 REVIEW QUEUE:
-- Start with review_summary to see pending reviews grouped by raw provider category with counts — much more efficient than listing all reviews
-- Use list_pending_reviews with category_primary_raw filter to process one group at a time. Use fields=triage to reduce response size. Supports limit up to 500.
+- Start with pending_reviews_overview to see the review queue composition — total count, breakdown by review type, and groups by raw provider category. Much more efficient than listing all reviews
+- Use list_pending_reviews with category_primary_raw or review_type filter to process one group at a time. Use fields=triage to reduce response size. Supports limit up to 500.
+- Review types: new_transaction (first sync), uncategorized (no category assigned), low_confidence (below threshold), manual (user-flagged), re_review (sent back after prior resolution)
 - Use submit_review (or batch_submit_reviews, up to 500 at once) to approve with the correct category_slug, or skip if uncertain
 - For bulk category work: batch_categorize_transactions assigns one category to many transactions; bulk_recategorize moves all transactions from one category to another
-- After creating rules with apply_retroactively=true, call auto_approve_categorized_reviews to clear reviews that rules already handled
 - After reviewing, create transaction rules for patterns you noticed so future transactions are auto-categorized
 
 TRANSACTION RULES:
@@ -202,7 +202,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"Import category definitions from TSV text. Existing slugs are updated (display_name, icon, color, sort_order, hidden). New slugs are created. Missing slugs are NOT deleted. Parents must appear before children. Use export_categories to get the current state, edit it, then import the modified version. To merge/consolidate categories, set the merge_into column to the target category slug — all transactions and mappings from the source are reassigned to the target, then the source is deleted. This is useful for simplifying a complex taxonomy without losing transaction categorization.",
 			s.handleImportCategories),
 		makeToolDef("list_pending_reviews", ToolRead,
-			"List pending transaction reviews in the review queue. Reviews are created automatically during sync for new, uncategorized, or low-confidence transactions. Use limit to control batch size — review 10-20 at a time unless instructed otherwise. Filter by review_type (new_transaction, uncategorized, low_confidence, manual) and account_id. Each review includes the full transaction details and suggested category.",
+			"List pending transaction reviews in the review queue. Reviews are created automatically during sync for new, uncategorized, or low-confidence transactions. Use limit to control batch size — review 10-20 at a time unless instructed otherwise. Filter by review_type (new_transaction, uncategorized, low_confidence, manual, re_review) and account_id. Each review includes the full transaction details and suggested category.",
 			s.handleListPendingReviews),
 		makeToolDef("submit_review", ToolWrite,
 			"Submit a decision on a pending review. Decision: 'approved' or 'skipped'. Use 'approved' to resolve the review — you MUST provide the correct category via category_slug (e.g. 'food_and_drink_groceries') or category_id. Look at the transaction's name, merchant, and raw category fields to determine the right category — use list_categories to find valid slugs. If the review's suggested_category_slug looks correct, use that. If the transaction is miscategorized, provide the correct category_slug to fix it. Use 'skipped' only if you cannot confidently determine the correct category. Include a note when changing the category or skipping to explain your reasoning.",
@@ -258,12 +258,9 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDef("reject_match", ToolWrite,
 			"Reject a false auto-match between two transactions. Removes the match record and clears the attributed_user_id on the primary transaction.",
 			s.handleRejectMatch),
-		makeToolDef("review_summary", ToolRead,
-			"Get pending reviews grouped by raw provider category (category_primary_raw) with counts and sample transaction names. Much more token-efficient than listing all reviews — use this first to understand the review queue composition, then use list_pending_reviews with category_primary_raw filter to process one group at a time.",
-			s.handleReviewSummary),
-		makeToolDef("auto_approve_categorized_reviews", ToolWrite,
-			"Bulk-approve all pending reviews whose transactions already have a category (e.g., from rules). This bridges the gap between rules and reviews — after creating rules with apply_retroactively=true, call this to clear the review queue of transactions that rules already handled. Returns count of approved reviews and remaining pending count.",
-			s.handleAutoApproveCategorized),
+		makeToolDef("pending_reviews_overview", ToolRead,
+			"Get an overview of the pending review queue. Returns total pending count, breakdown by review type (new_transaction, uncategorized, low_confidence, manual, re_review), and groups by raw provider category with counts and sample transaction names. Much more token-efficient than listing all reviews — use this first to understand the review queue composition, then use list_pending_reviews with filters to process one group at a time.",
+			s.handlePendingReviewsOverview),
 		makeToolDef("submit_report", ToolWrite,
 			"Send a message to the family's dashboard. The title is the main message — write it as a concise, self-contained 1-2 sentence summary the family can understand at a glance without expanding. The body provides the detailed breakdown (markdown with headers, bullets, transaction links). Use priority to signal urgency and author to identify your role.",
 			s.handleSubmitReport),

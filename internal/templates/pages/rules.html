@@ -147,23 +147,25 @@
 
 <div class="space-y-3 bb-stagger">
 {{range .Rules}}
-<div class="bb-card p-0 overflow-hidden cursor-pointer hover:shadow-md transition-shadow" x-data="{deleting: false}" @click="window.location.href='/rules/{{.ID}}'">
+<div class="bb-card p-0 overflow-hidden cursor-pointer hover:shadow-md transition-shadow{{if not .Enabled}} opacity-60{{end}}" x-data="{deleting: false}" @click="window.location.href='/rules/{{.ID}}'">
   <div class="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4">
-    <!-- Status indicator -->
+    <!-- Category avatar -->
     <div class="flex-shrink-0">
-      {{if .Enabled}}
-        {{if and .ExpiresAt (expired .ExpiresAt)}}
-        <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
-          <i data-lucide="clock" class="w-5 h-5 text-warning"></i>
-        </div>
-        {{else}}
-        <div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
-          <i data-lucide="zap" class="w-5 h-5 text-success"></i>
-        </div>
-        {{end}}
+      {{if and .CategoryIcon .Enabled (not (and .ExpiresAt (expired .ExpiresAt)))}}
+      <div class="bb-tx-avatar" style="--avatar-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}oklch(0.65 0 0){{end}}">
+        <i data-lucide="{{deref .CategoryIcon}}" class="w-4.5 h-4.5"></i>
+      </div>
+      {{else if and .ExpiresAt (expired .ExpiresAt)}}
+      <div class="w-9 h-9 rounded-xl bg-warning/10 flex items-center justify-center">
+        <i data-lucide="clock" class="w-4.5 h-4.5 text-warning"></i>
+      </div>
+      {{else if not .Enabled}}
+      <div class="w-9 h-9 rounded-xl bg-base-200 flex items-center justify-center">
+        <i data-lucide="pause" class="w-4.5 h-4.5 text-base-content/30"></i>
+      </div>
       {{else}}
-      <div class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center">
-        <i data-lucide="pause" class="w-5 h-5 text-base-content/30"></i>
+      <div class="w-9 h-9 rounded-xl bg-success/10 flex items-center justify-center">
+        <i data-lucide="zap" class="w-4.5 h-4.5 text-success"></i>
       </div>
       {{end}}
     </div>
@@ -180,11 +182,14 @@
         <span class="badge badge-ghost badge-xs rounded-lg">Disabled</span>
         {{end}}
       </div>
-      <div class="text-xs text-base-content/40 mt-0.5 font-mono truncate" title="{{conditionSummary .Conditions}}">{{conditionSummary .Conditions}}</div>
+      <div class="text-xs text-base-content/40 mt-0.5 truncate" title="{{conditionSummary .Conditions}}">{{conditionSummary .Conditions}}</div>
       <!-- Mobile-only: category + stats inline -->
       <div class="flex items-center gap-2 mt-1.5 sm:hidden flex-wrap">
         {{if .CategoryName}}
-        <span class="badge badge-outline badge-xs rounded-lg">{{deref .CategoryName}}</span>
+        <span class="bb-rule-cat-badge" {{if .CategoryColor}}style="--cat-color: {{safeCSS (deref .CategoryColor)}}"{{end}}>
+          <span class="bb-rule-cat-dot"></span>
+          {{deref .CategoryName}}
+        </span>
         {{end}}
         <span class="text-xs text-base-content/40 tabular-nums">{{.HitCount}} hits</span>
         <span class="text-xs text-base-content/30">&middot;</span>
@@ -193,9 +198,12 @@
     </div>
 
     <!-- Category (tablet+) -->
-    <div class="hidden sm:flex flex-col items-end gap-0.5 flex-shrink-0">
+    <div class="hidden sm:flex items-center gap-1.5 flex-shrink-0">
       {{if .CategoryName}}
-      <span class="badge badge-outline badge-sm rounded-lg">{{deref .CategoryName}}</span>
+      <span class="bb-rule-cat-badge" {{if .CategoryColor}}style="--cat-color: {{safeCSS (deref .CategoryColor)}}"{{end}}>
+        <span class="bb-rule-cat-dot"></span>
+        {{deref .CategoryName}}
+      </span>
       {{else}}
       <span class="text-base-content/30 text-xs">&mdash;</span>
       {{end}}
@@ -203,31 +211,46 @@
 
     <!-- Stats (desktop+) -->
     <div class="hidden md:flex items-center gap-4 text-xs text-base-content/40 flex-shrink-0">
-      <div class="text-center">
-        <div class="font-semibold text-sm text-base-content/70 tabular-nums">{{.HitCount}}</div>
+      <div class="text-center min-w-10">
+        <div class="font-semibold text-sm tabular-nums {{if ge .HitCount 50}}text-primary{{else if ge .HitCount 10}}text-base-content/70{{else}}text-base-content/50{{end}}">{{.HitCount}}</div>
         <div>hits</div>
       </div>
-      <div class="text-center">
-        <div class="font-semibold text-sm text-base-content/70 tabular-nums">{{.Priority}}</div>
+      <div class="text-center min-w-10">
+        <div class="font-semibold text-sm text-base-content/50 tabular-nums">{{.Priority}}</div>
         <div>priority</div>
       </div>
     </div>
 
     <!-- Creator badge (large desktop+) -->
-    <div class="hidden lg:block flex-shrink-0">
-      <span class="badge badge-ghost badge-xs rounded-lg">{{.CreatedByType}}</span>
+    <div class="hidden lg:flex items-center gap-1 flex-shrink-0">
+      {{if eq .CreatedByType "agent"}}
+      <span class="bb-rule-creator-badge bb-rule-creator-badge--agent" title="Created by {{.CreatedByName}}">
+        <i data-lucide="bot" class="w-3 h-3"></i>
+        agent
+      </span>
+      {{else if eq .CreatedByType "user"}}
+      <span class="bb-rule-creator-badge bb-rule-creator-badge--user" title="Created by {{.CreatedByName}}">
+        <i data-lucide="user" class="w-3 h-3"></i>
+        user
+      </span>
+      {{else}}
+      <span class="bb-rule-creator-badge" title="Created by system">
+        <i data-lucide="settings" class="w-3 h-3"></i>
+        system
+      </span>
+      {{end}}
     </div>
 
     <!-- Actions -->
-    <div class="flex items-center gap-1 flex-shrink-0">
-      <button class="btn btn-ghost btn-xs btn-square rounded-lg" title="Toggle" @click.stop="toggleRule('{{.ID}}')">
-        {{if .Enabled}}<i data-lucide="pause" class="w-4 h-4 pointer-events-none"></i>{{else}}<i data-lucide="play" class="w-4 h-4 pointer-events-none"></i>{{end}}
+    <div class="flex items-center gap-0.5 flex-shrink-0">
+      <button class="btn btn-ghost btn-xs btn-square rounded-lg" title="{{if .Enabled}}Disable{{else}}Enable{{end}}" @click.stop="toggleRule('{{.ID}}')">
+        {{if .Enabled}}<i data-lucide="pause" class="w-3.5 h-3.5 pointer-events-none"></i>{{else}}<i data-lucide="play" class="w-3.5 h-3.5 pointer-events-none"></i>{{end}}
       </button>
       <a href="/rules/{{.ID}}/edit" class="btn btn-ghost btn-xs btn-square rounded-lg" title="Edit" @click.stop>
-        <i data-lucide="pencil" class="w-4 h-4 pointer-events-none"></i>
+        <i data-lucide="pencil" class="w-3.5 h-3.5 pointer-events-none"></i>
       </a>
       <button class="btn btn-ghost btn-xs btn-square rounded-lg text-error/60" title="Delete" :disabled="deleting" @click.stop="deleteRule('{{.ID}}', $el)">
-        <i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i>
+        <i data-lucide="trash-2" class="w-3.5 h-3.5 pointer-events-none"></i>
       </button>
     </div>
   </div>
