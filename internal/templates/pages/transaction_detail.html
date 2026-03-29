@@ -186,28 +186,27 @@
   </div>
 
   <!-- Add Note / Re-enqueue -->
-  <div class="px-6 pb-3">
-    <div class="flex gap-3">
-      <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-        :class="enqueueMode ? 'bg-primary/10' : 'bg-base-200'">
-        <i :data-lucide="enqueueMode ? 'inbox' : 'user'" class="w-4 h-4" :class="enqueueMode ? 'text-primary' : 'text-base-content/40'"></i>
-      </div>
+  <div class="px-6 pb-4">
+    <div class="flex gap-3 items-end">
       <div class="flex-1">
-        <div class="flex gap-2">
-          <textarea x-model="newComment" :placeholder="enqueueMode ? 'Add a note for the reviewer...' : 'Add a note...'" class="textarea textarea-bordered textarea-sm flex-1 min-h-[2.5rem] resize-none bg-base-200/50" rows="1" @input="$el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'"></textarea>
-          <button @click="enqueueMode ? enqueueForReview() : addComment()" class="btn btn-sm self-end rounded-xl" :class="enqueueMode ? 'btn-primary' : 'btn-primary'" :disabled="enqueueMode ? false : !newComment.trim()">
-            <i :data-lucide="enqueueMode ? 'inbox' : 'send'" class="w-3.5 h-3.5"></i>
-            <span x-show="enqueueMode" class="hidden sm:inline">Enqueue</span>
-          </button>
-        </div>
-        <div class="flex items-center gap-2 mt-1.5">
+        <textarea x-model="newComment" :placeholder="enqueueMode ? 'Add a note for the reviewer... (optional)' : 'Add a note...'" class="textarea textarea-bordered textarea-sm w-full min-h-[2.5rem] resize-none bg-base-200/50 rounded-xl" rows="1" @input="$el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'" @keydown.meta.enter="enqueueMode ? enqueueForReview() : (newComment.trim() && addComment())" @keydown.ctrl.enter="enqueueMode ? enqueueForReview() : (newComment.trim() && addComment())"></textarea>
+        <div class="flex items-center justify-between mt-1.5">
           <label class="flex items-center gap-1.5 {{if .HasPendingReview}}opacity-40 cursor-not-allowed{{else}}cursor-pointer{{end}}">
-            <input type="checkbox" class="checkbox checkbox-xs checkbox-primary rounded" x-model="enqueueMode" {{if .HasPendingReview}}disabled{{end}} @change="$nextTick(() => lucide.createIcons())">
-            <span class="text-xs text-base-content/50">Send to review queue</span>
+            <input type="checkbox" class="checkbox checkbox-xs rounded" :class="enqueueMode ? 'checkbox-info' : ''" x-model="enqueueMode" {{if .HasPendingReview}}disabled{{end}}>
+            <span class="text-xs" :class="enqueueMode ? 'text-info font-medium' : 'text-base-content/40'">Send to review queue</span>
             {{if .HasPendingReview}}<span class="text-xs text-base-content/30">(already pending)</span>{{end}}
           </label>
+          <span class="text-xs text-base-content/30 hidden sm:block" x-show="newComment.trim()">&#8984;Enter to send</span>
         </div>
       </div>
+      <button @click="enqueueMode ? enqueueForReview() : addComment()" class="btn btn-sm rounded-xl mb-5" :class="enqueueMode ? 'btn-info' : 'btn-primary'" :disabled="enqueueMode ? false : !newComment.trim()">
+        <template x-if="enqueueMode">
+          <span class="flex items-center gap-1"><i data-lucide="inbox" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Enqueue</span></span>
+        </template>
+        <template x-if="!enqueueMode">
+          <i data-lucide="send" class="w-3.5 h-3.5"></i>
+        </template>
+      </button>
     </div>
   </div>
 
