@@ -975,6 +975,12 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 				return totalAffected, fmt.Errorf("update transactions: %w", err)
 			}
 			totalAffected += tag.RowsAffected()
+
+			// Record rule applications
+			ruleUUID, _ := parseUUID(ruleID)
+			for _, action := range rule.Actions {
+				s.recordRuleApplications(ctx, ruleUUID, matchIDs, action.Field, action.Value, "retroactive")
+			}
 		}
 
 		if rowCount < 1000 {
@@ -1047,10 +1053,14 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		}
 
 		// Per transaction: merge actions from all matching rules, keyed by category_id for batching
-		type txnUpdate struct {
-			catID pgtype.UUID
+		type txnRuleApp struct {
+			txnID       pgtype.UUID
+			ruleID      string
+			actionField string
+			actionValue string
 		}
-		updates := make(map[pgtype.UUID][]pgtype.UUID)  // category_id → transaction IDs
+		updates := make(map[pgtype.UUID][]pgtype.UUID) // category_id → transaction IDs
+		var applications []txnRuleApp
 		rowCount := 0
 
 		for rows.Next() {
@@ -1065,6 +1075,8 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 
 			// Merge actions from all matching rules (first to set a field wins)
 			var mergedCatID pgtype.UUID
+			var winningRuleID string
+			var winningSlug string
 			for _, cr := range compiled {
 				if EvaluateCondition(cr.compiled, r.tctx) {
 					hitCounts[cr.id]++
@@ -1073,6 +1085,8 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 						if slug := categoryActionSlug(cr.actions); slug != "" {
 							if catID, err := s.resolveActionsToCategory(ctx, cr.actions); err == nil && catID.Valid {
 								mergedCatID = catID
+								winningRuleID = cr.id
+								winningSlug = slug
 							}
 						}
 					}
@@ -1082,6 +1096,9 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 
 			if mergedCatID.Valid {
 				updates[mergedCatID] = append(updates[mergedCatID], r.id)
+				applications = append(applications, txnRuleApp{
+					txnID: r.id, ruleID: winningRuleID, actionField: "category", actionValue: winningSlug,
+				})
 			}
 		}
 		rows.Close()
@@ -1098,6 +1115,12 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 			if err != nil {
 				return hitCounts, fmt.Errorf("update transactions: %w", err)
 			}
+		}
+
+		// Record rule applications
+		for _, app := range applications {
+			ruleUUID, _ := parseUUID(app.ruleID)
+			s.recordRuleApplications(ctx, ruleUUID, []pgtype.UUID{app.txnID}, app.actionField, app.actionValue, "retroactive")
 		}
 
 		if rowCount < 1000 {
@@ -1326,6 +1349,17 @@ func (r *ruleRow) toResponse() TransactionRuleResponse {
 	}
 }
 
+// recordRuleApplications inserts rule application records for a batch of transactions.
+func (s *Service) recordRuleApplications(ctx context.Context, ruleID pgtype.UUID, txnIDs []pgtype.UUID, actionField, actionValue, appliedBy string) {
+	for _, txnID := range txnIDs {
+		_, _ = s.Pool.Exec(ctx,
+			`INSERT INTO transaction_rule_applications (transaction_id, rule_id, action_field, action_value, applied_by)
+			VALUES ($1, $2, $3, $4, $5)
+			ON CONFLICT (transaction_id, rule_id, action_field) DO UPDATE SET applied_at = NOW(), action_value = EXCLUDED.action_value, applied_by = EXCLUDED.applied_by`,
+			txnID, ruleID, actionField, actionValue, appliedBy)
+	}
+}
+
 // buildActionSetClause converts rule actions into SQL SET clause components.
 // Returns setClauses (e.g., ["category_id = $1"]), args, and error.
 func (s *Service) buildActionSetClause(ctx context.Context, actions []RuleAction) ([]string, []any, error) {
@@ -1425,4 +1459,192 @@ func ConditionSummary(c Condition) string {
 	default:
 		return fmt.Sprintf("%s %s %q", c.Field, c.Op, valStr)
 	}
+}
+
+// --- Rule application tracking ---
+
+// RuleApplicationRow represents a transaction affected by a rule.
+type RuleApplicationRow struct {
+	ID              string  `json:"id"`
+	TransactionID   string  `json:"transaction_id"`
+	TransactionName string  `json:"transaction_name"`
+	Amount          float64 `json:"amount"`
+	Date            string  `json:"date"`
+	ActionField     string  `json:"action_field"`
+	ActionValue     string  `json:"action_value"`
+	AppliedBy       string  `json:"applied_by"`
+	AppliedAt       string  `json:"applied_at"`
+}
+
+// RuleStats contains aggregate stats about a rule's impact.
+type RuleStats struct {
+	TotalApplications    int64  `json:"total_applications"`
+	UniqueTransactions   int64  `json:"unique_transactions"`
+	FirstAppliedAt       string `json:"first_applied_at,omitempty"`
+	LastAppliedAt        string `json:"last_applied_at,omitempty"`
+	SyncApplications     int64  `json:"sync_applications"`
+	RetroApplications    int64  `json:"retro_applications"`
+}
+
+// GetRuleStats returns aggregate stats about a rule's applications.
+func (s *Service) GetRuleStats(ctx context.Context, ruleID string) (*RuleStats, error) {
+	ruleUUID, err := parseUUID(ruleID)
+	if err != nil {
+		return &RuleStats{}, nil
+	}
+
+	stats := &RuleStats{}
+	err = s.Pool.QueryRow(ctx, `SELECT
+		COUNT(*) AS total,
+		COUNT(DISTINCT transaction_id) AS unique_txns,
+		COALESCE(MIN(applied_at)::text, ''),
+		COALESCE(MAX(applied_at)::text, ''),
+		COUNT(*) FILTER (WHERE applied_by = 'sync'),
+		COUNT(*) FILTER (WHERE applied_by = 'retroactive')
+		FROM transaction_rule_applications WHERE rule_id = $1`, ruleUUID).Scan(
+		&stats.TotalApplications,
+		&stats.UniqueTransactions,
+		&stats.FirstAppliedAt,
+		&stats.LastAppliedAt,
+		&stats.SyncApplications,
+		&stats.RetroApplications,
+	)
+	if err != nil {
+		return &RuleStats{}, nil
+	}
+	return stats, nil
+}
+
+// ListRuleApplications returns transactions affected by a rule, paginated.
+func (s *Service) ListRuleApplications(ctx context.Context, ruleID string, limit int, cursor string) ([]RuleApplicationRow, bool, error) {
+	ruleUUID, err := parseUUID(ruleID)
+	if err != nil {
+		return nil, false, ErrNotFound
+	}
+
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	query := `SELECT tra.id, tra.transaction_id, t.name, t.amount, t.date, tra.action_field, tra.action_value, tra.applied_by, tra.applied_at
+		FROM transaction_rule_applications tra
+		JOIN transactions t ON tra.transaction_id = t.id
+		WHERE tra.rule_id = $1`
+
+	args := []any{ruleUUID}
+	argN := 2
+
+	if cursor != "" {
+		cursorTime, cursorIDStr, err := decodeTimestampCursor(cursor)
+		if err != nil {
+			return nil, false, ErrInvalidCursor
+		}
+		cursorUUID, err := parseUUID(cursorIDStr)
+		if err != nil {
+			return nil, false, ErrInvalidCursor
+		}
+		query += fmt.Sprintf(" AND (tra.applied_at, tra.id) < ($%d, $%d)", argN, argN+1)
+		args = append(args, pgtype.Timestamptz{Time: cursorTime, Valid: true}, cursorUUID)
+		argN += 2
+	}
+
+	query += " ORDER BY tra.applied_at DESC, tra.id DESC"
+	query += fmt.Sprintf(" LIMIT $%d", argN)
+	args = append(args, limit+1)
+
+	rows, err := s.Pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, false, fmt.Errorf("query rule applications: %w", err)
+	}
+	defer rows.Close()
+
+	var results []RuleApplicationRow
+	for rows.Next() {
+		var r RuleApplicationRow
+		var txnID pgtype.UUID
+		var amount float64
+		var date pgtype.Date
+		var appliedAt pgtype.Timestamptz
+		var appID pgtype.UUID
+
+		if err := rows.Scan(&appID, &txnID, &r.TransactionName, &amount, &date, &r.ActionField, &r.ActionValue, &r.AppliedBy, &appliedAt); err != nil {
+			return nil, false, fmt.Errorf("scan rule application: %w", err)
+		}
+		r.ID = formatUUID(appID)
+		r.TransactionID = formatUUID(txnID)
+		r.Amount = amount
+		if date.Valid {
+			r.Date = date.Time.Format("2006-01-02")
+		}
+		if appliedAt.Valid {
+			r.AppliedAt = appliedAt.Time.UTC().Format(time.RFC3339)
+		}
+		results = append(results, r)
+	}
+
+	hasMore := len(results) > limit
+	if hasMore {
+		results = results[:limit]
+	}
+
+	return results, hasMore, nil
+}
+
+// CountRuleApplications returns the number of unique transactions affected by a rule.
+func (s *Service) CountRuleApplications(ctx context.Context, ruleID string) (int64, error) {
+	ruleUUID, err := parseUUID(ruleID)
+	if err != nil {
+		return 0, nil
+	}
+	var count int64
+	err = s.Pool.QueryRow(ctx, "SELECT COUNT(DISTINCT transaction_id) FROM transaction_rule_applications WHERE rule_id = $1", ruleUUID).Scan(&count)
+	return count, err
+}
+
+// GetRuleSyncHistory returns recent sync logs where this rule matched transactions.
+func (s *Service) GetRuleSyncHistory(ctx context.Context, ruleID string, limit int) ([]map[string]any, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+
+	rows, err := s.Pool.Query(ctx,
+		`SELECT sl.id, sl.started_at, sl.status, sl.rule_hits, bc.institution_name
+		FROM sync_logs sl
+		JOIN bank_connections bc ON sl.connection_id = bc.id
+		WHERE sl.rule_hits IS NOT NULL AND sl.rule_hits ? $1
+		ORDER BY sl.started_at DESC LIMIT $2`, ruleID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query sync history: %w", err)
+	}
+	defer rows.Close()
+
+	var results []map[string]any
+	for rows.Next() {
+		var id pgtype.UUID
+		var startedAt pgtype.Timestamptz
+		var status string
+		var ruleHits []byte
+		var instName pgtype.Text
+
+		if err := rows.Scan(&id, &startedAt, &status, &ruleHits, &instName); err != nil {
+			return nil, fmt.Errorf("scan sync history: %w", err)
+		}
+
+		var hits map[string]int
+		_ = json.Unmarshal(ruleHits, &hits)
+
+		entry := map[string]any{
+			"sync_id":     formatUUID(id),
+			"started_at":  startedAt.Time.UTC().Format(time.RFC3339),
+			"status":      status,
+			"hit_count":   hits[ruleID],
+			"institution": textPtr(instName),
+		}
+		results = append(results, entry)
+	}
+
+	return results, nil
 }

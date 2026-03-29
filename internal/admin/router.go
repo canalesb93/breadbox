@@ -115,6 +115,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/agent-wizard/{type}", PromptBuilderHandler(sm, tr))
 		r.Get("/rules", RulesPageHandler(svc, sm, tr, a.Config.Version))
 		r.Get("/rules/new", RuleFormPageHandler(svc, sm, tr))
+		r.Get("/rules/{id}", RuleDetailPageHandler(svc, sm, tr))
 		r.Get("/rules/{id}/edit", RuleFormPageHandler(svc, sm, tr))
 
 		r.Get("/categories", CategoriesPageHandler(svc, sm, tr))
@@ -207,6 +208,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Put("/rules/{id}", UpdateRuleAdminHandler(svc, sm))
 		r.Delete("/rules/{id}", DeleteRuleAdminHandler(svc))
 		r.Post("/rules/{id}/toggle", ToggleRuleAdminHandler(svc))
+		r.Post("/rules/{id}/apply", ApplyRuleAdminHandler(svc))
 
 		// Account links
 		r.Post("/account-links", CreateAccountLinkAdminHandler(svc, sm))

@@ -123,6 +123,51 @@ func RuleFormPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 	}
 }
 
+// RuleDetailPageHandler serves GET /admin/rules/{id}.
+func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		id := chi.URLParam(r, "id")
+
+		rule, err := svc.GetTransactionRule(ctx, id)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				tr.Render(w, r, "404.html", map[string]any{"PageTitle": "Not Found", "CurrentPage": "rules"})
+				return
+			}
+			tr.Render(w, r, "500.html", map[string]any{"PageTitle": "Error", "CurrentPage": "rules"})
+			return
+		}
+
+		// Preview: transactions that currently match this rule's conditions
+		preview, _ := svc.PreviewRule(ctx, rule.Conditions, 10)
+
+		// Application stats from junction table
+		stats, _ := svc.GetRuleStats(ctx, id)
+
+		// Recent applications
+		applications, hasMoreApps, _ := svc.ListRuleApplications(ctx, id, 10, "")
+
+		// Sync history where this rule matched
+		syncHistory, _ := svc.GetRuleSyncHistory(ctx, id, 10)
+
+		data := BaseTemplateData(r, sm, "rules", rule.Name)
+		data["Rule"] = rule
+		data["Preview"] = preview
+		data["Stats"] = stats
+		data["Applications"] = applications
+		data["HasMoreApplications"] = hasMoreApps
+		data["SyncHistory"] = syncHistory
+		data["ConditionSummary"] = service.ConditionSummary(rule.Conditions)
+		data["Breadcrumbs"] = []Breadcrumb{
+			{Label: "Rules", Href: "/rules"},
+			{Label: rule.Name},
+		}
+
+		tr.Render(w, r, "rule_detail.html", data)
+	}
+}
+
 // CreateRuleAdminHandler handles POST /admin/api/rules.
 func CreateRuleAdminHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -260,5 +305,31 @@ func ToggleRuleAdminHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		writeJSON(w, http.StatusOK, rule)
+	}
+}
+
+// ApplyRuleAdminHandler handles POST /-/rules/{id}/apply.
+func ApplyRuleAdminHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+
+		count, err := svc.ApplyRuleRetroactively(r.Context(), id)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				writeJSON(w, http.StatusNotFound, map[string]any{"error": "rule not found"})
+				return
+			}
+			if errors.Is(err, service.ErrInvalidParameter) {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to apply rule"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"rule_id":        id,
+			"affected_count": count,
+		})
 	}
 }

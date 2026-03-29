@@ -36,10 +36,19 @@ type TransactionContext struct {
 	UserName         string  // family member name
 }
 
+// RuleActionSource tracks which rule contributed which action.
+type RuleActionSource struct {
+	RuleID      pgtype.UUID
+	ActionField string // e.g., "category"
+	ActionValue string // e.g., "food_and_drink_coffee"
+}
+
 // RuleActions holds the merged actions to apply to a transaction.
 type RuleActions struct {
 	CategoryID pgtype.UUID
 	// future: MerchantName pgtype.Text, etc.
+
+	Sources []RuleActionSource // tracks which rule set which field
 }
 
 // RuleResolver loads transaction rules and evaluates them during sync.
@@ -257,6 +266,12 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 			// Merge: first rule to set a field wins
 			if !result.CategoryID.Valid && rule.actions.CategoryID.Valid {
 				result.CategoryID = rule.actions.CategoryID
+				slug := r.CategorySlug(rule.actions.CategoryID)
+				result.Sources = append(result.Sources, RuleActionSource{
+					RuleID:      rule.id,
+					ActionField: "category",
+					ActionValue: slug,
+				})
 			}
 			// future: same pattern for other fields
 		}

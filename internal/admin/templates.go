@@ -80,6 +80,20 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return result
 			},
+			"commaInt64": func(n int64) string {
+				s := fmt.Sprintf("%d", n)
+				if len(s) <= 3 {
+					return s
+				}
+				result := ""
+				for i, c := range s {
+					if i > 0 && (len(s)-i)%3 == 0 {
+						result += ","
+					}
+					result += string(c)
+				}
+				return result
+			},
 			"mulFloat": func(a *float64, b float64) float64 {
 				if a == nil {
 					return 0
@@ -666,6 +680,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/reviews.html",
 		"pages/rules.html",
 		"pages/rule_form.html",
+		"pages/rule_detail.html",
 		"pages/review_instructions.html",
 		"pages/insights.html",
 		"pages/account_links.html",
