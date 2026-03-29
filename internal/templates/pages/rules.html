@@ -6,9 +6,9 @@
     <h1 class="bb-page-title">Transaction Rules</h1>
     <p class="text-sm text-base-content/50 mt-1">Auto-categorize future transactions based on pattern matching</p>
   </div>
-  <button class="btn btn-primary btn-sm rounded-xl" @click="showCreateModal = true">
+  <a href="/rules/new" class="btn btn-primary btn-sm rounded-xl">
     <i data-lucide="plus" class="w-4 h-4"></i> New Rule
-  </button>
+  </a>
 </div>
 
 <!-- Summary Stats Cards -->
@@ -138,9 +138,9 @@
     </div>
     <h2 class="text-lg font-semibold mb-1">No rules yet</h2>
     <p class="text-base-content/50 text-sm mb-4">Create a rule to start auto-categorizing transactions.</p>
-    <button class="btn btn-primary btn-sm rounded-xl" @click="showCreateModal = true">
+    <a href="/rules/new" class="btn btn-primary btn-sm rounded-xl">
       <i data-lucide="plus" class="w-4 h-4"></i> Create Rule
-    </button>
+    </a>
   </div>
 </div>
 {{end}}
@@ -223,9 +223,9 @@
       <button class="btn btn-ghost btn-xs btn-square rounded-lg" title="Toggle" @click.stop="toggleRule('{{.ID}}')">
         {{if .Enabled}}<i data-lucide="pause" class="w-4 h-4 pointer-events-none"></i>{{else}}<i data-lucide="play" class="w-4 h-4 pointer-events-none"></i>{{end}}
       </button>
-      <button class="btn btn-ghost btn-xs btn-square rounded-lg" title="Edit" @click.stop="editRule({{toJSON .}})">
+      <a href="/rules/{{.ID}}/edit" class="btn btn-ghost btn-xs btn-square rounded-lg" title="Edit" @click.stop>
         <i data-lucide="pencil" class="w-4 h-4 pointer-events-none"></i>
-      </button>
+      </a>
       <button class="btn btn-ghost btn-xs btn-square rounded-lg text-error/60" title="Delete" :disabled="deleting" @click.stop="deleteRule('{{.ID}}', $el)">
         <i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i>
       </button>
@@ -242,314 +242,11 @@
 </div>
 {{end}}
 
-<!-- Create/Edit Rule Modal -->
-<dialog id="rules-modal" class="modal" x-ref="rulesModal"
-  @close="showCreateModal = false; showEditModal = false"
-  x-init="$watch('showCreateModal', v => { if (v) $refs.rulesModal?.showModal() }); $watch('showEditModal', v => { if (v) $refs.rulesModal?.showModal() })">
-  <div class="modal-box max-w-xl rounded-xl">
-    <h3 class="font-bold text-lg mb-1" x-text="showEditModal ? 'Edit Rule' : 'Create Rule'"></h3>
-    <p class="text-xs text-base-content/40 mb-5">When transactions match the conditions, the actions are applied automatically.</p>
-    <form @submit.prevent="submitRule()">
-      <!-- Name -->
-      <div class="form-control mb-4">
-        <label class="label"><span class="label-text text-sm font-medium">Name</span></label>
-        <input type="text" x-model="form.name" class="input input-bordered input-sm rounded-xl" placeholder="e.g., Uber Eats → Food Delivery" required />
-      </div>
-
-      <!-- Conditions Section -->
-      <div class="mb-4">
-        <div class="flex items-center justify-between mb-2">
-          <label class="label-text text-sm font-medium">Conditions</label>
-          <button type="button" class="btn btn-ghost btn-xs rounded-lg gap-1" @click="addCondition()">
-            <i data-lucide="plus" class="w-3 h-3"></i> Add
-          </button>
-        </div>
-
-        <!-- Condition rows -->
-        <div class="space-y-2">
-          <template x-for="(cond, idx) in form.conditions" :key="idx">
-            <div class="flex items-center gap-2 p-2.5 bg-base-200/40 rounded-xl">
-              <!-- Conjunction label -->
-              <div class="w-10 shrink-0 text-center">
-                <span x-show="idx === 0" class="text-xs text-base-content/30 font-medium">IF</span>
-                <span x-show="idx > 0" class="text-xs text-base-content/30 font-medium">AND</span>
-              </div>
-              <!-- Field -->
-              <select x-model="cond.field" @change="onFieldChange(idx)" class="select select-bordered select-xs rounded-lg flex-1 min-w-0">
-                <option value="">Field...</option>
-                <option value="name">Name</option>
-                <option value="merchant_name">Merchant</option>
-                <option value="amount">Amount</option>
-                <option value="category_primary">Category (raw)</option>
-                <option value="category_detailed">Category detail</option>
-                <option value="provider">Provider</option>
-                <option value="user_name">Family member</option>
-                <option value="pending">Pending</option>
-              </select>
-              <!-- Operator -->
-              <select x-model="cond.op" class="select select-bordered select-xs rounded-lg w-28 shrink-0">
-                <!-- String ops -->
-                <option value="contains" x-show="fieldType(cond.field) === 'string'">contains</option>
-                <option value="eq" x-show="fieldType(cond.field) === 'string'">equals</option>
-                <option value="neq" x-show="fieldType(cond.field) === 'string'">not equals</option>
-                <option value="not_contains" x-show="fieldType(cond.field) === 'string'">not contains</option>
-                <option value="matches" x-show="fieldType(cond.field) === 'string'">regex</option>
-                <option value="in" x-show="fieldType(cond.field) === 'string'">in list</option>
-                <!-- Numeric ops -->
-                <option value="gte" x-show="fieldType(cond.field) === 'numeric'">&ge;</option>
-                <option value="lte" x-show="fieldType(cond.field) === 'numeric'">&le;</option>
-                <option value="eq" x-show="fieldType(cond.field) === 'numeric'">=</option>
-                <option value="gt" x-show="fieldType(cond.field) === 'numeric'">&gt;</option>
-                <option value="lt" x-show="fieldType(cond.field) === 'numeric'">&lt;</option>
-                <option value="neq" x-show="fieldType(cond.field) === 'numeric'">&ne;</option>
-                <!-- Bool ops -->
-                <option value="eq" x-show="fieldType(cond.field) === 'bool'">is</option>
-                <option value="neq" x-show="fieldType(cond.field) === 'bool'">is not</option>
-              </select>
-              <!-- Value -->
-              <select x-model="cond.value" x-show="fieldType(cond.field) === 'bool'" class="select select-bordered select-xs rounded-lg w-20 shrink-0">
-                <option value="true">true</option>
-                <option value="false">false</option>
-              </select>
-              <input type="number" x-model="cond.value" step="0.01" x-show="fieldType(cond.field) === 'numeric'" class="input input-bordered input-xs rounded-lg w-24 shrink-0" placeholder="0.00" />
-              <input type="text" x-model="cond.value" x-show="fieldType(cond.field) === 'string'" class="input input-bordered input-xs rounded-lg flex-1 min-w-0" placeholder="value..." />
-              <!-- Remove -->
-              <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg shrink-0" @click="removeCondition(idx)" x-show="form.conditions.length > 1">
-                <i data-lucide="x" class="w-3.5 h-3.5 text-base-content/40"></i>
-              </button>
-            </div>
-          </template>
-        </div>
-
-        <!-- Advanced JSON toggle -->
-        <div class="mt-2">
-          <button type="button" class="text-xs text-base-content/40 hover:text-base-content/60 flex items-center gap-1" @click="showJsonEditor = !showJsonEditor">
-            <i data-lucide="code-2" class="w-3 h-3"></i>
-            <span x-text="showJsonEditor ? 'Hide JSON' : 'Edit as JSON'"></span>
-          </button>
-          <div x-show="showJsonEditor" x-cloak class="mt-2">
-            <textarea x-model="form.conditions_json" @input="syncFromJson()" class="textarea textarea-bordered textarea-sm font-mono text-xs rounded-xl w-full" rows="4" placeholder='{"field": "name", "op": "contains", "value": "uber"}'></textarea>
-          </div>
-        </div>
-      </div>
-
-      <!-- Actions Section -->
-      <div class="mb-4">
-        <label class="label-text text-sm font-medium">Actions</label>
-        <p class="text-xs text-base-content/40 mb-2">What to do when conditions match</p>
-        <div class="p-3 bg-base-200/40 rounded-xl">
-          <div class="flex items-center gap-2">
-            <div class="flex items-center gap-1.5 shrink-0">
-              <i data-lucide="tag" class="w-3.5 h-3.5 text-base-content/40"></i>
-              <span class="text-xs font-medium text-base-content/60">Set category</span>
-            </div>
-            <select x-model="form.category_slug" class="select select-bordered select-xs rounded-lg flex-1 min-w-0" required>
-              <option value="">Select category...</option>
-              {{range .FlatCategories}}
-              <option value="{{.Slug}}">{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
-              {{end}}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <!-- Priority + Expires row -->
-      <div class="flex gap-4 mb-4">
-        <div class="form-control flex-1">
-          <label class="label"><span class="label-text text-sm font-medium">Priority</span></label>
-          <input type="number" x-model.number="form.priority" class="input input-bordered input-sm rounded-xl" min="0" max="1000" />
-          <label class="label"><span class="label-text-alt text-base-content/40">Higher = evaluated first</span></label>
-        </div>
-        <div class="form-control flex-1" x-show="!showEditModal">
-          <label class="label"><span class="label-text text-sm font-medium">Expires in</span></label>
-          <input type="text" x-model="form.expires_in" class="input input-bordered input-sm rounded-xl" placeholder="e.g., 30d" />
-          <label class="label"><span class="label-text-alt text-base-content/40">24h, 7d, 4w, or empty</span></label>
-        </div>
-      </div>
-
-      <div x-show="formError" class="alert alert-error text-sm mb-4 rounded-xl">
-        <span x-text="formError"></span>
-      </div>
-
-      <div class="modal-action">
-        <button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="closeModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm rounded-xl" :disabled="submitting">
-          <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-          <span x-text="showEditModal ? 'Save' : 'Create'"></span>
-        </button>
-      </div>
-    </form>
-  </div>
-  <form method="dialog" class="modal-backdrop" @click="closeModal()"><button>close</button></form>
-</dialog>
-
 </div>
 
 <script>
 function rulesPage() {
-  const fieldTypes = {
-    name: 'string', merchant_name: 'string', amount: 'numeric',
-    category_primary: 'string', category_detailed: 'string',
-    pending: 'bool', provider: 'string', account_id: 'string',
-    user_id: 'string', user_name: 'string'
-  };
-  const defaultOps = { string: 'contains', numeric: 'gte', bool: 'eq' };
-  const emptyCondition = () => ({ field: 'name', op: 'contains', value: '' });
-
   return {
-    showCreateModal: false,
-    showEditModal: false,
-    showJsonEditor: false,
-    editingId: '',
-    submitting: false,
-    formError: '',
-    form: {
-      name: '',
-      category_slug: '',
-      priority: 10,
-      conditions: [emptyCondition()],
-      conditions_json: '',
-      expires_in: ''
-    },
-
-    fieldType(field) { return fieldTypes[field] || 'string'; },
-
-    onFieldChange(idx) {
-      const cond = this.form.conditions[idx];
-      cond.op = defaultOps[this.fieldType(cond.field)] || 'contains';
-      if (this.fieldType(cond.field) === 'bool') cond.value = 'true';
-      else if (this.fieldType(cond.field) === 'numeric') cond.value = '';
-      else cond.value = '';
-      this.syncToJson();
-    },
-    addCondition() {
-      this.form.conditions.push(emptyCondition());
-      this.syncToJson();
-    },
-    removeCondition(idx) {
-      this.form.conditions.splice(idx, 1);
-      this.syncToJson();
-    },
-    syncToJson() {
-      const json = this.buildConditionsJSON();
-      this.form.conditions_json = JSON.stringify(json, null, 2);
-    },
-    syncFromJson() {
-      try {
-        const parsed = JSON.parse(this.form.conditions_json);
-        this.form.conditions = this.flattenConditions(parsed);
-      } catch (e) { /* let them type freely */ }
-    },
-
-    buildConditionsJSON() {
-      const conds = this.form.conditions.filter(c => c.field && c.value !== '');
-      if (conds.length === 0) return {};
-      const mapped = conds.map(c => {
-        let val = c.value;
-        if (this.fieldType(c.field) === 'numeric') val = parseFloat(val) || 0;
-        else if (this.fieldType(c.field) === 'bool') val = val === 'true';
-        return { field: c.field, op: c.op, value: val };
-      });
-      return mapped.length === 1 ? mapped[0] : { and: mapped };
-    },
-
-    flattenConditions(c) {
-      if (!c || Object.keys(c).length === 0) return [emptyCondition()];
-      if (c.and) return c.and.map(sub => ({ field: sub.field || '', op: sub.op || 'contains', value: String(sub.value ?? '') }));
-      if (c.field) return [{ field: c.field, op: c.op || 'contains', value: String(c.value ?? '') }];
-      return [emptyCondition()];
-    },
-
-    editRule(rule) {
-      this.editingId = rule.id;
-      this.form.name = rule.name;
-      this.form.category_slug = rule.category_slug || '';
-      if (rule.actions && rule.actions.length) {
-        const catAction = rule.actions.find(a => a.field === 'category');
-        if (catAction) this.form.category_slug = catAction.value;
-      }
-      this.form.priority = rule.priority;
-      this.form.conditions = this.flattenConditions(rule.conditions);
-      this.form.conditions_json = JSON.stringify(rule.conditions, null, 2);
-      this.form.expires_in = '';
-      this.formError = '';
-      this.showJsonEditor = false;
-      this.showEditModal = true;
-    },
-    closeModal() {
-      this.$refs.rulesModal?.close();
-      this.showJsonEditor = false;
-      this.editingId = '';
-      this.formError = '';
-      this.form = { name: '', category_slug: '', priority: 10, conditions: [emptyCondition()], conditions_json: '', expires_in: '' };
-    },
-    async submitRule() {
-      this.formError = '';
-      this.submitting = true;
-
-      let conditions;
-      if (this.showJsonEditor && this.form.conditions_json.trim()) {
-        try {
-          conditions = JSON.parse(this.form.conditions_json);
-        } catch (e) {
-          this.formError = 'Invalid JSON in conditions: ' + e.message;
-          this.submitting = false;
-          return;
-        }
-      } else {
-        conditions = this.buildConditionsJSON();
-        if (!conditions || Object.keys(conditions).length === 0) {
-          this.formError = 'At least one condition is required';
-          this.submitting = false;
-          return;
-        }
-      }
-
-      try {
-        if (this.showEditModal) {
-          const body = {
-            name: this.form.name,
-            conditions: conditions,
-            category_slug: this.form.category_slug,
-            priority: this.form.priority
-          };
-          const resp = await fetch('/-/rules/' + this.editingId, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(body)
-          });
-          if (!resp.ok) {
-            const data = await resp.json();
-            this.formError = data.error?.message || data.error || 'Failed to update rule';
-            this.submitting = false;
-            return;
-          }
-        } else {
-          const body = {
-            name: this.form.name,
-            conditions: conditions,
-            category_slug: this.form.category_slug,
-            priority: this.form.priority,
-            expires_in: this.form.expires_in || undefined
-          };
-          const resp = await fetch('/-/rules', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(body)
-          });
-          if (!resp.ok) {
-            const data = await resp.json();
-            this.formError = data.error?.message || data.error || 'Failed to create rule';
-            this.submitting = false;
-            return;
-          }
-        }
-        location.reload();
-      } catch (e) {
-        this.formError = 'Network error: ' + e.message;
-        this.submitting = false;
-      }
-    },
     async toggleRule(id) {
       try {
         const resp = await fetch('/-/rules/' + id + '/toggle', { method: 'POST' });

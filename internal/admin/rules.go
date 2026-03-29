@@ -85,17 +85,48 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 	}
 }
 
+// RuleFormPageHandler serves GET /admin/rules/new and /admin/rules/{id}/edit.
+func RuleFormPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		categories, _ := svc.ListCategoryTree(ctx)
+
+		data := BaseTemplateData(r, sm, "rules", "New Rule")
+		data["FlatCategories"] = flattenCategories(categories)
+		data["IsEdit"] = false
+
+		// Edit mode: load existing rule
+		if id := chi.URLParam(r, "id"); id != "" {
+			rule, err := svc.GetTransactionRule(ctx, id)
+			if err != nil {
+				if errors.Is(err, service.ErrNotFound) {
+					tr.Render(w, r, "404.html", map[string]any{"PageTitle": "Not Found", "CurrentPage": "rules"})
+					return
+				}
+				tr.Render(w, r, "500.html", map[string]any{"PageTitle": "Error", "CurrentPage": "rules"})
+				return
+			}
+			data["Rule"] = rule
+			data["IsEdit"] = true
+			data["PageTitle"] = "Edit Rule"
+		}
+
+		tr.Render(w, r, "rule_form.html", data)
+	}
+}
+
 // CreateRuleAdminHandler handles POST /admin/api/rules.
 func CreateRuleAdminHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		actor := ActorFromSession(sm, r)
 
 		var body struct {
-			Name         string            `json:"name"`
-			Conditions   service.Condition `json:"conditions"`
-			CategorySlug string            `json:"category_slug"`
-			Priority     int               `json:"priority"`
-			ExpiresIn    string            `json:"expires_in"`
+			Name         string               `json:"name"`
+			Conditions   service.Condition     `json:"conditions"`
+			Actions      []service.RuleAction  `json:"actions"`
+			CategorySlug string                `json:"category_slug"`
+			Priority     int                   `json:"priority"`
+			ExpiresIn    string                `json:"expires_in"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
@@ -106,14 +137,15 @@ func CreateRuleAdminHandler(svc *service.Service, sm *scs.SessionManager) http.H
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "name is required"})
 			return
 		}
-		if body.CategorySlug == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "category_slug is required"})
+		if len(body.Actions) == 0 && body.CategorySlug == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "either actions or category_slug is required"})
 			return
 		}
 
 		rule, err := svc.CreateTransactionRule(r.Context(), service.CreateTransactionRuleParams{
 			Name:         body.Name,
 			Conditions:   body.Conditions,
+			Actions:      body.Actions,
 			CategorySlug: body.CategorySlug,
 			Priority:     body.Priority,
 			ExpiresIn:    body.ExpiresIn,
@@ -138,12 +170,13 @@ func UpdateRuleAdminHandler(svc *service.Service, sm *scs.SessionManager) http.H
 		id := chi.URLParam(r, "id")
 
 		var body struct {
-			Name         *string            `json:"name,omitempty"`
-			Conditions   *service.Condition `json:"conditions,omitempty"`
-			CategorySlug *string            `json:"category_slug,omitempty"`
-			Priority     *int               `json:"priority,omitempty"`
-			Enabled      *bool              `json:"enabled,omitempty"`
-			ExpiresAt    *string            `json:"expires_at,omitempty"`
+			Name         *string               `json:"name,omitempty"`
+			Conditions   *service.Condition     `json:"conditions,omitempty"`
+			Actions      *[]service.RuleAction  `json:"actions,omitempty"`
+			CategorySlug *string                `json:"category_slug,omitempty"`
+			Priority     *int                   `json:"priority,omitempty"`
+			Enabled      *bool                  `json:"enabled,omitempty"`
+			ExpiresAt    *string                `json:"expires_at,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
@@ -153,6 +186,7 @@ func UpdateRuleAdminHandler(svc *service.Service, sm *scs.SessionManager) http.H
 		rule, err := svc.UpdateTransactionRule(r.Context(), id, service.UpdateTransactionRuleParams{
 			Name:         body.Name,
 			Conditions:   body.Conditions,
+			Actions:      body.Actions,
 			CategorySlug: body.CategorySlug,
 			Priority:     body.Priority,
 			Enabled:      body.Enabled,

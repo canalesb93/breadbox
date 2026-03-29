@@ -665,6 +665,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/mcp_settings.html",
 		"pages/reviews.html",
 		"pages/rules.html",
+		"pages/rule_form.html",
 		"pages/review_instructions.html",
 		"pages/insights.html",
 		"pages/account_links.html",
