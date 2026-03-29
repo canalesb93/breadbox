@@ -16,7 +16,7 @@
     <label class="label"><span class="label-text text-sm font-medium">Rule Name</span></label>
     <div class="relative">
       <input type="text" x-model="form.name" x-ref="nameInput" @focus="nameFocused = true" @blur="setTimeout(() => nameFocused = false, 150)" class="input input-bordered input-sm rounded-xl w-full bg-base-200/50 pr-16" placeholder="e.g., Uber Eats → Food Delivery" required />
-      <button type="button" x-show="nameFocused" x-cloak x-transition.opacity class="absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-xs text-base-content/40 hover:text-base-content/70 bg-base-200 hover:bg-base-300 rounded-md transition-colors" @mousedown.prevent="insertArrow()">→</button>
+      <button type="button" x-show="nameFocused" x-cloak x-transition.opacity class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-base-content/30 hover:text-base-content/50 transition-colors" @mousedown.prevent="insertArrow()" title="Insert arrow">insert →</button>
     </div>
     <p class="text-xs text-base-content/40 mt-1">A descriptive name to identify this rule</p>
   </div>
