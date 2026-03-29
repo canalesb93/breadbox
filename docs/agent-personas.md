@@ -24,29 +24,32 @@ This document defines the purpose, trigger, success criteria, key tools, and rep
 
 ### 1. Initial Setup
 
-**Purpose:** First-time bulk categorization after connecting a new bank account. The account has synced hundreds or thousands of historical transactions that need categorization and rule creation.
+**Purpose:** First-time setup when a user first connects their bank accounts. Establishes the mapping from raw provider categories to the user's category taxonomy via broad rules, and reviews the initial batch of historical transactions. This is specifically for the very first time — when no rules exist yet and the system is a blank slate.
 
-**Trigger:** One-off. Run once per new bank connection, typically right after the first sync completes.
+**Trigger:** One-off. Run once when the user first sets up Breadbox and their initial accounts have synced. If a user adds a new account later, they should use **Bulk Review** instead — this agent is designed for the cold-start scenario.
 
-**Objective:** Maximize rule coverage so that future syncs produce minimal uncategorized transactions. By the end, 80-90%+ of transaction patterns should be covered by rules.
+**Safety check:** If this agent is run when rules already exist (user mistakenly chose Initial Setup instead of Bulk Review), it must detect this and adjust. Check `list_transaction_rules` first — if rules already exist, inform the user and switch to a bulk review approach: skip broad category_primary rule creation, do NOT use `apply_retroactively=true` (which would re-categorize already-reviewed transactions), and focus only on uncovered patterns.
+
+**Objective:** Establish the foundation: map each provider's raw categories to the user's taxonomy via rules, review all historical transactions, and maximize rule coverage so future syncs produce minimal uncategorized transactions.
 
 **Strategy:**
-1. Survey the landscape: read `breadbox://overview`, then `pending_reviews_overview` to see the queue grouped by raw provider category
-2. Create broad rules first — one `category_primary` rule per raw provider category handles the highest volume. Use `preview_rule` to verify before creating. Use `apply_retroactively=true` since this is initial setup.
-3. Create name-pattern rules for cross-merchant transaction types (ATM withdrawals, wire transfers, service charges, etc.)
-4. Process remaining reviews group by group using `list_pending_reviews` with `category_primary_raw` filter. Review each transaction individually and approve with the correct `category_slug` via `batch_submit_reviews`.
-5. Create per-merchant rules only for merchants that the broad rules miscategorize
-6. Report results
+1. **Sanity check:** Read `breadbox://overview` and check `list_transaction_rules`. If rules already exist, inform the user this looks like a returning account — suggest Bulk Review. If proceeding anyway, skip retroactive rule creation and treat as bulk review.
+2. Survey the queue: `pending_reviews_overview` to see transactions grouped by raw provider category
+3. Create broad `category_primary` rules — one per raw provider category, **scoped to the specific provider** (e.g., Teller's "dining" → food_and_drink_restaurant). Use `preview_rule` to verify before creating. Use `apply_retroactively=true` since this is the initial cold start with no prior reviews.
+4. Create name-pattern rules for cross-merchant transaction types (ATM withdrawals, wire transfers, service charges, etc.)
+5. Process remaining reviews group by group using `list_pending_reviews` with `category_primary_raw` filter. Review each transaction individually and approve with the correct `category_slug` via `batch_submit_reviews`.
+6. Create per-merchant rules only for merchants that the broad rules miscategorize
+7. Report results
 
 **Key tools:** `pending_reviews_overview`, `list_pending_reviews` (fields=triage), `create_transaction_rule` (apply_retroactively=true), `batch_create_rules`, `preview_rule`, `batch_submit_reviews`, `list_transaction_rules`, `submit_report`
 
 **What "done well" looks like:**
 - All pending reviews resolved (approved or skipped with reason)
-- 15-30+ rules created covering major patterns
-- Rule names are descriptive and conditions are as broad as safely possible
+- Broad category_primary rules established per provider
+- Name-pattern and per-merchant rules for common patterns
 - No duplicate rules
 - Skipped items have a clear reason (ambiguous, needs human input)
-- Report includes rule coverage stats and flagged items
+- Report gives a clear overview without listing every rule individually
 
 **Report format:**
 ```
@@ -58,10 +61,11 @@ Body:
 - Rules created: Y (covering ~Z% of historical transactions)
 - Skipped for human review: K
 
-## Rules Created
-| Rule | Pattern | Category | Est. Coverage |
-|------|---------|----------|---------------|
-| ... | ... | ... | ... |
+## Rule Coverage
+- Broad category rules: N (covering X raw provider categories)
+- Name-pattern rules: N (ATM, wire transfers, etc.)
+- Per-merchant rules: N
+- Estimated coverage of future transactions: ~Z%
 
 ## Needs Your Attention
 - [Transaction Name](/transactions/ID) — reason it was skipped
