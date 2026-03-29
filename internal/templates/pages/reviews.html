@@ -318,70 +318,52 @@
            x-transition:leave-end="opacity-0"
            @click.stop>
 
-        <div class="flex items-start gap-6 flex-wrap">
-          <!-- Transaction detail -->
-          <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-3 flex-wrap">
+          <!-- Context: link + raw category -->
+          <div class="flex items-center gap-2 flex-1 min-w-0">
             {{if $review.Transaction}}
-            <div class="flex items-center gap-2 mb-2">
-              <a href="/transactions/{{$review.TransactionID}}" class="text-sm font-semibold link link-hover">{{$review.Transaction.Name}}</a>
-              {{if $review.Transaction.Pending}}
-              <span class="badge badge-warning badge-xs">Pending</span>
-              {{end}}
-            </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 text-xs">
-              <div>
-                <span class="text-base-content/40">Merchant</span>
-                <div class="font-medium">{{if $review.Transaction.MerchantName}}{{$review.Transaction.MerchantName}}{{else}}&mdash;{{end}}</div>
-              </div>
-              <div>
-                <span class="text-base-content/40">Account</span>
-                <div class="font-medium">{{if $review.Transaction.AccountName}}{{$review.Transaction.AccountName}}{{else}}&mdash;{{end}}</div>
-              </div>
-              <div>
-                <span class="text-base-content/40">Date</span>
-                <div class="font-medium">{{formatDate $review.Transaction.Date}}</div>
-              </div>
-              <div>
-                <span class="text-base-content/40">Amount</span>
-                <div class="font-medium tabular-nums{{if lt $review.Transaction.Amount 0.0}} text-success{{end}}">{{formatAmount $review.Transaction.Amount}}</div>
-              </div>
-            </div>
+            <a href="/transactions/{{$review.TransactionID}}" class="text-xs link link-hover text-base-content/50 shrink-0">
+              <i data-lucide="external-link" class="w-3 h-3 inline"></i>
+              View
+            </a>
+            {{if $review.Transaction.Pending}}
+            <span class="badge badge-warning badge-xs">Pending</span>
+            {{end}}
             {{if $review.Transaction.CategoryPrimaryRaw}}
-            <div class="text-xs text-base-content/40 mt-2">
-              Raw category: <span class="font-mono text-base-content/50">{{$review.Transaction.CategoryPrimaryRaw}}{{if $review.Transaction.CategoryDetailedRaw}} / {{$review.Transaction.CategoryDetailedRaw}}{{end}}</span>
-            </div>
+            <span class="text-xs text-base-content/30">|</span>
+            <span class="text-xs text-base-content/40 truncate">Raw: <span class="font-mono text-base-content/50">{{$review.Transaction.CategoryPrimaryRaw}}{{if $review.Transaction.CategoryDetailedRaw}} / {{$review.Transaction.CategoryDetailedRaw}}{{end}}</span></span>
             {{end}}
             {{end}}
           </div>
 
-          <!-- Category picker + actions -->
-          <div class="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[220px]">
-            <div class="bb-cat-picker" data-picker-source="triage-{{$review.ID}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if $review.SuggestedCategoryID}}{{$review.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current', sourceId: 'triage-{{$review.ID}}'})" @category-change="selectedCatId = $event.detail.id">
-              <button type="button" class="btn btn-sm btn-ghost gap-2 w-full justify-start border border-base-300 rounded-xl" @click="openPicker()">
-                <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-                <span x-text="displayLabel" class="text-xs truncate"></span>
-                <svg class="w-3 h-3 ml-auto opacity-40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-              </button>
-            </div>
-            <div class="flex items-center gap-2">
-              <input type="text" class="input input-bordered input-xs flex-1 rounded-lg" placeholder="Add note..." x-model="triageNote" @keydown.stop @keydown.escape.prevent="$el.blur()">
-            </div>
-            <div class="flex gap-1.5">
-              <button class="btn btn-success btn-sm rounded-xl flex-1 gap-1" :disabled="submitting"
-                @click="$dispatch('triage-accept', { id: '{{$review.ID}}', catId: selectedCatId, note: triageNote, idx: {{$idx}} })">
-                <i data-lucide="check" class="w-3.5 h-3.5"></i>
-                Accept
-              </button>
-              <button class="btn btn-ghost btn-sm rounded-xl gap-1" :disabled="submitting"
-                @click="$dispatch('triage-skip', { id: '{{$review.ID}}', note: triageNote, idx: {{$idx}} })">
-                <i data-lucide="fast-forward" class="w-3.5 h-3.5"></i>
-                Skip
-              </button>
-              <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30" :disabled="submitting"
-                @click="$dispatch('triage-dismiss', { id: '{{$review.ID}}', idx: {{$idx}} })">
-                <i data-lucide="x" class="w-3.5 h-3.5"></i>
-              </button>
-            </div>
+          <!-- Category picker -->
+          <div class="bb-cat-picker shrink-0" data-picker-source="triage-{{$review.ID}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if $review.SuggestedCategoryID}}{{$review.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current'})" @category-change="selectedCatId = $event.detail.id">
+            <button type="button" class="btn btn-xs btn-ghost gap-1.5 justify-start border border-base-300 rounded-lg" @click="openPicker()">
+              <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
+              <span x-text="displayLabel" class="text-xs truncate max-w-[120px]"></span>
+              <svg class="w-3 h-3 opacity-40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+          </div>
+
+          <!-- Note -->
+          <input type="text" class="input input-bordered input-xs rounded-lg w-36 shrink-0" placeholder="Note..." x-model="triageNote" @keydown.stop @keydown.escape.prevent="$el.blur()">
+
+          <!-- Actions -->
+          <div class="flex gap-1 shrink-0">
+            <button class="btn btn-success btn-xs rounded-lg gap-1" :disabled="submitting"
+              @click="$dispatch('triage-accept', { id: '{{$review.ID}}', catId: selectedCatId, note: triageNote, idx: {{$idx}} })">
+              <i data-lucide="check" class="w-3 h-3"></i>
+              Accept
+            </button>
+            <button class="btn btn-ghost btn-xs rounded-lg gap-1" :disabled="submitting"
+              @click="$dispatch('triage-skip', { id: '{{$review.ID}}', note: triageNote, idx: {{$idx}} })">
+              <i data-lucide="fast-forward" class="w-3 h-3"></i>
+              Skip
+            </button>
+            <button class="btn btn-ghost btn-xs rounded-lg text-base-content/30" :disabled="submitting"
+              @click="$dispatch('triage-dismiss', { id: '{{$review.ID}}', idx: {{$idx}} })">
+              <i data-lucide="x" class="w-3 h-3"></i>
+            </button>
           </div>
         </div>
       </div>
