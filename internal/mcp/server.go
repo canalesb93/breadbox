@@ -20,97 +20,178 @@ DATA MODEL:
 - Connections: linked bank accounts via Plaid, Teller, or CSV import (status: active, error, pending_reauth, disconnected)
 - Accounts: individual bank accounts (checking, savings, credit card, etc.) belonging to a connection
 - Transactions: individual financial transactions belonging to an account
+- Categories: 2-level hierarchy (primary → subcategory), identified by slug (e.g., food_and_drink_groceries)
+- Transaction Rules: pattern-matching conditions that pre-categorize new transactions during sync
+- Reviews: queue of transactions awaiting agent or human assessment
 
-AMOUNT CONVENTION:
+AMOUNT CONVENTION (critical):
 - Positive amounts = money out (debits, purchases, payments)
 - Negative amounts = money in (credits, deposits, refunds)
 - All amounts include iso_currency_code — never sum across different currencies
 
-CATEGORY SYSTEM:
-- Categories are organized in a 2-level hierarchy (primary → detailed subcategories)
-- Each category has: id (UUID), slug (stable identifier), display_name (human label), icon, color
-- Use list_categories to get the full taxonomy tree with IDs and slugs
-- Filter transactions with category_slug param (parent slug includes all children)
-- Use categorize_transaction to manually override a single transaction's category
-- For bulk category changes: use batch_categorize_transactions (multiple transactions, one category) or bulk_recategorize (change all transactions from one category to another)
-- Use reset_transaction_category to undo a manual override
-- Use list_unmapped_categories to find raw provider categories without mappings
-- Use transaction rules to automatically categorize transactions based on conditions (name, amount, provider, etc). Rules are evaluated during sync in priority order.
-- For bulk editing categories: use export_categories / import_categories to export TSV text, edit it, and re-import
-- To simplify/consolidate categories: export categories, then set the merge_into column to a target slug for categories you want to merge. All transactions and mappings from the source are moved to the target. This preserves categorization history while reducing complexity
+GETTING STARTED:
+1. Read breadbox://overview for dataset context (users, connections, accounts, 30-day spending)
+2. Check get_sync_status to verify data freshness
 
-TOKEN EFFICIENCY:
-- Use the fields parameter on query_transactions to request only needed fields. Supports individual field names (e.g., fields=name,amount,date,account_name) and aliases: minimal (name,amount,date — smallest useful set), core (id,date,amount,name,iso_currency_code), category (category,category_primary_raw,category_detailed_raw), timestamps (created_at,updated_at,datetime,authorized_datetime). id is always included.
-- Use fields=triage on list_pending_reviews to get only fields needed for categorization decisions — dramatically reduces response size
-- Use transaction_summary for aggregated spending analysis instead of paginating through individual transactions. Supports group_by: category, month, week, day, category_month
-- Use merchant_summary to get a compact index of all merchants with transaction counts, totals, and date ranges — much more efficient than paginating through raw transactions to identify spending patterns or recurring charges
-- Transaction responses include account_name and user_name — no need to cross-reference list_accounts for "which card?" questions
-- The breadbox://overview resource includes users, connections, accounts by type, and 30-day spending summary — often eliminates the need for separate list_users + list_accounts calls
+QUERYING:
+- query_transactions: filters (date, account, user, category, amount, search), cursor pagination. Use fields= to control response size (aliases: minimal, core, category, timestamps). id always included.
+- count_transactions: same filters, returns count. Use before paginating.
+- transaction_summary: aggregated totals by category, month, week, day, or category_month. Use for spending analysis.
+- merchant_summary: merchant-level stats (count, total, avg, date range). Set min_count=2 for recurring, 3 for subscriptions.
+- exclude_search: filter OUT transactions matching a term
 
-RECOMMENDED QUERY PATTERNS:
-1. Read breadbox://overview first for dataset context (users, connections, accounts, spending)
-2. Use transaction_summary for spending analysis (group by category, month, etc.)
-3. Use merchant_summary to scan for recurring charges or spending patterns (set min_count=2 for recurring, min_count=3 for subscriptions)
-4. Use query_transactions with fields=core,category for browsing individual transactions
-5. Use list_categories to understand the category taxonomy
-6. Use count_transactions to get totals before paginating
-7. Check get_sync_status to verify data freshness
-8. Use list_unmapped_categories to identify categorization gaps
-- Use exclude_search on query_transactions to filter out known merchants when hunting for unknown charges
+SEARCH MODES (on query_transactions, count_transactions, merchant_summary, list_transaction_rules):
+- contains (default): substring — "star" matches "Starbucks"
+- words: all words match — "Century Link" matches "CenturyLink"
+- fuzzy: typo-tolerant — "starbuks" matches "Starbucks"
+- Comma-separated search values are ORed: search=starbucks,dunkin
 
-SEARCH MODES:
-- The search parameter supports three modes via search_mode: contains (default, substring match), words (all words must match — good for multi-word names like "Century Link" matching "CenturyLink"), fuzzy (typo-tolerant via trigram similarity — "starbuks" matches "Starbucks")
-- Comma-separated values in search are automatically ORed in all modes: search=starbucks,amazon matches either merchant
-- Available on: query_transactions, count_transactions, merchant_summary, list_transaction_rules
-- Use search_mode=words when you know the merchant name but not the exact formatting
-- Use search_mode=fuzzy when dealing with mangled bank feed names or uncertain spellings
+REVIEWS & RULES:
+- Tools: pending_reviews_overview, list_pending_reviews, submit_review, batch_submit_reviews, create_transaction_rule, batch_create_rules, preview_rule, apply_rules
+- Before processing reviews or creating rules, read breadbox://review-guidelines for detailed guidelines.
 
-COMMENTS:
-- Use add_transaction_comment to explain your reasoning when recategorizing transactions
-- Check list_transaction_comments before modifying a transaction to see prior context
+CATEGORIES:
+- list_categories: full taxonomy tree with slugs
+- categorize_transaction / batch_categorize_transactions: manual override (sets category_override=true)
+- bulk_recategorize: move all matching transactions to a new category
+- export_categories / import_categories: bulk taxonomy editing via TSV
 
-REVIEW QUEUE:
-- Start with pending_reviews_overview to see the review queue composition — total count, breakdown by review type, and groups by raw provider category. Much more efficient than listing all reviews
-- Use list_pending_reviews with category_primary_raw or review_type filter to process one group at a time. Use fields=triage to reduce response size. Supports limit up to 500.
-- Review types: new_transaction (first sync), uncategorized (no category assigned), low_confidence (below threshold), manual (user-flagged), re_review (sent back after prior resolution)
-- Use submit_review (or batch_submit_reviews, up to 500 at once) to approve with the correct category_slug, or skip if uncertain
-- For bulk category work: batch_categorize_transactions assigns one category to many transactions; bulk_recategorize moves all transactions from one category to another
-- After reviewing, create transaction rules for patterns you noticed so future transactions are auto-categorized
+ACCOUNT LINKING:
+- For shared credit cards (primary cardholder + authorized user): create_account_link deduplicates
+- System matches by date + exact amount, attributes transactions to the dependent user
+- Dependent account transactions excluded from totals. User filtering includes attributed transactions.
+- reconcile_account_link: re-run matching. confirm_match / reject_match: correct errors.
 
-TRANSACTION RULES:
-- Rules auto-categorize future transactions during sync. Good rules dramatically reduce future review work.
-- Conditions use a flexible JSON tree with AND/OR/NOT logic and operators: eq, contains, matches (regex), gt, gte, lt, lte, in
-- Available fields: name, merchant_name, amount, category_primary (raw provider category), category_detailed, pending, provider, account_id, user_id, user_name (family member name)
-- Rules apply automatically to new transactions during sync — no manual application needed
-- Set apply_retroactively=true on create_transaction_rule ONLY during initial bulk categorization (first-time setup). For routine work, just create the rule and let it match future syncs.
-- Use preview_rule to test a condition before creating — shows match count and sample transactions
-- Teller's "general" category is a catch-all — do NOT create a category_primary rule for it, use name patterns instead
-- Do NOT call apply_rules during routine reviews. It scans ALL transactions and its impact is hard to predict. Rules are forward-looking by design.
+REPORTS & COMMUNICATION:
+- Tools: submit_report, add_transaction_comment, list_transaction_comments
+- Before submitting reports, read breadbox://report-format for report structure and formatting guidelines.`
 
-ACCOUNT LINKING (Deduplication & Attribution):
-- When two family members connect the same credit card (e.g., primary cardholder + authorized user), transactions appear in both feeds with different IDs
-- Use create_account_link to link the dependent account to the primary account
-- The system auto-matches transactions by date + exact amount, attributes matched primary-side transactions to the dependent user
-- Dependent account transactions are excluded from totals and summaries by default
-- When filtering by user_id, attributed transactions are included — "Ricardo's transactions" includes his own plus those attributed to him on the shared card
-- Use reconcile_account_link to re-run matching after new syncs
-- Use list_transaction_matches to review matched pairs, confirm_match/reject_match to correct errors
+// DefaultReviewGuidelines contains the default review guidelines served via breadbox://review-guidelines.
+// User-editable via the MCP Settings page.
+const DefaultReviewGuidelines = `REVIEW PRINCIPLES — follow these strictly:
 
-RULE CREATION STRATEGY — follow this order:
-1. FIRST, create category_primary rules (highest impact). Look at the category_primary field on transactions — these are raw provider categories like "dining", "groceries", "phone", "accommodation", "fuel", "entertainment". One rule per category_primary covers ALL transactions with that label. Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]} → food_and_drink_restaurant. This single rule handles every dining transaction from Teller.
-2. THEN, create name-pattern rules for transaction types that span merchants: "ATM Withdrawal" → withdrawals, "Wire Transfer" → transfer_out, "Service Charge" → bank_fees, "Cash Deposit" → deposits. Use contains on the name field.
-3. LAST, create per-merchant rules only for specific merchants that get miscategorized or need a different category than their category_primary suggests (e.g., Walmart categorized as "shopping" but you want it under "groceries").
+1. EVERY REVIEW MUST BE INDIVIDUALLY ASSESSED. You must look at each transaction before approving it. Even when processing in batches via batch_submit_reviews, you must have examined each transaction's name, amount, and context to determine the correct category. There is no auto-approve mechanism — categorization quality depends on your judgment.
 
-- ALWAYS check list_transaction_rules before creating to avoid duplicates
-- Use batch_create_rules to create multiple rules efficiently
-- Before creating rules, query some transactions to see what category_primary values exist — use query_transactions with fields=core,category
+2. RULES ARE FORWARD-LOOKING. Transaction rules apply automatically to NEW transactions during sync. Do NOT use apply_rules or apply_retroactively=true during routine reviews. These are reserved for explicit one-off bulk work (initial setup only). During routine work, create rules and let them match future syncs naturally.
 
-AGENT REPORTS:
-- Use submit_report to communicate with the family — think of the title as a notification message they'll read on their dashboard
-- The title should be a concise 1-2 sentence summary that's self-contained and informative (e.g., "Reviewed 47 transactions this week — 3 recategorized, no suspicious activity found.")
-- The body is the detailed breakdown shown when they tap to expand — use markdown with headers, bullets, and transaction links: [Name](/transactions/ID)
-- Set priority to 'warning' or 'critical' when something needs attention, 'info' for routine updates
-- Sign reports with an author name that identifies your role (e.g., "Review Agent", "Budget Monitor")`
+3. RE-REVIEWS ARE HUMAN CORRECTIONS. When you see review_type=re_review, a human has disagreed with a previous decision and re-enqueued the transaction with a comment. Read that comment via list_transaction_comments. The human's feedback overrides your prior categorization. Acknowledge the correction in your approval note.
+
+4. SKIP RATHER THAN GUESS. If you cannot confidently determine the correct category, skip the review with a note explaining what's ambiguous. A skipped review can be revisited later with more context. A wrong categorization is harder to catch.
+
+5. COMMENT ON NON-OBVIOUS DECISIONS. When you approve a review with a category that isn't immediately obvious from the transaction name, add a brief note explaining why. This helps humans understand your reasoning and provides context if the transaction is later re-reviewed.
+
+6. NEVER BULK-APPROVE WITHOUT EXAMINATION. Do not use batch_submit_reviews to approve all remaining reviews with a default category. Each item in the batch must have been individually assessed with the correct category assigned.
+
+7. ALWAYS USE CATEGORY_SLUG. When approving reviews, use category_slug (e.g., "food_and_drink_groceries") not category_id. Slugs are human-readable, stable, and consistent across sessions.
+
+8. SKIPPED REVIEWS STAY IN THE QUEUE. When you skip a review, it remains pending and will appear again in future review sessions. Skip freely when uncertain.
+
+RULE CREATION:
+- Rules auto-categorize new transactions during sync. Good rules dramatically reduce future review work.
+- Conditions use a JSON tree with AND/OR/NOT logic
+- Operators: eq, neq, contains, not_contains, matches (regex), gt, gte, lt, lte, in
+- Fields: name, merchant_name, amount, category_primary (raw provider category), category_detailed, pending, provider, account_id, user_id, user_name
+
+BEFORE CREATING A RULE:
+1. Check list_transaction_rules to avoid duplicates
+2. Use preview_rule to test your conditions — verify match count and review sample transactions
+3. Query some transactions with fields=core,category to see what category_primary values exist
+
+RULE CREATION ORDER (highest impact first):
+1. category_primary rules: one rule per raw provider category covers ALL transactions with that label.
+   Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]} → food_and_drink_restaurant
+2. Name-pattern rules: for transaction types spanning merchants. Use contains on name.
+   Examples: "ATM Withdrawal" → withdrawals, "Wire Transfer" → transfer_out, "Service Charge" → bank_fees
+3. Per-merchant rules: only for specific merchants that get miscategorized by broad rules.
+
+RETROACTIVE APPLICATION:
+- apply_retroactively=true on create_transaction_rule: Use ONLY during initial setup, not routine reviews.
+- apply_rules tool: NEVER use during routine reviews. Reserved for explicit one-off bulk operations.
+- During routine work, create the rule and let it match future syncs naturally.
+
+RULE NAMING:
+- Use descriptive names: "[pattern type]: [match] → [category]"
+- Examples: "category_primary: dining → food_and_drink_restaurant", "name: Starbucks → food_and_drink_coffee"
+
+RULE PRIORITY & CONFLICTS:
+- Rules are evaluated in priority order during sync (higher priority number wins)
+- More specific rules should have higher priority than broad ones
+  - Per-merchant rules (priority 20-30) > name-pattern rules (priority 10-20) > category_primary rules (priority 1-10)
+- Check for conflicts before creating. If overlap exists, set priority to ensure the correct one wins.
+
+Use batch_create_rules (max 100) to create multiple rules efficiently.
+Prefer contains over exact match — bank feeds format merchant names inconsistently.
+Always use category_slug (not category_id) when creating rules.`
+
+// DefaultReportFormat contains the default report format guidelines served via breadbox://report-format.
+// User-editable via the MCP Settings page.
+const DefaultReportFormat = `Always submit a report when you finish your work using submit_report.
+
+REPORT TITLE:
+The title appears as a dashboard notification — make it self-contained and scannable. A family member should understand what happened without expanding the report.
+- Good: "Reviewed 47 transactions — 3 recategorized, no suspicious activity"
+- Good: "March spending: $4,200 total, dining up 25% from February"
+- Bad: "Review Complete" (says nothing)
+- Bad: "Transaction Review Report for Week of March 15-21, 2026" (too long, no substance)
+
+REPORT BODY:
+Use markdown with headers, bullets, and transaction links: [Transaction Name](/transactions/ID)
+
+Standard sections (include what's relevant to your task):
+- Summary: key numbers (transactions processed, rules created, amounts)
+- Actions Taken: what you did (rules created, categories changed)
+- Flagged Items: transactions needing human attention with links and reasons
+- Observations: trends, patterns, or recommendations
+
+PRIORITY:
+- info: routine updates, normal reports
+- warning: items needing attention (unusual charges, potential duplicates, data issues)
+- critical: urgent issues (suspected fraud, large unexpected charges, connection failures)
+
+AUTHOR:
+Set author to identify your role (e.g., "Review Agent", "Budget Monitor", "Anomaly Detector"). This helps families distinguish reports from different agents.
+
+REPORT TEMPLATES:
+
+Review Report:
+## Summary
+- Reviewed: N transactions (approved: X, skipped: Y)
+- New rules created: Z
+## Rules Created
+- Rule Name → category (matched N transactions)
+## Needs Your Attention
+- [Transaction](/transactions/ID) — why it's flagged
+## Notes
+Observations, data quality issues, patterns noticed
+
+Spending Report:
+## Spending Summary ({period})
+- Total: $X,XXX (vs prior period: +/-$Y, Z%)
+## Top Categories
+| Category | Amount | % of Total | vs Prior |
+|----------|--------|------------|----------|
+## Top Merchants
+| Merchant | Amount | Count |
+|----------|--------|-------|
+## Recurring Charges
+| Merchant | Monthly Cost | Frequency |
+|----------|-------------|-----------|
+## Notable Transactions
+- [Transaction](/transactions/ID) — $amount — context
+## Observations
+Trends, anomalies, recommendations
+
+Anomaly Report:
+## Flagged Items
+- [Transaction](/transactions/ID) — $amount at Merchant — reason (duplicate / new merchant / spike)
+## Spending Patterns
+Notable trends vs historical baselines
+## Data Health
+Connection status, stale data, dedup issues
+
+TRANSACTION LINKS:
+When referencing specific transactions, always use markdown links: [Transaction Name](/transactions/ID)
+This makes transactions clickable in the dashboard for quick access.`
 
 // ToolClassification indicates whether a tool is read-only or performs writes.
 type ToolClassification string
@@ -331,6 +412,20 @@ func (s *MCPServer) registerResources(server *mcpsdk.Server) {
 		Description: "Live summary of the Breadbox data model: user, connection, account, and transaction counts plus the transaction date range. Read this first to understand the dataset scope.",
 		MIMEType:    "application/json",
 	}, s.handleOverviewResource)
+
+	server.AddResource(&mcpsdk.Resource{
+		Name:        "Review Guidelines",
+		URI:         "breadbox://review-guidelines",
+		Description: "Guidelines for reviewing transactions and creating rules. Read this before processing any reviews or creating transaction rules.",
+		MIMEType:    "text/markdown",
+	}, s.handleReviewGuidelinesResource)
+
+	server.AddResource(&mcpsdk.Resource{
+		Name:        "Report Format",
+		URI:         "breadbox://report-format",
+		Description: "Report structure templates and formatting guidelines. Read this before submitting reports via submit_report.",
+		MIMEType:    "text/markdown",
+	}, s.handleReportFormatResource)
 }
 
 // AllToolDefs returns the full tool registry for admin display.

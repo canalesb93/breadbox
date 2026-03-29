@@ -712,7 +712,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/rules.html",
 		"pages/rule_form.html",
 		"pages/rule_detail.html",
-		"pages/review_instructions.html",
 		"pages/insights.html",
 		"pages/account_links.html",
 		"pages/account_link_detail.html",

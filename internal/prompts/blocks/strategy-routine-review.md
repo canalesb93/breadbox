@@ -1,15 +1,29 @@
 # Routine Review Strategy
 > Daily or weekly review of recent transactions
 
-You are performing a routine review of recent transactions. Review pending transactions, categorize them, and create rules for any new patterns you notice.
+You are performing a routine review of recently synced transactions. The queue is typically small (5-30 items). Focus on accuracy and incremental rule coverage.
 
-STRATEGY:
-1. List pending reviews with fields=triage (limit 15-30)
-2. Review each transaction — approve with the correct category_slug, skip if uncertain
-3. Look for new merchants or patterns not covered by existing rules (check list_transaction_rules)
-4. For recurring merchants (seen 2+ times), create a specific rule (rules apply to future syncs automatically)
-5. Use batch_submit_reviews (up to 500) for efficiency
+OBJECTIVE: Review all pending items with care. Create rules for new recurring patterns. Maintain high categorization accuracy.
 
-Focus on ACCURACY — take time to categorize correctly since there are fewer transactions. Create specific rules for new recurring merchants you encounter. Prefer contains over exact match for merchant names.
+STEP-BY-STEP:
+1. Check pending_reviews_overview — if queue is empty, check get_sync_status for data freshness and report accordingly
+2. Prioritize re_review items first — read comments via list_transaction_comments, respect human corrections
+3. List pending reviews (fields=triage, limit 30)
+4. Review each transaction:
+   a. Determine the correct category from the transaction name, merchant, amount, and raw category fields
+   b. Approve with the correct category_slug. Add a note for non-obvious decisions.
+   c. Skip if genuinely uncertain — note what's ambiguous
+5. After reviewing, check if any new merchants appeared 2+ times (use merchant_summary if needed) — create rules for recurring patterns
+6. Submit a brief report
 
-Do NOT use apply_rules during routine reviews — rules are designed to match future transactions during sync. Retroactive application is a separate, deliberate action.
+RULES IN ROUTINE MODE:
+- Create rules for new patterns, but they apply to FUTURE syncs only
+- NEVER use apply_retroactively=true during routine reviews
+- NEVER use apply_rules during routine reviews
+- Just create the rule and let it catch future transactions during sync
+
+ACCURACY OVER SPEED:
+- There are fewer items, so take time on each one
+- Prefer contains over exact match for merchant name rules
+- Check list_transaction_rules before creating to avoid duplicates
+- Comment on non-obvious categorization decisions

@@ -30,3 +30,49 @@ func (s *MCPServer) handleOverviewResource(_ context.Context, _ *mcpsdk.ReadReso
 		},
 	}, nil
 }
+
+func (s *MCPServer) handleReviewGuidelinesResource(_ context.Context, _ *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
+	ctx := context.Background()
+	cfg, err := s.svc.GetMCPConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get mcp config: %w", err)
+	}
+
+	content := cfg.ReviewGuidelines
+	if content == "" {
+		content = DefaultReviewGuidelines
+	}
+
+	return &mcpsdk.ReadResourceResult{
+		Contents: []*mcpsdk.ResourceContents{
+			{
+				URI:      "breadbox://review-guidelines",
+				MIMEType: "text/markdown",
+				Text:     content,
+			},
+		},
+	}, nil
+}
+
+func (s *MCPServer) handleReportFormatResource(_ context.Context, _ *mcpsdk.ReadResourceRequest) (*mcpsdk.ReadResourceResult, error) {
+	ctx := context.Background()
+	cfg, err := s.svc.GetMCPConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get mcp config: %w", err)
+	}
+
+	content := cfg.ReportFormat
+	if content == "" {
+		content = DefaultReportFormat
+	}
+
+	return &mcpsdk.ReadResourceResult{
+		Contents: []*mcpsdk.ResourceContents{
+			{
+				URI:      "breadbox://report-format",
+				MIMEType: "text/markdown",
+				Text:     content,
+			},
+		},
+	}, nil
+}

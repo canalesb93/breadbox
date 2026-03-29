@@ -12,9 +12,11 @@ import (
 
 // MCPConfig represents the MCP permission and instruction settings.
 type MCPConfig struct {
-	Mode          string   `json:"mode"`          // "read_only" or "read_write"
-	DisabledTools []string `json:"disabled_tools"` // tool names
-	Instructions  string   `json:"instructions"`   // full server instructions
+	Mode             string   `json:"mode"`              // "read_only" or "read_write"
+	DisabledTools    []string `json:"disabled_tools"`     // tool names
+	Instructions     string   `json:"instructions"`       // full server instructions
+	ReviewGuidelines string   `json:"review_guidelines"`  // breadbox://review-guidelines content
+	ReportFormat     string   `json:"report_format"`      // breadbox://report-format content
 }
 
 // GetMCPConfig loads MCP configuration from app_config.
@@ -44,6 +46,14 @@ func (s *Service) GetMCPConfig(ctx context.Context) (*MCPConfig, error) {
 		case "mcp_instructions":
 			if row.Value.Valid {
 				cfg.Instructions = row.Value.String
+			}
+		case "mcp_review_guidelines":
+			if row.Value.Valid {
+				cfg.ReviewGuidelines = row.Value.String
+			}
+		case "mcp_report_format":
+			if row.Value.Valid {
+				cfg.ReportFormat = row.Value.String
 			}
 		}
 	}
@@ -85,5 +95,27 @@ func (s *Service) SaveMCPInstructions(ctx context.Context, instructions string) 
 	return s.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 		Key:   "mcp_instructions",
 		Value: pgtype.Text{String: instructions, Valid: true},
+	})
+}
+
+// SaveMCPReviewGuidelines saves review guidelines (served via breadbox://review-guidelines).
+func (s *Service) SaveMCPReviewGuidelines(ctx context.Context, guidelines string) error {
+	if len(guidelines) > 30000 {
+		return fmt.Errorf("review guidelines exceed maximum length of 30,000 characters")
+	}
+	return s.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
+		Key:   "mcp_review_guidelines",
+		Value: pgtype.Text{String: guidelines, Valid: true},
+	})
+}
+
+// SaveMCPReportFormat saves report format guidelines (served via breadbox://report-format).
+func (s *Service) SaveMCPReportFormat(ctx context.Context, format string) error {
+	if len(format) > 20000 {
+		return fmt.Errorf("report format exceeds maximum length of 20,000 characters")
+	}
+	return s.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
+		Key:   "mcp_report_format",
+		Value: pgtype.Text{String: format, Valid: true},
 	})
 }

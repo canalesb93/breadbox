@@ -1,9 +1,16 @@
 # Sync Management
 > Check data freshness and trigger syncs when needed
 
-SYNC MANAGEMENT:
-- Before starting work, call get_sync_status to check when each connection was last synced
-- If data is stale (last sync > 24 hours ago for active connections), use trigger_sync to refresh before reviewing
-- After triggering a sync, wait briefly and check get_sync_status again to confirm it completed successfully
-- If a connection shows status "error" or "pending_reauth", note it in your report — these connections need human intervention
-- Do not trigger syncs on paused or disconnected connections
+BEFORE STARTING WORK:
+- Call get_sync_status to check when each connection was last synced
+- If data is stale (last sync > 24 hours for active connections), consider triggering a sync first
+
+TRIGGERING SYNCS:
+- trigger_sync: syncs all active connections, or pass connection_id for a specific one
+- Syncs run in the background — check get_sync_status afterward to confirm completion
+- Do NOT sync paused or disconnected connections
+
+CONNECTION ISSUES:
+- Status "error": sync failed — note in your report, may need human intervention
+- Status "pending_reauth": bank requires re-authentication — note in your report, human must fix
+- Status "disconnected": intentionally removed — ignore
