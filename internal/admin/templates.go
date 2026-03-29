@@ -566,6 +566,29 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return s
 			},
+			"relativeDate": func(s string) string {
+				t, err := time.Parse("2006-01-02", s)
+				if err != nil {
+					return s
+				}
+				now := time.Now()
+				today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+				d := t.In(now.Location())
+				dateOnly := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, now.Location())
+				days := int(today.Sub(dateOnly).Hours() / 24)
+				switch {
+				case days == 0:
+					return "Today"
+				case days == 1:
+					return "Yesterday"
+				case days >= 2 && days <= 6:
+					return fmt.Sprintf("%d days ago", days)
+				case days >= 7 && days <= 13:
+					return "1 week ago"
+				default:
+					return t.Format("Jan 2, 2006")
+				}
+			},
 			"formatNumeric": func(n pgtype.Numeric) string {
 				if !n.Valid {
 					return ""
