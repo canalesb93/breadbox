@@ -722,6 +722,15 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 		// Build unified activity timeline.
 		activity := buildActivityTimeline(reviews, comments, ruleApps)
 
+		// Check if there's a pending review (to disable re-enqueue)
+		hasPendingReview := false
+		for _, r := range reviews {
+			if r.Status == "pending" {
+				hasPendingReview = true
+				break
+			}
+		}
+
 		// Fetch account context for richer detail display.
 		var accountID, accountName, userName string
 		var institutionName, accountMask, accountType, connectionID string
@@ -795,7 +804,8 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			"AccountType":     accountType,
 			"ConnectionID":    connectionID,
 			"Account":         account,
-			"Activity":        activity,
+			"Activity":          activity,
+			"HasPendingReview":  hasPendingReview,
 			"Categories":      categoryTree,
 			"Breadcrumbs":     breadcrumbs,
 		}

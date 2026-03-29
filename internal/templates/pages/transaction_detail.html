@@ -201,9 +201,10 @@
           </button>
         </div>
         <div class="flex items-center gap-2 mt-1.5">
-          <label class="flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" class="checkbox checkbox-xs checkbox-primary rounded" x-model="enqueueMode" @change="$nextTick(() => lucide.createIcons())">
+          <label class="flex items-center gap-1.5 {{if .HasPendingReview}}opacity-40 cursor-not-allowed{{else}}cursor-pointer{{end}}">
+            <input type="checkbox" class="checkbox checkbox-xs checkbox-primary rounded" x-model="enqueueMode" {{if .HasPendingReview}}disabled{{end}} @change="$nextTick(() => lucide.createIcons())">
             <span class="text-xs text-base-content/50">Send to review queue</span>
+            {{if .HasPendingReview}}<span class="text-xs text-base-content/30">(already pending)</span>{{end}}
           </label>
         </div>
       </div>
