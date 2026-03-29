@@ -717,9 +717,17 @@ func (s *Service) EnqueueManualReview(ctx context.Context, transactionID string,
 		return nil, fmt.Errorf("check pending review: %w", err)
 	}
 
+	// Determine review type: "re_review" if there's a prior resolved review, "manual" otherwise
+	reviewType := "manual"
+	var resolvedCount int64
+	_ = s.Pool.QueryRow(ctx, "SELECT COUNT(*) FROM review_queue WHERE transaction_id = $1 AND status IN ('approved', 'rejected', 'skipped')", txnID).Scan(&resolvedCount)
+	if resolvedCount > 0 {
+		reviewType = "re_review"
+	}
+
 	review, err := s.Queries.EnqueueReview(ctx, db.EnqueueReviewParams{
 		TransactionID: txnID,
-		ReviewType:    "manual",
+		ReviewType:    reviewType,
 	})
 	if err != nil {
 		// ON CONFLICT DO NOTHING returns pgx.ErrNoRows when a pending review already exists.

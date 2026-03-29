@@ -150,7 +150,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - API key scope: `full_access`, `read_only`
 - MCP mode: `read_only`, `read_write`
 - MCP tool classification: `read`, `write`
-- Review type: `new_transaction`, `uncategorized`, `low_confidence`, `manual`
+- Review type: `new_transaction`, `uncategorized`, `low_confidence`, `manual`, `re_review`
 - Review status: `pending`, `approved`, `rejected`, `skipped`
 - Reviewer type: `user`, `agent`
 - Rule creator type: `user`, `agent`, `system`

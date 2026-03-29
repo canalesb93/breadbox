@@ -828,6 +828,8 @@ func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.
 			enqueueReason = "Low confidence categorization"
 		case "new_transaction":
 			enqueueReason = "New transaction"
+		case "re_review":
+			enqueueReason = "Sent back for review"
 		case "manual":
 			enqueueReason = "Manually flagged"
 		default:
