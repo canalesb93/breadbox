@@ -224,11 +224,11 @@
         {{if eq .ReviewStatus "approved"}}bg-success/10
         {{else if eq .ReviewStatus "rejected"}}bg-error/10
         {{else if eq .ReviewStatus "skipped"}}bg-warning/10
-        {{else}}bg-primary/20{{end}}">
+        {{else}}bg-base-200{{end}}">
         {{if eq .ReviewStatus "approved"}}<i data-lucide="check-circle" class="w-4 h-4 text-success"></i>
         {{else if eq .ReviewStatus "rejected"}}<i data-lucide="x-circle" class="w-4 h-4 text-error"></i>
         {{else if eq .ReviewStatus "skipped"}}<i data-lucide="skip-forward" class="w-4 h-4 text-warning"></i>
-        {{else}}<i data-lucide="inbox" class="w-4.5 h-4.5 text-primary"></i>{{end}}
+        {{else}}<i data-lucide="scan-search" class="w-4 h-4 text-base-content/40"></i>{{end}}
       </div>
       {{else}}
       <div class="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center shrink-0 mt-0.5">
@@ -243,7 +243,7 @@
           {{if and (eq .Type "rule") .RuleID}}
           <a href="/rules/{{.RuleID}}" class="font-medium hover:text-primary">{{.Summary}}</a>
           {{else if and (eq .Type "review") (eq .ReviewStatus "pending")}}
-          <span class="font-semibold text-primary">{{.Summary}}</span>
+          <span class="badge badge-primary badge-sm rounded-lg">{{.Summary}}</span>
           {{else}}
           <span class="font-medium">{{.Summary}}</span>
           {{end}}
