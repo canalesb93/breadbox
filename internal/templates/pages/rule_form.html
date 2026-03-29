@@ -17,7 +17,7 @@
   <div class="bb-card p-5 mb-4">
     <label class="label"><span class="label-text text-sm font-medium">Rule Name</span></label>
     <input type="text" x-model="form.name" class="input input-bordered input-sm rounded-xl w-full" placeholder="e.g., Uber Eats → Food Delivery" required />
-    <label class="label"><span class="label-text-alt text-base-content/40">A descriptive name to identify this rule</span></label>
+    <p class="text-xs text-base-content/40 mt-1">A descriptive name to identify this rule</p>
   </div>
 
   <!-- Conditions -->
@@ -163,12 +163,12 @@
       <div class="form-control">
         <label class="label"><span class="label-text text-xs text-base-content/60">Priority</span></label>
         <input type="number" x-model.number="form.priority" class="input input-bordered input-sm rounded-xl" min="0" max="1000" />
-        <label class="label"><span class="label-text-alt text-base-content/40">Higher = evaluated first (default: 10)</span></label>
+        <p class="text-xs text-base-content/40 mt-1">Higher priority wins when multiple rules set the same field</p>
       </div>
       <div class="form-control" x-show="!isEdit">
         <label class="label"><span class="label-text text-xs text-base-content/60">Expires in</span></label>
         <input type="text" x-model="form.expires_in" class="input input-bordered input-sm rounded-xl" placeholder="e.g., 30d" />
-        <label class="label"><span class="label-text-alt text-base-content/40">24h, 7d, 4w, or leave empty</span></label>
+        <p class="text-xs text-base-content/40 mt-1">24h, 7d, 4w, or leave empty</p>
       </div>
     </div>
   </div>
