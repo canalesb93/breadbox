@@ -810,23 +810,26 @@ func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.
 	// Convert reviews — for resolved reviews, emit both the enqueue and resolution events
 	for _, r := range reviews {
 		// Always emit the "enqueued" event (using CreatedAt)
-		enqueueLabel := "Added to review queue"
+		var enqueueReason string
 		switch r.ReviewType {
 		case "uncategorized":
-			enqueueLabel = "Added to review queue — uncategorized"
+			enqueueReason = "Uncategorized transaction"
 		case "low_confidence":
-			enqueueLabel = "Added to review queue — low confidence"
+			enqueueReason = "Low confidence categorization"
 		case "new_transaction":
-			enqueueLabel = "Added to review queue — new transaction"
+			enqueueReason = "New transaction"
 		case "manual":
-			enqueueLabel = "Added to review queue — manual"
+			enqueueReason = "Manually flagged"
+		default:
+			enqueueReason = "Flagged for review"
 		}
 		entries = append(entries, service.ActivityEntry{
 			Type:         "review",
 			Timestamp:    r.CreatedAt,
 			ActorName:    "System",
 			ActorType:    "system",
-			Summary:      enqueueLabel,
+			Summary:      enqueueReason,
+			Detail:       "Added to review queue",
 			ReviewStatus: "pending",
 		})
 

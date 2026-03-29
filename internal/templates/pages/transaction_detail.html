@@ -242,17 +242,23 @@
         <p class="text-sm">
           {{if and (eq .Type "rule") .RuleID}}
           <a href="/rules/{{.RuleID}}" class="font-medium hover:text-primary">{{.Summary}}</a>
-          {{else if and (eq .Type "review") (eq .ReviewStatus "pending")}}
-          <span class="badge badge-primary badge-sm rounded-lg">{{.Summary}}</span>
           {{else}}
           <span class="font-medium">{{.Summary}}</span>
           {{end}}
         </p>
         {{end}}
         {{if .Detail}}
+        {{if and (eq .Type "review") (eq .ReviewStatus "pending")}}
+        {{/* "Added to review queue" shown as blue label in subtitle */}}
+        {{else}}
         <p class="text-sm text-base-content/60 mt-1 whitespace-pre-wrap leading-relaxed">{{.Detail}}</p>
         {{end}}
+        {{end}}
         <div class="flex items-center gap-2 mt-1">
+          {{if and (eq .Type "review") (eq .ReviewStatus "pending") .Detail}}
+          <span class="text-xs text-primary font-medium">{{.Detail}}</span>
+          <span class="text-xs text-base-content/30">&middot;</span>
+          {{end}}
           {{if .ActorName}}<span class="text-xs text-base-content/40">{{.ActorName}}</span>{{end}}
           {{if .Timestamp}}<span class="text-xs text-base-content/30">{{relativeTime .Timestamp}}</span>{{end}}
         </div>
