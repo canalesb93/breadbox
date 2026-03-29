@@ -12,7 +12,7 @@
     <i data-lucide="link"></i>
     <span class="flex-1">Connections</span>
     {{if and .NavBadges (gt .NavBadges.ConnectionsAttention 0)}}
-    <span class="bb-nav-badge bb-nav-badge--warn">{{.NavBadges.ConnectionsAttention}}</span>
+    <span class="bb-nav-badge bb-nav-badge--warn" title="{{.NavBadges.ConnectionsAttention}} connections need attention">{{badgeCount .NavBadges.ConnectionsAttention}}</span>
     {{end}}
   </a>
   <a href="/transactions" class="bb-sidebar-link{{if eq .CurrentPage "transactions"}} bb-sidebar-link--active{{end}}">
@@ -42,14 +42,14 @@
     <i data-lucide="clipboard-check"></i>
     <span class="flex-1">Review Queue</span>
     {{if and .NavBadges (gt .NavBadges.PendingReviews 0)}}
-    <span class="bb-nav-badge">{{.NavBadges.PendingReviews}}</span>
+    <span class="bb-nav-badge" title="{{.NavBadges.PendingReviews}} pending reviews">{{badgeCount .NavBadges.PendingReviews}}</span>
     {{end}}
   </a>
   <a href="/reports" class="bb-sidebar-link{{if eq .CurrentPage "reports"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="file-text"></i>
     <span class="flex-1">Reports</span>
     {{if and .NavBadges (gt .NavBadges.UnreadReports 0)}}
-    <span class="bb-nav-badge">{{.NavBadges.UnreadReports}}</span>
+    <span class="bb-nav-badge" title="{{.NavBadges.UnreadReports}} unread reports">{{badgeCount .NavBadges.UnreadReports}}</span>
     {{end}}
   </a>
   <a href="/mcp-settings" class="bb-sidebar-link{{if eq .CurrentPage "mcp"}} bb-sidebar-link--active{{end}}">
