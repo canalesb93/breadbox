@@ -188,8 +188,8 @@
   <!-- Add Note / Re-enqueue -->
   <div class="px-6 pb-4">
     <div class="flex gap-2 items-center">
-      <input type="text" x-model="newComment" :placeholder="enqueueMode ? 'Add a note for the reviewer... (optional)' : 'Add a note...'" class="input input-bordered input-sm flex-1 bg-base-200/50 rounded-xl" @keydown.enter.prevent="enqueueMode ? enqueueForReview() : (newComment.trim() && addComment())" />
-      <button @click="enqueueMode ? enqueueForReview() : addComment()" class="btn btn-sm rounded-xl px-3" :class="enqueueMode ? 'btn-info' : 'btn-primary'" :disabled="enqueueMode ? false : !newComment.trim()">
+      <input type="text" x-model="newComment" :placeholder="enqueueMode ? 'Add a note for the reviewer... (optional)' : 'Add a note...'" class="input input-bordered input-sm h-9 flex-1 bg-base-200/50 rounded-xl" @keydown.enter.prevent="enqueueMode ? enqueueForReview() : (newComment.trim() && addComment())" />
+      <button @click="enqueueMode ? enqueueForReview() : addComment()" class="btn btn-sm h-9 rounded-xl px-3" :class="enqueueMode ? 'btn-info' : 'btn-primary'" :disabled="enqueueMode ? false : !newComment.trim()">
         <template x-if="enqueueMode">
           <span class="flex items-center gap-1"><i data-lucide="inbox" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Enqueue</span></span>
         </template>
