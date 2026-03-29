@@ -25,21 +25,81 @@ func MCPSettingsGetHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServe
 			Description    string
 			Classification string
 			Enabled        bool
+			Group          string
 		}
 		disabledSet := make(map[string]bool)
 		for _, t := range cfg.DisabledTools {
 			disabledSet[t] = true
 		}
 
-		var tools []toolInfo
+		// Tool group assignments (order matters for display).
+		toolGroups := map[string]string{
+			"list_accounts":                "Accounts & Data",
+			"list_users":                   "Accounts & Data",
+			"get_sync_status":              "Accounts & Data",
+			"trigger_sync":                 "Accounts & Data",
+			"query_transactions":           "Transactions",
+			"count_transactions":           "Transactions",
+			"transaction_summary":          "Transactions",
+			"merchant_summary":             "Transactions",
+			"list_categories":              "Categories",
+			"export_categories":            "Categories",
+			"import_categories":            "Categories",
+			"categorize_transaction":       "Categorization",
+			"reset_transaction_category":   "Categorization",
+			"batch_categorize_transactions": "Categorization",
+			"bulk_recategorize":            "Categorization",
+			"pending_reviews_overview":     "Reviews",
+			"list_pending_reviews":         "Reviews",
+			"submit_review":               "Reviews",
+			"batch_submit_reviews":         "Reviews",
+			"list_transaction_rules":       "Rules",
+			"create_transaction_rule":      "Rules",
+			"update_transaction_rule":      "Rules",
+			"delete_transaction_rule":      "Rules",
+			"batch_create_rules":           "Rules",
+			"apply_rules":                 "Rules",
+			"preview_rule":                "Rules",
+			"list_account_links":           "Account Links",
+			"create_account_link":          "Account Links",
+			"delete_account_link":          "Account Links",
+			"reconcile_account_link":       "Account Links",
+			"list_transaction_matches":     "Account Links",
+			"confirm_match":               "Account Links",
+			"reject_match":                "Account Links",
+			"add_transaction_comment":      "Comments & Reports",
+			"list_transaction_comments":    "Comments & Reports",
+			"submit_report":               "Comments & Reports",
+		}
+		// Ordered group names for display.
+		groupOrder := []string{
+			"Accounts & Data", "Transactions", "Categories", "Categorization",
+			"Reviews", "Rules", "Account Links", "Comments & Reports",
+		}
+
+		// Build tools grouped in order.
+		toolsByGroup := make(map[string][]toolInfo)
 		for _, td := range mcpServer.AllToolDefs() {
 			enabled := !disabledSet[td.Tool.Name]
-			tools = append(tools, toolInfo{
+			group := toolGroups[td.Tool.Name]
+			if group == "" {
+				group = "Other"
+			}
+			toolsByGroup[group] = append(toolsByGroup[group], toolInfo{
 				Name:           td.Tool.Name,
 				Description:    td.Tool.Description,
 				Classification: string(td.Classification),
 				Enabled:        enabled,
+				Group:          group,
 			})
+		}
+		// Flatten in group order.
+		var tools []toolInfo
+		for _, g := range groupOrder {
+			tools = append(tools, toolsByGroup[g]...)
+		}
+		if others := toolsByGroup["Other"]; len(others) > 0 {
+			tools = append(tools, others...)
 		}
 
 		// If no saved instructions, show the defaults.
@@ -55,16 +115,30 @@ func MCPSettingsGetHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServe
 			}
 		}
 
+		// Build grouped tool data for template.
+		type toolGroup struct {
+			Name  string
+			Tools []toolInfo
+		}
+		var toolGroupList []toolGroup
+		for _, g := range groupOrder {
+			if ts := toolsByGroup[g]; len(ts) > 0 {
+				toolGroupList = append(toolGroupList, toolGroup{Name: g, Tools: ts})
+			}
+		}
+		if others := toolsByGroup["Other"]; len(others) > 0 {
+			toolGroupList = append(toolGroupList, toolGroup{Name: "Other", Tools: others})
+		}
+
 		data := BaseTemplateData(r, sm, "mcp", "MCP Settings")
 		data["MCPConfig"] = cfg
 		data["Tools"] = tools
+		data["ToolGroups"] = toolGroupList
 		data["ToolsEnabledCount"] = enabledCount
 		data["ToolsDisabledCount"] = len(tools) - enabledCount
 		data["ToolsTotalCount"] = len(tools)
 		data["Instructions"] = instructions
 		data["DefaultInstructions"] = breadboxmcp.DefaultInstructions
-		data["InitialReviewInstructions"] = breadboxmcp.InitialReviewInstructions
-		data["RecurringReviewInstructions"] = breadboxmcp.RecurringReviewInstructions
 
 		tr.Render(w, r, "mcp_settings.html", data)
 	}

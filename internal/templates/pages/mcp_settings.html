@@ -77,20 +77,27 @@
         <p class="text-sm text-base-content/50 mb-4">Disabled tools are hidden from all agents. Read-only API keys cannot invoke write tools regardless of this setting.</p>
         <form method="POST" action="/mcp-settings/tools">
           <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-          <div class="space-y-1">
-            {{range .Tools}}
-            <div class="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl hover:bg-base-200/50 transition-colors duration-150">
-              <input type="checkbox" name="enabled_tools" value="{{.Name}}" class="toggle toggle-sm toggle-primary mt-0.5 flex-shrink-0" {{if .Enabled}}checked{{end}}>
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="font-mono text-xs sm:text-sm break-all sm:break-normal">{{.Name}}</span>
-                  {{if eq .Classification "write"}}
-                    <span class="badge badge-soft badge-warning badge-xs rounded-lg font-medium">write</span>
-                  {{else}}
-                    <span class="badge badge-soft badge-success badge-xs rounded-lg font-medium">read</span>
-                  {{end}}
+          <div class="space-y-6">
+            {{range .ToolGroups}}
+            <div>
+              <h3 class="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-2 px-2 sm:px-3">{{.Name}}</h3>
+              <div class="space-y-1">
+                {{range .Tools}}
+                <div class="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl hover:bg-base-200/50 transition-colors duration-150">
+                  <input type="checkbox" name="enabled_tools" value="{{.Name}}" class="toggle toggle-sm toggle-primary mt-0.5 flex-shrink-0" {{if .Enabled}}checked{{end}}>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-mono text-xs sm:text-sm break-all sm:break-normal">{{.Name}}</span>
+                      {{if eq .Classification "write"}}
+                        <span class="badge badge-soft badge-warning badge-xs rounded-lg font-medium">write</span>
+                      {{else}}
+                        <span class="badge badge-soft badge-success badge-xs rounded-lg font-medium">read</span>
+                      {{end}}
+                    </div>
+                    <div class="text-xs text-base-content/40 mt-0.5">{{.Description}}</div>
+                  </div>
                 </div>
-                <div class="text-xs text-base-content/40 mt-0.5 line-clamp-2 sm:line-clamp-1">{{.Description}}</div>
+                {{end}}
               </div>
             </div>
             {{end}}
@@ -149,59 +156,6 @@
             </button>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Card 4: Review Agent Instructions [Deprecated] -->
-  <div id="review-instructions" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#review-instructions' }">
-    <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
-      <div class="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center flex-shrink-0">
-        <i data-lucide="clipboard-check" class="w-5 h-5 text-base-content/40"></i>
-      </div>
-      <div class="min-w-0 flex-1">
-        <h2 class="font-semibold">Review Agent Instructions <span class="badge badge-soft badge-warning badge-xs ml-1">Deprecated</span></h2>
-        <p class="text-xs text-base-content/40">Pre-built instruction blocks — being replaced by Agent Wizard prompt builder</p>
-      </div>
-      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
-    </div>
-    <div x-show="expanded" x-collapse x-cloak>
-      <div class="px-4 sm:px-6 py-5 space-y-6">
-
-        <!-- Initial Review -->
-        <div x-data="{ copied: false }">
-          <div class="flex items-center gap-2 mb-2">
-            <i data-lucide="layers" class="w-4 h-4 text-primary"></i>
-            <h3 class="font-medium text-sm">Initial Review</h3>
-            <span class="badge badge-primary badge-xs rounded-lg">Bulk Analysis</span>
-          </div>
-          <p class="text-xs text-base-content/50 mb-3">Use when a new account is synced and you have many uncategorized transactions.</p>
-          <div class="relative">
-            <pre class="bg-base-200 rounded-xl p-4 text-xs whitespace-pre-wrap overflow-auto max-h-60 font-mono text-base-content/70">{{.InitialReviewInstructions}}</pre>
-            <button class="btn btn-xs btn-ghost rounded-lg absolute top-2 right-2" @click.stop="navigator.clipboard.writeText({{.InitialReviewInstructions | printf `%q`}}).then(() => { copied = true; setTimeout(() => copied = false, 2000) })">
-              <template x-if="!copied"><span class="flex items-center gap-1"><i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy</span></template>
-              <template x-if="copied"><span class="flex items-center gap-1 text-success"><i data-lucide="check" class="w-3.5 h-3.5"></i> Copied!</span></template>
-            </button>
-          </div>
-        </div>
-
-        <!-- Recurring Review -->
-        <div x-data="{ copied: false }">
-          <div class="flex items-center gap-2 mb-2">
-            <i data-lucide="repeat" class="w-4 h-4 text-success"></i>
-            <h3 class="font-medium text-sm">Recurring Review</h3>
-            <span class="badge badge-secondary badge-xs rounded-lg">Daily / Weekly</span>
-          </div>
-          <p class="text-xs text-base-content/50 mb-3">Use for routine review of incoming transactions. Reviews a small batch with more attention per transaction.</p>
-          <div class="relative">
-            <pre class="bg-base-200 rounded-xl p-4 text-xs whitespace-pre-wrap overflow-auto max-h-60 font-mono text-base-content/70">{{.RecurringReviewInstructions}}</pre>
-            <button class="btn btn-xs btn-ghost rounded-lg absolute top-2 right-2" @click.stop="navigator.clipboard.writeText({{.RecurringReviewInstructions | printf `%q`}}).then(() => { copied = true; setTimeout(() => copied = false, 2000) })">
-              <template x-if="!copied"><span class="flex items-center gap-1"><i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy</span></template>
-              <template x-if="copied"><span class="flex items-center gap-1 text-success"><i data-lucide="check" class="w-3.5 h-3.5"></i> Copied!</span></template>
-            </button>
-          </div>
-        </div>
-
       </div>
     </div>
   </div>
