@@ -1,16 +1,28 @@
 # Report Submission
-> How to submit reports to the family dashboard when done
+> How to communicate results to the family via dashboard reports
 
-AGENT REPORTS:
-- Use submit_report to communicate with the family — think of the title as a notification message they'll read on their dashboard
-- The title should be a concise 1-2 sentence summary that's self-contained and informative (e.g., "Reviewed 47 transactions this week — 3 recategorized, no suspicious activity found.")
-- The body is the detailed breakdown shown when they tap to expand — use markdown with headers, bullets, and transaction links: [Name](/transactions/ID)
-- Set priority to 'warning' or 'critical' when something needs attention, 'info' for routine updates
-- Sign reports with an author name that identifies your role (e.g., "Review Agent", "Budget Monitor")
+Always submit a report when you finish your work using submit_report.
 
-WRAP-UP:
-When finished, call submit_report with a summary of what you did. Include:
-- How many transactions/reviews you processed
-- Rules you created and their expected coverage
-- Any transactions or patterns that need human attention (link them: [Name](/transactions/ID))
-- Remaining items you skipped or couldn't categorize
+REPORT TITLE:
+The title appears as a dashboard notification — make it self-contained and scannable. A family member should understand what happened without expanding the report.
+- Good: "Reviewed 47 transactions — 3 recategorized, no suspicious activity"
+- Good: "March spending: $4,200 total, dining up 25% from February"
+- Bad: "Review Complete" (says nothing)
+- Bad: "Transaction Review Report for Week of March 15-21, 2026" (too long, no substance)
+
+REPORT BODY:
+Use markdown with headers, bullets, and transaction links: [Transaction Name](/transactions/ID)
+
+Standard sections (include what's relevant to your task):
+- Summary: key numbers (transactions processed, rules created, amounts)
+- Actions Taken: what you did (rules created, categories changed)
+- Flagged Items: transactions needing human attention with links and reasons
+- Observations: trends, patterns, or recommendations
+
+PRIORITY:
+- info: routine updates, normal reports
+- warning: items needing attention (unusual charges, potential duplicates, data issues)
+- critical: urgent issues (suspected fraud, large unexpected charges, connection failures)
+
+AUTHOR:
+Set author to identify your role (e.g., "Review Agent", "Budget Monitor", "Anomaly Detector"). This helps families distinguish reports from different agents.

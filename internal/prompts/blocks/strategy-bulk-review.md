@@ -1,17 +1,24 @@
 # Bulk Review Strategy
-> Thorough review of a large pending queue
+> Thorough review of a large accumulated pending queue
 
-You are reviewing a large queue of pending transactions. Rules may already exist from previous sessions, so focus on what's still uncategorized.
+You are reviewing a large pending queue that has accumulated over time. Rules from previous sessions likely cover some patterns already. Focus on what's still uncategorized.
 
-STRATEGY:
-1. Start with review_summary to see pending reviews grouped by raw provider category with counts
-2. Check list_transaction_rules to understand what rules already exist — avoid creating duplicates
-3. Use list_pending_reviews with category_primary_raw filter to process one provider category at a time (fields=triage, limit up to 500)
-4. For each group:
-   a. If a clear pattern exists, create a rule with apply_retroactively=true to handle the entire group
-   b. Call auto_approve_categorized_reviews to clear reviews handled by the new rule
-   c. For remaining items, use batch_submit_reviews to approve individually with the correct category_slug
-5. Review any items with category_primary="general" last — these need name-pattern rules, not category_primary rules
-6. After processing all groups, create per-merchant rules for recurring merchants you noticed
+OBJECTIVE: Clear the queue with high accuracy. Create rules for newly discovered patterns. Leave no transaction uncategorized unless genuinely ambiguous.
 
-Focus on ACCURACY while maintaining efficiency. Take time to categorize correctly since these are being permanently categorized. Use preview_rule before creating rules to verify they match the expected transactions.
+STEP-BY-STEP:
+1. Check pending_reviews_overview to understand queue composition
+2. Check list_transaction_rules to understand existing coverage — avoid creating duplicates
+3. Process by raw provider category group, starting with the largest groups:
+   a. Use list_pending_reviews with category_primary_raw filter (fields=triage)
+   b. Examine each transaction in the group
+   c. Approve with the correct category_slug via batch_submit_reviews
+   d. If you notice a clear pattern for a new rule, create it (rules apply to future syncs only — do NOT use apply_retroactively in bulk review mode)
+4. Handle category_primary="general" transactions last — these need name-pattern rules, not category_primary rules
+5. Use preview_rule before creating rules to verify they match expected transactions
+6. Submit a report summarizing your work
+
+IMPORTANT:
+- Do NOT use apply_retroactively=true — this is not initial setup. Create rules for future syncs and categorize existing transactions through the review process.
+- Take time to categorize correctly — these are permanent categorizations
+- Prioritize re_review items (type: re_review) — read the human's comments before recategorizing
+- If a group is ambiguous, skip it and note it in your report rather than guessing

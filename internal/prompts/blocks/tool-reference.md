@@ -1,28 +1,46 @@
 # Tool Reference
-> Recommended query patterns, search modes, and efficient tool usage
+> Key tools and recommended usage patterns
 
-RECOMMENDED QUERY PATTERNS:
-1. Read breadbox://overview first for dataset context (users, connections, accounts, spending)
-2. Use transaction_summary for spending analysis (group by category, month, etc.)
-3. Use merchant_summary to scan for recurring charges or spending patterns (set min_count=2 for recurring, min_count=3 for subscriptions)
-4. Use query_transactions with fields=core,category for browsing individual transactions
-5. Use list_categories to understand the category taxonomy
-6. Use count_transactions to get totals before paginating
-7. Check get_sync_status to verify data freshness
-8. Use list_unmapped_categories to identify categorization gaps
-- Use exclude_search on query_transactions to filter out known merchants when hunting for unknown charges
+START HERE:
+1. Read breadbox://overview for dataset context (users, connections, accounts, 30-day spending)
+2. Check get_sync_status to verify data freshness
+3. Use pending_reviews_overview to see the review queue composition before processing reviews
 
-SEARCH MODES:
-- The search parameter supports three modes via search_mode: contains (default, substring match), words (all words must match — good for multi-word names like "Century Link" matching "CenturyLink"), fuzzy (typo-tolerant via trigram similarity — "starbuks" matches "Starbucks")
-- Comma-separated values in search are automatically ORed in all modes: search=starbucks,amazon matches either merchant
-- Available on: query_transactions, count_transactions, merchant_summary, list_transaction_rules
-- Use search_mode=words when you know the merchant name but not the exact formatting
-- Use search_mode=fuzzy when dealing with mangled bank feed names or uncertain spellings
+QUERYING:
+- query_transactions: filters (date, account, user, category, amount, search), cursor pagination. Use fields= to control response size.
+- count_transactions: same filters, returns count only. Use before paginating.
+- transaction_summary: aggregated totals by category, month, week, day, or category_month. Use for spending analysis.
+- merchant_summary: merchant-level stats (count, total, avg, date range). Set min_count=2 for recurring, 3 for subscriptions.
 
-REVIEW QUEUE:
-- Start with review_summary to see pending reviews grouped by raw provider category with counts — much more efficient than listing all reviews
-- Use list_pending_reviews with category_primary_raw filter to process one group at a time. Use fields=triage to reduce response size. Supports limit up to 500.
-- Use submit_review (or batch_submit_reviews, up to 500 at once) to approve with the correct category_slug, or skip if uncertain
-- For bulk category work: batch_categorize_transactions assigns one category to many transactions; bulk_recategorize moves all transactions from one category to another
-- After creating rules with apply_retroactively=true, call auto_approve_categorized_reviews to clear reviews that rules already handled
-- After reviewing, create transaction rules for patterns you noticed so future transactions are auto-categorized
+SEARCH (available on query_transactions, count_transactions, merchant_summary, list_transaction_rules):
+- search_mode=contains (default): substring — "star" matches "Starbucks"
+- search_mode=words: all words must match — "Century Link" matches "CenturyLink"
+- search_mode=fuzzy: typo-tolerant — "starbuks" matches "Starbucks"
+- Comma-separated search values are ORed: search=starbucks,dunkin matches either
+- exclude_search: filter OUT matching transactions
+
+FIELD SELECTION (important for token efficiency):
+- query_transactions: fields=minimal (name,amount,date), core, category, timestamps
+- list_pending_reviews: fields=triage (review + transaction essentials)
+- id is always included
+
+REVIEWS:
+- pending_reviews_overview: queue composition (count by type, groups by raw category) — start here
+- list_pending_reviews: fetch reviews with filters (review_type, account_id, category_primary_raw). Use fields=triage.
+- submit_review / batch_submit_reviews: approve with category_slug, or skip with a note
+
+RULES:
+- list_transaction_rules: check existing rules before creating
+- create_transaction_rule: auto-categorization rule. Use preview_rule first to test conditions.
+- preview_rule: dry-run — shows match count and sample transactions
+- batch_create_rules: create multiple rules (max 100)
+
+CATEGORIZATION:
+- categorize_transaction / batch_categorize_transactions: manual category override
+- reset_transaction_category: remove override, let rules handle it
+- bulk_recategorize: move all transactions matching filters to a new category
+- list_categories: full taxonomy tree with slugs
+
+COMMUNICATION:
+- add_transaction_comment: explain decisions, flag concerns. Check list_transaction_comments first.
+- submit_report: send summary to family dashboard (title + markdown body + priority)

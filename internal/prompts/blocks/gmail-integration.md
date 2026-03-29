@@ -1,11 +1,15 @@
 # Gmail Integration
-> Cross-reference transactions with email receipts
+> Cross-reference transactions with email receipts for better accuracy
 
-GMAIL CROSS-REFERENCE:
-You have access to a Gmail connector in addition to Breadbox. Use it to cross-reference transactions with email receipts for improved accuracy:
-- When reviewing transactions, search Gmail for receipts matching the merchant name and approximate date
-- Email receipts can confirm exact amounts, itemized breakdowns, and merchant details that bank feeds often mangle
-- Particularly useful for online purchases where the bank feed shows a generic payment processor name instead of the actual merchant
-- Search Gmail with queries like: "from:receipts subject:order" or merchant-specific patterns
-- If a receipt confirms a transaction's purpose, use that information to categorize more accurately
-- Add a transaction comment noting the receipt source when it helps clarify ambiguous transactions
+WHEN THIS HELPS:
+- Online purchases where the bank feed shows a payment processor name instead of the merchant
+- Ambiguous transactions where the amount or name doesn't clearly indicate what it was
+- Verifying exact amounts or itemized breakdowns
+
+HOW TO USE:
+- Search Gmail for receipts matching the merchant name and approximate date
+- Useful queries: "from:receipts subject:order", merchant-specific patterns, "subject:{amount}"
+- If a receipt confirms the transaction's purpose, use that information for more accurate categorization
+- Add a transaction comment noting what the receipt confirmed when it resolves ambiguity
+
+NOTE: This requires your agent to have access to a Gmail MCP server or similar email integration alongside Breadbox.

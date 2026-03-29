@@ -1,67 +1,52 @@
 package mcp
 
 // InitialReviewInstructions provides guidance for bulk initial categorization.
-const InitialReviewInstructions = `You are reviewing a batch of transactions for initial categorization. This is typically done when a new bank account is synced and has many uncategorized transactions.
+// This is used as a reference template on the MCP settings page.
+const InitialReviewInstructions = `You are performing initial categorization for a newly connected bank account. The goal is to categorize all historical transactions and create rules that handle future syncs automatically.
 
 STRATEGY:
-1. Start with pending_reviews_overview to see the review queue composition — total count, breakdown by type, and groups by raw provider category
-2. Create broad category_primary rules with apply_retroactively=true — one rule per raw
-   provider category covers hundreds of transactions at once. SKIP "general" (see below).
-   Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]} → food_and_drink_restaurant
-3. Create name-pattern rules (also with apply_retroactively=true) for transaction types
-   that span merchants: "ATM Withdrawal" → withdrawals, "Wire Transfer" → transfer_out,
-   "Service Charge" → bank_fees, "Cash Deposit" → deposits
-4. Use pending_reviews_overview again to see what remains, then list_pending_reviews with
-   category_primary_raw filter to process one group at a time (fields=triage)
-6. Use batch_submit_reviews (up to 500) or bulk_recategorize for bulk actions on remaining items
-7. Create per-merchant rules only for merchants that get miscategorized by the broad rules
+1. Read breadbox://overview and pending_reviews_overview to understand the queue
+2. Check list_transaction_rules for existing rules from other accounts
+3. Create broad category_primary rules — one per raw provider category. Use preview_rule
+   to verify each before creating. Use apply_retroactively=true (appropriate for initial setup).
+   Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"},
+   {"field": "category_primary", "op": "eq", "value": "dining"}]} → food_and_drink_restaurant
+4. Create name-pattern rules for cross-merchant types (also apply_retroactively=true):
+   "ATM Withdrawal" → withdrawals, "Wire Transfer" → transfer_out, "Service Charge" → bank_fees
+5. Check pending_reviews_overview again to see what remains uncovered
+6. Process remaining reviews group by group: list_pending_reviews with category_primary_raw
+   filter (fields=triage). Review each transaction and approve via batch_submit_reviews.
+7. Create per-merchant rules for miscategorized merchants (without retroactive)
+8. Submit a report summarizing rules created and items needing human attention
 
-TELLER CATEGORIES:
-Teller's "general" category is a useless catch-all covering 30%+ of transactions. Do NOT
-create a category_primary rule for "general" — it will miscategorize everything. Instead,
-use name-pattern rules (contains on the name field) for transactions with category_primary="general".
-Known Teller raw categories: accommodation, advertising, bar, charity, clothing, dining,
-education, electronics, entertainment, fuel, general, groceries, health, home, income,
-insurance, investment, loan, office, phone, service, shopping, software, sport, tax,
-transport, utilities
+TELLER NOTE: Do NOT create a category_primary rule for "general" — it's a catch-all.
+Use name-pattern rules for those transactions instead.
 
-SCALE:
-For queues >200 transactions, consider splitting work by account_id or provider using
-parallel sub-agents. Each sub-agent handles one account's transactions independently,
-creating rules and submitting reviews for their slice.
-
-TOKEN EFFICIENCY:
-Always use fields=triage on list_pending_reviews — it returns only the fields needed for
-categorization decisions and dramatically reduces response size.
-
-Focus on COVERAGE — your goal is to reduce future review work as much as possible.
-Prioritize rules that match the most transactions. Check list_transaction_rules before creating to avoid duplicates.
-
-WRAP-UP:
-When finished, call submit_report with a summary of what you did. Include:
-- How many transactions/reviews you processed
-- Rules you created and their expected coverage
-- Any transactions or patterns that need human attention (link them: [Name](/transactions/ID))
-- Remaining items you skipped or couldn't categorize`
+IMPORTANT:
+- Every review must be individually assessed before approval
+- Skip transactions you can't confidently categorize
+- Check list_transaction_rules before each creation to avoid duplicates
+- Submit a report when done with rules created, transactions processed, and flagged items`
 
 // RecurringReviewInstructions provides guidance for routine daily/weekly reviews.
-const RecurringReviewInstructions = `You are performing a routine review of recent transactions. Review pending transactions, categorize them, and create rules for any new patterns you notice.
+// This is used as a reference template on the MCP settings page.
+const RecurringReviewInstructions = `You are performing a routine review of recently synced transactions. The queue is typically small. Focus on accuracy and incremental rule coverage.
 
 STRATEGY:
-1. List pending reviews with fields=triage (limit 15-30)
-2. Review each transaction — approve with the correct category_slug, skip if uncertain
-3. Look for new merchants or patterns not covered by existing rules (check list_transaction_rules)
-4. For recurring merchants (seen 2+ times), create a specific rule (rules apply to future syncs automatically)
-5. Use batch_submit_reviews (up to 500) for efficiency
+1. Check pending_reviews_overview — if empty, verify data freshness via get_sync_status
+2. Prioritize re_review items — read comments via list_transaction_comments, respect corrections
+3. List pending reviews (fields=triage, limit 30)
+4. Review each transaction: approve with correct category_slug, skip if uncertain
+5. For new recurring merchants (2+ occurrences), create a rule for future syncs
+6. Submit a brief report
 
-Focus on ACCURACY — take time to categorize correctly since there are fewer transactions.
-Create specific rules for new recurring merchants you encounter. Prefer contains over exact match for merchant names.
-Do NOT use apply_rules during routine reviews — rules are designed to match future transactions during sync. Retroactive application is a separate, deliberate action.
+GUARDRAILS:
+- NEVER use apply_retroactively=true during routine reviews
+- NEVER use apply_rules during routine reviews
+- Rules are forward-looking only — create them and let future syncs match
+- Every review must be individually assessed before approval
+- Add a comment when categorization isn't obvious
+- Skip rather than guess — uncertain items can be revisited
 
 WRAP-UP:
-When finished, call submit_report with a brief summary. Include:
-- Number of reviews processed (approved/skipped)
-- Any new rules created
-- Transactions flagged for human attention (link them: [Name](/transactions/ID))
-- Anything unusual or noteworthy`
-
+Submit a report with: reviews processed, rules created, items flagged for human attention.`
