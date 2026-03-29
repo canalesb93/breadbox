@@ -63,9 +63,6 @@
     <span class="text-success font-medium">{{.Counts.ApprovedToday}}</span> approved
   </span>
   <span class="inline-flex items-center gap-1 text-base-content/50 text-xs">
-    <span class="text-error font-medium">{{.Counts.RejectedToday}}</span> rejected
-  </span>
-  <span class="inline-flex items-center gap-1 text-base-content/50 text-xs">
     <span class="font-medium">{{.Counts.SkippedToday}}</span> skipped
   </span>
   <span class="text-base-content/30 text-xs">today</span>
@@ -142,7 +139,6 @@
           <select name="status" class="select select-sm select-bordered w-full">
             <option value="pending"{{if eq .StatusFilter "pending"}} selected{{end}}>Pending</option>
             <option value="approved"{{if eq .StatusFilter "approved"}} selected{{end}}>Approved</option>
-            <option value="rejected"{{if eq .StatusFilter "rejected"}} selected{{end}}>Rejected</option>
             <option value="skipped"{{if eq .StatusFilter "skipped"}} selected{{end}}>Skipped</option>
             <option value="all"{{if eq .StatusFilter "all"}} selected{{end}}>All</option>
           </select>
@@ -199,7 +195,6 @@
       <span class="flex items-center gap-1"><kbd class="bb-kbd">j</kbd><kbd class="bb-kbd">k</kbd> navigate</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">a</kbd> accept</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">s</kbd> skip</span>
-      <span class="flex items-center gap-1"><kbd class="bb-kbd">d</kbd> dismiss</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">n</kbd> note</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">c</kbd> category</span>
     </div>
@@ -286,18 +281,11 @@
             @click="$dispatch('triage-skip', { id: '{{$review.ID}}', note: triageNote, idx: {{$idx}} })">
             <i data-lucide="fast-forward" class="w-3.5 h-3.5"></i>
           </button>
-          <button class="bb-triage-action bb-triage-action--dismiss" title="Dismiss (d)"
-            :disabled="submitting"
-            @click="$dispatch('triage-dismiss', { id: '{{$review.ID}}', idx: {{$idx}} })">
-            <i data-lucide="x" class="w-3.5 h-3.5"></i>
-          </button>
         </div>
         {{else}}
         <div class="bb-triage-row__resolved">
           {{if eq $review.Status "approved"}}
           <span class="badge badge-success badge-xs">Approved</span>
-          {{else if eq $review.Status "rejected"}}
-          <span class="badge badge-error badge-xs">Rejected</span>
           {{else if eq $review.Status "skipped"}}
           <span class="badge badge-ghost badge-xs">Skipped</span>
           {{end}}
@@ -359,10 +347,6 @@
               @click="$dispatch('triage-skip', { id: '{{$review.ID}}', note: triageNote, idx: {{$idx}} })">
               <i data-lucide="fast-forward" class="w-3 h-3"></i>
               Skip
-            </button>
-            <button class="btn btn-ghost btn-xs rounded-lg text-base-content/30" :disabled="submitting"
-              @click="$dispatch('triage-dismiss', { id: '{{$review.ID}}', idx: {{$idx}} })">
-              <i data-lucide="x" class="w-3 h-3"></i>
             </button>
           </div>
         </div>
@@ -426,9 +410,6 @@ function triageQueue() {
       this.$el.addEventListener('triage-skip', (e) => {
         this.submitTriage(e.detail.id, 'skipped', null, e.detail.note, e.detail.idx);
       });
-      this.$el.addEventListener('triage-dismiss', (e) => {
-        this.dismissTriage(e.detail.id, e.detail.idx);
-      });
     },
 
     handleKey(e) {
@@ -458,10 +439,6 @@ function triageQueue() {
         case 's':
           e.preventDefault();
           this.skipFocused();
-          break;
-        case 'd':
-          e.preventDefault();
-          this.dismissFocused();
           break;
         case 'n':
           e.preventDefault();
@@ -500,13 +477,6 @@ function triageQueue() {
       const id = row.dataset.reviewId;
       const data = Alpine.$data(row);
       this.submitTriage(id, 'skipped', null, data.triageNote, this.focusedIdx);
-    },
-
-    dismissFocused() {
-      const row = this.getFocusedRow();
-      if (!row) return;
-      const id = row.dataset.reviewId;
-      this.dismissTriage(id, this.focusedIdx);
     },
 
     openCategoryPickerForFocused() {
@@ -567,33 +537,6 @@ function triageQueue() {
         } else {
           this.removeRow(id, idx);
           window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Review ' + decision, type:'success'}}));
-        }
-      })
-      .catch(() => {
-        window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Network error', type:'error'}}));
-        data.submitting = false;
-      });
-    },
-
-    dismissTriage(id, idx) {
-      const row = document.getElementById('triage-' + id);
-      if (!row) return;
-      const data = Alpine.$data(row);
-      if (data.submitting) return;
-      data.submitting = true;
-
-      fetch('/-/reviews/' + id + '/dismiss', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }
-      })
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) {
-          window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error, type:'error'}}));
-          data.submitting = false;
-        } else {
-          this.removeRow(id, idx);
-          window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Review dismissed', type:'info'}}));
         }
       })
       .catch(() => {
