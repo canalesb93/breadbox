@@ -807,58 +807,61 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.CommentResponse, ruleApps []service.TransactionRuleApplicationDetail) []service.ActivityEntry {
 	var entries []service.ActivityEntry
 
-	// Convert reviews
+	// Convert reviews — for resolved reviews, emit both the enqueue and resolution events
 	for _, r := range reviews {
-		e := service.ActivityEntry{
-			Type:      "review",
-			ActorType: "system",
+		// Always emit the "enqueued" event (using CreatedAt)
+		enqueueLabel := "Added to review queue"
+		switch r.ReviewType {
+		case "uncategorized":
+			enqueueLabel = "Added to review queue — uncategorized"
+		case "low_confidence":
+			enqueueLabel = "Added to review queue — low confidence"
+		case "new_transaction":
+			enqueueLabel = "Added to review queue — new transaction"
+		case "manual":
+			enqueueLabel = "Added to review queue — manual"
 		}
-		if r.ReviewedAt != nil {
-			e.Timestamp = *r.ReviewedAt
-		} else {
-			e.Timestamp = r.CreatedAt
-		}
-		if r.ReviewerName != nil {
-			e.ActorName = *r.ReviewerName
-		}
-		if r.ReviewerType != nil {
-			e.ActorType = *r.ReviewerType
-		}
+		entries = append(entries, service.ActivityEntry{
+			Type:         "review",
+			Timestamp:    r.CreatedAt,
+			ActorName:    "System",
+			ActorType:    "system",
+			Summary:      enqueueLabel,
+			ReviewStatus: "pending",
+		})
 
-		switch r.Status {
-		case "approved":
-			e.ReviewStatus = "approved"
-			e.Summary = "Approved"
-			if r.ResolvedCategoryDisplayName != nil {
-				e.Summary = "Approved as " + *r.ResolvedCategoryDisplayName
-				e.CategoryName = *r.ResolvedCategoryDisplayName
+		// For resolved reviews, also emit the resolution event
+		if r.Status != "pending" && r.ReviewedAt != nil {
+			e := service.ActivityEntry{
+				Type:      "review",
+				Timestamp: *r.ReviewedAt,
 			}
-		case "rejected":
-			e.ReviewStatus = "rejected"
-			e.Summary = "Rejected"
-		case "skipped":
-			e.ReviewStatus = "skipped"
-			e.Summary = "Skipped"
-		default:
-			e.ReviewStatus = "pending"
-			switch r.ReviewType {
-			case "uncategorized":
-				e.Summary = "Added to review queue — uncategorized"
-			case "low_confidence":
-				e.Summary = "Added to review queue — low confidence"
-			case "new_transaction":
-				e.Summary = "Added to review queue — new transaction"
-			default:
-				e.Summary = "Added to review queue"
+			if r.ReviewerName != nil {
+				e.ActorName = *r.ReviewerName
 			}
-			e.ActorName = "System"
-			e.ActorType = "system"
+			if r.ReviewerType != nil {
+				e.ActorType = *r.ReviewerType
+			}
+			switch r.Status {
+			case "approved":
+				e.ReviewStatus = "approved"
+				e.Summary = "Approved"
+				if r.ResolvedCategoryDisplayName != nil {
+					e.Summary = "Approved as " + *r.ResolvedCategoryDisplayName
+					e.CategoryName = *r.ResolvedCategoryDisplayName
+				}
+			case "rejected":
+				e.ReviewStatus = "rejected"
+				e.Summary = "Rejected"
+			case "skipped":
+				e.ReviewStatus = "skipped"
+				e.Summary = "Skipped"
+			}
+			if r.ReviewNote != nil && *r.ReviewNote != "" {
+				e.Detail = *r.ReviewNote
+			}
+			entries = append(entries, e)
 		}
-
-		if r.ReviewNote != nil && *r.ReviewNote != "" {
-			e.Detail = *r.ReviewNote
-		}
-		entries = append(entries, e)
 	}
 
 	// Convert comments (filter out [Review: ...] duplicates from legacy data)
