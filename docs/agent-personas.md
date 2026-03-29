@@ -6,15 +6,17 @@ This document defines the purpose, trigger, success criteria, key tools, and rep
 
 ## Design Principles (apply to all agents)
 
-1. **Every review must be individually assessed.** Agents must never auto-approve reviews in bulk without examining each transaction. Even when creating rules that handle categories automatically, the agent still reviews transactions one at a time (or in examined batches) through `submit_review` or `batch_submit_reviews`.
+1. **Every review must be individually assessed.** Agents must never auto-approve reviews in bulk without examining each transaction. Even when rules pre-categorize a transaction, the agent still reviews it — confirming the rule's decision or correcting it. Rules reduce cognitive load; they don't replace oversight.
 
-2. **Rules are forward-looking by default.** Transaction rules apply to future syncs automatically. Retroactive application (`apply_retroactively=true` on creation, or `apply_rules`) should only be used during explicit one-off bulk work (initial setup), never during routine reviews.
+2. **Rules are forward-looking by default.** Transaction rules apply to future syncs automatically. Retroactive application (`apply_retroactively=true` on creation, or `apply_rules`) should only be used during explicit one-off bulk work (initial setup), never during routine reviews. Rules are informed by the agent's context — its knowledge of local merchants, email receipts, family habits — which is what makes them superior to generic bank categorization.
 
 3. **Human-in-the-loop is assumed.** Agents operate collaboratively with the family. They comment on transactions to explain decisions, submit reports summarizing their work, and respect re-enqueued items (`re_review` type) as human feedback that overrides their prior judgment.
 
 4. **Reports are communication, not logging.** Report titles should be self-contained notifications a family member can read and understand without expanding. The body provides detail. Every agent that does meaningful work should report what it did.
 
 5. **Comments are the feedback channel.** When approving a review, include a brief note explaining non-obvious categorization decisions. When a human re-enqueues a transaction with a comment, treat that comment as a correction or clarification to learn from.
+
+6. **Open system, user control.** These instruction templates are defaults — the vanilla setup. Users can customize every block, disable features, or write entirely new instructions. The methodology is a recommendation, not a requirement.
 
 ---
 
