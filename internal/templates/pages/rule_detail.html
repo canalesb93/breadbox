@@ -15,7 +15,7 @@
     </div>
     <div>
       <h1 class="bb-page-title">{{.Rule.Name}}</h1>
-      <div class="flex items-center gap-2 mt-0.5">
+      <div class="flex items-center gap-2 mt-0.5 flex-wrap">
         {{if .Rule.Enabled}}
         <span class="badge badge-success badge-sm">Enabled</span>
         {{else}}
@@ -23,7 +23,7 @@
         {{end}}
         <span class="text-xs text-base-content/40">Priority {{.Rule.Priority}}</span>
         <span class="text-xs text-base-content/40">&middot;</span>
-        <span class="text-xs text-base-content/40">Created by {{.Rule.CreatedByType}}</span>
+        <span class="text-xs text-base-content/40">{{if eq .Rule.CreatedByType "agent"}}Created automatically{{else if eq .Rule.CreatedByType "system"}}System rule{{else}}Created manually{{end}}</span>
         {{if .Rule.ExpiresAt}}
         <span class="text-xs text-base-content/40">&middot;</span>
         <span class="text-xs text-warning">Expires {{deref .Rule.ExpiresAt}}</span>
@@ -42,8 +42,70 @@
   </div>
 </div>
 
-<!-- Stats Cards -->
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+<!-- What this rule does -->
+<div class="bb-card p-5 mb-4">
+  <span class="label-text text-sm font-medium">What this rule does</span>
+
+  <div class="mt-3 space-y-3">
+    <!-- Conditions -->
+    <div>
+      <span class="text-xs text-base-content/40 uppercase tracking-wider">When</span>
+      <div class="mt-1 space-y-1">
+        {{if .Rule.Conditions.And}}
+        <p class="text-xs text-base-content/50 mb-1"><strong>All</strong> of these match:</p>
+        {{range .Rule.Conditions.And}}
+        <div class="flex items-center gap-2 p-2 bg-base-200/40 rounded-lg">
+          <span class="text-sm text-base-content/60 w-28 shrink-0 capitalize">{{.Field}}</span>
+          <span class="text-xs font-mono text-base-content/40 w-20 shrink-0">{{.Op}}</span>
+          <span class="text-sm font-medium">{{.Value}}</span>
+        </div>
+        {{end}}
+        {{else if .Rule.Conditions.Or}}
+        <p class="text-xs text-base-content/50 mb-1"><strong>Any</strong> of these match:</p>
+        {{range .Rule.Conditions.Or}}
+        <div class="flex items-center gap-2 p-2 bg-base-200/40 rounded-lg">
+          <span class="text-sm text-base-content/60 w-28 shrink-0 capitalize">{{.Field}}</span>
+          <span class="text-xs font-mono text-base-content/40 w-20 shrink-0">{{.Op}}</span>
+          <span class="text-sm font-medium">{{.Value}}</span>
+        </div>
+        {{end}}
+        {{else if .Rule.Conditions.Field}}
+        <div class="flex items-center gap-2 p-2 bg-base-200/40 rounded-lg">
+          <span class="text-sm text-base-content/60 w-28 shrink-0 capitalize">{{.Rule.Conditions.Field}}</span>
+          <span class="text-xs font-mono text-base-content/40 w-20 shrink-0">{{.Rule.Conditions.Op}}</span>
+          <span class="text-sm font-medium">{{.Rule.Conditions.Value}}</span>
+        </div>
+        {{else}}
+        <div class="p-3 bg-base-200/40 rounded-xl">
+          <code class="text-xs font-mono text-base-content/70">{{.ConditionSummary}}</code>
+        </div>
+        {{end}}
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div>
+      <span class="text-xs text-base-content/40 uppercase tracking-wider">Then</span>
+      <div class="mt-1 space-y-1">
+        {{range .Rule.Actions}}
+        <div class="flex items-center gap-2 p-2.5 bg-base-200/40 rounded-xl">
+          {{if eq .Field "category"}}
+          <i data-lucide="tag" class="w-3.5 h-3.5 text-base-content/40"></i>
+          <span class="text-sm">Set category to <span class="font-semibold">{{if $.ActionCategoryName}}{{$.ActionCategoryName}}{{else}}{{.Value}}{{end}}</span></span>
+          {{if $.ActionCategoryName}}<span class="text-xs text-base-content/30 ml-1">({{.Value}})</span>{{end}}
+          {{else}}
+          <i data-lucide="settings" class="w-3.5 h-3.5 text-base-content/40"></i>
+          <span class="text-sm">Set {{.Field}} to <span class="font-semibold">{{.Value}}</span></span>
+          {{end}}
+        </div>
+        {{end}}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
   <div class="bb-card p-4">
     <div class="flex items-center gap-3">
       <div class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -51,7 +113,7 @@
       </div>
       <div>
         <div class="text-2xl font-semibold tabular-nums leading-none">{{commaInt .Rule.HitCount}}</div>
-        <div class="text-xs text-base-content/40 mt-0.5">Total hits</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Times matched</div>
       </div>
     </div>
   </div>
@@ -63,84 +125,98 @@
       </div>
       <div>
         <div class="text-2xl font-semibold tabular-nums leading-none">{{commaInt64 .Stats.UniqueTransactions}}</div>
-        <div class="text-xs text-base-content/40 mt-0.5">Transactions affected</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Categorized</div>
       </div>
     </div>
   </div>
 
   <div class="bb-card p-4">
     <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
-        <i data-lucide="refresh-cw" class="w-4 h-4 text-success"></i>
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 {{if and .Preview (gt .Preview.MatchCount 0)}}bg-warning/10{{else}}bg-success/10{{end}}">
+        <i data-lucide="{{if and .Preview (gt .Preview.MatchCount 0)}}alert-circle{{else}}check-circle{{end}}" class="w-4 h-4 {{if and .Preview (gt .Preview.MatchCount 0)}}text-warning{{else}}text-success{{end}}"></i>
       </div>
       <div>
-        <div class="text-2xl font-semibold tabular-nums leading-none">{{commaInt64 .Stats.SyncApplications}}</div>
-        <div class="text-xs text-base-content/40 mt-0.5">Via sync</div>
+        <div class="text-2xl font-semibold tabular-nums leading-none">{{if .Preview}}{{commaInt64 .Preview.MatchCount}}{{else}}0{{end}}</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Pending</div>
       </div>
     </div>
   </div>
 
   <div class="bb-card p-4">
     <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
-        <i data-lucide="history" class="w-4 h-4 text-warning"></i>
+      <div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+        <i data-lucide="clock" class="w-4 h-4 text-base-content/40"></i>
       </div>
       <div>
-        <div class="text-2xl font-semibold tabular-nums leading-none">{{commaInt64 .Stats.RetroApplications}}</div>
-        <div class="text-xs text-base-content/40 mt-0.5">Retroactive</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Rule Definition -->
-<div class="bb-card p-5 mb-4">
-  <span class="label-text text-sm font-medium">Rule Definition</span>
-
-  <div class="mt-3 space-y-3">
-    <!-- Conditions -->
-    <div>
-      <span class="text-xs text-base-content/40 uppercase tracking-wider">Conditions</span>
-      <div class="mt-1 p-3 bg-base-200/40 rounded-xl">
-        <code class="text-xs font-mono text-base-content/70">{{.ConditionSummary}}</code>
-      </div>
-    </div>
-
-    <!-- Actions -->
-    <div>
-      <span class="text-xs text-base-content/40 uppercase tracking-wider">Actions</span>
-      <div class="mt-1 space-y-1">
-        {{range .Rule.Actions}}
-        <div class="flex items-center gap-2 p-2.5 bg-base-200/40 rounded-xl">
-          {{if eq .Field "category"}}
-          <i data-lucide="tag" class="w-3.5 h-3.5 text-base-content/40"></i>
-          <span class="text-sm">Set category to <span class="font-medium">{{.Value}}</span></span>
-          {{else}}
-          <i data-lucide="settings" class="w-3.5 h-3.5 text-base-content/40"></i>
-          <span class="text-sm">Set {{.Field}} to <span class="font-medium">{{.Value}}</span></span>
-          {{end}}
-        </div>
+        {{if .LastActiveTime}}
+        <div class="text-sm font-semibold leading-none">{{relativeTime .LastActiveTime}}</div>
+        {{else}}
+        <div class="text-sm font-semibold leading-none text-base-content/30">Never</div>
         {{end}}
+        <div class="text-xs text-base-content/40 mt-0.5">Last active</div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Preview: Potential Matches -->
+{{if and (gt .Rule.HitCount 0) (eq .Stats.UniqueTransactions 0)}}
+<p class="text-xs text-base-content/40 mb-4 px-1">
+  <i data-lucide="info" class="w-3 h-3 inline-block -mt-0.5"></i>
+  Per-transaction tracking was recently enabled. The "Categorized" count will update as this rule runs in future syncs.
+</p>
+{{end}}
+
+<!-- Recent Categorizations -->
+<div class="bb-card p-5 mb-4">
+  <span class="label-text text-sm font-medium">Recent Categorizations</span>
+  <p class="text-xs text-base-content/40 mb-3">Transactions categorized by this rule during syncs</p>
+
+  {{if .Applications}}
+  <div class="overflow-x-auto">
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <th class="text-xs">Transaction</th>
+          <th class="text-xs text-right">Amount</th>
+          <th class="text-xs">Date</th>
+          <th class="text-xs">Category</th>
+          <th class="text-xs">How</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Applications}}
+        <tr>
+          <td class="text-sm"><a href="/transactions/{{.TransactionID}}" class="hover:text-primary">{{.TransactionName}}</a></td>
+          <td class="text-sm text-right tabular-nums bb-amount">{{printf "%.2f" .Amount}}</td>
+          <td class="text-sm text-base-content/60">{{.Date}}</td>
+          <td class="text-sm"><span class="badge badge-outline badge-xs rounded-lg">{{.ActionValue}}</span></td>
+          <td class="text-sm text-base-content/60">
+            {{if eq .AppliedBy "sync"}}During sync{{else if eq .AppliedBy "retroactive"}}Retroactive{{else}}Manual{{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{if .HasMoreApplications}}
+  <p class="text-xs text-base-content/40 mt-2">Showing most recent 10</p>
+  {{end}}
+  {{else}}
+  <div class="text-center py-6 text-base-content/40 text-sm">
+    <p>No categorization records yet. This rule will categorize matching transactions during the next sync.</p>
+  </div>
+  {{end}}
+</div>
+
+<!-- Pending Matches (retroactive section — de-emphasized) -->
+{{if and .Preview (gt .Preview.MatchCount 0)}}
 <div class="bb-card p-5 mb-4">
   <div class="flex items-center justify-between mb-1">
-    <span class="label-text text-sm font-medium">Potential Matches</span>
-    {{if and .Preview (gt .Preview.MatchCount 0)}}
-    <button class="btn btn-sm btn-primary rounded-xl" @click="applyRetroactively()" :disabled="applying">
-      <span x-show="applying" class="loading loading-spinner loading-xs"></span>
-      <i data-lucide="play" class="w-3.5 h-3.5" x-show="!applying"></i>
-      Apply to {{commaInt64 .Preview.MatchCount}} transactions
-    </button>
-    {{end}}
+    <span class="label-text text-sm font-medium">Uncategorized Matches</span>
+    <span class="badge badge-warning badge-sm">{{commaInt64 .Preview.MatchCount}} pending</span>
   </div>
-  <p class="text-xs text-base-content/40 mb-3">Transactions that currently match this rule's conditions but haven't been categorized by it yet</p>
+  <p class="text-xs text-base-content/40 mb-3">These existing transactions match the rule but were imported before it was created</p>
 
-  {{if and .Preview (gt .Preview.MatchCount 0)}}
   <div class="overflow-x-auto">
     <table class="table table-sm">
       <thead>
@@ -170,16 +246,18 @@
     </table>
   </div>
   {{if gt .Preview.MatchCount 10}}
-  <p class="text-xs text-base-content/40 mt-2">Showing 10 of {{commaInt64 .Preview.MatchCount}} matching transactions</p>
-  {{end}}
-  {{else}}
-  <div class="text-center py-8 text-base-content/40 text-sm">
-    <i data-lucide="check-circle" class="w-8 h-8 mx-auto mb-2 text-success/40"></i>
-    <p>All matching transactions are already categorized by this rule</p>
-  </div>
+  <p class="text-xs text-base-content/40 mt-2">Showing 10 of {{commaInt64 .Preview.MatchCount}}</p>
   {{end}}
 
-  <!-- Apply result toast -->
+  <div class="mt-4 flex items-center justify-between">
+    <p class="text-xs text-base-content/40">Apply this rule to categorize these existing transactions</p>
+    <button class="btn btn-sm btn-outline rounded-xl" @click="applyRetroactively()" :disabled="applying">
+      <span x-show="applying" class="loading loading-spinner loading-xs"></span>
+      <i data-lucide="play" class="w-3.5 h-3.5" x-show="!applying"></i>
+      Categorize as {{if .ActionCategoryName}}{{.ActionCategoryName}}{{else}}matched category{{end}}
+    </button>
+  </div>
+
   <div x-show="applyResult" x-cloak class="alert alert-success text-sm mt-3 rounded-xl">
     <span x-text="applyResult"></span>
   </div>
@@ -187,56 +265,19 @@
     <span x-text="applyError"></span>
   </div>
 </div>
+{{end}}
 
-<!-- Application History -->
-<div class="bb-card p-5 mb-4">
-  <span class="label-text text-sm font-medium">Application History</span>
-  <p class="text-xs text-base-content/40 mb-3">Transactions that have been categorized by this rule</p>
-
-  {{if .Applications}}
-  <div class="overflow-x-auto">
-    <table class="table table-sm">
-      <thead>
-        <tr>
-          <th class="text-xs">Transaction</th>
-          <th class="text-xs text-right">Amount</th>
-          <th class="text-xs">Date</th>
-          <th class="text-xs">Action</th>
-          <th class="text-xs">Applied</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{range .Applications}}
-        <tr>
-          <td class="text-sm"><a href="/transactions/{{.TransactionID}}" class="hover:text-primary">{{.TransactionName}}</a></td>
-          <td class="text-sm text-right tabular-nums bb-amount">{{printf "%.2f" .Amount}}</td>
-          <td class="text-sm text-base-content/60">{{.Date}}</td>
-          <td class="text-sm"><span class="badge badge-outline badge-xs rounded-lg">{{.ActionValue}}</span></td>
-          <td class="text-sm text-base-content/60">
-            <span class="badge badge-ghost badge-xs rounded-lg">{{.AppliedBy}}</span>
-          </td>
-        </tr>
-        {{end}}
-      </tbody>
-    </table>
-  </div>
-  {{if .HasMoreApplications}}
-  <p class="text-xs text-base-content/40 mt-2">Showing most recent 10 applications</p>
-  {{end}}
-  {{else}}
-  <div class="text-center py-8 text-base-content/40 text-sm">
-    <p>No applications recorded yet. Apply the rule retroactively or wait for the next sync.</p>
-  </div>
-  {{end}}
-</div>
-
-<!-- Sync Activity -->
+<!-- Sync Activity (collapsed) -->
 {{if .SyncHistory}}
-<div class="bb-card p-5 mb-4">
-  <span class="label-text text-sm font-medium">Recent Sync Activity</span>
-  <p class="text-xs text-base-content/40 mb-3">Syncs where this rule matched transactions</p>
-
-  <div class="space-y-2">
+<div class="bb-card p-0 mb-4" x-data="{ open: false }">
+  <button type="button" class="w-full flex items-center justify-between p-5" @click="open = !open">
+    <div>
+      <span class="label-text text-sm font-medium">Sync Log</span>
+      <span class="text-xs text-base-content/40 ml-2">{{len .SyncHistory}} recent syncs</span>
+    </div>
+    <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/40 transition-transform" :class="open ? 'rotate-180' : ''"></i>
+  </button>
+  <div x-show="open" x-cloak class="px-5 pb-5 space-y-2">
     {{range .SyncHistory}}
     <a href="/sync-logs/{{index . "sync_id"}}" class="flex items-center justify-between p-3 bg-base-200/40 rounded-xl hover:bg-base-200/60 transition-colors">
       <div class="flex items-center gap-3">
@@ -282,9 +323,8 @@ function ruleDetail() {
           this.applying = false;
           return;
         }
-        this.applyResult = 'Applied to ' + (data.affected_count || data.data?.affected_count || 0) + ' transactions';
+        this.applyResult = 'Categorized ' + (data.affected_count || 0) + ' transactions';
         this.applying = false;
-        // Reload after a short delay to update stats
         setTimeout(() => location.reload(), 1500);
       } catch (e) {
         this.applyError = 'Network error: ' + e.message;

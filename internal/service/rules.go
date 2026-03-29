@@ -1157,9 +1157,22 @@ type RulePreviewResult struct {
 	SampleMatches []RulePreviewMatch `json:"sample_matches"`
 }
 
+// PreviewRuleForDetail evaluates conditions and excludes transactions already applied by this rule.
+func (s *Service) PreviewRuleForDetail(ctx context.Context, ruleID string, conditions Condition, sampleSize int) (*RulePreviewResult, error) {
+	ruleUUID, err := parseUUID(ruleID)
+	if err != nil {
+		return s.PreviewRule(ctx, conditions, sampleSize)
+	}
+	return s.previewRuleInternal(ctx, &ruleUUID, conditions, sampleSize)
+}
+
 // PreviewRule evaluates conditions against existing transactions without modifying anything.
 // Returns match count, total scanned, and sample matches.
 func (s *Service) PreviewRule(ctx context.Context, conditions Condition, sampleSize int) (*RulePreviewResult, error) {
+	return s.previewRuleInternal(ctx, nil, conditions, sampleSize)
+}
+
+func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype.UUID, conditions Condition, sampleSize int) (*RulePreviewResult, error) {
 	if err := ValidateCondition(conditions); err != nil {
 		return nil, err
 	}
@@ -1195,10 +1208,20 @@ func (s *Service) PreviewRule(ctx context.Context, conditions Condition, sampleS
 		WHERE t.deleted_at IS NULL AND t.category_override = FALSE
 		AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
+	// When previewing for a specific rule's detail page, exclude transactions already applied by this rule
+	var baseArgs []any
+	baseArgN := 1
+	if excludeRuleID != nil {
+		baseQuery += fmt.Sprintf(" AND NOT EXISTS (SELECT 1 FROM transaction_rule_applications tra WHERE tra.transaction_id = t.id AND tra.rule_id = $%d)", baseArgN)
+		baseArgs = append(baseArgs, *excludeRuleID)
+		baseArgN++
+	}
+
 	for {
 		query := baseQuery
-		var args []any
-		argN := 1
+		args := make([]any, len(baseArgs))
+		copy(args, baseArgs)
+		argN := baseArgN
 
 		if lastID.Valid {
 			query += fmt.Sprintf(" AND t.id > $%d", argN)

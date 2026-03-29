@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"breadbox/internal/service"
 
@@ -139,8 +140,8 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 			return
 		}
 
-		// Preview: transactions that currently match this rule's conditions
-		preview, _ := svc.PreviewRule(ctx, rule.Conditions, 10)
+		// Preview: transactions matching conditions but NOT already applied by this rule
+		preview, _ := svc.PreviewRuleForDetail(ctx, id, rule.Conditions, 10)
 
 		// Application stats from junction table
 		stats, _ := svc.GetRuleStats(ctx, id)
@@ -151,6 +152,15 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		// Sync history where this rule matched
 		syncHistory, _ := svc.GetRuleSyncHistory(ctx, id, 10)
 
+		// Resolve category display name for the action description
+		var actionCategoryName string
+		for _, a := range rule.Actions {
+			if a.Field == "category" && rule.CategoryName != nil {
+				actionCategoryName = *rule.CategoryName
+				break
+			}
+		}
+
 		data := BaseTemplateData(r, sm, "rules", rule.Name)
 		data["Rule"] = rule
 		data["Preview"] = preview
@@ -158,6 +168,14 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		data["Applications"] = applications
 		data["HasMoreApplications"] = hasMoreApps
 		data["SyncHistory"] = syncHistory
+		data["ActionCategoryName"] = actionCategoryName
+
+		// Parse last_hit_at for relative time display
+		if rule.LastHitAt != nil {
+			if t, err := time.Parse(time.RFC3339, *rule.LastHitAt); err == nil {
+				data["LastActiveTime"] = t
+			}
+		}
 		data["ConditionSummary"] = service.ConditionSummary(rule.Conditions)
 		data["Breadcrumbs"] = []Breadcrumb{
 			{Label: "Rules", Href: "/rules"},
