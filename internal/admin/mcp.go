@@ -130,6 +130,16 @@ func MCPSettingsGetHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServe
 			toolGroupList = append(toolGroupList, toolGroup{Name: "Other", Tools: others})
 		}
 
+		// Resolve review guidelines and report format (custom or default).
+		reviewGuidelines := cfg.ReviewGuidelines
+		if reviewGuidelines == "" {
+			reviewGuidelines = breadboxmcp.DefaultReviewGuidelines
+		}
+		reportFormat := cfg.ReportFormat
+		if reportFormat == "" {
+			reportFormat = breadboxmcp.DefaultReportFormat
+		}
+
 		data := BaseTemplateData(r, sm, "mcp", "MCP Settings")
 		data["MCPConfig"] = cfg
 		data["Tools"] = tools
@@ -139,6 +149,10 @@ func MCPSettingsGetHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServe
 		data["ToolsTotalCount"] = len(tools)
 		data["Instructions"] = instructions
 		data["DefaultInstructions"] = breadboxmcp.DefaultInstructions
+		data["ReviewGuidelines"] = reviewGuidelines
+		data["DefaultReviewGuidelines"] = breadboxmcp.DefaultReviewGuidelines
+		data["ReportFormat"] = reportFormat
+		data["DefaultReportFormat"] = breadboxmcp.DefaultReportFormat
 
 		tr.Render(w, r, "mcp_settings.html", data)
 	}
@@ -202,5 +216,33 @@ func MCPSaveInstructionsHandler(svc *service.Service, sm *scs.SessionManager) ht
 		}
 		SetFlash(r.Context(), sm, "success", "Instructions saved.")
 		http.Redirect(w, r, "/mcp-settings", http.StatusSeeOther)
+	}
+}
+
+// MCPSaveReviewGuidelinesHandler handles POST /admin/mcp/review-guidelines.
+func MCPSaveReviewGuidelinesHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		guidelines := strings.TrimSpace(r.FormValue("review_guidelines"))
+		if err := svc.SaveMCPReviewGuidelines(r.Context(), guidelines); err != nil {
+			SetFlash(r.Context(), sm, "error", err.Error())
+			http.Redirect(w, r, "/mcp-settings#review-guidelines", http.StatusSeeOther)
+			return
+		}
+		SetFlash(r.Context(), sm, "success", "Review guidelines saved.")
+		http.Redirect(w, r, "/mcp-settings#review-guidelines", http.StatusSeeOther)
+	}
+}
+
+// MCPSaveReportFormatHandler handles POST /admin/mcp/report-format.
+func MCPSaveReportFormatHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		format := strings.TrimSpace(r.FormValue("report_format"))
+		if err := svc.SaveMCPReportFormat(r.Context(), format); err != nil {
+			SetFlash(r.Context(), sm, "error", err.Error())
+			http.Redirect(w, r, "/mcp-settings#report-format", http.StatusSeeOther)
+			return
+		}
+		SetFlash(r.Context(), sm, "success", "Report format saved.")
+		http.Redirect(w, r, "/mcp-settings#report-format", http.StatusSeeOther)
 	}
 }

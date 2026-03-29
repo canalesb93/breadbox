@@ -59,7 +59,91 @@
     </div>
   </div>
 
-  <!-- Card 2: Tools Enabled -->
+  <!-- Card 2: Review Guidelines -->
+  <div id="review-guidelines" class="bb-card p-0 overflow-hidden" x-data="{
+    expanded: location.hash === '#review-guidelines',
+    guidelines: {{.ReviewGuidelines | printf `%q`}},
+    defaultGuidelines: {{.DefaultReviewGuidelines | printf `%q`}},
+    async resetToDefaults() {
+      const ok = await bbConfirm({title:'Reset to defaults?',message:'Your review guidelines will be replaced with the defaults.',confirmLabel:'Reset',variant:'warning'});
+      if (ok) {
+        this.guidelines = this.defaultGuidelines;
+      }
+    }
+  }">
+    <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+      <div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center flex-shrink-0">
+        <i data-lucide="book-open" class="w-5 h-5 text-success"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <h2 class="font-semibold">Review Guidelines</h2>
+        <p class="text-xs text-base-content/40" x-show="!expanded">Served as <code class="text-xs">breadbox://review-guidelines</code> to agents during reviews</p>
+        <p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Guidelines for reviewing transactions and creating rules — agents read this resource before processing reviews</p>
+      </div>
+      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+    </div>
+    <div x-show="expanded" x-collapse x-cloak>
+      <div class="px-4 sm:px-6 py-5">
+        <form method="POST" action="/mcp-settings/review-guidelines">
+          <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+          <div class="form-control mb-4">
+            <textarea name="review_guidelines" class="textarea textarea-bordered font-mono text-xs leading-relaxed w-full rounded-xl" style="min-height: 20rem" maxlength="30000" x-model="guidelines" placeholder="Review guidelines for agents..."></textarea>
+            <label class="label">
+              <span class="label-text-alt text-base-content/40" x-text="guidelines.length + '/30000'"></span>
+            </label>
+          </div>
+          <div class="flex flex-wrap gap-2 items-center">
+            <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Guidelines</button>
+            <button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="resetToDefaults()">Reset to Defaults</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3: Report Format -->
+  <div id="report-format" class="bb-card p-0 overflow-hidden" x-data="{
+    expanded: location.hash === '#report-format',
+    reportFormat: {{.ReportFormat | printf `%q`}},
+    defaultReportFormat: {{.DefaultReportFormat | printf `%q`}},
+    async resetToDefaults() {
+      const ok = await bbConfirm({title:'Reset to defaults?',message:'Your report format will be replaced with the defaults.',confirmLabel:'Reset',variant:'warning'});
+      if (ok) {
+        this.reportFormat = this.defaultReportFormat;
+      }
+    }
+  }">
+    <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+      <div class="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center flex-shrink-0">
+        <i data-lucide="file-text" class="w-5 h-5 text-accent"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <h2 class="font-semibold">Report Format</h2>
+        <p class="text-xs text-base-content/40" x-show="!expanded">Served as <code class="text-xs">breadbox://report-format</code> to agents when submitting reports</p>
+        <p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Report structure templates and formatting guidelines — agents read this resource before submitting reports</p>
+      </div>
+      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+    </div>
+    <div x-show="expanded" x-collapse x-cloak>
+      <div class="px-4 sm:px-6 py-5">
+        <form method="POST" action="/mcp-settings/report-format">
+          <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+          <div class="form-control mb-4">
+            <textarea name="report_format" class="textarea textarea-bordered font-mono text-xs leading-relaxed w-full rounded-xl" style="min-height: 20rem" maxlength="20000" x-model="reportFormat" placeholder="Report format guidelines for agents..."></textarea>
+            <label class="label">
+              <span class="label-text-alt text-base-content/40" x-text="reportFormat.length + '/20000'"></span>
+            </label>
+          </div>
+          <div class="flex flex-wrap gap-2 items-center">
+            <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Format</button>
+            <button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="resetToDefaults()">Reset to Defaults</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 4: Tools Enabled -->
   <div id="tools" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#tools' }">
     <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
       <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">

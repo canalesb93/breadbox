@@ -21,7 +21,7 @@ DATA MODEL:
 - Accounts: individual bank accounts (checking, savings, credit card, etc.) belonging to a connection
 - Transactions: individual financial transactions belonging to an account
 - Categories: 2-level hierarchy (primary → subcategory), identified by slug (e.g., food_and_drink_groceries)
-- Transaction Rules: pattern-matching conditions that auto-categorize new transactions during sync
+- Transaction Rules: pattern-matching conditions that pre-categorize new transactions during sync
 - Reviews: queue of transactions awaiting agent or human assessment
 
 AMOUNT CONVENTION (critical):
@@ -32,7 +32,6 @@ AMOUNT CONVENTION (critical):
 GETTING STARTED:
 1. Read breadbox://overview for dataset context (users, connections, accounts, 30-day spending)
 2. Check get_sync_status to verify data freshness
-3. Use pending_reviews_overview to see the review queue before processing reviews
 
 QUERYING:
 - query_transactions: filters (date, account, user, category, amount, search), cursor pagination. Use fields= to control response size (aliases: minimal, core, category, timestamps). id always included.
@@ -47,22 +46,9 @@ SEARCH MODES (on query_transactions, count_transactions, merchant_summary, list_
 - fuzzy: typo-tolerant — "starbuks" matches "Starbucks"
 - Comma-separated search values are ORed: search=starbucks,dunkin
 
-REVIEW QUEUE:
-- pending_reviews_overview: queue composition by type and raw category — always start here
-- list_pending_reviews: fetch with filters (review_type, account_id, category_primary_raw). Use fields=triage.
-- Review types: new_transaction, uncategorized, low_confidence, manual, re_review (human correction)
-- submit_review / batch_submit_reviews: approve with category_slug, or skip with a note
-- Every review must be individually assessed — no auto-approve shortcuts
-- re_review items are human corrections — read comments first, respect the feedback
-
-TRANSACTION RULES:
-- Rules auto-categorize NEW transactions during sync — they are forward-looking by design
-- Conditions: JSON tree with AND/OR/NOT logic. Operators: eq, neq, contains, not_contains, matches (regex), gt, gte, lt, lte, in
-- Fields: name, merchant_name, amount, category_primary, category_detailed, pending, provider, account_id, user_id, user_name
-- Use preview_rule to test before creating. Check list_transaction_rules to avoid duplicates.
-- Rule creation order: (1) category_primary rules (highest coverage), (2) name-pattern rules, (3) per-merchant rules
-- apply_retroactively=true: ONLY during initial setup (first-time bulk categorization)
-- apply_rules: NEVER during routine reviews. Reserved for explicit one-off bulk operations.
+REVIEWS & RULES:
+- Tools: pending_reviews_overview, list_pending_reviews, submit_review, batch_submit_reviews, create_transaction_rule, batch_create_rules, preview_rule, apply_rules
+- Before processing reviews or creating rules, read breadbox://review-guidelines for detailed guidelines.
 
 CATEGORIES:
 - list_categories: full taxonomy tree with slugs
@@ -76,10 +62,136 @@ ACCOUNT LINKING:
 - Dependent account transactions excluded from totals. User filtering includes attributed transactions.
 - reconcile_account_link: re-run matching. confirm_match / reject_match: correct errors.
 
-COMMUNICATION:
-- add_transaction_comment: explain categorization decisions, flag concerns. Check list_transaction_comments first.
-- submit_report: send summary to family dashboard. Title = scannable notification. Body = markdown detail.
-  Priority: info (routine), warning (needs attention), critical (urgent). Set author to identify your role.`
+REPORTS & COMMUNICATION:
+- Tools: submit_report, add_transaction_comment, list_transaction_comments
+- Before submitting reports, read breadbox://report-format for report structure and formatting guidelines.`
+
+// DefaultReviewGuidelines contains the default review guidelines served via breadbox://review-guidelines.
+// User-editable via the MCP Settings page.
+const DefaultReviewGuidelines = `REVIEW PRINCIPLES — follow these strictly:
+
+1. EVERY REVIEW MUST BE INDIVIDUALLY ASSESSED. You must look at each transaction before approving it. Even when processing in batches via batch_submit_reviews, you must have examined each transaction's name, amount, and context to determine the correct category. There is no auto-approve mechanism — categorization quality depends on your judgment.
+
+2. RULES ARE FORWARD-LOOKING. Transaction rules apply automatically to NEW transactions during sync. Do NOT use apply_rules or apply_retroactively=true during routine reviews. These are reserved for explicit one-off bulk work (initial setup only). During routine work, create rules and let them match future syncs naturally.
+
+3. RE-REVIEWS ARE HUMAN CORRECTIONS. When you see review_type=re_review, a human has disagreed with a previous decision and re-enqueued the transaction with a comment. Read that comment via list_transaction_comments. The human's feedback overrides your prior categorization. Acknowledge the correction in your approval note.
+
+4. SKIP RATHER THAN GUESS. If you cannot confidently determine the correct category, skip the review with a note explaining what's ambiguous. A skipped review can be revisited later with more context. A wrong categorization is harder to catch.
+
+5. COMMENT ON NON-OBVIOUS DECISIONS. When you approve a review with a category that isn't immediately obvious from the transaction name, add a brief note explaining why. This helps humans understand your reasoning and provides context if the transaction is later re-reviewed.
+
+6. NEVER BULK-APPROVE WITHOUT EXAMINATION. Do not use batch_submit_reviews to approve all remaining reviews with a default category. Each item in the batch must have been individually assessed with the correct category assigned.
+
+7. ALWAYS USE CATEGORY_SLUG. When approving reviews, use category_slug (e.g., "food_and_drink_groceries") not category_id. Slugs are human-readable, stable, and consistent across sessions.
+
+8. SKIPPED REVIEWS STAY IN THE QUEUE. When you skip a review, it remains pending and will appear again in future review sessions. Skip freely when uncertain.
+
+RULE CREATION:
+- Rules auto-categorize new transactions during sync. Good rules dramatically reduce future review work.
+- Conditions use a JSON tree with AND/OR/NOT logic
+- Operators: eq, neq, contains, not_contains, matches (regex), gt, gte, lt, lte, in
+- Fields: name, merchant_name, amount, category_primary (raw provider category), category_detailed, pending, provider, account_id, user_id, user_name
+
+BEFORE CREATING A RULE:
+1. Check list_transaction_rules to avoid duplicates
+2. Use preview_rule to test your conditions — verify match count and review sample transactions
+3. Query some transactions with fields=core,category to see what category_primary values exist
+
+RULE CREATION ORDER (highest impact first):
+1. category_primary rules: one rule per raw provider category covers ALL transactions with that label.
+   Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]} → food_and_drink_restaurant
+2. Name-pattern rules: for transaction types spanning merchants. Use contains on name.
+   Examples: "ATM Withdrawal" → withdrawals, "Wire Transfer" → transfer_out, "Service Charge" → bank_fees
+3. Per-merchant rules: only for specific merchants that get miscategorized by broad rules.
+
+RETROACTIVE APPLICATION:
+- apply_retroactively=true on create_transaction_rule: Use ONLY during initial setup, not routine reviews.
+- apply_rules tool: NEVER use during routine reviews. Reserved for explicit one-off bulk operations.
+- During routine work, create the rule and let it match future syncs naturally.
+
+RULE NAMING:
+- Use descriptive names: "[pattern type]: [match] → [category]"
+- Examples: "category_primary: dining → food_and_drink_restaurant", "name: Starbucks → food_and_drink_coffee"
+
+RULE PRIORITY & CONFLICTS:
+- Rules are evaluated in priority order during sync (higher priority number wins)
+- More specific rules should have higher priority than broad ones
+  - Per-merchant rules (priority 20-30) > name-pattern rules (priority 10-20) > category_primary rules (priority 1-10)
+- Check for conflicts before creating. If overlap exists, set priority to ensure the correct one wins.
+
+Use batch_create_rules (max 100) to create multiple rules efficiently.
+Prefer contains over exact match — bank feeds format merchant names inconsistently.
+Always use category_slug (not category_id) when creating rules.`
+
+// DefaultReportFormat contains the default report format guidelines served via breadbox://report-format.
+// User-editable via the MCP Settings page.
+const DefaultReportFormat = `Always submit a report when you finish your work using submit_report.
+
+REPORT TITLE:
+The title appears as a dashboard notification — make it self-contained and scannable. A family member should understand what happened without expanding the report.
+- Good: "Reviewed 47 transactions — 3 recategorized, no suspicious activity"
+- Good: "March spending: $4,200 total, dining up 25% from February"
+- Bad: "Review Complete" (says nothing)
+- Bad: "Transaction Review Report for Week of March 15-21, 2026" (too long, no substance)
+
+REPORT BODY:
+Use markdown with headers, bullets, and transaction links: [Transaction Name](/transactions/ID)
+
+Standard sections (include what's relevant to your task):
+- Summary: key numbers (transactions processed, rules created, amounts)
+- Actions Taken: what you did (rules created, categories changed)
+- Flagged Items: transactions needing human attention with links and reasons
+- Observations: trends, patterns, or recommendations
+
+PRIORITY:
+- info: routine updates, normal reports
+- warning: items needing attention (unusual charges, potential duplicates, data issues)
+- critical: urgent issues (suspected fraud, large unexpected charges, connection failures)
+
+AUTHOR:
+Set author to identify your role (e.g., "Review Agent", "Budget Monitor", "Anomaly Detector"). This helps families distinguish reports from different agents.
+
+REPORT TEMPLATES:
+
+Review Report:
+## Summary
+- Reviewed: N transactions (approved: X, skipped: Y)
+- New rules created: Z
+## Rules Created
+- Rule Name → category (matched N transactions)
+## Needs Your Attention
+- [Transaction](/transactions/ID) — why it's flagged
+## Notes
+Observations, data quality issues, patterns noticed
+
+Spending Report:
+## Spending Summary ({period})
+- Total: $X,XXX (vs prior period: +/-$Y, Z%)
+## Top Categories
+| Category | Amount | % of Total | vs Prior |
+|----------|--------|------------|----------|
+## Top Merchants
+| Merchant | Amount | Count |
+|----------|--------|-------|
+## Recurring Charges
+| Merchant | Monthly Cost | Frequency |
+|----------|-------------|-----------|
+## Notable Transactions
+- [Transaction](/transactions/ID) — $amount — context
+## Observations
+Trends, anomalies, recommendations
+
+Anomaly Report:
+## Flagged Items
+- [Transaction](/transactions/ID) — $amount at Merchant — reason (duplicate / new merchant / spike)
+## Spending Patterns
+Notable trends vs historical baselines
+## Data Health
+Connection status, stale data, dedup issues
+
+TRANSACTION LINKS:
+When referencing specific transactions, always use markdown links: [Transaction Name](/transactions/ID)
+This makes transactions clickable in the dashboard for quick access.`
 
 // ToolClassification indicates whether a tool is read-only or performs writes.
 type ToolClassification string
@@ -300,6 +412,20 @@ func (s *MCPServer) registerResources(server *mcpsdk.Server) {
 		Description: "Live summary of the Breadbox data model: user, connection, account, and transaction counts plus the transaction date range. Read this first to understand the dataset scope.",
 		MIMEType:    "application/json",
 	}, s.handleOverviewResource)
+
+	server.AddResource(&mcpsdk.Resource{
+		Name:        "Review Guidelines",
+		URI:         "breadbox://review-guidelines",
+		Description: "Guidelines for reviewing transactions and creating rules. Read this before processing any reviews or creating transaction rules.",
+		MIMEType:    "text/markdown",
+	}, s.handleReviewGuidelinesResource)
+
+	server.AddResource(&mcpsdk.Resource{
+		Name:        "Report Format",
+		URI:         "breadbox://report-format",
+		Description: "Report structure templates and formatting guidelines. Read this before submitting reports via submit_report.",
+		MIMEType:    "text/markdown",
+	}, s.handleReportFormatResource)
 }
 
 // AllToolDefs returns the full tool registry for admin display.

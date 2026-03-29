@@ -12,7 +12,7 @@ Bank transaction data is raw, fragmented, and poorly categorized. Traditional fi
 
 ## The Thesis
 
-Personal AI agents that know a family's context are the natural solution. Your agent can cross-reference Gmail receipts, search for local merchants, and draw on the family's history. It knows "DEBIT POS MARIA'S" is the taqueria around the corner. **They see transaction metadata. Your agent sees your life.**
+Personal AI agents that know a family's context are the natural solution. Your agent can cross-reference Gmail receipts, search for local merchants, and draw on the family's history. It knows "DEBIT POS MARIA'S" is the taqueria around the corner. **They see transaction metadata. Your agent has the full picture.**
 
 Agents need: (1) aggregated, structured access to the data, and (2) the ability to act on it. Breadbox provides both.
 

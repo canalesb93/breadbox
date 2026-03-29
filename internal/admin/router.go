@@ -125,6 +125,8 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/mode", MCPSaveModeHandler(svc, sm))
 			r.Post("/tools", MCPSaveToolsHandler(svc, mcpServer, sm))
 			r.Post("/instructions", MCPSaveInstructionsHandler(svc, sm))
+			r.Post("/review-guidelines", MCPSaveReviewGuidelinesHandler(svc, sm))
+			r.Post("/report-format", MCPSaveReportFormatHandler(svc, sm))
 		})
 
 		r.Get("/providers", ProvidersGetHandler(a, sm, tr))
