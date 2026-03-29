@@ -6,22 +6,9 @@
   </div>
 </div>
 
-<!-- Summary Stats Cards -->
+<!-- Summary Stats -->
 {{if .Stats}}
-<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6 bb-stagger">
-  <!-- Total Syncs -->
-  <div class="bb-card p-4">
-    <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
-        <i data-lucide="refresh-cw" class="w-4 h-4 text-base-content/40"></i>
-      </div>
-      <div>
-        <div class="text-2xl font-semibold tabular-nums leading-none">{{.Stats.TotalSyncs}}</div>
-        <div class="text-xs text-base-content/40 mt-0.5">Total syncs</div>
-      </div>
-    </div>
-  </div>
-
+<div class="grid grid-cols-3 gap-3 mb-6 bb-stagger">
   <!-- Success Rate -->
   <div class="bb-card p-4">
     <div class="flex items-center gap-3">
@@ -37,19 +24,6 @@
       <div>
         <div class="text-2xl font-semibold tabular-nums leading-none {{if gt .Stats.SuccessRate 80.0}}text-success{{else if gt .Stats.SuccessRate 50.0}}text-warning{{else}}text-error{{end}}">{{printf "%.0f" .Stats.SuccessRate}}%</div>
         <div class="text-xs text-base-content/40 mt-0.5">Success rate</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Warnings -->
-  <div class="bb-card p-4">
-    <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 {{if gt .Stats.WarningCount 0}}bg-warning/10{{else}}bg-base-200/60{{end}}">
-        <i data-lucide="alert-triangle" class="w-4 h-4 {{if gt .Stats.WarningCount 0}}text-warning/70{{else}}text-base-content/40{{end}}"></i>
-      </div>
-      <div>
-        <div class="text-2xl font-semibold tabular-nums leading-none {{if gt .Stats.WarningCount 0}}text-warning{{end}}">{{.Stats.WarningCount}}</div>
-        <div class="text-xs text-base-content/40 mt-0.5">Warnings</div>
       </div>
     </div>
   </div>
