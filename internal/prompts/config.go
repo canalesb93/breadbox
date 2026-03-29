@@ -46,8 +46,8 @@ var agentConfigs = map[string]AgentTypeConfig{
 		Icon:        "sparkles",
 		Color:       "primary",
 		Core:        []string{"strategy-initial-setup"},
-		Default:     []string{"token-efficiency"},
-		Optional:    []string{"gmail-integration", "account-linking", "category-system", "sync-management", "transaction-comments", "merchant-analysis"},
+		Default:     []string{"review-depth-efficient"},
+		Optional:    []string{"review-depth-thorough", "gmail-integration", "account-linking", "category-system", "sync-management", "transaction-comments", "merchant-analysis"},
 	},
 	"bulk-review": {
 		Type:        "bulk-review",
@@ -56,8 +56,8 @@ var agentConfigs = map[string]AgentTypeConfig{
 		Icon:        "layers",
 		Color:       "primary",
 		Core:        []string{"strategy-bulk-review"},
-		Default:     []string{"token-efficiency"},
-		Optional:    []string{"gmail-integration", "account-linking", "category-system", "sync-management", "transaction-comments", "merchant-analysis"},
+		Default:     []string{"review-depth-thorough"},
+		Optional:    []string{"review-depth-efficient", "gmail-integration", "account-linking", "category-system", "sync-management", "transaction-comments", "merchant-analysis"},
 	},
 	"quick-review": {
 		Type:        "quick-review",
@@ -66,8 +66,8 @@ var agentConfigs = map[string]AgentTypeConfig{
 		Icon:        "zap",
 		Color:       "primary",
 		Core:        []string{"strategy-quick-review"},
-		Default:     []string{"token-efficiency"},
-		Optional:    []string{"gmail-integration", "account-linking", "category-system", "sync-management", "transaction-comments", "merchant-analysis"},
+		Default:     []string{"review-depth-efficient"},
+		Optional:    []string{"review-depth-thorough", "gmail-integration", "account-linking", "category-system", "sync-management", "transaction-comments", "merchant-analysis"},
 	},
 	"routine-review": {
 		Type:        "routine-review",
@@ -76,8 +76,8 @@ var agentConfigs = map[string]AgentTypeConfig{
 		Icon:        "repeat",
 		Color:       "success",
 		Core:        []string{"strategy-routine-review"},
-		Default:     []string{"transaction-comments"},
-		Optional:    []string{"gmail-integration", "account-linking", "token-efficiency", "category-system", "sync-management", "merchant-analysis"},
+		Default:     []string{"review-depth-thorough", "transaction-comments"},
+		Optional:    []string{"review-depth-efficient", "gmail-integration", "account-linking", "category-system", "sync-management", "merchant-analysis"},
 	},
 	"spending-report": {
 		Type:        "spending-report",
@@ -87,7 +87,7 @@ var agentConfigs = map[string]AgentTypeConfig{
 		Color:       "violet",
 		Core:        []string{"strategy-spending-report"},
 		Default:     []string{"category-system", "merchant-analysis"},
-		Optional:    []string{"gmail-integration", "token-efficiency", "account-linking", "sync-management", "transaction-comments"},
+		Optional:    []string{"gmail-integration", "account-linking", "sync-management", "transaction-comments"},
 	},
 	"anomaly-detection": {
 		Type:        "anomaly-detection",
@@ -97,7 +97,7 @@ var agentConfigs = map[string]AgentTypeConfig{
 		Color:       "warning",
 		Core:        []string{"strategy-anomaly-detection"},
 		Default:     []string{"merchant-analysis", "account-linking"},
-		Optional:    []string{"gmail-integration", "token-efficiency", "category-system", "sync-management", "transaction-comments"},
+		Optional:    []string{"gmail-integration", "category-system", "sync-management", "transaction-comments"},
 	},
 	"custom": {
 		Type:        "custom",
@@ -108,7 +108,8 @@ var agentConfigs = map[string]AgentTypeConfig{
 		Core:        []string{},
 		Default:     []string{},
 		Optional: []string{
-			"category-system", "account-linking", "token-efficiency",
+			"review-depth-efficient", "review-depth-thorough",
+			"category-system", "account-linking",
 			"gmail-integration", "sync-management", "transaction-comments", "merchant-analysis",
 		},
 	},
