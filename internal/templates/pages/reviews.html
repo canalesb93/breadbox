@@ -51,45 +51,24 @@
   </div>
 </div>
 
-<!-- Stat Cards -->
+<!-- Compact Stats Bar -->
 {{if .Counts}}
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 bb-stagger">
-  <div class="bb-stat-card">
-    <div class="bb-stat-card__icon text-warning">
-      <i data-lucide="clock" class="w-5 h-5"></i>
-    </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value{{if gt .Counts.Pending 0}} text-warning{{end}}">{{.Counts.Pending}}</span>
-      <span class="bb-stat-card__label">Pending</span>
-    </div>
-  </div>
-  <div class="bb-stat-card">
-    <div class="bb-stat-card__icon text-success">
-      <i data-lucide="check-circle" class="w-5 h-5"></i>
-    </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value text-success">{{.Counts.ApprovedToday}}</span>
-      <span class="bb-stat-card__label">Approved Today</span>
-    </div>
-  </div>
-  <div class="bb-stat-card">
-    <div class="bb-stat-card__icon text-error">
-      <i data-lucide="x-circle" class="w-5 h-5"></i>
-    </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value text-error">{{.Counts.RejectedToday}}</span>
-      <span class="bb-stat-card__label">Rejected Today</span>
-    </div>
-  </div>
-  <div class="bb-stat-card">
-    <div class="bb-stat-card__icon text-base-content/40">
-      <i data-lucide="skip-forward" class="w-5 h-5"></i>
-    </div>
-    <div class="bb-stat-card__body">
-      <span class="bb-stat-card__value">{{.Counts.SkippedToday}}</span>
-      <span class="bb-stat-card__label">Skipped Today</span>
-    </div>
-  </div>
+<div class="flex items-center gap-3 mb-4 text-sm flex-wrap">
+  <span class="inline-flex items-center gap-1.5 font-semibold{{if gt .Counts.Pending 0}} text-warning{{else}} text-base-content/50{{end}}">
+    <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+    {{.Counts.Pending}} pending
+  </span>
+  <span class="text-base-content/20">|</span>
+  <span class="inline-flex items-center gap-1 text-base-content/50 text-xs">
+    <span class="text-success font-medium">{{.Counts.ApprovedToday}}</span> approved
+  </span>
+  <span class="inline-flex items-center gap-1 text-base-content/50 text-xs">
+    <span class="text-error font-medium">{{.Counts.RejectedToday}}</span> rejected
+  </span>
+  <span class="inline-flex items-center gap-1 text-base-content/50 text-xs">
+    <span class="font-medium">{{.Counts.SkippedToday}}</span> skipped
+  </span>
+  <span class="text-base-content/30 text-xs">today</span>
 </div>
 {{end}}
 
@@ -215,13 +194,7 @@
   <!-- Triage toolbar (only shown for pending reviews) -->
   {{if eq .StatusFilter "pending"}}
   <div class="flex items-center justify-between mb-3">
-    <div class="flex items-center gap-3">
-      <span class="text-xs text-base-content/40 tabular-nums" x-text="sessionCount + ' reviewed this session'"></span>
-      {{if .Counts}}
-      <span class="text-xs text-base-content/30">&middot;</span>
-      <span class="text-xs text-base-content/40 tabular-nums">{{.Counts.Pending}} remaining</span>
-      {{end}}
-    </div>
+    <span class="text-xs text-base-content/40 tabular-nums" x-text="sessionCount + ' reviewed this session'"></span>
     <div class="hidden sm:flex items-center gap-2 text-xs text-base-content/30">
       <span class="flex items-center gap-1"><kbd class="bb-kbd">j</kbd><kbd class="bb-kbd">k</kbd> navigate</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">a</kbd> accept</span>
