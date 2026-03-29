@@ -147,7 +147,7 @@
 
 <div class="space-y-3 bb-stagger">
 {{range .Rules}}
-<a href="/rules/{{.ID}}" class="bb-card p-0 overflow-hidden block hover:shadow-md transition-shadow" x-data="{deleting: false}">
+<div class="bb-card p-0 overflow-hidden cursor-pointer hover:shadow-md transition-shadow" x-data="{deleting: false}" @click="window.location.href='/rules/{{.ID}}'">
   <div class="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4">
     <!-- Status indicator -->
     <div class="flex-shrink-0">
@@ -231,7 +231,7 @@
       </button>
     </div>
   </div>
-</a>
+</div>
 {{end}}
 </div>
 
