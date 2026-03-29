@@ -841,14 +841,15 @@ func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.
 			e.Summary = "Skipped"
 		default:
 			e.ReviewStatus = "pending"
-			e.Summary = "Flagged for review"
 			switch r.ReviewType {
 			case "uncategorized":
-				e.Summary = "Flagged: uncategorized"
+				e.Summary = "Added to review queue — uncategorized"
 			case "low_confidence":
-				e.Summary = "Flagged: low confidence"
+				e.Summary = "Added to review queue — low confidence"
 			case "new_transaction":
-				e.Summary = "Flagged: new transaction"
+				e.Summary = "Added to review queue — new transaction"
+			default:
+				e.Summary = "Added to review queue"
 			}
 			e.ActorName = "System"
 			e.ActorType = "system"
@@ -897,9 +898,9 @@ func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.
 		})
 	}
 
-	// Sort by timestamp ascending (oldest first = story order)
+	// Sort by timestamp descending (newest first)
 	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Timestamp < entries[j].Timestamp
+		return entries[i].Timestamp > entries[j].Timestamp
 	})
 
 	return entries
