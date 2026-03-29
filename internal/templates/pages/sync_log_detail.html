@@ -18,14 +18,24 @@
       {{end}}
     </div>
     <div>
-      <h1 class="bb-page-title">{{.Log.InstitutionName}}</h1>
-      <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+      <h1 class="bb-page-title"><a href="/connections/{{.Log.ConnectionID}}" class="hover:text-primary transition-colors">{{.Log.InstitutionName}}</a></h1>
+      <div class="flex items-center gap-2 mt-0.5 flex-wrap text-xs text-base-content/40">
+        <span class="capitalize">{{.Log.Provider}}</span>
+        <span class="text-base-content/20">&middot;</span>
         <span class="badge badge-ghost badge-xs">{{.Log.Trigger}}</span>
         {{syncBadge .Log.Status}}
         {{if .Log.WarningMessage}}
         <span class="badge badge-warning badge-sm gap-1">
           <i data-lucide="alert-triangle" class="w-3 h-3"></i>warning
         </span>
+        {{end}}
+        {{if .Log.StartedAt}}
+        <span class="text-base-content/20">&middot;</span>
+        <span>{{relativeTime .Log.StartedAt}}</span>
+        {{end}}
+        {{if .Log.Duration}}
+        <span class="text-base-content/20">&middot;</span>
+        <span class="tabular-nums">{{deref .Log.Duration}}</span>
         {{end}}
       </div>
     </div>
@@ -104,36 +114,6 @@
   {{end}}
 </div>
 
-<!-- Details Card -->
-<div class="bb-card p-5 mb-6">
-  <h2 class="text-sm font-semibold text-base-content/50 mb-4">Sync Details</h2>
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-5">
-    <div>
-      <p class="text-xs text-base-content/40 mb-1">Connection</p>
-      <p class="text-sm font-medium"><a href="/connections/{{.Log.ConnectionID}}" class="hover:text-primary transition-colors">{{.Log.InstitutionName}}</a></p>
-    </div>
-    <div>
-      <p class="text-xs text-base-content/40 mb-1">Provider</p>
-      <p class="text-sm font-medium capitalize">{{.Log.Provider}}</p>
-    </div>
-    <div>
-      <p class="text-xs text-base-content/40 mb-1">Trigger</p>
-      <p class="text-sm font-medium">{{.Log.Trigger}}</p>
-    </div>
-    {{if .Log.StartedAt}}
-    <div>
-      <p class="text-xs text-base-content/40 mb-1">Started</p>
-      <p class="text-sm font-medium">{{relativeTime .Log.StartedAt}}</p>
-    </div>
-    {{end}}
-    {{if .Log.Duration}}
-    <div>
-      <p class="text-xs text-base-content/40 mb-1">Duration</p>
-      <p class="text-sm font-medium tabular-nums">{{deref .Log.Duration}}</p>
-    </div>
-    {{end}}
-  </div>
-</div>
 
 <!-- Warning Card -->
 {{if .Log.WarningMessage}}
