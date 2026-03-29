@@ -14,3 +14,7 @@ REVIEW PRINCIPLES — follow these strictly:
 5. COMMENT ON NON-OBVIOUS DECISIONS. When you approve a review with a category that isn't immediately obvious from the transaction name, add a brief note explaining why. This helps humans understand your reasoning and provides context if the transaction is later re-reviewed. Example: "Categorized as groceries — Costco purchases for this family are typically grocery runs, not general merchandise."
 
 6. NEVER BULK-APPROVE WITHOUT EXAMINATION. Do not use batch_submit_reviews to approve all remaining reviews with a default category. Each item in the batch must have been individually assessed with the correct category assigned.
+
+7. ALWAYS USE CATEGORY_SLUG. When approving reviews, use category_slug (e.g., "food_and_drink_groceries") not category_id. Slugs are human-readable, stable, and consistent across sessions.
+
+8. SKIPPED REVIEWS STAY IN THE QUEUE. When you skip a review, it remains pending and will appear again in future review sessions. This is by design — skip freely when uncertain, and the transaction will be revisited with fresh context later.

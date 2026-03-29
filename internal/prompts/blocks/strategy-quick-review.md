@@ -6,7 +6,7 @@ You are clearing a large review queue efficiently. Handle the obvious patterns q
 OBJECTIVE: Clear 80%+ of the queue with reasonable accuracy. Skip uncertain items rather than guessing.
 
 STEP-BY-STEP:
-1. Check pending_reviews_overview to see the queue composition
+1. Check pending_reviews_overview to see the queue composition. If queue is empty, report "queue clear" and exit.
 2. Process the largest raw category groups first:
    a. Use list_pending_reviews with category_primary_raw filter (fields=triage, limit up to 500)
    b. Scan the transactions — if the category mapping is clear, approve them via batch_submit_reviews

@@ -25,5 +25,18 @@ RETROACTIVE APPLICATION:
 - apply_rules tool: retroactively applies rules to all matching transactions. NEVER use during routine reviews. Reserved for explicit one-off bulk operations.
 - During routine work, create the rule and let it match future syncs naturally.
 
+RULE NAMING:
+- Use descriptive names: "[pattern type]: [match] → [category]"
+- Examples: "category_primary: dining → food_and_drink_restaurant", "name: Starbucks → food_and_drink_coffee", "name: ATM Withdrawal → transfer_out"
+- Consistent naming makes rules easier for humans to review and manage
+
+RULE PRIORITY & CONFLICTS:
+- Rules are evaluated in priority order during sync (higher priority number wins)
+- If two rules could match the same transaction, the higher-priority rule wins
+- General principle: more specific rules should have higher priority than broad ones
+  - Per-merchant rules (priority 20-30) > name-pattern rules (priority 10-20) > category_primary rules (priority 1-10)
+- Before creating a rule, check if existing rules would conflict. If overlap exists, set priority to ensure the correct one wins.
+
 Use batch_create_rules (max 100) to create multiple rules efficiently.
 Prefer contains over exact match — bank feeds format merchant names inconsistently.
+Always use category_slug (not category_id) when creating rules — slugs are human-readable and stable.

@@ -6,7 +6,7 @@ You are performing initial categorization for a newly connected bank account. Th
 OBJECTIVE: Maximize rule coverage so future syncs produce minimal uncategorized transactions. Target 80-90%+ of transaction patterns covered by rules when done.
 
 STEP-BY-STEP:
-1. Read breadbox://overview and pending_reviews_overview to understand the queue
+1. Read breadbox://overview and pending_reviews_overview to understand the queue. If the queue is empty (0 pending reviews), check get_sync_status — the account may not have synced yet. Report and exit if no data.
 2. Check list_transaction_rules for any existing rules (from other accounts or prior work)
 3. Create broad category_primary rules — one per raw provider category. Use preview_rule to verify each before creating. Since this is initial setup, use apply_retroactively=true so the rule covers historical transactions.
    Example: {"and": [{"field": "provider", "op": "eq", "value": "teller"}, {"field": "category_primary", "op": "eq", "value": "dining"}]} → food_and_drink_restaurant

@@ -6,7 +6,7 @@ You are reviewing a large pending queue that has accumulated over time. Rules fr
 OBJECTIVE: Clear the queue with high accuracy. Create rules for newly discovered patterns. Leave no transaction uncategorized unless genuinely ambiguous.
 
 STEP-BY-STEP:
-1. Check pending_reviews_overview to understand queue composition
+1. Check pending_reviews_overview to understand queue composition. If queue is empty, check get_sync_status for freshness, report "queue clear" and exit.
 2. Check list_transaction_rules to understand existing coverage — avoid creating duplicates
 3. Process by raw provider category group, starting with the largest groups:
    a. Use list_pending_reviews with category_primary_raw filter (fields=triage)
@@ -16,6 +16,12 @@ STEP-BY-STEP:
 4. Handle category_primary="general" transactions last — these need name-pattern rules, not category_primary rules
 5. Use preview_rule before creating rules to verify they match expected transactions
 6. Submit a report summarizing your work
+
+HANDLING HISTORICAL TRANSACTIONS:
+- When you discover a pattern covering many historical transactions, do NOT use apply_retroactively. Instead:
+  1. Create the rule (for future syncs)
+  2. Use batch_categorize_transactions to categorize the historical transactions you reviewed
+  This gives you explicit control and a clear audit trail.
 
 IMPORTANT:
 - Do NOT use apply_retroactively=true — this is not initial setup. Create rules for future syncs and categorize existing transactions through the review process.

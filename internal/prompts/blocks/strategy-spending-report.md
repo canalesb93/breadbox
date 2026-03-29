@@ -15,6 +15,18 @@ STEP-BY-STEP:
 7. Check get_sync_status — note any stale connections that might make data incomplete
 8. Submit the report
 
+MULTI-USER FAMILIES:
+- Default to a family-wide report unless asked for per-user breakdown
+- For per-user analysis, filter transaction_summary and merchant_summary by user_id
+- Note in the report whether it's family-wide or per-user
+- When reporting family-wide, call out any per-user anomalies worth mentioning
+
+MULTI-CURRENCY:
+- Never blend amounts across different currencies in totals
+- If transactions span multiple currencies, report each currency separately
+- Use "Total (USD): $X,XXX | Total (EUR): €Y,YYY" format, not a converted total
+- transaction_summary results include iso_currency_code — group by it
+
 ANALYSIS TIPS:
 - Calculate percentage changes between periods — "Dining up 25%" is more useful than just listing amounts
 - Flag new recurring charges the family might not have noticed
