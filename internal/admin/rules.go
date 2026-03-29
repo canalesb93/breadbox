@@ -94,6 +94,10 @@ func RuleFormPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 		data := BaseTemplateData(r, sm, "rules", "New Rule")
 		data["FlatCategories"] = flattenCategories(categories)
 		data["IsEdit"] = false
+		data["Breadcrumbs"] = []Breadcrumb{
+			{Label: "Rules", Href: "/rules"},
+			{Label: "New Rule"},
+		}
 
 		// Edit mode: load existing rule
 		if id := chi.URLParam(r, "id"); id != "" {
@@ -109,6 +113,10 @@ func RuleFormPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 			data["Rule"] = rule
 			data["IsEdit"] = true
 			data["PageTitle"] = "Edit Rule"
+			data["Breadcrumbs"] = []Breadcrumb{
+				{Label: "Rules", Href: "/rules"},
+				{Label: rule.Name},
+			}
 		}
 
 		tr.Render(w, r, "rule_form.html", data)
