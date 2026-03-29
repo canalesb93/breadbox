@@ -13,6 +13,7 @@ function categoryPicker(config) {
     allowEmpty: config.allowEmpty !== false,
     emptyLabel: config.emptyLabel || 'All categories',
     highlightIndex: -1,
+    _bbSourceId: config.sourceId || '',
 
     get flatList() {
       let items = [];
@@ -118,23 +119,20 @@ function categoryPicker(config) {
 
     openPicker() {
       this.open = false;
-      var self = this;
       this.$dispatch('open-category-picker', {
         mode: this.mode,
         allowEmpty: this.allowEmpty,
         emptyLabel: this.emptyLabel,
         categories: this.categories,
-        sourceId: this._bbSourceId || this.$el.closest('[data-picker-source]')?.dataset.pickerSource || ('picker-' + Math.random().toString(36).slice(2, 8))
+        sourceId: this._bbSourceId
       });
-      // Store the sourceId so we can match the response
-      if (!this._bbSourceId) {
-        this._bbSourceId = this.$el.closest('[data-picker-source]')?.dataset.pickerSource || ('picker-' + Math.random().toString(36).slice(2, 8));
-      }
     },
 
     init() {
-      // Generate a stable sourceId
-      this._bbSourceId = this.$el.closest('[data-picker-source]')?.dataset.pickerSource || ('picker-' + Math.random().toString(36).slice(2, 8));
+      // Ensure sourceId is set (prefer config value, fall back to DOM attribute)
+      if (!this._bbSourceId) {
+        this._bbSourceId = this.$el.closest('[data-picker-source]')?.dataset.pickerSource || ('picker-' + Math.random().toString(36).slice(2, 8));
+      }
 
       // Listen for category-picked responses
       var self = this;

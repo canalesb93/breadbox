@@ -383,7 +383,7 @@
 
           <!-- Category picker + actions -->
           <div class="flex flex-col gap-2 w-full sm:w-auto sm:min-w-[220px]">
-            <div class="bb-cat-picker" data-picker-source="triage-{{$review.ID}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if $review.SuggestedCategoryID}}{{$review.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current'})" @category-change="selectedCatId = $event.detail.id">
+            <div class="bb-cat-picker" data-picker-source="triage-{{$review.ID}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if $review.SuggestedCategoryID}}{{$review.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current', sourceId: 'triage-{{$review.ID}}'})" @category-change="selectedCatId = $event.detail.id">
               <button type="button" class="btn btn-sm btn-ghost gap-2 w-full justify-start border border-base-300 rounded-xl" @click="openPicker()">
                 <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
                 <span x-text="displayLabel" class="text-xs truncate"></span>
