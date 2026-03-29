@@ -148,7 +148,7 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
       <label class="bb-filter-label">
         Category
-        <div class="bb-cat-picker" data-picker-source="tx-filter-cat" x-data="categoryPicker({categories: window.__bbCategories, mode: 'filter', initial: '{{.FilterCategory}}', allowEmpty: true, emptyLabel: 'All categories'})" @category-change="$refs.catInput.value = selectedSlug">
+        <div class="bb-cat-picker" data-picker-source="tx-filter-cat" x-data="categoryPicker({categories: window.__bbCategories, mode: 'filter', initial: '{{.FilterCategory}}', allowEmpty: true, emptyLabel: 'All categories', sourceId: 'tx-filter-cat'})" @category-change="$refs.catInput.value = selectedSlug">
           <input type="hidden" name="category" x-ref="catInput" value="{{.FilterCategory}}">
           <button type="button" class="select select-sm select-bordered w-full text-left flex items-center gap-2" @click="openPicker()">
             <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>

@@ -196,7 +196,7 @@
 
       <label class="form-control w-full">
         <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Parent Category</span></div>
-        <div class="bb-cat-picker" data-picker-source="cat-create-parent" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'assign', placeholder: 'None (top-level)', allowEmpty: true, emptyLabel: 'None (top-level)'})" @category-change="parentId = $event.detail.id">
+        <div class="bb-cat-picker" data-picker-source="cat-create-parent" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'assign', placeholder: 'None (top-level)', allowEmpty: true, emptyLabel: 'None (top-level)', sourceId: 'cat-create-parent'})" @category-change="parentId = $event.detail.id">
           <button type="button" class="select select-bordered w-full text-left flex items-center gap-2 rounded-xl" @click="openPicker()">
             <span x-text="displayLabel" class="flex-1 text-sm"></span>
             <i data-lucide="chevron-down" class="w-4 h-4 opacity-40"></i>
