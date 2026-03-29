@@ -12,7 +12,7 @@
 <form @submit.prevent="submitRule()" class="max-w-2xl">
 
   <!-- Name -->
-  <div class="bb-card p-5 mb-4" x-data="{ nameFocused: false }">
+  <div class="bb-card p-5 mb-4">
     <label class="label"><span class="label-text text-sm font-medium">Rule Name</span></label>
     <input type="text" x-model="form.name" x-ref="nameInput" @focus="nameFocused = true" @blur="setTimeout(() => nameFocused = false, 150)" class="input input-bordered input-sm rounded-xl w-full bg-base-200/50" placeholder="e.g., Uber Eats → Food Delivery" required />
     <div class="flex items-center justify-between mt-1">
@@ -263,6 +263,7 @@ function ruleForm() {
   return {
     isEdit: {{ if .IsEdit }}true{{ else }}false{{ end }},
     editingId: existingRule?.id || '',
+    nameFocused: false,
     showJsonEditor: false,
     submitting: false,
     formError: '',
