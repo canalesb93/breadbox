@@ -113,6 +113,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/mcp-getting-started", MCPGuideHandler(svc, sm, tr))
 		r.Get("/agent-wizard", AgentWizardHandler(svc, sm, tr))
 		r.Get("/agent-wizard/{type}", PromptBuilderHandler(sm, tr))
+		r.Get("/agent-wizard/{type}/copy", PromptCopyHandler())
 		r.Get("/rules", RulesPageHandler(svc, sm, tr, a.Config.Version))
 		r.Get("/rules/new", RuleFormPageHandler(svc, sm, tr))
 		r.Get("/rules/{id}", RuleDetailPageHandler(svc, sm, tr))
