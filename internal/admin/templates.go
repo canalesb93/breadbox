@@ -308,6 +308,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				return *s
 			},
 			"lower": strings.ToLower,
+			"eqFold": strings.EqualFold,
 			"titleCase": titleCaseMerchant,
 			"syncLogFilterQuery": func(status, connID, trigger, dateFrom, dateTo string) template.URL {
 				params := url.Values{}

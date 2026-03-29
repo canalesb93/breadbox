@@ -44,7 +44,7 @@
         <span class="text-base-content/20">&middot;</span>
         {{end}}
         <span class="truncate">{{.AccountName}}</span>
-        {{if .MerchantName}}
+        {{if and .MerchantName (not (eqFold .Name (deref .MerchantName)))}}
         <span class="text-base-content/20 hidden sm:inline">&middot;</span>
         <span class="text-base-content/40 truncate hidden sm:inline">{{titleCase (deref .MerchantName)}}</span>
         {{end}}
