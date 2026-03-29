@@ -98,6 +98,12 @@
               <span>Never synced</span>
               {{end}}
             </div>
+            {{if and (eq .LastSyncStatus "error") .LastSyncErrorMessage.Valid (ne (printf "%s" .Status) "disconnected")}}
+            <div class="flex items-center gap-1.5 mt-1 text-[0.7rem] text-error/70 leading-snug max-w-xs sm:max-w-md truncate">
+              <i data-lucide="alert-circle" class="w-3 h-3 shrink-0"></i>
+              <span class="truncate">{{.LastSyncErrorMessage.String}}</span>
+            </div>
+            {{end}}
           </div>
         </div>
         <div class="flex items-center gap-2 sm:gap-3 shrink-0">
