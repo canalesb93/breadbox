@@ -1671,3 +1671,52 @@ func (s *Service) GetRuleSyncHistory(ctx context.Context, ruleID string, limit i
 
 	return results, nil
 }
+
+// TransactionRuleApplicationDetail holds a rule application with rule metadata for the transaction detail page.
+type TransactionRuleApplicationDetail struct {
+	RuleID              string `json:"rule_id"`
+	RuleName            string `json:"rule_name"`
+	ActionField         string `json:"action_field"`
+	ActionValue         string `json:"action_value"`
+	CategoryDisplayName string `json:"category_display_name,omitempty"`
+	AppliedBy           string `json:"applied_by"`
+	AppliedAt           string `json:"applied_at"`
+}
+
+// ListRuleApplicationsByTransactionID returns all rules that applied actions to a transaction.
+func (s *Service) ListRuleApplicationsByTransactionID(ctx context.Context, transactionID string) ([]TransactionRuleApplicationDetail, error) {
+	txnUUID, err := parseUUID(transactionID)
+	if err != nil {
+		return nil, nil
+	}
+
+	rows, err := s.Pool.Query(ctx, `SELECT tra.rule_id, tr.name, tra.action_field, tra.action_value,
+		COALESCE(c.display_name, ''), tra.applied_by, tra.applied_at
+		FROM transaction_rule_applications tra
+		JOIN transaction_rules tr ON tr.id = tra.rule_id
+		LEFT JOIN categories c ON tra.action_field = 'category' AND c.slug = tra.action_value
+		WHERE tra.transaction_id = $1
+		ORDER BY tra.applied_at ASC`, txnUUID)
+	if err != nil {
+		return nil, fmt.Errorf("query rule applications by txn: %w", err)
+	}
+	defer rows.Close()
+
+	var results []TransactionRuleApplicationDetail
+	for rows.Next() {
+		var d TransactionRuleApplicationDetail
+		var ruleID pgtype.UUID
+		var appliedAt pgtype.Timestamptz
+		if err := rows.Scan(&ruleID, &d.RuleName, &d.ActionField, &d.ActionValue,
+			&d.CategoryDisplayName, &d.AppliedBy, &appliedAt); err != nil {
+			return nil, fmt.Errorf("scan rule application: %w", err)
+		}
+		d.RuleID = formatUUID(ruleID)
+		if appliedAt.Valid {
+			d.AppliedAt = appliedAt.Time.UTC().Format(time.RFC3339)
+		}
+		results = append(results, d)
+	}
+
+	return results, nil
+}

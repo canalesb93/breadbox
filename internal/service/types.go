@@ -421,6 +421,25 @@ type RuleAction struct {
 	Value string `json:"value"`
 }
 
+// ActivityEntry represents a single event in a transaction's activity timeline.
+type ActivityEntry struct {
+	Type      string `json:"type"`      // "review", "comment", "rule"
+	Timestamp string `json:"timestamp"` // RFC3339
+
+	ActorName string `json:"actor_name"`
+	ActorType string `json:"actor_type"` // "user", "agent", "system"
+
+	Summary string `json:"summary"`          // Short: "Approved as Food & Drink"
+	Detail  string `json:"detail,omitempty"` // Longer text (review note or comment body)
+
+	// Type-specific
+	ReviewStatus string `json:"review_status,omitempty"` // approved, rejected, skipped, pending
+	CategoryName string `json:"category_name,omitempty"` // display name
+	RuleName     string `json:"rule_name,omitempty"`
+	RuleID       string `json:"rule_id,omitempty"`
+	CommentID    string `json:"comment_id,omitempty"`
+}
+
 type Condition struct {
 	Field string      `json:"field,omitempty"`
 	Op    string      `json:"op,omitempty"`

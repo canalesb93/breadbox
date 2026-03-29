@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"breadbox/internal/db"
@@ -649,15 +648,9 @@ func (s *Service) SubmitReview(ctx context.Context, params SubmitReviewParams) (
 		}
 	}
 
-	// If note provided, create a transaction comment
-	if params.Note != nil && strings.TrimSpace(*params.Note) != "" {
-		commentContent := fmt.Sprintf("[Review: %s] %s", params.Decision, *params.Note)
-		_, _ = s.CreateComment(ctx, CreateCommentParams{
-			TransactionID: txnID,
-			Content:       commentContent,
-			Actor:         params.Actor,
-		})
-	}
+	// Note: Review notes are stored on the review itself (review_note column)
+	// and displayed in the unified Activity timeline. No separate comment is
+	// created to avoid duplicates.
 
 	resp := s.reviewFromRow(ctx, updated)
 	return &resp, nil
