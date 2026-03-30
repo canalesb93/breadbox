@@ -143,38 +143,18 @@
     </div>
   </div>
 
-  <!-- Card 3: System Info (always expanded) -->
-  <div id="system" class="bb-card p-0 overflow-hidden">
-    <div class="px-4 sm:px-6 py-5 border-b border-base-300 flex items-center gap-3">
+  <!-- Card 3: System Info -->
+  <div id="system" class="bb-card px-4 sm:px-6 py-5">
+    <div class="flex items-center gap-3 mb-4">
       <i data-lucide="cpu" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
-      <div class="min-w-0">
-        <h2 class="font-semibold">System</h2>
-        <p class="text-xs text-base-content/40">Runtime and version information</p>
-      </div>
+      <h2 class="font-semibold">System</h2>
     </div>
-    <div class="px-4 sm:px-6 py-5">
-      <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <div class="flex items-center justify-between gap-3 sm:block p-3.5 rounded-xl bg-base-200/40">
-          <div class="text-xs font-medium text-base-content/40 shrink-0 sm:mb-1">Version</div>
-          <div class="text-sm font-semibold tabular-nums">{{.Version}}</div>
-        </div>
-        <div class="flex items-center justify-between gap-3 sm:block p-3.5 rounded-xl bg-base-200/40">
-          <div class="text-xs font-medium text-base-content/40 shrink-0 sm:mb-1">Go Runtime</div>
-          <div class="text-sm font-semibold">{{.GoVersion}}</div>
-        </div>
-        <div class="flex items-center justify-between gap-3 sm:block p-3.5 rounded-xl bg-base-200/40">
-          <div class="text-xs font-medium text-base-content/40 shrink-0 sm:mb-1">PostgreSQL</div>
-          <div class="text-sm font-semibold">{{.PostgresVersion}}</div>
-        </div>
-        <div class="flex items-center justify-between gap-3 sm:block p-3.5 rounded-xl bg-base-200/40">
-          <div class="text-xs font-medium text-base-content/40 shrink-0 sm:mb-1">Uptime</div>
-          <div class="text-sm font-semibold">{{.Uptime}}</div>
-        </div>
-        <div class="flex items-center justify-between gap-3 sm:block p-3.5 rounded-xl bg-base-200/40">
-          <div class="text-xs font-medium text-base-content/40 shrink-0 sm:mb-1">Providers</div>
-          <div class="text-sm font-semibold">{{.ProviderCount}} configured</div>
-        </div>
-      </div>
+    <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+      <div><span class="text-base-content/40">Version</span> <span class="font-medium tabular-nums">{{.Version}}</span></div>
+      <div><span class="text-base-content/40">Go</span> <span class="font-medium">{{.GoVersion}}</span></div>
+      <div><span class="text-base-content/40">PostgreSQL</span> <span class="font-medium">{{.PostgresVersion}}</span></div>
+      <div><span class="text-base-content/40">Uptime</span> <span class="font-medium">{{.Uptime}}</span></div>
+      <div><span class="text-base-content/40">Providers</span> <span class="font-medium">{{.ProviderCount}} configured</span></div>
     </div>
   </div>
 
