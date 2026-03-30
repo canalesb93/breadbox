@@ -10,15 +10,10 @@
 
   <!-- Plaid Card -->
   <div class="bb-card p-0 overflow-hidden">
-    <div class="px-6 py-5 border-b border-base-300 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-info/10 flex items-center justify-center">
-          <i data-lucide="building-2" class="w-5 h-5 text-info"></i>
-        </div>
-        <div>
-          <h2 class="font-semibold">Plaid</h2>
-          <p class="text-xs text-base-content/40">Thousands of financial institutions</p>
-        </div>
+    <div class="px-6 py-4 border-b border-base-300 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <i data-lucide="building-2" class="w-4.5 h-4.5 text-info shrink-0"></i>
+        <h2 class="font-semibold">Plaid</h2>
       </div>
       {{if .PlaidConfigured}}
       <span class="badge badge-success badge-sm rounded-lg">Configured</span>
@@ -26,7 +21,7 @@
       <span class="badge badge-ghost badge-sm rounded-lg">Not Configured</span>
       {{end}}
     </div>
-    <div class="px-6 py-5">
+    <div class="px-6 py-4">
       {{if .PlaidFromEnv}}
       <p class="text-sm text-base-content/50 mb-4">Configured via environment variables (read-only).</p>
       <dl class="bb-info-grid">
@@ -108,15 +103,10 @@
 
   <!-- Teller Card -->
   <div class="bb-card p-0 overflow-hidden">
-    <div class="px-6 py-5 border-b border-base-300 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
-          <i data-lucide="landmark" class="w-5 h-5 text-success"></i>
-        </div>
-        <div>
-          <h2 class="font-semibold">Teller</h2>
-          <p class="text-xs text-base-content/40">mTLS certificate authentication</p>
-        </div>
+    <div class="px-6 py-4 border-b border-base-300 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <i data-lucide="landmark" class="w-4.5 h-4.5 text-success shrink-0"></i>
+        <h2 class="font-semibold">Teller</h2>
       </div>
       {{if .TellerConfigured}}
       <span class="badge badge-success badge-sm rounded-lg">Configured</span>
@@ -124,7 +114,7 @@
       <span class="badge badge-ghost badge-sm rounded-lg">Not Configured</span>
       {{end}}
     </div>
-    <div class="px-6 py-5">
+    <div class="px-6 py-4">
       {{if .TellerFromEnv}}
       <p class="text-sm text-base-content/50 mb-4">Configured via environment variables (read-only).</p>
       <dl class="bb-info-grid">
@@ -223,19 +213,14 @@
 
   <!-- CSV Card -->
   <div class="bb-card p-0 overflow-hidden">
-    <div class="px-6 py-5 border-b border-base-300 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
-          <i data-lucide="file-spreadsheet" class="w-5 h-5 text-success"></i>
-        </div>
-        <div>
-          <h2 class="font-semibold">CSV Import</h2>
-          <p class="text-xs text-base-content/40">No configuration needed</p>
-        </div>
+    <div class="px-6 py-4 border-b border-base-300 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <i data-lucide="file-spreadsheet" class="w-4.5 h-4.5 text-success shrink-0"></i>
+        <h2 class="font-semibold">CSV Import</h2>
       </div>
       <span class="badge badge-success badge-sm rounded-lg">Always Available</span>
     </div>
-    <div class="px-6 py-5">
+    <div class="px-6 py-4">
       <p class="text-sm text-base-content/50 mb-4">Import transactions from CSV files exported from your bank or financial institution.</p>
       <a href="/connections/import-csv" class="btn btn-sm btn-ghost rounded-xl">
         <i data-lucide="upload" class="w-4 h-4"></i>
