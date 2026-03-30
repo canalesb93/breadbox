@@ -46,41 +46,15 @@
 
       <!-- Financial Summary -->
       {{if gt .AccountCount 0}}
-      <div class="mt-5 pt-4 border-t border-base-300">
-        <div class="sm:hidden">
-          <div class="mb-2">
-            <p class="text-xs text-base-content/40 mb-1">Net Worth</p>
-            <p class="text-lg font-semibold tabular-nums{{if lt .NetWorth 0.0}} text-error{{end}}">
-              {{formatAmount .NetWorth}}
-            </p>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <p class="text-xs text-base-content/40 mb-1">Assets</p>
-              <p class="text-sm font-medium tabular-nums text-base-content/70">{{formatAmount .TotalAssets}}</p>
-            </div>
-            <div>
-              <p class="text-xs text-base-content/40 mb-1">Liabilities</p>
-              <p class="text-sm font-medium tabular-nums text-error/70">{{formatAmount .TotalLiabilities}}</p>
-            </div>
-          </div>
-        </div>
-        <div class="hidden sm:grid grid-cols-3 gap-4">
-          <div>
-            <p class="text-xs text-base-content/40 mb-1">Net Worth</p>
-            <p class="text-lg font-semibold tabular-nums{{if lt .NetWorth 0.0}} text-error{{end}}">
-              {{formatAmount .NetWorth}}
-            </p>
-          </div>
-          <div>
-            <p class="text-xs text-base-content/40 mb-1">Assets</p>
-            <p class="text-sm font-medium tabular-nums text-base-content/70">{{formatAmount .TotalAssets}}</p>
-          </div>
-          <div>
-            <p class="text-xs text-base-content/40 mb-1">Liabilities</p>
-            <p class="text-sm font-medium tabular-nums text-error/70">{{formatAmount .TotalLiabilities}}</p>
-          </div>
-        </div>
+      <div class="mt-4 flex items-baseline gap-4 flex-wrap">
+        <span class="text-lg font-semibold tabular-nums{{if lt .NetWorth 0.0}} text-error{{end}}">
+          {{formatAmount .NetWorth}}
+        </span>
+        <span class="text-xs text-base-content/35">
+          {{formatAmount .TotalAssets}} assets
+          <span class="text-base-content/20 mx-0.5">/</span>
+          <span class="text-error/50">{{formatAmount .TotalLiabilities}}</span> liabilities
+        </span>
       </div>
       {{end}}
     </div>
