@@ -43,8 +43,23 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0 opacity-50"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
       </span>
     </template>
-    <!-- Toggleable blocks -->
-    <template x-for="block in allToggleableBlocks" :key="block.id">
+    <!-- Exclusive group toggles (segmented) -->
+    <template x-for="group in exclusiveGroupEntries" :key="group.map(b=>b.id).join(',')">
+      <span class="inline-flex rounded-full border border-base-300 overflow-hidden">
+        <template x-for="block in group" :key="block.id">
+          <button class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-all duration-150 border-r border-base-300 last:border-r-0"
+                  :class="block.enabled
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-base-200/50 text-base-content/40 hover:text-base-content/60'"
+                  @click="toggleBlock(block.id)">
+            <span x-html="getBlockIcon(block.id)" class="flex-shrink-0 flex items-center"></span>
+            <span x-text="block.title"></span>
+          </button>
+        </template>
+      </span>
+    </template>
+    <!-- Regular toggleable blocks -->
+    <template x-for="block in nonGroupToggleableBlocks" :key="block.id">
       <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150"
               :class="block.enabled
                 ? 'bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15'
@@ -358,6 +373,31 @@ function promptBuilder(initialBlocks) {
       return this.blocks.filter(function(b) { return b.role !== 'core' && !b.isCustom; });
     },
 
+    get nonGroupToggleableBlocks() {
+      var self = this;
+      return this.allToggleableBlocks.filter(function(b) { return !self.isInExclusiveGroup(b.id); });
+    },
+
+    get exclusiveGroupEntries() {
+      var self = this;
+      var result = [];
+      var seen = {};
+      this.allToggleableBlocks.forEach(function(b) {
+        var group = self.getExclusiveGroup(b.id);
+        if (group) {
+          var key = group.join(',');
+          if (!seen[key]) {
+            seen[key] = true;
+            var members = group.map(function(gid) {
+              return self.blocks.find(function(bl) { return bl.id === gid; });
+            }).filter(Boolean);
+            if (members.length > 0) result.push(members);
+          }
+        }
+      });
+      return result;
+    },
+
     get preview() {
       return this.blocks
         .filter(function(b) { return b.enabled; })
@@ -385,7 +425,9 @@ function promptBuilder(initialBlocks) {
         'gmail-integration': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="12" viewBox="0 0 256 193"><path fill="#4285F4" d="M58.182 192.05V93.14L27.507 65.077 0 49.504v125.091c0 9.658 7.825 17.455 17.455 17.455z"/><path fill="#34A853" d="M197.818 192.05h40.727c9.659 0 17.455-7.826 17.455-17.455V49.505l-31.156 17.837-27.026 25.798z"/><path fill="#EA4335" d="m58.182 93.14-4.174-38.647 4.174-36.989L128 69.868l69.818-52.364 4.669 34.992-4.669 40.644L128 145.504z"/><path fill="#FBBC04" d="M197.818 17.504V93.14L256 49.504V26.231c0-21.585-24.64-33.89-41.89-20.945z"/><path fill="#C5221F" d="M0 49.504l26.759 20.07L58.182 93.14V17.504L41.89 5.286C24.61-7.66 0 4.646 0 26.23z"/></svg>',
         'sync-management': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>',
         'transaction-comments': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></svg>',
-        'merchant-analysis': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/></svg>'
+        'merchant-analysis': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7"/></svg>',
+        'review-depth-efficient': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+        'review-depth-thorough': '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>'
       };
       return icons[id] || '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>';
     },
@@ -467,9 +509,37 @@ function promptBuilder(initialBlocks) {
       });
     },
 
+    // Blocks that are mutually exclusive — enabling one disables the others in the same group.
+    exclusiveGroups: {
+      'review-depth': ['review-depth-efficient', 'review-depth-thorough']
+    },
+
+    getExclusiveGroup: function(id) {
+      var groups = this.exclusiveGroups;
+      for (var key in groups) {
+        if (groups[key].indexOf(id) !== -1) return groups[key];
+      }
+      return null;
+    },
+
+    isInExclusiveGroup: function(id) {
+      return this.getExclusiveGroup(id) !== null;
+    },
+
     toggleBlock: function(id) {
       var block = this.blocks.find(function(b) { return b.id === id; });
       if (block && block.role !== 'core') {
+        var group = this.getExclusiveGroup(id);
+        if (group && !block.enabled) {
+          // Enabling: disable siblings in the group
+          var self = this;
+          group.forEach(function(siblingId) {
+            if (siblingId !== id) {
+              var sib = self.blocks.find(function(b) { return b.id === siblingId; });
+              if (sib) sib.enabled = false;
+            }
+          });
+        }
         block.enabled = !block.enabled;
         if (block.enabled) {
           delete this.collapsedBlocks[id];

@@ -121,7 +121,19 @@ RULE PRIORITY & CONFLICTS:
 
 Use batch_create_rules (max 100) to create multiple rules efficiently.
 Prefer contains over exact match — bank feeds format merchant names inconsistently.
-Always use category_slug (not category_id) when creating rules.`
+Always use category_slug (not category_id) when creating rules.
+
+PROVIDER NOTES:
+Each bank data provider has quirks in how it labels transactions. Keep these in mind when creating rules and reviewing transactions.
+
+Teller:
+- "general" is a catch-all category covering 30%+ of transactions. Do NOT create a category_primary rule for "general" — it would miscategorize everything under one label. Instead, use name-pattern rules (contains on the name field) for transactions with category_primary="general".
+- Other Teller raw categories map reliably: accommodation, advertising, bar, charity, clothing, dining, education, electronics, entertainment, fuel, groceries, health, home, income, insurance, investment, loan, office, phone, service, shopping, software, sport, tax, transport, utilities. These can safely be mapped via category_primary rules (one rule per raw category, scoped to provider=teller).
+
+Plaid:
+- Raw categories use a hierarchical format (e.g., "FOOD_AND_DRINK_RESTAURANTS", "TRANSFER_DEBIT"). These are more specific than Teller's labels.
+- Plaid provides merchant_name separately from the transaction name — use merchant_name for rule matching when available.
+- Pending transactions from Plaid may have a different transaction ID than the posted version. The system handles this via pending_transaction_id linking.`
 
 // DefaultReportFormat contains the default report format guidelines served via breadbox://report-format.
 // User-editable via the MCP Settings page.
