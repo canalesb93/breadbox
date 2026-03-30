@@ -166,12 +166,12 @@
 </div>
 {{end}}
 
-<!-- Accounts Overview -->
+<!-- Net Worth & Accounts -->
 {{if .Accounts}}
-<div class="mb-6">
+<div class="bb-card mb-6" x-data="{ showAccounts: false }">
   <!-- Net Worth Summary -->
   {{if .AllocationSlices}}
-  <div class="bb-card p-4 sm:p-5 mb-6">
+  <div class="p-4 sm:p-5">
     <div class="flex items-baseline justify-between mb-3">
       <div>
         <div class="text-xs text-base-content/40 mb-0.5">Net Worth</div>
@@ -194,61 +194,66 @@
       <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: {{printf "%.1f" .Percent}}%; background: {{safeCSS .Color}}; opacity: 0.7;" title="{{.Label}}: {{formatBalance .Amount}}"></div>
       {{end}}
     </div>
-    <div class="flex items-center gap-4 mt-2.5 flex-wrap">
-      {{range .AllocationSlices}}
-      <span class="flex items-center gap-1.5 text-xs text-base-content/50">
-        <span class="w-2 h-2 rounded-full shrink-0" style="background: {{safeCSS .Color}}; opacity: 0.7;"></span>
-        {{.Label}}
-        <span class="tabular-nums font-medium text-base-content/70">{{formatBalance .Amount}}</span>
-      </span>
-      {{end}}
+    <div class="flex items-center justify-between mt-2.5">
+      <div class="flex items-center gap-4 flex-wrap">
+        {{range .AllocationSlices}}
+        <span class="flex items-center gap-1.5 text-xs text-base-content/50">
+          <span class="w-2 h-2 rounded-full shrink-0" style="background: {{safeCSS .Color}}; opacity: 0.7;"></span>
+          {{.Label}}
+          <span class="tabular-nums font-medium text-base-content/70">{{formatBalance .Amount}}</span>
+        </span>
+        {{end}}
+      </div>
+      <a href="/connections" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors shrink-0 ml-4">View all</a>
     </div>
   </div>
   {{end}}
 
-  <!-- Account Cards Grid -->
-  <div class="flex items-center justify-between mb-3">
-    <h2 class="text-sm font-semibold text-base-content/70">Accounts</h2>
-    <a href="/connections" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
+  <!-- Accounts Toggle -->
+  <div class="border-t border-base-200/60">
+    <button @click="showAccounts = !showAccounts" class="flex items-center justify-between w-full text-left px-4 sm:px-5 py-3 hover:bg-base-200/30 transition-colors rounded-b-xl" :class="showAccounts ? 'rounded-b-none' : ''">
+      <span class="text-sm font-semibold text-base-content/70">{{len .Accounts}} Accounts</span>
+      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200" :class="showAccounts ? 'rotate-180' : ''"></i>
+    </button>
   </div>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 bb-stagger">
-    {{range .Accounts}}
-    <a href="/accounts/{{.ID}}" class="bb-card bb-card--interactive p-4 no-underline group block">
-      <div class="flex items-start justify-between mb-2">
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-1.5">
-            <span class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</span>
-            {{if and .ConnectionStatus (ne .ConnectionStatus "active")}}
-            <span class="shrink-0 text-[0.55rem] font-medium px-1.5 py-0.5 rounded-full leading-none {{if eq .ConnectionStatus "error"}}bg-error/8 text-error/70{{else if eq .ConnectionStatus "pending_reauth"}}bg-warning/8 text-warning{{else if eq .ConnectionStatus "disconnected"}}bg-base-300/60 text-base-content/40{{end}}">{{if eq .ConnectionStatus "pending_reauth"}}reauth{{else}}{{.ConnectionStatus}}{{end}}</span>
+
+  <!-- Collapsible Account Cards -->
+  <div x-show="showAccounts" x-cloak class="border-t border-base-200/60 p-4 sm:p-5">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+      {{range .Accounts}}
+      <a href="/accounts/{{.ID}}" class="bb-card bb-card--interactive p-4 no-underline group block">
+        <div class="flex items-start justify-between mb-2">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-1.5">
+              <span class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</span>
+              {{if and .ConnectionStatus (ne .ConnectionStatus "active")}}
+              <span class="shrink-0 text-[0.55rem] font-medium px-1.5 py-0.5 rounded-full leading-none {{if eq .ConnectionStatus "error"}}bg-error/8 text-error/70{{else if eq .ConnectionStatus "pending_reauth"}}bg-warning/8 text-warning{{else if eq .ConnectionStatus "disconnected"}}bg-base-300/60 text-base-content/40{{end}}">{{if eq .ConnectionStatus "pending_reauth"}}reauth{{else}}{{.ConnectionStatus}}{{end}}</span>
+              {{end}}
+            </div>
+            <div class="text-[0.65rem] text-base-content/40 mt-0.5 truncate">{{.InstitutionName}}{{if .Mask}} · ····{{.Mask}}{{end}}</div>
+          </div>
+          <div class="w-7 h-7 rounded-lg bg-base-200/50 flex items-center justify-center shrink-0 ml-2">
+            <i data-lucide="{{accountTypeIcon .Type}}" class="w-3.5 h-3.5 text-base-content/35"></i>
+          </div>
+        </div>
+        {{if .SparklineData}}
+        <div class="bb-sparkline w-full h-8 my-1.5" data-values="{{.SparklineData}}" data-liability="{{.IsLiability}}"></div>
+        {{else}}
+        <div class="h-8 my-1.5"></div>
+        {{end}}
+        <div class="flex items-end justify-between mt-1">
+          <div class="text-lg font-bold tabular-nums tracking-tight {{if .IsLiability}}text-error/80{{end}}">{{if .IsLiability}}-{{end}}{{formatBalance .BalanceCurrent}}</div>
+          <div class="text-right">
+            {{if gt .SpendingTotal 0.0}}
+            <div class="text-[0.65rem] text-base-content/40 tabular-nums">{{formatBalance .SpendingTotal}} spent</div>
+            {{else}}
+            <div class="text-[0.65rem] text-base-content/35">{{accountTypeLabel .Type .Subtype}}</div>
             {{end}}
           </div>
-          <div class="text-[0.65rem] text-base-content/40 mt-0.5 truncate">{{.InstitutionName}}{{if .Mask}} · ····{{.Mask}}{{end}}</div>
         </div>
-        <div class="w-7 h-7 rounded-lg bg-base-200/50 flex items-center justify-center shrink-0 ml-2">
-          <i data-lucide="{{accountTypeIcon .Type}}" class="w-3.5 h-3.5 text-base-content/35"></i>
-        </div>
-      </div>
-      <!-- Sparkline -->
-      {{if .SparklineData}}
-      <div class="bb-sparkline w-full h-8 my-1.5" data-values="{{.SparklineData}}" data-liability="{{.IsLiability}}"></div>
-      {{else}}
-      <div class="h-8 my-1.5"></div>
+      </a>
       {{end}}
-      <!-- Balance -->
-      <div class="flex items-end justify-between mt-1">
-        <div>
-          <div class="text-lg font-bold tabular-nums tracking-tight {{if .IsLiability}}text-error/80{{end}}">{{if .IsLiability}}-{{end}}{{formatBalance .BalanceCurrent}}</div>
-        </div>
-        <div class="text-right">
-          {{if gt .SpendingTotal 0.0}}
-          <div class="text-[0.65rem] text-base-content/40 tabular-nums">{{formatBalance .SpendingTotal}} spent</div>
-          {{else}}
-          <div class="text-[0.65rem] text-base-content/35">{{accountTypeLabel .Type .Subtype}}</div>
-          {{end}}
-        </div>
-      </div>
-    </a>
-    {{end}}
+    </div>
   </div>
 </div>
 {{end}}

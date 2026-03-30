@@ -652,6 +652,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			AccountCount    int64
 			Paused          bool
 			IsStale         bool // hasn't synced in 24+ hours
+			lastSyncedRaw   time.Time
 		}
 		var connectionHealth []ConnectionHealthRow
 		var healthyCount, errorCount, staleCount int
@@ -715,18 +716,28 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 
 			connID := formatUUID(conn.ID)
 
+			var rawTime time.Time
+			if conn.LastSyncedAt.Valid {
+				rawTime = conn.LastSyncedAt.Time
+			}
 			connectionHealth = append(connectionHealth, ConnectionHealthRow{
-				ID:           connID,
-				Name:         name,
-				Provider:     string(conn.Provider),
-				Status:       status,
-				ErrorMessage: errMsg,
-				LastSyncedAt: lastSync,
-				AccountCount: conn.AccountCount,
-				Paused:       conn.Paused,
-				IsStale:      isStale,
+				ID:            connID,
+				Name:          name,
+				Provider:      string(conn.Provider),
+				Status:        status,
+				ErrorMessage:  errMsg,
+				LastSyncedAt:  lastSync,
+				AccountCount:  conn.AccountCount,
+				Paused:        conn.Paused,
+				IsStale:       isStale,
+				lastSyncedRaw: rawTime,
 			})
 		}
+
+		// Sort connections by last sync time (most recent first)
+		sort.Slice(connectionHealth, func(i, j int) bool {
+			return connectionHealth[i].lastSyncedRaw.After(connectionHealth[j].lastSyncedRaw)
+		})
 
 		// ── Sync Health Summary ──────────────────────────────────────
 		syncHealth, err := svc.GetSyncHealthSummary(ctx)
