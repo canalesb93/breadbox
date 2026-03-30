@@ -4,7 +4,7 @@
 {{template "breadcrumb" .}}
 
 <!-- Header -->
-<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+<div class="bb-page-header">
   <div class="flex items-center gap-4">
     <div class="w-12 h-12 rounded-xl bg-base-200 flex items-center justify-center">
       <i data-lucide="{{if eq .Account.Type "credit"}}credit-card{{else if eq .Account.Type "investment"}}trending-up{{else if eq .Account.Type "loan"}}landmark{{else}}wallet{{end}}" class="w-6 h-6 text-base-content/50"></i>
@@ -16,7 +16,10 @@
         {{if .Account.Mask}}<span class="text-xs text-base-content/30">&bull;&bull;&bull;&bull;{{.Account.Mask}}</span>{{end}}
         {{if .Account.Excluded}}<span class="badge badge-ghost badge-xs">Excluded</span>{{end}}
         {{if and .Account.ConnectionStatus (ne (deref .Account.ConnectionStatus) "active")}}
-        <span class="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full {{if eq (deref .Account.ConnectionStatus) "error"}}bg-error/8 text-error/70{{else if eq (deref .Account.ConnectionStatus) "pending_reauth"}}bg-warning/8 text-warning{{else if eq (deref .Account.ConnectionStatus) "disconnected"}}bg-base-300/60 text-base-content/40{{end}}">{{if eq (deref .Account.ConnectionStatus) "pending_reauth"}}reauth{{else}}{{deref .Account.ConnectionStatus}}{{end}}</span>
+        {{if eq (deref .Account.ConnectionStatus) "error"}}<span class="badge badge-error badge-xs">Error</span>
+        {{else if eq (deref .Account.ConnectionStatus) "pending_reauth"}}<span class="badge badge-warning badge-xs">Reauth</span>
+        {{else if eq (deref .Account.ConnectionStatus) "disconnected"}}<span class="badge badge-ghost badge-xs">Disconnected</span>
+        {{end}}
         {{end}}
       </div>
     </div>
@@ -207,174 +210,191 @@
 </div>
 
 <!-- Transactions Section -->
-<div class="bb-card">
-  <div class="px-6 pt-6 pb-4">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-sm font-semibold text-base-content/50">Transactions</h2>
-      <div class="flex items-center gap-2">
-        {{if .Transactions}}<span class="text-xs text-base-content/30">{{.Total}} total</span>
-        <a href="{{.ExportURL}}" class="btn btn-ghost btn-xs rounded-lg" title="Export as CSV">
-          <i data-lucide="download" class="w-3 h-3"></i>
-          CSV
-        </a>{{end}}
-      </div>
+<div class="mb-6" x-data="{ filtersOpen: {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}true{{else}}false{{end}} }">
+  <!-- Header row with filter toggle -->
+  <div class="flex items-center justify-between mb-3">
+    <div class="flex items-baseline gap-3">
+      <h2 class="text-sm font-semibold text-base-content/70">Transactions</h2>
+      {{if .Total}}<span class="text-xs text-base-content/30 tabular-nums">{{.Total}} total</span>{{end}}
     </div>
+    <div class="flex items-center gap-2">
+      {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
+      <a href="/accounts/{{.AccountID}}" class="btn btn-ghost btn-sm rounded-xl">
+        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        <span class="hidden sm:inline">Clear filters</span>
+      </a>
+      {{end}}
+      {{if .Transactions}}
+      <a href="{{.ExportURL}}" class="btn btn-ghost btn-sm rounded-xl" title="Export as CSV">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+        <span class="hidden sm:inline">CSV</span>
+      </a>
+      {{end}}
+      <button type="button" class="btn rounded-xl gap-2 shrink-0 h-9 min-h-0 px-3"
+        :class="filtersOpen ? 'btn-primary' : 'btn-ghost'"
+        @click="filtersOpen = !filtersOpen">
+        <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+        <span>Filters</span>
+        {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
+        <span class="badge badge-xs" :class="filtersOpen ? 'badge-primary-content' : 'badge-primary'">Active</span>
+        {{end}}
+        <i data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform duration-200" :class="filtersOpen && 'rotate-180'"></i>
+      </button>
+    </div>
+  </div>
 
-    <!-- Filters -->
-    <form method="GET" action="/accounts/{{.AccountID}}" class="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-3 pb-4 border-b border-base-300" x-data>
-      <label class="flex flex-col gap-1">
-        <span class="text-xs text-base-content/40">Start Date</span>
+  <!-- Filter panel (collapsible, matching transactions page style) -->
+  <form method="GET" action="/accounts/{{.AccountID}}" x-show="filtersOpen" x-cloak
+    x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0 -translate-y-2"
+    x-transition:enter-end="opacity-100 translate-y-0"
+    x-transition:leave="transition ease-in duration-150"
+    x-transition:leave-start="opacity-100 translate-y-0"
+    x-transition:leave-end="opacity-0 -translate-y-2"
+    class="bb-card mb-4 p-4" x-data>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+      <label class="bb-filter-label">
+        Start Date
         <input type="date" name="start_date" value="{{.FilterStartDate}}" class="input input-sm input-bordered w-full">
       </label>
-      <label class="flex flex-col gap-1">
-        <span class="text-xs text-base-content/40">End Date</span>
+      <label class="bb-filter-label">
+        End Date
         <input type="date" name="end_date" value="{{.FilterEndDate}}" class="input input-sm input-bordered w-full">
       </label>
-      <label class="flex flex-col gap-1">
-        <span class="text-xs text-base-content/40">Category</span>
-        <div class="bb-cat-picker" data-picker-source="acct-filter-cat" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'filter', initial: '{{.FilterCategory}}', allowEmpty: true, emptyLabel: 'All categories', sourceId: 'acct-filter-cat'})" @category-change="$refs.catInput.value = selectedSlug">
+      <label class="bb-filter-label">
+        Category
+        <div class="bb-cat-picker" data-picker-source="acct-filter-cat" x-data="categoryPicker({categories: window.__bbCategories, mode: 'filter', initial: '{{.FilterCategory}}', allowEmpty: true, emptyLabel: 'All categories', sourceId: 'acct-filter-cat'})" @category-change="$refs.catInput.value = selectedSlug">
           <input type="hidden" name="category" x-ref="catInput" value="{{.FilterCategory}}">
-          <button type="button" class="select select-sm select-bordered w-full sm:w-auto min-w-[8rem] text-left flex items-center gap-2" @click="openPicker()">
+          <button type="button" class="select select-sm select-bordered w-full text-left flex items-center gap-2" @click="openPicker()">
             <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
             <span x-text="displayLabel" class="text-sm truncate"></span>
           </button>
         </div>
       </label>
-      <label class="flex flex-col gap-1">
-        <span class="text-xs text-base-content/40">Status</span>
+      <label class="bb-filter-label">
+        Status
         <select name="pending" class="select select-sm select-bordered w-full">
           <option value="">All</option>
           <option value="true"{{if eq .FilterPending "true"}} selected{{end}}>Pending</option>
           <option value="false"{{if eq .FilterPending "false"}} selected{{end}}>Posted</option>
         </select>
       </label>
-      <label class="flex flex-col gap-1 col-span-2">
-        <span class="text-xs text-base-content/40">Search</span>
+      <label class="bb-filter-label">
+        Search
         <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Name or merchant" class="input input-sm input-bordered w-full">
       </label>
-      <div class="flex items-center gap-2 col-span-2 sm:col-span-1">
-        <button type="submit" class="btn btn-sm btn-primary rounded-xl flex-1 sm:flex-none">Filter</button>
-        {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
-        <a href="/accounts/{{.AccountID}}" class="btn btn-sm btn-ghost rounded-xl">Clear</a>
-        {{end}}
-      </div>
-    </form>
-  </div>
+    </div>
+    <div class="bb-filter-actions">
+      <a href="/accounts/{{.AccountID}}" class="btn btn-sm btn-ghost rounded-xl">Reset</a>
+      <button type="submit" class="btn btn-sm btn-primary rounded-xl">
+        <i data-lucide="search" class="w-3.5 h-3.5"></i>
+        Apply Filters
+      </button>
+    </div>
+  </form>
+</div>
 
-  {{if .Transactions}}
-  <!-- Mobile transaction list (< sm) -->
-  <div class="sm:hidden divide-y divide-base-300">
+{{if .Transactions}}
+<!-- Transaction List (using shared tx-row partial) -->
+<div class="bb-card overflow-hidden">
+  <!-- Table Header (desktop) -->
+  <div class="bb-table-header">
+    <div class="w-9"></div>
+    <div class="flex-1 min-w-0">Name</div>
+    <div class="hidden sm:block shrink-0">Category</div>
+    <div class="w-24 text-right hidden sm:block">Date</div>
+    <div class="w-24 text-right pl-3">Amount</div>
+    <div class="w-4 hidden sm:block"></div>
+  </div>
+  <!-- Transaction Rows -->
+  <div class="divide-y divide-base-300/50">
     {{range .Transactions}}
-    <a href="/transactions/{{.ID}}" class="flex items-center justify-between gap-3 px-6 py-3.5 hover:bg-base-200/40 transition-colors no-underline">
-      <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-1.5">
-          {{if .HasPendingReview}}<span class="w-2 h-2 rounded-full bg-info shrink-0" title="Pending review"></span>{{end}}
-          <span class="text-sm font-medium truncate">{{.Name}}</span>
-          {{if .Pending}}<span class="badge badge-warning badge-xs shrink-0">Pending</span>{{end}}
-        </div>
-        <div class="flex items-center gap-1.5 mt-1 text-xs text-base-content/40">
-          <span>{{formatDate .Date}}</span>
-          {{if .CategoryDisplayName}}
-          <span class="text-base-content/20">&middot;</span>
-          <span class="inline-flex items-center gap-1 truncate">
-            {{if .CategoryColor}}<span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {{safeCSS (deref .CategoryColor)}}"></span>{{end}}
-            <span class="truncate">{{deref .CategoryDisplayName}}</span>
-          </span>
-          {{end}}
-          {{if .CategoryOverride}}<span class="text-[0.6rem] text-base-content/30">override</span>{{end}}
-        </div>
-      </div>
-      <span class="text-sm font-semibold tabular-nums shrink-0{{if lt .Amount 0.0}} text-success{{end}}">
-        {{formatAmount .Amount}}
-      </span>
+    {{template "tx-row" .}}
+    {{end}}
+  </div>
+</div>
+
+<!-- Pagination -->
+{{if gt .TotalPages 1}}
+<div class="bb-paginator">
+  <div class="bb-paginator__info">
+    <span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
+      Showing {{.ShowingStart}}&ndash;{{.ShowingEnd}} of {{.Total}}
+    </span>
+  </div>
+  <div class="bb-paginator__nav">
+    <!-- First -->
+    {{if gt .Page 2}}
+    <a href="{{printf "%s%d" $.PaginationBase 1}}" class="bb-paginator__btn" title="First page">
+      <i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
+    </a>
+    {{end}}
+    <!-- Previous -->
+    {{if gt .Page 1}}
+    <a href="{{printf "%s%d" $.PaginationBase (sub $.Page 1)}}" class="bb-paginator__btn" title="Previous page">
+      <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+    </a>
+    {{end}}
+    <!-- Page numbers -->
+    {{range pageRange .Page .TotalPages}}
+    {{if eq . 0}}
+    <span class="bb-paginator__ellipsis">&hellip;</span>
+    {{else if eq . $.Page}}
+    <span class="bb-paginator__btn bb-paginator__btn--active">{{.}}</span>
+    {{else}}
+    <a href="{{printf "%s%d" $.PaginationBase .}}" class="bb-paginator__btn">{{.}}</a>
+    {{end}}
+    {{end}}
+    <!-- Next -->
+    {{if lt .Page .TotalPages}}
+    <a href="{{printf "%s%d" $.PaginationBase (add $.Page 1)}}" class="bb-paginator__btn" title="Next page">
+      <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+    </a>
+    {{end}}
+    <!-- Last -->
+    {{if lt .Page (sub .TotalPages 1)}}
+    <a href="{{printf "%s%d" $.PaginationBase $.TotalPages}}" class="bb-paginator__btn" title="Last page">
+      <i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
     </a>
     {{end}}
   </div>
-
-  <!-- Desktop transaction table (>= sm) -->
-  <div class="overflow-x-auto hidden sm:block">
-    <table class="table table-sm">
-      <thead>
-        <tr class="text-xs text-base-content/50 border-b border-base-300">
-          <th class="font-medium">Date</th>
-          <th class="font-medium">Description</th>
-          <th class="font-medium text-right">Amount</th>
-          <th class="font-medium">Category</th>
-          <th class="font-medium">Status</th>
-        </tr>
-      </thead>
-      {{range .Transactions}}
-      <tbody x-data="{ expanded: false }">
-        <tr @click="expanded = !expanded" class="cursor-pointer hover:bg-base-200/40 transition-colors duration-150">
-          <td class="text-sm text-base-content/60 whitespace-nowrap">{{formatDate .Date}}</td>
-          <td>
-            <div class="flex items-center gap-2">
-              <span class="relative">
-                {{if .HasPendingReview}}<span class="absolute -left-2.5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-info" title="Pending review"></span>{{end}}
-                <a href="/transactions/{{.ID}}" @click.stop class="font-medium text-sm hover:text-primary transition-colors no-underline">{{.Name}}</a>
-                {{if .MerchantName}}<span class="text-xs text-base-content/40 ml-1">{{titleCase (deref .MerchantName)}}</span>{{end}}
-              </span>
-            </div>
-          </td>
-          <td class="text-right tabular-nums text-sm font-semibold{{if lt .Amount 0.0}} text-success{{end}}">
-            {{formatAmount .Amount}}
-          </td>
-          <td @click.stop>
-            <div class="bb-cat-picker" data-picker-source="acct-tx-{{.ID}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', sourceId: 'acct-tx-{{.ID}}'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
-              <button type="button" class="btn btn-ghost btn-xs gap-1.5 -ml-1" @click="openPicker()">
-                <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-                <span x-text="displayLabel" class="text-sm" :class="!selectedId && 'text-base-content/30'"></span>
-                {{if .CategoryOverride}}<span class="badge badge-outline badge-xs">override</span>{{end}}
-              </button>
-            </div>
-          </td>
-          <td>{{if .Pending}}<span class="badge badge-warning badge-xs">Pending</span>{{end}}</td>
-        </tr>
-        <tr x-show="expanded" x-cloak>
-          <td colspan="5" class="bg-base-200/30 px-6 py-3">
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-              {{if .MerchantName}}<div><span class="text-xs text-base-content/40 block">Merchant</span>{{titleCase (deref .MerchantName)}}</div>{{end}}
-              <div><span class="text-xs text-base-content/40 block">Transaction ID</span><code class="font-mono text-xs text-base-content/50">{{.ID}}</code></div>
-              <div><span class="text-xs text-base-content/40 block">Created</span>{{formatDateTime .CreatedAt}}</div>
-              <div><span class="text-xs text-base-content/40 block">Updated</span>{{formatDateTime .UpdatedAt}}</div>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-      {{end}}
-    </table>
-  </div>
-
-  {{if gt .TotalPages 1}}
-  <div class="px-6 py-4 flex items-center justify-between border-t border-base-300">
-    <div>
-      {{if gt .Page 1}}
-      <a href="/accounts/{{$.AccountID}}?page={{sub .Page 1}}{{if $.FilterStartDate}}&start_date={{$.FilterStartDate}}{{end}}{{if $.FilterEndDate}}&end_date={{$.FilterEndDate}}{{end}}{{if $.FilterCategory}}&category={{$.FilterCategory}}{{end}}{{if $.FilterPending}}&pending={{$.FilterPending}}{{end}}{{if $.FilterSearch}}&search={{$.FilterSearch}}{{end}}" class="btn btn-sm btn-ghost">&larr; Previous</a>
-      {{end}}
-    </div>
-    <span class="text-xs text-base-content/40">Page {{.Page}} of {{.TotalPages}}</span>
-    <div>
-      {{if lt .Page .TotalPages}}
-      <a href="/accounts/{{$.AccountID}}?page={{add .Page 1}}{{if $.FilterStartDate}}&start_date={{$.FilterStartDate}}{{end}}{{if $.FilterEndDate}}&end_date={{$.FilterEndDate}}{{end}}{{if $.FilterCategory}}&category={{$.FilterCategory}}{{end}}{{if $.FilterPending}}&pending={{$.FilterPending}}{{end}}{{if $.FilterSearch}}&search={{$.FilterSearch}}{{end}}" class="btn btn-sm btn-ghost">Next &rarr;</a>
-      {{end}}
-    </div>
-  </div>
-  {{end}}
-
-  {{else}}
-  <div class="px-6 pb-8">
-    <div class="flex flex-col items-center justify-center py-10 text-base-content/30">
-      <i data-lucide="receipt" class="w-10 h-10 mb-3 opacity-50"></i>
-      <p class="text-sm">No transactions found</p>
-      {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
-      <a href="/accounts/{{.AccountID}}" class="btn btn-sm btn-ghost mt-3">Clear filters</a>
-      {{end}}
-    </div>
-  </div>
-  {{end}}
 </div>
+{{end}}
+
+{{else}}
+<div class="bb-card">
+  <div class="flex flex-col items-center text-center py-12 px-6">
+    <i data-lucide="receipt" class="w-12 h-12 text-base-content/20 mb-2"></i>
+    <p class="text-base-content/60">No transactions found.</p>
+    {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
+    <a href="/accounts/{{.AccountID}}" class="btn btn-ghost btn-sm mt-2">
+      <i data-lucide="x" class="w-3.5 h-3.5"></i>
+      Clear filters
+    </a>
+    {{end}}
+  </div>
+</div>
+{{end}}
 
 {{template "category-picker-script" .}}
+
+<script>
+window.__bbCategories = {{toJSON .Categories}};
+
+// Minimal bulk store for tx-row partial compatibility
+document.addEventListener('alpine:init', function() {
+  if (!Alpine.store('bulk')) {
+    Alpine.store('bulk', {
+      selecting: false,
+      sel: [],
+      isIn: function() { return false; },
+      toggle: function() {},
+      toggleMode: function() {},
+      clear: function() {}
+    });
+  }
+});
+</script>
 
 <!-- Chart.js Initialization -->
 {{if or .DailyLabels .CategoryLabels}}

@@ -619,6 +619,15 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			}
 		}
 
+		// Build pagination base for account detail
+		acctPaginationBase := buildAccountPaginationBase(r, idStr)
+		pageSize := txResult.PageSize
+		if pageSize == 0 {
+			pageSize = 50
+		}
+		showingStart := int64((txResult.Page-1)*pageSize + 1)
+		showingEnd := min(int64(txResult.Page*pageSize), txResult.Total)
+
 		data := map[string]any{
 			"PageTitle":       detail.InstitutionName + " — " + accountDisplayName(detail),
 			"CurrentPage":    "transactions",
@@ -629,8 +638,12 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			"Transactions":   txResult.Transactions,
 			"Categories":     categoryTree,
 			"Page":           txResult.Page,
+			"PageSize":       pageSize,
 			"TotalPages":     txResult.TotalPages,
 			"Total":          txResult.Total,
+			"PaginationBase": acctPaginationBase,
+			"ShowingStart":   showingStart,
+			"ShowingEnd":     showingEnd,
 			"ExportURL":      acctExportURL,
 			"FilterStartDate": stringOrEmpty(dateParamPtr(r, "start_date")),
 			"FilterEndDate":   stringOrEmpty(dateParamPtr(r, "end_date")),
@@ -1025,6 +1038,25 @@ func buildExportURL(r *http.Request) string {
 		exportURL += "?" + strings.Join(qs, "&")
 	}
 	return exportURL
+}
+
+// buildAccountPaginationBase returns the query string prefix for account detail pagination links.
+func buildAccountPaginationBase(r *http.Request, accountID string) string {
+	paginationParams := []string{
+		"start_date", "end_date", "category", "pending", "search",
+	}
+	q := r.URL.Query()
+	qs := make([]string, 0, len(paginationParams))
+	for _, key := range paginationParams {
+		if v := q.Get(key); v != "" {
+			qs = append(qs, key+"="+url.QueryEscape(v))
+		}
+	}
+	base := "/accounts/" + accountID + "?page="
+	if len(qs) > 0 {
+		base = "/accounts/" + accountID + "?" + strings.Join(qs, "&") + "&page="
+	}
+	return base
 }
 
 // QuickSearchTransactionsHandler serves GET /-/search/transactions.
