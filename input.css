@@ -285,16 +285,24 @@
     scrollbar-color: transparent transparent;
   }
 
-  .bb-sidebar-nav:hover {
+  .bb-sidebar-nav:hover,
+  .bb-sidebar-nav:active {
     scrollbar-color: oklch(var(--bc) / 0.15) transparent;
   }
 
+  @media (max-width: 1023px) {
+    .bb-sidebar-nav {
+      scrollbar-color: oklch(var(--bc) / 0.08) transparent;
+    }
+  }
+
   .bb-sidebar-section {
-    @apply text-[0.65rem] font-medium text-base-content/40 px-3 pt-5 pb-1.5;
+    @apply text-[0.7rem] lg:text-[0.65rem] font-medium text-base-content/40 px-3 pt-5 pb-2 lg:pb-1.5;
   }
 
   .bb-sidebar-link {
-    @apply flex items-center gap-3 px-3 py-2.5 lg:py-1.5 rounded-lg text-sm font-medium
+    @apply flex items-center gap-3 px-3 py-2.5 lg:py-1.5 min-h-11 lg:min-h-0
+           rounded-lg text-sm font-medium
            text-base-content/60 no-underline
            hover:bg-base-200 hover:text-base-content;
     transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
@@ -309,7 +317,7 @@
   }
 
   .bb-sidebar-link i, .bb-sidebar-link svg {
-    @apply w-4 h-4 opacity-50;
+    @apply w-[1.125rem] h-[1.125rem] lg:w-4 lg:h-4 opacity-50;
     transition: opacity 0.15s ease;
   }
 
