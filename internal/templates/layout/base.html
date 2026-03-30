@@ -593,6 +593,7 @@
           this.search = '';
           this.activeIndex = 0;
           this.open = true;
+          document.body.style.overflow = 'hidden';
 
           var self = this;
           setTimeout(function() {
@@ -605,6 +606,7 @@
         closePicker() {
           this.open = false;
           this.search = '';
+          document.body.style.overflow = '';
         },
 
         moveDown() {
@@ -729,6 +731,7 @@
           this.activeIndex = 0;
           this._txResults = [];
           this._txLoading = false;
+          document.body.style.overflow = 'hidden';
           var self = this;
           setTimeout(function() {
             if (self.$refs.cmdkInput) {
@@ -743,6 +746,7 @@
           this.query = '';
           this._txResults = [];
           this._txLoading = false;
+          document.body.style.overflow = '';
           if (this._txTimer) clearTimeout(this._txTimer);
           if (this._txAbort) this._txAbort.abort();
         },
