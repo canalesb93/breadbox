@@ -184,7 +184,7 @@
 </div>
 
 <!-- Triage: Compact, keyboard-driven review workflow -->
-<div x-data="triageQueue()" @keydown.window="handleKey($event)" class="space-y-0" :class="{ 'bb-instant-nav': keyboardNav }">
+<div x-data="triageQueue()" @keydown.window="handleKey($event)" class="space-y-0">
 
   {{if .Reviews}}
   <!-- Triage toolbar (only shown for pending reviews) -->
@@ -206,7 +206,7 @@
     {{range $idx, $review := .Reviews}}
     <div class="bb-triage-row"
          :class="{ 'bb-triage-row--focused': focusedIdx === {{$idx}} }"
-         @click="keyboardNav = false; focusedIdx = {{$idx}}"
+         @click="focusedIdx = {{$idx}}"
          id="triage-{{$review.ID}}"
          data-review-id="{{$review.ID}}"
          data-idx="{{$idx}}"
@@ -298,12 +298,6 @@
       <div class="bb-triage-detail"
            x-show="focusedIdx === {{$idx}}"
            x-cloak
-           x-transition:enter="transition ease-out duration-150"
-           x-transition:enter-start="opacity-0 -translate-y-1"
-           x-transition:enter-end="opacity-100 translate-y-0"
-           x-transition:leave="transition ease-in duration-100"
-           x-transition:leave-start="opacity-100"
-           x-transition:leave-end="opacity-0"
            @click.stop>
 
         <div class="flex items-center gap-3 flex-wrap">
@@ -314,6 +308,10 @@
               <i data-lucide="external-link" class="w-3 h-3 inline"></i>
               View
             </a>
+            {{if $review.Transaction.UserName}}
+            <span class="text-xs text-base-content/30">|</span>
+            <span class="text-xs text-base-content/50">{{deref $review.Transaction.UserName}}</span>
+            {{end}}
             {{if $review.Transaction.Pending}}
             <span class="badge badge-warning badge-xs">Pending</span>
             {{end}}
@@ -325,11 +323,11 @@
           </div>
 
           <!-- Category picker -->
-          <div class="bb-cat-picker shrink-0" data-picker-source="triage-{{$review.ID}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if $review.SuggestedCategoryID}}{{$review.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current'})" @category-change="selectedCatId = $event.detail.id">
-            <button type="button" class="btn btn-xs btn-ghost gap-1.5 justify-start border border-base-300 rounded-lg" @click="openPicker()">
-              <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
-              <span x-text="displayLabel" class="text-xs truncate max-w-[120px]"></span>
-              <svg class="w-3 h-3 opacity-40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          <div class="bb-cat-picker" data-picker-source="triage-{{$review.ID}}" x-data="categoryPicker({categories: {{toJSON $.Categories}}, mode: 'assign', initial: '{{if $review.SuggestedCategoryID}}{{$review.SuggestedCategoryID}}{{end}}', placeholder: 'Keep current', allowEmpty: true, emptyLabel: 'Keep current'})" @category-change="selectedCatId = $event.detail.id">
+            <button type="button" class="btn btn-xs btn-ghost gap-1.5 justify-start border border-base-300 rounded-lg max-w-[240px]" @click="openPicker()">
+              <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="'background-color:' + (displayColor || 'oklch(0.65 0 0)')"></span>
+              <span x-text="displayLabel" class="text-xs truncate"></span>
+              <svg class="w-3 h-3 opacity-40 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
             </button>
           </div>
 
@@ -382,7 +380,6 @@ function triageQueue() {
   return {
     focusedIdx: 0,
     sessionCount: 0,
-    keyboardNav: false,
     totalRows: document.querySelectorAll('.bb-triage-row').length,
 
     init() {
@@ -411,13 +408,13 @@ function triageQueue() {
       switch(e.key) {
         case 'j':
           e.preventDefault();
-          this.keyboardNav = true;
+
           this.focusedIdx = Math.min(this.focusedIdx + 1, rows.length - 1);
           this.scrollToFocused();
           break;
         case 'k':
           e.preventDefault();
-          this.keyboardNav = true;
+
           this.focusedIdx = Math.max(this.focusedIdx - 1, 0);
           this.scrollToFocused();
           break;

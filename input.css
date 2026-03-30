@@ -1951,9 +1951,4 @@
     }
   }
 
-  /* Instant expand/collapse during keyboard (J/K) navigation */
-  .bb-instant-nav .bb-triage-detail {
-    transition-duration: 0ms !important;
-    animation-duration: 0ms !important;
-  }
 }
