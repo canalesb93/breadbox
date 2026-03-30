@@ -1436,3 +1436,134 @@ func TestSync_LowConfidenceReviewType(t *testing.T) {
 		t.Errorf("expected review_type 'low_confidence', got %q", reviewType)
 	}
 }
+
+func TestSync_UnchangedTransactions_SkipRuleReapplication(t *testing.T) {
+	pool, queries := testutil.ServicePool(t)
+	ctx := context.Background()
+
+	seedCategories(t, queries)
+
+	// Create a category and rule for coffee.
+	coffeeCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "coffee_shops", DisplayName: "Coffee Shops",
+	})
+	if err != nil {
+		t.Fatalf("create coffee category: %v", err)
+	}
+
+	_, err = pool.Exec(ctx,
+		`INSERT INTO transaction_rules (name, conditions, category_id, priority, enabled, created_by_type, created_by_name)
+		 VALUES ('Coffee Rule', '{"field":"name","op":"contains","value":"coffee"}', $1, 100, true, 'system', 'test')`,
+		coffeeCat.ID,
+	)
+	if err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
+
+	txns := []provider.Transaction{
+		{
+			ExternalID:        "txn_coffee",
+			AccountExternalID: "ext_acct_1",
+			Amount:            decimal.NewFromFloat(5.50),
+			Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+			Name:              "Starbucks Coffee",
+			ISOCurrencyCode:   "USD",
+		},
+	}
+
+	mock := &mockProvider{
+		syncResult: provider.SyncResult{
+			Added:  txns,
+			Cursor: "cursor_1",
+		},
+	}
+
+	providers := map[string]provider.Provider{"plaid": mock}
+	engine := newEngine(t, pool, queries, providers)
+
+	// First sync: transaction is new, rule should apply.
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("first sync: %v", err)
+	}
+
+	// Verify rule was applied and record the applied_at timestamp.
+	var appliedAt1 time.Time
+	err = pool.QueryRow(ctx,
+		`SELECT applied_at FROM transaction_rule_applications
+		 WHERE transaction_id = (SELECT id FROM transactions WHERE external_transaction_id = 'txn_coffee')`,
+	).Scan(&appliedAt1)
+	if err != nil {
+		t.Fatalf("query rule application after first sync: %v", err)
+	}
+
+	var hitCount1 int
+	err = pool.QueryRow(ctx, "SELECT hit_count FROM transaction_rules WHERE name = 'Coffee Rule'").Scan(&hitCount1)
+	if err != nil {
+		t.Fatalf("query hit count: %v", err)
+	}
+	if hitCount1 != 1 {
+		t.Errorf("expected hit_count 1 after first sync, got %d", hitCount1)
+	}
+
+	// Second sync: same transaction data (unchanged), rule should NOT be re-applied.
+	// Provider returns same transaction in Added (simulating a re-sync).
+	mock.syncResult = provider.SyncResult{
+		Added:  txns,
+		Cursor: "cursor_2",
+	}
+
+	// Wait long enough that classifyUpsertResult can distinguish the first
+	// sync's created_at from the second sync's upsertStart (2s tolerance).
+	time.Sleep(3 * time.Second)
+
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("second sync: %v", err)
+	}
+
+	// Verify applied_at was NOT bumped.
+	var appliedAt2 time.Time
+	err = pool.QueryRow(ctx,
+		`SELECT applied_at FROM transaction_rule_applications
+		 WHERE transaction_id = (SELECT id FROM transactions WHERE external_transaction_id = 'txn_coffee')`,
+	).Scan(&appliedAt2)
+	if err != nil {
+		t.Fatalf("query rule application after second sync: %v", err)
+	}
+	if !appliedAt2.Equal(appliedAt1) {
+		t.Errorf("rule application applied_at was bumped on unchanged transaction: first=%v, second=%v", appliedAt1, appliedAt2)
+	}
+
+	// Verify hit count was NOT incremented again.
+	var hitCount2 int
+	err = pool.QueryRow(ctx, "SELECT hit_count FROM transaction_rules WHERE name = 'Coffee Rule'").Scan(&hitCount2)
+	if err != nil {
+		t.Fatalf("query hit count: %v", err)
+	}
+	if hitCount2 != hitCount1 {
+		t.Errorf("expected hit_count to stay at %d after unchanged re-sync, got %d", hitCount1, hitCount2)
+	}
+
+	// Verify the sync log shows 0 added, 0 modified, 1 unchanged.
+	var addedCount, modifiedCount, unchangedCount int32
+	err = pool.QueryRow(ctx,
+		`SELECT added_count, modified_count, unchanged_count FROM sync_logs
+		 WHERE connection_id = $1 ORDER BY started_at DESC LIMIT 1`,
+		conn.ID,
+	).Scan(&addedCount, &modifiedCount, &unchangedCount)
+	if err != nil {
+		t.Fatalf("query sync log: %v", err)
+	}
+	if addedCount != 0 {
+		t.Errorf("expected added_count 0 on re-sync, got %d", addedCount)
+	}
+	if modifiedCount != 0 {
+		t.Errorf("expected modified_count 0 on re-sync, got %d", modifiedCount)
+	}
+	if unchangedCount != 1 {
+		t.Errorf("expected unchanged_count 1 on re-sync, got %d", unchangedCount)
+	}
+}
