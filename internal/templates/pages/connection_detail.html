@@ -224,79 +224,57 @@
     <h2 class="text-sm font-semibold text-base-content/70">Accounts</h2>
     <span class="text-xs text-base-content/30">{{len .Accounts}} total{{if .HasBalance}} &middot; {{formatBalance .TotalBalance}}{{end}}</span>
   </div>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bb-stagger">
-    {{range .Accounts}}
-    <div class="bb-card p-0 overflow-hidden{{if .Excluded}} opacity-50{{end}}">
-      <div class="flex h-full">
-        <!-- Colored accent bar by account type -->
-        <div class="w-1 shrink-0
-          {{if eq .Type "depository"}}bg-info/50
-          {{else if eq .Type "credit"}}bg-warning/50
-          {{else if eq .Type "loan"}}bg-error/40
-          {{else if eq .Type "investment"}}bg-success/50
-          {{else}}bg-base-300/50{{end}}"></div>
-        <div class="flex-1 p-4">
-          <div class="flex items-start justify-between gap-2 mb-3">
-            <div class="flex items-center gap-2.5 min-w-0">
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0
-                {{if eq .Type "depository"}}bg-info/8
-                {{else if eq .Type "credit"}}bg-warning/8
-                {{else if eq .Type "loan"}}bg-error/8
-                {{else if eq .Type "investment"}}bg-success/8
-                {{else}}bg-base-200/60{{end}}">
-                <i data-lucide="{{accountTypeIcon .Type}}" class="w-4 h-4
-                  {{if eq .Type "depository"}}text-info/60
-                  {{else if eq .Type "credit"}}text-warning/70
-                  {{else if eq .Type "loan"}}text-error/60
-                  {{else if eq .Type "investment"}}text-success/60
-                  {{else}}text-base-content/40{{end}}"></i>
-              </div>
-              <div class="min-w-0">
-                <a href="/accounts/{{formatUUID .ID}}" class="text-sm font-medium hover:text-primary transition-colors no-underline block truncate">
-                  {{.Name}}
-                </a>
-                <div class="text-xs text-base-content/40">
-                  {{accountTypeLabel .Type (pgtext .Subtype)}}
-                  {{if .Mask.Valid}} &middot; ····{{.Mask.String}}{{end}}
-                </div>
-              </div>
+  <div class="bb-card p-0 overflow-hidden">
+    <table class="table table-sm">
+      <thead>
+        <tr class="text-[0.6rem] uppercase tracking-wider text-base-content/40">
+          <th class="font-medium">Account</th>
+          <th class="font-medium text-right">Current</th>
+          <th class="font-medium text-right hidden sm:table-cell">Available</th>
+          <th class="font-medium hidden lg:table-cell">Display Name</th>
+          <th class="font-medium text-center">Exclude</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Accounts}}
+        <tr class="{{if .Excluded}}opacity-50{{end}}">
+          <td class="py-3">
+            <a href="/accounts/{{formatUUID .ID}}" class="text-sm font-medium hover:text-primary transition-colors no-underline">
+              {{.Name}}
+            </a>
+            <div class="text-xs text-base-content/40">
+              {{accountTypeLabel .Type (pgtext .Subtype)}}{{if .Mask.Valid}} &middot; ····{{.Mask.String}}{{end}}
+              {{if .Excluded}}<span class="badge badge-ghost badge-xs ml-1">Excluded</span>{{end}}
             </div>
-            {{if .Excluded}}
-            <span class="badge badge-ghost badge-xs shrink-0">Excluded</span>
+          </td>
+          <td class="py-3 text-right tabular-nums">
+            {{if .BalanceCurrent.Valid}}
+            <span class="text-sm font-semibold{{if eq .Type "credit"}} text-warning/80{{else if eq .Type "loan"}} text-error/80{{end}}">{{formatNumeric .BalanceCurrent}}</span>
+            {{else}}
+            <span class="text-xs text-base-content/30">&mdash;</span>
             {{end}}
-          </div>
-          <!-- Balances -->
-          <div class="flex items-end justify-between gap-3">
-            <div class="min-w-0">
-              {{if .BalanceCurrent.Valid}}
-              <div class="text-[0.6rem] text-base-content/35 uppercase tracking-wider mb-0.5">Current</div>
-              <div class="text-lg font-bold tabular-nums{{if eq .Type "credit"}} text-warning/80{{else if eq .Type "loan"}} text-error/80{{end}}">{{formatNumeric .BalanceCurrent}}</div>
-              {{else}}
-              <div class="text-xs text-base-content/30">No balance data</div>
-              {{end}}
-            </div>
+          </td>
+          <td class="py-3 text-right tabular-nums hidden sm:table-cell">
             {{if .BalanceAvailable.Valid}}
-            <div class="text-right">
-              <div class="text-[0.6rem] text-base-content/35 uppercase tracking-wider mb-0.5">Available</div>
-              <div class="text-sm font-medium tabular-nums text-base-content/60">{{formatNumeric .BalanceAvailable}}</div>
-            </div>
+            <span class="text-sm text-base-content/60">{{formatNumeric .BalanceAvailable}}</span>
+            {{else}}
+            <span class="text-xs text-base-content/30">&mdash;</span>
             {{end}}
-          </div>
-          <!-- Inline actions -->
-          <div class="flex items-center gap-2 mt-3 pt-3 border-t border-base-300/40">
-            <input type="text" value="{{.DisplayName.String}}" placeholder="Display name..."
+          </td>
+          <td class="py-3 hidden lg:table-cell">
+            <input type="text" value="{{.DisplayName.String}}" placeholder="Nickname..."
               onchange="updateDisplayName('{{formatUUID .ID}}', this.value)"
-              class="input input-xs input-ghost flex-1 hover:input-bordered focus:input-bordered transition-all rounded-lg text-xs">
-            <label class="flex items-center gap-1.5 text-xs text-base-content/40 cursor-pointer shrink-0" title="Exclude from sync">
-              <input type="checkbox" class="checkbox checkbox-xs" {{if .Excluded}}checked{{end}}
-                onchange="toggleExcluded('{{formatUUID .ID}}', this.checked)">
-              <span>Exclude</span>
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>
-    {{end}}
+              class="input input-xs input-ghost w-full max-w-[160px] hover:input-bordered focus:input-bordered transition-all rounded-lg text-xs">
+          </td>
+          <td class="py-3 text-center">
+            <input type="checkbox" class="checkbox checkbox-xs" {{if .Excluded}}checked{{end}}
+              onchange="toggleExcluded('{{formatUUID .ID}}', this.checked)"
+              title="Exclude from sync">
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
   </div>
 </div>
 {{else}}
