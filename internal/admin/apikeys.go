@@ -82,13 +82,34 @@ func AccessPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templat
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
+		// Split keys into active and revoked for cleaner display
+		var activeKeys, revokedKeys []service.APIKeyResponse
+		for _, k := range keys {
+			if k.RevokedAt != nil {
+				revokedKeys = append(revokedKeys, k)
+			} else {
+				activeKeys = append(activeKeys, k)
+			}
+		}
+		var activeClients, revokedClients []service.OAuthClientResponse
+		for _, c := range clients {
+			if c.RevokedAt != nil {
+				revokedClients = append(revokedClients, c)
+			} else {
+				activeClients = append(activeClients, c)
+			}
+		}
 		data := map[string]any{
-			"PageTitle":   "Access",
-			"CurrentPage": "access",
-			"Keys":        keys,
-			"Clients":     clients,
-			"Flash":       GetFlash(r.Context(), sm),
-			"CSRFToken":   GetCSRFToken(r),
+			"PageTitle":      "Access",
+			"CurrentPage":    "access",
+			"Keys":           keys,
+			"ActiveKeys":     activeKeys,
+			"RevokedKeys":    revokedKeys,
+			"Clients":        clients,
+			"ActiveClients":  activeClients,
+			"RevokedClients": revokedClients,
+			"Flash":          GetFlash(r.Context(), sm),
+			"CSRFToken":      GetCSRFToken(r),
 		}
 		tr.Render(w, r, "access.html", data)
 	}
