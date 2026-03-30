@@ -179,57 +179,40 @@
 </div>
 {{end}}
 
-<!-- Connection Details + Sync Settings -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-  <!-- Connection Details Card -->
-  <div class="bb-card p-5 lg:col-span-2">
-    <h2 class="text-sm font-semibold text-base-content/50 mb-4">Connection Details</h2>
-    <div class="bb-info-grid">
+<!-- Connection Info -->
+<div class="bb-card p-5 mb-6">
+  <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
       <div>
-        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Family Member</p>
-        <p class="text-sm font-medium">{{pgtext .Connection.UserName}}</p>
-      </div>
-      <div>
-        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Provider</p>
-        <p class="text-sm font-medium capitalize">{{.Connection.Provider}}</p>
-      </div>
-      <div>
-        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Connected</p>
-        <p class="text-sm font-medium">{{if .Connection.CreatedAt.Valid}}{{.Connection.CreatedAt.Time.Format "Jan 2, 2006"}}{{else}}&mdash;{{end}}</p>
-      </div>
-      <div>
-        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Last Synced</p>
-        <p class="text-sm font-medium">{{if .Connection.LastSyncedAt.Valid}}{{relativeTime .Connection.LastSyncedAt.Time}}{{else}}<span class="text-base-content/30">Never</span>{{end}}</p>
+        <span class="text-base-content/40 text-xs">Connected</span>
+        <span class="ml-1.5 font-medium">{{if .Connection.CreatedAt.Valid}}{{.Connection.CreatedAt.Time.Format "Jan 2, 2006"}}{{else}}&mdash;{{end}}</span>
       </div>
       {{if gt .Connection.ConsecutiveFailures 0}}
       <div>
-        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Consecutive Failures</p>
-        <p class="text-sm font-semibold text-warning">{{.Connection.ConsecutiveFailures}}</p>
+        <span class="text-base-content/40 text-xs">Failures</span>
+        <span class="ml-1.5 font-semibold text-warning">{{.Connection.ConsecutiveFailures}} in a row</span>
       </div>
+      {{end}}
+      {{if and (gt .Connection.ConsecutiveFailures 0) .Connection.LastErrorAt.Valid}}
       <div>
-        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Last Error</p>
-        <p class="text-sm font-medium">{{if .Connection.LastErrorAt.Valid}}{{relativeTime .Connection.LastErrorAt.Time}}{{else}}<span class="text-base-content/30">&mdash;</span>{{end}}</p>
+        <span class="text-base-content/40 text-xs">Last error</span>
+        <span class="ml-1.5 font-medium">{{relativeTime .Connection.LastErrorAt.Time}}</span>
       </div>
       {{end}}
     </div>
-  </div>
-
-  <!-- Sync Settings Card -->
-  <div class="bb-card p-5">
-    <h2 class="text-sm font-semibold text-base-content/50 mb-4">Sync Settings</h2>
-    <div>
-      <label class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1.5 block">Sync Interval</label>
-      <select id="sync-interval" onchange="updateSyncInterval(this.value)" class="select select-sm select-bordered w-full rounded-xl">
-        <option value=""{{if not .Connection.SyncIntervalOverrideMinutes.Valid}} selected{{end}}>Use global default</option>
-        <option value="15"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 15)}} selected{{end}}>Every 15 minutes</option>
-        <option value="30"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 30)}} selected{{end}}>Every 30 minutes</option>
-        <option value="60"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 60)}} selected{{end}}>Every hour</option>
-        <option value="120"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 120)}} selected{{end}}>Every 2 hours</option>
-        <option value="240"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 240)}} selected{{end}}>Every 4 hours</option>
-        <option value="720"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 720)}} selected{{end}}>Every 12 hours</option>
-        <option value="1440"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 1440)}} selected{{end}}>Every 24 hours</option>
+    <div class="flex items-center gap-2 shrink-0">
+      <label class="text-xs text-base-content/40">Sync interval</label>
+      <select id="sync-interval" onchange="updateSyncInterval(this.value)" class="select select-xs select-bordered rounded-lg">
+        <option value=""{{if not .Connection.SyncIntervalOverrideMinutes.Valid}} selected{{end}}>Default</option>
+        <option value="15"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 15)}} selected{{end}}>15 min</option>
+        <option value="30"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 30)}} selected{{end}}>30 min</option>
+        <option value="60"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 60)}} selected{{end}}>1 hr</option>
+        <option value="120"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 120)}} selected{{end}}>2 hr</option>
+        <option value="240"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 240)}} selected{{end}}>4 hr</option>
+        <option value="720"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 720)}} selected{{end}}>12 hr</option>
+        <option value="1440"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 1440)}} selected{{end}}>24 hr</option>
       </select>
-      <span id="interval-status" class="text-xs text-base-content/50 mt-1 block"></span>
+      <span id="interval-status" class="text-xs text-base-content/50"></span>
     </div>
   </div>
 </div>
@@ -241,79 +224,57 @@
     <h2 class="text-sm font-semibold text-base-content/70">Accounts</h2>
     <span class="text-xs text-base-content/30">{{len .Accounts}} total{{if .HasBalance}} &middot; {{formatBalance .TotalBalance}}{{end}}</span>
   </div>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bb-stagger">
-    {{range .Accounts}}
-    <div class="bb-card p-0 overflow-hidden{{if .Excluded}} opacity-50{{end}}">
-      <div class="flex h-full">
-        <!-- Colored accent bar by account type -->
-        <div class="w-1 shrink-0
-          {{if eq .Type "depository"}}bg-info/50
-          {{else if eq .Type "credit"}}bg-warning/50
-          {{else if eq .Type "loan"}}bg-error/40
-          {{else if eq .Type "investment"}}bg-success/50
-          {{else}}bg-base-300/50{{end}}"></div>
-        <div class="flex-1 p-4">
-          <div class="flex items-start justify-between gap-2 mb-3">
-            <div class="flex items-center gap-2.5 min-w-0">
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0
-                {{if eq .Type "depository"}}bg-info/8
-                {{else if eq .Type "credit"}}bg-warning/8
-                {{else if eq .Type "loan"}}bg-error/8
-                {{else if eq .Type "investment"}}bg-success/8
-                {{else}}bg-base-200/60{{end}}">
-                <i data-lucide="{{accountTypeIcon .Type}}" class="w-4 h-4
-                  {{if eq .Type "depository"}}text-info/60
-                  {{else if eq .Type "credit"}}text-warning/70
-                  {{else if eq .Type "loan"}}text-error/60
-                  {{else if eq .Type "investment"}}text-success/60
-                  {{else}}text-base-content/40{{end}}"></i>
-              </div>
-              <div class="min-w-0">
-                <a href="/accounts/{{formatUUID .ID}}" class="text-sm font-medium hover:text-primary transition-colors no-underline block truncate">
-                  {{.Name}}
-                </a>
-                <div class="text-xs text-base-content/40">
-                  {{accountTypeLabel .Type (pgtext .Subtype)}}
-                  {{if .Mask.Valid}} &middot; ····{{.Mask.String}}{{end}}
-                </div>
-              </div>
+  <div class="bb-card p-0 overflow-hidden">
+    <table class="table table-sm">
+      <thead>
+        <tr class="text-[0.6rem] uppercase tracking-wider text-base-content/40">
+          <th class="font-medium">Account</th>
+          <th class="font-medium text-right">Current</th>
+          <th class="font-medium text-right hidden sm:table-cell">Available</th>
+          <th class="font-medium hidden lg:table-cell">Display Name</th>
+          <th class="font-medium text-center">Exclude</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Accounts}}
+        <tr class="{{if .Excluded}}opacity-50{{end}}">
+          <td class="py-3">
+            <a href="/accounts/{{formatUUID .ID}}" class="text-sm font-medium hover:text-primary transition-colors no-underline">
+              {{.Name}}
+            </a>
+            <div class="text-xs text-base-content/40">
+              {{accountTypeLabel .Type (pgtext .Subtype)}}{{if .Mask.Valid}} &middot; ····{{.Mask.String}}{{end}}
+              {{if .Excluded}}<span class="badge badge-ghost badge-xs ml-1">Excluded</span>{{end}}
             </div>
-            {{if .Excluded}}
-            <span class="badge badge-ghost badge-xs shrink-0">Excluded</span>
+          </td>
+          <td class="py-3 text-right tabular-nums">
+            {{if .BalanceCurrent.Valid}}
+            <span class="text-sm font-semibold{{if eq .Type "credit"}} text-warning/80{{else if eq .Type "loan"}} text-error/80{{end}}">{{formatNumeric .BalanceCurrent}}</span>
+            {{else}}
+            <span class="text-xs text-base-content/30">&mdash;</span>
             {{end}}
-          </div>
-          <!-- Balances -->
-          <div class="flex items-end justify-between gap-3">
-            <div class="min-w-0">
-              {{if .BalanceCurrent.Valid}}
-              <div class="text-[0.6rem] text-base-content/35 uppercase tracking-wider mb-0.5">Current</div>
-              <div class="text-lg font-bold tabular-nums{{if eq .Type "credit"}} text-warning/80{{else if eq .Type "loan"}} text-error/80{{end}}">{{formatNumeric .BalanceCurrent}}</div>
-              {{else}}
-              <div class="text-xs text-base-content/30">No balance data</div>
-              {{end}}
-            </div>
+          </td>
+          <td class="py-3 text-right tabular-nums hidden sm:table-cell">
             {{if .BalanceAvailable.Valid}}
-            <div class="text-right">
-              <div class="text-[0.6rem] text-base-content/35 uppercase tracking-wider mb-0.5">Available</div>
-              <div class="text-sm font-medium tabular-nums text-base-content/60">{{formatNumeric .BalanceAvailable}}</div>
-            </div>
+            <span class="text-sm text-base-content/60">{{formatNumeric .BalanceAvailable}}</span>
+            {{else}}
+            <span class="text-xs text-base-content/30">&mdash;</span>
             {{end}}
-          </div>
-          <!-- Inline actions -->
-          <div class="flex items-center gap-2 mt-3 pt-3 border-t border-base-300/40">
-            <input type="text" value="{{.DisplayName.String}}" placeholder="Display name..."
+          </td>
+          <td class="py-3 hidden lg:table-cell">
+            <input type="text" value="{{.DisplayName.String}}" placeholder="Nickname..."
               onchange="updateDisplayName('{{formatUUID .ID}}', this.value)"
-              class="input input-xs input-ghost flex-1 hover:input-bordered focus:input-bordered transition-all rounded-lg text-xs">
-            <label class="flex items-center gap-1.5 text-xs text-base-content/40 cursor-pointer shrink-0" title="Exclude from sync">
-              <input type="checkbox" class="checkbox checkbox-xs" {{if .Excluded}}checked{{end}}
-                onchange="toggleExcluded('{{formatUUID .ID}}', this.checked)">
-              <span>Exclude</span>
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>
-    {{end}}
+              class="input input-xs input-ghost w-full max-w-[160px] hover:input-bordered focus:input-bordered transition-all rounded-lg text-xs">
+          </td>
+          <td class="py-3 text-center">
+            <input type="checkbox" class="checkbox checkbox-xs" {{if .Excluded}}checked{{end}}
+              onchange="toggleExcluded('{{formatUUID .ID}}', this.checked)"
+              title="Exclude from sync">
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
   </div>
 </div>
 {{else}}
@@ -347,54 +308,50 @@
   </div>
   <div id="sync-history-content">
   {{if .SyncLogs}}
-  <div class="px-5 pb-4">
-    {{range .SyncLogs}}
-    <div class="flex gap-3 py-3 border-b border-base-300/30 last:border-0">
-      <!-- Timeline dot -->
-      <div class="flex flex-col items-center shrink-0 pt-0.5">
-        <div class="w-6 h-6 rounded-full flex items-center justify-center
-          {{if eq (printf "%s" .Status) "success"}}bg-success/12
-          {{else if eq (printf "%s" .Status) "error"}}bg-error/12
-          {{else}}bg-base-200{{end}}">
-          {{if eq (printf "%s" .Status) "success"}}<i data-lucide="check" class="w-3 h-3 text-success"></i>
-          {{else if eq (printf "%s" .Status) "error"}}<i data-lucide="x" class="w-3 h-3 text-error"></i>
-          {{else}}<i data-lucide="loader" class="w-3 h-3 text-base-content/40 animate-spin"></i>{{end}}
-        </div>
-      </div>
-      <!-- Content -->
-      <div class="flex-1 min-w-0 flex items-center justify-between gap-2">
-        <div class="min-w-0">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-sm font-medium capitalize">{{.Trigger}}</span>
-            <span class="text-xs text-base-content/35 tabular-nums">{{relativeTime .StartedAt}}</span>
-            {{if .DurationMs.Valid}}
-            <span class="text-[0.6rem] text-base-content/25 tabular-nums bg-base-200/50 px-1.5 py-0.5 rounded-full">{{formatDurationMs .DurationMs.Int32}}</span>
-            {{else if and .StartedAt.Valid .CompletedAt.Valid}}
-            <span class="text-[0.6rem] text-base-content/25 tabular-nums bg-base-200/50 px-1.5 py-0.5 rounded-full">{{syncDuration .StartedAt.Time .CompletedAt.Time}}</span>
+  <div class="overflow-x-auto">
+    <table class="table table-sm">
+      <thead>
+        <tr class="text-[0.6rem] uppercase tracking-wider text-base-content/40">
+          <th class="font-medium w-6"></th>
+          <th class="font-medium">Trigger</th>
+          <th class="font-medium">When</th>
+          <th class="font-medium text-right">Duration</th>
+          <th class="font-medium text-right">Changes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .SyncLogs}}
+        <tr>
+          <td class="py-2 pr-0">
+            {{if eq (printf "%s" .Status) "success"}}<span class="w-2 h-2 rounded-full bg-success/60 inline-block"></span>
+            {{else if eq (printf "%s" .Status) "error"}}<span class="w-2 h-2 rounded-full bg-error/60 inline-block"></span>
+            {{else}}<span class="loading loading-spinner w-3 h-3 text-base-content/40"></span>{{end}}
+          </td>
+          <td class="py-2">
+            <span class="text-sm capitalize">{{.Trigger}}</span>
+            {{if and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid}}
+            {{$friendly := syncFriendlyError .ErrorMessage.String}}
+            <p class="text-xs text-error/60 mt-0.5 max-w-sm truncate" title="{{.ErrorMessage.String}}">{{if $friendly}}{{$friendly}}{{else}}{{.ErrorMessage.String}}{{end}}</p>
             {{end}}
-          </div>
-          {{if and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid}}
-          {{$friendly := syncFriendlyError .ErrorMessage.String}}
-          {{if $friendly}}
-          <p class="text-xs text-error/60 mt-0.5 max-w-md truncate" title="{{.ErrorMessage.String}}">{{$friendly}}</p>
-          {{else}}
-          <p class="text-xs text-error/60 mt-0.5 max-w-md truncate" title="{{.ErrorMessage.String}}">{{.ErrorMessage.String}}</p>
-          {{end}}
-          {{end}}
-        </div>
-        <div class="flex items-center gap-2.5 tabular-nums text-xs shrink-0">
-          {{if or .AddedCount .ModifiedCount .RemovedCount}}
-          <div class="flex items-center gap-1.5">
-            {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
-            {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
-            {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
-          </div>
-          {{end}}
-          {{if .UnchangedCount}}<span class="text-base-content/25 text-[0.6rem]" title="{{.UnchangedCount}} unchanged">={{.UnchangedCount}}</span>{{end}}
-        </div>
-      </div>
-    </div>
-    {{end}}
+          </td>
+          <td class="py-2 text-xs text-base-content/50 tabular-nums whitespace-nowrap">{{relativeTime .StartedAt}}</td>
+          <td class="py-2 text-right text-xs text-base-content/35 tabular-nums whitespace-nowrap">
+            {{if .DurationMs.Valid}}{{formatDurationMs .DurationMs.Int32}}{{else if and .StartedAt.Valid .CompletedAt.Valid}}{{syncDuration .StartedAt.Time .CompletedAt.Time}}{{else}}&mdash;{{end}}
+          </td>
+          <td class="py-2 text-right tabular-nums text-xs whitespace-nowrap">
+            {{if or .AddedCount .ModifiedCount .RemovedCount}}
+            <span class="inline-flex items-center gap-1">
+              {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
+              {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
+              {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
+            </span>
+            {{end}}
+            {{if .UnchangedCount}}<span class="text-base-content/25 text-[0.6rem]" title="{{.UnchangedCount}} unchanged">={{.UnchangedCount}}</span>{{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
   </div>
   {{else}}
   <div class="px-5 pb-5">
