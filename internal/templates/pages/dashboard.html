@@ -138,7 +138,7 @@
           <!-- Bubble body -->
           <div class="rounded-2xl rounded-tl-sm bg-base-200/70 shadow-sm px-3.5 py-2.5 cursor-pointer hover:bg-base-200/90 transition-colors inline-block max-w-full"
                @click="toggle('{{.ID}}')">
-            <p class="text-sm text-base-content/80 leading-relaxed">{{.Title}}{{if .Tags}} {{range .Tags}}<span class="text-[0.6rem] px-1.5 py-0.5 rounded-full bg-base-content/5 text-base-content/40 ml-1 inline-block align-middle">{{.}}</span>{{end}}{{end}}</p>
+            <p class="text-sm text-base-content/80 leading-relaxed">{{.Title}}</p>
             <!-- Expanded body -->
             <div x-show="expanded['{{.ID}}']" x-cloak class="mt-2 pt-2 border-t border-base-content/5">
               <div class="bb-report-body text-sm text-base-content/60 leading-relaxed" data-markdown="{{.Body}}"></div>
