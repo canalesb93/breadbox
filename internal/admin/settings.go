@@ -34,9 +34,14 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		ctx := r.Context()
 
 		// System info.
-		var pgVersion string
-		_ = a.DB.QueryRow(ctx, "SELECT version()").Scan(&pgVersion)
-		pgVersion = strings.TrimPrefix(pgVersion, "PostgreSQL ")
+		var pgVersionRaw string
+		_ = a.DB.QueryRow(ctx, "SELECT version()").Scan(&pgVersionRaw)
+		pgVersionRaw = strings.TrimPrefix(pgVersionRaw, "PostgreSQL ")
+		// Extract just the version number (e.g., "16.13") from the full string.
+		pgVersion := pgVersionRaw
+		if idx := strings.IndexByte(pgVersionRaw, ' '); idx > 0 {
+			pgVersion = pgVersionRaw[:idx]
+		}
 
 		// Sync log retention.
 		retentionDays, _ := a.Service.GetSyncLogRetentionDays(ctx)
