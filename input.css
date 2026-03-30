@@ -290,9 +290,27 @@
     scrollbar-color: oklch(var(--bc) / 0.15) transparent;
   }
 
+  /* ── Mobile: iOS 26-style scroll fade gradients ── */
   @media (max-width: 1023px) {
     .bb-sidebar-nav {
-      scrollbar-color: oklch(var(--bc) / 0.08) transparent;
+      scrollbar-width: none;
+      --fade-size: 2rem;
+      --fade-top: 0;
+      --fade-bottom: 0;
+      mask-image: linear-gradient(
+        to bottom,
+        transparent,
+        black calc(var(--fade-size) * var(--fade-top)),
+        black calc(100% - var(--fade-size) * var(--fade-bottom)),
+        transparent
+      );
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent,
+        black calc(var(--fade-size) * var(--fade-top)),
+        black calc(100% - var(--fade-size) * var(--fade-bottom)),
+        transparent
+      );
     }
   }
 
