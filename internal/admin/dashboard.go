@@ -652,6 +652,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			AccountCount    int64
 			Paused          bool
 			IsStale         bool // hasn't synced in 24+ hours
+			lastSyncedRaw   time.Time
 		}
 		var connectionHealth []ConnectionHealthRow
 		var healthyCount, errorCount, staleCount int
@@ -715,18 +716,28 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 
 			connID := formatUUID(conn.ID)
 
+			var rawTime time.Time
+			if conn.LastSyncedAt.Valid {
+				rawTime = conn.LastSyncedAt.Time
+			}
 			connectionHealth = append(connectionHealth, ConnectionHealthRow{
-				ID:           connID,
-				Name:         name,
-				Provider:     string(conn.Provider),
-				Status:       status,
-				ErrorMessage: errMsg,
-				LastSyncedAt: lastSync,
-				AccountCount: conn.AccountCount,
-				Paused:       conn.Paused,
-				IsStale:      isStale,
+				ID:            connID,
+				Name:          name,
+				Provider:      string(conn.Provider),
+				Status:        status,
+				ErrorMessage:  errMsg,
+				LastSyncedAt:  lastSync,
+				AccountCount:  conn.AccountCount,
+				Paused:        conn.Paused,
+				IsStale:       isStale,
+				lastSyncedRaw: rawTime,
 			})
 		}
+
+		// Sort connections by last sync time (most recent first)
+		sort.Slice(connectionHealth, func(i, j int) bool {
+			return connectionHealth[i].lastSyncedRaw.After(connectionHealth[j].lastSyncedRaw)
+		})
 
 		// ── Sync Health Summary ──────────────────────────────────────
 		syncHealth, err := svc.GetSyncHealthSummary(ctx)
@@ -975,12 +986,19 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			CreatedAt     string // relative time
 		}
 		var agentReports []DashboardReport
-		rawReports, err := svc.ListUnreadAgentReports(ctx, 10)
+		var totalUnread int
+		rawReports, err := svc.ListUnreadAgentReports(ctx, 50)
 		if err != nil {
 			a.Logger.Error("list unread agent reports", "error", err)
 		}
-		for _, r := range rawReports {
+		totalUnread = len(rawReports)
+		now := time.Now()
+		for i, r := range rawReports {
 			t, _ := time.Parse(time.RFC3339, r.CreatedAt)
+			// Show first 3, plus any additional within 24 hours
+			if i >= 3 && now.Sub(t) > 24*time.Hour {
+				continue
+			}
 			displayAuthor := r.CreatedByName
 			if r.Author != nil && *r.Author != "" {
 				displayAuthor = *r.Author
@@ -996,6 +1014,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				CreatedAt:     relativeTime(t),
 			})
 		}
+		hasMoreReports := totalUnread > len(agentReports)
 
 		data := map[string]any{
 			"PageTitle":              "Dashboard",
@@ -1070,6 +1089,8 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"SpendingInsights":      spendingInsights,
 			// Agent reports.
 			"AgentReports":          agentReports,
+			"HasMoreReports":        hasMoreReports,
+			"TotalUnreadReports":    totalUnread,
 		}
 		tr.Render(w, r, "dashboard.html", data)
 	}
