@@ -475,6 +475,20 @@
       });
     })();
 
+    // iOS 26-style scroll fade for mobile sidebar nav
+    (function() {
+      var nav = document.querySelector('.bb-sidebar-nav');
+      if (!nav) return;
+      function update() {
+        nav.style.setProperty('--fade-top', nav.scrollTop > 2 ? '1' : '0');
+        nav.style.setProperty('--fade-bottom',
+          nav.scrollHeight - nav.scrollTop - nav.clientHeight > 2 ? '1' : '0');
+      }
+      nav.addEventListener('scroll', update, {passive: true});
+      // Initial check after icons render
+      requestAnimationFrame(function() { requestAnimationFrame(update); });
+    })();
+
     // Global Confirmation Modal
     function bbConfirmModal() {
       return {

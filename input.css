@@ -272,7 +272,7 @@
 
   /* ── Sidebar ── */
   .bb-sidebar {
-    @apply bg-base-100 h-full w-64 px-3 py-5 flex flex-col border-r border-base-300;
+    @apply bg-base-100 h-full w-[85vw] max-w-80 sm:w-72 lg:w-64 px-3 py-5 flex flex-col border-r border-base-300;
   }
 
   .bb-sidebar-brand {
@@ -285,16 +285,42 @@
     scrollbar-color: transparent transparent;
   }
 
-  .bb-sidebar-nav:hover {
+  .bb-sidebar-nav:hover,
+  .bb-sidebar-nav:active {
     scrollbar-color: oklch(var(--bc) / 0.15) transparent;
   }
 
+  /* ── Mobile: iOS 26-style scroll fade gradients ── */
+  @media (max-width: 1023px) {
+    .bb-sidebar-nav {
+      scrollbar-width: none;
+      --fade-size: 2rem;
+      --fade-top: 0;
+      --fade-bottom: 0;
+      mask-image: linear-gradient(
+        to bottom,
+        transparent,
+        black calc(var(--fade-size) * var(--fade-top)),
+        black calc(100% - var(--fade-size) * var(--fade-bottom)),
+        transparent
+      );
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent,
+        black calc(var(--fade-size) * var(--fade-top)),
+        black calc(100% - var(--fade-size) * var(--fade-bottom)),
+        transparent
+      );
+    }
+  }
+
   .bb-sidebar-section {
-    @apply text-[0.65rem] font-medium text-base-content/40 px-3 pt-5 pb-1.5;
+    @apply text-[0.7rem] lg:text-[0.65rem] font-medium text-base-content/40 px-3 pt-5 pb-2 lg:pb-1.5;
   }
 
   .bb-sidebar-link {
-    @apply flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium
+    @apply flex items-center gap-3 px-3 py-2.5 lg:py-1.5 min-h-11 lg:min-h-0
+           rounded-lg text-sm font-medium
            text-base-content/60 no-underline
            hover:bg-base-200 hover:text-base-content;
     transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
@@ -309,7 +335,7 @@
   }
 
   .bb-sidebar-link i, .bb-sidebar-link svg {
-    @apply w-4 h-4 opacity-50;
+    @apply w-[1.125rem] h-[1.125rem] lg:w-4 lg:h-4 opacity-50;
     transition: opacity 0.15s ease;
   }
 
@@ -1118,7 +1144,7 @@
 
   /* ── Sidebar Cmd+K trigger ── */
   .bb-sidebar-search {
-    @apply flex items-center gap-2.5 px-3 py-2 mx-0 mb-3 rounded-lg
+    @apply flex items-center gap-2.5 px-3 py-2.5 lg:py-2 mx-0 mb-3 rounded-lg
            text-sm text-base-content/35 bg-base-200/50 border border-base-300/50
            cursor-pointer select-none;
     transition: background-color 0.15s ease, border-color 0.15s ease;
@@ -1144,7 +1170,7 @@
 
   /* ── Sidebar user profile ── */
   .bb-sidebar-profile {
-    @apply flex items-center gap-2.5 px-2 py-2 rounded-lg;
+    @apply flex items-center gap-2.5 px-2 py-3 lg:py-2 rounded-lg;
     transition: background-color 0.15s ease;
   }
 
