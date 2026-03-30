@@ -308,54 +308,50 @@
   </div>
   <div id="sync-history-content">
   {{if .SyncLogs}}
-  <div class="px-5 pb-4">
-    {{range .SyncLogs}}
-    <div class="flex gap-3 py-3 border-b border-base-300/30 last:border-0">
-      <!-- Timeline dot -->
-      <div class="flex flex-col items-center shrink-0 pt-0.5">
-        <div class="w-6 h-6 rounded-full flex items-center justify-center
-          {{if eq (printf "%s" .Status) "success"}}bg-success/12
-          {{else if eq (printf "%s" .Status) "error"}}bg-error/12
-          {{else}}bg-base-200{{end}}">
-          {{if eq (printf "%s" .Status) "success"}}<i data-lucide="check" class="w-3 h-3 text-success"></i>
-          {{else if eq (printf "%s" .Status) "error"}}<i data-lucide="x" class="w-3 h-3 text-error"></i>
-          {{else}}<i data-lucide="loader" class="w-3 h-3 text-base-content/40 animate-spin"></i>{{end}}
-        </div>
-      </div>
-      <!-- Content -->
-      <div class="flex-1 min-w-0 flex items-center justify-between gap-2">
-        <div class="min-w-0">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-sm font-medium capitalize">{{.Trigger}}</span>
-            <span class="text-xs text-base-content/35 tabular-nums">{{relativeTime .StartedAt}}</span>
-            {{if .DurationMs.Valid}}
-            <span class="text-[0.6rem] text-base-content/25 tabular-nums bg-base-200/50 px-1.5 py-0.5 rounded-full">{{formatDurationMs .DurationMs.Int32}}</span>
-            {{else if and .StartedAt.Valid .CompletedAt.Valid}}
-            <span class="text-[0.6rem] text-base-content/25 tabular-nums bg-base-200/50 px-1.5 py-0.5 rounded-full">{{syncDuration .StartedAt.Time .CompletedAt.Time}}</span>
+  <div class="overflow-x-auto">
+    <table class="table table-sm">
+      <thead>
+        <tr class="text-[0.6rem] uppercase tracking-wider text-base-content/40">
+          <th class="font-medium w-6"></th>
+          <th class="font-medium">Trigger</th>
+          <th class="font-medium">When</th>
+          <th class="font-medium text-right">Duration</th>
+          <th class="font-medium text-right">Changes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .SyncLogs}}
+        <tr>
+          <td class="py-2 pr-0">
+            {{if eq (printf "%s" .Status) "success"}}<span class="w-2 h-2 rounded-full bg-success/60 inline-block"></span>
+            {{else if eq (printf "%s" .Status) "error"}}<span class="w-2 h-2 rounded-full bg-error/60 inline-block"></span>
+            {{else}}<span class="loading loading-spinner w-3 h-3 text-base-content/40"></span>{{end}}
+          </td>
+          <td class="py-2">
+            <span class="text-sm capitalize">{{.Trigger}}</span>
+            {{if and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid}}
+            {{$friendly := syncFriendlyError .ErrorMessage.String}}
+            <p class="text-xs text-error/60 mt-0.5 max-w-sm truncate" title="{{.ErrorMessage.String}}">{{if $friendly}}{{$friendly}}{{else}}{{.ErrorMessage.String}}{{end}}</p>
             {{end}}
-          </div>
-          {{if and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid}}
-          {{$friendly := syncFriendlyError .ErrorMessage.String}}
-          {{if $friendly}}
-          <p class="text-xs text-error/60 mt-0.5 max-w-md truncate" title="{{.ErrorMessage.String}}">{{$friendly}}</p>
-          {{else}}
-          <p class="text-xs text-error/60 mt-0.5 max-w-md truncate" title="{{.ErrorMessage.String}}">{{.ErrorMessage.String}}</p>
-          {{end}}
-          {{end}}
-        </div>
-        <div class="flex items-center gap-2.5 tabular-nums text-xs shrink-0">
-          {{if or .AddedCount .ModifiedCount .RemovedCount}}
-          <div class="flex items-center gap-1.5">
-            {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
-            {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
-            {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
-          </div>
-          {{end}}
-          {{if .UnchangedCount}}<span class="text-base-content/25 text-[0.6rem]" title="{{.UnchangedCount}} unchanged">={{.UnchangedCount}}</span>{{end}}
-        </div>
-      </div>
-    </div>
-    {{end}}
+          </td>
+          <td class="py-2 text-xs text-base-content/50 tabular-nums whitespace-nowrap">{{relativeTime .StartedAt}}</td>
+          <td class="py-2 text-right text-xs text-base-content/35 tabular-nums whitespace-nowrap">
+            {{if .DurationMs.Valid}}{{formatDurationMs .DurationMs.Int32}}{{else if and .StartedAt.Valid .CompletedAt.Valid}}{{syncDuration .StartedAt.Time .CompletedAt.Time}}{{else}}&mdash;{{end}}
+          </td>
+          <td class="py-2 text-right tabular-nums text-xs whitespace-nowrap">
+            {{if or .AddedCount .ModifiedCount .RemovedCount}}
+            <span class="inline-flex items-center gap-1">
+              {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
+              {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
+              {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
+            </span>
+            {{end}}
+            {{if .UnchangedCount}}<span class="text-base-content/25 text-[0.6rem]" title="{{.UnchangedCount}} unchanged">={{.UnchangedCount}}</span>{{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
   </div>
   {{else}}
   <div class="px-5 pb-5">
