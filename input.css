@@ -1219,38 +1219,21 @@
     @apply opacity-50;
   }
 
-  /* ── Landscape mobile: compact sidebar to maximize scroll area ── */
+  /* ── Landscape mobile: scroll entire sidebar, keep full touch targets ── */
   @media (orientation: landscape) and (max-height: 500px) {
     .bb-sidebar {
-      @apply py-3;
-    }
-    .bb-sidebar-brand {
-      @apply mb-2;
+      @apply overflow-y-auto;
+      display: block;
     }
     .bb-sidebar-search {
       @apply hidden;
     }
-    .bb-sidebar-section {
-      @apply pt-3 pb-1;
-    }
-    .bb-sidebar-link {
-      @apply py-1.5;
-      min-height: 0;
-    }
-    .bb-sidebar-link i, .bb-sidebar-link svg {
-      @apply w-4 h-4;
+    .bb-sidebar-nav {
+      overflow-y: visible;
+      flex: none;
     }
     .bb-sidebar-footer {
-      @apply pt-2;
-    }
-    .bb-sidebar-profile {
-      @apply py-1.5 gap-2;
-    }
-    .bb-sidebar-profile-avatar {
-      @apply w-6 h-6 text-[0.6rem];
-    }
-    .bb-sidebar-profile-role {
-      @apply hidden;
+      margin-top: var(--bb-gap-sm, 0.5rem);
     }
     .bb-sidebar-version {
       @apply hidden;
