@@ -20,7 +20,7 @@
 {{if .EnrichedUsers}}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 bb-stagger">
   {{range .EnrichedUsers}}
-  <div class="bb-card overflow-hidden">
+  <div class="bb-card overflow-hidden flex flex-col">
     <!-- Member Header -->
     <div class="p-4 sm:p-6 pb-4">
       <div class="flex items-start justify-between">
@@ -35,25 +35,52 @@
                 <i data-lucide="pencil" class="w-3 h-3"></i>
               </a>
             </div>
-            <p class="text-xs text-base-content/40 mt-0.5">
-              {{if .Email.Valid}}{{.Email.String}}{{else}}<span class="italic text-base-content/25">No email</span>{{end}}
-              {{if .CreatedAt.Valid}}<span class="text-base-content/20 mx-0.5">&middot;</span> Since {{.CreatedAt.Time.Format "Jan 2006"}}{{end}}
-            </p>
+            {{if .Email.Valid}}
+            <p class="text-xs text-base-content/45 mt-0.5">{{.Email.String}}</p>
+            {{else}}
+            <p class="text-xs text-base-content/30 italic mt-0.5">No email</p>
+            {{end}}
           </div>
         </div>
       </div>
 
       <!-- Financial Summary -->
       {{if gt .AccountCount 0}}
-      <div class="mt-4 flex items-baseline gap-4 flex-wrap">
-        <span class="text-lg font-semibold tabular-nums{{if lt .NetWorth 0.0}} text-error{{end}}">
-          {{formatAmount .NetWorth}}
-        </span>
-        <span class="text-xs text-base-content/35">
-          {{formatAmount .TotalAssets}} assets
-          <span class="text-base-content/20 mx-0.5">/</span>
-          <span class="text-error/50">{{formatAmount .TotalLiabilities}}</span> liabilities
-        </span>
+      <div class="mt-5 pt-4 border-t border-base-300">
+        <div class="sm:hidden">
+          <div class="mb-2">
+            <p class="text-xs text-base-content/40 mb-1">Net Worth</p>
+            <p class="text-lg font-semibold tabular-nums{{if lt .NetWorth 0.0}} text-error{{end}}">
+              {{formatAmount .NetWorth}}
+            </p>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-xs text-base-content/40 mb-1">Assets</p>
+              <p class="text-sm font-medium tabular-nums text-base-content/70">{{formatAmount .TotalAssets}}</p>
+            </div>
+            <div>
+              <p class="text-xs text-base-content/40 mb-1">Liabilities</p>
+              <p class="text-sm font-medium tabular-nums text-error/70">{{formatAmount .TotalLiabilities}}</p>
+            </div>
+          </div>
+        </div>
+        <div class="hidden sm:grid grid-cols-3 gap-4">
+          <div>
+            <p class="text-xs text-base-content/40 mb-1">Net Worth</p>
+            <p class="text-lg font-semibold tabular-nums{{if lt .NetWorth 0.0}} text-error{{end}}">
+              {{formatAmount .NetWorth}}
+            </p>
+          </div>
+          <div>
+            <p class="text-xs text-base-content/40 mb-1">Assets</p>
+            <p class="text-sm font-medium tabular-nums text-base-content/70">{{formatAmount .TotalAssets}}</p>
+          </div>
+          <div>
+            <p class="text-xs text-base-content/40 mb-1">Liabilities</p>
+            <p class="text-sm font-medium tabular-nums text-error/70">{{formatAmount .TotalLiabilities}}</p>
+          </div>
+        </div>
       </div>
       {{end}}
     </div>
@@ -66,7 +93,20 @@
       </div>
       <div class="divide-y divide-base-300/50">
         {{range .Accounts}}
-        <a href="/accounts/{{.ID}}" class="flex items-center gap-3 px-4 sm:px-6 py-2.5 hover:bg-base-200/40 transition-colors no-underline group">
+        <a href="/accounts/{{.ID}}" class="flex items-center gap-3 px-4 sm:px-6 py-3 hover:bg-base-200/40 transition-colors no-underline group">
+          <div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0 hidden sm:flex">
+            {{if eq .Type "depository"}}
+            <i data-lucide="landmark" class="w-3.5 h-3.5 text-base-content/40"></i>
+            {{else if eq .Type "credit"}}
+            <i data-lucide="credit-card" class="w-3.5 h-3.5 text-base-content/40"></i>
+            {{else if eq .Type "loan"}}
+            <i data-lucide="banknote" class="w-3.5 h-3.5 text-base-content/40"></i>
+            {{else if eq .Type "investment"}}
+            <i data-lucide="trending-up" class="w-3.5 h-3.5 text-base-content/40"></i>
+            {{else}}
+            <i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content/40"></i>
+            {{end}}
+          </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-1.5">
               <span class="text-sm font-medium group-hover:text-primary transition-colors truncate">{{.Name}}</span>
@@ -74,13 +114,28 @@
               <span class="shrink-0 text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full {{if eq .ConnectionStatus "error"}}bg-error/8 text-error/70{{else if eq .ConnectionStatus "pending_reauth"}}bg-warning/8 text-warning{{else if eq .ConnectionStatus "disconnected"}}bg-base-300/60 text-base-content/40{{end}}">{{if eq .ConnectionStatus "pending_reauth"}}reauth{{else}}{{.ConnectionStatus}}{{end}}</span>
               {{end}}
             </div>
-            <span class="text-xs text-base-content/35">{{.InstitutionName}}{{if .Mask}} &middot; {{.Mask}}{{end}}</span>
+            <div class="text-xs text-base-content/40 truncate">
+              <span>{{.InstitutionName}}</span>
+              {{if .Mask}}
+              <span class="text-base-content/20">&middot;</span>
+              <span>{{.Mask}}</span>
+              {{end}}
+              {{if .Subtype}}
+              <span class="text-base-content/20">&middot;</span>
+              <span class="capitalize">{{humanize .Subtype}}</span>
+              {{end}}
+            </div>
           </div>
-          {{if .HasBalance}}
-          <span class="text-sm font-semibold tabular-nums shrink-0{{if .IsLiability}} text-error{{end}}">
-            {{formatAmount .BalanceCurrent}}
-          </span>
-          {{end}}
+          <div class="text-right shrink-0">
+            {{if .HasBalance}}
+            <span class="text-sm font-semibold tabular-nums{{if .IsLiability}} text-error{{end}}">
+              {{formatAmount .BalanceCurrent}}
+            </span>
+            <div class="text-[0.65rem] text-base-content/30 mt-0.5 hidden sm:block">{{.IsoCurrencyCode}}</div>
+            {{else}}
+            <span class="text-xs text-base-content/30">&mdash;</span>
+            {{end}}
+          </div>
         </a>
         {{end}}
       </div>
@@ -97,14 +152,20 @@
     {{end}}
 
     <!-- Footer -->
-    {{if gt .AccountCount 0}}
-    <div class="px-4 sm:px-6 py-2 border-t border-base-300 bg-base-200/20">
-      <a href="/transactions?user_id={{formatUUID .ID}}" class="text-xs text-base-content/40 hover:text-primary transition-colors no-underline inline-flex items-center gap-1.5" title="View transactions for {{.Name}}">
-        <i data-lucide="receipt" class="w-3 h-3"></i>
-        View transactions
-      </a>
+    <div class="mt-auto px-4 sm:px-6 py-2.5 border-t border-base-300 flex items-center justify-between text-xs text-base-content/30 bg-base-200/20">
+      {{if .CreatedAt.Valid}}
+      <span>Member since {{.CreatedAt.Time.Format "Jan 2006"}}</span>
+      {{end}}
+      <div class="flex items-center gap-3">
+        {{if gt .AccountCount 0}}
+        <a href="/transactions?user_id={{formatUUID .ID}}" class="text-base-content/40 hover:text-primary transition-colors no-underline inline-flex items-center gap-1" title="View transactions for {{.Name}}">
+          <i data-lucide="receipt" class="w-3 h-3"></i>
+          <span class="hidden sm:inline">Transactions</span>
+        </a>
+        {{end}}
+        <a href="/users/{{formatUUID .ID}}/edit" class="text-base-content/40 hover:text-primary transition-colors no-underline">Edit profile</a>
+      </div>
     </div>
-    {{end}}
   </div>
   {{end}}
 </div>
