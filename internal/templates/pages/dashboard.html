@@ -327,28 +327,6 @@
         <a href="/connections" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">Manage</a>
       </div>
       {{if .ConnectionHealth}}
-      <!-- Health summary bar -->
-      <div class="flex items-center gap-3 mb-3 pb-3 border-b border-base-200/60">
-        {{if gt .HealthyCount 0}}
-        <span class="flex items-center gap-1.5 text-xs text-base-content/50">
-          <span class="w-2 h-2 rounded-full bg-success/60"></span>
-          {{.HealthyCount}} healthy
-        </span>
-        {{end}}
-        {{if gt .ErrorCount 0}}
-        <span class="flex items-center gap-1.5 text-xs text-error/70">
-          <span class="w-2 h-2 rounded-full bg-error/60"></span>
-          {{.ErrorCount}} error{{if gt .ErrorCount 1}}s{{end}}
-        </span>
-        {{end}}
-        {{if gt .StaleCount 0}}
-        <span class="flex items-center gap-1.5 text-xs text-warning">
-          <span class="w-2 h-2 rounded-full bg-warning/60"></span>
-          {{.StaleCount}} stale
-        </span>
-        {{end}}
-      </div>
-
       <!-- Per-connection rows -->
       <div class="space-y-1">
         {{range .ConnectionHealth}}
@@ -378,7 +356,6 @@
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-1.5">
               <span class="text-xs font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</span>
-              <span class="text-[0.6rem] text-base-content/25 shrink-0">{{.Provider}}</span>
             </div>
             {{if and (ne .Status "active") (ne .ErrorMessage "")}}
             <div class="text-[0.6rem] text-error/60 truncate mt-0.5 font-mono max-w-full" title="{{.ErrorMessage}}">{{.ErrorMessage}}</div>
@@ -386,19 +363,6 @@
             <div class="text-[0.6rem] text-base-content/30 mt-0.5">
               {{.AccountCount}} account{{if ne .AccountCount 1}}s{{end}} · synced {{.LastSyncedAt}}
             </div>
-            {{end}}
-          </div>
-          <div class="shrink-0">
-            {{if eq .Status "active"}}
-              {{if .IsStale}}
-              <span class="text-[0.6rem] font-medium text-warning/70 bg-warning/8 px-1.5 py-0.5 rounded-full">stale</span>
-              {{else}}
-              <span class="w-1.5 h-1.5 rounded-full bg-success/50"></span>
-              {{end}}
-            {{else if eq .Status "error"}}
-            <span class="text-[0.6rem] font-medium text-error/70 bg-error/8 px-1.5 py-0.5 rounded-full">error</span>
-            {{else if eq .Status "pending_reauth"}}
-            <span class="text-[0.6rem] font-medium text-warning bg-warning/8 px-1.5 py-0.5 rounded-full">reauth</span>
             {{end}}
           </div>
         </a>
