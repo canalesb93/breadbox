@@ -11,17 +11,7 @@
   </a>
 </div>
 
-<div class="bb-card p-8 max-w-lg">
-  <div class="flex items-center gap-3 mb-6">
-    <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/8">
-      <i data-lucide="key-round" class="w-5 h-5 text-primary"></i>
-    </div>
-    <div>
-      <h2 class="text-base font-semibold">Key Details</h2>
-      <p class="text-xs text-base-content/45">Configure your new API key</p>
-    </div>
-  </div>
-
+<div class="bb-card p-6 max-w-lg">
   <form method="POST" action="/api-keys/new">
     <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
