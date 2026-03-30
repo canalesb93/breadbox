@@ -84,28 +84,6 @@
         <p class="text-sm font-medium">{{titleCase (deref .Transaction.MerchantName)}}</p>
       </div>
       {{end}}
-      {{if .AccountName}}
-      <div>
-        <p class="text-xs text-base-content/40 mb-1">Account</p>
-        <a href="/accounts/{{.AccountID}}" class="text-sm font-medium hover:text-primary transition-colors no-underline">{{.AccountName}}</a>
-      </div>
-      {{end}}
-      {{if .UserName}}
-      <div>
-        <p class="text-xs text-base-content/40 mb-1">Family Member</p>
-        <p class="text-sm font-medium">{{.UserName}}</p>
-      </div>
-      {{end}}
-      {{if .InstitutionName}}
-      <div>
-        <p class="text-xs text-base-content/40 mb-1">Institution</p>
-        {{if .ConnectionID}}
-        <a href="/connections/{{.ConnectionID}}" class="text-sm font-medium hover:text-primary transition-colors no-underline">{{.InstitutionName}}</a>
-        {{else}}
-        <p class="text-sm font-medium">{{.InstitutionName}}</p>
-        {{end}}
-      </div>
-      {{end}}
       {{if .Transaction.PaymentChannel}}
       <div>
         <p class="text-xs text-base-content/40 mb-1">Payment Channel</p>
@@ -125,27 +103,33 @@
         </div>
       </div>
       {{if .Transaction.CategoryPrimaryRaw}}
-      <div class="col-span-2 sm:col-span-3">
-        <p class="text-xs text-base-content/40 mb-1">Raw Provider Category</p>
-        <p class="text-sm font-mono text-base-content/60">{{deref .Transaction.CategoryPrimaryRaw}}{{if .Transaction.CategoryDetailedRaw}} &rarr; {{deref .Transaction.CategoryDetailedRaw}}{{end}}</p>
+      <div>
+        <p class="text-xs text-base-content/40 mb-1">Provider Category</p>
+        <p class="text-xs font-mono text-base-content/50">{{deref .Transaction.CategoryPrimaryRaw}}{{if .Transaction.CategoryDetailedRaw}} / {{deref .Transaction.CategoryDetailedRaw}}{{end}}</p>
       </div>
       {{end}}
     </div>
 
-    <!-- Metadata -->
-    <div class="mt-6 pt-5 border-t border-base-300">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-y-3 gap-x-6 text-xs">
-        <div>
-          <p class="text-base-content/30 mb-0.5">Transaction ID</p>
-          <code class="font-mono text-base-content/50 break-all">{{.Transaction.ID}}</code>
-        </div>
-        <div>
-          <p class="text-base-content/30 mb-0.5">Created</p>
-          <p class="text-base-content/50">{{formatDateTime .Transaction.CreatedAt}}</p>
-        </div>
-        <div>
-          <p class="text-base-content/30 mb-0.5">Updated</p>
-          <p class="text-base-content/50">{{formatDateTime .Transaction.UpdatedAt}}</p>
+    <!-- Metadata (collapsed by default) -->
+    <div class="mt-5 pt-4 border-t border-base-300" x-data="{open: false}">
+      <button class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-base-content/50 transition-colors" @click="open = !open">
+        <i data-lucide="chevron-right" class="w-3 h-3 transition-transform" :class="open && 'rotate-90'"></i>
+        <span>System details</span>
+      </button>
+      <div x-show="open" x-collapse class="mt-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-y-3 gap-x-6 text-xs">
+          <div>
+            <p class="text-base-content/30 mb-0.5">Transaction ID</p>
+            <code class="font-mono text-base-content/50 break-all">{{.Transaction.ID}}</code>
+          </div>
+          <div>
+            <p class="text-base-content/30 mb-0.5">Created</p>
+            <p class="text-base-content/50">{{formatDateTime .Transaction.CreatedAt}}</p>
+          </div>
+          <div>
+            <p class="text-base-content/30 mb-0.5">Updated</p>
+            <p class="text-base-content/50">{{formatDateTime .Transaction.UpdatedAt}}</p>
+          </div>
         </div>
       </div>
     </div>
