@@ -986,12 +986,19 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			CreatedAt     string // relative time
 		}
 		var agentReports []DashboardReport
-		rawReports, err := svc.ListUnreadAgentReports(ctx, 10)
+		var totalUnread int
+		rawReports, err := svc.ListUnreadAgentReports(ctx, 50)
 		if err != nil {
 			a.Logger.Error("list unread agent reports", "error", err)
 		}
-		for _, r := range rawReports {
+		totalUnread = len(rawReports)
+		now := time.Now()
+		for i, r := range rawReports {
 			t, _ := time.Parse(time.RFC3339, r.CreatedAt)
+			// Show first 3, plus any additional within 24 hours
+			if i >= 3 && now.Sub(t) > 24*time.Hour {
+				continue
+			}
 			displayAuthor := r.CreatedByName
 			if r.Author != nil && *r.Author != "" {
 				displayAuthor = *r.Author
@@ -1007,6 +1014,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				CreatedAt:     relativeTime(t),
 			})
 		}
+		hasMoreReports := totalUnread > len(agentReports)
 
 		data := map[string]any{
 			"PageTitle":              "Dashboard",
@@ -1081,6 +1089,8 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"SpendingInsights":      spendingInsights,
 			// Agent reports.
 			"AgentReports":          agentReports,
+			"HasMoreReports":        hasMoreReports,
+			"TotalUnreadReports":    totalUnread,
 		}
 		tr.Render(w, r, "dashboard.html", data)
 	}

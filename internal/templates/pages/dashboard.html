@@ -94,28 +94,30 @@
 
 <!-- Agent Reports -->
 {{if .AgentReports}}
-<div class="bb-card mb-6 bb-stagger" x-data="agentReports()">
-  <div class="px-5 pt-4 pb-2">
-    <div class="flex items-center justify-between gap-2 flex-wrap">
-      <div class="flex items-center gap-2.5">
-        <div class="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-          <i data-lucide="bot" class="w-4 h-4 text-primary"></i>
-        </div>
-        <div>
-          <h2 class="text-sm font-semibold text-base-content/80">Agent Reports</h2>
-          <p class="text-[0.65rem] text-base-content/40">{{len .AgentReports}} unread report{{if gt (len .AgentReports) 1}}s{{end}}</p>
-        </div>
+<div class="bb-card mb-6 bb-stagger" x-data="{ ...agentReports(), showReports: false }">
+  <!-- Header — always visible, clickable to toggle -->
+  <button @click="showReports = !showReports" class="w-full text-left px-5 py-4 flex items-center justify-between gap-2 hover:bg-base-200/30 transition-colors rounded-xl" :class="showReports ? 'rounded-b-none' : ''">
+    <div class="flex items-center gap-2.5">
+      <div class="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+        <i data-lucide="bot" class="w-4 h-4 text-primary"></i>
       </div>
-      <div class="flex items-center gap-3">
-        <button class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors cursor-pointer"
-          @click="markAllRead()">
-          Mark all read
-        </button>
-        <a href="/reports" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
+      <div class="flex items-center gap-2">
+        <h2 class="text-sm font-semibold text-base-content/80">Agent Reports</h2>
+        <span class="text-[0.65rem] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">{{.TotalUnreadReports}} unread</span>
       </div>
     </div>
-  </div>
-  <div class="divide-y divide-base-200/60">
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors cursor-pointer"
+        @click.stop="markAllRead()">
+        Mark all read
+      </span>
+      <a href="/reports" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors" @click.stop>View all</a>
+      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200" :class="showReports ? 'rotate-180' : ''"></i>
+    </div>
+  </button>
+
+  <!-- Collapsible report list -->
+  <div x-show="showReports" x-cloak class="border-t border-base-200/60 divide-y divide-base-200/60">
     {{range .AgentReports}}
     <div class="transition-all duration-300"
       :class="dismissed['{{.ID}}'] ? 'opacity-0 h-0 overflow-hidden' : ''"
@@ -160,6 +162,11 @@
           <div class="bb-report-body text-sm text-base-content/60 leading-relaxed" data-markdown="{{.Body}}"></div>
         </div>
       </div>
+    </div>
+    {{end}}
+    {{if .HasMoreReports}}
+    <div class="px-5 py-3 border-t border-base-200/60 text-center">
+      <a href="/reports" class="text-xs text-primary/70 hover:text-primary transition-colors">View all {{.TotalUnreadReports}} unread reports &rarr;</a>
     </div>
     {{end}}
   </div>
