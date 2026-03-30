@@ -272,7 +272,7 @@
 
   /* ── Sidebar ── */
   .bb-sidebar {
-    @apply bg-base-100 h-full w-64 px-3 py-5 flex flex-col border-r border-base-300;
+    @apply bg-base-100 h-full w-[85vw] max-w-80 sm:w-72 lg:w-64 px-3 py-5 flex flex-col border-r border-base-300;
   }
 
   .bb-sidebar-brand {
@@ -294,7 +294,7 @@
   }
 
   .bb-sidebar-link {
-    @apply flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium
+    @apply flex items-center gap-3 px-3 py-2.5 lg:py-1.5 rounded-lg text-sm font-medium
            text-base-content/60 no-underline
            hover:bg-base-200 hover:text-base-content;
     transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
@@ -1118,7 +1118,7 @@
 
   /* ── Sidebar Cmd+K trigger ── */
   .bb-sidebar-search {
-    @apply flex items-center gap-2.5 px-3 py-2 mx-0 mb-3 rounded-lg
+    @apply flex items-center gap-2.5 px-3 py-2.5 lg:py-2 mx-0 mb-3 rounded-lg
            text-sm text-base-content/35 bg-base-200/50 border border-base-300/50
            cursor-pointer select-none;
     transition: background-color 0.15s ease, border-color 0.15s ease;
@@ -1144,7 +1144,7 @@
 
   /* ── Sidebar user profile ── */
   .bb-sidebar-profile {
-    @apply flex items-center gap-2.5 px-2 py-2 rounded-lg;
+    @apply flex items-center gap-2.5 px-2 py-3 lg:py-2 rounded-lg;
     transition: background-color 0.15s ease;
   }
 
