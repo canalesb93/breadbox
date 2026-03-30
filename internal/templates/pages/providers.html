@@ -86,15 +86,18 @@
         <button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick="testProvider('plaid')" id="test-plaid-btn">Test Connection</button>
         <span id="test-plaid-result" class="text-sm min-w-0 break-words"></span>
       </div>
-      <div class="mt-4 border-t border-base-300 pt-4">
-        <h3 class="text-sm font-medium mb-2 flex items-center gap-1.5">
+      <details class="mt-4 border-t border-base-300 pt-4 group">
+        <summary class="text-sm font-medium flex items-center gap-1.5 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
           <i data-lucide="webhook" class="w-3.5 h-3.5 text-base-content/40"></i>
           Webhook Setup
-        </h3>
-        <p class="text-xs text-base-content/50 mb-2">Plaid can push real-time transaction updates via webhooks. Set the webhook URL above, then configure Plaid to send events to:</p>
-        <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all">https://&lt;your-domain&gt;/webhooks/plaid</code>
-        <p class="text-xs text-base-content/40 mt-2">Plaid automatically sends webhooks when you set the URL during link token creation. No additional configuration needed in the Plaid dashboard.</p>
-      </div>
+          <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-base-content/30 transition-transform group-open:rotate-90"></i>
+        </summary>
+        <div class="mt-2">
+          <p class="text-xs text-base-content/50 mb-2">Endpoint for Plaid transaction updates:</p>
+          <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all">https://&lt;your-domain&gt;/webhooks/plaid</code>
+          <p class="text-xs text-base-content/40 mt-2">Webhooks are configured automatically when you set the URL during link token creation.</p>
+        </div>
+      </details>
       {{end}}
     </div>
   </div>
@@ -194,23 +197,19 @@
         <button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick="testProvider('teller')" id="test-teller-btn">Test Connection</button>
         <span id="test-teller-result" class="text-sm min-w-0 break-words"></span>
       </div>
-      <div class="mt-4 border-t border-base-300 pt-4">
-        <h3 class="text-sm font-medium mb-2 flex items-center gap-1.5">
+      <details class="mt-4 border-t border-base-300 pt-4 group">
+        <summary class="text-sm font-medium flex items-center gap-1.5 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
           <i data-lucide="webhook" class="w-3.5 h-3.5 text-base-content/40"></i>
           Webhook Setup
-        </h3>
-        <p class="text-xs text-base-content/50 mb-2">Teller sends webhooks for account disconnections and other events. To enable:</p>
-        <ol class="text-xs text-base-content/50 space-y-1.5 mb-3 list-decimal list-inside">
-          <li>Go to the <strong>Teller dashboard</strong> and navigate to your application settings</li>
-          <li>Set the webhook URL to:</li>
-        </ol>
-        <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all">https://&lt;your-domain&gt;/webhooks/teller</code>
-        <ol class="text-xs text-base-content/50 space-y-1.5 mt-2 list-decimal list-inside" start="3">
-          <li>Copy the <strong>webhook signing secret</strong> from Teller and paste it in the Webhook Secret field above</li>
-          <li>Breadbox verifies webhook signatures using this secret to ensure authenticity</li>
-        </ol>
-        <p class="text-xs text-base-content/40 mt-2.5">Without webhooks, Breadbox relies on cron-based polling (every {{if .SyncInterval}}{{.SyncInterval}}{{else}}12 hours{{end}}) to detect changes.</p>
-      </div>
+          <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-base-content/30 transition-transform group-open:rotate-90"></i>
+        </summary>
+        <div class="mt-2">
+          <p class="text-xs text-base-content/50 mb-2">In the Teller dashboard, set your webhook URL to:</p>
+          <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all">https://&lt;your-domain&gt;/webhooks/teller</code>
+          <p class="text-xs text-base-content/50 mt-2">Then paste the signing secret from Teller into the Webhook Secret field above.</p>
+          <p class="text-xs text-base-content/40 mt-1.5">Without webhooks, sync uses cron polling (every {{if .SyncInterval}}{{.SyncInterval}}{{else}}12 hours{{end}}).</p>
+        </div>
+      </details>
       {{end}}
     </div>
   </div>
