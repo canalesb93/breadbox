@@ -184,7 +184,7 @@
 </div>
 
 <!-- Triage: Compact, keyboard-driven review workflow -->
-<div x-data="triageQueue()" @keydown.window="handleKey($event)" class="space-y-0">
+<div x-data="triageQueue()" @keydown.window="handleKey($event)" class="space-y-0" :class="{ 'bb-instant-nav': keyboardNav }">
 
   {{if .Reviews}}
   <!-- Triage toolbar (only shown for pending reviews) -->
@@ -206,7 +206,7 @@
     {{range $idx, $review := .Reviews}}
     <div class="bb-triage-row"
          :class="{ 'bb-triage-row--focused': focusedIdx === {{$idx}} }"
-         @click="focusedIdx = {{$idx}}"
+         @click="keyboardNav = false; focusedIdx = {{$idx}}"
          id="triage-{{$review.ID}}"
          data-review-id="{{$review.ID}}"
          data-idx="{{$idx}}"
@@ -382,6 +382,7 @@ function triageQueue() {
   return {
     focusedIdx: 0,
     sessionCount: 0,
+    keyboardNav: false,
     totalRows: document.querySelectorAll('.bb-triage-row').length,
 
     init() {
@@ -410,11 +411,13 @@ function triageQueue() {
       switch(e.key) {
         case 'j':
           e.preventDefault();
+          this.keyboardNav = true;
           this.focusedIdx = Math.min(this.focusedIdx + 1, rows.length - 1);
           this.scrollToFocused();
           break;
         case 'k':
           e.preventDefault();
+          this.keyboardNav = true;
           this.focusedIdx = Math.max(this.focusedIdx - 1, 0);
           this.scrollToFocused();
           break;
