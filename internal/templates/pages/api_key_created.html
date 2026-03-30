@@ -8,41 +8,35 @@
   </div>
 </div>
 
-<div class="bb-card p-8 max-w-lg">
-  <div class="flex flex-col items-center text-center mb-6">
-    <div class="w-16 h-16 rounded-xl bg-success/10 flex items-center justify-center mb-4">
-      <i data-lucide="check-circle-2" class="w-8 h-8 text-success"></i>
+<div class="bb-card p-6 max-w-lg">
+  <div class="flex items-center gap-3 mb-5">
+    <div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center">
+      <i data-lucide="check" class="w-4.5 h-4.5 text-success"></i>
     </div>
-    <h2 class="text-lg font-semibold mb-1">Key Ready</h2>
-    <p class="text-sm text-base-content/50">Copy it now -- this is the only time it will be shown.</p>
-  </div>
-
-  <div class="space-y-4 mb-6">
     <div>
-      <label class="text-xs font-medium text-base-content/50 mb-1.5 block">Name</label>
-      <div class="px-4 py-2.5 rounded-xl bg-base-200/50 text-sm font-medium">{{.KeyName}}</div>
-    </div>
-
-    <div>
-      <label class="text-xs font-medium text-base-content/50 mb-1.5 block">API Key</label>
-      <div class="relative">
-        <input type="text" value="{{.PlaintextKey}}" readonly id="api-key-value"
-               class="input input-sm font-mono w-full bg-base-200/50 border-base-300 rounded-xl pr-24 text-xs">
-      </div>
+      <h2 class="text-sm font-semibold">{{.KeyName}}</h2>
+      <p class="text-xs text-base-content/45">Copy your key now -- it won't be shown again.</p>
     </div>
   </div>
 
-  <div class="flex items-center gap-3" x-data="{ copied: false }">
-    <button class="btn btn-primary btn-sm rounded-xl" @click="navigator.clipboard.writeText(document.getElementById('api-key-value').value).then(function(){ $data.copied = true; setTimeout(function(){ $data.copied = false; }, 2000); })">
-      <i data-lucide="clipboard" class="w-4 h-4"></i>
-      <span x-show="!copied">Copy to Clipboard</span>
-      <span x-show="copied" x-cloak>Copied!</span>
-    </button>
+  <div class="mb-5">
+    <label class="text-xs font-medium text-base-content/50 mb-1.5 block">API Key</label>
+    <div class="flex gap-2" x-data="{ copied: false }">
+      <input type="text" value="{{.PlaintextKey}}" readonly id="api-key-value"
+             class="input input-sm font-mono flex-1 bg-base-200/50 border-base-300 rounded-xl text-xs">
+      <button class="btn btn-primary btn-sm rounded-xl shrink-0" @click="navigator.clipboard.writeText(document.getElementById('api-key-value').value).then(function(){ $data.copied = true; setTimeout(function(){ $data.copied = false; }, 2000); })">
+        <i data-lucide="clipboard" class="w-4 h-4"></i>
+        <span x-show="!copied">Copy</span>
+        <span x-show="copied" x-cloak>Copied!</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-between pt-4 border-t border-base-300">
+    <p class="text-xs text-base-content/40">
+      Use in the <code class="font-mono text-primary/70 bg-primary/5 px-1.5 py-0.5 rounded">X-API-Key</code> header for API requests.
+    </p>
     <a href="/access" class="btn btn-ghost btn-sm rounded-xl">Done</a>
   </div>
-
-  <p class="text-xs text-base-content/40 mt-6 pt-4 border-t border-base-300">
-    Use this key in the <code class="font-mono text-primary/70 bg-primary/5 px-1.5 py-0.5 rounded">X-API-Key</code> header when making API requests.
-  </p>
 </div>
 {{end}}

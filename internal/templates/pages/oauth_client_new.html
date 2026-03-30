@@ -11,17 +11,7 @@
   </a>
 </div>
 
-<div class="bb-card p-8 max-w-lg">
-  <div class="flex items-center gap-3 mb-6">
-    <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
-      <i data-lucide="fingerprint" class="w-5 h-5 text-primary"></i>
-    </div>
-    <div>
-      <h2 class="text-base font-semibold">Client Details</h2>
-      <p class="text-xs text-base-content/45">Configure your new OAuth client</p>
-    </div>
-  </div>
-
+<div class="bb-card p-6 max-w-lg">
   <form method="POST" action="/oauth-clients/new">
     <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
