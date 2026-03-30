@@ -60,6 +60,14 @@ func TestClassifyUpsertResult(t *testing.T) {
 			wantNew:     false,
 			wantChanged: false,
 		},
+		{
+			name:        "unchanged: created_at == updated_at but both old (re-sync of recently added row)",
+			createdAt:   now.Add(-10 * time.Second),
+			updatedAt:   now.Add(-10 * time.Second),
+			upsertStart: now.Add(-100 * time.Millisecond),
+			wantNew:     false,
+			wantChanged: false,
+		},
 	}
 
 	for _, tt := range tests {
