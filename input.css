@@ -1219,6 +1219,44 @@
     @apply opacity-50;
   }
 
+  /* ── Landscape mobile: compact sidebar to maximize scroll area ── */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .bb-sidebar {
+      @apply py-3;
+    }
+    .bb-sidebar-brand {
+      @apply mb-2;
+    }
+    .bb-sidebar-search {
+      @apply hidden;
+    }
+    .bb-sidebar-section {
+      @apply pt-3 pb-1;
+    }
+    .bb-sidebar-link {
+      @apply py-1.5;
+      min-height: 0;
+    }
+    .bb-sidebar-link i, .bb-sidebar-link svg {
+      @apply w-4 h-4;
+    }
+    .bb-sidebar-footer {
+      @apply pt-2;
+    }
+    .bb-sidebar-profile {
+      @apply py-1.5 gap-2;
+    }
+    .bb-sidebar-profile-avatar {
+      @apply w-6 h-6 text-[0.6rem];
+    }
+    .bb-sidebar-profile-role {
+      @apply hidden;
+    }
+    .bb-sidebar-version {
+      @apply hidden;
+    }
+  }
+
   /* ─── Keyboard Shortcuts Help Overlay ─── */
   .bb-shortcuts-backdrop {
     @apply fixed inset-0 z-50;
