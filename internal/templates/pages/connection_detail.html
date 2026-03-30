@@ -179,57 +179,40 @@
 </div>
 {{end}}
 
-<!-- Connection Details + Sync Settings -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-  <!-- Connection Details Card -->
-  <div class="bb-card p-5 lg:col-span-2">
-    <h2 class="text-sm font-semibold text-base-content/50 mb-4">Connection Details</h2>
-    <div class="bb-info-grid">
+<!-- Connection Info -->
+<div class="bb-card p-5 mb-6">
+  <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
       <div>
-        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Family Member</p>
-        <p class="text-sm font-medium">{{pgtext .Connection.UserName}}</p>
-      </div>
-      <div>
-        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Provider</p>
-        <p class="text-sm font-medium capitalize">{{.Connection.Provider}}</p>
-      </div>
-      <div>
-        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Connected</p>
-        <p class="text-sm font-medium">{{if .Connection.CreatedAt.Valid}}{{.Connection.CreatedAt.Time.Format "Jan 2, 2006"}}{{else}}&mdash;{{end}}</p>
-      </div>
-      <div>
-        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Last Synced</p>
-        <p class="text-sm font-medium">{{if .Connection.LastSyncedAt.Valid}}{{relativeTime .Connection.LastSyncedAt.Time}}{{else}}<span class="text-base-content/30">Never</span>{{end}}</p>
+        <span class="text-base-content/40 text-xs">Connected</span>
+        <span class="ml-1.5 font-medium">{{if .Connection.CreatedAt.Valid}}{{.Connection.CreatedAt.Time.Format "Jan 2, 2006"}}{{else}}&mdash;{{end}}</span>
       </div>
       {{if gt .Connection.ConsecutiveFailures 0}}
       <div>
-        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Consecutive Failures</p>
-        <p class="text-sm font-semibold text-warning">{{.Connection.ConsecutiveFailures}}</p>
+        <span class="text-base-content/40 text-xs">Failures</span>
+        <span class="ml-1.5 font-semibold text-warning">{{.Connection.ConsecutiveFailures}} in a row</span>
       </div>
+      {{end}}
+      {{if and (gt .Connection.ConsecutiveFailures 0) .Connection.LastErrorAt.Valid}}
       <div>
-        <p class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1">Last Error</p>
-        <p class="text-sm font-medium">{{if .Connection.LastErrorAt.Valid}}{{relativeTime .Connection.LastErrorAt.Time}}{{else}}<span class="text-base-content/30">&mdash;</span>{{end}}</p>
+        <span class="text-base-content/40 text-xs">Last error</span>
+        <span class="ml-1.5 font-medium">{{relativeTime .Connection.LastErrorAt.Time}}</span>
       </div>
       {{end}}
     </div>
-  </div>
-
-  <!-- Sync Settings Card -->
-  <div class="bb-card p-5">
-    <h2 class="text-sm font-semibold text-base-content/50 mb-4">Sync Settings</h2>
-    <div>
-      <label class="text-[0.65rem] text-base-content/40 uppercase tracking-wider mb-1.5 block">Sync Interval</label>
-      <select id="sync-interval" onchange="updateSyncInterval(this.value)" class="select select-sm select-bordered w-full rounded-xl">
-        <option value=""{{if not .Connection.SyncIntervalOverrideMinutes.Valid}} selected{{end}}>Use global default</option>
-        <option value="15"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 15)}} selected{{end}}>Every 15 minutes</option>
-        <option value="30"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 30)}} selected{{end}}>Every 30 minutes</option>
-        <option value="60"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 60)}} selected{{end}}>Every hour</option>
-        <option value="120"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 120)}} selected{{end}}>Every 2 hours</option>
-        <option value="240"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 240)}} selected{{end}}>Every 4 hours</option>
-        <option value="720"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 720)}} selected{{end}}>Every 12 hours</option>
-        <option value="1440"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 1440)}} selected{{end}}>Every 24 hours</option>
+    <div class="flex items-center gap-2 shrink-0">
+      <label class="text-xs text-base-content/40">Sync interval</label>
+      <select id="sync-interval" onchange="updateSyncInterval(this.value)" class="select select-xs select-bordered rounded-lg">
+        <option value=""{{if not .Connection.SyncIntervalOverrideMinutes.Valid}} selected{{end}}>Default</option>
+        <option value="15"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 15)}} selected{{end}}>15 min</option>
+        <option value="30"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 30)}} selected{{end}}>30 min</option>
+        <option value="60"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 60)}} selected{{end}}>1 hr</option>
+        <option value="120"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 120)}} selected{{end}}>2 hr</option>
+        <option value="240"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 240)}} selected{{end}}>4 hr</option>
+        <option value="720"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 720)}} selected{{end}}>12 hr</option>
+        <option value="1440"{{if and .Connection.SyncIntervalOverrideMinutes.Valid (eq .Connection.SyncIntervalOverrideMinutes.Int32 1440)}} selected{{end}}>24 hr</option>
       </select>
-      <span id="interval-status" class="text-xs text-base-content/50 mt-1 block"></span>
+      <span id="interval-status" class="text-xs text-base-content/50"></span>
     </div>
   </div>
 </div>
