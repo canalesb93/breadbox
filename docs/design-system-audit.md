@@ -35,7 +35,7 @@ variant usage. No clear convention for when to use which size or radius.
 
 **Files to audit:** All files in `internal/templates/pages/*.html`
 
-- [ ] **1a. Audit and document all button patterns.** Grep for `btn btn-` across
+- [x] **1a. Audit and document all button patterns.** Grep for `btn btn-` across
   all templates. Create a table of every unique combination used and where.
   Decide on the standard:
   - Primary actions: `btn btn-primary btn-sm rounded-xl`
@@ -44,6 +44,7 @@ variant usage. No clear convention for when to use which size or radius.
   - Compact inline actions (table rows, badges): `btn btn-ghost btn-xs rounded-lg`
   - Icon-only buttons: `btn btn-ghost btn-sm btn-square rounded-xl`
   - Document the convention in `docs/design-system.md`
+  - **Done:** Audited 200+ button instances across all templates. Documented convention in `docs/design-system.md` section 6 with size/rounding table, variant usage guide, and 7 rules. Key deviations found: ~15 modal buttons missing `btn-sm`, ~5 buttons missing `rounded-xl`, confirm dialog in `base.html` uses `rounded-lg` instead of `rounded-xl`, inconsistent `btn-soft` on error buttons.
 
 - [ ] **1b. Normalize button rounding across all templates.** Apply the convention
   from 1a. Replace `rounded-lg` on primary/secondary buttons with `rounded-xl`.
@@ -549,4 +550,4 @@ there should match what's actually in the code after the above improvements.
 
 | Date | Task | Agent/Session | Notes |
 |------|------|---------------|-------|
-| | | | |
+| 2026-03-31 | 1a | Claude Code | Audited 200+ button instances, documented convention in design-system.md §6 |

@@ -293,7 +293,41 @@ The Go template functions `statusBadge()` and `syncBadge()` in `internal/admin/t
 </div>
 ```
 
-## 6. Table Guidelines
+## 6. Button Convention
+
+### Standard Sizes & Rounding
+
+| Context | Size | Rounding | Example |
+|---|---|---|---|
+| Default (page actions, forms, nav) | `btn-sm` | `rounded-xl` | `btn btn-primary btn-sm rounded-xl` |
+| Compact (table rows, badges, inline) | `btn-xs` | `rounded-lg` | `btn btn-ghost btn-xs rounded-lg` |
+| Full-width (login, setup) | unsized | `rounded-xl` | `btn btn-primary w-full h-12 rounded-xl` |
+| Icon-only (standard) | `btn-sm btn-square` | `rounded-xl` | `btn btn-ghost btn-sm btn-square rounded-xl` |
+| Icon-only (compact) | `btn-xs btn-square` | `rounded-lg` | `btn btn-ghost btn-xs btn-square rounded-lg` |
+
+### Variant Usage
+
+| Purpose | Classes |
+|---|---|
+| **Primary action** (create, save, submit) | `btn btn-primary btn-sm rounded-xl` |
+| **Secondary/ghost** (cancel, back, reset) | `btn btn-ghost btn-sm rounded-xl` |
+| **Outline** (secondary emphasis, re-auth, load more) | `btn btn-outline btn-sm rounded-xl` |
+| **Destructive** (delete, remove) | `btn btn-error btn-sm rounded-xl` |
+| **Destructive confirm** (inline confirm step) | `btn btn-error btn-sm btn-soft rounded-xl` |
+| **Compact ghost** (table actions, inline) | `btn btn-ghost btn-xs rounded-lg` |
+| **Compact destructive** (table delete) | `btn btn-ghost btn-xs rounded-lg text-error/60` |
+
+### Rules
+
+1. **Always specify a size** — `btn-sm` is the default, `btn-xs` for compact contexts only
+2. **Always specify rounding** — `rounded-xl` for `btn-sm`, `rounded-lg` for `btn-xs`
+3. **Icon+text gap** — use `gap-2` for `btn-sm`, `gap-1.5` for `btn-xs`
+4. **Class order** — `btn btn-{variant} btn-{size} [btn-soft|btn-square] rounded-{radius}` then modifiers
+5. **Error buttons in confirm flows** — use `btn-soft` variant for the confirm step to visually soften it
+6. **No bare `rounded`, `rounded-md`, or `rounded-lg` on `btn-sm`** — always `rounded-xl`
+7. **Full-width buttons** (login/setup pages) are the only exception to the `btn-sm` rule
+
+## 7. Table Guidelines
 
 ### Base Table
 
@@ -350,7 +384,7 @@ For tables that can grow long (transactions, sync logs):
 
 Badges in tables should use `badge-sm` for compact density.
 
-## 7. Form Patterns
+## 8. Form Patterns
 
 ### Filter Bar
 
@@ -397,7 +431,7 @@ Use DaisyUI form control patterns:
 </label>
 ```
 
-## 8. Icon System
+## 9. Icon System
 
 ### Lucide Icons
 
@@ -459,7 +493,7 @@ When Alpine.js dynamically adds elements with `data-lucide` attributes (e.g., to
 <div x-init="$watch('show', v => { if(v) $nextTick(() => lucide.createIcons()) })">
 ```
 
-## 9. Toast / Notification Pattern
+## 10. Toast / Notification Pattern
 
 Global toast component in `base.html`, using DaisyUI `toast` + `alert`:
 
@@ -491,7 +525,7 @@ window.dispatchEvent(new CustomEvent('bb-toast', {
 }));
 ```
 
-## 10. Typography
+## 11. Typography
 
 DaisyUI inherits Tailwind's type scale. Key decisions:
 
@@ -503,7 +537,7 @@ DaisyUI inherits Tailwind's type scale. Key decisions:
 - **Small text:** `text-sm` for labels, metadata, timestamps
 - **Monospace:** `font-mono` for API keys, transaction IDs, code snippets
 
-## 11. Migration Notes
+## 12. Migration Notes
 
 ### What to Remove
 
