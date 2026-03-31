@@ -540,6 +540,32 @@
       });
     };
 
+    // Scroll lock: freeze body in place so modals don't cause scroll-through
+    // or viewport jumps when the iOS keyboard opens.
+    (function() {
+      var savedY = 0;
+      var lockCount = 0;
+      window.bbLockScroll = function() {
+        if (lockCount++ > 0) return; // nested lock
+        savedY = window.scrollY;
+        document.body.style.position = 'fixed';
+        document.body.style.top = '-' + savedY + 'px';
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+        document.body.style.overflow = 'hidden';
+      };
+      window.bbUnlockScroll = function() {
+        if (--lockCount > 0) return; // still locked by another modal
+        lockCount = 0;
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.overflow = '';
+        window.scrollTo(0, savedY);
+      };
+    })();
+
     // Global Category Picker component
     function globalCategoryPicker() {
       return {
@@ -594,7 +620,7 @@
           this.search = '';
           this.activeIndex = 0;
           this.open = true;
-          document.body.style.overflow = 'hidden';
+          window.bbLockScroll();
 
           var self = this;
           setTimeout(function() {
@@ -607,7 +633,7 @@
         closePicker() {
           this.open = false;
           this.search = '';
-          document.body.style.overflow = '';
+          window.bbUnlockScroll();
         },
 
         moveDown() {
@@ -732,7 +758,7 @@
           this.activeIndex = 0;
           this._txResults = [];
           this._txLoading = false;
-          document.body.style.overflow = 'hidden';
+          window.bbLockScroll();
           var self = this;
           setTimeout(function() {
             if (self.$refs.cmdkInput) {
@@ -747,7 +773,7 @@
           this.query = '';
           this._txResults = [];
           this._txLoading = false;
-          document.body.style.overflow = '';
+          window.bbUnlockScroll();
           if (this._txTimer) clearTimeout(this._txTimer);
           if (this._txAbort) this._txAbort.abort();
         },
