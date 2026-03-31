@@ -1049,8 +1049,9 @@
   /* Mobile: pin to top, prevent Safari zoom on focus */
   @media (max-width: 640px) {
     .bb-cmdk-dialog {
-      top: 0;
-      border-radius: 0 0 0.75rem 0.75rem;
+      top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+      border-radius: 0.75rem;
+      width: calc(100vw - 1rem);
     }
 
     .bb-cmdk-input {
@@ -1440,8 +1441,9 @@
   /* Mobile: pin to top, prevent Safari zoom on focus */
   @media (max-width: 640px) {
     .bb-catpicker-dialog {
-      top: 0;
-      border-radius: 0 0 0.75rem 0.75rem;
+      top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+      border-radius: 0.75rem;
+      width: calc(100vw - 1rem);
     }
 
     .bb-catpicker-input {
