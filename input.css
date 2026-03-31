@@ -1044,6 +1044,8 @@
     background: oklch(0 0 0 / 0.4);
     backdrop-filter: blur(4px);
     animation: bb-cmdk-backdrop-in 0.15s ease-out;
+    touch-action: none;
+    -webkit-overflow-scrolling: auto;
   }
 
   @keyframes bb-cmdk-backdrop-in {
@@ -1114,6 +1116,7 @@
     @apply overflow-y-auto;
     max-height: min(55vh, 370px);
     scrollbar-width: thin;
+    overscroll-behavior: contain;
   }
 
   .bb-cmdk-group {
@@ -1414,6 +1417,8 @@
     background: oklch(0 0 0 / 0.4);
     backdrop-filter: blur(4px);
     animation: bb-catpicker-backdrop-in 0.15s ease-out;
+    touch-action: none;
+    -webkit-overflow-scrolling: auto;
   }
 
   @keyframes bb-catpicker-backdrop-in {
@@ -1484,6 +1489,7 @@
     @apply overflow-y-auto;
     max-height: min(55vh, 370px);
     scrollbar-width: thin;
+    overscroll-behavior: contain;
   }
 
   .bb-catpicker-item {
