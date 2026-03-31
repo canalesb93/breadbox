@@ -18,6 +18,10 @@
 > - Run `make css` after any `input.css` changes
 > - Run `go build ./...` after any Go template changes
 > - Do NOT change behavior — these are cosmetic/structural improvements only
+> - **Be careful not to break complex interactions** (keyboard shortcuts, triage
+>   queue, category picker, command palette, etc.) by over-simplifying. If a
+>   component has intricate state management or event wiring, leave the logic
+>   alone and only touch the CSS/class layer.
 > - When standardizing patterns, pick the most common existing usage as the winner
 > - Update `docs/design-system.md` if your changes establish a new convention
 
@@ -284,11 +288,22 @@ Should standardize on one.
 (`insights.html`, `connection_detail.html`) create inline toast HTML instead
 of using the global system.
 
+**Reference implementation:** The agent wizard page (`agent_wizard.html`) has the
+best inline feedback pattern — the copy buttons show a "Copied" state with a
+checkmark icon inline, changing color to `text-success`. This inline feedback
+pattern (icon swap + color change + timeout reset) is the gold standard for
+copy-to-clipboard and similar instant actions. The global `bb-toast` system
+should be reserved for async operations, confirmations, and errors.
+
 **Files to audit:** Search for `bb-toast`, `toast`, and `alert` patterns
 
-- [ ] **13a. Migrate all inline toasts to global system.** Find pages that create
-  their own toast markup instead of dispatching `bb-toast` events. Refactor them
-  to use the global toast. Remove any duplicate toast HTML.
+- [ ] **13a. Migrate stray toasts to the right system.** Audit all toast usage:
+  - Pages that create their own toast markup instead of dispatching `bb-toast`
+    events should be migrated to use the global toast
+  - Copy-to-clipboard actions: adopt the agent wizard inline feedback pattern
+    (icon swap to checkmark, `text-success`, 2s timeout) instead of firing a
+    global toast for a trivial action
+  - Remove any duplicate toast HTML
 
 ---
 
@@ -297,12 +312,15 @@ of using the global system.
 **Problem:** 4 different pagination implementations: `bb-paginator` custom component,
 server-side prev/next links, cursor-based links, and ad-hoc button pairs.
 
+**Reference implementation:** The transactions page (`transactions.html`) has the
+best pagination UX — use it as the model for all other paginated views.
+
 **Files to audit:** All templates with pagination
 
-- [ ] **14a. Standardize pagination markup.** The `bb-paginator` pattern (from
-  `input.css`) should be the standard for all paginated views. For cursor-based
-  pagination (no page numbers), use a simplified version with just prev/next.
-  Normalize all implementations to use consistent classes and button styles.
+- [ ] **14a. Standardize pagination markup.** Use the transactions page paginator
+  as the canonical pattern. For cursor-based pagination (no page numbers), use
+  a simplified version with just prev/next but same styling. Normalize all
+  implementations to use consistent `bb-paginator` classes and button styles.
 
 ---
 
@@ -393,17 +411,109 @@ colors that don't adapt properly in dark mode. The `bg-base-200/50` issue on
 
 ---
 
-## 20. Design System Documentation Sync
+## 20. Frosted Glass Pattern for Floating Elements
 
-**Problem:** `docs/design-system.md` was written during the Pico-to-DaisyUI
-migration and may not reflect the current state. The conventions documented
-there should match what's actually in the code after all the above improvements.
+**Problem:** The mobile topbar is getting a frosted glass treatment
+(`backdrop-blur` + semi-transparent background) so it's not entirely opaque.
+This pattern should be applied consistently across all floating/overlay elements.
 
-- [ ] **20a. Update `docs/design-system.md` to reflect current reality.** After
-  the above tasks are done (or substantially done), do a full review of the
-  design system doc. Update component examples, class conventions, and any
-  sections that have drifted from the code. Add sections for conventions
-  established during this audit (button sizes, badge patterns, icon sizes, etc.).
+**Files to audit:** `layout/base.html` (mobile navbar), `input.css` (modals,
+command palette, category picker, confirm dialog, shortcuts dialog)
+
+- [ ] **20a. Apply frosted glass to mobile topbar.** Update the mobile navbar
+  (`navbar bg-base-100 lg:hidden`) to use `bg-base-100/80 backdrop-blur-lg`
+  (or similar) instead of solid `bg-base-100`. Test in both light and dark mode.
+
+- [ ] **20b. Apply frosted glass to modal/dialog backdrops.** Update the backdrop
+  layers for `bb-cmdk-backdrop`, `bb-catpicker-backdrop`, `bb-confirm-backdrop`,
+  `bb-shortcuts-backdrop`, and DaisyUI modal backdrops to use a frosted glass
+  effect (`backdrop-blur-sm` on the backdrop layer). This adds depth and polish.
+  Be careful with performance — `backdrop-blur` can be expensive on low-end
+  devices, so keep blur values modest (4-8px).
+
+---
+
+## 21. Keyboard Shortcut Hints — Hide on Mobile
+
+**Problem:** Keyboard shortcut hints (e.g., `bb-kbd` badges showing "K", "?",
+key combos) are shown in a few places in the UI. These are meaningless on
+mobile/touch devices and add visual clutter.
+
+**Files to audit:** All templates showing `bb-kbd` or shortcut key hints,
+`base.html` (shortcuts help dialog trigger)
+
+- [ ] **21a. Hide keyboard shortcut hints on mobile.** Add `hidden sm:inline-flex`
+  (or `hidden lg:inline-flex`) to all keyboard shortcut hint elements so they
+  only appear on devices likely to have a keyboard. This includes:
+  - Command palette trigger hint ("K")
+  - Any "?" shortcut hints
+  - Shortcut badges in nav or page headers
+  - Do NOT hide the shortcuts help dialog itself (it's already behind a
+    keyboard shortcut to open it)
+
+---
+
+## 22. Button Loading Spinners for Async Actions
+
+**Problem:** When buttons trigger async operations (fetch calls, form submissions
+via AJAX), there's no loading feedback on the button itself. Users don't know
+if their click registered. Some pages show a global progress bar but the button
+stays static.
+
+**Pattern to implement:** When a button triggers an async action, it should:
+1. Show a `loading loading-spinner loading-xs` inside the button (replacing the icon)
+2. Add `btn-disabled` or `pointer-events-none` to prevent double-clicks
+3. Restore original state on success/error
+
+**Reference:** DaisyUI buttons support `<span class="loading loading-spinner loading-xs"></span>`
+natively and it looks great.
+
+**Files to audit:** All templates with `fetch()` or AJAX calls triggered by buttons
+
+- [ ] **22a. Create a reusable `bbButtonLoading(btn)` / `bbButtonDone(btn)` JS
+  helper.** Add to `base.html` a small utility:
+  ```js
+  window.bbButtonLoading = function(btn) {
+    btn._origHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span>';
+  };
+  window.bbButtonDone = function(btn) {
+    btn.disabled = false;
+    btn.innerHTML = btn._origHTML;
+    lucide.createIcons({ nodes: [btn] });
+  };
+  ```
+  This preserves the original content and restores it (including re-initializing
+  Lucide icons). Document the pattern.
+
+- [ ] **22b. Apply button loading pattern to key async actions.** Prioritize the
+  most user-facing async buttons:
+  - Sync Now buttons (connections page, connection detail)
+  - Delete/remove confirmations
+  - Form submissions via fetch (rule create/edit, category create, etc.)
+  - Review approve/skip/reject actions
+  - Any button that calls `fetch()` and then navigates or updates the page
+  - Don't apply to trivial instant actions (copy-to-clipboard, toggle switches)
+
+---
+
+## 23. Design System Documentation Sync
+
+**Problem:** `docs/design-system.md` is stale — it was written during the
+Pico-to-DaisyUI migration and hasn't been kept current. Many sections describe
+the migration plan rather than the current state. The conventions documented
+there should match what's actually in the code after the above improvements.
+
+- [ ] **23a. Rewrite `docs/design-system.md` to reflect current reality.** This
+  is a significant rewrite, not a patch. The doc should:
+  - Remove migration-era language ("migrates from Pico CSS")
+  - Document the actual component patterns as they exist now
+  - Include the conventions established during this audit (button sizes, badge
+    patterns, icon sizes, frosted glass, loading spinners, etc.)
+  - Serve as a reference for anyone building new pages
+  - Include code examples for each major pattern
+  - Be organized by component type, not by migration step
 
 ---
 
