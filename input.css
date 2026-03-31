@@ -1046,6 +1046,19 @@
     @apply w-full py-3.5 text-sm bg-transparent border-none outline-none placeholder:text-base-content/40;
   }
 
+  /* Mobile: pin to top, prevent Safari zoom on focus */
+  @media (max-width: 640px) {
+    .bb-cmdk-dialog {
+      top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+      border-radius: 0.75rem;
+      width: calc(100vw - 1rem);
+    }
+
+    .bb-cmdk-input {
+      font-size: 16px; /* prevents Safari auto-zoom on input focus */
+    }
+  }
+
   .bb-cmdk-input:focus {
     outline: none;
     box-shadow: none;
@@ -1406,6 +1419,19 @@
   .bb-catpicker-input:focus {
     outline: none;
     box-shadow: none;
+  }
+
+  /* Mobile: pin to top, prevent Safari zoom on focus */
+  @media (max-width: 640px) {
+    .bb-catpicker-dialog {
+      top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+      border-radius: 0.75rem;
+      width: calc(100vw - 1rem);
+    }
+
+    .bb-catpicker-input {
+      font-size: 16px;
+    }
   }
 
   .bb-catpicker-list {
