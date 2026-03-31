@@ -96,7 +96,7 @@
 {{if .AgentReports}}
 <div class="bb-card mb-6 bb-stagger" x-data="{ ...agentReports(), showReports: true }">
   <!-- Header — always visible, clickable to toggle -->
-  <button @click="showReports = !showReports" class="w-full text-left px-5 py-4 flex items-center justify-between gap-2 hover:bg-base-200/30 transition-colors rounded-xl" :class="showReports ? 'rounded-b-none' : ''">
+  <button @click="showReports = !showReports" class="w-full text-left px-5 py-3 sm:py-4 flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1 hover:bg-base-200/30 transition-colors rounded-xl" :class="showReports ? 'rounded-b-none' : ''">
     <div class="flex items-center gap-2">
         <h2 class="text-sm font-semibold text-base-content/80">Agent Reports</h2>
         <span class="text-[0.65rem] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">{{.TotalUnreadReports}} unread</span>
@@ -106,7 +106,7 @@
         @click.stop="markAllRead()">
         Mark all read
       </span>
-      <a href="/reports" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors" @click.stop>View all</a>
+      <a href="/reports" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors hidden sm:inline" @click.stop>View all</a>
       <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200" :class="showReports ? 'rotate-180' : ''"></i>
     </div>
   </button>
