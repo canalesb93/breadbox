@@ -323,11 +323,15 @@ used more broadly alongside the toast.
   they use the new global toast. The prompt builder's `showToast()` method
   should just call `window.dispatchEvent(new CustomEvent('bb-toast', ...))`.
 
-- [ ] **13c. Standardize inline copy feedback pattern.** For copy-to-clipboard
-  buttons throughout the app, adopt the agent wizard's inline feedback pattern
-  (icon swap to checkmark, `text-success` color, 2s timeout) as a complement
-  to the toast. This gives immediate tactile feedback on the button itself.
-  Audit all copy buttons and normalize.
+- [ ] **13c. Standardize inline button feedback pattern.** The agent wizard's
+  inline feedback (icon swap to checkmark, `text-success` color, 2s timeout)
+  is great UX and should be used beyond just copy buttons. Apply this pattern
+  to any button where the action is instant and the result is obvious:
+  - Copy-to-clipboard buttons (most obvious fit)
+  - Toggle switches (enable/disable rule, pause connection, etc.)
+  - Quick actions where a full toast feels heavy (e.g., "mark as read")
+  - Any single-click action that succeeds silently today with no feedback
+  Audit all such buttons and normalize to this inline feedback pattern.
 
 ---
 
