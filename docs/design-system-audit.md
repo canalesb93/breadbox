@@ -281,29 +281,53 @@ Should standardize on one.
 
 ---
 
-## 13. Toast/Notification Consolidation
+## 13. Toast/Notification Redesign
 
-**Problem:** Global toast system exists in `base.html` via
-`window.dispatchEvent(new CustomEvent('bb-toast', ...))`, but some pages
-(`insights.html`, `connection_detail.html`) create inline toast HTML instead
-of using the global system.
+**Problem:** The global toast in `base.html` uses DaisyUI's `toast toast-end
+toast-bottom` pattern (corner-anchored, boxy). The prompt builder page
+(`prompt_builder.html:196-208`) has a much better toast design: a centered
+floating pill at the bottom with a checkmark icon, smooth transitions, and
+a polished look. This should become the app-wide toast.
 
-**Reference implementation:** The agent wizard page (`agent_wizard.html`) has the
-best inline feedback pattern — the copy buttons show a "Copied" state with a
-checkmark icon inline, changing color to `text-success`. This inline feedback
-pattern (icon swap + color change + timeout reset) is the gold standard for
-copy-to-clipboard and similar instant actions. The global `bb-toast` system
-should be reserved for async operations, confirmations, and errors.
+**Reference implementation (`prompt_builder.html:196-208`):**
+```html
+<div class="fixed bottom-24 left-1/2 z-50 -translate-x-1/2">
+  <div class="bg-base-100 border border-base-300 rounded-xl shadow-lg px-4 py-2.5 flex items-center gap-2">
+    <svg class="text-success" ...checkmark.../></svg>
+    <span class="text-sm font-medium">Prompt copied to clipboard</span>
+  </div>
+</div>
+```
+Key traits: centered horizontally, floating near bottom, `rounded-xl`, border
++ shadow (not solid background color), checkmark icon for success, clean
+enter/leave transitions (fade + slide-up).
 
-**Files to audit:** Search for `bb-toast`, `toast`, and `alert` patterns
+**Secondary pattern:** The agent wizard copy buttons also have nice inline
+feedback (icon swap to checkmark, `text-success`, 2s timeout). This inline
+feedback is great for trivial instant actions (copy buttons) and should be
+used more broadly alongside the toast.
 
-- [ ] **13a. Migrate stray toasts to the right system.** Audit all toast usage:
-  - Pages that create their own toast markup instead of dispatching `bb-toast`
-    events should be migrated to use the global toast
-  - Copy-to-clipboard actions: adopt the agent wizard inline feedback pattern
-    (icon swap to checkmark, `text-success`, 2s timeout) instead of firing a
-    global toast for a trivial action
-  - Remove any duplicate toast HTML
+**Files to audit:** `layout/base.html` (global toast), `prompt_builder.html`
+(reference), all pages dispatching `bb-toast` or creating inline toasts
+
+- [ ] **13a. Redesign the global toast to match the prompt builder style.**
+  Update the global toast in `base.html` to use the centered floating pill
+  design from `prompt_builder.html`. Keep the `bb-toast` CustomEvent API so
+  existing callers don't break — just change the markup and positioning. Support
+  different types (success = checkmark, error = x-circle, info = info icon,
+  warning = alert-triangle). Auto-dismiss after 3-4 seconds with fade-out.
+
+- [ ] **13b. Migrate all per-page toast implementations to the global system.**
+  Remove the inline toast HTML from `prompt_builder.html` and any other pages
+  that build their own toast. Convert them to dispatch `bb-toast` events so
+  they use the new global toast. The prompt builder's `showToast()` method
+  should just call `window.dispatchEvent(new CustomEvent('bb-toast', ...))`.
+
+- [ ] **13c. Standardize inline copy feedback pattern.** For copy-to-clipboard
+  buttons throughout the app, adopt the agent wizard's inline feedback pattern
+  (icon swap to checkmark, `text-success` color, 2s timeout) as a complement
+  to the toast. This gives immediate tactile feedback on the button itself.
+  Audit all copy buttons and normalize.
 
 ---
 
