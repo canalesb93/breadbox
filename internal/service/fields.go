@@ -29,8 +29,6 @@ var validFields = map[string]bool{
 	"pending":               true,
 	"created_at":            true,
 	"updated_at":            true,
-	"attributed_user_id":   true,
-	"attributed_user_name": true,
 }
 
 // fieldAliases expand shorthand names to groups of fields.
@@ -243,6 +241,17 @@ func FilterReviewFields(r ReviewResponse, fields map[string]bool) map[string]any
 	return m
 }
 
+// NormalizeTransactionAttribution merges attributed_user into user_name and
+// clears the attributed_user_* fields. This gives MCP consumers a single
+// "user_name" that always reflects the effective user (attributed or owner).
+func NormalizeTransactionAttribution(t *TransactionResponse) {
+	if t.AttributedUserName != nil {
+		t.UserName = t.AttributedUserName
+	}
+	t.AttributedUserID = nil
+	t.AttributedUserName = nil
+}
+
 // FilterTransactionFields returns a map with only the requested fields.
 // If fields is nil, returns nil to signal the caller should use the full struct.
 func FilterTransactionFields(t TransactionResponse, fields map[string]bool) map[string]any {
@@ -260,7 +269,12 @@ func FilterTransactionFields(t TransactionResponse, fields map[string]bool) map[
 		m["account_name"] = t.AccountName
 	}
 	if fields["user_name"] {
-		m["user_name"] = t.UserName
+		// Use attributed user when set (account linking), otherwise connection owner.
+		if t.AttributedUserName != nil {
+			m["user_name"] = t.AttributedUserName
+		} else {
+			m["user_name"] = t.UserName
+		}
 	}
 	if fields["amount"] {
 		m["amount"] = t.Amount
@@ -312,12 +326,6 @@ func FilterTransactionFields(t TransactionResponse, fields map[string]bool) map[
 	}
 	if fields["updated_at"] {
 		m["updated_at"] = t.UpdatedAt
-	}
-	if fields["attributed_user_id"] {
-		m["attributed_user_id"] = t.AttributedUserID
-	}
-	if fields["attributed_user_name"] {
-		m["attributed_user_name"] = t.AttributedUserName
 	}
 	return m
 }
