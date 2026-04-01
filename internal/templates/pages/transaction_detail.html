@@ -34,7 +34,7 @@
 <div class="bb-card p-0 mb-6 overflow-hidden">
   <div class="flex items-center gap-4 px-5 py-3.5">
     <div class="w-9 h-9 rounded-lg bg-base-200/70 flex items-center justify-center shrink-0">
-      <i data-lucide="building-2" class="w-4.5 h-4.5 text-base-content/40"></i>
+      <i data-lucide="building-2" class="w-5 h-5 text-base-content/40"></i>
     </div>
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
@@ -151,7 +151,7 @@
       {{if .Transaction.CategoryOverride}}<span class="badge badge-ghost badge-xs">Manual override</span>{{end}}
       <template x-if="isOverride">
         <button class="btn btn-ghost btn-xs rounded-lg text-base-content/40 hover:text-base-content" @click="resetCategory()">
-          <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Reset to auto
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset to auto
         </button>
       </template>
       <span x-show="saving" class="loading loading-spinner loading-xs"></span>

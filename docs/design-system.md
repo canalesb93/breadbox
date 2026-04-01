@@ -232,6 +232,76 @@ Base class: `bb-card` — provides `bg-base-100 rounded-xl border border-base-30
 
 **Interactive cards** add `bb-card--interactive` for hover effects (cursor change, background shift).
 
+### Modals
+
+All `<dialog>` elements use:
+- Container: `<dialog id="..." class="modal modal-bottom sm:modal-middle">`
+- Content: `<div class="modal-box rounded-xl max-w-lg">` (use `<form>` wrapper only when the modal IS a form)
+- Rounding: always `rounded-xl`
+- Close backdrop: `<form method="dialog" class="modal-backdrop"><button>close</button></form>`
+
+Custom overlay dialogs (confirm, shortcuts, category picker) in `base.html` use their own CSS classes and are not standard modals.
+
+### Form Controls
+
+| Element | Standard classes |
+|---|---|
+| Text inputs | `input input-bordered w-full rounded-xl` |
+| Filter inputs | `input input-sm input-bordered w-full` (styled by `.bb-filter-bar` CSS) |
+| Compact inputs (rules) | `input input-bordered input-xs rounded-lg` |
+| Selects | `select select-bordered w-full rounded-xl` |
+| Filter selects | `select select-sm select-bordered w-full` |
+| Textareas | `textarea textarea-bordered rounded-xl w-full` |
+
+**Background:** No `bg-base-200/50` on standard form inputs — only on read-only, disabled, or inline-edit inputs.
+
+**Labels** use three patterns depending on context:
+- Filter bars: `.bb-filter-label` (defined in `input.css`)
+- Form fields: DaisyUI `<label class="label">` with `<span class="label-text">`
+- Simple forms: `<label class="text-sm font-medium text-base-content/70 mb-1.5 block">`
+
+### Icon Sizes
+
+| Context | Size |
+|---|---|
+| Inline with text (badges, labels) | `w-3.5 h-3.5` |
+| In buttons (`btn-sm`) | `w-4 h-4` |
+| In buttons (`btn-xs`) | `w-3.5 h-3.5` |
+| Section headers / standalone | `w-5 h-5` |
+| Empty state illustrations | `w-8 h-8` |
+| Sidebar nav | Managed by CSS (`.bb-sidebar-link` rules) — don't set manually |
+
+### Transitions (Alpine.js)
+
+| Context | Approach |
+|---|---|
+| Collapsible sections (filter panels, accordions, disclosures) | `x-collapse` |
+| Tab panels, wizard steps | Explicit `x-transition:enter` with `ease-out duration-200` |
+| Dropdowns / popovers | Explicit transitions with scale + opacity |
+| Modals | Handled by DaisyUI — no Alpine transitions needed |
+| Toast / notifications | Already handled in `base.html` |
+| Simple show/hide (spinners, help text) | No transition — instant is fine |
+
+### Empty States
+
+Standard pattern for "no data" screens:
+```html
+<div class="bb-card p-12 text-center">
+  <div class="flex flex-col items-center">
+    <div class="w-14 h-14 rounded-xl bg-base-200 flex items-center justify-center mb-4">
+      <i data-lucide="..." class="w-7 h-7 text-base-content/30"></i>
+    </div>
+    <h3 class="text-base font-semibold mb-1">Title</h3>
+    <p class="text-base-content/50 text-sm mb-5 max-w-sm">Description text.</p>
+    <a href="..." class="btn btn-primary btn-sm rounded-xl gap-2">
+      <i data-lucide="plus" class="w-4 h-4"></i> CTA Button
+    </a>
+  </div>
+</div>
+```
+
+For filtered "no results" states (e.g., transactions with active filters), a compact version with just icon + text is acceptable.
+
 ## 5. Layout Patterns
 
 ### Base Layout (Drawer Sidebar)
