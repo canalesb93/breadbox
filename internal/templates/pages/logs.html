@@ -1,0 +1,530 @@
+{{define "content"}}
+<div x-data="{ tab: '{{.Tab}}' }"
+     x-init="$watch('tab', function(v) { var u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); })">
+
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Logs</h1>
+    <p class="text-sm text-base-content/50 mt-1">Sync history and webhook events</p>
+  </div>
+</div>
+
+<!-- Tab Switcher -->
+<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 mb-6 w-fit">
+  <button @click="tab = 'syncs'"
+    :class="tab === 'syncs' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+    class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2">
+    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+    Sync Logs
+  </button>
+  <button @click="tab = 'webhooks'"
+    :class="tab === 'webhooks' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+    class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2">
+    <i data-lucide="webhook" class="w-3.5 h-3.5"></i>
+    Webhooks
+  </button>
+</div>
+
+<!-- ==================== SYNC LOGS TAB ==================== -->
+<div x-show="tab === 'syncs'" x-cloak>
+
+<!-- Summary Stats -->
+{{if .Stats}}
+<div class="grid grid-cols-3 gap-3 mb-6 bb-stagger">
+  <!-- Success Rate -->
+  <div class="bb-card p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 {{if gt .Stats.SuccessRate 80.0}}bg-success/10{{else if gt .Stats.SuccessRate 50.0}}bg-warning/10{{else}}bg-error/10{{end}}">
+        {{if gt .Stats.SuccessRate 80.0}}
+        <i data-lucide="check-circle-2" class="w-4 h-4 text-success"></i>
+        {{else if gt .Stats.SuccessRate 50.0}}
+        <i data-lucide="alert-triangle" class="w-4 h-4 text-warning"></i>
+        {{else}}
+        <i data-lucide="x-circle" class="w-4 h-4 text-error"></i>
+        {{end}}
+      </div>
+      <div>
+        <div class="text-2xl font-semibold tabular-nums leading-none {{if gt .Stats.SuccessRate 80.0}}text-success{{else if gt .Stats.SuccessRate 50.0}}text-warning{{else}}text-error{{end}}">{{printf "%.0f" .Stats.SuccessRate}}%</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Success rate</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Errors -->
+  <div class="bb-card p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 {{if gt .Stats.ErrorCount 0}}bg-error/10{{else}}bg-base-200/60{{end}}">
+        <i data-lucide="alert-circle" class="w-4 h-4 {{if gt .Stats.ErrorCount 0}}text-error/70{{else}}text-base-content/40{{end}}"></i>
+      </div>
+      <div>
+        <div class="text-2xl font-semibold tabular-nums leading-none {{if gt .Stats.ErrorCount 0}}text-error{{end}}">{{.Stats.ErrorCount}}</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Errors</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Avg Duration -->
+  <div class="bb-card p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+        <i data-lucide="timer" class="w-4 h-4 text-base-content/40"></i>
+      </div>
+      <div>
+        <div class="text-2xl font-semibold tabular-nums leading-none">
+          {{if gt .Stats.AvgDurationMs 999.0}}{{printf "%.1f" (divFloat .Stats.AvgDurationMs 1000.0)}}s{{else}}{{printf "%.0f" .Stats.AvgDurationMs}}ms{{end}}
+        </div>
+        <div class="text-xs text-base-content/40 mt-0.5">Avg duration</div>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+<!-- Collapsible Filter Bar -->
+<div class="bb-card mb-5" x-data="{ filtersOpen: {{if .HasAdvancedFilters}}true{{else}}false{{end}} }">
+  <div class="p-0">
+    <button type="button" class="bb-filter-toggle" @click="filtersOpen = !filtersOpen">
+      <div class="flex items-center gap-2">
+        <i data-lucide="sliders-horizontal" class="w-4 h-4 text-base-content/60"></i>
+        <span>Filters</span>
+        {{if .HasAdvancedFilters}}
+        <span class="badge badge-primary badge-xs">Active</span>
+        {{end}}
+      </div>
+      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/40 transition-transform duration-200" :class="filtersOpen ? 'rotate-180' : ''"></i>
+    </button>
+
+    <form method="GET" action="/logs" x-show="filtersOpen" x-cloak
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0 -translate-y-2"
+      x-transition:enter-end="opacity-100 translate-y-0"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-start="opacity-100 translate-y-0"
+      x-transition:leave-end="opacity-0 -translate-y-2"
+      class="bb-filter-form px-4 pb-4 pt-2">
+      <input type="hidden" name="tab" value="syncs">
+      {{if .FilterStatus}}<input type="hidden" name="status" value="{{.FilterStatus}}">{{end}}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+        <label class="bb-filter-label">
+          Connection
+          <select name="connection_id" class="select select-sm select-bordered w-full">
+            <option value="">All connections</option>
+            {{range .Connections}}
+            <option value="{{formatUUID .ID}}"{{if eq (formatUUID .ID) $.FilterConnID}} selected{{end}}>{{.InstitutionName.String}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label class="bb-filter-label">
+          Trigger
+          <select name="trigger" class="select select-sm select-bordered w-full">
+            <option value="">All triggers</option>
+            <option value="cron"{{if eq .FilterTrigger "cron"}} selected{{end}}>Cron</option>
+            <option value="manual"{{if eq .FilterTrigger "manual"}} selected{{end}}>Manual</option>
+            <option value="webhook"{{if eq .FilterTrigger "webhook"}} selected{{end}}>Webhook</option>
+            <option value="initial"{{if eq .FilterTrigger "initial"}} selected{{end}}>Initial</option>
+          </select>
+        </label>
+        <label class="bb-filter-label">
+          From Date
+          <input type="date" name="date_from" value="{{.FilterDateFrom}}" class="input input-sm input-bordered w-full">
+        </label>
+        <label class="bb-filter-label">
+          To Date
+          <input type="date" name="date_to" value="{{.FilterDateTo}}" class="input input-sm input-bordered w-full">
+        </label>
+      </div>
+      <div class="bb-filter-actions">
+        <a href="/logs?tab=syncs" class="btn btn-sm btn-ghost rounded-xl">Reset</a>
+        <button type="submit" class="btn btn-sm btn-primary rounded-xl">
+          <i data-lucide="search" class="w-3.5 h-3.5"></i>
+          Apply Filters
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Status Filter Tabs -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <!-- Status pill tabs -->
+  <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 overflow-x-auto">
+    <a href="/logs?tab=syncs&{{syncLogFilterQuery "" .FilterConnID .FilterTrigger .FilterDateFrom .FilterDateTo}}"
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5 whitespace-nowrap
+              {{if not .FilterStatus}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
+      All
+      <span class="text-[0.6rem] tabular-nums opacity-60">{{.Stats.TotalSyncs}}</span>
+    </a>
+    <a href="/logs?tab=syncs&{{syncLogFilterQuery "success" .FilterConnID .FilterTrigger .FilterDateFrom .FilterDateTo}}"
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5 whitespace-nowrap
+              {{if eq .FilterStatus "success"}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
+      <span class="w-1.5 h-1.5 rounded-full bg-success shrink-0"></span>
+      Success
+      <span class="text-[0.6rem] tabular-nums opacity-60">{{.SuccessCount}}</span>
+    </a>
+    <a href="/logs?tab=syncs&{{syncLogFilterQuery "error" .FilterConnID .FilterTrigger .FilterDateFrom .FilterDateTo}}"
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5 whitespace-nowrap
+              {{if eq .FilterStatus "error"}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
+      <span class="w-1.5 h-1.5 rounded-full bg-error shrink-0"></span>
+      Errors
+      <span class="text-[0.6rem] tabular-nums opacity-60">{{.ErrorCount}}</span>
+    </a>
+    <a href="/logs?tab=syncs&{{syncLogFilterQuery "in_progress" .FilterConnID .FilterTrigger .FilterDateFrom .FilterDateTo}}"
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5 whitespace-nowrap
+              {{if eq .FilterStatus "in_progress"}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
+      <span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0"></span>
+      In Progress
+      <span class="text-[0.6rem] tabular-nums opacity-60">{{.InProgressCount}}</span>
+    </a>
+  </div>
+
+  {{if or .FilterConnID .FilterTrigger .FilterDateFrom .FilterDateTo .FilterStatus}}
+  <a href="/logs?tab=syncs" class="btn btn-ghost btn-xs rounded-lg gap-1.5 text-base-content/50 hover:text-base-content/80">
+    <i data-lucide="x" class="w-3 h-3"></i>
+    Clear all filters
+  </a>
+  {{end}}
+</div>
+
+{{if .Logs}}
+
+<!-- Results count -->
+<div class="text-xs text-base-content/40 mb-3 px-1">{{.Total}} sync log{{if ne .Total 1}}s{{end}}</div>
+
+<!-- Timeline view -->
+<div class="space-y-1 bb-stagger">
+  {{range .Logs}}
+  <div class="bb-card bb-card--interactive group transition-all duration-150 {{if eq .Status "error"}}border-error/20 hover:border-error/30{{end}}">
+    <a href="/sync-logs/{{.ID}}" class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 py-3 px-4 no-underline">
+      <!-- Top row: status icon + main content + (desktop) changes -->
+      <div class="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+        <!-- Status indicator -->
+        <div class="relative shrink-0">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center
+                      {{if eq .Status "success"}}bg-success/10{{else if eq .Status "error"}}bg-error/10{{else if eq .Status "in_progress"}}bg-warning/10{{else}}bg-base-200/50{{end}}">
+            {{if eq .Status "success"}}
+            <i data-lucide="check" class="w-3.5 h-3.5 text-success"></i>
+            {{else if eq .Status "error"}}
+            <i data-lucide="x" class="w-3.5 h-3.5 text-error"></i>
+            {{else if eq .Status "in_progress"}}
+            <i data-lucide="loader" class="w-3.5 h-3.5 text-warning animate-spin"></i>
+            {{else}}
+            <i data-lucide="minus" class="w-3.5 h-3.5 text-base-content/30"></i>
+            {{end}}
+          </div>
+        </div>
+
+        <!-- Main content -->
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium group-hover:text-primary transition-colors truncate">{{.InstitutionName}}</span>
+            <span class="badge badge-ghost badge-xs opacity-60 shrink-0">{{.Trigger}}</span>
+          </div>
+          <div class="flex items-center gap-3 mt-0.5 text-xs text-base-content/40">
+            <span>{{relativeTime .StartedAt}}</span>
+            {{if .Duration}}
+            <span class="text-base-content/25">&middot;</span>
+            <span class="tabular-nums">{{.Duration}}</span>
+            {{end}}
+            {{if .AccountsAffected}}
+            <span class="text-base-content/25">&middot;</span>
+            <span>{{.AccountsAffected}} account{{if ne .AccountsAffected 1}}s{{end}}</span>
+            {{end}}
+          </div>
+          {{if and (eq .Status "error") .FriendlyErrorMessage}}
+          <div class="mt-1 text-xs text-error/60 truncate max-w-md">{{deref .FriendlyErrorMessage}}</div>
+          {{else if and (eq .Status "error") .ErrorMessage}}
+          <div class="mt-1 text-xs text-error/60 truncate max-w-md font-mono">{{deref .ErrorMessage}}</div>
+          {{end}}
+        </div>
+      </div>
+
+      <!-- Changes + Status (wraps to second line on mobile) -->
+      <div class="flex items-center gap-3 sm:gap-4 shrink-0 pl-11 sm:pl-0">
+        <!-- Transaction changes (only shown when there are actual changes) -->
+        {{if or .AddedCount .ModifiedCount .RemovedCount .UnchangedCount}}
+        <div class="flex items-center gap-2 text-xs tabular-nums">
+          {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
+          {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
+          {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
+          {{if .UnchangedCount}}<span class="text-base-content/30 font-medium" title="{{.UnchangedCount}} unchanged transactions">={{.UnchangedCount}}</span>{{end}}
+        </div>
+        {{end}}
+
+        <!-- Warning badge -->
+        {{if .WarningMessage}}
+        <span class="badge badge-soft badge-warning badge-sm gap-1">
+          <i data-lucide="alert-triangle" class="w-3 h-3"></i>warning
+        </span>
+        {{end}}
+
+      </div>
+    </a>
+  </div>
+  {{end}}
+</div>
+
+{{if gt .TotalPages 1}}
+<div class="flex items-center justify-between mt-6">
+  <div>
+    {{if gt .Page 1}}
+    <a href="/logs?tab=syncs&page={{sub .Page 1}}&{{syncLogFilterQuery .FilterStatus .FilterConnID .FilterTrigger .FilterDateFrom .FilterDateTo}}" class="btn btn-sm btn-ghost rounded-xl">&laquo; Previous</a>
+    {{end}}
+  </div>
+  <span class="text-xs text-base-content/40">Page {{.Page}} of {{.TotalPages}}</span>
+  <div>
+    {{if lt .Page .TotalPages}}
+    <a href="/logs?tab=syncs&page={{add .Page 1}}&{{syncLogFilterQuery .FilterStatus .FilterConnID .FilterTrigger .FilterDateFrom .FilterDateTo}}" class="btn btn-sm btn-ghost rounded-xl">Next &raquo;</a>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+{{else}}
+<div class="bb-card p-12 text-center">
+  <div class="flex flex-col items-center">
+    <div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
+      <i data-lucide="refresh-cw" class="w-8 h-8 text-base-content/25"></i>
+    </div>
+    <h3 class="text-lg font-semibold mb-1">No sync logs found</h3>
+    <p class="text-sm text-base-content/50 mb-5">{{if or .FilterConnID .FilterStatus .FilterTrigger .FilterDateFrom .FilterDateTo}}Try adjusting your filters.{{else}}Sync logs will appear here after your first bank sync.{{end}}</p>
+    {{if or .FilterConnID .FilterStatus .FilterTrigger .FilterDateFrom .FilterDateTo}}
+    <a href="/logs?tab=syncs" class="btn btn-ghost btn-sm rounded-xl">Clear filters</a>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+</div><!-- /syncs tab -->
+
+<!-- ==================== WEBHOOKS TAB ==================== -->
+<div x-show="tab === 'webhooks'" x-cloak>
+
+<!-- Summary Stats Cards -->
+{{if .WHStats}}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 bb-stagger">
+  <!-- Total Events -->
+  <div class="bb-card p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+        <i data-lucide="webhook" class="w-4 h-4 text-base-content/40"></i>
+      </div>
+      <div>
+        <div class="text-2xl font-semibold tabular-nums leading-none">{{.WHStats.TotalEvents}}</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Total events</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Processed -->
+  <div class="bb-card p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
+        <i data-lucide="check-circle-2" class="w-4 h-4 text-success"></i>
+      </div>
+      <div>
+        <div class="text-2xl font-semibold tabular-nums leading-none text-success">{{.WHStats.ProcessedCount}}</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Processed</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Received (in-flight) -->
+  <div class="bb-card p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+        <i data-lucide="clock" class="w-4 h-4 text-warning"></i>
+      </div>
+      <div>
+        <div class="text-2xl font-semibold tabular-nums leading-none {{if gt .WHStats.ReceivedCount 0}}text-warning{{end}}">{{.WHStats.ReceivedCount}}</div>
+        <div class="text-xs text-base-content/40 mt-0.5">In-flight</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Errors -->
+  <div class="bb-card p-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 {{if gt .WHStats.ErrorCount 0}}bg-error/10{{else}}bg-base-200/60{{end}}">
+        <i data-lucide="alert-circle" class="w-4 h-4 {{if gt .WHStats.ErrorCount 0}}text-error/70{{else}}text-base-content/40{{end}}"></i>
+      </div>
+      <div>
+        <div class="text-2xl font-semibold tabular-nums leading-none {{if gt .WHStats.ErrorCount 0}}text-error{{end}}">{{.WHStats.ErrorCount}}</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Errors</div>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+<!-- Status Filter Tabs + Provider Dropdown -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+  <!-- Status pill tabs -->
+  <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5">
+    <a href="/logs?tab=webhooks{{if .WHFilterProvider}}&wh_provider={{.WHFilterProvider}}{{end}}"
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5
+              {{if not .WHFilterStatus}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
+      All
+      <span class="text-[0.6rem] tabular-nums opacity-60">{{.WHStats.TotalEvents}}</span>
+    </a>
+    <a href="/logs?tab=webhooks&wh_status=processed{{if .WHFilterProvider}}&wh_provider={{.WHFilterProvider}}{{end}}"
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5
+              {{if eq .WHFilterStatus "processed"}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
+      <span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+      Processed
+      <span class="text-[0.6rem] tabular-nums opacity-60">{{.WHStats.ProcessedCount}}</span>
+    </a>
+    <a href="/logs?tab=webhooks&wh_status=received{{if .WHFilterProvider}}&wh_provider={{.WHFilterProvider}}{{end}}"
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5
+              {{if eq .WHFilterStatus "received"}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
+      <span class="w-1.5 h-1.5 rounded-full bg-warning"></span>
+      In-flight
+      <span class="text-[0.6rem] tabular-nums opacity-60">{{.WHStats.ReceivedCount}}</span>
+    </a>
+    <a href="/logs?tab=webhooks&wh_status=error{{if .WHFilterProvider}}&wh_provider={{.WHFilterProvider}}{{end}}"
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5
+              {{if eq .WHFilterStatus "error"}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
+      <span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+      Errors
+      <span class="text-[0.6rem] tabular-nums opacity-60">{{.WHStats.ErrorCount}}</span>
+    </a>
+  </div>
+
+  <!-- Provider filter dropdown -->
+  <form method="GET" action="/logs" class="flex items-center gap-2">
+    <input type="hidden" name="tab" value="webhooks">
+    {{if .WHFilterStatus}}<input type="hidden" name="wh_status" value="{{.WHFilterStatus}}">{{end}}
+    <select name="wh_provider" class="select select-sm select-bordered rounded-xl text-xs min-w-[10rem]"
+            onchange="this.form.submit()">
+      <option value="">All providers</option>
+      <option value="plaid"{{if eq .WHFilterProvider "plaid"}} selected{{end}}>Plaid</option>
+      <option value="teller"{{if eq .WHFilterProvider "teller"}} selected{{end}}>Teller</option>
+    </select>
+    {{if .WHFilterProvider}}
+    <a href="/logs?tab=webhooks{{if $.WHFilterStatus}}&wh_status={{$.WHFilterStatus}}{{end}}" class="btn btn-ghost btn-xs rounded-lg">
+      <i data-lucide="x" class="w-3 h-3"></i>
+    </a>
+    {{end}}
+  </form>
+</div>
+
+{{if .WHEvents}}
+
+<!-- Results count -->
+<div class="text-xs text-base-content/40 mb-3 px-1">{{.WHTotal}} webhook event{{if ne .WHTotal 1}}s{{end}}</div>
+
+<!-- Event list -->
+<div class="space-y-1 bb-stagger">
+  {{range .WHEvents}}
+  <div class="bb-card group transition-all duration-150 {{if eq .Status "error"}}border-error/20{{end}}" x-data="{ open: false }">
+    <div class="flex items-center gap-4 py-3 px-4 cursor-pointer" @click="open = !open">
+      <!-- Status indicator -->
+      <div class="relative shrink-0">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center
+                    {{if eq .Status "processed"}}bg-success/10{{else if eq .Status "error"}}bg-error/10{{else}}bg-warning/10{{end}}">
+          {{if eq .Status "processed"}}
+          <i data-lucide="check" class="w-3.5 h-3.5 text-success"></i>
+          {{else if eq .Status "error"}}
+          <i data-lucide="x" class="w-3.5 h-3.5 text-error"></i>
+          {{else}}
+          <i data-lucide="clock" class="w-3.5 h-3.5 text-warning"></i>
+          {{end}}
+        </div>
+      </div>
+
+      <!-- Main content -->
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium">{{.EventType}}</span>
+          <span class="badge badge-ghost badge-xs opacity-60">{{.Provider}}</span>
+        </div>
+        <div class="flex items-center gap-3 mt-0.5 text-xs text-base-content/40">
+          <span>{{relativeTime .CreatedAt}}</span>
+          {{if .InstitutionName}}
+          <span class="text-base-content/25">&middot;</span>
+          <span>{{deref .InstitutionName}}</span>
+          {{end}}
+        </div>
+      </div>
+
+      <!-- Status badge + expand -->
+      <div class="flex items-center gap-3 shrink-0">
+        {{if eq .Status "processed"}}
+        <span class="badge badge-soft badge-success badge-sm">processed</span>
+        {{else if eq .Status "error"}}
+        <span class="badge badge-soft badge-error badge-sm">error</span>
+        {{else}}
+        <span class="badge badge-soft badge-warning badge-sm">{{.Status}}</span>
+        {{end}}
+
+        <button class="btn btn-ghost btn-xs btn-square rounded-lg text-base-content/30 hover:text-base-content/60 transition-colors">
+          <i data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Expandable detail -->
+    <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="border-t border-base-200">
+      <div class="px-4 py-3 ml-12 space-y-2">
+        {{if .ConnectionID}}
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-base-content/40 w-24 shrink-0">Connection</span>
+          <a href="/connections/{{deref .ConnectionID}}" class="font-medium hover:text-primary transition-colors font-mono text-xs">
+            {{if .InstitutionName}}{{deref .InstitutionName}}{{else}}{{deref .ConnectionID}}{{end}}
+          </a>
+        </div>
+        {{end}}
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-base-content/40 w-24 shrink-0">Payload hash</span>
+          <span class="font-mono text-base-content/50 text-[0.65rem] break-all select-all">{{.PayloadHash}}</span>
+        </div>
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-base-content/40 w-24 shrink-0">Received at</span>
+          <span class="font-medium">{{formatDateTime .CreatedAt}}</span>
+        </div>
+        {{if .ErrorMessage}}
+        <div class="flex items-start gap-2 text-xs mt-2">
+          <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-error/60 shrink-0 mt-0.5"></i>
+          <p class="text-error/80 font-mono break-all leading-relaxed">{{deref .ErrorMessage}}</p>
+        </div>
+        {{end}}
+      </div>
+    </div>
+  </div>
+  {{end}}
+</div>
+
+{{if gt .WHTotalPages 1}}
+<div class="flex items-center justify-between mt-6">
+  <div>
+    {{if gt .WHPage 1}}
+    <a href="/logs?tab=webhooks&wh_page={{sub .WHPage 1}}{{if $.WHFilterProvider}}&wh_provider={{$.WHFilterProvider}}{{end}}{{if $.WHFilterStatus}}&wh_status={{$.WHFilterStatus}}{{end}}" class="btn btn-sm btn-ghost rounded-xl">&laquo; Previous</a>
+    {{end}}
+  </div>
+  <span class="text-xs text-base-content/40">Page {{.WHPage}} of {{.WHTotalPages}}</span>
+  <div>
+    {{if lt .WHPage .WHTotalPages}}
+    <a href="/logs?tab=webhooks&wh_page={{add .WHPage 1}}{{if $.WHFilterProvider}}&wh_provider={{$.WHFilterProvider}}{{end}}{{if $.WHFilterStatus}}&wh_status={{$.WHFilterStatus}}{{end}}" class="btn btn-sm btn-ghost rounded-xl">Next &raquo;</a>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+{{else}}
+<div class="bb-card p-12 text-center">
+  <div class="flex flex-col items-center">
+    <div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
+      <i data-lucide="webhook" class="w-8 h-8 text-base-content/25"></i>
+    </div>
+    <h3 class="text-lg font-semibold mb-1">No webhook events</h3>
+    <p class="text-sm text-base-content/50 mb-5">{{if or .WHFilterProvider .WHFilterStatus}}Try adjusting your filters.{{else}}Webhook events will appear here when providers send notifications.{{end}}</p>
+    {{if or .WHFilterProvider .WHFilterStatus}}
+    <a href="/logs?tab=webhooks" class="btn btn-ghost btn-sm rounded-xl">Clear filters</a>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+</div><!-- /webhooks tab -->
+
+</div><!-- /alpine x-data tabs -->
+{{end}}
