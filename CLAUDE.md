@@ -20,7 +20,7 @@ Go 1.24+ single binary. PostgreSQL, chi/v5 router, pgx/v5 + sqlc, goose migratio
 
 ## Architecture
 
-One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), MCP server (`/mcp`), admin dashboard (`/admin/...`), webhooks (`/webhooks/:provider`). Bank data providers are abstracted behind a `Provider` Go interface (Plaid first, Teller + CSV later).
+One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), MCP server (`/mcp`), admin dashboard (`/...`), webhooks (`/webhooks/:provider`). Bank data providers are abstracted behind a `Provider` Go interface (Plaid first, Teller + CSV later).
 
 ## Migrations
 
@@ -63,15 +63,15 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - **SPA progress bar**: `base.html` has a global progress bar and content fade (opacity/blur/pointer-events) that auto-starts on internal link clicks. When JS does async work (fetch + `window.location.href` on success), any error path **must** call `window.bbProgress.finish()` and restore `main` element styles (`opacity: '', filter: '', pointerEvents: ''`). Without this, the progress bar trickles forever and the page stays blurred/unclickable. Pattern: add a `restorePageState()` helper that does both, call it on every error/early-return path.
 - CSS spacing tokens: `--bb-gap-xs` (0.25rem) through `--bb-gap-xl` (2rem) in `:root`. Use these instead of hardcoded spacing values.
 - Template data helper: `BaseTemplateData(r, sm, currentPage, pageTitle)` returns `map[string]any` with common fields. Handlers can extend the returned map.
-- First-run: `CountAdminAccounts == 0` → redirect to `/admin/setup` (single-page admin creation form). No `setup_complete` flag. Wizard layout, no step indicator.
+- First-run: `CountAdminAccounts == 0` → redirect to `/setup` (single-page admin creation form). No `setup_complete` flag. Wizard layout, no step indicator.
 - Onboarding checklist: dashboard "Getting Started" card shown until dismissed (`onboarding_dismissed` in `app_config`). Checks: provider configured, family member exists, connection exists.
 - CLI admin management: `breadbox create-admin` command with `--username`/`--password` flags or interactive prompts.
-- Programmatic setup: `POST /admin/api/setup` creates admin + sets config (only works when no admin exists).
+- Programmatic setup: `POST /api/setup` creates admin + sets config (only works when no admin exists).
 - Config source tracking: `ConfigSources map[string]string` populated in `Load()` (env) and `LoadWithDB()` (db/default). `configSource` template function renders badges.
-- Settings password change: POST `/admin/settings/password`, validates current password via bcrypt, minimum 8 chars for new password
+- Settings password change: POST `/settings/password`, validates current password via bcrypt, minimum 8 chars for new password
 - Settings system info: `Version` and `StartTime` on `Config` struct, set in `main.go`. PostgreSQL version via inline `SELECT version()` query.
-- Teller settings: All Teller config (app_id, env, webhook_secret, cert/key PEM) editable via `/admin/providers`. Cert/key PEM files uploaded through dashboard are AES-256-GCM encrypted and stored base64-encoded in `app_config`. Env file paths take precedence over DB PEM.
-- Provider page: `/admin/providers` is a top-level nav page with equal-weight cards for Plaid, Teller, CSV. No "primary provider" concept. Settings page no longer contains provider configuration.
+- Teller settings: All Teller config (app_id, env, webhook_secret, cert/key PEM) editable via `/providers`. Cert/key PEM files uploaded through dashboard are AES-256-GCM encrypted and stored base64-encoded in `app_config`. Env file paths take precedence over DB PEM.
+- Provider page: `/providers` is a top-level nav page with equal-weight cards for Plaid, Teller, CSV. No "primary provider" concept. Settings page no longer contains provider configuration.
 - Provider reinitialization: `app.ReinitProvider(name)` hot-reloads providers after dashboard config changes. Sync engine shares the same `map[string]provider.Provider` reference.
 - Teller PEM client: `teller.NewClientFromPEM(certPEM, keyPEM)` creates mTLS client from in-memory PEM bytes (alternative to file-path constructor).
 - Human-readable error messages: `errorMessage()` template function maps provider error codes to user-friendly strings
@@ -113,11 +113,11 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - MCP tool registry: `MCPServer.allTools []ToolDef` with `ToolClassification` (read/write). `BuildServer(MCPServerConfig)` creates a filtered `*mcpsdk.Server` per request. Write tools suppressed when mode is read_only, tool is in disabled list, or API key scope is read_only.
 - MCP instruction templates: hardcoded Go constants in `internal/mcp/templates.go` (spend_review, monthly_analysis, reporting). Loaded into editor via Alpine.js, saved as `mcp_custom_instructions`.
 - API key scope: `scope TEXT NOT NULL DEFAULT 'full_access'` column on `api_keys`. Values: `full_access`, `read_only`. `RequireWriteScope()` middleware blocks read-only keys from write REST endpoints. Full API key record stored in request context via `middleware.SetAPIKey()`/`GetAPIKey()`.
-- MCP admin page: `/admin/mcp` with four cards — global mode, tool access, server instructions, API key scope info. Nav item with `bot` Lucide icon between API Keys and Sync Logs.
+- MCP admin page: `/mcp` with four cards — global mode, tool access, server instructions, API key scope info. Nav item with `bot` Lucide icon between API Keys and Sync Logs.
 - Review queue: `review_queue` table with `review_type` (new_transaction, uncategorized, low_confidence, manual) and `status` (pending, approved, rejected, skipped). Auto-enqueued during sync when `review_auto_enqueue` app_config is true. Confidence threshold from `review_confidence_threshold` app_config. `reviewer_complete` constraint ensures reviewer metadata is set on resolution.
 - Review sync hook: `Engine.enqueueForReview()` called after each upsert inside the sync transaction. Priority: uncategorized > low_confidence > new_transaction. Skips `category_override=true` transactions. ON CONFLICT DO NOTHING for idempotency.
 - Review service: `ListReviews` uses dynamic SQL with transaction JOINs and cursor pagination (ASC for pending FIFO, DESC for resolved). `SubmitReview` handles category override + comment creation. `BulkSubmitReviews` iterates individually.
-- Review admin page: `/admin/reviews` with filter bar (status, type, account, user), card-based review queue with inline approve/reject/skip/dismiss, Alpine.js `reviewQueue()` for AJAX actions with card fade-out animation.
+- Review admin page: `/reviews` with filter bar (status, type, account, user), card-based review queue with inline approve/reject/skip/dismiss, Alpine.js `reviewQueue()` for AJAX actions with card fade-out animation.
 - Review MCP tools: `list_pending_reviews` (ToolRead, supports `fields` param with aliases: `triage`, `review_core`, `transaction_core`), `submit_review` (ToolWrite), `batch_submit_reviews` (ToolWrite, max 500) in `internal/mcp/tools.go`. Limits: `list_pending_reviews` max 500, `batch_submit_reviews` max 500.
 - Review REST API: read endpoints at `/api/v1/reviews`, `/api/v1/reviews/counts`, `/api/v1/reviews/{id}`; write endpoints at `POST /reviews/{id}/submit`, `POST /reviews/bulk`, `POST /reviews/enqueue`, `DELETE /reviews/{id}`.
 - Transaction rules: `transaction_rules` table with recursive JSON condition tree (`conditions JSONB`). Rules auto-categorize future transactions during sync by matching conditions on transaction fields. Priority-ordered (higher wins). Support AND/OR/NOT logic with operators: eq, neq, contains, not_contains, matches (regex), gt, gte, lt, lte, in. Available fields: name, merchant_name, amount, category_primary, category_detailed, pending, provider, account_id, user_id, user_name.
@@ -125,7 +125,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Transaction rules MCP tools: `create_transaction_rule` (ToolWrite, supports `apply_retroactively` flag), `list_transaction_rules` (ToolRead), `update_transaction_rule` (ToolWrite), `delete_transaction_rule` (ToolWrite), `apply_rules` (ToolWrite, applies rules retroactively to existing transactions — optional `rule_id` for single rule or all active rules), `preview_rule` (ToolRead, dry-run a condition against existing transactions — returns match count + samples).
 - Transaction rules REST API: read endpoints at `/api/v1/rules`, `/api/v1/rules/{id}`; write endpoints at `POST /rules`, `PUT /rules/{id}`, `DELETE /rules/{id}`, `POST /rules/{id}/apply`, `POST /rules/apply-all`, `POST /rules/preview`.
 - Retroactive rule application: `ApplyRuleRetroactively` and `ApplyAllRulesRetroactively` in `internal/service/rules.go`. Batched keyset pagination (1000/batch), evaluates conditions in Go, bulk UPDATEs matching non-overridden transactions. Respects `category_override=true`.
-- Transaction rules admin: `/admin/rules` page with table, filter bar (search, category, enabled), create/edit modal with JSON condition editor, toggle enable/disable, delete. Nav item with `list-filter` Lucide icon.
+- Transaction rules admin: `/rules` page with table, filter bar (search, category, enabled), create/edit modal with JSON condition editor, toggle enable/disable, delete. Nav item with `list-filter` Lucide icon.
 - Rule creator tracking: `created_by_type` (user/agent/system), `created_by_id`, `created_by_name` — uses Actor pattern from request context.
 - Rule expiry: optional `expires_at` timestamp. `expires_in` param on create accepts duration strings (24h, 30d, 1w). Expired rules excluded from sync but remain visible.
 - Rule hit tracking: `hit_count` and `last_hit_at` updated by `BatchIncrementHitCounts` during sync.
@@ -137,7 +137,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Attribution-aware filtering: transaction queries use `COALESCE(t.attributed_user_id, bc.user_id)` for user filtering. "Ricardo's transactions" includes his own plus those attributed to him on shared cards. Dependent account transactions excluded from totals via `AND a.is_dependent_linked = FALSE`.
 - Account link MCP tools: `list_account_links`, `create_account_link` (ToolWrite, auto-runs initial reconciliation), `delete_account_link`, `reconcile_account_link`, `list_transaction_matches`, `confirm_match`, `reject_match`.
 - Account link REST API: `/api/v1/account-links` CRUD + `/reconcile` + `/matches`. `/api/v1/transaction-matches/{id}/confirm|reject`. `POST /api/v1/transaction-matches/manual`.
-- Account link admin: `/admin/account-links` page with link list, create modal, match detail view. Nav item with `link-2` Lucide icon between Categories and Family Members.
+- Account link admin: `/account-links` page with link list, create modal, match detail view. Nav item with `link-2` Lucide icon between Categories and Family Members.
 - Agent reports: `agent_reports` table for agents to submit summaries and flag transactions. `submit_report` MCP tool (ToolWrite) with title + markdown body. Dashboard widget shows unread reports with markdown rendering (marked.js CDN). Transaction deep-links via `[Name](/transactions/ID)` in markdown. Mark read/dismiss via admin API. Nav badge shows unread count.
 - Agent report REST API: `GET /api/v1/reports`, `POST /api/v1/reports`, `GET /api/v1/reports/unread-count`, `PATCH /api/v1/reports/{id}/read`. Admin API: `POST /-/reports/{id}/read`, `POST /-/reports/read-all`.
 
