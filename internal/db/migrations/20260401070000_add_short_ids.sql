@@ -2,6 +2,7 @@
 
 -- PL/pgSQL function to generate random 8-char base62 strings.
 -- Used as a trigger to auto-populate short_id on INSERT.
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION generate_short_id() RETURNS TEXT AS $$
 DECLARE
     chars TEXT := '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
@@ -16,8 +17,10 @@ BEGIN
     RETURN result;
 END;
 $$ LANGUAGE plpgsql;
+-- +goose StatementEnd
 
 -- Trigger function: sets short_id on INSERT if not already provided.
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION set_short_id() RETURNS TRIGGER AS $$
 DECLARE
     new_id TEXT;
@@ -35,6 +38,7 @@ BEGIN
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
+-- +goose StatementEnd
 
 -- Add short_id columns and triggers to all entity tables.
 -- Column is nullable initially for the backfill step.

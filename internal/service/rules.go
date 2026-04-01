@@ -500,11 +500,11 @@ func (s *Service) CreateTransactionRule(ctx context.Context, params CreateTransa
 
 	query := `INSERT INTO transaction_rules (name, conditions, category_id, actions, priority, enabled, expires_at, created_by_type, created_by_id, created_by_name)
 		VALUES ($1, $2, $3, $4, $5, TRUE, $6, $7, $8, $9)
-		RETURNING id, name, conditions, category_id, priority, enabled, expires_at, created_by_type, created_by_id, created_by_name, hit_count, last_hit_at, created_at, updated_at, actions`
+		RETURNING id, short_id, name, conditions, category_id, priority, enabled, expires_at, created_by_type, created_by_id, created_by_name, hit_count, last_hit_at, created_at, updated_at, actions`
 
 	var row ruleRow
 	scanDest := row.scanDest()
-	// INSERT RETURNING doesn't include JOINed category columns, so scan only the first 15
+	// INSERT RETURNING doesn't include JOINed category columns, so scan only the first 16
 	err = s.Pool.QueryRow(ctx, query,
 		params.Name,
 		conditionsJSON,
@@ -515,7 +515,7 @@ func (s *Service) CreateTransactionRule(ctx context.Context, params CreateTransa
 		createdByType,
 		createdByID,
 		createdByName,
-	).Scan(scanDest[:15]...)
+	).Scan(scanDest[:16]...)
 	if err != nil {
 		return nil, fmt.Errorf("insert transaction rule: %w", err)
 	}
@@ -782,12 +782,12 @@ func (s *Service) UpdateTransactionRule(ctx context.Context, id string, params U
 	query := `UPDATE transaction_rules
 		SET name = $2, conditions = $3, category_id = $4, actions = $5, priority = $6, enabled = $7, expires_at = $8, updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, name, conditions, category_id, priority, enabled, expires_at, created_by_type, created_by_id, created_by_name, hit_count, last_hit_at, created_at, updated_at, actions`
+		RETURNING id, short_id, name, conditions, category_id, priority, enabled, expires_at, created_by_type, created_by_id, created_by_name, hit_count, last_hit_at, created_at, updated_at, actions`
 
 	var row ruleRow
 	err = s.Pool.QueryRow(ctx, query,
 		ruleID, name, conditionsJSON, catID, actionsJSON, priority, enabled, expiresAt,
-	).Scan(row.scanDest()[:15]...)
+	).Scan(row.scanDest()[:16]...)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrNotFound
