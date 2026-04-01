@@ -17,7 +17,7 @@
         <span class="text-xs text-base-content/30">&middot;</span>
         <span class="text-xs text-base-content/40">{{titleCase (deref .Transaction.MerchantName)}}</span>
         {{end}}
-        {{if .Transaction.Pending}}<span class="badge badge-warning badge-xs ml-1">Pending</span>{{end}}
+        {{if .Transaction.Pending}}<span class="badge badge-soft badge-warning badge-xs ml-1">Pending</span>{{end}}
       </div>
     </div>
   </div>
@@ -71,7 +71,7 @@
 <!-- Main content: Details + Category sidebar -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
   <!-- Transaction Details -->
-  <div class="bb-card p-6 lg:col-span-2">
+  <div class="bb-card p-5 lg:col-span-2">
     <h2 class="text-sm font-semibold text-base-content/50 mb-5">Details</h2>
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-5 gap-x-6">
       <div>
@@ -136,7 +136,7 @@
   </div>
 
   <!-- Category Card -->
-  <div class="bb-card p-6" x-data="txCategoryEditor()">
+  <div class="bb-card p-5" x-data="txCategoryEditor()">
     <h2 class="text-sm font-semibold text-base-content/50 mb-5">Category</h2>
 
     <div class="bb-cat-picker" data-picker-source="txd-cat" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'assign', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', initial: '{{if .Transaction.Category}}{{.Transaction.Category.ID}}{{end}}', sourceId: 'txd-cat'})" @category-change="setCategoryFromPicker($event.detail)">
@@ -150,7 +150,7 @@
     <div class="flex items-center gap-2 mt-3">
       {{if .Transaction.CategoryOverride}}<span class="badge badge-ghost badge-xs">Manual override</span>{{end}}
       <template x-if="isOverride">
-        <button class="btn btn-ghost btn-xs text-base-content/40 hover:text-base-content" @click="resetCategory()">
+        <button class="btn btn-ghost btn-xs rounded-lg text-base-content/40 hover:text-base-content" @click="resetCategory()">
           <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Reset to auto
         </button>
       </template>
@@ -160,8 +160,8 @@
 </div>
 
 <!-- Activity Timeline -->
-<div class="bb-card" x-data="commentManager()">
-  <div class="px-6 pt-6 pb-3 flex items-center gap-2">
+<div class="bb-card p-0 overflow-hidden" x-data="commentManager()">
+  <div class="px-4 sm:px-5 pt-5 pb-3 flex items-center gap-2">
     <i data-lucide="activity" class="w-4 h-4 text-base-content/40"></i>
     <h2 class="text-sm font-semibold text-base-content/50">Activity</h2>
     {{if .Activity}}
@@ -170,7 +170,7 @@
   </div>
 
   <!-- Add Note / Re-enqueue -->
-  <div class="px-6 pb-4">
+  <div class="px-4 sm:px-5 pb-4">
     <div class="flex gap-2 items-center">
       <input type="text" x-model="newComment" :placeholder="enqueueMode ? 'Add a note for the reviewer... (optional)' : 'Add a note...'" class="input input-bordered input-sm h-9 flex-1 bg-base-200/50 rounded-xl" @keydown.enter.prevent="enqueueMode ? enqueueForReview() : (newComment.trim() && addComment())" />
       <button @click="enqueueMode ? enqueueForReview() : addComment()" class="btn btn-sm h-9 rounded-xl px-3" :class="enqueueMode ? 'btn-info' : 'btn-primary'" :disabled="enqueueMode ? false : !newComment.trim()">
@@ -192,7 +192,7 @@
   </div>
 
   {{if .Activity}}
-  <div class="px-6 border-t border-base-200 space-y-0">
+  <div class="px-4 sm:px-5 border-t border-base-200 space-y-0">
     {{range .Activity}}
     <div class="flex items-start gap-3 py-3 border-b border-base-200/50 last:border-b-0 group">
       <!-- Icon -->
@@ -250,7 +250,7 @@
 
       <!-- Delete button (comments only) -->
       {{if .CommentID}}
-      <button class="btn btn-ghost btn-xs sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-error/50 hover:text-error" @click="deleteComment('{{.CommentID}}')" title="Delete">
+      <button class="btn btn-ghost btn-xs rounded-lg sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-error/50 hover:text-error" @click="deleteComment('{{.CommentID}}')" title="Delete">
         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
       </button>
       {{end}}

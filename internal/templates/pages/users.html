@@ -88,12 +88,12 @@
     <!-- Accounts List -->
     {{if .Accounts}}
     <div class="border-t border-base-300">
-      <div class="px-4 sm:px-6 py-2.5 flex items-center justify-between bg-base-200/30">
+      <div class="px-4 sm:px-5 py-2.5 flex items-center justify-between bg-base-200/30">
         <span class="text-xs font-medium text-base-content/40">{{.AccountCount}} account{{if gt .AccountCount 1}}s{{end}} across {{.ConnectionCount}} connection{{if gt .ConnectionCount 1}}s{{end}}</span>
       </div>
       <div class="divide-y divide-base-300/50">
         {{range .Accounts}}
-        <a href="/accounts/{{.ID}}" class="flex items-center gap-3 px-4 sm:px-6 py-3 hover:bg-base-200/40 transition-colors no-underline group">
+        <a href="/accounts/{{.ID}}" class="flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-base-200/40 transition-colors no-underline group">
           <div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0 hidden sm:flex">
             {{if eq .Type "depository"}}
             <i data-lucide="landmark" class="w-3.5 h-3.5 text-base-content/40"></i>
@@ -142,7 +142,7 @@
     </div>
     {{else}}
     <!-- No accounts state -->
-    <div class="border-t border-base-300 px-4 sm:px-6 py-5 bg-base-200/20">
+    <div class="border-t border-base-300 px-4 sm:px-5 py-4 bg-base-200/20">
       <div class="flex items-center gap-3 text-sm text-base-content/40">
         <i data-lucide="link" class="w-4 h-4 shrink-0"></i>
         <span>No bank accounts connected</span>
@@ -152,7 +152,7 @@
     {{end}}
 
     <!-- Footer -->
-    <div class="mt-auto px-4 sm:px-6 py-2.5 border-t border-base-300 flex items-center justify-between text-xs text-base-content/30 bg-base-200/20">
+    <div class="mt-auto px-4 sm:px-5 py-2.5 border-t border-base-300 flex items-center justify-between text-xs text-base-content/30 bg-base-200/20">
       {{if .CreatedAt.Valid}}
       <span>Member since {{.CreatedAt.Time.Format "Jan 2006"}}</span>
       {{end}}

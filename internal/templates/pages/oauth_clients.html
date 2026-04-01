@@ -42,7 +42,7 @@
     <div class="shrink-0">
       <form method="POST" action="/oauth-clients/{{.ID}}/revoke" class="inline">
         <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
-        <button type="button" class="btn btn-ghost btn-sm text-base-content/50 hover:text-error" x-show="!confirming" @click="confirming = true">
+        <button type="button" class="btn btn-ghost btn-sm rounded-xl text-base-content/50 hover:text-error" x-show="!confirming" @click="confirming = true">
           Revoke
         </button>
         <span x-show="confirming" x-cloak class="flex items-center gap-1.5">

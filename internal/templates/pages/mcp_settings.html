@@ -20,7 +20,7 @@
       }
     }
   }">
-    <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+    <div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
       <!-- NOTE: Avoid bg-secondary/10 + text-secondary for card header icons —
            the secondary color has almost no contrast against the light background,
            making the icon look transparent/ghostly. Use info or primary instead. -->
@@ -35,7 +35,7 @@
       <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
     </div>
     <div x-show="expanded" x-collapse>
-      <div class="px-4 sm:px-6 py-5">
+      <div class="px-4 sm:px-5 py-4">
         <div class="alert alert-warning alert-soft mb-4 text-xs rounded-xl">
           <i data-lucide="triangle-alert" class="w-4 h-4"></i>
           <span>These instructions guide how agents understand your data model, query patterns, and available tools. Editing may cause agents to misuse tools or produce incorrect results.</span>
@@ -71,7 +71,7 @@
       }
     }
   }">
-    <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+    <div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
       <div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center flex-shrink-0">
         <i data-lucide="book-open" class="w-5 h-5 text-success"></i>
       </div>
@@ -83,7 +83,7 @@
       <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
     </div>
     <div x-show="expanded" x-collapse x-cloak>
-      <div class="px-4 sm:px-6 py-5">
+      <div class="px-4 sm:px-5 py-4">
         <form method="POST" action="/mcp-settings/review-guidelines">
           <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
           <div class="form-control mb-4">
@@ -113,7 +113,7 @@
       }
     }
   }">
-    <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+    <div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
       <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center flex-shrink-0">
         <i data-lucide="file-text" class="w-5 h-5 text-warning"></i>
       </div>
@@ -125,7 +125,7 @@
       <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
     </div>
     <div x-show="expanded" x-collapse x-cloak>
-      <div class="px-4 sm:px-6 py-5">
+      <div class="px-4 sm:px-5 py-4">
         <form method="POST" action="/mcp-settings/report-format">
           <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
           <div class="form-control mb-4">
@@ -145,7 +145,7 @@
 
   <!-- Card 4: Tools Enabled -->
   <div id="tools" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#tools' }">
-    <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+    <div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
       <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
         <i data-lucide="wrench" class="w-5 h-5 text-primary"></i>
       </div>
@@ -157,7 +157,7 @@
       <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
     </div>
     <div x-show="expanded" x-collapse x-cloak>
-      <div class="px-4 sm:px-6 py-5">
+      <div class="px-4 sm:px-5 py-4">
         <p class="text-sm text-base-content/50 mb-4">Disabled tools are hidden from all agents. Read-only API keys cannot invoke write tools regardless of this setting.</p>
         <form method="POST" action="/mcp-settings/tools">
           <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
@@ -196,7 +196,7 @@
 
   <!-- Card 3: MCP Connection -->
   <div id="connection" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#connection', copiedConfig: false }">
-    <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+    <div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
       <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center flex-shrink-0">
         <i data-lucide="plug" class="w-5 h-5 text-warning"></i>
       </div>
@@ -207,7 +207,7 @@
       <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
     </div>
     <div x-show="expanded" x-collapse x-cloak>
-      <div class="px-4 sm:px-6 py-5 space-y-5">
+      <div class="px-4 sm:px-5 py-4 space-y-5">
         <div>
           <h3 class="font-medium text-sm mb-2 text-base-content/60">HTTP Endpoint</h3>
           <div class="bg-base-200 rounded-xl p-3 font-mono text-sm break-all text-base-content/70">https://&lt;host&gt;/mcp</div>

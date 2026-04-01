@@ -232,23 +232,23 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"statusBadge": func(status string) template.HTML {
 				switch status {
 				case "active":
-					return `<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-success/10 text-success">Active</span>`
+					return `<span class="badge badge-soft badge-success badge-sm">Active</span>`
 				case "pending_reauth":
-					return `<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-warning/10 text-warning">Re-auth Needed</span>`
+					return `<span class="badge badge-soft badge-warning badge-sm">Reauth Needed</span>`
 				case "error":
-					return `<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-error/10 text-error">Error</span>`
+					return `<span class="badge badge-soft badge-error badge-sm">Error</span>`
 				default:
-					return `<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-base-content/5 text-base-content/40">Disconnected</span>`
+					return `<span class="badge badge-ghost badge-sm">Disconnected</span>`
 				}
 			},
 			"syncBadge": func(status string) template.HTML {
 				switch status {
 				case "success":
-					return `<span class="badge badge-success badge-sm">success</span>`
+					return `<span class="badge badge-soft badge-success badge-sm">success</span>`
 				case "error":
-					return `<span class="badge badge-error badge-sm">error</span>`
+					return `<span class="badge badge-soft badge-error badge-sm">error</span>`
 				case "in_progress":
-					return `<span class="badge badge-warning badge-sm">in progress</span>`
+					return `<span class="badge badge-soft badge-warning badge-sm">in progress</span>`
 				default:
 					return template.HTML(`<span class="badge badge-ghost badge-sm">` + template.HTMLEscapeString(status) + `</span>`)
 				}

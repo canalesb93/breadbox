@@ -10,7 +10,7 @@
 
   <!-- Plaid Card -->
   <div class="bb-card p-0 overflow-hidden">
-    <div class="px-4 sm:px-6 py-5 border-b border-base-300 flex items-center justify-between">
+    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-info/8 flex items-center justify-center flex-shrink-0">
           <i data-lucide="building-2" class="w-5 h-5 text-info"></i>
@@ -26,7 +26,7 @@
       <span class="badge badge-ghost badge-sm rounded-lg">Not Configured</span>
       {{end}}
     </div>
-    <div class="px-4 sm:px-6 py-5">
+    <div class="px-4 sm:px-5 py-4">
       {{if .PlaidFromEnv}}
       <p class="text-sm text-base-content/50 mb-4">Configured via environment variables (read-only).</p>
       <dl class="bb-info-grid">
@@ -101,7 +101,7 @@
 
   <!-- Teller Card -->
   <div class="bb-card p-0 overflow-hidden">
-    <div class="px-4 sm:px-6 py-5 border-b border-base-300 flex items-center justify-between">
+    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-success/8 flex items-center justify-center flex-shrink-0">
           <i data-lucide="landmark" class="w-5 h-5 text-success"></i>
@@ -117,7 +117,7 @@
       <span class="badge badge-ghost badge-sm rounded-lg">Not Configured</span>
       {{end}}
     </div>
-    <div class="px-4 sm:px-6 py-5">
+    <div class="px-4 sm:px-5 py-4">
       {{if .TellerFromEnv}}
       <p class="text-sm text-base-content/50 mb-4">Configured via environment variables (read-only).</p>
       <dl class="bb-info-grid">
@@ -217,7 +217,7 @@
 
   <!-- CSV Card -->
   <div class="bb-card p-0 overflow-hidden">
-    <div class="px-4 sm:px-6 py-5 border-b border-base-300 flex items-center justify-between">
+    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-warning/8 flex items-center justify-center flex-shrink-0">
           <i data-lucide="file-spreadsheet" class="w-5 h-5 text-warning"></i>
@@ -229,7 +229,7 @@
       </div>
       <span class="badge badge-success badge-sm rounded-lg">Always Available</span>
     </div>
-    <div class="px-4 sm:px-6 py-5">
+    <div class="px-4 sm:px-5 py-4">
       <p class="text-sm text-base-content/50 mb-4">Import transactions from CSV files exported from your bank or financial institution.</p>
       <a href="/connections/import-csv" class="btn btn-sm btn-ghost rounded-xl">
         <i data-lucide="upload" class="w-4 h-4"></i>

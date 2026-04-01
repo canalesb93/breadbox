@@ -155,7 +155,7 @@
   </div>
 
   {{if or .FilterConnID .FilterTrigger .FilterDateFrom .FilterDateTo .FilterStatus}}
-  <a href="/sync-logs" class="btn btn-ghost btn-xs rounded-lg gap-1 text-base-content/50 hover:text-base-content/80">
+  <a href="/sync-logs" class="btn btn-ghost btn-xs rounded-lg gap-1.5 text-base-content/50 hover:text-base-content/80">
     <i data-lucide="x" class="w-3 h-3"></i>
     Clear all filters
   </a>
@@ -229,7 +229,7 @@
 
         <!-- Warning badge -->
         {{if .WarningMessage}}
-        <span class="badge badge-warning badge-sm gap-1">
+        <span class="badge badge-soft badge-warning badge-sm gap-1">
           <i data-lucide="alert-triangle" class="w-3 h-3"></i>warning
         </span>
         {{end}}

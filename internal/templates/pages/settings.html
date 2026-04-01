@@ -10,7 +10,7 @@
 
   <!-- Card 1: Sync (Schedule + Retention combined) -->
   <div id="sync" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#sync' || location.hash === '#retention' }">
-    <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+    <div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
       <i data-lucide="refresh-cw" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
       <div class="min-w-0 flex-1">
         <h2 class="font-semibold">Sync</h2>
@@ -20,7 +20,7 @@
       <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
     </div>
     <div x-show="expanded" x-collapse x-cloak>
-      <div class="px-4 sm:px-6 py-5">
+      <div class="px-4 sm:px-5 py-4">
         <!-- Schedule section -->
         <form method="POST" action="/settings/sync">
           <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
@@ -88,7 +88,7 @@
 
   <!-- Card 2: Security -->
   <div id="security" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#security' }">
-    <div class="px-4 sm:px-6 py-5 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+    <div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
       <i data-lucide="shield" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
       <div class="min-w-0 flex-1">
         <h2 class="font-semibold">Security</h2>
@@ -98,7 +98,7 @@
       <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
     </div>
     <div x-show="expanded" x-collapse x-cloak>
-      <div class="px-4 sm:px-6 py-5">
+      <div class="px-4 sm:px-5 py-4">
         <!-- Encryption Key Status -->
         <div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 mb-5">
           <div class="flex items-center gap-2.5">
@@ -144,7 +144,7 @@
   </div>
 
   <!-- Card 3: System Info -->
-  <div id="system" class="bb-card px-4 sm:px-6 py-5">
+  <div id="system" class="bb-card p-5">
     <div class="flex items-center gap-3 mb-4">
       <i data-lucide="cpu" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
       <h2 class="font-semibold">System</h2>

@@ -17,7 +17,7 @@
       <h1 class="bb-page-title">{{.Rule.Name}}</h1>
       <div class="flex items-center gap-2 mt-0.5 flex-wrap">
         {{if .Rule.Enabled}}
-        <span class="badge badge-success badge-sm">Enabled</span>
+        <span class="badge badge-soft badge-success badge-sm">Enabled</span>
         {{else}}
         <span class="badge badge-ghost badge-sm">Disabled</span>
         {{end}}
@@ -189,7 +189,7 @@
           <td class="text-sm"><a href="/transactions/{{.TransactionID}}" class="hover:text-primary">{{.TransactionName}}</a></td>
           <td class="text-sm text-right tabular-nums bb-amount">{{printf "%.2f" .Amount}}</td>
           <td class="text-sm text-base-content/60">{{.Date}}</td>
-          <td class="text-sm"><span class="badge badge-outline badge-xs rounded-lg">{{.ActionValue}}</span></td>
+          <td class="text-sm"><span class="badge badge-outline badge-xs">{{.ActionValue}}</span></td>
           <td class="text-sm text-base-content/60">
             {{if eq .AppliedBy "sync"}}During sync{{else if eq .AppliedBy "retroactive"}}Retroactive{{else}}Manual{{end}}
           </td>
@@ -213,7 +213,7 @@
 <div class="bb-card p-5 mb-4">
   <div class="flex items-center justify-between mb-1">
     <span class="label-text text-sm font-medium">Uncategorized Matches</span>
-    <span class="badge badge-warning badge-sm">{{commaInt64 .Preview.MatchCount}} pending</span>
+    <span class="badge badge-soft badge-warning badge-sm">{{commaInt64 .Preview.MatchCount}} pending</span>
   </div>
   <p class="text-xs text-base-content/40 mb-3">These existing transactions match the rule but were imported before it was created</p>
 
@@ -235,7 +235,7 @@
           <td class="text-sm text-base-content/60">{{.Date}}</td>
           <td class="text-sm">
             {{if .CurrentCategorySlug}}
-            <span class="badge badge-outline badge-xs rounded-lg">{{.CurrentCategorySlug}}</span>
+            <span class="badge badge-outline badge-xs">{{.CurrentCategorySlug}}</span>
             {{else}}
             <span class="text-base-content/30">Uncategorized</span>
             {{end}}

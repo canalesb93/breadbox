@@ -108,7 +108,7 @@
                  class="text-base-content/30 flex-shrink-0 transition-transform duration-200"
                  :style="isCollapsed(block.id) ? '' : 'transform:rotate(90deg)'"><path d="m9 18 6-6-6-6"/></svg>
             <span class="text-sm font-semibold text-base-content/60 truncate" x-text="block.title"></span>
-            <span x-show="block.content !== block.originalContent && !block.isCustom" class="badge badge-soft badge-warning badge-xs rounded-lg flex-shrink-0">Modified</span>
+            <span x-show="block.content !== block.originalContent && !block.isCustom" class="badge badge-soft badge-warning badge-xs flex-shrink-0">Modified</span>
           </div>
 
           <!-- Actions -->
@@ -214,12 +214,12 @@
       <div class="hidden sm:block w-px h-4 bg-base-300"></div>
       <span class="text-xs text-base-content/40 tabular-nums whitespace-nowrap" x-text="activeBlocks.length + ' blocks · ' + preview.length.toLocaleString() + ' chars'"></span>
       <div class="w-px h-4 bg-base-300"></div>
-      <button class="btn btn-ghost btn-sm rounded-xl gap-1.5 text-xs" @click="openPreview()">
+      <button class="btn btn-ghost btn-sm rounded-xl gap-2 text-xs" @click="openPreview()">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
         <span class="hidden sm:inline">Preview</span>
         <span class="hidden sm:inline ml-1 text-[10px] opacity-50 border border-current/30 rounded px-1 leading-none py-0.5">P</span>
       </button>
-      <button class="btn btn-primary btn-sm rounded-xl gap-1.5 text-xs relative overflow-hidden" style="min-width:auto" @click="copyPrompt()">
+      <button class="btn btn-primary btn-sm rounded-xl gap-2 text-xs relative overflow-hidden" style="min-width:auto" @click="copyPrompt()">
         <span class="flex items-center gap-1.5 transition-all duration-200"
               :class="copied ? 'opacity-0 scale-75' : 'opacity-100 scale-100'">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
@@ -265,7 +265,7 @@
           <span class="text-xs text-base-content/40 tabular-nums" x-text="preview.length.toLocaleString() + ' chars'"></span>
         </div>
         <div class="flex items-center gap-2">
-          <button class="btn btn-sm btn-primary rounded-xl gap-1.5 text-xs relative overflow-hidden" style="min-width:6.5rem" @click="copyPrompt()">
+          <button class="btn btn-sm btn-primary rounded-xl gap-2 text-xs relative overflow-hidden" style="min-width:6.5rem" @click="copyPrompt()">
             <span class="flex items-center gap-1.5 transition-all duration-200"
                   :class="copied ? 'opacity-0 scale-75' : 'opacity-100 scale-100'">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
