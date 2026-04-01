@@ -83,6 +83,69 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 	}
 }
 
+// ReportDetailHandler handles GET /reports/{id}.
+func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		reportID := chi.URLParam(r, "id")
+		if reportID == "" {
+			tr.RenderNotFound(w, r)
+			return
+		}
+
+		report, err := svc.GetAgentReport(ctx, reportID)
+		if err != nil {
+			a.Logger.Error("get agent report", "id", reportID, "error", err)
+			tr.RenderNotFound(w, r)
+			return
+		}
+
+		t, _ := time.Parse(time.RFC3339, report.CreatedAt)
+		displayAuthor := report.CreatedByName
+		if report.Author != nil && *report.Author != "" {
+			displayAuthor = *report.Author
+		}
+
+		type ReportDetail struct {
+			ID            string
+			Title         string
+			Body          string
+			Priority      string
+			Tags          []string
+			DisplayAuthor string
+			CreatedAt     string
+			CreatedAtRel  string
+			IsRead        bool
+		}
+
+		detail := ReportDetail{
+			ID:            report.ID,
+			Title:         report.Title,
+			Body:          report.Body,
+			Priority:      report.Priority,
+			Tags:          report.Tags,
+			DisplayAuthor: displayAuthor,
+			CreatedAt:     t.Format("Jan 2, 2006 at 3:04 PM"),
+			CreatedAtRel:  relativeTime(t),
+			IsRead:        report.ReadAt != nil,
+		}
+
+		// Auto-mark as read when viewing.
+		if report.ReadAt == nil {
+			_ = svc.MarkAgentReportRead(ctx, reportID)
+			detail.IsRead = true
+		}
+
+		data := BaseTemplateData(r, sm, "reports", report.Title)
+		data["Report"] = detail
+		data["Breadcrumbs"] = []Breadcrumb{
+			{Label: "Reports", Href: "/reports"},
+			{Label: report.Title},
+		}
+		tr.Render(w, r, "report_detail.html", data)
+	}
+}
+
 // MarkReportReadAdminHandler handles POST /-/reports/{id}/read.
 func MarkReportReadAdminHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

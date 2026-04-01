@@ -131,6 +131,19 @@ func (s *Service) CountUnreadAgentReports(ctx context.Context) (int64, error) {
 	return s.Queries.CountUnreadAgentReports(ctx)
 }
 
+// GetAgentReport returns a single report by ID.
+func (s *Service) GetAgentReport(ctx context.Context, reportID string) (AgentReportResponse, error) {
+	uid, err := parseUUID(reportID)
+	if err != nil {
+		return AgentReportResponse{}, fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
+	}
+	row, err := s.Queries.GetAgentReport(ctx, uid)
+	if err != nil {
+		return AgentReportResponse{}, fmt.Errorf("get agent report: %w", err)
+	}
+	return agentReportFromRow(row), nil
+}
+
 // MarkAgentReportRead marks a single report as read.
 func (s *Service) MarkAgentReportRead(ctx context.Context, reportID string) error {
 	uid, err := parseUUID(reportID)

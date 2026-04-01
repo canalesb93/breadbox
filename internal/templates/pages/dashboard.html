@@ -135,15 +135,11 @@
             {{end}}
             <button @click.stop="markRead('{{.ID}}')" class="text-[0.65rem] text-base-content/30 hover:text-success transition-colors cursor-pointer ml-auto shrink-0 mr-1">Mark read</button>
           </div>
-          <!-- Bubble body -->
-          <div class="rounded-2xl rounded-tl-sm bg-base-200/70 shadow-sm px-3.5 py-2.5 cursor-pointer hover:bg-base-200/90 transition-colors inline-block max-w-full"
-               @click="toggle('{{.ID}}')">
-            <p class="text-sm text-base-content/80 leading-relaxed">{{.Title}}</p>
-            <!-- Expanded body -->
-            <div x-show="expanded['{{.ID}}']" x-cloak class="mt-2 pt-2 border-t border-base-content/5">
-              <div class="bb-report-body text-sm text-base-content/60 leading-relaxed" data-markdown="{{.Body}}"></div>
-            </div>
-          </div>
+          <!-- Bubble body — links to detail page -->
+          <a href="/reports/{{.ID}}" class="rounded-2xl rounded-tl-sm bg-base-200/70 shadow-sm px-3.5 py-2.5 hover:bg-base-200/90 transition-colors inline-block max-w-full no-underline group">
+            <p class="text-sm text-base-content/80 leading-relaxed group-hover:text-base-content transition-colors">{{.Title}}</p>
+            <span class="text-xs text-base-content/30 group-hover:text-primary/60 transition-colors">View report &rarr;</span>
+          </a>
         </div>
       </div>
     </div>
@@ -486,47 +482,12 @@
   </div>
 </div>
 
-<!-- Agent Reports: markdown rendering + dismiss logic -->
+<!-- Agent Reports: dismiss logic -->
 {{if .AgentReports}}
-<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  document.querySelectorAll('.bb-report-body').forEach(function(el) {
-    var md = el.getAttribute('data-markdown');
-    if (md) {
-      el.innerHTML = DOMPurify.sanitize(marked.parse(md));
-      el.querySelectorAll('a').forEach(function(a) {
-        a.classList.add('link', 'link-primary');
-        if (a.href && !a.href.startsWith(window.location.origin) && !a.getAttribute('href').startsWith('/')) {
-          a.setAttribute('target', '_blank');
-          a.setAttribute('rel', 'noopener');
-        }
-      });
-      el.querySelectorAll('ul, ol').forEach(function(list) {
-        list.classList.add('list-disc', 'pl-4', 'space-y-0.5');
-      });
-      el.querySelectorAll('p').forEach(function(p) {
-        p.classList.add('mb-1');
-      });
-      el.querySelectorAll('strong').forEach(function(s) {
-        s.classList.add('text-base-content');
-      });
-    }
-  });
-});
-
 function agentReports() {
   return {
     dismissed: {},
-    expanded: {},
-    toggle(id) {
-      if (this.expanded[id]) {
-        delete this.expanded[id];
-      } else {
-        this.expanded[id] = true;
-      }
-    },
     markRead(id) {
       this.dismissed[id] = true;
       fetch('/-/reports/' + id + '/read', { method: 'POST' });

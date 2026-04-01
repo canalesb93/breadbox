@@ -106,6 +106,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/account-links/{id}", AccountLinkDetailHandler(a, svc, sm, tr))
 
 		r.Get("/reports", ReportsPageHandler(a, svc, sm, tr))
+		r.Get("/reports/{id}", ReportDetailHandler(a, svc, sm, tr))
 		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
 		r.Get("/review-instructions", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/mcp-settings", http.StatusMovedPermanently)
