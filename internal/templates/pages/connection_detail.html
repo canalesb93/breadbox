@@ -132,7 +132,7 @@
     <div class="p-4">
       <div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Avg Duration</div>
       <div class="text-xl font-bold tabular-nums">
-        {{if gt .AvgDurationSec 60.0}}{{printf "%.0f" (divFloat .AvgDurationSec 60.0)}}m{{else if gt .AvgDurationSec 1.0}}{{printf "%.1f" .AvgDurationSec}}s{{else if gt .AvgDurationSec 0.0}}{{printf "%.0f" (mulFloatRaw .AvgDurationSec 1000.0)}}ms{{else}}<span class="text-base-content/30">&mdash;</span>{{end}}
+        {{if gt .AvgDurationSec 60.0}}{{printf "%.0f" (divf .AvgDurationSec 60.0)}}m{{else if gt .AvgDurationSec 1.0}}{{printf "%.1f" .AvgDurationSec}}s{{else if gt .AvgDurationSec 0.0}}{{printf "%.0f" (mulf .AvgDurationSec 1000.0)}}ms{{else}}<span class="text-base-content/30">&mdash;</span>{{end}}
       </div>
       <div class="text-[0.6rem] text-base-content/30 mt-0.5">per sync</div>
     </div>
@@ -157,10 +157,10 @@
       {{if gt .Total 0}}
       <div class="flex flex-col-reverse gap-px w-full rounded-md overflow-hidden" style="height: 52px;">
         {{if gt .Success 0}}
-        <div class="w-full bg-success/50 transition-all duration-200 group-hover:bg-success/70" style="height: {{if gt .Error 0}}{{printf "%.0f" (divFloat (mulFloatRaw (intToFloat .Success) 52.0) (intToFloat .Total))}}px{{else}}52px{{end}}; min-height: 4px;"></div>
+        <div class="w-full bg-success/50 transition-all duration-200 group-hover:bg-success/70" style="height: {{if gt .Error 0}}{{printf "%.0f" (divf (mulf (itof .Success) 52.0) (itof .Total))}}px{{else}}52px{{end}}; min-height: 4px;"></div>
         {{end}}
         {{if gt .Error 0}}
-        <div class="w-full bg-error/50 transition-all duration-200 group-hover:bg-error/70" style="height: {{if gt .Success 0}}{{printf "%.0f" (divFloat (mulFloatRaw (intToFloat .Error) 52.0) (intToFloat .Total))}}px{{else}}52px{{end}}; min-height: 4px;"></div>
+        <div class="w-full bg-error/50 transition-all duration-200 group-hover:bg-error/70" style="height: {{if gt .Success 0}}{{printf "%.0f" (divf (mulf (itof .Error) 52.0) (itof .Total))}}px{{else}}52px{{end}}; min-height: 4px;"></div>
         {{end}}
       </div>
       {{else}}
