@@ -9,7 +9,7 @@
   <div class="flex items-center gap-2">
     {{if and (eq .StatusFilter "pending") .Counts (gt .Counts.Pending 0)}}
     <div x-data="{ dismissing: false, confirmOpen: false }">
-      <button class="btn btn-sm btn-error btn-outline rounded-xl gap-1" @click="confirmOpen = true" :disabled="dismissing">
+      <button class="btn btn-sm btn-error btn-outline rounded-xl gap-2" @click="confirmOpen = true" :disabled="dismissing">
         <i data-lucide="trash-2" class="w-4 h-4"></i>
         Dismiss All
       </button>
@@ -18,8 +18,8 @@
           <h3 class="text-lg font-bold">Dismiss all pending reviews?</h3>
           <p class="py-4 text-base-content/70">This will permanently remove all <strong>{{.Counts.Pending}}</strong> pending reviews from the queue. This cannot be undone.</p>
           <div class="modal-action">
-            <button class="btn btn-ghost rounded-xl" @click="confirmOpen = false" :disabled="dismissing">Cancel</button>
-            <button class="btn btn-error rounded-xl gap-1" :disabled="dismissing"
+            <button class="btn btn-ghost btn-sm rounded-xl" @click="confirmOpen = false" :disabled="dismissing">Cancel</button>
+            <button class="btn btn-error btn-sm rounded-xl gap-2" :disabled="dismissing"
               @click="dismissing = true;
                 fetch('/-/reviews/dismiss-all', {
                   method: 'POST',
@@ -70,8 +70,8 @@
 {{end}}
 
 <!-- Review Settings (collapsible) -->
-<div class="bb-card mb-4" x-data="{ open: false }">
-  <button class="w-full flex items-center justify-between px-6 py-3 cursor-pointer" @click="open = !open">
+<div class="bb-card p-0 overflow-hidden mb-4" x-data="{ open: false }">
+  <button class="w-full flex items-center justify-between px-4 sm:px-5 py-3 cursor-pointer" @click="open = !open">
     <div class="flex items-center gap-3">
       <i data-lucide="settings" class="w-4 h-4 text-base-content/50"></i>
       <span class="font-medium text-sm">Review Settings</span>
@@ -79,7 +79,7 @@
     <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/40 transition-transform duration-200" :class="open && 'rotate-180'"></i>
   </button>
   <div x-show="open" x-cloak x-collapse x-data="{ autoEnqueue: {{.ReviewAutoEnqueue}}, threshold: '{{.ReviewConfidenceThreshold}}', saving: false }">
-    <div class="px-6 pb-5 pt-0 border-t border-base-300">
+    <div class="px-4 sm:px-5 pb-4 pt-0 border-t border-base-300">
       <div class="flex flex-wrap gap-6 items-end pt-4">
         <div class="form-control">
           <label class="label cursor-pointer gap-3">
@@ -285,7 +285,7 @@
         {{else}}
         <div class="bb-triage-row__resolved">
           {{if eq $review.Status "approved"}}
-          <span class="badge badge-success badge-xs">Approved</span>
+          <span class="badge badge-soft badge-success badge-xs">Approved</span>
           {{else if eq $review.Status "skipped"}}
           <span class="badge badge-ghost badge-xs">Skipped</span>
           {{end}}
@@ -313,7 +313,7 @@
             <span class="text-xs text-base-content/50">{{deref $review.Transaction.UserName}}</span>
             {{end}}
             {{if $review.Transaction.Pending}}
-            <span class="badge badge-warning badge-xs">Pending</span>
+            <span class="badge badge-soft badge-warning badge-xs">Pending</span>
             {{end}}
             {{if $review.Transaction.CategoryPrimaryRaw}}
             <span class="text-xs text-base-content/30">|</span>

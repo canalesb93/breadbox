@@ -173,44 +173,64 @@ These may be gradually replaced by Tailwind utility classes (`gap-1`, `gap-2`, e
 
 DaisyUI handles light/dark variants automatically — no manual `@media (prefers-color-scheme: dark)` overrides needed.
 
-## 4. Component Mapping
+## 4. Component Conventions
 
-### Current `bb-*` → DaisyUI
+### Buttons
 
-| Current Class | DaisyUI Replacement | Notes |
-|---|---|---|
-| `.bb-layout` | `drawer lg:drawer-open` | Wraps entire page layout |
-| `.bb-sidebar` | `drawer-side` + `menu bg-base-200` | Sidebar container + nav list |
-| `.bb-nav` | `menu` | `<ul class="menu">` with `<li><a>` items |
-| `.bb-nav a[aria-current]` | `menu-active` or Tailwind `bg-primary text-primary-content` | Active nav item |
-| `.bb-main` | `drawer-content` | Main content area |
-| `.bb-stats` | `stats stats-vertical lg:stats-horizontal` | Stat card container |
-| `.bb-stat` | `stat` | Individual stat card |
-| `.bb-stat-label` | `stat-title` | Stat label text |
-| `.bb-stat-value` | `stat-value` | Stat large number |
-| `.bb-stat--warn` | `stat` + custom border class | Add `border-l-4 border-warning` |
-| `.bb-badge` | `badge` | Base badge |
-| `.bb-badge--success` | `badge badge-success` | Green badge |
-| `.bb-badge--error` | `badge badge-error` | Red badge |
-| `.bb-badge--warning` | `badge badge-warning` | Yellow badge |
-| `.bb-badge--muted` | `badge badge-ghost` | Gray/muted badge |
-| `.bb-page-header` | Tailwind flex: `flex items-center justify-between mb-6` | Page title + action button row |
-| `.bb-empty` | `card bg-base-200` + centered content | Or `alert` with icon |
-| `[data-flash="success"]` | `alert alert-success` | Flash messages |
-| `[data-flash="error"]` | `alert alert-error` | Flash messages |
-| `[data-flash="info"]` | `alert alert-info` | Flash messages |
-| `<article>` (Pico card) | `card bg-base-100 shadow-sm` + `card-body` | Settings sections, detail panels |
+Two sizes only: `btn-sm` (default) and `btn-xs` (compact contexts like table cells).
 
-### Template Helper Updates
+| Context | Classes |
+|---|---|
+| Primary action | `btn btn-primary btn-sm rounded-xl` |
+| Secondary/ghost | `btn btn-ghost btn-sm rounded-xl` |
+| Destructive | `btn btn-error btn-sm rounded-xl` (add `btn-soft` for softer look) |
+| Compact inline (table rows) | `btn btn-ghost btn-xs rounded-lg` |
+| Icon-only (standard) | `btn btn-ghost btn-sm btn-square rounded-xl` |
+| Icon-only (compact) | `btn btn-ghost btn-xs btn-square rounded-lg` |
+| Outline | `btn btn-outline btn-sm rounded-xl` |
 
-The Go template functions `statusBadge()` and `syncBadge()` in `internal/admin/templates.go` need to emit DaisyUI classes:
+**Rounding:** `btn-sm` → `rounded-xl`, `btn-xs` → `rounded-lg`.
 
+**Icon + text gap:** `btn-sm` → `gap-2`, `btn-xs` → `gap-1.5`.
+
+**Full-width / oversized buttons** (login CTA, modal actions): May omit `btn-sm` and use custom sizing — these are intentional exceptions.
+
+### Badges
+
+| Context | Classes |
+|---|---|
+| Status (connection, sync, review) | `badge badge-soft badge-{color} badge-sm` |
+| Metadata labels (scope, source, type) | `badge badge-ghost badge-xs` |
+| Counts / numbers | `badge badge-{color} badge-xs` |
+
+**No extra rounding** — DaisyUI badges have their own radius. Never add `rounded-lg` or `rounded-xl` to badges.
+
+**`badge-soft`** is used for all semantic status badges (success/error/warning/info). Plain `badge badge-{color}` is for counts and indicators.
+
+**Template functions** (`statusBadge()`, `syncBadge()`, `configSource()`) emit standardized badge HTML:
 ```go
-// Before
-"active":  `<span class="bb-badge bb-badge--success">Active</span>`
-// After
-"active":  `<span class="badge badge-success">Active</span>`
+statusBadge("active")  → <span class="badge badge-soft badge-success badge-sm">Active</span>
+syncBadge("error")     → <span class="badge badge-soft badge-error badge-sm">error</span>
+configSource(src, key) → <span class="badge badge-ghost badge-sm">from env</span>
 ```
+
+### Cards (`bb-card`)
+
+Base class: `bb-card` — provides `bg-base-100 rounded-xl border border-base-300` with smooth transitions.
+
+| Pattern | Classes | Internal padding |
+|---|---|---|
+| Simple content | `bb-card p-5` | Direct content, no sections |
+| Compact (stat cards) | `bb-card p-4` | Metrics, small info blocks |
+| Forms (centered) | `bb-card p-6` or `bb-card p-8` | Auth forms, setup wizards |
+| Empty states | `bb-card p-12 text-center` | Large centered messages |
+| Sectioned (header + body) | `bb-card p-0 overflow-hidden` | Children: `px-4 sm:px-5 py-3` (header), `px-4 sm:px-5 py-4` (body) |
+| Table container | `bb-card p-0 overflow-hidden` | Table handles its own padding |
+| Collapsible panels | `bb-card p-0 overflow-hidden` | Toggle header + body sections |
+
+**Sectioned cards** use `border-t border-base-300/50` for dividers between sections. Always add `overflow-hidden` when using `p-0` to prevent rounded border clipping.
+
+**Interactive cards** add `bb-card--interactive` for hover effects (cursor change, background shift).
 
 ## 5. Layout Patterns
 
@@ -345,10 +365,10 @@ For tables that can grow long (transactions, sync logs):
 
 ```html
 <td>{{statusBadge .Status}}</td>
-<!-- Renders: <span class="badge badge-success badge-sm">Active</span> -->
+<!-- Renders: <span class="badge badge-soft badge-success badge-sm">Active</span> -->
 ```
 
-Badges in tables should use `badge-sm` for compact density.
+Status badges use `badge-soft badge-sm`. See Component Conventions above for the full badge pattern.
 
 ## 7. Form Patterns
 

@@ -23,7 +23,7 @@
     </div>
     <!-- Selection mode toggle -->
     <button type="button" x-data @click="$store.bulk.toggleMode()"
-      class="btn btn-ghost btn-sm rounded-xl gap-1.5"
+      class="btn btn-ghost btn-sm rounded-xl gap-2"
       :class="$store.bulk.selecting && 'bg-primary/10 text-primary'"
       title="Toggle selection mode">
       <i data-lucide="list-checks" class="w-3.5 h-3.5"></i>
@@ -251,7 +251,7 @@
     <i data-lucide="receipt" class="w-12 h-12 text-base-content/20 mb-2"></i>
     <p class="text-base-content/60">No transactions found.</p>
     {{if or .FilterStartDate .FilterEndDate .FilterAccountID .FilterUserID .FilterConnID .FilterCategory .FilterMinAmount .FilterMaxAmount .FilterPending .FilterSearch}}
-    <a href="/transactions" class="btn btn-ghost btn-sm mt-2">
+    <a href="/transactions" class="btn btn-ghost btn-sm rounded-xl mt-2">
       <i data-lucide="x" class="w-3.5 h-3.5"></i>
       Clear filters
     </a>
@@ -531,15 +531,15 @@ document.addEventListener('DOMContentLoaded', function() {
     + '<span class="text-base-content/70 font-medium">selected</span>'
     + '</div>'
     + '<div class="w-px h-6 bg-base-300"></div>'
-    + '<button type="button" id="bb-bulk-uncat" class="btn btn-ghost btn-sm rounded-xl text-xs gap-1.5" title="Select all uncategorized on this page">'
+    + '<button type="button" id="bb-bulk-uncat" class="btn btn-ghost btn-sm rounded-xl text-xs gap-2" title="Select all uncategorized on this page">'
     + '<i data-lucide="circle-off" class="w-3.5 h-3.5"></i>'
     + '<span class="hidden sm:inline">Uncategorized</span>'
     + '</button>'
     + '<div class="w-px h-6 bg-base-300"></div>'
-    + '<button type="button" id="bb-bulk-categorize" class="btn btn-primary btn-sm rounded-xl gap-1.5">'
+    + '<button type="button" id="bb-bulk-categorize" class="btn btn-primary btn-sm rounded-xl gap-2">'
     + '<i data-lucide="tags" class="w-3.5 h-3.5"></i> Categorize'
     + '</button>'
-    + '<button type="button" id="bb-bulk-clear" class="btn btn-ghost btn-sm btn-circle" title="Clear selection">'
+    + '<button type="button" id="bb-bulk-clear" class="btn btn-ghost btn-sm btn-square rounded-xl" title="Clear selection">'
     + '<i data-lucide="x" class="w-4 h-4"></i>'
     + '</button>'
     + '</div>';

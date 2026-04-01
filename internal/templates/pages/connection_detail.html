@@ -87,7 +87,7 @@
       </button>
       <span x-show="confirming" x-cloak class="inline-flex gap-2">
         <button class="btn btn-error btn-sm rounded-xl" @click="removeConnection()">Yes, Remove</button>
-        <button class="btn btn-ghost btn-sm" @click="confirming = false">Cancel</button>
+        <button class="btn btn-ghost btn-sm rounded-xl" @click="confirming = false">Cancel</button>
       </span>
     </span>
   </div>
@@ -322,13 +322,13 @@
 {{end}}
 
 <!-- Sync History -->
-<div class="bb-card">
-  <div class="px-5 pt-5 pb-3 flex items-center justify-between">
+<div class="bb-card p-0 overflow-hidden">
+  <div class="px-4 sm:px-5 pt-4 pb-3 flex items-center justify-between">
     <h2 class="text-sm font-semibold text-base-content/70">Sync History</h2>
     <span class="text-xs text-base-content/30">Last 10</span>
   </div>
   <!-- Skeleton shown during sync -->
-  <div id="sync-history-skeleton" class="px-5 pb-5" style="display:none">
+  <div id="sync-history-skeleton" class="px-4 sm:px-5 pb-4" style="display:none">
     <div class="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/10 mb-2">
       <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
         <span class="loading loading-spinner loading-xs text-primary"></span>
@@ -342,7 +342,7 @@
   </div>
   <div id="sync-history-content">
   {{if .SyncLogs}}
-  <div class="px-5 pb-4">
+  <div class="px-4 sm:px-5 pb-4">
     {{range .SyncLogs}}
     <div class="flex gap-3 py-3 border-b border-base-300/30 last:border-0">
       <!-- Timeline dot -->
@@ -392,7 +392,7 @@
     {{end}}
   </div>
   {{else}}
-  <div class="px-5 pb-5">
+  <div class="px-4 sm:px-5 pb-4">
     <div class="flex flex-col items-center justify-center py-10 text-base-content/30">
       <i data-lucide="refresh-cw" class="w-10 h-10 mb-3 opacity-50"></i>
       <p class="text-sm">No sync history yet</p>

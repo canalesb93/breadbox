@@ -10,7 +10,7 @@
   <div class="flex items-center gap-2">
     {{if .Connections}}
     <div x-data="syncAllBtn()">
-      <button class="btn btn-outline btn-sm rounded-xl gap-1.5"
+      <button class="btn btn-outline btn-sm rounded-xl gap-2"
               :disabled="state !== 'idle'"
               @click="triggerSyncAll()"
               :title="state === 'syncing' ? 'Syncing all connections...' : 'Sync all connections now'">
@@ -32,17 +32,17 @@
 
 <!-- Financial Summary Bar -->
 {{if .HasAnyBalance}}
-<div class="bb-card mb-6">
+<div class="bb-card p-0 overflow-hidden mb-6">
   <div class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-base-300">
-    <div class="px-6 py-5">
+    <div class="px-5 py-4">
       <div class="text-xs font-medium text-base-content/50 mb-1">Net Worth</div>
       <div class="text-2xl font-semibold tabular-nums tracking-tight">{{formatAmount .NetWorth}}</div>
     </div>
-    <div class="px-6 py-5">
+    <div class="px-5 py-4">
       <div class="text-xs font-medium text-base-content/50 mb-1">Assets</div>
       <div class="text-2xl font-semibold tabular-nums tracking-tight text-success">{{formatAmount .TotalAssets}}</div>
     </div>
-    <div class="px-6 py-5">
+    <div class="px-5 py-4">
       <div class="text-xs font-medium text-base-content/50 mb-1">Liabilities</div>
       <div class="text-2xl font-semibold tabular-nums tracking-tight text-error">{{formatAmount .TotalLiabilities}}</div>
     </div>
@@ -56,7 +56,7 @@
   <div class="bb-card overflow-hidden">
     <!-- Connection Header — clickable -->
     <a href="/connections/{{formatUUID .ID}}" class="block no-underline group">
-      <div class="px-4 py-3 sm:px-6 sm:py-5 flex items-center justify-between gap-3 sm:gap-4">
+      <div class="px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between gap-3 sm:gap-4">
         <div class="flex items-center gap-3 sm:gap-4 min-w-0">
           <div class="hidden sm:flex w-10 h-10 rounded-lg bg-base-200/60 items-center justify-center shrink-0">
             {{if eq (printf "%s" .Provider) "plaid"}}
@@ -156,7 +156,7 @@
     {{if .Accounts}}
     <div class="border-t border-base-300">
       {{range .Accounts}}
-      <a href="/accounts/{{formatUUID .ID}}" class="flex items-center justify-between px-6 py-3 hover:bg-base-200/40 transition-colors no-underline border-b border-base-300 last:border-b-0 group/acct">
+      <a href="/accounts/{{formatUUID .ID}}" class="flex items-center justify-between px-5 py-3 hover:bg-base-200/40 transition-colors no-underline border-b border-base-300 last:border-b-0 group/acct">
         <div class="flex items-center gap-3 min-w-0">
           <!-- Account type icon -->
           <div class="w-7 h-7 rounded-md bg-base-200/60 flex items-center justify-center shrink-0">

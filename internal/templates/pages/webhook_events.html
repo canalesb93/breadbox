@@ -155,14 +155,14 @@
       <!-- Status badge + expand -->
       <div class="flex items-center gap-3 shrink-0">
         {{if eq .Status "processed"}}
-        <span class="badge badge-success badge-sm">processed</span>
+        <span class="badge badge-soft badge-success badge-sm">processed</span>
         {{else if eq .Status "error"}}
-        <span class="badge badge-error badge-sm">error</span>
+        <span class="badge badge-soft badge-error badge-sm">error</span>
         {{else}}
-        <span class="badge badge-warning badge-sm">{{.Status}}</span>
+        <span class="badge badge-soft badge-warning badge-sm">{{.Status}}</span>
         {{end}}
 
-        <button class="btn btn-ghost btn-xs btn-circle text-base-content/30 hover:text-base-content/60 transition-colors">
+        <button class="btn btn-ghost btn-xs btn-square rounded-lg text-base-content/30 hover:text-base-content/60 transition-colors">
           <i data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
         </button>
       </div>

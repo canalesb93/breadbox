@@ -16,8 +16,8 @@
         {{if .Account.Mask}}<span class="text-xs text-base-content/30">&bull;&bull;&bull;&bull;{{.Account.Mask}}</span>{{end}}
         {{if .Account.Excluded}}<span class="badge badge-ghost badge-xs">Excluded</span>{{end}}
         {{if and .Account.ConnectionStatus (ne (deref .Account.ConnectionStatus) "active")}}
-        {{if eq (deref .Account.ConnectionStatus) "error"}}<span class="badge badge-error badge-xs">Error</span>
-        {{else if eq (deref .Account.ConnectionStatus) "pending_reauth"}}<span class="badge badge-warning badge-xs">Reauth</span>
+        {{if eq (deref .Account.ConnectionStatus) "error"}}<span class="badge badge-soft badge-error badge-xs">Error</span>
+        {{else if eq (deref .Account.ConnectionStatus) "pending_reauth"}}<span class="badge badge-soft badge-warning badge-xs">Reauth</span>
         {{else if eq (deref .Account.ConnectionStatus) "disconnected"}}<span class="badge badge-ghost badge-xs">Disconnected</span>
         {{end}}
         {{end}}
@@ -367,7 +367,7 @@
     <i data-lucide="receipt" class="w-12 h-12 text-base-content/20 mb-2"></i>
     <p class="text-base-content/60">No transactions found.</p>
     {{if or .FilterStartDate .FilterEndDate .FilterCategory .FilterPending .FilterSearch}}
-    <a href="/accounts/{{.AccountID}}" class="btn btn-ghost btn-sm mt-2">
+    <a href="/accounts/{{.AccountID}}" class="btn btn-ghost btn-sm rounded-xl mt-2">
       <i data-lucide="x" class="w-3.5 h-3.5"></i>
       Clear filters
     </a>

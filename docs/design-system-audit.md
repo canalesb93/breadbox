@@ -34,29 +34,21 @@ variant usage. No clear convention for when to use which size or radius.
 
 **Files to audit:** All files in `internal/templates/pages/*.html`
 
-- [ ] **1a. Audit and document all button patterns.** Grep for `btn btn-` across
-  all templates. Create a table of every unique combination used and where.
-  Decide on the standard:
-  - Primary actions: `btn btn-primary btn-sm rounded-xl`
-  - Secondary/ghost actions: `btn btn-ghost btn-sm rounded-xl`
-  - Destructive actions: `btn btn-error btn-sm rounded-xl` (or `btn-outline btn-error`)
-  - Compact inline actions (table rows, badges): `btn btn-ghost btn-xs rounded-lg`
-  - Icon-only buttons: `btn btn-ghost btn-sm btn-square rounded-xl`
-  - Document the convention in `docs/design-system.md`
+- [x] **1a. Audit and document all button patterns.** Audited 89 unique button
+  class combinations across 41 templates. Convention documented in
+  `docs/design-system.md` § Component Conventions → Buttons.
 
-- [ ] **1b. Normalize button rounding across all templates.** Apply the convention
-  from 1a. Replace `rounded-lg` on primary/secondary buttons with `rounded-xl`.
-  Keep `rounded-lg` only for compact `btn-xs` buttons. Fix any bare `rounded`
-  or `rounded-md` on buttons.
+- [x] **1b. Normalize button rounding across all templates.** Fixed ghost buttons
+  missing rounding (added `rounded-xl` for btn-sm, `rounded-lg` for btn-xs).
+  Fixed btn-sm buttons using `rounded-lg` → `rounded-xl`. 15 template files updated.
 
-- [ ] **1c. Normalize button sizing across all templates.** Ensure `btn-sm` is
-  the default everywhere. `btn-xs` should only appear in compact contexts
-  (inside table cells, inline with text). Remove any unsized buttons that
-  should have `btn-sm`.
+- [x] **1c. Normalize button sizing across all templates.** Added `btn-sm` to 6
+  unsized modal buttons in categories.html and reviews.html. Verified btn-xs
+  only in compact contexts.
 
-- [ ] **1d. Standardize icon+text button gap.** Search for buttons containing
-  both `<i data-lucide=` and text. Ensure they all use `gap-2` (or `gap-1.5`
-  for `btn-xs`). Remove any ad-hoc `gap-1` or missing gap classes.
+- [x] **1d. Standardize icon+text button gap.** Normalized all btn-sm icon+text
+  to `gap-2`, all btn-xs to `gap-1.5`. Fixed ~15 instances of `gap-1` or
+  `gap-1.5` on btn-sm buttons.
 
 ---
 
@@ -67,23 +59,17 @@ mixed sizing (`badge-xs` vs `badge-sm`), some badges have rounding overrides.
 
 **Files to audit:** All `internal/templates/pages/*.html`, `internal/admin/templates.go`
 
-- [ ] **2a. Audit all badge patterns.** Grep for `badge` across templates and
-  Go template functions (`statusBadge`, `syncBadge`, `configSource`). Document
-  every unique combination. Decide on convention:
-  - Status badges (connection, sync): `badge badge-soft badge-{color} badge-sm`
-  - Metadata labels (scope, source): `badge badge-ghost badge-xs`
-  - Counts/numbers: `badge badge-primary badge-xs` (or appropriate color)
-  - No extra rounding — DaisyUI badges have their own radius
-  - Document in `docs/design-system.md`
+- [x] **2a. Audit all badge patterns.** Audited 200+ badge instances across all
+  templates and 3 Go template functions. 28 unique class combinations found.
+  Convention documented in `docs/design-system.md` § Component Conventions → Badges.
 
-- [ ] **2b. Normalize badge classes across all templates.** Apply the convention.
-  Remove stray `rounded-lg` on badges. Ensure consistent use of `badge-soft`
-  for semantic status badges. Standardize sizing.
+- [x] **2b. Normalize badge classes across all templates.** Removed `rounded-lg`
+  from badges in 10 files (~28 occurrences). Added `badge-soft` to status badges
+  in 8+ files. Left badge-ghost metadata badges and nav badges unchanged.
 
-- [ ] **2c. Update Go template badge functions.** Update `statusBadge()`,
-  `syncBadge()`, and `configSource()` in `internal/admin/templates.go` to use
-  the standardized badge pattern instead of hand-built HTML spans with
-  inconsistent classes.
+- [x] **2c. Update Go template badge functions.** Updated `statusBadge()` from
+  custom hand-rolled CSS to `badge badge-soft badge-{color} badge-sm`. Updated
+  `syncBadge()` to add `badge-soft`. `configSource()` already correct.
 
 ---
 
@@ -95,21 +81,19 @@ child with `px-6 py-5`). No standard for card sections (header/body/footer).
 
 **Files to audit:** All templates using `bb-card`
 
-- [ ] **3a. Define card padding convention and document it.** Decide:
-  - Simple cards (single content block): `bb-card p-5` (or `p-4 sm:p-5`)
-  - Sectioned cards (header + body, or with dividers): `bb-card p-0 overflow-hidden`
-    with internal sections using consistent padding (e.g., `px-5 py-4`)
-  - Cards with tables: `bb-card p-0 overflow-hidden` (table handles its own padding)
-  - Document in `docs/design-system.md`
+- [x] **3a. Define card padding convention and document it.** Convention
+  documented in `docs/design-system.md` § Component Conventions → Cards.
+  Simple: p-5 (standard), p-4 (compact), p-6/p-8 (forms). Sectioned: p-0
+  overflow-hidden with `px-4 sm:px-5 py-3/py-4` internal sections.
 
-- [ ] **3b. Normalize simple card padding.** Go through templates and ensure
-  simple single-content cards use the standard padding. Replace one-off values
-  like `p-8`, `p-12`, `p-6` with the standard (unless the context genuinely
-  requires different padding, like empty states with `py-16`).
+- [x] **3b. Normalize simple card padding.** Changed `p-6` to `p-5` on
+  non-form content cards (transaction_detail details + category cards).
+  Left form cards (p-6, p-8) and empty states (p-12) as-is.
 
-- [ ] **3c. Normalize sectioned card structure.** For cards with headers and
-  bodies, ensure consistent internal padding. Replace ad-hoc `px-4 sm:px-6 py-5`
-  / `px-6 py-5` / etc. with a single standard pattern.
+- [x] **3c. Normalize sectioned card structure.** Replaced `px-6 py-5` and
+  `px-4 sm:px-6 py-5` with `px-4 sm:px-5 py-4` across 14 files. Added
+  `p-0 overflow-hidden` to sectioned cards missing it. Standardized divider
+  borders to `border-t border-base-300/50`.
 
 ---
 
@@ -548,4 +532,6 @@ there should match what's actually in the code after the above improvements.
 
 | Date | Task | Agent/Session | Notes |
 |------|------|---------------|-------|
-| | | | |
+| 2026-04-01 | 1a-1d Button Standardization | Claude Opus | 15 files, rounding/sizing/gap normalized |
+| 2026-04-01 | 2a-2c Badge Standardization | Claude Opus | 19 files + templates.go, badge-soft + rounded-lg cleanup |
+| 2026-04-01 | 3a-3c Card Standardization | Claude Opus | 14 files, px-6→px-5, sectioned card padding |

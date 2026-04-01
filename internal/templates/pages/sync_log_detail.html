@@ -117,7 +117,7 @@
 
 <!-- Warning Card -->
 {{if .Log.WarningMessage}}
-<div class="bb-card p-0 mb-6 border-warning/20">
+<div class="bb-card p-0 overflow-hidden mb-6 border-warning/20">
   <div class="px-5 py-3.5 border-b border-warning/10 bg-warning/5">
     <div class="flex items-center gap-2">
       <i data-lucide="alert-triangle" class="w-4 h-4 text-warning/70"></i>
@@ -132,7 +132,7 @@
 
 <!-- Error Card -->
 {{if .Log.ErrorMessage}}
-<div class="bb-card p-0 mb-6 border-error/20">
+<div class="bb-card p-0 overflow-hidden mb-6 border-error/20">
   <div class="px-5 py-3.5 border-b border-error/10 bg-error/5">
     <div class="flex items-center gap-2">
       <i data-lucide="alert-circle" class="w-4 h-4 text-error/70"></i>
@@ -147,7 +147,7 @@
 
 <!-- Rule Hits -->
 {{if .Log.RuleHits}}
-<div class="bb-card p-0 mb-6">
+<div class="bb-card p-0 overflow-hidden mb-6">
   <div class="px-5 py-3.5 border-b border-base-200">
     <div class="flex items-center justify-between">
       <div>

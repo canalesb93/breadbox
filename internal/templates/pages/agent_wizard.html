@@ -33,7 +33,7 @@
           <div class="flex-1 px-4 py-3.5 min-w-0">
             <div class="flex items-center gap-2 mb-0.5">
               <h3 class="font-semibold text-sm text-base-content group-hover:text-primary transition-colors">Initial Setup</h3>
-              <span class="badge badge-soft badge-primary badge-xs rounded-lg">First run</span>
+              <span class="badge badge-soft badge-primary badge-xs">First run</span>
             </div>
             <p class="text-xs text-base-content/50 leading-relaxed">Establish rules and categories after connecting your first accounts. Creates broad category mappings per provider.</p>
           </div>
@@ -57,7 +57,7 @@
           <div class="flex-1 px-4 py-3.5 min-w-0">
             <div class="flex items-center gap-2 mb-0.5">
               <h3 class="font-semibold text-sm text-base-content group-hover:text-primary transition-colors">Bulk Review</h3>
-              <span class="badge badge-soft badge-primary badge-xs rounded-lg">Thorough</span>
+              <span class="badge badge-soft badge-primary badge-xs">Thorough</span>
               {{if gt $stats.PendingReviews 0}}
               <span class="badge badge-primary badge-xs font-mono">{{$stats.PendingReviews}} waiting</span>
               {{end}}
@@ -84,7 +84,7 @@
           <div class="flex-1 px-4 py-3.5 min-w-0">
             <div class="flex items-center gap-2 mb-0.5">
               <h3 class="font-semibold text-sm text-base-content group-hover:text-primary transition-colors">Quick Review</h3>
-              <span class="badge badge-soft badge-primary badge-xs rounded-lg">Fast</span>
+              <span class="badge badge-soft badge-primary badge-xs">Fast</span>
             </div>
             <p class="text-xs text-base-content/50 leading-relaxed">Rapidly clear a large queue using batch operations. Prioritizes speed with reasonable accuracy.</p>
           </div>
@@ -118,7 +118,7 @@
           <div class="flex-1 px-4 py-3.5 min-w-0">
             <div class="flex items-center gap-2 mb-0.5">
               <h3 class="font-semibold text-sm text-base-content group-hover:text-success transition-colors">Routine Review</h3>
-              <span class="badge badge-soft badge-success badge-xs rounded-lg">Recurring</span>
+              <span class="badge badge-soft badge-success badge-xs">Recurring</span>
               {{if gt $stats.TotalRules 0}}
               <span class="text-xs text-base-content/40">{{$stats.TotalRules}} active rule{{if ne $stats.TotalRules 1}}s{{end}}</span>
               {{else}}
@@ -147,7 +147,7 @@
           <div class="flex-1 px-4 py-3.5 min-w-0">
             <div class="flex items-center gap-2 mb-0.5">
               <h3 class="font-semibold text-sm text-base-content group-hover:text-violet-500 transition-colors">Spending Report</h3>
-              <span class="badge badge-xs rounded-lg bg-violet-500/15 text-violet-600 border-0">Recurring</span>
+              <span class="badge badge-xs bg-violet-500/15 text-violet-600 border-0">Recurring</span>
               {{if gt $stats.TotalAccounts 0}}
               <span class="text-xs text-base-content/40">Across {{$stats.TotalAccounts}} account{{if ne $stats.TotalAccounts 1}}s{{end}}</span>
               {{end}}
@@ -184,7 +184,7 @@
           <div class="flex-1 px-4 py-3.5 min-w-0">
             <div class="flex items-center gap-2 mb-0.5">
               <h3 class="font-semibold text-sm text-base-content group-hover:text-warning transition-colors">Anomaly Detection</h3>
-              <span class="badge badge-soft badge-warning badge-xs rounded-lg">Monitoring</span>
+              <span class="badge badge-soft badge-warning badge-xs">Monitoring</span>
             </div>
             <p class="text-xs text-base-content/50 leading-relaxed">Watch for unusual charges, duplicate transactions, or unexpected spending spikes across all accounts.</p>
           </div>
