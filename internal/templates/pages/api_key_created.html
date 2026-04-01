@@ -24,10 +24,10 @@
     <div class="flex gap-2" x-data="{ copied: false }">
       <input type="text" value="{{.PlaintextKey}}" readonly id="api-key-value"
              class="input input-sm font-mono flex-1 bg-base-200/50 border-base-300 rounded-xl text-xs">
-      <button class="btn btn-primary btn-sm rounded-xl shrink-0" @click="navigator.clipboard.writeText(document.getElementById('api-key-value').value).then(function(){ $data.copied = true; setTimeout(function(){ $data.copied = false; }, 2000); })">
-        <i data-lucide="clipboard" class="w-4 h-4"></i>
-        <span x-show="!copied">Copy</span>
-        <span x-show="copied" x-cloak>Copied!</span>
+      <button class="btn btn-primary btn-sm rounded-xl shrink-0 gap-2" :class="copied && '!btn-success'" @click="navigator.clipboard.writeText(document.getElementById('api-key-value').value).then(function(){ $data.copied = true; setTimeout(function(){ $data.copied = false; }, 2000); })">
+        <i data-lucide="clipboard" class="w-4 h-4" x-show="!copied"></i>
+        <i data-lucide="check" class="w-4 h-4" x-show="copied" x-cloak></i>
+        <span x-text="copied ? 'Copied!' : 'Copy'"></span>
       </button>
     </div>
   </div>

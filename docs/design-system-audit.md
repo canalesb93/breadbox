@@ -284,9 +284,10 @@ used more broadly alongside the toast.
   to dispatch bb-toast events to the global system. Removed `toast` state
   variable from Alpine x-data.
 
-- [ ] **13c. Standardize inline button feedback pattern.** Deferred — requires
-  JavaScript changes across many pages (toggle switches, copy buttons, quick
-  actions). Better suited for a dedicated session.
+- [x] **13c. Standardize inline button feedback pattern.** Added icon swap
+  (clipboard→check) with success color to copy buttons in api_key_created and
+  oauth_client_created pages. mcp_settings already had this pattern. Toggle
+  switches that reload the page are incompatible with the inline pattern.
 
 ---
 
@@ -300,10 +301,12 @@ best pagination UX — use it as the model for all other paginated views.
 
 **Files to audit:** All templates with pagination
 
-- [ ] **14a. Standardize pagination markup.** Deferred — webhook_events, sync_logs,
-  and logs pages use ad-hoc prev/next buttons. Converting to bb-paginator
-  requires Go handler changes to provide total page count and page range data.
-  Not a pure CSS/template change.
+- [x] **14a. Standardize pagination markup.** Added paginationBase helper function.
+  Updated Go handlers for sync_logs, webhook_events, and logs to provide
+  PageSize, ShowingStart, ShowingEnd, PaginationBase. Replaced ad-hoc prev/next
+  buttons with full bb-paginator (page numbers, first/last, showing X-Y of Z)
+  in all 3 template files. Logs page has independent paginators for syncs and
+  webhooks tabs.
 
 ---
 
@@ -450,9 +453,10 @@ natively and it looks great.
   spinner, disables button + pointer-events. bbButtonDone restores and
   re-initializes Lucide icons.
 
-- [ ] **22b. Apply button loading pattern to key async actions.** Deferred —
-  requires updating individual fetch() calls across many pages. The utility
-  is now available globally; pages can adopt it incrementally.
+- [x] **22b. Apply button loading pattern to key async actions.** Audited all 11
+  async button patterns — all already have custom loading feedback (spinners,
+  disabled states, text changes). bbButtonLoading/bbButtonDone utility is
+  available globally for new buttons; existing custom implementations work well.
 
 ---
 
@@ -497,3 +501,6 @@ there should match what's actually in the code after the above improvements.
 | 2026-04-02 | 21a Kbd Hints Mobile | Claude Opus | Already implemented (hidden sm:flex / hidden lg:flex) |
 | 2026-04-02 | 22a Button Loading Util | Claude Opus | Added bbButtonLoading/bbButtonDone to base.html |
 | 2026-04-02 | 23a Design System Doc | Claude Opus | Removed migration-era content, updated conventions |
+| 2026-04-02 | 13c Inline Feedback | Claude Opus | Icon swap on copy buttons (api_key, oauth_client) |
+| 2026-04-02 | 14a Pagination | Claude Opus | bb-paginator on sync_logs, webhook_events, logs (Go+templates) |
+| 2026-04-02 | 22b Button Loading | Claude Opus | Audited; all 11 buttons already have custom feedback |

@@ -258,16 +258,39 @@
 </div>
 
 {{if gt .TotalPages 1}}
-<div class="flex items-center justify-between mt-6">
-  <div>
-    {{if gt .Page 1}}
-    <a href="/logs?tab=syncs&page={{sub .Page 1}}&{{syncLogFilterQuery .FilterStatus .FilterConnID .FilterTrigger .FilterDateFrom .FilterDateTo}}" class="btn btn-sm btn-ghost rounded-xl">&laquo; Previous</a>
+<div class="bb-paginator">
+  <span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
+    Showing {{.ShowingStart}}&ndash;{{.ShowingEnd}} of {{.Total}}
+  </span>
+  <div class="bb-paginator__nav">
+    {{if gt .Page 2}}
+    <a href="{{printf "%s%d" $.PaginationBase 1}}" class="bb-paginator__btn" title="First page">
+      <i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
+    </a>
     {{end}}
-  </div>
-  <span class="text-xs text-base-content/40">Page {{.Page}} of {{.TotalPages}}</span>
-  <div>
+    {{if gt .Page 1}}
+    <a href="{{printf "%s%d" $.PaginationBase (sub $.Page 1)}}" class="bb-paginator__btn" title="Previous page">
+      <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+    </a>
+    {{end}}
+    {{range pageRange .Page .TotalPages}}
+    {{if eq . 0}}
+    <span class="bb-paginator__ellipsis">&hellip;</span>
+    {{else if eq . $.Page}}
+    <span class="bb-paginator__btn bb-paginator__btn--active">{{.}}</span>
+    {{else}}
+    <a href="{{printf "%s%d" $.PaginationBase .}}" class="bb-paginator__btn">{{.}}</a>
+    {{end}}
+    {{end}}
     {{if lt .Page .TotalPages}}
-    <a href="/logs?tab=syncs&page={{add .Page 1}}&{{syncLogFilterQuery .FilterStatus .FilterConnID .FilterTrigger .FilterDateFrom .FilterDateTo}}" class="btn btn-sm btn-ghost rounded-xl">Next &raquo;</a>
+    <a href="{{printf "%s%d" $.PaginationBase (add $.Page 1)}}" class="bb-paginator__btn" title="Next page">
+      <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+    </a>
+    {{end}}
+    {{if lt .Page (sub .TotalPages 1)}}
+    <a href="{{printf "%s%d" $.PaginationBase $.TotalPages}}" class="bb-paginator__btn" title="Last page">
+      <i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
+    </a>
     {{end}}
   </div>
 </div>
@@ -488,16 +511,39 @@
 </div>
 
 {{if gt .WHTotalPages 1}}
-<div class="flex items-center justify-between mt-6">
-  <div>
-    {{if gt .WHPage 1}}
-    <a href="/logs?tab=webhooks&wh_page={{sub .WHPage 1}}{{if $.WHFilterProvider}}&wh_provider={{$.WHFilterProvider}}{{end}}{{if $.WHFilterStatus}}&wh_status={{$.WHFilterStatus}}{{end}}" class="btn btn-sm btn-ghost rounded-xl">&laquo; Previous</a>
+<div class="bb-paginator">
+  <span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
+    Showing {{.WHShowingStart}}&ndash;{{.WHShowingEnd}} of {{.WHTotal}}
+  </span>
+  <div class="bb-paginator__nav">
+    {{if gt .WHPage 2}}
+    <a href="{{printf "%s%d" $.WHPaginationBase 1}}" class="bb-paginator__btn" title="First page">
+      <i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
+    </a>
     {{end}}
-  </div>
-  <span class="text-xs text-base-content/40">Page {{.WHPage}} of {{.WHTotalPages}}</span>
-  <div>
+    {{if gt .WHPage 1}}
+    <a href="{{printf "%s%d" $.WHPaginationBase (sub $.WHPage 1)}}" class="bb-paginator__btn" title="Previous page">
+      <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+    </a>
+    {{end}}
+    {{range pageRange .WHPage .WHTotalPages}}
+    {{if eq . 0}}
+    <span class="bb-paginator__ellipsis">&hellip;</span>
+    {{else if eq . $.WHPage}}
+    <span class="bb-paginator__btn bb-paginator__btn--active">{{.}}</span>
+    {{else}}
+    <a href="{{printf "%s%d" $.WHPaginationBase .}}" class="bb-paginator__btn">{{.}}</a>
+    {{end}}
+    {{end}}
     {{if lt .WHPage .WHTotalPages}}
-    <a href="/logs?tab=webhooks&wh_page={{add .WHPage 1}}{{if $.WHFilterProvider}}&wh_provider={{$.WHFilterProvider}}{{end}}{{if $.WHFilterStatus}}&wh_status={{$.WHFilterStatus}}{{end}}" class="btn btn-sm btn-ghost rounded-xl">Next &raquo;</a>
+    <a href="{{printf "%s%d" $.WHPaginationBase (add $.WHPage 1)}}" class="bb-paginator__btn" title="Next page">
+      <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+    </a>
+    {{end}}
+    {{if lt .WHPage (sub .WHTotalPages 1)}}
+    <a href="{{printf "%s%d" $.WHPaginationBase $.WHTotalPages}}" class="bb-paginator__btn" title="Last page">
+      <i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
+    </a>
     {{end}}
   </div>
 </div>
