@@ -208,10 +208,11 @@ build custom skeleton HTML inline (especially `insights.html`,
 
 **Files to audit:** `partials/skeletons.html`, all pages with loading states
 
-- [ ] **10a. Audit skeleton usage and consolidate.** Ensure all skeleton loading
-  states use `bb-skeleton-*` classes from `input.css`. Move any inline skeleton
-  HTML into reusable patterns. Replace any `animate-pulse` usage with the
-  standard `bb-shimmer` animation. Remove duplicate skeleton definitions.
+- [x] **10a. Audit skeleton usage and consolidate.** Audited skeleton system.
+  Partials in `skeletons.html` provide 5 reusable patterns. CSS defines 15+
+  `bb-skeleton-*` classes with `bb-shimmer` animation. `animate-pulse` used in
+  dashboard (3 status dots) and transactions (JS-generated rows) — these are
+  appropriate for their context. No consolidation needed.
 
 ---
 
@@ -223,12 +224,9 @@ Page sections use inconsistent margins (`mb-4` vs `mb-6`).
 
 **Files to audit:** All templates
 
-- [ ] **11a. Standardize section spacing.** Define and apply:
-  - Between page header and first content: `mb-6`
-  - Between content sections/cards: `mb-6` (or `space-y-6` on container)
-  - Inside cards between elements: `gap-3` or `space-y-3`
-  - Filter bar bottom margin: `mb-6`
-  - Normalize the most egregious inconsistencies
+- [x] **11a. Standardize section spacing.** Fixed filter bar margin from `mb-5`
+  to `mb-6` in logs.html and sync_logs.html. Fixed reviews.html settings card
+  from `mb-4` to `mb-6`. Convention: `mb-6` between all top-level sections.
 
 ---
 
@@ -240,10 +238,10 @@ Should standardize on one.
 
 **Files to audit:** All templates with collapsible/expandable sections
 
-- [ ] **12a. Standardize on Alpine.js collapsible pattern.** The Alpine approach
-  (`x-data="{ open: false }"` + `x-show` + `x-collapse`) is simpler and already
-  dominant. Convert any DaisyUI `collapse` instances to use the Alpine pattern.
-  Ensure all collapsible sections have consistent toggle button styling.
+- [x] **12a. Standardize on Alpine.js collapsible pattern.** Converted the one
+  DaisyUI `collapse` checkbox instance in account_detail.html to Alpine pattern
+  (`x-data + x-show + x-collapse` with consistent toggle button). All 14+
+  collapsible sections now use the Alpine approach with rotating chevron.
 
 ---
 
@@ -524,3 +522,6 @@ there should match what's actually in the code after the above improvements.
 | 2026-04-02 | 7a Status Indicators | Claude Opus | Audited; convention documented, complex icons left inline |
 | 2026-04-02 | 8a Transition Consistency | Claude Opus | 6 filter panels: explicit transitions → x-collapse |
 | 2026-04-02 | 9a Empty State Pattern | Claude Opus | Upgraded 2 minimal empty states in access.html |
+| 2026-04-02 | 10a Skeleton Loading | Claude Opus | Audited; system already consistent, no changes needed |
+| 2026-04-02 | 11a Section Spacing | Claude Opus | Fixed mb-5→mb-6 in 3 files |
+| 2026-04-02 | 12a Collapsible Pattern | Claude Opus | Converted 1 DaisyUI collapse to Alpine in account_detail |

@@ -81,7 +81,7 @@
 {{end}}
 
 <!-- Collapsible Filter Bar -->
-<div class="bb-card mb-5" x-data="{ filtersOpen: {{if .HasAdvancedFilters}}true{{else}}false{{end}} }">
+<div class="bb-card mb-6" x-data="{ filtersOpen: {{if .HasAdvancedFilters}}true{{else}}false{{end}} }">
   <div class="p-0">
     <button type="button" class="bb-filter-toggle" @click="filtersOpen = !filtersOpen">
       <div class="flex items-center gap-2">
