@@ -1,10 +1,6 @@
-{{define "content"}}
-<div class="bb-page-header">
-  <div>
-    <h1 class="bb-page-title">Getting Started with MCP Agents</h1>
-    <p class="text-sm text-base-content/50 mt-1">Connect your AI agents to Breadbox in three steps</p>
-  </div>
-</div>
+{{define "content"}}{{template "agents-guide-content" .}}{{end}}
+
+{{define "agents-guide-content"}}
 
 <!-- Steps indicator -->
 <ul class="steps steps-horizontal w-full mb-8 text-sm">
@@ -283,7 +279,7 @@
     </div>
     <div class="px-4 sm:px-5 py-4">
       <p class="text-sm text-base-content/60 mb-4">Once your agent is connected, use the Agent Wizard to create prompts for common tasks like reviewing transactions, categorizing spending, and generating reports.</p>
-      <a href="/agent-wizard" class="btn btn-primary btn-sm rounded-xl gap-2">
+      <a href="/agents?tab=wizard" class="btn btn-primary btn-sm rounded-xl gap-2">
         <i data-lucide="wand-sparkles" class="w-4 h-4"></i>
         Open Agent Wizard
       </a>

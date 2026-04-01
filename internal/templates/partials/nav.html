@@ -1,49 +1,15 @@
 {{define "nav"}}
 <nav class="bb-sidebar-nav">
-  <div class="bb-sidebar-section">Data</div>
-  <a href="/" class="bb-sidebar-link{{if eq .CurrentPage "dashboard"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="layout-dashboard"></i>
-    <span class="flex-1">Dashboard</span>
+  <div class="bb-sidebar-section">Overview</div>
+  <a href="/" class="bb-sidebar-link{{if eq .CurrentPage "home"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="house"></i>
+    <span class="flex-1">Home</span>
   </a>
   <a href="/insights" class="bb-sidebar-link{{if eq .CurrentPage "insights"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="lightbulb"></i> Insights
   </a>
-  <a href="/connections" class="bb-sidebar-link{{if eq .CurrentPage "connections"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="link"></i>
-    <span class="flex-1">Connections</span>
-    {{if and .NavBadges (gt .NavBadges.ConnectionsAttention 0)}}
-    <span class="bb-nav-badge bb-nav-badge--warn" title="{{.NavBadges.ConnectionsAttention}} connections need attention">{{badgeCount .NavBadges.ConnectionsAttention}}</span>
-    {{end}}
-  </a>
   <a href="/transactions" class="bb-sidebar-link{{if eq .CurrentPage "transactions"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="receipt"></i> Transactions
-  </a>
-  <a href="/rules" class="bb-sidebar-link{{if eq .CurrentPage "rules"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="list-filter"></i> Rules
-  </a>
-  <a href="/categories" class="bb-sidebar-link{{if eq .CurrentPage "categories"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="tag"></i> Categories
-  </a>
-  <a href="/account-links" class="bb-sidebar-link{{if eq .CurrentPage "account-links"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="link-2"></i> Account Links
-  </a>
-  <a href="/users" class="bb-sidebar-link{{if eq .CurrentPage "users"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="users"></i> Family Members
-  </a>
-
-  <div class="bb-sidebar-section">Agents</div>
-  <a href="/mcp-getting-started" class="bb-sidebar-link{{if eq .CurrentPage "mcp-getting-started"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="rocket"></i> Getting Started
-  </a>
-  <a href="/agent-wizard" class="bb-sidebar-link{{if eq .CurrentPage "agent-wizard"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="wand-sparkles"></i> Agent Wizard
-  </a>
-  <a href="/reviews" class="bb-sidebar-link{{if eq .CurrentPage "reviews"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="clipboard-check"></i>
-    <span class="flex-1">Review Queue</span>
-    {{if and .NavBadges (gt .NavBadges.PendingReviews 0)}}
-    <span class="bb-nav-badge" title="{{.NavBadges.PendingReviews}} pending reviews">{{badgeCount .NavBadges.PendingReviews}}</span>
-    {{end}}
   </a>
   <a href="/reports" class="bb-sidebar-link{{if eq .CurrentPage "reports"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="file-text"></i>
@@ -52,8 +18,30 @@
     <span class="bb-nav-badge" title="{{.NavBadges.UnreadReports}} unread reports">{{badgeCount .NavBadges.UnreadReports}}</span>
     {{end}}
   </a>
-  <a href="/mcp-settings" class="bb-sidebar-link{{if eq .CurrentPage "mcp"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="bot"></i> MCP Settings
+
+  <div class="bb-sidebar-section">Manage</div>
+  <a href="/connections" class="bb-sidebar-link{{if eq .CurrentPage "connections"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="link"></i>
+    <span class="flex-1">Connections</span>
+    {{if and .NavBadges (gt .NavBadges.ConnectionsAttention 0)}}
+    <span class="bb-nav-badge bb-nav-badge--warn" title="{{.NavBadges.ConnectionsAttention}} connections need attention">{{badgeCount .NavBadges.ConnectionsAttention}}</span>
+    {{end}}
+  </a>
+  <a href="/agents" class="bb-sidebar-link{{if eq .CurrentPage "agents"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="bot"></i> Agents
+  </a>
+  <a href="/rules" class="bb-sidebar-link{{if or (eq .CurrentPage "rules") (eq .CurrentPage "categories")}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="list-filter"></i> Rules & Categories
+  </a>
+  <a href="/reviews" class="bb-sidebar-link{{if eq .CurrentPage "reviews"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="clipboard-check"></i>
+    <span class="flex-1">Review Queue</span>
+    {{if and .NavBadges (gt .NavBadges.PendingReviews 0)}}
+    <span class="bb-nav-badge" title="{{.NavBadges.PendingReviews}} pending reviews">{{badgeCount .NavBadges.PendingReviews}}</span>
+    {{end}}
+  </a>
+  <a href="/users" class="bb-sidebar-link{{if eq .CurrentPage "users"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="users"></i> Household
   </a>
 
   <div class="bb-sidebar-section">System</div>
@@ -63,11 +51,8 @@
   <a href="/access" class="bb-sidebar-link{{if eq .CurrentPage "access"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="shield-check"></i> Access
   </a>
-  <a href="/sync-logs" class="bb-sidebar-link{{if eq .CurrentPage "sync-logs"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="refresh-cw"></i> Sync Logs
-  </a>
-  <a href="/webhook-events" class="bb-sidebar-link{{if eq .CurrentPage "webhook-events"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="webhook"></i> Webhooks
+  <a href="/logs" class="bb-sidebar-link{{if eq .CurrentPage "logs"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="scroll-text"></i> Logs
   </a>
   <a href="/settings" class="bb-sidebar-link{{if eq .CurrentPage "settings"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="settings"></i> Settings

@@ -718,12 +718,22 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/reports.html",
 		"pages/report_detail.html",
 		"pages/webhook_events.html",
+		"pages/logs.html",
 		"pages/oauth_clients.html",
 		"pages/oauth_client_new.html",
 		"pages/oauth_client_created.html",
 		"pages/agent_wizard.html",
 		"pages/mcp_guide.html",
 		"pages/prompt_builder.html",
+	}
+
+	// Pages that need multiple page files parsed together (for sub-template sharing).
+	compositePages := map[string][]string{
+		"pages/agents.html": {
+			"pages/mcp_guide.html",
+			"pages/agent_wizard.html",
+			"pages/mcp_settings.html",
+		},
 	}
 
 	// Pages using the wizard layout (login + first-run admin creation + OAuth consent).
@@ -737,6 +747,19 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		if err := tr.parseBasePage(page); err != nil {
 			return err
 		}
+	}
+
+	// Composite pages: parsed with extra page files so sub-templates are available.
+	for page, extras := range compositePages {
+		files := []string{"layout/base.html"}
+		files = append(files, templatePartials...)
+		files = append(files, extras...)
+		files = append(files, page)
+		t, err := template.New("").Funcs(tr.funcMap).ParseFS(templates.FS, files...)
+		if err != nil {
+			return fmt.Errorf("parse composite page %s: %w", page, err)
+		}
+		tr.templates[path.Base(page)] = t
 	}
 
 	for _, page := range wizardPages {

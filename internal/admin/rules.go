@@ -66,7 +66,13 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 			}
 		}
 
-		data := BaseTemplateData(r, sm, "rules", "Transaction Rules")
+		tab := r.URL.Query().Get("tab")
+		if tab != "categories" {
+			tab = "rules"
+		}
+
+		data := BaseTemplateData(r, sm, "rules", "Rules & Categories")
+		data["Tab"] = tab
 		data["Rules"] = result.Rules
 		data["HasMore"] = result.HasMore
 		data["NextCursor"] = result.NextCursor
@@ -81,6 +87,88 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 		data["Categories"] = categories
 		data["FlatCategories"] = flattenCategories(categories)
 		data["Version"] = version
+
+		// Categories tab data.
+		{
+			type catSpending struct {
+				Amount           float64
+				TransactionCount int64
+				Percent          float64
+			}
+			spendingByCategory := make(map[string]catSpending)
+			var totalSpending float64
+			var maxCategorySpend float64
+
+			spendingDays := 30
+			if d := r.URL.Query().Get("days"); d != "" {
+				switch d {
+				case "7":
+					spendingDays = 7
+				case "30":
+					spendingDays = 30
+				case "90":
+					spendingDays = 90
+				case "365":
+					spendingDays = 365
+				}
+			}
+			spendingStart := time.Now().AddDate(0, 0, -spendingDays)
+
+			catSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+				GroupBy:      "category",
+				StartDate:    &spendingStart,
+				SpendingOnly: true,
+			})
+			if err == nil && catSummary != nil {
+				for _, row := range catSummary.Summary {
+					name := "Uncategorized"
+					if row.Category != nil && *row.Category != "" {
+						name = *row.Category
+					}
+					spendingByCategory[name] = catSpending{
+						Amount:           row.TotalAmount,
+						TransactionCount: row.TransactionCount,
+					}
+					totalSpending += row.TotalAmount
+				}
+
+				for _, parent := range categories {
+					var parentAmount float64
+					var parentCount int64
+					if ps, ok := spendingByCategory[parent.DisplayName]; ok {
+						parentAmount += ps.Amount
+						parentCount += ps.TransactionCount
+					}
+					for _, child := range parent.Children {
+						if cs, ok := spendingByCategory[child.DisplayName]; ok {
+							parentAmount += cs.Amount
+							parentCount += cs.TransactionCount
+						}
+					}
+					if parentAmount > 0 || parentCount > 0 {
+						spendingByCategory[parent.DisplayName] = catSpending{
+							Amount:           parentAmount,
+							TransactionCount: parentCount,
+						}
+					}
+					if parentAmount > maxCategorySpend {
+						maxCategorySpend = parentAmount
+					}
+				}
+
+				if totalSpending > 0 {
+					for name, cs := range spendingByCategory {
+						cs.Percent = (cs.Amount / totalSpending) * 100
+						spendingByCategory[name] = cs
+					}
+				}
+			}
+
+			data["SpendingByCategory"] = spendingByCategory
+			data["TotalSpending"] = totalSpending
+			data["MaxCategorySpend"] = maxCategorySpend
+			data["SpendingDays"] = spendingDays
+		}
 
 		tr.Render(w, r, "rules.html", data)
 	}

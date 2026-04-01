@@ -58,7 +58,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/onboarding/dismiss", DismissOnboardingHandler(a))
 
 		r.Route("/connections", func(r chi.Router) {
-			r.Get("/", ConnectionsListHandler(a, tr))
+			r.Get("/", ConnectionsListHandler(a, svc, sm, tr))
 			r.Get("/new", NewConnectionHandler(a, tr))
 			r.Get("/import-csv", CSVImportPageHandler(a, tr))
 			r.Get("/{id}", ConnectionDetailHandler(a, tr))
@@ -98,21 +98,33 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/transactions/search", TransactionSearchHandler(a, sm, tr, svc))
 		r.Get("/transactions/{id}", TransactionDetailHandler(a, sm, tr, svc))
 		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
-		r.Get("/sync-logs", SyncLogsHandler(a, sm, tr, svc))
+		r.Get("/logs", LogsPageHandler(a, svc, sm, tr))
+		r.Get("/sync-logs", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/logs?tab=syncs", http.StatusMovedPermanently)
+		})
 		r.Get("/sync-logs/{id}", SyncLogDetailHandler(a, sm, tr, svc))
-		r.Get("/webhook-events", WebhookEventsHandler(a, sm, tr, svc))
+		r.Get("/webhook-events", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/logs?tab=webhooks", http.StatusMovedPermanently)
+		})
 
-		r.Get("/account-links", AccountLinksPageHandler(a, svc, sm, tr))
+		r.Get("/account-links", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/connections?tab=links", http.StatusMovedPermanently)
+		})
 		r.Get("/account-links/{id}", AccountLinkDetailHandler(a, svc, sm, tr))
 
 		r.Get("/reports", ReportsPageHandler(a, svc, sm, tr))
 		r.Get("/reports/{id}", ReportDetailHandler(a, svc, sm, tr))
 		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
+		r.Get("/agents", AgentsPageHandler(svc, mcpServer, sm, tr))
 		r.Get("/review-instructions", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/mcp-settings", http.StatusMovedPermanently)
+			http.Redirect(w, r, "/agents?tab=settings", http.StatusMovedPermanently)
 		})
-		r.Get("/mcp-getting-started", MCPGuideHandler(svc, sm, tr))
-		r.Get("/agent-wizard", AgentWizardHandler(svc, sm, tr))
+		r.Get("/mcp-getting-started", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/agents?tab=guide", http.StatusMovedPermanently)
+		})
+		r.Get("/agent-wizard", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/agents?tab=wizard", http.StatusMovedPermanently)
+		})
 		r.Get("/agent-wizard/{type}", PromptBuilderHandler(sm, tr))
 		r.Get("/agent-wizard/{type}/copy", PromptCopyHandler())
 		r.Get("/rules", RulesPageHandler(svc, sm, tr, a.Config.Version))
@@ -120,10 +132,14 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/rules/{id}", RuleDetailPageHandler(svc, sm, tr))
 		r.Get("/rules/{id}/edit", RuleFormPageHandler(svc, sm, tr))
 
-		r.Get("/categories", CategoriesPageHandler(svc, sm, tr))
+		r.Get("/categories", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/rules?tab=categories", http.StatusMovedPermanently)
+		})
 
 		r.Route("/mcp-settings", func(r chi.Router) {
-			r.Get("/", MCPSettingsGetHandler(svc, mcpServer, sm, tr))
+			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, "/agents?tab=settings", http.StatusMovedPermanently)
+			})
 			r.Post("/mode", MCPSaveModeHandler(svc, sm))
 			r.Post("/tools", MCPSaveToolsHandler(svc, mcpServer, sm))
 			r.Post("/instructions", MCPSaveInstructionsHandler(svc, sm))
