@@ -1,0 +1,76 @@
+{{define "content"}}
+{{template "breadcrumb" .}}
+
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">{{.Report.Title}}</h1>
+    <div class="flex items-center flex-wrap gap-2 mt-1.5">
+      <span class="text-sm text-base-content/50">{{.Report.DisplayAuthor}}</span>
+      <span class="text-base-content/20">&middot;</span>
+      <span class="text-sm text-base-content/40" title="{{.Report.CreatedAt}}">{{.Report.CreatedAtRel}}</span>
+      {{if eq .Report.Priority "critical"}}
+      <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-error/10 text-error/80">critical</span>
+      {{else if eq .Report.Priority "warning"}}
+      <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-warning/10 text-warning">warning</span>
+      {{end}}
+      {{range .Report.Tags}}
+      <span class="text-xs px-2 py-0.5 rounded-full bg-base-200/80 text-base-content/50">{{.}}</span>
+      {{end}}
+    </div>
+  </div>
+</div>
+
+<div class="bb-card">
+  <div class="p-5 sm:p-6">
+    <div class="bb-report-body prose prose-sm max-w-none text-base-content/80 leading-relaxed" data-markdown="{{.Report.Body}}"></div>
+  </div>
+</div>
+
+<!-- Markdown rendering -->
+<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.bb-report-body').forEach(function(el) {
+    var md = el.getAttribute('data-markdown');
+    if (!md) return;
+    el.innerHTML = DOMPurify.sanitize(marked.parse(md));
+    el.querySelectorAll('a').forEach(function(a) {
+      a.classList.add('link', 'link-primary');
+      if (a.href && !a.href.startsWith(window.location.origin) && !a.getAttribute('href').startsWith('/')) {
+        a.setAttribute('target', '_blank');
+        a.setAttribute('rel', 'noopener');
+      }
+    });
+    el.querySelectorAll('ul').forEach(function(list) {
+      list.classList.add('list-disc', 'pl-5', 'space-y-1', 'my-2');
+    });
+    el.querySelectorAll('ol').forEach(function(list) {
+      list.classList.add('list-decimal', 'pl-5', 'space-y-1', 'my-2');
+    });
+    el.querySelectorAll('p').forEach(function(p) {
+      p.classList.add('mb-2');
+    });
+    el.querySelectorAll('strong').forEach(function(s) {
+      s.classList.add('text-base-content', 'font-semibold');
+    });
+    el.querySelectorAll('h1, h2, h3, h4').forEach(function(h) {
+      h.classList.add('text-base-content', 'font-semibold', 'mt-3', 'mb-1');
+    });
+    el.querySelectorAll('code').forEach(function(c) {
+      if (c.parentElement.tagName !== 'PRE') {
+        c.classList.add('bg-base-200/60', 'px-1.5', 'py-0.5', 'rounded', 'text-xs', 'font-mono');
+      }
+    });
+    el.querySelectorAll('pre').forEach(function(pre) {
+      pre.classList.add('bg-base-200/40', 'rounded-lg', 'p-3', 'my-2', 'overflow-x-auto', 'text-xs');
+    });
+    el.querySelectorAll('blockquote').forEach(function(bq) {
+      bq.classList.add('border-l-2', 'border-primary/30', 'pl-3', 'my-2', 'text-base-content/60', 'italic');
+    });
+    var lastChild = el.lastElementChild;
+    if (lastChild) lastChild.classList.add('!mb-0');
+  });
+});
+</script>
+{{end}}
