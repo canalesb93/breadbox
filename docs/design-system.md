@@ -38,55 +38,20 @@ Also available via Homebrew: `brew tap dobicinaitis/tailwind-cli-extra && brew i
 ```css
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: light --default, dark --prefersdark;
+  themes: false;
 }
+@plugin "daisyui/theme" { name: "breadbox-light"; default: true; ... }
+@plugin "daisyui/theme" { name: "breadbox-dark"; prefersdark: true; ... }
 
 /* App-specific component classes */
 @layer components {
-  .bb-filter-bar {
-    @apply flex flex-wrap items-end gap-4 mb-6;
-  }
-
-  .bb-filter-bar label {
-    @apply flex flex-col gap-1 text-sm;
-  }
-
-  .bb-filter-bar select,
-  .bb-filter-bar input {
-    @apply select select-sm select-bordered w-auto min-w-[8rem];
-  }
-
-  .bb-pagination {
-    @apply flex items-center justify-between mt-4;
-  }
-
-  .bb-action-bar {
-    @apply flex items-center gap-2 mb-4;
-  }
-
-  .bb-amount {
-    @apply text-right tabular-nums;
-  }
-
-  .bb-amount--debit {
-    @apply text-right tabular-nums;
-  }
-
-  .bb-amount--credit {
-    @apply text-right tabular-nums text-success;
-  }
-
-  .bb-info-grid {
-    @apply grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm;
-  }
-
-  .bb-info-grid dt {
-    @apply font-medium text-base-content/70;
-  }
-
-  .bb-info-grid dd {
-    @apply text-base-content;
-  }
+  .bb-filter-bar { ... }    /* Filter form layout */
+  .bb-card { ... }           /* Border-based card (not shadow) */
+  .bb-amount { ... }         /* Tabular-nums right-aligned amounts */
+  .bb-info-grid { ... }      /* Detail page key-value grids */
+  .bb-paginator { ... }      /* Numbered pagination with page range */
+  .bb-page-header { ... }    /* Page title + action row */
+  /* ... see input.css for full list */
 }
 ```
 
@@ -135,8 +100,8 @@ The Go server already serves `static/` via `http.FileServer`. The generated CSS 
 
 ### Theme Pairing
 
-- **Light:** `light` — DaisyUI default light theme, clean and neutral
-- **Dark:** `dark` — DaisyUI default dark theme with good contrast
+- **Light:** `breadbox-light` — custom shadcn/ui neutral palette, set as default
+- **Dark:** `breadbox-dark` — custom dark palette, auto-switches via `prefers-color-scheme`
 
 Auto-switches based on `prefers-color-scheme`. Users can also force a theme with `data-theme="light"` or `data-theme="dark"` on `<html>`.
 
@@ -410,9 +375,9 @@ For tables that can grow long (transactions, sync logs):
 
 ```html
 <td class="bb-amount">{{formatAmount .Amount}}</td>
-<!-- Negative amounts (credits) get color -->
-<td class="bb-amount--credit">-$42.50</td>
 ```
+
+Transaction rows use `bb-tx-amount` and `bb-tx-amount--income` for styled amounts.
 
 ### Status Badges in Tables
 
@@ -489,11 +454,11 @@ Pin to a specific version in production for stability.
 
 After `createIcons()`, each `<i data-lucide="...">` is replaced with an inline `<svg>`.
 
-**Size control:** Use Tailwind width/height classes on the `<i>` element:
-- Sidebar nav: `w-4 h-4`
-- Stat card icons: `w-8 h-8`
-- Button icons: `w-4 h-4`
-- Empty state icons: `w-12 h-12`
+**Size control:** See the Icon Sizes table in Component Conventions (§4) for the canonical convention. Quick reference:
+- In `btn-sm`: `w-4 h-4`
+- In `btn-xs` / inline: `w-3.5 h-3.5`
+- Section headers: `w-5 h-5`
+- Empty states: `w-8 h-8`
 
 ### Icon Inventory
 
@@ -534,28 +499,7 @@ When Alpine.js dynamically adds elements with `data-lucide` attributes (e.g., to
 
 ## 9. Toast / Notification Pattern
 
-Global toast component in `base.html`, using DaisyUI `toast` + `alert`:
-
-```html
-<div class="toast toast-end toast-bottom z-50"
-     x-data="{ toasts: [] }"
-     @bb-toast.window="
-       toasts.push({ message: $event.detail.message, type: $event.detail.type || 'info', id: Date.now() });
-       setTimeout(() => toasts.shift(), 4000)
-     ">
-  <template x-for="t in toasts" :key="t.id">
-    <div class="alert shadow-lg"
-         :class="{
-           'alert-success': t.type === 'success',
-           'alert-error': t.type === 'error',
-           'alert-warning': t.type === 'warning',
-           'alert-info': t.type === 'info'
-         }">
-      <span x-text="t.message"></span>
-    </div>
-  </template>
-</div>
-```
+Global toast in `base.html` — centered floating pill at the bottom of the viewport with type-specific Lucide icons (check, x-circle, alert-triangle, info). Auto-dismisses after 3 seconds with fade+slide transition.
 
 **Dispatch from anywhere:**
 ```js
@@ -563,6 +507,10 @@ window.dispatchEvent(new CustomEvent('bb-toast', {
   detail: { message: 'Sync triggered', type: 'success' }
 }));
 ```
+
+Supported types: `success` (default), `error`, `warning`, `info`.
+
+**Inline feedback:** For trivial instant actions (copy-to-clipboard), use the icon swap pattern instead of a toast: swap the icon to a checkmark with `text-success` for 2 seconds. See `agent_wizard.html` for the reference implementation.
 
 ## 10. Typography
 
