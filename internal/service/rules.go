@@ -608,8 +608,61 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 		return nil, fmt.Errorf("count rules: %w", err)
 	}
 
-	// Add cursor condition for the main query
+	// Main query
+	selectCols := `SELECT tr.id, tr.short_id, tr.name, tr.conditions, tr.category_id, tr.priority, tr.enabled,
+		tr.expires_at, tr.created_by_type, tr.created_by_id, tr.created_by_name,
+		tr.hit_count, tr.last_hit_at, tr.created_at, tr.updated_at,
+		tr.actions, c.slug AS category_slug, c.display_name AS category_display_name,
+		COALESCE(c.icon, cp.icon) AS category_icon, COALESCE(c.color, cp.color) AS category_color `
+
+	orderBy := " ORDER BY tr.created_at DESC, tr.id DESC"
 	whereSQL := filterWhereSQL
+
+	// Offset-based pagination (admin UI)
+	if params.Page > 0 {
+		pageSize := params.PageSize
+		if pageSize <= 0 {
+			pageSize = 50
+		}
+		offset := (params.Page - 1) * pageSize
+		limitClause := fmt.Sprintf(" LIMIT $%d OFFSET $%d", argN, argN+1)
+		args = append(args, pageSize, offset)
+
+		fullQuery := selectCols + baseFrom + whereSQL + orderBy + limitClause
+		rows, err := s.Pool.Query(ctx, fullQuery, args...)
+		if err != nil {
+			return nil, fmt.Errorf("query rules: %w", err)
+		}
+		defer rows.Close()
+
+		var rules []TransactionRuleResponse
+		for rows.Next() {
+			var row ruleRow
+			if err := rows.Scan(row.scanDest()...); err != nil {
+				return nil, fmt.Errorf("scan rule: %w", err)
+			}
+			rules = append(rules, row.toResponse())
+		}
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("iterate rules: %w", err)
+		}
+
+		totalPages := int(total) / pageSize
+		if int(total)%pageSize != 0 {
+			totalPages++
+		}
+
+		return &TransactionRuleListResult{
+			Rules:      rules,
+			Total:      total,
+			Page:       params.Page,
+			PageSize:   pageSize,
+			TotalPages: totalPages,
+			HasMore:    params.Page < totalPages,
+		}, nil
+	}
+
+	// Cursor-based pagination (API/MCP)
 	if params.Cursor != "" {
 		cursorTime, cursorIDStr, err := decodeTimestampCursor(params.Cursor)
 		if err != nil {
@@ -629,14 +682,6 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 		argN += 2
 	}
 
-	// Main query
-	selectCols := `SELECT tr.id, tr.short_id, tr.name, tr.conditions, tr.category_id, tr.priority, tr.enabled,
-		tr.expires_at, tr.created_by_type, tr.created_by_id, tr.created_by_name,
-		tr.hit_count, tr.last_hit_at, tr.created_at, tr.updated_at,
-		tr.actions, c.slug AS category_slug, c.display_name AS category_display_name,
-		COALESCE(c.icon, cp.icon) AS category_icon, COALESCE(c.color, cp.color) AS category_color `
-
-	orderBy := " ORDER BY tr.created_at DESC, tr.id DESC"
 	limitClause := fmt.Sprintf(" LIMIT $%d", argN)
 	args = append(args, limit+1)
 

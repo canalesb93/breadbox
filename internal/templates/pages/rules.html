@@ -160,7 +160,7 @@
 
 <!-- Rules count -->
 <div class="text-sm text-base-content/40 mb-4 px-1">
-  {{.Total}} rule{{if ne .Total 1}}s{{end}} found
+  {{if gt .TotalPages 1}}Showing {{.ShowingStart}}&ndash;{{.ShowingEnd}} of {{end}}{{.Total}} rule{{if ne .Total 1}}s{{end}} found
 </div>
 
 <!-- Rules as cards instead of table for Mercury feel -->
@@ -303,15 +303,64 @@
 </div>
 
 <!-- Pagination -->
-{{if .HasMore}}
-<div class="flex justify-center mt-8">
-  <a href="/rules?cursor={{.NextCursor}}{{if .SearchFilter}}&search={{.SearchFilter}}{{end}}{{if .CategoryFilter}}&category_slug={{.CategoryFilter}}{{end}}{{if .EnabledFilter}}&enabled={{.EnabledFilter}}{{end}}" class="btn btn-sm btn-outline rounded-xl">Load More</a>
+{{if gt .TotalPages 1}}
+<div class="bb-paginator mt-8" id="bb-rules-paginator">
+  <div class="bb-paginator__info">
+    <span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
+      Showing {{.ShowingStart}}&ndash;{{.ShowingEnd}} of {{.Total}}
+    </span>
+    <div class="bb-paginator__per-page">
+      <label class="text-xs text-base-content/40 whitespace-nowrap">Per page</label>
+      <select class="select select-xs select-bordered rounded-lg tabular-nums" onchange="bbSetRulesPerPage(this.value)">
+        <option value="25"{{if eq .PageSize 25}} selected{{end}}>25</option>
+        <option value="50"{{if eq .PageSize 50}} selected{{end}}>50</option>
+        <option value="100"{{if eq .PageSize 100}} selected{{end}}>100</option>
+      </select>
+    </div>
+  </div>
+  <div class="bb-paginator__nav">
+    {{if gt .Page 2}}
+    <a href="{{printf "%s%d" $.PaginationBase 1}}" class="bb-paginator__btn" title="First page">
+      <i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
+    </a>
+    {{end}}
+    {{if gt .Page 1}}
+    <a href="{{printf "%s%d" $.PaginationBase (sub $.Page 1)}}" class="bb-paginator__btn" title="Previous page">
+      <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+    </a>
+    {{end}}
+    {{range pageRange .Page .TotalPages}}
+    {{if eq . 0}}
+    <span class="bb-paginator__ellipsis">&hellip;</span>
+    {{else if eq . $.Page}}
+    <span class="bb-paginator__btn bb-paginator__btn--active">{{.}}</span>
+    {{else}}
+    <a href="{{printf "%s%d" $.PaginationBase .}}" class="bb-paginator__btn">{{.}}</a>
+    {{end}}
+    {{end}}
+    {{if lt .Page .TotalPages}}
+    <a href="{{printf "%s%d" $.PaginationBase (add $.Page 1)}}" class="bb-paginator__btn" title="Next page">
+      <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+    </a>
+    {{end}}
+    {{if lt .Page (sub .TotalPages 1)}}
+    <a href="{{printf "%s%d" $.PaginationBase $.TotalPages}}" class="bb-paginator__btn" title="Last page">
+      <i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
+    </a>
+    {{end}}
+  </div>
 </div>
 {{end}}
 
 </div>
 
 <script>
+function bbSetRulesPerPage(val) {
+  const u = new URL(window.location.href);
+  u.searchParams.set('per_page', val);
+  u.searchParams.delete('page');
+  window.location.href = u.toString();
+}
 function rulesPage() {
   return {
     async toggleRule(id) {

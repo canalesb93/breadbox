@@ -500,6 +500,9 @@ type TransactionRuleListParams struct {
 	SearchMode   *string
 	Limit        int
 	Cursor       string
+	// Offset-based pagination (used by admin UI). When Page > 0, cursor is ignored.
+	Page     int
+	PageSize int
 }
 
 type TransactionRuleListResult struct {
@@ -507,6 +510,10 @@ type TransactionRuleListResult struct {
 	NextCursor string                    `json:"next_cursor,omitempty"`
 	HasMore    bool                      `json:"has_more"`
 	Total      int64                     `json:"total"`
+	// Offset-based pagination fields (populated when Page > 0)
+	Page       int `json:"page,omitempty"`
+	PageSize   int `json:"page_size,omitempty"`
+	TotalPages int `json:"total_pages,omitempty"`
 }
 
 type CreateTransactionRuleParams struct {
