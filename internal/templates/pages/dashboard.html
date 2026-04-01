@@ -1,7 +1,7 @@
 {{define "content"}}
 
 {{if .ShowUpdateBanner}}
-<div class="alert alert-info mb-6" x-data="{ pulling: false, pulled: false, error: '' }">
+<div role="alert" class="alert alert-info rounded-xl mb-6" x-data="{ pulling: false, pulled: false, error: '' }">
   <i data-lucide="download" class="w-5 h-5"></i>
   <div class="flex-1">
     <h3 class="font-bold">Update Available</h3>
@@ -83,7 +83,7 @@
 {{end}}
 
 {{if gt .NeedsAttention 0}}
-<div class="alert alert-warning mb-6">
+<div role="alert" class="alert alert-warning rounded-xl mb-6">
   <i data-lucide="alert-triangle" class="w-5 h-5"></i>
   <div>
     <strong>{{.NeedsAttention}} connection(s) need attention.</strong>

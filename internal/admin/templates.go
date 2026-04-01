@@ -66,8 +66,16 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 		funcMap: template.FuncMap{
 			"sub": func(a, b int) int { return a - b },
 			"add": func(a, b int) int { return a + b },
-			"commaInt": func(n int) string {
-				s := fmt.Sprintf("%d", n)
+			"commaInt": func(n any) string {
+				var s string
+				switch v := n.(type) {
+				case int:
+					s = fmt.Sprintf("%d", v)
+				case int64:
+					s = fmt.Sprintf("%d", v)
+				default:
+					s = fmt.Sprintf("%v", v)
+				}
 				if len(s) <= 3 {
 					return s
 				}
@@ -79,38 +87,6 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					result += string(c)
 				}
 				return result
-			},
-			"commaInt64": func(n int64) string {
-				s := fmt.Sprintf("%d", n)
-				if len(s) <= 3 {
-					return s
-				}
-				result := ""
-				for i, c := range s {
-					if i > 0 && (len(s)-i)%3 == 0 {
-						result += ","
-					}
-					result += string(c)
-				}
-				return result
-			},
-			"mulFloat": func(a *float64, b float64) float64 {
-				if a == nil {
-					return 0
-				}
-				return *a * b
-			},
-			"divFloat": func(a, b float64) float64 {
-				if b == 0 {
-					return 0
-				}
-				return a / b
-			},
-			"mulFloatRaw": func(a, b float64) float64 {
-				return a * b
-			},
-			"intToFloat": func(a int) float64 {
-				return float64(a)
 			},
 			"subf": func(a, b float64) float64 { return a - b },
 			"mulf": func(a, b float64) float64 { return a * b },

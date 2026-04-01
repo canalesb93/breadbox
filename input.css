@@ -435,27 +435,9 @@
     @apply input input-sm w-full sm:w-auto sm:min-w-[8rem];
   }
 
-  /* ── Pagination ── */
-  .bb-pagination {
-    @apply flex items-center justify-between mt-4;
-  }
-
-  /* ── Action bar ── */
-  .bb-action-bar {
-    @apply flex items-center gap-2 mb-4;
-  }
-
   /* ── Amount formatting ── */
   .bb-amount {
     @apply text-right tabular-nums;
-  }
-
-  .bb-amount--debit {
-    @apply text-right tabular-nums;
-  }
-
-  .bb-amount--credit {
-    @apply text-right tabular-nums text-success;
   }
 
   /* ── Sparkline (inline mini charts in summary pills) ── */
@@ -501,50 +483,6 @@
 
   .bb-info-grid dd {
     @apply text-base-content;
-  }
-
-  /* ── Stat cards (shadcn: clean border, subtle hover) ── */
-  .bb-stat-card {
-    @apply flex items-center gap-4 rounded-xl bg-base-100 px-5 py-4
-           border border-base-300;
-    transition: border-color 0.15s ease, background-color 0.15s ease;
-  }
-
-  a.bb-stat-card:hover {
-    @apply bg-base-200/50;
-    border-color: oklch(0.85 0 0);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    a.bb-stat-card:hover {
-      border-color: oklch(0.35 0 0);
-    }
-  }
-
-  .bb-stat-card--primary,
-  .bb-stat-card--secondary,
-  .bb-stat-card--accent,
-  .bb-stat-card--warning,
-  .bb-stat-card--info,
-  .bb-stat-card--neutral {
-    /* No colored variants — monochrome first */
-  }
-
-  .bb-stat-card__icon {
-    @apply flex items-center justify-center w-10 h-10 rounded-lg bg-base-200 shrink-0;
-    transition: background-color 0.15s ease;
-  }
-
-  .bb-stat-card__body {
-    @apply flex flex-col min-w-0;
-  }
-
-  .bb-stat-card__value {
-    @apply text-2xl font-semibold leading-tight tabular-nums;
-  }
-
-  .bb-stat-card__label {
-    @apply text-xs font-medium text-base-content/50 mt-0.5;
   }
 
   /* ── Page header pattern ── */
@@ -744,21 +682,7 @@
     transition: opacity 0.2s ease !important;
   }
 
-  /* ── Toast entrance ── */
-  .toast .alert {
-    animation: bb-toast-enter 0.3s ease-out both;
-  }
 
-  @keyframes bb-toast-enter {
-    from {
-      opacity: 0;
-      transform: translateX(20px) scale(0.95);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0) scale(1);
-    }
-  }
 
   /* ── Dropdown smooth open ── */
   .dropdown-content {
@@ -902,15 +826,7 @@
     }
   }
 
-  /* ── Mobile transaction cards ── */
-  .bb-tx-card {
-    @apply overflow-hidden;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
-  }
 
-  .bb-tx-card:active {
-    @apply bg-base-200/30;
-  }
 
   /* ── Smooth collapse for filter panels ── */
   [x-collapse] {
@@ -922,18 +838,7 @@
     z-index: 40 !important;
   }
 
-  /* ── Responsive stat cards: stack value/label tighter on small screens ── */
-  @media (max-width: 639px) {
-    .bb-stat-card {
-      @apply px-4 py-3 gap-3;
-    }
-    .bb-stat-card__value {
-      @apply text-xl;
-    }
-    .bb-stat-card__icon {
-      @apply w-9 h-9;
-    }
-  }
+
 
   /* ── Mobile-friendly info grid ── */
   @media (max-width: 639px) {
@@ -1703,14 +1608,6 @@
     width: 60%;
   }
 
-  .bb-skeleton--heading {
-    @apply h-5 rounded w-48;
-  }
-
-  .bb-skeleton--title {
-    @apply h-6 rounded w-56;
-  }
-
   .bb-skeleton--badge {
     @apply h-5 w-16 rounded-full;
   }
@@ -1727,18 +1624,8 @@
     height: 32px;
   }
 
-  .bb-skeleton--avatar {
-    @apply rounded-xl;
-    width: 48px;
-    height: 48px;
-  }
-
   .bb-skeleton--amount {
     @apply h-7 w-24 rounded;
-  }
-
-  .bb-skeleton--btn {
-    @apply h-8 w-20 rounded-lg;
   }
 
   .bb-skeleton--card {
@@ -1753,20 +1640,12 @@
   }
 
   /* Pre-built skeleton patterns */
-  .bb-skeleton-stat {
-    @apply flex items-center gap-4 rounded-xl border border-base-300 px-5 py-4;
-  }
-
   .bb-skeleton-table-row {
     @apply flex items-center gap-4 px-4 py-3 border-b border-base-300/50;
   }
 
   .bb-skeleton-table-row:last-child {
     @apply border-b-0;
-  }
-
-  .bb-skeleton-list-item {
-    @apply flex items-center gap-3 p-3 rounded-xl;
   }
 
   /* Page-level skeleton overlay (shown during nav transitions) */
@@ -1785,16 +1664,6 @@
     opacity: 0.5;
     pointer-events: none;
     transition: opacity 0.2s ease;
-  }
-
-  /* Pulse animation for active skeleton areas */
-  .bb-skeleton-pulse {
-    animation: bb-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-
-  @keyframes bb-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
   }
 
   /* ── Keyboard shortcut badges ── */
@@ -1987,11 +1856,6 @@
       background: oklch(0.5 0 0 / 0.05);
       border-color: oklch(0.5 0 0 / 0.12);
     }
-    .bb-triage-action--dismiss {
-      color: oklch(0.55 0.2 27);
-      background: oklch(0.577 0.245 27.325 / 0.06);
-      border-color: oklch(0.577 0.245 27.325 / 0.15);
-    }
   }
 
   .bb-triage-action:hover {
@@ -2009,12 +1873,6 @@
     color: oklch(0.45 0 0);
     border-color: oklch(0.85 0 0);
     background: oklch(0.95 0 0);
-  }
-
-  .bb-triage-action--dismiss:hover {
-    color: oklch(0.55 0.2 27);
-    border-color: oklch(0.577 0.245 27.325 / 0.3);
-    background: oklch(0.577 0.245 27.325 / 0.08);
   }
 
   @media (prefers-color-scheme: dark) {
@@ -2035,11 +1893,6 @@
       border-color: oklch(0.4 0 0);
       background: oklch(0.28 0 0);
     }
-    .bb-triage-action--dismiss:hover {
-      color: oklch(0.75 0.17 22);
-      border-color: oklch(0.704 0.191 22.216 / 0.3);
-      background: oklch(0.704 0.191 22.216 / 0.1);
-    }
   }
 
   /* Dark mode mobile action buttons */
@@ -2053,11 +1906,6 @@
       color: oklch(0.7 0 0);
       background: oklch(0.5 0 0 / 0.08);
       border-color: oklch(0.5 0 0 / 0.15);
-    }
-    .bb-triage-action--dismiss {
-      color: oklch(0.75 0.17 22);
-      background: oklch(0.704 0.191 22.216 / 0.08);
-      border-color: oklch(0.704 0.191 22.216 / 0.15);
     }
   }
 

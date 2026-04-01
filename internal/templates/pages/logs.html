@@ -71,7 +71,7 @@
       </div>
       <div>
         <div class="text-2xl font-semibold tabular-nums leading-none">
-          {{if gt .Stats.AvgDurationMs 999.0}}{{printf "%.1f" (divFloat .Stats.AvgDurationMs 1000.0)}}s{{else}}{{printf "%.0f" .Stats.AvgDurationMs}}ms{{end}}
+          {{if gt .Stats.AvgDurationMs 999.0}}{{printf "%.1f" (divf .Stats.AvgDurationMs 1000.0)}}s{{else}}{{printf "%.0f" .Stats.AvgDurationMs}}ms{{end}}
         </div>
         <div class="text-xs text-base-content/40 mt-0.5">Avg duration</div>
       </div>

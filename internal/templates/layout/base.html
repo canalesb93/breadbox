@@ -475,6 +475,21 @@
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <script>
     lucide.createIcons();
+
+    // Button loading state helpers for async actions
+    window.bbButtonLoading = function(btn) {
+      btn._origHTML = btn.innerHTML;
+      btn.disabled = true;
+      btn.classList.add('pointer-events-none');
+      btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span>';
+    };
+    window.bbButtonDone = function(btn) {
+      btn.disabled = false;
+      btn.classList.remove('pointer-events-none');
+      btn.innerHTML = btn._origHTML;
+      lucide.createIcons({ nodes: [btn] });
+    };
+
     // Auto-close sidebar on mobile when a nav link is tapped
     (function() {
       var toggle = document.getElementById('bb-drawer');
