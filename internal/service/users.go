@@ -22,6 +22,7 @@ func (s *Service) ListUsers(ctx context.Context) ([]UserResponse, error) {
 func userFromRow(r db.User) UserResponse {
 	return UserResponse{
 		ID:        formatUUID(r.ID),
+		ShortID:   r.ShortID,
 		Name:      r.Name,
 		Email:     textPtr(r.Email),
 		CreatedAt: r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),

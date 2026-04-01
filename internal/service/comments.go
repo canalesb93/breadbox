@@ -22,7 +22,7 @@ func (s *Service) CreateComment(ctx context.Context, params CreateCommentParams)
 	}
 
 	// Verify transaction exists and is not soft-deleted.
-	txnID, err := parseUUID(params.TransactionID)
+	txnID, err := s.resolveTransactionID(ctx, params.TransactionID)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -61,7 +61,7 @@ func (s *Service) CreateComment(ctx context.Context, params CreateCommentParams)
 
 // ListComments returns all comments for a transaction, ordered by created_at ASC.
 func (s *Service) ListComments(ctx context.Context, transactionID string) ([]CommentResponse, error) {
-	txnID, err := parseUUID(transactionID)
+	txnID, err := s.resolveTransactionID(ctx, transactionID)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -85,7 +85,7 @@ func (s *Service) UpdateComment(ctx context.Context, id string, params UpdateCom
 		return nil, fmt.Errorf("content must be between 1 and %d characters", maxCommentLength)
 	}
 
-	commentID, err := parseUUID(id)
+	commentID, err := s.resolveCommentID(ctx, id)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -117,7 +117,7 @@ func (s *Service) UpdateComment(ctx context.Context, id string, params UpdateCom
 
 // DeleteComment hard-deletes a comment.
 func (s *Service) DeleteComment(ctx context.Context, id string, actor Actor) error {
-	commentID, err := parseUUID(id)
+	commentID, err := s.resolveCommentID(ctx, id)
 	if err != nil {
 		return ErrNotFound
 	}
@@ -153,6 +153,7 @@ func canModifyComment(comment db.TransactionComment, actor Actor) bool {
 func commentFromRow(c db.TransactionComment) CommentResponse {
 	return CommentResponse{
 		ID:            formatUUID(c.ID),
+		ShortID:       c.ShortID,
 		TransactionID: formatUUID(c.TransactionID),
 		AuthorType:    c.AuthorType,
 		AuthorID:      textPtr(c.AuthorID),

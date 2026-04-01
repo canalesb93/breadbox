@@ -10,6 +10,9 @@ RETURNING *;
 -- name: GetReviewByID :one
 SELECT * FROM review_queue WHERE id = $1;
 
+-- name: GetReviewUUIDByShortID :one
+SELECT id FROM review_queue WHERE short_id = $1;
+
 -- name: GetPendingReviewByTransactionID :one
 SELECT * FROM review_queue WHERE transaction_id = $1 AND status = 'pending';
 

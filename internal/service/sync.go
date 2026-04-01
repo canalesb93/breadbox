@@ -28,7 +28,7 @@ func (s *Service) TriggerSync(ctx context.Context, connectionID *string) error {
 		return nil
 	}
 
-	uid, err := parseUUID(*connectionID)
+	uid, err := s.resolveConnectionID(ctx, *connectionID)
 	if err != nil {
 		return fmt.Errorf("invalid connection id: %w", err)
 	}

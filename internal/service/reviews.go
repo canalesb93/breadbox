@@ -65,14 +65,14 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 
 	// Build the dynamic query with transaction context
 	query := `SELECT rq.id, rq.transaction_id, rq.review_type, rq.status,
-		rq.suggested_category_id, rq.confidence_score,
+		rq.short_id AS rq_short_id, rq.suggested_category_id, rq.confidence_score,
 		rq.reviewer_type, rq.reviewer_id, rq.reviewer_name, rq.review_note,
 		rq.resolved_category_id, rq.created_at, rq.reviewed_at,
 		sc.slug AS suggested_slug, sc.display_name AS suggested_display_name, scp.display_name AS suggested_parent_display_name,
 		rc.slug AS resolved_slug, rc.display_name AS resolved_display_name, rcp.display_name AS resolved_parent_display_name,
 		t.amount, t.iso_currency_code, t.date, t.name, t.merchant_name,
 		t.category_primary, t.category_detailed, t.pending, t.created_at AS t_created_at, t.updated_at AS t_updated_at,
-		t.account_id, COALESCE(a.display_name, a.name) AS account_name,
+		t.short_id AS t_short_id, t.account_id, COALESCE(a.display_name, a.name) AS account_name,
 		u.name AS user_name,
 		t.category_id, t.category_override,
 		c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, c.color AS cat_color,
@@ -111,7 +111,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 	}
 
 	if params.AccountID != nil {
-		aid, err := parseUUID(*params.AccountID)
+		aid, err := s.resolveAccountID(ctx, *params.AccountID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid account_id: %w", err)
 		}
@@ -121,7 +121,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 	}
 
 	if params.UserID != nil {
-		uid, err := parseUUID(*params.UserID)
+		uid, err := s.resolveUserID(ctx, *params.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid user_id: %w", err)
 		}
@@ -183,6 +183,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			rTransactionID        pgtype.UUID
 			rReviewType           string
 			rStatus               string
+			rqShortID             string
 			rSuggestedCategoryID  pgtype.UUID
 			rConfidenceScore      pgtype.Numeric
 			rReviewerType         pgtype.Text
@@ -208,6 +209,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			tPending              bool
 			tCreatedAt            pgtype.Timestamptz
 			tUpdatedAt            pgtype.Timestamptz
+			tShortID              string
 			tAccountID            pgtype.UUID
 			accountName           string
 			userName              pgtype.Text
@@ -224,14 +226,14 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 
 		if err := rows.Scan(
 			&rID, &rTransactionID, &rReviewType, &rStatus,
-			&rSuggestedCategoryID, &rConfidenceScore,
+			&rqShortID, &rSuggestedCategoryID, &rConfidenceScore,
 			&rReviewerType, &rReviewerID, &rReviewerName, &rReviewNote,
 			&rResolvedCategoryID, &rCreatedAt, &rReviewedAt,
 			&suggestedSlug, &suggestedDisplayName, &suggestedParentDisplayName,
 			&resolvedSlug, &resolvedDisplayName, &resolvedParentDisplayName,
 			&tAmount, &tIsoCurrencyCode, &tDate, &tName, &tMerchantName,
 			&tCategoryPrimary, &tCategoryDetailed, &tPending, &tCreatedAt, &tUpdatedAt,
-			&tAccountID, &accountName, &userName,
+			&tShortID, &tAccountID, &accountName, &userName,
 			&tCategoryID, &tCategoryOverride,
 			&catSlug, &catDisplayName, &catIcon, &catColor,
 			&catPrimarySlug, &catPrimaryDisplayName,
@@ -266,6 +268,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 
 		txnResp := &TransactionResponse{
 			ID:                  formatUUID(rTransactionID),
+			ShortID:             tShortID,
 			AccountID:           uuidPtr(tAccountID),
 			AccountName:         &accountName,
 			UserName:            textPtr(userName),
@@ -285,6 +288,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 
 		review := ReviewResponse{
 			ID:                           formatUUID(rID),
+			ShortID:                      rqShortID,
 			TransactionID:                formatUUID(rTransactionID),
 			ReviewType:                   rReviewType,
 			Status:                       rStatus,
@@ -402,12 +406,12 @@ func (s *Service) countReviewsFiltered(ctx context.Context, status string, param
 
 // ListReviewsByTransactionID returns all reviews (any status) for a given transaction.
 func (s *Service) ListReviewsByTransactionID(ctx context.Context, transactionID string) ([]ReviewResponse, error) {
-	txnID, err := parseUUID(transactionID)
+	txnID, err := s.resolveTransactionID(ctx, transactionID)
 	if err != nil {
 		return nil, ErrNotFound
 	}
 
-	query := `SELECT id, transaction_id, review_type, status,
+	query := `SELECT id, short_id, transaction_id, review_type, status,
 		suggested_category_id, confidence_score,
 		reviewer_type, reviewer_id, reviewer_name, review_note,
 		resolved_category_id, created_at, reviewed_at
@@ -425,6 +429,7 @@ func (s *Service) ListReviewsByTransactionID(ctx context.Context, transactionID 
 	for rows.Next() {
 		var (
 			rID                 pgtype.UUID
+			rShortID            string
 			rTransactionID      pgtype.UUID
 			rReviewType         string
 			rStatus             string
@@ -439,7 +444,7 @@ func (s *Service) ListReviewsByTransactionID(ctx context.Context, transactionID 
 			rReviewedAt         pgtype.Timestamptz
 		)
 		if err := rows.Scan(
-			&rID, &rTransactionID, &rReviewType, &rStatus,
+			&rID, &rShortID, &rTransactionID, &rReviewType, &rStatus,
 			&rSuggestedCatID, &rConfidenceScore,
 			&rReviewerType, &rReviewerID, &rReviewerName, &rReviewNote,
 			&rResolvedCatID, &rCreatedAt, &rReviewedAt,
@@ -449,6 +454,7 @@ func (s *Service) ListReviewsByTransactionID(ctx context.Context, transactionID 
 
 		review := ReviewResponse{
 			ID:            formatUUID(rID),
+			ShortID:       rShortID,
 			TransactionID: formatUUID(rTransactionID),
 			ReviewType:    rReviewType,
 			Status:        rStatus,
@@ -520,7 +526,7 @@ func (s *Service) ListReviewsByTransactionID(ctx context.Context, transactionID 
 
 // GetReview returns a single review item with full transaction context.
 func (s *Service) GetReview(ctx context.Context, id string) (*ReviewResponse, error) {
-	reviewID, err := parseUUID(id)
+	reviewID, err := s.resolveReviewID(ctx, id)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -559,7 +565,7 @@ func (s *Service) SubmitReview(ctx context.Context, params SubmitReviewParams) (
 		return nil, fmt.Errorf("%w: review note exceeds %d characters", ErrInvalidParameter, maxReviewNoteLength)
 	}
 
-	reviewID, err := parseUUID(params.ReviewID)
+	reviewID, err := s.resolveReviewID(ctx, params.ReviewID)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -583,7 +589,7 @@ func (s *Service) SubmitReview(ctx context.Context, params SubmitReviewParams) (
 
 	if params.CategoryID != nil {
 		// Explicit category override
-		catUID, err := parseUUID(*params.CategoryID)
+		catUID, err := s.resolveCategoryID(ctx, *params.CategoryID)
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid category_id", ErrInvalidParameter)
 		}
@@ -690,7 +696,7 @@ func (s *Service) BulkSubmitReviews(ctx context.Context, params BulkSubmitReview
 
 // EnqueueManualReview adds a transaction to the review queue manually.
 func (s *Service) EnqueueManualReview(ctx context.Context, transactionID string, actor Actor) (*ReviewResponse, error) {
-	txnID, err := parseUUID(transactionID)
+	txnID, err := s.resolveTransactionID(ctx, transactionID)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -780,7 +786,7 @@ func (s *Service) GetReviewCounts(ctx context.Context) (*ReviewCountsResponse, e
 
 // DismissReview removes a pending review item.
 func (s *Service) DismissReview(ctx context.Context, id string, actor Actor) error {
-	reviewID, err := parseUUID(id)
+	reviewID, err := s.resolveReviewID(ctx, id)
 	if err != nil {
 		return ErrNotFound
 	}
@@ -1005,6 +1011,7 @@ func (s *Service) GetPendingReviewsOverview(ctx context.Context) (*PendingReview
 func (s *Service) reviewFromRow(ctx context.Context, r db.ReviewQueue) ReviewResponse {
 	resp := ReviewResponse{
 		ID:                  formatUUID(r.ID),
+		ShortID:             r.ShortID,
 		TransactionID:       formatUUID(r.TransactionID),
 		ReviewType:          r.ReviewType,
 		Status:              r.Status,

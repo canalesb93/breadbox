@@ -133,7 +133,7 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`, selectCols)
 	argN++
 
 	if params.AccountID != nil {
-		aid, err := parseUUID(*params.AccountID)
+		aid, err := s.resolveAccountID(ctx, *params.AccountID)
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid account_id", ErrInvalidParameter)
 		}
@@ -143,7 +143,7 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`, selectCols)
 	}
 
 	if params.UserID != nil {
-		uid, err := parseUUID(*params.UserID)
+		uid, err := s.resolveUserID(ctx, *params.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid user_id", ErrInvalidParameter)
 		}
@@ -275,7 +275,7 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`
 	argN++
 
 	if params.AccountID != nil {
-		aid, err := parseUUID(*params.AccountID)
+		aid, err := s.resolveAccountID(ctx, *params.AccountID)
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid account_id", ErrInvalidParameter)
 		}
@@ -285,7 +285,7 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`
 	}
 
 	if params.UserID != nil {
-		uid, err := parseUUID(*params.UserID)
+		uid, err := s.resolveUserID(ctx, *params.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid user_id", ErrInvalidParameter)
 		}

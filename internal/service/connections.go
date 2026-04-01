@@ -10,7 +10,7 @@ import (
 
 func (s *Service) ListConnections(ctx context.Context, userID *string) ([]ConnectionResponse, error) {
 	if userID != nil {
-		uid, err := parseUUID(*userID)
+		uid, err := s.resolveUserID(ctx, *userID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid user id: %w", err)
 		}
@@ -22,6 +22,7 @@ func (s *Service) ListConnections(ctx context.Context, userID *string) ([]Connec
 		for i, r := range rows {
 			result[i] = ConnectionResponse{
 				ID:              formatUUID(r.ID),
+				ShortID:         r.ShortID,
 				UserID:          uuidPtr(r.UserID),
 				UserName:        textPtr(r.UserName),
 				Provider:        string(r.Provider),
@@ -46,6 +47,7 @@ func (s *Service) ListConnections(ctx context.Context, userID *string) ([]Connec
 	for i, r := range rows {
 		result[i] = ConnectionResponse{
 			ID:              formatUUID(r.ID),
+			ShortID:         r.ShortID,
 			UserID:          uuidPtr(r.UserID),
 			UserName:        textPtr(r.UserName),
 			Provider:        string(r.Provider),
@@ -63,7 +65,7 @@ func (s *Service) ListConnections(ctx context.Context, userID *string) ([]Connec
 }
 
 func (s *Service) GetConnectionStatus(ctx context.Context, id string) (*ConnectionStatusResponse, error) {
-	uid, err := parseUUID(id)
+	uid, err := s.resolveConnectionID(ctx, id)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -79,6 +81,7 @@ func (s *Service) GetConnectionStatus(ctx context.Context, id string) (*Connecti
 	resp := &ConnectionStatusResponse{
 		ConnectionResponse: ConnectionResponse{
 			ID:              formatUUID(conn.ID),
+			ShortID:         conn.ShortID,
 			UserID:          uuidPtr(conn.UserID),
 			UserName:        textPtr(conn.UserName),
 			Provider:        string(conn.Provider),
@@ -103,6 +106,7 @@ func (s *Service) GetConnectionStatus(ctx context.Context, id string) (*Connecti
 		resp.LastAttemptedSyncAt = timestampStr(syncLog.StartedAt)
 		slResp := SyncLogResponse{
 			ID:            formatUUID(syncLog.ID),
+			ShortID:       syncLog.ShortID,
 			ConnectionID:  formatUUID(syncLog.ConnectionID),
 			Trigger:       string(syncLog.Trigger),
 			Status:        string(syncLog.Status),

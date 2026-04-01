@@ -13,7 +13,7 @@ import (
 
 func (s *Service) ListTransactions(ctx context.Context, params TransactionListParams) (*TransactionListResult, error) {
 	// Build dynamic SQL query
-	query := "SELECT t.id, t.account_id, t.external_transaction_id, t.pending_transaction_id, " +
+	query := "SELECT t.id, t.short_id, t.account_id, t.external_transaction_id, t.pending_transaction_id, " +
 		"t.amount, t.iso_currency_code, t.unofficial_currency_code, t.date, t.authorized_date, " +
 		"t.datetime, t.authorized_datetime, t.name, t.merchant_name, " +
 		"t.category_primary, t.category_detailed, t.category_confidence, " +
@@ -51,7 +51,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	}
 
 	if params.UserID != nil {
-		uid, err := parseUUID(*params.UserID)
+		uid, err := s.resolveUserID(ctx, *params.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid user id: %w", err)
 		}
@@ -62,7 +62,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	}
 
 	if params.AccountID != nil {
-		aid, err := parseUUID(*params.AccountID)
+		aid, err := s.resolveAccountID(ctx, *params.AccountID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid account id: %w", err)
 		}
@@ -186,6 +186,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	for rows.Next() {
 		var (
 			id                     pgtype.UUID
+			shortID                string
 			accountID              pgtype.UUID
 			externalTransactionID  string
 			pendingTransactionID   pgtype.Text
@@ -221,7 +222,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		)
 
 		if err := rows.Scan(
-			&id, &accountID, &externalTransactionID, &pendingTransactionID,
+			&id, &shortID, &accountID, &externalTransactionID, &pendingTransactionID,
 			&amount, &isoCurrencyCode, &unofficialCurrencyCode,
 			&date, &authorizedDate, &datetime, &authorizedDatetime,
 			&name, &merchantName, &categoryPrimary, &categoryDetailed,
@@ -264,6 +265,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 
 		transactions = append(transactions, TransactionResponse{
 			ID:                  formatUUID(id),
+			ShortID:             shortID,
 			AccountID:           uuidPtr(accountID),
 			AccountName:         &accountName,
 			UserName:            textPtr(userName),
@@ -344,7 +346,7 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 	}
 
 	if params.UserID != nil {
-		uid, err := parseUUID(*params.UserID)
+		uid, err := s.resolveUserID(ctx, *params.UserID)
 		if err != nil {
 			return 0, fmt.Errorf("invalid user id: %w", err)
 		}
@@ -354,7 +356,7 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 	}
 
 	if params.AccountID != nil {
-		aid, err := parseUUID(*params.AccountID)
+		aid, err := s.resolveAccountID(ctx, *params.AccountID)
 		if err != nil {
 			return 0, fmt.Errorf("invalid account id: %w", err)
 		}
@@ -758,7 +760,7 @@ func (s *Service) ListDistinctCategories(ctx context.Context) ([]CategoryPair, e
 }
 
 func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionResponse, error) {
-	uid, err := parseUUID(id)
+	uid, err := s.resolveTransactionID(ctx, id)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -782,6 +784,7 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 
 	resp := &TransactionResponse{
 		ID:                  formatUUID(txn.ID),
+		ShortID:             txn.ShortID,
 		AccountID:           uuidPtr(txn.AccountID),
 		Amount:              amountVal,
 		IsoCurrencyCode:     textPtr(txn.IsoCurrencyCode),
@@ -838,6 +841,7 @@ func (s *Service) GetCategoryBySlug(ctx context.Context, slug string) (*Category
 	}
 	return &CategoryResponse{
 		ID:          formatUUID(cat.ID),
+		ShortID:     cat.ShortID,
 		Slug:        cat.Slug,
 		DisplayName: cat.DisplayName,
 		ParentID:    uuidPtr(cat.ParentID),

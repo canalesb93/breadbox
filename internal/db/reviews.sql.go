@@ -88,7 +88,7 @@ WHERE NOT EXISTS (
   SELECT 1 FROM review_queue WHERE transaction_id = $1
 )
 ON CONFLICT (transaction_id) WHERE status = 'pending' DO NOTHING
-RETURNING id, transaction_id, review_type, status, suggested_category_id, confidence_score, reviewer_type, reviewer_id, reviewer_name, review_note, resolved_category_id, created_at, reviewed_at
+RETURNING id, transaction_id, review_type, status, suggested_category_id, confidence_score, reviewer_type, reviewer_id, reviewer_name, review_note, resolved_category_id, created_at, reviewed_at, short_id
 `
 
 type EnqueueReviewParams struct {
@@ -120,12 +120,13 @@ func (q *Queries) EnqueueReview(ctx context.Context, arg EnqueueReviewParams) (R
 		&i.ResolvedCategoryID,
 		&i.CreatedAt,
 		&i.ReviewedAt,
+		&i.ShortID,
 	)
 	return i, err
 }
 
 const getPendingReviewByTransactionID = `-- name: GetPendingReviewByTransactionID :one
-SELECT id, transaction_id, review_type, status, suggested_category_id, confidence_score, reviewer_type, reviewer_id, reviewer_name, review_note, resolved_category_id, created_at, reviewed_at FROM review_queue WHERE transaction_id = $1 AND status = 'pending'
+SELECT id, transaction_id, review_type, status, suggested_category_id, confidence_score, reviewer_type, reviewer_id, reviewer_name, review_note, resolved_category_id, created_at, reviewed_at, short_id FROM review_queue WHERE transaction_id = $1 AND status = 'pending'
 `
 
 func (q *Queries) GetPendingReviewByTransactionID(ctx context.Context, transactionID pgtype.UUID) (ReviewQueue, error) {
@@ -145,12 +146,13 @@ func (q *Queries) GetPendingReviewByTransactionID(ctx context.Context, transacti
 		&i.ResolvedCategoryID,
 		&i.CreatedAt,
 		&i.ReviewedAt,
+		&i.ShortID,
 	)
 	return i, err
 }
 
 const getReviewByID = `-- name: GetReviewByID :one
-SELECT id, transaction_id, review_type, status, suggested_category_id, confidence_score, reviewer_type, reviewer_id, reviewer_name, review_note, resolved_category_id, created_at, reviewed_at FROM review_queue WHERE id = $1
+SELECT id, transaction_id, review_type, status, suggested_category_id, confidence_score, reviewer_type, reviewer_id, reviewer_name, review_note, resolved_category_id, created_at, reviewed_at, short_id FROM review_queue WHERE id = $1
 `
 
 func (q *Queries) GetReviewByID(ctx context.Context, id pgtype.UUID) (ReviewQueue, error) {
@@ -170,8 +172,20 @@ func (q *Queries) GetReviewByID(ctx context.Context, id pgtype.UUID) (ReviewQueu
 		&i.ResolvedCategoryID,
 		&i.CreatedAt,
 		&i.ReviewedAt,
+		&i.ShortID,
 	)
 	return i, err
+}
+
+const getReviewUUIDByShortID = `-- name: GetReviewUUIDByShortID :one
+SELECT id FROM review_queue WHERE short_id = $1
+`
+
+func (q *Queries) GetReviewUUIDByShortID(ctx context.Context, shortID string) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, getReviewUUIDByShortID, shortID)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const updateReviewDecision = `-- name: UpdateReviewDecision :one
@@ -184,7 +198,7 @@ SET status = $2,
     resolved_category_id = $7,
     reviewed_at = NOW()
 WHERE id = $1 AND status = 'pending'
-RETURNING id, transaction_id, review_type, status, suggested_category_id, confidence_score, reviewer_type, reviewer_id, reviewer_name, review_note, resolved_category_id, created_at, reviewed_at
+RETURNING id, transaction_id, review_type, status, suggested_category_id, confidence_score, reviewer_type, reviewer_id, reviewer_name, review_note, resolved_category_id, created_at, reviewed_at, short_id
 `
 
 type UpdateReviewDecisionParams struct {
@@ -222,6 +236,7 @@ func (q *Queries) UpdateReviewDecision(ctx context.Context, arg UpdateReviewDeci
 		&i.ResolvedCategoryID,
 		&i.CreatedAt,
 		&i.ReviewedAt,
+		&i.ShortID,
 	)
 	return i, err
 }

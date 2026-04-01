@@ -9,6 +9,7 @@ import (
 // validFields is the set of JSON field names that can be selected on TransactionResponse.
 var validFields = map[string]bool{
 	"id":                   true,
+	"short_id":             true,
 	"account_id":           true,
 	"account_name":         true,
 	"user_name":            true,
@@ -75,7 +76,8 @@ func ParseFields(raw string) (map[string]bool, error) {
 		sort.Strings(validList)
 		return nil, fmt.Errorf("unknown field(s): %s. Valid fields: %s", strings.Join(unknown, ", "), strings.Join(validList, ", "))
 	}
-	fields["id"] = true // always include
+	fields["id"] = true       // always include
+	fields["short_id"] = true // always include
 	return fields, nil
 }
 
@@ -84,6 +86,7 @@ func ParseFields(raw string) (map[string]bool, error) {
 // validReviewFields is the set of JSON field names that can be selected on ReviewResponse.
 var validReviewFields = map[string]bool{
 	"id":                      true,
+	"short_id":                true,
 	"transaction_id":          true,
 	"review_type":             true,
 	"status":                  true,
@@ -167,7 +170,8 @@ func ParseReviewFields(raw string) (map[string]bool, error) {
 		sort.Strings(validList)
 		return nil, fmt.Errorf("unknown field(s): %s. Valid fields: %s", strings.Join(unknown, ", "), strings.Join(validList, ", "))
 	}
-	fields["id"] = true // always include
+	fields["id"] = true       // always include
+	fields["short_id"] = true // always include
 	return fields, nil
 }
 
@@ -181,6 +185,9 @@ func FilterReviewFields(r ReviewResponse, fields map[string]bool) map[string]any
 	m := make(map[string]any, len(fields))
 	if fields["id"] {
 		m["id"] = r.ID
+	}
+	if fields["short_id"] {
+		m["short_id"] = r.ShortID
 	}
 	if fields["transaction_id"] {
 		m["transaction_id"] = r.TransactionID
@@ -261,6 +268,9 @@ func FilterTransactionFields(t TransactionResponse, fields map[string]bool) map[
 	m := make(map[string]any, len(fields))
 	if fields["id"] {
 		m["id"] = t.ID
+	}
+	if fields["short_id"] {
+		m["short_id"] = t.ShortID
 	}
 	if fields["account_id"] {
 		m["account_id"] = t.AccountID

@@ -3,6 +3,9 @@ INSERT INTO transaction_rules (name, conditions, category_id, priority, enabled,
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
+-- name: GetRuleUUIDByShortID :one
+SELECT id FROM transaction_rules WHERE short_id = $1;
+
 -- name: GetTransactionRuleByID :one
 SELECT tr.*,
        c.slug AS category_slug,

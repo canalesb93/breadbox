@@ -12,6 +12,7 @@ import (
 // AgentReportResponse is the API response type for agent reports.
 type AgentReportResponse struct {
 	ID            string   `json:"id"`
+	ShortID       string   `json:"short_id"`
 	Title         string   `json:"title"`
 	Body          string   `json:"body"`
 	CreatedByType string   `json:"created_by_type"`
@@ -31,6 +32,7 @@ func agentReportFromRow(r db.AgentReport) AgentReportResponse {
 	}
 	return AgentReportResponse{
 		ID:            formatUUID(r.ID),
+		ShortID:       r.ShortID,
 		Title:         r.Title,
 		Body:          r.Body,
 		CreatedByType: r.CreatedByType,
