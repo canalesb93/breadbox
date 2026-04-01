@@ -716,6 +716,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/account_links.html",
 		"pages/account_link_detail.html",
 		"pages/reports.html",
+		"pages/report_detail.html",
 		"pages/webhook_events.html",
 		"pages/oauth_clients.html",
 		"pages/oauth_client_new.html",
