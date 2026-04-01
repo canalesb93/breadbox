@@ -206,6 +206,13 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 		return errorResult(err), nil, nil
 	}
 
+	// Normalize attribution: merge attributed_user into user_name so MCP
+	// consumers see a single effective user without needing to understand
+	// the account-linking internals.
+	for i := range result.Transactions {
+		service.NormalizeTransactionAttribution(&result.Transactions[i])
+	}
+
 	if fieldSet != nil {
 		filtered := make([]map[string]any, len(result.Transactions))
 		for i, t := range result.Transactions {
@@ -566,6 +573,13 @@ func (s *MCPServer) handleListPendingReviews(_ context.Context, _ *mcpsdk.CallTo
 	result, err := s.svc.ListReviews(ctx, params)
 	if err != nil {
 		return errorResult(err), nil, nil
+	}
+
+	// Normalize attribution on nested transactions.
+	for i := range result.Reviews {
+		if result.Reviews[i].Transaction != nil {
+			service.NormalizeTransactionAttribution(result.Reviews[i].Transaction)
+		}
 	}
 
 	if fieldSet != nil {

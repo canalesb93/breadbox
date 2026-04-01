@@ -444,7 +444,7 @@ func strPtr(s string) *string { return &s }
 
 func TestFilterTransactionFields_AllFields(t *testing.T) {
 	// Build a fieldSet with all valid fields
-	fields, err := ParseFields("id,account_id,account_name,user_name,amount,iso_currency_code,date,authorized_date,datetime,authorized_datetime,name,merchant_name,category,category_override,category_primary_raw,category_detailed_raw,category_confidence,payment_channel,pending,created_at,updated_at,attributed_user_id,attributed_user_name")
+	fields, err := ParseFields("id,account_id,account_name,user_name,amount,iso_currency_code,date,authorized_date,datetime,authorized_datetime,name,merchant_name,category,category_override,category_primary_raw,category_detailed_raw,category_confidence,payment_channel,pending,created_at,updated_at")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -458,16 +458,14 @@ func TestFilterTransactionFields_AllFields(t *testing.T) {
 	}
 }
 
-func TestParseFields_AttributedFields(t *testing.T) {
-	fields, err := ParseFields("attributed_user_id,attributed_user_name")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestParseFields_AttributedFieldsRejected(t *testing.T) {
+	_, err := ParseFields("attributed_user_id")
+	if err == nil {
+		t.Fatal("expected error for removed attributed_user_id field")
 	}
-	if !fields["attributed_user_id"] {
-		t.Error("expected attributed_user_id to be selected")
-	}
-	if !fields["attributed_user_name"] {
-		t.Error("expected attributed_user_name to be selected")
+	_, err = ParseFields("attributed_user_name")
+	if err == nil {
+		t.Fatal("expected error for removed attributed_user_name field")
 	}
 }
 
@@ -489,21 +487,57 @@ func TestParseFields_MinimalAlias(t *testing.T) {
 	}
 }
 
-func TestFilterTransactionFields_AttributedFields(t *testing.T) {
-	uid := "user-123"
-	uname := "Ricardo"
+func TestNormalizeTransactionAttribution(t *testing.T) {
+	owner := "Alice"
+	attributed := "Ricardo"
+
+	// When attributed_user is set, user_name should be overridden.
 	txn := TransactionResponse{
 		ID:                 "txn-1",
-		AttributedUserID:   &uid,
-		AttributedUserName: &uname,
+		UserName:           &owner,
+		AttributedUserID:   strPtr("user-123"),
+		AttributedUserName: &attributed,
 	}
-	fields := map[string]bool{"id": true, "attributed_user_id": true, "attributed_user_name": true}
+	NormalizeTransactionAttribution(&txn)
+
+	if txn.UserName == nil || *txn.UserName != "Ricardo" {
+		t.Errorf("expected user_name to be 'Ricardo', got %v", txn.UserName)
+	}
+	if txn.AttributedUserID != nil {
+		t.Error("expected attributed_user_id to be cleared")
+	}
+	if txn.AttributedUserName != nil {
+		t.Error("expected attributed_user_name to be cleared")
+	}
+
+	// When no attribution, user_name stays as-is.
+	txn2 := TransactionResponse{
+		ID:       "txn-2",
+		UserName: &owner,
+	}
+	NormalizeTransactionAttribution(&txn2)
+
+	if txn2.UserName == nil || *txn2.UserName != "Alice" {
+		t.Errorf("expected user_name to remain 'Alice', got %v", txn2.UserName)
+	}
+}
+
+func TestFilterTransactionFields_UserNameUsesAttribution(t *testing.T) {
+	attributed := "Ricardo"
+	owner := "Alice"
+	txn := TransactionResponse{
+		ID:                 "txn-1",
+		UserName:           &owner,
+		AttributedUserName: &attributed,
+	}
+	// After normalization (as MCP handler would do):
+	NormalizeTransactionAttribution(&txn)
+
+	fields := map[string]bool{"id": true, "user_name": true}
 	result := FilterTransactionFields(txn, fields)
 
-	if result["attributed_user_id"] != &uid {
-		t.Error("expected attributed_user_id")
-	}
-	if result["attributed_user_name"] != &uname {
-		t.Error("expected attributed_user_name")
+	name, ok := result["user_name"].(*string)
+	if !ok || *name != "Ricardo" {
+		t.Errorf("expected user_name to be 'Ricardo' after normalization, got %v", result["user_name"])
 	}
 }
