@@ -33,7 +33,7 @@ func (q *Queries) AccountLinkExists(ctx context.Context, arg AccountLinkExistsPa
 const createAccountLink = `-- name: CreateAccountLink :one
 INSERT INTO account_links (primary_account_id, dependent_account_id, match_strategy, match_tolerance_days)
 VALUES ($1, $2, $3, $4)
-RETURNING id, primary_account_id, dependent_account_id, match_strategy, match_tolerance_days, enabled, created_at, updated_at
+RETURNING id, primary_account_id, dependent_account_id, match_strategy, match_tolerance_days, enabled, created_at, updated_at, short_id
 `
 
 type CreateAccountLinkParams struct {
@@ -60,6 +60,7 @@ func (q *Queries) CreateAccountLink(ctx context.Context, arg CreateAccountLinkPa
 		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ShortID,
 	)
 	return i, err
 }
@@ -74,7 +75,7 @@ func (q *Queries) DeleteAccountLink(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getAccountLink = `-- name: GetAccountLink :one
-SELECT al.id, al.primary_account_id, al.dependent_account_id, al.match_strategy, al.match_tolerance_days, al.enabled, al.created_at, al.updated_at,
+SELECT al.id, al.primary_account_id, al.dependent_account_id, al.match_strategy, al.match_tolerance_days, al.enabled, al.created_at, al.updated_at, al.short_id,
        pa.name AS primary_account_name,
        COALESCE(pa.display_name, pa.name) AS primary_account_display_name,
        da.name AS dependent_account_name,
@@ -100,6 +101,7 @@ type GetAccountLinkRow struct {
 	Enabled                     bool
 	CreatedAt                   pgtype.Timestamptz
 	UpdatedAt                   pgtype.Timestamptz
+	ShortID                     string
 	PrimaryAccountName          string
 	PrimaryAccountDisplayName   string
 	DependentAccountName        string
@@ -120,6 +122,7 @@ func (q *Queries) GetAccountLink(ctx context.Context, id pgtype.UUID) (GetAccoun
 		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ShortID,
 		&i.PrimaryAccountName,
 		&i.PrimaryAccountDisplayName,
 		&i.DependentAccountName,
@@ -128,6 +131,17 @@ func (q *Queries) GetAccountLink(ctx context.Context, id pgtype.UUID) (GetAccoun
 		&i.DependentUserName,
 	)
 	return i, err
+}
+
+const getAccountLinkUUIDByShortID = `-- name: GetAccountLinkUUIDByShortID :one
+SELECT id FROM account_links WHERE short_id = $1
+`
+
+func (q *Queries) GetAccountLinkUUIDByShortID(ctx context.Context, shortID string) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, getAccountLinkUUIDByShortID, shortID)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const getDependentUserID = `-- name: GetDependentUserID :one
@@ -144,7 +158,7 @@ func (q *Queries) GetDependentUserID(ctx context.Context, id pgtype.UUID) (pgtyp
 }
 
 const listAccountLinks = `-- name: ListAccountLinks :many
-SELECT al.id, al.primary_account_id, al.dependent_account_id, al.match_strategy, al.match_tolerance_days, al.enabled, al.created_at, al.updated_at,
+SELECT al.id, al.primary_account_id, al.dependent_account_id, al.match_strategy, al.match_tolerance_days, al.enabled, al.created_at, al.updated_at, al.short_id,
        pa.name AS primary_account_name,
        COALESCE(pa.display_name, pa.name) AS primary_account_display_name,
        da.name AS dependent_account_name,
@@ -170,6 +184,7 @@ type ListAccountLinksRow struct {
 	Enabled                     bool
 	CreatedAt                   pgtype.Timestamptz
 	UpdatedAt                   pgtype.Timestamptz
+	ShortID                     string
 	PrimaryAccountName          string
 	PrimaryAccountDisplayName   string
 	DependentAccountName        string
@@ -196,6 +211,7 @@ func (q *Queries) ListAccountLinks(ctx context.Context) ([]ListAccountLinksRow, 
 			&i.Enabled,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ShortID,
 			&i.PrimaryAccountName,
 			&i.PrimaryAccountDisplayName,
 			&i.DependentAccountName,
@@ -214,7 +230,7 @@ func (q *Queries) ListAccountLinks(ctx context.Context) ([]ListAccountLinksRow, 
 }
 
 const listAccountLinksByAccountID = `-- name: ListAccountLinksByAccountID :many
-SELECT id, primary_account_id, dependent_account_id, match_strategy, match_tolerance_days, enabled, created_at, updated_at FROM account_links
+SELECT id, primary_account_id, dependent_account_id, match_strategy, match_tolerance_days, enabled, created_at, updated_at, short_id FROM account_links
 WHERE (primary_account_id = $1 OR dependent_account_id = $1) AND enabled = TRUE
 `
 
@@ -236,6 +252,7 @@ func (q *Queries) ListAccountLinksByAccountID(ctx context.Context, primaryAccoun
 			&i.Enabled,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ShortID,
 		); err != nil {
 			return nil, err
 		}
@@ -248,7 +265,7 @@ func (q *Queries) ListAccountLinksByAccountID(ctx context.Context, primaryAccoun
 }
 
 const listAccountLinksByConnectionID = `-- name: ListAccountLinksByConnectionID :many
-SELECT DISTINCT al.id, al.primary_account_id, al.dependent_account_id, al.match_strategy, al.match_tolerance_days, al.enabled, al.created_at, al.updated_at FROM account_links al
+SELECT DISTINCT al.id, al.primary_account_id, al.dependent_account_id, al.match_strategy, al.match_tolerance_days, al.enabled, al.created_at, al.updated_at, al.short_id FROM account_links al
 JOIN accounts a ON a.id = al.primary_account_id OR a.id = al.dependent_account_id
 WHERE a.connection_id = $1 AND al.enabled = TRUE
 `
@@ -271,6 +288,7 @@ func (q *Queries) ListAccountLinksByConnectionID(ctx context.Context, connection
 			&i.Enabled,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ShortID,
 		); err != nil {
 			return nil, err
 		}
@@ -303,7 +321,7 @@ SET match_strategy = $2,
     enabled = $4,
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, primary_account_id, dependent_account_id, match_strategy, match_tolerance_days, enabled, created_at, updated_at
+RETURNING id, primary_account_id, dependent_account_id, match_strategy, match_tolerance_days, enabled, created_at, updated_at, short_id
 `
 
 type UpdateAccountLinkParams struct {
@@ -330,6 +348,7 @@ func (q *Queries) UpdateAccountLink(ctx context.Context, arg UpdateAccountLinkPa
 		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ShortID,
 	)
 	return i, err
 }

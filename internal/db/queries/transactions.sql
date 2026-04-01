@@ -56,3 +56,6 @@ WHERE account_id IN (SELECT id FROM accounts WHERE connection_id = $1)
 
 -- name: GetTransaction :one
 SELECT * FROM transactions WHERE id = $1 AND deleted_at IS NULL;
+
+-- name: GetTransactionUUIDByShortID :one
+SELECT id FROM transactions WHERE short_id = $1 AND deleted_at IS NULL;

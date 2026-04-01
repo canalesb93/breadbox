@@ -427,7 +427,7 @@ func categoryActionSlug(actions []RuleAction) string {
 // --- Service methods ---
 
 // ruleSelectQuery is the base SELECT for transaction rules with category JOIN.
-const ruleSelectQuery = `SELECT tr.id, tr.name, tr.conditions, tr.category_id, tr.priority, tr.enabled,
+const ruleSelectQuery = `SELECT tr.id, tr.short_id, tr.name, tr.conditions, tr.category_id, tr.priority, tr.enabled,
 	tr.expires_at, tr.created_by_type, tr.created_by_id, tr.created_by_name,
 	tr.hit_count, tr.last_hit_at, tr.created_at, tr.updated_at,
 	tr.actions, c.slug AS category_slug, c.display_name AS category_display_name,
@@ -534,7 +534,7 @@ func (s *Service) CreateTransactionRule(ctx context.Context, params CreateTransa
 
 // GetTransactionRule returns a transaction rule by ID.
 func (s *Service) GetTransactionRule(ctx context.Context, id string) (*TransactionRuleResponse, error) {
-	ruleID, err := parseUUID(id)
+	ruleID, err := s.resolveRuleID(ctx, id)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -630,7 +630,7 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 	}
 
 	// Main query
-	selectCols := `SELECT tr.id, tr.name, tr.conditions, tr.category_id, tr.priority, tr.enabled,
+	selectCols := `SELECT tr.id, tr.short_id, tr.name, tr.conditions, tr.category_id, tr.priority, tr.enabled,
 		tr.expires_at, tr.created_by_type, tr.created_by_id, tr.created_by_name,
 		tr.hit_count, tr.last_hit_at, tr.created_at, tr.updated_at,
 		tr.actions, c.slug AS category_slug, c.display_name AS category_display_name,
@@ -806,7 +806,7 @@ func (s *Service) UpdateTransactionRule(ctx context.Context, id string, params U
 
 // DeleteTransactionRule deletes a transaction rule by ID.
 func (s *Service) DeleteTransactionRule(ctx context.Context, id string) error {
-	ruleID, err := parseUUID(id)
+	ruleID, err := s.resolveRuleID(ctx, id)
 	if err != nil {
 		return ErrNotFound
 	}
@@ -1162,7 +1162,7 @@ type RulePreviewResult struct {
 
 // PreviewRuleForDetail evaluates conditions and excludes transactions already applied by this rule.
 func (s *Service) PreviewRuleForDetail(ctx context.Context, ruleID string, conditions Condition, sampleSize int) (*RulePreviewResult, error) {
-	ruleUUID, err := parseUUID(ruleID)
+	ruleUUID, err := s.resolveRuleID(ctx, ruleID)
 	if err != nil {
 		return s.PreviewRule(ctx, conditions, sampleSize)
 	}
@@ -1315,6 +1315,7 @@ func (s *Service) BatchIncrementHitCounts(ctx context.Context, hits map[string]i
 // ruleRow holds the scanned columns for a transaction rule row.
 type ruleRow struct {
 	id               pgtype.UUID
+	shortID          string
 	name             string
 	conditions       []byte
 	categoryID       pgtype.UUID
@@ -1338,7 +1339,7 @@ type ruleRow struct {
 // scanDest returns a slice of pointers for use with rows.Scan.
 func (r *ruleRow) scanDest() []any {
 	return []any{
-		&r.id, &r.name, &r.conditions, &r.categoryID, &r.priority, &r.enabled,
+		&r.id, &r.shortID, &r.name, &r.conditions, &r.categoryID, &r.priority, &r.enabled,
 		&r.expiresAt, &r.createdByType, &r.createdByID, &r.createdByName,
 		&r.hitCount, &r.lastHitAt, &r.createdAt, &r.updatedAt,
 		&r.actions, &r.categorySlug, &r.categoryDispName, &r.categoryIcon, &r.categoryColor,
@@ -1358,6 +1359,7 @@ func (r *ruleRow) toResponse() TransactionRuleResponse {
 
 	return TransactionRuleResponse{
 		ID:            formatUUID(r.id),
+		ShortID:       r.shortID,
 		Name:          r.name,
 		Conditions:    cond,
 		Actions:       actions,
@@ -1518,7 +1520,7 @@ type RuleStats struct {
 
 // GetRuleStats returns aggregate stats about a rule's applications.
 func (s *Service) GetRuleStats(ctx context.Context, ruleID string) (*RuleStats, error) {
-	ruleUUID, err := parseUUID(ruleID)
+	ruleUUID, err := s.resolveRuleID(ctx, ruleID)
 	if err != nil {
 		return &RuleStats{}, nil
 	}
@@ -1547,7 +1549,7 @@ func (s *Service) GetRuleStats(ctx context.Context, ruleID string) (*RuleStats, 
 
 // ListRuleApplications returns transactions affected by a rule, paginated.
 func (s *Service) ListRuleApplications(ctx context.Context, ruleID string, limit int, cursor string) ([]RuleApplicationRow, bool, error) {
-	ruleUUID, err := parseUUID(ruleID)
+	ruleUUID, err := s.resolveRuleID(ctx, ruleID)
 	if err != nil {
 		return nil, false, ErrNotFound
 	}
@@ -1625,7 +1627,7 @@ func (s *Service) ListRuleApplications(ctx context.Context, ruleID string, limit
 
 // CountRuleApplications returns the number of unique transactions affected by a rule.
 func (s *Service) CountRuleApplications(ctx context.Context, ruleID string) (int64, error) {
-	ruleUUID, err := parseUUID(ruleID)
+	ruleUUID, err := s.resolveRuleID(ctx, ruleID)
 	if err != nil {
 		return 0, nil
 	}
@@ -1692,7 +1694,7 @@ type TransactionRuleApplicationDetail struct {
 
 // ListRuleApplicationsByTransactionID returns all rules that applied actions to a transaction.
 func (s *Service) ListRuleApplicationsByTransactionID(ctx context.Context, transactionID string) ([]TransactionRuleApplicationDetail, error) {
-	txnUUID, err := parseUUID(transactionID)
+	txnUUID, err := s.resolveTransactionID(ctx, transactionID)
 	if err != nil {
 		return nil, nil
 	}

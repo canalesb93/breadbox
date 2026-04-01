@@ -13,7 +13,7 @@ import (
 
 func (s *Service) ListAccounts(ctx context.Context, userID *string) ([]AccountResponse, error) {
 	if userID != nil {
-		uid, err := parseUUID(*userID)
+		uid, err := s.resolveUserID(ctx, *userID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid user id: %w", err)
 		}
@@ -40,7 +40,7 @@ func (s *Service) ListAccounts(ctx context.Context, userID *string) ([]AccountRe
 }
 
 func (s *Service) GetAccount(ctx context.Context, id string) (*AccountResponse, error) {
-	uid, err := parseUUID(id)
+	uid, err := s.resolveAccountID(ctx, id)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -56,7 +56,7 @@ func (s *Service) GetAccount(ctx context.Context, id string) (*AccountResponse, 
 }
 
 func (s *Service) GetAccountDetail(ctx context.Context, id string) (*AdminAccountDetail, error) {
-	uid, err := parseUUID(id)
+	uid, err := s.resolveAccountID(ctx, id)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -98,6 +98,7 @@ func (s *Service) GetAccountDetail(ctx context.Context, id string) (*AdminAccoun
 func accountFromAllRow(r db.ListAccountsRow) AccountResponse {
 	return AccountResponse{
 		ID:                formatUUID(r.ID),
+		ShortID:           r.ShortID,
 		ConnectionID:      uuidPtr(r.ConnectionID),
 		UserID:            uuidPtr(r.UserID),
 		InstitutionName:   textPtr(r.InstitutionName),
@@ -120,6 +121,7 @@ func accountFromAllRow(r db.ListAccountsRow) AccountResponse {
 func accountFromUserRow(r db.ListAccountsByUserRow) AccountResponse {
 	return AccountResponse{
 		ID:                formatUUID(r.ID),
+		ShortID:           r.ShortID,
 		ConnectionID:      uuidPtr(r.ConnectionID),
 		UserID:            uuidPtr(r.UserID),
 		InstitutionName:   textPtr(r.InstitutionName),
@@ -142,6 +144,7 @@ func accountFromUserRow(r db.ListAccountsByUserRow) AccountResponse {
 func accountFromGetRow(r db.GetAccountRow) AccountResponse {
 	return AccountResponse{
 		ID:                formatUUID(r.ID),
+		ShortID:           r.ShortID,
 		ConnectionID:      uuidPtr(r.ConnectionID),
 		UserID:            uuidPtr(r.UserID),
 		InstitutionName:   textPtr(r.InstitutionName),

@@ -11,6 +11,9 @@ ORDER BY created_at ASC;
 -- name: GetComment :one
 SELECT * FROM transaction_comments WHERE id = $1;
 
+-- name: GetCommentUUIDByShortID :one
+SELECT id FROM transaction_comments WHERE short_id = $1;
+
 -- name: UpdateComment :one
 UPDATE transaction_comments
 SET content = $2, updated_at = NOW()

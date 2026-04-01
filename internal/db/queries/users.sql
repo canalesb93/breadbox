@@ -14,5 +14,8 @@ UPDATE users SET name = $2, email = $3, updated_at = NOW()
 WHERE id = $1
 RETURNING *;
 
+-- name: GetUserUUIDByShortID :one
+SELECT id FROM users WHERE short_id = $1;
+
 -- name: CountUsers :one
 SELECT count(*) FROM users;

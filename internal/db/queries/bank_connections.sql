@@ -9,6 +9,9 @@ FROM bank_connections bc
 LEFT JOIN users u ON bc.user_id = u.id
 WHERE bc.id = $1;
 
+-- name: GetConnectionUUIDByShortID :one
+SELECT id FROM bank_connections WHERE short_id = $1;
+
 -- name: ListBankConnections :many
 SELECT bc.*, u.name as user_name,
   (SELECT COUNT(*) FROM accounts a WHERE a.connection_id = bc.id) as account_count,
@@ -60,21 +63,21 @@ SELECT * FROM bank_connections WHERE status = 'active';
 SELECT id, provider, external_id, encrypted_credentials, sync_cursor, user_id FROM bank_connections WHERE id = $1 AND status != 'disconnected';
 
 -- name: ListConnectionsForAPI :many
-SELECT bc.id, bc.user_id, bc.provider, bc.institution_id, bc.institution_name,
+SELECT bc.id, bc.short_id, bc.user_id, bc.provider, bc.institution_id, bc.institution_name,
        bc.status, bc.error_code, bc.error_message, bc.last_synced_at,
        bc.created_at, bc.updated_at, u.name as user_name
 FROM bank_connections bc LEFT JOIN users u ON bc.user_id = u.id
 WHERE bc.status != 'disconnected' ORDER BY bc.created_at;
 
 -- name: ListConnectionsByUserForAPI :many
-SELECT bc.id, bc.user_id, bc.provider, bc.institution_id, bc.institution_name,
+SELECT bc.id, bc.short_id, bc.user_id, bc.provider, bc.institution_id, bc.institution_name,
        bc.status, bc.error_code, bc.error_message, bc.last_synced_at,
        bc.created_at, bc.updated_at, u.name as user_name
 FROM bank_connections bc LEFT JOIN users u ON bc.user_id = u.id
 WHERE bc.user_id = $1 AND bc.status != 'disconnected' ORDER BY bc.created_at;
 
 -- name: GetConnectionForAPI :one
-SELECT bc.id, bc.user_id, bc.provider, bc.institution_id, bc.institution_name,
+SELECT bc.id, bc.short_id, bc.user_id, bc.provider, bc.institution_id, bc.institution_name,
        bc.status, bc.error_code, bc.error_message, bc.last_synced_at,
        bc.created_at, bc.updated_at, u.name as user_name
 FROM bank_connections bc LEFT JOIN users u ON bc.user_id = u.id
