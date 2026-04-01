@@ -62,7 +62,7 @@ func PromptBuilderHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.Han
 
 		blocksJSON, _ := json.Marshal(blocks)
 
-		data := BaseTemplateData(r, sm, "agents", cfg.Label+" — Prompt Library")
+		data := BaseTemplateData(r, sm, "agent-wizard", cfg.Label+" — Agent Wizard")
 		data["AgentType"] = agentType
 		data["AgentLabel"] = cfg.Label
 		data["AgentDescription"] = cfg.Description

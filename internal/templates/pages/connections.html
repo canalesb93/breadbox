@@ -1,63 +1,32 @@
 {{define "content"}}
-<div x-data="{ tab: '{{.Tab}}' }"
-     x-init="$watch('tab', function(v) { var u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); })">
-
 <!-- Page Header -->
 <div class="flex items-center justify-between mb-6">
   <div class="flex items-baseline gap-3">
     <h1 class="bb-page-title">Connections</h1>
     {{if .Connections}}
-    <span class="text-sm text-base-content/40" x-show="tab === 'connections'">{{len .Connections}} bank{{if ne (len .Connections) 1}}s{{end}}</span>
+    <span class="text-sm text-base-content/40">{{len .Connections}} bank{{if ne (len .Connections) 1}}s{{end}}</span>
     {{end}}
   </div>
   <div class="flex items-center gap-2">
-    <template x-if="tab === 'connections'">
-      <div class="flex items-center gap-2">
-        {{if .Connections}}
-        <div x-data="syncAllBtn()">
-          <button class="btn btn-outline btn-sm rounded-xl gap-2"
-                  :disabled="state !== 'idle'"
-                  @click="triggerSyncAll()"
-                  :title="state === 'syncing' ? 'Syncing all connections...' : 'Sync all connections now'">
-            <i data-lucide="refresh-cw" class="w-4 h-4" x-show="state === 'idle'"></i>
-            <span class="loading loading-spinner loading-xs" x-show="state === 'syncing'" x-cloak></span>
-            <i data-lucide="check" class="w-4 h-4 text-success" x-show="state === 'done'" x-cloak></i>
-            <span x-text="state === 'syncing' ? 'Syncing...' : state === 'done' ? 'Triggered!' : 'Sync All'"></span>
-          </button>
-        </div>
-        {{end}}
-        <a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">
-          <i data-lucide="plus" class="w-4 h-4"></i>
-          Connect Bank
-        </a>
-      </div>
-    </template>
-    <template x-if="tab === 'links'">
-      <button class="btn btn-primary btn-sm rounded-xl" onclick="document.getElementById('create-link-modal').showModal()">
-        <i data-lucide="plus" class="w-4 h-4"></i> New Link
+    {{if .Connections}}
+    <div x-data="syncAllBtn()">
+      <button class="btn btn-outline btn-sm rounded-xl gap-2"
+              :disabled="state !== 'idle'"
+              @click="triggerSyncAll()"
+              :title="state === 'syncing' ? 'Syncing all connections...' : 'Sync all connections now'">
+        <i data-lucide="refresh-cw" class="w-4 h-4" x-show="state === 'idle'"></i>
+        <span class="loading loading-spinner loading-xs" x-show="state === 'syncing'" x-cloak></span>
+        <i data-lucide="check" class="w-4 h-4 text-success" x-show="state === 'done'" x-cloak></i>
+        <span x-text="state === 'syncing' ? 'Syncing...' : state === 'done' ? 'Triggered!' : 'Sync All'"></span>
       </button>
-    </template>
+    </div>
+    {{end}}
+    <a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">
+      <i data-lucide="plus" class="w-4 h-4"></i>
+      Connect Bank
+    </a>
   </div>
 </div>
-
-<!-- Tab Switcher -->
-<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 mb-6 w-fit">
-  <button @click="tab = 'connections'"
-    :class="tab === 'connections' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
-    class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2">
-    <i data-lucide="link" class="w-3.5 h-3.5"></i>
-    Connections
-  </button>
-  <button @click="tab = 'links'"
-    :class="tab === 'links' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
-    class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2">
-    <i data-lucide="link-2" class="w-3.5 h-3.5"></i>
-    Account Links
-  </button>
-</div>
-
-<!-- ==================== CONNECTIONS TAB ==================== -->
-<div x-show="tab === 'connections'">
 
 {{if .Connections}}
 
@@ -308,134 +277,4 @@ function syncBtn(connId) {
   };
 }
 </script>
-
-</div><!-- /connections tab -->
-
-<!-- ==================== ACCOUNT LINKS TAB ==================== -->
-<div x-show="tab === 'links'" x-cloak>
-
-{{if .Links}}
-<div class="space-y-3 bb-stagger">
-  {{range .Links}}
-  <div class="bb-card p-5">
-    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-      <div class="flex-1 min-w-0">
-        <!-- Account link: stacked on mobile, inline on desktop -->
-        <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-          <div class="flex items-center gap-2 min-w-0">
-            <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/8 shrink-0">
-              <i data-lucide="credit-card" class="w-4 h-4 text-primary"></i>
-            </div>
-            <div class="min-w-0">
-              <span class="font-semibold text-sm truncate block">{{.PrimaryAccountName}}</span>
-              <span class="text-xs text-base-content/40">{{.PrimaryUserName}}</span>
-            </div>
-          </div>
-          <i data-lucide="arrow-right" class="w-4 h-4 text-base-content/30 shrink-0 hidden sm:block"></i>
-          <i data-lucide="arrow-down" class="w-4 h-4 text-base-content/30 shrink-0 sm:hidden ml-3"></i>
-          <div class="flex items-center gap-2 min-w-0 sm:ml-0 ml-3">
-            <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-secondary/8 shrink-0">
-              <i data-lucide="credit-card" class="w-4 h-4 text-secondary"></i>
-            </div>
-            <div class="min-w-0">
-              <span class="font-semibold text-sm truncate block">{{.DependentAccountName}}</span>
-              <span class="text-xs text-base-content/40">{{.DependentUserName}}</span>
-            </div>
-          </div>
-          {{if not .Enabled}}<span class="badge badge-ghost badge-sm">Disabled</span>{{end}}
-        </div>
-        <!-- Stats row -->
-        <div class="flex items-center gap-3 sm:gap-4 mt-3 text-xs text-base-content/50 flex-wrap">
-          <span class="flex items-center gap-1">
-            <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-success"></i>
-            {{.MatchCount}} matched
-          </span>
-          {{if gt .UnmatchedDependentCount 0}}
-          <span class="flex items-center gap-1">
-            <i data-lucide="help-circle" class="w-3.5 h-3.5 text-warning"></i>
-            {{.UnmatchedDependentCount}} unmatched
-          </span>
-          {{end}}
-          <span class="hidden sm:inline">Strategy: {{.MatchStrategy}}</span>
-          {{if gt .MatchToleranceDays 0}}<span class="hidden sm:inline">Tolerance: {{.MatchToleranceDays}}d</span>{{end}}
-        </div>
-      </div>
-      <!-- Actions -->
-      <div class="flex items-center gap-1 shrink-0 sm:self-start self-end">
-        <form method="POST" action="/-/account-links/{{.ID}}/reconcile" class="inline">
-          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
-          <button type="submit" class="btn btn-ghost btn-xs rounded-lg" title="Run reconciliation">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-          </button>
-        </form>
-        <a href="/account-links/{{.ID}}" class="btn btn-ghost btn-xs rounded-lg" title="View matches">
-          <i data-lucide="list" class="w-3.5 h-3.5"></i>
-        </a>
-        <form method="POST" action="/-/account-links/{{.ID}}/delete" class="inline"
-              x-data @submit.prevent="bbConfirm({title:'Delete account link?',message:'All transaction attribution from this link will be cleared. This cannot be undone.',confirmLabel:'Delete',variant:'danger'}).then(ok => { if(ok) $el.submit(); })">
-          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
-          <button type="submit" class="btn btn-ghost btn-xs text-error rounded-lg" title="Delete link">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-  {{end}}
-</div>
-{{else}}
-<div class="bb-card p-12 text-center">
-  <div class="flex flex-col items-center">
-    <div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
-      <i data-lucide="link-2" class="w-8 h-8 text-base-content/25"></i>
-    </div>
-    <h3 class="text-lg font-semibold mb-1">No Account Links</h3>
-    <p class="text-sm text-base-content/50 mb-5 max-w-sm">
-      Account links connect authorized user accounts to primary accounts for deduplication.
-      If two family members connect the same credit card, linking prevents double-counting.
-    </p>
-    <button class="btn btn-primary btn-sm rounded-xl" onclick="document.getElementById('create-link-modal').showModal()">
-      <i data-lucide="plus" class="w-4 h-4"></i> Create First Link
-    </button>
-  </div>
-</div>
-{{end}}
-
-</div><!-- /links tab -->
-
-<!-- Create Account Link Modal -->
-<dialog id="create-link-modal" class="modal">
-  <div class="modal-box rounded-2xl">
-    <h3 class="font-bold text-lg">Create Account Link</h3>
-    <p class="text-sm text-base-content/50 mt-1">Link a dependent (authorized user) account to the primary cardholder's account.</p>
-    <form method="POST" action="/-/account-links" class="mt-4 space-y-4" x-data="{ loading: false }" @submit="loading = true">
-      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-      <div class="form-control">
-        <label class="label label-text text-sm font-medium">Primary Account</label>
-        <select name="primary_account_id" class="select select-bordered select-sm w-full rounded-xl" required>
-          <option value="">Select the primary cardholder's account...</option>
-          {{range .LinkAccounts}}
-          <option value="{{.ID}}">{{.DisplayName}}{{if .Mask}} ••{{.Mask}}{{end}} ({{.UserName}} - {{.InstitutionName}})</option>
-          {{end}}
-        </select>
-      </div>
-      <div class="form-control">
-        <label class="label label-text text-sm font-medium">Dependent Account</label>
-        <select name="dependent_account_id" class="select select-bordered select-sm w-full rounded-xl" required>
-          <option value="">Select the authorized user's account...</option>
-          {{range .LinkAccounts}}
-          <option value="{{.ID}}">{{.DisplayName}}{{if .Mask}} ••{{.Mask}}{{end}} ({{.UserName}} - {{.InstitutionName}})</option>
-          {{end}}
-        </select>
-      </div>
-      <div class="modal-action">
-        <button type="button" class="btn btn-ghost btn-sm rounded-xl" onclick="document.getElementById('create-link-modal').close()">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm rounded-xl" :class="{ 'loading': loading }" :disabled="loading">Create Link</button>
-      </div>
-    </form>
-  </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
-</dialog>
-
-</div><!-- /alpine x-data tabs -->
 {{end}}

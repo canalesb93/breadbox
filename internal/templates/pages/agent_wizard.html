@@ -1,17 +1,15 @@
-{{define "content"}}{{template "agents-wizard-content" .}}{{end}}
-
-{{define "agents-wizard-content"}}
+{{define "content"}}
 {{$stats := .Stats}}
 <div class="bb-page-header">
   <div>
-    <h1 class="bb-page-title">Prompt Library</h1>
+    <h1 class="bb-page-title">Agent Wizard</h1>
     <p class="text-sm text-base-content/50 mt-1">Create agent prompts for automating financial tasks</p>
   </div>
 </div>
 
 <div class="alert alert-info alert-soft text-sm rounded-xl mb-6">
   <i data-lucide="rocket" class="w-4 h-4"></i>
-  <span>New to MCP agents? Follow the <a href="/agents?tab=guide" class="link font-medium">Getting Started guide</a> to connect your first agent.</span>
+  <span>New to MCP agents? Follow the <a href="/mcp-getting-started" class="link font-medium">Getting Started guide</a> to connect your first agent.</span>
 </div>
 
 <div class="space-y-8 bb-stagger">

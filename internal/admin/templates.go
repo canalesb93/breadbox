@@ -718,14 +718,12 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/reports.html",
 		"pages/report_detail.html",
 		"pages/webhook_events.html",
-		"pages/logs.html",
 		"pages/oauth_clients.html",
 		"pages/oauth_client_new.html",
 		"pages/oauth_client_created.html",
 		"pages/agent_wizard.html",
 		"pages/mcp_guide.html",
 		"pages/prompt_builder.html",
-		"pages/agents.html",
 	}
 
 	// Pages using the wizard layout (login + first-run admin creation + OAuth consent).
