@@ -3,9 +3,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{{.PageTitle}} — Breadbox</title>
+  <!-- Safari: theme color for status bar / tab bar -->
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
+  <!-- Safari: Add to Home Screen support -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Breadbox">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/css/styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -424,7 +432,7 @@
                    :data-cmdk-idx="item._flatIndex"
                    @click="go(item)"
                    @mouseenter="activeIndex = item._flatIndex">
-                <div class="bb-cmdk-item-icon" :style="item.iconColor ? 'background-color: color-mix(in oklch, ' + item.iconColor + ' 15%, transparent); color: ' + item.iconColor : ''">
+                <div class="bb-cmdk-item-icon" :style="item.iconColor ? 'background-color: color-mix(in srgb, ' + item.iconColor + ' 15%, transparent); color: ' + item.iconColor : ''">
                   <i :data-lucide="item.icon"></i>
                 </div>
                 <div class="bb-cmdk-item-label">
@@ -562,7 +570,7 @@
         document.body.style.left = '';
         document.body.style.right = '';
         document.body.style.overflow = '';
-        window.scrollTo(0, savedY);
+        window.scrollTo({ top: savedY, behavior: 'instant' });
       };
     })();
 
