@@ -13,11 +13,10 @@
 > 5. Move on or hand off to the next session
 >
 > **Rules for agents:**
-> - Only work on ONE task per session (unless a task is trivially small)
 > - Read the relevant files before making changes
 > - Run `make css` after any `input.css` changes
 > - Run `go build ./...` after any Go template changes
-> - Do NOT change behavior — these are cosmetic/structural improvements only
+> - Avoid changing behavior — these should be mostly cosmetic/structural improvements only
 > - **Be careful not to break complex interactions** (keyboard shortcuts, triage
 >   queue, category picker, command palette, etc.) by over-simplifying. If a
 >   component has intricate state management or event wiring, leave the logic
