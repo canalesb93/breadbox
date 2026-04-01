@@ -762,7 +762,7 @@
       </div>
       <div class="flex items-center gap-2">
         <span x-show="isDrilledDown" x-cloak class="text-[0.6rem] text-base-content/30">click chart or</span>
-        <a x-show="!isDrilledDown" href="/categories" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
+        <a x-show="!isDrilledDown" href="/rules?tab=categories" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
         <button x-show="isDrilledDown" @click="drillUp()" x-cloak
           class="text-xs text-primary/60 hover:text-primary/80 transition-colors cursor-pointer bg-transparent">back to categories</button>
       </div>

@@ -12,6 +12,7 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/db"
 	"breadbox/internal/provider"
+	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -52,7 +53,7 @@ type ConnectionWithAccounts struct {
 }
 
 // ConnectionsListHandler serves GET /admin/connections.
-func ConnectionsListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
+func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -152,15 +153,60 @@ func ConnectionsListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			}
 		}
 
+		tab := r.URL.Query().Get("tab")
+		if tab != "links" {
+			tab = "connections"
+		}
+
+		// Fetch account links for the "Account Links" tab.
+		links, err := svc.ListAccountLinks(ctx)
+		if err != nil {
+			a.Logger.Error("list account links", "error", err)
+		}
+		allAccounts, _ := svc.ListAccounts(ctx, nil)
+		var linkAccounts []AccountForLink
+		for _, acct := range allAccounts {
+			displayName := acct.Name
+			userName := ""
+			if acct.ConnectionID != nil {
+				detail, err := svc.GetAccountDetail(ctx, acct.ID)
+				if err == nil {
+					if detail.DisplayName != nil && *detail.DisplayName != "" {
+						displayName = *detail.DisplayName
+					}
+					userName = detail.UserName
+				}
+			}
+			mask := ""
+			if acct.Mask != nil {
+				mask = *acct.Mask
+			}
+			instName := ""
+			if acct.InstitutionName != nil {
+				instName = *acct.InstitutionName
+			}
+			linkAccounts = append(linkAccounts, AccountForLink{
+				ID:              acct.ID,
+				DisplayName:     displayName,
+				Mask:            mask,
+				UserName:        userName,
+				InstitutionName: instName,
+			})
+		}
+
 		data := map[string]any{
 			"PageTitle":        "Connections",
 			"CurrentPage":      "connections",
 			"Connections":      enriched,
 			"CSRFToken":        GetCSRFToken(r),
+			"Flash":            GetFlash(ctx, sm),
 			"TotalAssets":      totalAssets,
 			"TotalLiabilities": totalLiabilities,
 			"NetWorth":         netWorth,
 			"HasAnyBalance":    hasAnyBalance,
+			"Tab":              tab,
+			"Links":            links,
+			"LinkAccounts":     linkAccounts,
 		}
 		tr.Render(w, r, "connections.html", data)
 	}

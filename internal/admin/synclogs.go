@@ -155,13 +155,13 @@ func SyncLogDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 
 		data := map[string]any{
 			"PageTitle":   "Sync Log Detail",
-			"CurrentPage": "sync-logs",
+			"CurrentPage": "logs",
 			"CSRFToken":   GetCSRFToken(r),
 			"Flash":       GetFlash(ctx, sm),
 			"Log":         syncLog,
 			"Accounts":    accounts,
 			"Breadcrumbs": []Breadcrumb{
-				{Label: "Sync Logs", Href: "/sync-logs"},
+				{Label: "Logs", Href: "/logs?tab=syncs"},
 				{Label: syncLog.InstitutionName},
 			},
 		}
