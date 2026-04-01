@@ -1,0 +1,50 @@
+{{define "content"}}
+<div x-data="{ tab: '{{.Tab}}' }"
+     x-init="$watch('tab', function(v) { var u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); })">
+
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Agents</h1>
+    <p class="text-sm text-base-content/50 mt-1">Set up and configure AI agent access to your financial data</p>
+  </div>
+</div>
+
+<!-- Tab Switcher -->
+<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 mb-6 w-fit">
+  <button @click="tab = 'guide'"
+    :class="tab === 'guide' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+    class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2">
+    <i data-lucide="rocket" class="w-3.5 h-3.5"></i>
+    Getting Started
+  </button>
+  <button @click="tab = 'wizard'"
+    :class="tab === 'wizard' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+    class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2">
+    <i data-lucide="wand-sparkles" class="w-3.5 h-3.5"></i>
+    Prompt Library
+  </button>
+  <button @click="tab = 'settings'"
+    :class="tab === 'settings' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+    class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2">
+    <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+    MCP Settings
+  </button>
+</div>
+
+<!-- Getting Started Tab -->
+<div x-show="tab === 'guide'">
+  {{template "agents-guide-content" .}}
+</div>
+
+<!-- Prompt Library Tab -->
+<div x-show="tab === 'wizard'" x-cloak>
+  {{template "agents-wizard-content" .}}
+</div>
+
+<!-- MCP Settings Tab -->
+<div x-show="tab === 'settings'" x-cloak>
+  {{template "agents-settings-content" .}}
+</div>
+
+</div><!-- /alpine x-data tabs -->
+{{end}}

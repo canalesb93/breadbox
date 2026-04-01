@@ -1017,8 +1017,8 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		hasMoreReports := totalUnread > len(agentReports)
 
 		data := map[string]any{
-			"PageTitle":              "Dashboard",
-			"CurrentPage":            "dashboard",
+			"PageTitle":              "Home",
+			"CurrentPage":            "home",
 			"AccountCount":           accountCount,
 			"TxCount":                txCount,
 			"LastSync":               lastSyncText,

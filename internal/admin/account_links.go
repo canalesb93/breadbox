@@ -84,7 +84,7 @@ func AccountLinkDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionM
 
 		link, err := svc.GetAccountLink(r.Context(), id)
 		if err != nil {
-			http.Redirect(w, r, "/account-links", http.StatusSeeOther)
+			http.Redirect(w, r, "/connections?tab=links", http.StatusSeeOther)
 			return
 		}
 
@@ -93,7 +93,7 @@ func AccountLinkDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionM
 			a.Logger.Error("list matches", "error", err)
 		}
 
-		data := BaseTemplateData(r, sm, "account-links", "Transaction Matches")
+		data := BaseTemplateData(r, sm, "connections", "Transaction Matches")
 		data["Link"] = link
 		data["Matches"] = matches
 
@@ -109,7 +109,7 @@ func CreateAccountLinkAdminHandler(svc *service.Service, sm *scs.SessionManager)
 
 		if primaryID == "" || dependentID == "" {
 			SetFlash(r.Context(), sm, "error", "Both accounts must be selected.")
-			http.Redirect(w, r, "/account-links", http.StatusSeeOther)
+			http.Redirect(w, r, "/connections?tab=links", http.StatusSeeOther)
 			return
 		}
 
@@ -119,7 +119,7 @@ func CreateAccountLinkAdminHandler(svc *service.Service, sm *scs.SessionManager)
 		})
 		if err != nil {
 			SetFlash(r.Context(), sm, "error", "Failed to create link: "+err.Error())
-			http.Redirect(w, r, "/account-links", http.StatusSeeOther)
+			http.Redirect(w, r, "/connections?tab=links", http.StatusSeeOther)
 			return
 		}
 
@@ -131,7 +131,7 @@ func CreateAccountLinkAdminHandler(svc *service.Service, sm *scs.SessionManager)
 			SetFlash(r.Context(), sm, "success", formatReconciliationFlash(result))
 		}
 
-		http.Redirect(w, r, "/account-links", http.StatusSeeOther)
+		http.Redirect(w, r, "/connections?tab=links", http.StatusSeeOther)
 	}
 }
 
@@ -144,7 +144,7 @@ func DeleteAccountLinkAdminHandler(svc *service.Service, sm *scs.SessionManager)
 		} else {
 			SetFlash(r.Context(), sm, "success", "Account link deleted. Attribution cleared.")
 		}
-		http.Redirect(w, r, "/account-links", http.StatusSeeOther)
+		http.Redirect(w, r, "/connections?tab=links", http.StatusSeeOther)
 	}
 }
 
@@ -165,7 +165,7 @@ func ReconcileAccountLinkAdminHandler(svc *service.Service, sm *scs.SessionManag
 			http.Redirect(w, r, referer, http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, "/account-links", http.StatusSeeOther)
+		http.Redirect(w, r, "/connections?tab=links", http.StatusSeeOther)
 	}
 }
 
@@ -181,7 +181,7 @@ func ConfirmMatchAdminHandler(svc *service.Service, sm *scs.SessionManager) http
 			http.Redirect(w, r, referer, http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, "/account-links", http.StatusSeeOther)
+		http.Redirect(w, r, "/connections?tab=links", http.StatusSeeOther)
 	}
 }
 
@@ -199,7 +199,7 @@ func RejectMatchAdminHandler(svc *service.Service, sm *scs.SessionManager) http.
 			http.Redirect(w, r, referer, http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, "/account-links", http.StatusSeeOther)
+		http.Redirect(w, r, "/connections?tab=links", http.StatusSeeOther)
 	}
 }
 

@@ -136,7 +136,7 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 		}
 
 		data := map[string]any{
-			"PageTitle":     "Family Members",
+			"PageTitle":     "Household",
 			"CurrentPage":   "users",
 			"EnrichedUsers": enrichedUsers,
 			"CSRFToken":     GetCSRFToken(r),
@@ -155,7 +155,7 @@ func NewUserHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			"IsEdit":      false,
 			"CSRFToken":   GetCSRFToken(r),
 			"Breadcrumbs": []Breadcrumb{
-				{Label: "Family Members", Href: "/users"},
+				{Label: "Household", Href: "/users"},
 				{Label: "Add Member"},
 			},
 		}
@@ -190,7 +190,7 @@ func EditUserHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			"UserID":      idStr,
 			"CSRFToken":   GetCSRFToken(r),
 			"Breadcrumbs": []Breadcrumb{
-				{Label: "Family Members", Href: "/users"},
+				{Label: "Household", Href: "/users"},
 				{Label: user.Name},
 			},
 		}
