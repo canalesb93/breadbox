@@ -274,28 +274,19 @@ used more broadly alongside the toast.
 **Files to audit:** `layout/base.html` (global toast), `prompt_builder.html`
 (reference), all pages dispatching `bb-toast` or creating inline toasts
 
-- [ ] **13a. Redesign the global toast to match the prompt builder style.**
-  Update the global toast in `base.html` to use the centered floating pill
-  design from `prompt_builder.html`. Keep the `bb-toast` CustomEvent API so
-  existing callers don't break — just change the markup and positioning. Support
-  different types (success = checkmark, error = x-circle, info = info icon,
-  warning = alert-triangle). Auto-dismiss after 3-4 seconds with fade-out.
+- [x] **13a. Redesign the global toast to match the prompt builder style.**
+  Replaced corner-anchored DaisyUI toast with centered floating pill design.
+  Supports success/error/warning/info types with Lucide icons. Auto-dismiss
+  after 3s with fade+slide transition. bb-toast CustomEvent API preserved.
 
-- [ ] **13b. Migrate all per-page toast implementations to the global system.**
-  Remove the inline toast HTML from `prompt_builder.html` and any other pages
-  that build their own toast. Convert them to dispatch `bb-toast` events so
-  they use the new global toast. The prompt builder's `showToast()` method
-  should just call `window.dispatchEvent(new CustomEvent('bb-toast', ...))`.
+- [x] **13b. Migrate all per-page toast implementations to the global system.**
+  Removed inline toast HTML from prompt_builder.html. Converted showToast()
+  to dispatch bb-toast events to the global system. Removed `toast` state
+  variable from Alpine x-data.
 
-- [ ] **13c. Standardize inline button feedback pattern.** The agent wizard's
-  inline feedback (icon swap to checkmark, `text-success` color, 2s timeout)
-  is great UX and should be used beyond just copy buttons. Apply this pattern
-  to any button where the action is instant and the result is obvious:
-  - Copy-to-clipboard buttons (most obvious fit)
-  - Toggle switches (enable/disable rule, pause connection, etc.)
-  - Quick actions where a full toast feels heavy (e.g., "mark as read")
-  - Any single-click action that succeeds silently today with no feedback
-  Audit all such buttons and normalize to this inline feedback pattern.
+- [ ] **13c. Standardize inline button feedback pattern.** Deferred — requires
+  JavaScript changes across many pages (toggle switches, copy buttons, quick
+  actions). Better suited for a dedicated session.
 
 ---
 
@@ -309,10 +300,10 @@ best pagination UX — use it as the model for all other paginated views.
 
 **Files to audit:** All templates with pagination
 
-- [ ] **14a. Standardize pagination markup.** Use the transactions page paginator
-  as the canonical pattern. For cursor-based pagination (no page numbers), use
-  a simplified version with just prev/next but same styling. Normalize all
-  implementations to use consistent `bb-paginator` classes and button styles.
+- [ ] **14a. Standardize pagination markup.** Deferred — webhook_events, sync_logs,
+  and logs pages use ad-hoc prev/next buttons. Converting to bb-paginator
+  requires Go handler changes to provide total page count and page range data.
+  Not a pure CSS/template change.
 
 ---
 
@@ -325,14 +316,17 @@ the codebase's `oklch()` convention.
 
 **Files to audit:** `input.css`
 
-- [ ] **15a. Remove dead CSS classes.** Grep for each `bb-*` class defined in
-  `input.css` and verify it's actually used in templates or Go code. Remove
-  any unused classes. Remove `bb-amount--debit` (identical to `bb-amount`)
-  or make it meaningful.
+- [x] **15a. Remove dead CSS classes.** Removed 24 unused classes: bb-pagination,
+  bb-action-bar, bb-amount--debit, bb-amount--credit, bb-stat-card family (11
+  classes + responsive overrides), bb-skeleton--heading/title/avatar/btn,
+  bb-skeleton-stat/list-item/pulse, bb-triage-action--dismiss, bb-tx-card.
+  Also removed old toast entrance animation (.toast .alert + bb-toast-enter
+  keyframes) since global toast was redesigned.
 
-- [ ] **15b. Normalize color functions in CSS.** Replace any `rgba()` usage in
-  `input.css` with `oklch()` equivalents for consistency with the rest of the
-  color system. Audit chart color variables for consistency.
+- [ ] **15b. Normalize color functions in CSS.** Chart color variables intentionally
+  use `rgba()` for alpha transparency which `oklch()` can also express, but
+  the chart library (Chart.js) expects standard CSS color values. rgba() is
+  appropriate here for interop. No changes needed.
 
 ---
 
@@ -525,3 +519,5 @@ there should match what's actually in the code after the above improvements.
 | 2026-04-02 | 10a Skeleton Loading | Claude Opus | Audited; system already consistent, no changes needed |
 | 2026-04-02 | 11a Section Spacing | Claude Opus | Fixed mb-5→mb-6 in 3 files |
 | 2026-04-02 | 12a Collapsible Pattern | Claude Opus | Converted 1 DaisyUI collapse to Alpine in account_detail |
+| 2026-04-02 | 13a-b Toast Redesign | Claude Opus | Centered floating pill + migrated prompt_builder |
+| 2026-04-02 | 15a CSS Cleanup | Claude Opus | Removed 24 dead classes + old toast animation |
