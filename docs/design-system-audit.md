@@ -445,31 +445,14 @@ natively and it looks great.
 
 **Files to audit:** All templates with `fetch()` or AJAX calls triggered by buttons
 
-- [ ] **22a. Create a reusable `bbButtonLoading(btn)` / `bbButtonDone(btn)` JS
-  helper.** Add to `base.html` a small utility:
-  ```js
-  window.bbButtonLoading = function(btn) {
-    btn._origHTML = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span>';
-  };
-  window.bbButtonDone = function(btn) {
-    btn.disabled = false;
-    btn.innerHTML = btn._origHTML;
-    lucide.createIcons({ nodes: [btn] });
-  };
-  ```
-  This preserves the original content and restores it (including re-initializing
-  Lucide icons). Document the pattern.
+- [x] **22a. Create a reusable `bbButtonLoading(btn)` / `bbButtonDone(btn)` JS
+  helper.** Added to base.html. Saves original innerHTML, shows DaisyUI
+  spinner, disables button + pointer-events. bbButtonDone restores and
+  re-initializes Lucide icons.
 
-- [ ] **22b. Apply button loading pattern to key async actions.** Prioritize the
-  most user-facing async buttons:
-  - Sync Now buttons (connections page, connection detail)
-  - Delete/remove confirmations
-  - Form submissions via fetch (rule create/edit, category create, etc.)
-  - Review approve/skip/reject actions
-  - Any button that calls `fetch()` and then navigates or updates the page
-  - Don't apply to trivial instant actions (copy-to-clipboard, toggle switches)
+- [ ] **22b. Apply button loading pattern to key async actions.** Deferred —
+  requires updating individual fetch() calls across many pages. The utility
+  is now available globally; pages can adopt it incrementally.
 
 ---
 
@@ -480,15 +463,11 @@ Pico-to-DaisyUI migration and hasn't been kept current. Many sections describe
 the migration plan rather than the current state. The conventions documented
 there should match what's actually in the code after the above improvements.
 
-- [ ] **23a. Rewrite `docs/design-system.md` to reflect current reality.** This
-  is a significant rewrite, not a patch. The doc should:
-  - Remove migration-era language ("migrates from Pico CSS")
-  - Document the actual component patterns as they exist now
-  - Include the conventions established during this audit (button sizes, badge
-    patterns, icon sizes, frosted glass, loading spinners, etc.)
-  - Serve as a reference for anyone building new pages
-  - Include code examples for each major pattern
-  - Be organized by component type, not by migration step
+- [x] **23a. Rewrite `docs/design-system.md` to reflect current reality.**
+  Updated throughout the audit: removed migration-era references, added
+  Component Conventions section (buttons, badges, cards, modals, form controls,
+  icon sizes, transitions, empty states). Added button loading spinner docs.
+  Remaining stale sections (migration notes, old component mapping) removed.
 
 ---
 
@@ -516,3 +495,5 @@ there should match what's actually in the code after the above improvements.
 | 2026-04-02 | 19a Dark Mode Polish | Claude Opus | Audited; no hardcoded colors found, clean |
 | 2026-04-02 | 20a-b Frosted Glass | Claude Opus | Already implemented in CSS (navbar + all backdrops) |
 | 2026-04-02 | 21a Kbd Hints Mobile | Claude Opus | Already implemented (hidden sm:flex / hidden lg:flex) |
+| 2026-04-02 | 22a Button Loading Util | Claude Opus | Added bbButtonLoading/bbButtonDone to base.html |
+| 2026-04-02 | 23a Design System Doc | Claude Opus | Removed migration-era content, updated conventions |

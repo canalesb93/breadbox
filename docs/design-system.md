@@ -2,13 +2,7 @@
 
 ## 1. Overview
 
-Breadbox migrates from Pico CSS (classless) to **DaisyUI 5 + Tailwind CSS v4** for the admin dashboard. This provides dashboard-native components (drawer, stat, table, badge, menu, modal, toast) with built-in dark mode and responsive behavior.
-
-**Why the switch:**
-- Pico CSS is a content/reading framework — its classless approach produces a "documentation site" aesthetic, not a dashboard
-- DaisyUI provides semantic component classes (`drawer`, `stat`, `table`, `badge`, `menu`) purpose-built for application UIs
-- Built-in dark mode with theme pairing (light + dark auto-switch)
-- No JavaScript included — pure CSS, works alongside Alpine.js
+The Breadbox admin dashboard uses **DaisyUI 5 + Tailwind CSS v4** with **Alpine.js v3** for interactivity. DaisyUI provides semantic component classes (drawer, table, badge, menu, modal) with built-in dark mode.
 
 **Constraints:**
 - No Node.js, no npm, no bundler — uses `tailwindcss-extra` standalone binary
@@ -160,18 +154,7 @@ Some `--bb-*` variables are kept for app-specific tokens not covered by DaisyUI 
 }
 ```
 
-These may be gradually replaced by Tailwind utility classes (`gap-1`, `gap-2`, etc.) as templates are migrated.
-
-### Color Mapping
-
-| Old `--bb-color-*` | DaisyUI Equivalent |
-|---|---|
-| `--bb-color-success` (#2e7d32) | `success` theme color (used as `badge-success`, `alert-success`, `text-success`) |
-| `--bb-color-error` (#c62828) | `error` theme color |
-| `--bb-color-warning` (#e65100) | `warning` theme color |
-| `--bb-color-cyan` (#00838f) | `info` theme color |
-
-DaisyUI handles light/dark variants automatically — no manual `@media (prefers-color-scheme: dark)` overrides needed.
+DaisyUI semantic colors (`success`, `error`, `warning`, `info`, `primary`, `secondary`) handle light/dark variants automatically.
 
 ## 4. Component Conventions
 
@@ -593,43 +576,23 @@ DaisyUI inherits Tailwind's type scale. Key decisions:
 - **Small text:** `text-sm` for labels, metadata, timestamps
 - **Monospace:** `font-mono` for API keys, transaction IDs, code snippets
 
-## 11. Migration Notes
+## 11. Async Button Loading
 
-### What to Remove
+Use `bbButtonLoading(btn)` / `bbButtonDone(btn)` for async button feedback:
 
-- Pico CSS CDN link (`@picocss/pico@2/css/pico.min.css`)
-- All `--bb-color-*` CSS custom properties (replaced by DaisyUI theme colors)
-- All `bb-badge`, `bb-stat`, `bb-layout`, `bb-sidebar`, `bb-main`, `bb-nav`, `bb-page-header`, `bb-empty` CSS class definitions
-- Flash message `[data-flash]` CSS (replaced by DaisyUI `alert`)
-- The `@media (max-width: 768px)` responsive block (DaisyUI drawer handles this)
-- All `data-theme="light"` hardcoding (if any remains)
+```js
+// Before fetch
+bbButtonLoading(btn);  // saves content, shows spinner, disables
 
-### What to Keep
+fetch('/api/...').then(() => {
+  bbButtonDone(btn);   // restores content + re-initializes Lucide icons
+}).catch(() => {
+  bbButtonDone(btn);
+});
+```
 
-- Alpine.js v3 CDN script
-- `[x-cloak]` CSS rule
-- `--bb-gap-*` spacing tokens (until fully replaced by Tailwind utilities)
-- Go template functions (`statusBadge`, `syncBadge`, `errorMessage`) — update their HTML output to use DaisyUI classes
-- `relativeTime`, `formatUUID`, `formatNumeric` template functions — unchanged
+## 12. Alerts
 
-### Migration Order
+All alerts use: `<div role="alert" class="alert alert-{type} rounded-xl mb-6">`.
 
-1. Set up build tooling (16A.1)
-2. Swap CSS framework in layouts (16A.2)
-3. Migrate base layout to drawer (16A.3) — this is the biggest single change
-4. Add icons (16A.4)
-5. Extract component classes (16A.5)
-6. Unify toast (16A.6)
-7. Standardize tables (16A.7)
-8. Brand identity (16A.8)
-9. Then page-by-page redesigns (16B.1-16B.8)
-
-### Template Conversion Pattern
-
-For each page template:
-1. Replace inline `style` attributes with Tailwind utility classes or `bb-*` component classes
-2. Replace `<article>` (Pico card) with `<div class="card bg-base-100 shadow-sm"><div class="card-body">`
-3. Replace custom badge HTML with `{{statusBadge .Status}}` (which now emits DaisyUI classes)
-4. Replace `<div style="overflow-x: auto;">` + `<table>` with `<div class="overflow-x-auto"><table class="table table-zebra table-sm">`
-5. Replace flash message divs with `<div class="alert alert-success">` etc.
-6. Add Lucide icon `<i data-lucide="...">` elements where appropriate
+Flash messages (`partials/flash.html`) and inline alerts follow the same pattern. Use `alert-soft` for less prominent inline warnings.
