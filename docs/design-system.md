@@ -271,6 +271,37 @@ Custom overlay dialogs (confirm, shortcuts, category picker) in `base.html` use 
 | Empty state illustrations | `w-8 h-8` |
 | Sidebar nav | Managed by CSS (`.bb-sidebar-link` rules) — don't set manually |
 
+### Transitions (Alpine.js)
+
+| Context | Approach |
+|---|---|
+| Collapsible sections (filter panels, accordions, disclosures) | `x-collapse` |
+| Tab panels, wizard steps | Explicit `x-transition:enter` with `ease-out duration-200` |
+| Dropdowns / popovers | Explicit transitions with scale + opacity |
+| Modals | Handled by DaisyUI — no Alpine transitions needed |
+| Toast / notifications | Already handled in `base.html` |
+| Simple show/hide (spinners, help text) | No transition — instant is fine |
+
+### Empty States
+
+Standard pattern for "no data" screens:
+```html
+<div class="bb-card p-12 text-center">
+  <div class="flex flex-col items-center">
+    <div class="w-14 h-14 rounded-xl bg-base-200 flex items-center justify-center mb-4">
+      <i data-lucide="..." class="w-7 h-7 text-base-content/30"></i>
+    </div>
+    <h3 class="text-base font-semibold mb-1">Title</h3>
+    <p class="text-base-content/50 text-sm mb-5 max-w-sm">Description text.</p>
+    <a href="..." class="btn btn-primary btn-sm rounded-xl gap-2">
+      <i data-lucide="plus" class="w-4 h-4"></i> CTA Button
+    </a>
+  </div>
+</div>
+```
+
+For filtered "no results" states (e.g., transactions with active filters), a compact version with just icon + text is acceptable.
+
 ## 5. Layout Patterns
 
 ### Base Layout (Drawer Sidebar)

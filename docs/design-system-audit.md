@@ -157,11 +157,12 @@ one approach.
 
 **Files to audit:** Connection status, sync status, review status displays
 
-- [ ] **7a. Standardize status indicator pattern.** Use the `statusBadge()` /
-  `syncBadge()` template function pattern. All status displays should go through
-  a template function that returns consistent markup. For any status type not
-  yet covered by a template function, add one. Remove inline hand-built status
-  markup from templates.
+- [x] **7a. Standardize status indicator pattern.** Audited all inline status
+  indicators. `statusBadge()`/`syncBadge()` cover connection and sync status
+  badges. Webhook badges already use identical badge-soft classes (standardized
+  in task 2). Complex icon-based status indicators (timeline dots, activity
+  icons, sync spinners) are intentionally inline — they have unique contextual
+  styling that doesn't fit a simple badge function. Convention documented.
 
 ---
 
@@ -173,13 +174,12 @@ simple `x-transition`, and `x-collapse`. No convention for when to use which.
 
 **Files to audit:** All templates with `x-transition` or `x-collapse`
 
-- [ ] **8a. Define transition convention and normalize.** Standard:
-  - Collapsible sections (filter panels, expandable details): `x-collapse`
-  - Dropdowns/popovers: explicit transitions with `ease-out duration-150`
-  - Modals: handled by DaisyUI (no Alpine transitions needed)
-  - Toast/notifications: explicit transitions (already handled in base.html)
-  - Normalize across templates, removing over-specified transitions where
-    `x-collapse` or simple `x-transition` suffices
+- [x] **8a. Define transition convention and normalize.** Replaced over-specified
+  6-line explicit transitions with `x-collapse` on 6 filter panels (transactions,
+  account_detail, sync_logs, reviews, rules, logs). Accordion sections already
+  used `x-collapse` correctly. Tab panels and wizard steps correctly use explicit
+  transitions. Convention: collapsible sections → `x-collapse`, tabs/wizards →
+  explicit transitions, modals → DaisyUI handles it.
 
 ---
 
@@ -190,20 +190,12 @@ description + CTA button, others are just a `<p>` tag. No reusable pattern.
 
 **Files to audit:** All templates that conditionally show "no data" states
 
-- [ ] **9a. Create a standard empty state partial or convention.** Define a
-  consistent empty state block:
-  ```html
-  <div class="flex flex-col items-center text-center py-12 px-6">
-    <div class="w-14 h-14 rounded-xl bg-base-200 flex items-center justify-center mb-4">
-      <i data-lucide="..." class="w-7 h-7 text-base-content/30"></i>
-    </div>
-    <h3 class="text-base font-semibold mb-1">Title</h3>
-    <p class="text-base-content/50 text-sm mb-5 max-w-sm">Description</p>
-    <!-- Optional CTA button -->
-  </div>
-  ```
-  Audit all empty states and normalize to this pattern. Consider creating a
-  Go template partial if there are enough instances.
+- [x] **9a. Create a standard empty state partial or convention.** Audited 12
+  empty states across all pages. 4 already match the complete pattern (icon +
+  title + description + CTA). Upgraded 2 minimal empty states in access.html
+  (OAuth clients, API keys sections) to the full pattern. Transaction/account
+  "no results" states left intentionally compact for filtered views. Convention
+  documented in design-system.md.
 
 ---
 
@@ -529,3 +521,6 @@ there should match what's actually in the code after the above improvements.
 | 2026-04-01 | 4a Modal Standardization | Claude Opus | 2 files, added responsive classes + fixed rounding |
 | 2026-04-01 | 5a-5b Form Control Standardization | Claude Opus | 4 files, removed bg-base-200/50, standardized borders |
 | 2026-04-01 | 6a Icon Size Convention | Claude Opus | 10 files, fixed w-4.5→w-5, btn-xs w-3→w-3.5 |
+| 2026-04-02 | 7a Status Indicators | Claude Opus | Audited; convention documented, complex icons left inline |
+| 2026-04-02 | 8a Transition Consistency | Claude Opus | 6 filter panels: explicit transitions → x-collapse |
+| 2026-04-02 | 9a Empty State Pattern | Claude Opus | Upgraded 2 minimal empty states in access.html |

@@ -109,12 +109,18 @@
   {{end}}
 
   {{else}}
-  <div class="bb-card px-5 py-8 text-center">
-    <p class="text-sm text-base-content/40 mb-3">No OAuth clients yet</p>
-    <a href="/oauth-clients/new" class="btn btn-primary btn-sm btn-soft rounded-xl">
-      <i data-lucide="plus" class="w-4 h-4"></i>
-      Create your first client
-    </a>
+  <div class="bb-card p-12 text-center">
+    <div class="flex flex-col items-center">
+      <div class="w-14 h-14 rounded-xl bg-base-200 flex items-center justify-center mb-4">
+        <i data-lucide="fingerprint" class="w-7 h-7 text-base-content/30"></i>
+      </div>
+      <h3 class="text-base font-semibold mb-1">No OAuth clients yet</h3>
+      <p class="text-base-content/50 text-sm mb-5 max-w-sm">Create an OAuth client to connect external AI services to your Breadbox MCP server.</p>
+      <a href="/oauth-clients/new" class="btn btn-primary btn-sm rounded-xl gap-2">
+        <i data-lucide="plus" class="w-4 h-4"></i>
+        Create your first client
+      </a>
+    </div>
   </div>
   {{end}}
 </div>
@@ -223,12 +229,18 @@
   {{end}}
 
   {{else}}
-  <div class="bb-card px-5 py-8 text-center">
-    <p class="text-sm text-base-content/40 mb-3">No API keys yet</p>
-    <a href="/api-keys/new" class="btn btn-primary btn-sm btn-soft rounded-xl">
-      <i data-lucide="plus" class="w-4 h-4"></i>
-      Create your first key
-    </a>
+  <div class="bb-card p-12 text-center">
+    <div class="flex flex-col items-center">
+      <div class="w-14 h-14 rounded-xl bg-base-200 flex items-center justify-center mb-4">
+        <i data-lucide="key" class="w-7 h-7 text-base-content/30"></i>
+      </div>
+      <h3 class="text-base font-semibold mb-1">No API keys yet</h3>
+      <p class="text-base-content/50 text-sm mb-5 max-w-sm">Create an API key to connect MCP agents or integrate with external tools.</p>
+      <a href="/api-keys/new" class="btn btn-primary btn-sm rounded-xl gap-2">
+        <i data-lucide="plus" class="w-4 h-4"></i>
+        Create your first key
+      </a>
+    </div>
   </div>
   {{end}}
 </div>
