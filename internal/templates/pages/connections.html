@@ -98,12 +98,6 @@
               <span>Never synced</span>
               {{end}}
             </div>
-            {{if and (eq .LastSyncStatus "error") .LastSyncErrorMessage.Valid (ne (printf "%s" .Status) "disconnected")}}
-            <div class="flex items-center gap-1.5 mt-1 text-[0.7rem] text-error/70 leading-snug max-w-xs sm:max-w-md truncate">
-              <i data-lucide="alert-circle" class="w-3 h-3 shrink-0"></i>
-              <span class="truncate">{{.LastSyncErrorMessage.String}}</span>
-            </div>
-            {{end}}
           </div>
         </div>
         <div class="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -137,9 +131,16 @@
 
     <!-- Connection-level error message (e.g. reauth needed) -->
     {{if .ErrorMessage.Valid}}
-    <div class="mx-6 mb-4 flex items-start gap-2 text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-      <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
-      <span>{{errorMessage .ErrorCode.String}}</span>
+    <div class="mx-4 sm:mx-6 mb-4 flex items-center justify-between gap-2 text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0"></i>
+        <span class="truncate">{{errorMessage .ErrorCode.String}}</span>
+      </div>
+      {{if and (ne (printf "%s" .Provider) "csv") (or (eq .ErrorCode.String "ITEM_LOGIN_REQUIRED") (eq .ErrorCode.String "INSUFFICIENT_CREDENTIALS") (eq .ErrorCode.String "INVALID_CREDENTIALS") (eq (printf "%s" .Status) "pending_reauth"))}}
+      <a href="/connections/{{formatUUID .ID}}/reauth" class="btn btn-warning btn-xs rounded-lg shrink-0" @click.stop>Re-authenticate</a>
+      {{else}}
+      <a href="/connections/{{formatUUID .ID}}" class="btn btn-ghost btn-xs rounded-lg shrink-0" @click.stop>View Details</a>
+      {{end}}
     </div>
     {{end}}
 
