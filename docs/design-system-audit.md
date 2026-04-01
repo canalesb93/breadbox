@@ -106,14 +106,11 @@ varies (`rounded-xl` vs `rounded-2xl`).
 
 **Files to audit:** All templates with `modal` class usage
 
-- [ ] **4a. Audit all modal instances and standardize.** Pick one pattern:
-  - Container: `<dialog id="..." class="modal modal-bottom sm:modal-middle">`
-  - Content: `<div class="modal-box rounded-xl max-w-lg">` (use `<form>` only
-    when the modal IS a form)
-  - Close: consistent backdrop `<form method="dialog" class="modal-backdrop"><button>close</button></form>`
-  - Open: `document.getElementById('x').showModal()` (not Alpine `modal-open` class)
-  - Rounding: always `rounded-xl`
-  - Apply across all templates and document the convention
+- [x] **4a. Audit all modal instances and standardize.** Audited 9 modal instances
+  (5 `<dialog>`, 3 custom div, 1 special overlay). Added `modal-bottom sm:modal-middle`
+  to reviews.html and account_links.html dialogs. Fixed `rounded-2xl` → `rounded-xl`
+  and added `max-w-lg` on account_links modal. Left custom div dialogs (confirm,
+  shortcuts, category picker) untouched — they're complex CSS components.
 
 ---
 
@@ -125,18 +122,15 @@ plain Tailwind `text-sm font-medium`.
 
 **Files to audit:** All form-containing templates
 
-- [ ] **5a. Standardize form input/select classes.** Decide on:
-  - Text inputs: `input input-sm input-bordered w-full rounded-xl`
-  - Selects: `select select-sm select-bordered w-full rounded-xl`
-  - Textareas: `textarea textarea-bordered rounded-xl`
-  - Background: no `bg-base-200` on normal inputs (only on read-only/disabled)
-  - Apply consistently across all templates
+- [x] **5a. Standardize form input/select classes.** Removed `bg-base-200/50` from
+  standard form inputs/selects in 4 files (user_form, api_key_new, oauth_client_new,
+  csv_import). Replaced with `input-bordered`/`select-bordered`. Kept bg-base-200/50
+  on inline-edit and read-only inputs. Filter bar and rule builder inputs left as-is.
 
-- [ ] **5b. Standardize label patterns.** Outside filter bars, use a consistent
-  label class. Options:
-  - Define `.bb-label` in `input.css` as `@apply text-sm font-medium text-base-content/70`
-  - Or use DaisyUI `label` class consistently
-  - Audit and normalize all label markup
+- [x] **5b. Standardize label patterns.** Audited 3 label patterns: `.bb-filter-label`
+  (filter bars), DaisyUI `label` (form fields), plain `text-sm font-medium`
+  (simpler forms). All are valid in context — documented convention rather than
+  force-converting. Each page is internally consistent.
 
 ---
 
@@ -147,14 +141,11 @@ plain Tailwind `text-sm font-medium`.
 
 **Files to audit:** All templates with `data-lucide`
 
-- [ ] **6a. Define and apply icon size convention.** Standard:
-  - Inline with text (badges, labels): `w-3.5 h-3.5`
-  - In buttons (`btn-sm`): `w-4 h-4`
-  - In buttons (`btn-xs`): `w-3.5 h-3.5`
-  - Section headers / standalone: `w-5 h-5`
-  - Empty state illustrations: `w-8 h-8`
-  - Sidebar nav icons already have their own convention — don't touch
-  - Document in `docs/design-system.md` and normalize across templates
+- [x] **6a. Define and apply icon size convention.** Fixed 26+ deviations across
+  10 files. Normalized w-4.5 h-4.5 (non-standard) → w-5 h-5 in categories,
+  rules, api_key_created, oauth_client_created, transaction_detail. Fixed
+  btn-xs icons from w-3 h-3 → w-3.5 h-3.5 in mcp_guide and other files.
+  Convention documented in `docs/design-system.md`.
 
 ---
 
@@ -535,3 +526,6 @@ there should match what's actually in the code after the above improvements.
 | 2026-04-01 | 1a-1d Button Standardization | Claude Opus | 15 files, rounding/sizing/gap normalized |
 | 2026-04-01 | 2a-2c Badge Standardization | Claude Opus | 19 files + templates.go, badge-soft + rounded-lg cleanup |
 | 2026-04-01 | 3a-3c Card Standardization | Claude Opus | 14 files, px-6→px-5, sectioned card padding |
+| 2026-04-01 | 4a Modal Standardization | Claude Opus | 2 files, added responsive classes + fixed rounding |
+| 2026-04-01 | 5a-5b Form Control Standardization | Claude Opus | 4 files, removed bg-base-200/50, standardized borders |
+| 2026-04-01 | 6a Icon Size Convention | Claude Opus | 10 files, fixed w-4.5→w-5, btn-xs w-3→w-3.5 |

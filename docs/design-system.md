@@ -232,6 +232,45 @@ Base class: `bb-card` — provides `bg-base-100 rounded-xl border border-base-30
 
 **Interactive cards** add `bb-card--interactive` for hover effects (cursor change, background shift).
 
+### Modals
+
+All `<dialog>` elements use:
+- Container: `<dialog id="..." class="modal modal-bottom sm:modal-middle">`
+- Content: `<div class="modal-box rounded-xl max-w-lg">` (use `<form>` wrapper only when the modal IS a form)
+- Rounding: always `rounded-xl`
+- Close backdrop: `<form method="dialog" class="modal-backdrop"><button>close</button></form>`
+
+Custom overlay dialogs (confirm, shortcuts, category picker) in `base.html` use their own CSS classes and are not standard modals.
+
+### Form Controls
+
+| Element | Standard classes |
+|---|---|
+| Text inputs | `input input-bordered w-full rounded-xl` |
+| Filter inputs | `input input-sm input-bordered w-full` (styled by `.bb-filter-bar` CSS) |
+| Compact inputs (rules) | `input input-bordered input-xs rounded-lg` |
+| Selects | `select select-bordered w-full rounded-xl` |
+| Filter selects | `select select-sm select-bordered w-full` |
+| Textareas | `textarea textarea-bordered rounded-xl w-full` |
+
+**Background:** No `bg-base-200/50` on standard form inputs — only on read-only, disabled, or inline-edit inputs.
+
+**Labels** use three patterns depending on context:
+- Filter bars: `.bb-filter-label` (defined in `input.css`)
+- Form fields: DaisyUI `<label class="label">` with `<span class="label-text">`
+- Simple forms: `<label class="text-sm font-medium text-base-content/70 mb-1.5 block">`
+
+### Icon Sizes
+
+| Context | Size |
+|---|---|
+| Inline with text (badges, labels) | `w-3.5 h-3.5` |
+| In buttons (`btn-sm`) | `w-4 h-4` |
+| In buttons (`btn-xs`) | `w-3.5 h-3.5` |
+| Section headers / standalone | `w-5 h-5` |
+| Empty state illustrations | `w-8 h-8` |
+| Sidebar nav | Managed by CSS (`.bb-sidebar-link` rules) — don't set manually |
+
 ## 5. Layout Patterns
 
 ### Base Layout (Drawer Sidebar)

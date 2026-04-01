@@ -59,7 +59,7 @@
       {{else}}
       <fieldset class="fieldset mb-5">
         <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="csv-user-id">Family Member</label>
-        <select id="csv-user-id" class="select w-full bg-base-200 border-base-300 focus:border-primary rounded-xl" required>
+        <select id="csv-user-id" class="select select-bordered w-full rounded-xl" required>
           <option value="" disabled selected>Select a member...</option>
           {{range .Users}}
           <option value="{{formatUUID .ID}}">{{.Name}}</option>
@@ -70,7 +70,7 @@
 
       <fieldset class="fieldset mb-6">
         <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="csv-file">CSV File</label>
-        <input type="file" id="csv-file" accept=".csv,.tsv,.txt" class="file-input file-input-bordered w-full bg-base-200/50 border-base-300 rounded-xl">
+        <input type="file" id="csv-file" accept=".csv,.tsv,.txt" class="file-input file-input-bordered w-full rounded-xl">
         <p class="text-xs text-base-content/40 mt-2">Supported: CSV, TSV, TXT files up to 10MB. Max 50,000 rows.</p>
       </fieldset>
 
@@ -101,31 +101,31 @@
           <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-date">
             Date Column <span class="text-xs text-base-content/30">(required)</span>
           </label>
-          <select id="map-date" class="select w-full bg-base-200 border-base-300 rounded-xl"></select>
+          <select id="map-date" class="select select-bordered w-full rounded-xl"></select>
         </fieldset>
         <fieldset class="fieldset">
           <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-amount">
             Amount Column <span class="text-xs text-base-content/30">(required)</span>
           </label>
-          <select id="map-amount" class="select w-full bg-base-200 border-base-300 rounded-xl"></select>
+          <select id="map-amount" class="select select-bordered w-full rounded-xl"></select>
         </fieldset>
         <fieldset class="fieldset">
           <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-description">
             Description Column <span class="text-xs text-base-content/30">(required)</span>
           </label>
-          <select id="map-description" class="select w-full bg-base-200 border-base-300 rounded-xl"></select>
+          <select id="map-description" class="select select-bordered w-full rounded-xl"></select>
         </fieldset>
         <fieldset class="fieldset">
           <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-category">
             Category Column <span class="text-xs text-base-content/30">(optional)</span>
           </label>
-          <select id="map-category" class="select w-full bg-base-200 border-base-300 rounded-xl"></select>
+          <select id="map-category" class="select select-bordered w-full rounded-xl"></select>
         </fieldset>
         <fieldset class="fieldset">
           <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-merchant">
             Merchant Column <span class="text-xs text-base-content/30">(optional)</span>
           </label>
-          <select id="map-merchant" class="select w-full bg-base-200 border-base-300 rounded-xl"></select>
+          <select id="map-merchant" class="select select-bordered w-full rounded-xl"></select>
         </fieldset>
       </div>
 
@@ -135,11 +135,11 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <fieldset class="fieldset">
               <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-debit">Debit Column</label>
-              <select id="map-debit" class="select w-full bg-base-100 border-base-300 rounded-xl"></select>
+              <select id="map-debit" class="select select-bordered w-full rounded-xl"></select>
             </fieldset>
             <fieldset class="fieldset">
               <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="map-credit">Credit Column</label>
-              <select id="map-credit" class="select w-full bg-base-100 border-base-300 rounded-xl"></select>
+              <select id="map-credit" class="select select-bordered w-full rounded-xl"></select>
             </fieldset>
           </div>
         </div>
@@ -167,7 +167,7 @@
       {{if not .ConnectionID}}
       <fieldset class="fieldset mb-6">
         <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="account-name">Account Name</label>
-        <input type="text" id="account-name" class="input w-full bg-base-200/50 border-base-300 rounded-xl" value="CSV Import" placeholder="e.g., Chase Checking CSV">
+        <input type="text" id="account-name" class="input input-bordered w-full rounded-xl" value="CSV Import" placeholder="e.g., Chase Checking CSV">
       </fieldset>
       {{end}}
 

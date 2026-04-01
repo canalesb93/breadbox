@@ -193,19 +193,19 @@
     <div class="flex-shrink-0">
       {{if and .CategoryIcon .Enabled (not (and .ExpiresAt (expired .ExpiresAt)))}}
       <div class="bb-tx-avatar" style="--avatar-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}oklch(0.65 0 0){{end}}">
-        <i data-lucide="{{deref .CategoryIcon}}" class="w-4.5 h-4.5"></i>
+        <i data-lucide="{{deref .CategoryIcon}}" class="w-5 h-5"></i>
       </div>
       {{else if and .ExpiresAt (expired .ExpiresAt)}}
       <div class="w-9 h-9 rounded-xl bg-warning/10 flex items-center justify-center">
-        <i data-lucide="clock" class="w-4.5 h-4.5 text-warning"></i>
+        <i data-lucide="clock" class="w-5 h-5 text-warning"></i>
       </div>
       {{else if not .Enabled}}
       <div class="w-9 h-9 rounded-xl bg-base-200 flex items-center justify-center">
-        <i data-lucide="pause" class="w-4.5 h-4.5 text-base-content/30"></i>
+        <i data-lucide="pause" class="w-5 h-5 text-base-content/30"></i>
       </div>
       {{else}}
       <div class="w-9 h-9 rounded-xl bg-success/10 flex items-center justify-center">
-        <i data-lucide="zap" class="w-4.5 h-4.5 text-success"></i>
+        <i data-lucide="zap" class="w-5 h-5 text-success"></i>
       </div>
       {{end}}
     </div>

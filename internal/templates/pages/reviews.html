@@ -13,7 +13,7 @@
         <i data-lucide="trash-2" class="w-4 h-4"></i>
         Dismiss All
       </button>
-      <dialog class="modal" :class="{ 'modal-open': confirmOpen }">
+      <dialog class="modal modal-bottom sm:modal-middle" :class="{ 'modal-open': confirmOpen }">
         <div class="modal-box rounded-xl">
           <h3 class="text-lg font-bold">Dismiss all pending reviews?</h3>
           <p class="py-4 text-base-content/70">This will permanently remove all <strong>{{.Counts.Pending}}</strong> pending reviews from the queue. This cannot be undone.</p>
