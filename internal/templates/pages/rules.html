@@ -49,7 +49,8 @@
 </div>
 
 <!-- ==================== RULES TAB ==================== -->
-<div x-show="rcTab === 'rules'" x-data="rulesPage()">
+<div x-show="rcTab === 'rules'">
+<div x-data="rulesPage()">
 
 <!-- Summary Stats Cards -->
 {{if .Rules}}
@@ -385,6 +386,7 @@ function rulesPage() {
 }
 </script>
 
+</div><!-- /rulesPage x-data -->
 </div><!-- /rules tab -->
 
 <!-- ==================== CATEGORIES TAB ==================== -->
