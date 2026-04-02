@@ -19,6 +19,7 @@ import (
 // CategoryResponse represents a category for API responses.
 type CategoryResponse struct {
 	ID                 string              `json:"id"`
+	ShortID            string              `json:"short_id"`
 	Slug               string              `json:"slug"`
 	DisplayName        string              `json:"display_name"`
 	ParentID           *string             `json:"parent_id"`
@@ -51,6 +52,7 @@ func (s *Service) ListCategories(ctx context.Context) ([]CategoryResponse, error
 	for _, r := range rows {
 		result = append(result, CategoryResponse{
 			ID:                formatUUID(r.ID),
+			ShortID:           r.ShortID,
 			Slug:              r.Slug,
 			DisplayName:       r.DisplayName,
 			ParentID:          uuidPtr(r.ParentID),
@@ -98,7 +100,7 @@ func (s *Service) ListCategoryTree(ctx context.Context) ([]CategoryResponse, err
 
 // GetCategory returns a single category by ID.
 func (s *Service) GetCategory(ctx context.Context, id string) (*CategoryResponse, error) {
-	uid, err := parseUUID(id)
+	uid, err := s.resolveCategoryID(ctx, id)
 	if err != nil {
 		return nil, ErrCategoryNotFound
 	}
@@ -113,6 +115,7 @@ func (s *Service) GetCategory(ctx context.Context, id string) (*CategoryResponse
 
 	return &CategoryResponse{
 		ID:          formatUUID(cat.ID),
+		ShortID:     cat.ShortID,
 		Slug:        cat.Slug,
 		DisplayName: cat.DisplayName,
 		ParentID:    uuidPtr(cat.ParentID),
@@ -167,7 +170,7 @@ func (s *Service) CreateCategory(ctx context.Context, params CreateCategoryParam
 
 	var parentID pgtype.UUID
 	if params.ParentID != nil {
-		parentID, err = parseUUID(*params.ParentID)
+		parentID, err = s.resolveCategoryID(ctx, *params.ParentID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid parent id: %w", err)
 		}
@@ -189,6 +192,7 @@ func (s *Service) CreateCategory(ctx context.Context, params CreateCategoryParam
 
 	return &CategoryResponse{
 		ID:          formatUUID(cat.ID),
+		ShortID:     cat.ShortID,
 		Slug:        cat.Slug,
 		DisplayName: cat.DisplayName,
 		ParentID:    uuidPtr(cat.ParentID),
@@ -213,7 +217,7 @@ type UpdateCategoryParams struct {
 
 // UpdateCategory updates an existing category.
 func (s *Service) UpdateCategory(ctx context.Context, id string, params UpdateCategoryParams) (*CategoryResponse, error) {
-	uid, err := parseUUID(id)
+	uid, err := s.resolveCategoryID(ctx, id)
 	if err != nil {
 		return nil, ErrCategoryNotFound
 	}
@@ -235,6 +239,7 @@ func (s *Service) UpdateCategory(ctx context.Context, id string, params UpdateCa
 
 	return &CategoryResponse{
 		ID:          formatUUID(cat.ID),
+		ShortID:     cat.ShortID,
 		Slug:        cat.Slug,
 		DisplayName: cat.DisplayName,
 		ParentID:    uuidPtr(cat.ParentID),
@@ -251,7 +256,7 @@ func (s *Service) UpdateCategory(ctx context.Context, id string, params UpdateCa
 // DeleteCategory deletes a category. The "uncategorized" system category cannot be deleted.
 // Returns the count of transactions that were affected.
 func (s *Service) DeleteCategory(ctx context.Context, id string) (int64, error) {
-	uid, err := parseUUID(id)
+	uid, err := s.resolveCategoryID(ctx, id)
 	if err != nil {
 		return 0, ErrCategoryNotFound
 	}
@@ -318,11 +323,11 @@ func (s *Service) MergeCategories(ctx context.Context, sourceID, targetID string
 		return fmt.Errorf("%w: cannot merge a category into itself", ErrInvalidParameter)
 	}
 
-	srcUID, err := parseUUID(sourceID)
+	srcUID, err := s.resolveCategoryID(ctx, sourceID)
 	if err != nil {
 		return ErrCategoryNotFound
 	}
-	tgtUID, err := parseUUID(targetID)
+	tgtUID, err := s.resolveCategoryID(ctx, targetID)
 	if err != nil {
 		return ErrCategoryNotFound
 	}
@@ -401,11 +406,11 @@ func (s *Service) MergeCategories(ctx context.Context, sourceID, targetID string
 
 // SetTransactionCategory sets a manual category override on a transaction.
 func (s *Service) SetTransactionCategory(ctx context.Context, txnID, categoryID string) error {
-	txnUID, err := parseUUID(txnID)
+	txnUID, err := s.resolveTransactionID(ctx, txnID)
 	if err != nil {
 		return ErrNotFound
 	}
-	catUID, err := parseUUID(categoryID)
+	catUID, err := s.resolveCategoryID(ctx, categoryID)
 	if err != nil {
 		return ErrCategoryNotFound
 	}
@@ -431,7 +436,7 @@ func (s *Service) SetTransactionCategory(ctx context.Context, txnID, categoryID 
 // ResetTransactionCategory clears the manual override and sets the category to uncategorized.
 // Transaction rules will re-categorize it on the next sync if a matching rule exists.
 func (s *Service) ResetTransactionCategory(ctx context.Context, txnID string) error {
-	txnUID, err := parseUUID(txnID)
+	txnUID, err := s.resolveTransactionID(ctx, txnID)
 	if err != nil {
 		return ErrNotFound
 	}
@@ -537,7 +542,7 @@ func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecat
 	argN := 2
 
 	if params.UserID != nil {
-		uid, err := parseUUID(*params.UserID)
+		uid, err := s.resolveUserID(ctx, *params.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid user id: %w", err)
 		}
@@ -547,7 +552,7 @@ func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecat
 	}
 
 	if params.AccountID != nil {
-		aid, err := parseUUID(*params.AccountID)
+		aid, err := s.resolveAccountID(ctx, *params.AccountID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid account id: %w", err)
 		}

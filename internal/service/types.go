@@ -4,6 +4,7 @@ import "time"
 
 type AccountResponse struct {
 	ID                string   `json:"id"`
+	ShortID           string   `json:"short_id"`
 	ConnectionID      *string  `json:"connection_id"`
 	UserID            *string  `json:"user_id"`
 	InstitutionName   *string  `json:"institution_name"`
@@ -34,6 +35,7 @@ type TransactionCategoryInfo struct {
 
 type TransactionResponse struct {
 	ID                  string                   `json:"id"`
+	ShortID             string                   `json:"short_id"`
 	AccountID           *string                  `json:"account_id"`
 	AccountName         *string                  `json:"account_name"`
 	UserName            *string                  `json:"user_name"`
@@ -106,6 +108,7 @@ type CategoryPair struct {
 
 type UserResponse struct {
 	ID        string  `json:"id"`
+	ShortID   string  `json:"short_id"`
 	Name      string  `json:"name"`
 	Email     *string `json:"email"`
 	CreatedAt string  `json:"created_at"`
@@ -114,6 +117,7 @@ type UserResponse struct {
 
 type ConnectionResponse struct {
 	ID              string  `json:"id"`
+	ShortID         string  `json:"short_id"`
 	UserID          *string `json:"user_id"`
 	UserName        *string `json:"user_name"`
 	Provider        string  `json:"provider"`
@@ -135,6 +139,7 @@ type ConnectionStatusResponse struct {
 
 type SyncLogResponse struct {
 	ID            string  `json:"id"`
+	ShortID       string  `json:"short_id"`
 	ConnectionID  string  `json:"connection_id"`
 	Trigger       string  `json:"trigger"`
 	Status        string  `json:"status"`
@@ -326,6 +331,7 @@ type UpdateCommentParams struct {
 
 type CommentResponse struct {
 	ID            string  `json:"id"`
+	ShortID       string  `json:"short_id"`
 	TransactionID string  `json:"transaction_id"`
 	AuthorType    string  `json:"author_type"`
 	AuthorID      *string `json:"author_id"`
@@ -339,6 +345,7 @@ type CommentResponse struct {
 
 type ReviewResponse struct {
 	ID                  string               `json:"id"`
+	ShortID             string               `json:"short_id"`
 	TransactionID       string               `json:"transaction_id"`
 	ReviewType          string               `json:"review_type"`
 	Status              string               `json:"status"`
@@ -465,6 +472,7 @@ type TransactionContext struct {
 
 type TransactionRuleResponse struct {
 	ID            string       `json:"id"`
+	ShortID       string       `json:"short_id"`
 	Name          string       `json:"name"`
 	Conditions    Condition    `json:"conditions"`
 	Actions       []RuleAction `json:"actions"`
@@ -492,6 +500,9 @@ type TransactionRuleListParams struct {
 	SearchMode   *string
 	Limit        int
 	Cursor       string
+	// Offset-based pagination (used by admin UI). When Page > 0, cursor is ignored.
+	Page     int
+	PageSize int
 }
 
 type TransactionRuleListResult struct {
@@ -499,6 +510,10 @@ type TransactionRuleListResult struct {
 	NextCursor string                    `json:"next_cursor,omitempty"`
 	HasMore    bool                      `json:"has_more"`
 	Total      int64                     `json:"total"`
+	// Offset-based pagination fields (populated when Page > 0)
+	Page       int `json:"page,omitempty"`
+	PageSize   int `json:"page_size,omitempty"`
+	TotalPages int `json:"total_pages,omitempty"`
 }
 
 type CreateTransactionRuleParams struct {

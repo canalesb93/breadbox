@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"breadbox/internal/service"
@@ -18,8 +20,22 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		if page < 1 {
+			page = 1
+		}
+
+		pageSize := 50
+		if v, err := strconv.Atoi(r.URL.Query().Get("per_page")); err == nil {
+			switch v {
+			case 25, 50, 100:
+				pageSize = v
+			}
+		}
+
 		params := service.TransactionRuleListParams{
-			Limit: 50,
+			Page:     page,
+			PageSize: pageSize,
 		}
 
 		if v := r.URL.Query().Get("search"); v != "" {
@@ -32,14 +48,6 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 			b, err := strconv.ParseBool(v)
 			if err == nil {
 				params.Enabled = &b
-			}
-		}
-		if v := r.URL.Query().Get("cursor"); v != "" {
-			params.Cursor = v
-		}
-		if v := r.URL.Query().Get("limit"); v != "" {
-			if l, err := strconv.Atoi(v); err == nil && l > 0 {
-				params.Limit = l
 			}
 		}
 
@@ -71,12 +79,19 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 			tab = "rules"
 		}
 
+		// Build pagination base URL (all params except page).
+		paginationBase := buildRulesPaginationBase(r)
+
 		data := BaseTemplateData(r, sm, "rules", "Rules & Categories")
 		data["Tab"] = tab
 		data["Rules"] = result.Rules
-		data["HasMore"] = result.HasMore
-		data["NextCursor"] = result.NextCursor
 		data["Total"] = result.Total
+		data["Page"] = result.Page
+		data["PageSize"] = result.PageSize
+		data["TotalPages"] = result.TotalPages
+		data["PaginationBase"] = paginationBase
+		data["ShowingStart"] = (result.Page-1)*result.PageSize + 1
+		data["ShowingEnd"] = min(int64(result.Page*result.PageSize), result.Total)
 		data["ActiveCount"] = activeCount
 		data["DisabledCount"] = disabledCount
 		data["TotalHits"] = totalHits
@@ -172,6 +187,23 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 
 		tr.Render(w, r, "rules.html", data)
 	}
+}
+
+// buildRulesPaginationBase returns the pagination base URL for the rules page.
+func buildRulesPaginationBase(r *http.Request) string {
+	params := []string{"search", "category_slug", "enabled", "per_page"}
+	q := r.URL.Query()
+	var qs []string
+	for _, key := range params {
+		if v := q.Get(key); v != "" {
+			qs = append(qs, key+"="+url.QueryEscape(v))
+		}
+	}
+	base := "/rules?page="
+	if len(qs) > 0 {
+		base = "/rules?" + strings.Join(qs, "&") + "&page="
+	}
+	return base
 }
 
 // RuleFormPageHandler serves GET /admin/rules/new and /admin/rules/{id}/edit.

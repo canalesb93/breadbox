@@ -54,18 +54,34 @@ func WebhookEventsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			filterStatus = *params.Status
 		}
 
+		pageSize := 25
+		showingStart := (result.Page-1)*pageSize + 1
+		showingEnd := result.Page * pageSize
+		if int64(showingEnd) > result.Total {
+			showingEnd = int(result.Total)
+		}
+
+		pBase := paginationBase("/webhook-events", map[string]string{
+			"provider": filterProvider,
+			"status":   filterStatus,
+		}, "page")
+
 		data := map[string]any{
-			"PageTitle":      "Webhook Events",
-			"CurrentPage":    "webhook-events",
-			"CSRFToken":      GetCSRFToken(r),
-			"Flash":          GetFlash(ctx, sm),
-			"Events":         result.Events,
-			"Page":           result.Page,
-			"TotalPages":     result.TotalPages,
-			"Total":          result.Total,
-			"Stats":          stats,
-			"FilterProvider": filterProvider,
-			"FilterStatus":   filterStatus,
+			"PageTitle":       "Webhook Events",
+			"CurrentPage":     "webhook-events",
+			"CSRFToken":       GetCSRFToken(r),
+			"Flash":           GetFlash(ctx, sm),
+			"Events":          result.Events,
+			"Page":            result.Page,
+			"TotalPages":      result.TotalPages,
+			"Total":           result.Total,
+			"PageSize":        pageSize,
+			"ShowingStart":    showingStart,
+			"ShowingEnd":      showingEnd,
+			"PaginationBase":  pBase,
+			"Stats":           stats,
+			"FilterProvider":  filterProvider,
+			"FilterStatus":    filterStatus,
 		}
 		tr.Render(w, r, "webhook_events.html", data)
 	}

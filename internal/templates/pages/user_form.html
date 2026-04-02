@@ -27,7 +27,7 @@
       <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="name">
         Name <span class="text-error text-xs">*</span>
       </label>
-      <input type="text" id="name" name="name" class="input w-full bg-base-200/50 border-base-300 focus:border-primary rounded-xl" required maxlength="128"
+      <input type="text" id="name" name="name" class="input input-bordered w-full rounded-xl" required maxlength="128"
         value="{{if .IsEdit}}{{.User.Name}}{{end}}"
         placeholder="e.g., Alex Canales">
     </fieldset>
@@ -36,7 +36,7 @@
       <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="email">
         Email <span class="text-xs text-base-content/30">(optional)</span>
       </label>
-      <input type="email" id="email" name="email" class="input w-full bg-base-200/50 border-base-300 focus:border-primary rounded-xl"
+      <input type="email" id="email" name="email" class="input input-bordered w-full rounded-xl"
         value="{{if and .IsEdit .User.Email.Valid}}{{.User.Email.String}}{{end}}"
         placeholder="e.g., alex@example.com">
     </fieldset>

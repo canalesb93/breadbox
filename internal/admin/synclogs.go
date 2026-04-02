@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -102,6 +103,21 @@ func SyncLogsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, s
 		// Determine whether the advanced filter panel has active filters.
 		hasAdvancedFilters := filterConnID != "" || filterTrigger != "" || filterDateFrom != "" || filterDateTo != ""
 
+		pageSize := 25
+		showingStart := (result.Page-1)*pageSize + 1
+		showingEnd := result.Page * pageSize
+		if int64(showingEnd) > result.Total {
+			showingEnd = int(result.Total)
+		}
+
+		pBase := paginationBase("/sync-logs", map[string]string{
+			"connection_id": filterConnID,
+			"status":        filterStatus,
+			"trigger":       filterTrigger,
+			"date_from":     filterDateFrom,
+			"date_to":       filterDateTo,
+		}, "page")
+
 		data := map[string]any{
 			"PageTitle":          "Sync Logs",
 			"CurrentPage":        "sync-logs",
@@ -118,6 +134,10 @@ func SyncLogsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, s
 			"Page":               result.Page,
 			"TotalPages":         result.TotalPages,
 			"Total":              result.Total,
+			"PageSize":           pageSize,
+			"ShowingStart":       showingStart,
+			"ShowingEnd":         showingEnd,
+			"PaginationBase":     pBase,
 			"Stats":              stats,
 			"SuccessCount":       successCount,
 			"ErrorCount":         errorCount,
@@ -174,4 +194,22 @@ func stringOrEmpty(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// paginationBase builds a URL query string prefix for pagination links.
+// It preserves all current filter params and ends with "&page=" (or "?page=")
+// so the template can append the page number directly.
+func paginationBase(path string, params map[string]string, pageParam string) string {
+	q := url.Values{}
+	for k, v := range params {
+		if v != "" {
+			q.Set(k, v)
+		}
+	}
+	q.Del(pageParam) // remove page param so we can append it fresh
+	encoded := q.Encode()
+	if encoded == "" {
+		return path + "?" + pageParam + "="
+	}
+	return path + "?" + encoded + "&" + pageParam + "="
 }

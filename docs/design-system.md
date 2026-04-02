@@ -2,13 +2,7 @@
 
 ## 1. Overview
 
-Breadbox migrates from Pico CSS (classless) to **DaisyUI 5 + Tailwind CSS v4** for the admin dashboard. This provides dashboard-native components (drawer, stat, table, badge, menu, modal, toast) with built-in dark mode and responsive behavior.
-
-**Why the switch:**
-- Pico CSS is a content/reading framework — its classless approach produces a "documentation site" aesthetic, not a dashboard
-- DaisyUI provides semantic component classes (`drawer`, `stat`, `table`, `badge`, `menu`) purpose-built for application UIs
-- Built-in dark mode with theme pairing (light + dark auto-switch)
-- No JavaScript included — pure CSS, works alongside Alpine.js
+The Breadbox admin dashboard uses **DaisyUI 5 + Tailwind CSS v4** with **Alpine.js v3** for interactivity. DaisyUI provides semantic component classes (drawer, table, badge, menu, modal) with built-in dark mode.
 
 **Constraints:**
 - No Node.js, no npm, no bundler — uses `tailwindcss-extra` standalone binary
@@ -44,55 +38,20 @@ Also available via Homebrew: `brew tap dobicinaitis/tailwind-cli-extra && brew i
 ```css
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: light --default, dark --prefersdark;
+  themes: false;
 }
+@plugin "daisyui/theme" { name: "breadbox-light"; default: true; ... }
+@plugin "daisyui/theme" { name: "breadbox-dark"; prefersdark: true; ... }
 
 /* App-specific component classes */
 @layer components {
-  .bb-filter-bar {
-    @apply flex flex-wrap items-end gap-4 mb-6;
-  }
-
-  .bb-filter-bar label {
-    @apply flex flex-col gap-1 text-sm;
-  }
-
-  .bb-filter-bar select,
-  .bb-filter-bar input {
-    @apply select select-sm select-bordered w-auto min-w-[8rem];
-  }
-
-  .bb-pagination {
-    @apply flex items-center justify-between mt-4;
-  }
-
-  .bb-action-bar {
-    @apply flex items-center gap-2 mb-4;
-  }
-
-  .bb-amount {
-    @apply text-right tabular-nums;
-  }
-
-  .bb-amount--debit {
-    @apply text-right tabular-nums;
-  }
-
-  .bb-amount--credit {
-    @apply text-right tabular-nums text-success;
-  }
-
-  .bb-info-grid {
-    @apply grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm;
-  }
-
-  .bb-info-grid dt {
-    @apply font-medium text-base-content/70;
-  }
-
-  .bb-info-grid dd {
-    @apply text-base-content;
-  }
+  .bb-filter-bar { ... }    /* Filter form layout */
+  .bb-card { ... }           /* Border-based card (not shadow) */
+  .bb-amount { ... }         /* Tabular-nums right-aligned amounts */
+  .bb-info-grid { ... }      /* Detail page key-value grids */
+  .bb-paginator { ... }      /* Numbered pagination with page range */
+  .bb-page-header { ... }    /* Page title + action row */
+  /* ... see input.css for full list */
 }
 ```
 
@@ -141,8 +100,8 @@ The Go server already serves `static/` via `http.FileServer`. The generated CSS 
 
 ### Theme Pairing
 
-- **Light:** `light` — DaisyUI default light theme, clean and neutral
-- **Dark:** `dark` — DaisyUI default dark theme with good contrast
+- **Light:** `breadbox-light` — custom shadcn/ui neutral palette, set as default
+- **Dark:** `breadbox-dark` — custom dark palette, auto-switches via `prefers-color-scheme`
 
 Auto-switches based on `prefers-color-scheme`. Users can also force a theme with `data-theme="light"` or `data-theme="dark"` on `<html>`.
 
@@ -160,18 +119,7 @@ Some `--bb-*` variables are kept for app-specific tokens not covered by DaisyUI 
 }
 ```
 
-These may be gradually replaced by Tailwind utility classes (`gap-1`, `gap-2`, etc.) as templates are migrated.
-
-### Color Mapping
-
-| Old `--bb-color-*` | DaisyUI Equivalent |
-|---|---|
-| `--bb-color-success` (#2e7d32) | `success` theme color (used as `badge-success`, `alert-success`, `text-success`) |
-| `--bb-color-error` (#c62828) | `error` theme color |
-| `--bb-color-warning` (#e65100) | `warning` theme color |
-| `--bb-color-cyan` (#00838f) | `info` theme color |
-
-DaisyUI handles light/dark variants automatically — no manual `@media (prefers-color-scheme: dark)` overrides needed.
+DaisyUI semantic colors (`success`, `error`, `warning`, `info`, `primary`, `secondary`) handle light/dark variants automatically.
 
 ## 4. Component Conventions
 
@@ -231,6 +179,76 @@ Base class: `bb-card` — provides `bg-base-100 rounded-xl border border-base-30
 **Sectioned cards** use `border-t border-base-300/50` for dividers between sections. Always add `overflow-hidden` when using `p-0` to prevent rounded border clipping.
 
 **Interactive cards** add `bb-card--interactive` for hover effects (cursor change, background shift).
+
+### Modals
+
+All `<dialog>` elements use:
+- Container: `<dialog id="..." class="modal modal-bottom sm:modal-middle">`
+- Content: `<div class="modal-box rounded-xl max-w-lg">` (use `<form>` wrapper only when the modal IS a form)
+- Rounding: always `rounded-xl`
+- Close backdrop: `<form method="dialog" class="modal-backdrop"><button>close</button></form>`
+
+Custom overlay dialogs (confirm, shortcuts, category picker) in `base.html` use their own CSS classes and are not standard modals.
+
+### Form Controls
+
+| Element | Standard classes |
+|---|---|
+| Text inputs | `input input-bordered w-full rounded-xl` |
+| Filter inputs | `input input-sm input-bordered w-full` (styled by `.bb-filter-bar` CSS) |
+| Compact inputs (rules) | `input input-bordered input-xs rounded-lg` |
+| Selects | `select select-bordered w-full rounded-xl` |
+| Filter selects | `select select-sm select-bordered w-full` |
+| Textareas | `textarea textarea-bordered rounded-xl w-full` |
+
+**Background:** No `bg-base-200/50` on standard form inputs — only on read-only, disabled, or inline-edit inputs.
+
+**Labels** use three patterns depending on context:
+- Filter bars: `.bb-filter-label` (defined in `input.css`)
+- Form fields: DaisyUI `<label class="label">` with `<span class="label-text">`
+- Simple forms: `<label class="text-sm font-medium text-base-content/70 mb-1.5 block">`
+
+### Icon Sizes
+
+| Context | Size |
+|---|---|
+| Inline with text (badges, labels) | `w-3.5 h-3.5` |
+| In buttons (`btn-sm`) | `w-4 h-4` |
+| In buttons (`btn-xs`) | `w-3.5 h-3.5` |
+| Section headers / standalone | `w-5 h-5` |
+| Empty state illustrations | `w-8 h-8` |
+| Sidebar nav | Managed by CSS (`.bb-sidebar-link` rules) — don't set manually |
+
+### Transitions (Alpine.js)
+
+| Context | Approach |
+|---|---|
+| Collapsible sections (filter panels, accordions, disclosures) | `x-collapse` |
+| Tab panels, wizard steps | Explicit `x-transition:enter` with `ease-out duration-200` |
+| Dropdowns / popovers | Explicit transitions with scale + opacity |
+| Modals | Handled by DaisyUI — no Alpine transitions needed |
+| Toast / notifications | Already handled in `base.html` |
+| Simple show/hide (spinners, help text) | No transition — instant is fine |
+
+### Empty States
+
+Standard pattern for "no data" screens:
+```html
+<div class="bb-card p-12 text-center">
+  <div class="flex flex-col items-center">
+    <div class="w-14 h-14 rounded-xl bg-base-200 flex items-center justify-center mb-4">
+      <i data-lucide="..." class="w-7 h-7 text-base-content/30"></i>
+    </div>
+    <h3 class="text-base font-semibold mb-1">Title</h3>
+    <p class="text-base-content/50 text-sm mb-5 max-w-sm">Description text.</p>
+    <a href="..." class="btn btn-primary btn-sm rounded-xl gap-2">
+      <i data-lucide="plus" class="w-4 h-4"></i> CTA Button
+    </a>
+  </div>
+</div>
+```
+
+For filtered "no results" states (e.g., transactions with active filters), a compact version with just icon + text is acceptable.
 
 ## 5. Layout Patterns
 
@@ -357,9 +375,9 @@ For tables that can grow long (transactions, sync logs):
 
 ```html
 <td class="bb-amount">{{formatAmount .Amount}}</td>
-<!-- Negative amounts (credits) get color -->
-<td class="bb-amount--credit">-$42.50</td>
 ```
+
+Transaction rows use `bb-tx-amount` and `bb-tx-amount--income` for styled amounts.
 
 ### Status Badges in Tables
 
@@ -436,11 +454,11 @@ Pin to a specific version in production for stability.
 
 After `createIcons()`, each `<i data-lucide="...">` is replaced with an inline `<svg>`.
 
-**Size control:** Use Tailwind width/height classes on the `<i>` element:
-- Sidebar nav: `w-4 h-4`
-- Stat card icons: `w-8 h-8`
-- Button icons: `w-4 h-4`
-- Empty state icons: `w-12 h-12`
+**Size control:** See the Icon Sizes table in Component Conventions (§4) for the canonical convention. Quick reference:
+- In `btn-sm`: `w-4 h-4`
+- In `btn-xs` / inline: `w-3.5 h-3.5`
+- Section headers: `w-5 h-5`
+- Empty states: `w-8 h-8`
 
 ### Icon Inventory
 
@@ -481,28 +499,7 @@ When Alpine.js dynamically adds elements with `data-lucide` attributes (e.g., to
 
 ## 9. Toast / Notification Pattern
 
-Global toast component in `base.html`, using DaisyUI `toast` + `alert`:
-
-```html
-<div class="toast toast-end toast-bottom z-50"
-     x-data="{ toasts: [] }"
-     @bb-toast.window="
-       toasts.push({ message: $event.detail.message, type: $event.detail.type || 'info', id: Date.now() });
-       setTimeout(() => toasts.shift(), 4000)
-     ">
-  <template x-for="t in toasts" :key="t.id">
-    <div class="alert shadow-lg"
-         :class="{
-           'alert-success': t.type === 'success',
-           'alert-error': t.type === 'error',
-           'alert-warning': t.type === 'warning',
-           'alert-info': t.type === 'info'
-         }">
-      <span x-text="t.message"></span>
-    </div>
-  </template>
-</div>
-```
+Global toast in `base.html` — centered floating pill at the bottom of the viewport with type-specific Lucide icons (check, x-circle, alert-triangle, info). Auto-dismisses after 3 seconds with fade+slide transition.
 
 **Dispatch from anywhere:**
 ```js
@@ -510,6 +507,10 @@ window.dispatchEvent(new CustomEvent('bb-toast', {
   detail: { message: 'Sync triggered', type: 'success' }
 }));
 ```
+
+Supported types: `success` (default), `error`, `warning`, `info`.
+
+**Inline feedback:** For trivial instant actions (copy-to-clipboard), use the icon swap pattern instead of a toast: swap the icon to a checkmark with `text-success` for 2 seconds. See `agent_wizard.html` for the reference implementation.
 
 ## 10. Typography
 
@@ -523,43 +524,23 @@ DaisyUI inherits Tailwind's type scale. Key decisions:
 - **Small text:** `text-sm` for labels, metadata, timestamps
 - **Monospace:** `font-mono` for API keys, transaction IDs, code snippets
 
-## 11. Migration Notes
+## 11. Async Button Loading
 
-### What to Remove
+Use `bbButtonLoading(btn)` / `bbButtonDone(btn)` for async button feedback:
 
-- Pico CSS CDN link (`@picocss/pico@2/css/pico.min.css`)
-- All `--bb-color-*` CSS custom properties (replaced by DaisyUI theme colors)
-- All `bb-badge`, `bb-stat`, `bb-layout`, `bb-sidebar`, `bb-main`, `bb-nav`, `bb-page-header`, `bb-empty` CSS class definitions
-- Flash message `[data-flash]` CSS (replaced by DaisyUI `alert`)
-- The `@media (max-width: 768px)` responsive block (DaisyUI drawer handles this)
-- All `data-theme="light"` hardcoding (if any remains)
+```js
+// Before fetch
+bbButtonLoading(btn);  // saves content, shows spinner, disables
 
-### What to Keep
+fetch('/api/...').then(() => {
+  bbButtonDone(btn);   // restores content + re-initializes Lucide icons
+}).catch(() => {
+  bbButtonDone(btn);
+});
+```
 
-- Alpine.js v3 CDN script
-- `[x-cloak]` CSS rule
-- `--bb-gap-*` spacing tokens (until fully replaced by Tailwind utilities)
-- Go template functions (`statusBadge`, `syncBadge`, `errorMessage`) — update their HTML output to use DaisyUI classes
-- `relativeTime`, `formatUUID`, `formatNumeric` template functions — unchanged
+## 12. Alerts
 
-### Migration Order
+All alerts use: `<div role="alert" class="alert alert-{type} rounded-xl mb-6">`.
 
-1. Set up build tooling (16A.1)
-2. Swap CSS framework in layouts (16A.2)
-3. Migrate base layout to drawer (16A.3) — this is the biggest single change
-4. Add icons (16A.4)
-5. Extract component classes (16A.5)
-6. Unify toast (16A.6)
-7. Standardize tables (16A.7)
-8. Brand identity (16A.8)
-9. Then page-by-page redesigns (16B.1-16B.8)
-
-### Template Conversion Pattern
-
-For each page template:
-1. Replace inline `style` attributes with Tailwind utility classes or `bb-*` component classes
-2. Replace `<article>` (Pico card) with `<div class="card bg-base-100 shadow-sm"><div class="card-body">`
-3. Replace custom badge HTML with `{{statusBadge .Status}}` (which now emits DaisyUI classes)
-4. Replace `<div style="overflow-x: auto;">` + `<table>` with `<div class="overflow-x-auto"><table class="table table-zebra table-sm">`
-5. Replace flash message divs with `<div class="alert alert-success">` etc.
-6. Add Lucide icon `<i data-lucide="...">` elements where appropriate
+Flash messages (`partials/flash.html`) and inline alerts follow the same pattern. Use `alert-soft` for less prominent inline warnings.

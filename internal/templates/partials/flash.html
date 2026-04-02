@@ -1,6 +1,6 @@
 {{define "flash"}}
 {{if .Flash}}
-<div role="alert" class="alert {{if eq .Flash.Type "success"}}alert-success{{else if eq .Flash.Type "error"}}alert-error{{else}}alert-info{{end}} mb-4">
+<div role="alert" class="alert {{if eq .Flash.Type "success"}}alert-success{{else if eq .Flash.Type "error"}}alert-error{{else}}alert-info{{end}} rounded-xl mb-6">
   <span>{{.Flash.Message}}</span>
 </div>
 {{end}}

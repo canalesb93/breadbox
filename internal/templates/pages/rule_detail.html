@@ -124,7 +124,7 @@
         <i data-lucide="layers" class="w-4 h-4 text-info"></i>
       </div>
       <div>
-        <div class="text-2xl font-semibold tabular-nums leading-none">{{commaInt64 .Stats.UniqueTransactions}}</div>
+        <div class="text-2xl font-semibold tabular-nums leading-none">{{commaInt .Stats.UniqueTransactions}}</div>
         <div class="text-xs text-base-content/40 mt-0.5">Categorized</div>
       </div>
     </div>
@@ -136,7 +136,7 @@
         <i data-lucide="{{if and .Preview (gt .Preview.MatchCount 0)}}alert-circle{{else}}check-circle{{end}}" class="w-4 h-4 {{if and .Preview (gt .Preview.MatchCount 0)}}text-warning{{else}}text-success{{end}}"></i>
       </div>
       <div>
-        <div class="text-2xl font-semibold tabular-nums leading-none">{{if .Preview}}{{commaInt64 .Preview.MatchCount}}{{else}}0{{end}}</div>
+        <div class="text-2xl font-semibold tabular-nums leading-none">{{if .Preview}}{{commaInt .Preview.MatchCount}}{{else}}0{{end}}</div>
         <div class="text-xs text-base-content/40 mt-0.5">Pending</div>
       </div>
     </div>
@@ -213,7 +213,7 @@
 <div class="bb-card p-5 mb-4">
   <div class="flex items-center justify-between mb-1">
     <span class="label-text text-sm font-medium">Uncategorized Matches</span>
-    <span class="badge badge-soft badge-warning badge-sm">{{commaInt64 .Preview.MatchCount}} pending</span>
+    <span class="badge badge-soft badge-warning badge-sm">{{commaInt .Preview.MatchCount}} pending</span>
   </div>
   <p class="text-xs text-base-content/40 mb-3">These existing transactions match the rule but were imported before it was created</p>
 
@@ -246,7 +246,7 @@
     </table>
   </div>
   {{if gt .Preview.MatchCount 10}}
-  <p class="text-xs text-base-content/40 mt-2">Showing 10 of {{commaInt64 .Preview.MatchCount}}</p>
+  <p class="text-xs text-base-content/40 mt-2">Showing 10 of {{commaInt .Preview.MatchCount}}</p>
   {{end}}
 
   <div class="mt-4 flex items-center justify-between">
@@ -258,10 +258,10 @@
     </button>
   </div>
 
-  <div x-show="applyResult" x-cloak class="alert alert-success text-sm mt-3 rounded-xl">
+  <div x-show="applyResult" x-cloak role="alert" class="alert alert-success text-sm mt-3 rounded-xl">
     <span x-text="applyResult"></span>
   </div>
-  <div x-show="applyError" x-cloak class="alert alert-error text-sm mt-3 rounded-xl">
+  <div x-show="applyError" x-cloak role="alert" class="alert alert-error text-sm mt-3 rounded-xl">
     <span x-text="applyError"></span>
   </div>
 </div>

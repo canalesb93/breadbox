@@ -108,6 +108,21 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 
 			hasAdvancedFilters := filterConnID != "" || filterTrigger != "" || filterDateFrom != "" || filterDateTo != ""
 
+			pageSize := 25
+			showingStart := (result.Page-1)*pageSize + 1
+			showingEnd := result.Page * pageSize
+			if int64(showingEnd) > result.Total {
+				showingEnd = int(result.Total)
+			}
+			pBase := paginationBase("/logs", map[string]string{
+				"tab":           "syncs",
+				"connection_id": filterConnID,
+				"status":        filterStatus,
+				"trigger":       filterTrigger,
+				"date_from":     filterDateFrom,
+				"date_to":       filterDateTo,
+			}, "page")
+
 			data["Logs"] = result.Logs
 			data["Connections"] = connections
 			data["FilterConnID"] = filterConnID
@@ -119,6 +134,10 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 			data["Page"] = result.Page
 			data["TotalPages"] = result.TotalPages
 			data["Total"] = result.Total
+			data["PageSize"] = pageSize
+			data["ShowingStart"] = showingStart
+			data["ShowingEnd"] = showingEnd
+			data["PaginationBase"] = pBase
 			data["Stats"] = stats
 			data["SuccessCount"] = successCount
 			data["ErrorCount"] = errorCount
@@ -166,10 +185,26 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 				whFilterStatus = *params.Status
 			}
 
+			whPageSize := 25
+			whShowingStart := (result.Page-1)*whPageSize + 1
+			whShowingEnd := result.Page * whPageSize
+			if int64(whShowingEnd) > result.Total {
+				whShowingEnd = int(result.Total)
+			}
+			whPBase := paginationBase("/logs", map[string]string{
+				"tab":         "webhooks",
+				"wh_provider": whFilterProvider,
+				"wh_status":   whFilterStatus,
+			}, "wh_page")
+
 			data["WHEvents"] = result.Events
 			data["WHPage"] = result.Page
 			data["WHTotalPages"] = result.TotalPages
 			data["WHTotal"] = result.Total
+			data["WHPageSize"] = whPageSize
+			data["WHShowingStart"] = whShowingStart
+			data["WHShowingEnd"] = whShowingEnd
+			data["WHPaginationBase"] = whPBase
 			data["WHStats"] = whStats
 			data["WHFilterProvider"] = whFilterProvider
 			data["WHFilterStatus"] = whFilterStatus

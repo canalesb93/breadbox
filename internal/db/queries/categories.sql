@@ -9,6 +9,9 @@ SELECT * FROM categories WHERE id = $1;
 -- name: GetCategoryBySlug :one
 SELECT * FROM categories WHERE slug = $1;
 
+-- name: GetCategoryUUIDByShortID :one
+SELECT id FROM categories WHERE short_id = $1;
+
 -- name: ListCategories :many
 SELECT c.*, p.slug AS parent_slug, p.display_name AS parent_display_name
 FROM categories c

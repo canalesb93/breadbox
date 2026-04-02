@@ -11,7 +11,7 @@
 <div class="bb-card p-6 max-w-lg" x-data="{ copiedId: false, copiedSecret: false }">
   <div class="flex items-center gap-3 mb-5">
     <div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center">
-      <i data-lucide="check" class="w-4.5 h-4.5 text-success"></i>
+      <i data-lucide="check" class="w-5 h-5 text-success"></i>
     </div>
     <div>
       <h2 class="text-sm font-semibold">{{.ClientName}}</h2>
@@ -25,10 +25,10 @@
       <div class="flex gap-2">
         <input type="text" value="{{.ClientID}}" readonly id="oauth-client-id"
                class="input input-sm font-mono flex-1 bg-base-200/50 border-base-300 rounded-xl text-xs">
-        <button class="btn btn-sm btn-ghost rounded-xl shrink-0" @click="navigator.clipboard.writeText(document.getElementById('oauth-client-id').value).then(function(){ $data.copiedId = true; setTimeout(function(){ $data.copiedId = false; }, 2000); })">
-          <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
-          <span x-show="!copiedId">Copy</span>
-          <span x-show="copiedId" x-cloak>Copied!</span>
+        <button class="btn btn-sm btn-ghost rounded-xl shrink-0 gap-1.5" :class="copiedId && '!text-success'" @click="navigator.clipboard.writeText(document.getElementById('oauth-client-id').value).then(function(){ $data.copiedId = true; setTimeout(function(){ $data.copiedId = false; }, 2000); })">
+          <i data-lucide="clipboard" class="w-3.5 h-3.5" x-show="!copiedId"></i>
+          <i data-lucide="check" class="w-3.5 h-3.5" x-show="copiedId" x-cloak></i>
+          <span x-text="copiedId ? 'Copied!' : 'Copy'"></span>
         </button>
       </div>
     </div>
@@ -38,10 +38,10 @@
       <div class="flex gap-2">
         <input type="text" value="{{.ClientSecret}}" readonly id="oauth-client-secret"
                class="input input-sm font-mono flex-1 bg-base-200/50 border-base-300 rounded-xl text-xs">
-        <button class="btn btn-primary btn-sm rounded-xl shrink-0" @click="navigator.clipboard.writeText(document.getElementById('oauth-client-secret').value).then(function(){ $data.copiedSecret = true; setTimeout(function(){ $data.copiedSecret = false; }, 2000); })">
-          <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
-          <span x-show="!copiedSecret">Copy</span>
-          <span x-show="copiedSecret" x-cloak>Copied!</span>
+        <button class="btn btn-primary btn-sm rounded-xl shrink-0 gap-1.5" :class="copiedSecret && '!btn-success'" @click="navigator.clipboard.writeText(document.getElementById('oauth-client-secret').value).then(function(){ $data.copiedSecret = true; setTimeout(function(){ $data.copiedSecret = false; }, 2000); })">
+          <i data-lucide="clipboard" class="w-3.5 h-3.5" x-show="!copiedSecret"></i>
+          <i data-lucide="check" class="w-3.5 h-3.5" x-show="copiedSecret" x-cloak></i>
+          <span x-text="copiedSecret ? 'Copied!' : 'Copy'"></span>
         </button>
       </div>
     </div>

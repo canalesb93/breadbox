@@ -27,6 +27,9 @@ WHERE external_account_id = $1;
 -- name: GetAccountIDByExternalAccountID :one
 SELECT id FROM accounts WHERE external_account_id = $1;
 
+-- name: GetAccountUUIDByShortID :one
+SELECT id FROM accounts WHERE short_id = $1;
+
 -- name: ListAccounts :many
 SELECT a.*, bc.institution_name, bc.user_id, bc.status as connection_status
 FROM accounts a LEFT JOIN bank_connections bc ON a.connection_id = bc.id

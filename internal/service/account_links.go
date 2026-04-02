@@ -14,6 +14,7 @@ import (
 // AccountLinkResponse is the API response for an account link.
 type AccountLinkResponse struct {
 	ID                       string `json:"id"`
+	ShortID                  string `json:"short_id"`
 	PrimaryAccountID         string `json:"primary_account_id"`
 	PrimaryAccountName       string `json:"primary_account_name"`
 	PrimaryUserName          string `json:"primary_user_name"`
@@ -32,6 +33,7 @@ type AccountLinkResponse struct {
 // TransactionMatchResponse is the API response for a transaction match.
 type TransactionMatchResponse struct {
 	ID                     string   `json:"id"`
+	ShortID                string   `json:"short_id"`
 	AccountLinkID          string   `json:"account_link_id"`
 	PrimaryTransactionID   string   `json:"primary_transaction_id"`
 	DependentTransactionID string   `json:"dependent_transaction_id"`
@@ -74,11 +76,11 @@ func (s *Service) CreateAccountLink(ctx context.Context, params CreateAccountLin
 		return nil, fmt.Errorf("%w: cannot link an account to itself", ErrInvalidParameter)
 	}
 
-	primaryID, err := parseUUID(params.PrimaryAccountID)
+	primaryID, err := s.resolveAccountID(ctx, params.PrimaryAccountID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid primary account id", ErrInvalidParameter)
 	}
-	dependentID, err := parseUUID(params.DependentAccountID)
+	dependentID, err := s.resolveAccountID(ctx, params.DependentAccountID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid dependent account id", ErrInvalidParameter)
 	}
@@ -139,7 +141,7 @@ func (s *Service) CreateAccountLink(ctx context.Context, params CreateAccountLin
 
 // GetAccountLink returns a single account link by ID with denormalized info.
 func (s *Service) GetAccountLink(ctx context.Context, id string) (*AccountLinkResponse, error) {
-	uid, err := parseUUID(id)
+	uid, err := s.resolveAccountLinkID(ctx, id)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -156,6 +158,7 @@ func (s *Service) GetAccountLink(ctx context.Context, id string) (*AccountLinkRe
 
 	return &AccountLinkResponse{
 		ID:                      formatUUID(row.ID),
+		ShortID:                 row.ShortID,
 		PrimaryAccountID:        formatUUID(row.PrimaryAccountID),
 		PrimaryAccountName:      row.PrimaryAccountDisplayName,
 		PrimaryUserName:         textPtrVal(row.PrimaryUserName),
@@ -186,6 +189,7 @@ func (s *Service) ListAccountLinks(ctx context.Context) ([]AccountLinkResponse, 
 
 		result = append(result, AccountLinkResponse{
 			ID:                      formatUUID(row.ID),
+			ShortID:                 row.ShortID,
 			PrimaryAccountID:        formatUUID(row.PrimaryAccountID),
 			PrimaryAccountName:      row.PrimaryAccountDisplayName,
 			PrimaryUserName:         textPtrVal(row.PrimaryUserName),
@@ -206,7 +210,7 @@ func (s *Service) ListAccountLinks(ctx context.Context) ([]AccountLinkResponse, 
 
 // UpdateAccountLink updates match strategy, tolerance, or enabled status.
 func (s *Service) UpdateAccountLink(ctx context.Context, id string, params UpdateAccountLinkParams) (*AccountLinkResponse, error) {
-	uid, err := parseUUID(id)
+	uid, err := s.resolveAccountLinkID(ctx, id)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -275,7 +279,7 @@ func (s *Service) UpdateAccountLink(ctx context.Context, id string, params Updat
 
 // DeleteAccountLink removes a link, clears attribution, and unmarks the dependent.
 func (s *Service) DeleteAccountLink(ctx context.Context, id string) error {
-	uid, err := parseUUID(id)
+	uid, err := s.resolveAccountLinkID(ctx, id)
 	if err != nil {
 		return ErrNotFound
 	}
@@ -312,7 +316,7 @@ func (s *Service) DeleteAccountLink(ctx context.Context, id string) error {
 
 // ListTransactionMatches returns all matches for a given link.
 func (s *Service) ListTransactionMatches(ctx context.Context, linkID string) ([]TransactionMatchResponse, error) {
-	uid, err := parseUUID(linkID)
+	uid, err := s.resolveAccountLinkID(ctx, linkID)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -335,6 +339,7 @@ func (s *Service) ListTransactionMatches(ctx context.Context, linkID string) ([]
 
 		result = append(result, TransactionMatchResponse{
 			ID:                     formatUUID(row.ID),
+			ShortID:                row.ShortID,
 			AccountLinkID:          formatUUID(row.AccountLinkID),
 			PrimaryTransactionID:   formatUUID(row.PrimaryTransactionID),
 			DependentTransactionID: formatUUID(row.DependentTransactionID),
@@ -354,7 +359,7 @@ func (s *Service) ListTransactionMatches(ctx context.Context, linkID string) ([]
 
 // ConfirmMatch marks an auto-match as confirmed.
 func (s *Service) ConfirmMatch(ctx context.Context, matchID string) error {
-	uid, err := parseUUID(matchID)
+	uid, err := s.resolveMatchID(ctx, matchID)
 	if err != nil {
 		return ErrNotFound
 	}
@@ -372,7 +377,7 @@ func (s *Service) ConfirmMatch(ctx context.Context, matchID string) error {
 
 // RejectMatch removes a match and clears the attribution on the primary transaction.
 func (s *Service) RejectMatch(ctx context.Context, matchID string) error {
-	uid, err := parseUUID(matchID)
+	uid, err := s.resolveMatchID(ctx, matchID)
 	if err != nil {
 		return ErrNotFound
 	}
@@ -401,15 +406,15 @@ func (s *Service) RejectMatch(ctx context.Context, matchID string) error {
 
 // ManualMatch creates a match between two specific transactions.
 func (s *Service) ManualMatch(ctx context.Context, linkID, primaryTxnID, dependentTxnID string) (*TransactionMatchResponse, error) {
-	linkUUID, err := parseUUID(linkID)
+	linkUUID, err := s.resolveAccountLinkID(ctx, linkID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid link id", ErrInvalidParameter)
 	}
-	primaryUUID, err := parseUUID(primaryTxnID)
+	primaryUUID, err := s.resolveTransactionID(ctx, primaryTxnID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid primary transaction id", ErrInvalidParameter)
 	}
-	dependentUUID, err := parseUUID(dependentTxnID)
+	dependentUUID, err := s.resolveTransactionID(ctx, dependentTxnID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid dependent transaction id", ErrInvalidParameter)
 	}
@@ -445,6 +450,7 @@ func (s *Service) ManualMatch(ctx context.Context, linkID, primaryTxnID, depende
 
 	return &TransactionMatchResponse{
 		ID:                     formatUUID(match.ID),
+		ShortID:                match.ShortID,
 		AccountLinkID:          formatUUID(match.AccountLinkID),
 		PrimaryTransactionID:   formatUUID(match.PrimaryTransactionID),
 		DependentTransactionID: formatUUID(match.DependentTransactionID),
@@ -456,7 +462,7 @@ func (s *Service) ManualMatch(ctx context.Context, linkID, primaryTxnID, depende
 
 // RunMatchReconciliation triggers matching for a specific link.
 func (s *Service) RunMatchReconciliation(ctx context.Context, linkID string) (*MatchReconciliationResult, error) {
-	uid, err := parseUUID(linkID)
+	uid, err := s.resolveAccountLinkID(ctx, linkID)
 	if err != nil {
 		return nil, ErrNotFound
 	}

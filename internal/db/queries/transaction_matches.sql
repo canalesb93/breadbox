@@ -7,6 +7,9 @@ RETURNING *;
 -- name: GetTransactionMatch :one
 SELECT * FROM transaction_matches WHERE id = $1;
 
+-- name: GetMatchUUIDByShortID :one
+SELECT id FROM transaction_matches WHERE short_id = $1;
+
 -- name: GetTransactionMatchByPrimaryTxn :one
 SELECT * FROM transaction_matches WHERE primary_transaction_id = $1;
 

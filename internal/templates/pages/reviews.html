@@ -13,7 +13,7 @@
         <i data-lucide="trash-2" class="w-4 h-4"></i>
         Dismiss All
       </button>
-      <dialog class="modal" :class="{ 'modal-open': confirmOpen }">
+      <dialog class="modal modal-bottom sm:modal-middle" :class="{ 'modal-open': confirmOpen }">
         <div class="modal-box rounded-xl">
           <h3 class="text-lg font-bold">Dismiss all pending reviews?</h3>
           <p class="py-4 text-base-content/70">This will permanently remove all <strong>{{.Counts.Pending}}</strong> pending reviews from the queue. This cannot be undone.</p>
@@ -70,7 +70,7 @@
 {{end}}
 
 <!-- Review Settings (collapsible) -->
-<div class="bb-card p-0 overflow-hidden mb-4" x-data="{ open: false }">
+<div class="bb-card p-0 overflow-hidden mb-6" x-data="{ open: false }">
   <button class="w-full flex items-center justify-between px-4 sm:px-5 py-3 cursor-pointer" @click="open = !open">
     <div class="flex items-center gap-3">
       <i data-lucide="settings" class="w-4 h-4 text-base-content/50"></i>
@@ -125,13 +125,7 @@
       <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/40 transition-transform duration-200" :class="filtersOpen ? 'rotate-180' : ''"></i>
     </button>
 
-    <form method="GET" action="/reviews" x-show="filtersOpen" x-cloak
-      x-transition:enter="transition ease-out duration-200"
-      x-transition:enter-start="opacity-0 -translate-y-2"
-      x-transition:enter-end="opacity-100 translate-y-0"
-      x-transition:leave="transition ease-in duration-150"
-      x-transition:leave-start="opacity-100 translate-y-0"
-      x-transition:leave-end="opacity-0 -translate-y-2"
+    <form method="GET" action="/reviews" x-show="filtersOpen" x-cloak x-collapse
       class="bb-filter-form">
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4 pt-3">
         <label class="bb-filter-label">

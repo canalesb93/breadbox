@@ -3,6 +3,9 @@ INSERT INTO account_links (primary_account_id, dependent_account_id, match_strat
 VALUES ($1, $2, $3, $4)
 RETURNING *;
 
+-- name: GetAccountLinkUUIDByShortID :one
+SELECT id FROM account_links WHERE short_id = $1;
+
 -- name: GetAccountLink :one
 SELECT al.*,
        pa.name AS primary_account_name,
