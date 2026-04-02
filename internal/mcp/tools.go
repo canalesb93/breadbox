@@ -1144,11 +1144,44 @@ func jsonResult(v any) (*mcpsdk.CallToolResult, any, error) {
 	if err != nil {
 		return errorResult(fmt.Errorf("marshal result: %w", err)), nil, nil
 	}
+
+	// Compact IDs for MCP responses: replace "id" with short_id value, drop "short_id" field.
+	// This reduces token usage by ~75% per ID without changing the schema agents see.
+	var raw any
+	if err := json.Unmarshal(data, &raw); err == nil {
+		compactIDs(raw)
+		if compacted, err := json.Marshal(raw); err == nil {
+			data = compacted
+		}
+	}
+
 	return &mcpsdk.CallToolResult{
 		Content: []mcpsdk.Content{
 			&mcpsdk.TextContent{Text: string(data)},
 		},
 	}, nil, nil
+}
+
+// compactIDs recursively walks a JSON structure and replaces "id" with the
+// "short_id" value wherever both fields exist in the same object, then removes
+// "short_id". This makes MCP responses use compact 8-char IDs by default.
+func compactIDs(v any) {
+	switch val := v.(type) {
+	case map[string]any:
+		if shortID, ok := val["short_id"]; ok {
+			if _, hasID := val["id"]; hasID {
+				val["id"] = shortID
+			}
+			delete(val, "short_id")
+		}
+		for _, child := range val {
+			compactIDs(child)
+		}
+	case []any:
+		for _, item := range val {
+			compactIDs(item)
+		}
+	}
 }
 
 func errorResult(err error) *mcpsdk.CallToolResult {

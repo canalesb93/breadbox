@@ -30,17 +30,16 @@ AMOUNT CONVENTION (critical):
 - All amounts include iso_currency_code — never sum across different currencies
 
 ID CONVENTION:
-- All entities include both id (full UUID) and short_id (compact 8-character alphanumeric alias).
-- Always use short_id values when passing IDs to tool parameters — they work everywhere id works but use fewer tokens.
-- Both formats are accepted in all tool inputs (transaction_id, account_id, user_id, category_id, review_id, rule_id, etc.).
-- Example: instead of transaction_id="9466ab98-0de2-41a0-847b-6740bb519cdc", use transaction_id="k7Xm9pQ2".
+- Entity IDs in responses are compact 8-character alphanumeric strings (e.g., "k7Xm9pQ2").
+- Use these compact IDs in all tool inputs (transaction_id, account_id, user_id, category_id, review_id, rule_id, etc.).
+- Full UUIDs are also accepted as input for backward compatibility.
 
 GETTING STARTED:
 1. Read breadbox://overview for dataset context (users, connections, accounts, 30-day spending)
 2. Check get_sync_status to verify data freshness
 
 QUERYING:
-- query_transactions: filters (date, account, user, category, amount, search), cursor pagination. Use fields= to control response size (aliases: minimal, core, category, timestamps). id and short_id always included.
+- query_transactions: filters (date, account, user, category, amount, search), cursor pagination. Use fields= to control response size (aliases: minimal, core, category, timestamps). id always included.
 - count_transactions: same filters, returns count. Use before paginating.
 - transaction_summary: aggregated totals by category, month, week, day, or category_month. Use for spending analysis.
 - merchant_summary: merchant-level stats (count, total, avg, date range). Set min_count=2 for recurring, 3 for subscriptions.
