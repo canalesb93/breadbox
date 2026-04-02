@@ -11,13 +11,47 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// --- Session context types ---
+
+// sessionContextProvider extracts session tracking fields from tool inputs.
+type sessionContextProvider interface {
+	GetSessionID() string
+	GetReason() string
+}
+
+// WriteSessionContext is embedded in write tool inputs. session_id and reason are required.
+type WriteSessionContext struct {
+	SessionID string `json:"session_id" jsonschema:"required,Session ID from create_session tool. Call create_session first."`
+	Reason    string `json:"reason" jsonschema:"required,Brief reason for this action (e.g. 'categorizing grocery transactions')."`
+}
+
+func (w WriteSessionContext) GetSessionID() string { return w.SessionID }
+func (w WriteSessionContext) GetReason() string    { return w.Reason }
+
+// ReadSessionContext is embedded in read tool inputs. Both fields are optional.
+type ReadSessionContext struct {
+	SessionID string `json:"session_id,omitempty" jsonschema:"Optional session ID to associate this read with a session."`
+	Reason    string `json:"reason,omitempty" jsonschema:"Optional brief reason for this query."`
+}
+
+func (r ReadSessionContext) GetSessionID() string { return r.SessionID }
+func (r ReadSessionContext) GetReason() string    { return r.Reason }
+
+// --- Session tool input ---
+
+type createSessionInput struct {
+	Purpose string `json:"purpose" jsonschema:"required,Brief label for this session (e.g. 'weekly transaction review', 'rule creation for dining')."`
+}
+
 // --- Input types ---
 
 type listAccountsInput struct {
+	ReadSessionContext
 	UserID string `json:"user_id,omitempty" jsonschema:"Filter accounts by user ID"`
 }
 
 type queryTransactionsInput struct {
+	ReadSessionContext
 	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
 	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
 	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
@@ -37,6 +71,7 @@ type queryTransactionsInput struct {
 }
 
 type countTransactionsInput struct {
+	ReadSessionContext
 	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
 	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
 	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
@@ -51,28 +86,34 @@ type countTransactionsInput struct {
 }
 
 type triggerSyncInput struct {
+	WriteSessionContext
 	ConnectionID string `json:"connection_id,omitempty" jsonschema:"Sync a specific connection by ID. If omitted syncs all connections."`
 }
 
 type categorizeTransactionInput struct {
+	WriteSessionContext
 	TransactionID string `json:"transaction_id" jsonschema:"The transaction ID to categorize"`
 	CategoryID    string `json:"category_id" jsonschema:"The category ID to assign (use list_categories to find IDs)"`
 }
 
 type resetTransactionCategoryInput struct {
+	WriteSessionContext
 	TransactionID string `json:"transaction_id" jsonschema:"The transaction ID to reset"`
 }
 
 type addTransactionCommentInput struct {
+	WriteSessionContext
 	TransactionID string `json:"transaction_id" jsonschema:"required,UUID of the transaction to comment on"`
 	Content       string `json:"content" jsonschema:"required,Comment text (markdown supported, max 10000 chars)"`
 }
 
 type listTransactionCommentsInput struct {
+	ReadSessionContext
 	TransactionID string `json:"transaction_id" jsonschema:"required,UUID of the transaction"`
 }
 
 type transactionSummaryInput struct {
+	ReadSessionContext
 	StartDate      string `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive. Defaults to 30 days ago."`
 	EndDate        string `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive. Defaults to today."`
 	GroupBy        string `json:"group_by" jsonschema:"required,How to group results: category, month, week, day, or category_month"`
@@ -83,6 +124,7 @@ type transactionSummaryInput struct {
 }
 
 type merchantSummaryInput struct {
+	ReadSessionContext
 	StartDate     string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive. Defaults to 90 days ago."`
 	EndDate       string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive. Defaults to today."`
 	AccountID     string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
@@ -98,6 +140,7 @@ type merchantSummaryInput struct {
 }
 
 type listPendingReviewsInput struct {
+	ReadSessionContext
 	ReviewType         string `json:"review_type,omitempty" jsonschema:"Filter by review type: new_transaction, uncategorized, low_confidence, manual, re_review"`
 	AccountID          string `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
 	UserID             string `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
@@ -108,6 +151,7 @@ type listPendingReviewsInput struct {
 }
 
 type submitReviewInput struct {
+	WriteSessionContext
 	ReviewID     string `json:"review_id" jsonschema:"required,UUID of the review to submit"`
 	Decision     string `json:"decision" jsonschema:"required,Decision: approved or skipped"`
 	CategoryID   string `json:"category_id,omitempty" jsonschema:"Category ID to assign. Provide either category_id or category_slug (not both)."`
@@ -115,13 +159,43 @@ type submitReviewInput struct {
 	Note         string `json:"note,omitempty" jsonschema:"Optional note explaining the decision"`
 }
 
-type exportCategoriesInput struct{}
+type listCategoriesInput struct {
+	ReadSessionContext
+}
+
+type listUsersInput struct {
+	ReadSessionContext
+}
+
+type getSyncStatusInput struct {
+	ReadSessionContext
+}
+
+type exportCategoriesInput struct {
+	ReadSessionContext
+}
 
 type importCategoriesInput struct {
+	WriteSessionContext
 	Content string `json:"content" jsonschema:"required,TSV content with category definitions. Columns: slug, display_name, parent_slug, icon, color, sort_order, hidden, merge_into. The merge_into column is optional — set to a target slug to merge the source category into the target (transactions reassigned then source deleted)."`
 }
 
 // --- Handlers ---
+
+func (s *MCPServer) handleCreateSession(reqCtx context.Context, _ *mcpsdk.CallToolRequest, input createSessionInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(reqCtx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.Purpose == "" {
+		return errorResult(fmt.Errorf("purpose is required")), nil, nil
+	}
+	actor := service.ActorFromContext(reqCtx)
+	session, err := s.svc.CreateMCPSession(context.Background(), actor, input.Purpose)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(session)
+}
 
 func (s *MCPServer) handleListAccounts(_ context.Context, _ *mcpsdk.CallToolRequest, input listAccountsInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
@@ -286,7 +360,7 @@ func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToo
 	return jsonResult(map[string]int64{"count": count})
 }
 
-func (s *MCPServer) handleListCategories(_ context.Context, _ *mcpsdk.CallToolRequest, _ any) (*mcpsdk.CallToolResult, any, error) {
+func (s *MCPServer) handleListCategories(_ context.Context, _ *mcpsdk.CallToolRequest, _ listCategoriesInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
 	categories, err := s.svc.ListCategoryTree(ctx)
 	if err != nil {
@@ -295,7 +369,7 @@ func (s *MCPServer) handleListCategories(_ context.Context, _ *mcpsdk.CallToolRe
 	return jsonResult(categories)
 }
 
-func (s *MCPServer) handleListUsers(_ context.Context, _ *mcpsdk.CallToolRequest, _ any) (*mcpsdk.CallToolResult, any, error) {
+func (s *MCPServer) handleListUsers(_ context.Context, _ *mcpsdk.CallToolRequest, _ listUsersInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
 	users, err := s.svc.ListUsers(ctx)
 	if err != nil {
@@ -305,7 +379,7 @@ func (s *MCPServer) handleListUsers(_ context.Context, _ *mcpsdk.CallToolRequest
 	return jsonResult(users)
 }
 
-func (s *MCPServer) handleGetSyncStatus(_ context.Context, _ *mcpsdk.CallToolRequest, _ any) (*mcpsdk.CallToolResult, any, error) {
+func (s *MCPServer) handleGetSyncStatus(_ context.Context, _ *mcpsdk.CallToolRequest, _ getSyncStatusInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
 	connections, err := s.svc.ListConnections(ctx, nil)
 	if err != nil {
@@ -637,6 +711,7 @@ func (s *MCPServer) handleSubmitReview(ctx context.Context, _ *mcpsdk.CallToolRe
 // --- Transaction Rules ---
 
 type createTransactionRuleInput struct {
+	WriteSessionContext
 	Name               string              `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
 	Conditions         map[string]any      `json:"conditions" jsonschema:"required,JSON condition object. Simple: {\"field\": \"name\", \"op\": \"contains\", \"value\": \"uber\"}. AND: {\"and\": [{...}, {...}]}. OR: {\"or\": [{...}, {...}]}. NOT: {\"not\": {...}}. Fields: name merchant_name amount category_primary category_detailed pending provider account_id user_id user_name. Ops: eq neq contains not_contains matches(regex) gt gte lt lte in."`
 	Actions            []map[string]string `json:"actions,omitempty" jsonschema:"Array of actions to perform when rule matches. Each action: {\"field\": \"category\", \"value\": \"food_and_drink_restaurant\"}. Supported fields: category. If omitted, use category_slug instead."`
@@ -647,6 +722,7 @@ type createTransactionRuleInput struct {
 }
 
 type listTransactionRulesInput struct {
+	ReadSessionContext
 	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Filter by category slug"`
 	Enabled      *bool  `json:"enabled,omitempty" jsonschema:"Filter by enabled status"`
 	Search       string `json:"search,omitempty" jsonschema:"Search by rule name. Comma-separated values are ORed."`
@@ -656,6 +732,7 @@ type listTransactionRulesInput struct {
 }
 
 type updateTransactionRuleInput struct {
+	WriteSessionContext
 	ID           string               `json:"id" jsonschema:"required,UUID of the rule to update"`
 	Name         *string              `json:"name,omitempty" jsonschema:"New name for the rule"`
 	Conditions   map[string]any       `json:"conditions,omitempty" jsonschema:"New condition tree (same format as create)"`
@@ -667,10 +744,12 @@ type updateTransactionRuleInput struct {
 }
 
 type deleteTransactionRuleInput struct {
+	WriteSessionContext
 	ID string `json:"id" jsonschema:"required,UUID of the rule to delete"`
 }
 
 type batchCreateRulesInput struct {
+	WriteSessionContext
 	Rules []batchRuleItem `json:"rules" jsonschema:"required,Array of rules to create"`
 }
 
@@ -684,15 +763,18 @@ type batchRuleItem struct {
 }
 
 type applyRulesInput struct {
+	WriteSessionContext
 	RuleID string `json:"rule_id,omitempty" jsonschema:"Optional UUID of a specific rule to apply. If omitted, applies all active rules (first match wins by priority)."`
 }
 
 type previewRuleInput struct {
+	ReadSessionContext
 	Conditions map[string]any `json:"conditions" jsonschema:"required,Condition tree to evaluate against existing transactions (same format as create_transaction_rule conditions)."`
 	SampleSize int            `json:"sample_size,omitempty" jsonschema:"Number of sample matching transactions to return (default 10, max 50)."`
 }
 
 type batchSubmitReviewsInput struct {
+	WriteSessionContext
 	Reviews []batchReviewItem `json:"reviews" jsonschema:"required,Array of review decisions to submit"`
 }
 
@@ -998,6 +1080,7 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 // --- Batch categorize / Bulk recategorize ---
 
 type batchCategorizeInput struct {
+	WriteSessionContext
 	Items []batchCategorizeItemInput `json:"items" jsonschema:"required,Array of transaction/category pairs (max 500)"`
 }
 
@@ -1007,6 +1090,7 @@ type batchCategorizeItemInput struct {
 }
 
 type bulkRecategorizeInput struct {
+	WriteSessionContext
 	TargetCategorySlug string   `json:"target_category_slug" jsonschema:"required,Category slug to assign to all matching transactions"`
 	StartDate          string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
 	EndDate            string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
@@ -1104,6 +1188,7 @@ func (s *MCPServer) handleBulkRecategorize(ctx context.Context, _ *mcpsdk.CallTo
 // --- Agent Reports ---
 
 type submitReportInput struct {
+	WriteSessionContext
 	Title    string   `json:"title" jsonschema:"required,A concise 1-2 sentence summary that reads like a notification or message. This is the primary thing the family sees on their dashboard — make it informative and self-contained. Good: 'Reviewed 47 transactions this week — 3 recategorized and no suspicious activity found.' Bad: 'Weekly Review Complete' (too vague to be useful without opening the full report)."`
 	Body     string   `json:"body" jsonschema:"required,Detailed breakdown in markdown format with supporting data. This is shown when the user expands the report for more detail. Use headers and bullet points and transaction links: [Transaction Name](/transactions/TRANSACTION_ID)."`
 	Priority string   `json:"priority" jsonschema:"Severity level. Valid values: info (default — routine updates and summaries), warning (needs attention soon), critical (urgent action required)"`
@@ -1119,7 +1204,7 @@ func (s *MCPServer) handleSubmitReport(reqCtx context.Context, _ *mcpsdk.CallToo
 	}
 
 	actor := service.ActorFromContext(reqCtx)
-	report, err := s.svc.CreateAgentReport(ctx, input.Title, input.Body, actor, input.Priority, input.Tags, input.Author)
+	report, err := s.svc.CreateAgentReport(ctx, input.Title, input.Body, actor, input.Priority, input.Tags, input.Author, input.SessionID)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}

@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -288,6 +289,33 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return ""
 				}
 				return *s
+			},
+			"derefInt32": func(p *int32) int32 {
+				if p == nil {
+					return 0
+				}
+				return *p
+			},
+			"prettyJSON": func(v interface{}) string {
+				var raw []byte
+				switch val := v.(type) {
+				case *json.RawMessage:
+					if val == nil {
+						return ""
+					}
+					raw = *val
+				case json.RawMessage:
+					raw = val
+				case []byte:
+					raw = val
+				default:
+					return fmt.Sprintf("%v", v)
+				}
+				var buf bytes.Buffer
+				if err := json.Indent(&buf, raw, "", "  "); err != nil {
+					return string(raw)
+				}
+				return buf.String()
 			},
 			"lower": strings.ToLower,
 			"eqFold": strings.EqualFold,
@@ -701,6 +729,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/agent_wizard.html",
 		"pages/mcp_guide.html",
 		"pages/prompt_builder.html",
+		"pages/session_detail.html",
 	}
 
 	// Pages that need multiple page files parsed together (for sub-template sharing).

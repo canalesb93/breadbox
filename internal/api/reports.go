@@ -50,7 +50,7 @@ func CreateReportHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		actor := service.ActorFromContext(r.Context())
-		report, err := svc.CreateAgentReport(r.Context(), req.Title, req.Body, actor, req.Priority, req.Tags, req.Author)
+		report, err := svc.CreateAgentReport(r.Context(), req.Title, req.Body, actor, req.Priority, req.Tags, req.Author, "")
 		if err != nil {
 			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return

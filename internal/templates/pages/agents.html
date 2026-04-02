@@ -29,6 +29,12 @@
     <i data-lucide="settings" class="w-3.5 h-3.5"></i>
     MCP Settings
   </button>
+  <a href="/agents?tab=activity"
+    :class="tab === 'activity' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+    class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 no-underline">
+    <i data-lucide="scroll-text" class="w-3.5 h-3.5"></i>
+    Activity
+  </a>
 </div>
 
 <!-- Getting Started Tab -->
@@ -44,6 +50,70 @@
 <!-- MCP Settings Tab -->
 <div x-show="tab === 'settings'" x-cloak>
   {{template "agents-settings-content" .}}
+</div>
+
+<!-- Activity Tab -->
+<div x-show="tab === 'activity'" x-cloak>
+{{if .Sessions}}
+  <div class="space-y-3">
+    {{range .Sessions}}
+    <a href="/agents/sessions/{{.ShortID}}" class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow no-underline block">
+      <div class="card-body p-4">
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-medium text-base-content">{{.Purpose}}</span>
+              {{if .ReportID}}
+                <span class="badge badge-sm badge-success gap-1">
+                  <i data-lucide="file-text" class="w-3 h-3"></i> Report
+                </span>
+              {{end}}
+            </div>
+            <div class="flex items-center gap-3 text-xs text-base-content/50">
+              {{if .AgentName}}
+                <span class="flex items-center gap-1">
+                  <i data-lucide="bot" class="w-3 h-3"></i>
+                  {{.AgentName}}
+                </span>
+              {{else}}
+                <span class="flex items-center gap-1">
+                  <i data-lucide="key" class="w-3 h-3"></i>
+                  {{.APIKeyName}}
+                </span>
+              {{end}}
+              <span>{{.ToolCallCount}} tool calls</span>
+              <span>{{relativeTime .CreatedAt}}</span>
+            </div>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-base-content/30 shrink-0 mt-1"></i>
+        </div>
+      </div>
+    </a>
+    {{end}}
+  </div>
+
+  {{if gt .SessionsTotalPages 1}}
+  <div class="bb-pagination mt-6">
+    {{$page := .SessionsPage}}
+    {{$total := .SessionsTotalPages}}
+    {{if gt $page 1}}
+      <a href="/agents?tab=activity&page={{add $page -1}}" class="btn btn-sm btn-ghost">&laquo; Previous</a>
+    {{end}}
+    <span class="text-sm text-base-content/50">Page {{$page}} of {{$total}}</span>
+    {{if lt $page $total}}
+      <a href="/agents?tab=activity&page={{add $page 1}}" class="btn btn-sm btn-ghost">Next &raquo;</a>
+    {{end}}
+  </div>
+  {{end}}
+{{else}}
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body items-center text-center py-12">
+      <i data-lucide="scroll-text" class="w-12 h-12 text-base-content/20 mb-3"></i>
+      <h3 class="font-medium text-base-content/70">No agent sessions yet</h3>
+      <p class="text-sm text-base-content/50 max-w-md">When AI agents use the MCP tools with sessions enabled, their activity will appear here.</p>
+    </div>
+  </div>
+{{end}}
 </div>
 
 </div><!-- /alpine x-data tabs -->

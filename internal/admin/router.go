@@ -116,6 +116,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/reports/{id}", ReportDetailHandler(a, svc, sm, tr))
 		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
 		r.Get("/agents", AgentsPageHandler(svc, mcpServer, sm, tr))
+		r.Get("/agents/sessions/{id}", SessionDetailHandler(svc, sm, tr))
 		r.Get("/review-instructions", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/agents?tab=settings", http.StatusMovedPermanently)
 		})

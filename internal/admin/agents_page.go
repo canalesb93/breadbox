@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"strconv"
 
 	breadboxmcp "breadbox/internal/mcp"
 	"breadbox/internal/service"
@@ -14,7 +15,7 @@ func AgentsPageHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer, s
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		tab := r.URL.Query().Get("tab")
-		if tab != "wizard" && tab != "settings" {
+		if tab != "wizard" && tab != "settings" && tab != "activity" {
 			tab = "guide"
 		}
 
@@ -138,9 +139,10 @@ func AgentsPageHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer, s
 			"add_transaction_comment":       "Comments & Reports",
 			"list_transaction_comments":     "Comments & Reports",
 			"submit_report":                 "Comments & Reports",
+			"create_session":                "Session",
 		}
 		groupOrder := []string{
-			"Accounts & Data", "Transactions", "Categories", "Categorization",
+			"Session", "Accounts & Data", "Transactions", "Categories", "Categorization",
 			"Reviews", "Rules", "Account Links", "Comments & Reports",
 		}
 
@@ -214,6 +216,23 @@ func AgentsPageHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer, s
 		data["DefaultReviewGuidelines"] = breadboxmcp.DefaultReviewGuidelines
 		data["ReportFormat"] = reportFormat
 		data["DefaultReportFormat"] = breadboxmcp.DefaultReportFormat
+
+		// === Activity tab data ===
+		if tab == "activity" {
+			page := 1
+			if p, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && p > 0 {
+				page = p
+			}
+			sessions, total, _ := svc.ListMCPSessions(ctx, page, 25)
+			data["Sessions"] = sessions
+			data["SessionsTotal"] = int(total)
+			data["SessionsPage"] = page
+			totalPages := int((total + 24) / 25)
+			if totalPages < 1 {
+				totalPages = 1
+			}
+			data["SessionsTotalPages"] = totalPages
+		}
 
 		tr.Render(w, r, "agents.html", data)
 	}
