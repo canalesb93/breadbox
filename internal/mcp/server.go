@@ -2,8 +2,10 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
@@ -208,7 +210,15 @@ Connection status, stale data, dedup issues
 
 TRANSACTION LINKS:
 When referencing specific transactions, always use markdown links: [Transaction Name](/transactions/ID)
-This makes transactions clickable in the dashboard for quick access.`
+This makes transactions clickable in the dashboard for quick access.
+
+SESSION MANAGEMENT:
+- Before performing write operations, call create_session with a purpose describing your task.
+- Include the returned session_id and a brief reason on ALL write tool calls.
+- Optionally include session_id on read calls to associate them with your session.
+- One session per logical task (e.g. "weekly review", "rule cleanup for dining").
+- The reason should be informal and specific (e.g. "approving clearly valid grocery charge", "creating rule for recurring uber charges").
+- Sessions and their tool calls are visible on the family's dashboard for transparency.`
 
 // ToolClassification indicates whether a tool is read-only or performs writes.
 type ToolClassification string
@@ -253,120 +263,125 @@ func NewMCPServer(svc *service.Service, version string) *MCPServer {
 
 // buildToolRegistry populates the allTools slice with all available tools and their classifications.
 func (s *MCPServer) buildToolRegistry() {
+	svc := s.svc
 	s.allTools = []ToolDef{
-		makeToolDef("list_accounts", ToolRead,
+		makeToolDefLogged("create_session", ToolWrite,
+			"Start an audit session before performing write operations. Returns a session_id to include on all subsequent tool calls. One session per logical task (e.g. 'weekly transaction review', 'rule creation for dining').",
+			s.handleCreateSession, svc),
+		makeToolDefLogged("list_accounts", ToolRead,
 			"List all bank accounts synced from Plaid, Teller, or CSV import. Each account belongs to a bank connection and optionally a user (family member). Returns account type, balances, institution name, and currency. Filter by user_id to see one family member's accounts.",
-			s.handleListAccounts),
-		makeToolDef("query_transactions", ToolRead,
+			s.handleListAccounts, svc),
+		makeToolDefLogged("query_transactions", ToolRead,
 			"Query bank transactions with optional filters and cursor-based pagination. Amounts: positive = money out (debit), negative = money in (credit). Dates: YYYY-MM-DD, start_date inclusive, end_date exclusive. Filter by category_slug (use list_categories to find slugs); parent slugs include all children. Results ordered by date desc by default. Pagination: pass next_cursor from response. Use the fields parameter to request only the fields you need (e.g., fields=core,category) to significantly reduce response size.",
-			s.handleQueryTransactions),
-		makeToolDef("count_transactions", ToolRead,
+			s.handleQueryTransactions, svc),
+		makeToolDefLogged("count_transactions", ToolRead,
 			"Count transactions matching optional filters. Same filters as query_transactions except cursor, limit, sort_by, and sort_order. Use this to get totals before paginating, or to compare counts across date ranges or categories.",
-			s.handleCountTransactions),
-		makeToolDef("list_categories", ToolRead,
+			s.handleCountTransactions, svc),
+		makeToolDefLogged("list_categories", ToolRead,
 			"List the full category taxonomy as a tree. Categories have: slug (stable identifier for filtering), display_name (human label), icon, color, and optional children. Use category slugs with the category_slug filter in query_transactions and count_transactions. Parent slugs include all children when filtering.",
-			s.handleListCategories),
-		makeToolDef("list_users", ToolRead,
+			s.handleListCategories, svc),
+		makeToolDefLogged("list_users", ToolRead,
 			"List all users (family members) in the system. Each user can own bank connections and their associated accounts. Use the returned user IDs to filter accounts or transactions by family member.",
-			s.handleListUsers),
-		makeToolDef("get_sync_status", ToolRead,
+			s.handleListUsers, svc),
+		makeToolDefLogged("get_sync_status", ToolRead,
 			"Get the status of all bank connections including provider type (plaid/teller/csv), sync status (active/error/pending_reauth), last sync time, and any error details. Use this to check data freshness or diagnose sync issues.",
-			s.handleGetSyncStatus),
-		makeToolDef("trigger_sync", ToolWrite,
+			s.handleGetSyncStatus, svc),
+		makeToolDefLogged("trigger_sync", ToolWrite,
 			"Trigger a manual sync of bank data from the provider (Plaid or Teller). Optionally specify a connection_id to sync a single connection; otherwise syncs all active connections. Returns immediately — the sync runs in the background. Check get_sync_status for results.",
-			s.handleTriggerSync),
-		makeToolDef("categorize_transaction", ToolWrite,
+			s.handleTriggerSync, svc),
+		makeToolDefLogged("categorize_transaction", ToolWrite,
 			"Manually override a transaction's category. Use list_categories to find the category ID, then pass both the transaction_id and category_id. This creates a permanent override that won't be changed by automatic sync.",
-			s.handleCategorizeTransaction),
-		makeToolDef("reset_transaction_category", ToolWrite,
+			s.handleCategorizeTransaction, svc),
+		makeToolDefLogged("reset_transaction_category", ToolWrite,
 			"Remove a manual category override from a transaction and re-resolve its category from the automatic mapping rules. Use this to undo a categorize_transaction action.",
-			s.handleResetTransactionCategory),
-		makeToolDef("add_transaction_comment", ToolWrite,
+			s.handleResetTransactionCategory, svc),
+		makeToolDefLogged("add_transaction_comment", ToolWrite,
 			"Add a comment to a transaction. Use this to explain categorization decisions, flag unusual transactions, or leave notes for the family. Comments are visible on the transaction detail page and to other agents. Supports markdown formatting.",
-			s.handleAddTransactionComment),
-		makeToolDef("list_transaction_comments", ToolRead,
+			s.handleAddTransactionComment, svc),
+		makeToolDefLogged("list_transaction_comments", ToolRead,
 			"List all comments on a transaction, ordered chronologically. Check comments before making changes to understand prior context and decisions by other agents or family members.",
-			s.handleListTransactionComments),
-		makeToolDef("transaction_summary", ToolRead,
+			s.handleListTransactionComments, svc),
+		makeToolDefLogged("transaction_summary", ToolRead,
 			"Get aggregated transaction totals grouped by category and/or time period. Replaces the need to paginate through thousands of individual transactions for spending analysis. Amounts follow the convention: positive = money out (debit), negative = money in (credit). Only includes non-deleted, non-pending transactions by default.",
-			s.handleTransactionSummary),
-		makeToolDef("merchant_summary", ToolRead,
+			s.handleTransactionSummary, svc),
+		makeToolDefLogged("merchant_summary", ToolRead,
 			"List distinct merchants with aggregated stats: transaction count, total spent, average amount, and date range. Returns a compact merchant-level index — use this to scan for recurring charges, identify top merchants, or find unknown subscriptions. Then drill into specific merchants with query_transactions using the search filter. Default date range: 90 days. Set min_count=2 to find recurring charges, min_count=3 for likely subscriptions.",
-			s.handleMerchantSummary),
-		makeToolDef("export_categories", ToolRead,
+			s.handleMerchantSummary, svc),
+		makeToolDefLogged("export_categories", ToolRead,
 			"Export all category definitions as TSV text. The returned format can be edited externally (in a text editor, by an AI agent, etc.) and re-imported via import_categories. Columns: slug, display_name, parent_slug, icon, color, sort_order, hidden, merge_into. Slugs are immutable identifiers; display_name and other fields can be changed. The merge_into column is empty on export.",
-			s.handleExportCategories),
-		makeToolDef("import_categories", ToolWrite,
+			s.handleExportCategories, svc),
+		makeToolDefLogged("import_categories", ToolWrite,
 			"Import category definitions from TSV text. Existing slugs are updated (display_name, icon, color, sort_order, hidden). New slugs are created. Missing slugs are NOT deleted. Parents must appear before children. Use export_categories to get the current state, edit it, then import the modified version. To merge/consolidate categories, set the merge_into column to the target category slug — all transactions and mappings from the source are reassigned to the target, then the source is deleted. This is useful for simplifying a complex taxonomy without losing transaction categorization.",
-			s.handleImportCategories),
-		makeToolDef("list_pending_reviews", ToolRead,
+			s.handleImportCategories, svc),
+		makeToolDefLogged("list_pending_reviews", ToolRead,
 			"List pending transaction reviews in the review queue. Reviews are created automatically during sync for new, uncategorized, or low-confidence transactions. Use limit to control batch size — review 10-20 at a time unless instructed otherwise. Filter by review_type (new_transaction, uncategorized, low_confidence, manual, re_review) and account_id. Each review includes the full transaction details and suggested category.",
-			s.handleListPendingReviews),
-		makeToolDef("submit_review", ToolWrite,
+			s.handleListPendingReviews, svc),
+		makeToolDefLogged("submit_review", ToolWrite,
 			"Submit a decision on a pending review. Decision: 'approved' or 'skipped'. Use 'approved' to resolve the review — you MUST provide the correct category via category_slug (e.g. 'food_and_drink_groceries') or category_id. Look at the transaction's name, merchant, and raw category fields to determine the right category — use list_categories to find valid slugs. If the review's suggested_category_slug looks correct, use that. If the transaction is miscategorized, provide the correct category_slug to fix it. Use 'skipped' only if you cannot confidently determine the correct category. Include a note when changing the category or skipping to explain your reasoning.",
-			s.handleSubmitReview),
-		makeToolDef("create_transaction_rule", ToolWrite,
+			s.handleSubmitReview, svc),
+		makeToolDefLogged("create_transaction_rule", ToolWrite,
 			"Create a transaction rule for automatic categorization. Rules match conditions against transaction fields and apply to ALL future transactions during sync. IMPORTANT: Before creating, check list_transaction_rules to avoid duplicates. Prefer broader patterns (contains) over exact matches. Conditions use a JSON tree with AND/OR/NOT logic. Available fields: name, merchant_name, amount, category_primary (raw provider category), category_detailed, pending, provider, account_id, user_id. Operators: eq, neq, contains, not_contains, matches (regex), gt, gte, lt, lte, in.",
-			s.handleCreateTransactionRule),
-		makeToolDef("list_transaction_rules", ToolRead,
+			s.handleCreateTransactionRule, svc),
+		makeToolDefLogged("list_transaction_rules", ToolRead,
 			"List transaction rules with optional filters. Rules auto-categorize transactions during sync based on pattern matching. Use this to check existing rules before creating new ones.",
-			s.handleListTransactionRules),
-		makeToolDef("update_transaction_rule", ToolWrite,
+			s.handleListTransactionRules, svc),
+		makeToolDefLogged("update_transaction_rule", ToolWrite,
 			"Update a transaction rule's name, conditions, category, priority, enabled status, or expiry.",
-			s.handleUpdateTransactionRule),
-		makeToolDef("delete_transaction_rule", ToolWrite,
+			s.handleUpdateTransactionRule, svc),
+		makeToolDefLogged("delete_transaction_rule", ToolWrite,
 			"Delete a transaction rule by ID.",
-			s.handleDeleteTransactionRule),
-		makeToolDef("batch_submit_reviews", ToolWrite,
+			s.handleDeleteTransactionRule, svc),
+		makeToolDefLogged("batch_submit_reviews", ToolWrite,
 			"Submit decisions on multiple pending reviews at once. Each review needs a decision (approved or skipped) and optionally a category_slug or category_id. More efficient than submitting reviews one at a time.",
-			s.handleBatchSubmitReviews),
-		makeToolDef("batch_create_rules", ToolWrite,
+			s.handleBatchSubmitReviews, svc),
+		makeToolDefLogged("batch_create_rules", ToolWrite,
 			"Create multiple transaction rules at once. Each rule needs a name, category_slug, and conditions object. More efficient than creating rules one at a time. Returns created rules and any errors.",
-			s.handleBatchCreateRules),
-		makeToolDef("apply_rules", ToolWrite,
+			s.handleBatchCreateRules, svc),
+		makeToolDefLogged("apply_rules", ToolWrite,
 			"Apply transaction rules retroactively to existing transactions. Pass rule_id to apply a single rule, or omit to apply all active rules (first match wins by priority). Updates category_id on matching non-deleted, non-overridden transactions. Returns count of affected transactions.",
-			s.handleApplyRules),
-		makeToolDef("preview_rule", ToolRead,
+			s.handleApplyRules, svc),
+		makeToolDefLogged("preview_rule", ToolRead,
 			"Preview/dry-run a rule's conditions against existing transactions without making changes. Returns match_count, total_scanned, and sample_matches with transaction details. Use this to test conditions before creating a rule.",
-			s.handlePreviewRule),
-		makeToolDef("batch_categorize_transactions", ToolWrite,
+			s.handlePreviewRule, svc),
+		makeToolDefLogged("batch_categorize_transactions", ToolWrite,
 			"Categorize multiple transactions at once. Each item needs a transaction_id and category_slug. Max 500 items per request. Sets category_override=true on each transaction. More efficient than calling categorize_transaction repeatedly. Returns succeeded count and any per-item errors.",
-			s.handleBatchCategorize),
-		makeToolDef("bulk_recategorize", ToolWrite,
+			s.handleBatchCategorize, svc),
+		makeToolDefLogged("bulk_recategorize", ToolWrite,
 			"Recategorize all transactions matching a filter to a new category. Requires target_category_slug and at least one filter (safety requirement). Sets category_override=true since this is an explicit action. Use this for bulk corrections — e.g., recategorize all transactions currently tagged 'general_merchandise' in a date range to 'groceries'. Returns matched/updated counts.",
-			s.handleBulkRecategorize),
-		makeToolDef("list_account_links", ToolRead,
+			s.handleBulkRecategorize, svc),
+		makeToolDefLogged("list_account_links", ToolRead,
 			"List account links between primary and dependent/authorized-user accounts. Account links deduplicate transactions that appear in both a primary cardholder and authorized user's bank feeds. Returns link details, match counts, and unmatched transaction counts.",
-			s.handleListAccountLinks),
-		makeToolDef("create_account_link", ToolWrite,
+			s.handleListAccountLinks, svc),
+		makeToolDefLogged("create_account_link", ToolWrite,
 			"Link a dependent account to a primary account for cross-connection deduplication. When two family members connect the same credit card (e.g., primary cardholder and authorized user), transactions appear in both feeds. This link pairs matching transactions by date+amount, excludes the dependent's copies from totals, and attributes matched primary-side transactions to the dependent user. Automatically runs initial reconciliation after creation.",
-			s.handleCreateAccountLink),
-		makeToolDef("delete_account_link", ToolWrite,
+			s.handleCreateAccountLink, svc),
+		makeToolDefLogged("delete_account_link", ToolWrite,
 			"Remove an account link and clear all transaction attribution set by it. Transactions from the dependent account will be included in totals again.",
-			s.handleDeleteAccountLink),
-		makeToolDef("reconcile_account_link", ToolWrite,
+			s.handleDeleteAccountLink, svc),
+		makeToolDefLogged("reconcile_account_link", ToolWrite,
 			"Manually trigger match reconciliation for an account link. Finds unmatched dependent transactions and attempts to pair them with primary account transactions by date and exact amount. Matched primary transactions are attributed to the dependent user.",
-			s.handleReconcileAccountLink),
-		makeToolDef("list_transaction_matches", ToolRead,
+			s.handleReconcileAccountLink, svc),
+		makeToolDefLogged("list_transaction_matches", ToolRead,
 			"List matched transaction pairs for an account link. Shows which primary-side transactions have been matched to dependent-side transactions, with match confidence and the fields that matched.",
-			s.handleListTransactionMatches),
-		makeToolDef("confirm_match", ToolWrite,
+			s.handleListTransactionMatches, svc),
+		makeToolDefLogged("confirm_match", ToolWrite,
 			"Confirm an auto-matched transaction pair as correct. Changes match confidence from 'auto' to 'confirmed'.",
-			s.handleConfirmMatch),
-		makeToolDef("reject_match", ToolWrite,
+			s.handleConfirmMatch, svc),
+		makeToolDefLogged("reject_match", ToolWrite,
 			"Reject a false auto-match between two transactions. Removes the match record and restores the primary transaction's original user attribution.",
-			s.handleRejectMatch),
-		makeToolDef("pending_reviews_overview", ToolRead,
+			s.handleRejectMatch, svc),
+		makeToolDefLogged("pending_reviews_overview", ToolRead,
 			"Get an overview of the pending review queue. Returns total pending count, breakdown by review type (new_transaction, uncategorized, low_confidence, manual, re_review), and groups by raw provider category with counts and sample transaction names. Much more token-efficient than listing all reviews — use this first to understand the review queue composition, then use list_pending_reviews with filters to process one group at a time.",
-			s.handlePendingReviewsOverview),
-		makeToolDef("submit_report", ToolWrite,
+			s.handlePendingReviewsOverview, svc),
+		makeToolDefLogged("submit_report", ToolWrite,
 			"Send a message to the family's dashboard. The title is the main message — write it as a concise, self-contained 1-2 sentence summary the family can understand at a glance without expanding. The body provides the detailed breakdown (markdown with headers, bullets, transaction links). Use priority to signal urgency and author to identify your role.",
-			s.handleSubmitReport),
+			s.handleSubmitReport, svc),
 	}
 }
 
-// makeToolDef is a helper to create a ToolDef with a typed handler.
-func makeToolDef[T any](name string, classification ToolClassification, description string, handler func(context.Context, *mcpsdk.CallToolRequest, T) (*mcpsdk.CallToolResult, any, error)) ToolDef {
+// makeToolDefLogged creates a ToolDef with logging and session enforcement.
+// This is called during buildToolRegistry when s.svc is available.
+func makeToolDefLogged[T any](name string, classification ToolClassification, description string, handler func(context.Context, *mcpsdk.CallToolRequest, T) (*mcpsdk.CallToolResult, any, error), svc *service.Service) ToolDef {
 	return ToolDef{
 		Tool: mcpsdk.Tool{
 			Name:        name,
@@ -374,12 +389,77 @@ func makeToolDef[T any](name string, classification ToolClassification, descript
 		},
 		Classification: classification,
 		register: func(server *mcpsdk.Server) {
+			wrappedHandler := func(ctx context.Context, req *mcpsdk.CallToolRequest, input T) (*mcpsdk.CallToolResult, any, error) {
+				// Extract session context via interface.
+				var sessionID, reason string
+				if sc, ok := any(input).(sessionContextProvider); ok {
+					sessionID = sc.GetSessionID()
+					reason = sc.GetReason()
+				}
+
+				// Enforce session_id + reason on write tools (except create_session).
+				if classification == ToolWrite && name != "create_session" {
+					if sessionID == "" {
+						return errorResult(fmt.Errorf("session_id is required for write operations; call create_session first")), nil, nil
+					}
+					if reason == "" {
+						return errorResult(fmt.Errorf("reason is required for write operations")), nil, nil
+					}
+				}
+
+				start := time.Now()
+				result, out, err := handler(ctx, req, input)
+				duration := time.Since(start)
+
+				// Log tool call asynchronously.
+				go func() {
+					logCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancel()
+
+					var reqJSON []byte
+					if req != nil && req.Params.Arguments != nil {
+						reqJSON = truncateBytes(req.Params.Arguments, maxLogBytes)
+					}
+					var respJSON []byte
+					if result != nil {
+						if b, err := json.Marshal(result); err == nil {
+							respJSON = truncateBytes(b, maxLogBytes)
+						}
+					}
+
+					actor := service.ActorFromContext(ctx)
+					isErr := (result != nil && result.IsError) || err != nil
+					svc.LogToolCall(logCtx, service.ToolCallLogInput{
+						SessionID:      sessionID,
+						ToolName:       name,
+						Classification: string(classification),
+						Reason:         reason,
+						RequestJSON:    reqJSON,
+						ResponseJSON:   respJSON,
+						IsError:        isErr,
+						Actor:          actor,
+						DurationMs:     int(duration.Milliseconds()),
+					})
+				}()
+
+				return result, out, err
+			}
 			mcpsdk.AddTool(server, &mcpsdk.Tool{
 				Name:        name,
 				Description: description,
-			}, handler)
+			}, wrappedHandler)
 		},
 	}
+}
+
+const maxLogBytes = 32768 // 32KB max for stored request/response JSON
+
+// truncateBytes returns b if len <= max, otherwise truncates and appends a marker.
+func truncateBytes(b []byte, max int) []byte {
+	if len(b) <= max {
+		return b
+	}
+	return append(b[:max-50], []byte(`... [truncated]"}`)...)
 }
 
 // BuildServer creates a filtered *mcpsdk.Server for the given config.

@@ -53,8 +53,8 @@ var ValidReportPriorities = map[string]bool{
 	"critical": true,
 }
 
-// CreateAgentReport creates a new agent report.
-func (s *Service) CreateAgentReport(ctx context.Context, title, body string, actor Actor, priority string, tags []string, author string) (AgentReportResponse, error) {
+// CreateAgentReport creates a new agent report, optionally linked to an MCP session.
+func (s *Service) CreateAgentReport(ctx context.Context, title, body string, actor Actor, priority string, tags []string, author string, sessionID string) (AgentReportResponse, error) {
 	if title == "" {
 		return AgentReportResponse{}, fmt.Errorf("%w: title is required", ErrInvalidParameter)
 	}
@@ -79,6 +79,8 @@ func (s *Service) CreateAgentReport(ctx context.Context, title, body string, act
 		createdByName = author
 	}
 
+	sessUUID, _ := s.ResolveSessionUUID(ctx, sessionID)
+
 	report, err := s.Queries.CreateAgentReport(ctx, db.CreateAgentReportParams{
 		Title:         title,
 		Body:          body,
@@ -88,6 +90,7 @@ func (s *Service) CreateAgentReport(ctx context.Context, title, body string, act
 		Priority:      priority,
 		Tags:          tags,
 		Author:        pgtype.Text{String: author, Valid: author != ""},
+		SessionID:     sessUUID,
 	})
 	if err != nil {
 		return AgentReportResponse{}, fmt.Errorf("create agent report: %w", err)

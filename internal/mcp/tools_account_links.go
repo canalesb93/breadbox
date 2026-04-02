@@ -10,9 +10,12 @@ import (
 
 // --- Input types ---
 
-type listAccountLinksInput struct{}
+type listAccountLinksInput struct {
+	ReadSessionContext
+}
 
 type createAccountLinkInput struct {
+	WriteSessionContext
 	PrimaryAccountID   string `json:"primary_account_id" jsonschema:"The primary cardholder's account ID"`
 	DependentAccountID string `json:"dependent_account_id" jsonschema:"The authorized/dependent user's account ID"`
 	MatchStrategy      string `json:"match_strategy,omitempty" jsonschema:"Matching strategy: date_amount_name (default)"`
@@ -20,26 +23,33 @@ type createAccountLinkInput struct {
 }
 
 type deleteAccountLinkInput struct {
+	WriteSessionContext
 	LinkID string `json:"link_id" jsonschema:"The account link ID to delete"`
 }
 
 type reconcileAccountLinkInput struct {
+	WriteSessionContext
 	LinkID string `json:"link_id" jsonschema:"The account link ID to reconcile"`
 }
 
 type listTransactionMatchesInput struct {
+	ReadSessionContext
 	LinkID string `json:"link_id" jsonschema:"The account link ID to list matches for"`
 }
 
 type confirmMatchInput struct {
+	WriteSessionContext
 	MatchID string `json:"match_id" jsonschema:"The transaction match ID to confirm"`
 }
 
 type rejectMatchInput struct {
+	WriteSessionContext
 	MatchID string `json:"match_id" jsonschema:"The transaction match ID to reject"`
 }
 
-type pendingReviewsOverviewInput struct{}
+type pendingReviewsOverviewInput struct {
+	ReadSessionContext
+}
 
 // --- Handlers ---
 
