@@ -58,7 +58,8 @@ nav:
       - CSV Import: csv-import.md
       - Backup & Restore: backup.md
   - API Reference:
-      - REST API: rest-api.md
+      - Quick Reference: api-reference.md
+      - REST API (detailed): rest-api.md
       - MCP Server: mcp-server.md
   - Provider Setup:
       - Plaid: plaid-integration.md
