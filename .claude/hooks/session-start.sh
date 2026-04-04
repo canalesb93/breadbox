@@ -1,14 +1,52 @@
 #!/bin/bash
-# Session startup hook for Claude Code Web.
-# Installs tools and generates gitignored build artifacts.
-
-# Only run in Claude Code Web (remote) sessions
-if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
-  exit 0
-fi
+# Session startup hook for Claude Code.
+# - Remote (web) sessions: installs tools and generates build artifacts from scratch
+# - Local worktree sessions: verifies build and injects env vars
+#   (file copying is handled by .worktreeinclude)
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 cd "$PROJECT_DIR"
+
+# --- Local sessions ---
+if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
+  # Check if we're in a git worktree
+  GIT_COMMON="$(git rev-parse --git-common-dir 2>/dev/null || echo ".git")"
+  if [ "$GIT_COMMON" = ".git" ]; then
+    # Main repo — nothing to do
+    exit 0
+  fi
+
+  # Worktree: verify build works with the copied artifacts
+  echo "==> Worktree session — verifying Go build..."
+  if go build ./... 2>&1; then
+    echo "    Build OK"
+  else
+    echo "WARN: go build failed — check for missing generated files"
+  fi
+
+  # Inject env vars if CLAUDE_ENV_FILE is available
+  if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
+    if [ -z "${DATABASE_URL:-}" ]; then
+      echo 'DATABASE_URL=postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable' >> "$CLAUDE_ENV_FILE"
+      echo "    Set DATABASE_URL"
+    fi
+    if [ -z "${ENCRYPTION_KEY:-}" ]; then
+      RUNNING_PID="$(pgrep -f 'breadbox serve' | head -1 || true)"
+      if [ -n "$RUNNING_PID" ]; then
+        EK="$(ps eww -p "$RUNNING_PID" 2>/dev/null | tr ' ' '\n' | grep '^ENCRYPTION_KEY=' | cut -d= -f2 || true)"
+        if [ -n "$EK" ]; then
+          echo "ENCRYPTION_KEY=$EK" >> "$CLAUDE_ENV_FILE"
+          echo "    Set ENCRYPTION_KEY from running process"
+        fi
+      fi
+    fi
+  fi
+
+  echo "==> Worktree setup complete."
+  exit 0
+fi
+
+# --- Remote (web) sessions below ---
 
 SQLC_VERSION="1.30.0"
 

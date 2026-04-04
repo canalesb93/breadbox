@@ -1,0 +1,17 @@
+# Gitignored build artifacts to copy into worktrees automatically.
+# Only files matching these patterns AND ignored by .gitignore get copied.
+
+# Tailwind CSS standalone binary
+tailwindcss-extra
+
+# Built CSS
+static/css/styles.css
+
+# sqlc generated files
+internal/db/db.go
+internal/db/models.go
+internal/db/querier.go
+internal/db/*.sql.go
+
+# Local env (if present)
+.local.env
