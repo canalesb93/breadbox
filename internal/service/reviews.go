@@ -73,7 +73,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 		t.amount, t.iso_currency_code, t.date, t.name, t.merchant_name,
 		t.category_primary, t.category_detailed, t.pending, t.created_at AS t_created_at, t.updated_at AS t_updated_at,
 		t.short_id AS t_short_id, t.account_id, COALESCE(a.display_name, a.name) AS account_name,
-		u.name AS user_name,
+		COALESCE(au.name, u.name) AS user_name,
 		t.category_id, t.category_override,
 		c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, c.color AS cat_color,
 		pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name,
@@ -83,6 +83,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 		JOIN accounts a ON t.account_id = a.id
 		LEFT JOIN bank_connections bc ON a.connection_id = bc.id
 		LEFT JOIN users u ON bc.user_id = u.id
+		LEFT JOIN users au ON t.attributed_user_id = au.id
 		LEFT JOIN categories sc ON rq.suggested_category_id = sc.id
 		LEFT JOIN categories scp ON sc.parent_id = scp.id
 		LEFT JOIN categories rc ON rq.resolved_category_id = rc.id
