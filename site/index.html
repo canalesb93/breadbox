@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Breadbox — Your data. Your agents.</title>
+<meta name="description" content="Self-hosted financial data aggregation for families. Connect your banks, sync transactions, query with AI agents via MCP.">
+<meta property="og:title" content="Breadbox — Your data. Your agents.">
+<meta property="og:description" content="Self-hosted financial data aggregation for families. Connect your banks, query with AI agents.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://breadbox.sh">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root {
+    --amber-50: #fffbeb; --amber-100: #fef3c7; --amber-200: #fde68a;
+    --amber-300: #fcd34d; --amber-400: #fbbf24; --amber-500: #f59e0b;
+    --amber-600: #d97706; --amber-700: #b45309; --amber-800: #92400e;
+    --amber-900: #78350f; --amber-950: #451a03;
+    --stone-50: #fafaf9; --stone-100: #f5f5f4; --stone-200: #e7e5e4;
+    --stone-300: #d6d3d1; --stone-400: #a8a29e; --stone-500: #78716c;
+    --stone-600: #57534e; --stone-700: #44403c; --stone-800: #292524;
+    --stone-900: #1c1917; --stone-950: #0c0a09;
+
+    --bg: var(--stone-50); --bg-alt: #fff; --bg-card: #fff;
+    --text: var(--stone-900); --text-muted: var(--stone-500);
+    --text-dim: var(--stone-400); --border: var(--stone-200);
+    --accent: var(--amber-600); --accent-light: var(--amber-100);
+    --accent-glow: rgba(245, 158, 11, 0.15);
+    --term-bg: var(--stone-900); --term-text: var(--stone-200);
+    --term-accent: var(--amber-400);
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-lg: 0 10px 40px rgba(0,0,0,0.08);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: var(--stone-950); --bg-alt: var(--stone-900); --bg-card: var(--stone-900);
+      --text: var(--stone-100); --text-muted: var(--stone-400);
+      --text-dim: var(--stone-600); --border: var(--stone-800);
+      --accent: var(--amber-500); --accent-light: rgba(245,158,11,0.12);
+      --accent-glow: rgba(245, 158, 11, 0.08);
+      --shadow: 0 1px 3px rgba(0,0,0,0.3); --shadow-lg: 0 10px 40px rgba(0,0,0,0.4);
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container { max-width: 1120px; margin: 0 auto; padding: 0 1.5rem; }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    padding: 1rem 0;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    transition: box-shadow 0.3s;
+  }
+  nav.scrolled { box-shadow: var(--shadow); }
+  nav .container { display: flex; align-items: center; justify-content: space-between; }
+  .nav-brand {
+    display: flex; align-items: center; gap: 0.6rem;
+    font-weight: 700; font-size: 1.15rem; text-decoration: none; color: var(--text);
+    letter-spacing: -0.02em;
+  }
+  .nav-logo {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--amber-500), var(--amber-700));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; line-height: 1;
+  }
+  .nav-links { display: flex; align-items: center; gap: 2rem; }
+  .nav-links a {
+    font-size: 0.875rem; color: var(--text-muted); text-decoration: none;
+    font-weight: 500; transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--text); }
+  .nav-links .btn-nav {
+    background: var(--text); color: var(--bg); padding: 0.45rem 1rem;
+    border-radius: 8px; font-weight: 600; transition: opacity 0.2s;
+  }
+  .nav-links .btn-nav:hover { opacity: 0.85; color: var(--bg); }
+
+  @media (max-width: 640px) {
+    .nav-links a:not(.btn-nav) { display: none; }
+  }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 10rem 0 6rem; text-align: center; position: relative;
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, var(--accent-glow), transparent);
+  }
+  .hero-kicker {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.35rem 0.9rem; border-radius: 100px;
+    border: 1px solid var(--border); background: var(--bg-card);
+    font-size: 0.78rem; font-weight: 500; color: var(--text-muted);
+    margin-bottom: 2rem; box-shadow: var(--shadow);
+  }
+  .hero-kicker .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-dim); }
+
+  .hero h1 {
+    font-size: clamp(2.8rem, 7vw, 5rem); font-weight: 800;
+    line-height: 1.05; letter-spacing: -0.04em;
+    max-width: 720px; margin: 0 auto 1.5rem;
+  }
+  .hero h1 .accent {
+    background: linear-gradient(135deg, var(--amber-500), var(--amber-700));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero .tagline {
+    font-size: 1.15rem; color: var(--text-muted);
+    max-width: 540px; margin: 0 auto 2.5rem; line-height: 1.7;
+  }
+  .hero-ctas { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-bottom: 3rem; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.7rem 1.5rem; border-radius: 10px;
+    font-size: 0.9rem; font-weight: 600; text-decoration: none;
+    transition: all 0.2s; border: none; cursor: pointer;
+  }
+  .btn i { width: 16px; height: 16px; }
+  .btn-primary {
+    background: var(--text); color: var(--bg);
+  }
+  .btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
+  .btn-secondary {
+    background: var(--bg-card); color: var(--text); border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .btn-secondary:hover { border-color: var(--text-dim); transform: translateY(-1px); }
+
+  .hero-badges {
+    display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;
+    font-size: 0.8rem; color: var(--text-dim); font-weight: 500;
+  }
+  .hero-badges span { display: flex; align-items: center; gap: 0.35rem; }
+  .hero-badges i { width: 14px; height: 14px; }
+
+  /* ── SECTION COMMON ── */
+  section { padding: 6rem 0; }
+  .section-label {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--accent); margin-bottom: 0.75rem;
+  }
+  .section-label i { width: 14px; height: 14px; }
+  section h2 {
+    font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800;
+    letter-spacing: -0.03em; line-height: 1.15; margin-bottom: 1rem;
+  }
+  section .subtitle {
+    color: var(--text-muted); font-size: 1.05rem;
+    max-width: 560px; line-height: 1.7; margin-bottom: 3rem;
+  }
+
+  /* ── PROBLEM / COMPARISON ── */
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 768px) { .comparison { grid-template-columns: 1fr; } }
+  .comp-card {
+    border: 1px solid var(--border); border-radius: 16px;
+    padding: 1.75rem; background: var(--bg-card); box-shadow: var(--shadow);
+  }
+  .comp-card h3 {
+    font-size: 0.85rem; font-weight: 600; margin-bottom: 1.25rem;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .comp-card h3 i { width: 16px; height: 16px; }
+  .comp-card.enriched { border-color: var(--amber-300); }
+  .comp-card.enriched h3 { color: var(--accent); }
+  .tx-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.55rem 0; border-bottom: 1px solid var(--border);
+    font-size: 0.82rem;
+  }
+  .tx-row:last-child { border-bottom: none; }
+  .tx-name { font-weight: 500; font-family: 'DM Mono', monospace; font-size: 0.78rem; }
+  .tx-cat {
+    font-size: 0.72rem; padding: 0.2rem 0.5rem; border-radius: 6px;
+    font-weight: 500; white-space: nowrap;
+  }
+  .tx-cat.unknown { background: var(--stone-200); color: var(--stone-600); }
+  .tx-cat.known { background: var(--accent-light); color: var(--amber-800); }
+  @media (prefers-color-scheme: dark) {
+    .tx-cat.unknown { background: var(--stone-800); color: var(--stone-400); }
+    .tx-cat.known { color: var(--amber-300); }
+  }
+  .comp-verdict {
+    margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);
+    font-size: 0.82rem; color: var(--text-muted);
+  }
+
+  /* ── FLOW ── */
+  .flow-section { background: var(--bg-alt); }
+  .flow-diagram {
+    display: flex; align-items: center; justify-content: center;
+    gap: 0; flex-wrap: wrap; margin-top: 1rem;
+  }
+  .flow-node {
+    text-align: center; padding: 1.5rem;
+    border: 1px solid var(--border); border-radius: 14px;
+    background: var(--bg-card); box-shadow: var(--shadow);
+    flex: 1; min-width: 200px; max-width: 280px;
+  }
+  .flow-node h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
+  .flow-node h4 i { width: 18px; height: 18px; }
+  .flow-node p { font-size: 0.8rem; color: var(--text-muted); }
+  .flow-node.highlight { border-color: var(--amber-400); background: linear-gradient(180deg, var(--accent-glow), var(--bg-card)); }
+  .flow-arrow { color: var(--text-dim); padding: 0 0.75rem; flex-shrink: 0; }
+  .flow-arrow i { width: 20px; height: 20px; }
+  .flow-tags { display: flex; gap: 0.35rem; justify-content: center; margin-top: 0.6rem; flex-wrap: wrap; }
+  .flow-tag {
+    font-size: 0.65rem; font-weight: 600; padding: 0.15rem 0.45rem;
+    border-radius: 4px; background: var(--accent-light); color: var(--accent);
+    letter-spacing: 0.02em;
+  }
+  .flow-feedback {
+    margin-top: 1.5rem; text-align: center;
+    font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--text-dim);
+    display: flex; align-items: center; justify-content: center; gap: 0.75rem;
+  }
+  .flow-feedback i { width: 14px; height: 14px; color: var(--accent); }
+  .flow-feedback .line { flex: 1; max-width: 80px; height: 1px; background: var(--border); }
+  @media (max-width: 768px) {
+    .flow-diagram { flex-direction: column; }
+    .flow-arrow { transform: rotate(90deg); padding: 0.5rem 0; }
+  }
+
+  /* ── TERMINAL ── */
+  .terminal-section { padding: 6rem 0; }
+  .terminal {
+    max-width: 700px; margin: 0 auto; border-radius: 14px; overflow: hidden;
+    box-shadow: var(--shadow-lg); border: 1px solid var(--border);
+  }
+  .terminal-bar {
+    background: var(--stone-800); padding: 0.65rem 1rem;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .terminal-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .terminal-dot.r { background: #ef4444; } .terminal-dot.y { background: #eab308; }
+  .terminal-dot.g { background: #22c55e; }
+  .terminal-title {
+    flex: 1; text-align: center; font-size: 0.72rem; color: var(--stone-500);
+    font-family: 'DM Mono', monospace;
+  }
+  .terminal-body {
+    background: var(--term-bg); padding: 1.5rem; min-height: 280px;
+    font-family: 'DM Mono', monospace; font-size: 0.8rem;
+    line-height: 1.7; color: var(--term-text);
+  }
+  .term-prompt { color: var(--term-accent); }
+  .term-comment { color: var(--stone-600); }
+  .term-string { color: #86efac; }
+  .term-number { color: #93c5fd; }
+  .term-key { color: var(--term-accent); }
+  .term-line { margin-bottom: 0.15rem; opacity: 0; animation: fadeUp 0.3s forwards; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .cursor-blink { animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── FEATURES ── */
+  .features-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem;
+  }
+  @media (max-width: 768px) { .features-grid { grid-template-columns: 1fr; } }
+  @media (min-width: 769px) and (max-width: 1024px) { .features-grid { grid-template-columns: repeat(2, 1fr); } }
+  .feature-card {
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 1.5rem; background: var(--bg-card); box-shadow: var(--shadow);
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .feature-card:hover { border-color: var(--amber-300); transform: translateY(-2px); }
+  .feature-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: var(--accent-light); color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 1rem;
+  }
+  .feature-icon i { width: 18px; height: 18px; }
+  .feature-card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; }
+  .feature-card p { font-size: 0.82rem; color: var(--text-muted); line-height: 1.6; }
+
+  /* ── QUICKSTART ── */
+  .quickstart { background: var(--bg-alt); }
+  .quickstart pre {
+    max-width: 600px; margin: 0 auto;
+    background: var(--term-bg); border-radius: 12px;
+    padding: 1.5rem; overflow-x: auto;
+    font-family: 'DM Mono', monospace; font-size: 0.82rem;
+    line-height: 1.8; color: var(--term-text);
+    box-shadow: var(--shadow-lg); border: 1px solid var(--stone-800);
+  }
+  .quickstart pre .comment { color: var(--stone-600); }
+  .quickstart pre .cmd { color: var(--term-accent); }
+
+  /* ── FOOTER ── */
+  footer {
+    padding: 3rem 0; border-top: 1px solid var(--border);
+    text-align: center; font-size: 0.8rem; color: var(--text-dim);
+  }
+  footer .footer-links { display: flex; gap: 1.5rem; justify-content: center; margin-bottom: 0.75rem; }
+  footer a { color: var(--text-muted); text-decoration: none; font-weight: 500; }
+  footer a:hover { color: var(--text); }
+
+  /* ── SCROLL ANIMATIONS ── */
+  .reveal { opacity: 0; transform: translateY(20px); transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+  .reveal.visible { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="container">
+    <a href="/" class="nav-brand">
+      <span class="nav-logo" aria-label="Breadbox logo">&#127838;</span>
+      Breadbox
+    </a>
+    <div class="nav-links">
+      <a href="https://canalesb93.github.io/breadbox">Docs</a>
+      <a href="https://github.com/canalesb93/breadbox">GitHub</a>
+      <a href="https://github.com/canalesb93/breadbox#quick-start" class="btn-nav">Get Started</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="container">
+    <div class="hero-kicker">Self-hosted <span class="dot"></span> MCP-native <span class="dot"></span> Open source</div>
+    <h1>Your data.<br><span class="accent">Your agents.</span></h1>
+    <p class="tagline">Financial data aggregation infrastructure purpose-built for the age of personal AI agents. Connect your banks, sync transactions, query with any AI assistant.</p>
+    <div class="hero-ctas">
+      <a href="https://github.com/canalesb93/breadbox#quick-start" class="btn btn-primary"><i data-lucide="terminal"></i> Get Started</a>
+      <a href="https://canalesb93.github.io/breadbox" class="btn btn-secondary"><i data-lucide="book-open"></i> Read the Docs</a>
+    </div>
+    <div class="hero-badges">
+      <span><i data-lucide="server"></i> Self-hosted</span>
+      <span><i data-lucide="bot"></i> 30+ MCP tools</span>
+      <span><i data-lucide="scale"></i> AGPL-3.0</span>
+      <span><i data-lucide="code-2"></i> Go</span>
+    </div>
+  </div>
+</div>
+
+<!-- PROBLEM -->
+<section>
+  <div class="container">
+    <div class="section-label"><i data-lucide="alert-triangle"></i> The Problem</div>
+    <h2>Closed systems will never<br>get this right</h2>
+    <p class="subtitle">Banks categorize with ML trained on aggregate data. They fail on the long tail &mdash; because the context doesn't exist in the transaction data alone.</p>
+
+    <div class="comparison reveal">
+      <div class="comp-card">
+        <h3><i data-lucide="landmark"></i> What your bank sees</h3>
+        <div class="tx-row"><span class="tx-name">DEBIT POS MARIA'S KITCHEN</span> <span class="tx-cat unknown">Unknown</span></div>
+        <div class="tx-row"><span class="tx-name">APPLE.COM/BILL</span> <span class="tx-cat unknown">Tech</span></div>
+        <div class="tx-row"><span class="tx-name">VENMO *SARAH-K</span> <span class="tx-cat unknown">Transfer</span></div>
+        <div class="tx-row"><span class="tx-name">WHOLEFDS MKT #10847</span> <span class="tx-cat unknown">Shopping</span></div>
+        <div class="tx-row"><span class="tx-name">GENERAL MERCHANDISE</span> <span class="tx-cat unknown">General</span></div>
+        <div class="comp-verdict"><strong>They see metadata.</strong> No merchant context, no accuracy on the long tail.</div>
+      </div>
+
+      <div class="comp-card enriched">
+        <h3><i data-lucide="sparkles"></i> What your agent knows</h3>
+        <div class="tx-row"><span class="tx-name">DEBIT POS MARIA'S KITCHEN</span> <span class="tx-cat known">Dining</span></div>
+        <div class="tx-row"><span class="tx-name">APPLE.COM/BILL</span> <span class="tx-cat known">Subscriptions</span></div>
+        <div class="tx-row"><span class="tx-name">VENMO *SARAH-K</span> <span class="tx-cat known">Dining</span></div>
+        <div class="tx-row"><span class="tx-name">WHOLEFDS MKT #10847</span> <span class="tx-cat known">Groceries</span></div>
+        <div class="tx-row"><span class="tx-name">GENERAL MERCHANDISE</span> <span class="tx-cat known">Gifts</span></div>
+        <div class="comp-verdict"><strong>Your agent has the full picture.</strong> Receipts, location, family context.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="flow-section">
+  <div class="container">
+    <div class="section-label"><i data-lucide="workflow"></i> How It Works</div>
+    <h2>The feedback loop</h2>
+    <p class="subtitle">Breadbox sits between your banks and your agents. Data gets richer every cycle.</p>
+
+    <div class="flow-diagram reveal">
+      <div class="flow-node">
+        <h4><i data-lucide="landmark"></i> Banks</h4>
+        <p>Raw transactions sync automatically</p>
+        <div class="flow-tags"><span class="flow-tag">Plaid</span><span class="flow-tag">Teller</span><span class="flow-tag">CSV</span></div>
+      </div>
+      <div class="flow-arrow"><i data-lucide="arrow-right"></i></div>
+      <div class="flow-node highlight">
+        <h4><i data-lucide="box"></i> Breadbox</h4>
+        <p>Unified database. Rules pre-categorize. Review queue populated.</p>
+        <div class="flow-tags"><span class="flow-tag">PostgreSQL</span><span class="flow-tag">MCP</span><span class="flow-tag">Rules</span></div>
+      </div>
+      <div class="flow-arrow"><i data-lucide="arrow-right"></i></div>
+      <div class="flow-node">
+        <h4><i data-lucide="bot"></i> Your Agent</h4>
+        <p>Reviews transactions. Confirms, corrects, creates rules.</p>
+        <div class="flow-tags"><span class="flow-tag">30+ Tools</span><span class="flow-tag">Your Context</span></div>
+      </div>
+    </div>
+    <div class="flow-feedback reveal">
+      <span class="line"></span>
+      <i data-lucide="refresh-cw"></i>
+      Rules improve &middot; Reviews get smarter &middot; Data gets richer
+      <span class="line"></span>
+    </div>
+  </div>
+</section>
+
+<!-- TERMINAL DEMO -->
+<section class="terminal-section">
+  <div class="container">
+    <div class="section-label"><i data-lucide="message-square"></i> Ask Your Finances Anything</div>
+    <h2>Works with the agents<br>you already use</h2>
+    <p class="subtitle">Connect Claude, ChatGPT, or any MCP-compatible agent. Open a conversation and ask.</p>
+
+    <div class="terminal reveal" id="terminal">
+      <div class="terminal-bar">
+        <span class="terminal-dot r"></span>
+        <span class="terminal-dot y"></span>
+        <span class="terminal-dot g"></span>
+        <span class="terminal-title">breadbox mcp-stdio</span>
+      </div>
+      <div class="terminal-body" id="term-body"></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section>
+  <div class="container">
+    <div class="section-label"><i data-lucide="layers"></i> Features</div>
+    <h2>Everything you need.<br>Nothing you don't.</h2>
+    <p class="subtitle">One Go binary. One PostgreSQL database. Every feature built for agent consumption.</p>
+
+    <div class="features-grid">
+      <div class="feature-card reveal">
+        <div class="feature-icon"><i data-lucide="landmark"></i></div>
+        <h3>Bank Sync</h3>
+        <p>Connect via Plaid, Teller, or CSV import. Transactions and balances sync automatically on a schedule.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon"><i data-lucide="bot"></i></div>
+        <h3>MCP Server</h3>
+        <p>30+ tools for querying, categorizing, and managing transactions. Streamable HTTP or stdio transport.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon"><i data-lucide="list-filter"></i></div>
+        <h3>Transaction Rules</h3>
+        <p>Recursive AND/OR/NOT conditions. Agents create rules that auto-categorize future transactions during sync.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon"><i data-lucide="clipboard-check"></i></div>
+        <h3>Review Queue</h3>
+        <p>New and uncategorized transactions surface for triage. Agents or humans approve, reject, or skip.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon"><i data-lucide="code-2"></i></div>
+        <h3>REST API</h3>
+        <p>Full CRUD with cursor pagination, field selection, and composable filters. Build your own dashboards.</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon"><i data-lucide="shield-check"></i></div>
+        <h3>Privacy First</h3>
+        <p>Self-hosted. AES-256-GCM encryption at rest. Your data never leaves your server. Export or delete anytime.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- QUICKSTART -->
+<section class="quickstart">
+  <div class="container">
+    <div class="section-label"><i data-lucide="terminal"></i> Quick Start</div>
+    <h2>Running in 60 seconds</h2>
+    <p class="subtitle">Docker Compose handles everything. PostgreSQL, migrations, and the server.</p>
+    <pre class="reveal"><span class="comment"># Clone and configure</span>
+<span class="cmd">$</span> git clone https://github.com/canalesb93/breadbox.git
+<span class="cmd">$</span> cd breadbox && cp .env.example .docker.env
+<span class="cmd">$</span> echo "ENCRYPTION_KEY=$(openssl rand -hex 32)" >> .docker.env
+
+<span class="comment"># Launch</span>
+<span class="cmd">$</span> docker compose up -d
+
+<span class="comment"># Visit http://localhost:8080 to start the setup wizard</span></pre>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/canalesb93/breadbox">GitHub</a>
+      <a href="https://canalesb93.github.io/breadbox">Documentation</a>
+      <a href="https://github.com/canalesb93/breadbox/blob/main/LICENSE">AGPL-3.0</a>
+    </div>
+    <p>Built with Go. Made for families who want to own their financial data.</p>
+  </div>
+</footer>
+
+<script>
+  // Nav scroll effect
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 20);
+  });
+
+  // Scroll reveal
+  const reveals = document.querySelectorAll('.reveal');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry, i) => {
+      if (entry.isIntersecting) {
+        setTimeout(() => entry.target.classList.add('visible'), i * 80);
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15 });
+  reveals.forEach(el => observer.observe(el));
+
+  // Terminal typewriter
+  const termBody = document.getElementById('term-body');
+  const lines = [
+    { text: '# Agent asks Breadbox via MCP', cls: 'term-comment' },
+    { text: '' },
+    { text: '> query_transactions', cls: 'term-prompt' },
+    { text: '  category_slug: "food_and_drink_dining"' },
+    { text: '  start_date: "2026-04-01"' },
+    { text: '  fields: "minimal"' },
+    { text: '' },
+    { text: '# Response', cls: 'term-comment' },
+    { text: '{' },
+    { text: '  <span class="term-key">"total"</span>: <span class="term-number">12</span>,' },
+    { text: '  <span class="term-key">"amount"</span>: <span class="term-number">847.32</span>,' },
+    { text: '  <span class="term-key">"currency"</span>: <span class="term-string">"USD"</span>,' },
+    { text: '  <span class="term-key">"top_merchants"</span>: [' },
+    { text: '    <span class="term-string">"Maria\'s Kitchen"</span> <span class="term-comment">($180)</span>,' },
+    { text: '    <span class="term-string">"Epoch Coffee"</span> <span class="term-comment">($95)</span>,' },
+    { text: '    <span class="term-string">"Uchi"</span> <span class="term-comment">($87)</span>' },
+    { text: '  ]' },
+    { text: '}' },
+    { text: '' },
+    { text: '<span class="term-comment"># Up 15% from last month</span>' },
+  ];
+
+  let started = false;
+  const termObs = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && !started) {
+      started = true;
+      let i = 0;
+      function addLine() {
+        if (i >= lines.length) {
+          const cursor = document.createElement('span');
+          cursor.className = 'cursor-blink';
+          cursor.innerHTML = '&#9608;';
+          termBody.lastChild.appendChild(cursor);
+          return;
+        }
+        const div = document.createElement('div');
+        div.className = 'term-line';
+        if (lines[i].cls) div.classList.add(lines[i].cls);
+        div.innerHTML = lines[i].text || '&nbsp;';
+        div.style.animationDelay = `${i * 0.08}s`;
+        termBody.appendChild(div);
+        i++;
+        setTimeout(addLine, 80);
+      }
+      addLine();
+    }
+  }, { threshold: 0.3 });
+  termObs.observe(document.getElementById('terminal'));
+
+  // Init Lucide icons
+  lucide.createIcons();
+</script>
+</body>
+</html>
