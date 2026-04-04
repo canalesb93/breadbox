@@ -16,12 +16,24 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
     exit 0
   fi
 
-  # Worktree: verify build works with the copied artifacts
+  # Worktree: verify build works with the copied artifacts.
+  # .worktreeinclude copies sqlc files from the main repo's working directory,
+  # which may be on a different branch. If the build fails, regenerate with sqlc.
   echo "==> Worktree session — verifying Go build..."
-  if go build ./... 2>&1; then
-    echo "    Build OK"
+  if ! go build ./... 2>&1; then
+    echo "    Build failed — regenerating sqlc files..."
+    if command -v sqlc &>/dev/null && sqlc generate 2>&1; then
+      echo "    sqlc regenerated"
+      if go build ./... 2>&1; then
+        echo "    Build OK after regeneration"
+      else
+        echo "WARN: go build still failing after sqlc regenerate"
+      fi
+    else
+      echo "WARN: sqlc not available, build may be broken"
+    fi
   else
-    echo "WARN: go build failed — check for missing generated files"
+    echo "    Build OK"
   fi
 
   # Inject env vars if CLAUDE_ENV_FILE is available

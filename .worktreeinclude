@@ -13,5 +13,8 @@ internal/db/models.go
 internal/db/querier.go
 internal/db/*.sql.go
 
+# Teller mTLS certificates
+teller/
+
 # Local env (if present)
 .local.env
