@@ -40,7 +40,9 @@
     },
     "excludedCommands": [
       "make dev*",
-      "go run *"
+      "make test*",
+      "go run *",
+      "go test *"
     ]
   }
 }

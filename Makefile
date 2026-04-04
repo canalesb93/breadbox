@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc seed docker-up docker-down css css-watch css-install
+.PHONY: dev dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc sqlc-install seed docker-up docker-down css css-watch css-install
 
 PORT ?= 8080
 
@@ -54,7 +54,13 @@ migrate-down:
 migrate-create:
 	goose -dir internal/db/migrations create $(NAME) sql
 
-sqlc:
+sqlc-install:
+	@if ! command -v sqlc &>/dev/null; then \
+		echo "Installing sqlc..."; \
+		go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0; \
+	fi
+
+sqlc: sqlc-install
 	sqlc generate
 
 seed:
