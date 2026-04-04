@@ -381,3 +381,38 @@ breadbox completion bash|zsh|fish|powershell
 **Phase 4 — Auth**: OAuth authorization code flow, device code flow, token refresh. Server-side OAuth endpoints if not already sufficient.
 
 **Phase 5 — Polish**: shell completions, CI release pipeline for both binaries, install script
+
+## Implementation Reference
+
+> **Read this section before starting implementation.** The codebase will likely have changed since this doc was written. These are the canonical sources of truth for the current state of the API, data model, and conventions.
+
+### Must-Read Files
+
+| File | What to learn from it |
+|------|-----------------------|
+| `CLAUDE.md` | Project conventions, tech stack, design decisions, enum values, testing strategy |
+| `docs/data-model.md` | Canonical schema — all tables, columns, types, constraints |
+| `docs/architecture.md` | Provider interface, service layer patterns, auth model |
+| `internal/api/router.go` | **All REST API endpoints** — this is what the CLI wraps. Check for new routes, changed paths, or new middleware |
+| `internal/api/` (handler files) | Request/response shapes, query params, JSON field names. The CLI's flags and output should mirror these exactly |
+| `internal/service/service.go` | Service struct and method signatures — understand what the API can do |
+| `internal/middleware/` | Auth middleware — understand API key scopes, OAuth bearer token handling |
+| `go.mod` | Current dependencies — check before adding new ones |
+
+### What Changes to Watch For
+
+The CLI is a thin client over the REST API. Before implementing each command group, check these for changes since this doc was last updated:
+
+- **New endpoints**: `grep -r 'r.Get\|r.Post\|r.Put\|r.Patch\|r.Delete' internal/api/router.go` — any new routes should get a corresponding CLI command
+- **New query params**: read the handler for each endpoint to see current filter/sort/pagination params — these become CLI flags
+- **Response shapes**: read the handler's JSON response or the service method's return type — these determine `--fields` options and table columns
+- **Auth changes**: check `internal/middleware/` and `internal/api/router.go` for any new auth mechanisms, scopes, or OAuth flows that the CLI needs to support
+- **New entity types**: check `docs/data-model.md` for new tables that might need their own `cmd_<resource>.go`
+- **Error envelope**: check `internal/middleware/` for the current error response format — the CLI client needs to parse it
+
+### Conventions to Follow
+
+- **Flag names should match API query params** (e.g., API uses `sort_by` → CLI uses `--sort-by`; API uses `category_slug` → CLI uses `--category`)
+- **Short IDs**: the API accepts both UUIDs and 8-char short IDs. The CLI should display short IDs by default and accept either format as input
+- **Amount convention**: positive = money out, negative = money in. Display formatting should respect this
+- **Date format**: accept flexible input (`2026-04-01`, `yesterday`, `last week`) but send ISO 8601 to the API
