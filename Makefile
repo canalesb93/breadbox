@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc sqlc-install seed docker-up docker-down css css-watch css-install
+.PHONY: dev dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc sqlc-install seed db db-stop docker-up docker-down css css-watch css-install
 
 PORT ?= 8080
 
@@ -65,6 +65,15 @@ sqlc: sqlc-install
 
 seed:
 	go run ./cmd/breadbox seed
+
+db:
+	docker compose up -d db
+	@echo "Waiting for Postgres..."
+	@until docker compose exec db pg_isready -U breadbox -q 2>/dev/null; do sleep 1; done
+	@echo "Postgres ready on localhost:5432"
+
+db-stop:
+	docker compose stop db
 
 docker-up:
 	docker compose up --build -d
