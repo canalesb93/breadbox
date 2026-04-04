@@ -1,131 +1,79 @@
 # Breadbox
 
-Self-hosted financial data aggregation for families. Syncs bank data via [Plaid](https://plaid.com/) and [Teller](https://teller.io/), stores it in PostgreSQL, and exposes it through a REST API and MCP server for AI agents.
+Self-hosted financial data aggregation for families. Connect your banks, sync transactions automatically, and query your financial data through a REST API or AI agents via [MCP](https://modelcontextprotocol.io/).
 
-## Tech Stack
+<!-- TODO: Add screenshot of dashboard here -->
 
-- **Go 1.24+** -- single binary, all components in one process
-- **PostgreSQL 16+** -- primary data store
-- **chi/v5** -- HTTP router
-- **pgx/v5 + sqlc** -- database driver and query generation
-- **goose** -- schema migrations
-- **robfig/cron** -- scheduled sync engine
-- **DaisyUI 5 + Tailwind CSS v4 + Alpine.js v3** -- admin dashboard (CSS pre-compiled via standalone CLI, no Node.js)
-- **MCP server** -- Streamable HTTP at `/mcp`, stdio via `breadbox mcp-stdio`
+## Why Breadbox?
 
-## Prerequisites
+Banks silo your financial data behind their own apps. AI agents can help with budgeting, spending analysis, and anomaly detection -- but they need structured access to your data without touching your bank credentials.
 
-- Go 1.24+
-- PostgreSQL 16+
-- Docker and Docker Compose (optional, for containerized deployment)
+Breadbox syncs your bank data into a PostgreSQL database you control, then exposes it through a structured API that any tool or agent can query. Your data stays on your hardware, encrypted at rest, exportable and deletable at any time.
 
-## Docker Quickstart (Recommended)
+## Features
+
+- **Bank sync** via [Plaid](https://plaid.com/), [Teller](https://teller.io/), and CSV import
+- **MCP server** for AI agent integration (Streamable HTTP + stdio)
+- **REST API** with cursor pagination, field selection, and filtering
+- **Admin dashboard** with connection management, sync monitoring, and transaction review
+- **Transaction rules engine** with recursive AND/OR/NOT conditions for auto-categorization
+- **Review queue** for triaging new or uncategorized transactions
+- **Account linking** for cross-connection transaction deduplication (e.g., authorized user cards)
+- **Multi-user** household support (admin + family members)
+- **Category system** with 2-level hierarchy
+- **Agent reports** for AI agents to submit summaries and flag transactions
+- **API key auth** with scoped access (full/read-only)
+- **AES-256-GCM encryption** for provider credentials at rest
+- **Single binary** -- one Go binary serves everything (API, MCP, dashboard, webhooks, cron)
+
+## Quick Start
+
+### Docker (recommended)
 
 ```bash
+git clone https://github.com/canalesb93/breadbox.git && cd breadbox
 cp .env.example .docker.env
 
-# Edit .docker.env:
-#   - Set ENCRYPTION_KEY (generate with: openssl rand -hex 32)
-#   - Configure Plaid or Teller credentials (or skip and use the setup wizard)
+# Edit .docker.env — set ENCRYPTION_KEY (generate with: openssl rand -hex 32)
 
 docker compose up -d
 
 # Visit http://localhost:8080 to start the setup wizard
 ```
 
-The `docker-compose.yml` runs both the app and a PostgreSQL 16 container. Migrations run automatically on startup.
-
-## Manual Install
+### From source
 
 ```bash
-# Clone and build
-git clone <repo-url> && cd breadbox
-go build -o breadbox ./cmd/breadbox
+git clone https://github.com/canalesb93/breadbox.git && cd breadbox
 
-# Create a PostgreSQL database
-createdb breadbox
+# Requires Go 1.24+ and PostgreSQL 16+
+make dev
 
-# Configure environment
+# Visit http://localhost:8080
+```
+
+### Binary download
+
+Download the latest release from [GitHub Releases](https://github.com/canalesb93/breadbox/releases):
+
+```bash
+# Configure
 cp .env.example .local.env
-# Edit .local.env: set DATABASE_URL, ENCRYPTION_KEY, provider credentials
+# Edit .local.env — set DATABASE_URL and ENCRYPTION_KEY
 
-# Run migrations and start the server
-./breadbox migrate
+# Run
 ./breadbox serve
-```
-
-The server starts on port 8080 by default. Visit `http://localhost:8080` to open the setup wizard.
-
-## Configuration Reference
-
-All configuration is via environment variables. Copy `.env.example` to `.local.env` (local dev) or `.docker.env` (Docker).
-
-| Variable | Description | Default | Required |
-|---|---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string | `postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable` | Yes |
-| `ENCRYPTION_KEY` | 32-byte hex key for AES-256-GCM encryption of bank tokens. Generate with `openssl rand -hex 32` | -- | Yes (when using Plaid/Teller) |
-| `SERVER_PORT` | HTTP listen port | `8080` | No |
-| `ENVIRONMENT` | `local` or `docker`. Controls log format and env file loading | `local` | No |
-| `LOG_LEVEL` | Log verbosity: `debug`, `info`, `warn`, `error` (case-insensitive). Overrides environment-based defaults | -- | No |
-| `PLAID_CLIENT_ID` | Plaid API client ID (also configurable via setup wizard) | -- | No |
-| `PLAID_SECRET` | Plaid API secret | -- | No |
-| `PLAID_ENV` | Plaid environment: `sandbox`, `development`, `production` | `sandbox` | No |
-| `TELLER_APP_ID` | Teller application ID (also configurable via admin settings) | -- | No |
-| `TELLER_CERT_PATH` | Path to Teller mTLS certificate file | -- | No |
-| `TELLER_KEY_PATH` | Path to Teller mTLS private key file | -- | No |
-| `TELLER_ENV` | Teller environment: `sandbox`, `development`, `production` | `sandbox` | No |
-| `TELLER_WEBHOOK_SECRET` | Teller webhook signing secret | -- | No |
-| `SYNC_TIMEOUT_SECONDS` | Per-connection sync timeout | `300` | No |
-| `DB_MAX_CONNS` | Maximum database pool connections | `25` | No |
-| `DB_MIN_CONNS` | Minimum database pool connections | `2` | No |
-| `DB_MAX_CONN_LIFETIME_MINUTES` | Maximum connection lifetime | `60` | No |
-| `HTTP_READ_TIMEOUT_SECONDS` | HTTP server read timeout | `30` | No |
-| `HTTP_WRITE_TIMEOUT_SECONDS` | HTTP server write timeout | `60` | No |
-| `HTTP_IDLE_TIMEOUT_SECONDS` | HTTP server idle timeout | `120` | No |
-
-Environment variables take precedence over values stored in the `app_config` database table, which take precedence over defaults.
-
-## First-Run Walkthrough
-
-On first launch, Breadbox presents a setup wizard at the root URL. The wizard has six steps:
-
-1. **Admin Account** -- create the administrator username and password.
-2. **Bank Providers** -- choose Plaid, Teller, both, or skip. Enter API credentials.
-3. **Family Member** -- create your first family member (name and email). This prevents an empty member dropdown when connecting a bank.
-4. **Sync Interval** -- set how often Breadbox automatically syncs bank data.
-5. **Webhooks** -- configure webhook URLs for real-time updates from providers (optional).
-6. **Review** -- confirm settings and complete setup.
-
-After setup:
-
-- **Add family members** via the admin dashboard under Members.
-- **Connect a bank** by navigating to Connections and linking an account through Plaid Link or Teller Connect.
-
-## CLI Commands
-
-```
-breadbox serve            Start the HTTP server (API, MCP, admin dashboard, webhooks, cron)
-breadbox migrate          Run pending database migrations
-breadbox seed             Insert sandbox test data (development only)
-breadbox mcp-stdio        Start MCP server on stdin/stdout (for local AI agent dev)
-breadbox api-keys          Manage API keys
-  api-keys list            List all API keys
-  api-keys create <name>   Create a new API key
-breadbox reset-password   Reset an admin user's password
-breadbox version          Print build version and exit
 ```
 
 ## MCP Integration
 
-Breadbox exposes financial data to AI agents via the [Model Context Protocol](https://modelcontextprotocol.io/).
+Breadbox exposes financial data to AI agents via the [Model Context Protocol](https://modelcontextprotocol.io/). This is the primary way to connect your financial data to AI assistants.
 
-**Streamable HTTP** (production): The MCP endpoint is available at `/mcp` when running `breadbox serve`. Authenticate with an API key in the `X-API-Key` header.
+**Streamable HTTP** (remote): The MCP endpoint is at `/mcp`, authenticated with an API key.
 
-**Stdio** (local development): Run `breadbox mcp-stdio` for a stdio-based MCP server that reads/writes the MCP protocol on stdin/stdout. No authentication required.
+**Stdio** (local): Run `breadbox mcp-stdio` for direct stdin/stdout MCP transport.
 
-### Claude Desktop
-
-Add to your Claude Desktop MCP config:
+### Claude Desktop / Claude Code
 
 ```json
 {
@@ -141,34 +89,57 @@ Add to your Claude Desktop MCP config:
 }
 ```
 
-### Claude Code
+### Remote MCP (any agent)
 
-Add to your Claude Code MCP settings:
+Point your agent's MCP client at your Breadbox instance:
 
-```json
-{
-  "mcpServers": {
-    "breadbox": {
-      "command": "/path/to/breadbox",
-      "args": ["mcp-stdio"],
-      "env": {
-        "DATABASE_URL": "postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable"
-      }
-    }
-  }
-}
+```
+URL: https://your-host/mcp
+Header: X-API-Key: bb_your_api_key
+```
+
+## Configuration
+
+All configuration via environment variables. See `.env.example` for the full list.
+
+| Variable | Description | Required |
+|---|---|---|
+| `DATABASE_URL` | PostgreSQL connection string | Yes |
+| `ENCRYPTION_KEY` | 32-byte hex key for AES-256-GCM (`openssl rand -hex 32`) | Yes (with Plaid/Teller) |
+| `SERVER_PORT` | HTTP listen port (default: 8080) | No |
+| `PLAID_CLIENT_ID` | Plaid API client ID | No |
+| `PLAID_SECRET` | Plaid API secret | No |
+| `TELLER_APP_ID` | Teller application ID | No |
+
+Provider credentials can also be configured through the setup wizard or admin dashboard.
+
+## CLI
+
+```
+breadbox serve           Start the server (API, MCP, dashboard, webhooks, cron)
+breadbox create-admin    Create an admin user
+breadbox mcp-stdio       Start MCP server on stdin/stdout
+breadbox migrate         Run pending database migrations
+breadbox version         Print version
 ```
 
 ## Documentation
 
-Detailed documentation lives in the `docs/` directory:
-
-- [Architecture and Deployment](docs/architecture.md) -- system design, provider interface, configuration, security, Docker deployment
+- [Architecture](docs/architecture.md) -- system design, provider interface, deployment
 - [Data Model](docs/data-model.md) -- database schema, enums, relationships
-- [REST API](docs/rest-api.md) -- API endpoints, authentication, request/response formats
-- [MCP Server](docs/mcp-server.md) -- MCP tools, schemas, usage examples
-- [Plaid Integration](docs/plaid-integration.md) -- Plaid provider details
-- [Teller Integration](docs/teller-integration.md) -- Teller provider details, mTLS setup
-- [CSV Import](docs/csv-import.md) -- CSV file import format and behavior
+- [REST API](docs/rest-api.md) -- endpoints, authentication, request/response formats
+- [MCP Server](docs/mcp-server.md) -- tools, resources, usage
+- [Plaid Integration](docs/plaid-integration.md) -- Plaid setup and sync details
+- [Teller Integration](docs/teller-integration.md) -- Teller mTLS setup
+- [CSV Import](docs/csv-import.md) -- CSV file format and import behavior
 - [Admin Dashboard](docs/admin-dashboard.md) -- dashboard pages and features
-- [Backup and Restore](docs/backup.md) -- database backup strategies and restore procedures
+- [Design System](docs/design-system.md) -- UI framework and component reference
+- [Backup & Restore](docs/backup.md) -- database backup strategies
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and guidelines.
+
+## License
+
+[AGPL-3.0](LICENSE)

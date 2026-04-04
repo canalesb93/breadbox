@@ -133,7 +133,7 @@ If the app fails to start, check `tail -20 /tmp/breadbox.log` and fix.
 Take 1-2 screenshots showing your improvement. If mobile, show the mobile viewport.
 
 1. Navigate Chrome MCP to the page you changed
-2. If redirected to login, use JS to submit: `canalesb93@gmail.com` / `password`
+2. If redirected to login, use JS to submit: `admin@example.com` / `password`
 3. Capture and upload:
 
 ```bash

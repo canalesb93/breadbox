@@ -85,7 +85,7 @@ Write integration tests for undertested code paths:
 
 For Track A (Browser QA):
 1. Navigate to the page
-2. If redirected to login, use JS to submit: `canalesb93@gmail.com` / `password`
+2. If redirected to login, use JS to submit: `admin@example.com` / `password`
 3. Interact with the page — click buttons, fill forms, test workflows
 4. Check console for errors: `read_console_messages`
 5. Check network for failed requests: `read_network_requests`
