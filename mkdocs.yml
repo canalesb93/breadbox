@@ -61,6 +61,7 @@ nav:
       - Quick Reference: api-reference.md
       - REST API (detailed): rest-api.md
       - MCP Server: mcp-server.md
+      - MCP Tools: mcp-tools-reference.md
   - Provider Setup:
       - Plaid: plaid-integration.md
       - Teller: teller-integration.md
