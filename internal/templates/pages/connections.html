@@ -11,32 +11,28 @@
     {{end}}
   </div>
   <div class="flex items-center gap-2">
-    <template x-if="tab === 'connections'">
-      <div class="flex items-center gap-2">
-        {{if .Connections}}
-        <div x-data="syncAllBtn()">
-          <button class="btn btn-outline btn-sm rounded-xl gap-2"
-                  :disabled="state !== 'idle'"
-                  @click="triggerSyncAll()"
-                  :title="state === 'syncing' ? 'Syncing all connections...' : 'Sync all connections now'">
-            <i data-lucide="refresh-cw" class="w-4 h-4" x-show="state === 'idle'"></i>
-            <span class="loading loading-spinner loading-xs" x-show="state === 'syncing'" x-cloak></span>
-            <i data-lucide="check" class="w-4 h-4 text-success" x-show="state === 'done'" x-cloak></i>
-            <span x-text="state === 'syncing' ? 'Syncing...' : state === 'done' ? 'Triggered!' : 'Sync All'"></span>
-          </button>
-        </div>
-        {{end}}
-        <a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">
-          <i data-lucide="plus" class="w-4 h-4"></i>
-          Connect Bank
-        </a>
+    <div x-show="tab === 'connections'" x-cloak class="flex items-center gap-2">
+      {{if .Connections}}
+      <div x-data="syncAllBtn()">
+        <button class="btn btn-outline btn-sm rounded-xl gap-2"
+                :disabled="state !== 'idle'"
+                @click="triggerSyncAll()"
+                :title="state === 'syncing' ? 'Syncing all connections...' : 'Sync all connections now'">
+          <i data-lucide="refresh-cw" class="w-4 h-4" x-show="state === 'idle'"></i>
+          <span class="loading loading-spinner loading-xs" x-show="state === 'syncing'" x-cloak></span>
+          <i data-lucide="check" class="w-4 h-4 text-success" x-show="state === 'done'" x-cloak></i>
+          <span x-text="state === 'syncing' ? 'Syncing...' : state === 'done' ? 'Triggered!' : 'Sync All'"></span>
+        </button>
       </div>
-    </template>
-    <template x-if="tab === 'links'">
-      <button class="btn btn-primary btn-sm rounded-xl" onclick="document.getElementById('create-link-modal').showModal()">
-        <i data-lucide="plus" class="w-4 h-4"></i> New Link
-      </button>
-    </template>
+      {{end}}
+      <a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">
+        <i data-lucide="plus" class="w-4 h-4"></i>
+        Connect Bank
+      </a>
+    </div>
+    <button x-show="tab === 'links'" x-cloak class="btn btn-primary btn-sm rounded-xl" onclick="document.getElementById('create-link-modal').showModal()">
+      <i data-lucide="plus" class="w-4 h-4"></i> New Link
+    </button>
   </div>
 </div>
 
