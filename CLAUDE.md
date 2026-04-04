@@ -164,7 +164,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 
 ## Spec Documents
 
-Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Teller-specific details are in `docs/teller-integration.md`. CSV import details are in `docs/csv-import.md`. Design system (CSS framework, components, icons) is in `docs/design-system.md`. Implementation order is in `docs/ROADMAP.md`.
+Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Teller-specific details are in `docs/teller-integration.md`. CSV import details are in `docs/csv-import.md`. Design system (CSS framework, components, icons) is in `docs/design-system.md`. REST API quick reference is in `docs/api-reference.md`. MCP tools reference is in `docs/mcp-tools-reference.md`.
 
 ## Local Dev & Git Worktrees
 
