@@ -74,8 +74,8 @@ When asked to review instructions or tool designs:
 5. Suggest specific improvements with reasoning
 
 When asked to design new agent types or workflows:
-1. Read `docs/agent-personas.md` for the established pattern
-2. Understand the available tools by reading `internal/mcp/server.go`
+1. Review `docs/mcp-tools-reference.md` for available tools
+2. Understand the tool registry by reading `internal/mcp/server.go`
 3. Design the workflow step-by-step, mapping each step to specific tool calls
 4. Define clear success criteria and report format
 5. Identify which instruction blocks the new agent type needs
