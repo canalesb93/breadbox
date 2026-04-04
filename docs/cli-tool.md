@@ -139,6 +139,17 @@ breadbox report mark-read <id>
 
 ## Architecture
 
+### Server Editions
+
+Two editions of `breadboxd` are planned:
+
+| Edition | License | What's included |
+|---------|---------|-----------------|
+| **Community** | Open source (TBD) | Core server — self-hosted, bring your own Plaid/Teller keys |
+| **Managed** | Proprietary | Hosted service — providers baked in, multi-tenant, users just connect |
+
+The CLI (`breadbox`) is the same for both — it's a pure REST API client that doesn't care which edition is on the other end. This separation is intentional: the CLI should never contain server-edition-specific logic. Any feature differences between editions are handled server-side and surfaced through the same API (e.g., a managed instance might expose additional endpoints the CLI discovers dynamically, or restrict certain admin commands).
+
 ### Two Binaries, Shared Code
 
 The CLI and server are **separately distributable** but live in the same Go module. Users who self-host get both; users connecting to a hosted instance only need the CLI.
