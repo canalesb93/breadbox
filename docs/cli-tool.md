@@ -2,14 +2,15 @@
 
 ## Overview
 
-`breadbox` already has server-side commands (`serve`, `migrate`, `create-admin`, etc.). This design adds **client-side commands** that talk to a running Breadbox instance via its REST API, giving users a `gh`-like experience for managing their financial data from the terminal.
+A standalone CLI tool that talks to any Breadbox server instance via its REST API, giving users a `gh`-like experience for managing their financial data from the terminal. Designed for a deployment model where Breadbox instances may be hosted centrally while users interact from their own machines.
 
 ## Goals
 
+- **Standalone distribution** — users download the CLI without needing the server
 - Provide a full-featured alternative to the MCP path for power users
 - Follow the `gh` CLI pattern: `breadbox <noun> <verb>` with consistent flags
+- **Multi-instance support** — connect to different Breadbox instances (family, work, etc.)
 - Extensible command structure — easy to add new resource types
-- Works against any Breadbox instance (local or remote)
 - Output formats: human-readable tables (default), JSON (`--json`), TSV (`--tsv`)
 
 ## Command Structure
@@ -110,58 +111,59 @@ breadbox report submit --title "Monthly Review" --body "Everything looks good."
 breadbox report mark-read <id>
 ```
 
-### Server Admin (Direct DB, No API Key Needed)
-
-These existing commands stay as-is — they connect to the database directly:
-
-```bash
-breadbox serve
-breadbox migrate
-breadbox create-admin
-breadbox reset-password
-breadbox api-keys list|create
-breadbox version
-```
-
 ## Architecture
 
-### Single Binary, Two Modes
+### Two Binaries, Shared Code
 
-The `breadbox` binary already serves as the server. Client commands live in the same binary — no separate install. The binary detects mode by command name:
+The CLI and server are **separately distributable** but live in the same Go module. Users who self-host get both; users connecting to a hosted instance only need the CLI.
 
-- **Server commands** (`serve`, `migrate`, `create-admin`): connect to DB directly
-- **Client commands** (`tx`, `category`, `rule`, etc.): talk to REST API via HTTP
+| Binary | Command | What it does | Requires |
+|--------|---------|-------------|----------|
+| `breadbox` | CLI client | Talks to REST API over HTTP | Nothing (standalone) |
+| `breadboxd` | Server daemon | Runs the server, DB, sync, admin UI | PostgreSQL, config |
+
+The server binary (`breadboxd`) also embeds all CLI commands for convenience — self-hosters can use `breadboxd tx list` without installing the CLI separately. But the CLI binary has zero server dependencies (no DB driver, no sync engine, no templates).
 
 ```
-cmd/breadbox/
-  main.go           # top-level command dispatch
-  admin.go           # existing: create-admin, reset-password
-  client.go          # NEW: HTTP client, config loading
-  cmd_tx.go          # NEW: transaction subcommands
-  cmd_category.go    # NEW: category subcommands
-  cmd_rule.go        # NEW: rule subcommands
-  cmd_review.go      # NEW: review subcommands
-  cmd_account.go     # NEW: account/connection subcommands
-  cmd_auth.go        # NEW: auth/config subcommands
-  cmd_report.go      # NEW: report subcommands
+cmd/
+  breadbox/          # CLI binary (lightweight, HTTP-only)
+    main.go          # cobra root command
+    cmd_auth.go      # auth login/status/switch
+    cmd_tx.go        # transaction subcommands
+    cmd_category.go  # category subcommands
+    cmd_rule.go      # rule subcommands
+    cmd_review.go    # review subcommands
+    cmd_account.go   # account/connection subcommands
+    cmd_report.go    # report subcommands
+  breadboxd/         # Server binary (current cmd/breadbox/, renamed)
+    main.go          # serve, migrate, create-admin, etc. + embeds CLI commands
+    admin.go         # existing: create-admin, reset-password
+
+internal/
+  cli/               # NEW: shared CLI library (used by both binaries)
+    client.go        # HTTP client wrapper
+    config.go        # Config file loading (~/.config/breadbox/)
+    output.go        # Table/JSON/TSV formatter
+  # ... existing packages (api/, service/, etc.) only imported by breadboxd
 ```
 
 ### CLI Framework
 
-Adopt **[cobra](https://github.com/spf13/cobra)** for client commands. Reasons:
+Adopt **[cobra](https://github.com/spf13/cobra)** for the CLI. Reasons:
 
 - Industry standard (`gh`, `kubectl`, `docker` all use it)
 - Subcommand nesting, flag parsing, help generation, shell completions out of the box
-- Can migrate existing server commands incrementally (not required upfront)
+- `breadboxd` can import and mount the CLI's cobra command tree alongside its server commands
 
 ### HTTP Client
 
 A thin wrapper around `net/http` that handles:
 
-- Base URL + API key from config
+- Base URL + API key from active profile
 - JSON marshaling/unmarshaling
 - Error envelope parsing (`{"error": {"code": "...", "message": "..."}}`)
 - Pagination (cursor-based, follows `next_cursor` automatically when `--limit` exceeds page size)
+- Per-request `--server` and `--api-key` flag overrides (skip config file for scripting)
 
 ```go
 // internal/cli/client.go
@@ -193,6 +195,8 @@ profiles:
     api_key: bb_yyyyyyyyyyyyy
 ```
 
+Profiles support the multi-instance model — a user might have one family Breadbox and one shared with a partner, each on different servers.
+
 ### Output Formatting
 
 Three modes, consistent across all commands:
@@ -214,13 +218,40 @@ type Formatter struct {
 }
 ```
 
+## Distribution
+
+### Install Methods
+
+```bash
+# Homebrew (macOS/Linux)
+brew install canalesb93/tap/breadbox
+
+# Go install
+go install github.com/canalesb93/breadbox/cmd/breadbox@latest
+
+# Binary download (GitHub Releases)
+curl -fsSL https://breadbox.example.com/install.sh | sh
+```
+
+### Release Artifacts
+
+Each GitHub release publishes:
+
+| Artifact | Contents | Who needs it |
+|----------|----------|-------------|
+| `breadbox-cli-{os}-{arch}` | CLI binary only | End users connecting to hosted instances |
+| `breadboxd-{os}-{arch}` | Server binary (includes CLI) | Self-hosters |
+| `breadbox-server` Docker image | Server + migrations | Docker/Kubernetes deployments |
+
+The CLI binary should be small (few MB, no CGo) since it's just HTTP + cobra + formatting.
+
 ## Extension Points
 
 ### Adding a New Resource
 
-1. Create `cmd_<resource>.go` with cobra commands
-2. Register root command in `main.go`
-3. Add any new API calls to the client
+1. Create `cmd_<resource>.go` in `cmd/breadbox/` with cobra commands
+2. Register under root command in `main.go`
+3. Add any new API calls to the `internal/cli` client
 
 Each resource file is self-contained — no need to touch shared code.
 
@@ -238,16 +269,17 @@ breadbox completion bash|zsh|fish|powershell
 
 ## Implementation Plan
 
-**Phase 1 — Foundation**: `auth`, HTTP client, config file, output formatter, `tx list/view/search`
+**Phase 1 — Foundation**: Rename server binary to `breadboxd`, create `cmd/breadbox/` for CLI, `auth login/status/switch`, HTTP client, config file, output formatter
 
-**Phase 2 — Read commands**: `category list`, `account list`, `connection list/status`, `rule list/view`, `review list`
+**Phase 2 — Read commands**: `tx list/view/search/summary/merchants`, `category list`, `account list`, `connection list/status`, `rule list/view`, `review list`
 
 **Phase 3 — Write commands**: `tx categorize`, `rule create/update/delete/apply`, `review approve/reject`, `report submit`
 
-**Phase 4 — Polish**: shell completions, `--interactive` mode for reviews, `breadbox sync` shorthand, man pages
+**Phase 4 — Polish**: shell completions, `--interactive` mode for reviews, CI release pipeline for both binaries, install script
 
 ## Open Questions
 
-- **Separate binary?** Current design puts client commands in the same binary. An alternative is a separate `bb` binary (shorter to type, smaller download for users who don't self-host). We could do both — `bb` as a lightweight alias.
+- **Server binary rename**: `breadboxd` is the obvious choice (follows `dockerd`, `containerd` convention). Any other preferences?
 - **Interactive mode?** `breadbox review` without subcommands could enter an interactive TUI for triaging reviews one by one.
 - **Piping patterns?** Should `breadbox tx list --json | breadbox tx categorize --stdin` be a pattern we design for explicitly?
+- **Auth flow**: For hosted instances, should we support OAuth/browser-based login in addition to API key pasting? e.g., `breadbox auth login` opens a browser, user approves, CLI receives a token.
