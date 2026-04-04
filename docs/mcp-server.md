@@ -81,18 +81,16 @@ The MCP server does not manage its own database connection. It receives the same
 
 ### Server Capabilities
 
-The server advertises tools only. Resources and prompts are not advertised in the MVP.
+The server advertises tools and resources. Prompts are not used. Server instructions are provided via `ServerOptions.Instructions` (customizable from the MCP admin page, with a comprehensive default).
 
 ```go
-mcp.NewServer(&mcp.Implementation{
-    Name:    "breadbox",
-    Version: "0.1.0",
-}, &mcp.ServerOptions{
-    HasTools: true,
-})
+server := mcpsdk.NewServer(
+    &mcpsdk.Implementation{Name: "breadbox", Version: s.version},
+    &mcpsdk.ServerOptions{Instructions: instructions},
+)
 ```
 
-When resources are added in a future version, `HasResources: true` is added to this struct.
+Three resources are registered on every server instance via `registerResources()` (see [Section 4](#4-mcp-resources)).
 
 ---
 
@@ -649,11 +647,19 @@ Calls `GET /api/v1/categories`. Returns the same `[]CategoryPair` response.
 
 MCP resources are passive context documents the LLM can read, similar to files. They do not execute queries at call time in the same on-demand way tools do.
 
+All three resources are registered via `s.registerResources()` in `internal/mcp/server.go`, with handlers in `internal/mcp/resources.go`.
+
+| Resource URI | MIME Type | Description |
+|---|---|---|
+| `breadbox://overview` | `application/json` | Live dataset summary (users, connections, accounts, transactions, spending) |
+| `breadbox://review-guidelines` | `text/markdown` | Guidelines for reviewing transactions and creating rules |
+| `breadbox://report-format` | `text/markdown` | Report structure templates and formatting guidelines |
+
 ### Resource: `breadbox://overview`
 
-Returns a lightweight summary of the household's financial data — total accounts, total transactions, date range of available data, and provider summary. This gives an LLM ambient context about the financial state without a round-trip tool call.
+Returns a lightweight summary of the household's financial data — users, connections with account counts, accounts by type, transaction counts, date range, 30-day spending summary with top categories, and pending review count. This gives an LLM ambient context about the financial state without a round-trip tool call.
 
-Registered via `s.registerResources()` in server setup. Implementation in `internal/mcp/resources.go`, backed by `service.GetOverviewStats()`.
+Backed by `service.GetOverviewStats()`.
 
 ```json
 {
@@ -666,6 +672,18 @@ Registered via `s.registerResources()` in server setup. Implementation in `inter
   "providers": ["plaid", "teller"]
 }
 ```
+
+### Resource: `breadbox://review-guidelines`
+
+Returns guidelines for reviewing transactions and creating transaction rules. Agents should read this before processing any reviews or creating rules.
+
+Content is user-editable via the MCP Settings admin page (`mcp_review_guidelines` in `app_config`). Falls back to `DefaultReviewGuidelines` (a comprehensive constant in `server.go`) when no custom guidelines are saved.
+
+### Resource: `breadbox://report-format`
+
+Returns report structure templates and formatting guidelines. Agents should read this before submitting reports via the `submit_report` tool.
+
+Content is user-editable via the MCP Settings admin page (`mcp_report_format` in `app_config`). Falls back to `DefaultReportFormat` (a comprehensive constant in `server.go`) when no custom format is saved.
 
 ---
 

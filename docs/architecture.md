@@ -25,19 +25,27 @@
 ### 1.1 Binary and Subcommands
 
 Breadbox compiles to a single Go binary. All runtime components are started by
-a single subcommand. The binary exposes five subcommands:
+subcommands. The binary exposes these subcommands:
 
 ```
-breadbox serve        Start HTTP server with all components
-breadbox mcp-stdio    Start MCP server on stdio (local agent dev only)
-breadbox migrate      Run pending database migrations
-breadbox seed         Insert sandbox test data (development only)
-breadbox version      Print build version and exit
+breadbox serve           Start HTTP server with all components
+breadbox mcp-stdio       Start MCP server on stdio (local agent dev only)
+breadbox migrate         Run pending database migrations
+breadbox seed            Insert sandbox test data (development only)
+breadbox api-keys        List or create API keys (list | create <name>)
+breadbox create-admin    Create an admin account (interactive or --username/--password flags)
+breadbox reset-password  Reset the admin account password
+breadbox version         Print build version and exit
 ```
+
+> **Note:** There is no separate CLI client binary. All subcommands above are
+> part of the server binary (`cmd/breadbox/main.go`). The `api-keys`,
+> `create-admin`, and `reset-password` commands connect directly to the database
+> — they are administrative utilities, not API clients.
 
 `breadbox serve` is the production entry point. It initializes every component
 — HTTP router, sync engine, cron scheduler, webhook handler — and runs them
-in the same process. There is no microservice split at MVP.
+in the same process. There is no microservice split.
 
 `breadbox mcp-stdio` is a convenience mode for local agent development. It
 starts only the MCP server and reads/writes the MCP protocol on stdin/stdout.
@@ -227,8 +235,12 @@ breadbox/
 │   │   └── health.go            GET /health
 │   │
 │   ├── mcp/
-│   │   ├── server.go            MCP server construction; registers tools; mounts on router
-│   │   └── tools.go             Tool handler functions (list_accounts, query_transactions, etc.)
+│   │   ├── server.go            MCP server construction; registers tools + resources; mounts on router
+│   │   ├── tools.go             Tool handler functions (list_accounts, query_transactions, etc.)
+│   │   └── resources.go         MCP resource handlers:
+│   │                            - breadbox://overview (live dataset stats, JSON)
+│   │                            - breadbox://review-guidelines (review/rule guidelines, markdown)
+│   │                            - breadbox://report-format (report structure templates, markdown)
 │   │
 │   ├── admin/
 │   │   ├── router.go            Mounts all /admin/ routes; session auth middleware
@@ -357,12 +369,12 @@ type Provider interface {
     // CreateReauthSession starts a re-authentication flow for an existing
     // connection that has broken (e.g., password changed, MFA required).
     // Returns a provider-specific token or URL for the Link widget update mode.
-    CreateReauthSession(ctx context.Context, connectionID string) (LinkSession, error)
+    CreateReauthSession(ctx context.Context, conn Connection) (LinkSession, error)
 
     // RemoveConnection revokes the provider's access and marks the connection
     // as removed. The application must delete or deactivate the connection
     // record after this call succeeds.
-    RemoveConnection(ctx context.Context, connectionID string) error
+    RemoveConnection(ctx context.Context, conn Connection) error
 }
 ```
 
@@ -392,6 +404,8 @@ type Connection struct {
     EncryptedCredentials []byte
     // InstitutionName is the human-readable name of the financial institution.
     InstitutionName string
+    // UserID is the internal user ID, for provider flows that need user identity.
+    UserID string
 }
 
 type Account struct {
@@ -427,10 +441,13 @@ type Transaction struct {
     Amount                decimal.Decimal // positive = debit, negative = credit
     Date                  time.Time
     AuthorizedDate        *time.Time
+    Datetime              *time.Time
+    AuthorizedDatetime    *time.Time
     Name                  string
     MerchantName          *string
     CategoryPrimary       *string
     CategoryDetailed      *string
+    CategoryConfidence    *string
     PaymentChannel        string // online, in store, other
     Pending               bool
     ISOCurrencyCode       string
@@ -446,43 +463,53 @@ type WebhookPayload struct {
 
 type WebhookEvent struct {
     // Type classifies the event for routing.
-    // Values: "sync_available", "connection_error", "connection_removed", "unknown"
-    Type         string
-    ConnectionID string // internal connection ID, resolved by provider
-    ErrorCode    *string
+    // Values: "sync_available", "connection_error", "pending_expiration", "new_accounts", "unknown"
+    Type                  string
+    ConnectionID          string // internal connection ID, resolved by provider
+    ErrorCode             *string
+    ErrorMessage          *string
+    ConsentExpirationTime *string
+    NeedsReauth           bool // provider determines if reauth needed
 }
 ```
 
-### 3.3 Provider-Specific Data Storage
+### 3.3 Multi-Provider Data Storage
 
-Provider-specific secrets (e.g., the Plaid `access_token` and `item_id`) are
-stored in the `bank_connections` table using explicit typed columns rather than
-a generic encrypted JSON blob. This matches the canonical schema defined in
-`data-model.md`.
+Provider credentials are stored in generic columns on `bank_connections`, not
+provider-specific ones. This supports all providers (Plaid, Teller, CSV)
+without schema changes per provider.
 
-- Column: `plaid_item_id TEXT` — the Plaid item identifier
-- Column: `plaid_access_token BYTEA` — the Plaid access token, encrypted with
-  AES-256-GCM using the `ENCRYPTION_KEY` env var (nonce prepended to ciphertext)
-- On read: the provider decrypts `plaid_access_token` before making API calls.
-
-> **Note:** Provider-specific fields are explicit columns (not a JSON blob) for
-> type safety and query simplicity in MVP. This may be revisited when adding
-> Teller support.
+- Column: `external_id TEXT` — the provider's identifier for this connection
+  (Plaid `item_id`, Teller `enrollment_id`, etc.)
+- Column: `encrypted_credentials BYTEA` — AES-256-GCM encrypted blob containing
+  all provider-specific secrets (e.g., Plaid access token, Teller access token).
+  Nonce is prepended to ciphertext.
+- Unique constraint: `(provider, external_id)` — prevents duplicate connections
+  per provider.
+- On read: each provider decrypts `encrypted_credentials` before making API calls.
+- Encryption implementation: `internal/crypto/encrypt.go` (shared by all providers).
 
 ```
 bank_connections
-├── id                    UUID primary key
-├── user_id               UUID references users
-├── provider              TEXT ("plaid", "teller", "csv")
-├── plaid_item_id         TEXT nullable (Plaid item_id)
-├── plaid_access_token    BYTEA nullable (AES-256-GCM encrypted)
-├── institution_name      TEXT
-├── sync_cursor           TEXT (last successfully persisted sync cursor)
-├── status                TEXT ("active", "error", "pending_reauth", "disconnected")
-├── error_code            TEXT nullable
-├── error_message         TEXT nullable
-├── last_synced_at        TIMESTAMPTZ nullable
-└── created_at            TIMESTAMPTZ
+├── id                      UUID primary key
+├── short_id                TEXT NOT NULL UNIQUE (8-char base62)
+├── user_id                 UUID references users
+├── provider                provider_type NOT NULL ("plaid", "teller", "csv")
+├── external_id             TEXT (provider-specific connection ID)
+├── encrypted_credentials   BYTEA (AES-256-GCM encrypted)
+├── institution_id          TEXT nullable
+├── institution_name        TEXT
+├── sync_cursor             TEXT (last successfully persisted sync cursor)
+├── status                  connection_status ("active", "error", "pending_reauth", "disconnected")
+├── error_code              TEXT nullable
+├── error_message           TEXT nullable
+├── paused                  BOOLEAN DEFAULT FALSE
+├── sync_interval_override_minutes  INTEGER nullable
+├── new_accounts_available  BOOLEAN DEFAULT FALSE
+├── consent_expiration_time TIMESTAMPTZ nullable
+├── last_synced_at          TIMESTAMPTZ nullable
+├── created_at              TIMESTAMPTZ
+└── updated_at              TIMESTAMPTZ
 ```
 
 Connections are soft-deleted: when a user disconnects a bank, the `status` is
@@ -510,8 +537,10 @@ the `provider` field from the `bank_connections` row and looks up the
 corresponding implementation in `App.Providers`. If no implementation is
 registered for a given provider name, the operation returns an error.
 
-At MVP, only `"plaid"` is registered. The structure is in place for `"teller"`
-and `"csv"` to be added without modifying the sync engine or webhook handler.
+All three providers are implemented: `"plaid"` (`internal/provider/plaid/`),
+`"teller"` (`internal/provider/teller/`), and `"csv"` (`internal/provider/csv/`).
+Providers are initialized at startup based on configuration and can be
+hot-reloaded via `app.ReinitProvider(name)` after dashboard config changes.
 
 ---
 
@@ -632,7 +661,7 @@ encrypted with AES-256-GCM before being written and decrypted on read.
 - **Key:** 32 bytes derived from `ENCRYPTION_KEY` (64-char hex)
 - **Nonce:** 12 bytes, randomly generated per encryption operation
 - **Storage format:** nonce prepended to ciphertext, stored as `BYTEA`
-- **Implementation:** `internal/provider/plaid/encrypt.go`
+- **Implementation:** `internal/crypto/encrypt.go` (shared by all providers)
 
 The encryption key must be rotated by decrypting all credentials with the old
 key, re-encrypting with the new key, and updating `ENCRYPTION_KEY`. No
