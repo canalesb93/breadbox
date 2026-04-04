@@ -39,3 +39,6 @@ internal/db/*.sql.go
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# MCP config (contains API key)
+.mcp.json
