@@ -35,7 +35,12 @@
         "github.com",
         "api.github.com",
         "objects.githubusercontent.com"
-      ]
-    }
+      ],
+      "allowLocalBinding": true
+    },
+    "excludedCommands": [
+      "make dev*",
+      "go run *"
+    ]
   }
 }
