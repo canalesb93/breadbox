@@ -168,12 +168,25 @@ Detailed specs live in `docs/`. The canonical source for schema and enums is `do
 
 ## Local Dev & Git Worktrees
 
+### Quick Start
+
+Prerequisites: Go 1.24+, PostgreSQL (Homebrew or Docker).
+
+```
+make db       # start Postgres via Docker (skip if you have local Postgres)
+make dev      # auto-installs sqlc + tailwind, generates code, runs migrations, starts server
+```
+
+On first run, `make dev` will download `tailwindcss-extra`, install `sqlc` via `go install`, and generate all build artifacts. Subsequent runs skip these steps if artifacts exist.
+
 ### Database
 
-PostgreSQL runs locally (Homebrew `postgresql@15`), **not** in Docker. Credentials: `breadbox:breadbox`. All worktrees and dev server instances share the same database.
+PostgreSQL credentials: `breadbox:breadbox`. All worktrees and dev server instances share the same database.
 
 - **Dev database**: `postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable`
 - **Test database**: `postgres://breadbox:breadbox@localhost:5432/breadbox_test?sslmode=disable`
+- **Local Postgres**: Homebrew `postgresql@15` or `make db` (Docker). Both use port 5432.
+- **Migrations**: Run automatically on `breadbox serve` startup. For manual control: `make migrate-up` / `make migrate-down`.
 - **Shared state warning**: Multiple agents/worktrees may run simultaneously against the same `breadbox` database. Avoid destructive schema changes (DROP TABLE, DROP COLUMN, ALTER TYPE) without coordinating — another agent's running server will break. Additive migrations (ADD COLUMN, CREATE TABLE, CREATE INDEX) are safe.
 
 ### Required Environment Variables
@@ -183,28 +196,37 @@ The app requires these env vars when Plaid or Teller providers are configured in
 - `DATABASE_URL` — pgx falls back to Unix socket with current OS user if unset, which may not work in all contexts (e.g., worktrees spawned by agents). Always set it explicitly.
 - `ENCRYPTION_KEY` — 64-char hex (32-byte AES-256-GCM key). Required at startup if any provider is configured. To find the key from a running breadbox process: `ps eww -p $(pgrep -f "breadbox serve" | head -1) | tr ' ' '\n' | grep ENCRYPTION_KEY`
 
-### Setting Up a Git Worktree
+### Worktree Automation
 
-Worktrees get a clean checkout but **not** gitignored build artifacts. You must copy or regenerate them:
+Worktrees are fully automated via `claude --worktree` (or `claude -w`). Three mechanisms handle setup:
 
-1. **Create the worktree**: `git worktree add -b <branch-name> /tmp/breadbox-<name>`
-2. **Copy the Tailwind binary**: `cp /path/to/main/repo/tailwindcss-extra /tmp/breadbox-<name>/`
-3. **Build CSS**: `cd /tmp/breadbox-<name> && make css` (or copy `static/css/styles.css` from main repo)
-4. **Copy sqlc generated files**: `cp /path/to/main/repo/internal/db/*.go /tmp/breadbox-<name>/internal/db/` (or run `sqlc generate` if sqlc is installed)
-5. **Verify build**: `cd /tmp/breadbox-<name> && go build ./...`
-6. **Start dev server on a unique port**:
-   ```
-   DATABASE_URL="postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable" \
-   ENCRYPTION_KEY="$(ps eww -p $(pgrep -f 'breadbox serve' | head -1) 2>/dev/null | tr ' ' '\n' | grep ENCRYPTION_KEY | cut -d= -f2)" \
-   PORT=8082 make dev
-   ```
-7. **Port convention**: main repo uses 8080, first worktree 8081, second 8082, etc. Check `lsof -i :PORT` before starting.
+1. **`.worktreeinclude`**: Automatically copies gitignored build artifacts (sqlc files, `tailwindcss-extra`, `styles.css`, teller certs, `.local.env`) from the main repo into the worktree at creation time.
+2. **`SessionStart` hook** (`.claude/hooks/session-start.sh`): Verifies `go build` works (falls back to `sqlc generate` if copied files are stale), injects `DATABASE_URL`, `ENCRYPTION_KEY`, and `PORT` via `CLAUDE_ENV_FILE`.
+3. **Port assignment**: The hook scans ports 8081–8099 for the first available one and claims it with an atomic lock file under `.claude/port-locks/` to prevent races between concurrent sessions. Main repo uses 8080.
+
+After setup, the agent just runs `make dev` — the `PORT` env var is already set, and `generate` skips since artifacts exist.
+
+### Sandbox
+
+OS-level sandboxing is enabled via `.claude/settings.json` with auto-allow mode. This replaces manual "bypass permissions" for most operations:
+
+- **Filesystem**: Write access to project dir, `~/go`, `~/Library/Caches/go-build`, `/tmp`, `/var/folders`.
+- **Network**: `localhost`, Go module proxy, GitHub.
+- **Excluded commands**: `make dev*`, `make test*`, `go run *`, `go test *` run outside the sandbox (they need full network access for Postgres and HTTP binding).
+
+### Manual Worktree Setup
+
+If not using `claude -w`, you can set up manually:
+
+1. `git worktree add -b <branch> .claude/worktrees/<name>`
+2. Copy artifacts: `cp tailwindcss-extra static/css/styles.css internal/db/*.go .claude/worktrees/<name>/` (matching paths)
+3. `cd .claude/worktrees/<name> && PORT=808X make dev`
 
 ### Cleanup
 
-- Remove worktree: `git worktree remove /tmp/breadbox-<name>`
-- If changes were committed, push the branch first
-- Kill any running dev server: `kill $(lsof -ti:<PORT>)`
+- Worktrees created by `claude -w` are cleaned up automatically when the session ends.
+- Manual cleanup: `git worktree remove .claude/worktrees/<name>`
+- Kill dev servers: `kill $(lsof -ti:<PORT>)` or `make dev-stop` (kills all instances)
 
 ## Workflow Rules
 
