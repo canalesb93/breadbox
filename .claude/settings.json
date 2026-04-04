@@ -21,7 +21,8 @@
       "allowWrite": [
         "~/go",
         "~/Library/Caches/go-build",
-        "/tmp"
+        "/tmp",
+        "/var/folders"
       ]
     },
     "network": {
