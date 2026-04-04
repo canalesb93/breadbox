@@ -10,5 +10,31 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "mcp-server-dev@claude-plugins-official": true
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllow": true,
+    "filesystem": {
+      "allowWrite": [
+        "~/go",
+        "~/Library/Caches/go-build",
+        "/tmp"
+      ]
+    },
+    "network": {
+      "allowedDomains": [
+        "localhost",
+        "127.0.0.1",
+        "proxy.golang.org",
+        "sum.golang.org",
+        "storage.googleapis.com",
+        "github.com",
+        "api.github.com",
+        "objects.githubusercontent.com"
+      ]
+    }
   }
 }
