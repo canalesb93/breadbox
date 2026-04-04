@@ -7,8 +7,12 @@ TAILWIND_BIN := ./tailwindcss-extra
 
 PORT ?= 8080
 
-# generate runs sqlc + css so all gitignored build artifacts exist
-generate: sqlc css
+# generate ensures gitignored build artifacts exist.
+# Skips if artifacts are already present (e.g., copied by .worktreeinclude).
+# Run 'make sqlc' or 'make css' directly to force regeneration.
+generate:
+	@if [ ! -f internal/db/models.go ]; then $(MAKE) sqlc; fi
+	@if [ ! -f static/css/styles.css ]; then $(MAKE) css; fi
 
 dev: generate
 	@if lsof -ti:$(PORT) >/dev/null 2>&1; then \
