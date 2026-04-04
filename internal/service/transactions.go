@@ -19,7 +19,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		"t.category_primary, t.category_detailed, t.category_confidence, " +
 		"t.payment_channel, t.pending, t.deleted_at, t.created_at, t.updated_at, " +
 		"COALESCE(a.display_name, a.name) AS account_name, " +
-		"u.name AS user_name, " +
+		"COALESCE(au.name, u.name) AS user_name, " +
 		"t.category_id, t.category_override, " +
 		"c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, c.color AS cat_color, " +
 		"pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name, " +
@@ -442,7 +442,7 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 
 func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransactionListParams) (*AdminTransactionListResult, error) {
 	selectPrefix := "SELECT t.id, t.account_id, COALESCE(a.display_name, a.name, ''), " +
-		"COALESCE(bc.institution_name, ''), COALESCE(u.name, ''), " +
+		"COALESCE(bc.institution_name, ''), COALESCE(au.name, u.name, ''), " +
 		"t.date, t.name, t.merchant_name, t.amount, t.iso_currency_code, " +
 		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
 		"t.category_override, t.pending, " +
@@ -453,6 +453,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		"LEFT JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
 		"LEFT JOIN users u ON bc.user_id = u.id " +
+		"LEFT JOIN users au ON t.attributed_user_id = au.id " +
 		"LEFT JOIN categories c ON t.category_id = c.id " +
 		"LEFT JOIN categories pc ON c.parent_id = pc.id "
 	query := selectPrefix + fromClause + "WHERE t.deleted_at IS NULL"
