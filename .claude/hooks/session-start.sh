@@ -26,10 +26,13 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
 
   # Inject env vars if CLAUDE_ENV_FILE is available
   if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
+    # DATABASE_URL
     if [ -z "${DATABASE_URL:-}" ]; then
       echo 'DATABASE_URL=postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable' >> "$CLAUDE_ENV_FILE"
       echo "    Set DATABASE_URL"
     fi
+
+    # ENCRYPTION_KEY — grab from running breadbox process
     if [ -z "${ENCRYPTION_KEY:-}" ]; then
       RUNNING_PID="$(pgrep -f 'breadbox serve' | head -1 || true)"
       if [ -n "$RUNNING_PID" ]; then
@@ -38,6 +41,45 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
           echo "ENCRYPTION_KEY=$EK" >> "$CLAUDE_ENV_FILE"
           echo "    Set ENCRYPTION_KEY from running process"
         fi
+      fi
+    fi
+
+    # PORT — find next available port starting from 8081
+    # Uses lock files under main repo's .claude/ to prevent races between
+    # concurrent worktree sessions that haven't started their server yet.
+    if [ -z "${PORT:-}" ]; then
+      MAIN_REPO="$(dirname "$GIT_COMMON")"
+      PORT_LOCKS="$MAIN_REPO/.claude/port-locks"
+      mkdir -p "$PORT_LOCKS"
+
+      # Clean up stale lock files (port not in use AND lock older than 5 min)
+      for lockfile in "$PORT_LOCKS"/*; do
+        [ -f "$lockfile" ] || continue
+        LOCK_PORT="$(basename "$lockfile")"
+        if ! lsof -i :"$LOCK_PORT" >/dev/null 2>&1; then
+          LOCK_AGE=$(( $(date +%s) - $(stat -f %m "$lockfile" 2>/dev/null || echo 0) ))
+          if [ "$LOCK_AGE" -gt 300 ]; then
+            rm -f "$lockfile"
+          fi
+        fi
+      done
+
+      PORT=8081
+      while [ "$PORT" -le 8099 ]; do
+        if ! lsof -i :"$PORT" >/dev/null 2>&1 && ! [ -f "$PORT_LOCKS/$PORT" ]; then
+          # Claim it atomically
+          if (set -o noclobber; echo "$$" > "$PORT_LOCKS/$PORT") 2>/dev/null; then
+            break
+          fi
+        fi
+        PORT=$((PORT + 1))
+      done
+
+      if [ "$PORT" -le 8099 ]; then
+        echo "PORT=$PORT" >> "$CLAUDE_ENV_FILE"
+        echo "    Set PORT=$PORT (use 'make dev' to start server)"
+      else
+        echo "WARN: no available port in 8081-8099"
       fi
     fi
   fi

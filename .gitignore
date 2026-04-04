@@ -37,8 +37,9 @@ internal/db/*.sql.go
 # OS
 .DS_Store
 
-# Claude Code worktrees
+# Claude Code worktrees and port locks
 .claude/worktrees/
+.claude/port-locks/
 
 # MCP config (contains API key)
 .mcp.json
