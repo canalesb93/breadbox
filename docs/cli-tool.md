@@ -13,6 +13,17 @@ A standalone CLI tool that talks to any Breadbox server instance via its REST AP
 - Extensible command structure — easy to add new resource types
 - Output formats: human-readable tables (default), JSON (`--json`), TSV (`--tsv`)
 
+## Binary Rename
+
+The current `breadbox` binary becomes `breadboxd` (the server daemon). The `breadbox` name is reclaimed for the CLI.
+
+| Before | After | Role |
+|--------|-------|------|
+| `cmd/breadbox/` | `cmd/breadboxd/` | Server daemon (serve, migrate, create-admin, etc.) |
+| *(new)* | `cmd/breadbox/` | Standalone CLI client |
+
+**Migration**: existing deployments that reference `breadbox serve` in systemd units, Docker entrypoints, or scripts will need to update to `breadboxd serve`. The Docker image entrypoint and `deploy/` scripts should be updated as part of the rename.
+
 ## Command Structure
 
 ```
@@ -22,10 +33,25 @@ breadbox <command> <subcommand> [flags]
 ### Connection & Auth
 
 ```bash
-# Configure which server to talk to (writes ~/.config/breadbox/config.yaml)
+# Browser-based OAuth (default for humans)
+breadbox auth login --server https://breadbox.example.com
+# → Opens browser to authorize, saves token to profile
+
+# Device code flow (agents, SSH sessions, headless environments)
+breadbox auth login --server https://breadbox.example.com
+# → When no browser detected:
+#   Visit: https://breadbox.example.com/oauth/device
+#   Enter code: ABCD-1234
+#   Waiting for approval... ✓
+
+# API key (scripts, CI, agents with pre-provisioned keys)
 breadbox auth login --server https://breadbox.example.com --api-key bb_xxxxx
-breadbox auth status          # Show current server + key info
+# Or via env var (no config file needed):
+BREADBOX_API_KEY=bb_xxxxx BREADBOX_SERVER=https://... breadbox tx list
+
+breadbox auth status          # Show current server + key info + token expiry
 breadbox auth switch <name>   # Switch between saved profiles
+breadbox auth logout          # Remove current profile's credentials
 ```
 
 ### Transactions
@@ -144,6 +170,7 @@ internal/
     client.go        # HTTP client wrapper
     config.go        # Config file loading (~/.config/breadbox/)
     output.go        # Table/JSON/TSV formatter
+    auth.go          # OAuth + device code flow + API key auth
   # ... existing packages (api/, service/, etc.) only imported by breadboxd
 ```
 
@@ -155,14 +182,74 @@ Adopt **[cobra](https://github.com/spf13/cobra)** for the CLI. Reasons:
 - Subcommand nesting, flag parsing, help generation, shell completions out of the box
 - `breadboxd` can import and mount the CLI's cobra command tree alongside its server commands
 
+### Authentication
+
+Three methods, in order of preference:
+
+**1. OAuth with browser (default for humans)**
+
+Standard authorization code flow. CLI starts a temporary local HTTP server on a random port to receive the callback.
+
+```
+breadbox auth login --server https://breadbox.example.com
+→ Opening browser to https://breadbox.example.com/oauth/authorize?...
+→ Waiting for authorization... ✓
+→ Logged in as Ricardo. Token saved to profile "home".
+```
+
+**2. Device code flow (agents + headless environments)**
+
+When no browser is available (detected via `os.Getenv("DISPLAY")` / `os.Getenv("BROWSER")` / TTY check), falls back to device code flow. The CLI prints a URL and short code — agents can present this to users in whatever interface they're running in (chat window, terminal, Slack, etc.).
+
+```
+breadbox auth login --server https://breadbox.example.com
+→ No browser detected. To authenticate:
+→
+→   Visit:  https://breadbox.example.com/oauth/device
+→   Code:   ABCD-1234
+→
+→ Waiting for approval... ✓
+→ Logged in as Ricardo. Token saved to profile "home".
+```
+
+Agents can also force this mode explicitly:
+
+```bash
+breadbox auth login --server https://... --device-code
+```
+
+The device code + URL are also available as structured output for programmatic use:
+
+```bash
+breadbox auth login --server https://... --device-code --json
+# {"verification_url": "https://...", "user_code": "ABCD-1234", "expires_in": 900}
+```
+
+**3. API key (scripts, CI, pre-provisioned agents)**
+
+Direct API key auth, no OAuth round-trip. Works via flag or env var:
+
+```bash
+# Via flag (saved to config)
+breadbox auth login --server https://... --api-key bb_xxxxx
+
+# Via env vars (ephemeral, no config file needed)
+BREADBOX_SERVER=https://... BREADBOX_API_KEY=bb_xxxxx breadbox tx list
+```
+
+**Precedence**: env vars > flags > config file profile.
+
+**Token storage**: OAuth tokens and API keys stored in `~/.config/breadbox/config.yaml`. File permissions set to `0600`. Tokens include refresh tokens for silent renewal.
+
 ### HTTP Client
 
 A thin wrapper around `net/http` that handles:
 
-- Base URL + API key from active profile
+- Base URL + credentials from active profile (or env var overrides)
 - JSON marshaling/unmarshaling
 - Error envelope parsing (`{"error": {"code": "...", "message": "..."}}`)
 - Pagination (cursor-based, follows `next_cursor` automatically when `--limit` exceeds page size)
+- OAuth token refresh (transparent, using stored refresh token)
 - Per-request `--server` and `--api-key` flag overrides (skip config file for scripting)
 
 ```go
@@ -170,6 +257,7 @@ A thin wrapper around `net/http` that handles:
 type Client struct {
     BaseURL    string
     APIKey     string
+    OAuthToken *OAuthToken // access_token + refresh_token + expiry
     HTTPClient *http.Client
 }
 
@@ -189,13 +277,17 @@ current_profile: home
 profiles:
   home:
     server: https://breadbox.example.com
-    api_key: bb_xxxxxxxxxxxxx
+    # OAuth token (from browser or device code login)
+    oauth_token: eyJhbGci...
+    oauth_refresh_token: dGhpcyBp...
+    oauth_expiry: 2026-05-01T00:00:00Z
   work:
     server: http://localhost:8080
+    # API key (from --api-key login)
     api_key: bb_yyyyyyyyyyyyy
 ```
 
-Profiles support the multi-instance model — a user might have one family Breadbox and one shared with a partner, each on different servers.
+Profiles support the multi-instance model — a user might have one family Breadbox and one shared with a partner, each on different servers. OAuth and API key auth can be mixed across profiles.
 
 ### Output Formatting
 
@@ -204,7 +296,7 @@ Three modes, consistent across all commands:
 | Flag | Format | Use Case |
 |------|--------|----------|
 | *(default)* | Aligned table | Human reading |
-| `--json` | JSON array/object | Piping to `jq`, scripts |
+| `--json` | JSON array/object | Piping to `jq`, scripts, agents |
 | `--tsv` | Tab-separated | Spreadsheets, `awk` |
 
 The `--fields` flag controls which columns appear (mirrors the API's `fields` param).
@@ -269,17 +361,12 @@ breadbox completion bash|zsh|fish|powershell
 
 ## Implementation Plan
 
-**Phase 1 — Foundation**: Rename server binary to `breadboxd`, create `cmd/breadbox/` for CLI, `auth login/status/switch`, HTTP client, config file, output formatter
+**Phase 1 — Foundation**: Rename `cmd/breadbox/` to `cmd/breadboxd/`, update Makefile/Dockerfile/deploy scripts. Create `cmd/breadbox/` for CLI. HTTP client, config file, output formatter, `auth login/status/switch`.
 
 **Phase 2 — Read commands**: `tx list/view/search/summary/merchants`, `category list`, `account list`, `connection list/status`, `rule list/view`, `review list`
 
 **Phase 3 — Write commands**: `tx categorize`, `rule create/update/delete/apply`, `review approve/reject`, `report submit`
 
-**Phase 4 — Polish**: shell completions, `--interactive` mode for reviews, CI release pipeline for both binaries, install script
+**Phase 4 — Auth**: OAuth authorization code flow, device code flow, token refresh. Server-side OAuth endpoints if not already sufficient.
 
-## Open Questions
-
-- **Server binary rename**: `breadboxd` is the obvious choice (follows `dockerd`, `containerd` convention). Any other preferences?
-- **Interactive mode?** `breadbox review` without subcommands could enter an interactive TUI for triaging reviews one by one.
-- **Piping patterns?** Should `breadbox tx list --json | breadbox tx categorize --stdin` be a pattern we design for explicitly?
-- **Auth flow**: For hosted instances, should we support OAuth/browser-based login in addition to API key pasting? e.g., `breadbox auth login` opens a browser, user approves, CLI receives a token.
+**Phase 5 — Polish**: shell completions, CI release pipeline for both binaries, install script
