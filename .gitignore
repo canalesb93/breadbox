@@ -19,7 +19,6 @@ vendor/
 # sqlc generated files
 internal/db/db.go
 internal/db/models.go
-internal/db/querier.go
 internal/db/*.sql.go
 
 # IDE
