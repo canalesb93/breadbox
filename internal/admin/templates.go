@@ -875,6 +875,7 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 			}
 			m["SessionRole"] = role
 			m["IsAdmin"] = role == RoleAdmin
+			m["IsEditor"] = role == RoleAdmin || role == RoleEditor
 		}
 	}
 

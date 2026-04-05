@@ -83,17 +83,12 @@
     <i data-lucide="settings"></i> Settings
   </a>
   {{end}}
-  {{if not .IsEditor}}
-  <div class="bb-sidebar-section">Account</div>
-  <a href="/my-account" class="bb-sidebar-link{{if eq .CurrentPage "my-account"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="settings"></i> My Account
-  </a>
-  {{end}}
+
 </nav>
 
 <!-- User profile + Sign out -->
 <div class="bb-sidebar-footer mt-auto pt-4 border-t border-base-300">
-  <div class="bb-sidebar-profile">
+  <a href="/my-account" class="bb-sidebar-profile no-underline hover:bg-base-200/50 rounded-xl transition-colors" title="My Account">
     <div class="bb-sidebar-profile-avatar">
       {{if .AdminUsername}}{{slice .AdminUsername 0 1}}{{else}}A{{end}}
     </div>
@@ -101,10 +96,12 @@
       <div class="bb-sidebar-profile-name">{{if .AdminUsername}}{{.AdminUsername}}{{else}}Admin{{end}}</div>
       <div class="bb-sidebar-profile-role">{{.RoleDisplay}}</div>
     </div>
-    <form method="POST" action="/logout" class="bb-sidebar-profile-logout">
+  </a>
+  <div class="flex items-center gap-1 mt-1 px-1">
+    <form method="POST" action="/logout" class="ml-auto">
       {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
-      <button type="submit" class="bb-sidebar-logout-btn" title="Sign out">
-        <i data-lucide="log-out"></i>
+      <button type="submit" class="btn btn-ghost btn-xs gap-1 opacity-50 hover:opacity-100" title="Sign out">
+        <i data-lucide="log-out" class="w-3 h-3"></i> Sign out
       </button>
     </form>
   </div>
