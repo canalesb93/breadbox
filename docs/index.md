@@ -1,6 +1,6 @@
 # Breadbox Documentation
 
-Breadbox is a self-hosted financial data aggregation server for families. It syncs bank data from multiple providers (Plaid, Teller, CSV), stores it in PostgreSQL, and exposes it through a REST API and MCP server for AI agents.
+Breadbox is a self-hosted financial data aggregation server for households. It syncs bank data from multiple providers (Plaid, Teller, CSV), stores it in PostgreSQL, and exposes it through a REST API and MCP server for AI agents.
 
 ## Quick Links
 

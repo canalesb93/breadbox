@@ -1,6 +1,6 @@
 # Breadbox
 
-Self-hosted financial data aggregation for families. Connect your banks, sync transactions automatically, and query your financial data through a REST API or AI agents via [MCP](https://modelcontextprotocol.io/).
+Self-hosted financial data aggregation for households. Connect your banks, sync transactions automatically, and query your financial data through a REST API or AI agents via [MCP](https://modelcontextprotocol.io/).
 
 <!-- TODO: Add screenshot of dashboard here -->
 

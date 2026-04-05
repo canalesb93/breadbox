@@ -1,6 +1,6 @@
 # Breadbox
 
-Self-hosted financial data aggregation for families. Syncs bank data via Plaid and Teller, stores it in PostgreSQL, exposes it to AI agents via MCP and REST API.
+Self-hosted financial data aggregation for households. Syncs bank data via Plaid and Teller, stores it in PostgreSQL, exposes it to AI agents via MCP and REST API.
 
 ## Tech Stack
 
