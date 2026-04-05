@@ -148,11 +148,18 @@
           if(data.setup_token) {
             setupURL = window.location.origin + '/setup-account/' + data.setup_token;
             done = true;
+            if (window.bbProgress) window.bbProgress.finish();
+            var main = document.querySelector('main');
+            if (main) { main.style.opacity = ''; main.style.filter = ''; main.style.pointerEvents = ''; }
+            $nextTick(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); });
           } else {
             window.location.href = '/users';
           }
         }).catch(e => {
           submitting = false;
+          if (window.bbProgress) window.bbProgress.finish();
+          var main = document.querySelector('main');
+          if (main) { main.style.opacity = ''; main.style.filter = ''; main.style.pointerEvents = ''; }
           error = (e.error && e.error.message) || 'Failed to create login account';
         });
       ">
