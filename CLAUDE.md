@@ -230,6 +230,7 @@ If not using `claude -w`, you can set up manually:
 
 ## Releases & CI
 
+- **Branch protection**: `main` is a restricted branch — direct pushes are blocked. All changes must go through a pull request with passing CI status checks.
 - **Versioning**: Semantic versioning (`v0.1.0`). See `CHANGELOG.md`.
 - **Releasing**: Manual. Create a git tag and push it — CI handles the rest.
   ```
