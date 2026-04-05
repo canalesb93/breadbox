@@ -72,7 +72,13 @@ ACCOUNT LINKING:
 
 REPORTS & COMMUNICATION:
 - Tools: submit_report, add_transaction_comment, list_transaction_comments
-- Before submitting reports, read breadbox://report-format for report structure and formatting guidelines.`
+- Before submitting reports, read breadbox://report-format for report structure and formatting guidelines.
+
+USER ROLES:
+- admin: Full access. Can manage connections, settings, users, rules, and all data.
+- editor: Can view and edit ALL household members' transactions (categorize, review, comment). Cannot manage connections, settings, users, or system config.
+- viewer: Can only see their own connections, accounts, and transactions. Read-only for their own data.
+- The permissions section in breadbox://overview shows what the current session can do.`
 
 // DefaultReviewGuidelines contains the default review guidelines served via breadbox://review-guidelines.
 // User-editable via the MCP Settings page.

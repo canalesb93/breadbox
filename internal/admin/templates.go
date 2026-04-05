@@ -848,7 +848,7 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 	// Auto-inject common fields into map data if not already present.
 	if m, ok := data.(map[string]any); ok {
 		if _, exists := m["AdminUsername"]; !exists && tr.sm != nil {
-			m["AdminUsername"] = tr.sm.GetString(r.Context(), sessionKeyAdminUsername)
+			m["AdminUsername"] = tr.sm.GetString(r.Context(), sessionKeyAccountUsername)
 		}
 		if _, exists := m["AppVersion"]; !exists && tr.version != "" {
 			m["AppVersion"] = tr.version
@@ -912,9 +912,11 @@ func BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage, page
 		"CurrentPage":   currentPage,
 		"Flash":         GetFlash(r.Context(), sm),
 		"CSRFToken":     GetCSRFToken(r),
-		"AdminUsername": sm.GetString(r.Context(), sessionKeyAdminUsername),
+		"AdminUsername": sm.GetString(r.Context(), sessionKeyAccountUsername),
 		"SessionRole":   role,
 		"IsAdmin":       role == RoleAdmin,
+		"IsEditor":      role == RoleAdmin || role == RoleEditor,
+		"RoleDisplay":   RoleDisplayName(role),
 	}
 }
 
@@ -1009,9 +1011,9 @@ func titleCaseMerchant(s string) string {
 	return strings.Join(words, " ")
 }
 
-// AdminUsername returns the admin username from the session for use in template data maps.
+// AdminUsername returns the username from the session for use in template data maps.
 func AdminUsername(r *http.Request, sm *scs.SessionManager) string {
-	return sm.GetString(r.Context(), sessionKeyAdminUsername)
+	return sm.GetString(r.Context(), sessionKeyAccountUsername)
 }
 
 // RenderTo writes the named template to any io.Writer.

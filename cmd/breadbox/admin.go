@@ -73,9 +73,9 @@ func runCreateAdmin() error {
 	}
 
 	// Check if username already exists.
-	_, err = queries.GetAdminAccountByUsername(ctx, username)
+	_, err = queries.GetAuthAccountByUsername(ctx, username)
 	if err == nil {
-		return fmt.Errorf("admin account with username %q already exists", username)
+		return fmt.Errorf("account with username %q already exists", username)
 	}
 
 	// Hash password with bcrypt.
@@ -85,9 +85,10 @@ func runCreateAdmin() error {
 	}
 
 	// Create admin account.
-	_, err = queries.CreateAdminAccount(ctx, db.CreateAdminAccountParams{
+	_, err = queries.CreateAuthAccount(ctx, db.CreateAuthAccountParams{
 		Username:       username,
 		HashedPassword: hashedPassword,
+		Role:           "admin",
 	})
 	if err != nil {
 		return fmt.Errorf("create admin account: %w", err)

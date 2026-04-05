@@ -43,6 +43,8 @@
   <a href="/rules" class="bb-sidebar-link{{if or (eq .CurrentPage "rules") (eq .CurrentPage "categories")}} bb-sidebar-link--active{{end}}">
     <i data-lucide="list-filter"></i> Rules & Categories
   </a>
+  {{end}}
+  {{if .IsEditor}}
   <a href="/reviews" class="bb-sidebar-link{{if eq .CurrentPage "reviews"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="clipboard-check"></i>
     <span class="flex-1">Review Queue</span>
@@ -52,6 +54,8 @@
     <span class="badge badge-ghost badge-xs">Off</span>
     {{end}}
   </a>
+  {{end}}
+  {{if .IsAdmin}}
   <a href="/users" class="bb-sidebar-link{{if eq .CurrentPage "users"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="users"></i> Household
   </a>
@@ -90,7 +94,7 @@
     </div>
     <div class="bb-sidebar-profile-info">
       <div class="bb-sidebar-profile-name">{{if .AdminUsername}}{{.AdminUsername}}{{else}}Admin{{end}}</div>
-      <div class="bb-sidebar-profile-role">{{if .IsAdmin}}Administrator{{else}}Member{{end}}</div>
+      <div class="bb-sidebar-profile-role">{{.RoleDisplay}}</div>
     </div>
     <form method="POST" action="/logout" class="bb-sidebar-profile-logout">
       {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}

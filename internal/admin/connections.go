@@ -61,9 +61,9 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 		var connections []db.ListBankConnectionsRow
 		var err error
 
-		// Scope to member's own connections if not admin.
+		// Scope to viewer's own connections. Editors and admins see all.
 		memberUserID := SessionUserID(sm, r)
-		if !IsAdmin(sm, r) && memberUserID != "" {
+		if !IsEditor(sm, r) && memberUserID != "" {
 			var uid pgtype.UUID
 			if scanErr := uid.Scan(memberUserID); scanErr == nil {
 				userConns, queryErr := a.Queries.ListBankConnectionsByUser(ctx, uid)
@@ -440,8 +440,8 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 			return
 		}
 
-		// IDOR check: non-admin members can only view their own connections.
-		if !IsAdmin(sm, r) {
+		// IDOR check: viewers can only view their own connections. Editors+ see all.
+		if !IsEditor(sm, r) {
 			memberUID := SessionUserID(sm, r)
 			connUserID := formatUUID(conn.UserID)
 			if connUserID == "" || connUserID != memberUID {

@@ -9,28 +9,28 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// MemberAccountResponse is the API/service response for a member account.
-type MemberAccountResponse struct {
-	ID           string  `json:"id"`
-	UserID       string  `json:"user_id"`
-	UserName     string  `json:"user_name"`
-	UserEmail    *string `json:"user_email"`
-	Username     string  `json:"username"`
-	Role         string  `json:"role"`
-	HasPassword  bool    `json:"has_password"`
-	CreatedAt    string  `json:"created_at"`
-	UpdatedAt    string  `json:"updated_at"`
+// LoginAccountResponse is the API/service response for a login account.
+type LoginAccountResponse struct {
+	ID          string  `json:"id"`
+	UserID      string  `json:"user_id"`
+	UserName    string  `json:"user_name"`
+	UserEmail   *string `json:"user_email"`
+	Username    string  `json:"username"`
+	Role        string  `json:"role"`
+	HasPassword bool    `json:"has_password"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
 }
 
-// CreateMemberAccountParams holds the inputs for creating a member account.
-type CreateMemberAccountParams struct {
+// CreateLoginAccountParams holds the inputs for creating a login account.
+type CreateLoginAccountParams struct {
 	UserID   string
 	Username string
-	Role     string // "admin" or "member"
+	Role     string // "admin", "editor", or "viewer"
 }
 
-// CreateMemberAccount creates a new member account linked to an existing user.
-func (s *Service) CreateMemberAccount(ctx context.Context, params CreateMemberAccountParams) (*MemberAccountResponse, error) {
+// CreateLoginAccount creates a new login account linked to an existing user.
+func (s *Service) CreateLoginAccount(ctx context.Context, params CreateLoginAccountParams) (*LoginAccountResponse, error) {
 	// Resolve user ID.
 	userUUID, err := s.resolveUserID(ctx, params.UserID)
 	if err != nil {
@@ -38,29 +38,30 @@ func (s *Service) CreateMemberAccount(ctx context.Context, params CreateMemberAc
 	}
 
 	// Validate role.
-	if params.Role != "admin" && params.Role != "member" {
-		return nil, fmt.Errorf("invalid role: must be 'admin' or 'member'")
+	validRoles := map[string]bool{"admin": true, "editor": true, "viewer": true}
+	if !validRoles[params.Role] {
+		return nil, fmt.Errorf("invalid role: must be 'admin', 'editor', or 'viewer'")
 	}
 
-	// Check that user doesn't already have a member account.
-	_, err = s.Queries.GetMemberAccountByUserID(ctx, userUUID)
+	// Check that user doesn't already have a login account.
+	_, err = s.Queries.GetAuthAccountByUserID(ctx, userUUID)
 	if err == nil {
-		return nil, fmt.Errorf("user already has a member account")
+		return nil, fmt.Errorf("user already has a login account")
 	}
 
-	// Check username uniqueness across both admin_accounts and member_accounts.
-	_, err = s.Queries.GetAdminAccountByUsername(ctx, params.Username)
+	// Check username uniqueness (auth_accounts has UNIQUE constraint, but check first for better error).
+	_, err = s.Queries.GetAuthAccountByUsername(ctx, params.Username)
 	if err == nil {
 		return nil, fmt.Errorf("username already taken")
 	}
 
-	member, err := s.Queries.CreateMemberAccount(ctx, db.CreateMemberAccountParams{
+	account, err := s.Queries.CreateAuthAccount(ctx, db.CreateAuthAccountParams{
 		UserID:   userUUID,
 		Username: params.Username,
 		Role:     params.Role,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("create member account: %w", err)
+		return nil, fmt.Errorf("create login account: %w", err)
 	}
 
 	// Look up user details for response.
@@ -69,29 +70,29 @@ func (s *Service) CreateMemberAccount(ctx context.Context, params CreateMemberAc
 		return nil, fmt.Errorf("get user: %w", err)
 	}
 
-	return &MemberAccountResponse{
-		ID:          formatUUID(member.ID),
-		UserID:      formatUUID(member.UserID),
+	return &LoginAccountResponse{
+		ID:          formatUUID(account.ID),
+		UserID:      formatUUID(account.UserID),
 		UserName:    user.Name,
 		UserEmail:   textPtr(user.Email),
-		Username:    member.Username,
-		Role:        member.Role,
-		HasPassword: member.HashedPassword != nil,
-		CreatedAt:   member.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:   member.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		Username:    account.Username,
+		Role:        account.Role,
+		HasPassword: account.HashedPassword != nil,
+		CreatedAt:   account.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:   account.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
 	}, nil
 }
 
-// ListMemberAccounts returns all member accounts with their linked user details.
-func (s *Service) ListMemberAccounts(ctx context.Context) ([]MemberAccountResponse, error) {
-	rows, err := s.Queries.ListMemberAccounts(ctx)
+// ListLoginAccounts returns all login accounts with their linked user details.
+func (s *Service) ListLoginAccounts(ctx context.Context) ([]LoginAccountResponse, error) {
+	rows, err := s.Queries.ListAuthAccountsWithUser(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list member accounts: %w", err)
+		return nil, fmt.Errorf("list login accounts: %w", err)
 	}
 
-	result := make([]MemberAccountResponse, len(rows))
+	result := make([]LoginAccountResponse, len(rows))
 	for i, r := range rows {
-		result[i] = MemberAccountResponse{
+		result[i] = LoginAccountResponse{
 			ID:          formatUUID(r.ID),
 			UserID:      formatUUID(r.UserID),
 			UserName:    r.UserName,
@@ -106,31 +107,32 @@ func (s *Service) ListMemberAccounts(ctx context.Context) ([]MemberAccountRespon
 	return result, nil
 }
 
-// UpdateMemberRole updates a member account's role.
-func (s *Service) UpdateMemberRole(ctx context.Context, memberID string, role string) error {
-	if role != "admin" && role != "member" {
-		return fmt.Errorf("invalid role: must be 'admin' or 'member'")
+// UpdateLoginAccountRole updates a login account's role.
+func (s *Service) UpdateLoginAccountRole(ctx context.Context, accountID string, role string) error {
+	validRoles := map[string]bool{"admin": true, "editor": true, "viewer": true}
+	if !validRoles[role] {
+		return fmt.Errorf("invalid role: must be 'admin', 'editor', or 'viewer'")
 	}
 
 	var id pgtype.UUID
-	if err := id.Scan(memberID); err != nil {
-		return fmt.Errorf("invalid member id: %w", err)
+	if err := id.Scan(accountID); err != nil {
+		return fmt.Errorf("invalid account id: %w", err)
 	}
 
-	return s.Queries.UpdateMemberAccountRole(ctx, db.UpdateMemberAccountRoleParams{
+	return s.Queries.UpdateAuthAccountRole(ctx, db.UpdateAuthAccountRoleParams{
 		ID:   id,
 		Role: role,
 	})
 }
 
-// DeleteMemberAccount deletes a member account (does not delete the linked user).
-func (s *Service) DeleteMemberAccount(ctx context.Context, memberID string) error {
+// DeleteLoginAccount deletes a login account (does not delete the linked user).
+func (s *Service) DeleteLoginAccount(ctx context.Context, accountID string) error {
 	var id pgtype.UUID
-	if err := id.Scan(memberID); err != nil {
-		return fmt.Errorf("invalid member id: %w", err)
+	if err := id.Scan(accountID); err != nil {
+		return fmt.Errorf("invalid account id: %w", err)
 	}
 
-	return s.Queries.DeleteMemberAccount(ctx, id)
+	return s.Queries.DeleteAuthAccount(ctx, id)
 }
 
 // WipeUserData deletes all connections and transactions for a given user.

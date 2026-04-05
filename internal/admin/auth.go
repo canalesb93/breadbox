@@ -12,19 +12,25 @@ import (
 )
 
 const (
-	sessionKeyAdminID       = "admin_id"
-	sessionKeyAdminUsername = "admin_username"
-	sessionKeyAccountRole   = "account_role"   // "admin" or "member"
-	sessionKeyUserID        = "user_id"         // linked family member UUID (member accounts only)
-	sessionKeyAccountType   = "account_type"    // "admin_account" or "member_account"
-	sessionKeyMemberID      = "member_id"       // member_accounts.id (member accounts only)
+	sessionKeyAccountID       = "account_id"       // auth_accounts.id
+	sessionKeyAccountUsername = "account_username"  // auth_accounts.username
+	sessionKeyAccountRole     = "account_role"      // "admin", "editor", or "viewer"
+	sessionKeyUserID          = "user_id"           // linked family member UUID (NULL-linked admins have "")
 )
 
-// Session role constants.
+// Role constants.
 const (
 	RoleAdmin  = "admin"
-	RoleMember = "member"
+	RoleEditor = "editor"
+	RoleViewer = "viewer"
 )
+
+// ValidRoles is the set of valid role values.
+var ValidRoles = map[string]bool{
+	RoleAdmin:  true,
+	RoleEditor: true,
+	RoleViewer: true,
+}
 
 // dummyHash is a pre-computed bcrypt hash used for constant-time login responses.
 // When a username is not found, we still run bcrypt.CompareHashAndPassword against
@@ -33,7 +39,7 @@ const (
 var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("dummy-password-for-timing"), 12)
 
 // LoginHandler returns an http.HandlerFunc that handles GET and POST /login.
-// It checks both admin_accounts and member_accounts tables for authentication.
+// Single table lookup against auth_accounts.
 func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -73,80 +79,58 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRende
 			tr.Render(w, r, "login.html", data)
 		}
 
-		// Try admin_accounts first.
-		admin, adminErr := queries.GetAdminAccountByUsername(r.Context(), username)
-		if adminErr == nil {
-			if err := bcrypt.CompareHashAndPassword(admin.HashedPassword, []byte(password)); err != nil {
-				renderLoginError()
-				return
-			}
+		// Single table lookup.
+		account, err := queries.GetAuthAccountByUsername(r.Context(), username)
+		if err != nil {
+			// Not found — run dummy bcrypt to prevent timing enumeration.
+			bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+			renderLoginError()
+			return
+		}
 
+		// Account exists but no password set yet — redirect to setup.
+		if account.HashedPassword == nil {
 			if err := sm.RenewToken(r.Context()); err != nil {
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
-
-			sm.Put(r.Context(), sessionKeyAdminID, formatUUID(admin.ID))
-			sm.Put(r.Context(), sessionKeyAdminUsername, admin.Username)
-			sm.Put(r.Context(), sessionKeyAccountRole, RoleAdmin)
-			sm.Put(r.Context(), sessionKeyAccountType, "admin_account")
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+			sm.Put(r.Context(), sessionKeyAccountID, formatUUID(account.ID))
+			http.Redirect(w, r, "/member-setup", http.StatusSeeOther)
 			return
 		}
 
-		// Try member_accounts.
-		member, memberErr := queries.GetMemberAccountByUsername(r.Context(), username)
-		if memberErr == nil {
-			// Member must have a password set (non-nil).
-			if member.HashedPassword == nil {
-				// Account exists but no password set yet — redirect to setup.
-				if err := sm.RenewToken(r.Context()); err != nil {
-					http.Error(w, "Internal server error", http.StatusInternalServerError)
-					return
-				}
-				sm.Put(r.Context(), sessionKeyMemberID, formatUUID(member.ID))
-				http.Redirect(w, r, "/member-setup", http.StatusSeeOther)
-				return
-			}
-
-			if err := bcrypt.CompareHashAndPassword(member.HashedPassword, []byte(password)); err != nil {
-				renderLoginError()
-				return
-			}
-
-			if err := sm.RenewToken(r.Context()); err != nil {
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-
-			sm.Put(r.Context(), sessionKeyAdminID, formatUUID(member.ID))
-			sm.Put(r.Context(), sessionKeyAdminUsername, member.Username)
-			sm.Put(r.Context(), sessionKeyAccountRole, member.Role)
-			sm.Put(r.Context(), sessionKeyAccountType, "member_account")
-			sm.Put(r.Context(), sessionKeyUserID, formatUUID(member.UserID))
-			sm.Put(r.Context(), sessionKeyMemberID, formatUUID(member.ID))
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+		if err := bcrypt.CompareHashAndPassword(account.HashedPassword, []byte(password)); err != nil {
+			renderLoginError()
 			return
 		}
 
-		// Neither found — run dummy bcrypt to prevent timing enumeration.
-		bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
-		renderLoginError()
+		if err := sm.RenewToken(r.Context()); err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		sm.Put(r.Context(), sessionKeyAccountID, formatUUID(account.ID))
+		sm.Put(r.Context(), sessionKeyAccountUsername, account.Username)
+		sm.Put(r.Context(), sessionKeyAccountRole, account.Role)
+		if account.UserID.Valid {
+			sm.Put(r.Context(), sessionKeyUserID, formatUUID(account.UserID))
+		}
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
 }
 
-// ActorFromSession builds a service.Actor from the admin session.
+// ActorFromSession builds a service.Actor from the session.
 func ActorFromSession(sm *scs.SessionManager, r *http.Request) service.Actor {
-	id := sm.GetString(r.Context(), sessionKeyAdminID)
-	name := sm.GetString(r.Context(), sessionKeyAdminUsername)
+	id := sm.GetString(r.Context(), sessionKeyAccountID)
+	name := sm.GetString(r.Context(), sessionKeyAccountUsername)
 	if name == "" {
 		name = "admin"
 	}
 	return service.Actor{Type: "user", ID: id, Name: name}
 }
 
-// SessionRole returns the role of the logged-in user ("admin" or "member").
-// Returns "admin" for legacy admin_account sessions that lack the role key.
+// SessionRole returns the role of the logged-in user ("admin", "editor", or "viewer").
+// Returns "admin" for legacy sessions that lack the role key.
 func SessionRole(sm *scs.SessionManager, r *http.Request) string {
 	role := sm.GetString(r.Context(), sessionKeyAccountRole)
 	if role == "" {
@@ -156,46 +140,70 @@ func SessionRole(sm *scs.SessionManager, r *http.Request) string {
 	return role
 }
 
-// SessionUserID returns the family member user_id for member accounts.
-// Returns empty string for admin accounts (which aren't linked to a user).
+// SessionUserID returns the family member user_id for accounts linked to a user.
+// Returns empty string for accounts not linked to a family member (initial admin).
 func SessionUserID(sm *scs.SessionManager, r *http.Request) string {
 	return sm.GetString(r.Context(), sessionKeyUserID)
 }
 
-// SessionMemberID returns the member_accounts.id for member account sessions.
-// Returns empty string for legacy admin accounts.
-func SessionMemberID(sm *scs.SessionManager, r *http.Request) string {
-	return sm.GetString(r.Context(), sessionKeyMemberID)
+// SessionAccountID returns the auth_accounts.id for the current session.
+func SessionAccountID(sm *scs.SessionManager, r *http.Request) string {
+	return sm.GetString(r.Context(), sessionKeyAccountID)
 }
 
-// IsAdmin returns true if the current session is an admin (either admin_account or member with admin role).
+// IsAdmin returns true if the current session has admin role.
 func IsAdmin(sm *scs.SessionManager, r *http.Request) bool {
 	return SessionRole(sm, r) == RoleAdmin
+}
+
+// IsEditor returns true if the current session has admin or editor role.
+func IsEditor(sm *scs.SessionManager, r *http.Request) bool {
+	role := SessionRole(sm, r)
+	return role == RoleAdmin || role == RoleEditor
+}
+
+// IsViewer returns true for any authenticated user (always true if session exists).
+func IsViewer(sm *scs.SessionManager, r *http.Request) bool {
+	return sm.GetString(r.Context(), sessionKeyAccountID) != ""
+}
+
+// RoleDisplayName returns a human-readable display name for the role.
+func RoleDisplayName(role string) string {
+	switch role {
+	case RoleAdmin:
+		return "Administrator"
+	case RoleEditor:
+		return "Editor"
+	case RoleViewer:
+		return "Viewer"
+	default:
+		return role
+	}
 }
 
 // MemberSetupHandler handles GET/POST /member-setup — first-time password setup for members.
 func MemberSetupHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		memberIDStr := sm.GetString(r.Context(), sessionKeyMemberID)
-		if memberIDStr == "" {
+		accountIDStr := sm.GetString(r.Context(), sessionKeyAccountID)
+		if accountIDStr == "" {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 
-		var memberID pgtype.UUID
-		if err := memberID.Scan(memberIDStr); err != nil {
+		var accountID pgtype.UUID
+		if err := accountID.Scan(accountIDStr); err != nil {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 
-		member, err := queries.GetMemberAccountByID(r.Context(), memberID)
+		account, err := queries.GetAuthAccountByID(r.Context(), accountID)
 		if err != nil {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 
 		// If password is already set, redirect to login.
-		if member.HashedPassword != nil {
+		if account.HashedPassword != nil {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
@@ -204,7 +212,7 @@ func MemberSetupHandler(sm *scs.SessionManager, queries *db.Queries, tr *Templat
 			data := map[string]any{
 				"PageTitle": "Set Your Password",
 				"CSRFToken": GenerateCSRFToken(r.Context(), sm),
-				"Username":  member.Username,
+				"Username":  account.Username,
 				"Error":     "",
 				"Errors":    map[string]string{},
 			}
@@ -228,7 +236,7 @@ func MemberSetupHandler(sm *scs.SessionManager, queries *db.Queries, tr *Templat
 			data := map[string]any{
 				"PageTitle": "Set Your Password",
 				"CSRFToken": GenerateCSRFToken(r.Context(), sm),
-				"Username":  member.Username,
+				"Username":  account.Username,
 				"Error":     "",
 				"Errors":    errors,
 			}
@@ -242,8 +250,8 @@ func MemberSetupHandler(sm *scs.SessionManager, queries *db.Queries, tr *Templat
 			return
 		}
 
-		if err := queries.UpdateMemberAccountPassword(r.Context(), db.UpdateMemberAccountPasswordParams{
-			ID:             memberID,
+		if err := queries.UpdateAuthAccountPassword(r.Context(), db.UpdateAuthAccountPasswordParams{
+			ID:             accountID,
 			HashedPassword: hashedPassword,
 		}); err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -256,7 +264,7 @@ func MemberSetupHandler(sm *scs.SessionManager, queries *db.Queries, tr *Templat
 			return
 		}
 		// Remove setup-only session keys but keep the session alive for flash.
-		sm.Remove(r.Context(), sessionKeyMemberID)
+		sm.Remove(r.Context(), sessionKeyAccountID)
 		SetFlash(r.Context(), sm, "success", "Password set successfully. Please sign in.")
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	}

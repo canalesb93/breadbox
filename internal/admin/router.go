@@ -86,6 +86,16 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/settings/password", ChangePasswordHandler(a, sm))
 	})
 
+	// Editor+ authenticated routes (HTML pages) — editors can view reviews.
+	r.Group(func(r chi.Router) {
+		r.Use(RequireAuth(sm))
+		r.Use(RequireEditor(sm))
+		r.Use(CSRFMiddleware(sm))
+		r.Use(NavBadgesMiddleware(a.Queries, a.Logger))
+
+		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
+	})
+
 	// Admin-only authenticated routes (HTML pages).
 	r.Group(func(r chi.Router) {
 		r.Use(RequireAuth(sm))
@@ -141,7 +151,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		r.Get("/reports", ReportsPageHandler(a, svc, sm, tr))
 		r.Get("/reports/{id}", ReportDetailHandler(a, svc, sm, tr))
-		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
 		r.Get("/agents", AgentsPageHandler(svc, mcpServer, sm, tr))
 		r.Get("/agents/sessions/{id}", SessionDetailHandler(svc, sm, tr))
 		r.Get("/review-instructions", func(w http.ResponseWriter, r *http.Request) {
@@ -186,7 +195,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
 	})
 
-	// Admin API (authenticated, JSON responses) — admin-only operations.
+	// Admin API (authenticated, JSON responses).
 	r.Route("/-", func(r chi.Router) {
 		r.Use(RequireAuth(sm))
 		r.Use(CSRFMiddleware(sm))
@@ -197,6 +206,22 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Transaction comments — accessible to all roles.
 		r.Post("/transactions/{id}/comments", CreateTransactionCommentHandler(a, sm, svc))
 		r.Delete("/transactions/{id}/comments/{comment_id}", DeleteTransactionCommentHandler(a, sm, svc))
+
+		// Editor+ API routes (categorization, reviews, comments).
+		r.Group(func(r chi.Router) {
+			r.Use(RequireEditor(sm))
+
+			// Transaction category override
+			r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc))
+			r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc))
+
+			// Transaction bulk categorize
+			r.Post("/transactions/batch-categorize", BatchSetTransactionCategoryAdminHandler(svc))
+
+			// Review queue (submit/dismiss)
+			r.Post("/reviews/{id}/submit", SubmitReviewAdminHandler(a, sm, svc))
+			r.Post("/reviews/{id}/dismiss", DismissReviewAdminHandler(a, sm, svc))
+		})
 
 		// Admin-only API routes.
 		r.Group(func(r chi.Router) {
@@ -253,16 +278,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// Transaction CSV export
 			r.Get("/transactions/export-csv", ExportTransactionsCSVHandler(a, svc))
 
-			// Transaction bulk categorize
-			r.Post("/transactions/batch-categorize", BatchSetTransactionCategoryAdminHandler(svc))
-
-			// Transaction category override
-			r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc))
-			r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc))
-
-			// Review queue
-			r.Post("/reviews/{id}/submit", SubmitReviewAdminHandler(a, sm, svc))
-			r.Post("/reviews/{id}/dismiss", DismissReviewAdminHandler(a, sm, svc))
+			// Review queue (admin-only bulk operations)
 			r.Post("/reviews/dismiss-all", DismissAllReviewsAdminHandler(a, sm, svc))
 			r.Post("/reviews/enqueue", EnqueueReviewAdminHandler(a, sm, svc))
 			r.Post("/reviews/enqueue-existing", EnqueueExistingReviewsHandler(a, sm, svc))
@@ -286,11 +302,11 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/reports/{id}/read", MarkReportReadAdminHandler(svc))
 			r.Post("/reports/read-all", MarkAllReportsReadAdminHandler(svc))
 
-			// Member account management
-			r.Get("/members", ListMemberAccountsHandler(svc))
-			r.Post("/members", CreateMemberAccountHandler(svc, sm))
-			r.Put("/members/{id}/role", UpdateMemberRoleHandler(svc, sm))
-			r.Delete("/members/{id}", DeleteMemberAccountHandler(svc, sm))
+			// Login account management
+			r.Get("/members", ListLoginAccountsHandler(svc))
+			r.Post("/members", CreateLoginAccountHandler(svc, sm))
+			r.Put("/members/{id}/role", UpdateLoginAccountRoleHandler(svc, sm))
+			r.Delete("/members/{id}", DeleteLoginAccountHandler(svc, sm))
 			r.Post("/users/{id}/wipe", WipeUserDataHandler(a, sm))
 		})
 	})

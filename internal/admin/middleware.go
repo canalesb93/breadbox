@@ -70,13 +70,12 @@ func getNavBadges(ctx context.Context) NavBadges {
 }
 
 // RequireAuth is chi middleware that checks for an authenticated session.
-// Works for both admin_account and member_account sessions.
-// If the session does not contain an admin_id, it redirects to /login.
+// If the session does not contain an account_id, it redirects to /login.
 func RequireAuth(sm *scs.SessionManager) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			adminID := sm.GetString(r.Context(), sessionKeyAdminID)
-			if adminID == "" {
+			accountID := sm.GetString(r.Context(), sessionKeyAccountID)
+			if accountID == "" {
 				http.Redirect(w, r, "/login", http.StatusSeeOther)
 				return
 			}
@@ -86,16 +85,11 @@ func RequireAuth(sm *scs.SessionManager) func(http.Handler) http.Handler {
 }
 
 // RequireAdmin is chi middleware that blocks non-admin users.
-// Must be used after RequireAuth. Returns 403 for members trying to access admin-only routes.
+// Must be used after RequireAuth. Returns 403 for non-admins.
 func RequireAdmin(sm *scs.SessionManager) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			role := sm.GetString(r.Context(), sessionKeyAccountRole)
-			if role == "" {
-				// Legacy admin sessions without the role key are treated as admin.
-				role = RoleAdmin
-			}
-			if role != RoleAdmin {
+			if !IsAdmin(sm, r) {
 				http.Error(w, "Admin access required", http.StatusForbidden)
 				return
 			}
@@ -104,12 +98,26 @@ func RequireAdmin(sm *scs.SessionManager) func(http.Handler) http.Handler {
 	}
 }
 
+// RequireEditor is chi middleware that blocks viewers from edit operations.
+// Must be used after RequireAuth. Allows admin and editor, blocks viewer.
+func RequireEditor(sm *scs.SessionManager) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !IsEditor(sm, r) {
+				http.Error(w, "Editor access required", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // SetupDetection is chi middleware that redirects to the admin creation page
-// if no admin accounts exist in the database.
+// if no auth accounts exist in the database.
 func SetupDetection(queries *db.Queries) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			count, err := queries.CountAdminAccounts(r.Context())
+			count, err := queries.CountAuthAccounts(r.Context())
 			if err != nil {
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
