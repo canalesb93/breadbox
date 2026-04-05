@@ -746,6 +746,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/session_detail.html",
 		"pages/my_account.html",
 		"pages/getting_started.html",
+		"pages/create_login.html",
 	}
 
 	// Pages that need multiple page files parsed together (for sub-template sharing).
@@ -757,11 +758,11 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		},
 	}
 
-	// Pages using the wizard layout (login + first-run admin creation + OAuth consent + member setup).
+	// Pages using the wizard layout (login + first-run admin creation + OAuth consent + account setup).
 	wizardPages := []string{
 		"pages/login.html",
 		"pages/setup_create_admin.html",
-		"pages/member_setup.html",
+		"pages/setup_account.html",
 		"pages/oauth_authorize.html",
 	}
 

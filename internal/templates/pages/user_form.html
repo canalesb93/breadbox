@@ -41,42 +41,6 @@
         placeholder="e.g., alex@example.com">
     </fieldset>
 
-    {{if not .IsEdit}}
-    <!-- Login Account (optional during creation) -->
-    <div x-data="{ createLogin: false }">
-      <div class="border-t border-base-300 pt-5 mb-5">
-        <label class="flex items-center gap-3 cursor-pointer">
-          <input type="checkbox" x-model="createLogin" class="checkbox checkbox-sm checkbox-primary rounded-lg">
-          <div>
-            <span class="text-sm font-medium text-base-content/70">Create login account</span>
-            <p class="text-xs text-base-content/40 mt-0.5">Allow this member to sign in and view their data</p>
-          </div>
-        </label>
-      </div>
-
-      <div x-show="createLogin" x-cloak class="space-y-5 mb-6 pl-1 border-l-2 border-primary/20 ml-2 pl-5">
-        <fieldset class="fieldset">
-          <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="login_username">
-            Username <span class="text-error text-xs">*</span>
-          </label>
-          <input type="text" id="login_username" name="login_username" class="input input-bordered w-full rounded-xl" maxlength="64"
-            placeholder="e.g., alex">
-          <p class="text-xs text-base-content/30 mt-1">They will set their password on first sign-in</p>
-        </fieldset>
-
-        <fieldset class="fieldset">
-          <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="login_role">
-            Role
-          </label>
-          <select id="login_role" name="login_role" class="select select-bordered w-full rounded-xl bg-base-200">
-            <option value="viewer">Viewer &mdash; can only see their own data</option>
-            <option value="editor">Editor &mdash; can view and edit all household data</option>
-          </select>
-        </fieldset>
-      </div>
-    </div>
-    {{end}}
-
     <div id="form-error" class="rounded-xl bg-error/10 border border-error/20 text-error text-sm px-4 py-3 mb-4 hidden"></div>
 
     <div class="flex gap-3 pt-2">
@@ -111,30 +75,9 @@
 
     var body = {name: name};
     if (isEdit) {
-      // Always send email on edit so clearing the field sets it to null
       body.email = email || "";
     } else if (email) {
       body.email = email;
-    }
-
-    // Check if login account should be created (only on new member).
-    var createLogin = false;
-    var loginUsername = "";
-    var loginRole = "viewer";
-    if (!isEdit) {
-      var checkbox = document.querySelector('[x-model="createLogin"]');
-      if (checkbox && checkbox.checked) {
-        createLogin = true;
-        loginUsername = (document.getElementById("login_username").value || "").trim();
-        var roleSelect = document.getElementById("login_role");
-        if (roleSelect) loginRole = roleSelect.value;
-
-        if (!loginUsername) {
-          formError.textContent = "Username is required when creating a login account.";
-          formError.classList.remove("hidden");
-          return;
-        }
-      }
     }
 
     var url = isEdit ? "/-/users/" + userId : "/-/users";
@@ -147,31 +90,7 @@
     })
     .then(function (res) {
       if (res.ok) {
-        return res.json().then(function (data) {
-          // If we need to create a login account, do that now.
-          if (createLogin && data.id) {
-            return fetch("/-/members", {
-              method: "POST",
-              headers: {"Content-Type": "application/json"},
-              body: JSON.stringify({
-                user_id: data.id,
-                username: loginUsername,
-                role: loginRole
-              })
-            }).then(function (loginRes) {
-              if (!loginRes.ok) {
-                return loginRes.json().then(function (err) {
-                  // User was created but login failed — redirect with note.
-                  var msg = err.error && err.error.message ? err.error.message : "Login account creation failed";
-                  formError.textContent = "Member created, but login account failed: " + msg;
-                  formError.classList.remove("hidden");
-                });
-              }
-              window.location.href = "/users?created=1";
-            });
-          }
-          window.location.href = "/users" + (isEdit ? "" : "?created=1");
-        });
+        window.location.href = "/users" + (isEdit ? "" : "?created=1");
       } else {
         return res.json().then(function (data) {
           var msg = "An error occurred.";

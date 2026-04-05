@@ -36,5 +36,14 @@ UPDATE auth_accounts SET hashed_password = $2, updated_at = NOW() WHERE id = $1;
 -- name: UpdateAuthAccountRole :exec
 UPDATE auth_accounts SET role = $2, updated_at = NOW() WHERE id = $1;
 
+-- name: GetAuthAccountBySetupToken :one
+SELECT * FROM auth_accounts WHERE setup_token = $1;
+
+-- name: SetAuthAccountSetupToken :exec
+UPDATE auth_accounts SET setup_token = $2, setup_token_expires_at = $3, updated_at = NOW() WHERE id = $1;
+
+-- name: ClearAuthAccountSetupToken :exec
+UPDATE auth_accounts SET setup_token = NULL, setup_token_expires_at = NULL, updated_at = NOW() WHERE id = $1;
+
 -- name: DeleteAuthAccount :exec
 DELETE FROM auth_accounts WHERE id = $1;

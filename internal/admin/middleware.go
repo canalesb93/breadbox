@@ -79,11 +79,6 @@ func RequireAuth(sm *scs.SessionManager) func(http.Handler) http.Handler {
 				http.Redirect(w, r, "/login", http.StatusSeeOther)
 				return
 			}
-			// Members mid-setup must complete password setup before accessing anything else.
-			if sm.GetString(r.Context(), "setup_pending") == "true" && r.URL.Path != "/member-setup" {
-				http.Redirect(w, r, "/member-setup", http.StatusSeeOther)
-				return
-			}
 			next.ServeHTTP(w, r)
 		})
 	}

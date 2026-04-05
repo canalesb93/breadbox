@@ -36,9 +36,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 	})
 	r.Post("/logout", LogoutHandler(sm))
 
-	// Member password setup (partially authenticated — member ID in session but no full login).
-	r.With(CSRFMiddleware(sm)).Get("/member-setup", MemberSetupHandler(sm, a.Queries, tr))
-	r.With(CSRFMiddleware(sm)).Post("/member-setup", MemberSetupHandler(sm, a.Queries, tr))
+	// Token-based account setup (unauthenticated — member uses a link from admin).
+	r.With(CSRFMiddleware(sm)).Get("/setup-account/{token}", SetupAccountHandler(sm, a.Queries, tr))
+	r.With(CSRFMiddleware(sm)).Post("/setup-account/{token}", SetupAccountHandler(sm, a.Queries, tr))
 
 	// OAuth 2.1 authorize flow (needs session for consent screen).
 	r.Get("/oauth/authorize", OAuthAuthorizeHandler(svc, sm, tr))
@@ -110,6 +110,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Get("/", UsersListHandler(a, tr))
 			r.Get("/new", NewUserHandler(a, tr))
 			r.Get("/{id}/edit", EditUserHandler(a, tr))
+			r.Get("/{id}/create-login", CreateLoginPageHandler(a, tr))
 		})
 
 		// Combined Access page (API Keys + OAuth Clients)
@@ -306,6 +307,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Get("/members", ListLoginAccountsHandler(svc))
 			r.Post("/members", CreateLoginAccountHandler(svc, sm))
 			r.Put("/members/{id}/role", UpdateLoginAccountRoleHandler(svc, sm))
+			r.Post("/members/{id}/setup-token", RegenerateSetupTokenHandler(svc, sm))
 			r.Delete("/members/{id}", DeleteLoginAccountHandler(svc, sm))
 			r.Post("/users/{id}/wipe", WipeUserDataHandler(a, sm))
 		})

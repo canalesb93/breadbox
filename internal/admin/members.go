@@ -3,6 +3,7 @@ package admin
 import (
 	"encoding/json"
 	"net/http"
+	"net/mail"
 	"strings"
 
 	"breadbox/internal/app"
@@ -31,14 +32,22 @@ func CreateLoginAccountHandler(svc *service.Service, sm *scs.SessionManager) htt
 		req.Username = strings.TrimSpace(req.Username)
 		if req.Username == "" {
 			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Username is required"},
+				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Email is required"},
+			})
+			return
+		}
+
+		// Validate email format since username = email.
+		if _, err := mail.ParseAddress(req.Username); err != nil {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Please enter a valid email address"},
 			})
 			return
 		}
 
 		if len(req.Username) > 64 {
 			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Username must be 64 characters or fewer"},
+				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Email must be 64 characters or fewer"},
 			})
 			return
 		}
@@ -62,7 +71,7 @@ func CreateLoginAccountHandler(svc *service.Service, sm *scs.SessionManager) htt
 		if err != nil {
 			if strings.Contains(err.Error(), "username already taken") {
 				writeJSON(w, http.StatusConflict, map[string]any{
-					"error": map[string]string{"code": "USERNAME_TAKEN", "message": "This username is already in use"},
+					"error": map[string]string{"code": "EMAIL_TAKEN", "message": "This email is already in use as a login"},
 				})
 				return
 			}
@@ -127,6 +136,29 @@ func DeleteLoginAccountHandler(svc *service.Service, sm *scs.SessionManager) htt
 		}
 
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+// RegenerateSetupTokenHandler serves POST /-/members/{id}/setup-token -- regenerate setup token.
+func RegenerateSetupTokenHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+
+		token, err := svc.RegenerateSetupToken(r.Context(), id)
+		if err != nil {
+			if strings.Contains(err.Error(), "already has a password") {
+				writeJSON(w, http.StatusConflict, map[string]any{
+					"error": map[string]string{"code": "PASSWORD_ALREADY_SET", "message": "This account already has a password set"},
+				})
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to regenerate setup token"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"setup_token": token,
+		})
 	}
 }
 

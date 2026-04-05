@@ -2,11 +2,13 @@ package admin
 
 import (
 	"net/http"
+	"time"
 
 	"breadbox/internal/db"
 	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -88,16 +90,16 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRende
 			return
 		}
 
-		// Account exists but no password set yet — redirect to setup.
+		// Account exists but no password set yet — tell user to use setup link.
 		if account.HashedPassword == nil {
-			if err := sm.RenewToken(r.Context()); err != nil {
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
+			bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+			data := map[string]any{
+				"PageTitle": "Sign In",
+				"CSRFToken": GenerateCSRFToken(r.Context(), sm),
+				"Username":  username,
+				"Error":     "Your account hasn't been set up yet. Ask your administrator for a setup link.",
 			}
-			sm.Put(r.Context(), sessionKeyAccountID, formatUUID(account.ID))
-			sm.Put(r.Context(), sessionKeyAccountRole, account.Role)
-			sm.Put(r.Context(), "setup_pending", "true")
-			http.Redirect(w, r, "/member-setup", http.StatusSeeOther)
+			tr.Render(w, r, "login.html", data)
 			return
 		}
 
@@ -183,29 +185,31 @@ func RoleDisplayName(role string) string {
 	}
 }
 
-// MemberSetupHandler handles GET/POST /member-setup — first-time password setup for members.
-func MemberSetupHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
+// SetupAccountHandler handles GET/POST /setup-account/{token} — token-based password setup.
+// This is an unauthenticated route. Members receive a setup URL from their admin.
+func SetupAccountHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		accountIDStr := sm.GetString(r.Context(), sessionKeyAccountID)
-		if accountIDStr == "" {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+		token := chi.URLParam(r, "token")
+		if token == "" {
+			renderSetupError(w, r, sm, tr, "This setup link is invalid.")
 			return
 		}
 
-		var accountID pgtype.UUID
-		if err := accountID.Scan(accountIDStr); err != nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-
-		account, err := queries.GetAuthAccountByID(r.Context(), accountID)
+		account, err := queries.GetAuthAccountBySetupToken(r.Context(), pgtype.Text{String: token, Valid: true})
 		if err != nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			renderSetupError(w, r, sm, tr, "This setup link is invalid or has expired.")
+			return
+		}
+
+		// Check expiry.
+		if account.SetupTokenExpiresAt.Valid && account.SetupTokenExpiresAt.Time.Before(time.Now()) {
+			renderSetupError(w, r, sm, tr, "This setup link has expired. Ask your administrator for a new one.")
 			return
 		}
 
 		// If password is already set, redirect to login.
 		if account.HashedPassword != nil {
+			SetFlash(r.Context(), sm, "info", "Your account is already set up. Please sign in.")
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
@@ -215,10 +219,11 @@ func MemberSetupHandler(sm *scs.SessionManager, queries *db.Queries, tr *Templat
 				"PageTitle": "Set Your Password",
 				"CSRFToken": GenerateCSRFToken(r.Context(), sm),
 				"Username":  account.Username,
+				"Token":     token,
 				"Error":     "",
 				"Errors":    map[string]string{},
 			}
-			tr.Render(w, r, "member_setup.html", data)
+			tr.Render(w, r, "setup_account.html", data)
 			return
 		}
 
@@ -226,23 +231,24 @@ func MemberSetupHandler(sm *scs.SessionManager, queries *db.Queries, tr *Templat
 		password := r.FormValue("password")
 		confirmPassword := r.FormValue("confirm_password")
 
-		errors := map[string]string{}
+		fieldErrors := map[string]string{}
 		if len(password) < 8 {
-			errors["Password"] = "Password must be at least 8 characters"
+			fieldErrors["Password"] = "Password must be at least 8 characters"
 		}
 		if password != confirmPassword {
-			errors["ConfirmPassword"] = "Passwords do not match"
+			fieldErrors["ConfirmPassword"] = "Passwords do not match"
 		}
 
-		if len(errors) > 0 {
+		if len(fieldErrors) > 0 {
 			data := map[string]any{
 				"PageTitle": "Set Your Password",
 				"CSRFToken": GenerateCSRFToken(r.Context(), sm),
 				"Username":  account.Username,
+				"Token":     token,
 				"Error":     "",
-				"Errors":    errors,
+				"Errors":    fieldErrors,
 			}
-			tr.Render(w, r, "member_setup.html", data)
+			tr.Render(w, r, "setup_account.html", data)
 			return
 		}
 
@@ -253,24 +259,28 @@ func MemberSetupHandler(sm *scs.SessionManager, queries *db.Queries, tr *Templat
 		}
 
 		if err := queries.UpdateAuthAccountPassword(r.Context(), db.UpdateAuthAccountPasswordParams{
-			ID:             accountID,
+			ID:             account.ID,
 			HashedPassword: hashedPassword,
 		}); err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
-		// Renew session token (clear setup state) and set flash for login page.
-		if err := sm.RenewToken(r.Context()); err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-		// Remove setup-only session keys but keep the session alive for flash.
-		sm.Remove(r.Context(), "setup_pending")
-		sm.Remove(r.Context(), sessionKeyAccountID)
+		// Clear the setup token.
+		_ = queries.ClearAuthAccountSetupToken(r.Context(), account.ID)
+
 		SetFlash(r.Context(), sm, "success", "Password set successfully. Please sign in.")
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	}
+}
+
+// renderSetupError renders the setup account page with an error message (no form).
+func renderSetupError(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, tr *TemplateRenderer, message string) {
+	data := map[string]any{
+		"PageTitle":  "Account Setup",
+		"SetupError": message,
+	}
+	tr.Render(w, r, "setup_account.html", data)
 }
 
 // LogoutHandler returns an http.HandlerFunc that handles POST /logout.

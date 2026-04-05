@@ -1,4 +1,19 @@
 {{define "content"}}
+{{if .SetupError}}
+<div class="text-center mb-8">
+  <h1 class="text-xl font-semibold tracking-tight">Account Setup</h1>
+</div>
+<div role="alert" class="flex items-center gap-3 rounded-xl bg-error/10 text-error px-4 py-3 text-sm mb-6">
+  <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+  <span>{{.SetupError}}</span>
+</div>
+<div class="text-center">
+  <a href="/login" class="btn btn-ghost btn-sm rounded-xl">
+    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+    Go to Sign In
+  </a>
+</div>
+{{else}}
 <div class="text-center mb-8">
   <h1 class="text-xl font-semibold tracking-tight">Set your password</h1>
   <p class="text-sm text-base-content/50 mt-1.5">Welcome, <strong>{{.Username}}</strong>. Create a password to complete your account setup.</p>
@@ -11,7 +26,7 @@
 </div>
 {{end}}
 
-<form method="POST" action="/member-setup" class="space-y-5">
+<form method="POST" action="/setup-account/{{.Token}}" class="space-y-5">
   {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
 
   <div>
@@ -36,4 +51,5 @@
     <i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
   </button>
 </form>
+{{end}}
 {{end}}

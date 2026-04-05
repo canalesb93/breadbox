@@ -362,6 +362,73 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	}
 }
 
+// CreateLoginPageHandler serves GET /users/{id}/create-login -- form to create login account.
+func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		idStr := chi.URLParam(r, "id")
+
+		var userID pgtype.UUID
+		if err := userID.Scan(idStr); err != nil {
+			tr.RenderNotFound(w, r)
+			return
+		}
+
+		user, err := a.Queries.GetUser(ctx, userID)
+		if err != nil {
+			tr.RenderNotFound(w, r)
+			return
+		}
+
+		// Check if user already has a login account — redirect to manage page.
+		loginAccount, err := a.Queries.GetAuthAccountByUserID(ctx, userID)
+		if err == nil {
+			// Already has a login — render the manage view.
+			setupURL := ""
+			if loginAccount.SetupToken.Valid {
+				scheme := "https"
+				if r.TLS == nil {
+					scheme = "http"
+				}
+				setupURL = scheme + "://" + r.Host + "/setup-account/" + loginAccount.SetupToken.String
+			}
+			data := map[string]any{
+				"PageTitle":    "Manage Login — " + user.Name,
+				"CurrentPage":  "users",
+				"IsManage":     true,
+				"User":         user,
+				"UserID":       idStr,
+				"LoginAccount": loginAccount,
+				"SetupURL":     setupURL,
+				"CSRFToken":    GetCSRFToken(r),
+				"Breadcrumbs": []Breadcrumb{
+					{Label: "Household", Href: "/users"},
+					{Label: user.Name, Href: "/users/" + idStr + "/edit"},
+					{Label: "Login Account"},
+				},
+			}
+			tr.Render(w, r, "create_login.html", data)
+			return
+		}
+
+		// No login account — show create form.
+		data := map[string]any{
+			"PageTitle":   "Create Login — " + user.Name,
+			"CurrentPage": "users",
+			"IsManage":    false,
+			"User":        user,
+			"UserID":      idStr,
+			"CSRFToken":   GetCSRFToken(r),
+			"Breadcrumbs": []Breadcrumb{
+				{Label: "Household", Href: "/users"},
+				{Label: user.Name, Href: "/users/" + idStr + "/edit"},
+				{Label: "Create Login"},
+			},
+		}
+		tr.Render(w, r, "create_login.html", data)
+	}
+}
+
 // nullTextToPtr converts a pgtype.Text to a *string for JSON serialization.
 func nullTextToPtr(t pgtype.Text) *string {
 	if !t.Valid {
