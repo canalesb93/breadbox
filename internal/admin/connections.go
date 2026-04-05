@@ -422,7 +422,7 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 }
 
 // ConnectionDetailHandler serves GET /admin/connections/{id}.
-func ConnectionDetailHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
+func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		idStr := chi.URLParam(r, "id")
@@ -438,6 +438,16 @@ func ConnectionDetailHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 			a.Logger.Error("get bank connection", "error", err)
 			tr.RenderNotFound(w, r)
 			return
+		}
+
+		// IDOR check: non-admin members can only view their own connections.
+		if !IsAdmin(sm, r) {
+			memberUID := SessionUserID(sm, r)
+			connUserID := formatUUID(conn.UserID)
+			if connUserID == "" || connUserID != memberUID {
+				tr.RenderNotFound(w, r)
+				return
+			}
 		}
 
 		accounts, err := a.Queries.ListAccountsByConnection(ctx, connID)

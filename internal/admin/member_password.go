@@ -34,12 +34,15 @@ func changePasswordFromMember(a *app.App, sm *scs.SessionManager, w http.Respons
 	newPassword := r.FormValue("new_password")
 	confirmPassword := r.FormValue("confirm_password")
 
-	if member.HashedPassword != nil {
-		if err := bcrypt.CompareHashAndPassword(member.HashedPassword, []byte(currentPassword)); err != nil {
-			SetFlash(ctx, sm, "error", "Current password is incorrect.")
-			http.Redirect(w, r, redirectPath, http.StatusSeeOther)
-			return
-		}
+	if member.HashedPassword == nil {
+		SetFlash(ctx, sm, "error", "No password set. Please contact your administrator.")
+		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
+		return
+	}
+	if err := bcrypt.CompareHashAndPassword(member.HashedPassword, []byte(currentPassword)); err != nil {
+		SetFlash(ctx, sm, "error", "Current password is incorrect.")
+		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
+		return
 	}
 
 	if len(newPassword) < 8 {

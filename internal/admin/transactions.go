@@ -408,6 +408,15 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			return
 		}
 
+		// IDOR check: non-admin members can only view their own accounts.
+		memberUID := SessionUserID(sm, r)
+		if !IsAdmin(sm, r) {
+			if detail.UserID == nil || *detail.UserID != memberUID {
+				tr.RenderNotFound(w, r)
+				return
+			}
+		}
+
 		// Fetch transactions for this account.
 		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 		if page < 1 {
@@ -418,6 +427,11 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			Page:      page,
 			PageSize:  50,
 			AccountID: &idStr,
+		}
+
+		// Scope transaction query to member's user for non-admins.
+		if !IsAdmin(sm, r) {
+			txParams.UserID = &memberUID
 		}
 
 		if v := r.URL.Query().Get("start_date"); v != "" {
@@ -727,6 +741,23 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			a.Logger.Error("get transaction detail", "error", err)
 			tr.RenderError(w, r)
 			return
+		}
+
+		// IDOR check: non-admin members can only view transactions belonging to their user.
+		if !IsAdmin(sm, r) {
+			memberUID := SessionUserID(sm, r)
+			// Look up the account to determine ownership.
+			ownerMatch := false
+			if txn.AccountID != nil {
+				acctCheck, acctErr := svc.GetAccount(ctx, *txn.AccountID)
+				if acctErr == nil && acctCheck.UserID != nil && *acctCheck.UserID == memberUID {
+					ownerMatch = true
+				}
+			}
+			if !ownerMatch {
+				tr.RenderNotFound(w, r)
+				return
+			}
 		}
 
 		comments, err := svc.ListComments(ctx, idStr)

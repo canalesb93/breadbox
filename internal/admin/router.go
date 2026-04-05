@@ -37,8 +37,8 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 	r.Post("/logout", LogoutHandler(sm))
 
 	// Member password setup (partially authenticated — member ID in session but no full login).
-	r.Get("/member-setup", MemberSetupHandler(sm, a.Queries, tr))
-	r.Post("/member-setup", MemberSetupHandler(sm, a.Queries, tr))
+	r.With(CSRFMiddleware(sm)).Get("/member-setup", MemberSetupHandler(sm, a.Queries, tr))
+	r.With(CSRFMiddleware(sm)).Post("/member-setup", MemberSetupHandler(sm, a.Queries, tr))
 
 	// OAuth 2.1 authorize flow (needs session for consent screen).
 	r.Get("/oauth/authorize", OAuthAuthorizeHandler(svc, sm, tr))
@@ -61,7 +61,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/insights", InsightsHandler(a, svc, tr))
 
 		r.Get("/connections", ConnectionsListHandler(a, svc, sm, tr))
-		r.Get("/connections/{id}", ConnectionDetailHandler(a, tr))
+		r.Get("/connections/{id}", ConnectionDetailHandler(a, sm, tr))
 
 		r.Get("/transactions", TransactionListHandler(a, sm, tr, svc))
 		r.Get("/transactions/search", TransactionSearchHandler(a, sm, tr, svc))
