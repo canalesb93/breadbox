@@ -179,6 +179,8 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/providers/plaid", ProvidersSavePlaidHandler(a, sm))
 		r.Post("/providers/teller", ProvidersSaveTellerHandler(a, sm))
 
+		r.Get("/backups", BackupsPageHandler(a, sm, tr))
+
 		r.Get("/settings", SettingsGetHandler(a, sm, tr))
 		r.Post("/settings/sync", SettingsSyncPostHandler(a, sm))
 		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
@@ -229,6 +231,14 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 			r.Post("/update/dismiss", DismissUpdateHandler(a))
 			r.Post("/update", TriggerUpdateHandler(a))
+
+			// Backups
+			r.Post("/backups/create", CreateBackupHandler(a, sm))
+			r.Get("/backups/{filename}/download", DownloadBackupHandler(a))
+			r.Post("/backups/{filename}/restore", RestoreExistingBackupHandler(a, sm))
+			r.Post("/backups/{filename}/delete", DeleteBackupHandler(a, sm))
+			r.Post("/backups/restore", RestoreBackupHandler(a, sm))
+			r.Post("/backups/schedule", BackupScheduleHandler(a, sm))
 
 			// Category CRUD
 			r.Post("/categories", CreateCategoryAdminHandler(svc))

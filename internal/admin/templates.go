@@ -678,6 +678,9 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return m
 			},
+			"formatBytes": func(bytes int64) string {
+				return service.FormatBytes(bytes)
+			},
 		},
 	}
 	if err := tr.parseTemplates(); err != nil {
@@ -727,6 +730,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/rule_form.html",
 		"pages/rule_detail.html",
 		"pages/insights.html",
+		"pages/backups.html",
 		"pages/account_links.html",
 		"pages/account_link_detail.html",
 		"pages/reports.html",
