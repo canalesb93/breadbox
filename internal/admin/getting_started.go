@@ -105,10 +105,15 @@ func GettingStartedHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRende
 // Sets onboarding_dismissed=true and redirects to the dashboard.
 func DismissGettingStartedHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		_ = a.Queries.SetAppConfig(r.Context(), db.SetAppConfigParams{
+		if err := a.Queries.SetAppConfig(r.Context(), db.SetAppConfigParams{
 			Key:   "onboarding_dismissed",
 			Value: pgtype.Text{String: "true", Valid: true},
-		})
+		}); err != nil {
+			a.Logger.Error("dismiss getting started: set app config", "error", err)
+			SetFlash(r.Context(), sm, "error", "Failed to dismiss guide. Please try again.")
+			http.Redirect(w, r, "/getting-started", http.StatusSeeOther)
+			return
+		}
 		SetFlash(r.Context(), sm, "success", "Getting Started guide dismissed. You can re-open it from Settings.")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
@@ -118,10 +123,15 @@ func DismissGettingStartedHandler(a *app.App, sm *scs.SessionManager) http.Handl
 // Clears onboarding_dismissed and redirects to /getting-started.
 func ReopenGettingStartedHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		_ = a.Queries.SetAppConfig(r.Context(), db.SetAppConfigParams{
+		if err := a.Queries.SetAppConfig(r.Context(), db.SetAppConfigParams{
 			Key:   "onboarding_dismissed",
 			Value: pgtype.Text{String: "false", Valid: true},
-		})
+		}); err != nil {
+			a.Logger.Error("reopen getting started: set app config", "error", err)
+			SetFlash(r.Context(), sm, "error", "Failed to re-open guide. Please try again.")
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
+			return
+		}
 		SetFlash(r.Context(), sm, "success", "Getting Started guide re-opened.")
 		http.Redirect(w, r, "/getting-started", http.StatusSeeOther)
 	}
