@@ -109,10 +109,20 @@ func SettingsSyncPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 }
 
 // ChangePasswordHandler serves POST /admin/settings/password.
+// Works for both admin_account and member_account sessions.
 func ChangePasswordHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
+		// Check if this is a member account session.
+		accountType := sm.GetString(ctx, sessionKeyAccountType)
+		if accountType == "member_account" {
+			memberIDStr := sm.GetString(ctx, sessionKeyMemberID)
+			changePasswordFromMember(a, sm, w, r, memberIDStr, "/settings")
+			return
+		}
+
+		// Legacy admin account flow.
 		adminIDStr := sm.GetString(ctx, sessionKeyAdminID)
 		if adminIDStr == "" {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)

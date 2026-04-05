@@ -53,15 +53,37 @@ type ConnectionWithAccounts struct {
 }
 
 // ConnectionsListHandler serves GET /admin/connections.
+// For members, only shows connections owned by their linked user.
 func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		connections, err := a.Queries.ListBankConnections(ctx)
-		if err != nil {
-			a.Logger.Error("list bank connections", "error", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
+		var connections []db.ListBankConnectionsRow
+		var err error
+
+		// Scope to member's own connections if not admin.
+		memberUserID := SessionUserID(sm, r)
+		if !IsAdmin(sm, r) && memberUserID != "" {
+			var uid pgtype.UUID
+			if scanErr := uid.Scan(memberUserID); scanErr == nil {
+				userConns, queryErr := a.Queries.ListBankConnectionsByUser(ctx, uid)
+				if queryErr != nil {
+					a.Logger.Error("list bank connections by user", "error", queryErr)
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+				// Convert to the common row type (same fields).
+				for _, uc := range userConns {
+					connections = append(connections, db.ListBankConnectionsRow(uc))
+				}
+			}
+		} else {
+			connections, err = a.Queries.ListBankConnections(ctx)
+			if err != nil {
+				a.Logger.Error("list bank connections", "error", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
 		}
 
 		// Fetch accounts for each connection and compute balances.

@@ -169,6 +169,13 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			params.SortOrder = "asc"
 		}
 
+		// Scope to member's own data if not admin.
+		if !IsAdmin(sm, r) {
+			if uid := SessionUserID(sm, r); uid != "" {
+				params.UserID = &uid
+			}
+		}
+
 		result, err := svc.ListTransactionsAdmin(ctx, params)
 		if err != nil {
 			a.Logger.Error("list admin transactions", "error", err)
@@ -337,6 +344,13 @@ func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 		}
 		if v := r.URL.Query().Get("sort"); v == "asc" {
 			params.SortOrder = "asc"
+		}
+
+		// Scope to member's own data if not admin.
+		if !IsAdmin(sm, r) {
+			if uid := SessionUserID(sm, r); uid != "" {
+				params.UserID = &uid
+			}
 		}
 
 		result, err := svc.ListTransactionsAdmin(ctx, params)

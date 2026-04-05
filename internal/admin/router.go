@@ -36,6 +36,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 	})
 	r.Post("/logout", LogoutHandler(sm))
 
+	// Member password setup (partially authenticated — member ID in session but no full login).
+	r.Get("/member-setup", MemberSetupHandler(sm, a.Queries, tr))
+	r.Post("/member-setup", MemberSetupHandler(sm, a.Queries, tr))
+
 	// OAuth 2.1 authorize flow (needs session for consent screen).
 	r.Get("/oauth/authorize", OAuthAuthorizeHandler(svc, sm, tr))
 	r.Post("/oauth/authorize", OAuthAuthorizeSubmitHandler(svc, sm))
@@ -47,7 +51,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 	// Programmatic setup API (unauthenticated).
 	r.Post("/-/setup", ProgrammaticSetupHandler(a.Queries, sm))
 
-	// Authenticated admin routes (HTML pages).
+	// Authenticated routes accessible to all roles (admin + member).
 	r.Group(func(r chi.Router) {
 		r.Use(RequireAuth(sm))
 		r.Use(CSRFMiddleware(sm))
@@ -55,13 +59,36 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		r.Get("/", DashboardHandler(a, svc, tr))
 		r.Get("/insights", InsightsHandler(a, svc, tr))
+
+		r.Get("/connections", ConnectionsListHandler(a, svc, sm, tr))
+		r.Get("/connections/{id}", ConnectionDetailHandler(a, tr))
+
+		r.Get("/transactions", TransactionListHandler(a, sm, tr, svc))
+		r.Get("/transactions/search", TransactionSearchHandler(a, sm, tr, svc))
+		r.Get("/transactions/{id}", TransactionDetailHandler(a, sm, tr, svc))
+		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
+
+		// Member account self-service pages.
+		r.Get("/my-account", MyAccountHandler(a, sm, tr, svc))
+		r.Post("/my-account/password", MyAccountChangePasswordHandler(a, sm))
+		r.Post("/my-account/wipe-data", MyAccountWipeDataHandler(a, sm))
+
+		// Password change works for both admin and member sessions.
+		r.Post("/settings/password", ChangePasswordHandler(a, sm))
+	})
+
+	// Admin-only authenticated routes (HTML pages).
+	r.Group(func(r chi.Router) {
+		r.Use(RequireAuth(sm))
+		r.Use(RequireAdmin(sm))
+		r.Use(CSRFMiddleware(sm))
+		r.Use(NavBadgesMiddleware(a.Queries, a.Logger))
+
 		r.Post("/onboarding/dismiss", DismissOnboardingHandler(a))
 
 		r.Route("/connections", func(r chi.Router) {
-			r.Get("/", ConnectionsListHandler(a, svc, sm, tr))
 			r.Get("/new", NewConnectionHandler(a, tr))
 			r.Get("/import-csv", CSVImportPageHandler(a, tr))
-			r.Get("/{id}", ConnectionDetailHandler(a, tr))
 			r.Get("/{id}/reauth", ConnectionReauthHandler(a, tr))
 		})
 
@@ -94,10 +121,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/{id}/revoke", OAuthClientRevokePageHandler(svc, sm))
 		})
 
-		r.Get("/transactions", TransactionListHandler(a, sm, tr, svc))
-		r.Get("/transactions/search", TransactionSearchHandler(a, sm, tr, svc))
-		r.Get("/transactions/{id}", TransactionDetailHandler(a, sm, tr, svc))
-		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
 		r.Get("/logs", LogsPageHandler(a, svc, sm, tr))
 		r.Get("/sync-logs", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/logs?tab=syncs", http.StatusMovedPermanently)
@@ -155,95 +178,106 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/settings", SettingsGetHandler(a, sm, tr))
 		r.Post("/settings/sync", SettingsSyncPostHandler(a, sm))
 		r.Post("/settings/retention", SettingsRetentionPostHandler(a, sm))
-		r.Post("/settings/password", ChangePasswordHandler(a, sm))
 	})
 
-	// Admin API (authenticated, JSON responses).
+	// Admin API (authenticated, JSON responses) — admin-only operations.
 	r.Route("/-", func(r chi.Router) {
 		r.Use(RequireAuth(sm))
 		r.Use(CSRFMiddleware(sm))
 
-		r.Post("/link-token", LinkTokenHandler(a))
-		r.Post("/exchange-token", ExchangeTokenHandler(a))
-		r.Post("/connections/{id}/reauth", ConnectionReauthAPIHandler(a))
-		r.Post("/connections/{id}/reauth-complete", ConnectionReauthCompleteHandler(a))
-		r.Post("/connections/{id}/sync", SyncConnectionHandler(a))
-		r.Post("/connections/sync-all", SyncAllConnectionsHandler(a))
-		r.Post("/connections/{id}/paused", UpdateConnectionPausedHandler(a, sm))
-		r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(a, sm))
-		r.Delete("/connections/{id}", DeleteConnectionHandler(a, sm))
-		r.Post("/accounts/{id}/excluded", UpdateAccountExcludedHandler(a, sm))
-		r.Post("/accounts/{id}/display-name", UpdateAccountDisplayNameHandler(a, sm))
-		r.Post("/test-provider/{provider}", ProvidersTestHandler(a))
-		r.Post("/users", CreateUserHandler(a, sm))
-		r.Put("/users/{id}", UpdateUserHandler(a, sm))
+		// Quick search — accessible to all roles.
+		r.Get("/search/transactions", QuickSearchTransactionsHandler(svc))
 
-		r.Post("/csv/upload", CSVUploadHandler(a, sm))
-		r.Post("/csv/preview", CSVPreviewHandler(a, sm))
-		r.Post("/csv/import", CSVImportHandler(a, sm, svc))
-
-		r.Get("/api-keys", ListAPIKeysHandler(svc))
-		r.Post("/api-keys", CreateAPIKeyHandler(svc))
-		r.Delete("/api-keys/{id}", RevokeAPIKeyHandler(svc))
-
-		r.Get("/oauth-clients", ListOAuthClientsHandler(svc))
-		r.Post("/oauth-clients", CreateOAuthClientHandler(svc))
-		r.Delete("/oauth-clients/{id}", RevokeOAuthClientHandler(svc))
-
-		r.Post("/update/dismiss", DismissUpdateHandler(a))
-		r.Post("/update", TriggerUpdateHandler(a))
-
-		// Category CRUD
-		r.Post("/categories", CreateCategoryAdminHandler(svc))
-		r.Put("/categories/{id}", UpdateCategoryAdminHandler(svc))
-		r.Delete("/categories/{id}", DeleteCategoryAdminHandler(svc))
-		r.Post("/categories/{id}/merge", MergeCategoryAdminHandler(svc))
-
-		// Category bulk export/import (TSV)
-		r.Get("/categories/export-tsv", ExportCategoriesTSVAdminHandler(svc))
-		r.Post("/categories/import-tsv", ImportCategoriesTSVAdminHandler(svc))
-
-		// Transaction CSV export
-		r.Get("/transactions/export-csv", ExportTransactionsCSVHandler(a, svc))
-
-		// Transaction bulk categorize
-		r.Post("/transactions/batch-categorize", BatchSetTransactionCategoryAdminHandler(svc))
-
-		// Transaction category override
-		r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc))
-		r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc))
-
-		// Transaction comments
+		// Transaction comments — accessible to all roles.
 		r.Post("/transactions/{id}/comments", CreateTransactionCommentHandler(a, sm, svc))
 		r.Delete("/transactions/{id}/comments/{comment_id}", DeleteTransactionCommentHandler(a, sm, svc))
 
-		// Review queue
-		r.Post("/reviews/{id}/submit", SubmitReviewAdminHandler(a, sm, svc))
-		r.Post("/reviews/{id}/dismiss", DismissReviewAdminHandler(a, sm, svc))
-		r.Post("/reviews/dismiss-all", DismissAllReviewsAdminHandler(a, sm, svc))
-		r.Post("/reviews/enqueue", EnqueueReviewAdminHandler(a, sm, svc))
-		r.Post("/reviews/settings", ReviewSettingsHandler(a, sm))
+		// Admin-only API routes.
+		r.Group(func(r chi.Router) {
+			r.Use(RequireAdmin(sm))
 
-		// Transaction rules
-		r.Post("/rules", CreateRuleAdminHandler(svc, sm))
-		r.Put("/rules/{id}", UpdateRuleAdminHandler(svc, sm))
-		r.Delete("/rules/{id}", DeleteRuleAdminHandler(svc))
-		r.Post("/rules/{id}/toggle", ToggleRuleAdminHandler(svc))
-		r.Post("/rules/{id}/apply", ApplyRuleAdminHandler(svc))
+			r.Post("/link-token", LinkTokenHandler(a))
+			r.Post("/exchange-token", ExchangeTokenHandler(a))
+			r.Post("/connections/{id}/reauth", ConnectionReauthAPIHandler(a))
+			r.Post("/connections/{id}/reauth-complete", ConnectionReauthCompleteHandler(a))
+			r.Post("/connections/{id}/sync", SyncConnectionHandler(a))
+			r.Post("/connections/sync-all", SyncAllConnectionsHandler(a))
+			r.Post("/connections/{id}/paused", UpdateConnectionPausedHandler(a, sm))
+			r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(a, sm))
+			r.Delete("/connections/{id}", DeleteConnectionHandler(a, sm))
+			r.Post("/accounts/{id}/excluded", UpdateAccountExcludedHandler(a, sm))
+			r.Post("/accounts/{id}/display-name", UpdateAccountDisplayNameHandler(a, sm))
+			r.Post("/test-provider/{provider}", ProvidersTestHandler(a))
+			r.Post("/users", CreateUserHandler(a, sm))
+			r.Put("/users/{id}", UpdateUserHandler(a, sm))
 
-		// Account links
-		r.Post("/account-links", CreateAccountLinkAdminHandler(svc, sm))
-		r.Post("/account-links/{id}/delete", DeleteAccountLinkAdminHandler(svc, sm))
-		r.Post("/account-links/{id}/reconcile", ReconcileAccountLinkAdminHandler(svc, sm))
-		r.Post("/transaction-matches/{id}/confirm", ConfirmMatchAdminHandler(svc, sm))
-		r.Post("/transaction-matches/{id}/reject", RejectMatchAdminHandler(svc, sm))
+			r.Post("/csv/upload", CSVUploadHandler(a, sm))
+			r.Post("/csv/preview", CSVPreviewHandler(a, sm))
+			r.Post("/csv/import", CSVImportHandler(a, sm, svc))
 
-		// Quick search (command palette)
-		r.Get("/search/transactions", QuickSearchTransactionsHandler(svc))
+			r.Get("/api-keys", ListAPIKeysHandler(svc))
+			r.Post("/api-keys", CreateAPIKeyHandler(svc))
+			r.Delete("/api-keys/{id}", RevokeAPIKeyHandler(svc))
 
-		// Agent reports
-		r.Post("/reports/{id}/read", MarkReportReadAdminHandler(svc))
-		r.Post("/reports/read-all", MarkAllReportsReadAdminHandler(svc))
+			r.Get("/oauth-clients", ListOAuthClientsHandler(svc))
+			r.Post("/oauth-clients", CreateOAuthClientHandler(svc))
+			r.Delete("/oauth-clients/{id}", RevokeOAuthClientHandler(svc))
+
+			r.Post("/update/dismiss", DismissUpdateHandler(a))
+			r.Post("/update", TriggerUpdateHandler(a))
+
+			// Category CRUD
+			r.Post("/categories", CreateCategoryAdminHandler(svc))
+			r.Put("/categories/{id}", UpdateCategoryAdminHandler(svc))
+			r.Delete("/categories/{id}", DeleteCategoryAdminHandler(svc))
+			r.Post("/categories/{id}/merge", MergeCategoryAdminHandler(svc))
+
+			// Category bulk export/import (TSV)
+			r.Get("/categories/export-tsv", ExportCategoriesTSVAdminHandler(svc))
+			r.Post("/categories/import-tsv", ImportCategoriesTSVAdminHandler(svc))
+
+			// Transaction CSV export
+			r.Get("/transactions/export-csv", ExportTransactionsCSVHandler(a, svc))
+
+			// Transaction bulk categorize
+			r.Post("/transactions/batch-categorize", BatchSetTransactionCategoryAdminHandler(svc))
+
+			// Transaction category override
+			r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc))
+			r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc))
+
+			// Review queue
+			r.Post("/reviews/{id}/submit", SubmitReviewAdminHandler(a, sm, svc))
+			r.Post("/reviews/{id}/dismiss", DismissReviewAdminHandler(a, sm, svc))
+			r.Post("/reviews/dismiss-all", DismissAllReviewsAdminHandler(a, sm, svc))
+			r.Post("/reviews/enqueue", EnqueueReviewAdminHandler(a, sm, svc))
+			r.Post("/reviews/settings", ReviewSettingsHandler(a, sm))
+
+			// Transaction rules
+			r.Post("/rules", CreateRuleAdminHandler(svc, sm))
+			r.Put("/rules/{id}", UpdateRuleAdminHandler(svc, sm))
+			r.Delete("/rules/{id}", DeleteRuleAdminHandler(svc))
+			r.Post("/rules/{id}/toggle", ToggleRuleAdminHandler(svc))
+			r.Post("/rules/{id}/apply", ApplyRuleAdminHandler(svc))
+
+			// Account links
+			r.Post("/account-links", CreateAccountLinkAdminHandler(svc, sm))
+			r.Post("/account-links/{id}/delete", DeleteAccountLinkAdminHandler(svc, sm))
+			r.Post("/account-links/{id}/reconcile", ReconcileAccountLinkAdminHandler(svc, sm))
+			r.Post("/transaction-matches/{id}/confirm", ConfirmMatchAdminHandler(svc, sm))
+			r.Post("/transaction-matches/{id}/reject", RejectMatchAdminHandler(svc, sm))
+
+			// Agent reports
+			r.Post("/reports/{id}/read", MarkReportReadAdminHandler(svc))
+			r.Post("/reports/read-all", MarkAllReportsReadAdminHandler(svc))
+
+			// Member account management
+			r.Get("/members", ListMemberAccountsHandler(svc))
+			r.Post("/members", CreateMemberAccountHandler(svc, sm))
+			r.Put("/members/{id}/role", UpdateMemberRoleHandler(svc, sm))
+			r.Delete("/members/{id}", DeleteMemberAccountHandler(svc, sm))
+			r.Post("/users/{id}/wipe", WipeUserDataHandler(a, sm))
+		})
 	})
 
 	return r

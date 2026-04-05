@@ -59,7 +59,8 @@ func getNavBadges(ctx context.Context) NavBadges {
 	return NavBadges{}
 }
 
-// RequireAuth is chi middleware that checks for an authenticated admin session.
+// RequireAuth is chi middleware that checks for an authenticated session.
+// Works for both admin_account and member_account sessions.
 // If the session does not contain an admin_id, it redirects to /login.
 func RequireAuth(sm *scs.SessionManager) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -67,6 +68,25 @@ func RequireAuth(sm *scs.SessionManager) func(http.Handler) http.Handler {
 			adminID := sm.GetString(r.Context(), sessionKeyAdminID)
 			if adminID == "" {
 				http.Redirect(w, r, "/login", http.StatusSeeOther)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// RequireAdmin is chi middleware that blocks non-admin users.
+// Must be used after RequireAuth. Returns 403 for members trying to access admin-only routes.
+func RequireAdmin(sm *scs.SessionManager) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			role := sm.GetString(r.Context(), sessionKeyAccountRole)
+			if role == "" {
+				// Legacy admin sessions without the role key are treated as admin.
+				role = RoleAdmin
+			}
+			if role != RoleAdmin {
+				http.Error(w, "Admin access required", http.StatusForbidden)
 				return
 			}
 			next.ServeHTTP(w, r)
