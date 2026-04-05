@@ -668,6 +668,14 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"mapInt": func(m map[string]int64, key string) int64 {
 				return m[key]
 			},
+			"dict": func(pairs ...any) map[string]any {
+				m := make(map[string]any, len(pairs)/2)
+				for i := 0; i < len(pairs)-1; i += 2 {
+					key, _ := pairs[i].(string)
+					m[key] = pairs[i+1]
+				}
+				return m
+			},
 		},
 	}
 	if err := tr.parseTemplates(); err != nil {
