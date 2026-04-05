@@ -141,7 +141,7 @@ type merchantSummaryInput struct {
 
 type listPendingReviewsInput struct {
 	ReadSessionContext
-	ReviewType         string `json:"review_type,omitempty" jsonschema:"Filter by review type: new_transaction, uncategorized, low_confidence, manual, re_review"`
+	ReviewType         string `json:"review_type,omitempty" jsonschema:"Filter by review type: new_transaction, uncategorized, manual, re_review"`
 	AccountID          string `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
 	UserID             string `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
 	CategoryPrimaryRaw string `json:"category_primary_raw,omitempty" jsonschema:"Filter by raw provider category (e.g., dining, groceries, general). Useful for batch processing reviews by category."`
@@ -614,6 +614,16 @@ func (s *MCPServer) handleImportCategories(ctx context.Context, _ *mcpsdk.CallTo
 
 func (s *MCPServer) handleListPendingReviews(_ context.Context, _ *mcpsdk.CallToolRequest, input listPendingReviewsInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
+
+	if !s.svc.IsReviewsEnabled(ctx) {
+		return jsonResult(map[string]any{
+			"reviews":  []any{},
+			"total":    0,
+			"has_more": false,
+			"note":     "Transaction reviews are currently disabled. Enable them in the admin dashboard at /reviews.",
+		})
+	}
+
 	status := "pending"
 	params := service.ReviewListParams{
 		Status: &status,
@@ -675,6 +685,11 @@ func (s *MCPServer) handleSubmitReview(ctx context.Context, _ *mcpsdk.CallToolRe
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
+
+	if !s.svc.IsReviewsEnabled(context.Background()) {
+		return errorResult(fmt.Errorf("transaction reviews are currently disabled. Enable them in the admin dashboard at /reviews")), nil, nil
+	}
+
 	if input.ReviewID == "" || input.Decision == "" {
 		return errorResult(fmt.Errorf("review_id and decision are required")), nil, nil
 	}
@@ -973,6 +988,11 @@ func (s *MCPServer) handleBatchSubmitReviews(ctx context.Context, _ *mcpsdk.Call
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
+
+	if !s.svc.IsReviewsEnabled(context.Background()) {
+		return errorResult(fmt.Errorf("transaction reviews are currently disabled. Enable them in the admin dashboard at /reviews")), nil, nil
+	}
+
 	if len(input.Reviews) == 0 {
 		return errorResult(fmt.Errorf("reviews array is required and must not be empty")), nil, nil
 	}

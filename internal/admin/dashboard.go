@@ -27,10 +27,16 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			needsAttention = 0
 		}
 
-		reviewPending, err := a.Queries.CountPendingReviews(ctx)
-		if err != nil {
-			a.Logger.Error("count pending reviews", "error", err)
-			reviewPending = 0
+		// Only count pending reviews if reviews are enabled.
+		var reviewPending int64
+		reviewsEnabled := false
+		if cfg, err := a.Queries.GetAppConfig(ctx, "review_auto_enqueue"); err == nil && cfg.Value.Valid && cfg.Value.String == "true" {
+			reviewsEnabled = true
+			reviewPending, err = a.Queries.CountPendingReviews(ctx)
+			if err != nil {
+				a.Logger.Error("count pending reviews", "error", err)
+				reviewPending = 0
+			}
 		}
 
 		// Recent transactions (last 8).
@@ -468,6 +474,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"CurrentVersion":       currentVersion,
 			"DockerSocketAvailable": a.DockerSocketAvailable,
 			"ReviewPending":        reviewPending,
+			"ReviewsEnabled":      reviewsEnabled,
 			"RecentTransactions":   recentTransactions,
 			"Accounts":             dashAccounts,
 			// Account totals & allocation bar.

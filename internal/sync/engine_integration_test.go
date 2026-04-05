@@ -1372,23 +1372,18 @@ func TestSync_UncategorizedReviewType(t *testing.T) {
 	}
 }
 
-func TestSync_LowConfidenceReviewType(t *testing.T) {
+func TestSync_CategorizedNewTransaction(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
 	ctx := context.Background()
 
 	_, food := seedCategoriesWithFood(t, queries)
 	_ = food
 
-	// Enable review auto-enqueue with high confidence threshold.
+	// Enable review auto-enqueue.
 	if err := queries.SetAppConfig(ctx, db.SetAppConfigParams{
 		Key: "review_auto_enqueue", Value: pgtype.Text{String: "true", Valid: true},
 	}); err != nil {
 		t.Fatalf("set app config: %v", err)
-	}
-	if err := queries.SetAppConfig(ctx, db.SetAppConfigParams{
-		Key: "review_confidence_threshold", Value: pgtype.Text{String: "0.9", Valid: true},
-	}); err != nil {
-		t.Fatalf("set confidence threshold: %v", err)
 	}
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
@@ -1401,7 +1396,7 @@ func TestSync_LowConfidenceReviewType(t *testing.T) {
 		syncResult: provider.SyncResult{
 			Added: []provider.Transaction{
 				{
-					ExternalID:         "txn_lowconf",
+					ExternalID:         "txn_categorized_new",
 					AccountExternalID:  "ext_acct_1",
 					Amount:             decimal.NewFromFloat(25.00),
 					Date:               time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
@@ -1422,18 +1417,18 @@ func TestSync_LowConfidenceReviewType(t *testing.T) {
 		t.Fatalf("Sync() error: %v", err)
 	}
 
-	// Verify review type is "low_confidence".
+	// With confidence threshold removed, a categorized transaction gets "new_transaction" type.
 	var reviewType string
 	err := pool.QueryRow(ctx,
 		`SELECT rq.review_type FROM review_queue rq
 		 JOIN transactions t ON t.id = rq.transaction_id
-		 WHERE t.external_transaction_id = 'txn_lowconf' AND rq.status = 'pending'`,
+		 WHERE t.external_transaction_id = 'txn_categorized_new' AND rq.status = 'pending'`,
 	).Scan(&reviewType)
 	if err != nil {
 		t.Fatalf("query review: %v", err)
 	}
-	if reviewType != "low_confidence" {
-		t.Errorf("expected review_type 'low_confidence', got %q", reviewType)
+	if reviewType != "new_transaction" {
+		t.Errorf("expected review_type 'new_transaction', got %q", reviewType)
 	}
 }
 

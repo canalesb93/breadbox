@@ -1,6 +1,91 @@
 {{define "content"}}
 {{template "category-picker-styles" .}}
 
+{{if not .ReviewAutoEnqueue}}
+<!-- Reviews Disabled State -->
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Reviews</h1>
+    <p class="text-sm text-base-content/50 mt-1">Review and categorize transactions flagged during sync</p>
+  </div>
+</div>
+
+<div class="bb-card" x-data="{ enabling: false, enqueuing: false, justEnabled: false }">
+  <div class="flex flex-col items-center text-center py-16 px-6">
+    <div class="w-16 h-16 rounded-xl bg-base-200 flex items-center justify-center mb-4">
+      <i data-lucide="clipboard-x" class="w-8 h-8 text-base-content/30"></i>
+    </div>
+    <h2 class="text-lg font-semibold mb-2">Transaction Reviews are Disabled</h2>
+    <p class="text-base-content/50 text-sm max-w-md mb-6">Enable transaction reviews to have your AI agent categorize and verify transactions as they sync from your bank.</p>
+
+    <template x-if="!justEnabled">
+      <button class="btn btn-primary rounded-xl gap-2" :disabled="enabling"
+        @click="enabling = true;
+          fetch('/-/reviews/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{.CSRFToken}}' },
+            body: JSON.stringify({ auto_enqueue: true })
+          })
+          .then(r => r.json())
+          .then(d => {
+            if (d.error) {
+              window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error, type:'error'}}));
+              enabling = false;
+            } else {
+              justEnabled = true;
+              enabling = false;
+            }
+          })
+          .catch(() => {
+            window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Network error', type:'error'}}));
+            enabling = false;
+          })">
+        <span x-show="!enabling"><i data-lucide="toggle-right" class="w-4 h-4"></i> Enable Reviews</span>
+        <span x-show="enabling" class="loading loading-spinner loading-sm"></span>
+      </button>
+    </template>
+
+    <template x-if="justEnabled">
+      <div class="space-y-4">
+        <div class="alert alert-success">
+          <i data-lucide="check-circle" class="w-5 h-5"></i>
+          <span>Reviews enabled! New transactions will be added to the review queue during sync.</span>
+        </div>
+        <p class="text-sm text-base-content/60">Would you like to create reviews for existing uncategorized transactions?</p>
+        <div class="flex items-center gap-3 justify-center">
+          <button class="btn btn-sm btn-primary rounded-xl gap-2" :disabled="enqueuing"
+            @click="enqueuing = true;
+              fetch('/-/reviews/enqueue-existing', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{.CSRFToken}}' }
+              })
+              .then(r => r.json())
+              .then(d => {
+                if (d.error) {
+                  window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error, type:'error'}}));
+                } else {
+                  window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: (d.enqueued || 0) + ' transactions enqueued for review', type:'success'}}));
+                  setTimeout(() => window.location.reload(), 1000);
+                }
+                enqueuing = false;
+              })
+              .catch(() => {
+                window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Network error', type:'error'}}));
+                enqueuing = false;
+              })">
+            <span x-show="!enqueuing">Yes, enqueue existing</span>
+            <span x-show="enqueuing" class="loading loading-spinner loading-xs"></span>
+          </button>
+          <a href="/reviews" class="btn btn-sm btn-ghost rounded-xl">Skip, just reload</a>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+<script>var csrfToken = "{{.CSRFToken}}";</script>
+{{else}}
+<!-- Reviews Enabled: Normal View -->
+
 <div class="bb-page-header">
   <div>
     <h1 class="bb-page-title">Reviews</h1>
@@ -78,34 +163,24 @@
     </div>
     <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/40 transition-transform duration-200" :class="open && 'rotate-180'"></i>
   </button>
-  <div x-show="open" x-cloak x-collapse x-data="{ autoEnqueue: {{.ReviewAutoEnqueue}}, threshold: '{{.ReviewConfidenceThreshold}}', saving: false }">
+  <div x-show="open" x-cloak x-collapse x-data="{ saving: false, disabling: false }">
     <div class="px-4 sm:px-5 pb-4 pt-0 border-t border-base-300">
-      <div class="flex flex-wrap gap-6 items-end pt-4">
-        <div class="form-control">
-          <label class="label cursor-pointer gap-3">
-            <span class="label-text text-sm">Auto-enqueue on sync</span>
-            <input type="checkbox" class="toggle toggle-primary toggle-sm" x-model="autoEnqueue">
-          </label>
-        </div>
-        <div class="form-control">
-          <label class="label label-text text-xs text-base-content/50">Confidence threshold <span class="badge badge-ghost badge-xs ml-1">Plaid only</span></label>
-          <input type="number" step="0.1" min="0" max="1" class="input input-bordered input-sm w-24 rounded-xl"
-            x-model="threshold" :disabled="!autoEnqueue">
-        </div>
-        <button class="btn btn-primary btn-sm rounded-xl" :disabled="saving"
-          @click="saving = true;
+      <div class="flex flex-wrap gap-6 items-center pt-4">
+        <p class="text-sm text-base-content/70">Reviews are currently <span class="badge badge-success badge-sm">Enabled</span></p>
+        <button class="btn btn-sm btn-ghost btn-error rounded-xl" :disabled="disabling"
+          @click="disabling = true;
             fetch('/-/reviews/settings', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-              body: JSON.stringify({ auto_enqueue: autoEnqueue, confidence_threshold: parseFloat(threshold) })
-            }).then(r => r.json()).then(d => { saving = false; }).catch(() => { saving = false; })">
-          <span x-show="!saving">Save</span>
-          <span x-show="saving" class="loading loading-spinner loading-xs"></span>
+              body: JSON.stringify({ auto_enqueue: false })
+            }).then(r => r.json()).then(d => { window.location.reload(); }).catch(() => { disabling = false; })">
+          <span x-show="!disabling">Disable Reviews</span>
+          <span x-show="disabling" class="loading loading-spinner loading-xs"></span>
         </button>
       </div>
       <p class="text-xs text-base-content/40 mt-3">
-        When enabled, new transactions are automatically added to the review queue during sync.
-        The confidence threshold only applies to Plaid transactions.
+        New transactions are automatically added to the review queue during sync.
+        Disabling will stop new reviews from being created but existing reviews remain.
       </p>
     </div>
   </div>
@@ -143,7 +218,6 @@
             <option value="">All Types</option>
             <option value="new_transaction"{{if eq .ReviewTypeFilter "new_transaction"}} selected{{end}}>New Transaction</option>
             <option value="uncategorized"{{if eq .ReviewTypeFilter "uncategorized"}} selected{{end}}>Uncategorized</option>
-            <option value="low_confidence"{{if eq .ReviewTypeFilter "low_confidence"}} selected{{end}}>Low Confidence</option>
             <option value="manual"{{if eq .ReviewTypeFilter "manual"}} selected{{end}}>Manual</option>
           </select>
         </label>
@@ -217,10 +291,12 @@
           <span class="bb-triage-badge bb-triage-badge--info" title="New Transaction">New</span>
           {{else if eq $review.ReviewType "uncategorized"}}
           <span class="bb-triage-badge bb-triage-badge--warning" title="Uncategorized">Uncat</span>
-          {{else if eq $review.ReviewType "low_confidence"}}
-          <span class="bb-triage-badge bb-triage-badge--error" title="Low Confidence">Low</span>
           {{else if eq $review.ReviewType "manual"}}
           <span class="bb-triage-badge bb-triage-badge--neutral" title="Manual">Man</span>
+          {{else if eq $review.ReviewType "re_review"}}
+          <span class="bb-triage-badge bb-triage-badge--info" title="Re-review">Re</span>
+          {{else}}
+          <span class="bb-triage-badge bb-triage-badge--neutral" title="{{$review.ReviewType}}">{{$review.ReviewType}}</span>
           {{end}}
         </div>
 
@@ -528,4 +604,5 @@ function triageQueue() {
 }
 
 </script>
+{{end}}{{/* end if .ReviewAutoEnqueue */}}
 {{end}}
