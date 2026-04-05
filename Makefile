@@ -15,6 +15,12 @@ generate:
 	@if [ ! -f static/css/styles.css ]; then $(MAKE) css; fi
 
 dev: generate
+	@if [ -z "$$DATABASE_URL" ]; then \
+		echo "Error: DATABASE_URL is not set."; \
+		echo "  Set it for local dev:  export DATABASE_URL=postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable"; \
+		echo "  Or add it to .local.env (auto-loaded by Make)"; \
+		exit 1; \
+	fi
 	@if lsof -ti:$(PORT) >/dev/null 2>&1; then \
 		echo "Error: port $(PORT) is already in use."; \
 		echo "  - Run on another port:  make dev PORT=8081"; \

@@ -140,6 +140,14 @@ func runServe() error {
 
 	logger := newLogger(cfg)
 
+	// Auto-run migrations before connecting the app.
+	if cfg.DatabaseURL != "" {
+		logger.Info("running database migrations...")
+		if err := migrateDB(cfg.DatabaseURL); err != nil {
+			return fmt.Errorf("auto-migrate: %w", err)
+		}
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -276,15 +284,25 @@ func runMigrate() error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logger := newLogger(cfg)
-
 	if cfg.DatabaseURL == "" {
 		return fmt.Errorf("DATABASE_URL is required for migrations")
 	}
 
+	if err := migrateDB(cfg.DatabaseURL); err != nil {
+		return err
+	}
+
+	logger := newLogger(cfg)
+	logger.Info("migrations applied successfully")
+	return nil
+}
+
+// migrateDB runs goose migrations against the given database URL.
+// Extracted so both runServe (auto-migrate) and runMigrate (CLI) can use it.
+func migrateDB(databaseURL string) error {
 	goose.SetBaseFS(db.Migrations)
 
-	sqlDB, err := goose.OpenDBWithDriver("pgx", cfg.DatabaseURL)
+	sqlDB, err := goose.OpenDBWithDriver("pgx", databaseURL)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
@@ -298,7 +316,6 @@ func runMigrate() error {
 		return fmt.Errorf("run migrations: %w", err)
 	}
 
-	logger.Info("migrations applied successfully")
 	return nil
 }
 

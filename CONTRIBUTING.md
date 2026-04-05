@@ -12,11 +12,14 @@
 # Start Postgres (skip if you have a local instance)
 make db
 
-# Run the dev server (auto-installs sqlc + tailwind, generates code, runs migrations)
+# Set DATABASE_URL (or add to .local.env — auto-loaded by Make)
+export DATABASE_URL=postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable
+
+# Run the dev server (auto-installs sqlc + tailwind, generates code, runs migrations, starts server)
 make dev
 ```
 
-On first run, `make dev` downloads `tailwindcss-extra`, installs `sqlc` via `go install`, and generates all build artifacts. Subsequent runs skip these steps.
+On first run, `make dev` downloads `tailwindcss-extra`, installs `sqlc` via `go install`, generates all build artifacts, runs database migrations, and starts the server. Subsequent runs skip the install/generate steps if artifacts already exist.
 
 ## Database
 
