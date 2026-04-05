@@ -17,6 +17,7 @@ import (
 	"breadbox/internal/service"
 	bsync "breadbox/internal/sync"
 	"breadbox/internal/templates"
+	"breadbox/internal/version"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -51,11 +52,12 @@ type Breadcrumb struct {
 
 // TemplateRenderer parses and renders HTML templates.
 type TemplateRenderer struct {
-	mu        sync.RWMutex
-	templates map[string]*template.Template
-	funcMap   template.FuncMap
-	sm        *scs.SessionManager
-	version   string
+	mu             sync.RWMutex
+	templates      map[string]*template.Template
+	funcMap        template.FuncMap
+	sm             *scs.SessionManager
+	version        string
+	versionChecker *version.Checker
 }
 
 // NewTemplateRenderer parses all embedded templates and returns a renderer.
@@ -836,6 +838,15 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 		if _, exists := m["AppVersion"]; !exists && tr.version != "" {
 			m["AppVersion"] = tr.version
 		}
+		// Auto-inject version update status for nav footer.
+		if _, exists := m["NavUpdateAvailable"]; !exists && tr.versionChecker != nil {
+			updateAvailable, latest, err := tr.versionChecker.CheckForUpdate(r.Context())
+			if err == nil && updateAvailable != nil && *updateAvailable && latest != nil {
+				m["NavUpdateAvailable"] = true
+				m["NavLatestVersion"] = latest.Version
+				m["NavLatestURL"] = latest.URL
+			}
+		}
 		// Auto-inject sidebar notification badges from middleware context.
 		if _, exists := m["NavBadges"]; !exists {
 			m["NavBadges"] = getNavBadges(r.Context())
@@ -894,6 +905,11 @@ func (tr *TemplateRenderer) RenderError(w http.ResponseWriter, r *http.Request) 
 // SetVersion sets the application version for auto-injection into template data.
 func (tr *TemplateRenderer) SetVersion(v string) {
 	tr.version = v
+}
+
+// SetVersionChecker sets the version checker for auto-injecting update status into template data.
+func (tr *TemplateRenderer) SetVersionChecker(vc *version.Checker) {
+	tr.versionChecker = vc
 }
 
 // formatCurrency formats a non-negative float as "$X,XXX.XX".

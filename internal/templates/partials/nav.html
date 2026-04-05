@@ -77,12 +77,18 @@
     </form>
   </div>
   <div class="bb-sidebar-version">
-    {{if .AppVersion}}
-    <i data-lucide="package" class="w-3 h-3"></i>
-    <span>Breadbox v{{.AppVersion}}</span>
+    <a href="https://github.com/canalesb93/breadbox" target="_blank" rel="noopener" class="bb-sidebar-version-link" title="View on GitHub">
+      <i data-lucide="github" class="w-3 h-3"></i>
+      <span>Breadbox</span>
+    </a>
+    {{if .NavUpdateAvailable}}
+    <a href="{{.NavLatestURL}}" target="_blank" rel="noopener" class="badge badge-warning badge-xs gap-0.5" title="Update available: v{{.NavLatestVersion}}">
+      v{{.AppVersion}} &rarr; v{{.NavLatestVersion}}
+    </a>
+    {{else if .AppVersion}}
+    <a href="https://github.com/canalesb93/breadbox/releases" target="_blank" rel="noopener" class="badge badge-ghost badge-xs" title="Version {{.AppVersion}}">v{{.AppVersion}}</a>
     {{else}}
-    <i data-lucide="package" class="w-3 h-3"></i>
-    <span>Breadbox vdev</span>
+    <span class="badge badge-ghost badge-xs">dev</span>
     {{end}}
     <span class="ml-auto" style="cursor:pointer;opacity:0.5" @click="$dispatch('open-shortcuts')" title="Keyboard shortcuts">
       <kbd class="bb-shortcuts-kbd" style="font-size:0.5rem;min-width:1rem;height:1rem;padding:0 0.25rem">?</kbd>
