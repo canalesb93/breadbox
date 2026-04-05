@@ -487,19 +487,21 @@
     // Auto-render Lucide icons when new elements are added to the DOM.
     // Prevents icons from missing when Alpine.js x-if templates or
     // fetch-based content adds data-lucide elements after initial render.
-    new MutationObserver(function(mutations) {
-      for (var m of mutations) {
-        for (var node of m.addedNodes) {
-          if (node.nodeType === 1) {
-            if ((node.hasAttribute && node.hasAttribute('data-lucide')) ||
-                (node.querySelector && node.querySelector('[data-lucide]'))) {
-              lucide.createIcons({ nodes: [node.parentElement || document.body] });
-              return;
-            }
+    // Note: lucide.createIcons() replaces [data-lucide] with <svg>, which
+    // adds nodes and would re-trigger this observer. We debounce and check
+    // for unprocessed [data-lucide] elements to avoid an infinite loop.
+    (function() {
+      var iconTimer = null;
+      new MutationObserver(function() {
+        if (iconTimer) return;
+        iconTimer = setTimeout(function() {
+          iconTimer = null;
+          if (document.querySelector('[data-lucide]')) {
+            lucide.createIcons();
           }
-        }
-      }
-    }).observe(document.body, { childList: true, subtree: true });
+        }, 50);
+      }).observe(document.body, { childList: true, subtree: true });
+    })();
 
     // Button loading state helpers for async actions
     window.bbButtonLoading = function(btn) {
