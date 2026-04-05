@@ -63,8 +63,14 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/getting-started/reopen", ReopenGettingStartedHandler(a, sm))
 		r.Get("/insights", InsightsHandler(a, svc, tr))
 
-		r.Get("/connections", ConnectionsListHandler(a, svc, sm, tr))
-		r.Get("/connections/{id}", ConnectionDetailHandler(a, sm, tr))
+		r.Route("/connections", func(r chi.Router) {
+			r.Get("/", ConnectionsListHandler(a, svc, sm, tr))
+			r.Get("/{id}", ConnectionDetailHandler(a, sm, tr))
+			// Admin-only connection sub-pages.
+			r.With(RequireAdmin(sm)).Get("/new", NewConnectionHandler(a, tr))
+			r.With(RequireAdmin(sm)).Get("/import-csv", CSVImportPageHandler(a, tr))
+			r.With(RequireAdmin(sm)).Get("/{id}/reauth", ConnectionReauthHandler(a, tr))
+		})
 
 		r.Get("/transactions", TransactionListHandler(a, sm, tr, svc))
 		r.Get("/transactions/search", TransactionSearchHandler(a, sm, tr, svc))
@@ -89,12 +95,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		// Legacy onboarding dismiss route — redirect to new handler.
 		r.Post("/onboarding/dismiss", DismissGettingStartedHandler(a, sm))
-
-		r.Route("/connections", func(r chi.Router) {
-			r.Get("/new", NewConnectionHandler(a, tr))
-			r.Get("/import-csv", CSVImportPageHandler(a, tr))
-			r.Get("/{id}/reauth", ConnectionReauthHandler(a, tr))
-		})
 
 		r.Route("/users", func(r chi.Router) {
 			r.Get("/", UsersListHandler(a, tr))
