@@ -178,9 +178,11 @@ func (bs *BackupService) ListBackups() ([]BackupInfo, error) {
 		})
 	}
 
-	// Sort newest first.
+	// Sort newest first by filename (contains YYYYMMDD_HHMMSS timestamp).
+	// Filename sort is more reliable than ModTime because test helpers and
+	// file copies can produce identical modification times.
 	sort.Slice(backups, func(i, j int) bool {
-		return backups[i].CreatedAt.After(backups[j].CreatedAt)
+		return backups[i].Filename > backups[j].Filename
 	})
 
 	return backups, nil
