@@ -318,7 +318,8 @@
 
   /* ── Sidebar ── */
   .bb-sidebar {
-    @apply bg-base-100 h-full w-[85vw] max-w-80 sm:w-72 lg:w-64 px-3 py-5 flex flex-col border-r border-base-300;
+    @apply bg-base-100 h-full w-[85vw] max-w-80 sm:w-72 lg:w-64 flex flex-col border-r border-base-300;
+    padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 0.75rem calc(1.25rem + env(safe-area-inset-bottom, 0px)) calc(0.75rem + env(safe-area-inset-left, 0px));
   }
 
   .bb-sidebar-brand {
