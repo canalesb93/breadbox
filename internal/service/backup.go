@@ -89,33 +89,43 @@ func (bs *BackupService) CreateBackup(ctx context.Context, trigger string) (stri
 		return "", fmt.Errorf("create stdout pipe: %w", err)
 	}
 
+	var fileClosed bool
 	outFile, err := os.Create(fullPath)
 	if err != nil {
 		return "", fmt.Errorf("create backup file: %w", err)
 	}
-	defer outFile.Close()
+	defer func() {
+		if !fileClosed {
+			outFile.Close()
+			os.Remove(fullPath) // cleanup incomplete backup
+		}
+	}()
 
 	gzWriter := gzip.NewWriter(outFile)
-	defer gzWriter.Close()
+	defer func() {
+		if !fileClosed {
+			gzWriter.Close()
+		}
+	}()
 
 	if err := cmd.Start(); err != nil {
 		os.Remove(fullPath)
 		return "", fmt.Errorf("start pg_dump: %w", err)
 	}
+	// Ensure the process is always reaped even if we return early.
+	defer func() { _ = cmd.Wait() }()
 
 	if _, err := io.Copy(gzWriter, stdout); err != nil {
-		os.Remove(fullPath)
 		return "", fmt.Errorf("write backup data: %w", err)
 	}
 
 	if err := gzWriter.Close(); err != nil {
-		os.Remove(fullPath)
 		return "", fmt.Errorf("close gzip writer: %w", err)
 	}
 	if err := outFile.Close(); err != nil {
-		os.Remove(fullPath)
 		return "", fmt.Errorf("close backup file: %w", err)
 	}
+	fileClosed = true
 
 	if err := cmd.Wait(); err != nil {
 		os.Remove(fullPath)
