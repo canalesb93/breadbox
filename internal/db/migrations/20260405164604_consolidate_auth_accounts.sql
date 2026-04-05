@@ -27,6 +27,15 @@ SELECT id, user_id, username, hashed_password,
        created_at, updated_at
 FROM member_accounts;
 
+-- Re-point OAuth FKs from admin_accounts to auth_accounts.
+ALTER TABLE oauth_authorization_codes DROP CONSTRAINT IF EXISTS oauth_authorization_codes_admin_id_fkey;
+ALTER TABLE oauth_authorization_codes ADD CONSTRAINT oauth_authorization_codes_admin_id_fkey
+    FOREIGN KEY (admin_id) REFERENCES auth_accounts(id) ON DELETE CASCADE;
+
+ALTER TABLE oauth_access_tokens DROP CONSTRAINT IF EXISTS oauth_access_tokens_admin_id_fkey;
+ALTER TABLE oauth_access_tokens ADD CONSTRAINT oauth_access_tokens_admin_id_fkey
+    FOREIGN KEY (admin_id) REFERENCES auth_accounts(id) ON DELETE CASCADE;
+
 -- Drop old tables.
 DROP TABLE IF EXISTS member_accounts;
 DROP TABLE IF EXISTS admin_accounts;
@@ -66,5 +75,14 @@ SELECT id, user_id, username, hashed_password,
        CASE WHEN role = 'admin' THEN 'admin' ELSE 'member' END,
        created_at, updated_at
 FROM auth_accounts WHERE user_id IS NOT NULL;
+
+-- Re-point OAuth FKs back to admin_accounts.
+ALTER TABLE oauth_authorization_codes DROP CONSTRAINT IF EXISTS oauth_authorization_codes_admin_id_fkey;
+ALTER TABLE oauth_authorization_codes ADD CONSTRAINT oauth_authorization_codes_admin_id_fkey
+    FOREIGN KEY (admin_id) REFERENCES admin_accounts(id) ON DELETE CASCADE;
+
+ALTER TABLE oauth_access_tokens DROP CONSTRAINT IF EXISTS oauth_access_tokens_admin_id_fkey;
+ALTER TABLE oauth_access_tokens ADD CONSTRAINT oauth_access_tokens_admin_id_fkey
+    FOREIGN KEY (admin_id) REFERENCES admin_accounts(id) ON DELETE CASCADE;
 
 DROP TABLE IF EXISTS auth_accounts;
