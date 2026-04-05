@@ -6,7 +6,10 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -197,6 +200,33 @@ func runServe() error {
 	scheduler := sync.NewScheduler(a.SyncEngine, a.Queries, logger, syncTimeout)
 	scheduler.Start(cfg.SyncIntervalMinutes)
 	a.Scheduler = scheduler
+
+	// Initialize backup service if pg_dump is available.
+	if _, err := exec.LookPath("pg_dump"); err == nil {
+		backupDir := os.Getenv("BACKUP_DIR")
+		if backupDir == "" {
+			// Default: ./backups/ relative to working directory, or /var/lib/breadbox/backups/ in Docker.
+			if cfg.Environment == "docker" {
+				backupDir = "/var/lib/breadbox/backups"
+			} else {
+				backupDir = filepath.Join(".", "backups")
+			}
+		}
+		bs := service.NewBackupService(cfg.DatabaseURL, backupDir, logger)
+		a.BackupService = bs
+
+		// Schedule automated backups — runs every hour, checks app_config for actual schedule.
+		backupQueries := a.Queries
+		if err := scheduler.AddFunc("0 * * * *", func() {
+			runScheduledBackup(bs, backupQueries, logger)
+		}); err != nil {
+			logger.Error("failed to add backup cron job", "error", err)
+		}
+
+		logger.Info("backup service initialized", "backup_dir", backupDir)
+	} else {
+		logger.Warn("pg_dump not found — backup service disabled")
+	}
 
 	// Run startup sync for stale connections in background.
 	go scheduler.RunStartupSync(ctx, cfg.SyncIntervalMinutes)
@@ -527,4 +557,64 @@ func runSeed() error {
 	defer pool.Close()
 
 	return seed.Run(ctx, pool, logger)
+}
+
+// runScheduledBackup checks the backup schedule config and runs a backup if due.
+// Called every hour by the cron scheduler. The schedule config determines the
+// actual backup frequency (daily at 2/3/4am, or weekly on Sundays at 2am).
+func runScheduledBackup(bs *service.BackupService, queries *db.Queries, logger *slog.Logger) {
+	ctx := context.Background()
+
+	row, err := queries.GetAppConfig(ctx, "backup_schedule")
+	if err != nil || !row.Value.Valid || row.Value.String == "" {
+		return // Backups not scheduled
+	}
+	schedule := row.Value.String
+
+	now := time.Now()
+	hour := now.Hour()
+	weekday := now.Weekday()
+
+	// Check if we should run based on the schedule.
+	shouldRun := false
+	switch schedule {
+	case "daily_2am":
+		shouldRun = hour == 2
+	case "daily_3am":
+		shouldRun = hour == 3
+	case "daily_4am":
+		shouldRun = hour == 4
+	case "weekly":
+		shouldRun = hour == 2 && weekday == time.Sunday
+	}
+
+	if !shouldRun {
+		return
+	}
+
+	logger.Info("scheduled backup starting", "schedule", schedule)
+
+	filename, err := bs.CreateBackup(ctx, "scheduled")
+	if err != nil {
+		logger.Error("scheduled backup failed", "error", err)
+		return
+	}
+
+	logger.Info("scheduled backup completed", "filename", filename)
+
+	// Clean up old backups based on retention setting.
+	retentionDays := 7 // default
+	retRow, err := queries.GetAppConfig(ctx, "backup_retention_days")
+	if err == nil && retRow.Value.Valid && retRow.Value.String != "" {
+		if d, parseErr := strconv.Atoi(retRow.Value.String); parseErr == nil && d > 0 {
+			retentionDays = d
+		}
+	}
+
+	deleted, err := bs.CleanupOldBackups(retentionDays)
+	if err != nil {
+		logger.Error("backup cleanup failed", "error", err)
+	} else if deleted > 0 {
+		logger.Info("backup cleanup completed", "deleted", deleted, "retention_days", retentionDays)
+	}
 }

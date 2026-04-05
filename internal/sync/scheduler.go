@@ -75,6 +75,13 @@ func (s *Scheduler) NextRun() time.Time {
 	return entries[0].Next
 }
 
+// AddFunc registers an additional cron job with the scheduler.
+// spec is a standard cron expression (e.g., "0 2 * * *" for daily at 2am).
+func (s *Scheduler) AddFunc(spec string, cmd func()) error {
+	_, err := s.cron.AddFunc(spec, cmd)
+	return err
+}
+
 // Stop gracefully stops the scheduler, waiting for any running jobs to finish.
 func (s *Scheduler) Stop() {
 	ctx := s.cron.Stop()

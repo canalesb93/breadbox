@@ -261,6 +261,14 @@
             </span>
           </div>
           <div class="bb-shortcuts-row">
+            <span class="bb-shortcuts-label">Backups</span>
+            <span class="bb-shortcuts-keys">
+              <kbd class="bb-shortcuts-kbd">g</kbd>
+              <span class="bb-shortcuts-then">then</span>
+              <kbd class="bb-shortcuts-kbd">b</kbd>
+            </span>
+          </div>
+          <div class="bb-shortcuts-row">
             <span class="bb-shortcuts-label">Settings</span>
             <span class="bb-shortcuts-keys">
               <kbd class="bb-shortcuts-kbd">g</kbd>
@@ -721,6 +729,7 @@
         { id: 'sys-providers', group: 'System', title: 'Providers', desc: 'Configure Plaid, Teller, CSV', icon: 'plug', href: '/providers', keywords: 'plaid teller csv bank setup' },
         { id: 'sys-access', group: 'System', title: 'Access', desc: 'API keys and OAuth clients', icon: 'shield-check', href: '/access', keywords: 'tokens authentication api keys oauth connector claude' },
         { id: 'sys-logs', group: 'System', title: 'Logs', desc: 'Sync logs and webhook events', icon: 'scroll-text', href: '/logs', keywords: 'sync history errors status webhooks events' },
+        { id: 'sys-backups', group: 'System', title: 'Backups', desc: 'Database backup and restore', icon: 'hard-drive', href: '/backups', keywords: 'backup restore database dump export' },
         { id: 'sys-settings', group: 'System', title: 'Settings', desc: 'Sync schedule, security, system', icon: 'settings', href: '/settings', keywords: 'schedule password encryption' },
         // Quick Actions
         { id: 'act-connect', group: 'Quick Actions', title: 'Connect a Bank', desc: 'Add a new bank connection', icon: 'plus-circle', href: '/connections/new', keywords: 'add new link' },
@@ -1072,6 +1081,7 @@
         u: '/rules',
         a: '/categories',
         l: '/sync-logs',
+        b: '/backups',
         s: '/settings',
         p: '/providers',
         m: '/mcp-settings',

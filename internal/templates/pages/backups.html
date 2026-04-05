@@ -1,0 +1,280 @@
+{{define "content"}}
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Backups</h1>
+    <p class="text-sm text-base-content/50 mt-1">Database backup, restore, and scheduled backups</p>
+  </div>
+  <div class="flex items-center gap-2">
+    {{if not .Error}}
+    <form method="POST" action="/-/backups/create">
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+      <button type="submit" class="btn btn-primary btn-sm rounded-xl">
+        <i data-lucide="download" class="w-4 h-4"></i>
+        Create Backup Now
+      </button>
+    </form>
+    {{end}}
+  </div>
+</div>
+
+<div class="grid gap-6 bb-stagger">
+
+  <!-- Encryption Key Warning -->
+  <div class="alert alert-warning shadow-sm">
+    <i data-lucide="shield-alert" class="w-5 h-5 flex-shrink-0"></i>
+    <div>
+      <h3 class="font-semibold text-sm">Back up your ENCRYPTION_KEY separately</h3>
+      <p class="text-xs mt-1 leading-relaxed">
+        Database backups contain encrypted bank credentials that are useless without the matching
+        <code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code>.
+        If you lose the key, all bank connections must be re-linked from scratch. Store it in a
+        password manager or secure vault — never commit it to version control.
+      </p>
+      {{if not .HasEncryptionKey}}
+      <p class="text-xs mt-2 text-error font-semibold">
+        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-0.5"></i>
+        No encryption key is currently set. Bank credentials cannot be stored or restored.
+      </p>
+      {{end}}
+    </div>
+  </div>
+
+  {{if .Error}}
+  <div class="alert alert-error shadow-sm">
+    <i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0"></i>
+    <span class="text-sm">{{.Error}}</span>
+  </div>
+  {{else}}
+
+  <!-- Stats -->
+  <div class="flex flex-wrap gap-4">
+    <div class="bb-card p-4 flex-1 min-w-[140px]">
+      <div class="text-xs text-base-content/40 mb-1">Backups</div>
+      <div class="text-2xl font-bold tabular-nums">{{.BackupCount}}</div>
+    </div>
+    <div class="bb-card p-4 flex-1 min-w-[140px]">
+      <div class="text-xs text-base-content/40 mb-1">Total Size</div>
+      <div class="text-2xl font-bold tabular-nums">{{.TotalSize}}</div>
+    </div>
+    <div class="bb-card p-4 flex-1 min-w-[140px]">
+      <div class="text-xs text-base-content/40 mb-1">Schedule</div>
+      <div class="text-2xl font-bold">
+        {{if eq .Schedule ""}}Off{{else if eq .Schedule "daily_2am"}}Daily 2am{{else if eq .Schedule "daily_3am"}}Daily 3am{{else if eq .Schedule "daily_4am"}}Daily 4am{{else if eq .Schedule "weekly"}}Weekly{{else}}{{.Schedule}}{{end}}
+      </div>
+    </div>
+    <div class="bb-card p-4 flex-1 min-w-[140px]">
+      <div class="text-xs text-base-content/40 mb-1">Retention</div>
+      <div class="text-2xl font-bold tabular-nums">{{.RetentionDays}}d</div>
+    </div>
+  </div>
+
+  <!-- Schedule Configuration -->
+  <div id="schedule" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#schedule' }">
+    <div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+      <i data-lucide="clock" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+      <div class="min-w-0 flex-1">
+        <h2 class="font-semibold">Schedule</h2>
+        <p class="text-xs text-base-content/40" x-show="!expanded">
+          {{if eq .Schedule ""}}Automatic backups disabled{{else}}Automatic backups enabled · Retention: {{.RetentionDays}} days{{end}}
+        </p>
+        <p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Configure automatic backup frequency and retention</p>
+      </div>
+      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+    </div>
+    <div x-show="expanded" x-collapse x-cloak>
+      <div class="px-4 sm:px-5 py-4">
+        <form method="POST" action="/-/backups/schedule">
+          <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+
+          <div class="grid sm:grid-cols-2 gap-4 max-w-lg">
+            <div>
+              <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="backup_schedule">Frequency</label>
+              <select id="backup_schedule" name="backup_schedule" class="select select-sm select-bordered w-full rounded-xl bg-base-200">
+                <option value=""{{if eq .Schedule ""}} selected{{end}}>Disabled</option>
+                <option value="daily_2am"{{if eq .Schedule "daily_2am"}} selected{{end}}>Daily at 2:00 AM</option>
+                <option value="daily_3am"{{if eq .Schedule "daily_3am"}} selected{{end}}>Daily at 3:00 AM</option>
+                <option value="daily_4am"{{if eq .Schedule "daily_4am"}} selected{{end}}>Daily at 4:00 AM</option>
+                <option value="weekly"{{if eq .Schedule "weekly"}} selected{{end}}>Weekly (Sunday 2:00 AM)</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="backup_retention_days">Retention</label>
+              <select id="backup_retention_days" name="backup_retention_days" class="select select-sm select-bordered w-full rounded-xl bg-base-200">
+                <option value="3"{{if eq .RetentionDays 3}} selected{{end}}>3 days</option>
+                <option value="7"{{if eq .RetentionDays 7}} selected{{end}}>7 days (default)</option>
+                <option value="14"{{if eq .RetentionDays 14}} selected{{end}}>14 days</option>
+                <option value="30"{{if eq .RetentionDays 30}} selected{{end}}>30 days</option>
+                <option value="60"{{if eq .RetentionDays 60}} selected{{end}}>60 days</option>
+                <option value="90"{{if eq .RetentionDays 90}} selected{{end}}>90 days</option>
+                <option value="180"{{if eq .RetentionDays 180}} selected{{end}}>180 days</option>
+                <option value="365"{{if eq .RetentionDays 365}} selected{{end}}>1 year</option>
+              </select>
+            </div>
+          </div>
+
+          <p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
+            <i data-lucide="folder" class="w-3.5 h-3.5"></i>
+            Backups stored in: <code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">{{.BackupDir}}</code>
+          </p>
+
+          <div class="mt-4">
+            <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Schedule</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backup List -->
+  <div class="bb-card p-0 overflow-hidden">
+    <div class="px-4 sm:px-5 py-4 flex items-center gap-3 border-b border-base-300">
+      <i data-lucide="archive" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+      <h2 class="font-semibold">Backup Files</h2>
+      <span class="text-xs text-base-content/40 ml-auto tabular-nums">{{.BackupCount}} files</span>
+    </div>
+
+    {{if eq .BackupCount 0}}
+    <div class="px-4 sm:px-5 py-8 text-center text-sm text-base-content/40">
+      <i data-lucide="database" class="w-8 h-8 mx-auto mb-2 opacity-30"></i>
+      <p>No backups yet. Click "Create Backup Now" to create your first backup.</p>
+    </div>
+    {{else}}
+    <div class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Filename</th>
+            <th>Size</th>
+            <th>Created</th>
+            <th>Type</th>
+            <th class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Backups}}
+          <tr>
+            <td>
+              <div class="flex items-center gap-2">
+                <i data-lucide="file-archive" class="w-4 h-4 text-base-content/30 flex-shrink-0"></i>
+                <span class="font-mono text-xs">{{.Filename}}</span>
+              </div>
+            </td>
+            <td class="tabular-nums text-sm">{{formatBytes .Size}}</td>
+            <td class="text-sm">{{relativeTime .CreatedAt}}</td>
+            <td>
+              {{if eq .Trigger "manual"}}
+              <span class="badge badge-ghost badge-sm">manual</span>
+              {{else if eq .Trigger "scheduled"}}
+              <span class="badge badge-soft badge-info badge-sm">scheduled</span>
+              {{else}}
+              <span class="badge badge-ghost badge-sm">{{.Trigger}}</span>
+              {{end}}
+            </td>
+            <td>
+              <div class="flex items-center justify-end gap-1">
+                <a href="/-/backups/{{.Filename}}/download" class="btn btn-ghost btn-xs rounded-lg" title="Download">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                </a>
+                <form method="POST" action="/-/backups/{{.Filename}}/restore"
+                      x-data
+                      @submit.prevent="$dispatch('bb-confirm', {
+                        title: 'Restore this backup?',
+                        message: 'This will replace all current data with the contents of this backup. This action cannot be undone.',
+                        variant: 'danger',
+                        confirmLabel: 'Restore',
+                        cancelLabel: 'Cancel',
+                        onConfirm: () => $el.submit()
+                      })">
+                  <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                  <button type="submit" class="btn btn-ghost btn-xs rounded-lg text-warning" title="Restore">
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                  </button>
+                </form>
+                <form method="POST" action="/-/backups/{{.Filename}}/delete"
+                      x-data
+                      @submit.prevent="$dispatch('bb-confirm', {
+                        title: 'Delete this backup?',
+                        message: 'The backup file will be permanently removed from disk.',
+                        variant: 'danger',
+                        confirmLabel: 'Delete',
+                        cancelLabel: 'Cancel',
+                        onConfirm: () => $el.submit()
+                      })">
+                  <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                  <button type="submit" class="btn btn-ghost btn-xs rounded-lg text-error" title="Delete">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{end}}
+  </div>
+
+  <!-- Restore from Upload -->
+  <div id="restore" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#restore' }">
+    <div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+      <i data-lucide="upload" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+      <div class="min-w-0 flex-1">
+        <h2 class="font-semibold">Restore from File</h2>
+        <p class="text-xs text-base-content/40" x-show="!expanded">Upload a .sql.gz backup file to restore</p>
+        <p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Upload a previously downloaded backup to restore</p>
+      </div>
+      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+    </div>
+    <div x-show="expanded" x-collapse x-cloak>
+      <div class="px-4 sm:px-5 py-4">
+        <div class="text-xs text-error/80 bg-error/5 rounded-lg p-3 mb-4">
+          <i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-1"></i>
+          <strong>Warning:</strong> Restoring a backup will replace all current data. Make sure you have the correct
+          <code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code> that matches the backup,
+          or bank connections will need to be re-linked.
+        </div>
+
+        <form method="POST" action="/-/backups/restore" enctype="multipart/form-data"
+              x-data="{ filename: '' }"
+              @submit.prevent="$dispatch('bb-confirm', {
+                title: 'Restore database from upload?',
+                message: 'This will replace ALL current data with the contents of the uploaded file. This action cannot be undone.',
+                variant: 'danger',
+                confirmLabel: 'Restore',
+                cancelLabel: 'Cancel',
+                onConfirm: () => $el.submit()
+              })">
+          <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+          <input type="hidden" name="restore_source" value="upload">
+
+          <div class="max-w-md">
+            <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="backup_file">Backup File (.sql.gz)</label>
+            <input type="file" id="backup_file" name="backup_file" accept=".sql.gz,.gz"
+                   class="file-input file-input-bordered file-input-sm w-full rounded-xl"
+                   @change="filename = $event.target.files[0]?.name || ''"
+                   required>
+          </div>
+
+          <div class="mt-4">
+            <button type="submit" class="btn btn-warning btn-sm rounded-xl" :disabled="!filename">
+              <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+              Restore from Upload
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {{end}}
+</div>
+
+<script>
+(function() {
+  if (!location.hash) return;
+  var el = document.querySelector(location.hash);
+  if (el) setTimeout(function() { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+})();
+</script>
+{{end}}

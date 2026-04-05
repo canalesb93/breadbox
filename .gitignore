@@ -33,6 +33,9 @@ internal/db/*.sql.go
 *.cert
 *.crt
 
+# Backups
+backups/
+
 # OS
 .DS_Store
 
