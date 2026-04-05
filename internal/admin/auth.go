@@ -95,6 +95,8 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRende
 				return
 			}
 			sm.Put(r.Context(), sessionKeyAccountID, formatUUID(account.ID))
+			sm.Put(r.Context(), sessionKeyAccountRole, account.Role)
+			sm.Put(r.Context(), "setup_pending", "true")
 			http.Redirect(w, r, "/member-setup", http.StatusSeeOther)
 			return
 		}
@@ -264,6 +266,7 @@ func MemberSetupHandler(sm *scs.SessionManager, queries *db.Queries, tr *Templat
 			return
 		}
 		// Remove setup-only session keys but keep the session alive for flash.
+		sm.Remove(r.Context(), "setup_pending")
 		sm.Remove(r.Context(), sessionKeyAccountID)
 		SetFlash(r.Context(), sm, "success", "Password set successfully. Please sign in.")
 		http.Redirect(w, r, "/login", http.StatusSeeOther)

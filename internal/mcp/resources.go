@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"breadbox/internal/service"
-
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -17,16 +15,11 @@ func (s *MCPServer) handleOverviewResource(_ context.Context, _ *mcpsdk.ReadReso
 		return nil, fmt.Errorf("get overview stats: %w", err)
 	}
 
-	// Always include full household context.
-	// Add default permissions (full access) -- MCP agents always see the full picture.
-	// Per-request API key scope is handled at the tool level, not the resource level.
-	stats.Permissions = &service.OverviewPermissions{
-		Role:                   "full_access",
-		CanReadAllTransactions: true,
-		CanEditTransactions:    true,
-		CanManageConnections:   true,
-		CanManageSettings:      true,
-	}
+	// Permissions are intentionally omitted from the resource-level response.
+	// The resource handler has no access to the per-request MCPServerConfig
+	// (API key scope, MCP mode), so we cannot populate permissions accurately here.
+	// Per-request scoping is enforced at the tool level via BuildServer filtering.
+	stats.Permissions = nil
 
 	data, err := json.MarshalIndent(stats, "", "  ")
 	if err != nil {
