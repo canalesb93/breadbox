@@ -193,19 +193,10 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 	}
 
 	// Read review queue config.
-	reviewAutoEnqueue := true
+	reviewAutoEnqueue := false // reviews are off by default
 	if cfg, err := e.db.GetAppConfig(ctx, "review_auto_enqueue"); err == nil && cfg.Value.Valid {
 		if v, err := strconv.ParseBool(cfg.Value.String); err == nil {
 			reviewAutoEnqueue = v
-		}
-	}
-	var confidenceThreshold float64
-	if reviewAutoEnqueue {
-		confidenceThreshold = 0.5 // default
-		if cfg, err := e.db.GetAppConfig(ctx, "review_confidence_threshold"); err == nil && cfg.Value.Valid {
-			if v, err := strconv.ParseFloat(cfg.Value.String, 64); err == nil {
-				confidenceThreshold = v
-			}
 		}
 	}
 
@@ -348,7 +339,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				}
 			}
 			if reviewAutoEnqueue && (isNew || isChanged) {
-				e.enqueueForReview(ctx, txQueries, dbTxn, isNew, confidenceThreshold, resolver)
+				e.enqueueForReview(ctx, txQueries, dbTxn, isNew, resolver)
 			}
 			if isNew {
 				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "added")
@@ -393,7 +384,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "unchanged")
 			}
 			if reviewAutoEnqueue && isChanged {
-				e.enqueueForReview(ctx, txQueries, dbTxn, false, confidenceThreshold, resolver)
+				e.enqueueForReview(ctx, txQueries, dbTxn, false, resolver)
 			}
 		}
 

@@ -39,8 +39,10 @@
   <a href="/reviews" class="bb-sidebar-link{{if eq .CurrentPage "reviews"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="clipboard-check"></i>
     <span class="flex-1">Review Queue</span>
-    {{if and .NavBadges (gt .NavBadges.PendingReviews 0)}}
+    {{if and .NavBadges .NavBadges.ReviewsEnabled (gt .NavBadges.PendingReviews 0)}}
     <span class="bb-nav-badge" title="{{.NavBadges.PendingReviews}} pending reviews">{{badgeCount .NavBadges.PendingReviews}}</span>
+    {{else if and .NavBadges (not .NavBadges.ReviewsEnabled)}}
+    <span class="badge badge-ghost badge-xs">Off</span>
     {{end}}
   </a>
   <a href="/users" class="bb-sidebar-link{{if eq .CurrentPage "users"}} bb-sidebar-link--active{{end}}">

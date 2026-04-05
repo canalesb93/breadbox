@@ -148,7 +148,7 @@ List reviews awaiting assessment. Supports field selection.
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `status` | string | `pending` (default), `approved`, `rejected`, `skipped` |
-| `review_type` | string | `new_transaction`, `uncategorized`, `low_confidence`, `manual` |
+| `review_type` | string | `new_transaction`, `uncategorized`, `manual`, `re_review` |
 | `account_id` | string | Filter by account |
 | `user_id` | string | Filter by user |
 | `fields` | string | Aliases: `triage`, `review_core`, `transaction_core` |

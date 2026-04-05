@@ -13,6 +13,16 @@ import (
 
 const maxReviewNoteLength = 2000
 
+// IsReviewsEnabled checks if review auto-enqueue is enabled in app_config.
+// Returns false by default (reviews are off unless explicitly enabled).
+func (s *Service) IsReviewsEnabled(ctx context.Context) bool {
+	cfg, err := s.Queries.GetAppConfig(ctx, "review_auto_enqueue")
+	if err != nil || !cfg.Value.Valid {
+		return false
+	}
+	return cfg.Value.String == "true"
+}
+
 // buildCategoryDisplayName builds a human-readable category display name
 // with optional parent prefix (e.g., "Food & Drink › Restaurants").
 func buildCategoryDisplayName(displayName, parentDisplayName pgtype.Text) *string {
@@ -53,10 +63,10 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 	// Validate review_type enum if provided
 	if params.ReviewType != nil && *params.ReviewType != "" {
 		switch *params.ReviewType {
-		case "new_transaction", "uncategorized", "low_confidence", "manual":
-			// valid
+		case "new_transaction", "uncategorized", "low_confidence", "manual", "re_review":
+			// valid — low_confidence is accepted for filtering historical data
 		default:
-			return nil, fmt.Errorf("%w: invalid review_type %q, must be one of: new_transaction, uncategorized, low_confidence, manual", ErrInvalidParameter, *params.ReviewType)
+			return nil, fmt.Errorf("%w: invalid review_type %q, must be one of: new_transaction, uncategorized, manual, re_review", ErrInvalidParameter, *params.ReviewType)
 		}
 	}
 
@@ -1006,6 +1016,25 @@ func (s *Service) GetPendingReviewsOverview(ctx context.Context) (*PendingReview
 		CountsByType:   typeCounts,
 		CategoryGroups: groups,
 	}, nil
+}
+
+// EnqueueExistingUncategorized creates review entries for all existing transactions
+// that don't have a category and don't already have a pending review.
+func (s *Service) EnqueueExistingUncategorized(ctx context.Context) (int64, error) {
+	result, err := s.Pool.Exec(ctx, `
+		INSERT INTO review_queue (transaction_id, review_type)
+		SELECT t.id, 'uncategorized'
+		FROM transactions t
+		JOIN accounts a ON t.account_id = a.id
+		WHERE t.deleted_at IS NULL
+		  AND t.category_override = FALSE
+		  AND (t.category_id IS NULL OR t.category_id = (SELECT id FROM categories WHERE slug = 'uncategorized' LIMIT 1))
+		  AND NOT EXISTS (SELECT 1 FROM review_queue rq WHERE rq.transaction_id = t.id AND rq.status = 'pending')
+		ON CONFLICT DO NOTHING`)
+	if err != nil {
+		return 0, fmt.Errorf("enqueue existing uncategorized: %w", err)
+	}
+	return result.RowsAffected(), nil
 }
 
 // reviewFromRow converts a db.ReviewQueue row to a ReviewResponse, enriching with category slugs.

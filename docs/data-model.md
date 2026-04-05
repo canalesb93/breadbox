@@ -603,14 +603,13 @@ The following keys are seeded during initial migration and used by the applicati
 | `webhook_url` | `(empty)` | Publicly accessible URL for Plaid webhooks. Optional. |
 | `sync_interval_hours` | `12` | How often the cron sync runs, in hours. |
 | `setup_complete` | `false` | Whether the first-run setup wizard has been completed. |
-| `review_auto_enqueue` | `true` | When true, sync auto-enqueues transactions for review. |
-| `review_confidence_threshold` | `0.5` | Category confidence below this value triggers low_confidence review. Range 0.0–1.0. |
+| `review_auto_enqueue` | `false` | When true, sync auto-enqueues transactions for review. Off by default. |
 
 ---
 
 ### 2.9 `review_queue`
 
-**Purpose:** Queue for human or agent review of transactions. Items are auto-enqueued during sync (for new, uncategorized, or low-confidence transactions) or manually enqueued. Reviewers approve, reject, or skip items.
+**Purpose:** Queue for human or agent review of transactions. Items are auto-enqueued during sync (for new or uncategorized transactions) when enabled, or manually enqueued. Reviewers approve, reject, or skip items.
 
 #### Columns
 

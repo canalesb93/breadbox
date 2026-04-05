@@ -149,6 +149,16 @@ func (s *MCPServer) handleRejectMatch(ctx context.Context, _ *mcpsdk.CallToolReq
 
 func (s *MCPServer) handlePendingReviewsOverview(_ context.Context, _ *mcpsdk.CallToolRequest, _ pendingReviewsOverviewInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
+
+	if !s.svc.IsReviewsEnabled(ctx) {
+		return jsonResult(map[string]any{
+			"total_pending":   0,
+			"counts_by_type":  []any{},
+			"category_groups": []any{},
+			"note":            "Transaction reviews are currently disabled. Enable them in the admin dashboard at /reviews.",
+		})
+	}
+
 	result, err := s.svc.GetPendingReviewsOverview(ctx)
 	if err != nil {
 		return errorResult(err), nil, nil

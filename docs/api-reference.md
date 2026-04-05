@@ -133,7 +133,7 @@ The review queue surfaces transactions that need human or agent assessment (new,
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `status` | string | `pending`, `approved`, `rejected`, `skipped` |
-| `review_type` | string | `new_transaction`, `uncategorized`, `low_confidence`, `manual` |
+| `review_type` | string | `new_transaction`, `uncategorized`, `manual`, `re_review` |
 | `account_id` | string | Filter by account |
 | `user_id` | string | Filter by user |
 | `fields` | string | Field selection. Aliases: `triage`, `review_core`, `transaction_core` |

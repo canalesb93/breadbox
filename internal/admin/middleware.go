@@ -15,6 +15,7 @@ const navBadgesKey contextKey = "navBadges"
 // NavBadges holds notification counts displayed in the sidebar navigation.
 type NavBadges struct {
 	PendingReviews       int64
+	ReviewsEnabled       bool
 	ConnectionsAttention int64
 	UnreadReports        int64
 }
@@ -27,10 +28,14 @@ func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Han
 			ctx := r.Context()
 			badges := NavBadges{}
 
-			if pending, err := queries.CountPendingReviews(ctx); err == nil {
-				badges.PendingReviews = pending
-			} else {
-				logger.Debug("nav badges: count pending reviews", "error", err)
+			// Check if reviews are enabled before counting.
+			if cfg, err := queries.GetAppConfig(ctx, "review_auto_enqueue"); err == nil && cfg.Value.Valid && cfg.Value.String == "true" {
+				badges.ReviewsEnabled = true
+				if pending, err := queries.CountPendingReviews(ctx); err == nil {
+					badges.PendingReviews = pending
+				} else {
+					logger.Debug("nav badges: count pending reviews", "error", err)
+				}
 			}
 
 			if attn, err := queries.CountConnectionsNeedingAttention(ctx); err == nil {
