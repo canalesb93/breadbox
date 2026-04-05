@@ -29,7 +29,7 @@ CREATE UNIQUE INDEX review_queue_pending_unique_idx ON review_queue (transaction
 
 -- Seed review config values
 INSERT INTO app_config (key, value) VALUES
-    ('review_auto_enqueue', 'true'),
+    ('review_auto_enqueue', 'false'),
     ('review_confidence_threshold', '0.5')
 ON CONFLICT (key) DO NOTHING;
 

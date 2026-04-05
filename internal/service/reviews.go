@@ -1029,6 +1029,7 @@ func (s *Service) EnqueueExistingUncategorized(ctx context.Context) (int64, erro
 		WHERE t.deleted_at IS NULL
 		  AND t.category_override = FALSE
 		  AND (t.category_id IS NULL OR t.category_id = (SELECT id FROM categories WHERE slug = 'uncategorized' LIMIT 1))
+		  AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))
 		  AND NOT EXISTS (SELECT 1 FROM review_queue rq WHERE rq.transaction_id = t.id AND rq.status = 'pending')
 		ON CONFLICT DO NOTHING`)
 	if err != nil {
