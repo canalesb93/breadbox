@@ -186,11 +186,18 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      - name: Generate SHA256 checksums
+        run: |
+          cd artifacts
+          sha256sum breadbox-* > SHA256SUMS
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: artifacts/breadbox-*
+          files: |
+            artifacts/breadbox-*
+            artifacts/SHA256SUMS
 
   deploy:
     name: Deploy
