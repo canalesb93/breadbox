@@ -58,6 +58,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Use(NavBadgesMiddleware(a.Queries, a.Logger))
 
 		r.Get("/", DashboardHandler(a, svc, tr))
+		r.Get("/getting-started", GettingStartedHandler(a, sm, tr))
+		r.Post("/getting-started/dismiss", DismissGettingStartedHandler(a, sm))
+		r.Post("/getting-started/reopen", ReopenGettingStartedHandler(a, sm))
 		r.Get("/insights", InsightsHandler(a, svc, tr))
 
 		r.Get("/connections", ConnectionsListHandler(a, svc, sm, tr))
@@ -84,7 +87,8 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Use(CSRFMiddleware(sm))
 		r.Use(NavBadgesMiddleware(a.Queries, a.Logger))
 
-		r.Post("/onboarding/dismiss", DismissOnboardingHandler(a))
+		// Legacy onboarding dismiss route — redirect to new handler.
+		r.Post("/onboarding/dismiss", DismissGettingStartedHandler(a, sm))
 
 		r.Route("/connections", func(r chi.Router) {
 			r.Get("/new", NewConnectionHandler(a, tr))

@@ -40,3 +40,6 @@ WHERE started_at < $1
 
 -- name: CountSyncLogs :one
 SELECT COUNT(*) FROM sync_logs;
+
+-- name: CountSuccessfulSyncs :one
+SELECT COUNT(*) FROM sync_logs WHERE status = 'success';

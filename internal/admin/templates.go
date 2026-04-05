@@ -741,6 +741,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/prompt_builder.html",
 		"pages/session_detail.html",
 		"pages/my_account.html",
+		"pages/getting_started.html",
 	}
 
 	// Pages that need multiple page files parsed together (for sub-template sharing).

@@ -158,6 +158,42 @@
     </div>
   </div>
 
+  <!-- Card 4: Help -->
+  <div id="help" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#help' }">
+    <div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+      <i data-lucide="life-buoy" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+      <div class="min-w-0 flex-1">
+        <h2 class="font-semibold">Help</h2>
+        <p class="text-xs text-base-content/40" x-show="!expanded">Setup guide and documentation</p>
+        <p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Resources and guides</p>
+      </div>
+      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+    </div>
+    <div x-show="expanded" x-collapse x-cloak>
+      <div class="px-4 sm:px-5 py-4">
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="compass" class="w-4 h-4 text-base-content/50"></i>
+              <div>
+                <span class="text-sm font-medium">Getting Started Guide</span>
+                <p class="text-xs text-base-content/40">Step-by-step setup walkthrough</p>
+              </div>
+            </div>
+            {{if .OnboardingDismissed}}
+            <form method="POST" action="/getting-started/reopen">
+              <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+              <button type="submit" class="btn btn-ghost btn-sm rounded-xl">Re-open</button>
+            </form>
+            {{else}}
+            <a href="/getting-started" class="btn btn-ghost btn-sm rounded-xl">Open</a>
+            {{end}}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>

@@ -17,6 +17,7 @@ type NavBadges struct {
 	PendingReviews       int64
 	ConnectionsAttention int64
 	UnreadReports        int64
+	ShowGettingStarted   bool
 }
 
 // NavBadgesMiddleware fetches sidebar notification badge counts and stores them
@@ -44,6 +45,10 @@ func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Han
 			} else {
 				logger.Debug("nav badges: count unread agent reports", "error", err)
 			}
+
+			// Check if getting started guide should show in nav.
+			dismissed, _ := queries.GetAppConfig(ctx, "onboarding_dismissed")
+			badges.ShowGettingStarted = !(dismissed.Value.Valid && dismissed.Value.String == "true")
 
 			ctx = context.WithValue(ctx, navBadgesKey, badges)
 			next.ServeHTTP(w, r.WithContext(ctx))
