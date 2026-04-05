@@ -19,17 +19,22 @@ Caddy handles automatic HTTPS via Let's Encrypt. Breadbox is a single Go binary 
 ## Quick Install (One-Liner)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/canalesb93/breadbox/main/deploy/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/canalesb93/breadbox/main/deploy/install.sh | bash
 ```
 
 The script will:
-1. Check for Docker (install if missing)
-2. Prompt for your domain name and email
-3. Generate encryption keys and database passwords
-4. Download configuration files and start all services
-5. Verify the application is healthy
+1. Verify Docker and Docker Compose are installed
+2. Fetch the latest release tag from GitHub
+3. Download `docker-compose.prod.yml` and `Caddyfile`, pinned to that release
+4. Generate an `ENCRYPTION_KEY` and database password
+5. Create a `.env` file (will not overwrite an existing one)
+6. Start all services and wait for a healthy status
 
-After installation, visit `https://your-domain.com/admin/setup` to create your admin account.
+After installation, visit `http://localhost:8080/setup` to create your admin account.
+
+Options:
+- `INSTALL_DIR=./my-dir bash install.sh` -- install to a custom directory (default: `./breadbox`)
+- `bash install.sh --uninstall` -- stop containers and remove installed files (preserves database volume)
 
 ## Manual Setup
 
