@@ -133,7 +133,7 @@ If the app fails to start, check `tail -20 /tmp/breadbox.log` and fix the issue 
 Take 1-2 screenshots that show the impact of your changes. **This is the ONLY phase where you should use the screenshot/upload pipeline.** During discovery and implementation, use regular Chrome MCP tools (`navigate`, `read_page`, etc.) instead.
 
 1. Navigate Chrome MCP to the page you changed
-2. If redirected to login, use JS to submit: `canalesb93@gmail.com` / `password`
+2. If redirected to login, use JS to submit: `admin@example.com` / `password`
 3. Wait for render, then capture and upload:
 
 ```bash

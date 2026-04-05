@@ -51,11 +51,9 @@ You help the team:
 - Handler: `internal/admin/prompt_builder.go`
 
 ### Documentation
-- Product one-pager: `docs/product-one-pager.md` — core thesis, open system philosophy, rules-don't-replace-review framing
-- Product pitch visual: `docs/pitch/index.html` — self-contained HTML pitch page with enrichment examples
-- Agent personas: `docs/agent-personas.md` — source of truth for agent type objectives and success criteria
-- MCP toolset audit: `docs/mcp-toolset-audit.md` — gaps, redundancies, recommendations
-- Agent config resource spec: `docs/agent-config-resource.md`
+- MCP tools reference: `docs/mcp-tools-reference.md` — all 37 tools with parameters
+- MCP server spec: `docs/mcp-server.md` — server setup, resources, error handling
+- API quick reference: `docs/api-reference.md` — all REST endpoints
 
 ### Critical Guardrails (always verify these)
 1. **Every review must be individually assessed** — no auto-approve, no bulk-approve without examination. Rules pre-categorize but agents still review in the vanilla setup.
@@ -76,8 +74,8 @@ When asked to review instructions or tool designs:
 5. Suggest specific improvements with reasoning
 
 When asked to design new agent types or workflows:
-1. Read `docs/agent-personas.md` for the established pattern
-2. Understand the available tools by reading `internal/mcp/server.go`
+1. Review `docs/mcp-tools-reference.md` for available tools
+2. Understand the tool registry by reading `internal/mcp/server.go`
 3. Design the workflow step-by-step, mapping each step to specific tool calls
 4. Define clear success criteria and report format
 5. Identify which instruction blocks the new agent type needs

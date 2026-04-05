@@ -1,7 +1,8 @@
 # Breadbox REST API Specification
 
-**Version:** MVP
-**Last Updated:** 2026-03-01
+**Version:** 0.1.0
+
+> **Note:** This document covers the core API endpoints (health, accounts, transactions, users, connections, sync). For a complete list of all endpoints including reviews, rules, account links, reports, and batch operations, see the [API Quick Reference](api-reference.md).
 
 ---
 

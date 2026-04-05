@@ -1,6 +1,6 @@
 # Breadbox
 
-Self-hosted financial data aggregation for families. Syncs bank data via Plaid and Teller, stores it in PostgreSQL, exposes it to AI agents via MCP and REST API.
+Self-hosted financial data aggregation for households. Syncs bank data via Plaid and Teller, stores it in PostgreSQL, exposes it to AI agents via MCP and REST API.
 
 ## Tech Stack
 
@@ -136,7 +136,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - Review field selection: `list_pending_reviews` supports `fields` param. Aliases: `triage` (review id/type/status + transaction name/amount/date/category_primary_raw/account_name/user_name/merchant_name), `review_core` (review metadata only), `transaction_core` (key transaction fields). Implemented in `internal/service/fields.go` via `ParseReviewFields`/`FilterReviewFields`.
 - Account linking: `account_links` table links dependent (authorized user) accounts to primary (cardholder) accounts for cross-connection transaction deduplication. `transaction_matches` table stores matched pairs. `transactions.attributed_user_id` overrides user attribution. `accounts.is_dependent_linked` flag excludes dependent transactions from totals at query time.
 - Account link matching: `internal/sync/matcher.go` matches by date + exact amount. Runs post-sync via `Engine.matcher.ReconcileForConnection()`. Single candidate → auto-match. Multiple candidates → name similarity tiebreaker. Ambiguous → skip for manual review.
-- Attribution-aware filtering: transaction queries use `COALESCE(t.attributed_user_id, bc.user_id)` for user filtering. "Ricardo's transactions" includes his own plus those attributed to him on shared cards. Dependent account transactions excluded from totals via `AND a.is_dependent_linked = FALSE`.
+- Attribution-aware filtering: transaction queries use `COALESCE(t.attributed_user_id, bc.user_id)` for user filtering. "User's transactions" includes their own plus those attributed to them on shared cards. Dependent account transactions excluded from totals via `AND a.is_dependent_linked = FALSE`.
 - Account link MCP tools: `list_account_links`, `create_account_link` (ToolWrite, auto-runs initial reconciliation), `delete_account_link`, `reconcile_account_link`, `list_transaction_matches`, `confirm_match`, `reject_match`.
 - Account link REST API: `/api/v1/account-links` CRUD + `/reconcile` + `/matches`. `/api/v1/transaction-matches/{id}/confirm|reject`. `POST /api/v1/transaction-matches/manual`.
 - Account link admin: `/account-links` page with link list, create modal, match detail view. Nav item with `link-2` Lucide icon between Categories and Family Members.
@@ -164,7 +164,7 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 
 ## Spec Documents
 
-Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Teller-specific details are in `docs/teller-integration.md`. CSV import details are in `docs/csv-import.md`. Design system (CSS framework, components, icons) is in `docs/design-system.md`. Implementation order is in `docs/ROADMAP.md`.
+Detailed specs live in `docs/`. The canonical source for schema and enums is `docs/data-model.md`. The canonical source for the Provider interface is `docs/architecture.md`. Teller-specific details are in `docs/teller-integration.md`. CSV import details are in `docs/csv-import.md`. Design system (CSS framework, components, icons) is in `docs/design-system.md`. REST API quick reference is in `docs/api-reference.md`. MCP tools reference is in `docs/mcp-tools-reference.md`.
 
 ## Local Dev & Git Worktrees
 
@@ -228,37 +228,18 @@ If not using `claude -w`, you can set up manually:
 - Manual cleanup: `git worktree remove .claude/worktrees/<name>`
 - Kill dev servers: `kill $(lsof -ti:<PORT>)` or `make dev-stop` (kills all instances)
 
-## Workflow Rules
+## Releases & CI
 
-> If you are a subagent or teammate executing a specific task, ignore this section — just do your work. These rules are for the top-level orchestrating agent only.
+- **Versioning**: Semantic versioning (`v0.1.0`). See `CHANGELOG.md`.
+- **Releasing**: Manual. Create a git tag and push it — CI handles the rest.
+  ```
+  git tag -a v0.1.0 -m "Description"
+  git push origin v0.1.0
+  ```
+- **What CI does on tag push**: runs tests, builds cross-platform binaries (linux/darwin, amd64/arm64), creates GitHub Release with binaries attached, builds + pushes versioned Docker image.
+- **What CI does on merge to main**: runs tests, builds + pushes `latest` Docker image, auto-deploys to dev instance. Deploy job only runs on `canalesb93/breadbox` (skipped on forks).
+- **What CI does on PR**: runs tests only. No builds, no deploys.
 
-### How We Work (Orchestrator → Ricardo)
+## Contributing
 
-- If it makes sense for the current task **follow `docs/ROADMAP.md`** phase by phase. Don't skip ahead.
-- **Checkpoint before moving on.** At the end of each phase, pause and let Ricardo verify the checkpoint steps before starting the next phase.
-- **Commit after each completed phase.** One clean commit per phase, not mid-phase.
-- **No surprises.** If a task is ambiguous or a design decision comes up that isn't covered in the specs, ask Ricardo rather than guessing.
-
-### Parallelism Strategy
-
-- **Agent teams** for phase-level work where multiple independent modules can be built simultaneously (e.g., separate REST endpoints, dashboard pages). Teammates get their own context windows and can work on different files without conflicts.
-- **Git worktrees** (`isolation: "worktree"`) for teammates that write code, so they each get an isolated copy of the repo. Merge results back when done.
-- **Subagents** (via Agent tool) for quick, focused tasks within the orchestrator's session: research, code review, running tests, reading specs. These don't need worktrees since they report results back.
-- **Avoid file conflicts.** Never assign two agents to edit the same file. Break work so each agent owns distinct files.
-- **3-5 teammates max** per team. More adds coordination overhead without proportional benefit.
-
-### Task Sizing
-
-- Each teammate should have 3-6 tasks to stay productive.
-- Tasks should be self-contained: one package, one endpoint group, one dashboard page, etc.
-- Include spec references in every task description so teammates have full context.
-
-### Keeping Docs Current
-
-After completing a phase or making a significant decision:
-
-- **`docs/ROADMAP.md`**: Mark completed tasks/phases so progress is visible across sessions.
-- **`CLAUDE.md`** (this file): Update if a design decision changes, a new convention is established, or the tech stack evolves. Keep it concise.
-- **Spec docs** (`docs/*.md`): Update if implementation reveals the spec was wrong or incomplete. Specs should reflect reality, not aspirations.
-
-It's critical to also keep this CLAUDE.md up to date. If you are the orchestrator agent include in your plans to come back to this at the end and make updates it necessary.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and contribution guidelines.

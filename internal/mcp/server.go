@@ -15,7 +15,7 @@ import (
 
 // DefaultInstructions contains the default MCP server instructions.
 // These are used when no custom instructions have been saved.
-const DefaultInstructions = `Breadbox is a self-hosted financial data aggregation server for families. It syncs bank data from Plaid, Teller, and CSV imports into a unified PostgreSQL database.
+const DefaultInstructions = `Breadbox is a self-hosted financial data aggregation server for households. It syncs bank data from Plaid, Teller, and CSV imports into a unified PostgreSQL database.
 
 DATA MODEL:
 - Users: family members who own bank connections

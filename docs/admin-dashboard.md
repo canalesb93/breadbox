@@ -547,6 +547,8 @@ Displays all rows from `bank_connections` joined with `users` for the family mem
 
 ## 6. New Connection Flow
 
+> **Note:** The new connection flow supports multiple providers. When both Plaid and Teller are configured, the user selects the provider (radio buttons) alongside the family member before proceeding to the provider-specific link dialog. CSV import is also available as a provider option and redirects to a separate import page. The sections below describe the Plaid-specific flow in detail; the Teller flow uses the Teller Connect SDK (`TellerConnect.setup()`) with equivalent `onSuccess`/`onExit` callbacks.
+
 **Routes:**
 - `GET /admin/connections/new` — Step 1 (select member)
 - `POST /admin/connections/new` — Process Step 1, redirect to Step 2 with user_id
@@ -843,11 +845,13 @@ Displayed in a row below the connection info section:
 
 ## 8. Re-authentication Flow
 
+> **Note:** Re-authentication is supported for both Plaid and Teller connections. The re-auth page (`connection_reauth.html`) detects the connection provider and loads the appropriate SDK (Plaid Link or Teller Connect). The flow below describes the Plaid-specific path; Teller re-auth uses `TellerConnect.setup()` in update mode with equivalent callbacks.
+
 ### 8.1 Trigger Conditions
 
 A connection enters `error` or `pending_reauth` status when:
 - Plaid sends a webhook with item status `LOGIN_REQUIRED` or `PENDING_EXPIRATION`
-- A sync attempt fails with a Plaid error that indicates the user must re-authenticate
+- A sync attempt fails with a provider error that indicates the user must re-authenticate
 
 ### 8.2 Warning Banner
 
@@ -1167,7 +1171,7 @@ Display "Breadbox" as the application name at the top of the sidebar or as the l
 
 ## 14. Styling and Design System
 
-> **Note:** The admin dashboard was migrated from Pico CSS to DaisyUI 5 + Tailwind CSS v4 in Phase 16A. For the complete design system reference including component classes, theme configuration, icon inventory, and build setup, see **`docs/design-system.md`**.
+> **Note:** For the complete design system reference including component classes, theme configuration, icon inventory, and build setup, see **`docs/design-system.md`**.
 
 ### 14.1 CSS Framework
 
