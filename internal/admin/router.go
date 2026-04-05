@@ -53,7 +53,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 	// Authenticated routes accessible to all roles (admin + member).
 	r.Group(func(r chi.Router) {
-		r.Use(RequireAuth(sm))
+		r.Use(RequireAuth(sm, a.Queries))
 		r.Use(CSRFMiddleware(sm))
 		r.Use(NavBadgesMiddleware(a.Queries, a.Logger))
 
@@ -86,19 +86,49 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/settings/password", ChangePasswordHandler(a, sm))
 	})
 
-	// Editor+ authenticated routes (HTML pages) — editors can view reviews.
+	// Editor+ authenticated routes (HTML pages) — editors can view reviews,
+	// access/agents pages, and create (but not revoke) API keys and OAuth clients.
 	r.Group(func(r chi.Router) {
-		r.Use(RequireAuth(sm))
+		r.Use(RequireAuth(sm, a.Queries))
 		r.Use(RequireEditor(sm))
 		r.Use(CSRFMiddleware(sm))
 		r.Use(NavBadgesMiddleware(a.Queries, a.Logger))
 
 		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
+
+		// Access page (API Keys + OAuth Clients) — editors can view and create.
+		r.Get("/access", AccessPageHandler(svc, sm, tr))
+
+		r.Route("/api-keys", func(r chi.Router) {
+			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, "/access", http.StatusMovedPermanently)
+			})
+			r.Get("/new", APIKeyNewPageHandler(tr))
+			r.Post("/new", APIKeyCreatePageHandler(svc, sm, tr))
+			r.Get("/{id}/created", APIKeyCreatedPageHandler(sm, tr))
+			// Revoke is admin-only — handled in the admin group below.
+		})
+
+		r.Route("/oauth-clients", func(r chi.Router) {
+			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, "/access", http.StatusMovedPermanently)
+			})
+			r.Get("/new", OAuthClientNewPageHandler(tr))
+			r.Post("/new", OAuthClientCreatePageHandler(svc, sm, tr))
+			r.Get("/{id}/created", OAuthClientCreatedPageHandler(sm, tr))
+			// Revoke is admin-only — handled in the admin group below.
+		})
+
+		// Agents page — editors can view.
+		r.Get("/agents", AgentsPageHandler(svc, mcpServer, sm, tr))
+		r.Get("/agents/sessions/{id}", SessionDetailHandler(svc, sm, tr))
+		r.Get("/agent-wizard/{type}", PromptBuilderHandler(sm, tr))
+		r.Get("/agent-wizard/{type}/copy", PromptCopyHandler())
 	})
 
 	// Admin-only authenticated routes (HTML pages).
 	r.Group(func(r chi.Router) {
-		r.Use(RequireAuth(sm))
+		r.Use(RequireAuth(sm, a.Queries))
 		r.Use(RequireAdmin(sm))
 		r.Use(CSRFMiddleware(sm))
 		r.Use(NavBadgesMiddleware(a.Queries, a.Logger))
@@ -113,28 +143,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Get("/{id}/create-login", CreateLoginPageHandler(a, tr))
 		})
 
-		// Combined Access page (API Keys + OAuth Clients)
-		r.Get("/access", AccessPageHandler(svc, sm, tr))
-
-		r.Route("/api-keys", func(r chi.Router) {
-			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				http.Redirect(w, r, "/access", http.StatusMovedPermanently)
-			})
-			r.Get("/new", APIKeyNewPageHandler(tr))
-			r.Post("/new", APIKeyCreatePageHandler(svc, sm, tr))
-			r.Get("/{id}/created", APIKeyCreatedPageHandler(sm, tr))
-			r.Post("/{id}/revoke", APIKeyRevokePageHandler(svc, sm))
-		})
-
-		r.Route("/oauth-clients", func(r chi.Router) {
-			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				http.Redirect(w, r, "/access", http.StatusMovedPermanently)
-			})
-			r.Get("/new", OAuthClientNewPageHandler(tr))
-			r.Post("/new", OAuthClientCreatePageHandler(svc, sm, tr))
-			r.Get("/{id}/created", OAuthClientCreatedPageHandler(sm, tr))
-			r.Post("/{id}/revoke", OAuthClientRevokePageHandler(svc, sm))
-		})
+		// API key and OAuth client revoke — admin only.
+		r.Post("/api-keys/{id}/revoke", APIKeyRevokePageHandler(svc, sm))
+		r.Post("/oauth-clients/{id}/revoke", OAuthClientRevokePageHandler(svc, sm))
 
 		r.Get("/logs", LogsPageHandler(a, svc, sm, tr))
 		r.Get("/sync-logs", func(w http.ResponseWriter, r *http.Request) {
@@ -152,8 +163,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 		r.Get("/reports", ReportsPageHandler(a, svc, sm, tr))
 		r.Get("/reports/{id}", ReportDetailHandler(a, svc, sm, tr))
-		r.Get("/agents", AgentsPageHandler(svc, mcpServer, sm, tr))
-		r.Get("/agents/sessions/{id}", SessionDetailHandler(svc, sm, tr))
 		r.Get("/review-instructions", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/agents?tab=settings", http.StatusMovedPermanently)
 		})
@@ -163,8 +172,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/agent-wizard", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/agents?tab=wizard", http.StatusMovedPermanently)
 		})
-		r.Get("/agent-wizard/{type}", PromptBuilderHandler(sm, tr))
-		r.Get("/agent-wizard/{type}/copy", PromptCopyHandler())
 		r.Get("/rules", RulesPageHandler(svc, sm, tr, a.Config.Version))
 		r.Get("/rules/new", RuleFormPageHandler(svc, sm, tr))
 		r.Get("/rules/{id}", RuleDetailPageHandler(svc, sm, tr))
@@ -198,7 +205,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 	// Admin API (authenticated, JSON responses).
 	r.Route("/-", func(r chi.Router) {
-		r.Use(RequireAuth(sm))
+		r.Use(RequireAuth(sm, a.Queries))
 		r.Use(CSRFMiddleware(sm))
 
 		// Quick search — accessible to all roles.
@@ -208,7 +215,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/transactions/{id}/comments", CreateTransactionCommentHandler(a, sm, svc))
 		r.Delete("/transactions/{id}/comments/{comment_id}", DeleteTransactionCommentHandler(a, sm, svc))
 
-		// Editor+ API routes (categorization, reviews, comments).
+		// Editor+ API routes (categorization, reviews, access management).
 		r.Group(func(r chi.Router) {
 			r.Use(RequireEditor(sm))
 
@@ -222,6 +229,14 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// Review queue (submit/dismiss)
 			r.Post("/reviews/{id}/submit", SubmitReviewAdminHandler(a, sm, svc))
 			r.Post("/reviews/{id}/dismiss", DismissReviewAdminHandler(a, sm, svc))
+
+			// API keys — editors can list and create (revoke is admin-only below).
+			r.Get("/api-keys", ListAPIKeysHandler(svc))
+			r.Post("/api-keys", CreateAPIKeyHandler(svc))
+
+			// OAuth clients — editors can list and create (revoke is admin-only below).
+			r.Get("/oauth-clients", ListOAuthClientsHandler(svc))
+			r.Post("/oauth-clients", CreateOAuthClientHandler(svc))
 		})
 
 		// Admin-only API routes.
@@ -247,12 +262,8 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/csv/preview", CSVPreviewHandler(a, sm))
 			r.Post("/csv/import", CSVImportHandler(a, sm, svc))
 
-			r.Get("/api-keys", ListAPIKeysHandler(svc))
-			r.Post("/api-keys", CreateAPIKeyHandler(svc))
+			// API key + OAuth client revoke/delete — admin only.
 			r.Delete("/api-keys/{id}", RevokeAPIKeyHandler(svc))
-
-			r.Get("/oauth-clients", ListOAuthClientsHandler(svc))
-			r.Post("/oauth-clients", CreateOAuthClientHandler(svc))
 			r.Delete("/oauth-clients/{id}", RevokeOAuthClientHandler(svc))
 
 			r.Post("/update/dismiss", DismissUpdateHandler(a))

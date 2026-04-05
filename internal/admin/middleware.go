@@ -8,6 +8,7 @@ import (
 	"breadbox/internal/db"
 
 	"github.com/alexedwards/scs/v2"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const navBadgesKey contextKey = "navBadges"
@@ -71,14 +72,40 @@ func getNavBadges(ctx context.Context) NavBadges {
 
 // RequireAuth is chi middleware that checks for an authenticated session.
 // If the session does not contain an account_id, it redirects to /login.
-func RequireAuth(sm *scs.SessionManager) func(http.Handler) http.Handler {
+// It also refreshes the session role from the database on every request,
+// so that role changes made by an admin take effect immediately without
+// requiring the user to log out and back in.
+func RequireAuth(sm *scs.SessionManager, args ...interface{}) func(http.Handler) http.Handler {
+	// Extract optional *db.Queries from variadic args for backward compatibility.
+	var queries *db.Queries
+	for _, arg := range args {
+		if q, ok := arg.(*db.Queries); ok {
+			queries = q
+		}
+	}
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			accountID := sm.GetString(r.Context(), sessionKeyAccountID)
+			ctx := r.Context()
+			accountID := sm.GetString(ctx, sessionKeyAccountID)
 			if accountID == "" {
 				http.Redirect(w, r, "/login", http.StatusSeeOther)
 				return
 			}
+
+			// Refresh role from DB to pick up admin-initiated role changes.
+			if queries != nil {
+				var uuid pgtype.UUID
+				if err := uuid.Scan(accountID); err == nil {
+					if account, err := queries.GetAuthAccountByID(ctx, uuid); err == nil {
+						sessionRole := sm.GetString(ctx, sessionKeyAccountRole)
+						if sessionRole != account.Role {
+							sm.Put(ctx, sessionKeyAccountRole, account.Role)
+						}
+					}
+				}
+			}
+
 			next.ServeHTTP(w, r)
 		})
 	}

@@ -52,6 +52,7 @@
             {{end}}
           </td>
           <td class="w-28 text-right">
+            {{if $.IsAdmin}}
             <form method="POST" action="/oauth-clients/{{.ID}}/revoke" class="inline">
               <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
               <button type="button" class="btn btn-ghost btn-xs rounded-lg text-base-content/40 hover:text-error" x-show="!confirming" @click="confirming = true">
@@ -62,6 +63,7 @@
                 <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="confirming = false">Cancel</button>
               </span>
             </form>
+            {{end}}
           </td>
         </tr>
         {{end}}
@@ -172,6 +174,7 @@
             {{end}}
           </td>
           <td class="w-28 text-right">
+            {{if $.IsAdmin}}
             <form method="POST" action="/api-keys/{{.ID}}/revoke" class="inline">
               <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
               <button type="button" class="btn btn-ghost btn-xs rounded-lg text-base-content/40 hover:text-error" x-show="!confirming" @click="confirming = true">
@@ -182,6 +185,7 @@
                 <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="confirming = false">Cancel</button>
               </span>
             </form>
+            {{end}}
           </td>
         </tr>
         {{end}}

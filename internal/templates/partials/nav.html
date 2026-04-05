@@ -36,10 +36,12 @@
     <span class="bb-nav-badge bb-nav-badge--warn" title="{{.NavBadges.ConnectionsAttention}} connections need attention">{{badgeCount .NavBadges.ConnectionsAttention}}</span>
     {{end}}
   </a>
-  {{if .IsAdmin}}
+  {{if .IsEditor}}
   <a href="/agents" class="bb-sidebar-link{{if eq .CurrentPage "agents"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="bot"></i> Agents
   </a>
+  {{end}}
+  {{if .IsAdmin}}
   <a href="/rules" class="bb-sidebar-link{{if or (eq .CurrentPage "rules") (eq .CurrentPage "categories")}} bb-sidebar-link--active{{end}}">
     <i data-lucide="list-filter"></i> Rules & Categories
   </a>
@@ -61,13 +63,15 @@
   </a>
   {{end}}
 
-  {{if .IsAdmin}}
+  {{if .IsEditor}}
   <div class="bb-sidebar-section">System</div>
-  <a href="/providers" class="bb-sidebar-link{{if eq .CurrentPage "providers"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="plug"></i> Providers
-  </a>
   <a href="/access" class="bb-sidebar-link{{if eq .CurrentPage "access"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="shield-check"></i> Access
+  </a>
+  {{end}}
+  {{if .IsAdmin}}
+  <a href="/providers" class="bb-sidebar-link{{if eq .CurrentPage "providers"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="plug"></i> Providers
   </a>
   <a href="/logs" class="bb-sidebar-link{{if eq .CurrentPage "logs"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="scroll-text"></i> Logs
@@ -78,7 +82,8 @@
   <a href="/settings" class="bb-sidebar-link{{if eq .CurrentPage "settings"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="settings"></i> Settings
   </a>
-  {{else}}
+  {{end}}
+  {{if not .IsEditor}}
   <div class="bb-sidebar-section">Account</div>
   <a href="/my-account" class="bb-sidebar-link{{if eq .CurrentPage "my-account"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="settings"></i> My Account
