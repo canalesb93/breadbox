@@ -365,8 +365,8 @@
   }
 
   .bb-sidebar-link {
-    @apply flex items-center gap-3 px-3 py-2.5 lg:py-1.5 min-h-11 lg:min-h-0
-           rounded-lg text-sm font-medium
+    @apply flex items-center gap-3 px-3 py-2.5 lg:py-1.5 min-h-11 lg:min-h-8
+           shrink-0 rounded-lg text-sm font-medium
            text-base-content/60 no-underline
            hover:bg-base-200 hover:text-base-content;
     transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
