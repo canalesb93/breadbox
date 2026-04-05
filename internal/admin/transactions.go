@@ -3,7 +3,6 @@ package admin
 import (
 	"encoding/json"
 	"errors"
-	"html/template"
 	"math"
 	"net/http"
 	"net/url"
@@ -458,108 +457,26 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 		thirtyDaysAgo := now.AddDate(0, 0, -30)
 		sixtyDaysAgo := now.AddDate(0, 0, -60)
 
-		// Category breakdown (last 30 days)
-		type AccountCategory struct {
-			Name  string
-			Color string
-			Icon  string
-			Amount float64
-		}
-		var topCategories []AccountCategory
-		var categoryLabelsJSON, categoryAmountsJSON, categoryColorsJSON template.JS
+		// 30-day spending total
 		var totalSpending float64
-
-		catSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+		var txCount30d int64
+		spendingSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
 			GroupBy:      "category",
 			AccountID:    &idStr,
 			StartDate:    &thirtyDaysAgo,
 			SpendingOnly: true,
 		})
 		if err != nil {
-			a.Logger.Error("account category summary", "error", err)
+			a.Logger.Error("account spending summary", "error", err)
 		}
-		if catSummary != nil {
-			if catSummary.Totals.TotalAmount != nil {
-				totalSpending = *catSummary.Totals.TotalAmount
+		if spendingSummary != nil {
+			if spendingSummary.Totals.TotalAmount != nil {
+				totalSpending = *spendingSummary.Totals.TotalAmount
 			}
-			catLabels := make([]string, 0, len(catSummary.Summary))
-			catAmounts := make([]float64, 0, len(catSummary.Summary))
-			catColors := make([]string, 0, len(catSummary.Summary))
-			defaultColors := []string{
-				"oklch(0.55 0.15 250)", "oklch(0.55 0.15 150)", "oklch(0.55 0.15 25)",
-				"oklch(0.55 0.15 310)", "oklch(0.55 0.15 75)", "oklch(0.55 0.15 200)",
-				"oklch(0.55 0.10 50)", "oklch(0.55 0.10 120)",
-			}
-			for i, row := range catSummary.Summary {
-				name := "Uncategorized"
-				if row.Category != nil {
-					name = *row.Category
-				}
-				color := defaultColors[i%len(defaultColors)]
-				if row.CategoryColor != nil && *row.CategoryColor != "" {
-					color = *row.CategoryColor
-				}
-				icon := ""
-				if row.CategoryIcon != nil {
-					icon = *row.CategoryIcon
-				}
-				topCategories = append(topCategories, AccountCategory{
-					Name:   name,
-					Color:  color,
-					Icon:   icon,
-					Amount: row.TotalAmount,
-				})
-				catLabels = append(catLabels, name)
-				catAmounts = append(catAmounts, row.TotalAmount)
-				catColors = append(catColors, color)
-			}
-			if lb, err := json.Marshal(catLabels); err == nil {
-				categoryLabelsJSON = template.JS(lb)
-			}
-			if ab, err := json.Marshal(catAmounts); err == nil {
-				categoryAmountsJSON = template.JS(ab)
-			}
-			if cb, err := json.Marshal(catColors); err == nil {
-				categoryColorsJSON = template.JS(cb)
-			}
-		}
-
-		// Daily spending trend (last 30 days)
-		var dailyLabelsJSON, dailyAmountsJSON template.JS
-		dailySummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
-			GroupBy:      "day",
-			AccountID:    &idStr,
-			StartDate:    &thirtyDaysAgo,
-			SpendingOnly: true,
-		})
-		if err != nil {
-			a.Logger.Error("account daily summary", "error", err)
-		}
-		if dailySummary != nil && len(dailySummary.Summary) > 0 {
-			// Build a map of date->amount, then fill in all 30 days.
-			dayMap := make(map[string]float64, len(dailySummary.Summary))
-			for _, row := range dailySummary.Summary {
-				if row.Period != nil {
-					dayMap[*row.Period] = row.TotalAmount
-				}
-			}
-			labels := make([]string, 0, 30)
-			amounts := make([]float64, 0, 30)
-			for i := 29; i >= 0; i-- {
-				d := now.AddDate(0, 0, -i).Format("2006-01-02")
-				labels = append(labels, d)
-				amounts = append(amounts, dayMap[d])
-			}
-			if lb, err := json.Marshal(labels); err == nil {
-				dailyLabelsJSON = template.JS(lb)
-			}
-			if ab, err := json.Marshal(amounts); err == nil {
-				dailyAmountsJSON = template.JS(ab)
-			}
+			txCount30d = spendingSummary.Totals.TransactionCount
 		}
 
 		// Previous 30-day spending for comparison
-		var prevTotalSpending float64
 		var spendingChangePercent float64
 		var hasSpendingChange bool
 		prevSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
@@ -573,35 +490,11 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			a.Logger.Error("account prev period summary", "error", err)
 		}
 		if prevSummary != nil && prevSummary.Totals.TotalAmount != nil {
-			prevTotalSpending = *prevSummary.Totals.TotalAmount
-		}
-		if prevTotalSpending > 0 {
-			hasSpendingChange = true
-			spendingChangePercent = ((totalSpending - prevTotalSpending) / prevTotalSpending) * 100
-		}
-
-		// Total income for this account (negative amounts = credits/income)
-		var totalIncome float64
-		allSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
-			GroupBy:   "day",
-			AccountID: &idStr,
-			StartDate: &thirtyDaysAgo,
-		})
-		if err != nil {
-			a.Logger.Error("account income summary", "error", err)
-		}
-		if allSummary != nil {
-			for _, row := range allSummary.Summary {
-				if row.TotalAmount < 0 {
-					totalIncome += -row.TotalAmount
-				}
+			prevTotalSpending := *prevSummary.Totals.TotalAmount
+			if prevTotalSpending > 0 {
+				hasSpendingChange = true
+				spendingChangePercent = ((totalSpending - prevTotalSpending) / prevTotalSpending) * 100
 			}
-		}
-
-		// Transaction count for this account (30 days)
-		var txCount30d int64
-		if catSummary != nil {
-			txCount30d = catSummary.Totals.TransactionCount
 		}
 
 		// Is this a liability (credit/loan)?
@@ -652,14 +545,7 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			"FilterSearch":    r.URL.Query().Get("search"),
 			// Spending analytics
 			"TotalSpending":         totalSpending,
-			"TotalIncome":           totalIncome,
 			"TxCount30d":            txCount30d,
-			"TopCategories":         topCategories,
-			"CategoryLabels":        categoryLabelsJSON,
-			"CategoryAmounts":       categoryAmountsJSON,
-			"CategoryColors":        categoryColorsJSON,
-			"DailyLabels":           dailyLabelsJSON,
-			"DailyAmounts":          dailyAmountsJSON,
 			"SpendingChangePercent": spendingChangePercent,
 			"HasSpendingChange":     hasSpendingChange,
 			"IsLiability":           isLiability,
