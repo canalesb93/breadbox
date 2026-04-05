@@ -13,6 +13,7 @@ import (
 	"breadbox/internal/db"
 	plaidprovider "breadbox/internal/provider/plaid"
 	tellerprovider "breadbox/internal/provider/teller"
+	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -20,8 +21,24 @@ import (
 )
 
 // ProvidersGetHandler serves GET /admin/providers.
-func ProvidersGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+func ProvidersGetHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// Fetch provider health summaries (connection counts, last sync info).
+		providerHealth, err := svc.GetProviderHealthSummaries(ctx)
+		if err != nil {
+			a.Logger.Error("get provider health summaries", "error", err)
+			providerHealth = map[string]*service.ProviderHealthSummary{}
+		}
+
+		// Ensure entries exist for all providers even if they have no connections.
+		for _, p := range []string{"plaid", "teller", "csv"} {
+			if _, ok := providerHealth[p]; !ok {
+				providerHealth[p] = &service.ProviderHealthSummary{Provider: p}
+			}
+		}
+
 		data := map[string]any{
 			"PageTitle":   "Providers",
 			"CurrentPage": "providers",
@@ -47,6 +64,12 @@ func ProvidersGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRendere
 
 			// Encryption key available (needed to store PEM)
 			"HasEncryptionKey": len(a.Config.EncryptionKey) > 0,
+
+			// Provider health summaries
+			"ProviderHealth": providerHealth,
+
+			// Sync interval for webhook fallback message
+			"SyncInterval": a.Config.SyncIntervalMinutes,
 		}
 		tr.Render(w, r, "providers.html", data)
 	}

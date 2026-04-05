@@ -6,91 +6,126 @@
   </div>
 </div>
 
-<div class="grid gap-6 bb-stagger">
+<div class="grid gap-[var(--bb-gap-lg)] bb-stagger">
 
-  <!-- Plaid Card -->
-  <div class="bb-card p-0 overflow-hidden">
-    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between">
-      <div class="flex items-center gap-3">
+  <!-- ─── Plaid ─── -->
+  {{$plaidHealth := index .ProviderHealth "plaid"}}
+  <div class="bb-card p-0 overflow-hidden" x-data="providerCard('plaid')">
+    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
         <div class="w-10 h-10 rounded-xl bg-info/8 flex items-center justify-center flex-shrink-0">
           <i data-lucide="building-2" class="w-5 h-5 text-info"></i>
         </div>
-        <div>
+        <div class="min-w-0">
           <h2 class="font-semibold">Plaid</h2>
-          <p class="text-xs text-base-content/40">Thousands of financial institutions</p>
+          <p class="text-xs text-base-content/40 truncate">Thousands of financial institutions</p>
         </div>
       </div>
-      {{if .PlaidConfigured}}
-      <span class="badge badge-success badge-sm rounded-lg">Configured</span>
-      {{else}}
-      <span class="badge badge-ghost badge-sm rounded-lg">Not Configured</span>
-      {{end}}
+      <div class="flex items-center gap-2 flex-shrink-0">
+        {{if and $plaidHealth.LastSyncTime (eq $plaidHealth.LastSyncStatus "error")}}
+          <span class="badge badge-soft badge-error badge-sm rounded-lg">Sync Error</span>
+        {{else if and $plaidHealth.LastSyncTime (eq $plaidHealth.LastSyncStatus "success")}}
+          <span class="badge badge-soft badge-success badge-sm rounded-lg">Healthy</span>
+        {{end}}
+        {{if .PlaidConfigured}}
+          <span class="badge badge-success badge-sm rounded-lg">Configured</span>
+        {{else}}
+          <span class="badge badge-ghost badge-sm rounded-lg">Not Configured</span>
+        {{end}}
+      </div>
     </div>
-    <div class="px-4 sm:px-5 py-4">
-      {{if .PlaidFromEnv}}
-      <p class="text-sm text-base-content/50 mb-4">Configured via environment variables (read-only).</p>
-      <dl class="bb-info-grid">
-        <dt>Client ID {{configSource .ConfigSources "plaid_client_id"}}</dt>
-        <dd><code class="font-mono text-xs break-all">{{.PlaidClientID}}</code></dd>
-        <dt>Secret</dt>
-        <dd><code class="font-mono text-xs">********</code></dd>
-        <dt>Environment {{configSource .ConfigSources "plaid_env"}}</dt>
-        <dd>{{.PlaidEnv}}</dd>
-        <dt>Webhook URL</dt>
-        <dd>{{if .WebhookURL}}<code class="font-mono text-xs break-all">{{.WebhookURL}}</code>{{else}}<span class="text-base-content/40">Not set</span>{{end}}</dd>
-      </dl>
-      {{else}}
-      <form method="POST" action="/providers/plaid" autocomplete="off" class="space-y-4 max-w-xl">
-        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
-        <div class="form-control">
-          <label class="label label-text text-sm font-medium" for="plaid_client_id">
-            Client ID {{configSource .ConfigSources "plaid_client_id"}}
-          </label>
-          <input type="text" id="plaid_client_id" name="plaid_client_id" value="{{.PlaidClientID}}" placeholder="Plaid Client ID" autocomplete="off" class="input input-sm input-bordered w-full rounded-xl">
-        </div>
+    <div class="px-4 sm:px-5 py-4 space-y-4">
+      {{/* ── Health stats row ��─ */}}
+      {{template "provider-stats" $plaidHealth}}
 
-        <div class="form-control">
-          <label class="label label-text text-sm font-medium" for="plaid_secret">Secret</label>
-          <input type="password" id="plaid_secret" name="plaid_secret" value="" placeholder="{{if .PlaidConfigured}}Unchanged (enter to update){{else}}Plaid Secret{{end}}" autocomplete="new-password" class="input input-sm input-bordered w-full rounded-xl">
-        </div>
+      {{/* ── Configuration ── */}}
+      <div class="border-t border-base-300 pt-4">
+        <button type="button" class="flex items-center gap-2 text-sm font-medium text-base-content/70 hover:text-base-content w-full" @click="showConfig = !showConfig">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+          Configuration
+          <i data-lucide="chevron-down" class="w-3.5 h-3.5 ml-auto transition-transform duration-200" :class="showConfig && 'rotate-180'"></i>
+        </button>
 
-        <div class="form-control">
-          <label class="label label-text text-sm font-medium" for="plaid_env">
-            Environment {{configSource .ConfigSources "plaid_env"}}
-          </label>
-          <select id="plaid_env" name="plaid_env" class="select select-sm select-bordered w-full sm:max-w-xs rounded-xl">
-            <option value="sandbox"{{if eq .PlaidEnv "sandbox"}} selected{{end}}>Sandbox</option>
-            <option value="development"{{if eq .PlaidEnv "development"}} selected{{end}}>Development</option>
-            <option value="production"{{if eq .PlaidEnv "production"}} selected{{end}}>Production</option>
-          </select>
-          <p class="text-xs text-base-content/40 mt-1.5">Credentials will be validated before saving.</p>
-        </div>
+        <div x-show="showConfig" x-collapse x-cloak class="mt-4">
+          {{if .PlaidFromEnv}}
+          <p class="text-sm text-base-content/50 mb-4 flex items-center gap-1.5">
+            <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+            Configured via environment variables (read-only)
+          </p>
+          <dl class="bb-info-grid">
+            <dt>Client ID {{configSource .ConfigSources "plaid_client_id"}}</dt>
+            <dd><code class="font-mono text-xs break-all">{{.PlaidClientID}}</code></dd>
+            <dt>Secret</dt>
+            <dd><code class="font-mono text-xs">********</code></dd>
+            <dt>Environment {{configSource .ConfigSources "plaid_env"}}</dt>
+            <dd>{{.PlaidEnv}}</dd>
+            <dt>Webhook URL</dt>
+            <dd>{{if .WebhookURL}}<code class="font-mono text-xs break-all">{{.WebhookURL}}</code>{{else}}<span class="text-base-content/40">Not set</span>{{end}}</dd>
+          </dl>
+          {{else}}
+          <form method="POST" action="/providers/plaid" autocomplete="off" class="space-y-4 max-w-xl" @submit="saving = true">
+            <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
-        <div class="form-control">
-          <label class="label label-text text-sm font-medium" for="webhook_url">
-            Webhook URL {{configSource .ConfigSources "webhook_url"}}
-          </label>
-          <input type="url" id="webhook_url" name="webhook_url" value="{{.WebhookURL}}" placeholder="https://example.com/webhooks/plaid" autocomplete="off" class="input input-sm input-bordered w-full rounded-xl">
-          <p class="text-xs text-base-content/40 mt-1.5">Plaid will send transaction updates to this URL. Must use HTTPS.</p>
-        </div>
+            <div class="form-control">
+              <label class="label label-text text-sm font-medium" for="plaid_client_id">
+                Client ID {{configSource .ConfigSources "plaid_client_id"}}
+              </label>
+              <input type="text" id="plaid_client_id" name="plaid_client_id" value="{{.PlaidClientID}}" placeholder="Plaid Client ID" autocomplete="off" class="input input-sm input-bordered w-full rounded-xl">
+            </div>
 
-        <div class="pt-2">
-          <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Plaid Settings</button>
+            <div class="form-control">
+              <label class="label label-text text-sm font-medium" for="plaid_secret">Secret</label>
+              <input type="password" id="plaid_secret" name="plaid_secret" value="" placeholder="{{if .PlaidConfigured}}Unchanged (enter to update){{else}}Plaid Secret{{end}}" autocomplete="new-password" class="input input-sm input-bordered w-full rounded-xl">
+            </div>
+
+            <div class="form-control">
+              <label class="label label-text text-sm font-medium" for="plaid_env">
+                Environment {{configSource .ConfigSources "plaid_env"}}
+              </label>
+              <select id="plaid_env" name="plaid_env" class="select select-sm select-bordered w-full sm:max-w-xs rounded-xl bg-base-200">
+                <option value="sandbox"{{if eq .PlaidEnv "sandbox"}} selected{{end}}>Sandbox</option>
+                <option value="development"{{if eq .PlaidEnv "development"}} selected{{end}}>Development</option>
+                <option value="production"{{if eq .PlaidEnv "production"}} selected{{end}}>Production</option>
+              </select>
+              <p class="text-xs text-base-content/40 mt-1.5">Credentials will be validated before saving.</p>
+            </div>
+
+            <div class="form-control">
+              <label class="label label-text text-sm font-medium" for="webhook_url">
+                Webhook URL {{configSource .ConfigSources "webhook_url"}}
+              </label>
+              <input type="url" id="webhook_url" name="webhook_url" value="{{.WebhookURL}}" placeholder="https://example.com/webhooks/plaid" autocomplete="off" class="input input-sm input-bordered w-full rounded-xl">
+              <p class="text-xs text-base-content/40 mt-1.5">Plaid will send transaction updates to this URL. Must use HTTPS.</p>
+            </div>
+
+            <div class="pt-2">
+              <button type="submit" class="btn btn-primary btn-sm rounded-xl" :disabled="saving">
+                <span x-show="!saving">Save Plaid Settings</span>
+                <span x-show="saving" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Saving...</span>
+              </button>
+            </div>
+          </form>
+          {{end}}
         </div>
-      </form>
-      {{end}}
+      </div>
 
       {{if .PlaidConfigured}}
-      <div class="mt-5 flex flex-wrap items-center gap-3 border-t border-base-300 pt-4">
-        <button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick="testProvider('plaid')" id="test-plaid-btn">Test Connection</button>
-        <span id="test-plaid-result" class="text-sm min-w-0 break-words"></span>
+      {{/* ── Test connection ���─ */}}
+      <div class="border-t border-base-300 pt-4 flex flex-wrap items-center gap-3">
+        <button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="testConnection()" :disabled="testing">
+          <span x-show="!testing" class="flex items-center gap-1.5"><i data-lucide="plug" class="w-3.5 h-3.5"></i> Test Connection</span>
+          <span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing...</span>
+        </button>
+        <span x-show="testResult" x-cloak class="text-sm" :class="testSuccess ? 'text-success' : 'text-error'" x-text="testResult" x-transition></span>
       </div>
-      <div class="mt-4 border-t border-base-300 pt-4">
-        <h3 class="text-sm font-medium mb-2 flex items-center gap-1.5">
+
+      {{/* ── Webhook instructions ── */}}
+      <div class="border-t border-base-300 pt-4">
+        <div class="flex items-center gap-1.5 mb-2">
           <i data-lucide="webhook" class="w-3.5 h-3.5 text-base-content/40"></i>
-          Webhook Setup
-        </h3>
+          <h3 class="text-sm font-medium">Webhook Setup</h3>
+        </div>
         <p class="text-xs text-base-content/50 mb-2">Plaid can push real-time transaction updates via webhooks. Set the webhook URL above, then configure Plaid to send events to:</p>
         <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all">https://&lt;your-domain&gt;/webhooks/plaid</code>
         <p class="text-xs text-base-content/40 mt-2">Plaid automatically sends webhooks when you set the URL during link token creation. No additional configuration needed in the Plaid dashboard.</p>
@@ -99,106 +134,141 @@
     </div>
   </div>
 
-  <!-- Teller Card -->
-  <div class="bb-card p-0 overflow-hidden">
-    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between">
-      <div class="flex items-center gap-3">
+  <!-- ─── Teller ─── -->
+  {{$tellerHealth := index .ProviderHealth "teller"}}
+  <div class="bb-card p-0 overflow-hidden" x-data="providerCard('teller')">
+    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
         <div class="w-10 h-10 rounded-xl bg-success/8 flex items-center justify-center flex-shrink-0">
           <i data-lucide="landmark" class="w-5 h-5 text-success"></i>
         </div>
-        <div>
+        <div class="min-w-0">
           <h2 class="font-semibold">Teller</h2>
-          <p class="text-xs text-base-content/40">mTLS certificate authentication</p>
+          <p class="text-xs text-base-content/40 truncate">mTLS certificate authentication</p>
         </div>
       </div>
-      {{if .TellerConfigured}}
-      <span class="badge badge-success badge-sm rounded-lg">Configured</span>
-      {{else}}
-      <span class="badge badge-ghost badge-sm rounded-lg">Not Configured</span>
-      {{end}}
-    </div>
-    <div class="px-4 sm:px-5 py-4">
-      {{if .TellerFromEnv}}
-      <p class="text-sm text-base-content/50 mb-4">Configured via environment variables (read-only).</p>
-      <dl class="bb-info-grid">
-        <dt>App ID {{configSource .ConfigSources "teller_app_id"}}</dt>
-        <dd><code class="font-mono text-xs break-all">{{.TellerAppID}}</code></dd>
-        <dt>Certificate</dt>
-        <dd>{{if .TellerCertConfigured}}Configured{{else}}Not configured{{end}}</dd>
-        <dt>Environment {{configSource .ConfigSources "teller_env"}}</dt>
-        <dd>{{.TellerEnv}}</dd>
-        <dt>Webhook Secret</dt>
-        <dd>{{if .TellerWebhookConfigured}}Configured{{else}}Not configured{{end}}</dd>
-      </dl>
-      {{else}}
-      <form method="POST" action="/providers/teller" enctype="multipart/form-data" autocomplete="off" class="space-y-4 max-w-xl">
-        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-
-        <div class="form-control">
-          <label class="label label-text text-sm font-medium" for="teller_app_id">App ID</label>
-          <input type="text" id="teller_app_id" name="teller_app_id" value="{{.TellerAppID}}" placeholder="Teller App ID" autocomplete="off" class="input input-sm input-bordered w-full rounded-xl">
-        </div>
-
-        <div class="form-control">
-          <label class="label label-text text-sm font-medium" for="teller_env">Environment</label>
-          <select id="teller_env" name="teller_env" class="select select-sm select-bordered w-full sm:max-w-xs rounded-xl">
-            <option value="sandbox"{{if eq .TellerEnv "sandbox"}} selected{{end}}>Sandbox</option>
-            <option value="development"{{if eq .TellerEnv "development"}} selected{{end}}>Development</option>
-            <option value="production"{{if eq .TellerEnv "production"}} selected{{end}}>Production</option>
-          </select>
-        </div>
-
-        {{if not .TellerCertFromEnv}}
-        <div class="border-t border-base-300 pt-4 mt-4">
-          <h3 class="text-sm font-medium mb-3 text-base-content/60">mTLS Certificate</h3>
-
-          {{if .TellerCertConfigured}}
-          <p class="text-sm text-success mb-3 flex items-center gap-1.5">
-            <i data-lucide="check-circle" class="w-4 h-4"></i> Certificate and private key are configured.
-          </p>
-          {{end}}
-
-          <div class="form-control mb-3">
-            <label class="label label-text text-sm font-medium" for="teller_cert_file">Certificate File (.pem)</label>
-            <input type="file" id="teller_cert_file" name="teller_cert_file" accept=".pem,.crt,.cert" class="file-input file-input-sm file-input-bordered w-full rounded-xl">
-          </div>
-
-          <div class="form-control">
-            <label class="label label-text text-sm font-medium" for="teller_key_file">Private Key File (.pem)</label>
-            <input type="file" id="teller_key_file" name="teller_key_file" accept=".pem,.key" class="file-input file-input-sm file-input-bordered w-full rounded-xl">
-          </div>
-
-          {{if not .HasEncryptionKey}}
-          <p class="text-xs text-warning mt-3 flex items-center gap-1.5">
-            <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> ENCRYPTION_KEY must be set to store certificates.
-          </p>
-          {{end}}
-        </div>
-        {{else}}
-        <p class="text-xs text-base-content/40 mt-2">Certificate configured via environment file paths.</p>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        {{if and $tellerHealth.LastSyncTime (eq $tellerHealth.LastSyncStatus "error")}}
+          <span class="badge badge-soft badge-error badge-sm rounded-lg">Sync Error</span>
+        {{else if and $tellerHealth.LastSyncTime (eq $tellerHealth.LastSyncStatus "success")}}
+          <span class="badge badge-soft badge-success badge-sm rounded-lg">Healthy</span>
         {{end}}
+        {{if .TellerConfigured}}
+          <span class="badge badge-success badge-sm rounded-lg">Configured</span>
+        {{else}}
+          <span class="badge badge-ghost badge-sm rounded-lg">Not Configured</span>
+        {{end}}
+      </div>
+    </div>
 
-        <div class="form-control">
-          <label class="label label-text text-sm font-medium" for="teller_webhook_secret">Webhook Secret</label>
-          <input type="password" id="teller_webhook_secret" name="teller_webhook_secret" value="" placeholder="{{if .TellerWebhookConfigured}}Unchanged (enter to update){{else}}Teller Webhook Secret (optional){{end}}" autocomplete="new-password" class="input input-sm input-bordered w-full rounded-xl">
-        </div>
+    <div class="px-4 sm:px-5 py-4 space-y-4">
+      {{/* ── Health stats row ── */}}
+      {{template "provider-stats" $tellerHealth}}
 
-        <div class="pt-2">
-          <button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Teller Settings</button>
+      {{/* ── Configuration ── */}}
+      <div class="border-t border-base-300 pt-4">
+        <button type="button" class="flex items-center gap-2 text-sm font-medium text-base-content/70 hover:text-base-content w-full" @click="showConfig = !showConfig">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+          Configuration
+          <i data-lucide="chevron-down" class="w-3.5 h-3.5 ml-auto transition-transform duration-200" :class="showConfig && 'rotate-180'"></i>
+        </button>
+
+        <div x-show="showConfig" x-collapse x-cloak class="mt-4">
+          {{if .TellerFromEnv}}
+          <p class="text-sm text-base-content/50 mb-4 flex items-center gap-1.5">
+            <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+            Configured via environment variables (read-only)
+          </p>
+          <dl class="bb-info-grid">
+            <dt>App ID {{configSource .ConfigSources "teller_app_id"}}</dt>
+            <dd><code class="font-mono text-xs break-all">{{.TellerAppID}}</code></dd>
+            <dt>Certificate</dt>
+            <dd>{{if .TellerCertConfigured}}Configured{{else}}Not configured{{end}}</dd>
+            <dt>Environment {{configSource .ConfigSources "teller_env"}}</dt>
+            <dd>{{.TellerEnv}}</dd>
+            <dt>Webhook Secret</dt>
+            <dd>{{if .TellerWebhookConfigured}}Configured{{else}}Not configured{{end}}</dd>
+          </dl>
+          {{else}}
+          <form method="POST" action="/providers/teller" enctype="multipart/form-data" autocomplete="off" class="space-y-4 max-w-xl" @submit="saving = true">
+            <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+
+            <div class="form-control">
+              <label class="label label-text text-sm font-medium" for="teller_app_id">App ID</label>
+              <input type="text" id="teller_app_id" name="teller_app_id" value="{{.TellerAppID}}" placeholder="Teller App ID" autocomplete="off" class="input input-sm input-bordered w-full rounded-xl">
+            </div>
+
+            <div class="form-control">
+              <label class="label label-text text-sm font-medium" for="teller_env">Environment</label>
+              <select id="teller_env" name="teller_env" class="select select-sm select-bordered w-full sm:max-w-xs rounded-xl bg-base-200">
+                <option value="sandbox"{{if eq .TellerEnv "sandbox"}} selected{{end}}>Sandbox</option>
+                <option value="development"{{if eq .TellerEnv "development"}} selected{{end}}>Development</option>
+                <option value="production"{{if eq .TellerEnv "production"}} selected{{end}}>Production</option>
+              </select>
+            </div>
+
+            {{if not .TellerCertFromEnv}}
+            <div class="border-t border-base-300 pt-4 mt-4">
+              <h3 class="text-sm font-medium mb-3 text-base-content/60">mTLS Certificate</h3>
+
+              {{if .TellerCertConfigured}}
+              <p class="text-sm text-success mb-3 flex items-center gap-1.5">
+                <i data-lucide="check-circle" class="w-4 h-4"></i> Certificate and private key are configured.
+              </p>
+              {{end}}
+
+              <div class="form-control mb-3">
+                <label class="label label-text text-sm font-medium" for="teller_cert_file">Certificate File (.pem)</label>
+                <input type="file" id="teller_cert_file" name="teller_cert_file" accept=".pem,.crt,.cert" class="file-input file-input-sm file-input-bordered w-full rounded-xl">
+              </div>
+
+              <div class="form-control">
+                <label class="label label-text text-sm font-medium" for="teller_key_file">Private Key File (.pem)</label>
+                <input type="file" id="teller_key_file" name="teller_key_file" accept=".pem,.key" class="file-input file-input-sm file-input-bordered w-full rounded-xl">
+              </div>
+
+              {{if not .HasEncryptionKey}}
+              <p class="text-xs text-warning mt-3 flex items-center gap-1.5">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> ENCRYPTION_KEY must be set to store certificates.
+              </p>
+              {{end}}
+            </div>
+            {{else}}
+            <p class="text-xs text-base-content/40 mt-2">Certificate configured via environment file paths.</p>
+            {{end}}
+
+            <div class="form-control">
+              <label class="label label-text text-sm font-medium" for="teller_webhook_secret">Webhook Secret</label>
+              <input type="password" id="teller_webhook_secret" name="teller_webhook_secret" value="" placeholder="{{if .TellerWebhookConfigured}}Unchanged (enter to update){{else}}Teller Webhook Secret (optional){{end}}" autocomplete="new-password" class="input input-sm input-bordered w-full rounded-xl">
+            </div>
+
+            <div class="pt-2">
+              <button type="submit" class="btn btn-primary btn-sm rounded-xl" :disabled="saving">
+                <span x-show="!saving">Save Teller Settings</span>
+                <span x-show="saving" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Saving...</span>
+              </button>
+            </div>
+          </form>
+          {{end}}
         </div>
-      </form>
-      {{end}}
+      </div>
 
       {{if .TellerConfigured}}
-      <div class="mt-5 flex flex-wrap items-center gap-3 border-t border-base-300 pt-4">
-        <button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick="testProvider('teller')" id="test-teller-btn">Test Connection</button>
-        <span id="test-teller-result" class="text-sm min-w-0 break-words"></span>
+      {{/* ── Test connection ── */}}
+      <div class="border-t border-base-300 pt-4 flex flex-wrap items-center gap-3">
+        <button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="testConnection()" :disabled="testing">
+          <span x-show="!testing" class="flex items-center gap-1.5"><i data-lucide="plug" class="w-3.5 h-3.5"></i> Test Connection</span>
+          <span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing...</span>
+        </button>
+        <span x-show="testResult" x-cloak class="text-sm" :class="testSuccess ? 'text-success' : 'text-error'" x-text="testResult" x-transition></span>
       </div>
-      <div class="mt-4 border-t border-base-300 pt-4">
-        <h3 class="text-sm font-medium mb-2 flex items-center gap-1.5">
+
+      {{/* ── Webhook instructions ── */}}
+      <div class="border-t border-base-300 pt-4">
+        <div class="flex items-center gap-1.5 mb-2">
           <i data-lucide="webhook" class="w-3.5 h-3.5 text-base-content/40"></i>
-          Webhook Setup
-        </h3>
+          <h3 class="text-sm font-medium">Webhook Setup</h3>
+        </div>
         <p class="text-xs text-base-content/50 mb-2">Teller sends webhooks for account disconnections and other events. To enable:</p>
         <ol class="text-xs text-base-content/50 space-y-1.5 mb-3 list-decimal list-inside">
           <li>Go to the <strong>Teller dashboard</strong> and navigate to your application settings</li>
@@ -209,60 +279,114 @@
           <li>Copy the <strong>webhook signing secret</strong> from Teller and paste it in the Webhook Secret field above</li>
           <li>Breadbox verifies webhook signatures using this secret to ensure authenticity</li>
         </ol>
-        <p class="text-xs text-base-content/40 mt-2.5">Without webhooks, Breadbox relies on cron-based polling (every {{if .SyncInterval}}{{.SyncInterval}}{{else}}12 hours{{end}}) to detect changes.</p>
+        <p class="text-xs text-base-content/40 mt-2.5">Without webhooks, Breadbox relies on cron-based polling (every {{formatIntervalMinutes .SyncInterval}}) to detect changes.</p>
       </div>
       {{end}}
     </div>
   </div>
 
-  <!-- CSV Card -->
+  <!-- ─── CSV Import ─── -->
+  {{$csvHealth := index .ProviderHealth "csv"}}
   <div class="bb-card p-0 overflow-hidden">
-    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between">
-      <div class="flex items-center gap-3">
+    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
         <div class="w-10 h-10 rounded-xl bg-warning/8 flex items-center justify-center flex-shrink-0">
           <i data-lucide="file-spreadsheet" class="w-5 h-5 text-warning"></i>
         </div>
-        <div>
+        <div class="min-w-0">
           <h2 class="font-semibold">CSV Import</h2>
-          <p class="text-xs text-base-content/40">No configuration needed</p>
+          <p class="text-xs text-base-content/40 truncate">Import from bank-exported files</p>
         </div>
       </div>
-      <span class="badge badge-success badge-sm rounded-lg">Always Available</span>
+      <span class="badge badge-success badge-sm rounded-lg flex-shrink-0">Always Available</span>
     </div>
-    <div class="px-4 sm:px-5 py-4">
-      <p class="text-sm text-base-content/50 mb-4">Import transactions from CSV files exported from your bank or financial institution.</p>
-      <a href="/connections/import-csv" class="btn btn-sm btn-ghost rounded-xl">
-        <i data-lucide="upload" class="w-4 h-4"></i>
-        Import CSV File
-      </a>
+
+    <div class="px-4 sm:px-5 py-4 space-y-4">
+      {{/* ── Health stats row ── */}}
+      {{template "provider-stats" $csvHealth}}
+
+      {{/* ── Description + action ── */}}
+      <div class="border-t border-base-300 pt-4">
+        <p class="text-sm text-base-content/60 mb-4">Import transactions from CSV files exported from your bank or financial institution. CSV import is always available and requires no API credentials.</p>
+        <div class="flex flex-wrap items-center gap-3">
+          <a href="/connections/import-csv" class="btn btn-sm btn-primary btn-outline rounded-xl">
+            <i data-lucide="upload" class="w-4 h-4"></i>
+            Import CSV File
+          </a>
+          <span class="text-xs text-base-content/40">Supports most common bank CSV formats</span>
+        </div>
+      </div>
     </div>
   </div>
 
 </div>
 
 <script>
-function testProvider(name) {
-  var btn = document.getElementById('test-' + name + '-btn');
-  var result = document.getElementById('test-' + name + '-result');
-  btn.disabled = true;
-  result.textContent = '';
-  result.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Testing...';
-  fetch("/-/test-provider/" + name, {
-    method: "POST"
-  })
-  .then(function(res) { return res.json(); })
-  .then(function(data) {
-    btn.disabled = false;
-    if (data.success) {
-      result.innerHTML = '<span class="text-success">' + data.message + '</span>';
-    } else {
-      result.innerHTML = '<span class="text-error">' + (data.message || data.error) + '</span>';
+function providerCard(name) {
+  return {
+    showConfig: false,
+    saving: false,
+    testing: false,
+    testResult: '',
+    testSuccess: false,
+
+    testConnection() {
+      this.testing = true;
+      this.testResult = '';
+      fetch('/-/test-provider/' + name, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          this.testing = false;
+          this.testSuccess = data.success;
+          this.testResult = data.message || data.error || 'Unknown result';
+          setTimeout(() => { this.testResult = ''; }, 8000);
+        })
+        .catch(() => {
+          this.testing = false;
+          this.testSuccess = false;
+          this.testResult = 'Network error';
+          setTimeout(() => { this.testResult = ''; }, 8000);
+        });
     }
-  })
-  .catch(function() {
-    btn.disabled = false;
-    result.innerHTML = '<span class="text-error">Network error</span>';
-  });
+  };
 }
 </script>
+{{end}}
+
+{{/* ── Reusable provider stats row ── */}}
+{{define "provider-stats"}}
+{{if .}}
+<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+  <div class="flex items-center gap-1.5">
+    <i data-lucide="link" class="w-3.5 h-3.5 text-base-content/30"></i>
+    <span class="text-base-content/50">Connections:</span>
+    <span class="font-medium">{{.ConnectionCount}}</span>
+  </div>
+  <div class="flex items-center gap-1.5">
+    <i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content/30"></i>
+    <span class="text-base-content/50">Accounts:</span>
+    <span class="font-medium">{{.AccountCount}}</span>
+  </div>
+  {{if .LastSyncTime}}
+  <div class="flex items-center gap-1.5">
+    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/30"></i>
+    <span class="text-base-content/50">Last sync:</span>
+    {{if eq .LastSyncStatus "success"}}
+      <span class="font-medium text-success">{{deref .LastSyncTime}}</span>
+    {{else if eq .LastSyncStatus "error"}}
+      <span class="font-medium text-error">failed {{deref .LastSyncTime}}</span>
+    {{else if eq .LastSyncStatus "in_progress"}}
+      <span class="font-medium text-warning">in progress</span>
+    {{else}}
+      <span class="font-medium">{{deref .LastSyncTime}}</span>
+    {{end}}
+  </div>
+  {{else if gt .ConnectionCount 0}}
+  <div class="flex items-center gap-1.5">
+    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/30"></i>
+    <span class="text-base-content/40">Never synced</span>
+  </div>
+  {{end}}
+</div>
+{{end}}
 {{end}}

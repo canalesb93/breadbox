@@ -576,6 +576,89 @@ func (s *Service) parseRuleHits(ctx context.Context, ruleHitsJSON []byte) ([]Rul
 	return entries, total
 }
 
+// GetProviderHealthSummaries returns per-provider health info (connection count, last sync status/time).
+func (s *Service) GetProviderHealthSummaries(ctx context.Context) (map[string]*ProviderHealthSummary, error) {
+	// Query 1: connection and account counts per provider.
+	countQuery := `
+		SELECT bc.provider::text,
+			COUNT(DISTINCT bc.id) AS connection_count,
+			COUNT(DISTINCT a.id) AS account_count
+		FROM bank_connections bc
+		LEFT JOIN accounts a ON a.connection_id = bc.id
+		WHERE bc.status != 'disconnected'
+		GROUP BY bc.provider`
+
+	countRows, err := s.Pool.Query(ctx, countQuery)
+	if err != nil {
+		return nil, fmt.Errorf("provider counts: %w", err)
+	}
+	defer countRows.Close()
+
+	result := map[string]*ProviderHealthSummary{}
+	for countRows.Next() {
+		var provider string
+		var connCount, acctCount int64
+		if err := countRows.Scan(&provider, &connCount, &acctCount); err != nil {
+			return nil, fmt.Errorf("scan provider counts: %w", err)
+		}
+		result[provider] = &ProviderHealthSummary{
+			Provider:        provider,
+			ConnectionCount: connCount,
+			AccountCount:    acctCount,
+		}
+	}
+	if err := countRows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate provider counts: %w", err)
+	}
+
+	// Query 2: latest sync per provider using DISTINCT ON.
+	syncQuery := `
+		SELECT DISTINCT ON (bc.provider)
+			bc.provider::text,
+			sl.status::text,
+			COALESCE(sl.completed_at, sl.started_at) AS sync_time,
+			sl.error_message
+		FROM sync_logs sl
+		JOIN bank_connections bc ON sl.connection_id = bc.id
+		ORDER BY bc.provider, sl.started_at DESC`
+
+	syncRows, err := s.Pool.Query(ctx, syncQuery)
+	if err != nil {
+		return nil, fmt.Errorf("provider sync status: %w", err)
+	}
+	defer syncRows.Close()
+
+	for syncRows.Next() {
+		var (
+			provider   string
+			status     string
+			syncTime   pgtype.Timestamptz
+			errMessage pgtype.Text
+		)
+		if err := syncRows.Scan(&provider, &status, &syncTime, &errMessage); err != nil {
+			return nil, fmt.Errorf("scan provider sync: %w", err)
+		}
+		summary, ok := result[provider]
+		if !ok {
+			summary = &ProviderHealthSummary{Provider: provider}
+			result[provider] = summary
+		}
+		summary.LastSyncStatus = status
+		if syncTime.Valid {
+			t := relativeTimeStr(syncTime.Time)
+			summary.LastSyncTime = &t
+		}
+		if errMessage.Valid && errMessage.String != "" {
+			summary.LastSyncError = &errMessage.String
+		}
+	}
+	if err := syncRows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate provider sync: %w", err)
+	}
+
+	return result, nil
+}
+
 // buildSyncLogWhereClause constructs a WHERE clause and args from SyncLogListParams.
 // Returns the clause string (starting with "WHERE 1=1"), the args slice, and the next argN.
 func (s *Service) buildSyncLogWhereClause(params SyncLogListParams) (string, []any, int, error) {

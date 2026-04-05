@@ -619,3 +619,13 @@ type MerchantSummaryFilters struct {
 	EndDate   string `json:"end_date"`
 	MinCount  int    `json:"min_count"`
 }
+
+// ProviderHealthSummary contains per-provider health info for the providers page.
+type ProviderHealthSummary struct {
+	Provider        string  // "plaid", "teller", "csv"
+	ConnectionCount int64   // active (non-disconnected) connections using this provider
+	AccountCount    int64   // accounts across those connections
+	LastSyncStatus  string  // "success", "error", "in_progress", or ""
+	LastSyncTime    *string // relative time string, nil if never synced
+	LastSyncError   *string // error message from last sync, nil if success
+}
