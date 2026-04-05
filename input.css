@@ -326,7 +326,7 @@
   }
 
   .bb-sidebar-nav {
-    @apply flex flex-col gap-0.5 flex-1 overflow-y-auto;
+    @apply flex flex-col gap-0.5 flex-1 overflow-y-auto pb-4;
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
   }
