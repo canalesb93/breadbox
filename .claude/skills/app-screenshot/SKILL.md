@@ -51,7 +51,7 @@ If redirected to `/login`, use JavaScript to submit the login form:
 
 ```
 mcp__claude-in-chrome__javascript_tool(action="javascript_exec", tabId=<tab>, text="
-  document.querySelector('input[type=\"text\"]').value = 'canalesb93@gmail.com';
+  document.querySelector('input[type=\"text\"]').value = 'admin@example.com';
   document.querySelector('input[type=\"password\"]').value = 'password';
   document.querySelector('form').submit();
 ")

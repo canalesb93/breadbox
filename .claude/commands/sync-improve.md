@@ -90,7 +90,6 @@ git log main --oneline -15
 
 Read the relevant source files to understand current state. Cross-reference with docs:
 - `docs/architecture.md`, `docs/data-model.md`, `docs/teller-integration.md`
-- `docs/category-mapping.md`, `docs/ROADMAP.md`
 
 ## Phase 2: Choose ONE Improvement
 

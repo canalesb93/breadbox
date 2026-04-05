@@ -9,6 +9,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$TOOL_INPUT\" | grep -qE '\"command\"\\s*:\\s*\"git tag'; then echo 'BLOCK: Git tags trigger releases. Only create tags when explicitly requested.' && exit 1; fi"
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {
