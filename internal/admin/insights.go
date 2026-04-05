@@ -96,8 +96,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		chartStart := time.Now().AddDate(0, 0, -chartDays)
 
 		// ── Shared palette and time constants ──
-		// Category palette: oklch colors balanced for both light and dark mode.
-		// Lightness ~0.62-0.68 gives good contrast on white and dark backgrounds.
 		categoryPalette := []string{
 			"oklch(0.62 0.15 250)", // blue
 			"oklch(0.64 0.16 160)", // teal
@@ -134,11 +132,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		}
 		lastMonthSameDayEnd := time.Date(lastMonthSameDay.Year(), lastMonthSameDay.Month(), sameDayOfLastMonth+1, 0, 0, 0, 0, today.Location())
 
-		historyDays := 90
-		if chartDays >= 90 {
-			historyDays = 365
-		}
-		histStart := time.Now().AddDate(0, 0, -historyDays)
 		recurringLookback := time.Now().AddDate(0, 0, -90)
 		compStart := time.Date(today.Year(), today.Month()-3, 1, 0, 0, 0, 0, today.Location())
 		compEnd := time.Now().AddDate(0, 0, 1)
@@ -180,15 +173,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			LastChargeDate string
 			MonthlyEst     float64
 		}
-		type SpendingInsight struct {
-			Icon      string
-			Title     string
-			Detail    string
-			Amount    float64
-			Change    float64
-			Sentiment string
-			Category  string
-		}
 		type MonthlyCompRow struct {
 			Category      string
 			CategoryColor string
@@ -196,68 +180,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			Total         float64
 			Change        float64
 			HasChange     bool
-		}
-		type VelocityMonth struct {
-			Label      string
-			ShortLabel string
-			IsCurrent  bool
-			Days       []float64
-			FinalTotal float64
-		}
-		type FamilyMemberSpend struct {
-			UserID   string
-			UserName string
-			Total    float64
-			Percent  float64
-			TxCount  int
-			TopCat   string
-			Color    string
-		}
-		type SavingsRatePoint struct {
-			Month     string
-			MonthFull string
-			Income    float64
-			Spending  float64
-			Net       float64
-			Rate      float64
-		}
-		type ForecastPoint struct {
-			Day       int     `json:"day"`
-			DateLabel string  `json:"dateLabel"`
-			Actual    float64 `json:"actual"`
-			Forecast  float64 `json:"forecast"`
-			IsActual  bool    `json:"isActual"`
-		}
-		type CategoryAnomaly struct {
-			Category   string
-			Color      string
-			Current    float64
-			Historical float64
-			Multiplier float64
-			Percentile float64
-			TopTxName  string
-			TopTxAmount float64
-			TopTxDate  string
-		}
-		type TransactionAnomaly struct {
-			Name          string
-			Amount        float64
-			Date          string
-			Category      string
-			CategoryColor string
-			CategoryAvg   float64
-			Multiplier    float64
-			AccountName   string
-		}
-		type BudgetTarget struct {
-			Category    string
-			Color       string
-			Current     float64
-			Target      float64
-			Percent     float64
-			OverBudget  bool
-			Difference  float64
-			DiffPercent float64
 		}
 
 		// ══════════════════════════════════════════════════════════════
@@ -276,7 +198,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		var lastMonthSummary *service.TransactionSummaryResult
 		var lastMonthPaceSummary *service.TransactionSummaryResult
 		var compSummary *service.TransactionSummaryResult
-		var histCatSummary *service.TransactionSummaryResult
 		categoryDrilldown := make(map[string][]CategoryMerchant)
 		var topMerchants []MerchantSpend
 		var maxMerchantSpend float64
@@ -285,24 +206,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		var recurringCharges []RecurringCharge
 		var totalRecurringMonthly float64
 		var hasRecurringData bool
-		var velocityMonths []VelocityMonth
-		var hasVelocityData bool
-		var velocityMaxDays int
-		var savingsRateTrend []SavingsRatePoint
-		var hasSavingsRateTrend bool
-		var familySpending []FamilyMemberSpend
-		var hasFamilyData bool
-		var maxFamilySpend float64
-		var forecastPoints []ForecastPoint
-		var hasForecastData bool
-		var transactionAnomalies []TransactionAnomaly
-		var hasTransactionAnomalies bool
-		var largestTxName string
-		var largestTxAmount float64
-		var largestTxDate string
-		var recurringMerchant string
-		var recurringCount int64
-		var recurringTotal float64
 		var sparklineSpending []float64
 		var sparklineIncome []float64
 		var netWorth, totalAssets, totalLiabilities float64
@@ -756,347 +659,7 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			compSummary = result
 		}()
 
-		// 15. Spending velocity (3 months)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for mi := 2; mi >= 0; mi-- {
-				mStart := time.Date(today.Year(), today.Month()-time.Month(mi), 1, 0, 0, 0, 0, today.Location())
-				mEnd := time.Date(mStart.Year(), mStart.Month()+1, 1, 0, 0, 0, 0, today.Location())
-				mDaysInMonth := time.Date(mStart.Year(), mStart.Month()+1, 0, 0, 0, 0, 0, today.Location()).Day()
-
-				maxDay := mDaysInMonth
-				if mi == 0 && daysElapsed < mDaysInMonth {
-					maxDay = daysElapsed
-				}
-
-				vm := VelocityMonth{
-					Label:      mStart.Format("January 2006"),
-					ShortLabel: mStart.Format("Jan"),
-					IsCurrent:  mi == 0,
-					Days:       make([]float64, mDaysInMonth),
-				}
-
-				vRows, vErr := a.DB.Query(ctx, `
-					SELECT EXTRACT(DAY FROM date)::int AS day_num, SUM(amount)
-					FROM transactions
-					WHERE deleted_at IS NULL AND date >= $1 AND date < $2 AND amount > 0 AND pending = false
-					GROUP BY EXTRACT(DAY FROM date)::int
-					ORDER BY day_num
-				`, mStart, mEnd)
-				if vErr != nil {
-					a.Logger.Error("velocity query", "error", vErr)
-				} else {
-					for vRows.Next() {
-						var dayNum int
-						var dayTotal float64
-						if err := vRows.Scan(&dayNum, &dayTotal); err != nil {
-							continue
-						}
-						if dayNum >= 1 && dayNum <= mDaysInMonth {
-							vm.Days[dayNum-1] = dayTotal
-						}
-					}
-					vRows.Close()
-				}
-
-				var cumulative float64
-				for d := 0; d < mDaysInMonth; d++ {
-					cumulative += vm.Days[d]
-					vm.Days[d] = cumulative
-					if mi == 0 && d >= maxDay {
-						vm.Days[d] = 0
-					}
-				}
-				vm.FinalTotal = cumulative
-
-				if mDaysInMonth > velocityMaxDays {
-					velocityMaxDays = mDaysInMonth
-				}
-				if cumulative > 0 {
-					hasVelocityData = true
-				}
-				velocityMonths = append(velocityMonths, vm)
-			}
-		}()
-
-		// 16. Savings rate trend (6 months)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for mi := 5; mi >= 0; mi-- {
-				mStart := time.Date(today.Year(), today.Month()-time.Month(mi), 1, 0, 0, 0, 0, today.Location())
-				mEnd := time.Date(mStart.Year(), mStart.Month()+1, 1, 0, 0, 0, 0, today.Location())
-
-				var mIncome, mSpending float64
-				srtRows, srtErr := a.DB.Query(ctx, `
-					SELECT amount
-					FROM transactions
-					WHERE deleted_at IS NULL AND date >= $1 AND date < $2 AND pending = false
-				`, mStart, mEnd)
-				if srtErr != nil {
-					a.Logger.Error("savings rate trend query", "error", srtErr)
-					continue
-				}
-				for srtRows.Next() {
-					var amt float64
-					if err := srtRows.Scan(&amt); err != nil {
-						continue
-					}
-					if amt > 0 {
-						mSpending += amt
-					} else {
-						mIncome += -amt
-					}
-				}
-				srtRows.Close()
-
-				net := mIncome - mSpending
-				rate := 0.0
-				if mIncome > 0 {
-					rate = (net / mIncome) * 100
-				}
-				if rate < -200 {
-					rate = -200
-				}
-				if rate > 100 {
-					rate = 100
-				}
-
-				savingsRateTrend = append(savingsRateTrend, SavingsRatePoint{
-					Month:     mStart.Format("Jan"),
-					MonthFull: mStart.Format("January 2006"),
-					Income:    mIncome,
-					Spending:  mSpending,
-					Net:       net,
-					Rate:      rate,
-				})
-				if mIncome > 0 || mSpending > 0 {
-					hasSavingsRateTrend = true
-				}
-			}
-		}()
-
-		// 17. Family spending
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			rows, fErr := a.DB.Query(ctx, `
-				SELECT
-					COALESCE(bc.user_id::text, 'unknown') AS uid,
-					COALESCE(u.name, 'Unknown') AS user_name,
-					SUM(t.amount) AS total,
-					COUNT(*)::int AS tx_count,
-					MODE() WITHIN GROUP (ORDER BY COALESCE(t.category_primary, '')) AS top_cat
-				FROM transactions t
-				JOIN accounts a ON t.account_id = a.id
-				LEFT JOIN bank_connections bc ON a.connection_id = bc.id
-				LEFT JOIN users u ON bc.user_id = u.id
-				WHERE t.deleted_at IS NULL AND t.date >= $1 AND t.amount > 0 AND t.pending = false
-					AND COALESCE(a.is_dependent_linked, false) = false
-				GROUP BY bc.user_id, u.name
-				ORDER BY SUM(t.amount) DESC
-			`, chartStart)
-			if fErr != nil {
-				a.Logger.Error("family spending query", "error", fErr)
-				return
-			}
-			defer rows.Close()
-			familyColors := []string{
-				"oklch(0.60 0.15 250)",
-				"oklch(0.58 0.14 160)",
-				"oklch(0.60 0.14 35)",
-				"oklch(0.55 0.14 300)",
-				"oklch(0.58 0.12 80)",
-			}
-			for rows.Next() {
-				var fs FamilyMemberSpend
-				var topCat *string
-				if err := rows.Scan(&fs.UserID, &fs.UserName, &fs.Total, &fs.TxCount, &topCat); err != nil {
-					a.Logger.Error("family spending scan", "error", err)
-					continue
-				}
-				if topCat != nil && *topCat != "" {
-					fs.TopCat = *topCat
-				}
-				fs.Color = familyColors[len(familySpending)%len(familyColors)]
-				familySpending = append(familySpending, fs)
-				if fs.Total > maxFamilySpend {
-					maxFamilySpend = fs.Total
-				}
-			}
-			hasFamilyData = len(familySpending) > 1
-		}()
-
-		// 18. Cash flow forecast
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			type dailyFlow struct {
-				Income   float64
-				Spending float64
-			}
-			dailyFlows := make(map[int]dailyFlow)
-			rows, err := a.DB.Query(ctx, `
-				SELECT EXTRACT(DAY FROM date)::int AS day_num, amount
-				FROM transactions
-				WHERE deleted_at IS NULL
-					AND date >= $1
-					AND date < $2
-					AND pending = false
-			`, monthStart, time.Date(today.Year(), today.Month()+1, 1, 0, 0, 0, 0, today.Location()))
-			if err != nil {
-				a.Logger.Error("forecast flow query", "error", err)
-				return
-			}
-			defer rows.Close()
-			for rows.Next() {
-				var dayNum int
-				var amt float64
-				if err := rows.Scan(&dayNum, &amt); err != nil {
-					continue
-				}
-				df := dailyFlows[dayNum]
-				if amt > 0 {
-					df.Spending += amt
-				} else {
-					df.Income += -amt
-				}
-				dailyFlows[dayNum] = df
-			}
-
-			if len(dailyFlows) > 0 && daysElapsed > 0 {
-				hasForecastData = true
-				var totalDailyIncome, totalDailySpending float64
-				for d := 1; d <= daysElapsed; d++ {
-					df := dailyFlows[d]
-					totalDailyIncome += df.Income
-					totalDailySpending += df.Spending
-				}
-				avgDailyIncome := totalDailyIncome / float64(daysElapsed)
-				avgDailySpending := totalDailySpending / float64(daysElapsed)
-
-				var cumulativeNet float64
-				for d := 1; d <= daysInMonth; d++ {
-					pt := ForecastPoint{
-						Day:       d,
-						DateLabel: time.Date(today.Year(), today.Month(), d, 0, 0, 0, 0, today.Location()).Format("Jan 2"),
-					}
-					if d <= daysElapsed {
-						df := dailyFlows[d]
-						dayNet := df.Income - df.Spending
-						cumulativeNet += dayNet
-						pt.Actual = math.Round(cumulativeNet*100) / 100
-						pt.Forecast = math.Round(cumulativeNet*100) / 100
-						pt.IsActual = true
-					} else {
-						projectedDayNet := avgDailyIncome - avgDailySpending
-						cumulativeNet += projectedDayNet
-						pt.Forecast = math.Round(cumulativeNet*100) / 100
-						pt.IsActual = false
-					}
-					forecastPoints = append(forecastPoints, pt)
-				}
-			}
-		}()
-
-		// 19. Historical category summary (for anomalies + budgets)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			result, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
-				GroupBy:      "category",
-				StartDate:    &histStart,
-				SpendingOnly: true,
-			})
-			if err != nil {
-				a.Logger.Error("anomaly historical summary", "error", err)
-				return
-			}
-			histCatSummary = result
-		}()
-
-		// 20. Transaction anomalies
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			rows, err := a.DB.Query(ctx, `
-				WITH cat_stats AS (
-					SELECT
-						COALESCE(category_primary, '') AS cat,
-						AVG(amount) AS avg_amount,
-						STDDEV(amount) AS std_amount,
-						COUNT(*) AS tx_count
-					FROM transactions
-					WHERE deleted_at IS NULL AND date >= $1 AND amount > 0 AND pending = false
-					GROUP BY COALESCE(category_primary, '')
-					HAVING COUNT(*) >= 3 AND AVG(amount) > 5
-				)
-				SELECT
-					COALESCE(NULLIF(t.merchant_name, ''), t.name) AS tx_name,
-					t.amount,
-					TO_CHAR(t.date, 'Mon DD') AS tx_date,
-					COALESCE(t.category_primary, 'Uncategorized') AS category,
-					cs.avg_amount AS cat_avg,
-					t.amount / cs.avg_amount AS multiplier,
-					COALESCE(a.display_name, a.name, '') AS account_name
-				FROM transactions t
-				JOIN cat_stats cs ON COALESCE(t.category_primary, '') = cs.cat
-				LEFT JOIN accounts a ON t.account_id = a.id
-				WHERE t.deleted_at IS NULL AND t.date >= $2 AND t.amount > 0 AND t.pending = false
-					AND t.amount >= cs.avg_amount * 1.5
-					AND t.amount >= 50
-				ORDER BY t.amount / cs.avg_amount DESC
-				LIMIT 8
-			`, histStart, chartStart)
-			if err != nil {
-				a.Logger.Error("transaction anomaly query", "error", err)
-				return
-			}
-			defer rows.Close()
-			for rows.Next() {
-				var ta TransactionAnomaly
-				if err := rows.Scan(&ta.Name, &ta.Amount, &ta.Date, &ta.Category, &ta.CategoryAvg, &ta.Multiplier, &ta.AccountName); err != nil {
-					a.Logger.Error("transaction anomaly scan", "error", err)
-					continue
-				}
-				transactionAnomalies = append(transactionAnomalies, ta)
-			}
-			hasTransactionAnomalies = len(transactionAnomalies) > 0
-		}()
-
-		// 21. Largest transaction
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_ = a.DB.QueryRow(ctx, `
-				SELECT COALESCE(merchant_name, name), amount, TO_CHAR(date, 'Mon DD')
-				FROM transactions
-				WHERE deleted_at IS NULL AND date >= $1 AND amount > 0 AND pending = false
-				ORDER BY amount DESC
-				LIMIT 1
-			`, chartStart).Scan(&largestTxName, &largestTxAmount, &largestTxDate)
-		}()
-
-		// 22. Recurring merchant insight (excludes payment processors)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			rmExcl, rmExclParams := buildPaymentProcessorExclusion("COALESCE(merchant_name, name)", 2)
-			rmQueryParams := append([]any{chartStart}, rmExclParams...)
-			_ = a.DB.QueryRow(ctx, `
-				SELECT COALESCE(merchant_name, name), COUNT(*), SUM(amount)
-				FROM transactions
-				WHERE deleted_at IS NULL AND date >= $1 AND amount > 0 AND pending = false
-				`+rmExcl+`
-				GROUP BY COALESCE(merchant_name, name)
-				HAVING COUNT(*) >= 3
-				ORDER BY SUM(amount) DESC
-				LIMIT 1
-			`, rmQueryParams...).Scan(&recurringMerchant, &recurringCount, &recurringTotal)
-		}()
-
-		// 23. Sparkline data — last 7 days of daily spending and income for summary pills
+		// 15. Sparkline data -- last 7 days of daily spending and income for summary pills
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -1140,7 +703,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		// ── Process category summary ──
 		var categoryLabelsJSON, categoryAmountsJSON, categoryColorsJSON template.JS
 		var topCategories []CategorySpend
-		var maxCategorySpend float64
 		if categorySummary != nil && len(categorySummary.Summary) > 0 {
 			labels := make([]string, 0, len(categorySummary.Summary))
 			amounts := make([]float64, 0, len(categorySummary.Summary))
@@ -1160,9 +722,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 				}
 				colors = append(colors, color)
 				topCategories = append(topCategories, CategorySpend{Name: label, Color: color, Amount: row.TotalAmount})
-				if row.TotalAmount > maxCategorySpend {
-					maxCategorySpend = row.TotalAmount
-				}
 			}
 			if lb, err := json.Marshal(labels); err == nil {
 				categoryLabelsJSON = template.JS(lb)
@@ -1378,133 +937,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			lowSpendDayAmt = 0
 		}
 
-		// ── Family spending percentages ──
-		if len(familySpending) > 0 {
-			var familyTotal float64
-			for _, fs := range familySpending {
-				familyTotal += fs.Total
-			}
-			if familyTotal > 0 {
-				for i := range familySpending {
-					familySpending[i].Percent = (familySpending[i].Total / familyTotal) * 100
-				}
-			}
-		}
-
-		// ── Smart spending insights ──
-		var spendingInsights []SpendingInsight
-
-		currentCatMap := make(map[string]float64)
-		if categorySummary != nil {
-			for _, row := range categorySummary.Summary {
-				label := "Uncategorized"
-				if row.Category != nil && *row.Category != "" {
-					label = *row.Category
-				}
-				currentCatMap[label] = row.TotalAmount
-			}
-		}
-		prevCatMap := make(map[string]float64)
-		if prevSummary != nil {
-			for _, row := range prevSummary.Summary {
-				label := "Uncategorized"
-				if row.Category != nil && *row.Category != "" {
-					label = *row.Category
-				}
-				prevCatMap[label] = row.TotalAmount
-			}
-		}
-
-		var biggestIncreaseCat string
-		var biggestIncreaseAmt, biggestIncreasePct float64
-		var biggestDecreaseCat string
-		var biggestDecreaseAmt, biggestDecreasePct float64
-
-		for cat, curAmt := range currentCatMap {
-			prevAmt, existed := prevCatMap[cat]
-			if !existed || prevAmt < 10 {
-				continue
-			}
-			changePct := ((curAmt - prevAmt) / prevAmt) * 100
-			if changePct > biggestIncreasePct && changePct > 15 {
-				biggestIncreaseCat = cat
-				biggestIncreaseAmt = curAmt
-				biggestIncreasePct = changePct
-			}
-			if changePct < biggestDecreasePct && changePct < -15 {
-				biggestDecreaseCat = cat
-				biggestDecreaseAmt = curAmt
-				biggestDecreasePct = changePct
-			}
-		}
-
-		if biggestIncreaseCat != "" {
-			spendingInsights = append(spendingInsights, SpendingInsight{
-				Icon:      "trending-up",
-				Title:     fmt.Sprintf("%s up %.0f%%", biggestIncreaseCat, biggestIncreasePct),
-				Detail:    fmt.Sprintf("$%.0f spent vs $%.0f last period", biggestIncreaseAmt, prevCatMap[biggestIncreaseCat]),
-				Amount:    biggestIncreaseAmt,
-				Change:    biggestIncreasePct,
-				Sentiment: "negative",
-				Category:  biggestIncreaseCat,
-			})
-		}
-		if biggestDecreaseCat != "" {
-			spendingInsights = append(spendingInsights, SpendingInsight{
-				Icon:      "trending-down",
-				Title:     fmt.Sprintf("%s down %.0f%%", biggestDecreaseCat, math.Abs(biggestDecreasePct)),
-				Detail:    fmt.Sprintf("$%.0f spent vs $%.0f last period", biggestDecreaseAmt, prevCatMap[biggestDecreaseCat]),
-				Amount:    biggestDecreaseAmt,
-				Change:    biggestDecreasePct,
-				Sentiment: "positive",
-				Category:  biggestDecreaseCat,
-			})
-		}
-
-		if largestTxAmount >= 50 {
-			spendingInsights = append(spendingInsights, SpendingInsight{
-				Icon:      "receipt",
-				Title:     fmt.Sprintf("Largest: $%.0f", largestTxAmount),
-				Detail:    fmt.Sprintf("%s on %s", largestTxName, largestTxDate),
-				Amount:    largestTxAmount,
-				Sentiment: "neutral",
-			})
-		}
-
-		if recurringCount >= 3 {
-			spendingInsights = append(spendingInsights, SpendingInsight{
-				Icon:      "repeat",
-				Title:     fmt.Sprintf("%s: %dx", recurringMerchant, recurringCount),
-				Detail:    fmt.Sprintf("$%.0f total across %d transactions", recurringTotal, recurringCount),
-				Amount:    recurringTotal,
-				Sentiment: "info",
-			})
-		}
-
-		newCatCount := 0
-		for cat, amt := range currentCatMap {
-			if cat == "Uncategorized" {
-				continue
-			}
-			if _, existed := prevCatMap[cat]; !existed && amt >= 20 {
-				spendingInsights = append(spendingInsights, SpendingInsight{
-					Icon:      "sparkles",
-					Title:     fmt.Sprintf("New: %s", cat),
-					Detail:    fmt.Sprintf("$%.0f in first-time spending", amt),
-					Amount:    amt,
-					Sentiment: "info",
-					Category:  cat,
-				})
-				newCatCount++
-				if newCatCount >= 1 {
-					break
-				}
-			}
-		}
-		if len(spendingInsights) > 5 {
-			spendingInsights = spendingInsights[:5]
-		}
-
 		// ── Monthly comparison table ──
 		var monthHeaders []string
 		var monthlyCompRows []MonthlyCompRow
@@ -1613,419 +1045,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			}
 		}
 
-		// ── Velocity JSON ──
-		type velocityDS struct {
-			Label string    `json:"label"`
-			Data  []float64 `json:"data"`
-		}
-		type velocityChartData struct {
-			Labels   []int        `json:"labels"`
-			Datasets []velocityDS `json:"datasets"`
-		}
-		var velocityJSON template.JS
-		if hasVelocityData {
-			vLabels := make([]int, velocityMaxDays)
-			for i := range vLabels {
-				vLabels[i] = i + 1
-			}
-			vData := velocityChartData{Labels: vLabels}
-			for _, vm := range velocityMonths {
-				ds := velocityDS{Label: vm.ShortLabel}
-				padded := make([]float64, velocityMaxDays)
-				for i := 0; i < len(vm.Days) && i < velocityMaxDays; i++ {
-					padded[i] = vm.Days[i]
-				}
-				ds.Data = padded
-				vData.Datasets = append(vData.Datasets, ds)
-			}
-			if vb, err := json.Marshal(vData); err == nil {
-				velocityJSON = template.JS(vb)
-			}
-		}
-
-		// ── Savings rate trend JSON ──
-		var savingsRateTrendJSON template.JS
-		if hasSavingsRateTrend {
-			type srtJSON struct {
-				Labels   []string  `json:"labels"`
-				Rates    []float64 `json:"rates"`
-				Income   []float64 `json:"income"`
-				Spending []float64 `json:"spending"`
-				Net      []float64 `json:"net"`
-			}
-			srtData := srtJSON{}
-			for _, pt := range savingsRateTrend {
-				srtData.Labels = append(srtData.Labels, pt.Month)
-				srtData.Rates = append(srtData.Rates, math.Round(pt.Rate*10)/10)
-				srtData.Income = append(srtData.Income, math.Round(pt.Income*100)/100)
-				srtData.Spending = append(srtData.Spending, math.Round(pt.Spending*100)/100)
-				srtData.Net = append(srtData.Net, math.Round(pt.Net*100)/100)
-			}
-			if sb, err := json.Marshal(srtData); err == nil {
-				savingsRateTrendJSON = template.JS(sb)
-			}
-		}
-
-		// ── Forecast JSON ──
-		var forecastJSON template.JS
-		if hasForecastData && len(forecastPoints) > 0 {
-			type forecastChartData struct {
-				Labels       []string  `json:"labels"`
-				Actual       []any     `json:"actual"`
-				Forecast     []float64 `json:"forecast"`
-				DaysElapsed  int       `json:"daysElapsed"`
-				AvgDailyNet  float64   `json:"avgDailyNet"`
-				ProjectedEOM float64   `json:"projectedEOM"`
-			}
-			fcd := forecastChartData{
-				DaysElapsed: daysElapsed,
-			}
-			// Recompute avg daily net from forecast points.
-			if daysElapsed > 0 {
-				var lastActual float64
-				for _, pt := range forecastPoints {
-					if pt.IsActual {
-						lastActual = pt.Actual
-					}
-				}
-				fcd.AvgDailyNet = math.Round((lastActual/float64(daysElapsed))*100) / 100
-			}
-			for _, pt := range forecastPoints {
-				fcd.Labels = append(fcd.Labels, pt.DateLabel)
-				if pt.IsActual {
-					fcd.Actual = append(fcd.Actual, pt.Actual)
-				} else {
-					fcd.Actual = append(fcd.Actual, nil)
-				}
-				fcd.Forecast = append(fcd.Forecast, pt.Forecast)
-			}
-			fcd.ProjectedEOM = forecastPoints[len(forecastPoints)-1].Forecast
-			if fb, err := json.Marshal(fcd); err == nil {
-				forecastJSON = template.JS(fb)
-			}
-		}
-
-		// ── Anomaly detection (category anomalies) ──
-		numPeriods := float64(historyDays) / float64(chartDays)
-		if numPeriods < 1 {
-			numPeriods = 1
-		}
-
-		histCatAvg := make(map[string]float64)
-		histCatColor := make(map[string]string)
-		if histCatSummary != nil {
-			for i, row := range histCatSummary.Summary {
-				label := "Uncategorized"
-				if row.Category != nil && *row.Category != "" {
-					label = *row.Category
-				}
-				avgPerPeriod := row.TotalAmount / numPeriods
-				histCatAvg[label] = avgPerPeriod
-				color := ""
-				if row.CategoryColor != nil && *row.CategoryColor != "" {
-					color = *row.CategoryColor
-				} else {
-					color = categoryPalette[i%len(categoryPalette)]
-				}
-				histCatColor[label] = color
-			}
-		}
-
-		// Assign colors to transaction anomalies.
-		for i := range transactionAnomalies {
-			ta := &transactionAnomalies[i]
-			ta.CategoryColor = histCatColor[ta.Category]
-			if ta.CategoryColor == "" {
-				ta.CategoryColor = categoryPalette[i%len(categoryPalette)]
-			}
-		}
-
-		var categoryAnomalies []CategoryAnomaly
-		var hasCategoryAnomalies bool
-		for cat, curAmt := range currentCatMap {
-			avgAmt, exists := histCatAvg[cat]
-			if !exists || avgAmt < 20 {
-				continue
-			}
-			multiplier := curAmt / avgAmt
-			if multiplier >= 1.8 && curAmt >= 50 {
-				pctl := math.Min((multiplier-1)*50, 99)
-				ca := CategoryAnomaly{
-					Category:   cat,
-					Color:      histCatColor[cat],
-					Current:    curAmt,
-					Historical: avgAmt,
-					Multiplier: multiplier,
-					Percentile: pctl,
-				}
-
-				var txName *string
-				var txAmt *float64
-				var txDate *string
-				_ = a.DB.QueryRow(ctx, `
-					SELECT COALESCE(NULLIF(merchant_name, ''), name), amount, TO_CHAR(date, 'Mon DD')
-					FROM transactions
-					WHERE deleted_at IS NULL AND date >= $1 AND amount > 0
-						AND pending = false AND COALESCE(category_primary, '') = $2
-					ORDER BY amount DESC LIMIT 1
-				`, chartStart, cat).Scan(&txName, &txAmt, &txDate)
-				if txName != nil {
-					ca.TopTxName = *txName
-				}
-				if txAmt != nil {
-					ca.TopTxAmount = *txAmt
-				}
-				if txDate != nil {
-					ca.TopTxDate = *txDate
-				}
-
-				categoryAnomalies = append(categoryAnomalies, ca)
-			}
-		}
-		sort.Slice(categoryAnomalies, func(i, j int) bool {
-			return categoryAnomalies[i].Multiplier > categoryAnomalies[j].Multiplier
-		})
-		if len(categoryAnomalies) > 6 {
-			categoryAnomalies = categoryAnomalies[:6]
-		}
-		hasCategoryAnomalies = len(categoryAnomalies) > 0
-
-		// ── Budget targets ──
-		var budgetTargets []BudgetTarget
-		var hasBudgetTargets bool
-		var budgetOnTrackCount, budgetOverCount int
-
-		for _, tc := range topCategories {
-			avgAmt, exists := histCatAvg[tc.Name]
-			if !exists || avgAmt < 10 {
-				continue
-			}
-			pct := (tc.Amount / avgAmt) * 100
-			diff := tc.Amount - avgAmt
-			diffPct := 0.0
-			if avgAmt > 0 {
-				diffPct = (diff / avgAmt) * 100
-			}
-			bt := BudgetTarget{
-				Category:    tc.Name,
-				Color:       tc.Color,
-				Current:     tc.Amount,
-				Target:      avgAmt,
-				Percent:     pct,
-				OverBudget:  pct > 105,
-				Difference:  diff,
-				DiffPercent: diffPct,
-			}
-			budgetTargets = append(budgetTargets, bt)
-			if bt.OverBudget {
-				budgetOverCount++
-			} else {
-				budgetOnTrackCount++
-			}
-		}
-		hasBudgetTargets = len(budgetTargets) > 0
-
-		// ── Financial Health Score (composite 0-100) ──
-		// Five dimensions, each scored 0-20 points:
-		//   1. Savings Rate: higher savings = higher score
-		//   2. Budget Adherence: % of categories on-track
-		//   3. Spending Trend: spending down vs previous period
-		//   4. Cash Flow: positive net = good, negative = bad
-		//   5. Spending Pace: on-track for month vs overshooting
-		type HealthDimension struct {
-			Name        string
-			Score       int
-			MaxScore    int
-			Description string
-			Icon        string
-			Color       string
-		}
-
-		var healthScore int
-		var healthDimensions []HealthDimension
-		var hasHealthScore bool
-
-		// Only compute if we have meaningful data.
-		if totalSpending > 0 || totalIncome > 0 {
-			hasHealthScore = true
-
-			// Dimension 1: Savings Rate (0-20)
-			savingsScore := 0
-			savingsDesc := "No income data"
-			if totalIncome > 0 {
-				sr := savingsRate
-				switch {
-				case sr >= 30:
-					savingsScore = 20
-					savingsDesc = "Excellent savings rate"
-				case sr >= 20:
-					savingsScore = 17
-					savingsDesc = "Strong savings rate"
-				case sr >= 10:
-					savingsScore = 14
-					savingsDesc = "Good savings rate"
-				case sr >= 0:
-					savingsScore = 10
-					savingsDesc = "Break-even or minimal savings"
-				case sr >= -20:
-					savingsScore = 6
-					savingsDesc = "Spending slightly exceeds income"
-				case sr >= -50:
-					savingsScore = 3
-					savingsDesc = "Spending significantly exceeds income"
-				default:
-					savingsScore = 0
-					savingsDesc = "Spending far exceeds income"
-				}
-			}
-			healthDimensions = append(healthDimensions, HealthDimension{
-				Name: "Savings Rate", Score: savingsScore, MaxScore: 20,
-				Description: savingsDesc, Icon: "piggy-bank", Color: "oklch(0.65 0.17 155)",
-			})
-
-			// Dimension 2: Budget Adherence (0-20)
-			budgetScore := 10 // Default if no budget data
-			budgetDesc := "No budget data yet"
-			if len(budgetTargets) > 0 {
-				total := budgetOnTrackCount + budgetOverCount
-				if total > 0 {
-					onTrackRatio := float64(budgetOnTrackCount) / float64(total)
-					budgetScore = int(math.Round(onTrackRatio * 20))
-					switch {
-					case onTrackRatio >= 0.8:
-						budgetDesc = fmt.Sprintf("%d of %d categories on track", budgetOnTrackCount, total)
-					case onTrackRatio >= 0.5:
-						budgetDesc = fmt.Sprintf("%d of %d categories over budget", budgetOverCount, total)
-					default:
-						budgetDesc = fmt.Sprintf("Most categories (%d/%d) over budget", budgetOverCount, total)
-					}
-				}
-			}
-			healthDimensions = append(healthDimensions, HealthDimension{
-				Name: "Budget Adherence", Score: budgetScore, MaxScore: 20,
-				Description: budgetDesc, Icon: "target", Color: "oklch(0.62 0.15 250)",
-			})
-
-			// Dimension 3: Spending Trend (0-20)
-			trendScore := 10 // Default if no comparison data
-			trendDesc := "Not enough history"
-			if hasSpendingChange {
-				pct := spendingChangePercent
-				switch {
-				case pct <= -20:
-					trendScore = 20
-					trendDesc = fmt.Sprintf("Spending down %.0f%% vs previous period", math.Abs(pct))
-				case pct <= -10:
-					trendScore = 17
-					trendDesc = fmt.Sprintf("Spending down %.0f%%", math.Abs(pct))
-				case pct <= -2:
-					trendScore = 14
-					trendDesc = fmt.Sprintf("Spending slightly down %.0f%%", math.Abs(pct))
-				case pct <= 2:
-					trendScore = 12
-					trendDesc = "Spending roughly flat"
-				case pct <= 10:
-					trendScore = 8
-					trendDesc = fmt.Sprintf("Spending up %.0f%%", pct)
-				case pct <= 25:
-					trendScore = 4
-					trendDesc = fmt.Sprintf("Spending up %.0f%%", pct)
-				default:
-					trendScore = 0
-					trendDesc = fmt.Sprintf("Spending up %.0f%% vs previous period", pct)
-				}
-			}
-			healthDimensions = append(healthDimensions, HealthDimension{
-				Name: "Spending Trend", Score: trendScore, MaxScore: 20,
-				Description: trendDesc, Icon: "trending-down", Color: "oklch(0.64 0.16 160)",
-			})
-
-			// Dimension 4: Cash Flow (0-20)
-			cashFlowScore := 10
-			cashFlowDesc := "No cash flow data"
-			if hasCashFlow && totalIncome > 0 {
-				ratio := cashFlowNet / totalIncome
-				switch {
-				case ratio >= 0.3:
-					cashFlowScore = 20
-					cashFlowDesc = "Strong positive cash flow"
-				case ratio >= 0.1:
-					cashFlowScore = 16
-					cashFlowDesc = "Positive cash flow"
-				case ratio >= 0:
-					cashFlowScore = 12
-					cashFlowDesc = "Near break-even"
-				case ratio >= -0.2:
-					cashFlowScore = 6
-					cashFlowDesc = "Negative cash flow"
-				default:
-					cashFlowScore = 0
-					cashFlowDesc = "Significant negative cash flow"
-				}
-			}
-			healthDimensions = append(healthDimensions, HealthDimension{
-				Name: "Cash Flow", Score: cashFlowScore, MaxScore: 20,
-				Description: cashFlowDesc, Icon: "wallet", Color: "oklch(0.66 0.14 35)",
-			})
-
-			// Dimension 5: Spending Pace (0-20)
-			paceScore := 10 // Default
-			paceDesc := "No pace data"
-			if hasPaceData && lastMonthSpending > 0 {
-				switch paceVsLastMonth {
-				case "behind":
-					paceScore = 18
-					paceDesc = fmt.Sprintf("Spending %.0f%% less than last month's pace", math.Abs(pacePercent))
-				case "same":
-					paceScore = 12
-					paceDesc = "On pace with last month"
-				case "ahead":
-					if pacePercent <= 10 {
-						paceScore = 8
-						paceDesc = fmt.Sprintf("Slightly ahead of last month (+%.0f%%)", pacePercent)
-					} else if pacePercent <= 25 {
-						paceScore = 4
-						paceDesc = fmt.Sprintf("Spending faster than last month (+%.0f%%)", pacePercent)
-					} else {
-						paceScore = 0
-						paceDesc = fmt.Sprintf("Spending much faster than last month (+%.0f%%)", pacePercent)
-					}
-				}
-			}
-			healthDimensions = append(healthDimensions, HealthDimension{
-				Name: "Monthly Pace", Score: paceScore, MaxScore: 20,
-				Description: paceDesc, Icon: "gauge", Color: "oklch(0.60 0.16 300)",
-			})
-
-			// Sum up total health score
-			for _, d := range healthDimensions {
-				healthScore += d.Score
-			}
-		}
-
-		// Health score label and color
-		healthLabel := "N/A"
-		healthColorClass := "text-base-content/50"
-		if hasHealthScore {
-			switch {
-			case healthScore >= 80:
-				healthLabel = "Excellent"
-				healthColorClass = "text-success"
-			case healthScore >= 65:
-				healthLabel = "Good"
-				healthColorClass = "text-success/70"
-			case healthScore >= 50:
-				healthLabel = "Fair"
-				healthColorClass = "text-warning"
-			case healthScore >= 35:
-				healthLabel = "Needs Attention"
-				healthColorClass = "text-warning/70"
-			default:
-				healthLabel = "Critical"
-				healthColorClass = "text-error"
-			}
-		}
-
 		// ── CSV Export data (JSON blob for client-side CSV generation) ──
 		type csvExportData struct {
 			PeriodLabel string `json:"periodLabel"`
@@ -2069,36 +1088,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 				Amounts  []float64 `json:"amounts"`
 			} `json:"monthlyComparison"`
 			MonthlyTotals []float64 `json:"monthlyTotals"`
-			// Budget targets
-			Budgets []struct {
-				Category string  `json:"category"`
-				Current  float64 `json:"current"`
-				Target   float64 `json:"target"`
-				Percent  float64 `json:"percent"`
-			} `json:"budgets"`
-			// Anomalies
-			CategoryAnomalies []struct {
-				Category   string  `json:"category"`
-				Current    float64 `json:"current"`
-				Historical float64 `json:"historical"`
-				Multiplier float64 `json:"multiplier"`
-			} `json:"categoryAnomalies"`
-			TransactionAnomalies []struct {
-				Name        string  `json:"name"`
-				Amount      float64 `json:"amount"`
-				Date        string  `json:"date"`
-				Category    string  `json:"category"`
-				CategoryAvg float64 `json:"categoryAvg"`
-				Multiplier  float64 `json:"multiplier"`
-			} `json:"transactionAnomalies"`
-			// Savings rate trend
-			SavingsRateTrend []struct {
-				Month    string  `json:"month"`
-				Income   float64 `json:"income"`
-				Spending float64 `json:"spending"`
-				Net      float64 `json:"net"`
-				Rate     float64 `json:"rate"`
-			} `json:"savingsRateTrend"`
 		}
 
 		periodLabel := fmt.Sprintf("%dd", chartDays)
@@ -2154,41 +1143,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 				Amounts  []float64 `json:"amounts"`
 			}{row.Category, row.Amounts})
 		}
-		for _, bt := range budgetTargets {
-			exportData.Budgets = append(exportData.Budgets, struct {
-				Category string  `json:"category"`
-				Current  float64 `json:"current"`
-				Target   float64 `json:"target"`
-				Percent  float64 `json:"percent"`
-			}{bt.Category, bt.Current, bt.Target, bt.Percent})
-		}
-		for _, ca := range categoryAnomalies {
-			exportData.CategoryAnomalies = append(exportData.CategoryAnomalies, struct {
-				Category   string  `json:"category"`
-				Current    float64 `json:"current"`
-				Historical float64 `json:"historical"`
-				Multiplier float64 `json:"multiplier"`
-			}{ca.Category, ca.Current, ca.Historical, ca.Multiplier})
-		}
-		for _, ta := range transactionAnomalies {
-			exportData.TransactionAnomalies = append(exportData.TransactionAnomalies, struct {
-				Name        string  `json:"name"`
-				Amount      float64 `json:"amount"`
-				Date        string  `json:"date"`
-				Category    string  `json:"category"`
-				CategoryAvg float64 `json:"categoryAvg"`
-				Multiplier  float64 `json:"multiplier"`
-			}{ta.Name, ta.Amount, ta.Date, ta.Category, ta.CategoryAvg, ta.Multiplier})
-		}
-		for _, sr := range savingsRateTrend {
-			exportData.SavingsRateTrend = append(exportData.SavingsRateTrend, struct {
-				Month    string  `json:"month"`
-				Income   float64 `json:"income"`
-				Spending float64 `json:"spending"`
-				Net      float64 `json:"net"`
-				Rate     float64 `json:"rate"`
-			}{sr.Month, sr.Income, sr.Spending, sr.Net, sr.Rate})
-		}
 
 		var exportJSON template.JS
 		if eb, err := json.Marshal(exportData); err == nil {
@@ -2196,7 +1150,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		}
 
 		// ── Sparkline data for summary pills ──
-		// Compute net cash flow and savings rate sparklines from spending/income.
 		sparklineNet := make([]float64, len(sparklineSpending))
 		sparklineSavingsRate := make([]float64, len(sparklineSpending))
 		for i := range sparklineSpending {
@@ -2223,112 +1176,76 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		}
 
 		data := map[string]any{
-			"PageTitle":              "Insights",
-			"CurrentPage":            "insights",
-			"CSRFToken":              GetCSRFToken(r),
-			"ChartDays":              chartDays,
+			"PageTitle":             "Insights",
+			"CurrentPage":          "insights",
+			"CSRFToken":            GetCSRFToken(r),
+			"ChartDays":            chartDays,
 			// Spending chart data.
-			"CategoryLabels":         categoryLabelsJSON,
-			"CategoryAmounts":        categoryAmountsJSON,
-			"CategoryColors":         categoryColorsJSON,
-			"DailyLabels":            dailyLabelsJSON,
-			"DailyAmounts":           dailyAmountsJSON,
-			"DailyIncomeAmounts":     dailyIncomeAmountsJSON,
-			"TopCategories":          topCategories,
-			"MaxCategorySpend":       maxCategorySpend,
-			"CategoryDrilldownJSON":  categoryDrilldownJSON,
+			"CategoryLabels":        categoryLabelsJSON,
+			"CategoryAmounts":       categoryAmountsJSON,
+			"CategoryColors":        categoryColorsJSON,
+			"DailyLabels":           dailyLabelsJSON,
+			"DailyAmounts":          dailyAmountsJSON,
+			"DailyIncomeAmounts":    dailyIncomeAmountsJSON,
+			"TopCategories":         topCategories,
+			"CategoryDrilldownJSON": categoryDrilldownJSON,
 			// Totals.
-			"TotalSpending":          totalSpending,
-			"TotalIncome":            totalIncome,
-			"PrevTotalSpending":      prevTotalSpending,
-			"SpendingChangePercent":  spendingChangePercent,
-			"HasSpendingChange":      hasSpendingChange,
+			"TotalSpending":         totalSpending,
+			"TotalIncome":           totalIncome,
+			"SpendingChangePercent": spendingChangePercent,
+			"HasSpendingChange":     hasSpendingChange,
 			// Cash flow.
-			"CashFlowNet":            cashFlowNet,
-			"SavingsRate":            savingsRate,
-			"HasCashFlow":            hasCashFlow,
-			"SpendingRatio":          spendingRatio,
+			"CashFlowNet":           cashFlowNet,
+			"SavingsRate":           savingsRate,
+			"HasCashFlow":           hasCashFlow,
+			"SpendingRatio":         spendingRatio,
 			// Spending pace.
-			"HasPaceData":            hasPaceData,
-			"CurrentMonthSpending":   currentMonthSpending,
-			"CurrentMonthIncome":     currentMonthIncome,
-			"LastMonthSpending":      lastMonthSpending,
-			"LastMonthPaceSpending":  lastMonthPaceSpending,
-			"DailyAvgSpending":       dailyAvgSpending,
-			"ProjectedMonthly":       projectedMonthly,
-			"PacePercent":            pacePercent,
-			"PaceVsLastMonth":        paceVsLastMonth,
-			"DaysElapsed":            daysElapsed,
-			"DaysInMonth":            daysInMonth,
-			"DaysRemaining":          daysRemaining,
-			"MonthProgress":          monthProgress,
-			"CurrentMonthName":       today.Format("January"),
-			"LastMonthName":          lastMonthStart.Format("January"),
-			// Smart spending insights.
-			"SpendingInsights":       spendingInsights,
+			"HasPaceData":           hasPaceData,
+			"CurrentMonthSpending":  currentMonthSpending,
+			"CurrentMonthIncome":    currentMonthIncome,
+			"LastMonthSpending":     lastMonthSpending,
+			"DailyAvgSpending":      dailyAvgSpending,
+			"ProjectedMonthly":      projectedMonthly,
+			"PacePercent":           pacePercent,
+			"PaceVsLastMonth":       paceVsLastMonth,
+			"DaysElapsed":           daysElapsed,
+			"DaysInMonth":           daysInMonth,
+			"DaysRemaining":         daysRemaining,
+			"MonthProgress":         monthProgress,
+			"CurrentMonthName":      today.Format("January"),
+			"LastMonthName":         lastMonthStart.Format("January"),
 			// Merchant analysis.
-			"TopMerchants":           topMerchants,
+			"TopMerchants":          topMerchants,
 			// Day-of-week spending.
-			"DOWSpending":            dowSpending,
-			"HasDOWData":             hasDOWData,
-			"HighSpendDay":           highSpendDay,
-			"LowSpendDay":            lowSpendDay,
-			"HighSpendDayAmt":        highSpendDayAmt,
-			"LowSpendDayAmt":         lowSpendDayAmt,
+			"DOWSpending":           dowSpending,
+			"HasDOWData":            hasDOWData,
+			"HighSpendDay":          highSpendDay,
+			"LowSpendDay":           lowSpendDay,
+			"HighSpendDayAmt":       highSpendDayAmt,
+			"LowSpendDayAmt":        lowSpendDayAmt,
 			// Recurring charges.
-			"RecurringCharges":       recurringCharges,
-			"HasRecurringData":       hasRecurringData,
-			"TotalRecurringMonthly":  totalRecurringMonthly,
+			"RecurringCharges":      recurringCharges,
+			"HasRecurringData":      hasRecurringData,
+			"TotalRecurringMonthly": totalRecurringMonthly,
 			// Monthly category comparison.
-			"HasMonthlyComp":         hasMonthlyComp,
-			"MonthHeaders":           monthHeaders,
-			"MonthlyCompRows":        monthlyCompRows,
-			"MonthlyTotals":          monthlyTotals,
-			"MaxMonthlyTotal":        maxMonthlyTotal,
-			// Spending velocity.
-			"HasVelocityData":        hasVelocityData,
-			"VelocityJSON":           velocityJSON,
-			"VelocityMonths":         velocityMonths,
-			"VelocityMaxDays":        velocityMaxDays,
-			// Family spending breakdown.
-			"HasFamilyData":          hasFamilyData,
-			"FamilySpending":         familySpending,
-			// Savings rate trend.
-			"HasSavingsRateTrend":       hasSavingsRateTrend,
-			"SavingsRateTrend":          savingsRateTrend,
-			"SavingsRateTrendJSON":      savingsRateTrendJSON,
-			// Cash flow forecast.
-			"HasForecastData":           hasForecastData,
-			"ForecastJSON":              forecastJSON,
-			// Anomaly detection.
-			"HasCategoryAnomalies":      hasCategoryAnomalies,
-			"CategoryAnomalies":         categoryAnomalies,
-			"HasTransactionAnomalies":   hasTransactionAnomalies,
-			"TransactionAnomalies":      transactionAnomalies,
-			// Category budget targets.
-			"HasBudgetTargets":          hasBudgetTargets,
-			"BudgetTargets":             budgetTargets,
-			"BudgetOnTrackCount":        budgetOnTrackCount,
-			"BudgetOverCount":           budgetOverCount,
+			"HasMonthlyComp":        hasMonthlyComp,
+			"MonthHeaders":          monthHeaders,
+			"MonthlyCompRows":       monthlyCompRows,
+			"MonthlyTotals":         monthlyTotals,
+			"MaxMonthlyTotal":       maxMonthlyTotal,
 			// CSV Export.
-			"ExportJSON":                exportJSON,
+			"ExportJSON":            exportJSON,
 			// Sparkline data for summary pills.
-			"SparkSpending":             sparkSpendJSON,
-			"SparkIncome":               sparkIncomeJSON,
-			"SparkNet":                  sparkNetJSON,
-			"SparkSavings":              sparkSavingsJSON,
-			// Financial health score.
-			"HasHealthScore":            hasHealthScore,
-			"HealthScore":               healthScore,
-			"HealthLabel":               healthLabel,
-			"HealthColorClass":          healthColorClass,
-			"HealthDimensions":          healthDimensions,
+			"SparkSpending":         sparkSpendJSON,
+			"SparkIncome":           sparkIncomeJSON,
+			"SparkNet":              sparkNetJSON,
+			"SparkSavings":          sparkSavingsJSON,
 			// Net worth.
-			"NetWorth":                  netWorth,
-			"TotalAssets":               totalAssets,
-			"TotalLiabilities":          totalLiabilities,
-			"NetWorthLabels":            netWorthLabelsJSON,
-			"NetWorthValues":            netWorthValuesJSON,
+			"NetWorth":              netWorth,
+			"TotalAssets":           totalAssets,
+			"TotalLiabilities":      totalLiabilities,
+			"NetWorthLabels":        netWorthLabelsJSON,
+			"NetWorthValues":        netWorthValuesJSON,
 		}
 		tr.Render(w, r, "insights.html", data)
 	}

@@ -9,17 +9,17 @@
      "
      @keydown.window="
        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.isContentEditable) return;
-       const tabs = ['overview', 'analysis', 'trends'];
+       const tabs = ['overview', 'spending', 'trends'];
        const idx = tabs.indexOf(tab);
        if (event.key === 'ArrowRight' && idx < tabs.length - 1) { event.preventDefault(); tab = tabs[idx + 1]; }
        else if (event.key === 'ArrowLeft' && idx > 0) { event.preventDefault(); tab = tabs[idx - 1]; }
        else if (event.key === '1') { tab = 'overview'; }
-       else if (event.key === '2') { tab = 'analysis'; }
+       else if (event.key === '2') { tab = 'spending'; }
        else if (event.key === '3') { tab = 'trends'; }
        else if (event.key === 'Escape') { highlightedCategory = ''; $dispatch('insights-drill-up'); }
      ">
 
-<!-- Insights Page Header with Date Range Picker -->
+<!-- Insights Page Header -->
 <div class="bb-page-header">
   <div>
     <h1 class="bb-page-title">Insights</h1>
@@ -56,11 +56,6 @@
           class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
           <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/30"></i>
           Recurring Charges
-        </button>
-        <button @click="window._insightsExportCSV('anomalies'); exportOpen = false"
-          class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
-          <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-base-content/30"></i>
-          Anomalies
         </button>
         <div class="border-t border-base-200/60 mt-1 pt-1">
           <button @click="window._insightsExportCSV('all'); exportOpen = false"
@@ -115,32 +110,6 @@
     </div>
   </div>
 
-  <!-- Skeleton Health Score Card -->
-  <div class="bb-skeleton--card mb-6 !p-5">
-    <div class="flex flex-col lg:flex-row items-start lg:items-center gap-6">
-      <div class="flex items-center gap-5 shrink-0">
-        <div class="bb-skeleton rounded-full" style="width: 112px; height: 112px;"></div>
-        <div class="lg:hidden">
-          <div class="bb-skeleton" style="width: 100px; height: 16px; margin-bottom: 6px;"></div>
-          <div class="bb-skeleton bb-skeleton--text-xs" style="width: 120px;"></div>
-        </div>
-      </div>
-      <div class="flex-1 w-full">
-        <div class="hidden lg:flex items-center gap-2.5 mb-4">
-          <div class="bb-skeleton" style="width: 120px; height: 16px;"></div>
-          <div class="bb-skeleton bb-skeleton--badge"></div>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-5 gap-2 sm:gap-3">
-          <div class="bb-skeleton--card !p-3"><div class="bb-skeleton bb-skeleton--circle-sm mb-2"></div><div class="bb-skeleton bb-skeleton--text-xs mb-1.5"></div><div class="bb-skeleton" style="width: 100%; height: 6px;"></div></div>
-          <div class="bb-skeleton--card !p-3"><div class="bb-skeleton bb-skeleton--circle-sm mb-2"></div><div class="bb-skeleton bb-skeleton--text-xs mb-1.5"></div><div class="bb-skeleton" style="width: 100%; height: 6px;"></div></div>
-          <div class="bb-skeleton--card !p-3"><div class="bb-skeleton bb-skeleton--circle-sm mb-2"></div><div class="bb-skeleton bb-skeleton--text-xs mb-1.5"></div><div class="bb-skeleton" style="width: 100%; height: 6px;"></div></div>
-          <div class="bb-skeleton--card !p-3"><div class="bb-skeleton bb-skeleton--circle-sm mb-2"></div><div class="bb-skeleton bb-skeleton--text-xs mb-1.5"></div><div class="bb-skeleton" style="width: 100%; height: 6px;"></div></div>
-          <div class="bb-skeleton--card !p-3"><div class="bb-skeleton bb-skeleton--circle-sm mb-2"></div><div class="bb-skeleton bb-skeleton--text-xs mb-1.5"></div><div class="bb-skeleton" style="width: 100%; height: 6px;"></div></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Skeleton Pace + Summary Row -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
     <div class="bb-skeleton--card !p-5">
@@ -186,23 +155,6 @@
       <div class="flex items-center justify-center" style="height: 240px;">
         <div class="bb-skeleton rounded-full" style="width: 180px; height: 180px;"></div>
       </div>
-    </div>
-  </div>
-
-  <!-- Skeleton Budget Targets -->
-  <div class="bb-skeleton--card !p-5">
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-2.5">
-        <div class="bb-skeleton" style="width: 28px; height: 28px; border-radius: 8px;"></div>
-        <div class="bb-skeleton" style="width: 120px; height: 16px;"></div>
-      </div>
-    </div>
-    <div class="space-y-3">
-      <div><div class="flex items-center justify-between mb-1.5"><div class="bb-skeleton bb-skeleton--text-xs" style="width: 100px;"></div><div class="bb-skeleton bb-skeleton--text-xs" style="width: 80px;"></div></div><div class="bb-skeleton" style="width: 100%; height: 10px; border-radius: 9999px;"></div></div>
-      <div><div class="flex items-center justify-between mb-1.5"><div class="bb-skeleton bb-skeleton--text-xs" style="width: 90px;"></div><div class="bb-skeleton bb-skeleton--text-xs" style="width: 75px;"></div></div><div class="bb-skeleton" style="width: 100%; height: 10px; border-radius: 9999px;"></div></div>
-      <div><div class="flex items-center justify-between mb-1.5"><div class="bb-skeleton bb-skeleton--text-xs" style="width: 110px;"></div><div class="bb-skeleton bb-skeleton--text-xs" style="width: 70px;"></div></div><div class="bb-skeleton" style="width: 100%; height: 10px; border-radius: 9999px;"></div></div>
-      <div><div class="flex items-center justify-between mb-1.5"><div class="bb-skeleton bb-skeleton--text-xs" style="width: 85px;"></div><div class="bb-skeleton bb-skeleton--text-xs" style="width: 65px;"></div></div><div class="bb-skeleton" style="width: 100%; height: 10px; border-radius: 9999px;"></div></div>
-      <div><div class="flex items-center justify-between mb-1.5"><div class="bb-skeleton bb-skeleton--text-xs" style="width: 95px;"></div><div class="bb-skeleton bb-skeleton--text-xs" style="width: 82px;"></div></div><div class="bb-skeleton" style="width: 100%; height: 10px; border-radius: 9999px;"></div></div>
     </div>
   </div>
 </div>
@@ -281,10 +233,10 @@
     Overview
     <kbd class="hidden lg:inline-block text-[0.55rem] font-normal text-base-content/20 bg-base-200/50 px-1 py-0.5 rounded ml-1">1</kbd>
   </button>
-  <button @click="tab = 'analysis'" :class="tab === 'analysis' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
+  <button @click="tab = 'spending'" :class="tab === 'spending' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
     class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap">
-    <i data-lucide="search" class="w-3.5 h-3.5 hidden sm:block"></i>
-    Analysis
+    <i data-lucide="store" class="w-3.5 h-3.5 hidden sm:block"></i>
+    Spending
     <kbd class="hidden lg:inline-block text-[0.55rem] font-normal text-base-content/20 bg-base-200/50 px-1 py-0.5 rounded ml-1">2</kbd>
   </button>
   <button @click="tab = 'trends'" :class="tab === 'trends' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
@@ -357,73 +309,7 @@
   {{end}}
 </div>
 
-<!-- Financial Health Score -->
-{{if .HasHealthScore}}
-<div class="bb-card mb-6 p-5 bb-stagger">
-  <div class="flex flex-col lg:flex-row items-start lg:items-center gap-6">
-    <!-- Score Ring -->
-    <div class="flex items-center gap-5 shrink-0">
-      <div class="relative w-24 h-24 sm:w-28 sm:h-28">
-        <svg viewBox="0 0 120 120" class="w-full h-full -rotate-90">
-          <!-- Background ring -->
-          <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" stroke-width="8"
-            class="text-base-200/60" />
-          <!-- Score arc -->
-          <circle cx="60" cy="60" r="52" fill="none" stroke-width="8" stroke-linecap="round"
-            class="bb-health-ring {{.HealthColorClass}}"
-            stroke-dasharray="{{printf "%.1f" (mulf (divf (itof .HealthScore) 100.0) 326.7)}} 326.7"
-            style="transition: stroke-dasharray 1.2s cubic-bezier(0.4, 0, 0.2, 1);" />
-        </svg>
-        <div class="absolute inset-0 flex flex-col items-center justify-center">
-          <span class="text-2xl sm:text-3xl font-bold tabular-nums {{.HealthColorClass}}"
-            data-countup="{{.HealthScore}}" data-prefix="" data-decimals="0" data-duration="1200">{{.HealthScore}}</span>
-          <span class="text-[0.55rem] text-base-content/30 font-medium -mt-0.5">/ 100</span>
-        </div>
-      </div>
-      <div class="lg:hidden">
-        <div class="text-sm font-semibold {{.HealthColorClass}}">{{.HealthLabel}}</div>
-        <div class="text-[0.65rem] text-base-content/35 mt-0.5">Financial Health Score</div>
-      </div>
-    </div>
-
-    <!-- Dimension Breakdown -->
-    <div class="flex-1 w-full">
-      <div class="hidden lg:flex items-center gap-2.5 mb-4">
-        <h2 class="text-sm font-semibold text-base-content/70">Financial Health</h2>
-        <span class="text-xs font-semibold {{.HealthColorClass}}">{{.HealthLabel}}</span>
-        <span class="text-[0.6rem] text-base-content/25 ml-auto">Based on 5 dimensions, scored 0-20 each</span>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-5 gap-2 sm:gap-3">
-        {{range .HealthDimensions}}
-        <div class="group flex sm:flex-col items-center sm:items-start gap-3 sm:gap-0 p-2.5 sm:p-3 rounded-xl border border-base-200/50 bg-base-200/[0.03] hover:bg-base-200/20 hover:border-base-300/50 transition-all duration-200">
-          <div class="flex items-center gap-2 sm:mb-2 shrink-0">
-            <div class="flex items-center justify-center w-6 h-6 rounded-md" style="background-color: {{safeCSS .Color}}; opacity: 0.12;">
-              <i data-lucide="{{.Icon}}" class="w-3 h-3" style="color: {{safeCSS .Color}};"></i>
-            </div>
-            <span class="text-[0.65rem] font-medium text-base-content/50 sm:hidden">{{.Name}}</span>
-          </div>
-          <div class="flex-1 sm:flex-initial w-full min-w-0">
-            <div class="hidden sm:block text-[0.6rem] font-medium text-base-content/45 mb-1.5 truncate">{{.Name}}</div>
-            <!-- Score bar -->
-            <div class="w-full h-1.5 bg-base-200/60 rounded-full overflow-hidden mb-1.5">
-              <div class="h-full rounded-full transition-all duration-700 ease-out"
-                style="width: {{printf "%.0f" (mulf (divf (itof .Score) (itof .MaxScore)) 100.0)}}%; background-color: {{safeCSS .Color}}; opacity: 0.6;"></div>
-            </div>
-            <div class="flex items-center justify-between gap-1">
-              <span class="text-[0.55rem] text-base-content/30 truncate hidden sm:inline">{{.Description}}</span>
-              <span class="text-[0.6rem] font-semibold tabular-nums text-base-content/50 shrink-0">{{.Score}}/{{.MaxScore}}</span>
-            </div>
-            <span class="text-[0.55rem] text-base-content/30 sm:hidden">{{.Description}}</span>
-          </div>
-        </div>
-        {{end}}
-      </div>
-    </div>
-  </div>
-</div>
-{{end}}
-
-<!-- Monthly Spending Pace -->
+<!-- Monthly Spending Pace + Month Summary -->
 {{if .HasPaceData}}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 bb-stagger">
   <!-- Spending Pace Card -->
@@ -601,116 +487,6 @@
 </div>
 {{end}}
 
-<!-- Cash Flow Summary -->
-{{if .HasCashFlow}}
-<div class="bb-card mb-6 p-5 bb-stagger">
-  <div class="flex items-center justify-between mb-4">
-    <h2 class="text-sm font-semibold text-base-content/70">Cash Flow</h2>
-    <span class="text-xs text-base-content/40">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}} period</span>
-  </div>
-
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-    <!-- Income vs Spending Bars -->
-    <div class="md:col-span-2 space-y-3">
-      <div class="group">
-        <div class="flex items-center justify-between mb-1.5">
-          <span class="flex items-center gap-2 text-xs font-medium text-base-content/60">
-            <span class="w-2 h-2 rounded-full shrink-0" style="background: var(--bb-chart-income-bar)"></span>
-            Income
-          </span>
-          <span class="text-sm font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</span>
-        </div>
-        <div class="w-full h-3 bg-base-200/60 rounded-full overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: 100%; background: var(--bb-chart-income-bar); opacity: 0.6;"></div>
-        </div>
-      </div>
-
-      <div class="group">
-        <div class="flex items-center justify-between mb-1.5">
-          <span class="flex items-center gap-2 text-xs font-medium text-base-content/60">
-            <span class="w-2 h-2 rounded-full shrink-0 bg-base-content/20"></span>
-            Spending
-          </span>
-          <span class="text-sm font-semibold tabular-nums text-base-content/80">{{formatBalance .TotalSpending}}</span>
-        </div>
-        <div class="w-full h-3 bg-base-200/60 rounded-full overflow-hidden">
-          {{if gt .TotalIncome 0.0}}
-          <div class="h-full rounded-full transition-all duration-700 ease-out {{if gt .SpendingRatio 90.0}}bg-error/50{{else if gt .SpendingRatio 70.0}}bg-warning/50{{else}}bg-base-content/15{{end}}" style="width: {{printf "%.1f" .SpendingRatio}}%;"></div>
-          {{else}}
-          <div class="h-full rounded-full transition-all duration-700 ease-out bg-base-content/15" style="width: 100%;"></div>
-          {{end}}
-        </div>
-      </div>
-    </div>
-
-    <!-- Net Cash Flow + Savings Rate -->
-    <div class="flex flex-col items-center justify-center text-center border-t md:border-t-0 md:border-l border-base-200/80 pt-4 md:pt-0 md:pl-6">
-      <div class="text-xs font-medium text-base-content/40 mb-1">Net Cash Flow</div>
-      <div class="text-2xl font-semibold tabular-nums {{if gt .CashFlowNet 0.0}}text-success{{else if lt .CashFlowNet 0.0}}text-error{{else}}text-base-content{{end}}">
-        {{if gt .CashFlowNet 0.0}}+{{end}}{{if lt .CashFlowNet 0.0}}-{{end}}{{formatBalance .CashFlowNet}}
-      </div>
-      {{if gt .TotalIncome 0.0}}
-      <div class="mt-2 flex items-center gap-1.5">
-        <div class="w-8 h-8 rounded-full flex items-center justify-center {{if gt .SavingsRate 20.0}}bg-success/10{{else if gt .SavingsRate 0.0}}bg-warning/10{{else}}bg-error/10{{end}}">
-          {{if gt .SavingsRate 20.0}}
-          <i data-lucide="trending-up" class="w-3.5 h-3.5 text-success"></i>
-          {{else if gt .SavingsRate 0.0}}
-          <i data-lucide="minus" class="w-3.5 h-3.5 text-warning"></i>
-          {{else}}
-          <i data-lucide="trending-down" class="w-3.5 h-3.5 text-error"></i>
-          {{end}}
-        </div>
-        <div class="text-left">
-          {{if lt .SavingsRate -200.0}}
-          <div class="text-xs font-semibold text-error/80">Over budget</div>
-          <div class="text-[0.6rem] text-base-content/30">spending > income</div>
-          {{else}}
-          <div class="text-xs font-semibold tabular-nums {{if gt .SavingsRate 0.0}}text-success/80{{else}}text-error/80{{end}}">{{printf "%.0f" .SavingsRate}}%</div>
-          <div class="text-[0.6rem] text-base-content/30">savings rate</div>
-          {{end}}
-        </div>
-      </div>
-      {{end}}
-    </div>
-  </div>
-</div>
-{{end}}
-
-<!-- Cash Flow Forecast -->
-{{if .HasForecastData}}
-<div class="bb-card mb-6 p-5 bb-stagger">
-  <div class="flex items-center justify-between mb-4">
-    <div class="flex items-center gap-2.5">
-      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-info/8">
-        <i data-lucide="chart-line" class="w-3.5 h-3.5 text-info/60"></i>
-      </div>
-      <div>
-        <h2 class="text-sm font-semibold text-base-content/70">{{.CurrentMonthName}} Cash Flow Forecast</h2>
-        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Actual net cash flow + projection through end of month</p>
-      </div>
-    </div>
-  </div>
-
-  <div id="echartsForecastChart" style="width: 100%; height: 260px;"></div>
-
-  <!-- Legend -->
-  <div class="flex items-center gap-5 mt-3 pt-3 border-t border-base-200/60">
-    <span class="flex items-center gap-1.5 text-xs text-base-content/50">
-      <span class="w-2.5 h-1.5 rounded-sm bg-primary/60"></span>
-      Actual
-    </span>
-    <span class="flex items-center gap-1.5 text-xs text-base-content/50">
-      <span class="w-2.5 h-1.5 rounded-sm bg-primary/25 border border-dashed border-primary/40"></span>
-      Projected
-    </span>
-    <span class="flex items-center gap-1.5 text-xs text-base-content/50">
-      <span class="w-2.5 h-0.5 rounded-sm bg-base-content/20"></span>
-      Break-even
-    </span>
-  </div>
-</div>
-{{end}}
-
 <!-- Charts Row: Spending Chart + Category Donut (ECharts) -->
 <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6 bb-stagger">
   <!-- Spending & Income Chart -->
@@ -825,92 +601,77 @@
   </div>
 </div>
 
-
-<!-- Category Budget Targets: current spending vs historical averages -->
-{{if .HasBudgetTargets}}
+<!-- Cash Flow Summary -->
+{{if .HasCashFlow}}
 <div class="bb-card mb-6 p-5 bb-stagger">
-  <div class="flex flex-wrap items-center justify-between gap-y-2 mb-4">
-    <div class="flex items-center gap-2.5">
-      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/8">
-        <i data-lucide="target" class="w-3.5 h-3.5 text-primary/60"></i>
-      </div>
-      <div>
-        <h2 class="text-sm font-semibold text-base-content/70">Category Targets</h2>
-        <p class="text-[0.6rem] text-base-content/30 mt-0.5 hidden sm:block">Spending vs historical average for this period</p>
-      </div>
-    </div>
-    <div class="flex items-center gap-3">
-      {{if gt .BudgetOnTrackCount 0}}
-      <span class="flex items-center gap-1 text-[0.65rem] font-medium text-success/70">
-        <i data-lucide="check-circle" class="w-3 h-3"></i>
-        {{.BudgetOnTrackCount}} on track
-      </span>
-      {{end}}
-      {{if gt .BudgetOverCount 0}}
-      <span class="flex items-center gap-1 text-[0.65rem] font-medium text-error/70">
-        <i data-lucide="alert-circle" class="w-3 h-3"></i>
-        {{.BudgetOverCount}} over
-      </span>
-      {{end}}
-    </div>
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-sm font-semibold text-base-content/70">Cash Flow</h2>
+    <span class="text-xs text-base-content/40">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}} period</span>
   </div>
 
-  <div class="space-y-3">
-    {{range .BudgetTargets}}
-    <div class="group transition-all duration-150 -mx-2 px-2 py-0.5 rounded-lg"
-      :class="highlightedCategory === '{{.Category}}' ? 'bg-base-200/40 ring-1 ring-base-300/60' : ''"
-      data-category="{{.Category}}"
-      @mouseenter="highlightedCategory = '{{.Category}}'; if (window._insightsHighlightDonut) window._insightsHighlightDonut('{{.Category}}')"
-      @mouseleave="highlightedCategory = ''; if (window._insightsDownplayDonut) window._insightsDownplayDonut()">
-      <div class="flex items-center justify-between gap-2 mb-1.5">
-        <div class="flex items-center gap-2 min-w-0 flex-1">
-          <span class="w-2 h-2 rounded-full shrink-0 transition-transform duration-150" :class="highlightedCategory === '{{.Category}}' ? 'scale-150' : ''" style="background-color: {{safeCSS .Color}}"></span>
-          <span class="text-xs font-medium transition-colors duration-150 sm:truncate" :class="highlightedCategory === '{{.Category}}' ? 'text-base-content font-semibold' : 'text-base-content/70 group-hover:text-base-content'">{{.Category}}</span>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- Income vs Spending Bars -->
+    <div class="md:col-span-2 space-y-3">
+      <div class="group">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="flex items-center gap-2 text-xs font-medium text-base-content/60">
+            <span class="w-2 h-2 rounded-full shrink-0" style="background: var(--bb-chart-income-bar)"></span>
+            Income
+          </span>
+          <span class="text-sm font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</span>
         </div>
-        <div class="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-          <span class="text-xs tabular-nums font-semibold text-base-content/80">{{formatAmount .Current}}</span>
-          <span class="text-[0.6rem] text-base-content/25 hidden sm:inline">/</span>
-          <span class="text-[0.6rem] tabular-nums text-base-content/35 hidden sm:inline">{{formatAmount .Target}} avg</span>
-          {{if .OverBudget}}
-          <span class="text-[0.6rem] font-semibold tabular-nums px-1.5 py-0.5 rounded-full bg-error/8 text-error/70">+{{printf "%.0f" .DiffPercent}}%</span>
-          {{else if gt .Percent 80.0}}
-          <span class="text-[0.6rem] font-semibold tabular-nums px-1.5 py-0.5 rounded-full bg-warning/8 text-warning/70">{{printf "%.0f" .Percent}}%</span>
+        <div class="w-full h-3 bg-base-200/60 rounded-full overflow-hidden">
+          <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: 100%; background: var(--bb-chart-income-bar); opacity: 0.6;"></div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="flex items-center gap-2 text-xs font-medium text-base-content/60">
+            <span class="w-2 h-2 rounded-full shrink-0 bg-base-content/20"></span>
+            Spending
+          </span>
+          <span class="text-sm font-semibold tabular-nums text-base-content/80">{{formatBalance .TotalSpending}}</span>
+        </div>
+        <div class="w-full h-3 bg-base-200/60 rounded-full overflow-hidden">
+          {{if gt .TotalIncome 0.0}}
+          <div class="h-full rounded-full transition-all duration-700 ease-out {{if gt .SpendingRatio 90.0}}bg-error/50{{else if gt .SpendingRatio 70.0}}bg-warning/50{{else}}bg-base-content/15{{end}}" style="width: {{printf "%.1f" .SpendingRatio}}%;"></div>
           {{else}}
-          <span class="text-[0.6rem] font-semibold tabular-nums px-1.5 py-0.5 rounded-full bg-success/8 text-success/70">{{printf "%.0f" .Percent}}%</span>
+          <div class="h-full rounded-full transition-all duration-700 ease-out bg-base-content/15" style="width: 100%;"></div>
           {{end}}
         </div>
       </div>
-      <!-- Progress bar -->
-      <div class="relative">
-        <div class="w-full h-2.5 bg-base-200/50 rounded-full overflow-hidden">
-          {{if .OverBudget}}
-          <div class="h-full rounded-full transition-all duration-700 ease-out bg-error/40"
-            style="width: 100%;"></div>
-          {{else if gt .Percent 80.0}}
-          <div class="h-full rounded-full transition-all duration-700 ease-out bg-warning/40"
-            style="width: {{printf "%.1f" (minf .Percent 100.0)}}%;"></div>
+    </div>
+
+    <!-- Net Cash Flow + Savings Rate -->
+    <div class="flex flex-col items-center justify-center text-center border-t md:border-t-0 md:border-l border-base-200/80 pt-4 md:pt-0 md:pl-6">
+      <div class="text-xs font-medium text-base-content/40 mb-1">Net Cash Flow</div>
+      <div class="text-2xl font-semibold tabular-nums {{if gt .CashFlowNet 0.0}}text-success{{else if lt .CashFlowNet 0.0}}text-error{{else}}text-base-content{{end}}">
+        {{if gt .CashFlowNet 0.0}}+{{end}}{{if lt .CashFlowNet 0.0}}-{{end}}{{formatBalance .CashFlowNet}}
+      </div>
+      {{if gt .TotalIncome 0.0}}
+      <div class="mt-2 flex items-center gap-1.5">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center {{if gt .SavingsRate 20.0}}bg-success/10{{else if gt .SavingsRate 0.0}}bg-warning/10{{else}}bg-error/10{{end}}">
+          {{if gt .SavingsRate 20.0}}
+          <i data-lucide="trending-up" class="w-3.5 h-3.5 text-success"></i>
+          {{else if gt .SavingsRate 0.0}}
+          <i data-lucide="minus" class="w-3.5 h-3.5 text-warning"></i>
           {{else}}
-          <div class="h-full rounded-full transition-all duration-700 ease-out"
-            style="width: {{printf "%.1f" (minf .Percent 100.0)}}%; background-color: {{safeCSS .Color}}; opacity: 0.4;"></div>
+          <i data-lucide="trending-down" class="w-3.5 h-3.5 text-error"></i>
           {{end}}
         </div>
-        {{if and .OverBudget (lt .Percent 200.0)}}
-        <!-- Target marker showing where 100% would be -->
-        <div class="absolute top-0 h-2.5 w-0.5 bg-base-content/25 rounded-full"
-          style="left: {{printf "%.1f" (divf 10000.0 .Percent)}}%;">
+        <div class="text-left">
+          {{if lt .SavingsRate -200.0}}
+          <div class="text-xs font-semibold text-error/80">Over budget</div>
+          <div class="text-[0.6rem] text-base-content/30">spending > income</div>
+          {{else}}
+          <div class="text-xs font-semibold tabular-nums {{if gt .SavingsRate 0.0}}text-success/80{{else}}text-error/80{{end}}">{{printf "%.0f" .SavingsRate}}%</div>
+          <div class="text-[0.6rem] text-base-content/30">savings rate</div>
+          {{end}}
         </div>
-        {{end}}
       </div>
+      {{end}}
     </div>
-    {{end}}
-  </div>
-
-  <!-- Summary footer -->
-  <div class="mt-4 pt-3 border-t border-base-200/60 flex items-center gap-3">
-    <i data-lucide="info" class="w-3 h-3 text-base-content/25 shrink-0"></i>
-    <p class="text-[0.6rem] text-base-content/30 leading-relaxed">
-      Targets are based on your historical average spending per category for {{if eq .ChartDays 365}}12-month{{else}}{{.ChartDays}}-day{{end}} periods. Categories exceeding 105% are flagged as over budget.
-    </p>
   </div>
 </div>
 {{end}}
@@ -918,9 +679,9 @@
 </div><!-- /tab: overview -->
 
 <!-- ═══════════════════════════════════════════════ -->
-<!-- TAB: Analysis                                  -->
+<!-- TAB: Spending                                  -->
 <!-- ═══════════════════════════════════════════════ -->
-<div x-show="tab === 'analysis'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
+<div x-show="tab === 'spending'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
 
 <!-- Merchant Analysis + Day-of-Week Heatmap -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 bb-stagger">
@@ -1125,192 +886,7 @@
 </div>
 {{end}}
 
-<!-- Smart Spending Insights -->
-{{if .SpendingInsights}}
-<div class="bb-card mb-6 p-5 bb-stagger">
-  <div class="flex items-center justify-between mb-4">
-    <div class="flex items-center gap-2.5">
-      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/8">
-        <i data-lucide="lightbulb" class="w-3.5 h-3.5 text-primary"></i>
-      </div>
-      <h2 class="text-sm font-semibold text-base-content/70">Spending Insights</h2>
-    </div>
-    <span class="text-xs text-base-content/30">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}} vs prev</span>
-  </div>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 sm:gap-3">
-    {{range .SpendingInsights}}
-    <div class="group relative p-4 rounded-xl border transition-all duration-200
-      {{if eq .Sentiment "negative"}}border-error/15 bg-error/3 hover:bg-error/5 hover:border-error/25
-      {{else if eq .Sentiment "positive"}}border-success/15 bg-success/3 hover:bg-success/5 hover:border-success/25
-      {{else if eq .Sentiment "info"}}border-primary/15 bg-primary/3 hover:bg-primary/5 hover:border-primary/25
-      {{else}}border-base-300/60 bg-base-200/20 hover:bg-base-200/40 hover:border-base-300{{end}}">
-      <div class="flex items-center gap-2.5 mb-2.5">
-        <div class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0
-          {{if eq .Sentiment "negative"}}bg-error/10
-          {{else if eq .Sentiment "positive"}}bg-success/10
-          {{else if eq .Sentiment "info"}}bg-primary/10
-          {{else}}bg-base-200/60{{end}}">
-          <i data-lucide="{{.Icon}}" class="w-4 h-4
-            {{if eq .Sentiment "negative"}}text-error/70
-            {{else if eq .Sentiment "positive"}}text-success/70
-            {{else if eq .Sentiment "info"}}text-primary/70
-            {{else}}text-base-content/40{{end}}"></i>
-        </div>
-        {{if ne .Change 0.0}}
-        <span class="text-[0.65rem] font-semibold px-1.5 py-0.5 rounded-full
-          {{if gt .Change 0.0}}bg-error/10 text-error/80
-          {{else}}bg-success/10 text-success/80{{end}}">
-          {{if gt .Change 0.0}}+{{end}}{{printf "%.0f" .Change}}%
-        </span>
-        {{end}}
-      </div>
-      <div class="text-sm font-semibold text-base-content/85 leading-tight mb-1">{{.Title}}</div>
-      <div class="text-xs text-base-content/45 leading-relaxed">{{.Detail}}</div>
-    </div>
-    {{end}}
-  </div>
-</div>
-{{end}}
-
-<!-- Anomaly Detection: Unusual Activity -->
-{{if or .HasCategoryAnomalies .HasTransactionAnomalies}}
-<div class="bb-card mb-6 p-5 bb-stagger">
-  <div class="flex items-center justify-between mb-4">
-    <div class="flex items-center gap-2.5">
-      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-error/8">
-        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-error/60"></i>
-      </div>
-      <div>
-        <h2 class="text-sm font-semibold text-base-content/70">Unusual Activity</h2>
-        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Spending patterns that differ significantly from your history</p>
-      </div>
-    </div>
-    <span class="text-xs text-base-content/30">vs historical avg</span>
-  </div>
-
-  {{if .HasCategoryAnomalies}}
-  <!-- Category Anomalies -->
-  <div class="mb-5">
-    <div class="text-[0.65rem] uppercase tracking-wider text-base-content/30 font-medium mb-3">Category Outliers</div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-      {{range .CategoryAnomalies}}
-      <div class="group relative p-4 rounded-xl border border-error/10 bg-error/[0.02] hover:bg-error/[0.04] hover:border-error/20 transition-all duration-200">
-        <!-- Severity indicator -->
-        <div class="absolute top-3 right-3">
-          <div class="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[0.6rem] font-bold tabular-nums
-            {{if ge .Multiplier 3.0}}bg-error/12 text-error/80
-            {{else if ge .Multiplier 2.0}}bg-warning/12 text-warning/80
-            {{else}}bg-warning/8 text-warning/60{{end}}">
-            {{printf "%.1f" .Multiplier}}x
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2 mb-2.5">
-          <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {{safeCSS .Color}}"></span>
-          <span class="text-sm font-semibold text-base-content/80 truncate pr-10">{{.Category}}</span>
-        </div>
-
-        <!-- Amount comparison -->
-        <div class="flex items-baseline gap-2 mb-3">
-          <span class="text-lg font-bold tabular-nums text-base-content/85">{{formatAmount .Current}}</span>
-          <span class="text-xs text-base-content/30">vs avg {{formatAmount .Historical}}</span>
-        </div>
-
-        <!-- Visual bar showing current vs average -->
-        <div class="relative mb-2.5">
-          <div class="w-full h-2 bg-base-200/50 rounded-full overflow-hidden">
-            <div class="h-full rounded-full transition-all duration-700 ease-out bg-error/30"
-              style="width: 100%;"></div>
-          </div>
-          <!-- Average marker -->
-          <div class="absolute top-0 h-2 w-0.5 bg-base-content/40 rounded-full"
-            style="left: {{if gt .Multiplier 0.0}}{{printf "%.0f" (divf 100.0 .Multiplier)}}%{{else}}0%{{end}};">
-            <div class="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[0.5rem] text-base-content/30 whitespace-nowrap font-medium">avg</div>
-          </div>
-        </div>
-
-        <!-- Top transaction in this category -->
-        {{if .TopTxName}}
-        <div class="mt-4 pt-2.5 border-t border-error/8">
-          <div class="flex items-center justify-between">
-            <span class="text-[0.65rem] text-base-content/40 truncate">{{.TopTxName}}</span>
-            <span class="text-[0.65rem] font-semibold tabular-nums text-base-content/50 shrink-0 ml-2">{{formatAmount .TopTxAmount}} &middot; {{.TopTxDate}}</span>
-          </div>
-        </div>
-        {{end}}
-      </div>
-      {{end}}
-    </div>
-  </div>
-  {{end}}
-
-  {{if .HasTransactionAnomalies}}
-  <!-- Individual Transaction Anomalies -->
-  <div>
-    <div class="text-[0.65rem] uppercase tracking-wider text-base-content/30 font-medium mb-3">Unusually Large Transactions</div>
-    <div class="overflow-x-auto">
-      <table class="w-full">
-        <thead>
-          <tr class="text-[0.65rem] uppercase tracking-wider text-base-content/30 border-b border-base-200/60">
-            <th class="text-left py-2 font-medium">Transaction</th>
-            <th class="text-right py-2 font-medium w-20">Amount</th>
-            <th class="text-right py-2 font-medium w-20 hidden sm:table-cell">Cat. Avg</th>
-            <th class="text-right py-2 font-medium w-14">Factor</th>
-            <th class="text-left py-2 font-medium w-20 pl-3 hidden md:table-cell">Date</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-base-200/40">
-          {{range .TransactionAnomalies}}
-          <tr class="group hover:bg-error/[0.02] transition-colors">
-            <td class="py-2.5 pr-3">
-              <div class="flex items-center gap-2.5">
-                <div class="flex items-center justify-center w-6 h-6 rounded-md shrink-0"
-                  style="background-color: {{safeCSS .CategoryColor}}; opacity: 0.15;">
-                  <i data-lucide="alert-circle" class="w-3 h-3" style="color: {{safeCSS .CategoryColor}};"></i>
-                </div>
-                <div class="min-w-0">
-                  <div class="text-sm font-medium text-base-content/80 truncate group-hover:text-base-content transition-colors">{{.Name}}</div>
-                  <div class="text-[0.6rem] text-base-content/30 truncate">{{.Category}}{{if .AccountName}} &middot; {{.AccountName}}{{end}}</div>
-                </div>
-              </div>
-            </td>
-            <td class="py-2.5 text-right">
-              <span class="text-sm font-semibold tabular-nums text-error/80">{{formatAmount .Amount}}</span>
-            </td>
-            <td class="py-2.5 text-right hidden sm:table-cell">
-              <span class="text-xs tabular-nums text-base-content/35">{{formatAmount .CategoryAvg}}</span>
-            </td>
-            <td class="py-2.5 text-right">
-              <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[0.65rem] font-bold tabular-nums
-                {{if ge .Multiplier 5.0}}bg-error/12 text-error/80
-                {{else if ge .Multiplier 3.0}}bg-warning/12 text-warning/80
-                {{else}}bg-warning/8 text-warning/60{{end}}">
-                {{printf "%.1f" .Multiplier}}x
-              </span>
-            </td>
-            <td class="py-2.5 pl-3 hidden md:table-cell">
-              <span class="text-xs text-base-content/40">{{.Date}}</span>
-            </td>
-          </tr>
-          {{end}}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {{end}}
-
-  <!-- Explanation footer -->
-  <div class="mt-4 pt-3 border-t border-base-200/60 flex items-center gap-3">
-    <i data-lucide="info" class="w-3 h-3 text-base-content/25 shrink-0"></i>
-    <p class="text-[0.6rem] text-base-content/30 leading-relaxed">
-      Categories flagged when spending exceeds 1.8x historical average. Transactions flagged when 1.5x or more above their category average.
-    </p>
-  </div>
-</div>
-{{end}}
-
-
-</div><!-- /tab: analysis -->
+</div><!-- /tab: spending -->
 
 <!-- ═══════════════════════════════════════════════ -->
 <!-- TAB: Trends                                    -->
@@ -1433,134 +1009,6 @@
 </div>
 {{end}}
 
-<!-- Spending Velocity: Cumulative daily curves for last 3 months -->
-{{if .HasVelocityData}}
-<div class="bb-card mb-6 p-5 bb-stagger">
-  <div class="flex items-center justify-between mb-4">
-    <div class="flex items-center gap-2.5">
-      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/8">
-        <i data-lucide="activity" class="w-3.5 h-3.5 text-primary/60"></i>
-      </div>
-      <div>
-        <h2 class="text-sm font-semibold text-base-content/70">Spending Velocity</h2>
-        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Cumulative daily spending across months</p>
-      </div>
-    </div>
-  </div>
-
-  <div id="echartsVelocityChart" style="width: 100%; height: 280px;"></div>
-
-  <!-- Legend -->
-  <div class="flex items-center gap-5 mt-3 pt-3 border-t border-base-200/60">
-    {{range .VelocityMonths}}
-    <span class="flex items-center gap-1.5 text-xs text-base-content/50">
-      <span class="w-2.5 h-1.5 rounded-sm {{if .IsCurrent}}bg-primary/60{{else}}bg-base-content/15{{end}}"></span>
-      {{.Label}}
-      <span class="text-[0.6rem] text-base-content/30 tabular-nums">{{formatBalance .FinalTotal}}</span>
-    </span>
-    {{end}}
-  </div>
-</div>
-{{end}}
-
-<!-- Savings Rate Trend -->
-{{if .HasSavingsRateTrend}}
-<div class="bb-card mb-6 p-5 bb-stagger">
-  <div class="flex items-center justify-between mb-4">
-    <div class="flex items-center gap-2.5">
-      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-success/8">
-        <i data-lucide="piggy-bank" class="w-3.5 h-3.5 text-success/60"></i>
-      </div>
-      <div>
-        <h2 class="text-sm font-semibold text-base-content/70">Savings Rate Trend</h2>
-        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Monthly (income - spending) / income over time</p>
-      </div>
-    </div>
-  </div>
-
-  <div id="echartsSavingsRateChart" style="width: 100%; height: 300px;"></div>
-
-  <!-- Monthly breakdown cards -->
-  <div class="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 mt-4 pt-3 border-t border-base-200/60">
-    {{range .SavingsRateTrend}}
-    <div class="text-center p-2.5 rounded-lg {{if gt .Rate 10.0}}bg-success/[0.04]{{else if gt .Rate 0.0}}bg-success/[0.02]{{else if eq .Income 0.0}}bg-base-200/20{{else}}bg-error/[0.03]{{end}}">
-      <div class="text-[0.65rem] text-base-content/35 font-medium mb-1">{{.Month}}</div>
-      {{if gt .Income 0.0}}
-      <div class="text-sm font-bold tabular-nums {{if gt .Rate 10.0}}text-success/80{{else if gt .Rate 0.0}}text-success/60{{else}}text-error/70{{end}}">
-        {{if gt .Rate 0.0}}+{{end}}{{printf "%.0f" .Rate}}%
-      </div>
-      <div class="text-[0.55rem] text-base-content/25 mt-0.5 tabular-nums">
-        {{if gt .Net 0.0}}+{{end}}{{if lt .Net 0.0}}-{{end}}{{formatBalance (absf .Net)}}
-      </div>
-      {{else}}
-      <div class="text-sm text-base-content/20">&mdash;</div>
-      <div class="text-[0.55rem] text-base-content/20 mt-0.5">no income</div>
-      {{end}}
-    </div>
-    {{end}}
-  </div>
-</div>
-{{end}}
-
-<!-- Family Spending Breakdown -->
-{{if .HasFamilyData}}
-<div class="bb-card mb-6 p-5 bb-stagger">
-  <div class="flex items-center justify-between mb-4">
-    <div class="flex items-center gap-2.5">
-      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
-        <i data-lucide="users" class="w-3.5 h-3.5 text-base-content/50"></i>
-      </div>
-      <div>
-        <h2 class="text-sm font-semibold text-base-content/70">Family Spending</h2>
-        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Per-member breakdown for selected period</p>
-      </div>
-    </div>
-    <span class="text-xs text-base-content/30">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}} period</span>
-  </div>
-
-  <!-- Stacked proportion bar -->
-  <div class="w-full h-4 rounded-full overflow-hidden flex mb-5">
-    {{range .FamilySpending}}
-    <div class="h-full transition-all duration-700 ease-out first:rounded-l-full last:rounded-r-full"
-      style="width: {{printf "%.1f" .Percent}}%; background-color: {{safeCSS .Color}}; opacity: 0.6;"
-      title="{{.UserName}}: {{printf "%.0f" .Percent}}%"></div>
-    {{end}}
-  </div>
-
-  <!-- Member cards -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-{{if le (len .FamilySpending) 3}}{{len .FamilySpending}}{{else}}3{{end}} gap-2 sm:gap-3">
-    {{range $i, $fs := .FamilySpending}}
-    <div class="group flex items-center gap-3.5 p-4 rounded-xl border border-base-200/60 bg-base-200/10 hover:bg-base-200/30 hover:border-base-300/60 transition-all duration-200">
-      <!-- Avatar circle with initial -->
-      <div class="flex items-center justify-center w-10 h-10 rounded-full shrink-0 text-sm font-bold text-white/90"
-        style="background-color: {{safeCSS $fs.Color}};">
-        {{slice $fs.UserName 0 1}}
-      </div>
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center justify-between gap-2 mb-1">
-          <span class="text-sm font-semibold text-base-content/80 truncate group-hover:text-base-content transition-colors">{{$fs.UserName}}</span>
-          <span class="text-sm font-semibold tabular-nums text-base-content/80 shrink-0">{{formatAmount $fs.Total}}</span>
-        </div>
-        <!-- Progress bar relative to max -->
-        <div class="w-full h-1.5 bg-base-200/50 rounded-full overflow-hidden mb-1.5">
-          <div class="h-full rounded-full transition-all duration-500 ease-out"
-            style="width: {{printf "%.1f" $fs.Percent}}%; background-color: {{safeCSS $fs.Color}}; opacity: 0.5;"></div>
-        </div>
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full bg-base-200/60 text-base-content/40">{{printf "%.0f" $fs.Percent}}%</span>
-            {{if $fs.TopCat}}<span class="text-[0.6rem] text-base-content/25 truncate">{{$fs.TopCat}}</span>{{end}}
-          </div>
-          <span class="text-[0.6rem] text-base-content/30 tabular-nums">{{$fs.TxCount}} txns</span>
-        </div>
-      </div>
-    </div>
-    {{end}}
-  </div>
-</div>
-{{end}}
-
-
 </div><!-- /tab: trends -->
 
 </div><!-- /x-show insightsReady wrapper -->
@@ -1574,7 +1022,6 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   // ── Sparkline Renderer ──
-  // Draws a tiny polyline + gradient fill in each .bb-sparkline SVG
   document.querySelectorAll('.bb-sparkline').forEach(function(svg) {
     var raw = svg.getAttribute('data-values');
     if (!raw) return;
@@ -1596,7 +1043,6 @@ document.addEventListener('DOMContentLoaded', function() {
       return x.toFixed(1) + ',' + y.toFixed(1);
     });
 
-    // Gradient fill area
     var gradId = 'sg' + Math.random().toString(36).substr(2, 6);
     var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
     var grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
@@ -1616,7 +1062,6 @@ document.addEventListener('DOMContentLoaded', function() {
     defs.appendChild(grad);
     svg.appendChild(defs);
 
-    // Fill polygon (area under curve)
     var fillPoints = points.join(' ') + ' ' + (w - pad).toFixed(1) + ',' + (h - pad).toFixed(1) + ' ' + pad.toFixed(1) + ',' + (h - pad).toFixed(1);
     var polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
     polygon.setAttribute('points', fillPoints);
@@ -1624,7 +1069,6 @@ document.addEventListener('DOMContentLoaded', function() {
     polygon.setAttribute('class', 'bb-sparkline-area');
     svg.appendChild(polygon);
 
-    // Polyline (the sparkline itself)
     var polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
     polyline.setAttribute('points', points.join(' '));
     polyline.setAttribute('fill', 'none');
@@ -1635,7 +1079,6 @@ document.addEventListener('DOMContentLoaded', function() {
     polyline.setAttribute('class', 'bb-sparkline-line');
     svg.appendChild(polyline);
 
-    // End dot
     var lastPt = points[points.length - 1].split(',');
     var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     dot.setAttribute('cx', lastPt[0]);
@@ -1649,7 +1092,6 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // ── Count-Up Animation ──
-  // Animates numbers from 0 to their final value using easeOutExpo
   var countEls = document.querySelectorAll('[data-countup]');
   if (!countEls.length) return;
 
@@ -1695,11 +1137,9 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- ECharts Initialization -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // Reset flag for this page load.
   window._insightsChartsLoaded = false;
 
   var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  // Read theme-aware colors from CSS custom properties
   var cs = getComputedStyle(document.documentElement);
   var textColor = cs.getPropertyValue('--bb-chart-text').trim();
   var splitLineColor = cs.getPropertyValue('--bb-chart-grid').trim();
@@ -1713,10 +1153,8 @@ document.addEventListener('DOMContentLoaded', function() {
   var incomeColor = cs.getPropertyValue('--bb-chart-income').trim();
   var incomeLineColor = cs.getPropertyValue('--bb-chart-income-line').trim();
 
-  // Mobile-aware chart sizing
   var isMobile = window.innerWidth < 640;
 
-  // Compact dollar formatter for Y-axis labels (abbreviates on mobile)
   function formatAxisDollar(v) {
     var abs = Math.abs(v);
     var prefix = v < 0 ? '-$' : '$';
@@ -1726,7 +1164,6 @@ document.addEventListener('DOMContentLoaded', function() {
     return prefix + abs.toLocaleString();
   }
 
-  // Track all ECharts instances for tab-switch resize
   var insightCharts = [];
 
   // ── Net Worth Trend Chart ──
@@ -1743,7 +1180,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var first = values[0], last = values[values.length - 1];
     var trendUp = last >= first;
-    // ECharts 5.x canvas renderer cannot parse oklch() — use rgba for gradients
     var lineColor, gradTop, gradBot;
     if (trendUp) {
       lineColor = isDark ? 'rgba(74, 222, 128, 1)' : 'rgba(22, 163, 74, 1)';
@@ -1780,10 +1216,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         }
       },
-      yAxis: {
-        type: 'value',
-        show: false
-      },
+      yAxis: { type: 'value', show: false },
       tooltip: {
         trigger: 'axis',
         backgroundColor: tooltipBg,
@@ -1822,10 +1255,7 @@ document.addEventListener('DOMContentLoaded', function() {
             ]
           }
         },
-        emphasis: {
-          disabled: false,
-          scale: false
-        }
+        emphasis: { disabled: false, scale: false }
       }],
       animation: true,
       animationDuration: 600,
@@ -1877,13 +1307,8 @@ document.addEventListener('DOMContentLoaded', function() {
       name: 'Spending',
       type: 'bar',
       data: dailyData,
-      itemStyle: {
-        color: spendColor,
-        borderRadius: [3, 3, 0, 0]
-      },
-      emphasis: {
-        itemStyle: { color: spendHoverColor }
-      },
+      itemStyle: { color: spendColor, borderRadius: [3, 3, 0, 0] },
+      emphasis: { itemStyle: { color: spendHoverColor } },
       barWidth: barWidth,
       z: 2
     }];
@@ -1975,7 +1400,6 @@ document.addEventListener('DOMContentLoaded', function() {
       series: series
     };
 
-    // Add dataZoom slider for 90d and 12m views
     if (chartDays >= 90) {
       option.dataZoom = [{
         type: 'slider',
@@ -2020,13 +1444,6 @@ document.addEventListener('DOMContentLoaded', function() {
     var colors = {{.CategoryColors}};
     var totalSpending = {{printf "%.2f" .TotalSpending}};
     var drilldownData = {{if .CategoryDrilldownJSON}}{{.CategoryDrilldownJSON}}{{else}}{}{{end}};
-
-    // Merchant sub-colors: generate shades from parent color
-    var merchantPalette = [
-      'oklch(0.55 0.12 250)', 'oklch(0.60 0.10 250)', 'oklch(0.50 0.14 250)',
-      'oklch(0.58 0.08 250)', 'oklch(0.52 0.11 250)', 'oklch(0.63 0.07 250)',
-      'oklch(0.48 0.13 250)', 'oklch(0.65 0.06 250)'
-    ];
 
     var categoryData = labels.map(function(name, i) {
       return { value: amounts[i], name: name, itemStyle: { color: colors[i] } };
@@ -2088,18 +1505,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function buildMerchantOption(categoryName, parentColor, merchants) {
       var catTotal = 0;
       merchants.forEach(function(m) { catTotal += m.amount; });
-      // Generate color shades from parent
       var hueMatch = parentColor.match(/oklch\([\d.]+ [\d.]+ ([\d.]+)\)/);
       var baseHue = hueMatch ? parseFloat(hueMatch[1]) : 250;
-      var mColors = merchants.map(function(_, i) {
+      var mData = merchants.map(function(m, i) {
         var l = 0.58 - (i * 0.03);
         var c = 0.12 - (i * 0.008);
         if (l < 0.38) l = 0.38;
         if (c < 0.04) c = 0.04;
-        return 'oklch(' + l.toFixed(2) + ' ' + c.toFixed(2) + ' ' + baseHue.toFixed(0) + ')';
-      });
-      var mData = merchants.map(function(m, i) {
-        return { value: m.amount, name: m.name, itemStyle: { color: mColors[i] } };
+        var color = 'oklch(' + l.toFixed(2) + ' ' + c.toFixed(2) + ' ' + baseHue.toFixed(0) + ')';
+        return { value: m.amount, name: m.name, itemStyle: { color: color } };
       });
       return {
         animation: true,
@@ -2156,7 +1570,6 @@ document.addEventListener('DOMContentLoaded', function() {
     chart.setOption(buildCategoryOption());
     insightCharts.push(chart);
 
-    // Click handler: drill into category
     chart.on('click', function(params) {
       if (params.componentType !== 'series') return;
       var categoryName = params.name;
@@ -2164,7 +1577,6 @@ document.addEventListener('DOMContentLoaded', function() {
       var merchants = drilldownData[categoryName];
       if (!merchants || merchants.length === 0) return;
 
-      // Update Alpine state
       var alpineEl = el.closest('[x-data]');
       if (alpineEl && alpineEl.__x) {
         alpineEl.__x.$data.isDrilledDown = true;
@@ -2181,14 +1593,11 @@ document.addEventListener('DOMContentLoaded', function() {
       chart.setOption(buildMerchantOption(categoryName, parentColor, merchants), true);
     });
 
-    // Expose chart for Alpine drill-up
     window._categoryDonutChart = chart;
     window._categoryDonutCategoryOption = buildCategoryOption;
     window._categoryDonutMerchantOption = buildMerchantOption;
     window._categoryDrilldownData = drilldownData;
 
-    // ── Linked chart-list highlighting ──
-    // When hovering a donut segment, update Alpine highlightedCategory state.
     chart.on('mouseover', function(params) {
       if (params.componentType !== 'series') return;
       var pageEl = document.querySelector('[x-data]');
@@ -2210,7 +1619,6 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
 
-    // Expose highlight/downplay for list -> chart interaction.
     window._insightsHighlightDonut = function(categoryName) {
       if (!chart || chart.isDisposed()) return;
       chart.dispatchAction({ type: 'highlight', seriesIndex: 0, name: categoryName });
@@ -2224,524 +1632,9 @@ document.addEventListener('DOMContentLoaded', function() {
   })();
   {{end}}
 
-  // ── Cash Flow Forecast Chart ──
-  {{if .HasForecastData}}
-  (function() {
-    var el = document.getElementById('echartsForecastChart');
-    if (!el) return;
-    var chart = echarts.init(el, null, { renderer: 'canvas' });
-
-    var fData = {{.ForecastJSON}};
-    var daysElapsed = fData.daysElapsed;
-
-    var positiveColor = cs.getPropertyValue('--bb-chart-positive').trim();
-    var negativeColor = cs.getPropertyValue('--bb-chart-negative').trim();
-    var projColor = cs.getPropertyValue('--bb-chart-proj').trim();
-    var projAreaColor = cs.getPropertyValue('--bb-chart-proj-area').trim();
-
-    // Actual line: only actual days (past).
-    var actualData = fData.actual.slice();
-
-    // Forecast line: starts from last actual day and continues.
-    var forecastData = fData.forecast.map(function(v, i) {
-      if (i < daysElapsed - 1) return null;
-      return v;
-    });
-
-    var projectedEOM = fData.projectedEOM;
-    var eomColor = projectedEOM >= 0 ? positiveColor : negativeColor;
-
-    var option = {
-      animation: true,
-      animationDuration: 800,
-      animationEasing: 'cubicOut',
-      grid: { top: 28, right: isMobile ? 50 : 70, bottom: 28, left: isMobile ? 8 : 50, containLabel: true },
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: tooltipBg,
-        borderColor: tooltipBorder,
-        borderWidth: 1,
-        padding: [10, 14],
-        textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
-        extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
-        formatter: function(params) {
-          var idx = params[0].dataIndex;
-          var label = fData.labels[idx];
-          var isActual = idx < daysElapsed;
-          var title = '<div style="font-weight:600;font-size:11px;margin-bottom:6px;color:' + tooltipText + '">' + label + (isActual ? '' : ' (projected)') + '</div>';
-          var items = '';
-          params.forEach(function(p) {
-            if (p.value == null) return;
-            var dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + p.color + ';margin-right:8px;vertical-align:middle;"></span>';
-            var val = (p.value >= 0 ? '+' : '-') + '$' + Math.abs(p.value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-            var valColor = p.value >= 0 ? positiveColor : negativeColor;
-            items += '<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:2px 0;">' +
-              '<span style="color:' + tooltipSubtext + ';font-size:12px;">' + dot + p.seriesName + '</span>' +
-              '<span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + valColor + '">' + val + '</span></div>';
-          });
-          return title + items;
-        }
-      },
-      xAxis: {
-        type: 'category',
-        data: fData.labels,
-        axisLine: { show: false },
-        axisTick: { show: false },
-        axisLabel: {
-          color: textColor,
-          fontSize: 10,
-          fontWeight: 500,
-          fontFamily: 'Inter, system-ui, sans-serif',
-          interval: function(index) {
-            var step = isMobile ? 7 : 5;
-            return index === 0 || (index + 1) % step === 0 || index === fData.labels.length - 1;
-          }
-        }
-      },
-      yAxis: {
-        type: 'value',
-        axisLine: { show: false },
-        axisTick: { show: false },
-        axisLabel: {
-          color: textColor,
-          fontSize: 10,
-          fontWeight: 500,
-          fontFamily: 'Inter, system-ui, sans-serif',
-          formatter: formatAxisDollar
-        },
-        splitLine: { lineStyle: { color: splitLineColor } },
-        splitNumber: 4
-      },
-      series: [
-        {
-          name: 'Actual',
-          type: 'line',
-          data: actualData,
-          symbol: 'circle',
-          symbolSize: function(value, params) {
-            return params.dataIndex === daysElapsed - 1 ? 8 : 0;
-          },
-          lineStyle: {
-            color: cs.getPropertyValue('--bb-chart-accent').trim(),
-            width: 2.5
-          },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: cs.getPropertyValue('--bb-chart-accent-area').trim() },
-              { offset: 1, color: 'rgba(70,100,200,0.01)' }
-            ])
-          },
-          itemStyle: { color: cs.getPropertyValue('--bb-chart-accent').trim() },
-          emphasis: {
-            itemStyle: { borderWidth: 2, borderColor: isDark ? '#222' : '#fff', shadowBlur: 4 }
-          },
-          smooth: 0.3,
-          z: 3,
-          connectNulls: false,
-          markLine: {
-            silent: true,
-            symbol: 'none',
-            lineStyle: { color: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)', type: 'dashed', width: 1 },
-            label: {
-              show: true,
-              position: 'insideEndTop',
-              formatter: '$0',
-              color: textColor,
-              fontSize: 9,
-              fontFamily: 'Inter, system-ui, sans-serif'
-            },
-            data: [{ yAxis: 0 }]
-          }
-        },
-        {
-          name: 'Projected',
-          type: 'line',
-          data: forecastData,
-          symbol: 'none',
-          lineStyle: {
-            color: projColor,
-            width: 2,
-            type: 'dashed'
-          },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: projAreaColor },
-              { offset: 1, color: 'rgba(70,100,200,0.005)' }
-            ])
-          },
-          itemStyle: { color: projColor },
-          smooth: 0.3,
-          z: 2,
-          connectNulls: false,
-          markPoint: {
-            symbol: 'circle',
-            symbolSize: 40,
-            label: {
-              show: true,
-              formatter: function(params) {
-                var v = params.value;
-                var prefix = v >= 0 ? '+$' : '-$';
-                var abs = Math.abs(v);
-                if (abs >= 1000) return prefix + (abs / 1000).toFixed(1) + 'k';
-                return prefix + abs.toFixed(0);
-              },
-              color: eomColor,
-              fontSize: 10,
-              fontWeight: 700,
-              fontFamily: 'Inter, system-ui, sans-serif'
-            },
-            itemStyle: {
-              color: isDark ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.95)',
-              borderColor: eomColor,
-              borderWidth: 2,
-              shadowBlur: 8,
-              shadowColor: 'rgba(0,0,0,0.1)'
-            },
-            data: [{
-              coord: [fData.labels.length - 1, projectedEOM],
-              value: projectedEOM
-            }]
-          }
-        }
-      ]
-    };
-
-    chart.setOption(option);
-    insightCharts.push(chart);
-    window.addEventListener('resize', function() { chart.resize(); });
-  })();
-  {{end}}
-
-  // ── Velocity Chart (ECharts) ──
-  {{if .HasVelocityData}}
-  (function() {
-    var velocityInitialized = false;
-    var velocityData = {{.VelocityJSON}};
-
-    function initVelocityChart() {
-      if (velocityInitialized) return;
-      var el = document.getElementById('echartsVelocityChart');
-      if (!el || el.offsetParent === null) return;
-      velocityInitialized = true;
-
-      var chart = echarts.init(el, null, { renderer: 'canvas' });
-      var vData = velocityData;
-      var numMonths = vData.datasets.length;
-
-      var lineColors = [
-        cs.getPropertyValue('--bb-chart-velocity-old1').trim(),
-        cs.getPropertyValue('--bb-chart-velocity-old2').trim(),
-        cs.getPropertyValue('--bb-chart-velocity-current').trim()
-      ];
-      var lineWidths = [1.5, 1.5, 2.5];
-      var lineDashes = [[5, 4], [5, 4], [0, 0]];
-
-      var series = vData.datasets.map(function(ds, i) {
-        var data = ds.data.slice();
-        // For current month, trim trailing zeroes
-        if (i === numMonths - 1) {
-          var lastNonZero = data.length - 1;
-          while (lastNonZero > 0 && data[lastNonZero] === 0) lastNonZero--;
-          // Set trailing zeroes to null so line stops
-          for (var k = lastNonZero + 1; k < data.length; k++) data[k] = null;
-        }
-        var s = {
-          name: ds.label,
-          type: 'line',
-          data: data,
-          symbol: 'none',
-          smooth: 0.3,
-          lineStyle: {
-            color: lineColors[i],
-            width: lineWidths[i],
-            type: lineDashes[i][0] > 0 ? 'dashed' : 'solid'
-          },
-          itemStyle: { color: lineColors[i] },
-          emphasis: {
-            lineStyle: { width: lineWidths[i] + 1 }
-          },
-          z: i + 1
-        };
-        // Fill area for current month only
-        if (i === numMonths - 1) {
-          s.areaStyle = {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: cs.getPropertyValue('--bb-chart-accent-area').trim() },
-              { offset: 1, color: 'rgba(70,100,200,0.01)' }
-            ])
-          };
-        }
-        return s;
-      });
-
-      var option = {
-        animation: true,
-        animationDuration: 800,
-        animationEasing: 'cubicOut',
-        grid: { top: 12, right: 12, bottom: 36, left: isMobile ? 8 : 50, containLabel: true },
-        tooltip: {
-          trigger: 'axis',
-          backgroundColor: tooltipBg,
-          borderColor: tooltipBorder,
-          borderWidth: 1,
-          padding: [10, 14],
-          textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
-          extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
-          formatter: function(params) {
-            var title = '<div style="font-weight:600;font-size:11px;margin-bottom:6px;color:' + tooltipText + '">Day ' + params[0].axisValue + '</div>';
-            var items = '';
-            params.forEach(function(p) {
-              if (p.value == null) return;
-              var dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + p.color + ';margin-right:8px;vertical-align:middle;"></span>';
-              var val = '$' + p.value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-              items += '<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:2px 0;">' +
-                '<span style="color:' + tooltipSubtext + ';font-size:12px;">' + dot + p.seriesName + '</span>' +
-                '<span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + val + '</span></div>';
-            });
-            return title + items;
-          }
-        },
-        xAxis: {
-          type: 'category',
-          data: vData.labels,
-          axisLine: { show: false },
-          axisTick: { show: false },
-          axisLabel: {
-            color: textColor,
-            fontSize: 10,
-            fontWeight: 500,
-            fontFamily: 'Inter, system-ui, sans-serif',
-            formatter: function(v) {
-              var n = parseInt(v);
-              var step = isMobile ? 7 : 5;
-              return (n === 1 || n % step === 0) ? n : '';
-            }
-          },
-          name: 'Day of month',
-          nameLocation: 'middle',
-          nameGap: 22,
-          nameTextStyle: { color: textColor, fontSize: 10, fontWeight: 500, fontFamily: 'Inter, system-ui, sans-serif' }
-        },
-        yAxis: {
-          type: 'value',
-          axisLine: { show: false },
-          axisTick: { show: false },
-          axisLabel: {
-            color: textColor,
-            fontSize: 10,
-            fontWeight: 500,
-            fontFamily: 'Inter, system-ui, sans-serif',
-            formatter: formatAxisDollar
-          },
-          splitLine: { lineStyle: { color: splitLineColor } },
-          splitNumber: 4
-        },
-        series: series
-      };
-
-      chart.setOption(option);
-      insightCharts.push(chart);
-      window.addEventListener('resize', function() { chart.resize(); });
-    }
-
-    // Initialize on DOMContentLoaded if tab is already 'trends', otherwise defer.
-    if (new URLSearchParams(window.location.search).get('tab') === 'trends') {
-      setTimeout(initVelocityChart, 50);
-    }
-    // Deferred init registered below in tab-switch handler.
-    window._initVelocityChart = initVelocityChart;
-  })();
-  {{end}}
-
-  // ── Savings Rate Trend Chart ──
-  {{if .HasSavingsRateTrend}}
-  (function() {
-    var srtInitialized = false;
-    var srtData = {{.SavingsRateTrendJSON}};
-
-    function initSavingsRateChart() {
-      if (srtInitialized) return;
-      var el = document.getElementById('echartsSavingsRateChart');
-      if (!el || el.offsetParent === null) return;
-      srtInitialized = true;
-
-      var chart = echarts.init(el, null, { renderer: 'canvas' });
-
-      var positiveColor = cs.getPropertyValue('--bb-chart-positive').trim();
-      var negativeColor = cs.getPropertyValue('--bb-chart-negative').trim();
-      var zeroLineColor = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
-      var areaPositive = isDark ? 'rgba(100,210,150,0.08)' : 'rgba(46,160,100,0.06)';
-      var areaNegative = isDark ? 'rgba(250,110,110,0.08)' : 'rgba(220,60,60,0.06)';
-
-      // Color each data point based on positive/negative.
-      var rateData = srtData.rates.map(function(r) {
-        return {
-          value: r,
-          itemStyle: { color: r >= 0 ? positiveColor : negativeColor }
-        };
-      });
-
-      var option = {
-        animation: true,
-        animationDuration: 800,
-        animationEasing: 'cubicOut',
-        grid: { top: 40, right: 20, bottom: 36, left: isMobile ? 8 : 50, containLabel: true },
-        tooltip: {
-          trigger: 'axis',
-          backgroundColor: tooltipBg,
-          borderColor: tooltipBorder,
-          borderWidth: 1,
-          padding: [10, 14],
-          textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
-          extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
-          formatter: function(params) {
-            var idx = params[0].dataIndex;
-            var rate = srtData.rates[idx];
-            var income = srtData.income[idx];
-            var spending = srtData.spending[idx];
-            var net = srtData.net[idx];
-            var rateColor = rate >= 0 ? positiveColor : negativeColor;
-
-            var title = '<div style="font-weight:600;font-size:11px;margin-bottom:8px;color:' + tooltipText + '">' + srtData.labels[idx] + '</div>';
-
-            // Savings rate big number.
-            var rateStr = (rate >= 0 ? '+' : '') + rate.toFixed(1) + '%';
-            var rateLine = '<div style="font-size:18px;font-weight:700;color:' + rateColor + ';margin-bottom:8px;font-variant-numeric:tabular-nums;">' + rateStr + ' <span style="font-size:11px;font-weight:500;color:' + tooltipSubtext + '">savings rate</span></div>';
-
-            var fmt = function(v) { return '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
-            var rows = '';
-            rows += '<div style="display:flex;justify-content:space-between;gap:16px;padding:2px 0;"><span style="color:' + tooltipSubtext + ';font-size:12px;">Income</span><span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + fmt(income) + '</span></div>';
-            rows += '<div style="display:flex;justify-content:space-between;gap:16px;padding:2px 0;"><span style="color:' + tooltipSubtext + ';font-size:12px;">Spending</span><span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + fmt(spending) + '</span></div>';
-            rows += '<div style="border-top:1px solid ' + tooltipBorder + ';margin:4px 0;"></div>';
-            rows += '<div style="display:flex;justify-content:space-between;gap:16px;padding:2px 0;"><span style="color:' + tooltipSubtext + ';font-size:12px;">Net</span><span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + (net >= 0 ? positiveColor : negativeColor) + '">' + (net >= 0 ? '+' : '-') + fmt(net) + '</span></div>';
-
-            return title + rateLine + rows;
-          }
-        },
-        xAxis: {
-          type: 'category',
-          data: srtData.labels,
-          axisLine: { show: false },
-          axisTick: { show: false },
-          axisLabel: {
-            color: textColor,
-            fontSize: 11,
-            fontWeight: 600,
-            fontFamily: 'Inter, system-ui, sans-serif'
-          }
-        },
-        yAxis: {
-          type: 'value',
-          axisLine: { show: false },
-          axisTick: { show: false },
-          axisLabel: {
-            color: textColor,
-            fontSize: 10,
-            fontWeight: 500,
-            fontFamily: 'Inter, system-ui, sans-serif',
-            formatter: function(v) { return v + '%'; }
-          },
-          splitLine: { lineStyle: { color: splitLineColor } },
-          splitNumber: 4
-        },
-        series: [
-          {
-            name: 'Savings Rate',
-            type: 'line',
-            data: rateData,
-            symbol: 'circle',
-            symbolSize: 10,
-            lineStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 1, 0,
-                srtData.rates.map(function(r, i) {
-                  return { offset: i / Math.max(srtData.rates.length - 1, 1), color: r >= 0 ? positiveColor : negativeColor };
-                })
-              ),
-              width: 3
-            },
-            areaStyle: {
-              color: {
-                type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-                colorStops: [
-                  { offset: 0, color: areaPositive },
-                  { offset: 0.5, color: 'rgba(0,0,0,0)' },
-                  { offset: 1, color: areaNegative }
-                ]
-              },
-              origin: 0
-            },
-            emphasis: {
-              itemStyle: { borderWidth: 3, borderColor: isDark ? '#222' : '#fff', shadowBlur: 6, shadowColor: 'rgba(0,0,0,0.15)' }
-            },
-            markLine: {
-              silent: true,
-              symbol: 'none',
-              lineStyle: { color: zeroLineColor, type: 'dashed', width: 1.5 },
-              label: {
-                show: true,
-                position: 'insideEndTop',
-                formatter: '0%',
-                color: textColor,
-                fontSize: 9,
-                fontFamily: 'Inter, system-ui, sans-serif'
-              },
-              data: [{ yAxis: 0 }]
-            },
-            smooth: 0.3
-          },
-          // Invisible bar series to show income/spending context.
-          {
-            name: 'Income',
-            type: 'bar',
-            data: srtData.income,
-            barWidth: '30%',
-            itemStyle: {
-              color: isDark ? 'rgba(100,210,150,0.08)' : 'rgba(46,160,100,0.06)',
-              borderRadius: [3, 3, 0, 0]
-            },
-            emphasis: {
-              itemStyle: { color: isDark ? 'rgba(100,210,150,0.15)' : 'rgba(46,160,100,0.12)' }
-            },
-            yAxisIndex: 0,
-            z: 1,
-            // Use a second y-axis for absolute values.
-            silent: true
-          }
-        ]
-      };
-
-      // Add a second y-axis for the bar chart (hidden, auto-scaled).
-      option.yAxis = [option.yAxis, {
-        type: 'value',
-        show: false,
-        // Scale independently.
-      }];
-      option.series[1].yAxisIndex = 1;
-
-      chart.setOption(option);
-      insightCharts.push(chart);
-      window.addEventListener('resize', function() { chart.resize(); });
-    }
-
-    // Initialize if trends tab is active, otherwise defer.
-    if (new URLSearchParams(window.location.search).get('tab') === 'trends') {
-      setTimeout(initSavingsRateChart, 60);
-    }
-    // Deferred init registered below in tab-switch handler.
-    window._initSavingsRateChart = initSavingsRateChart;
-  })();
-  {{end}}
-
-  // ── Tab-switch handler: init deferred charts + resize all ──
-  // Use Alpine's $watch via a custom event to properly handle tab visibility.
+  // ── Tab-switch handler: resize all charts ──
   window._insightCharts = insightCharts;
   window._onInsightsTabSwitch = function(newTab) {
-    // Initialize deferred charts when their tab becomes visible.
-    if (newTab === 'trends') {
-      if (window._initVelocityChart) setTimeout(window._initVelocityChart, 50);
-      if (window._initSavingsRateChart) setTimeout(window._initSavingsRateChart, 60);
-    }
-    // Resize all existing chart instances after tab transition completes.
     setTimeout(function() {
       insightCharts.forEach(function(c) {
         try { c.resize(); } catch(e) {}
@@ -2750,10 +1643,6 @@ document.addEventListener('DOMContentLoaded', function() {
   };
 
   // ── Signal to Alpine that insights content is ready ──
-  // Race condition: DOMContentLoaded may fire before or after Alpine x-init.
-  // 1. Set flag so x-init picks it up if it runs later.
-  // 2. Try calling _setInsightsReady now (works if x-init already ran).
-  // 3. Retry after a short delay to catch Alpine finishing after us.
   window._insightsChartsLoaded = true;
   function resizeAllCharts() {
     insightCharts.forEach(function(c) {
@@ -2763,17 +1652,12 @@ document.addEventListener('DOMContentLoaded', function() {
   function activateInsights() {
     if (typeof window._setInsightsReady === 'function') {
       window._setInsightsReady();
-      // The content div has a 400ms enter transition (display:none → visible).
-      // Charts initialized while hidden get 100px default width.
-      // Resize aggressively: after transition, and watch the wrapper for layout changes.
       var wrapper = document.getElementById('insightsContent');
       function doResize() { resizeAllCharts(); }
       setTimeout(doResize, 50);
       setTimeout(doResize, 200);
       setTimeout(doResize, 450);
       setTimeout(doResize, 800);
-      // Watch the content wrapper — when it transitions from display:none to visible,
-      // its dimensions change and we resize all charts inside it.
       if (wrapper && typeof ResizeObserver !== 'undefined') {
         var ro = new ResizeObserver(doResize);
         ro.observe(wrapper);
@@ -2783,7 +1667,6 @@ document.addEventListener('DOMContentLoaded', function() {
     return false;
   }
   if (!activateInsights()) {
-    // Alpine x-init hasn't run yet; retry until it does.
     var retries = 0;
     var retryInterval = setInterval(function() {
       if (activateInsights() || ++retries > 50) clearInterval(retryInterval);
@@ -2815,14 +1698,12 @@ function categoryDrilldown() {
       this.activeCategoryColor = parentColor;
       this.activeMerchants = merchants;
 
-      // Update chart
       var chart = window._categoryDonutChart;
       var buildMerchant = window._categoryDonutMerchantOption;
       if (chart && buildMerchant) {
         chart.setOption(buildMerchant(categoryName, parentColor, merchants), true);
       }
 
-      // Re-render lucide icons
       this.$nextTick(function() {
         if (typeof lucide !== 'undefined') lucide.createIcons();
       });
@@ -2832,14 +1713,12 @@ function categoryDrilldown() {
       this.activeCategoryName = '';
       this.activeMerchants = [];
 
-      // Reset chart
       var chart = window._categoryDonutChart;
       var buildCategory = window._categoryDonutCategoryOption;
       if (chart && buildCategory) {
         chart.setOption(buildCategory(), true);
       }
 
-      // Re-render lucide icons
       this.$nextTick(function() {
         if (typeof lucide !== 'undefined') lucide.createIcons();
       });
@@ -2848,10 +1727,9 @@ function categoryDrilldown() {
 }
 </script>
 
-<!-- Re-init Lucide icons and resize charts on tab switch -->
+<!-- Re-init Lucide icons on tab switch -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // Augment the tab-switch handler to also re-render Lucide icons.
   var originalHandler = window._onInsightsTabSwitch;
   window._onInsightsTabSwitch = function(newTab) {
     if (originalHandler) originalHandler(newTab);
@@ -2916,13 +1794,6 @@ document.addEventListener('DOMContentLoaded', function() {
         rows.push(['', c.name, fmt(c.amount), c.percent.toFixed(1) + '%']);
       });
     }
-    if (exportData.budgets && exportData.budgets.length > 0) {
-      rows.push([]);
-      rows.push(['Budget Targets', 'Category', 'Current', 'Target (Historical Avg)', 'Percent of Target']);
-      exportData.budgets.forEach(function(b) {
-        rows.push(['', b.category, fmt(b.current), fmt(b.target), b.percent.toFixed(1) + '%']);
-      });
-    }
     if (exportData.dayOfWeek && exportData.dayOfWeek.length > 0) {
       rows.push([]);
       rows.push(['Day of Week', 'Day', 'Total', 'Transactions']);
@@ -2963,26 +1834,6 @@ document.addEventListener('DOMContentLoaded', function() {
     return toCSV(headers, rows);
   }
 
-  function buildAnomalies() {
-    var sections = [];
-    if (exportData.categoryAnomalies && exportData.categoryAnomalies.length > 0) {
-      var headers1 = ['Type', 'Category', 'Current', 'Historical Avg', 'Multiplier'];
-      var rows1 = exportData.categoryAnomalies.map(function(a) {
-        return ['Category', a.category, fmt(a.current), fmt(a.historical), a.multiplier.toFixed(1) + 'x'];
-      });
-      sections.push(toCSV(headers1, rows1));
-    }
-    if (exportData.transactionAnomalies && exportData.transactionAnomalies.length > 0) {
-      var headers2 = ['Type', 'Name', 'Amount', 'Date', 'Category', 'Category Avg', 'Multiplier'];
-      var rows2 = exportData.transactionAnomalies.map(function(a) {
-        return ['Transaction', a.name, fmt(a.amount), a.date, a.category, fmt(a.categoryAvg), a.multiplier.toFixed(1) + 'x'];
-      });
-      sections.push(toCSV(headers2, rows2));
-    }
-    if (sections.length === 0) return null;
-    return sections.join('\n\n');
-  }
-
   function buildAll() {
     var sections = [];
     var summary = buildSummary();
@@ -2996,17 +1847,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var recurring = buildRecurring();
     if (recurring) sections.push('\n=== RECURRING CHARGES ===\n' + recurring);
-
-    var anomalies = buildAnomalies();
-    if (anomalies) sections.push('\n=== ANOMALIES ===\n' + anomalies);
-
-    if (exportData.savingsRateTrend && exportData.savingsRateTrend.length > 0) {
-      var sHeaders = ['Month', 'Income', 'Spending', 'Net', 'Savings Rate'];
-      var sRows = exportData.savingsRateTrend.map(function(s) {
-        return [s.month, fmt(s.income), fmt(s.spending), fmt(s.net), s.rate.toFixed(1) + '%'];
-      });
-      sections.push('\n=== SAVINGS RATE TREND ===\n' + toCSV(sHeaders, sRows));
-    }
 
     return sections.join('\n');
   }
@@ -3033,10 +1873,6 @@ document.addEventListener('DOMContentLoaded', function() {
         csv = buildRecurring();
         filename = 'breadbox-recurring-charges-' + date + '.csv';
         break;
-      case 'anomalies':
-        csv = buildAnomalies();
-        filename = 'breadbox-anomalies-' + period + '-' + date + '.csv';
-        break;
       case 'all':
         csv = buildAll();
         filename = 'breadbox-insights-full-' + period + '-' + date + '.csv';
@@ -3044,7 +1880,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (!csv) {
-      // Show a brief toast-style notification if no data
       var toast = document.createElement('div');
       toast.className = 'fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-base-300 text-sm text-base-content shadow-lg';
       toast.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>No data available for this export';
@@ -3056,7 +1891,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     downloadCSV(filename, csv);
 
-    // Success toast
     var toast = document.createElement('div');
     toast.className = 'fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-success/10 border border-success/20 text-sm text-success shadow-lg';
     toast.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>CSV downloaded';
@@ -3067,24 +1901,20 @@ document.addEventListener('DOMContentLoaded', function() {
 })();
 </script>
 
-<!-- Print Styles: clean printable version of insights -->
+<!-- Print Styles -->
 <style>
 @media print {
-  /* Hide non-essential UI elements */
   nav, .drawer-side, .bb-page-header > div:last-child,
   [x-data] > .flex.items-center.gap-1.border-b,
   .bb-filter-bar, button, a[href], .cursor-pointer,
   .navbar, .drawer-toggle, footer { display: none !important; }
 
-  /* Show all tab content at once */
   [x-show] { display: block !important; opacity: 1 !important; transform: none !important; }
 
-  /* Reset page layout */
   body { background: white !important; color: #1a1a1a !important; font-size: 11px !important; }
   .drawer-content { margin-left: 0 !important; padding: 0 !important; }
   main { padding: 0 !important; max-width: 100% !important; }
 
-  /* Cards: remove shadows, use borders */
   .bb-card, [class*="bb-card"] {
     box-shadow: none !important;
     border: 1px solid #e5e5e5 !important;
@@ -3093,7 +1923,6 @@ document.addEventListener('DOMContentLoaded', function() {
     page-break-inside: avoid;
   }
 
-  /* Text colors for print */
   .text-base-content\/70, .text-base-content\/80, .text-base-content\/85 { color: #333 !important; }
   .text-base-content\/40, .text-base-content\/50, .text-base-content\/60 { color: #666 !important; }
   .text-base-content\/25, .text-base-content\/30, .text-base-content\/35 { color: #999 !important; }
@@ -3101,64 +1930,40 @@ document.addEventListener('DOMContentLoaded', function() {
   .text-error, .text-error\/70, .text-error\/80 { color: #dc2626 !important; }
   .text-warning, .text-warning\/70 { color: #d97706 !important; }
 
-  /* Summary pills: ensure readable */
   .grid.grid-cols-2.sm\:grid-cols-4 .bb-card { border: 1px solid #ddd !important; }
 
-  /* Charts: set minimum height for print */
   [id^="echarts"] { min-height: 200px !important; break-inside: avoid; }
 
-  /* Tab section headers for print context */
   [x-show="tab === 'overview'"]::before {
     content: "Overview";
-    display: block;
-    font-size: 16px;
-    font-weight: 700;
-    color: #1a1a1a;
-    margin: 24px 0 12px;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #1a1a1a;
+    display: block; font-size: 16px; font-weight: 700; color: #1a1a1a;
+    margin: 24px 0 12px; padding-bottom: 8px; border-bottom: 2px solid #1a1a1a;
   }
-  [x-show="tab === 'analysis'"]::before {
-    content: "Analysis";
-    display: block;
-    font-size: 16px;
-    font-weight: 700;
-    color: #1a1a1a;
-    margin: 24px 0 12px;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #1a1a1a;
+  [x-show="tab === 'spending'"]::before {
+    content: "Spending";
+    display: block; font-size: 16px; font-weight: 700; color: #1a1a1a;
+    margin: 24px 0 12px; padding-bottom: 8px; border-bottom: 2px solid #1a1a1a;
   }
   [x-show="tab === 'trends'"]::before {
     content: "Trends";
-    display: block;
-    font-size: 16px;
-    font-weight: 700;
-    color: #1a1a1a;
-    margin: 24px 0 12px;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #1a1a1a;
+    display: block; font-size: 16px; font-weight: 700; color: #1a1a1a;
+    margin: 24px 0 12px; padding-bottom: 8px; border-bottom: 2px solid #1a1a1a;
   }
 
-  /* Page title for print */
   .bb-page-title { font-size: 20px !important; color: #1a1a1a !important; }
   .bb-page-title + p { color: #666 !important; }
 
-  /* Table readability */
   table { font-size: 10px !important; }
   th, td { padding: 4px 8px !important; }
 
-  /* Progress bars: ensure visible */
   .rounded-full[style*="width:"] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 
-  /* Grid adjustments for narrower print */
   .lg\:grid-cols-5 { grid-template-columns: repeat(5, 1fr) !important; }
   .lg\:grid-cols-3 { grid-template-columns: repeat(3, 1fr) !important; }
   .lg\:grid-cols-2 { grid-template-columns: repeat(2, 1fr) !important; }
 
-  /* Force color printing for colored elements */
   * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
 
-  /* Page breaks */
   .bb-stagger { page-break-inside: avoid; }
   h2 { page-break-after: avoid; }
 }
