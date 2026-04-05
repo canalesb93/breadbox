@@ -1187,6 +1187,21 @@
     @apply opacity-50;
   }
 
+  .bb-sidebar-version-link {
+    @apply inline-flex items-center gap-1 no-underline;
+    color: inherit;
+    transition: color 0.15s ease;
+  }
+  .bb-sidebar-version-link:hover {
+    color: var(--color-base-content);
+  }
+
+  .bb-sidebar-version .badge {
+    @apply no-underline;
+    font-size: 0.55rem;
+    line-height: 1;
+  }
+
   /* ── Landscape mobile: scroll entire sidebar, keep full touch targets ── */
   @media (orientation: landscape) and (max-height: 500px) {
     .bb-sidebar {
