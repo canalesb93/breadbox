@@ -47,6 +47,13 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		retentionDays, _ := a.Service.GetSyncLogRetentionDays(ctx)
 		syncLogCount, _ := a.Service.CountSyncLogs(ctx)
 
+		// Check onboarding dismissed state for help section.
+		onboardingDismissed := false
+		dismissedCfg, _ := a.Queries.GetAppConfig(ctx, "onboarding_dismissed")
+		if dismissedCfg.Value.Valid && dismissedCfg.Value.String == "true" {
+			onboardingDismissed = true
+		}
+
 		data := map[string]any{
 			"PageTitle":           "Settings",
 			"CurrentPage":         "settings",
@@ -66,6 +73,8 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 			"ConfigSources":   a.Config.ConfigSources,
 			// Safety indicators
 			"HasEncryptionKey": len(a.Config.EncryptionKey) > 0,
+			// Help section
+			"OnboardingDismissed": onboardingDismissed,
 			// Next sync time
 			"NextSyncTime": func() string {
 				if a.Scheduler != nil {

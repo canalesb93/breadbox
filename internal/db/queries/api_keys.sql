@@ -15,3 +15,6 @@ SELECT * FROM api_keys WHERE id = $1;
 
 -- name: UpdateApiKeyLastUsed :exec
 UPDATE api_keys SET last_used_at = NOW() WHERE id = $1;
+
+-- name: CountActiveApiKeys :one
+SELECT COUNT(*) FROM api_keys WHERE revoked_at IS NULL;

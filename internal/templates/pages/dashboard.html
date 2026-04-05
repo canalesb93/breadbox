@@ -50,38 +50,6 @@
 </div>
 {{end}}
 
-{{if .ShowOnboarding}}
-<div class="bb-card mb-6">
-  <div class="p-6">
-    <h2 class="flex items-center gap-2 text-lg font-semibold">
-      <i data-lucide="rocket" class="w-5 h-5 text-primary"></i>
-      Getting Started
-    </h2>
-    <p class="text-sm text-base-content/70 mb-2">Complete these steps to set up Breadbox.</p>
-    <ul class="steps steps-vertical text-sm">
-      <li class="step step-primary">
-        <span class="text-left">Create admin account</span>
-      </li>
-      <li class="step{{if .HasProvider}} step-primary{{end}}">
-        <span class="text-left">{{if .HasProvider}}Bank provider configured{{else}}<a href="/providers" class="link">Configure a bank provider</a>{{end}}</span>
-      </li>
-      <li class="step{{if .HasMember}} step-primary{{end}}">
-        <span class="text-left">{{if .HasMember}}Family member added{{else}}<a href="/users/new" class="link">Add a family member</a>{{end}}</span>
-      </li>
-      <li class="step{{if .HasConnection}} step-primary{{end}}">
-        <span class="text-left">{{if .HasConnection}}Bank connected{{else}}<a href="/connections/new" class="link">Connect your first bank</a>{{end}}</span>
-      </li>
-    </ul>
-    <div class="flex justify-end mt-2">
-      <form method="POST" action="/onboarding/dismiss">
-        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-        <button type="submit" class="btn btn-ghost btn-sm rounded-xl">Dismiss</button>
-      </form>
-    </div>
-  </div>
-</div>
-{{end}}
-
 {{if gt .NeedsAttention 0}}
 <div role="alert" class="alert alert-warning rounded-xl mb-6">
   <i data-lucide="alert-triangle" class="w-5 h-5"></i>

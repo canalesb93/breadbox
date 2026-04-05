@@ -10,16 +10,21 @@ import (
 	"time"
 
 	"breadbox/internal/app"
-	"breadbox/internal/db"
 	"breadbox/internal/service"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // DashboardHandler serves GET /admin/ — the dashboard home page.
+// When onboarding has not been dismissed, the root path redirects to /getting-started.
 func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+
+		// Redirect to getting-started page if onboarding is not dismissed.
+		dismissed, _ := a.Queries.GetAppConfig(ctx, "onboarding_dismissed")
+		if !(dismissed.Value.Valid && dismissed.Value.String == "true") {
+			http.Redirect(w, r, "/getting-started", http.StatusSeeOther)
+			return
+		}
 
 		needsAttention, err := a.Queries.CountConnectionsNeedingAttention(ctx)
 		if err != nil {
@@ -46,32 +51,6 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		})
 		if err != nil {
 			a.Logger.Error("recent transactions", "error", err)
-		}
-
-		// Onboarding checklist detection.
-		showOnboarding := false
-		var hasProvider, hasMember, hasConnection bool
-
-		dismissed, _ := a.Queries.GetAppConfig(ctx, "onboarding_dismissed")
-		if !(dismissed.Value.Valid && dismissed.Value.String == "true") {
-			showOnboarding = true
-
-			// Check provider
-			hasProvider = a.Config.PlaidClientID != "" || a.Config.TellerAppID != ""
-
-			// Check members
-			userCount, err := a.Queries.CountUsers(ctx)
-			if err != nil {
-				a.Logger.Error("count users", "error", err)
-			}
-			hasMember = userCount > 0
-
-			// Check connections
-			connCount, err := a.Queries.CountConnections(ctx)
-			if err != nil {
-				a.Logger.Error("count connections", "error", err)
-			}
-			hasConnection = connCount > 0
 		}
 
 		// Version check for update banner.
@@ -464,10 +443,6 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"CurrentPage":          "home",
 			"NeedsAttention":       needsAttention,
 			"CSRFToken":            GetCSRFToken(r),
-			"ShowOnboarding":       showOnboarding,
-			"HasProvider":          hasProvider,
-			"HasMember":            hasMember,
-			"HasConnection":        hasConnection,
 			"ShowUpdateBanner":     showUpdateBanner,
 			"LatestVersion":        latestVersion,
 			"LatestURL":            latestURL,
@@ -499,17 +474,6 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"TotalUnreadReports": totalUnread,
 		}
 		tr.Render(w, r, "dashboard.html", data)
-	}
-}
-
-// DismissOnboardingHandler handles POST /admin/onboarding/dismiss.
-func DismissOnboardingHandler(a *app.App) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		_ = a.Queries.SetAppConfig(r.Context(), db.SetAppConfigParams{
-			Key:   "onboarding_dismissed",
-			Value: pgtype.Text{String: "true", Valid: true},
-		})
-		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
 }
 

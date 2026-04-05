@@ -1,5 +1,12 @@
 {{define "nav"}}
 <nav class="bb-sidebar-nav">
+  {{if and .NavBadges .NavBadges.ShowGettingStarted}}
+  <div class="bb-sidebar-section">Setup</div>
+  <a href="/getting-started" class="bb-sidebar-link{{if eq .CurrentPage "getting-started"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="compass"></i>
+    <span class="flex-1">Getting Started</span>
+  </a>
+  {{end}}
   <div class="bb-sidebar-section">Overview</div>
   <a href="/" class="bb-sidebar-link{{if eq .CurrentPage "home"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="house"></i>
