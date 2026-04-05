@@ -348,7 +348,8 @@
       </div>
 
       <!-- Results list -->
-      <div class="bb-catpicker-list" x-ref="catPickerList">
+      <div class="bb-catpicker-list" x-ref="catPickerList"
+           x-effect="filteredList; $nextTick(() => { if (typeof lucide !== 'undefined' && $refs.catPickerList) lucide.createIcons({ nodes: [$refs.catPickerList] }); })">
         <div class="py-1">
           <template x-for="(item, idx) in filteredList" :key="item.slug + '-' + idx">
             <div class="bb-catpicker-item"

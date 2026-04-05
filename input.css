@@ -226,11 +226,17 @@
 
   /* ── Breadcrumbs: shadcn-style navigation trail ── */
   .bb-breadcrumb {
-    @apply flex items-center gap-1.5 text-sm mb-6;
+    @apply flex items-center gap-1.5 text-sm mb-6 overflow-x-auto whitespace-nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;        /* Firefox */
+    -ms-overflow-style: none;     /* IE/Edge */
+  }
+  .bb-breadcrumb::-webkit-scrollbar {
+    display: none;                /* Chrome/Safari */
   }
 
   .bb-breadcrumb-item {
-    @apply text-base-content/40 transition-colors duration-150;
+    @apply text-base-content/40 transition-colors duration-150 shrink-0;
   }
 
   .bb-breadcrumb-item a {
@@ -238,7 +244,7 @@
   }
 
   .bb-breadcrumb-sep {
-    @apply text-base-content/25 select-none;
+    @apply text-base-content/25 select-none shrink-0;
   }
 
   .bb-breadcrumb-sep svg {
@@ -246,7 +252,7 @@
   }
 
   .bb-breadcrumb-current {
-    @apply text-base-content/70 font-medium truncate max-w-[20rem];
+    @apply text-base-content/70 font-medium shrink-0;
   }
 
   /* ── Cards: shadcn-style — border, not shadow ── */

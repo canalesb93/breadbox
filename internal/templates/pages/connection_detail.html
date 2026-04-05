@@ -1,17 +1,17 @@
 {{define "content"}}
+<div class="max-w-full overflow-x-hidden">
 {{template "breadcrumb" .}}
 
 {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
-<div class="bb-card border-error/30 bg-error/5 p-5 mb-6 flex items-start gap-4">
-  <div class="w-10 h-10 rounded-xl bg-error/10 flex items-center justify-center shrink-0">
-    <i data-lucide="alert-triangle" class="w-5 h-5 text-error"></i>
+<div class="bb-card border-error/30 bg-error/5 px-5 py-4 mb-6 flex items-center gap-4 flex-wrap">
+  <div class="w-9 h-9 rounded-xl bg-error/10 flex items-center justify-center shrink-0">
+    <i data-lucide="alert-triangle" class="w-4 h-4 text-error"></i>
   </div>
   <div class="flex-1 min-w-0">
-    <p class="font-semibold text-sm">This connection requires re-authentication</p>
-    <p class="text-sm text-base-content/60 mt-0.5">The bank may have changed its login requirements, or your session may have expired.</p>
-    {{if .Connection.ErrorCode.Valid}}<p class="text-xs text-base-content/50 mt-1">{{errorMessage .Connection.ErrorCode.String}}</p>{{else if .Connection.ErrorMessage.Valid}}<p class="text-xs text-base-content/50 mt-1">{{.Connection.ErrorMessage.String}}</p>{{end}}
-    <a href="/connections/{{.ConnID}}/reauth" class="btn btn-sm btn-error mt-3 rounded-xl">Re-authenticate</a>
+    <p class="font-semibold text-sm">This connection needs re-authentication</p>
+    {{if .Connection.ErrorCode.Valid}}<p class="text-xs text-base-content/50 mt-0.5">{{errorMessage .Connection.ErrorCode.String}}</p>{{else if .Connection.ErrorMessage.Valid}}<p class="text-xs text-base-content/50 mt-0.5 truncate">{{.Connection.ErrorMessage.String}}</p>{{end}}
   </div>
+  <a href="/connections/{{.ConnID}}/reauth" class="btn btn-sm btn-error rounded-xl shrink-0">Re-authenticate</a>
 </div>
 {{end}}
 
@@ -29,7 +29,7 @@
 
 <!-- Header with actions -->
 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
-  <div class="flex items-center gap-4">
+  <div class="flex items-center gap-4 min-w-0">
     <div class="w-11 h-11 rounded-xl flex items-center justify-center shrink-0
       {{if eq (printf "%s" .Connection.Provider) "plaid"}}bg-info/10
       {{else if eq (printf "%s" .Connection.Provider) "teller"}}bg-success/10
@@ -42,9 +42,9 @@
       <i data-lucide="file-spreadsheet" class="w-5 h-5 text-warning"></i>
       {{end}}
     </div>
-    <div>
-      <div class="flex items-center gap-2.5">
-        <h1 class="bb-page-title">{{.Connection.InstitutionName.String}}</h1>
+    <div class="min-w-0">
+      <div class="flex items-center gap-2.5 flex-wrap">
+        <h1 class="bb-page-title truncate">{{.Connection.InstitutionName.String}}</h1>
         {{statusBadge (printf "%s" .Connection.Status)}}
         {{if .Connection.Paused}}<span class="badge badge-ghost badge-sm">Paused</span>{{end}}
       </div>
@@ -61,7 +61,7 @@
       </div>
     </div>
   </div>
-  <div class="flex items-center gap-2 flex-wrap shrink-0">
+  <div class="flex items-center gap-2 flex-wrap shrink-0" x-data="{ confirming: false }">
     {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
     <a href="/connections/{{.ConnID}}/reauth" class="btn btn-sm btn-outline rounded-xl">Re-authenticate</a>
     {{end}}
@@ -81,14 +81,12 @@
       <i data-lucide="{{if .Connection.Paused}}play{{else}}pause{{end}}" class="w-3.5 h-3.5"></i>
       {{if .Connection.Paused}}Resume{{else}}Pause{{end}}
     </button>
-    <span x-data="{ confirming: false }">
-      <button class="btn btn-sm btn-ghost text-error/70 hover:text-error rounded-xl" x-show="!confirming" @click="confirming = true" id="remove-btn">
-        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-      </button>
-      <span x-show="confirming" x-cloak class="inline-flex gap-2">
-        <button class="btn btn-error btn-sm rounded-xl" @click="removeConnection()">Yes, Remove</button>
-        <button class="btn btn-ghost btn-sm rounded-xl" @click="confirming = false">Cancel</button>
-      </span>
+    <button class="btn btn-sm btn-ghost text-error/70 hover:text-error rounded-xl" x-show="!confirming" @click="confirming = true" id="remove-btn">
+      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+    </button>
+    <span x-show="confirming" x-cloak class="inline-flex gap-2">
+      <button class="btn btn-error btn-sm rounded-xl" @click="removeConnection()">Yes, Remove</button>
+      <button class="btn btn-ghost btn-sm rounded-xl" @click="confirming = false">Cancel</button>
     </span>
   </div>
 </div>
@@ -563,4 +561,5 @@ function toggleExcluded(accountId, checked) {
   });
 }
 </script>
+</div><!-- /overflow wrapper -->
 {{end}}
