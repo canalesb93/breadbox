@@ -92,79 +92,34 @@
 </div>
 {{end}}
 
-<!-- Agent Reports -->
-{{if .AgentReports}}
-<div class="bb-card mb-6 bb-stagger" x-data="{ ...agentReports(), showReports: true }">
-  <!-- Header — always visible, clickable to toggle -->
-  <button @click="showReports = !showReports" class="w-full text-left px-5 py-3 sm:py-4 flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1 hover:bg-base-200/30 transition-colors rounded-xl" :class="showReports ? 'rounded-b-none' : ''">
-    <div class="flex items-center gap-2">
-        <h2 class="text-sm font-semibold text-base-content/80">Agent Reports</h2>
-        <span class="text-[0.65rem] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">{{.TotalUnreadReports}} unread</span>
-    </div>
-    <div class="flex items-center gap-3">
-      <span class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors cursor-pointer"
-        @click.stop="markAllRead()">
-        Mark all read
-      </span>
-      <a href="/reports" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors hidden sm:inline" @click.stop>View all</a>
-      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200" :class="showReports ? 'rotate-180' : ''"></i>
-    </div>
-  </button>
-
-  <!-- Collapsible report list -->
-  <div x-show="showReports" x-cloak class="border-t border-base-200/60 px-4 sm:px-5 py-4 space-y-3">
-    {{range .AgentReports}}
-    <div class="transition-all duration-300"
-      :class="dismissed['{{.ID}}'] ? 'opacity-0 h-0 overflow-hidden !my-0' : ''"
-      id="report-{{.ID}}">
-      <!-- Message bubble -->
-      <div class="flex items-start gap-2.5">
-        <!-- Bot avatar -->
-        <div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-          <i data-lucide="bot" class="w-3.5 h-3.5 text-primary"></i>
-        </div>
-        <div class="flex-1 min-w-0">
-          <!-- Author + time + mark read -->
-          <div class="flex items-center gap-2 mb-1">
-            <span class="text-xs font-semibold text-base-content/70">{{.DisplayAuthor}}</span>
-            <span class="text-[0.65rem] text-base-content/30">{{.CreatedAt}}</span>
-            {{if eq .Priority "critical"}}
-            <span class="flex w-2 h-2"><span class="animate-ping absolute w-2 h-2 rounded-full bg-error/60"></span><span class="relative w-2 h-2 rounded-full bg-error"></span></span>
-            {{else if eq .Priority "warning"}}
-            <span class="w-2 h-2 rounded-full bg-warning shrink-0"></span>
-            {{end}}
-            <button @click.stop="markRead('{{.ID}}')" class="text-[0.65rem] text-base-content/30 hover:text-success transition-colors cursor-pointer ml-auto shrink-0 mr-1">Mark read</button>
-          </div>
-          <!-- Bubble body — links to detail page -->
-          <a href="/reports/{{.ID}}" class="rounded-2xl rounded-tl-sm bg-base-200/70 shadow-sm px-3.5 py-2.5 hover:bg-base-200/90 transition-colors inline-block max-w-full no-underline group">
-            <p class="text-sm text-base-content/80 leading-relaxed group-hover:text-base-content transition-colors">{{.Title}}</p>
-            <span class="text-xs text-base-content/30 group-hover:text-primary/60 transition-colors">View report &rarr;</span>
-          </a>
-        </div>
-      </div>
-    </div>
-    {{end}}
-    {{if .HasMoreReports}}
-    <div class="px-5 py-3 border-t border-base-200/60 text-center">
-      <a href="/reports" class="text-xs text-primary/70 hover:text-primary transition-colors">View all {{.TotalUnreadReports}} unread reports &rarr;</a>
-    </div>
-    {{end}}
-  </div>
-</div>
-{{end}}
-
-<!-- Net Worth & Accounts -->
+<!-- ============================================================ -->
+<!-- NET WORTH HERO                                                -->
+<!-- ============================================================ -->
 {{if .Accounts}}
-<div class="bb-card mb-6" x-data="{ showAccounts: false }">
-  <!-- Net Worth Summary -->
+<div class="bb-card mb-6">
   {{if .AllocationSlices}}
-  <div class="p-4 sm:p-5">
-    <div class="flex items-baseline justify-between mb-3">
+  <div class="p-5 sm:p-6">
+    <!-- Net worth + sync health row -->
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
       <div>
-        <div class="text-xs text-base-content/40 mb-0.5">Net Worth</div>
-        <div class="text-2xl font-bold tabular-nums tracking-tight">{{formatBalance .NetWorth}}</div>
+        <div class="text-xs text-base-content/40 mb-0.5 flex items-center gap-2">
+          Net Worth
+          {{if .SyncHealth}}
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[0.6rem] font-medium
+            {{if eq .SyncHealth.OverallHealth "healthy"}}bg-success/10 text-success
+            {{else if eq .SyncHealth.OverallHealth "degraded"}}bg-warning/10 text-warning
+            {{else if eq .SyncHealth.OverallHealth "unhealthy"}}bg-error/10 text-error{{end}}">
+            <span class="w-1.5 h-1.5 rounded-full
+              {{if eq .SyncHealth.OverallHealth "healthy"}}bg-success
+              {{else if eq .SyncHealth.OverallHealth "degraded"}}bg-warning
+              {{else}}bg-error{{end}}"></span>
+            {{if .SyncHealth.LastSyncTime}}Synced {{deref .SyncHealth.LastSyncTime}}{{else}}No syncs yet{{end}}
+          </span>
+          {{end}}
+        </div>
+        <div class="text-3xl sm:text-4xl font-bold tabular-nums tracking-tight">{{formatBalance .NetWorth}}</div>
       </div>
-      <div class="flex items-center gap-4 text-right">
+      <div class="flex items-center gap-5 sm:text-right">
         <div>
           <div class="text-[0.65rem] text-base-content/35 uppercase tracking-wider">Assets</div>
           <div class="text-sm font-semibold tabular-nums text-success/80">{{formatBalance .TotalAssets}}</div>
@@ -175,86 +130,169 @@
         </div>
       </div>
     </div>
+
     <!-- Allocation Bar -->
     <div class="flex h-2.5 rounded-full overflow-hidden gap-0.5">
       {{range .AllocationSlices}}
       <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: {{printf "%.1f" .Percent}}%; background: {{safeCSS .Color}}; opacity: 0.7;" title="{{.Label}}: {{formatBalance .Amount}}"></div>
       {{end}}
     </div>
-    <div class="flex items-center justify-between mt-2.5">
-      <div class="flex items-center gap-4 flex-wrap">
-        {{range .AllocationSlices}}
-        <span class="flex items-center gap-1.5 text-xs text-base-content/50">
-          <span class="w-2 h-2 rounded-full shrink-0" style="background: {{safeCSS .Color}}; opacity: 0.7;"></span>
-          {{.Label}}
-          <span class="tabular-nums font-medium text-base-content/70">{{formatBalance .Amount}}</span>
-        </span>
-        {{end}}
-      </div>
-      <a href="/connections" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors shrink-0 ml-4">View all</a>
+    <div class="flex items-center gap-4 flex-wrap mt-2.5">
+      {{range .AllocationSlices}}
+      <span class="flex items-center gap-1.5 text-xs text-base-content/50">
+        <span class="w-2 h-2 rounded-full shrink-0" style="background: {{safeCSS .Color}}; opacity: 0.7;"></span>
+        {{.Label}}
+        <span class="tabular-nums font-medium text-base-content/70">{{formatBalance .Amount}}</span>
+      </span>
+      {{end}}
     </div>
   </div>
   {{end}}
 
-  <!-- Accounts Toggle -->
+  <!-- Accounts Grid -->
   <div class="border-t border-base-200/60">
-    <button @click="showAccounts = !showAccounts" class="flex items-center justify-between w-full text-left px-4 sm:px-5 py-3 hover:bg-base-200/30 transition-colors rounded-b-xl" :class="showAccounts ? 'rounded-b-none' : ''">
+    <div class="px-4 sm:px-5 py-3 flex items-center justify-between">
       <span class="text-sm font-semibold text-base-content/70">{{len .Accounts}} Accounts</span>
-      <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200" :class="showAccounts ? 'rotate-180' : ''"></i>
-    </button>
-  </div>
-
-  <!-- Collapsible Account Cards -->
-  <div x-show="showAccounts" x-cloak class="border-t border-base-200/60 p-4 sm:p-5">
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-      {{range .Accounts}}
-      <a href="/accounts/{{.ID}}" class="bb-card bb-card--interactive p-4 no-underline group block">
-        <div class="flex items-start justify-between mb-2">
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-1.5">
-              <span class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</span>
-              {{if and .ConnectionStatus (ne .ConnectionStatus "active")}}
-              <span class="shrink-0 text-[0.55rem] font-medium px-1.5 py-0.5 rounded-full leading-none {{if eq .ConnectionStatus "error"}}bg-error/8 text-error/70{{else if eq .ConnectionStatus "pending_reauth"}}bg-warning/8 text-warning{{else if eq .ConnectionStatus "disconnected"}}bg-base-300/60 text-base-content/40{{end}}">{{if eq .ConnectionStatus "pending_reauth"}}reauth{{else}}{{.ConnectionStatus}}{{end}}</span>
+      <a href="/connections" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">Manage</a>
+    </div>
+    <div class="px-4 sm:px-5 pb-4 sm:pb-5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        {{range .Accounts}}
+        <a href="/accounts/{{.ID}}" class="bb-card bb-card--interactive p-4 no-underline group block">
+          <div class="flex items-start justify-between mb-2">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5">
+                <!-- Connection health dot -->
+                {{if eq .ConnectionStatus "active"}}
+                <span class="w-1.5 h-1.5 rounded-full bg-success/60 shrink-0" title="Connected"></span>
+                {{else if eq .ConnectionStatus "error"}}
+                <span class="w-1.5 h-1.5 rounded-full bg-error/70 shrink-0" title="Error"></span>
+                {{else if eq .ConnectionStatus "pending_reauth"}}
+                <span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0" title="Needs reauth"></span>
+                {{else if eq .ConnectionStatus "disconnected"}}
+                <span class="w-1.5 h-1.5 rounded-full bg-base-300 shrink-0" title="Disconnected"></span>
+                {{end}}
+                <span class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</span>
+              </div>
+              <div class="text-[0.65rem] text-base-content/40 mt-0.5 truncate">{{.InstitutionName}}{{if .Mask}} · ····{{.Mask}}{{end}}</div>
+            </div>
+            <div class="w-7 h-7 rounded-lg bg-base-200/50 flex items-center justify-center shrink-0 ml-2">
+              <i data-lucide="{{accountTypeIcon .Type}}" class="w-3.5 h-3.5 text-base-content/35"></i>
+            </div>
+          </div>
+          {{if .SparklineData}}
+          <div class="bb-sparkline w-full h-8 my-1.5" data-values="{{.SparklineData}}" data-liability="{{.IsLiability}}"></div>
+          {{else}}
+          <div class="h-8 my-1.5"></div>
+          {{end}}
+          <div class="flex items-end justify-between mt-1">
+            <div class="text-lg font-bold tabular-nums tracking-tight {{if .IsLiability}}text-error/80{{end}}">{{if .IsLiability}}-{{end}}{{formatBalance .BalanceCurrent}}</div>
+            <div class="text-right">
+              {{if gt .SpendingTotal 0.0}}
+              <div class="text-[0.65rem] text-base-content/40 tabular-nums">{{formatBalance .SpendingTotal}} spent</div>
+              {{else}}
+              <div class="text-[0.65rem] text-base-content/35">{{accountTypeLabel .Type .Subtype}}</div>
               {{end}}
             </div>
-            <div class="text-[0.65rem] text-base-content/40 mt-0.5 truncate">{{.InstitutionName}}{{if .Mask}} · ····{{.Mask}}{{end}}</div>
           </div>
-          <div class="w-7 h-7 rounded-lg bg-base-200/50 flex items-center justify-center shrink-0 ml-2">
-            <i data-lucide="{{accountTypeIcon .Type}}" class="w-3.5 h-3.5 text-base-content/35"></i>
-          </div>
-        </div>
-        {{if .SparklineData}}
-        <div class="bb-sparkline w-full h-8 my-1.5" data-values="{{.SparklineData}}" data-liability="{{.IsLiability}}"></div>
-        {{else}}
-        <div class="h-8 my-1.5"></div>
+        </a>
         {{end}}
-        <div class="flex items-end justify-between mt-1">
-          <div class="text-lg font-bold tabular-nums tracking-tight {{if .IsLiability}}text-error/80{{end}}">{{if .IsLiability}}-{{end}}{{formatBalance .BalanceCurrent}}</div>
-          <div class="text-right">
-            {{if gt .SpendingTotal 0.0}}
-            <div class="text-[0.65rem] text-base-content/40 tabular-nums">{{formatBalance .SpendingTotal}} spent</div>
-            {{else}}
-            <div class="text-[0.65rem] text-base-content/35">{{accountTypeLabel .Type .Subtype}}</div>
-            {{end}}
-          </div>
-        </div>
-      </a>
-      {{end}}
+      </div>
     </div>
   </div>
 </div>
+{{else}}
+<!-- Empty state: no accounts -->
+<div class="bb-card mb-6 p-8 text-center">
+  <i data-lucide="wallet" class="w-10 h-10 mx-auto mb-3 text-base-content/20"></i>
+  <h2 class="text-lg font-semibold mb-1">No accounts yet</h2>
+  <p class="text-sm text-base-content/50 mb-4">Connect your first bank to see your balances and transactions here.</p>
+  <a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">
+    <i data-lucide="plus" class="w-4 h-4"></i>
+    Connect a Bank
+  </a>
+</div>
 {{end}}
 
-<!-- Recent Transactions + System Health -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+<!-- ============================================================ -->
+<!-- AGENT REPORTS + RECENT TRANSACTIONS (2-col on desktop)        -->
+<!-- ============================================================ -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+  <!-- Agent Reports -->
+  <div class="bb-card" x-data="{ ...agentReports() }">
+    <div class="px-5 py-4 flex items-center justify-between border-b border-base-200/60">
+      <div class="flex items-center gap-2">
+        <i data-lucide="bot" class="w-4 h-4 text-primary/70"></i>
+        <h2 class="text-sm font-semibold text-base-content/80">Agent Reports</h2>
+        {{if .AgentReports}}
+        <span class="text-[0.65rem] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">{{.TotalUnreadReports}} unread</span>
+        {{end}}
+      </div>
+      <div class="flex items-center gap-3">
+        {{if .AgentReports}}
+        <span class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors cursor-pointer"
+          @click="markAllRead()">
+          Mark all read
+        </span>
+        {{end}}
+        <a href="/reports" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
+      </div>
+    </div>
+
+    {{if .AgentReports}}
+    <div class="px-4 sm:px-5 py-4 space-y-3">
+      {{range .AgentReports}}
+      <div class="transition-all duration-300"
+        :class="dismissed['{{.ID}}'] ? 'opacity-0 h-0 overflow-hidden !my-0' : ''"
+        id="report-{{.ID}}">
+        <div class="flex items-start gap-2.5">
+          <div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+            <i data-lucide="bot" class="w-3.5 h-3.5 text-primary"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs font-semibold text-base-content/70">{{.DisplayAuthor}}</span>
+              <span class="text-[0.65rem] text-base-content/30">{{.CreatedAt}}</span>
+              {{if eq .Priority "critical"}}
+              <span class="flex w-2 h-2"><span class="animate-ping absolute w-2 h-2 rounded-full bg-error/60"></span><span class="relative w-2 h-2 rounded-full bg-error"></span></span>
+              {{else if eq .Priority "warning"}}
+              <span class="w-2 h-2 rounded-full bg-warning shrink-0"></span>
+              {{end}}
+              <button @click.stop="markRead('{{.ID}}')" class="text-[0.65rem] text-base-content/30 hover:text-success transition-colors cursor-pointer ml-auto shrink-0 mr-1">Mark read</button>
+            </div>
+            <a href="/reports/{{.ID}}" class="rounded-2xl rounded-tl-sm bg-base-200/70 shadow-sm px-3.5 py-2.5 hover:bg-base-200/90 transition-colors inline-block max-w-full no-underline group">
+              <p class="text-sm text-base-content/80 leading-relaxed group-hover:text-base-content transition-colors">{{.Title}}</p>
+              <span class="text-xs text-base-content/30 group-hover:text-primary/60 transition-colors">View report &rarr;</span>
+            </a>
+          </div>
+        </div>
+      </div>
+      {{end}}
+      {{if .HasMoreReports}}
+      <div class="pt-3 border-t border-base-200/60 text-center">
+        <a href="/reports" class="text-xs text-primary/70 hover:text-primary transition-colors">View all {{.TotalUnreadReports}} unread reports &rarr;</a>
+      </div>
+      {{end}}
+    </div>
+    {{else}}
+    <div class="px-5 py-8 text-center">
+      <i data-lucide="bot" class="w-8 h-8 mx-auto mb-2 text-base-content/15"></i>
+      <p class="text-sm text-base-content/40 mb-1">No unread reports</p>
+      <p class="text-xs text-base-content/30">Agent reports appear here when AI agents submit findings about your finances.</p>
+      <a href="/agents" class="text-xs text-primary/60 hover:text-primary transition-colors mt-2 inline-block">Set up an agent &rarr;</a>
+    </div>
+    {{end}}
+  </div>
+
   <!-- Recent Transactions -->
-  <div class="bb-card lg:col-span-2 p-5">
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-sm font-semibold text-base-content/70">Recent Transactions</h2>
+  <div class="bb-card">
+    <div class="px-5 py-4 flex items-center justify-between border-b border-base-200/60">
+      <h2 class="text-sm font-semibold text-base-content/80">Recent Transactions</h2>
       <a href="/transactions" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
     </div>
     {{if .RecentTransactions}}
-    <div class="space-y-0.5">
+    <div class="px-3 sm:px-4 py-2">
       {{range .RecentTransactions}}
       <a href="/transactions/{{.ID}}" class="flex items-center gap-3 py-2.5 px-1 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline">
         <div class="relative shrink-0">
@@ -267,7 +305,7 @@
             <span>{{firstChar .Name}}</span>
           </div>
           {{end}}
-          {{if .HasPendingReview}}<span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-info ring-2 ring-base-100 group-hover:ring-base-200/40" title="Pending review"></span>{{end}}
+          {{if .HasPendingReview}}<span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-info ring-2 ring-base-100" title="Pending review"></span>{{end}}
         </div>
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-1.5 min-w-0">
@@ -285,7 +323,7 @@
             <span class="text-base-content/20 shrink-0 hidden sm:inline">&middot;</span>
             <span class="items-center gap-1 shrink-0 hidden sm:inline-flex">
               <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}{{safeCSS "oklch(0.65 0 0)"}}{{end}}"></span>
-              <span class="text-base-content/50 truncate max-w-24 lg:max-w-40">{{deref .CategoryDisplayName}}</span>
+              <span class="text-base-content/50 truncate max-w-24">{{deref .CategoryDisplayName}}</span>
             </span>
             {{end}}
             {{if .AgentReviewed}}
@@ -312,178 +350,144 @@
     </div>
     {{end}}
   </div>
-
-  <!-- Right Column: Combined System Health + Quick Actions -->
-  <div class="flex flex-col gap-4">
-    <!-- Combined Connection & Sync Health -->
-    <div class="bb-card p-5 flex-1">
-      <div class="flex items-center justify-between mb-3">
-        <div class="flex items-center gap-2">
-          <h2 class="text-sm font-semibold text-base-content/70">System Health</h2>
-          {{if .SyncHealth}}
-            {{if eq .SyncHealth.OverallHealth "healthy"}}
-            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[0.6rem] font-medium bg-success/10 text-success">
-              <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
-              Healthy
-            </span>
-            {{else if eq .SyncHealth.OverallHealth "degraded"}}
-            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[0.6rem] font-medium bg-warning/10 text-warning">
-              <span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse"></span>
-              Degraded
-            </span>
-            {{else if eq .SyncHealth.OverallHealth "unhealthy"}}
-            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[0.6rem] font-medium bg-error/10 text-error">
-              <span class="w-1.5 h-1.5 rounded-full bg-error animate-pulse"></span>
-              Unhealthy
-            </span>
-            {{end}}
-          {{end}}
-        </div>
-        <a href="/logs" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">Logs</a>
-      </div>
-
-      <!-- Sync Stats Row -->
-      {{if .SyncHealth}}
-      <div class="flex items-center gap-3 mb-3 pb-3 border-b border-base-200/60 flex-wrap">
-        {{if .SyncHealth.LastSyncTime}}
-        <span class="flex items-center gap-1.5 text-xs text-base-content/50">
-          <i data-lucide="clock" class="w-3 h-3 text-base-content/30"></i>
-          {{deref .SyncHealth.LastSyncTime}}
-        </span>
-        {{end}}
-        {{if gt .SyncHealth.RecentSyncCount 0}}
-        <span class="flex items-center gap-1.5 text-xs {{if ge .SyncHealth.RecentSuccessRate 90.0}}text-success{{else if ge .SyncHealth.RecentSuccessRate 50.0}}text-warning{{else}}text-error/80{{end}}">
-          <i data-lucide="bar-chart-3" class="w-3 h-3"></i>
-          {{printf "%.0f" .SyncHealth.RecentSuccessRate}}% ({{.SyncHealth.RecentSyncCount}} syncs)
-        </span>
-        {{end}}
-        {{if .SyncHealth.NextSyncTime}}
-        <span class="flex items-center gap-1.5 text-xs text-base-content/40">
-          <i data-lucide="timer" class="w-3 h-3"></i>
-          {{.SyncHealth.NextSyncTime}}
-        </span>
-        {{end}}
-      </div>
-      {{end}}
-
-      <!-- Connection Health Summary Dots -->
-      {{if .ConnectionHealth}}
-      <div class="flex items-center gap-3 mb-3 pb-3 border-b border-base-200/60">
-        {{if gt .HealthyCount 0}}
-        <span class="flex items-center gap-1.5 text-xs text-base-content/50">
-          <span class="w-2 h-2 rounded-full bg-success/60"></span>
-          {{.HealthyCount}} healthy
-        </span>
-        {{end}}
-        {{if gt .ErrorCount 0}}
-        <span class="flex items-center gap-1.5 text-xs text-error/70">
-          <span class="w-2 h-2 rounded-full bg-error/60"></span>
-          {{.ErrorCount}} error{{if gt .ErrorCount 1}}s{{end}}
-        </span>
-        {{end}}
-        {{if gt .StaleCount 0}}
-        <span class="flex items-center gap-1.5 text-xs text-warning">
-          <span class="w-2 h-2 rounded-full bg-warning/60"></span>
-          {{.StaleCount}} stale
-        </span>
-        {{end}}
-      </div>
-
-      <!-- Per-connection rows -->
-      <div class="space-y-1">
-        {{range .ConnectionHealth}}
-        <a href="/connections/{{.ID}}" class="flex items-center gap-2.5 py-2 px-1 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline group">
-          <div class="relative shrink-0">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center
-              {{if eq .Status "error"}}bg-error/10
-              {{else if eq .Status "pending_reauth"}}bg-warning/10
-              {{else if .IsStale}}bg-warning/8
-              {{else}}bg-success/8{{end}}">
-              {{if eq .Status "error"}}
-              <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-error/70"></i>
-              {{else if eq .Status "pending_reauth"}}
-              <i data-lucide="key" class="w-3.5 h-3.5 text-warning"></i>
-              {{else if .IsStale}}
-              <i data-lucide="clock" class="w-3.5 h-3.5 text-warning/70"></i>
-              {{else}}
-              <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-success/70"></i>
-              {{end}}
-            </div>
-            {{if .Paused}}
-            <div class="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-base-100 flex items-center justify-center">
-              <i data-lucide="pause" class="w-2 h-2 text-base-content/40"></i>
-            </div>
-            {{end}}
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-1.5">
-              <span class="text-xs font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</span>
-              <span class="text-[0.6rem] text-base-content/25 shrink-0">{{.Provider}}</span>
-            </div>
-            {{if and (ne .Status "active") (ne .ErrorMessage "")}}
-            <div class="text-[0.6rem] text-error/60 truncate mt-0.5 font-mono max-w-full" title="{{.ErrorMessage}}">{{.ErrorMessage}}</div>
-            {{else}}
-            <div class="text-[0.6rem] text-base-content/30 mt-0.5">
-              {{.AccountCount}} account{{if ne .AccountCount 1}}s{{end}} · synced {{.LastSyncedAt}}
-            </div>
-            {{end}}
-          </div>
-          <div class="shrink-0">
-            {{if eq .Status "active"}}
-              {{if .IsStale}}
-              <span class="text-[0.6rem] font-medium text-warning/70 bg-warning/8 px-1.5 py-0.5 rounded-full">stale</span>
-              {{else}}
-              <span class="w-1.5 h-1.5 rounded-full bg-success/50"></span>
-              {{end}}
-            {{else if eq .Status "error"}}
-            <span class="text-[0.6rem] font-medium text-error/70 bg-error/8 px-1.5 py-0.5 rounded-full">error</span>
-            {{else if eq .Status "pending_reauth"}}
-            <span class="text-[0.6rem] font-medium text-warning bg-warning/8 px-1.5 py-0.5 rounded-full">reauth</span>
-            {{end}}
-          </div>
-        </a>
-        {{end}}
-      </div>
-      {{else}}
-      <div class="flex items-center justify-center py-6 text-base-content/40">
-        <div class="text-center">
-          <i data-lucide="plug" class="w-6 h-6 mx-auto mb-2 opacity-40"></i>
-          <p class="text-xs">No connections yet</p>
-          <a href="/connections/new" class="btn btn-primary btn-xs mt-2 rounded-lg">Connect a bank</a>
-        </div>
-      </div>
-      {{end}}
-
-      <!-- Success rate mini bar -->
-      {{if and .SyncHealth (gt .SyncHealth.RecentSyncCount 0)}}
-      <div class="mt-3 pt-3 border-t border-base-200/60">
-        <div class="flex h-1.5 rounded-full overflow-hidden bg-base-200/60">
-          {{if gt .SyncHealth.RecentSuccessRate 0.0}}
-          <div class="h-full rounded-full {{if ge .SyncHealth.RecentSuccessRate 90.0}}bg-success/60{{else if ge .SyncHealth.RecentSuccessRate 50.0}}bg-warning/60{{else}}bg-error/60{{end}} transition-all duration-700" style="width: {{printf "%.0f" .SyncHealth.RecentSuccessRate}}%;"></div>
-          {{end}}
-        </div>
-      </div>
-      {{end}}
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="bb-card p-4">
-      <div class="flex gap-2">
-        <a href="/connections/new" class="btn btn-primary btn-sm flex-1 rounded-xl">
-          <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-          Connect Bank
-        </a>
-        <a href="/insights" class="btn btn-ghost btn-sm flex-1 rounded-xl">
-          <i data-lucide="lightbulb" class="w-3.5 h-3.5"></i>
-          Insights
-        </a>
-      </div>
-    </div>
-  </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- STATUS BAR: connection health + quick stats                   -->
+<!-- ============================================================ -->
+{{if .ConnectionHealth}}
+<div class="bb-card mb-6 p-4 sm:p-5" x-data="{ showDetail: false }">
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-4 flex-wrap">
+      <!-- Connection health summary dots -->
+      {{if gt .HealthyCount 0}}
+      <span class="flex items-center gap-1.5 text-xs text-base-content/50">
+        <span class="w-2 h-2 rounded-full bg-success/60"></span>
+        {{.HealthyCount}} healthy
+      </span>
+      {{end}}
+      {{if gt .ErrorCount 0}}
+      <span class="flex items-center gap-1.5 text-xs text-error/70">
+        <span class="w-2 h-2 rounded-full bg-error/60"></span>
+        {{.ErrorCount}} error{{if gt .ErrorCount 1}}s{{end}}
+      </span>
+      {{end}}
+      {{if gt .StaleCount 0}}
+      <span class="flex items-center gap-1.5 text-xs text-warning">
+        <span class="w-2 h-2 rounded-full bg-warning/60"></span>
+        {{.StaleCount}} stale
+      </span>
+      {{end}}
+      <!-- Quick stats -->
+      <span class="text-base-content/15">|</span>
+      <span class="text-xs text-base-content/40">{{commaInt .TxCount}} transactions</span>
+      {{if gt .UncategorizedCount 0}}
+      <a href="/transactions" class="text-xs text-warning/70 hover:text-warning transition-colors">{{commaInt .UncategorizedCount}} uncategorized</a>
+      {{end}}
+      {{if gt .ReviewPending 0}}
+      <a href="/reviews" class="text-xs text-info/70 hover:text-info transition-colors">{{commaInt .ReviewPending}} pending reviews</a>
+      {{end}}
+    </div>
+    <button @click="showDetail = !showDetail" class="text-xs text-base-content/30 hover:text-base-content/50 transition-colors flex items-center gap-1">
+      <span class="hidden sm:inline">Details</span>
+      <i data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform duration-200" :class="showDetail ? 'rotate-180' : ''"></i>
+    </button>
+  </div>
+
+  <!-- Expandable connection detail -->
+  <div x-show="showDetail" x-cloak x-collapse class="mt-4 pt-4 border-t border-base-200/60">
+    {{if .SyncHealth}}
+    <div class="flex items-center gap-4 mb-3 flex-wrap">
+      {{if .SyncHealth.LastSyncTime}}
+      <span class="flex items-center gap-1.5 text-xs text-base-content/50">
+        <i data-lucide="clock" class="w-3 h-3 text-base-content/30"></i>
+        Last sync {{deref .SyncHealth.LastSyncTime}}
+      </span>
+      {{end}}
+      {{if gt .SyncHealth.RecentSyncCount 0}}
+      <span class="flex items-center gap-1.5 text-xs {{if ge .SyncHealth.RecentSuccessRate 90.0}}text-success{{else if ge .SyncHealth.RecentSuccessRate 50.0}}text-warning{{else}}text-error/80{{end}}">
+        <i data-lucide="bar-chart-3" class="w-3 h-3"></i>
+        {{printf "%.0f" .SyncHealth.RecentSuccessRate}}% success ({{.SyncHealth.RecentSyncCount}} syncs / 24h)
+      </span>
+      {{end}}
+      {{if .SyncHealth.NextSyncTime}}
+      <span class="flex items-center gap-1.5 text-xs text-base-content/40">
+        <i data-lucide="timer" class="w-3 h-3"></i>
+        Next: {{.SyncHealth.NextSyncTime}}
+      </span>
+      {{end}}
+    </div>
+    {{end}}
+    <div class="space-y-1">
+      {{range .ConnectionHealth}}
+      <a href="/connections/{{.ID}}" class="flex items-center gap-2.5 py-2 px-1 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline group">
+        <div class="relative shrink-0">
+          <div class="w-7 h-7 rounded-lg flex items-center justify-center
+            {{if eq .Status "error"}}bg-error/10
+            {{else if eq .Status "pending_reauth"}}bg-warning/10
+            {{else if .IsStale}}bg-warning/8
+            {{else}}bg-success/8{{end}}">
+            {{if eq .Status "error"}}
+            <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-error/70"></i>
+            {{else if eq .Status "pending_reauth"}}
+            <i data-lucide="key" class="w-3.5 h-3.5 text-warning"></i>
+            {{else if .IsStale}}
+            <i data-lucide="clock" class="w-3.5 h-3.5 text-warning/70"></i>
+            {{else}}
+            <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-success/70"></i>
+            {{end}}
+          </div>
+          {{if .Paused}}
+          <div class="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-base-100 flex items-center justify-center">
+            <i data-lucide="pause" class="w-2 h-2 text-base-content/40"></i>
+          </div>
+          {{end}}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-medium truncate group-hover:text-primary transition-colors">{{.Name}}</span>
+            <span class="text-[0.6rem] text-base-content/25 shrink-0">{{.Provider}}</span>
+          </div>
+          {{if and (ne .Status "active") (ne .ErrorMessage "")}}
+          <div class="text-[0.6rem] text-error/60 truncate mt-0.5 font-mono max-w-full" title="{{.ErrorMessage}}">{{.ErrorMessage}}</div>
+          {{else}}
+          <div class="text-[0.6rem] text-base-content/30 mt-0.5">
+            {{.AccountCount}} account{{if ne .AccountCount 1}}s{{end}} · synced {{.LastSyncedAt}}
+          </div>
+          {{end}}
+        </div>
+        <div class="shrink-0">
+          {{if eq .Status "active"}}
+            {{if .IsStale}}
+            <span class="text-[0.6rem] font-medium text-warning/70 bg-warning/8 px-1.5 py-0.5 rounded-full">stale</span>
+            {{else}}
+            <span class="w-1.5 h-1.5 rounded-full bg-success/50"></span>
+            {{end}}
+          {{else if eq .Status "error"}}
+          <span class="text-[0.6rem] font-medium text-error/70 bg-error/8 px-1.5 py-0.5 rounded-full">error</span>
+          {{else if eq .Status "pending_reauth"}}
+          <span class="text-[0.6rem] font-medium text-warning bg-warning/8 px-1.5 py-0.5 rounded-full">reauth</span>
+          {{end}}
+        </div>
+      </a>
+      {{end}}
+    </div>
+
+    <!-- Sync success rate bar -->
+    {{if and .SyncHealth (gt .SyncHealth.RecentSyncCount 0)}}
+    <div class="mt-3 pt-3 border-t border-base-200/60">
+      <div class="flex h-1.5 rounded-full overflow-hidden bg-base-200/60">
+        {{if gt .SyncHealth.RecentSuccessRate 0.0}}
+        <div class="h-full rounded-full {{if ge .SyncHealth.RecentSuccessRate 90.0}}bg-success/60{{else if ge .SyncHealth.RecentSuccessRate 50.0}}bg-warning/60{{else}}bg-error/60{{end}} transition-all duration-700" style="width: {{printf "%.0f" .SyncHealth.RecentSuccessRate}}%;"></div>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
 <!-- Agent Reports: dismiss logic -->
-{{if .AgentReports}}
 <script>
 function agentReports() {
   return {
@@ -503,7 +507,6 @@ function agentReports() {
   };
 }
 </script>
-{{end}}
 
 <!-- Sparkline Rendering -->
 <script>
