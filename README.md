@@ -26,22 +26,83 @@ Breadbox syncs your bank data into a PostgreSQL database you control, then expos
 - **AES-256-GCM encryption** for provider credentials at rest
 - **Single binary** -- one Go binary serves everything (API, MCP, dashboard, webhooks, cron)
 
-## Quick Start
+## Installation
 
 ### Docker (recommended)
 
+No need to clone the repo. This pulls the pre-built image from GHCR and starts Breadbox with PostgreSQL:
+
 ```bash
-git clone https://github.com/canalesb93/breadbox.git && cd breadbox
-cp .env.example .docker.env
+mkdir breadbox && cd breadbox
+curl -O https://raw.githubusercontent.com/canalesb93/breadbox/main/deploy/docker-compose.prod.yml
+mv docker-compose.prod.yml docker-compose.yml
+```
 
-# Edit .docker.env — set ENCRYPTION_KEY (generate with: openssl rand -hex 32)
+Create a `.env` file with required configuration:
 
-docker compose up -d
+```bash
+cat > .env <<EOF
+DATABASE_URL=postgres://breadbox:breadbox@db:5432/breadbox?sslmode=disable
+ENCRYPTION_KEY=$(openssl rand -hex 32)
+SERVER_PORT=8080
+ENVIRONMENT=docker
+POSTGRES_USER=breadbox
+POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -d '=/+')
+POSTGRES_DB=breadbox
+EOF
+```
 
+Start the services:
+
+```bash
+docker compose up -d breadbox db
 # Visit http://localhost:8080 to start the setup wizard
 ```
 
-### From source
+> **Note:** This starts Breadbox and PostgreSQL without the Caddy reverse proxy, exposing port 8080 directly. For production with automatic HTTPS, run `docker compose up -d` (all services) and configure your domain in the Caddyfile -- see [Production Deployment](#production-deployment) below.
+
+To pin a specific version instead of `latest`, edit `docker-compose.yml` and change the image tag:
+
+```yaml
+image: ghcr.io/canalesb93/breadbox:v0.1.0
+```
+
+### Binary download
+
+Pre-built binaries for Linux and macOS (amd64/arm64) are available on the [GitHub Releases](https://github.com/canalesb93/breadbox/releases) page.
+
+```bash
+# Download the binary for your platform (example: Linux amd64)
+curl -fsSL https://github.com/canalesb93/breadbox/releases/latest/download/breadbox-linux-amd64 -o breadbox
+chmod +x breadbox
+
+# Requires a running PostgreSQL instance
+export DATABASE_URL="postgres://user:pass@localhost:5432/breadbox?sslmode=disable"
+export ENCRYPTION_KEY="$(openssl rand -hex 32)"
+
+./breadbox serve
+# Visit http://localhost:8080
+```
+
+### Go install
+
+Build from source using Go:
+
+```bash
+git clone https://github.com/canalesb93/breadbox.git && cd breadbox
+go install ./cmd/breadbox
+
+# Requires a running PostgreSQL instance
+export DATABASE_URL="postgres://user:pass@localhost:5432/breadbox?sslmode=disable"
+export ENCRYPTION_KEY="$(openssl rand -hex 32)"
+
+breadbox serve
+# Visit http://localhost:8080
+```
+
+> **Note:** The module path is `breadbox`, so `go install github.com/...@latest` is not supported. Clone the repo and install locally.
+
+### From source (development)
 
 ```bash
 git clone https://github.com/canalesb93/breadbox.git && cd breadbox
@@ -52,18 +113,15 @@ make dev
 # Visit http://localhost:8080
 ```
 
-### Binary download
+### Production deployment
 
-Download the latest release from [GitHub Releases](https://github.com/canalesb93/breadbox/releases):
+For production with automatic HTTPS via Caddy, use the one-liner install script:
 
 ```bash
-# Configure
-cp .env.example .local.env
-# Edit .local.env — set DATABASE_URL and ENCRYPTION_KEY
-
-# Run
-./breadbox serve
+curl -fsSL https://raw.githubusercontent.com/canalesb93/breadbox/main/deploy/install.sh | sudo bash
 ```
+
+This installs Docker if needed, downloads the deployment files, generates secrets, and starts Breadbox with Caddy for automatic TLS. See [`deploy/`](deploy/) for details.
 
 ## MCP Integration
 
