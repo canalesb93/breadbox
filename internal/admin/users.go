@@ -135,12 +135,25 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			enrichedUsers = append(enrichedUsers, eu)
 		}
 
+		// Load member accounts.
+		memberAccounts, err := a.Queries.ListMemberAccounts(ctx)
+		if err != nil {
+			a.Logger.Error("list member accounts", "error", err)
+		}
+		// Build a map of user_id -> member account for quick lookup in template.
+		memberAccountMap := make(map[string]db.ListMemberAccountsRow)
+		for _, ma := range memberAccounts {
+			memberAccountMap[formatUUID(ma.UserID)] = ma
+		}
+
 		data := map[string]any{
-			"PageTitle":     "Household",
-			"CurrentPage":   "users",
-			"EnrichedUsers": enrichedUsers,
-			"CSRFToken":     GetCSRFToken(r),
-			"Created":       r.URL.Query().Get("created") == "1",
+			"PageTitle":        "Household",
+			"CurrentPage":      "users",
+			"EnrichedUsers":    enrichedUsers,
+			"MemberAccounts":   memberAccounts,
+			"MemberAccountMap": memberAccountMap,
+			"CSRFToken":        GetCSRFToken(r),
+			"Created":          r.URL.Query().Get("created") == "1",
 		}
 		tr.Render(w, r, "users.html", data)
 	}

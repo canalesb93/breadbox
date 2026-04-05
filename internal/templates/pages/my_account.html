@@ -1,0 +1,112 @@
+{{define "content"}}
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">My Account</h1>
+    <p class="text-sm text-base-content/50 mt-1">Manage your account settings and data</p>
+  </div>
+</div>
+
+{{if .Flash}}
+<div role="alert" class="alert {{if eq .Flash.Type "success"}}alert-success{{else if eq .Flash.Type "error"}}alert-error{{else}}alert-info{{end}} rounded-xl mb-6">
+  {{if eq .Flash.Type "success"}}<i data-lucide="check-circle" class="w-5 h-5"></i>{{else if eq .Flash.Type "error"}}<i data-lucide="alert-circle" class="w-5 h-5"></i>{{else}}<i data-lucide="info" class="w-5 h-5"></i>{{end}}
+  <span>{{.Flash.Message}}</span>
+</div>
+{{end}}
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <!-- Change Password -->
+  <div class="bb-card">
+    <div class="p-5 border-b border-base-300">
+      <h2 class="font-semibold text-base flex items-center gap-2">
+        <i data-lucide="lock" class="w-4 h-4 text-base-content/40"></i>
+        Change Password
+      </h2>
+    </div>
+    <form method="POST" action="/my-account/password" class="p-5 space-y-4">
+      {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+
+      <div>
+        <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="current_password">Current Password</label>
+        <input type="password" id="current_password" name="current_password" required autocomplete="current-password"
+               class="input w-full rounded-lg text-sm bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40">
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="new_password">New Password</label>
+        <input type="password" id="new_password" name="new_password" required autocomplete="new-password" minlength="8"
+               class="input w-full rounded-lg text-sm bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40">
+        <p class="text-xs text-base-content/40 mt-1">Minimum 8 characters</p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="confirm_password">Confirm New Password</label>
+        <input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password"
+               class="input w-full rounded-lg text-sm bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40">
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-sm rounded-lg">Update Password</button>
+    </form>
+  </div>
+
+  <!-- My Connections -->
+  <div class="bb-card">
+    <div class="p-5 border-b border-base-300">
+      <h2 class="font-semibold text-base flex items-center gap-2">
+        <i data-lucide="link" class="w-4 h-4 text-base-content/40"></i>
+        My Connections
+      </h2>
+    </div>
+    <div class="p-5">
+      {{if .Connections}}
+      <div class="space-y-3">
+        {{range .Connections}}
+        <a href="/connections/{{.ID}}" class="flex items-center justify-between p-3 rounded-lg bg-base-200/30 hover:bg-base-200/50 transition-colors no-underline">
+          <div>
+            <div class="text-sm font-medium">{{if .InstitutionName}}{{deref .InstitutionName}}{{else}}Connection{{end}}</div>
+            <div class="text-xs text-base-content/40">{{.Provider}} &middot; {{.Status}}</div>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-base-content/30"></i>
+        </a>
+        {{end}}
+      </div>
+      {{else}}
+      <p class="text-sm text-base-content/40">No connections linked to your account.</p>
+      {{end}}
+    </div>
+  </div>
+
+  <!-- Danger Zone -->
+  <div class="bb-card border-error/20">
+    <div class="p-5 border-b border-error/20">
+      <h2 class="font-semibold text-base flex items-center gap-2 text-error">
+        <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+        Danger Zone
+      </h2>
+    </div>
+    <div class="p-5" x-data="{ confirmWipe: false }">
+      <p class="text-sm text-base-content/60 mb-4">
+        Permanently delete all your financial data including bank connections, accounts, and transactions.
+        This action cannot be undone.
+      </p>
+      <template x-if="!confirmWipe">
+        <button @click="confirmWipe = true" class="btn btn-error btn-sm btn-outline rounded-lg">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+          Wipe My Data
+        </button>
+      </template>
+      <template x-if="confirmWipe">
+        <div class="space-y-3">
+          <p class="text-sm font-medium text-error">Are you sure? This will permanently delete all your data.</p>
+          <div class="flex gap-2">
+            <form method="POST" action="/my-account/wipe-data">
+              {{if $.CSRFToken}}<input type="hidden" name="_csrf" value="{{$.CSRFToken}}">{{end}}
+              <button type="submit" class="btn btn-error btn-sm rounded-lg">Yes, wipe my data</button>
+            </form>
+            <button @click="confirmWipe = false" class="btn btn-ghost btn-sm rounded-lg">Cancel</button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>
+{{end}}

@@ -740,6 +740,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/mcp_guide.html",
 		"pages/prompt_builder.html",
 		"pages/session_detail.html",
+		"pages/my_account.html",
 	}
 
 	// Pages that need multiple page files parsed together (for sub-template sharing).
@@ -751,10 +752,11 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		},
 	}
 
-	// Pages using the wizard layout (login + first-run admin creation + OAuth consent).
+	// Pages using the wizard layout (login + first-run admin creation + OAuth consent + member setup).
 	wizardPages := []string{
 		"pages/login.html",
 		"pages/setup_create_admin.html",
+		"pages/member_setup.html",
 		"pages/oauth_authorize.html",
 	}
 
@@ -859,6 +861,15 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 		if _, exists := m["NavBadges"]; !exists {
 			m["NavBadges"] = getNavBadges(r.Context())
 		}
+		// Auto-inject role info for nav rendering.
+		if _, exists := m["SessionRole"]; !exists && tr.sm != nil {
+			role := tr.sm.GetString(r.Context(), sessionKeyAccountRole)
+			if role == "" {
+				role = RoleAdmin
+			}
+			m["SessionRole"] = role
+			m["IsAdmin"] = role == RoleAdmin
+		}
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -887,12 +898,18 @@ func (tr *TemplateRenderer) RenderPartial(w http.ResponseWriter, r *http.Request
 // BaseTemplateData returns the common fields needed by every template as a map.
 // Handlers can add page-specific fields to the returned map before rendering.
 func BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage, pageTitle string) map[string]any {
+	role := sm.GetString(r.Context(), sessionKeyAccountRole)
+	if role == "" {
+		role = RoleAdmin
+	}
 	return map[string]any{
 		"PageTitle":     pageTitle,
 		"CurrentPage":   currentPage,
 		"Flash":         GetFlash(r.Context(), sm),
 		"CSRFToken":     GetCSRFToken(r),
 		"AdminUsername": sm.GetString(r.Context(), sessionKeyAdminUsername),
+		"SessionRole":   role,
+		"IsAdmin":       role == RoleAdmin,
 	}
 }
 
