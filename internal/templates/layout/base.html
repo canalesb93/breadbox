@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
   <!-- Safari: Add to Home Screen support -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Breadbox">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
@@ -73,9 +73,8 @@
           <span class="text-sm font-semibold truncate">{{.PageTitle}}</span>
         </div>
         <div class="flex-none">
-          <button class="bb-mobile-search-btn" x-data @click="$dispatch('open-cmdk')">
-            <i data-lucide="search" class="w-4 h-4"></i>
-            <span class="bb-mobile-search-label">Search</span>
+          <button class="btn btn-square btn-ghost" x-data @click="$dispatch('open-cmdk')" title="Search">
+            <i data-lucide="search" class="w-5 h-5"></i>
           </button>
         </div>
       </div>
