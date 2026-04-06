@@ -11,7 +11,7 @@
   <!-- ─── Plaid ─── -->
   {{$plaidHealth := index .ProviderHealth "plaid"}}
   <div class="bb-card p-0 overflow-hidden" x-data="providerCard('plaid')">
-    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between gap-3">
+    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between gap-3 min-w-0">
       <div class="flex items-center gap-3 min-w-0">
         <div class="w-10 h-10 rounded-xl bg-info/8 flex items-center justify-center flex-shrink-0">
           <i data-lucide="building-2" class="w-5 h-5 text-info"></i>
@@ -21,7 +21,7 @@
           <p class="text-xs text-base-content/40 truncate">Thousands of financial institutions</p>
         </div>
       </div>
-      <div class="flex items-center gap-2 flex-shrink-0">
+      <div class="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
         {{if and $plaidHealth.LastSyncTime (eq $plaidHealth.LastSyncStatus "error")}}
           <span class="badge badge-soft badge-error badge-sm rounded-lg">Sync Error</span>
         {{else if and $plaidHealth.LastSyncTime (eq $plaidHealth.LastSyncStatus "success")}}
@@ -127,7 +127,7 @@
           <h3 class="text-sm font-medium">Webhook Setup</h3>
         </div>
         <p class="text-xs text-base-content/50 mb-2">Plaid can push real-time transaction updates via webhooks. Set the webhook URL above, then configure Plaid to send events to:</p>
-        <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all">https://&lt;your-domain&gt;/webhooks/plaid</code>
+        <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all overflow-hidden">https://&lt;your-domain&gt;/webhooks/plaid</code>
         <p class="text-xs text-base-content/40 mt-2">Plaid automatically sends webhooks when you set the URL during link token creation. No additional configuration needed in the Plaid dashboard.</p>
       </div>
       {{end}}
@@ -137,7 +137,7 @@
   <!-- ─── Teller ─── -->
   {{$tellerHealth := index .ProviderHealth "teller"}}
   <div class="bb-card p-0 overflow-hidden" x-data="providerCard('teller')">
-    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between gap-3">
+    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between gap-3 min-w-0">
       <div class="flex items-center gap-3 min-w-0">
         <div class="w-10 h-10 rounded-xl bg-success/8 flex items-center justify-center flex-shrink-0">
           <i data-lucide="landmark" class="w-5 h-5 text-success"></i>
@@ -147,7 +147,7 @@
           <p class="text-xs text-base-content/40 truncate">mTLS certificate authentication</p>
         </div>
       </div>
-      <div class="flex items-center gap-2 flex-shrink-0">
+      <div class="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
         {{if and $tellerHealth.LastSyncTime (eq $tellerHealth.LastSyncStatus "error")}}
           <span class="badge badge-soft badge-error badge-sm rounded-lg">Sync Error</span>
         {{else if and $tellerHealth.LastSyncTime (eq $tellerHealth.LastSyncStatus "success")}}
@@ -274,7 +274,7 @@
           <li>Go to the <strong>Teller dashboard</strong> and navigate to your application settings</li>
           <li>Set the webhook URL to:</li>
         </ol>
-        <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all">https://&lt;your-domain&gt;/webhooks/teller</code>
+        <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all overflow-hidden">https://&lt;your-domain&gt;/webhooks/teller</code>
         <ol class="text-xs text-base-content/50 space-y-1.5 mt-2 list-decimal list-inside" start="3">
           <li>Copy the <strong>webhook signing secret</strong> from Teller and paste it in the Webhook Secret field above</li>
           <li>Breadbox verifies webhook signatures using this secret to ensure authenticity</li>
@@ -295,26 +295,43 @@
         </div>
         <div class="min-w-0">
           <h2 class="font-semibold">CSV Import</h2>
-          <p class="text-xs text-base-content/40 truncate">Import from bank-exported files</p>
+          <p class="text-xs text-base-content/40 truncate">Import transactions from bank-exported files</p>
         </div>
       </div>
       <span class="badge badge-success badge-sm rounded-lg flex-shrink-0">Always Available</span>
     </div>
 
     <div class="px-4 sm:px-5 py-4 space-y-4">
-      {{/* ── Health stats row ── */}}
-      {{template "provider-stats" $csvHealth}}
+      {{/* ── CSV-specific stats (no sync status) ── */}}
+      {{if $csvHealth}}
+      <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+        <div class="flex items-center gap-1.5">
+          <i data-lucide="file-up" class="w-3.5 h-3.5 text-base-content/30"></i>
+          <span class="text-base-content/50">Imports:</span>
+          <span class="font-medium">{{$csvHealth.ConnectionCount}}</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content/30"></i>
+          <span class="text-base-content/50">Accounts:</span>
+          <span class="font-medium">{{$csvHealth.AccountCount}}</span>
+        </div>
+        {{if $csvHealth.LastSyncTime}}
+        <div class="flex items-center gap-1.5">
+          <i data-lucide="clock" class="w-3.5 h-3.5 text-base-content/30"></i>
+          <span class="text-base-content/50">Last import:</span>
+          <span class="font-medium">{{deref $csvHealth.LastSyncTime}}</span>
+        </div>
+        {{end}}
+      </div>
+      {{end}}
 
       {{/* ── Description + action ── */}}
       <div class="border-t border-base-300 pt-4">
-        <p class="text-sm text-base-content/60 mb-4">Import transactions from CSV files exported from your bank or financial institution. CSV import is always available and requires no API credentials.</p>
-        <div class="flex flex-wrap items-center gap-3">
-          <a href="/connections/import-csv" class="btn btn-sm btn-primary btn-outline rounded-xl">
-            <i data-lucide="upload" class="w-4 h-4"></i>
-            Import CSV File
-          </a>
-          <span class="text-xs text-base-content/40">Supports most common bank CSV formats</span>
-        </div>
+        <p class="text-sm text-base-content/60 mb-4">Import transactions from CSV files exported from your bank or financial institution. No API credentials required.</p>
+        <a href="/connections/import-csv" class="btn btn-sm btn-primary btn-outline rounded-xl">
+          <i data-lucide="upload" class="w-4 h-4"></i>
+          Import CSV File
+        </a>
       </div>
     </div>
   </div>
@@ -356,34 +373,34 @@ function providerCard(name) {
 {{/* ── Reusable provider stats row ── */}}
 {{define "provider-stats"}}
 {{if .}}
-<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm min-w-0">
   <div class="flex items-center gap-1.5">
-    <i data-lucide="link" class="w-3.5 h-3.5 text-base-content/30"></i>
+    <i data-lucide="link" class="w-3.5 h-3.5 text-base-content/30 flex-shrink-0"></i>
     <span class="text-base-content/50">Connections:</span>
     <span class="font-medium">{{.ConnectionCount}}</span>
   </div>
   <div class="flex items-center gap-1.5">
-    <i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content/30"></i>
+    <i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content/30 flex-shrink-0"></i>
     <span class="text-base-content/50">Accounts:</span>
     <span class="font-medium">{{.AccountCount}}</span>
   </div>
   {{if .LastSyncTime}}
-  <div class="flex items-center gap-1.5">
-    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/30"></i>
-    <span class="text-base-content/50">Last sync:</span>
+  <div class="flex items-center gap-1.5 min-w-0">
+    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/30 flex-shrink-0"></i>
+    <span class="text-base-content/50 flex-shrink-0">Last sync:</span>
     {{if eq .LastSyncStatus "success"}}
-      <span class="font-medium text-success">{{deref .LastSyncTime}}</span>
+      <span class="font-medium text-success truncate">{{deref .LastSyncTime}}</span>
     {{else if eq .LastSyncStatus "error"}}
-      <span class="font-medium text-error">failed {{deref .LastSyncTime}}</span>
+      <span class="font-medium text-error truncate">failed {{deref .LastSyncTime}}</span>
     {{else if eq .LastSyncStatus "in_progress"}}
       <span class="font-medium text-warning">in progress</span>
     {{else}}
-      <span class="font-medium">{{deref .LastSyncTime}}</span>
+      <span class="font-medium truncate">{{deref .LastSyncTime}}</span>
     {{end}}
   </div>
   {{else if gt .ConnectionCount 0}}
   <div class="flex items-center gap-1.5">
-    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/30"></i>
+    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/30 flex-shrink-0"></i>
     <span class="text-base-content/40">Never synced</span>
   </div>
   {{end}}
