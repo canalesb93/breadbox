@@ -11,19 +11,19 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// changePasswordFromMember handles password change for a member account.
-// Used by both /my-account/password and /settings/password (when logged in as member).
-func changePasswordFromMember(a *app.App, sm *scs.SessionManager, w http.ResponseWriter, r *http.Request, memberIDStr, redirectPath string) {
+// changePasswordForAccount handles password change for any auth account.
+// Used by both /my-account/password and /settings/password.
+func changePasswordForAccount(a *app.App, sm *scs.SessionManager, w http.ResponseWriter, r *http.Request, accountIDStr, redirectPath string) {
 	ctx := r.Context()
 
-	var memberID pgtype.UUID
-	if err := memberID.Scan(memberIDStr); err != nil {
+	var accountID pgtype.UUID
+	if err := accountID.Scan(accountIDStr); err != nil {
 		SetFlash(ctx, sm, "error", "Invalid session.")
 		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
 		return
 	}
 
-	member, err := a.Queries.GetMemberAccountByID(ctx, memberID)
+	account, err := a.Queries.GetAuthAccountByID(ctx, accountID)
 	if err != nil {
 		SetFlash(ctx, sm, "error", "Account not found.")
 		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
@@ -34,12 +34,12 @@ func changePasswordFromMember(a *app.App, sm *scs.SessionManager, w http.Respons
 	newPassword := r.FormValue("new_password")
 	confirmPassword := r.FormValue("confirm_password")
 
-	if member.HashedPassword == nil {
+	if account.HashedPassword == nil {
 		SetFlash(ctx, sm, "error", "No password set. Please contact your administrator.")
 		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
 		return
 	}
-	if err := bcrypt.CompareHashAndPassword(member.HashedPassword, []byte(currentPassword)); err != nil {
+	if err := bcrypt.CompareHashAndPassword(account.HashedPassword, []byte(currentPassword)); err != nil {
 		SetFlash(ctx, sm, "error", "Current password is incorrect.")
 		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
 		return
@@ -64,11 +64,11 @@ func changePasswordFromMember(a *app.App, sm *scs.SessionManager, w http.Respons
 		return
 	}
 
-	if err := a.Queries.UpdateMemberAccountPassword(ctx, db.UpdateMemberAccountPasswordParams{
-		ID:             memberID,
+	if err := a.Queries.UpdateAuthAccountPassword(ctx, db.UpdateAuthAccountPasswordParams{
+		ID:             accountID,
 		HashedPassword: hashedPassword,
 	}); err != nil {
-		a.Logger.Error("update member password", "error", err)
+		a.Logger.Error("update account password", "error", err)
 		SetFlash(ctx, sm, "error", "Failed to update password.")
 		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
 		return

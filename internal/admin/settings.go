@@ -13,7 +13,6 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // formatNextSync returns a human-readable string for the next sync time.
@@ -118,81 +117,16 @@ func SettingsSyncPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 }
 
 // ChangePasswordHandler serves POST /admin/settings/password.
-// Works for both admin_account and member_account sessions.
+// Works for all account types via the unified auth_accounts table.
 func ChangePasswordHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		// Check if this is a member account session.
-		accountType := sm.GetString(ctx, sessionKeyAccountType)
-		if accountType == "member_account" {
-			memberIDStr := sm.GetString(ctx, sessionKeyMemberID)
-			changePasswordFromMember(a, sm, w, r, memberIDStr, "/settings")
-			return
-		}
-
-		// Legacy admin account flow.
-		adminIDStr := sm.GetString(ctx, sessionKeyAdminID)
-		if adminIDStr == "" {
+		accountIDStr := SessionAccountID(sm, r)
+		if accountIDStr == "" {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 
-		var adminID pgtype.UUID
-		if err := adminID.Scan(adminIDStr); err != nil {
-			SetFlash(ctx, sm, "error", "Invalid session.")
-			http.Redirect(w, r, "/settings", http.StatusSeeOther)
-			return
-		}
-
-		admin, err := a.Queries.GetAdminAccountByID(ctx, adminID)
-		if err != nil {
-			SetFlash(ctx, sm, "error", "Account not found.")
-			http.Redirect(w, r, "/settings", http.StatusSeeOther)
-			return
-		}
-
-		currentPassword := r.FormValue("current_password")
-		newPassword := r.FormValue("new_password")
-		confirmPassword := r.FormValue("confirm_password")
-
-		if err := bcrypt.CompareHashAndPassword(admin.HashedPassword, []byte(currentPassword)); err != nil {
-			SetFlash(ctx, sm, "error", "Current password is incorrect.")
-			http.Redirect(w, r, "/settings", http.StatusSeeOther)
-			return
-		}
-
-		if len(newPassword) < 8 {
-			SetFlash(ctx, sm, "error", "New password must be at least 8 characters.")
-			http.Redirect(w, r, "/settings", http.StatusSeeOther)
-			return
-		}
-
-		if newPassword != confirmPassword {
-			SetFlash(ctx, sm, "error", "New passwords do not match.")
-			http.Redirect(w, r, "/settings", http.StatusSeeOther)
-			return
-		}
-
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), 12)
-		if err != nil {
-			SetFlash(ctx, sm, "error", "Failed to hash password.")
-			http.Redirect(w, r, "/settings", http.StatusSeeOther)
-			return
-		}
-
-		if err := a.Queries.UpdateAdminPassword(ctx, db.UpdateAdminPasswordParams{
-			ID:             adminID,
-			HashedPassword: hashedPassword,
-		}); err != nil {
-			a.Logger.Error("update admin password", "error", err)
-			SetFlash(ctx, sm, "error", "Failed to update password.")
-			http.Redirect(w, r, "/settings", http.StatusSeeOther)
-			return
-		}
-
-		SetFlash(ctx, sm, "success", "Password updated successfully.")
-		http.Redirect(w, r, "/settings", http.StatusSeeOther)
+		changePasswordForAccount(a, sm, w, r, accountIDStr, "/settings")
 	}
 }
 

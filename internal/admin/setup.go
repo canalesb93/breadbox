@@ -21,8 +21,8 @@ func CreateAdminHandler(queries *db.Queries, sm *scs.SessionManager, tr *Templat
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// If admin accounts already exist, redirect to dashboard.
-		count, err := queries.CountAdminAccounts(ctx)
+		// If auth accounts already exist, redirect to dashboard.
+		count, err := queries.CountAuthAccounts(ctx)
 		if err == nil && count > 0 {
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
@@ -86,9 +86,10 @@ func CreateAdminHandler(queries *db.Queries, sm *scs.SessionManager, tr *Templat
 			return
 		}
 
-		_, err = queries.CreateAdminAccount(ctx, db.CreateAdminAccountParams{
+		_, err = queries.CreateAuthAccount(ctx, db.CreateAuthAccountParams{
 			Username:       username,
 			HashedPassword: hashedPassword,
+			Role:           RoleAdmin,
 		})
 		if err != nil {
 			data := map[string]any{
@@ -120,13 +121,13 @@ type programmaticSetupRequest struct {
 }
 
 // ProgrammaticSetupHandler handles POST /admin/api/setup — all-in-one setup.
-// Only works if no admin accounts exist (returns 409 otherwise).
+// Only works if no auth accounts exist (returns 409 otherwise).
 func ProgrammaticSetupHandler(queries *db.Queries, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// Guard: only works when no admin accounts exist.
-		count, _ := queries.CountAdminAccounts(ctx)
+		// Guard: only works when no auth accounts exist.
+		count, _ := queries.CountAuthAccounts(ctx)
 		if count > 0 {
 			writeJSON(w, http.StatusConflict, map[string]string{
 				"error": "Admin account already exists",
@@ -210,9 +211,10 @@ func ProgrammaticSetupHandler(queries *db.Queries, sm *scs.SessionManager) http.
 			return
 		}
 
-		_, err = queries.CreateAdminAccount(ctx, db.CreateAdminAccountParams{
+		_, err = queries.CreateAuthAccount(ctx, db.CreateAuthAccountParams{
 			Username:       strings.TrimSpace(req.Username),
 			HashedPassword: hashedPassword,
+			Role:           RoleAdmin,
 		})
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{

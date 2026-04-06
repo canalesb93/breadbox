@@ -1,0 +1,237 @@
+{{define "content"}}
+{{template "breadcrumb" .}}
+
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">{{if .IsManage}}Manage Login{{else}}Create Login{{end}}</h1>
+    <p class="text-sm text-base-content/50 mt-1">{{if .IsManage}}Manage login account for {{.User.Name}}{{else}}Create a login account for {{.User.Name}}{{end}}</p>
+  </div>
+  <a href="/users" class="btn btn-sm btn-ghost rounded-xl gap-2">
+    <i data-lucide="arrow-left" class="w-4 h-4"></i> Household
+  </a>
+</div>
+
+{{if .IsManage}}
+<!-- Manage existing login account -->
+<div class="bb-card p-8 max-w-lg">
+  <div class="flex items-center gap-3 mb-6">
+    <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/8">
+      <i data-lucide="key" class="w-5 h-5 text-primary"></i>
+    </div>
+    <div>
+      <h2 class="text-base font-semibold">Login Account</h2>
+      <p class="text-xs text-base-content/45">Account details for {{.User.Name}}</p>
+    </div>
+  </div>
+
+  <div class="space-y-4">
+    <div class="bb-info-grid">
+      <div>
+        <span class="text-xs text-base-content/40">Email / Username</span>
+        <span class="text-sm font-medium">{{.LoginAccount.Username}}</span>
+      </div>
+      <div>
+        <span class="text-xs text-base-content/40">Role</span>
+        <div class="flex items-center gap-2" x-data="{ role: '{{.LoginAccount.Role}}', saving: false }">
+          <select x-model="role" class="select select-sm select-bordered rounded-xl bg-base-200 text-sm"
+                  @change="
+                    saving = true;
+                    fetch('/-/members/{{formatUUID .LoginAccount.ID}}/role', {
+                      method: 'PUT',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({role: role})
+                    }).then(r => { saving = false; if(!r.ok) alert('Failed to update role'); })
+                  ">
+            <option value="viewer">Viewer</option>
+            <option value="editor">Editor</option>
+          </select>
+          <span x-show="saving" class="loading loading-spinner loading-xs"></span>
+        </div>
+      </div>
+      <div>
+        <span class="text-xs text-base-content/40">Password</span>
+        <span class="text-sm">{{if .LoginAccount.HashedPassword}}<span class="badge badge-sm badge-success badge-soft">Set</span>{{else}}<span class="badge badge-sm badge-warning badge-soft">Not set</span>{{end}}</span>
+      </div>
+    </div>
+
+    {{if not .LoginAccount.HashedPassword}}
+    <!-- Setup link section -->
+    <div class="border-t border-base-300 pt-4 mt-4" x-data="{ setupURL: '{{.SetupURL}}', regenerating: false, copied: false }">
+      <h3 class="text-sm font-semibold mb-2">Setup Link</h3>
+      <p class="text-xs text-base-content/50 mb-3">Share this link with {{.User.Name}} so they can set their password.</p>
+
+      <div class="flex items-center gap-2 mb-3">
+        <input type="text" :value="setupURL" readonly
+               class="input input-bordered input-sm rounded-xl flex-1 text-xs font-mono bg-base-200 select-all cursor-text">
+        <button @click="navigator.clipboard.writeText(setupURL); copied = true; setTimeout(() => copied = false, 2000)"
+                class="btn btn-sm btn-ghost rounded-xl" :class="copied ? 'text-success' : ''">
+          <i x-show="!copied" data-lucide="copy" class="w-4 h-4"></i>
+          <i x-show="copied" data-lucide="check" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <button @click="
+        regenerating = true;
+        fetch('/-/members/{{formatUUID .LoginAccount.ID}}/setup-token', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'}
+        }).then(r => r.json()).then(data => {
+          regenerating = false;
+          if(data.setup_token) {
+            setupURL = window.location.origin + '/setup-account/' + data.setup_token;
+            copied = false;
+          }
+        }).catch(() => { regenerating = false; })
+      " :disabled="regenerating" class="btn btn-ghost btn-xs rounded-lg">
+        <span x-show="!regenerating"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Regenerate link</span>
+        <span x-show="regenerating" class="loading loading-spinner loading-xs"></span>
+      </button>
+    </div>
+    {{end}}
+
+    <!-- Danger zone -->
+    <div class="border-t border-base-300 pt-4 mt-4" x-data>
+      <button @click="if(confirm('Delete login account for {{.User.Name}}? They will no longer be able to sign in.')) fetch('/-/members/{{formatUUID .LoginAccount.ID}}', {method:'DELETE'}).then(()=>window.location.href='/users')"
+              class="btn btn-error btn-soft btn-sm rounded-xl">
+        <i data-lucide="user-x" class="w-4 h-4"></i>
+        Delete Login Account
+      </button>
+    </div>
+  </div>
+</div>
+
+{{else}}
+<!-- Create new login account -->
+<div class="bb-card p-8 max-w-lg" x-data="{ submitting: false, error: '', setupURL: '', done: false }">
+  <template x-if="!done">
+    <div>
+      <div class="flex items-center gap-3 mb-6">
+        <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/8">
+          <i data-lucide="user-plus" class="w-5 h-5 text-primary"></i>
+        </div>
+        <div>
+          <h2 class="text-base font-semibold">Create Login for {{.User.Name}}</h2>
+          <p class="text-xs text-base-content/45">They'll receive a link to set their password</p>
+        </div>
+      </div>
+
+      <form @submit.prevent="
+        error = '';
+        var email = document.getElementById('login_email').value.trim();
+        var role = document.getElementById('login_role').value;
+        if(!email) { error = 'Email is required'; return; }
+        if(!email.includes('@') || !email.includes('.')) { error = 'Please enter a valid email address'; return; }
+        submitting = true;
+
+        // Update user email if changed
+        var emailChanged = email !== '{{if .User.Email.Valid}}{{.User.Email.String}}{{end}}';
+        var chain = Promise.resolve();
+        if(emailChanged) {
+          chain = fetch('/-/users/{{.UserID}}', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({email: email})
+          }).then(r => { if(!r.ok) return r.json().then(d => { throw d }); });
+        }
+
+        chain.then(() => {
+          return fetch('/-/members', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: '{{.UserID}}', username: email, role: role})
+          });
+        }).then(r => {
+          if(!r.ok) return r.json().then(d => { throw d });
+          return r.json();
+        }).then(data => {
+          submitting = false;
+          if(data.setup_token) {
+            setupURL = window.location.origin + '/setup-account/' + data.setup_token;
+            done = true;
+            if (window.bbProgress) window.bbProgress.finish();
+            var main = document.querySelector('main');
+            if (main) { main.style.opacity = ''; main.style.filter = ''; main.style.pointerEvents = ''; }
+            $nextTick(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); });
+          } else {
+            window.location.href = '/users';
+          }
+        }).catch(e => {
+          submitting = false;
+          if (window.bbProgress) window.bbProgress.finish();
+          var main = document.querySelector('main');
+          if (main) { main.style.opacity = ''; main.style.filter = ''; main.style.pointerEvents = ''; }
+          error = (e.error && e.error.message) || 'Failed to create login account';
+        });
+      ">
+        <fieldset class="fieldset mb-5">
+          <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="login_email">
+            Email <span class="text-error text-xs">*</span>
+          </label>
+          <input type="email" id="login_email" name="login_email"
+                 class="input input-bordered w-full rounded-xl" required
+                 value="{{if .User.Email.Valid}}{{.User.Email.String}}{{end}}"
+                 placeholder="e.g., alex@example.com">
+          <p class="text-xs text-base-content/30 mt-1">This will be their sign-in email and username</p>
+        </fieldset>
+
+        <fieldset class="fieldset mb-6">
+          <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="login_role">
+            Role
+          </label>
+          <select id="login_role" name="login_role" class="select select-bordered w-full rounded-xl bg-base-200">
+            <option value="viewer">Viewer &mdash; can only see their own data</option>
+            <option value="editor">Editor &mdash; can view and edit all household data</option>
+          </select>
+        </fieldset>
+
+        <template x-if="error">
+          <div class="rounded-xl bg-error/10 border border-error/20 text-error text-sm px-4 py-3 mb-4" x-text="error"></div>
+        </template>
+
+        <div class="flex gap-3 pt-2">
+          <button type="submit" class="btn btn-primary btn-sm rounded-xl" :disabled="submitting">
+            <span x-show="!submitting"><i data-lucide="plus" class="w-4 h-4"></i> Create Login</span>
+            <span x-show="submitting" class="loading loading-spinner loading-sm"></span>
+          </button>
+          <a href="/users" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </template>
+
+  <template x-if="done">
+    <div>
+      <div class="flex items-center gap-3 mb-6">
+        <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-success/10">
+          <i data-lucide="check-circle" class="w-5 h-5 text-success"></i>
+        </div>
+        <div>
+          <h2 class="text-base font-semibold">Login Created</h2>
+          <p class="text-xs text-base-content/45">Share the setup link with {{.User.Name}}</p>
+        </div>
+      </div>
+
+      <p class="text-sm text-base-content/60 mb-4">Share this link with {{.User.Name}} so they can set their password and start using Breadbox.</p>
+
+      <div class="flex items-center gap-2 mb-4" x-data="{ copied: false }">
+        <input type="text" :value="setupURL" readonly
+               class="input input-bordered input-sm rounded-xl flex-1 text-xs font-mono bg-base-200 select-all cursor-text">
+        <button @click="navigator.clipboard.writeText(setupURL); copied = true; setTimeout(() => copied = false, 2000)"
+                class="btn btn-sm btn-primary rounded-xl" :class="copied ? 'btn-success' : ''">
+          <i x-show="!copied" data-lucide="copy" class="w-4 h-4"></i>
+          <i x-show="copied" data-lucide="check" class="w-4 h-4"></i>
+          <span x-text="copied ? 'Copied!' : 'Copy Link'"></span>
+        </button>
+      </div>
+
+      <p class="text-xs text-base-content/40 mb-6">This link expires in 7 days. You can regenerate it from the Household page.</p>
+
+      <a href="/users" class="btn btn-ghost btn-sm rounded-xl">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+        Back to Household
+      </a>
+    </div>
+  </template>
+</div>
+{{end}}
+{{end}}

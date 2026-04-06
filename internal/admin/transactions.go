@@ -168,8 +168,8 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			params.SortOrder = "asc"
 		}
 
-		// Scope to member's own data if not admin.
-		if !IsAdmin(sm, r) {
+		// Scope to viewer's own data. Editors and admins see all.
+		if !IsEditor(sm, r) {
 			if uid := SessionUserID(sm, r); uid != "" {
 				params.UserID = &uid
 			}
@@ -345,8 +345,8 @@ func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			params.SortOrder = "asc"
 		}
 
-		// Scope to member's own data if not admin.
-		if !IsAdmin(sm, r) {
+		// Scope to viewer's own data. Editors and admins see all.
+		if !IsEditor(sm, r) {
 			if uid := SessionUserID(sm, r); uid != "" {
 				params.UserID = &uid
 			}
@@ -407,9 +407,9 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			return
 		}
 
-		// IDOR check: non-admin members can only view their own accounts.
+		// IDOR check: viewers can only view their own accounts. Editors+ see all.
 		memberUID := SessionUserID(sm, r)
-		if !IsAdmin(sm, r) {
+		if !IsEditor(sm, r) {
 			if detail.UserID == nil || *detail.UserID != memberUID {
 				tr.RenderNotFound(w, r)
 				return
@@ -428,8 +428,8 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			AccountID: &idStr,
 		}
 
-		// Scope transaction query to member's user for non-admins.
-		if !IsAdmin(sm, r) {
+		// Scope transaction query to viewer's user. Editors+ see all.
+		if !IsEditor(sm, r) {
 			txParams.UserID = &memberUID
 		}
 
@@ -629,8 +629,8 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			return
 		}
 
-		// IDOR check: non-admin members can only view transactions belonging to their user.
-		if !IsAdmin(sm, r) {
+		// IDOR check: viewers can only view transactions belonging to their user. Editors+ see all.
+		if !IsEditor(sm, r) {
 			memberUID := SessionUserID(sm, r)
 			// Look up the account to determine ownership.
 			ownerMatch := false

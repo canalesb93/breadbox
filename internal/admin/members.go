@@ -3,6 +3,7 @@ package admin
 import (
 	"encoding/json"
 	"net/http"
+	"net/mail"
 	"strings"
 
 	"breadbox/internal/app"
@@ -12,21 +13,17 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// MembersPageHandler serves GET /users (updated to include member accounts tab).
-// This is kept as the enhanced users page — member account management is shown alongside
-// existing family member management.
-
-// createMemberAccountRequest is the JSON body for POST /-/members.
-type createMemberAccountRequest struct {
+// createLoginAccountRequest is the JSON body for POST /-/members.
+type createLoginAccountRequest struct {
 	UserID   string `json:"user_id"`
 	Username string `json:"username"`
 	Role     string `json:"role"`
 }
 
-// CreateMemberAccountHandler serves POST /-/members — create a member account.
-func CreateMemberAccountHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
+// CreateLoginAccountHandler serves POST /-/members -- create a login account for a family member.
+func CreateLoginAccountHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req createMemberAccountRequest
+		var req createLoginAccountRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
 			return
@@ -35,14 +32,22 @@ func CreateMemberAccountHandler(svc *service.Service, sm *scs.SessionManager) ht
 		req.Username = strings.TrimSpace(req.Username)
 		if req.Username == "" {
 			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Username is required"},
+				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Email is required"},
+			})
+			return
+		}
+
+		// Validate email format since username = email.
+		if _, err := mail.ParseAddress(req.Username); err != nil {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Please enter a valid email address"},
 			})
 			return
 		}
 
 		if len(req.Username) > 64 {
 			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Username must be 64 characters or fewer"},
+				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Email must be 64 characters or fewer"},
 			})
 			return
 		}
@@ -55,10 +60,10 @@ func CreateMemberAccountHandler(svc *service.Service, sm *scs.SessionManager) ht
 		}
 
 		if req.Role == "" {
-			req.Role = "member"
+			req.Role = "viewer"
 		}
 
-		member, err := svc.CreateMemberAccount(r.Context(), service.CreateMemberAccountParams{
+		member, err := svc.CreateLoginAccount(r.Context(), service.CreateLoginAccountParams{
 			UserID:   req.UserID,
 			Username: req.Username,
 			Role:     req.Role,
@@ -66,17 +71,17 @@ func CreateMemberAccountHandler(svc *service.Service, sm *scs.SessionManager) ht
 		if err != nil {
 			if strings.Contains(err.Error(), "username already taken") {
 				writeJSON(w, http.StatusConflict, map[string]any{
-					"error": map[string]string{"code": "USERNAME_TAKEN", "message": "This username is already in use"},
+					"error": map[string]string{"code": "EMAIL_TAKEN", "message": "This email is already in use as a login"},
 				})
 				return
 			}
-			if strings.Contains(err.Error(), "already has a member account") {
+			if strings.Contains(err.Error(), "already has a login account") {
 				writeJSON(w, http.StatusConflict, map[string]any{
 					"error": map[string]string{"code": "DUPLICATE_MEMBER", "message": "This family member already has a login account"},
 				})
 				return
 			}
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create member account"})
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create login account"})
 			return
 		}
 
@@ -84,20 +89,20 @@ func CreateMemberAccountHandler(svc *service.Service, sm *scs.SessionManager) ht
 	}
 }
 
-// ListMemberAccountsHandler serves GET /-/members — list all member accounts.
-func ListMemberAccountsHandler(svc *service.Service) http.HandlerFunc {
+// ListLoginAccountsHandler serves GET /-/members -- list all login accounts.
+func ListLoginAccountsHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		members, err := svc.ListMemberAccounts(r.Context())
+		members, err := svc.ListLoginAccounts(r.Context())
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to list member accounts"})
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to list login accounts"})
 			return
 		}
 		writeJSON(w, http.StatusOK, members)
 	}
 }
 
-// UpdateMemberRoleHandler serves PUT /-/members/{id}/role.
-func UpdateMemberRoleHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
+// UpdateLoginAccountRoleHandler serves PUT /-/members/{id}/role.
+func UpdateLoginAccountRoleHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 
@@ -109,7 +114,7 @@ func UpdateMemberRoleHandler(svc *service.Service, sm *scs.SessionManager) http.
 			return
 		}
 
-		if err := svc.UpdateMemberRole(r.Context(), id, req.Role); err != nil {
+		if err := svc.UpdateLoginAccountRole(r.Context(), id, req.Role); err != nil {
 			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
 				"error": map[string]string{"code": "VALIDATION_ERROR", "message": err.Error()},
 			})
@@ -120,13 +125,13 @@ func UpdateMemberRoleHandler(svc *service.Service, sm *scs.SessionManager) http.
 	}
 }
 
-// DeleteMemberAccountHandler serves DELETE /-/members/{id}.
-func DeleteMemberAccountHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
+// DeleteLoginAccountHandler serves DELETE /-/members/{id}.
+func DeleteLoginAccountHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 
-		if err := svc.DeleteMemberAccount(r.Context(), id); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete member account"})
+		if err := svc.DeleteLoginAccount(r.Context(), id); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete login account"})
 			return
 		}
 
@@ -134,7 +139,30 @@ func DeleteMemberAccountHandler(svc *service.Service, sm *scs.SessionManager) ht
 	}
 }
 
-// WipeUserDataHandler serves POST /-/users/{id}/wipe — delete all connections and transactions for a user.
+// RegenerateSetupTokenHandler serves POST /-/members/{id}/setup-token -- regenerate setup token.
+func RegenerateSetupTokenHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+
+		token, err := svc.RegenerateSetupToken(r.Context(), id)
+		if err != nil {
+			if strings.Contains(err.Error(), "already has a password") {
+				writeJSON(w, http.StatusConflict, map[string]any{
+					"error": map[string]string{"code": "PASSWORD_ALREADY_SET", "message": "This account already has a password set"},
+				})
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to regenerate setup token"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"setup_token": token,
+		})
+	}
+}
+
+// WipeUserDataHandler serves POST /-/users/{id}/wipe -- delete all connections and transactions for a user.
 func WipeUserDataHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
@@ -148,20 +176,20 @@ func WipeUserDataHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 
 		SetFlash(r.Context(), sm, "success", "User data wiped successfully.")
 		writeJSON(w, http.StatusOK, map[string]any{
-			"status":              "ok",
+			"status":               "ok",
 			"transactions_deleted": txnCount,
 		})
 	}
 }
 
-// MyAccountHandler serves GET /my-account — member's own account page.
+// MyAccountHandler serves GET /my-account -- member's own account page.
 func MyAccountHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		memberIDStr := SessionMemberID(sm, r)
+		accountIDStr := SessionAccountID(sm, r)
 		userIDStr := SessionUserID(sm, r)
 
 		data := BaseTemplateData(r, sm, "my-account", "My Account")
-		data["MemberID"] = memberIDStr
+		data["AccountID"] = accountIDStr
 		data["UserID"] = userIDStr
 
 		// Load the user's connections and accounts for display.
@@ -176,23 +204,23 @@ func MyAccountHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, 
 	}
 }
 
-// MyAccountChangePasswordHandler serves POST /my-account/password — member changes their own password.
+// MyAccountChangePasswordHandler serves POST /my-account/password -- member changes their own password.
 func MyAccountChangePasswordHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		memberIDStr := SessionMemberID(sm, r)
-		if memberIDStr == "" {
+		accountIDStr := SessionAccountID(sm, r)
+		if accountIDStr == "" {
 			SetFlash(ctx, sm, "error", "Invalid session.")
 			http.Redirect(w, r, "/my-account", http.StatusSeeOther)
 			return
 		}
 
-		changePasswordFromMember(a, sm, w, r, memberIDStr, "/my-account")
+		changePasswordForAccount(a, sm, w, r, accountIDStr, "/my-account")
 	}
 }
 
-// MyAccountWipeDataHandler serves POST /my-account/wipe-data — member wipes their own data.
+// MyAccountWipeDataHandler serves POST /my-account/wipe-data -- member wipes their own data.
 func MyAccountWipeDataHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

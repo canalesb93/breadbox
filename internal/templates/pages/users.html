@@ -153,61 +153,29 @@
 
     <!-- Login Account Status -->
     {{$uid := formatUUID .ID}}
-    {{$ma := index $.MemberAccountMap $uid}}
+    {{$la := index $.LoginAccountMap $uid}}
     <div class="border-t border-base-300 px-4 sm:px-5 py-3 bg-base-200/20">
-      {{if $ma.Username}}
+      {{if $la.Username}}
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2 text-xs">
-          <i data-lucide="user-check" class="w-3.5 h-3.5 text-success/60"></i>
-          <span class="text-base-content/50">Login: <span class="font-medium text-base-content/70">{{$ma.Username}}</span></span>
-          <span class="badge badge-xs {{if eq $ma.Role "admin"}}badge-primary{{else}}badge-ghost{{end}}">{{$ma.Role}}</span>
-          {{if not $ma.HashedPassword}}
-          <span class="badge badge-xs badge-warning">no password</span>
+          <i data-lucide="key" class="w-3.5 h-3.5 text-success/60"></i>
+          <span class="text-base-content/50">Login: <span class="font-medium text-base-content/70">{{$la.Username}}</span></span>
+          <span class="badge badge-xs {{if eq $la.Role "admin"}}badge-primary{{else if eq $la.Role "editor"}}badge-secondary{{else}}badge-ghost{{end}}">{{$la.Role}}</span>
+          {{if not $la.HashedPassword}}
+          <span class="badge badge-xs badge-warning">setup pending</span>
           {{end}}
         </div>
-        <div class="flex items-center gap-1" x-data>
-          <button class="btn btn-ghost btn-xs rounded-lg opacity-40 hover:opacity-100"
-                  @click="if(confirm('Delete login account for {{.Name}}?')) fetch('/-/members/{{formatUUID $ma.ID}}', {method:'DELETE'}).then(()=>window.location.reload())"
-                  title="Remove login account">
-            <i data-lucide="user-x" class="w-3.5 h-3.5"></i>
-          </button>
-        </div>
+        <a href="/users/{{$uid}}/create-login" class="btn btn-ghost btn-xs rounded-lg opacity-40 hover:opacity-100" title="Manage login">
+          <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+        </a>
       </div>
       {{else}}
-      <div class="flex items-center justify-between" x-data="{ showForm: false, username: '', role: 'member', submitting: false, error: '' }">
-        <template x-if="!showForm">
-          <button @click="showForm = true" class="btn btn-ghost btn-xs rounded-lg text-base-content/40 hover:text-primary">
-            <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
-            <span>Create login</span>
-          </button>
-        </template>
-        <template x-if="showForm">
-          <div class="flex flex-wrap items-center gap-2 w-full">
-            <input x-model="username" type="text" placeholder="Username" class="input input-xs rounded-lg bg-base-200 border-base-300 w-28 text-xs" maxlength="64">
-            <select x-model="role" class="select select-xs rounded-lg bg-base-200 border-base-300 text-xs">
-              <option value="member">Member</option>
-              <option value="admin">Admin</option>
-            </select>
-            <button @click="
-              if(!username.trim()) { error = 'Username required'; return; }
-              submitting = true; error = '';
-              fetch('/-/members', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({user_id: '{{$uid}}', username: username.trim(), role: role})
-              }).then(r => { if(!r.ok) return r.json().then(d => { throw d }); return r.json(); })
-                .then(() => window.location.reload())
-                .catch(e => { error = e.error?.message || 'Failed'; submitting = false; })
-            " :disabled="submitting" class="btn btn-primary btn-xs rounded-lg">
-              <span x-show="!submitting">Create</span>
-              <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-            </button>
-            <button @click="showForm = false; error = ''" class="btn btn-ghost btn-xs rounded-lg">Cancel</button>
-            <template x-if="error">
-              <span class="text-xs text-error" x-text="error"></span>
-            </template>
-          </div>
-        </template>
+      <div class="flex items-center justify-between">
+        <span class="text-xs text-base-content/30">No login account</span>
+        <a href="/users/{{$uid}}/create-login" class="btn btn-ghost btn-xs rounded-lg text-base-content/40 hover:text-primary">
+          <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+          <span>Create login</span>
+        </a>
       </div>
       {{end}}
     </div>

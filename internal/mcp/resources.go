@@ -15,6 +15,12 @@ func (s *MCPServer) handleOverviewResource(_ context.Context, _ *mcpsdk.ReadReso
 		return nil, fmt.Errorf("get overview stats: %w", err)
 	}
 
+	// Permissions are intentionally omitted from the resource-level response.
+	// The resource handler has no access to the per-request MCPServerConfig
+	// (API key scope, MCP mode), so we cannot populate permissions accurately here.
+	// Per-request scoping is enforced at the tool level via BuildServer filtering.
+	stats.Permissions = nil
+
 	data, err := json.MarshalIndent(stats, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("marshal overview: %w", err)

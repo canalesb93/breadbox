@@ -150,7 +150,7 @@ func OAuthAuthorizeHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		}
 
 		// Check if admin is logged in.
-		adminID := sm.GetString(r.Context(), sessionKeyAdminID)
+		adminID := sm.GetString(r.Context(), sessionKeyAccountID)
 		if adminID == "" {
 			// Store OAuth params in session and redirect to login.
 			sm.Put(r.Context(), "oauth_return_url", r.URL.String())
@@ -177,7 +177,7 @@ func OAuthAuthorizeHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 // OAuthAuthorizeSubmitHandler handles POST /oauth/authorize (consent form submission).
 func OAuthAuthorizeSubmitHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		adminID := sm.GetString(r.Context(), sessionKeyAdminID)
+		adminID := sm.GetString(r.Context(), sessionKeyAccountID)
 		if adminID == "" {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return

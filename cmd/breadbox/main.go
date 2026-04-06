@@ -277,7 +277,7 @@ func runServe() error {
 		encryptionStatus = "NOT SET"
 	}
 	adminStatus := "none"
-	adminCount, err := a.Queries.CountAdminAccounts(ctx)
+	adminCount, err := a.Queries.CountAuthAccounts(ctx)
 	if err != nil {
 		logger.Warn("failed to check admin accounts", "error", err)
 	} else if adminCount > 0 {
@@ -484,7 +484,7 @@ func runResetPassword() error {
 	queries := db.New(pool)
 
 	// Check if any admin account exists.
-	count, err := queries.CountAdminAccounts(ctx)
+	count, err := queries.CountAuthAccounts(ctx)
 	if err != nil {
 		return fmt.Errorf("check admin accounts: %w", err)
 	}
@@ -495,7 +495,7 @@ func runResetPassword() error {
 	// Get the first admin account.
 	var adminID pgtype.UUID
 	var adminUsername string
-	row := pool.QueryRow(ctx, "SELECT id, username FROM admin_accounts ORDER BY created_at LIMIT 1")
+	row := pool.QueryRow(ctx, "SELECT id, username FROM auth_accounts WHERE role = 'admin' ORDER BY created_at LIMIT 1")
 	if err := row.Scan(&adminID, &adminUsername); err != nil {
 		return fmt.Errorf("get admin account: %w", err)
 	}
@@ -530,7 +530,7 @@ func runResetPassword() error {
 	}
 
 	// Update password.
-	if err := queries.UpdateAdminPassword(ctx, db.UpdateAdminPasswordParams{
+	if err := queries.UpdateAuthAccountPassword(ctx, db.UpdateAuthAccountPasswordParams{
 		ID:             adminID,
 		HashedPassword: hashedPassword,
 	}); err != nil {

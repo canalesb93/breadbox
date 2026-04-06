@@ -36,13 +36,17 @@
     <span class="bb-nav-badge bb-nav-badge--warn" title="{{.NavBadges.ConnectionsAttention}} connections need attention">{{badgeCount .NavBadges.ConnectionsAttention}}</span>
     {{end}}
   </a>
-  {{if .IsAdmin}}
+  {{if .IsEditor}}
   <a href="/agents" class="bb-sidebar-link{{if eq .CurrentPage "agents"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="bot"></i> Agents
   </a>
+  {{end}}
+  {{if .IsAdmin}}
   <a href="/rules" class="bb-sidebar-link{{if or (eq .CurrentPage "rules") (eq .CurrentPage "categories")}} bb-sidebar-link--active{{end}}">
     <i data-lucide="list-filter"></i> Rules & Categories
   </a>
+  {{end}}
+  {{if .IsEditor}}
   <a href="/reviews" class="bb-sidebar-link{{if eq .CurrentPage "reviews"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="clipboard-check"></i>
     <span class="flex-1">Review Queue</span>
@@ -52,18 +56,22 @@
     <span class="badge badge-ghost badge-xs">Off</span>
     {{end}}
   </a>
+  {{end}}
+  {{if .IsAdmin}}
   <a href="/users" class="bb-sidebar-link{{if eq .CurrentPage "users"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="users"></i> Household
   </a>
   {{end}}
 
-  {{if .IsAdmin}}
+  {{if .IsEditor}}
   <div class="bb-sidebar-section">System</div>
-  <a href="/providers" class="bb-sidebar-link{{if eq .CurrentPage "providers"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="plug"></i> Providers
-  </a>
   <a href="/access" class="bb-sidebar-link{{if eq .CurrentPage "access"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="shield-check"></i> Access
+  </a>
+  {{end}}
+  {{if .IsAdmin}}
+  <a href="/providers" class="bb-sidebar-link{{if eq .CurrentPage "providers"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="plug"></i> Providers
   </a>
   <a href="/logs" class="bb-sidebar-link{{if eq .CurrentPage "logs"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="scroll-text"></i> Logs
@@ -74,28 +82,24 @@
   <a href="/settings" class="bb-sidebar-link{{if eq .CurrentPage "settings"}} bb-sidebar-link--active{{end}}">
     <i data-lucide="settings"></i> Settings
   </a>
-  {{else}}
-  <div class="bb-sidebar-section">Account</div>
-  <a href="/my-account" class="bb-sidebar-link{{if eq .CurrentPage "my-account"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="settings"></i> My Account
-  </a>
   {{end}}
+
 </nav>
 
 <!-- User profile + Sign out -->
-<div class="bb-sidebar-footer mt-auto pt-4 border-t border-base-300">
-  <div class="bb-sidebar-profile">
-    <div class="bb-sidebar-profile-avatar">
+<div class="mt-auto pt-3 border-t border-base-300 px-2">
+  <div class="flex items-center gap-2.5 py-2">
+    <a href="/my-account" class="bb-sidebar-profile-avatar no-underline shrink-0" title="My Account">
       {{if .AdminUsername}}{{slice .AdminUsername 0 1}}{{else}}A{{end}}
-    </div>
-    <div class="bb-sidebar-profile-info">
+    </a>
+    <a href="/my-account" class="flex-1 min-w-0 no-underline" title="My Account">
       <div class="bb-sidebar-profile-name">{{if .AdminUsername}}{{.AdminUsername}}{{else}}Admin{{end}}</div>
-      <div class="bb-sidebar-profile-role">{{if .IsAdmin}}Administrator{{else}}Member{{end}}</div>
-    </div>
-    <form method="POST" action="/logout" class="bb-sidebar-profile-logout">
+      <div class="bb-sidebar-profile-role">{{.RoleDisplay}}</div>
+    </a>
+    <form method="POST" action="/logout" class="shrink-0">
       {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
-      <button type="submit" class="bb-sidebar-logout-btn" title="Sign out">
-        <i data-lucide="log-out"></i>
+      <button type="submit" class="btn btn-ghost btn-sm btn-square opacity-40 hover:opacity-100" title="Sign out">
+        <i data-lucide="log-out" class="w-4 h-4"></i>
       </button>
     </form>
   </div>
@@ -113,7 +117,7 @@
     {{else}}
     <span class="badge badge-ghost badge-xs">dev</span>
     {{end}}
-    <span class="ml-auto" style="cursor:pointer;opacity:0.5" @click="$dispatch('open-shortcuts')" title="Keyboard shortcuts">
+    <span class="ml-auto hidden lg:inline" style="cursor:pointer;opacity:0.5" @click="$dispatch('open-shortcuts')" title="Keyboard shortcuts">
       <kbd class="bb-shortcuts-kbd" style="font-size:0.5rem;min-width:1rem;height:1rem;padding:0 0.25rem">?</kbd>
     </span>
   </div>

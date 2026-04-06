@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
   <!-- Safari: Add to Home Screen support -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Breadbox">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
@@ -73,9 +73,8 @@
           <span class="text-sm font-semibold truncate">{{.PageTitle}}</span>
         </div>
         <div class="flex-none">
-          <button class="bb-mobile-search-btn" x-data @click="$dispatch('open-cmdk')">
-            <i data-lucide="search" class="w-4 h-4"></i>
-            <span class="bb-mobile-search-label">Search</span>
+          <button class="btn btn-square btn-ghost" x-data @click="$dispatch('open-cmdk')" title="Search">
+            <i data-lucide="search" class="w-5 h-5"></i>
           </button>
         </div>
       </div>
@@ -484,6 +483,25 @@
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <script>
     lucide.createIcons();
+
+    // Auto-render Lucide icons when new elements are added to the DOM.
+    // Prevents icons from missing when Alpine.js x-if templates or
+    // fetch-based content adds data-lucide elements after initial render.
+    // Note: lucide.createIcons() replaces [data-lucide] with <svg>, which
+    // adds nodes and would re-trigger this observer. We debounce and check
+    // for unprocessed [data-lucide] elements to avoid an infinite loop.
+    (function() {
+      var iconTimer = null;
+      new MutationObserver(function() {
+        if (iconTimer) return;
+        iconTimer = setTimeout(function() {
+          iconTimer = null;
+          if (document.querySelector('[data-lucide]')) {
+            lucide.createIcons();
+          }
+        }, 50);
+      }).observe(document.body, { childList: true, subtree: true });
+    })();
 
     // Button loading state helpers for async actions
     window.bbButtonLoading = function(btn) {

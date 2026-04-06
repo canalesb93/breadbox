@@ -158,6 +158,11 @@
   body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Match safe area bars to content background */
+    background-color: oklch(0.97 0 0);
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background-color: oklch(0.205 0 0); }
   }
 
   /* ── Themed text selection ── */
@@ -278,19 +283,14 @@
 
   /* ── Mobile Navbar (glassmorphism) ── */
   .bb-mobile-navbar {
-    @apply navbar sticky top-0 z-30 px-2;
-    background: oklch(1 0 0 / 0.72);
-    backdrop-filter: blur(16px) saturate(1.8);
-    -webkit-backdrop-filter: blur(16px) saturate(1.8);
+    @apply navbar px-2 bg-base-100;
     border-bottom: 1px solid oklch(0 0 0 / 0.06);
-    box-shadow: 0 1px 3px oklch(0 0 0 / 0.04), 0 4px 12px oklch(0 0 0 / 0.02);
   }
 
   @media (prefers-color-scheme: dark) {
     .bb-mobile-navbar {
-      background: oklch(0.205 0 0 / 0.65);
+      @apply bg-base-100;
       border-bottom-color: oklch(1 0 0 / 0.08);
-      box-shadow: 0 1px 3px oklch(0 0 0 / 0.2), 0 4px 12px oklch(0 0 0 / 0.15);
     }
   }
 
@@ -332,7 +332,7 @@
   }
 
   .bb-sidebar-nav {
-    @apply flex flex-col gap-0.5 flex-1 overflow-y-auto;
+    @apply flex flex-col gap-0.5 flex-1 overflow-y-auto pb-4;
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
   }
@@ -371,8 +371,8 @@
   }
 
   .bb-sidebar-link {
-    @apply flex items-center gap-3 px-3 py-2.5 lg:py-1.5 min-h-11 lg:min-h-0
-           rounded-lg text-sm font-medium
+    @apply flex items-center gap-3 px-3 py-2.5 lg:py-1.5 min-h-11 lg:min-h-8
+           shrink-0 rounded-lg text-sm font-medium
            text-base-content/60 no-underline
            hover:bg-base-200 hover:text-base-content;
     transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;

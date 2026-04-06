@@ -23,6 +23,16 @@ type OverviewStats struct {
 	AccountsByType          map[string]int         `json:"accounts_by_type"`
 	Connections             []OverviewConnection   `json:"connections"`
 	SpendingSummary30d      *OverviewSpending      `json:"spending_summary_30d,omitempty"`
+	Permissions             *OverviewPermissions   `json:"permissions,omitempty"`
+}
+
+// OverviewPermissions describes what the current API key/session can do.
+type OverviewPermissions struct {
+	Role                    string `json:"role"`
+	CanReadAllTransactions  bool   `json:"can_read_all_transactions"`
+	CanEditTransactions     bool   `json:"can_edit_transactions"`
+	CanManageConnections    bool   `json:"can_manage_connections"`
+	CanManageSettings       bool   `json:"can_manage_settings"`
 }
 
 // OverviewUser is a minimal user representation for the overview.
