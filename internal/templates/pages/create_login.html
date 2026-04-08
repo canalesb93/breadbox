@@ -189,8 +189,8 @@
         </template>
 
         <div class="flex gap-3 pt-2">
-          <button type="submit" class="btn btn-primary btn-sm rounded-xl" :disabled="submitting">
-            <span x-show="!submitting"><i data-lucide="plus" class="w-4 h-4"></i> Create Login</span>
+          <button type="submit" class="btn btn-primary btn-sm rounded-xl whitespace-nowrap" :disabled="submitting">
+            <span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="plus" class="w-4 h-4"></i> Create Login</span>
             <span x-show="submitting" class="loading loading-spinner loading-sm"></span>
           </button>
           <a href="/users" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
