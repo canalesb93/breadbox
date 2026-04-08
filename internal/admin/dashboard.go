@@ -438,6 +438,18 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			txCount = 0
 		}
 
+		// Compute attention items count for the dashboard card.
+		attentionCount := 0
+		if uncatCount > 0 {
+			attentionCount++
+		}
+		if reviewsEnabled && reviewPending > 0 {
+			attentionCount++
+		}
+		if errorCount > 0 {
+			attentionCount++
+		}
+
 		data := map[string]any{
 			"PageTitle":             "Home",
 			"CurrentPage":          "home",
@@ -469,6 +481,9 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"TxCount":          txCount,
 			"UncategorizedCount": uncatCount,
 			// Agent reports.
+			// Attention items.
+			"AttentionCount":    attentionCount,
+			"HasAttentionItems": attentionCount > 0,
 			"AgentReports":       agentReports,
 			"HasMoreReports":     hasMoreReports,
 			"TotalUnreadReports": totalUnread,
