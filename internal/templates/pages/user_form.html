@@ -110,8 +110,8 @@
         </template>
 
         <div class="flex gap-3 pt-2">
-          <button type="submit" class="btn btn-primary btn-sm rounded-xl" :disabled="submitting">
-            <span x-show="!submitting"><i data-lucide="plus" class="w-4 h-4"></i> Create Member</span>
+          <button type="submit" class="btn btn-primary btn-sm rounded-xl whitespace-nowrap" :disabled="submitting">
+            <span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="plus" class="w-4 h-4"></i> Create Member</span>
             <span x-show="submitting" class="loading loading-spinner loading-sm"></span>
           </button>
           <a href="/users" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
@@ -247,9 +247,8 @@ function userForm() {
     <div id="form-error" class="rounded-xl bg-error/10 border border-error/20 text-error text-sm px-4 py-3 mb-4 hidden"></div>
 
     <div class="flex gap-3 pt-2">
-      <button type="submit" class="btn btn-primary btn-sm rounded-xl">
-        <i data-lucide="save" class="w-4 h-4"></i>
-        Save Changes
+      <button type="submit" class="btn btn-primary btn-sm rounded-xl whitespace-nowrap">
+        <span class="inline-flex items-center gap-1.5"><i data-lucide="save" class="w-4 h-4"></i> Save Changes</span>
       </button>
       <a href="/users" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
     </div>
