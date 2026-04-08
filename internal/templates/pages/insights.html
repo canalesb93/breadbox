@@ -1,7 +1,7 @@
 {{define "content"}}
 
 <!-- Insights Page with Tabbed Layout -->
-<div x-data="{ tab: (new URLSearchParams(window.location.search).get('tab')) || 'overview', highlightedCategory: '', insightsReady: false }"
+<div x-data="{ tab: (new URLSearchParams(window.location.search).get('tab')) || 'overview', highlightedCategory: '', insightsReady: false, excludeNoise: false }"
      x-init="
        $watch('tab', v => { const u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); if (window._onInsightsTabSwitch) window._onInsightsTabSwitch(v); });
        window._setInsightsReady = () => { insightsReady = true; };
@@ -16,7 +16,7 @@
        else if (event.key === '1') { tab = 'overview'; }
        else if (event.key === '2') { tab = 'spending'; }
        else if (event.key === '3') { tab = 'trends'; }
-       else if (event.key === 'Escape') { highlightedCategory = ''; $dispatch('insights-drill-up'); }
+       else if (event.key === 'Escape') { highlightedCategory = ''; }
      ">
 
 <!-- Insights Page Header -->
@@ -42,20 +42,15 @@
           <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-base-content/30"></i>
           Summary &amp; Categories
         </button>
-        <button @click="window._insightsExportCSV('merchants'); exportOpen = false"
+        <button @click="window._insightsExportCSV('accounts'); exportOpen = false"
           class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
-          <i data-lucide="store" class="w-3.5 h-3.5 text-base-content/30"></i>
-          Top Merchants
+          <i data-lucide="landmark" class="w-3.5 h-3.5 text-base-content/30"></i>
+          Account Spending
         </button>
         <button @click="window._insightsExportCSV('monthly'); exportOpen = false"
           class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
           <i data-lucide="columns-3" class="w-3.5 h-3.5 text-base-content/30"></i>
           Monthly Comparison
-        </button>
-        <button @click="window._insightsExportCSV('recurring'); exportOpen = false"
-          class="w-full text-left px-3 py-2 text-xs text-base-content/70 hover:bg-base-200/40 hover:text-base-content transition-colors flex items-center gap-2.5 cursor-pointer">
-          <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-base-content/30"></i>
-          Recurring Charges
         </button>
         <div class="border-t border-base-200/60 mt-1 pt-1">
           <button @click="window._insightsExportCSV('all'); exportOpen = false"
@@ -110,8 +105,16 @@
     </div>
   </div>
 
-  <!-- Skeleton Pace + Summary Row -->
+  <!-- Skeleton Overview Cards -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+    <div class="bb-skeleton--card !p-5 lg:col-span-2">
+      <div class="flex items-center justify-between mb-4">
+        <div class="bb-skeleton" style="width: 100px; height: 16px;"></div>
+        <div class="bb-skeleton bb-skeleton--text-xs" style="width: 140px;"></div>
+      </div>
+      <div class="bb-skeleton" style="width: 220px; height: 36px; margin-bottom: 12px;"></div>
+      <div class="bb-skeleton" style="width: 100%; height: 160px; border-radius: 8px;"></div>
+    </div>
     <div class="bb-skeleton--card !p-5">
       <div class="flex items-center justify-between mb-4">
         <div class="bb-skeleton" style="width: 160px; height: 16px;"></div>
@@ -135,25 +138,6 @@
       <div class="space-y-3">
         <div class="bb-skeleton" style="width: 100%; height: 10px; border-radius: 9999px;"></div>
         <div class="bb-skeleton" style="width: 100%; height: 10px; border-radius: 9999px;"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Skeleton Charts Row -->
-  <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
-    <div class="bb-skeleton--card lg:col-span-3 !p-5">
-      <div class="flex items-center justify-between mb-4">
-        <div class="bb-skeleton" style="width: 140px; height: 16px;"></div>
-        <div class="bb-skeleton bb-skeleton--badge"></div>
-      </div>
-      <div class="bb-skeleton" style="width: 100%; height: 240px; border-radius: 8px;"></div>
-    </div>
-    <div class="bb-skeleton--card lg:col-span-2 !p-5">
-      <div class="flex items-center justify-between mb-4">
-        <div class="bb-skeleton" style="width: 110px; height: 16px;"></div>
-      </div>
-      <div class="flex items-center justify-center" style="height: 240px;">
-        <div class="bb-skeleton rounded-full" style="width: 180px; height: 180px;"></div>
       </div>
     </div>
   </div>
@@ -245,12 +229,18 @@
     Trends
     <kbd class="hidden lg:inline-block text-[0.55rem] font-normal text-base-content/20 bg-base-200/50 px-1 py-0.5 rounded ml-1">3</kbd>
   </button>
-  <!-- Date Range Picker -->
-  <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 ml-auto shrink-0">
+  <!-- Spending Date Range Picker (7d/30d/90d/12m) -->
+  <div x-show="tab === 'spending'" x-transition class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 ml-auto shrink-0">
     <a :href="'/insights?days=7&tab=' + tab" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 7}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">7d</a>
     <a :href="'/insights?days=30&tab=' + tab" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 30}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">30d</a>
     <a :href="'/insights?days=90&tab=' + tab" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 90}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">90d</a>
     <a :href="'/insights?days=365&tab=' + tab" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .ChartDays 365}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">12m</a>
+  </div>
+  <!-- Trends Date Range Picker (3m/6m/12m) -->
+  <div x-show="tab === 'trends'" x-transition class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 ml-auto shrink-0">
+    <a href="/insights?months=3&tab=trends" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .TrendMonths 3}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">3m</a>
+    <a href="/insights?months=6&tab=trends" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .TrendMonths 6}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">6m</a>
+    <a href="/insights?months=12&tab=trends" class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-150 no-underline {{if eq .TrendMonths 12}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">12m</a>
   </div>
 </div>
 
@@ -280,24 +270,13 @@
           </span>
         </div>
       </div>
-      <!-- Right: Spending + Income summary pills -->
-      <div class="flex items-center gap-3 sm:gap-4">
-        <div class="flex flex-col items-end">
-          <div class="text-xs text-base-content/40 mb-0.5">Spending <span class="text-base-content/25">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}}</span></div>
-          <div class="flex items-baseline gap-1.5">
-            <span class="text-lg font-semibold tabular-nums">{{formatBalance .TotalSpending}}</span>
-            {{if .HasSpendingChange}}
-            <span class="text-[0.65rem] font-medium {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
-              {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}%
-            </span>
-            {{end}}
-          </div>
-        </div>
-        <div class="w-px h-8 bg-base-300"></div>
-        <div class="flex flex-col items-end">
-          <div class="text-xs text-base-content/40 mb-0.5">Income <span class="text-base-content/25">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}}</span></div>
-          <span class="text-lg font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</span>
-        </div>
+      <!-- Right: Net Worth date range picker -->
+      <div x-data="{ nwRange: '90d' }" class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5 shrink-0">
+        <template x-for="r in [{v:'30d',l:'30d'},{v:'90d',l:'90d'},{v:'6m',l:'6m'},{v:'1y',l:'1y'}]" :key="r.v">
+          <button @click="nwRange = r.v; window._updateNetWorthRange && window._updateNetWorthRange(r.v)"
+            :class="nwRange === r.v ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+            class="px-2 py-1 text-xs font-medium rounded-md transition-all duration-150 cursor-pointer" x-text="r.l"></button>
+        </template>
       </div>
     </div>
   </div>
@@ -487,130 +466,129 @@
 </div>
 {{end}}
 
-<!-- Charts Row: Spending Chart + Category Donut (ECharts) -->
-<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6 bb-stagger">
-  <!-- Spending & Income Chart -->
-  <div class="bb-card lg:col-span-3 p-5">
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-3">
-        <h2 class="text-sm font-semibold text-base-content/70">Spending & Income</h2>
-        {{if .HasSpendingChange}}
-        <span class="text-xs font-medium {{if gt .SpendingChangePercent 0.0}}text-error/70{{else}}text-success/70{{end}}">
-          {{if gt .SpendingChangePercent 0.0}}+{{end}}{{printf "%.0f" .SpendingChangePercent}}% vs prev
-        </span>
+<!-- Spending Pace Comparison (current vs prior 2 months) -->
+{{if .PaceCompJSON}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+        <i data-lucide="git-compare-arrows" class="w-3.5 h-3.5 text-base-content/50"></i>
+      </div>
+      <h2 class="text-sm font-semibold text-base-content/70">Monthly Spending Pace</h2>
+    </div>
+    <span class="text-xs text-base-content/30">cumulative by day of month</span>
+  </div>
+  <div id="echartsPaceComp" style="width: 100%; height: 220px;"></div>
+</div>
+{{end}}
+
+<!-- Account Balances Breakdown -->
+{{if .HasAccounts}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+        <i data-lucide="landmark" class="w-3.5 h-3.5 text-base-content/50"></i>
+      </div>
+      <h2 class="text-sm font-semibold text-base-content/70">Account Balances</h2>
+    </div>
+    <div class="flex items-center gap-3 text-xs text-base-content/40">
+      <span class="flex items-center gap-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-base-content/30"></span>
+        Assets {{formatBalance .TotalAssets}}
+      </span>
+      <span class="flex items-center gap-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-error/50"></span>
+        Liabilities {{formatBalance .TotalLiabilities}}
+      </span>
+    </div>
+  </div>
+
+  <!-- Assets -->
+  <div class="text-[0.6rem] uppercase tracking-wider text-base-content/30 font-medium mb-2 mt-2">Assets</div>
+  <div class="divide-y divide-base-200/30">
+  {{range .AllAccounts}}
+  {{if and (ne .Type "credit") (ne .Type "loan")}}
+  <div class="flex items-center justify-between py-2.5">
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-base-200/50 shrink-0">
+        {{if eq .Type "depository"}}
+        <i data-lucide="landmark" class="w-4 h-4 text-base-content/40"></i>
+        {{else if eq .Type "investment"}}
+        <i data-lucide="trending-up" class="w-4 h-4 text-base-content/40"></i>
+        {{else}}
+        <i data-lucide="piggy-bank" class="w-4 h-4 text-base-content/40"></i>
+        {{end}}
+      </div>
+      <div class="min-w-0">
+        <div class="text-sm font-medium text-base-content/80 truncate">{{.Name}}</div>
+        <div class="text-[0.65rem] text-base-content/35 truncate">{{if .InstitutionName}}{{.InstitutionName}}{{end}}{{if .Mask}} &middot; {{.Mask}}{{end}}</div>
+      </div>
+    </div>
+    <div class="text-sm font-semibold tabular-nums text-base-content/70 shrink-0 ml-3">
+      {{if .BalanceCurrent}}{{formatBalance .BalanceCurrent}}{{else}}&mdash;{{end}}
+    </div>
+  </div>
+  {{end}}
+  {{end}}
+  </div>
+
+  <!-- Liabilities -->
+  <div class="text-[0.6rem] uppercase tracking-wider text-base-content/30 font-medium mb-2 mt-5">Liabilities</div>
+  <div class="divide-y divide-base-200/30">
+  {{range .AllAccounts}}
+  {{if or (eq .Type "credit") (eq .Type "loan")}}
+  <div class="flex items-center justify-between py-2.5">
+    <div class="flex items-center gap-3 min-w-0 flex-1">
+      <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-error/5 shrink-0">
+        {{if eq .Type "credit"}}
+        <i data-lucide="credit-card" class="w-4 h-4 text-error/40"></i>
+        {{else}}
+        <i data-lucide="receipt" class="w-4 h-4 text-error/40"></i>
+        {{end}}
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <div class="text-sm font-medium text-base-content/80 truncate">{{.Name}}</div>
+            <div class="text-[0.65rem] text-base-content/35 truncate">{{if .InstitutionName}}{{.InstitutionName}}{{end}}{{if .Mask}} &middot; {{.Mask}}{{end}}</div>
+          </div>
+          <div class="text-sm font-semibold tabular-nums text-error/70 shrink-0">
+            {{if .BalanceCurrent}}{{formatBalance .BalanceCurrent}}{{else}}&mdash;{{end}}
+          </div>
+        </div>
+        {{if and .BalanceLimit .BalanceCurrent}}
+        <div class="mt-1.5">
+          <div class="w-full h-1.5 bg-base-200/50 rounded-full overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-500"
+              style="width: {{printf "%.1f" (minf (mulf (divf (absf .BalanceCurrent) .BalanceLimit) 100.0) 100.0)}}%;
+              background-color: {{if gt (mulf (divf (absf .BalanceCurrent) .BalanceLimit) 100.0) 70.0}}oklch(0.65 0.2 25){{else if gt (mulf (divf (absf .BalanceCurrent) .BalanceLimit) 100.0) 30.0}}oklch(0.75 0.15 85){{else}}oklch(0.65 0.17 155){{end}};"></div>
+          </div>
+          <div class="flex items-center justify-between mt-0.5">
+            <span class="text-[0.55rem] text-base-content/25">{{printf "%.0f" (minf (mulf (divf (absf .BalanceCurrent) .BalanceLimit) 100.0) 100.0)}}% utilized</span>
+            <span class="text-[0.55rem] text-base-content/25">Limit {{formatBalance .BalanceLimit}}</span>
+          </div>
+        </div>
         {{end}}
       </div>
     </div>
-    {{if .DailyLabels}}
-    <div id="echartsSpendingChart" style="width: 100%; height: 240px;"></div>
-    <div class="flex items-center gap-5 mt-3 pt-3 border-t border-base-200/60">
-      <span class="flex items-center gap-1.5 text-xs text-base-content/50">
-        <span class="w-2.5 h-1.5 rounded-sm bg-base-content/15"></span>
-        Spending
-      </span>
-      <span class="flex items-center gap-1.5 text-xs text-base-content/50">
-        <span class="w-2.5 h-1.5 rounded-sm" style="background: color-mix(in oklch, var(--bb-chart-income-bar) 35%, transparent)"></span>
-        Income
-      </span>
-    </div>
-    {{else}}
-    <div class="flex items-center justify-center h-60 text-base-content/40">
-      <div class="text-center">
-        <i data-lucide="bar-chart-3" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
-        <p class="text-sm">No spending data yet</p>
-      </div>
-    </div>
-    {{end}}
   </div>
-
-  <!-- Category Donut Chart with Drill-Down -->
-  <div class="bb-card lg:col-span-2 p-5" x-data="categoryDrilldown()" @insights-drill-up.window="if (isDrilledDown) drillUp()">
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-2">
-        <button x-show="isDrilledDown" @click="drillUp()" x-transition
-          class="flex items-center justify-center w-6 h-6 rounded-md bg-base-200/60 hover:bg-base-200 transition-colors cursor-pointer">
-          <i data-lucide="arrow-left" class="w-3.5 h-3.5 text-base-content/50"></i>
-        </button>
-        <h2 class="text-sm font-semibold text-base-content/70">
-          <span x-show="!isDrilledDown">Top Categories</span>
-          <span x-show="isDrilledDown" x-text="'Top Merchants in ' + activeCategoryName" x-cloak></span>
-        </h2>
-      </div>
-      <div class="flex items-center gap-2">
-        <span x-show="isDrilledDown" x-cloak class="text-[0.6rem] text-base-content/30">click chart or</span>
-        <a x-show="!isDrilledDown" href="/rules?tab=categories" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
-        <button x-show="isDrilledDown" @click="drillUp()" x-cloak
-          class="text-xs text-primary/60 hover:text-primary/80 transition-colors cursor-pointer bg-transparent">back to categories</button>
-      </div>
-    </div>
-    {{if .TopCategories}}
-    <div id="echartsCategoryDonut" style="width: 100%; height: 240px;"></div>
-    <!-- Category/merchant list below donut -->
-    <div class="mt-3 pt-3 border-t border-base-200/60 space-y-1.5">
-      <!-- Category view -->
-      <template x-if="!isDrilledDown">
-        <div class="space-y-1.5">
-          {{range .TopCategories}}
-          <div class="flex items-center justify-between group cursor-pointer hover:bg-base-200/30 -mx-2 px-2 py-0.5 rounded-md transition-all duration-150"
-            :class="highlightedCategory === '{{.Name}}' ? 'bg-base-200/40 ring-1 ring-base-300/60 scale-[1.01]' : ''"
-            data-category="{{.Name}}"
-            @click="drillInto('{{.Name}}', '{{safeCSS .Color}}')"
-            @mouseenter="highlightedCategory = '{{.Name}}'; if (window._insightsHighlightDonut) window._insightsHighlightDonut('{{.Name}}')"
-            @mouseleave="highlightedCategory = ''; if (window._insightsDownplayDonut) window._insightsDownplayDonut()">
-            <span class="flex items-center gap-2 text-xs text-base-content/60 truncate">
-              <span class="w-2 h-2 rounded-full shrink-0 transition-transform duration-150" :class="highlightedCategory === '{{.Name}}' ? 'scale-150' : ''" style="background-color: {{safeCSS .Color}}"></span>
-              <span class="truncate transition-colors duration-150" :class="highlightedCategory === '{{.Name}}' ? 'text-base-content/90 font-medium' : 'group-hover:text-base-content/80'">{{.Name}}</span>
-            </span>
-            <span class="flex items-center gap-1.5">
-              <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0">{{formatAmount .Amount}}</span>
-              <i data-lucide="chevron-right" class="w-3 h-3 text-base-content/20 opacity-0 group-hover:opacity-100 transition-opacity"></i>
-            </span>
-          </div>
-          {{end}}
-        </div>
-      </template>
-      <!-- Merchant drill-down view -->
-      <template x-if="isDrilledDown">
-        <div class="space-y-1.5">
-          <template x-for="(m, i) in activeMerchants" :key="i">
-            <div class="flex items-center justify-between -mx-2 px-2 py-0.5">
-              <span class="flex items-center gap-2 text-xs text-base-content/60 truncate">
-                <span class="w-5 h-5 rounded-md flex items-center justify-center text-[0.55rem] font-semibold tabular-nums shrink-0"
-                  :style="'background-color: ' + merchantColors[i % merchantColors.length] + '; opacity: 0.15; color: ' + merchantColors[i % merchantColors.length]"
-                  x-text="i + 1"></span>
-                <span class="truncate" x-text="m.name"></span>
-              </span>
-              <span class="flex items-center gap-2">
-                <span class="text-[0.6rem] text-base-content/30 tabular-nums" x-text="m.count + ' txns'"></span>
-                <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0"
-                  x-text="'$' + m.amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
-              </span>
-            </div>
-          </template>
-        </div>
-      </template>
-    </div>
-    {{else}}
-    <div class="flex items-center justify-center h-60 text-base-content/40">
-      <div class="text-center">
-        <i data-lucide="bar-chart-2" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
-        <p class="text-sm">No category data yet</p>
-      </div>
-    </div>
-    {{end}}
+  {{end}}
+  {{end}}
   </div>
 </div>
+{{end}}
 
 <!-- Cash Flow Summary -->
 {{if .HasCashFlow}}
 <div class="bb-card mb-6 p-5 bb-stagger">
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-sm font-semibold text-base-content/70">Cash Flow</h2>
-    <span class="text-xs text-base-content/40">{{if eq .ChartDays 365}}12m{{else}}{{.ChartDays}}d{{end}} period</span>
+    <span class="text-xs text-base-content/40">{{.CurrentMonthName}}</span>
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-    <!-- Income vs Spending Bars -->
+    <!-- Income vs Spending Bars (current month) -->
     <div class="md:col-span-2 space-y-3">
       <div class="group">
         <div class="flex items-center justify-between mb-1.5">
@@ -618,10 +596,14 @@
             <span class="w-2 h-2 rounded-full shrink-0" style="background: var(--bb-chart-income-bar)"></span>
             Income
           </span>
-          <span class="text-sm font-semibold tabular-nums text-success">{{formatBalance .TotalIncome}}</span>
+          <span class="text-sm font-semibold tabular-nums text-success">{{formatBalance .CurrentMonthIncome}}</span>
         </div>
         <div class="w-full h-3 bg-base-200/60 rounded-full overflow-hidden">
-          <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: 100%; background: var(--bb-chart-income-bar); opacity: 0.6;"></div>
+          {{if and (gt .CurrentMonthIncome 0.0) (gt .CurrentMonthSpending 0.0)}}
+          <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: {{if gt .CurrentMonthIncome .CurrentMonthSpending}}100{{else}}{{printf "%.1f" (mulf (divf .CurrentMonthIncome .CurrentMonthSpending) 100.0)}}{{end}}%; background: var(--bb-chart-income-bar); opacity: 0.6;"></div>
+          {{else}}
+          <div class="h-full rounded-full transition-all duration-700 ease-out" style="width: {{if gt .CurrentMonthIncome 0.0}}100{{else}}0{{end}}%; background: var(--bb-chart-income-bar); opacity: 0.6;"></div>
+          {{end}}
         </div>
       </div>
 
@@ -631,43 +613,40 @@
             <span class="w-2 h-2 rounded-full shrink-0 bg-base-content/20"></span>
             Spending
           </span>
-          <span class="text-sm font-semibold tabular-nums text-base-content/80">{{formatBalance .TotalSpending}}</span>
+          <span class="text-sm font-semibold tabular-nums text-base-content/80">{{formatBalance .CurrentMonthSpending}}</span>
         </div>
         <div class="w-full h-3 bg-base-200/60 rounded-full overflow-hidden">
-          {{if gt .TotalIncome 0.0}}
-          <div class="h-full rounded-full transition-all duration-700 ease-out {{if gt .SpendingRatio 90.0}}bg-error/50{{else if gt .SpendingRatio 70.0}}bg-warning/50{{else}}bg-base-content/15{{end}}" style="width: {{printf "%.1f" .SpendingRatio}}%;"></div>
+          {{if and (gt .CurrentMonthSpending 0.0) (gt .CurrentMonthIncome 0.0)}}
+          <div class="h-full rounded-full transition-all duration-700 ease-out {{if gt (mulf (divf .CurrentMonthSpending .CurrentMonthIncome) 100.0) 90.0}}bg-error/50{{else if gt (mulf (divf .CurrentMonthSpending .CurrentMonthIncome) 100.0) 70.0}}bg-warning/50{{else}}bg-base-content/15{{end}}" style="width: {{if gt .CurrentMonthSpending .CurrentMonthIncome}}100{{else}}{{printf "%.1f" (mulf (divf .CurrentMonthSpending .CurrentMonthIncome) 100.0)}}{{end}}%;"></div>
           {{else}}
-          <div class="h-full rounded-full transition-all duration-700 ease-out bg-base-content/15" style="width: 100%;"></div>
+          <div class="h-full rounded-full transition-all duration-700 ease-out bg-base-content/15" style="width: {{if gt .CurrentMonthSpending 0.0}}100{{else}}0{{end}}%;"></div>
           {{end}}
         </div>
       </div>
     </div>
 
-    <!-- Net Cash Flow + Savings Rate -->
-    <div class="flex flex-col items-center justify-center text-center border-t md:border-t-0 md:border-l border-base-200/80 pt-4 md:pt-0 md:pl-6">
+    <!-- Net Cash Flow + Savings Rate (current month) -->
+    <div class="flex flex-col items-center justify-center text-center border-t md:border-t-0 md:border-l border-base-200/60 pt-4 md:pt-0 md:pl-6">
       <div class="text-xs font-medium text-base-content/40 mb-1">Net Cash Flow</div>
-      <div class="text-2xl font-semibold tabular-nums {{if gt .CashFlowNet 0.0}}text-success{{else if lt .CashFlowNet 0.0}}text-error{{else}}text-base-content{{end}}">
-        {{if gt .CashFlowNet 0.0}}+{{end}}{{if lt .CashFlowNet 0.0}}-{{end}}{{formatBalance .CashFlowNet}}
+      {{$monthNet := subf .CurrentMonthIncome .CurrentMonthSpending}}
+      <div class="text-2xl font-semibold tabular-nums {{if gt $monthNet 0.0}}text-success{{else if lt $monthNet 0.0}}text-error{{else}}text-base-content{{end}}">
+        {{if gt $monthNet 0.0}}+{{end}}{{formatBalance $monthNet}}
       </div>
-      {{if gt .TotalIncome 0.0}}
+      {{if gt .CurrentMonthIncome 0.0}}
+      {{$monthSavings := mulf (divf $monthNet .CurrentMonthIncome) 100.0}}
       <div class="mt-2 flex items-center gap-1.5">
-        <div class="w-8 h-8 rounded-full flex items-center justify-center {{if gt .SavingsRate 20.0}}bg-success/10{{else if gt .SavingsRate 0.0}}bg-warning/10{{else}}bg-error/10{{end}}">
-          {{if gt .SavingsRate 20.0}}
+        <div class="w-8 h-8 rounded-full flex items-center justify-center {{if gt $monthSavings 20.0}}bg-success/10{{else if gt $monthSavings 0.0}}bg-warning/10{{else}}bg-error/10{{end}}">
+          {{if gt $monthSavings 20.0}}
           <i data-lucide="trending-up" class="w-3.5 h-3.5 text-success"></i>
-          {{else if gt .SavingsRate 0.0}}
+          {{else if gt $monthSavings 0.0}}
           <i data-lucide="minus" class="w-3.5 h-3.5 text-warning"></i>
           {{else}}
           <i data-lucide="trending-down" class="w-3.5 h-3.5 text-error"></i>
           {{end}}
         </div>
         <div class="text-left">
-          {{if lt .SavingsRate -200.0}}
-          <div class="text-xs font-semibold text-error/80">Over budget</div>
-          <div class="text-[0.6rem] text-base-content/30">spending > income</div>
-          {{else}}
-          <div class="text-xs font-semibold tabular-nums {{if gt .SavingsRate 0.0}}text-success/80{{else}}text-error/80{{end}}">{{printf "%.0f" .SavingsRate}}%</div>
+          <div class="text-xs font-semibold tabular-nums {{if gt $monthSavings 0.0}}text-success/80{{else}}text-error/80{{end}}">{{printf "%.0f" $monthSavings}}%</div>
           <div class="text-[0.6rem] text-base-content/30">savings rate</div>
-          {{end}}
         </div>
       </div>
       {{end}}
@@ -683,208 +662,217 @@
 <!-- ═══════════════════════════════════════════════ -->
 <div x-show="tab === 'spending'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
 
-<!-- Merchant Analysis + Day-of-Week Heatmap -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 bb-stagger">
-  <!-- Top Merchants -->
-  {{if .TopMerchants}}
-  <div class="bb-card lg:col-span-2 p-5">
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-2.5">
-        <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
-          <i data-lucide="store" class="w-3.5 h-3.5 text-base-content/50"></i>
-        </div>
-        <h2 class="text-sm font-semibold text-base-content/70">Top Merchants</h2>
+<!-- Category Spending Breakdown (Horizontal Bar Chart) -->
+<div class="bb-card mb-6 p-5 bb-stagger" x-data="categoryBreakdown()">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+        <i data-lucide="bar-chart-horizontal" class="w-3.5 h-3.5 text-base-content/50"></i>
       </div>
-      <span class="text-xs text-base-content/30">by total spend</span>
+      <h2 class="text-sm font-semibold text-base-content/70">
+        <span x-show="!isDrilledDown">Category Spending</span>
+        <span x-show="isDrilledDown" x-text="'Merchants in ' + activeCategoryName" x-cloak></span>
+      </h2>
     </div>
-    <div class="overflow-x-auto">
-      <table class="w-full">
-        <thead>
-          <tr class="text-[0.65rem] uppercase tracking-wider text-base-content/30 border-b border-base-200/60">
-            <th class="text-left py-2 font-medium">Merchant</th>
-            <th class="text-right py-2 font-medium w-20">Total</th>
-            <th class="text-right py-2 font-medium w-12 hidden sm:table-cell">Txns</th>
-            <th class="text-right py-2 font-medium w-16 hidden sm:table-cell">Avg</th>
-            <th class="text-left py-2 font-medium w-28 pl-3 hidden md:table-cell"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-base-200/40">
-          {{range $i, $m := .TopMerchants}}
-          <tr class="group hover:bg-base-200/20 transition-colors">
-            <td class="py-2.5 pr-3">
-              <div class="flex items-center gap-2.5">
-                <span class="flex items-center justify-center w-6 h-6 rounded-md bg-base-200/50 text-[0.6rem] font-semibold text-base-content/35 shrink-0 tabular-nums">{{add $i 1}}</span>
-                <div class="min-w-0">
-                  <div class="text-sm font-medium text-base-content/80 truncate group-hover:text-base-content transition-colors">{{$m.Name}}</div>
-                  {{if $m.Category}}<div class="text-[0.6rem] text-base-content/30 truncate">{{$m.Category}}</div>{{end}}
-                </div>
-              </div>
-            </td>
-            <td class="py-2.5 text-right">
-              <span class="text-sm font-semibold tabular-nums text-base-content/80">{{formatAmount $m.Total}}</span>
-            </td>
-            <td class="py-2.5 text-right hidden sm:table-cell">
-              <span class="text-xs tabular-nums text-base-content/40">{{$m.Count}}</span>
-            </td>
-            <td class="py-2.5 text-right hidden sm:table-cell">
-              <span class="text-xs tabular-nums text-base-content/40">{{formatAmount $m.AvgAmount}}</span>
-            </td>
-            <td class="py-2.5 pl-3 hidden md:table-cell">
-              <div class="w-full h-1.5 bg-base-200/50 rounded-full overflow-hidden">
-                <div class="h-full rounded-full transition-all duration-500 ease-out bg-base-content/12 group-hover:bg-base-content/20"
-                  style="width: {{printf "%.1f" $m.Percent}}%;"></div>
-              </div>
-            </td>
-          </tr>
-          {{end}}
-        </tbody>
-      </table>
+    <div class="flex items-center gap-3">
+      <label x-show="!isDrilledDown" class="flex items-center gap-1.5 cursor-pointer">
+        <input type="checkbox" class="toggle toggle-xs toggle-primary" x-model="excludeNoise" @change="window._updateCategoryBars && window._updateCategoryBars(excludeNoise)">
+        <span class="text-[0.6rem] text-base-content/35">Hide transfers</span>
+      </label>
+      <button x-show="isDrilledDown" @click="drillUp()" x-cloak
+        class="text-xs text-primary/60 hover:text-primary/80 transition-colors cursor-pointer bg-transparent flex items-center gap-1">
+        <i data-lucide="arrow-left" class="w-3 h-3"></i> Back
+      </button>
     </div>
   </div>
-  {{end}}
 
-  <!-- Day-of-Week Spending Heatmap -->
-  {{if .HasDOWData}}
-  <div class="bb-card p-5">
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-2.5">
-        <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
-          <i data-lucide="calendar-days" class="w-3.5 h-3.5 text-base-content/50"></i>
+  {{if .TopCategories}}
+  <div x-show="!isDrilledDown">
+    <div id="echartsCategoryBars" style="width: 100%; height: 360px;"></div>
+  </div>
+  <div x-show="isDrilledDown" x-cloak>
+    <div id="echartsMerchantBars" style="width: 100%; height: 280px;"></div>
+  </div>
+
+  <!-- Category / Merchant list below chart -->
+  <div class="mt-3 pt-3 border-t border-base-200/60 space-y-1">
+    <!-- Category list -->
+    <template x-if="!isDrilledDown">
+      <div class="space-y-1">
+        {{range .TopCategories}}
+        <div class="flex items-center justify-between group cursor-pointer hover:bg-base-200/30 -mx-2 px-2 py-1 rounded-md transition-all duration-150"
+          :class="highlightedCategory === '{{.Name}}' ? 'bg-base-200/40 ring-1 ring-base-300/60' : ''"
+          @click="drillInto('{{.Name}}', '{{safeCSS .Color}}')"
+          @mouseenter="highlightedCategory = '{{.Name}}'"
+          @mouseleave="highlightedCategory = ''">
+          <span class="flex items-center gap-2 text-xs text-base-content/60 truncate">
+            <span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{safeCSS .Color}}"></span>
+            <span class="truncate group-hover:text-base-content/80">{{.Name}}</span>
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="text-[0.6rem] tabular-nums text-base-content/30">{{printf "%.1f" .Percent}}%</span>
+            <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0">{{formatAmount .Amount}}</span>
+            <i data-lucide="chevron-right" class="w-3 h-3 text-base-content/20 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+          </span>
         </div>
-        <h2 class="text-sm font-semibold text-base-content/70">Spending by Day</h2>
+        {{end}}
       </div>
-    </div>
-    <div class="space-y-2">
-      {{range .DOWSpending}}
-      <div class="group flex items-center gap-3">
-        <span class="text-[0.65rem] font-medium text-base-content/40 w-7 shrink-0">{{.DayShort}}</span>
-        <div class="flex-1 relative">
-          <div class="w-full h-7 rounded-md transition-all duration-300 flex items-center"
-            style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) {{if gt .Intensity 0.0}}{{printf "%.0f" (mulf .Intensity 45.0)}}%{{else}}3%{{end}}, transparent);">
-            {{if gt .Total 0.0}}
-            <span class="text-[0.6rem] font-semibold tabular-nums text-base-content/60 pl-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              {{formatAmount .Total}}
+    </template>
+    <!-- Merchant drill-down list -->
+    <template x-if="isDrilledDown">
+      <div class="space-y-1">
+        <template x-for="(m, i) in activeMerchants" :key="i">
+          <div class="flex items-center justify-between -mx-2 px-2 py-1">
+            <span class="flex items-center gap-2 text-xs text-base-content/60 truncate">
+              <span class="w-5 h-5 rounded-md flex items-center justify-center text-[0.55rem] font-semibold tabular-nums shrink-0 bg-base-200/60 text-base-content/35"
+                x-text="i + 1"></span>
+              <span class="truncate" x-text="m.name"></span>
             </span>
-            {{end}}
+            <span class="flex items-center gap-2">
+              <span class="text-[0.6rem] text-base-content/30 tabular-nums" x-text="m.count + ' txns'"></span>
+              <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0"
+                x-text="'$' + m.amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+            </span>
           </div>
-        </div>
-        <div class="text-right shrink-0 w-12">
-          {{if gt .Count 0}}
-          <div class="text-xs font-semibold tabular-nums text-base-content/50">{{.Count}}</div>
-          <div class="text-[0.55rem] text-base-content/25">txns</div>
-          {{else}}
-          <div class="text-xs text-base-content/20">&mdash;</div>
-          {{end}}
-        </div>
+        </template>
       </div>
-      {{end}}
-    </div>
-    <!-- Insight text -->
-    {{if .HighSpendDay}}
-    <div class="mt-4 pt-3 border-t border-base-200/60">
-      <p class="text-[0.65rem] text-base-content/35 leading-relaxed">
-        You spend the most on <span class="font-semibold text-base-content/50">{{.HighSpendDay}}s</span> ({{formatAmount .HighSpendDayAmt}}){{if .LowSpendDay}} and least on <span class="font-semibold text-base-content/50">{{.LowSpendDay}}s</span> ({{formatAmount .LowSpendDayAmt}}){{end}}.
-      </p>
-    </div>
-    {{end}}
-    <!-- Legend -->
-    <div class="mt-3 pt-3 border-t border-base-200/60 flex items-center justify-between">
-      <span class="text-[0.6rem] text-base-content/25">Less</span>
-      <div class="flex items-center gap-1">
-        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 5%, transparent);"></div>
-        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 12%, transparent);"></div>
-        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 22%, transparent);"></div>
-        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 33%, transparent);"></div>
-        <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 45%, transparent);"></div>
-      </div>
-      <span class="text-[0.6rem] text-base-content/25">More</span>
+    </template>
+  </div>
+  {{else}}
+  <div class="flex items-center justify-center h-60 text-base-content/40">
+    <div class="text-center">
+      <i data-lucide="bar-chart-2" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+      <p class="text-sm">No category data yet</p>
     </div>
   </div>
   {{end}}
 </div>
 
-<!-- Recurring & Subscriptions -->
-{{if .HasRecurringData}}
+<!-- Spending by Account -->
+{{if .HasAccountSpending}}
 <div class="bb-card mb-6 p-5 bb-stagger">
   <div class="flex items-center justify-between mb-4">
     <div class="flex items-center gap-2.5">
-      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-warning/8">
-        <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-warning"></i>
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+        <i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content/50"></i>
       </div>
-      <div>
-        <h2 class="text-sm font-semibold text-base-content/70">Recurring & Subscriptions</h2>
-        <p class="text-[0.6rem] text-base-content/30 mt-0.5">Detected from 90-day transaction patterns</p>
-      </div>
-    </div>
-    <div class="text-right">
-      <div class="text-xs text-base-content/35">Est. monthly</div>
-      <div class="text-lg font-semibold tabular-nums text-base-content/80">{{formatBalance .TotalRecurringMonthly}}</div>
+      <h2 class="text-sm font-semibold text-base-content/70">Spending by Account</h2>
     </div>
   </div>
-
-  <!-- Recurring charges grid -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-2.5">
-    {{range .RecurringCharges}}
-    <div class="group flex items-center gap-3 p-3 rounded-xl border border-base-200/60 bg-base-200/10 hover:bg-base-200/30 hover:border-base-300/60 transition-all duration-200">
-      <!-- Frequency icon -->
-      <div class="flex items-center justify-center w-9 h-9 rounded-lg shrink-0
-        {{if eq .Frequency "monthly"}}bg-primary/8
-        {{else if eq .Frequency "weekly"}}bg-warning/8
-        {{else if eq .Frequency "biweekly"}}bg-info/8
-        {{else}}bg-base-200/60{{end}}">
-        <i data-lucide="{{if eq .Frequency "monthly"}}calendar{{else if eq .Frequency "weekly"}}calendar-clock{{else if eq .Frequency "biweekly"}}calendar-range{{else if eq .Frequency "quarterly"}}calendar-check{{else if eq .Frequency "yearly"}}calendar-heart{{else}}repeat{{end}}"
-          class="w-4 h-4
-          {{if eq .Frequency "monthly"}}text-primary/60
-          {{else if eq .Frequency "weekly"}}text-warning/60
-          {{else if eq .Frequency "biweekly"}}text-info/60
-          {{else}}text-base-content/35{{end}}"></i>
-      </div>
-      <!-- Details -->
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center justify-between gap-2">
-          <span class="text-sm font-medium text-base-content/80 truncate group-hover:text-base-content transition-colors">{{.Name}}</span>
-          <span class="text-sm font-semibold tabular-nums text-base-content/80 shrink-0">{{formatAmount .Amount}}</span>
+  <div class="space-y-3">
+    {{range .AccountSpending}}
+    <div>
+      <div class="flex items-center justify-between mb-1">
+        <div class="flex items-center gap-2 min-w-0">
+          <i data-lucide="{{if eq .Type "credit"}}credit-card{{else if eq .Type "depository"}}landmark{{else}}piggy-bank{{end}}" class="w-3.5 h-3.5 text-base-content/35 shrink-0"></i>
+          <span class="text-xs font-medium text-base-content/70 truncate">{{.Name}}</span>
+          {{if .InstitutionName}}<span class="text-[0.6rem] text-base-content/30 hidden sm:inline">{{.InstitutionName}}</span>{{end}}
         </div>
-        <div class="flex items-center justify-between gap-2 mt-0.5">
-          <div class="flex items-center gap-1.5">
-            <span class="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full
-              {{if eq .Frequency "monthly"}}bg-primary/8 text-primary/70
-              {{else if eq .Frequency "weekly"}}bg-warning/8 text-warning/70
-              {{else if eq .Frequency "biweekly"}}bg-info/8 text-info/70
-              {{else}}bg-base-200/80 text-base-content/40{{end}}">{{.Frequency}}</span>
-            {{if .Category}}<span class="text-[0.6rem] text-base-content/25 truncate">{{.Category}}</span>{{end}}
-          </div>
-          <span class="text-[0.6rem] text-base-content/30">{{.TxCount}}x &middot; last {{.LastChargeDate}}</span>
+        <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0 ml-2">{{formatAmount .Total}}</span>
+      </div>
+      <div class="w-full h-2 bg-base-200/50 rounded-full overflow-hidden">
+        <div class="h-full rounded-full bg-primary/30 transition-all duration-500" style="width: {{printf "%.1f" .Percent}}%;"></div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+<!-- Spending by Member + Day-of-Week (side by side on desktop) -->
+<div class="grid grid-cols-1 {{if .HasUserSpending}}lg:grid-cols-2{{end}} gap-4 mb-6 bb-stagger">
+
+{{if .HasUserSpending}}
+<div class="bb-card p-5">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+        <i data-lucide="users" class="w-3.5 h-3.5 text-base-content/50"></i>
+      </div>
+      <h2 class="text-sm font-semibold text-base-content/70">Spending by Member</h2>
+    </div>
+  </div>
+  <div class="space-y-3">
+    {{range .UserSpending}}
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary/70 shrink-0">
+        {{slice .Name 0 1}}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-medium text-base-content/70 truncate">{{.Name}}</span>
+          <span class="text-xs font-semibold tabular-nums text-base-content/70 shrink-0 ml-2">{{formatAmount .Total}}</span>
+        </div>
+        <div class="w-full h-2 bg-base-200/50 rounded-full overflow-hidden">
+          <div class="h-full rounded-full bg-primary/25 transition-all duration-500" style="width: {{printf "%.1f" .Percent}}%;"></div>
         </div>
       </div>
     </div>
     {{end}}
   </div>
+</div>
+{{end}}
 
-  <!-- Summary footer -->
-  <div class="mt-4 pt-3 border-t border-base-200/60 flex items-center justify-between">
-    <div class="flex items-center gap-4">
-      <div class="flex items-center gap-1.5">
-        <span class="w-2 h-2 rounded-full bg-primary/40"></span>
-        <span class="text-[0.6rem] text-base-content/30">monthly</span>
+<!-- Day-of-Week Spending Heatmap -->
+{{if .HasDOWData}}
+<div class="bb-card p-5">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+        <i data-lucide="calendar-days" class="w-3.5 h-3.5 text-base-content/50"></i>
       </div>
-      <div class="flex items-center gap-1.5">
-        <span class="w-2 h-2 rounded-full bg-warning/40"></span>
-        <span class="text-[0.6rem] text-base-content/30">weekly</span>
+      <h2 class="text-sm font-semibold text-base-content/70">Spending by Day</h2>
+    </div>
+  </div>
+  <div class="space-y-2">
+    {{range .DOWSpending}}
+    <div class="group flex items-center gap-3">
+      <span class="text-[0.65rem] font-medium text-base-content/40 w-7 shrink-0">{{.DayShort}}</span>
+      <div class="flex-1 relative">
+        <div class="w-full h-7 rounded-md transition-all duration-300 flex items-center"
+          style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) {{if gt .Intensity 0.0}}{{printf "%.0f" (mulf .Intensity 45.0)}}%{{else}}3%{{end}}, transparent);">
+          {{if gt .Total 0.0}}
+          <span class="text-[0.6rem] font-semibold tabular-nums text-base-content/60 pl-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            {{formatAmount .Total}}
+          </span>
+          {{end}}
+        </div>
       </div>
-      <div class="flex items-center gap-1.5">
-        <span class="w-2 h-2 rounded-full bg-info/40"></span>
-        <span class="text-[0.6rem] text-base-content/30">biweekly</span>
-      </div>
-      <div class="flex items-center gap-1.5">
-        <span class="w-2 h-2 rounded-full bg-base-content/20"></span>
-        <span class="text-[0.6rem] text-base-content/30">other</span>
+      <div class="text-right shrink-0 w-12">
+        {{if gt .Count 0}}
+        <div class="text-xs font-semibold tabular-nums text-base-content/50">{{.Count}}</div>
+        <div class="text-[0.55rem] text-base-content/25">txns</div>
+        {{else}}
+        <div class="text-xs text-base-content/20">&mdash;</div>
+        {{end}}
       </div>
     </div>
-    <span class="text-[0.6rem] text-base-content/25">{{len .RecurringCharges}} recurring charges detected</span>
+    {{end}}
+  </div>
+  <!-- Insight text -->
+  {{if .HighSpendDay}}
+  <div class="mt-4 pt-3 border-t border-base-200/60">
+    <p class="text-[0.65rem] text-base-content/35 leading-relaxed">
+      You spend the most on <span class="font-semibold text-base-content/50">{{.HighSpendDay}}s</span> ({{formatAmount .HighSpendDayAmt}}){{if .LowSpendDay}} and least on <span class="font-semibold text-base-content/50">{{.LowSpendDay}}s</span> ({{formatAmount .LowSpendDayAmt}}){{end}}.
+    </p>
+  </div>
+  {{end}}
+  <!-- Legend -->
+  <div class="mt-3 pt-3 border-t border-base-200/60 flex items-center justify-between">
+    <span class="text-[0.6rem] text-base-content/25">Less</span>
+    <div class="flex items-center gap-1">
+      <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 5%, transparent);"></div>
+      <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 12%, transparent);"></div>
+      <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 22%, transparent);"></div>
+      <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 33%, transparent);"></div>
+      <div class="w-4 h-3 rounded-sm" style="background-color: color-mix(in oklch, var(--bb-chart-heatmap) 45%, transparent);"></div>
+    </div>
+    <span class="text-[0.6rem] text-base-content/25">More</span>
   </div>
 </div>
 {{end}}
+
+</div><!-- /grid: member + dow -->
 
 </div><!-- /tab: spending -->
 
@@ -893,9 +881,43 @@
 <!-- ═══════════════════════════════════════════════ -->
 <div x-show="tab === 'trends'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
 
+<!-- Income vs Spending by Month (Grouped Bar Chart) -->
+{{if .HasMonthlyIncomeSpend}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+        <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-base-content/50"></i>
+      </div>
+      <h2 class="text-sm font-semibold text-base-content/70">Income vs Spending</h2>
+    </div>
+  </div>
+  <div id="echartsMonthlyChart" style="width: 100%; height: 280px;"></div>
+  <div class="flex items-center gap-5 mt-3 pt-3 border-t border-base-200/60">
+    <span class="flex items-center gap-1.5 text-xs text-base-content/50">
+      <span class="w-2.5 h-1.5 rounded-sm bg-base-content/15"></span>
+      Spending
+    </span>
+    <span class="flex items-center gap-1.5 text-xs text-base-content/50">
+      <span class="w-2.5 h-1.5 rounded-sm" style="background: var(--bb-chart-income-bar); opacity: 0.5"></span>
+      Income
+    </span>
+  </div>
+</div>
+{{else}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-center h-40 text-base-content/40">
+    <div class="text-center">
+      <i data-lucide="bar-chart-3" class="w-10 h-10 mx-auto mb-2 opacity-40"></i>
+      <p class="text-sm">Need at least 2 months of data for trends</p>
+    </div>
+  </div>
+</div>
+{{end}}
+
 <!-- Monthly Category Comparison -->
 {{if .HasMonthlyComp}}
-<div class="bb-card mb-6 p-5 bb-stagger">
+<div class="bb-card mb-6 p-5 bb-stagger" x-data="{ excludeNoiseTable: false }">
   <div class="flex items-center justify-between mb-4">
     <div class="flex items-center gap-2.5">
       <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
@@ -906,6 +928,10 @@
         <p class="text-[0.6rem] text-base-content/30 mt-0.5">Category spending across recent months</p>
       </div>
     </div>
+    <label class="flex items-center gap-1.5 cursor-pointer">
+      <input type="checkbox" class="toggle toggle-xs toggle-primary" x-model="excludeNoiseTable">
+      <span class="text-[0.6rem] text-base-content/35">Hide transfers</span>
+    </label>
   </div>
 
   <div class="overflow-x-auto -mx-1">
@@ -921,7 +947,8 @@
       </thead>
       <tbody class="divide-y divide-base-200/30">
         {{range $row := .MonthlyCompRows}}
-        <tr class="group hover:bg-base-200/20 transition-colors">
+        <tr class="group hover:bg-base-200/20 transition-colors"
+          x-show="!excludeNoiseTable || !(/transfer|payment/i.test('{{$row.Category}}'))">
           <td class="py-2.5 pl-1 pr-2">
             <div class="flex items-center gap-2">
               <span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{safeCSS $row.CategoryColor}}"></span>
@@ -1006,6 +1033,21 @@
     </div>
   </div>
   {{end}}
+</div>
+{{end}}
+
+<!-- Savings Rate Trend -->
+{{if .HasMonthlyIncomeSpend}}
+<div class="bb-card mb-6 p-5 bb-stagger">
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/60">
+        <i data-lucide="piggy-bank" class="w-3.5 h-3.5 text-base-content/50"></i>
+      </div>
+      <h2 class="text-sm font-semibold text-base-content/70">Savings Rate Trend</h2>
+    </div>
+  </div>
+  <div id="echartsSavingsRate" style="width: 100%; height: 220px;"></div>
 </div>
 {{end}}
 
@@ -1263,89 +1305,336 @@ document.addEventListener('DOMContentLoaded', function() {
       animationDurationUpdate: 0
     });
 
+    // Net worth range picker: slice the full 365-day dataset
+    window._updateNetWorthRange = function(range) {
+      var dayMap = { '30d': 30, '90d': 90, '6m': 182, '1y': 365 };
+      var days = dayMap[range] || 90;
+      var sliceStart = Math.max(0, labels.length - days - 1);
+      var slicedLabels = labels.slice(sliceStart);
+      var slicedValues = values.slice(sliceStart);
+      var slicedShort = slicedLabels.map(function(d) {
+        var date = new Date(d + 'T00:00:00');
+        if (days <= 30) return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        if (days <= 90) return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      });
+      var sf = slicedValues[0], sl = slicedValues[slicedValues.length - 1];
+      var tu = sl >= sf;
+      var lc = tu ? (isDark ? 'rgba(74, 222, 128, 1)' : 'rgba(22, 163, 74, 1)') : (isDark ? 'rgba(248, 113, 113, 1)' : 'rgba(220, 38, 38, 1)');
+      var gt2 = tu ? (isDark ? 'rgba(74, 222, 128, 0.15)' : 'rgba(22, 163, 74, 0.12)') : (isDark ? 'rgba(248, 113, 113, 0.15)' : 'rgba(220, 38, 38, 0.12)');
+      var gb2 = tu ? (isDark ? 'rgba(74, 222, 128, 0.01)' : 'rgba(22, 163, 74, 0.01)') : (isDark ? 'rgba(248, 113, 113, 0.01)' : 'rgba(220, 38, 38, 0.01)');
+      chart.setOption({
+        xAxis: { data: slicedShort, axisLabel: { interval: function(idx) { var step = Math.max(1, Math.floor(slicedShort.length / 8)); return idx % step === 0; } } },
+        series: [{ data: slicedValues, lineStyle: { color: lc }, itemStyle: { color: lc, borderColor: lc }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: gt2 }, { offset: 1, color: gb2 }] } } }]
+      });
+    };
+    // Default to 90d view
+    window._updateNetWorthRange('90d');
     window.addEventListener('resize', function() { chart.resize(); });
   })();
   {{end}}
 
-  // ── Spending & Income Chart ──
-  {{if .DailyLabels}}
+  // ── Spending Pace Comparison Chart ──
+  {{if .PaceCompJSON}}
   (function() {
-    var el = document.getElementById('echartsSpendingChart');
+    var el = document.getElementById('echartsPaceComp');
     if (!el) return;
     var chart = echarts.init(el, null, { renderer: 'canvas' });
+    insightCharts.push(chart);
 
-    var dailyLabels = {{.DailyLabels}};
-    var dailyData = {{.DailyAmounts}};
-    var incomeData = {{.DailyIncomeAmounts}};
-    var chartDays = {{.ChartDays}};
+    var paceData = {{.PaceCompJSON}};
+    if (!paceData || paceData.length === 0) return;
 
-    var shortLabels = dailyLabels.map(function(d) {
-      if (chartDays === 365) {
-        var parts = d.split('-');
-        var mdate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
-        return mdate.toLocaleDateString('en-US', { month: 'short' });
-      }
-      var date = new Date(d + 'T00:00:00');
-      if (chartDays <= 7) return date.toLocaleDateString('en-US', { weekday: 'short' });
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    });
+    // Line colors and styles for each month (newest = most prominent)
+    var lineStyles = [
+      { color: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.10)', width: 1.5, type: 'dotted' },
+      { color: isDark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.20)', width: 2, type: 'dashed' },
+      { color: isDark ? 'rgba(99,179,237,1)' : 'oklch(0.55 0.15 250)', width: 2.5, type: 'solid' }
+    ];
+    // If only 2 months, skip the first style
+    var offset = Math.max(0, 3 - paceData.length);
 
-    var fullLabels = dailyLabels.map(function(d) {
-      if (chartDays === 365) {
-        var parts = d.split('-');
-        var mdate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
-        return mdate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      }
-      var date = new Date(d + 'T00:00:00');
-      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    });
+    // Find the max day count (longest month)
+    var maxDays = 0;
+    paceData.forEach(function(m) { if (m.days.length > maxDays) maxDays = m.days.length; });
+    var dayLabels = [];
+    for (var i = 1; i <= maxDays; i++) dayLabels.push(i);
 
-    var hasIncome = incomeData && incomeData.some(function(v) { return v > 0; });
-    var barWidth = chartDays <= 7 ? '50%' : chartDays <= 30 ? '60%' : '70%';
-
-    var series = [{
-      name: 'Spending',
-      type: 'bar',
-      data: dailyData,
-      itemStyle: { color: spendColor, borderRadius: [3, 3, 0, 0] },
-      emphasis: { itemStyle: { color: spendHoverColor } },
-      barWidth: barWidth,
-      z: 2
-    }];
-
-    if (hasIncome) {
-      series.push({
-        name: 'Income',
+    var series = paceData.map(function(m, i) {
+      var style = lineStyles[i + offset] || lineStyles[lineStyles.length - 1];
+      var isCurrentMonth = (i === paceData.length - 1);
+      return {
+        name: m.name,
         type: 'line',
-        data: incomeData,
-        symbol: 'circle',
-        symbolSize: 0,
-        lineStyle: { color: incomeLineColor, width: 2.5 },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: incomeColor },
-            { offset: 1, color: 'rgba(46,160,100,0.01)' }
-          ])
-        },
-        itemStyle: { color: incomeLineColor },
-        emphasis: {
-          itemStyle: { borderWidth: 2, borderColor: '#fff', shadowBlur: 4 },
-          lineStyle: { width: 3 }
-        },
-        smooth: 0.3,
-        z: 3
-      });
-    }
+        data: m.days,
+        smooth: 0.2,
+        symbol: isCurrentMonth ? 'circle' : 'none',
+        showSymbol: isCurrentMonth,
+        symbolSize: function(val, params) { return params.dataIndex === m.days.length - 1 ? 6 : 0; },
+        lineStyle: { color: style.color, width: style.width, type: style.type },
+        itemStyle: { color: style.color },
+        emphasis: { lineStyle: { width: style.width + 1 } }
+      };
+    });
 
-    var maxTicks = isMobile
-      ? (chartDays <= 7 ? 7 : chartDays <= 30 ? 5 : chartDays <= 90 ? 5 : 6)
-      : (chartDays <= 7 ? 7 : chartDays <= 30 ? 8 : chartDays <= 90 ? 10 : 12);
-
-    var option = {
+    chart.setOption({
       animation: true,
       animationDuration: 600,
       animationEasing: 'cubicOut',
-      grid: { top: 12, right: 12, bottom: (chartDays >= 90 ? 52 : 28), left: isMobile ? 8 : 50, containLabel: true },
+      grid: { top: 16, right: 16, bottom: 28, left: isMobile ? 8 : 50, containLabel: true },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: tooltipBg,
+        borderColor: tooltipBorder,
+        borderWidth: 1,
+        padding: [8, 12],
+        textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
+        extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
+        formatter: function(params) {
+          var day = params[0].axisValue;
+          var title = '<div style="font-weight:600;font-size:11px;margin-bottom:4px;color:' + tooltipSubtext + '">Day ' + day + '</div>';
+          var items = '';
+          params.forEach(function(p) {
+            if (p.value == null) return;
+            var dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + p.color + ';margin-right:8px;vertical-align:middle;"></span>';
+            var val = '$' + p.value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            items += '<div style="display:flex;justify-content:space-between;gap:16px;padding:1px 0;">' +
+              '<span style="color:' + tooltipSubtext + ';font-size:12px;">' + dot + p.seriesName + '</span>' +
+              '<span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + val + '</span></div>';
+          });
+          return title + items;
+        }
+      },
+      legend: {
+        show: true,
+        bottom: 0,
+        itemWidth: 16,
+        itemHeight: 3,
+        textStyle: { color: textColor, fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif' }
+      },
+      xAxis: {
+        type: 'category',
+        data: dayLabels,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: textColor,
+          fontSize: 10,
+          fontWeight: 500,
+          interval: function(idx) { return idx === 0 || (idx + 1) % 5 === 0; }
+        }
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: textColor, fontSize: 10, fontWeight: 500, formatter: formatAxisDollar },
+        splitLine: { lineStyle: { color: splitLineColor } },
+        splitNumber: 4
+      },
+      series: series
+    });
+
+    window.addEventListener('resize', function() { chart.resize(); });
+  })();
+  {{end}}
+
+  // ── Category Horizontal Bar Chart ──
+  {{if .CategoryLabels}}
+  (function() {
+    var el = document.getElementById('echartsCategoryBars');
+    if (!el) return;
+    var chart = echarts.init(el, null, { renderer: 'canvas' });
+    insightCharts.push(chart);
+
+    var allLabels = {{.CategoryLabels}};
+    var allAmounts = {{.CategoryAmounts}};
+    var allColors = {{.CategoryColors}};
+    var drilldownData = {{if .CategoryDrilldownJSON}}{{.CategoryDrilldownJSON}}{{else}}{}{{end}};
+
+    function buildCategoryBarsOption(exclude) {
+      var labels = [], amounts = [], colors = [];
+      for (var i = 0; i < allLabels.length; i++) {
+        if (exclude && /transfer|payment/i.test(allLabels[i])) continue;
+        labels.push(allLabels[i]);
+        amounts.push(allAmounts[i]);
+        colors.push(allColors[i]);
+      }
+      // Reverse for horizontal bars (ECharts renders bottom-to-top)
+      var rLabels = labels.slice().reverse();
+      var rAmounts = amounts.slice().reverse();
+      var rColors = colors.slice().reverse();
+
+      return {
+        animation: true,
+        animationDuration: 600,
+        animationEasing: 'cubicOut',
+        grid: { left: isMobile ? 90 : 120, right: 70, top: 8, bottom: 8 },
+        xAxis: { type: 'value', show: false },
+        yAxis: {
+          type: 'category',
+          data: rLabels,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: textColor,
+            fontSize: isMobile ? 10 : 12,
+            fontWeight: 500,
+            fontFamily: 'Inter, system-ui, sans-serif',
+            overflow: 'truncate',
+            width: isMobile ? 80 : 110
+          }
+        },
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          backgroundColor: tooltipBg,
+          borderColor: tooltipBorder,
+          borderWidth: 1,
+          padding: [8, 12],
+          textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
+          extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
+          formatter: function(params) {
+            var val = '$' + params[0].value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return '<div style="font-weight:600;font-size:12px;color:' + tooltipText + '">' + params[0].name + '</div>' +
+              '<div style="font-weight:600;font-size:13px;color:' + tooltipText + ';margin-top:4px">' + val + '</div>';
+          }
+        },
+        series: [{
+          type: 'bar',
+          data: rAmounts.map(function(v, i) {
+            return {
+              value: v,
+              itemStyle: { color: rColors[i], borderRadius: [0, 4, 4, 0] }
+            };
+          }),
+          barWidth: '65%',
+          label: {
+            show: true,
+            position: 'right',
+            formatter: function(p) { return '$' + p.value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); },
+            fontSize: 11,
+            fontWeight: 500,
+            fontFamily: 'Inter, system-ui, sans-serif',
+            color: textColor
+          }
+        }]
+      };
+    }
+
+    chart.setOption(buildCategoryBarsOption(false));
+
+    // Click handler for drill-down
+    chart.on('click', function(params) {
+      if (params.componentType !== 'series') return;
+      var categoryName = params.name;
+      var merchants = drilldownData[categoryName];
+      if (!merchants || merchants.length === 0) return;
+
+      // Find the category color
+      var colorIdx = allLabels.indexOf(categoryName);
+      var parentColor = colorIdx >= 0 ? allColors[colorIdx] : 'oklch(0.55 0.12 250)';
+
+      // Update Alpine state
+      var alpineEl = el.closest('[x-data]');
+      if (alpineEl && window.Alpine) {
+        try {
+          var data = Alpine.evaluate(alpineEl, '$data');
+          data.isDrilledDown = true;
+          data.activeCategoryName = categoryName;
+          data.activeCategoryColor = parentColor;
+          data.activeMerchants = merchants;
+        } catch(e) {}
+      }
+
+      // Build merchant bars
+      setTimeout(function() {
+        var mEl = document.getElementById('echartsMerchantBars');
+        if (!mEl) return;
+        if (!window._merchantBarsChart) {
+          window._merchantBarsChart = echarts.init(mEl, null, { renderer: 'canvas' });
+          insightCharts.push(window._merchantBarsChart);
+        }
+        var mNames = merchants.map(function(m) { return m.name; }).reverse();
+        var mAmounts = merchants.map(function(m) { return m.amount; }).reverse();
+        var hueMatch = parentColor.match && parentColor.match(/oklch\([\d.]+ [\d.]+ ([\d.]+)\)/);
+        var baseHue = hueMatch ? parseFloat(hueMatch[1]) : 250;
+
+        window._merchantBarsChart.setOption({
+          animation: true,
+          animationDuration: 600,
+          grid: { left: isMobile ? 90 : 120, right: 70, top: 8, bottom: 8 },
+          xAxis: { type: 'value', show: false },
+          yAxis: {
+            type: 'category',
+            data: mNames,
+            axisLine: { show: false },
+            axisTick: { show: false },
+            axisLabel: { color: textColor, fontSize: isMobile ? 10 : 12, fontWeight: 500, fontFamily: 'Inter, system-ui, sans-serif', overflow: 'truncate', width: isMobile ? 80 : 110 }
+          },
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' },
+            backgroundColor: tooltipBg,
+            borderColor: tooltipBorder,
+            borderWidth: 1,
+            padding: [8, 12],
+            textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
+            extraCssText: 'border-radius: 10px;'
+          },
+          series: [{
+            type: 'bar',
+            data: mAmounts.map(function(v, i) {
+              var l = 0.58 - (i * 0.03); if (l < 0.38) l = 0.38;
+              var c = 0.12 - (i * 0.008); if (c < 0.04) c = 0.04;
+              return { value: v, itemStyle: { color: 'oklch(' + l.toFixed(2) + ' ' + c.toFixed(2) + ' ' + baseHue.toFixed(0) + ')', borderRadius: [0, 4, 4, 0] } };
+            }),
+            barWidth: '65%',
+            label: {
+              show: true, position: 'right',
+              formatter: function(p) { return '$' + p.value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); },
+              fontSize: 11, fontWeight: 500, color: textColor
+            }
+          }]
+        }, true);
+        window._merchantBarsChart.resize();
+      }, 50);
+    });
+
+    window._categoryBarsChart = chart;
+    window._buildCategoryBarsOption = buildCategoryBarsOption;
+    window._categoryDrilldownData = drilldownData;
+    window._updateCategoryBars = function(exclude) {
+      chart.setOption(buildCategoryBarsOption(exclude), true);
+    };
+
+    window.addEventListener('resize', function() { chart.resize(); });
+  })();
+  {{end}}
+
+  // ── Monthly Income vs Spending Grouped Bar Chart ──
+  {{if .HasMonthlyIncomeSpend}}
+  (function() {
+    var el = document.getElementById('echartsMonthlyChart');
+    if (!el) return;
+    var chart = echarts.init(el, null, { renderer: 'canvas' });
+    insightCharts.push(chart);
+
+    var monthlyData = [
+      {{range .MonthlyIncomeSpend}}
+      {month: "{{.Month}}", spending: {{printf "%.2f" .Spending}}, income: {{printf "%.2f" .Income}}, net: {{printf "%.2f" .Net}}, savingsRate: {{printf "%.1f" .SavingsRate}}},
+      {{end}}
+    ];
+
+    var months = monthlyData.map(function(m) { return m.month; });
+    var spending = monthlyData.map(function(m) { return m.spending; });
+    var income = monthlyData.map(function(m) { return m.income; });
+
+    chart.setOption({
+      animation: true,
+      animationDuration: 600,
+      animationEasing: 'cubicOut',
+      grid: { top: 20, right: 20, bottom: 30, left: isMobile ? 8 : 50, containLabel: true },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow', shadowStyle: { color: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' } },
@@ -1357,7 +1646,8 @@ document.addEventListener('DOMContentLoaded', function() {
         extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
         formatter: function(params) {
           var idx = params[0].dataIndex;
-          var title = '<div style="font-weight:600;font-size:11px;margin-bottom:6px;color:' + tooltipText + '">' + fullLabels[idx] + '</div>';
+          var d = monthlyData[idx];
+          var title = '<div style="font-weight:600;font-size:11px;margin-bottom:6px;color:' + tooltipText + '">' + d.month + '</div>';
           var items = '';
           params.forEach(function(p) {
             var dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + p.color + ';margin-right:8px;vertical-align:middle;"></span>';
@@ -1366,22 +1656,124 @@ document.addEventListener('DOMContentLoaded', function() {
               '<span style="color:' + tooltipSubtext + ';font-size:12px;">' + dot + p.seriesName + '</span>' +
               '<span style="font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + val + '</span></div>';
           });
+          var netVal = d.net;
+          var netColor = netVal >= 0 ? (isDark ? 'rgba(74,222,128,1)' : 'rgba(22,163,74,1)') : (isDark ? 'rgba(248,113,113,1)' : 'rgba(220,38,38,1)');
+          items += '<div style="border-top:1px solid ' + tooltipBorder + ';margin-top:4px;padding-top:4px;display:flex;justify-content:space-between;align-items:center;gap:16px;">' +
+            '<span style="color:' + tooltipSubtext + ';font-size:11px;">Net</span>' +
+            '<span style="font-weight:600;font-size:12px;color:' + netColor + '">' + (netVal >= 0 ? '+' : '-') + '$' + Math.abs(netVal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</span></div>';
           return title + items;
         }
       },
       xAxis: {
         type: 'category',
-        data: shortLabels,
+        data: months,
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: {
-          color: textColor,
-          fontSize: 10,
-          fontWeight: 500,
-          fontFamily: 'Inter, system-ui, sans-serif',
-          interval: Math.max(0, Math.floor(shortLabels.length / maxTicks) - 1)
+        axisLabel: { color: textColor, fontSize: 10, fontWeight: 500, fontFamily: 'Inter, system-ui, sans-serif' }
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: textColor, fontSize: 10, fontWeight: 500, fontFamily: 'Inter, system-ui, sans-serif', formatter: formatAxisDollar },
+        splitLine: { lineStyle: { color: splitLineColor } },
+        splitNumber: 4
+      },
+      series: [
+        {
+          name: 'Spending',
+          type: 'bar',
+          data: spending,
+          itemStyle: { color: spendColor, borderRadius: [3, 3, 0, 0] },
+          emphasis: { itemStyle: { color: spendHoverColor } },
+          barWidth: '30%',
+          barGap: '20%'
         },
-        splitLine: { show: false }
+        {
+          name: 'Income',
+          type: 'bar',
+          data: income,
+          itemStyle: { color: incomeLineColor, borderRadius: [3, 3, 0, 0] },
+          barWidth: '25%'
+        }
+      ]
+    });
+
+    window._monthlyIncomeSpendData = monthlyData;
+    window.addEventListener('resize', function() { chart.resize(); });
+  })();
+  {{end}}
+
+  // ── Savings Rate Trend Line Chart ──
+  {{if .HasMonthlyIncomeSpend}}
+  (function() {
+    var el = document.getElementById('echartsSavingsRate');
+    if (!el) return;
+    var chart = echarts.init(el, null, { renderer: 'canvas' });
+    insightCharts.push(chart);
+
+    var monthlyData = [
+      {{range .MonthlyIncomeSpend}}
+      {month: "{{.Month}}", savingsRate: {{printf "%.1f" .SavingsRate}}},
+      {{end}}
+    ];
+
+    if (monthlyData.length < 2) {
+      el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--bb-chart-text);opacity:0.4;font-size:14px;">Need more data</div>';
+      return;
+    }
+
+    var months = monthlyData.map(function(m) { return m.month; });
+    var rates = monthlyData.map(function(m) { return m.savingsRate; });
+
+    // Color segments: green for positive, red for negative
+    var visualMapPieces = [];
+    for (var i = 0; i < rates.length - 1; i++) {
+      var avgRate = (rates[i] + rates[i + 1]) / 2;
+      visualMapPieces.push({
+        gte: i,
+        lt: i + 1,
+        color: avgRate >= 0 ? (isDark ? 'rgba(74, 222, 128, 0.9)' : 'rgba(22, 163, 74, 0.9)') : (isDark ? 'rgba(248, 113, 113, 0.9)' : 'rgba(220, 38, 38, 0.9)')
+      });
+    }
+    // Last segment
+    visualMapPieces.push({
+      gte: rates.length - 1,
+      lte: rates.length,
+      color: rates[rates.length - 1] >= 0 ? (isDark ? 'rgba(74, 222, 128, 0.9)' : 'rgba(22, 163, 74, 0.9)') : (isDark ? 'rgba(248, 113, 113, 0.9)' : 'rgba(220, 38, 38, 0.9)')
+    });
+
+    chart.setOption({
+      animation: true,
+      animationDuration: 600,
+      animationEasing: 'cubicOut',
+      grid: { top: 20, right: 20, bottom: 30, left: isMobile ? 8 : 50, containLabel: true },
+      visualMap: {
+        show: false,
+        dimension: 0,
+        pieces: visualMapPieces
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: tooltipBg,
+        borderColor: tooltipBorder,
+        borderWidth: 1,
+        padding: [8, 12],
+        textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
+        extraCssText: 'border-radius: 10px;',
+        formatter: function(params) {
+          var val = params[0].value;
+          var color = val >= 0 ? (isDark ? 'rgba(74,222,128,1)' : 'rgba(22,163,74,1)') : (isDark ? 'rgba(248,113,113,1)' : 'rgba(220,38,38,1)');
+          return '<div style="font-weight:600;font-size:11px;color:' + tooltipSubtext + ';margin-bottom:4px">' + params[0].name + '</div>' +
+            '<div style="font-weight:600;font-size:14px;color:' + color + '">' + val.toFixed(1) + '%</div>';
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: months,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: textColor, fontSize: 10, fontWeight: 500, fontFamily: 'Inter, system-ui, sans-serif' }
       },
       yAxis: {
         type: 'value',
@@ -1392,241 +1784,30 @@ document.addEventListener('DOMContentLoaded', function() {
           fontSize: 10,
           fontWeight: 500,
           fontFamily: 'Inter, system-ui, sans-serif',
-          formatter: formatAxisDollar
+          formatter: function(v) { return v + '%'; }
         },
         splitLine: { lineStyle: { color: splitLineColor } },
         splitNumber: 4
       },
-      series: series
-    };
-
-    if (chartDays >= 90) {
-      option.dataZoom = [{
-        type: 'slider',
-        show: true,
-        height: 18,
-        bottom: 4,
-        borderColor: 'transparent',
-        backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-        fillerColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-        handleIcon: 'path://M10,0A10,10,0,1,1,0,10,10,10,0,0,1,10,0Z',
-        handleSize: '60%',
-        handleStyle: { color: isDark ? '#555' : '#ccc', borderColor: isDark ? '#666' : '#bbb' },
-        textStyle: { color: textColor, fontSize: 10, fontFamily: 'Inter, system-ui, sans-serif' },
-        dataBackground: {
-          lineStyle: { color: 'transparent' },
-          areaStyle: { color: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }
-        },
-        selectedDataBackground: {
-          lineStyle: { color: 'transparent' },
-          areaStyle: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }
-        },
-        start: chartDays === 365 ? 50 : 30,
-        end: 100
-      }];
-    }
-
-    chart.setOption(option);
-    insightCharts.push(chart);
-    window.addEventListener('resize', function() { chart.resize(); });
-  })();
-  {{end}}
-
-  // ── Category Donut Chart with Drill-Down ──
-  {{if .CategoryLabels}}
-  (function() {
-    var el = document.getElementById('echartsCategoryDonut');
-    if (!el) return;
-    var chart = echarts.init(el, null, { renderer: 'canvas' });
-
-    var labels = {{.CategoryLabels}};
-    var amounts = {{.CategoryAmounts}};
-    var colors = {{.CategoryColors}};
-    var totalSpending = {{printf "%.2f" .TotalSpending}};
-    var drilldownData = {{if .CategoryDrilldownJSON}}{{.CategoryDrilldownJSON}}{{else}}{}{{end}};
-
-    var categoryData = labels.map(function(name, i) {
-      return { value: amounts[i], name: name, itemStyle: { color: colors[i] } };
+      series: [{
+        type: 'line',
+        data: rates,
+        smooth: 0.3,
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: { width: 2.5 },
+        areaStyle: { opacity: 0.08 },
+        markLine: {
+          silent: true,
+          symbol: 'none',
+          data: [{
+            yAxis: 0,
+            lineStyle: { color: textColor, type: 'dashed', opacity: 0.3, width: 1 },
+            label: { show: false }
+          }]
+        }
+      }]
     });
-
-    function buildCategoryOption() {
-      return {
-        animation: true,
-        animationDuration: 800,
-        animationEasing: 'cubicOut',
-        tooltip: {
-          trigger: 'item',
-          backgroundColor: tooltipBg,
-          borderColor: tooltipBorder,
-          borderWidth: 1,
-          padding: [10, 14],
-          extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
-          formatter: function(params) {
-            var pct = (params.value / totalSpending * 100).toFixed(1);
-            var val = '$' + params.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            return '<div style="font-family:Inter,system-ui,sans-serif">' +
-              '<div style="font-weight:600;font-size:12px;margin-bottom:4px;color:' + tooltipText + '">' + params.name + '</div>' +
-              '<div style="display:flex;justify-content:space-between;gap:16px;align-items:center;">' +
-              '<span style="color:' + tooltipSubtext + ';font-size:12px">' + pct + '% of total</span>' +
-              '<span style="font-weight:600;font-size:13px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + val + '</span></div></div>';
-          }
-        },
-        series: [{
-          type: 'pie',
-          radius: ['52%', '78%'],
-          center: ['50%', '50%'],
-          avoidLabelOverlap: false,
-          padAngle: 2,
-          itemStyle: {
-            borderRadius: 4,
-            borderColor: isDark ? '#1a1a1a' : '#ffffff',
-            borderWidth: 2
-          },
-          label: {
-            show: true,
-            position: 'center',
-            formatter: function() {
-              return '{total|$' + totalSpending.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '}\n{label|total spending}';
-            },
-            rich: {
-              total: { fontSize: isMobile ? 15 : 20, fontWeight: 700, fontFamily: 'Inter, system-ui, sans-serif', color: tooltipText, padding: [0, 0, 4, 0] },
-              label: { fontSize: isMobile ? 9 : 10, fontFamily: 'Inter, system-ui, sans-serif', color: textColor }
-            }
-          },
-          emphasis: {
-            itemStyle: { shadowBlur: 12, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.15)' },
-            label: { show: true }
-          },
-          data: categoryData
-        }]
-      };
-    }
-
-    function buildMerchantOption(categoryName, parentColor, merchants) {
-      var catTotal = 0;
-      merchants.forEach(function(m) { catTotal += m.amount; });
-      var hueMatch = parentColor.match(/oklch\([\d.]+ [\d.]+ ([\d.]+)\)/);
-      var baseHue = hueMatch ? parseFloat(hueMatch[1]) : 250;
-      var mData = merchants.map(function(m, i) {
-        var l = 0.58 - (i * 0.03);
-        var c = 0.12 - (i * 0.008);
-        if (l < 0.38) l = 0.38;
-        if (c < 0.04) c = 0.04;
-        var color = 'oklch(' + l.toFixed(2) + ' ' + c.toFixed(2) + ' ' + baseHue.toFixed(0) + ')';
-        return { value: m.amount, name: m.name, itemStyle: { color: color } };
-      });
-      return {
-        animation: true,
-        animationDuration: 600,
-        animationEasing: 'cubicOut',
-        tooltip: {
-          trigger: 'item',
-          backgroundColor: tooltipBg,
-          borderColor: tooltipBorder,
-          borderWidth: 1,
-          padding: [10, 14],
-          extraCssText: 'border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);',
-          formatter: function(params) {
-            var pct = (params.value / catTotal * 100).toFixed(1);
-            var val = '$' + params.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            return '<div style="font-family:Inter,system-ui,sans-serif">' +
-              '<div style="font-weight:600;font-size:12px;margin-bottom:4px;color:' + tooltipText + '">' + params.name + '</div>' +
-              '<div style="display:flex;justify-content:space-between;gap:16px;align-items:center;">' +
-              '<span style="color:' + tooltipSubtext + ';font-size:12px">' + pct + '% of ' + categoryName + '</span>' +
-              '<span style="font-weight:600;font-size:13px;font-variant-numeric:tabular-nums;color:' + tooltipText + '">' + val + '</span></div></div>';
-          }
-        },
-        series: [{
-          type: 'pie',
-          radius: ['52%', '78%'],
-          center: ['50%', '50%'],
-          avoidLabelOverlap: false,
-          padAngle: 2,
-          itemStyle: {
-            borderRadius: 4,
-            borderColor: isDark ? '#1a1a1a' : '#ffffff',
-            borderWidth: 2
-          },
-          label: {
-            show: true,
-            position: 'center',
-            formatter: function() {
-              return '{total|$' + catTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '}\n{label|' + categoryName + '}';
-            },
-            rich: {
-              total: { fontSize: isMobile ? 15 : 20, fontWeight: 700, fontFamily: 'Inter, system-ui, sans-serif', color: tooltipText, padding: [0, 0, 4, 0] },
-              label: { fontSize: isMobile ? 9 : 10, fontFamily: 'Inter, system-ui, sans-serif', color: textColor }
-            }
-          },
-          emphasis: {
-            itemStyle: { shadowBlur: 12, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.15)' },
-            label: { show: true }
-          },
-          data: mData
-        }]
-      };
-    }
-
-    chart.setOption(buildCategoryOption());
-    insightCharts.push(chart);
-
-    chart.on('click', function(params) {
-      if (params.componentType !== 'series') return;
-      var categoryName = params.name;
-      var parentColor = params.color || 'oklch(0.55 0.12 250)';
-      var merchants = drilldownData[categoryName];
-      if (!merchants || merchants.length === 0) return;
-
-      var alpineEl = el.closest('[x-data]');
-      if (alpineEl && alpineEl.__x) {
-        alpineEl.__x.$data.isDrilledDown = true;
-        alpineEl.__x.$data.activeCategoryName = categoryName;
-        alpineEl.__x.$data.activeCategoryColor = parentColor;
-        alpineEl.__x.$data.activeMerchants = merchants;
-      } else if (alpineEl && window.Alpine) {
-        Alpine.evaluate(alpineEl, '$data').isDrilledDown = true;
-        Alpine.evaluate(alpineEl, '$data').activeCategoryName = categoryName;
-        Alpine.evaluate(alpineEl, '$data').activeCategoryColor = parentColor;
-        Alpine.evaluate(alpineEl, '$data').activeMerchants = merchants;
-      }
-
-      chart.setOption(buildMerchantOption(categoryName, parentColor, merchants), true);
-    });
-
-    window._categoryDonutChart = chart;
-    window._categoryDonutCategoryOption = buildCategoryOption;
-    window._categoryDonutMerchantOption = buildMerchantOption;
-    window._categoryDrilldownData = drilldownData;
-
-    chart.on('mouseover', function(params) {
-      if (params.componentType !== 'series') return;
-      var pageEl = document.querySelector('[x-data]');
-      if (pageEl && window.Alpine) {
-        try {
-          var data = Alpine.evaluate(pageEl, '$data');
-          if (data && !data.isDrilledDown) data.highlightedCategory = params.name;
-        } catch(e) {}
-      }
-    });
-    chart.on('mouseout', function(params) {
-      if (params.componentType !== 'series') return;
-      var pageEl = document.querySelector('[x-data]');
-      if (pageEl && window.Alpine) {
-        try {
-          var data = Alpine.evaluate(pageEl, '$data');
-          if (data) data.highlightedCategory = '';
-        } catch(e) {}
-      }
-    });
-
-    window._insightsHighlightDonut = function(categoryName) {
-      if (!chart || chart.isDisposed()) return;
-      chart.dispatchAction({ type: 'highlight', seriesIndex: 0, name: categoryName });
-    };
-    window._insightsDownplayDonut = function() {
-      if (!chart || chart.isDisposed()) return;
-      chart.dispatchAction({ type: 'downplay', seriesIndex: 0 });
-    };
 
     window.addEventListener('resize', function() { chart.resize(); });
   })();
@@ -1639,6 +1820,9 @@ document.addEventListener('DOMContentLoaded', function() {
       insightCharts.forEach(function(c) {
         try { c.resize(); } catch(e) {}
       });
+      if (window._merchantBarsChart) {
+        try { window._merchantBarsChart.resize(); } catch(e) {}
+      }
     }, 250);
   };
 
@@ -1648,6 +1832,9 @@ document.addEventListener('DOMContentLoaded', function() {
     insightCharts.forEach(function(c) {
       try { c.resize(); } catch(e) {}
     });
+    if (window._merchantBarsChart) {
+      try { window._merchantBarsChart.resize(); } catch(e) {}
+    }
   }
   function activateInsights() {
     if (typeof window._setInsightsReady === 'function') {
@@ -1675,19 +1862,14 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<!-- Alpine: Category Drill-Down Component -->
+<!-- Alpine: Category Breakdown Component -->
 <script>
-function categoryDrilldown() {
+function categoryBreakdown() {
   return {
     isDrilledDown: false,
     activeCategoryName: '',
     activeCategoryColor: '',
     activeMerchants: [],
-    merchantColors: [
-      'oklch(0.55 0.12 250)', 'oklch(0.60 0.10 250)', 'oklch(0.50 0.14 250)',
-      'oklch(0.58 0.08 250)', 'oklch(0.52 0.11 250)', 'oklch(0.63 0.07 250)',
-      'oklch(0.48 0.13 250)', 'oklch(0.65 0.06 250)'
-    ],
     drillInto: function(categoryName, parentColor) {
       var drilldownData = window._categoryDrilldownData || {};
       var merchants = drilldownData[categoryName];
@@ -1698,10 +1880,73 @@ function categoryDrilldown() {
       this.activeCategoryColor = parentColor;
       this.activeMerchants = merchants;
 
-      var chart = window._categoryDonutChart;
-      var buildMerchant = window._categoryDonutMerchantOption;
-      if (chart && buildMerchant) {
-        chart.setOption(buildMerchant(categoryName, parentColor, merchants), true);
+      // Trigger the chart click handler to build merchant bars
+      var chart = window._categoryBarsChart;
+      if (chart) {
+        chart.dispatchAction({ type: 'select', seriesIndex: 0, name: categoryName });
+        // Manually trigger the merchant bars rendering
+        var allLabels = chart.getOption().yAxis[0].data || [];
+        var colorIdx = allLabels.indexOf(categoryName);
+        // Build merchant bar chart
+        var self = this;
+        setTimeout(function() {
+          var mEl = document.getElementById('echartsMerchantBars');
+          if (!mEl) return;
+          if (!window._merchantBarsChart) {
+            var cs = getComputedStyle(document.documentElement);
+            var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            window._merchantBarsChart = echarts.init(mEl, null, { renderer: 'canvas' });
+            window._insightCharts.push(window._merchantBarsChart);
+          }
+          var isMobile = window.innerWidth < 640;
+          var textColor = getComputedStyle(document.documentElement).getPropertyValue('--bb-chart-text').trim();
+          var tooltipBg = getComputedStyle(document.documentElement).getPropertyValue('--bb-chart-tooltip-bg').trim();
+          var tooltipBorder = getComputedStyle(document.documentElement).getPropertyValue('--bb-chart-tooltip-border').trim();
+          var tooltipText = getComputedStyle(document.documentElement).getPropertyValue('--bb-chart-tooltip-text').trim();
+          var hueMatch = parentColor.match && parentColor.match(/oklch\([\d.]+ [\d.]+ ([\d.]+)\)/);
+          var baseHue = hueMatch ? parseFloat(hueMatch[1]) : 250;
+          var mNames = merchants.map(function(m) { return m.name; }).reverse();
+          var mAmounts = merchants.map(function(m) { return m.amount; }).reverse();
+
+          window._merchantBarsChart.setOption({
+            animation: true,
+            animationDuration: 600,
+            grid: { left: isMobile ? 90 : 120, right: 70, top: 8, bottom: 8 },
+            xAxis: { type: 'value', show: false },
+            yAxis: {
+              type: 'category',
+              data: mNames,
+              axisLine: { show: false },
+              axisTick: { show: false },
+              axisLabel: { color: textColor, fontSize: isMobile ? 10 : 12, fontWeight: 500, fontFamily: 'Inter, system-ui, sans-serif', overflow: 'truncate', width: isMobile ? 80 : 110 }
+            },
+            tooltip: {
+              trigger: 'axis',
+              axisPointer: { type: 'shadow' },
+              backgroundColor: tooltipBg,
+              borderColor: tooltipBorder,
+              borderWidth: 1,
+              padding: [8, 12],
+              textStyle: { fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, color: tooltipText },
+              extraCssText: 'border-radius: 10px;'
+            },
+            series: [{
+              type: 'bar',
+              data: mAmounts.map(function(v, i) {
+                var l = 0.58 - (i * 0.03); if (l < 0.38) l = 0.38;
+                var c = 0.12 - (i * 0.008); if (c < 0.04) c = 0.04;
+                return { value: v, itemStyle: { color: 'oklch(' + l.toFixed(2) + ' ' + c.toFixed(2) + ' ' + baseHue.toFixed(0) + ')', borderRadius: [0, 4, 4, 0] } };
+              }),
+              barWidth: '65%',
+              label: {
+                show: true, position: 'right',
+                formatter: function(p) { return '$' + p.value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); },
+                fontSize: 11, fontWeight: 500, color: textColor
+              }
+            }]
+          }, true);
+          window._merchantBarsChart.resize();
+        }, 50);
       }
 
       this.$nextTick(function() {
@@ -1713,13 +1958,10 @@ function categoryDrilldown() {
       this.activeCategoryName = '';
       this.activeMerchants = [];
 
-      var chart = window._categoryDonutChart;
-      var buildCategory = window._categoryDonutCategoryOption;
-      if (chart && buildCategory) {
-        chart.setOption(buildCategory(), true);
-      }
-
       this.$nextTick(function() {
+        if (window._categoryBarsChart) {
+          try { window._categoryBarsChart.resize(); } catch(e) {}
+        }
         if (typeof lucide !== 'undefined') lucide.createIcons();
       });
     }
@@ -1804,11 +2046,11 @@ document.addEventListener('DOMContentLoaded', function() {
     return toCSV(headers, rows);
   }
 
-  function buildMerchants() {
-    if (!exportData.merchants || exportData.merchants.length === 0) return null;
-    var headers = ['Rank', 'Merchant', 'Category', 'Total', 'Transactions', 'Average'];
-    var rows = exportData.merchants.map(function(m, i) {
-      return [i + 1, m.name, m.category, fmt(m.total), m.count, fmt(m.average)];
+  function buildAccounts() {
+    if (!exportData.accountSpending || exportData.accountSpending.length === 0) return null;
+    var headers = ['Account', 'Institution', 'Type', 'Total', 'Percent'];
+    var rows = exportData.accountSpending.map(function(a) {
+      return [a.name, a.institution || '', a.type, fmt(a.total), a.percent.toFixed(1) + '%'];
     });
     return toCSV(headers, rows);
   }
@@ -1825,28 +2067,16 @@ document.addEventListener('DOMContentLoaded', function() {
     return toCSV(headers, rows);
   }
 
-  function buildRecurring() {
-    if (!exportData.recurring || exportData.recurring.length === 0) return null;
-    var headers = ['Name', 'Amount', 'Frequency', 'Category', 'Monthly Estimate'];
-    var rows = exportData.recurring.map(function(r) {
-      return [r.name, fmt(r.amount), r.frequency, r.category, fmt(r.monthlyEstimate)];
-    });
-    return toCSV(headers, rows);
-  }
-
   function buildAll() {
     var sections = [];
     var summary = buildSummary();
     if (summary) sections.push('=== SUMMARY & CATEGORIES ===\n' + summary);
 
-    var merchants = buildMerchants();
-    if (merchants) sections.push('\n=== TOP MERCHANTS ===\n' + merchants);
+    var accounts = buildAccounts();
+    if (accounts) sections.push('\n=== ACCOUNT SPENDING ===\n' + accounts);
 
     var monthly = buildMonthly();
     if (monthly) sections.push('\n=== MONTHLY COMPARISON ===\n' + monthly);
-
-    var recurring = buildRecurring();
-    if (recurring) sections.push('\n=== RECURRING CHARGES ===\n' + recurring);
 
     return sections.join('\n');
   }
@@ -1861,17 +2091,13 @@ document.addEventListener('DOMContentLoaded', function() {
         csv = buildSummary();
         filename = 'breadbox-insights-summary-' + period + '-' + date + '.csv';
         break;
-      case 'merchants':
-        csv = buildMerchants();
-        filename = 'breadbox-merchants-' + period + '-' + date + '.csv';
+      case 'accounts':
+        csv = buildAccounts();
+        filename = 'breadbox-account-spending-' + period + '-' + date + '.csv';
         break;
       case 'monthly':
         csv = buildMonthly();
         filename = 'breadbox-monthly-comparison-' + date + '.csv';
-        break;
-      case 'recurring':
-        csv = buildRecurring();
-        filename = 'breadbox-recurring-charges-' + date + '.csv';
         break;
       case 'all':
         csv = buildAll();
