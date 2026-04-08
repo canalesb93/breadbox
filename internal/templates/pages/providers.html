@@ -6,7 +6,7 @@
   </div>
 </div>
 
-<div class="grid gap-[var(--bb-gap-lg)] bb-stagger">
+<div class="grid gap-4 bb-stagger">
 
   <!-- ─── Plaid ─── -->
   {{$plaidHealth := index .ProviderHealth "plaid"}}
@@ -47,7 +47,7 @@
           <i data-lucide="chevron-down" class="w-3.5 h-3.5 ml-auto transition-transform duration-200" :class="showConfig && 'rotate-180'"></i>
         </button>
 
-        <div x-show="showConfig" x-collapse x-cloak class="mt-4">
+        <div x-show="showConfig" x-collapse x-cloak class="mt-4 space-y-4">
           {{if .PlaidFromEnv}}
           <p class="text-sm text-base-content/50 mb-4 flex items-center gap-1.5">
             <i data-lucide="lock" class="w-3.5 h-3.5"></i>
@@ -107,30 +107,30 @@
             </div>
           </form>
           {{end}}
+
+          {{if .PlaidConfigured}}
+          {{/* ── Test connection ── */}}
+          <div class="border-t border-base-300 pt-4 flex flex-wrap items-center gap-3">
+            <button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="testConnection()" :disabled="testing">
+              <span x-show="!testing" class="flex items-center gap-1.5"><i data-lucide="plug" class="w-3.5 h-3.5"></i> Test Connection</span>
+              <span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing...</span>
+            </button>
+            <span x-show="testResult" x-cloak class="text-sm" :class="testSuccess ? 'text-success' : 'text-error'" x-text="testResult" x-transition></span>
+          </div>
+
+          {{/* ── Webhook instructions ── */}}
+          <div class="border-t border-base-300 pt-4">
+            <div class="flex items-center gap-1.5 mb-2">
+              <i data-lucide="webhook" class="w-3.5 h-3.5 text-base-content/40"></i>
+              <h3 class="text-sm font-medium">Webhook Setup</h3>
+            </div>
+            <p class="text-xs text-base-content/50 mb-2">Plaid can push real-time transaction updates via webhooks. Set the webhook URL above, then configure Plaid to send events to:</p>
+            <code class="text-xs bg-base-300/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all overflow-hidden">https://&lt;your-domain&gt;/webhooks/plaid</code>
+            <p class="text-xs text-base-content/40 mt-2">Plaid automatically sends webhooks when you set the URL during link token creation. No additional configuration needed in the Plaid dashboard.</p>
+          </div>
+          {{end}}
         </div>
       </div>
-
-      {{if .PlaidConfigured}}
-      {{/* ── Test connection ���─ */}}
-      <div class="border-t border-base-300 pt-4 flex flex-wrap items-center gap-3">
-        <button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="testConnection()" :disabled="testing">
-          <span x-show="!testing" class="flex items-center gap-1.5"><i data-lucide="plug" class="w-3.5 h-3.5"></i> Test Connection</span>
-          <span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing...</span>
-        </button>
-        <span x-show="testResult" x-cloak class="text-sm" :class="testSuccess ? 'text-success' : 'text-error'" x-text="testResult" x-transition></span>
-      </div>
-
-      {{/* ── Webhook instructions ── */}}
-      <div class="border-t border-base-300 pt-4">
-        <div class="flex items-center gap-1.5 mb-2">
-          <i data-lucide="webhook" class="w-3.5 h-3.5 text-base-content/40"></i>
-          <h3 class="text-sm font-medium">Webhook Setup</h3>
-        </div>
-        <p class="text-xs text-base-content/50 mb-2">Plaid can push real-time transaction updates via webhooks. Set the webhook URL above, then configure Plaid to send events to:</p>
-        <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all overflow-hidden">https://&lt;your-domain&gt;/webhooks/plaid</code>
-        <p class="text-xs text-base-content/40 mt-2">Plaid automatically sends webhooks when you set the URL during link token creation. No additional configuration needed in the Plaid dashboard.</p>
-      </div>
-      {{end}}
     </div>
   </div>
 
@@ -173,7 +173,7 @@
           <i data-lucide="chevron-down" class="w-3.5 h-3.5 ml-auto transition-transform duration-200" :class="showConfig && 'rotate-180'"></i>
         </button>
 
-        <div x-show="showConfig" x-collapse x-cloak class="mt-4">
+        <div x-show="showConfig" x-collapse x-cloak class="mt-4 space-y-4">
           {{if .TellerFromEnv}}
           <p class="text-sm text-base-content/50 mb-4 flex items-center gap-1.5">
             <i data-lucide="lock" class="w-3.5 h-3.5"></i>
@@ -250,38 +250,38 @@
             </div>
           </form>
           {{end}}
+
+          {{if .TellerConfigured}}
+          {{/* ── Test connection ── */}}
+          <div class="border-t border-base-300 pt-4 flex flex-wrap items-center gap-3">
+            <button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="testConnection()" :disabled="testing">
+              <span x-show="!testing" class="flex items-center gap-1.5"><i data-lucide="plug" class="w-3.5 h-3.5"></i> Test Connection</span>
+              <span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing...</span>
+            </button>
+            <span x-show="testResult" x-cloak class="text-sm" :class="testSuccess ? 'text-success' : 'text-error'" x-text="testResult" x-transition></span>
+          </div>
+
+          {{/* ── Webhook instructions ── */}}
+          <div class="border-t border-base-300 pt-4">
+            <div class="flex items-center gap-1.5 mb-2">
+              <i data-lucide="webhook" class="w-3.5 h-3.5 text-base-content/40"></i>
+              <h3 class="text-sm font-medium">Webhook Setup</h3>
+            </div>
+            <p class="text-xs text-base-content/50 mb-2">Teller sends webhooks for account disconnections and other events. To enable:</p>
+            <ol class="text-xs text-base-content/50 space-y-1.5 mb-3 list-decimal list-inside">
+              <li>Go to the <strong>Teller dashboard</strong> and navigate to your application settings</li>
+              <li>Set the webhook URL to:</li>
+            </ol>
+            <code class="text-xs bg-base-300/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all overflow-hidden">https://&lt;your-domain&gt;/webhooks/teller</code>
+            <ol class="text-xs text-base-content/50 space-y-1.5 mt-2 list-decimal list-inside" start="3">
+              <li>Copy the <strong>webhook signing secret</strong> from Teller and paste it in the Webhook Secret field above</li>
+              <li>Breadbox verifies webhook signatures using this secret to ensure authenticity</li>
+            </ol>
+            <p class="text-xs text-base-content/40 mt-2.5">Without webhooks, Breadbox relies on cron-based polling (every {{formatIntervalMinutes .SyncInterval}}) to detect changes.</p>
+          </div>
+          {{end}}
         </div>
       </div>
-
-      {{if .TellerConfigured}}
-      {{/* ── Test connection ── */}}
-      <div class="border-t border-base-300 pt-4 flex flex-wrap items-center gap-3">
-        <button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="testConnection()" :disabled="testing">
-          <span x-show="!testing" class="flex items-center gap-1.5"><i data-lucide="plug" class="w-3.5 h-3.5"></i> Test Connection</span>
-          <span x-show="testing" x-cloak class="flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Testing...</span>
-        </button>
-        <span x-show="testResult" x-cloak class="text-sm" :class="testSuccess ? 'text-success' : 'text-error'" x-text="testResult" x-transition></span>
-      </div>
-
-      {{/* ── Webhook instructions ── */}}
-      <div class="border-t border-base-300 pt-4">
-        <div class="flex items-center gap-1.5 mb-2">
-          <i data-lucide="webhook" class="w-3.5 h-3.5 text-base-content/40"></i>
-          <h3 class="text-sm font-medium">Webhook Setup</h3>
-        </div>
-        <p class="text-xs text-base-content/50 mb-2">Teller sends webhooks for account disconnections and other events. To enable:</p>
-        <ol class="text-xs text-base-content/50 space-y-1.5 mb-3 list-decimal list-inside">
-          <li>Go to the <strong>Teller dashboard</strong> and navigate to your application settings</li>
-          <li>Set the webhook URL to:</li>
-        </ol>
-        <code class="text-xs bg-base-200/60 px-2.5 py-1.5 rounded-lg block font-mono select-all break-all overflow-hidden">https://&lt;your-domain&gt;/webhooks/teller</code>
-        <ol class="text-xs text-base-content/50 space-y-1.5 mt-2 list-decimal list-inside" start="3">
-          <li>Copy the <strong>webhook signing secret</strong> from Teller and paste it in the Webhook Secret field above</li>
-          <li>Breadbox verifies webhook signatures using this secret to ensure authenticity</li>
-        </ol>
-        <p class="text-xs text-base-content/40 mt-2.5">Without webhooks, Breadbox relies on cron-based polling (every {{formatIntervalMinutes .SyncInterval}}) to detect changes.</p>
-      </div>
-      {{end}}
     </div>
   </div>
 
