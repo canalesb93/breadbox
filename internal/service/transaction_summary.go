@@ -80,8 +80,8 @@ func (s *Service) GetTransactionSummary(ctx context.Context, params TransactionS
 	joinCategories := false
 	switch params.GroupBy {
 	case "category":
-		selectCols = "COALESCE(cat.display_name, t.category_primary) AS category, cat.icon AS category_icon, cat.color AS category_color, t.iso_currency_code"
-		groupCols = "COALESCE(cat.display_name, t.category_primary), cat.icon, cat.color, t.iso_currency_code"
+		selectCols = "COALESCE(cat.display_name, INITCAP(REPLACE(t.category_primary, '_', ' ')), 'Uncategorized') AS category, cat.icon AS category_icon, cat.color AS category_color, t.iso_currency_code"
+		groupCols = "COALESCE(cat.display_name, INITCAP(REPLACE(t.category_primary, '_', ' ')), 'Uncategorized'), cat.icon, cat.color, t.iso_currency_code"
 		orderCols = "SUM(t.amount) DESC"
 		joinCategories = true
 	case "month":
@@ -97,8 +97,8 @@ func (s *Service) GetTransactionSummary(ctx context.Context, params TransactionS
 		groupCols = "t.date, t.iso_currency_code"
 		orderCols = "t.date DESC"
 	case "category_month":
-		selectCols = "COALESCE(cat.display_name, t.category_primary) AS category, cat.icon AS category_icon, cat.color AS category_color, to_char(date_trunc('month', t.date), 'YYYY-MM') AS period, t.iso_currency_code"
-		groupCols = "COALESCE(cat.display_name, t.category_primary), cat.icon, cat.color, date_trunc('month', t.date), t.iso_currency_code"
+		selectCols = "COALESCE(cat.display_name, INITCAP(REPLACE(t.category_primary, '_', ' ')), 'Uncategorized') AS category, cat.icon AS category_icon, cat.color AS category_color, to_char(date_trunc('month', t.date), 'YYYY-MM') AS period, t.iso_currency_code"
+		groupCols = "COALESCE(cat.display_name, INITCAP(REPLACE(t.category_primary, '_', ' ')), 'Uncategorized'), cat.icon, cat.color, date_trunc('month', t.date), t.iso_currency_code"
 		orderCols = "date_trunc('month', t.date) DESC, SUM(t.amount) DESC"
 		joinCategories = true
 	}

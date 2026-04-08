@@ -7,72 +7,12 @@ import (
 	"math"
 	"net/http"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
 )
-
-// paymentProcessorPatterns contains ILIKE patterns for merchants that are
-// credit card companies, banks, or payment processors — not real merchants.
-// These are filtered out of Top Merchants and related merchant rankings to
-// avoid showing "American Express" or "Chase" as top spending destinations.
-var paymentProcessorPatterns = []string{
-	// Credit card issuers / banks
-	"american express%", "amex%",
-	"chase%", "jpmorgan%",
-	"capital one%", "capitalone%",
-	"citibank%", "citi card%", "citi %",
-	"discover%",
-	"bank of america%", "bofa%",
-	"wells fargo%",
-	"us bank%", "usbank%",
-	"barclays%",
-	"synchrony%",
-	"td bank%",
-	"pnc bank%",
-	"truist%",
-	"ally bank%",
-	"marcus%goldman%",
-	// Payment processors / transfers
-	"paypal%",
-	"venmo%",
-	"zelle%",
-	"cash app%", "square cash%",
-	"apple cash%",
-	// Credit card payment labels
-	"%payment thank you%",
-	"%autopay%",
-	"%credit card payment%",
-	"%card payment%",
-	"%balance payment%",
-	"%minimum payment%",
-	// Transfers
-	"%transfer to%",
-	"%transfer from%",
-	"%ach transfer%",
-	"%wire transfer%",
-	"%online transfer%",
-}
-
-// buildPaymentProcessorExclusion returns a SQL WHERE clause fragment that
-// excludes payment processors from merchant queries. The merchantExpr should
-// be the SQL expression for the merchant name (e.g., "COALESCE(NULLIF(merchant_name, ''), name)").
-// Returns the clause fragment and the parameter values to append.
-func buildPaymentProcessorExclusion(merchantExpr string, startParam int) (string, []any) {
-	if len(paymentProcessorPatterns) == 0 {
-		return "", nil
-	}
-	var conditions []string
-	var params []any
-	for i, pattern := range paymentProcessorPatterns {
-		conditions = append(conditions, fmt.Sprintf("LOWER(%s) NOT LIKE $%d", merchantExpr, startParam+i))
-		params = append(params, pattern)
-	}
-	return " AND " + strings.Join(conditions, " AND "), params
-}
 
 // InsightsHandler serves GET /admin/insights — the spending insights page.
 func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) http.HandlerFunc {
@@ -132,8 +72,19 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		}
 		lastMonthSameDayEnd := time.Date(lastMonthSameDay.Year(), lastMonthSameDay.Month(), sameDayOfLastMonth+1, 0, 0, 0, 0, today.Location())
 
-		recurringLookback := time.Now().AddDate(0, 0, -90)
-		compStart := time.Date(today.Year(), today.Month()-3, 1, 0, 0, 0, 0, today.Location())
+		// Parse trends month range (default 6 months).
+		trendMonths := 6
+		if m := r.URL.Query().Get("months"); m != "" {
+			switch m {
+			case "3":
+				trendMonths = 3
+			case "6":
+				trendMonths = 6
+			case "12":
+				trendMonths = 12
+			}
+		}
+		trendStart := time.Date(today.Year(), today.Month()-time.Month(trendMonths), 1, 0, 0, 0, 0, today.Location())
 		compEnd := time.Now().AddDate(0, 0, 1)
 
 		// ── Type definitions ──
@@ -148,13 +99,20 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			Amount float64 `json:"amount"`
 			Count  int     `json:"count"`
 		}
-		type MerchantSpend struct {
-			Name      string
-			Category  string
-			Total     float64
-			Count     int
-			AvgAmount float64
-			Percent   float64
+		type AccountSpend struct {
+			ID              string
+			ShortID         string
+			Name            string
+			InstitutionName string
+			Type            string
+			Total           float64
+			Percent         float64
+		}
+		type UserSpend struct {
+			ID      string
+			Name    string
+			Total   float64
+			Percent float64
 		}
 		type DayOfWeekSpend struct {
 			DayShort  string
@@ -163,15 +121,12 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			Count     int
 			Intensity float64
 		}
-		type RecurringCharge struct {
-			Name           string
-			Category       string
-			Amount         float64
-			Frequency      string
-			TxCount        int
-			TotalSpent     float64
-			LastChargeDate string
-			MonthlyEst     float64
+		type MonthlyIncomeSpend struct {
+			Month       string
+			Spending    float64
+			Income      float64
+			Net         float64
+			SavingsRate float64
 		}
 		type MonthlyCompRow struct {
 			Category      string
@@ -198,18 +153,19 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 		var lastMonthSummary *service.TransactionSummaryResult
 		var lastMonthPaceSummary *service.TransactionSummaryResult
 		var compSummary *service.TransactionSummaryResult
+		var trendSummary *service.TransactionSummaryResult
 		categoryDrilldown := make(map[string][]CategoryMerchant)
-		var topMerchants []MerchantSpend
-		var maxMerchantSpend float64
+		var accountSpending []AccountSpend
+		var userSpending []UserSpend
 		dowSpending := make([]DayOfWeekSpend, 7)
 		var maxDaySpend float64
-		var recurringCharges []RecurringCharge
-		var totalRecurringMonthly float64
-		var hasRecurringData bool
 		var sparklineSpending []float64
 		var sparklineIncome []float64
 		var netWorth, totalAssets, totalLiabilities float64
 		var netWorthLabelsJSON, netWorthValuesJSON template.JS
+		var allAccounts []service.AccountResponse
+		// Pace comparison: daily cumulative spending for current + 2 prior months
+		var paceCompJSON template.JS
 
 		// 0. Net worth: fetch accounts and compute balances + trend
 		wg.Add(1)
@@ -234,8 +190,10 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 					netWorth += bal
 				}
 			}
+			allAccounts = accounts
 			// Net worth trend: work backwards from current balance using daily transaction totals.
-			netWorthTrendStart := time.Now().AddDate(0, 0, -chartDays)
+			// Compute 365 days so client-side date picker can slice (30d, 90d, 6m, 1y).
+			netWorthTrendStart := time.Now().AddDate(0, 0, -365)
 			dailyNetSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
 				GroupBy:   "day",
 				StartDate: &netWorthTrendStart,
@@ -253,10 +211,7 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 				}
 			}
 			now := time.Now()
-			nwDays := chartDays
-			if nwDays > 90 {
-				nwDays = 90
-			}
+			nwDays := 365
 			nwLabels := make([]string, nwDays+1)
 			nwValues := make([]float64, nwDays+1)
 			nwValues[nwDays] = netWorth
@@ -291,12 +246,10 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			categorySummary = result
 		}()
 
-		// 2. Category drilldown (excludes payment processors)
+		// 2. Category drilldown
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			drillExcl, drillExclParams := buildPaymentProcessorExclusion("COALESCE(NULLIF(t.merchant_name, ''), t.name)", 2)
-			drillQueryParams := append([]any{chartStart}, drillExclParams...)
 			rows, err := a.DB.Query(ctx, `
 				WITH ranked AS (
 					SELECT
@@ -308,14 +261,13 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 					FROM transactions t
 					LEFT JOIN categories cat ON t.category_id = cat.id
 					WHERE t.deleted_at IS NULL AND t.date >= $1 AND t.amount > 0 AND t.pending = false
-					`+drillExcl+`
 					GROUP BY COALESCE(cat.display_name, t.category_primary, 'Uncategorized'), COALESCE(NULLIF(t.merchant_name, ''), t.name)
 				)
 				SELECT cat, merchant, total, tx_count
 				FROM ranked
 				WHERE rn <= 8
 				ORDER BY cat, total DESC
-			`, drillQueryParams...)
+			`, chartStart)
 			if err != nil {
 				a.Logger.Error("category drilldown query", "error", err)
 				return
@@ -464,44 +416,149 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			lastMonthPaceSummary = result
 		}()
 
-		// 11. Top merchants (excludes payment processors & credit card companies)
+		// 10b. Pace comparison: daily spending for current month + 2 prior months
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			merchantExcl, exclParams := buildPaymentProcessorExclusion("COALESCE(NULLIF(merchant_name, ''), name)", 2)
-			queryParams := append([]any{chartStart}, exclParams...)
-			rows, err := a.DB.Query(ctx, `
-				SELECT
-					COALESCE(NULLIF(merchant_name, ''), name) AS merchant,
-					COUNT(*)::int AS tx_count,
-					SUM(amount) AS total,
-					AVG(amount) AS avg_amount,
-					MODE() WITHIN GROUP (ORDER BY COALESCE(category_primary, '')) AS top_category
-				FROM transactions
-				WHERE deleted_at IS NULL AND date >= $1 AND amount > 0 AND pending = false
-				`+merchantExcl+`
-				GROUP BY COALESCE(NULLIF(merchant_name, ''), name)
-				ORDER BY SUM(amount) DESC
-				LIMIT 10
-			`, queryParams...)
+			// Get 3 months of daily spending data
+			threeMonthsAgo := time.Date(today.Year(), today.Month()-2, 1, 0, 0, 0, 0, today.Location())
+			result, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+				GroupBy:      "day",
+				StartDate:    &threeMonthsAgo,
+				SpendingOnly: true,
+			})
 			if err != nil {
-				a.Logger.Error("top merchants query", "error", err)
+				a.Logger.Error("pace comparison query", "error", err)
+				return
+			}
+			if result == nil {
+				return
+			}
+			// Group daily totals by month, then build cumulative arrays
+			type monthData struct {
+				Name string        `json:"name"`
+				Days []float64     `json:"days"`
+			}
+			monthBuckets := make(map[string]map[int]float64) // "2026-01" -> {1: 100.0, 2: 50.0, ...}
+			for _, row := range result.Summary {
+				if row.Period == nil {
+					continue
+				}
+				d, err := time.Parse("2006-01-02", *row.Period)
+				if err != nil {
+					continue
+				}
+				key := d.Format("2006-01")
+				if monthBuckets[key] == nil {
+					monthBuckets[key] = make(map[int]float64)
+				}
+				monthBuckets[key][d.Day()] += row.TotalAmount
+			}
+			// Build sorted month list (most recent last)
+			months := make([]string, 0, len(monthBuckets))
+			for m := range monthBuckets {
+				months = append(months, m)
+			}
+			sort.Strings(months)
+			// Build cumulative spending per day-of-month for each month
+			var paceMonths []monthData
+			for _, m := range months {
+				t, err := time.Parse("2006-01", m)
+				if err != nil {
+					continue
+				}
+				daysInM := time.Date(t.Year(), t.Month()+1, 0, 0, 0, 0, 0, t.Location()).Day()
+				// For current month, only include up to today
+				isCurrentMonth := t.Year() == today.Year() && t.Month() == today.Month()
+				maxDay := daysInM
+				if isCurrentMonth {
+					maxDay = daysElapsed
+				}
+				cumulative := make([]float64, maxDay)
+				var running float64
+				for day := 1; day <= maxDay; day++ {
+					running += monthBuckets[m][day]
+					cumulative[day-1] = math.Round(running*100) / 100
+				}
+				paceMonths = append(paceMonths, monthData{
+					Name: t.Format("Jan"),
+					Days: cumulative,
+				})
+			}
+			if pb, err := json.Marshal(paceMonths); err == nil {
+				paceCompJSON = template.JS(pb)
+			}
+		}()
+
+		// 11. Spending by account
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rows, err := a.DB.Query(ctx, `
+				SELECT a.id, a.short_id, COALESCE(a.display_name, a.name) AS name, a.institution_name, a.type,
+				       SUM(t.amount) AS total
+				FROM transactions t
+				JOIN accounts a ON t.account_id = a.id
+				WHERE t.deleted_at IS NULL AND t.date >= $1 AND t.amount > 0 AND t.pending = false
+				GROUP BY a.id, a.short_id, a.name, a.display_name, a.institution_name, a.type
+				ORDER BY SUM(t.amount) DESC
+			`, chartStart)
+			if err != nil {
+				a.Logger.Error("account spending query", "error", err)
 				return
 			}
 			defer rows.Close()
+			var grandTotal float64
 			for rows.Next() {
-				var m MerchantSpend
-				var cat *string
-				if err := rows.Scan(&m.Name, &m.Count, &m.Total, &m.AvgAmount, &cat); err != nil {
-					a.Logger.Error("top merchants scan", "error", err)
+				var as AccountSpend
+				if err := rows.Scan(&as.ID, &as.ShortID, &as.Name, &as.InstitutionName, &as.Type, &as.Total); err != nil {
+					a.Logger.Error("account spending scan", "error", err)
 					continue
 				}
-				if cat != nil && *cat != "" {
-					m.Category = *cat
+				grandTotal += as.Total
+				accountSpending = append(accountSpending, as)
+			}
+			if grandTotal > 0 {
+				for i := range accountSpending {
+					accountSpending[i].Percent = (accountSpending[i].Total / grandTotal) * 100
 				}
-				topMerchants = append(topMerchants, m)
-				if m.Total > maxMerchantSpend {
-					maxMerchantSpend = m.Total
+			}
+		}()
+
+		// 11b. Spending by user
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rows, err := a.DB.Query(ctx, `
+				SELECT COALESCE(t.attributed_user_id, bc.user_id)::text AS uid,
+				       u.name AS user_name,
+				       SUM(t.amount) AS total
+				FROM transactions t
+				JOIN accounts a ON t.account_id = a.id
+				JOIN bank_connections bc ON a.connection_id = bc.id
+				JOIN users u ON COALESCE(t.attributed_user_id, bc.user_id) = u.id
+				WHERE t.deleted_at IS NULL AND t.date >= $1 AND t.amount > 0 AND t.pending = false
+				GROUP BY uid, u.name
+				ORDER BY SUM(t.amount) DESC
+			`, chartStart)
+			if err != nil {
+				a.Logger.Error("user spending query", "error", err)
+				return
+			}
+			defer rows.Close()
+			var grandTotal float64
+			for rows.Next() {
+				var us UserSpend
+				if err := rows.Scan(&us.ID, &us.Name, &us.Total); err != nil {
+					a.Logger.Error("user spending scan", "error", err)
+					continue
+				}
+				grandTotal += us.Total
+				userSpending = append(userSpending, us)
+			}
+			if grandTotal > 0 {
+				for i := range userSpending {
+					userSpending[i].Percent = (userSpending[i].Total / grandTotal) * 100
 				}
 			}
 		}()
@@ -549,106 +606,28 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			}
 		}()
 
-		// 13. Recurring charges (excludes payment processors)
+		// 13. Monthly income vs spending (trends tab)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			recurExcl, recurExclParams := buildPaymentProcessorExclusion("COALESCE(NULLIF(merchant_name, ''), name)", 2)
-			recurQueryParams := append([]any{recurringLookback}, recurExclParams...)
-			rows, err := a.DB.Query(ctx, `
-				WITH merchant_stats AS (
-					SELECT
-						COALESCE(NULLIF(merchant_name, ''), name) AS merchant,
-						MODE() WITHIN GROUP (ORDER BY amount) AS typical_amount,
-						MODE() WITHIN GROUP (ORDER BY COALESCE(category_primary, '')) AS top_category,
-						COUNT(*) AS tx_count,
-						SUM(amount) AS total_spent,
-						MAX(date) AS last_date,
-						MIN(date) AS first_date,
-						CASE WHEN AVG(amount) > 0 THEN COALESCE(STDDEV(amount), 0) / AVG(amount) ELSE 1 END AS cv
-					FROM transactions
-					WHERE deleted_at IS NULL
-						AND date >= $1
-						AND amount > 0
-						AND pending = false
-						`+recurExcl+`
-					GROUP BY COALESCE(NULLIF(merchant_name, ''), name)
-					HAVING COUNT(*) >= 2
-				)
-				SELECT
-					merchant,
-					typical_amount,
-					top_category,
-					tx_count,
-					total_spent,
-					TO_CHAR(last_date, 'Mon DD') AS last_charge,
-					(last_date - first_date)::float / NULLIF(tx_count - 1, 0) AS avg_days_between,
-					cv
-				FROM merchant_stats
-				WHERE cv < 0.3
-					AND typical_amount >= 3
-				ORDER BY total_spent DESC
-				LIMIT 12
-			`, recurQueryParams...)
+			result, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
+				GroupBy:   "month",
+				StartDate: &trendStart,
+			})
 			if err != nil {
-				a.Logger.Error("recurring charges query", "error", err)
+				a.Logger.Error("monthly income vs spending", "error", err)
 				return
 			}
-			defer rows.Close()
-			for rows.Next() {
-				var rc RecurringCharge
-				var cat *string
-				var avgDaysBetween *float64
-				var cv float64
-				if err := rows.Scan(&rc.Name, &rc.Amount, &cat, &rc.TxCount, &rc.TotalSpent, &rc.LastChargeDate, &avgDaysBetween, &cv); err != nil {
-					a.Logger.Error("recurring charges scan", "error", err)
-					continue
-				}
-				if cat != nil && *cat != "" {
-					rc.Category = *cat
-				}
-				if avgDaysBetween != nil && *avgDaysBetween > 0 {
-					days := *avgDaysBetween
-					switch {
-					case days >= 25 && days <= 35:
-						rc.Frequency = "monthly"
-						rc.MonthlyEst = rc.Amount
-					case days >= 12 && days <= 18:
-						rc.Frequency = "biweekly"
-						rc.MonthlyEst = rc.Amount * 2
-					case days >= 5 && days <= 9:
-						rc.Frequency = "weekly"
-						rc.MonthlyEst = rc.Amount * 4.33
-					case days >= 55 && days <= 65:
-						rc.Frequency = "bimonthly"
-						rc.MonthlyEst = rc.Amount / 2
-					case days >= 80 && days <= 100:
-						rc.Frequency = "quarterly"
-						rc.MonthlyEst = rc.Amount / 3
-					case days >= 350 && days <= 380:
-						rc.Frequency = "yearly"
-						rc.MonthlyEst = rc.Amount / 12
-					default:
-						rc.Frequency = "recurring"
-						rc.MonthlyEst = rc.TotalSpent / 3
-					}
-				} else {
-					rc.Frequency = "recurring"
-					rc.MonthlyEst = rc.TotalSpent / 3
-				}
-				totalRecurringMonthly += rc.MonthlyEst
-				recurringCharges = append(recurringCharges, rc)
-			}
-			hasRecurringData = len(recurringCharges) > 0
+			trendSummary = result
 		}()
 
-		// 14. Monthly comparison
+		// 14. Monthly comparison (uses trendStart to match trends tab)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			result, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
 				GroupBy:      "category_month",
-				StartDate:    &compStart,
+				StartDate:    &trendStart,
 				EndDate:      &compEnd,
 				SpendingOnly: true,
 			})
@@ -904,13 +883,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 
 		monthProgress := float64(daysElapsed) / float64(daysInMonth) * 100
 
-		// ── Merchant bar percentages ──
-		if len(topMerchants) > 0 && maxMerchantSpend > 0 {
-			for i := range topMerchants {
-				topMerchants[i].Percent = (topMerchants[i].Total / maxMerchantSpend) * 100
-			}
-		}
-
 		// ── Day-of-week intensities ──
 		hasDOWData := maxDaySpend > 0
 		if hasDOWData {
@@ -975,8 +947,8 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 				sortedMonths = append(sortedMonths, m)
 			}
 			sort.Strings(sortedMonths)
-			if len(sortedMonths) > 4 {
-				sortedMonths = sortedMonths[len(sortedMonths)-4:]
+			if len(sortedMonths) > trendMonths {
+				sortedMonths = sortedMonths[len(sortedMonths)-trendMonths:]
 			}
 
 			for _, m := range sortedMonths {
@@ -1045,6 +1017,57 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			}
 		}
 
+		// ── Process monthly income vs spending (trends tab) ──
+		var monthlyIncomeSpend []MonthlyIncomeSpend
+		if trendSummary != nil && len(trendSummary.Summary) > 0 {
+			// Build a map of period -> {spending, income}
+			type monthData struct {
+				spending float64
+				income   float64
+			}
+			monthMap := make(map[string]*monthData)
+			for _, row := range trendSummary.Summary {
+				if row.Period == nil {
+					continue
+				}
+				period := *row.Period
+				if monthMap[period] == nil {
+					monthMap[period] = &monthData{}
+				}
+				if row.TotalAmount > 0 {
+					monthMap[period].spending += row.TotalAmount
+				} else {
+					monthMap[period].income += -row.TotalAmount
+				}
+			}
+			// Sort periods chronologically
+			periods := make([]string, 0, len(monthMap))
+			for p := range monthMap {
+				periods = append(periods, p)
+			}
+			sort.Strings(periods)
+			for _, p := range periods {
+				md := monthMap[p]
+				t, parseErr := time.Parse("2006-01", p)
+				label := p
+				if parseErr == nil {
+					label = t.Format("Jan")
+				}
+				net := md.income - md.spending
+				var sr float64
+				if md.income > 0 {
+					sr = (net / md.income) * 100
+				}
+				monthlyIncomeSpend = append(monthlyIncomeSpend, MonthlyIncomeSpend{
+					Month:       label,
+					Spending:    md.spending,
+					Income:      md.income,
+					Net:         net,
+					SavingsRate: sr,
+				})
+			}
+		}
+
 		// ── CSV Export data (JSON blob for client-side CSV generation) ──
 		type csvExportData struct {
 			PeriodLabel string `json:"periodLabel"`
@@ -1059,28 +1082,20 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 				Amount  float64 `json:"amount"`
 				Percent float64 `json:"percent"`
 			} `json:"categories"`
-			// Merchants
-			Merchants []struct {
-				Name     string  `json:"name"`
-				Category string  `json:"category"`
-				Total    float64 `json:"total"`
-				Count    int     `json:"count"`
-				Average  float64 `json:"average"`
-			} `json:"merchants"`
+			// Accounts
+			Accounts []struct {
+				Name            string  `json:"name"`
+				InstitutionName string  `json:"institutionName"`
+				Type            string  `json:"type"`
+				Total           float64 `json:"total"`
+				Percent         float64 `json:"percent"`
+			} `json:"accounts"`
 			// Day of week
 			DayOfWeek []struct {
 				Day   string  `json:"day"`
 				Total float64 `json:"total"`
 				Count int     `json:"count"`
 			} `json:"dayOfWeek"`
-			// Recurring
-			Recurring []struct {
-				Name      string  `json:"name"`
-				Amount    float64 `json:"amount"`
-				Frequency string  `json:"frequency"`
-				Category  string  `json:"category"`
-				Monthly   float64 `json:"monthlyEstimate"`
-			} `json:"recurring"`
 			// Monthly comparison
 			MonthHeaders []string `json:"monthHeaders"`
 			MonthlyComp  []struct {
@@ -1112,14 +1127,14 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 				Percent float64 `json:"percent"`
 			}{tc.Name, tc.Amount, tc.Percent})
 		}
-		for _, m := range topMerchants {
-			exportData.Merchants = append(exportData.Merchants, struct {
-				Name     string  `json:"name"`
-				Category string  `json:"category"`
-				Total    float64 `json:"total"`
-				Count    int     `json:"count"`
-				Average  float64 `json:"average"`
-			}{m.Name, m.Category, m.Total, m.Count, m.AvgAmount})
+		for _, as := range accountSpending {
+			exportData.Accounts = append(exportData.Accounts, struct {
+				Name            string  `json:"name"`
+				InstitutionName string  `json:"institutionName"`
+				Type            string  `json:"type"`
+				Total           float64 `json:"total"`
+				Percent         float64 `json:"percent"`
+			}{as.Name, as.InstitutionName, as.Type, as.Total, as.Percent})
 		}
 		for _, d := range dowSpending {
 			exportData.DayOfWeek = append(exportData.DayOfWeek, struct {
@@ -1127,15 +1142,6 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 				Total float64 `json:"total"`
 				Count int     `json:"count"`
 			}{d.DayFull, d.Total, d.Count})
-		}
-		for _, rc := range recurringCharges {
-			exportData.Recurring = append(exportData.Recurring, struct {
-				Name      string  `json:"name"`
-				Amount    float64 `json:"amount"`
-				Frequency string  `json:"frequency"`
-				Category  string  `json:"category"`
-				Monthly   float64 `json:"monthlyEstimate"`
-			}{rc.Name, rc.Amount, rc.Frequency, rc.Category, rc.MonthlyEst})
 		}
 		for _, row := range monthlyCompRows {
 			exportData.MonthlyComp = append(exportData.MonthlyComp, struct {
@@ -1214,8 +1220,18 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			"MonthProgress":         monthProgress,
 			"CurrentMonthName":      today.Format("January"),
 			"LastMonthName":         lastMonthStart.Format("January"),
-			// Merchant analysis.
-			"TopMerchants":          topMerchants,
+			// Account balances (overview tab).
+			"AllAccounts":           allAccounts,
+			"HasAccounts":           len(allAccounts) > 0,
+			// Pace comparison chart (overview tab).
+			"PaceCompJSON":          paceCompJSON,
+			// Account spending breakdown.
+			"AccountSpending":       accountSpending,
+			"HasAccountSpending":    len(accountSpending) > 0,
+			// User spending breakdown.
+			"UserSpending":          userSpending,
+			"HasUserSpending":       len(userSpending) > 1,
+			"UserCount":             len(userSpending),
 			// Day-of-week spending.
 			"DOWSpending":           dowSpending,
 			"HasDOWData":            hasDOWData,
@@ -1223,16 +1239,19 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 			"LowSpendDay":           lowSpendDay,
 			"HighSpendDayAmt":       highSpendDayAmt,
 			"LowSpendDayAmt":        lowSpendDayAmt,
-			// Recurring charges.
-			"RecurringCharges":      recurringCharges,
-			"HasRecurringData":      hasRecurringData,
-			"TotalRecurringMonthly": totalRecurringMonthly,
 			// Monthly category comparison.
 			"HasMonthlyComp":        hasMonthlyComp,
 			"MonthHeaders":          monthHeaders,
 			"MonthlyCompRows":       monthlyCompRows,
 			"MonthlyTotals":         monthlyTotals,
 			"MaxMonthlyTotal":       maxMonthlyTotal,
+			// Trends: monthly income vs spending.
+			"MonthlyIncomeSpend":    monthlyIncomeSpend,
+			"HasMonthlyIncomeSpend": len(monthlyIncomeSpend) > 0,
+			// Tab-aware filters.
+			"TrendMonths":           trendMonths,
+			// Category slugs for exclude toggle (client-side filtering).
+			"NoiseCategorySlugs":    []string{"transfer", "payment"},
 			// CSV Export.
 			"ExportJSON":            exportJSON,
 			// Sparkline data for summary pills.
