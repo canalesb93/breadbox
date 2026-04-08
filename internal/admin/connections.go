@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"time"
-
 	"math"
+	"net/http"
+	"sort"
+	"time"
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
@@ -216,6 +216,24 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 			})
 		}
 
+		// Fetch users for the family member filter subtabs, sorted by account count (descending).
+		users, _ := a.Queries.ListUsers(ctx)
+		// Count accounts per user from the enriched connections.
+		userAccountCount := make(map[[16]byte]int)
+		for _, conn := range enriched {
+			if conn.UserID.Valid {
+				userAccountCount[conn.UserID.Bytes] += len(conn.Accounts)
+			}
+		}
+		sort.Slice(users, func(i, j int) bool {
+			ci := userAccountCount[users[i].ID.Bytes]
+			cj := userAccountCount[users[j].ID.Bytes]
+			if ci != cj {
+				return ci > cj
+			}
+			return users[i].Name < users[j].Name
+		})
+
 		data := map[string]any{
 			"PageTitle":        "Connections",
 			"CurrentPage":      "connections",
@@ -229,6 +247,7 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 			"Tab":              tab,
 			"Links":            links,
 			"LinkAccounts":     linkAccounts,
+			"Users":            users,
 		}
 		tr.Render(w, r, "connections.html", data)
 	}

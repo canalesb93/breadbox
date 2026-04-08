@@ -1,5 +1,5 @@
 {{define "content"}}
-<div x-data="{ tab: '{{.Tab}}' }"
+<div x-data="{ tab: '{{.Tab}}', filterUser: 'all' }"
      x-init="$watch('tab', function(v) { var u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); })">
 
 <!-- Page Header -->
@@ -52,6 +52,28 @@
   </button>
 </div>
 
+<!-- Family Member Filter -->
+{{if gt (len .Users) 1}}
+<div class="flex items-center gap-1 border-b border-base-200/80 mb-6 overflow-x-auto" x-show="tab === 'connections'">
+  <button @click="filterUser = 'all'"
+    :class="filterUser === 'all' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
+    class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap">
+    <span class="w-5 h-5 rounded-full bg-base-300/60 flex items-center justify-center text-[0.6rem] font-semibold text-base-content/50 shrink-0">
+      <i data-lucide="users" class="w-3 h-3"></i>
+    </span>
+    All
+  </button>
+  {{range .Users}}
+  <button @click="filterUser = '{{formatUUID .ID}}'"
+    :class="filterUser === '{{formatUUID .ID}}' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
+    class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap">
+    <span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[0.6rem] font-semibold text-primary shrink-0 uppercase">{{slice .Name 0 1}}</span>
+    {{.Name}}
+  </button>
+  {{end}}
+</div>
+{{end}}
+
 <!-- ==================== CONNECTIONS TAB ==================== -->
 <div x-show="tab === 'connections'">
 
@@ -59,7 +81,7 @@
 
 <!-- Financial Summary Bar -->
 {{if .HasAnyBalance}}
-<div class="bb-card p-0 overflow-hidden mb-6">
+<div class="bb-card p-0 overflow-hidden mb-6" x-show="filterUser === 'all'">
   <div class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-base-300">
     <div class="px-5 py-4">
       <div class="text-xs font-medium text-base-content/50 mb-1">Net Worth</div>
@@ -80,7 +102,7 @@
 <!-- Connection Cards -->
 <div class="flex flex-col gap-4 bb-stagger">
   {{range .Connections}}
-  <div class="bb-card overflow-hidden">
+  <div class="bb-card overflow-hidden" x-show="filterUser === 'all' || filterUser === '{{formatUUID .UserID}}'">
     <!-- Connection Header — clickable -->
     <a href="/connections/{{formatUUID .ID}}" class="block no-underline group">
       <div class="px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between gap-3 sm:gap-4">
