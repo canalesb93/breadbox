@@ -178,71 +178,81 @@ func ParseReviewFields(raw string) (map[string]bool, error) {
 // FilterReviewFields returns a map with only the requested review fields.
 // Transaction.* fields are delegated to FilterTransactionFields.
 // If fields is nil, returns nil to signal the caller should use the full struct.
+//
+// Review-level keys are dispatched via a switch over the requested field set
+// (O(requested) rather than O(16) unconditional map lookups). If any
+// transaction.* keys were requested, a second narrow-scoped pass builds the
+// nested txnFields map and delegates. Keeping the txnFields allocation inside
+// that inner block lets the compiler prove it does not escape, so it stays
+// stack-allocated (matches the pre-optimization allocation profile).
 func FilterReviewFields(r ReviewResponse, fields map[string]bool) map[string]any {
 	if fields == nil {
 		return nil
 	}
 	m := make(map[string]any, len(fields))
-	if fields["id"] {
-		m["id"] = r.ID
-	}
-	if fields["short_id"] {
-		m["short_id"] = r.ShortID
-	}
-	if fields["transaction_id"] {
-		m["transaction_id"] = r.TransactionID
-	}
-	if fields["review_type"] {
-		m["review_type"] = r.ReviewType
-	}
-	if fields["status"] {
-		m["status"] = r.Status
-	}
-	if fields["provider"] {
-		m["provider"] = r.Provider
-	}
-	if fields["suggested_category_slug"] {
-		m["suggested_category_slug"] = r.SuggestedCategory
-	}
-	if fields["suggested_category_display_name"] {
-		m["suggested_category_display_name"] = r.SuggestedCategoryDisplayName
-	}
-	if fields["confidence_score"] {
-		m["confidence_score"] = r.ConfidenceScore
-	}
-	if fields["reviewer_type"] {
-		m["reviewer_type"] = r.ReviewerType
-	}
-	if fields["reviewer_id"] {
-		m["reviewer_id"] = r.ReviewerID
-	}
-	if fields["reviewer_name"] {
-		m["reviewer_name"] = r.ReviewerName
-	}
-	if fields["review_note"] {
-		m["review_note"] = r.ReviewNote
-	}
-	if fields["resolved_category_slug"] {
-		m["resolved_category_slug"] = r.ResolvedCategory
-	}
-	if fields["created_at"] {
-		m["created_at"] = r.CreatedAt
-	}
-	if fields["reviewed_at"] {
-		m["reviewed_at"] = r.ReviewedAt
+	hasTxnField := false
+	for key, want := range fields {
+		// Detect transaction.* keys eagerly (before the want check) to match
+		// the original implementation's delegation semantics: in the
+		// pre-optimization code, the second loop scanning for "transaction."
+		// prefixes did not consult the bool value, so a present-but-false
+		// transaction.* key still triggered the nested filter call. Practical
+		// callers always set values to true (ParseReviewFields enforces this),
+		// but we preserve the prior behavior exactly.
+		if strings.HasPrefix(key, "transaction.") {
+			hasTxnField = true
+			continue
+		}
+		if !want {
+			continue
+		}
+		switch key {
+		case "id":
+			m["id"] = r.ID
+		case "short_id":
+			m["short_id"] = r.ShortID
+		case "transaction_id":
+			m["transaction_id"] = r.TransactionID
+		case "review_type":
+			m["review_type"] = r.ReviewType
+		case "status":
+			m["status"] = r.Status
+		case "provider":
+			m["provider"] = r.Provider
+		case "suggested_category_slug":
+			m["suggested_category_slug"] = r.SuggestedCategory
+		case "suggested_category_display_name":
+			m["suggested_category_display_name"] = r.SuggestedCategoryDisplayName
+		case "confidence_score":
+			m["confidence_score"] = r.ConfidenceScore
+		case "reviewer_type":
+			m["reviewer_type"] = r.ReviewerType
+		case "reviewer_id":
+			m["reviewer_id"] = r.ReviewerID
+		case "reviewer_name":
+			m["reviewer_name"] = r.ReviewerName
+		case "review_note":
+			m["review_note"] = r.ReviewNote
+		case "resolved_category_slug":
+			m["resolved_category_slug"] = r.ResolvedCategory
+		case "created_at":
+			m["created_at"] = r.CreatedAt
+		case "reviewed_at":
+			m["reviewed_at"] = r.ReviewedAt
+		}
 	}
 
-	// Delegate transaction.* fields
-	if r.Transaction != nil {
+	// Delegate transaction.* fields. Building txnFields in this narrow scope
+	// keeps it stack-allocated (the compiler can see it never outlives the
+	// nested call).
+	if hasTxnField && r.Transaction != nil {
 		txnFields := make(map[string]bool)
 		for f := range fields {
 			if strings.HasPrefix(f, "transaction.") {
 				txnFields[strings.TrimPrefix(f, "transaction.")] = true
 			}
 		}
-		if len(txnFields) > 0 {
-			m["transaction"] = FilterTransactionFields(*r.Transaction, txnFields)
-		}
+		m["transaction"] = FilterTransactionFields(*r.Transaction, txnFields)
 	}
 
 	return m
@@ -261,81 +271,74 @@ func NormalizeTransactionAttribution(t *TransactionResponse) {
 
 // FilterTransactionFields returns a map with only the requested fields.
 // If fields is nil, returns nil to signal the caller should use the full struct.
+//
+// This iterates the requested field set once (O(requested)) rather than
+// performing a fixed O(22) map lookup per call. For small field sets
+// (e.g. "core" = 5 fields) this is several times faster per transaction,
+// and the total work is proportional to what the caller asked for.
 func FilterTransactionFields(t TransactionResponse, fields map[string]bool) map[string]any {
 	if fields == nil {
 		return nil
 	}
 	m := make(map[string]any, len(fields))
-	if fields["id"] {
-		m["id"] = t.ID
-	}
-	if fields["short_id"] {
-		m["short_id"] = t.ShortID
-	}
-	if fields["account_id"] {
-		m["account_id"] = t.AccountID
-	}
-	if fields["account_name"] {
-		m["account_name"] = t.AccountName
-	}
-	if fields["user_name"] {
-		// Use attributed user when set (account linking), otherwise connection owner.
-		if t.AttributedUserName != nil {
-			m["user_name"] = t.AttributedUserName
-		} else {
-			m["user_name"] = t.UserName
+	for key, want := range fields {
+		if !want {
+			continue
 		}
-	}
-	if fields["amount"] {
-		m["amount"] = t.Amount
-	}
-	if fields["iso_currency_code"] {
-		m["iso_currency_code"] = t.IsoCurrencyCode
-	}
-	if fields["date"] {
-		m["date"] = t.Date
-	}
-	if fields["authorized_date"] {
-		m["authorized_date"] = t.AuthorizedDate
-	}
-	if fields["datetime"] {
-		m["datetime"] = t.Datetime
-	}
-	if fields["authorized_datetime"] {
-		m["authorized_datetime"] = t.AuthorizedDatetime
-	}
-	if fields["name"] {
-		m["name"] = t.Name
-	}
-	if fields["merchant_name"] {
-		m["merchant_name"] = t.MerchantName
-	}
-	if fields["category"] {
-		m["category"] = t.Category
-	}
-	if fields["category_override"] {
-		m["category_override"] = t.CategoryOverride
-	}
-	if fields["category_primary_raw"] {
-		m["category_primary_raw"] = t.CategoryPrimaryRaw
-	}
-	if fields["category_detailed_raw"] {
-		m["category_detailed_raw"] = t.CategoryDetailedRaw
-	}
-	if fields["category_confidence"] {
-		m["category_confidence"] = t.CategoryConfidence
-	}
-	if fields["payment_channel"] {
-		m["payment_channel"] = t.PaymentChannel
-	}
-	if fields["pending"] {
-		m["pending"] = t.Pending
-	}
-	if fields["created_at"] {
-		m["created_at"] = t.CreatedAt
-	}
-	if fields["updated_at"] {
-		m["updated_at"] = t.UpdatedAt
+		switch key {
+		case "id":
+			m["id"] = t.ID
+		case "short_id":
+			m["short_id"] = t.ShortID
+		case "account_id":
+			m["account_id"] = t.AccountID
+		case "account_name":
+			m["account_name"] = t.AccountName
+		case "user_name":
+			// Use attributed user when set (account linking), otherwise connection owner.
+			if t.AttributedUserName != nil {
+				m["user_name"] = t.AttributedUserName
+			} else {
+				m["user_name"] = t.UserName
+			}
+		case "amount":
+			m["amount"] = t.Amount
+		case "iso_currency_code":
+			m["iso_currency_code"] = t.IsoCurrencyCode
+		case "date":
+			m["date"] = t.Date
+		case "authorized_date":
+			m["authorized_date"] = t.AuthorizedDate
+		case "datetime":
+			m["datetime"] = t.Datetime
+		case "authorized_datetime":
+			m["authorized_datetime"] = t.AuthorizedDatetime
+		case "name":
+			m["name"] = t.Name
+		case "merchant_name":
+			m["merchant_name"] = t.MerchantName
+		case "category":
+			m["category"] = t.Category
+		case "category_override":
+			m["category_override"] = t.CategoryOverride
+		case "category_primary_raw":
+			m["category_primary_raw"] = t.CategoryPrimaryRaw
+		case "category_detailed_raw":
+			m["category_detailed_raw"] = t.CategoryDetailedRaw
+		case "category_confidence":
+			m["category_confidence"] = t.CategoryConfidence
+		case "payment_channel":
+			m["payment_channel"] = t.PaymentChannel
+		case "pending":
+			m["pending"] = t.Pending
+		case "created_at":
+			m["created_at"] = t.CreatedAt
+		case "updated_at":
+			m["updated_at"] = t.UpdatedAt
+		}
+		// Keys outside the switch are silently ignored. ParseFields already
+		// rejects unknown names; review delegation strips "transaction." before
+		// calling this function, so callers always pass valid field names.
 	}
 	return m
 }
