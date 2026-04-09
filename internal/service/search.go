@@ -1,7 +1,7 @@
 package service
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -56,35 +56,56 @@ func BuildSearchClause(search string, mode string, columns []string, nullableCol
 		return SearchClauseResult{ArgN: argN}
 	}
 
-	var termClauses []string
-	var args []any
+	// Pre-allocate a single builder for the whole clause and an args slice
+	// sized for the common case. In "words" mode one term may emit multiple
+	// args (one per word) — the slice will grow if needed but the upfront
+	// capacity covers the usual non-words path exactly.
+	var sb strings.Builder
+	sb.Grow(estimateClauseSize(mode, len(columns), len(terms), columns))
+	args := make([]any, 0, len(terms))
 
+	// We build the clause in a scratch segment so that if no term produces
+	// output we can return early without needing to trim the builder.
+	// Structure: " AND ( <term1> OR <term2> ... )"
+	// The outer " AND (" and trailing ")" are only written if ≥1 term wrote
+	// content.
+	wrote := false
 	for _, term := range terms {
 		term = strings.TrimSpace(term)
 		if term == "" {
 			continue
 		}
 
-		var clause string
+		// In words mode we need to know up-front if the term produces any
+		// words — otherwise it emits no SQL and we must not write the
+		// separator before it.
+		if mode == SearchModeWords && len(strings.Fields(term)) == 0 {
+			continue
+		}
+
+		if !wrote {
+			sb.WriteString(" AND (")
+			wrote = true
+		} else {
+			sb.WriteString(" OR ")
+		}
+
 		switch mode {
 		case SearchModeFuzzy:
-			clause, args, argN = buildFuzzyClause(term, columns, nullableColumns, args, argN)
+			args, argN = writeFuzzyClause(&sb, term, columns, nullableColumns, args, argN)
 		case SearchModeWords:
-			clause, args, argN = buildWordsClause(term, columns, nullableColumns, args, argN)
+			args, argN = writeWordsClause(&sb, term, columns, nullableColumns, args, argN)
 		default: // contains
-			clause, args, argN = buildContainsClause(term, columns, nullableColumns, args, argN)
-		}
-		if clause != "" {
-			termClauses = append(termClauses, clause)
+			args, argN = writeContainsClause(&sb, term, columns, args, argN)
 		}
 	}
 
-	if len(termClauses) == 0 {
+	if !wrote {
 		return SearchClauseResult{ArgN: argN}
 	}
 
-	sql := " AND (" + strings.Join(termClauses, " OR ") + ")"
-	return SearchClauseResult{SQL: sql, Args: args, ArgN: argN}
+	sb.WriteByte(')')
+	return SearchClauseResult{SQL: sb.String(), Args: args, ArgN: argN}
 }
 
 // BuildExcludeSearchClause generates a SQL WHERE clause that excludes matching rows.
@@ -100,107 +121,225 @@ func BuildExcludeSearchClause(search string, columns []string, nullableColumns m
 		return SearchClauseResult{ArgN: argN}
 	}
 
-	var termClauses []string
-	var args []any
+	var sb strings.Builder
+	sb.Grow(estimateExcludeSize(len(columns), len(terms), columns, nullableColumns))
+	args := make([]any, 0, len(terms))
 
+	wrote := false
 	for _, term := range terms {
 		term = strings.TrimSpace(term)
 		if term == "" {
 			continue
 		}
 
-		// For exclude, each column must NOT match (AND logic per column).
-		var colClauses []string
-		for _, col := range columns {
+		// Each term contributes a " AND (col1clause AND col2clause ...)"
+		// fragment.
+		sb.WriteString(" AND (")
+
+		argNStr := strconv.Itoa(argN)
+		for i, col := range columns {
+			if i > 0 {
+				sb.WriteString(" AND ")
+			}
 			if nullableColumns[col] {
-				colClauses = append(colClauses, fmt.Sprintf("(%s IS NULL OR %s NOT ILIKE '%%' || $%d || '%%')", col, col, argN))
+				// (col IS NULL OR col NOT ILIKE '%' || $N || '%')
+				sb.WriteByte('(')
+				sb.WriteString(col)
+				sb.WriteString(" IS NULL OR ")
+				sb.WriteString(col)
+				sb.WriteString(" NOT ILIKE '%' || $")
+				sb.WriteString(argNStr)
+				sb.WriteString(" || '%')")
 			} else {
-				colClauses = append(colClauses, fmt.Sprintf("%s NOT ILIKE '%%' || $%d || '%%'", col, argN))
+				// col NOT ILIKE '%' || $N || '%'
+				sb.WriteString(col)
+				sb.WriteString(" NOT ILIKE '%' || $")
+				sb.WriteString(argNStr)
+				sb.WriteString(" || '%'")
 			}
 		}
+
+		sb.WriteByte(')')
+
 		args = append(args, term)
 		argN++
-		termClauses = append(termClauses, "("+strings.Join(colClauses, " AND ")+")")
+		wrote = true
 	}
 
-	if len(termClauses) == 0 {
+	if !wrote {
 		return SearchClauseResult{ArgN: argN}
 	}
 
-	// Any term match should exclude: NOT (match1 OR match2)
-	// Equivalent to: AND NOT match1 AND NOT match2
-	var parts []string
-	for _, tc := range termClauses {
-		parts = append(parts, " AND "+tc)
-	}
-	return SearchClauseResult{SQL: strings.Join(parts, ""), Args: args, ArgN: argN}
+	return SearchClauseResult{SQL: sb.String(), Args: args, ArgN: argN}
 }
 
 // splitTerms splits a search string on commas for multi-value OR.
 // Single terms (no commas) return a slice with one element.
 func splitTerms(search string) []string {
-	parts := strings.Split(search, ",")
-	var result []string
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			result = append(result, p)
+	// Fast path: no comma — single-term slice (or empty).
+	if !strings.Contains(search, ",") {
+		trimmed := strings.TrimSpace(search)
+		if trimmed == "" {
+			return nil
 		}
+		return []string{trimmed}
+	}
+
+	// Pre-size to the exact comma count + 1 to avoid regrowing.
+	n := strings.Count(search, ",") + 1
+	result := make([]string, 0, n)
+	start := 0
+	for i := 0; i < len(search); i++ {
+		if search[i] == ',' {
+			p := strings.TrimSpace(search[start:i])
+			if p != "" {
+				result = append(result, p)
+			}
+			start = i + 1
+		}
+	}
+	p := strings.TrimSpace(search[start:])
+	if p != "" {
+		result = append(result, p)
 	}
 	return result
 }
 
-// buildContainsClause builds an ILIKE substring match for a single term across columns.
-func buildContainsClause(term string, columns []string, nullableColumns map[string]bool, args []any, argN int) (string, []any, int) {
-	var colClauses []string
-	for _, col := range columns {
-		colClauses = append(colClauses, fmt.Sprintf("%s ILIKE '%%' || $%d || '%%'", col, argN))
+// writeContainsClause appends an ILIKE substring clause for a single term
+// across columns directly to sb. Returns the updated args slice and argN.
+func writeContainsClause(sb *strings.Builder, term string, columns []string, args []any, argN int) ([]any, int) {
+	argNStr := strconv.Itoa(argN)
+	sb.WriteByte('(')
+	for i, col := range columns {
+		if i > 0 {
+			sb.WriteString(" OR ")
+		}
+		sb.WriteString(col)
+		sb.WriteString(" ILIKE '%' || $")
+		sb.WriteString(argNStr)
+		sb.WriteString(" || '%'")
 	}
+	sb.WriteByte(')')
 	args = append(args, term)
 	argN++
-	return "(" + strings.Join(colClauses, " OR ") + ")", args, argN
+	return args, argN
 }
 
-// buildWordsClause splits the term on spaces and requires all words to match.
-// Each word must appear in at least one of the searched columns.
-func buildWordsClause(term string, columns []string, nullableColumns map[string]bool, args []any, argN int) (string, []any, int) {
+// writeWordsClause splits the term on spaces and requires all words to match.
+// Each word must appear in at least one of the searched columns. Caller must
+// ensure the term produces at least one word.
+func writeWordsClause(sb *strings.Builder, term string, columns []string, _ map[string]bool, args []any, argN int) ([]any, int) {
 	words := strings.Fields(term)
 	if len(words) == 0 {
-		return "", args, argN
+		// Defensive: caller should have filtered this out.
+		return args, argN
 	}
-	// Single word: same as contains
+	// Single word: identical to contains.
 	if len(words) == 1 {
-		return buildContainsClause(words[0], columns, nullableColumns, args, argN)
+		return writeContainsClause(sb, words[0], columns, args, argN)
 	}
 
-	// Each word must match at least one column
-	var wordClauses []string
-	for _, word := range words {
-		var colClauses []string
-		for _, col := range columns {
-			colClauses = append(colClauses, fmt.Sprintf("%s ILIKE '%%' || $%d || '%%'", col, argN))
+	// Multi-word: ((col OR col) AND (col OR col) ...)
+	sb.WriteByte('(')
+	for wi, word := range words {
+		if wi > 0 {
+			sb.WriteString(" AND ")
 		}
+		argNStr := strconv.Itoa(argN)
+		sb.WriteByte('(')
+		for ci, col := range columns {
+			if ci > 0 {
+				sb.WriteString(" OR ")
+			}
+			sb.WriteString(col)
+			sb.WriteString(" ILIKE '%' || $")
+			sb.WriteString(argNStr)
+			sb.WriteString(" || '%'")
+		}
+		sb.WriteByte(')')
 		args = append(args, word)
 		argN++
-		wordClauses = append(wordClauses, "("+strings.Join(colClauses, " OR ")+")")
 	}
-	return "(" + strings.Join(wordClauses, " AND ") + ")", args, argN
+	sb.WriteByte(')')
+	return args, argN
 }
 
-// buildFuzzyClause uses pg_trgm similarity() for typo-tolerant matching.
+// writeFuzzyClause uses pg_trgm similarity() for typo-tolerant matching.
 // Threshold is 0.15 (lower than default 0.3) to catch more partial matches.
-func buildFuzzyClause(term string, columns []string, nullableColumns map[string]bool, args []any, argN int) (string, []any, int) {
-	var colClauses []string
-	for _, col := range columns {
+func writeFuzzyClause(sb *strings.Builder, term string, columns []string, nullableColumns map[string]bool, args []any, argN int) ([]any, int) {
+	argNStr := strconv.Itoa(argN)
+	sb.WriteByte('(')
+	for i, col := range columns {
+		if i > 0 {
+			sb.WriteString(" OR ")
+		}
 		if nullableColumns[col] {
-			colClauses = append(colClauses, fmt.Sprintf("(%s IS NOT NULL AND similarity(%s, $%d) > 0.15)", col, col, argN))
+			// (col IS NOT NULL AND similarity(col, $N) > 0.15)
+			sb.WriteByte('(')
+			sb.WriteString(col)
+			sb.WriteString(" IS NOT NULL AND similarity(")
+			sb.WriteString(col)
+			sb.WriteString(", $")
+			sb.WriteString(argNStr)
+			sb.WriteString(") > 0.15)")
 		} else {
-			colClauses = append(colClauses, fmt.Sprintf("similarity(%s, $%d) > 0.15", col, argN))
+			// similarity(col, $N) > 0.15
+			sb.WriteString("similarity(")
+			sb.WriteString(col)
+			sb.WriteString(", $")
+			sb.WriteString(argNStr)
+			sb.WriteString(") > 0.15")
 		}
 	}
+	sb.WriteByte(')')
 	args = append(args, term)
 	argN++
-	return "(" + strings.Join(colClauses, " OR ") + ")", args, argN
+	return args, argN
+}
+
+// estimateClauseSize approximates the output buffer size for
+// BuildSearchClause so the Builder can Grow once rather than reallocating.
+// Overshoot is free; undershoot triggers a realloc.
+func estimateClauseSize(mode string, numCols, numTerms int, columns []string) int {
+	colLenSum := 0
+	for _, c := range columns {
+		colLenSum += len(c)
+	}
+	// Per-column fixed overhead (ILIKE '%' || $NN || '%' + separators).
+	perColumn := 24
+	if mode == SearchModeFuzzy {
+		// Fuzzy clauses are longer (similarity() and optional IS NOT NULL).
+		perColumn = 64
+	}
+	// Words mode may AND multiple word sub-clauses per term; allow 4x slack.
+	multiplier := 1
+	if mode == SearchModeWords {
+		multiplier = 4
+	}
+	// " AND (" + trailing ")" + per-term ( " OR " + "(... )" )
+	return 8 + numTerms*multiplier*(colLenSum+numCols*perColumn+8)
+}
+
+// estimateExcludeSize approximates the output buffer size for
+// BuildExcludeSearchClause.
+func estimateExcludeSize(numCols, numTerms int, columns []string, nullableColumns map[string]bool) int {
+	colLenSum := 0
+	nullableCount := 0
+	for _, c := range columns {
+		colLenSum += len(c)
+		if nullableColumns[c] {
+			nullableCount++
+		}
+	}
+	// Per-column: non-nullable ~32, nullable ~60 (IS NULL OR col NOT ILIKE...).
+	perColumnNonNull := 32
+	perColumnNullable := 64
+	perTerm := 7 + // " AND ("
+		colLenSum +
+		(numCols-nullableCount)*perColumnNonNull +
+		nullableCount*perColumnNullable +
+		1 // ")"
+	return 8 + numTerms*perTerm
 }
 
 // TransactionSearchColumns are the standard columns searched for transactions.
