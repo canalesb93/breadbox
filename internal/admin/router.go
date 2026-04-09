@@ -28,6 +28,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		tr.RenderNotFound(w, r)
 	})
 
+	// Avatar serving — unauthenticated (like static files).
+	r.Get("/avatars/preview/{seed}", AvatarPreviewHandler())
+	r.Get("/avatars/{id}", AvatarHandler(a))
+
 	// Unauthenticated routes.
 	r.Group(func(r chi.Router) {
 		r.Use(OAuthLoginReturnMiddleware(sm))
@@ -80,6 +84,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		// Member account self-service pages.
 		r.Get("/my-account", MyAccountHandler(a, sm, tr, svc))
 		r.Post("/my-account/password", MyAccountChangePasswordHandler(a, sm))
+		r.Post("/my-account/avatar", UploadMyAvatarHandler(a, sm))
+		r.Delete("/my-account/avatar", DeleteMyAvatarHandler(a, sm))
+		r.Post("/my-account/avatar/regenerate", RegenerateMyAvatarHandler(a, sm))
 		r.Post("/my-account/wipe-data", MyAccountWipeDataHandler(a, sm))
 
 		// Password change works for both admin and member sessions.
@@ -257,6 +264,9 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/test-provider/{provider}", ProvidersTestHandler(a))
 			r.Post("/users", CreateUserHandler(a, sm))
 			r.Put("/users/{id}", UpdateUserHandler(a, sm))
+			r.Post("/users/{id}/avatar", UploadUserAvatarHandler(a))
+			r.Delete("/users/{id}/avatar", DeleteUserAvatarHandler(a))
+			r.Post("/users/{id}/avatar/regenerate", RegenerateUserAvatarHandler(a))
 
 			r.Post("/csv/upload", CSVUploadHandler(a, sm))
 			r.Post("/csv/preview", CSVPreviewHandler(a, sm))

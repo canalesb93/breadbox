@@ -41,6 +41,7 @@ type TransactionResponse struct {
 	UserName            *string                  `json:"user_name"`
 	AttributedUserID    *string                  `json:"attributed_user_id,omitempty"`
 	AttributedUserName  *string                  `json:"attributed_user_name,omitempty"`
+	EffectiveUserID     *string                  `json:"effective_user_id,omitempty"`
 	Amount              float64                  `json:"amount"`
 	IsoCurrencyCode     *string                  `json:"iso_currency_code"`
 	Date                string                   `json:"date"`
@@ -280,6 +281,7 @@ type AdminTransactionRow struct {
 	AccountName         string
 	InstitutionName     string
 	UserName            string
+	EffectiveUserID     *string
 	Date                string
 	Name                string
 	MerchantName        *string

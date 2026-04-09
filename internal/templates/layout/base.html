@@ -1005,6 +1005,15 @@
         fill.classList.add('bb-progress-bar__fill--done');
         isActive = false;
 
+        // Always restore main content interactivity.
+        var main = document.querySelector('main');
+        if (main) {
+          main.style.opacity = '';
+          main.style.filter = '';
+          main.style.pointerEvents = '';
+          main.style.transition = '';
+        }
+
         setTimeout(function() {
           bar.classList.add('bb-progress-bar--fade');
           setTimeout(function() {

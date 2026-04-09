@@ -89,9 +89,11 @@
 <!-- User profile + Sign out -->
 <div class="mt-auto pt-3 border-t border-base-300 px-2">
   <div class="flex items-center gap-2.5 py-2">
-    <a href="/my-account" class="bb-sidebar-profile-avatar no-underline shrink-0" title="My Account">
-      {{if .AdminUsername}}{{slice .AdminUsername 0 1}}{{else}}A{{end}}
+    {{if .HasLinkedUser}}
+    <a href="/my-account" class="shrink-0" title="My Account">
+      <img src="{{avatarURL .SessionUserID .SessionAvatarVersion}}" alt="" class="bb-sidebar-profile-avatar">
     </a>
+    {{end}}
     <a href="/my-account" class="flex-1 min-w-0 no-underline" title="My Account">
       <div class="bb-sidebar-profile-name">{{if .AdminUsername}}{{.AdminUsername}}{{else}}Admin{{end}}</div>
       <div class="bb-sidebar-profile-role">{{.RoleDisplay}}</div>

@@ -19,3 +19,18 @@ SELECT id FROM users WHERE short_id = $1;
 
 -- name: CountUsers :one
 SELECT count(*) FROM users;
+
+-- name: GetUserAvatar :one
+SELECT avatar_data, avatar_content_type, avatar_seed, updated_at FROM users WHERE id = $1;
+
+-- name: SetUserAvatarSeed :exec
+UPDATE users SET avatar_seed = $2, updated_at = NOW()
+WHERE id = $1;
+
+-- name: SetUserAvatar :exec
+UPDATE users SET avatar_data = $2, avatar_content_type = $3, updated_at = NOW()
+WHERE id = $1;
+
+-- name: ClearUserAvatar :exec
+UPDATE users SET avatar_data = NULL, avatar_content_type = NULL, updated_at = NOW()
+WHERE id = $1;

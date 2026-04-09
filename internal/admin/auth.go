@@ -18,6 +18,7 @@ const (
 	sessionKeyAccountUsername = "account_username"  // auth_accounts.username
 	sessionKeyAccountRole     = "account_role"      // "admin", "editor", or "viewer"
 	sessionKeyUserID          = "user_id"           // linked family member UUID (NULL-linked admins have "")
+	sessionKeyAvatarVersion   = "avatar_v"          // bumped on avatar change for cache busting
 )
 
 // Role constants.
