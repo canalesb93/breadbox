@@ -201,15 +201,26 @@ func (m *Matcher) ReconcileForConnection(ctx context.Context, connectionID pgtyp
 // with the same date+amount. Returns nil if ambiguous.
 func pickBestCandidate(depName, depMerchant string, candidates []matchCandidate) (*matchCandidate, []string) {
 	type scored struct {
-		idx      int
-		score    int
-		fields   []string
+		idx    int
+		score  int
+		fields []string
 	}
+
+	// Hoist ToLower on the dependent strings out of the per-candidate loop.
+	// pickBestCandidate is called with the same depName / depMerchant against
+	// every candidate, so lowering them once avoids O(candidates) redundant
+	// allocations when the substring branches are exercised.
+	depNameLower := strings.ToLower(depName)
+	depMerchantLower := strings.ToLower(depMerchant)
 
 	var best []scored
 
 	for i, c := range candidates {
-		s, fields := nameSimilarityScore(depName, depMerchant, c.Name, c.MerchantName)
+		s, fields := nameSimilarityScoreLowered(
+			depName, depNameLower,
+			depMerchant, depMerchantLower,
+			c.Name, c.MerchantName,
+		)
 		if len(best) == 0 || s > best[0].score {
 			best = []scored{{idx: i, score: s, fields: fields}}
 		} else if s == best[0].score {
@@ -228,9 +239,8 @@ func pickBestCandidate(depName, depMerchant string, candidates []matchCandidate)
 // nameSimilarityScore computes how similar two transactions' names are.
 // Returns score (0-3) and which fields matched.
 func nameSimilarityScore(depName, depMerchant, priName, priMerchant string) (int, []string) {
-	var fields []string
-
 	// Exact merchant_name match (highest signal).
+	// EqualFold covers case-insensitive equality without allocating.
 	if depMerchant != "" && priMerchant != "" &&
 		strings.EqualFold(depMerchant, priMerchant) {
 		return 3, []string{"merchant_name"}
@@ -238,9 +248,10 @@ func nameSimilarityScore(depName, depMerchant, priName, priMerchant string) (int
 
 	// Merchant name contains or is contained.
 	if depMerchant != "" && priMerchant != "" {
-		dl := strings.ToLower(depMerchant)
-		pl := strings.ToLower(priMerchant)
-		if strings.Contains(dl, pl) || strings.Contains(pl, dl) {
+		depMerchantLower := strings.ToLower(depMerchant)
+		priMerchantLower := strings.ToLower(priMerchant)
+		if strings.Contains(depMerchantLower, priMerchantLower) ||
+			strings.Contains(priMerchantLower, depMerchantLower) {
 			return 2, []string{"merchant_name"}
 		}
 	}
@@ -251,11 +262,53 @@ func nameSimilarityScore(depName, depMerchant, priName, priMerchant string) (int
 	}
 
 	// Name contains or is contained.
-	dl := strings.ToLower(depName)
-	pl := strings.ToLower(priName)
-	if strings.Contains(dl, pl) || strings.Contains(pl, dl) {
-		fields = append(fields, "name")
-		return 1, fields
+	depNameLower := strings.ToLower(depName)
+	priNameLower := strings.ToLower(priName)
+	if strings.Contains(depNameLower, priNameLower) ||
+		strings.Contains(priNameLower, depNameLower) {
+		return 1, []string{"name"}
+	}
+
+	// No name similarity — still valid (date + amount matched).
+	return 0, nil
+}
+
+// nameSimilarityScoreLowered is the same as nameSimilarityScore but accepts
+// pre-lowered dependent strings so callers iterating over many candidates
+// can lower the dep side exactly once. The scoring behavior is identical to
+// nameSimilarityScore.
+func nameSimilarityScoreLowered(
+	depName, depNameLower,
+	depMerchant, depMerchantLower,
+	priName, priMerchant string,
+) (int, []string) {
+	// Exact merchant_name match (highest signal).
+	if depMerchant != "" && priMerchant != "" &&
+		strings.EqualFold(depMerchant, priMerchant) {
+		return 3, []string{"merchant_name"}
+	}
+
+	// Merchant name contains or is contained. We reuse depMerchantLower
+	// across candidates and only lower priMerchant on demand.
+	if depMerchant != "" && priMerchant != "" {
+		priMerchantLower := strings.ToLower(priMerchant)
+		if strings.Contains(depMerchantLower, priMerchantLower) ||
+			strings.Contains(priMerchantLower, depMerchantLower) {
+			return 2, []string{"merchant_name"}
+		}
+	}
+
+	// Exact name match.
+	if strings.EqualFold(depName, priName) {
+		return 2, []string{"name"}
+	}
+
+	// Name contains or is contained. Reuse the pre-lowered depName and
+	// lower priName on demand.
+	priNameLower := strings.ToLower(priName)
+	if strings.Contains(depNameLower, priNameLower) ||
+		strings.Contains(priNameLower, depNameLower) {
+		return 1, []string{"name"}
 	}
 
 	// No name similarity — still valid (date + amount matched).
