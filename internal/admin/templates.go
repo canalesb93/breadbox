@@ -393,6 +393,45 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return result
 			},
+			"avatarURL": func(args ...any) string {
+				if len(args) == 0 {
+					return "/avatars/unknown"
+				}
+				var base string
+				switch v := args[0].(type) {
+				case pgtype.UUID:
+					if !v.Valid {
+						return "/avatars/unknown"
+					}
+					base = "/avatars/" + formatUUID(v)
+				case string:
+					if v == "" {
+						return "/avatars/unknown"
+					}
+					base = "/avatars/" + v
+				case *string:
+					if v == nil || *v == "" {
+						return "/avatars/unknown"
+					}
+					base = "/avatars/" + *v
+				default:
+					return "/avatars/unknown"
+				}
+				// Optional second arg: version fingerprint for cache busting.
+				if len(args) > 1 {
+					switch v := args[1].(type) {
+					case pgtype.Timestamptz:
+						if v.Valid {
+							base += "?v=" + fmt.Sprintf("%d", v.Time.Unix())
+						}
+					case string:
+						if v != "" {
+							base += "?v=" + v
+						}
+					}
+				}
+				return base
+			},
 			"firstChar": func(s string) string {
 				if s == "" {
 					return "?"
@@ -867,15 +906,30 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 		if _, exists := m["NavBadges"]; !exists {
 			m["NavBadges"] = getNavBadges(r.Context())
 		}
-		// Auto-inject role info for nav rendering.
-		if _, exists := m["SessionRole"]; !exists && tr.sm != nil {
-			role := tr.sm.GetString(r.Context(), sessionKeyAccountRole)
-			if role == "" {
-				role = RoleAdmin
+		// Auto-inject all nav-required session fields.
+		// This is the single source of truth — handlers don't need to set these.
+		if tr.sm != nil {
+			if _, exists := m["SessionRole"]; !exists {
+				role := tr.sm.GetString(r.Context(), sessionKeyAccountRole)
+				if role == "" {
+					role = RoleAdmin
+				}
+				m["SessionRole"] = role
+				m["IsAdmin"] = role == RoleAdmin
+				m["IsEditor"] = role == RoleAdmin || role == RoleEditor
+				m["RoleDisplay"] = RoleDisplayName(role)
 			}
-			m["SessionRole"] = role
-			m["IsAdmin"] = role == RoleAdmin
-			m["IsEditor"] = role == RoleAdmin || role == RoleEditor
+			if _, exists := m["SessionUserID"]; !exists {
+				uid := tr.sm.GetString(r.Context(), sessionKeyUserID)
+				m["HasLinkedUser"] = uid != ""
+				if uid == "" {
+					uid = tr.sm.GetString(r.Context(), sessionKeyAccountID)
+				}
+				m["SessionUserID"] = uid
+			}
+			if _, exists := m["SessionAvatarVersion"]; !exists {
+				m["SessionAvatarVersion"] = tr.sm.GetString(r.Context(), sessionKeyAvatarVersion)
+			}
 		}
 	}
 

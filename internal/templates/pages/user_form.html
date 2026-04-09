@@ -51,9 +51,15 @@
   <!-- Form state -->
   <template x-if="!setupURL">
     <div class="bb-card p-8">
-      <div class="flex items-center gap-3 mb-6">
-        <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/8">
-          <i data-lucide="user-plus" class="w-5 h-5 text-primary"></i>
+      <!-- Avatar preview + header -->
+      <div class="flex items-center gap-4 mb-6">
+        <div class="relative group">
+          <img :src="avatarPreviewSrc" alt="" class="w-14 h-14 rounded-full object-cover ring-2 ring-base-300">
+          <button type="button" @click="shuffleAvatar()"
+            class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            title="Shuffle pattern">
+            <i data-lucide="refresh-cw" class="w-4 h-4 text-white"></i>
+          </button>
         </div>
         <div>
           <h2 class="text-base font-semibold">New Member</h2>
@@ -67,7 +73,7 @@
             Name <span class="text-error text-xs">*</span>
           </label>
           <input type="text" id="name" name="name" class="input input-bordered w-full rounded-xl" required maxlength="128"
-            placeholder="e.g., Alex Canales">
+            placeholder="e.g., Alex Canales" @input="updateAvatarPreview($event.target.value)">
         </fieldset>
 
         <fieldset class="fieldset mb-5">
@@ -123,12 +129,28 @@
 
 <script>
 function userForm() {
+  var initialSeed = 'new-member-' + Date.now();
   return {
     createLogin: false,
     role: 'viewer',
     submitting: false,
     error: '',
     setupURL: '',
+    avatarSeed: initialSeed,
+    avatarPreviewSrc: '/avatars/preview/' + encodeURIComponent(initialSeed),
+
+    updateAvatarPreview(name) {
+      var seed = name.trim() || this.avatarSeed;
+      this.avatarPreviewSrc = '/avatars/preview/' + encodeURIComponent(seed) + '?v=' + Date.now();
+    },
+
+    shuffleAvatar() {
+      this.avatarSeed = 'seed-' + Math.random().toString(36).slice(2);
+      var nameVal = document.getElementById('name').value.trim();
+      // If name is typed, append seed to make it unique; otherwise use seed alone.
+      var seed = nameVal ? nameVal + '-' + this.avatarSeed : this.avatarSeed;
+      this.avatarPreviewSrc = '/avatars/preview/' + encodeURIComponent(seed) + '?v=' + Date.now();
+    },
 
     submit() {
       this.error = '';
@@ -213,15 +235,43 @@ function userForm() {
 </script>
 
 {{else}}
-<!-- Edit mode uses the simpler form without login toggle -->
-<div class="bb-card p-8 max-w-lg">
-  <div class="flex items-center gap-3 mb-6">
-    <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/8">
-      <i data-lucide="user-pen" class="w-5 h-5 text-primary"></i>
-    </div>
-    <div>
-      <h2 class="text-base font-semibold">Member Details</h2>
-      <p class="text-xs text-base-content/45">Update name and email</p>
+<!-- Edit mode with avatar upload -->
+<div x-data="avatarEditor('{{.UserID}}')" class="max-w-lg">
+  <!-- Avatar Card -->
+  <div class="bb-card p-6 mb-5">
+    <div class="flex items-center gap-5">
+      <div class="relative group">
+        <img :src="avatarSrc" alt="" class="w-20 h-20 rounded-full object-cover ring-2 ring-base-300">
+        <button type="button" @click="$refs.fileInput.click()"
+          class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+          <i data-lucide="camera" class="w-5 h-5 text-white"></i>
+        </button>
+        <input type="file" x-ref="fileInput" accept="image/png,image/jpeg,image/gif" class="hidden" @change="onFileSelect">
+      </div>
+      <div class="flex-1">
+        <h3 class="text-sm font-semibold">Profile Picture</h3>
+        <p class="text-xs text-base-content/45 mt-0.5">PNG, JPG, or GIF. Max 5 MB.</p>
+        <div class="flex items-center gap-2 mt-3">
+          <button type="button" @click="$refs.fileInput.click()" class="btn btn-ghost btn-xs rounded-lg">
+            <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+            Upload
+          </button>
+          <button type="button" @click="regenerate()" class="btn btn-ghost btn-xs rounded-lg">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            Regenerate
+          </button>
+          <button type="button" x-show="hasCustomAvatar" @click="removeAvatar()" class="btn btn-ghost btn-xs rounded-lg text-error/70 hover:text-error">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            Remove
+          </button>
+        </div>
+        <template x-if="avatarError">
+          <p class="text-xs text-error mt-2" x-text="avatarError"></p>
+        </template>
+        <template x-if="avatarUploading">
+          <p class="text-xs text-base-content/50 mt-2">Uploading...</p>
+        </template>
+      </div>
     </div>
   </div>
 
@@ -256,6 +306,85 @@ function userForm() {
 </div>
 
 <script>
+function avatarEditor(userId) {
+  return {
+    userId: userId,
+    avatarSrc: '/avatars/' + userId + '?v=' + Date.now(),
+    hasCustomAvatar: {{if .User.AvatarData}}true{{else}}false{{end}},
+    avatarError: '',
+    avatarUploading: false,
+
+    onFileSelect(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      this.avatarError = '';
+
+      if (!file.type.match(/^image\/(png|jpeg|gif)$/)) {
+        this.avatarError = 'Please select a PNG, JPG, or GIF image.';
+        e.target.value = '';
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        this.avatarError = 'Image must be under 5 MB.';
+        e.target.value = '';
+        return;
+      }
+
+      var self = this;
+      self.avatarUploading = true;
+      var fd = new FormData();
+      fd.append('avatar', file);
+
+      fetch('/-/users/' + self.userId + '/avatar', { method: 'POST', body: fd })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw d; });
+          return res.json();
+        })
+        .then(function() {
+          self.avatarSrc = '/avatars/' + self.userId + '?v=' + Date.now();
+          self.hasCustomAvatar = true;
+          self.avatarUploading = false;
+        })
+        .catch(function(err) {
+          self.avatarError = (err.error || 'Upload failed');
+          self.avatarUploading = false;
+        });
+      e.target.value = '';
+    },
+
+    removeAvatar() {
+      var self = this;
+      self.avatarError = '';
+      fetch('/-/users/' + self.userId + '/avatar', { method: 'DELETE' })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw d; });
+          self.avatarSrc = '/avatars/' + self.userId + '?v=' + Date.now();
+          self.hasCustomAvatar = false;
+        })
+        .catch(function(err) {
+          self.avatarError = (err.error || 'Remove failed');
+        });
+    },
+
+    regenerate() {
+      var self = this;
+      self.avatarError = '';
+      fetch('/-/users/' + self.userId + '/avatar/regenerate', { method: 'POST' })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw d; });
+          return res.json();
+        })
+        .then(function() {
+          self.avatarSrc = '/avatars/' + self.userId + '?v=' + Date.now();
+          self.hasCustomAvatar = false;
+        })
+        .catch(function(err) {
+          self.avatarError = (err.error || 'Regenerate failed');
+        });
+    }
+  };
+}
+
 (function () {
   var form = document.getElementById("user-form");
   var formError = document.getElementById("form-error");

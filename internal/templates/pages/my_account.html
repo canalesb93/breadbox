@@ -13,6 +13,52 @@
 </div>
 {{end}}
 
+{{if .UserID}}
+<div class="bb-card mb-6" x-data="myAvatar()">
+  <div class="p-5 border-b border-base-300">
+    <h2 class="font-semibold text-base flex items-center gap-2">
+      <i data-lucide="user-circle" class="w-4 h-4 text-base-content/40"></i>
+      Profile Picture
+    </h2>
+  </div>
+  <div class="p-5">
+    <div class="flex items-center gap-5">
+      <div class="relative group">
+        <img :src="avatarSrc" alt="" class="w-20 h-20 rounded-full object-cover ring-2 ring-base-300">
+        <button type="button" @click="$refs.fileInput.click()"
+          class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+          <i data-lucide="camera" class="w-5 h-5 text-white"></i>
+        </button>
+        <input type="file" x-ref="fileInput" accept="image/png,image/jpeg,image/gif" class="hidden" @change="onFileSelect">
+      </div>
+      <div>
+        <p class="text-xs text-base-content/45">PNG, JPG, or GIF. Max 5 MB.</p>
+        <div class="flex items-center gap-2 mt-2">
+          <button type="button" @click="$refs.fileInput.click()" class="btn btn-ghost btn-xs rounded-lg">
+            <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+            Upload
+          </button>
+          <button type="button" @click="regenerate()" class="btn btn-ghost btn-xs rounded-lg">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            Regenerate
+          </button>
+          <button type="button" x-show="hasCustom" @click="removeAvatar()" class="btn btn-ghost btn-xs rounded-lg text-error/70 hover:text-error">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            Remove
+          </button>
+        </div>
+        <template x-if="error">
+          <p class="text-xs text-error mt-2" x-text="error"></p>
+        </template>
+        <template x-if="uploading">
+          <p class="text-xs text-base-content/50 mt-2">Uploading...</p>
+        </template>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
   <!-- Change Password -->
   <div class="bb-card">
@@ -109,4 +155,97 @@
     </div>
   </div>
 </div>
+
+{{if .UserID}}
+<script>
+function myAvatar() {
+  var uid = '{{.UserID}}';
+  return {
+    avatarSrc: '/avatars/' + uid + '?v=' + Date.now(),
+    hasCustom: false,
+    error: '',
+    uploading: false,
+
+    init() {
+      var self = this;
+      fetch('/avatars/' + uid, { method: 'HEAD' })
+        .then(function(r) {
+          var ct = r.headers.get('content-type') || '';
+          self.hasCustom = ct.indexOf('svg') === -1;
+        })
+        .catch(function() {});
+    },
+
+    onFileSelect(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      this.error = '';
+
+      if (!file.type.match(/^image\/(png|jpeg|gif)$/)) {
+        this.error = 'Please select a PNG, JPG, or GIF image.';
+        e.target.value = '';
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        this.error = 'Image must be under 5 MB.';
+        e.target.value = '';
+        return;
+      }
+
+      var self = this;
+      self.uploading = true;
+      var fd = new FormData();
+      fd.append('avatar', file);
+
+      fetch('/my-account/avatar', { method: 'POST', body: fd })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw d; });
+          return res.json();
+        })
+        .then(function() {
+          self.avatarSrc = '/avatars/' + uid + '?v=' + Date.now();
+          self.hasCustom = true;
+          self.uploading = false;
+        })
+        .catch(function(err) {
+          self.error = (err.error || 'Upload failed');
+          self.uploading = false;
+        });
+      e.target.value = '';
+    },
+
+    removeAvatar() {
+      var self = this;
+      self.error = '';
+      fetch('/my-account/avatar', { method: 'DELETE' })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw d; });
+          self.avatarSrc = '/avatars/' + uid + '?v=' + Date.now();
+          self.hasCustom = false;
+        })
+        .catch(function(err) {
+          self.error = (err.error || 'Remove failed');
+        });
+    },
+
+    regenerate() {
+      var self = this;
+      self.error = '';
+      fetch('/my-account/avatar/regenerate', { method: 'POST' })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw d; });
+          return res.json();
+        })
+        .then(function() {
+          self.avatarSrc = '/avatars/' + uid + '?v=' + Date.now();
+          self.hasCustom = false;
+        })
+        .catch(function(err) {
+          self.error = (err.error || 'Regenerate failed');
+        });
+    }
+  };
+}
+</script>
+{{end}}
 {{end}}

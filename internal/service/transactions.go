@@ -23,7 +23,8 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		"t.category_id, t.category_override, " +
 		"c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, c.color AS cat_color, " +
 		"pc.slug AS cat_primary_slug, pc.display_name AS cat_primary_display_name, " +
-		"t.attributed_user_id, au.name AS attributed_user_name " +
+		"t.attributed_user_id, au.name AS attributed_user_name, " +
+		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id " +
 		"FROM transactions t " +
 		"JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
@@ -219,6 +220,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			catPrimaryDisplayName  pgtype.Text
 			attributedUserID       pgtype.UUID
 			attributedUserName     pgtype.Text
+			effectiveUserID        pgtype.UUID
 		)
 
 		if err := rows.Scan(
@@ -233,6 +235,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			&catSlug, &catDisplayName, &catIcon, &catColor,
 			&catPrimarySlug, &catPrimaryDisplayName,
 			&attributedUserID, &attributedUserName,
+			&effectiveUserID,
 		); err != nil {
 			return nil, fmt.Errorf("scan transaction: %w", err)
 		}
@@ -271,6 +274,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			UserName:            textPtr(userName),
 			AttributedUserID:    uuidPtr(attributedUserID),
 			AttributedUserName:  textPtr(attributedUserName),
+			EffectiveUserID:     uuidPtr(effectiveUserID),
 			Amount:              amountVal,
 			IsoCurrencyCode:     textPtr(isoCurrencyCode),
 			Date:                dateVal,
@@ -448,7 +452,8 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		"t.category_override, t.pending, " +
 		"EXISTS(SELECT 1 FROM review_queue rq WHERE rq.transaction_id = t.id AND rq.reviewer_type = 'agent' AND rq.status IN ('approved', 'rejected')) AS agent_reviewed, " +
 		"EXISTS(SELECT 1 FROM review_queue rq WHERE rq.transaction_id = t.id AND rq.status = 'pending') AS has_pending_review, " +
-		"t.created_at, t.updated_at "
+		"t.created_at, t.updated_at, " +
+		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id "
 	fromClause := "FROM transactions t " +
 		"LEFT JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
@@ -666,6 +671,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			hasPendingReview bool
 			createdAt        pgtype.Timestamptz
 			updatedAt        pgtype.Timestamptz
+			effectiveUserID  pgtype.UUID
 		)
 
 		if err := rows.Scan(
@@ -674,6 +680,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			&date, &name, &merchantName, &amount, &isoCurrencyCode,
 			&categoryID, &catDisplayName, &catSlug, &catIcon, &catColor,
 			&categoryOverride, &pending, &agentReviewed, &hasPendingReview, &createdAt, &updatedAt,
+			&effectiveUserID,
 		); err != nil {
 			return nil, fmt.Errorf("scan admin transaction: %w", err)
 		}
@@ -700,6 +707,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			AccountName:         accountName,
 			InstitutionName:     institutionName,
 			UserName:            userName,
+			EffectiveUserID:     uuidPtr(effectiveUserID),
 			Date:                dateVal,
 			Name:                name,
 			MerchantName:        textPtr(merchantName),

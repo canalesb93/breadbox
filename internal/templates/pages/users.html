@@ -27,9 +27,7 @@
     <div class="p-4 sm:p-6 pb-4">
       <div class="flex items-start justify-between">
         <div class="flex items-center gap-4">
-          <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shrink-0">
-            {{slice .Name 0 1}}
-          </div>
+          <img src="{{avatarURL .ID .UpdatedAt}}" alt="" class="w-12 h-12 rounded-full object-cover shrink-0">
           <div>
             <div class="flex items-center gap-2">
               <h3 class="font-semibold text-base">{{.Name}}</h3>

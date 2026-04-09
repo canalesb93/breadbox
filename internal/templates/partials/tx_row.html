@@ -36,11 +36,15 @@
       </div>
       <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40">
         {{if .UserName}}
-        <!-- Mobile: show short name; Desktop: show initial avatar -->
+        <!-- Mobile: show short name; Desktop: show avatar -->
         <span class="sm:hidden text-base-content/50 shrink-0">{{firstWord .UserName}}</span>
+        {{if .EffectiveUserID}}
+        <img src="{{avatarURL .EffectiveUserID}}" alt="" class="hidden sm:inline-block w-4 h-4 rounded-full object-cover shrink-0" title="{{.UserName}}">
+        {{else}}
         <span class="hidden sm:inline-flex w-4 h-4 rounded-full bg-primary/10 items-center justify-center shrink-0" title="{{.UserName}}">
           <span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{{firstChar .UserName}}</span>
         </span>
+        {{end}}
         <span class="text-base-content/20">&middot;</span>
         {{end}}
         <span class="truncate">{{.AccountName}}</span>

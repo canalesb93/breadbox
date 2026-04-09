@@ -153,6 +153,9 @@
 
 /* ─── shadcn-inspired global overrides ─── */
 @layer base {
+  /* Ensure Lucide SVG icons inside interactive elements don't steal clicks. */
+  a svg, button svg { pointer-events: none; }
+
   html { scroll-behavior: smooth; }
 
   body {
@@ -1149,9 +1152,8 @@
   }
 
   .bb-sidebar-profile-avatar {
-    @apply w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center
-           text-xs font-semibold text-primary shrink-0 uppercase;
-    transition: background-color 0.15s ease;
+    @apply w-8 h-8 rounded-full object-cover shrink-0;
+    transition: opacity 0.15s ease;
   }
 
   .bb-sidebar-profile-info {
