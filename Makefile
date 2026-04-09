@@ -31,12 +31,12 @@ dev: generate
 	SERVER_PORT=$(PORT) go run ./cmd/breadbox serve; rm -f .breadbox-port
 
 dev-stop:
-	@pids=$$(pgrep -f 'go run ./cmd/breadbox serve' 2>/dev/null || true); \
+	@pids=$$(lsof -ti:8080-8099 2>/dev/null | sort -u || true); \
 	if [ -z "$$pids" ]; then \
 		echo "No dev instances running."; \
 	else \
 		echo "$$pids" | xargs kill 2>/dev/null; \
-		echo "Stopped dev instances: $$pids"; \
+		echo "Stopped dev instances on ports 8080-8099: $$pids"; \
 	fi
 
 build: generate
