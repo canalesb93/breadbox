@@ -97,9 +97,11 @@ func buildTestRouter(svc *service.Service) http.Handler {
 
 		// Read endpoints
 		r.Get("/accounts", ListAccountsHandler(svc))
+		r.Get("/accounts/{id}", GetAccountHandler(svc))
 		r.Get("/transactions", ListTransactionsHandler(svc))
 		r.Get("/transactions/count", CountTransactionsHandler(svc))
 		r.Get("/transactions/summary", TransactionSummaryHandler(svc))
+		r.Get("/transactions/merchants", MerchantSummaryHandler(svc))
 		r.Get("/transactions/{id}", GetTransactionHandler(svc))
 		r.Get("/categories", ListCategoriesHandler(svc))
 		r.Get("/categories/{id}", GetCategoryHandler(svc))
@@ -111,6 +113,11 @@ func buildTestRouter(svc *service.Service) http.Handler {
 		r.Get("/rules", ListRulesHandler(svc))
 		r.Get("/rules/{id}", GetRuleHandler(svc))
 		r.Get("/transactions/{transaction_id}/comments", ListCommentsHandler(svc))
+		r.Get("/account-links", ListAccountLinksHandler(svc))
+		r.Get("/account-links/{id}", GetAccountLinkHandler(svc))
+		r.Get("/account-links/{id}/matches", ListTransactionMatchesHandler(svc))
+		r.Get("/reports", ListReportsHandler(svc))
+		r.Get("/reports/unread-count", UnreadReportCountHandler(svc))
 
 		// Write endpoints — require full_access scope
 		r.Group(func(r chi.Router) {
@@ -132,6 +139,16 @@ func buildTestRouter(svc *service.Service) http.Handler {
 			r.Post("/reviews/enqueue", EnqueueReviewHandler(svc))
 			r.Delete("/reviews/{id}", DismissReviewHandler(svc))
 			r.Post("/transactions/batch-categorize", BatchCategorizeHandler(svc))
+			r.Post("/transactions/bulk-recategorize", BulkRecategorizeHandler(svc))
+			r.Post("/account-links", CreateAccountLinkHandler(svc))
+			r.Put("/account-links/{id}", UpdateAccountLinkHandler(svc))
+			r.Delete("/account-links/{id}", DeleteAccountLinkHandler(svc))
+			r.Post("/account-links/{id}/reconcile", ReconcileAccountLinkHandler(svc))
+			r.Post("/transaction-matches/{id}/confirm", ConfirmMatchHandler(svc))
+			r.Post("/transaction-matches/{id}/reject", RejectMatchHandler(svc))
+			r.Post("/transaction-matches/manual", ManualMatchHandler(svc))
+			r.Post("/reports", CreateReportHandler(svc))
+			r.Patch("/reports/{id}/read", MarkReportReadHandler(svc))
 		})
 	})
 	return r
@@ -1715,4 +1732,321 @@ func TestAPI_ErrorEnvelope_HasCorrectStructure(t *testing.T) {
 	if errorObj["message"] == nil {
 		t.Error("expected 'message' in error object")
 	}
+}
+
+// ============================================================
+// Agent Reports API Tests
+// ============================================================
+
+func TestAPI_ListReports_Empty(t *testing.T) {
+	env := setupTestEnv(t)
+	resp := env.doGet(t, "/api/v1/reports")
+	assertStatus(t, resp, http.StatusOK)
+
+	var reports []any
+	parseJSON(t, resp, &reports)
+	if len(reports) != 0 {
+		t.Errorf("expected 0 reports, got %d", len(reports))
+	}
+}
+
+func TestAPI_UnreadReportCount_Empty(t *testing.T) {
+	env := setupTestEnv(t)
+	resp := env.doGet(t, "/api/v1/reports/unread-count")
+	assertStatus(t, resp, http.StatusOK)
+
+	var result map[string]int64
+	parseJSON(t, resp, &result)
+	if result["unread_count"] != 0 {
+		t.Errorf("expected 0 unread, got %d", result["unread_count"])
+	}
+}
+
+func TestAPI_CreateReport_Success(t *testing.T) {
+	env := setupTestEnv(t)
+
+	resp := env.doPost(t, "/api/v1/reports", map[string]any{
+		"title":    "Test Report",
+		"body":     "Report body content",
+		"priority": "warning",
+		"tags":     []string{"spending", "review"},
+	})
+	assertStatus(t, resp, http.StatusCreated)
+
+	var report map[string]any
+	parseJSON(t, resp, &report)
+	if report["title"] != "Test Report" {
+		t.Errorf("expected title 'Test Report', got %v", report["title"])
+	}
+	if report["priority"] != "warning" {
+		t.Errorf("expected priority 'warning', got %v", report["priority"])
+	}
+}
+
+func TestAPI_CreateReport_MissingTitle(t *testing.T) {
+	env := setupTestEnv(t)
+	resp := env.doPost(t, "/api/v1/reports", map[string]any{
+		"body": "Body",
+	})
+	readErrorCode(t, resp, http.StatusBadRequest, "INVALID_PARAMETER")
+}
+
+func TestAPI_CreateReport_MissingBody(t *testing.T) {
+	env := setupTestEnv(t)
+	resp := env.doPost(t, "/api/v1/reports", map[string]any{
+		"title": "Title",
+	})
+	readErrorCode(t, resp, http.StatusBadRequest, "INVALID_PARAMETER")
+}
+
+func TestAPI_CreateReport_InvalidPriority(t *testing.T) {
+	env := setupTestEnv(t)
+	resp := env.doPost(t, "/api/v1/reports", map[string]any{
+		"title":    "Title",
+		"body":     "Body",
+		"priority": "urgent",
+	})
+	readErrorCode(t, resp, http.StatusBadRequest, "INVALID_PARAMETER")
+}
+
+func TestAPI_ListReports_WithData(t *testing.T) {
+	env := setupTestEnv(t)
+
+	// Create a report via API
+	resp := env.doPost(t, "/api/v1/reports", map[string]any{
+		"title": "My Report",
+		"body":  "Report content",
+	})
+	assertStatus(t, resp, http.StatusCreated)
+	resp.Body.Close()
+
+	// List
+	resp = env.doGet(t, "/api/v1/reports")
+	assertStatus(t, resp, http.StatusOK)
+
+	var reports []map[string]any
+	parseJSON(t, resp, &reports)
+	if len(reports) != 1 {
+		t.Fatalf("expected 1 report, got %d", len(reports))
+	}
+	if reports[0]["title"] != "My Report" {
+		t.Errorf("expected title 'My Report', got %v", reports[0]["title"])
+	}
+}
+
+func TestAPI_MarkReportRead(t *testing.T) {
+	env := setupTestEnv(t)
+
+	// Create report
+	resp := env.doPost(t, "/api/v1/reports", map[string]any{
+		"title": "Report to Read",
+		"body":  "Body",
+	})
+	assertStatus(t, resp, http.StatusCreated)
+
+	var report map[string]any
+	parseJSON(t, resp, &report)
+	reportID := report["id"].(string)
+
+	// Mark as read
+	resp = env.doPatch(t, fmt.Sprintf("/api/v1/reports/%s/read", reportID), nil)
+	assertStatus(t, resp, http.StatusOK)
+
+	// Verify unread count is 0
+	resp = env.doGet(t, "/api/v1/reports/unread-count")
+	assertStatus(t, resp, http.StatusOK)
+
+	var result map[string]any
+	parseJSON(t, resp, &result)
+	if result["unread_count"] != float64(0) {
+		t.Errorf("expected 0 unread after marking read, got %v", result["unread_count"])
+	}
+}
+
+// ============================================================
+// Account Links API Tests
+// ============================================================
+
+func TestAPI_ListAccountLinks_Empty(t *testing.T) {
+	env := setupTestEnv(t)
+	resp := env.doGet(t, "/api/v1/account-links")
+	assertStatus(t, resp, http.StatusOK)
+
+	var links []any
+	parseJSON(t, resp, &links)
+	if len(links) != 0 {
+		t.Errorf("expected 0 links, got %d", len(links))
+	}
+}
+
+func TestAPI_CreateAccountLink_Success(t *testing.T) {
+	env := setupTestEnv(t)
+
+	// Create two users with separate connections and accounts
+	user1 := testutil.MustCreateUser(t, env.Queries, "Alice")
+	conn1 := testutil.MustCreateConnection(t, env.Queries, user1.ID, "item_1")
+	acct1 := testutil.MustCreateAccount(t, env.Queries, conn1.ID, "ext_acct_1", "Primary Checking")
+
+	user2 := testutil.MustCreateUser(t, env.Queries, "Bob")
+	conn2 := testutil.MustCreateConnection(t, env.Queries, user2.ID, "item_2")
+	acct2 := testutil.MustCreateAccount(t, env.Queries, conn2.ID, "ext_acct_2", "Dependent Card")
+
+	resp := env.doPost(t, "/api/v1/account-links", map[string]any{
+		"primary_account_id":   acct1.ShortID,
+		"dependent_account_id": acct2.ShortID,
+	})
+	assertStatus(t, resp, http.StatusCreated)
+
+	var link map[string]any
+	parseJSON(t, resp, &link)
+	if link["primary_account_name"] != "Primary Checking" {
+		t.Errorf("expected primary_account_name 'Primary Checking', got %v", link["primary_account_name"])
+	}
+	if link["dependent_account_name"] != "Dependent Card" {
+		t.Errorf("expected dependent_account_name 'Dependent Card', got %v", link["dependent_account_name"])
+	}
+}
+
+func TestAPI_CreateAccountLink_MissingParams(t *testing.T) {
+	env := setupTestEnv(t)
+	resp := env.doPost(t, "/api/v1/account-links", map[string]any{
+		"primary_account_id": "abc123",
+	})
+	readErrorCode(t, resp, http.StatusBadRequest, "VALIDATION_ERROR")
+}
+
+func TestAPI_GetAccountLink_NotFound(t *testing.T) {
+	env := setupTestEnv(t)
+	resp := env.doGet(t, "/api/v1/account-links/00000000-0000-0000-0000-000000000000")
+	readErrorCode(t, resp, http.StatusNotFound, "NOT_FOUND")
+}
+
+func TestAPI_DeleteAccountLink_NotFound(t *testing.T) {
+	env := setupTestEnv(t)
+	resp := env.doDelete(t, "/api/v1/account-links/00000000-0000-0000-0000-000000000000")
+	readErrorCode(t, resp, http.StatusNotFound, "NOT_FOUND")
+}
+
+// ============================================================
+// Merchant Summary API Tests
+// ============================================================
+
+func TestAPI_MerchantSummary_Empty(t *testing.T) {
+	env := setupTestEnv(t)
+	resp := env.doGet(t, "/api/v1/transactions/merchants")
+	assertStatus(t, resp, http.StatusOK)
+
+	var result map[string]any
+	parseJSON(t, resp, &result)
+	merchants, ok := result["merchants"].([]any)
+	if !ok {
+		t.Fatal("expected 'merchants' array in response")
+	}
+	if len(merchants) != 0 {
+		t.Errorf("expected 0 merchants, got %d", len(merchants))
+	}
+}
+
+func TestAPI_MerchantSummary_WithData(t *testing.T) {
+	env := setupTestEnv(t)
+	_, acct, _ := seedFixture(t, env.Queries)
+
+	// Create additional transactions with different names
+	testutil.MustCreateTransaction(t, env.Queries, acct.ID, "ext_txn_2", "Coffee Shop", 550, "2025-03-16")
+	testutil.MustCreateTransaction(t, env.Queries, acct.ID, "ext_txn_3", "Grocery Store", 2000, "2025-03-17")
+
+	resp := env.doGet(t, "/api/v1/transactions/merchants?start_date=2025-03-01&end_date=2025-04-01")
+	assertStatus(t, resp, http.StatusOK)
+
+	var result map[string]any
+	parseJSON(t, resp, &result)
+	merchants, ok := result["merchants"].([]any)
+	if !ok {
+		t.Fatal("expected 'merchants' array in response")
+	}
+	if len(merchants) < 1 {
+		t.Errorf("expected at least 1 merchant, got %d", len(merchants))
+	}
+}
+
+// ============================================================
+// Get Account API Tests
+// ============================================================
+
+func TestAPI_GetAccount_NotFound(t *testing.T) {
+	env := setupTestEnv(t)
+	resp := env.doGet(t, "/api/v1/accounts/00000000-0000-0000-0000-000000000000")
+	readErrorCode(t, resp, http.StatusNotFound, "NOT_FOUND")
+}
+
+func TestAPI_GetAccount_Found(t *testing.T) {
+	env := setupTestEnv(t)
+	_, acct, _ := seedFixture(t, env.Queries)
+
+	resp := env.doGet(t, "/api/v1/accounts/"+acct.ShortID)
+	assertStatus(t, resp, http.StatusOK)
+
+	var result map[string]any
+	parseJSON(t, resp, &result)
+	if result["name"] != "Checking" {
+		t.Errorf("expected name 'Checking', got %v", result["name"])
+	}
+}
+
+// ============================================================
+// Bulk Recategorize API Tests
+// ============================================================
+
+func TestAPI_BulkRecategorize_RequiresFilter(t *testing.T) {
+	env := setupTestEnv(t)
+	seedUncategorized(t, env.Queries)
+
+	resp := env.doPost(t, "/api/v1/transactions/bulk-recategorize", map[string]any{
+		"category_slug": "uncategorized",
+	})
+	// Should fail because no filter is provided (safety check)
+	readErrorCode(t, resp, http.StatusBadRequest, "INVALID_PARAMETER")
+}
+
+// ============================================================
+// ReadOnly key blocks write endpoints
+// ============================================================
+
+func TestAPI_ReadOnlyKeyBlocksReportCreate(t *testing.T) {
+	env := setupReadOnlyEnv(t)
+	resp := env.doPost(t, "/api/v1/reports", map[string]any{
+		"title": "Test",
+		"body":  "Body",
+	})
+	readErrorCode(t, resp, http.StatusForbidden, "INSUFFICIENT_SCOPE")
+}
+
+func TestAPI_ReadOnlyKeyBlocksAccountLinkCreate(t *testing.T) {
+	env := setupReadOnlyEnv(t)
+	resp := env.doPost(t, "/api/v1/account-links", map[string]any{
+		"primary_account_id":   "abc",
+		"dependent_account_id": "def",
+	})
+	readErrorCode(t, resp, http.StatusForbidden, "INSUFFICIENT_SCOPE")
+}
+
+func TestAPI_ReadOnlyKeyAllowsReportRead(t *testing.T) {
+	env := setupReadOnlyEnv(t)
+	resp := env.doGet(t, "/api/v1/reports")
+	assertStatus(t, resp, http.StatusOK)
+	resp.Body.Close()
+}
+
+func TestAPI_ReadOnlyKeyAllowsAccountLinkRead(t *testing.T) {
+	env := setupReadOnlyEnv(t)
+	resp := env.doGet(t, "/api/v1/account-links")
+	assertStatus(t, resp, http.StatusOK)
+	resp.Body.Close()
+}
+
+func TestAPI_ReadOnlyKeyAllowsMerchantSummaryRead(t *testing.T) {
+	env := setupReadOnlyEnv(t)
+	resp := env.doGet(t, "/api/v1/transactions/merchants")
+	assertStatus(t, resp, http.StatusOK)
+	resp.Body.Close()
 }
