@@ -1,7 +1,7 @@
 {{define "content"}}
 <div class="text-center mb-8">
   <h1 class="text-xl font-semibold tracking-tight">Create your account</h1>
-  <p class="text-sm text-base-content/50 mt-1.5">Set up the admin account to get started with Breadbox</p>
+  <p class="text-sm text-base-content/50 mt-1.5">Set up your account to get started with Breadbox</p>
 </div>
 
 {{if .Error}}
@@ -13,6 +13,14 @@
 
 <form method="POST" action="/setup" class="space-y-5">
   {{if .CSRFToken}}<input type="hidden" name="_csrf" value="{{.CSRFToken}}">{{end}}
+
+  <div>
+    <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="name">Your Name</label>
+    <input type="text" id="name" name="name" value="{{.Name}}" required autocomplete="name"
+           placeholder="Your name"
+           class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200{{if .Errors.Name}} input-error{{end}}">
+    {{if .Errors.Name}}<p class="text-xs text-error mt-1.5">{{.Errors.Name}}</p>{{end}}
+  </div>
 
   <div>
     <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="username">Username</label>

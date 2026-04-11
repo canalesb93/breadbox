@@ -49,11 +49,11 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 	r.Post("/oauth/authorize", OAuthAuthorizeSubmitHandler(svc, sm))
 
 	// First-run admin creation (unauthenticated).
-	r.Get("/setup", CreateAdminHandler(a.Queries, sm, tr))
-	r.Post("/setup", CreateAdminHandler(a.Queries, sm, tr))
+	r.Get("/setup", CreateAdminHandler(a, sm, tr))
+	r.Post("/setup", CreateAdminHandler(a, sm, tr))
 
 	// Programmatic setup API (unauthenticated).
-	r.Post("/-/setup", ProgrammaticSetupHandler(a.Queries, sm))
+	r.Post("/-/setup", ProgrammaticSetupHandler(a, sm))
 
 	// Authenticated routes accessible to all roles (admin + member).
 	r.Group(func(r chi.Router) {
@@ -87,6 +87,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/my-account/avatar", UploadMyAvatarHandler(a, sm))
 		r.Delete("/my-account/avatar", DeleteMyAvatarHandler(a, sm))
 		r.Post("/my-account/avatar/regenerate", RegenerateMyAvatarHandler(a, sm))
+		r.Post("/my-account/link-user", LinkAdminToUserHandler(a, sm))
 		r.Post("/my-account/wipe-data", MyAccountWipeDataHandler(a, sm))
 
 		// Password change works for both admin and member sessions.

@@ -7,10 +7,12 @@ import (
 	"strings"
 
 	"breadbox/internal/app"
+	"breadbox/internal/db"
 	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // createLoginAccountRequest is the JSON body for POST /-/members.
@@ -192,6 +194,18 @@ func MyAccountHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, 
 		data["AccountID"] = accountIDStr
 		data["UserID"] = userIDStr
 
+		// Check if this admin is unlinked (no household member).
+		isUnlinked := userIDStr == ""
+		data["IsUnlinked"] = isUnlinked
+
+		if isUnlinked {
+			// Fetch users that don't have a login account for the "link existing" option.
+			unlinked, err := a.Queries.ListUsersWithoutAuthAccount(r.Context())
+			if err == nil {
+				data["UnlinkedUsers"] = unlinked
+			}
+		}
+
 		// Load the user's connections and accounts for display.
 		if userIDStr != "" {
 			conns, err := svc.ListConnections(r.Context(), &userIDStr)
@@ -201,6 +215,95 @@ func MyAccountHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, 
 		}
 
 		tr.Render(w, r, "my_account.html", data)
+	}
+}
+
+// LinkAdminToUserHandler serves POST /my-account/link-user -- link an unlinked admin to a household member.
+func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// Guard: must be an unlinked account.
+		if SessionUserID(sm, r) != "" {
+			SetFlash(ctx, sm, "error", "Your account is already linked to a household member.")
+			http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+			return
+		}
+
+		accountIDStr := SessionAccountID(sm, r)
+		accountID, err := parseUUID(accountIDStr)
+		if err != nil {
+			SetFlash(ctx, sm, "error", "Invalid session.")
+			http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+			return
+		}
+
+		mode := r.FormValue("mode")
+		var userID pgtype.UUID
+
+		switch mode {
+		case "create":
+			name := strings.TrimSpace(r.FormValue("name"))
+			if name == "" {
+				SetFlash(ctx, sm, "error", "Name is required.")
+				http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+				return
+			}
+			user, err := a.Queries.CreateUser(ctx, db.CreateUserParams{Name: name})
+			if err != nil {
+				SetFlash(ctx, sm, "error", "Failed to create household member.")
+				http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+				return
+			}
+			userID = user.ID
+
+		case "existing":
+			uid := r.FormValue("user_id")
+			if uid == "" {
+				SetFlash(ctx, sm, "error", "Please select a household member.")
+				http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+				return
+			}
+			parsed, err := parseUUID(uid)
+			if err != nil {
+				SetFlash(ctx, sm, "error", "Invalid user selected.")
+				http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+				return
+			}
+			// Verify user exists and isn't already linked.
+			if _, err := a.Queries.GetUser(ctx, parsed); err != nil {
+				SetFlash(ctx, sm, "error", "Household member not found.")
+				http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+				return
+			}
+			if _, err := a.Queries.GetAuthAccountByUserID(ctx, parsed); err == nil {
+				SetFlash(ctx, sm, "error", "That household member already has a login account.")
+				http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+				return
+			}
+			userID = parsed
+
+		default:
+			SetFlash(ctx, sm, "error", "Invalid request.")
+			http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+			return
+		}
+
+		// Link the auth account to the user.
+		if err := a.Queries.UpdateAuthAccountUserID(ctx, db.UpdateAuthAccountUserIDParams{
+			ID:     accountID,
+			UserID: userID,
+		}); err != nil {
+			SetFlash(ctx, sm, "error", "Failed to link account.")
+			http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+			return
+		}
+
+		// Update session so the change takes effect immediately.
+		sm.Put(ctx, sessionKeyUserID, formatUUID(userID))
+
+		SetFlash(ctx, sm, "success", "Account linked to household member.")
+		http.Redirect(w, r, "/my-account", http.StatusSeeOther)
 	}
 }
 

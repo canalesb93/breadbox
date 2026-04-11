@@ -20,6 +20,12 @@ SELECT id FROM users WHERE short_id = $1;
 -- name: CountUsers :one
 SELECT count(*) FROM users;
 
+-- name: ListUsersWithoutAuthAccount :many
+SELECT u.* FROM users u
+LEFT JOIN auth_accounts aa ON aa.user_id = u.id
+WHERE aa.id IS NULL
+ORDER BY u.name;
+
 -- name: GetUserAvatar :one
 SELECT avatar_data, avatar_content_type, avatar_seed, updated_at FROM users WHERE id = $1;
 

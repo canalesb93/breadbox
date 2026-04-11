@@ -45,5 +45,8 @@ UPDATE auth_accounts SET setup_token = $2, setup_token_expires_at = $3, updated_
 -- name: ClearAuthAccountSetupToken :exec
 UPDATE auth_accounts SET setup_token = NULL, setup_token_expires_at = NULL, updated_at = NOW() WHERE id = $1;
 
+-- name: UpdateAuthAccountUserID :exec
+UPDATE auth_accounts SET user_id = $2, updated_at = NOW() WHERE id = $1;
+
 -- name: DeleteAuthAccount :exec
 DELETE FROM auth_accounts WHERE id = $1;

@@ -119,6 +119,8 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRende
 		sm.Put(r.Context(), sessionKeyAccountRole, account.Role)
 		if account.UserID.Valid {
 			sm.Put(r.Context(), sessionKeyUserID, formatUUID(account.UserID))
+		} else {
+			sm.Remove(r.Context(), sessionKeyUserID)
 		}
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
