@@ -526,7 +526,7 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 		}
 
 		// Is this a liability (credit/loan)?
-		isLiability := detail.Type == "credit" || detail.Type == "loan"
+		isLiability := IsLiabilityAccount(detail.Type)
 
 		// Credit utilization for credit cards
 		var creditUtilization float64

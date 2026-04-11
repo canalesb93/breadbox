@@ -107,12 +107,11 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 							hasAnyBalance = true
 
 							// Classify as asset or liability based on account type.
-							switch acct.Type {
-							case "credit", "loan":
+							if IsLiabilityAccount(acct.Type) {
 								totalLiabilities += math.Abs(f)
 								// Show as negative for display.
 								ca.BalanceFloat = -math.Abs(f)
-							default:
+							} else {
 								totalAssets += f
 								ca.BalanceFloat = f
 							}
@@ -130,12 +129,6 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 		// next-sync schedule, and staleness.
 		now := time.Now()
 		globalInterval := a.Config.SyncIntervalMinutes
-		// Default staleness threshold: 2x the global sync interval (or 24h minimum).
-		globalSyncInterval := time.Duration(globalInterval) * time.Minute
-		defaultStaleThreshold := globalSyncInterval * 2
-		if defaultStaleThreshold < 24*time.Hour {
-			defaultStaleThreshold = 24 * time.Hour
-		}
 		for i := range enriched {
 			if enriched[i].HasBalance {
 				total := 0.0
@@ -155,23 +148,14 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 				LastSyncedAt:                enriched[i].LastSyncedAt,
 			}, globalInterval, now)
 
-			// Compute staleness (same logic as dashboard Connection Health).
+			// Compute staleness.
 			if string(enriched[i].Status) != "disconnected" {
-				staleThreshold := defaultStaleThreshold
-				if enriched[i].SyncIntervalOverrideMinutes.Valid {
-					connInterval := time.Duration(enriched[i].SyncIntervalOverrideMinutes.Int32) * time.Minute
-					staleThreshold = connInterval * 2
-					if staleThreshold < time.Hour {
-						staleThreshold = time.Hour
-					}
-				}
-				if enriched[i].LastSyncedAt.Valid {
-					if now.Sub(enriched[i].LastSyncedAt.Time) > staleThreshold {
-						enriched[i].IsStale = true
-					}
-				} else {
-					enriched[i].IsStale = true
-				}
+				enriched[i].IsStale = ConnectionStaleness(
+					globalInterval,
+					enriched[i].SyncIntervalOverrideMinutes,
+					enriched[i].LastSyncedAt,
+					now,
+				)
 			}
 		}
 

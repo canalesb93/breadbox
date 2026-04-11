@@ -181,7 +181,7 @@ func InsightsHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) htt
 					continue
 				}
 				bal := *acct.BalanceCurrent
-				isLiability := acct.Type == "credit" || acct.Type == "loan"
+				isLiability := IsLiabilityAccount(acct.Type)
 				if isLiability {
 					totalLiabilities += math.Abs(bal)
 					netWorth -= math.Abs(bal)

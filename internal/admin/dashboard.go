@@ -20,8 +20,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		ctx := r.Context()
 
 		// Redirect to getting-started page if onboarding is not dismissed.
-		dismissed, _ := a.Queries.GetAppConfig(ctx, "onboarding_dismissed")
-		if !(dismissed.Value.Valid && dismissed.Value.String == "true") {
+		if !GetConfigBool(ctx, a.Queries, "onboarding_dismissed") {
 			http.Redirect(w, r, "/getting-started", http.StatusSeeOther)
 			return
 		}
@@ -34,9 +33,8 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 
 		// Only count pending reviews if reviews are enabled.
 		var reviewPending int64
-		reviewsEnabled := false
-		if cfg, err := a.Queries.GetAppConfig(ctx, "review_auto_enqueue"); err == nil && cfg.Value.Valid && cfg.Value.String == "true" {
-			reviewsEnabled = true
+		reviewsEnabled := GetConfigBool(ctx, a.Queries, "review_auto_enqueue")
+		if reviewsEnabled {
 			reviewPending, err = a.Queries.CountPendingReviews(ctx)
 			if err != nil {
 				a.Logger.Error("count pending reviews", "error", err)
@@ -64,8 +62,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				a.Logger.Debug("version check failed", "error", err)
 			}
 			if updateAvailable != nil && *updateAvailable && latest != nil {
-				dismissed, _ := a.Queries.GetAppConfig(ctx, "update_dismissed_version")
-				if !(dismissed.Value.Valid && dismissed.Value.String == latest.Version) {
+				if GetConfigString(ctx, a.Queries, "update_dismissed_version") != latest.Version {
 					showUpdateBanner = true
 					latestVersion = latest.Version
 					latestURL = latest.URL
@@ -123,7 +120,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				currency = *acct.IsoCurrencyCode
 			}
 
-			isLiability := acct.Type == "credit" || acct.Type == "loan"
+			isLiability := IsLiabilityAccount(acct.Type)
 
 			// Fetch per-account daily spending for sparkline.
 			acctID := acct.ID
@@ -281,12 +278,6 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		if err != nil {
 			a.Logger.Error("list bank connections for health", "error", err)
 		}
-		// Default staleness threshold: 2x the global sync interval (or 24h minimum).
-		globalSyncInterval := time.Duration(a.Config.SyncIntervalMinutes) * time.Minute
-		defaultStaleThreshold := globalSyncInterval * 2
-		if defaultStaleThreshold < 24*time.Hour {
-			defaultStaleThreshold = 24 * time.Hour
-		}
 
 		for _, conn := range bankConnections {
 			if string(conn.Status) == "disconnected" {
@@ -301,25 +292,15 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				errMsg = conn.ErrorMessage.String
 			}
 			lastSync := "Never"
-			isStale := false
-
-			// Use the connection's override interval if set, otherwise use global default.
-			staleThreshold := defaultStaleThreshold
-			if conn.SyncIntervalOverrideMinutes.Valid {
-				connInterval := time.Duration(conn.SyncIntervalOverrideMinutes.Int32) * time.Minute
-				staleThreshold = connInterval * 2
-				if staleThreshold < time.Hour {
-					staleThreshold = time.Hour
-				}
-			}
+			isStale := ConnectionStaleness(
+				a.Config.SyncIntervalMinutes,
+				conn.SyncIntervalOverrideMinutes,
+				conn.LastSyncedAt,
+				time.Now(),
+			)
 
 			if conn.LastSyncedAt.Valid {
 				lastSync = relativeTime(conn.LastSyncedAt.Time)
-				if time.Since(conn.LastSyncedAt.Time) > staleThreshold {
-					isStale = true
-				}
-			} else {
-				isStale = true
 			}
 
 			status := string(conn.Status)

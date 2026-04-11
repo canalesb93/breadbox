@@ -101,7 +101,7 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 						displayName = acct.DisplayName.String
 					}
 
-					isLiability := acct.Type == "credit" || acct.Type == "loan"
+					isLiability := IsLiabilityAccount(acct.Type)
 					displayBal := bal
 					if hasBal {
 						if isLiability {
