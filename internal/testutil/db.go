@@ -23,7 +23,10 @@ package testutil
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
@@ -196,6 +199,105 @@ func MustParseDate(s string) time.Time {
 		panic(fmt.Sprintf("MustParseDate(%q): %v", s, err))
 	}
 	return t
+}
+
+// MustCreateCategory creates a category and fatals on error.
+func MustCreateCategory(t *testing.T, q *db.Queries, slug, displayName string) db.Category {
+	t.Helper()
+	cat, err := q.InsertCategory(context.Background(), db.InsertCategoryParams{
+		Slug:        slug,
+		DisplayName: displayName,
+	})
+	if err != nil {
+		t.Fatalf("MustCreateCategory(%q): %v", slug, err)
+	}
+	return cat
+}
+
+// MustCreateTransactionRule creates an enabled transaction rule and fatals on error.
+// conditions should be valid JSON (e.g., json.RawMessage(`{"field":"name","operator":"contains","value":"coffee"}`)).
+func MustCreateTransactionRule(t *testing.T, q *db.Queries, name string, categoryID pgtype.UUID, conditions []byte) db.TransactionRule {
+	t.Helper()
+	rule, err := q.InsertTransactionRule(context.Background(), db.InsertTransactionRuleParams{
+		Name:          name,
+		Conditions:    conditions,
+		CategoryID:    categoryID,
+		Priority:      100,
+		Enabled:       true,
+		CreatedByType: "system",
+		CreatedByName: "test",
+	})
+	if err != nil {
+		t.Fatalf("MustCreateTransactionRule(%q): %v", name, err)
+	}
+	return rule
+}
+
+// MustCreateAccountLink creates an account link between a primary and dependent account and fatals on error.
+func MustCreateAccountLink(t *testing.T, q *db.Queries, primaryAcctID, dependentAcctID pgtype.UUID) db.AccountLink {
+	t.Helper()
+	link, err := q.CreateAccountLink(context.Background(), db.CreateAccountLinkParams{
+		PrimaryAccountID:   primaryAcctID,
+		DependentAccountID: dependentAcctID,
+		MatchStrategy:      "date_amount_name",
+		MatchToleranceDays: 1,
+	})
+	if err != nil {
+		t.Fatalf("MustCreateAccountLink: %v", err)
+	}
+	return link
+}
+
+// MustCreateAPIKey creates an API key with full_access scope and fatals on error.
+// Returns the db.ApiKey record. The key_hash is a SHA-256 of random bytes.
+func MustCreateAPIKey(t *testing.T, q *db.Queries, name string) db.ApiKey {
+	t.Helper()
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		t.Fatalf("MustCreateAPIKey: generate random key: %v", err)
+	}
+	hash := sha256.Sum256(raw)
+	key, err := q.CreateApiKey(context.Background(), db.CreateApiKeyParams{
+		Name:      name,
+		KeyHash:   hex.EncodeToString(hash[:]),
+		KeyPrefix: "bb_test_",
+		Scope:     "full_access",
+	})
+	if err != nil {
+		t.Fatalf("MustCreateAPIKey(%q): %v", name, err)
+	}
+	return key
+}
+
+// MustCreateReview enqueues a review for a transaction and fatals on error.
+// reviewType should be one of: new_transaction, uncategorized, manual, re_review.
+func MustCreateReview(t *testing.T, q *db.Queries, txnID pgtype.UUID, reviewType string) db.ReviewQueue {
+	t.Helper()
+	review, err := q.EnqueueReview(context.Background(), db.EnqueueReviewParams{
+		TransactionID: txnID,
+		ReviewType:    reviewType,
+	})
+	if err != nil {
+		t.Fatalf("MustCreateReview(%q): %v", reviewType, err)
+	}
+	return review
+}
+
+// MustCreateAgentReport creates an agent report and fatals on error.
+func MustCreateAgentReport(t *testing.T, q *db.Queries, title, body string) db.AgentReport {
+	t.Helper()
+	report, err := q.CreateAgentReport(context.Background(), db.CreateAgentReportParams{
+		Title:         title,
+		Body:          body,
+		CreatedByType: "agent",
+		CreatedByID:   pgtype.Text{String: "test-agent", Valid: true},
+		CreatedByName: "TestAgent",
+		Priority:      "info",
+	})
+	if err != nil {
+		t.Fatalf("MustCreateAgentReport(%q): %v", title, err)
+	}
+	return report
 }
 
 func testDSN() string {
