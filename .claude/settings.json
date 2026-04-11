@@ -27,7 +27,7 @@
   },
   "sandbox": {
     "enabled": true,
-    "autoAllow": true,
+    "autoAllowBashIfSandboxed": true,
     "filesystem": {
       "allowWrite": [
         "~/go",
