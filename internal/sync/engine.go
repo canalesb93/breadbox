@@ -28,6 +28,15 @@ type accountSyncCounts struct {
 	Unchanged   int
 }
 
+// pendingApplication holds a deferred rule application record to be batch-inserted
+// after the transaction processing loops complete.
+type pendingApplication struct {
+	txnID       pgtype.UUID
+	ruleID      pgtype.UUID
+	actionField string
+	actionValue string
+}
+
 // Engine orchestrates transaction syncing across all bank connections.
 type Engine struct {
 	db                *db.Queries
@@ -295,97 +304,53 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		//   fields identical to what was already stored).
 		upsertStart := time.Now()
 		var skipped int
-		// Accumulate rule applications to batch-insert after the transaction loop.
-		type pendingApplication struct {
-			txnID       pgtype.UUID
-			ruleID      pgtype.UUID
-			actionField string
-			actionValue string
-		}
 		var ruleApplications []pendingApplication
 
+		processOpts := processTransactionOpts{
+			txQueries:        txQueries,
+			tx:               tx,
+			accountIDCache:   accountIDCache,
+			accountNameCache: accountNameCache,
+			excludedSet:      excludedSet,
+			providerName:     string(conn.Provider),
+			resolver:         resolver,
+			userID:           conn.UserID,
+			userName:         userName,
+			reviewAutoEnqueue: reviewAutoEnqueue,
+			upsertStart:      upsertStart,
+			perAccount:       perAccount,
+			logger:           logger,
+		}
+
 		for i := range pendingAdded {
-			accountID, err := e.resolveAccountID(ctx, pendingAdded[i].AccountExternalID, accountIDCache)
-			if err != nil {
-				logger.Error("resolve account for added txn", "external_id", pendingAdded[i].ExternalID, "error", err)
-				continue
-			}
-			if excludedSet[accountID] {
+			result := e.processTransaction(ctx, &pendingAdded[i], true, processOpts)
+			if result.skipped {
 				skipped++
 				continue
 			}
-			dbTxn, err := e.upsertTransaction(ctx, txQueries, &pendingAdded[i], accountIDCache)
-			if err != nil {
-				logger.Error("upsert added transaction", "external_id", pendingAdded[i].ExternalID, "error", err)
+			if result.errored {
 				continue
 			}
-			isNew, isChanged := classifyUpsertResult(dbTxn, upsertStart)
-			if isNew {
-				added++
-			} else if isChanged {
-				modified++
-			} else {
-				unchanged++
-			}
-			if isNew || isChanged {
-				sources, ruleErr := e.applyRulesToTransaction(ctx, tx, &pendingAdded[i], dbTxn, accountIDCache, string(conn.Provider), resolver, conn.UserID, userName)
-				if ruleErr != nil {
-					logger.Error("apply rules to added txn", "external_id", pendingAdded[i].ExternalID, "error", ruleErr)
-				}
-				for _, src := range sources {
-					ruleApplications = append(ruleApplications, pendingApplication{
-						txnID: dbTxn.ID, ruleID: src.RuleID, actionField: src.ActionField, actionValue: src.ActionValue,
-					})
-				}
-			}
-			if reviewAutoEnqueue && (isNew || isChanged) {
-				e.enqueueForReview(ctx, txQueries, dbTxn, isNew, resolver)
-			}
-			if isNew {
-				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "added")
-			} else if isChanged {
-				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "modified")
-			} else {
-				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "unchanged")
-			}
+			added += result.added
+			modified += result.modified
+			unchanged += result.unchanged
+			ruleApplications = append(ruleApplications, result.ruleApplications...)
 		}
 
 		// Process modified transactions (skip excluded accounts).
 		for i := range pendingModified {
-			accountID, err := e.resolveAccountID(ctx, pendingModified[i].AccountExternalID, accountIDCache)
-			if err != nil {
-				logger.Error("resolve account for modified txn", "external_id", pendingModified[i].ExternalID, "error", err)
-				continue
-			}
-			if excludedSet[accountID] {
+			result := e.processTransaction(ctx, &pendingModified[i], false, processOpts)
+			if result.skipped {
 				skipped++
 				continue
 			}
-			dbTxn, err := e.upsertTransaction(ctx, txQueries, &pendingModified[i], accountIDCache)
-			if err != nil {
-				logger.Error("upsert modified transaction", "external_id", pendingModified[i].ExternalID, "error", err)
+			if result.errored {
 				continue
 			}
-			_, isChanged := classifyUpsertResult(dbTxn, upsertStart)
-			if isChanged {
-				modified++
-				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "modified")
-				sources, ruleErr := e.applyRulesToTransaction(ctx, tx, &pendingModified[i], dbTxn, accountIDCache, string(conn.Provider), resolver, conn.UserID, userName)
-				if ruleErr != nil {
-					logger.Error("apply rules to modified txn", "external_id", pendingModified[i].ExternalID, "error", ruleErr)
-				}
-				for _, src := range sources {
-					ruleApplications = append(ruleApplications, pendingApplication{
-						txnID: dbTxn.ID, ruleID: src.RuleID, actionField: src.ActionField, actionValue: src.ActionValue,
-					})
-				}
-			} else {
-				unchanged++
-				e.trackAccountCount(ctx, perAccount, accountID, accountNameCache, "unchanged")
-			}
-			if reviewAutoEnqueue && isChanged {
-				e.enqueueForReview(ctx, txQueries, dbTxn, false, resolver)
-			}
+			added += result.added
+			modified += result.modified
+			unchanged += result.unchanged
+			ruleApplications = append(ruleApplications, result.ruleApplications...)
 		}
 
 		// Batch-insert rule application records.
@@ -452,6 +417,112 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 	}
 
 	return added, modified, removed, unchanged, perAccount, ruleHits, warning, nil
+}
+
+// processTransactionOpts captures the shared context for processing a single
+// transaction during sync. These values are identical across all transactions
+// in a sync batch, so they are set once and reused.
+type processTransactionOpts struct {
+	txQueries        *db.Queries
+	tx               pgx.Tx
+	accountIDCache   map[string]pgtype.UUID
+	accountNameCache map[string]string
+	excludedSet      map[pgtype.UUID]bool
+	providerName     string
+	resolver         *RuleResolver
+	userID           pgtype.UUID
+	userName         string
+	reviewAutoEnqueue bool
+	upsertStart      time.Time
+	perAccount       map[string]*accountSyncCounts
+	logger           *slog.Logger
+}
+
+// processTransactionResult captures the outcome of processing a single transaction.
+type processTransactionResult struct {
+	added            int // 1 if newly inserted, 0 otherwise
+	modified         int // 1 if existing row changed, 0 otherwise
+	unchanged        int // 1 if existing row was identical, 0 otherwise
+	skipped          bool // true if account is excluded
+	errored          bool // true if resolve or upsert failed (already logged)
+	ruleApplications []pendingApplication
+}
+
+// processTransaction handles the full lifecycle of a single transaction during
+// sync: resolve account, check exclusion, upsert, classify, apply rules, enqueue
+// review, and track per-account counts.
+//
+// When providerAdded is true, the provider classified this transaction as "added"
+// (new from the provider's perspective). This allows newly inserted rows to be
+// counted as "added" rather than "modified". When false (provider said "modified"),
+// all changes are counted as "modified" regardless of DB classification.
+func (e *Engine) processTransaction(ctx context.Context, txn *provider.Transaction, providerAdded bool, opts processTransactionOpts) processTransactionResult {
+	var result processTransactionResult
+
+	label := "modified"
+	if providerAdded {
+		label = "added"
+	}
+
+	accountID, err := e.resolveAccountID(ctx, txn.AccountExternalID, opts.accountIDCache)
+	if err != nil {
+		opts.logger.Error("resolve account for "+label+" txn", "external_id", txn.ExternalID, "error", err)
+		result.errored = true
+		return result
+	}
+	if opts.excludedSet[accountID] {
+		result.skipped = true
+		return result
+	}
+
+	dbTxn, err := e.upsertTransaction(ctx, opts.txQueries, txn, opts.accountIDCache)
+	if err != nil {
+		opts.logger.Error("upsert "+label+" transaction", "external_id", txn.ExternalID, "error", err)
+		result.errored = true
+		return result
+	}
+
+	isNew, isChanged := classifyUpsertResult(dbTxn, opts.upsertStart)
+
+	// For provider-added transactions, a newly inserted row counts as "added".
+	// For provider-modified transactions, isNew is not expected — all changes
+	// are counted as "modified".
+	if providerAdded && isNew {
+		result.added = 1
+	} else if isChanged {
+		result.modified = 1
+	} else {
+		result.unchanged = 1
+	}
+
+	// Apply rules to new or changed transactions.
+	if isNew || isChanged {
+		sources, ruleErr := e.applyRulesToTransaction(ctx, opts.tx, txn, dbTxn, opts.accountIDCache, opts.providerName, opts.resolver, opts.userID, opts.userName)
+		if ruleErr != nil {
+			opts.logger.Error("apply rules to "+label+" txn", "external_id", txn.ExternalID, "error", ruleErr)
+		}
+		for _, src := range sources {
+			result.ruleApplications = append(result.ruleApplications, pendingApplication{
+				txnID: dbTxn.ID, ruleID: src.RuleID, actionField: src.ActionField, actionValue: src.ActionValue,
+			})
+		}
+	}
+
+	// Enqueue for review if enabled and transaction is new or changed.
+	if opts.reviewAutoEnqueue && (isNew || isChanged) {
+		e.enqueueForReview(ctx, opts.txQueries, dbTxn, providerAdded && isNew, opts.resolver)
+	}
+
+	// Track per-account counts.
+	if providerAdded && isNew {
+		e.trackAccountCount(ctx, opts.perAccount, accountID, opts.accountNameCache, "added")
+	} else if isChanged {
+		e.trackAccountCount(ctx, opts.perAccount, accountID, opts.accountNameCache, "modified")
+	} else {
+		e.trackAccountCount(ctx, opts.perAccount, accountID, opts.accountNameCache, "unchanged")
+	}
+
+	return result
 }
 
 // upsertTransaction upserts a single transaction without rule evaluation.
