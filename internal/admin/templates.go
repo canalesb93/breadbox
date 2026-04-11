@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	bsync "breadbox/internal/sync"
 	"breadbox/internal/templates"
@@ -165,7 +166,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 			},
 			"formatUUID": func(u pgtype.UUID) string {
-				return formatUUID(u)
+				return pgconv.FormatUUID(u)
 			},
 			"formatIntervalMinutes": func(minutes int) string {
 				// Render a sync interval in human-readable form (e.g., "12h", "4h", "30m", "1d").
@@ -403,7 +404,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					if !v.Valid {
 						return "/avatars/unknown"
 					}
-					base = "/avatars/" + formatUUID(v)
+					base = "/avatars/" + pgconv.FormatUUID(v)
 				case string:
 					if v == "" {
 						return "/avatars/unknown"

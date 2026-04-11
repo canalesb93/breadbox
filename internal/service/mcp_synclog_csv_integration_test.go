@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/testutil"
 
@@ -250,7 +251,7 @@ func TestListSyncLogsPaginated_FilterByConnection(t *testing.T) {
 		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
 	})
 
-	conn1ID := formatUUID(conn1.ID)
+	conn1ID := pgconv.FormatUUID(conn1.ID)
 	result, err := svc.ListSyncLogsPaginated(ctx, service.SyncLogListParams{
 		Page:         1,
 		PageSize:     10,
@@ -493,7 +494,7 @@ func TestSyncLogStats_FilterByConnection(t *testing.T) {
 		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
 	})
 
-	conn1ID := formatUUID(conn1.ID)
+	conn1ID := pgconv.FormatUUID(conn1.ID)
 	stats, err := svc.SyncLogStats(ctx, service.SyncLogListParams{
 		ConnectionID: &conn1ID,
 	})
@@ -805,7 +806,7 @@ func TestGetConnectionStatus_WithSyncLog(t *testing.T) {
 		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
 	})
 
-	connID := formatUUID(conn.ID)
+	connID := pgconv.FormatUUID(conn.ID)
 	status, err := svc.GetConnectionStatus(ctx, connID)
 	if err != nil {
 		t.Fatalf("GetConnectionStatus: %v", err)
@@ -831,7 +832,7 @@ func TestGetConnectionStatus_NoSyncLog(t *testing.T) {
 	user := testutil.MustCreateUser(t, queries, "Alice")
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_status_nosync")
 
-	connID := formatUUID(conn.ID)
+	connID := pgconv.FormatUUID(conn.ID)
 	status, err := svc.GetConnectionStatus(ctx, connID)
 	if err != nil {
 		t.Fatalf("GetConnectionStatus: %v", err)
@@ -903,7 +904,7 @@ func TestListConnections_FilterByUser(t *testing.T) {
 	testutil.MustCreateConnection(t, queries, alice.ID, "alice_conn_2")
 	testutil.MustCreateConnection(t, queries, bob.ID, "bob_conn_1")
 
-	aliceID := formatUUID(alice.ID)
+	aliceID := pgconv.FormatUUID(alice.ID)
 	conns, err := svc.ListConnections(ctx, &aliceID)
 	if err != nil {
 		t.Fatalf("ListConnections: %v", err)
@@ -932,7 +933,7 @@ func TestGetAccount_Success(t *testing.T) {
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_acct_1")
 	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_get", "Checking Account")
 
-	acctID := formatUUID(acct.ID)
+	acctID := pgconv.FormatUUID(acct.ID)
 	resp, err := svc.GetAccount(ctx, acctID)
 	if err != nil {
 		t.Fatalf("GetAccount: %v", err)
@@ -963,7 +964,7 @@ func TestGetAccountDetail_Success(t *testing.T) {
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_detail_1")
 	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_detail_1", "My Savings")
 
-	acctID := formatUUID(acct.ID)
+	acctID := pgconv.FormatUUID(acct.ID)
 	detail, err := svc.GetAccountDetail(ctx, acctID)
 	if err != nil {
 		t.Fatalf("GetAccountDetail: %v", err)
@@ -1006,7 +1007,7 @@ func TestImportCSV_BasicSuccess(t *testing.T) {
 	ctx := context.Background()
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
-	userID := formatUUID(user.ID)
+	userID := pgconv.FormatUUID(user.ID)
 
 	result, err := svc.ImportCSV(ctx, service.CSVImportParams{
 		UserID:      userID,
@@ -1048,7 +1049,7 @@ func TestImportCSV_SkipsInvalidRows(t *testing.T) {
 	ctx := context.Background()
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
-	userID := formatUUID(user.ID)
+	userID := pgconv.FormatUUID(user.ID)
 
 	result, err := svc.ImportCSV(ctx, service.CSVImportParams{
 		UserID:      userID,
@@ -1086,7 +1087,7 @@ func TestImportCSV_Deduplication(t *testing.T) {
 	ctx := context.Background()
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
-	userID := formatUUID(user.ID)
+	userID := pgconv.FormatUUID(user.ID)
 
 	params := service.CSVImportParams{
 		UserID:      userID,
@@ -1155,9 +1156,9 @@ func TestImportCSV_ReimportNonCSVConnection(t *testing.T) {
 	user := testutil.MustCreateUser(t, queries, "Alice")
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "plaid_conn")
 
-	connID := formatUUID(conn.ID)
+	connID := pgconv.FormatUUID(conn.ID)
 	_, err := svc.ImportCSV(ctx, service.CSVImportParams{
-		UserID:       formatUUID(user.ID),
+		UserID:       pgconv.FormatUUID(user.ID),
 		ConnectionID: connID,
 		AccountName:  "Test",
 		ColumnMapping: map[string]int{
@@ -1177,7 +1178,7 @@ func TestImportCSV_DefaultAccountName(t *testing.T) {
 	ctx := context.Background()
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
-	userID := formatUUID(user.ID)
+	userID := pgconv.FormatUUID(user.ID)
 
 	result, err := svc.ImportCSV(ctx, service.CSVImportParams{
 		UserID:      userID,
@@ -1211,7 +1212,7 @@ func TestImportCSV_DebitCreditColumns(t *testing.T) {
 	ctx := context.Background()
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
-	userID := formatUUID(user.ID)
+	userID := pgconv.FormatUUID(user.ID)
 
 	result, err := svc.ImportCSV(ctx, service.CSVImportParams{
 		UserID:      userID,
@@ -1245,7 +1246,7 @@ func TestImportCSV_WithCategoryAndMerchant(t *testing.T) {
 	ctx := context.Background()
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
-	userID := formatUUID(user.ID)
+	userID := pgconv.FormatUUID(user.ID)
 
 	result, err := svc.ImportCSV(ctx, service.CSVImportParams{
 		UserID:      userID,
@@ -1275,7 +1276,7 @@ func TestImportCSV_AllRowsSkipped_ErrorStatus(t *testing.T) {
 	ctx := context.Background()
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
-	userID := formatUUID(user.ID)
+	userID := pgconv.FormatUUID(user.ID)
 
 	result, err := svc.ImportCSV(ctx, service.CSVImportParams{
 		UserID:      userID,

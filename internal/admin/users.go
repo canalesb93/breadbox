@@ -10,6 +10,7 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -64,7 +65,7 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 
 			accounts, err := a.Queries.ListAccountsByUser(ctx, u.ID)
 			if err != nil {
-				a.Logger.Error("list accounts for user", "error", err, "user_id", formatUUID(u.ID))
+				a.Logger.Error("list accounts for user", "error", err, "user_id", pgconv.FormatUUID(u.ID))
 			} else {
 				eu.AccountCount = len(accounts)
 				// Count distinct connections from displayed accounts so the
@@ -72,7 +73,7 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 				connSet := make(map[string]struct{})
 				for _, acct := range accounts {
 					if acct.ConnectionID.Valid {
-						connSet[formatUUID(acct.ConnectionID)] = struct{}{}
+						connSet[pgconv.FormatUUID(acct.ConnectionID)] = struct{}{}
 					}
 				}
 				eu.ConnectionCount = int64(len(connSet))
@@ -117,7 +118,7 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 
 					connStatus := string(acct.ConnectionStatus)
 					eu.Accounts = append(eu.Accounts, UserAccountSummary{
-						ID:               formatUUID(acct.ID),
+						ID:               pgconv.FormatUUID(acct.ID),
 						Name:             displayName,
 						Type:             acct.Type,
 						Subtype:          subtype,
@@ -143,7 +144,7 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 		// Build a map of user_id -> login account for quick lookup in template.
 		loginAccountMap := make(map[string]db.ListAuthAccountsWithUserRow)
 		for _, la := range loginAccounts {
-			loginAccountMap[formatUUID(la.UserID)] = la
+			loginAccountMap[pgconv.FormatUUID(la.UserID)] = la
 		}
 
 		data := map[string]any{
@@ -262,7 +263,7 @@ func CreateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 			return
 		}
 
-		userID := formatUUID(user.ID)
+		userID := pgconv.FormatUUID(user.ID)
 
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"id":         userID,
@@ -353,7 +354,7 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{
-			"id":         formatUUID(user.ID),
+			"id":         pgconv.FormatUUID(user.ID),
 			"name":       user.Name,
 			"email":      nullTextToPtr(user.Email),
 			"created_at": user.CreatedAt.Time,

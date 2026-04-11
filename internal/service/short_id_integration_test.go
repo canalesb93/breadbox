@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/shortid"
 	"breadbox/internal/testutil"
@@ -148,7 +149,7 @@ func TestShortID_Resolver_GetAccount_ByUUID(t *testing.T) {
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "sid_resolve_conn")
 	dbAcct := testutil.MustCreateAccount(t, queries, conn.ID, "sid_resolve_acct", "Checking")
 
-	uuid := formatUUID(dbAcct.ID)
+	uuid := pgconv.FormatUUID(dbAcct.ID)
 	acct, err := svc.GetAccount(ctx, uuid)
 	if err != nil {
 		t.Fatalf("GetAccount by UUID: %v", err)
@@ -170,8 +171,8 @@ func TestShortID_Resolver_GetAccount_ByShortID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAccount by short_id %q: %v", dbAcct.ShortID, err)
 	}
-	if acct.ID != formatUUID(dbAcct.ID) {
-		t.Fatalf("expected UUID %q, got %q", formatUUID(dbAcct.ID), acct.ID)
+	if acct.ID != pgconv.FormatUUID(dbAcct.ID) {
+		t.Fatalf("expected UUID %q, got %q", pgconv.FormatUUID(dbAcct.ID), acct.ID)
 	}
 }
 
@@ -188,8 +189,8 @@ func TestShortID_Resolver_GetTransaction_ByShortID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTransaction by short_id %q: %v", dbTxn.ShortID, err)
 	}
-	if txn.ID != formatUUID(dbTxn.ID) {
-		t.Fatalf("expected UUID %q, got %q", formatUUID(dbTxn.ID), txn.ID)
+	if txn.ID != pgconv.FormatUUID(dbTxn.ID) {
+		t.Fatalf("expected UUID %q, got %q", pgconv.FormatUUID(dbTxn.ID), txn.ID)
 	}
 	if txn.ShortID != dbTxn.ShortID {
 		t.Fatalf("expected ShortID %q, got %q", dbTxn.ShortID, txn.ShortID)

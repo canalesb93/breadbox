@@ -19,6 +19,7 @@ import (
 
 	"breadbox/internal/db"
 	mw "breadbox/internal/middleware"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/testutil"
 
@@ -286,13 +287,6 @@ func seedUncategorized(t *testing.T, q *db.Queries) db.Category {
 	return cat
 }
 
-func fmtUUID(u pgtype.UUID) string {
-	if !u.Valid {
-		return ""
-	}
-	b := u.Bytes
-	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
-}
 
 // ============================================================
 // Authentication & Scope Tests
@@ -630,7 +624,7 @@ func TestAPI_GetTransaction_NotFound(t *testing.T) {
 func TestAPI_GetTransaction_Found(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	resp := env.doGet(t, "/api/v1/transactions/"+txnID)
 	assertStatus(t, resp, http.StatusOK)
@@ -870,7 +864,7 @@ func TestAPI_DeleteCategory_Success(t *testing.T) {
 func TestAPI_DeleteCategory_UndeletableSystem(t *testing.T) {
 	env := setupTestEnv(t)
 	uncat := seedUncategorized(t, env.Queries)
-	uncatID := fmtUUID(uncat.ID)
+	uncatID := pgconv.FormatUUID(uncat.ID)
 
 	resp := env.doDelete(t, "/api/v1/categories/"+uncatID)
 	readErrorCode(t, resp, http.StatusConflict, "CATEGORY_UNDELETABLE")
@@ -900,7 +894,7 @@ func TestAPI_SetTransactionCategory_NotFound(t *testing.T) {
 func TestAPI_SetTransactionCategory_MissingCategoryID(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	resp := env.doPatch(t, "/api/v1/transactions/"+txnID+"/category", map[string]string{})
 	readErrorCode(t, resp, http.StatusBadRequest, "INVALID_PARAMETER")
@@ -909,7 +903,7 @@ func TestAPI_SetTransactionCategory_MissingCategoryID(t *testing.T) {
 func TestAPI_SetTransactionCategory_CategoryNotFound(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	resp := env.doPatch(t, "/api/v1/transactions/"+txnID+"/category", map[string]string{
 		"category_id": "00000000-0000-0000-0000-000000000099",
@@ -920,7 +914,7 @@ func TestAPI_SetTransactionCategory_CategoryNotFound(t *testing.T) {
 func TestAPI_SetTransactionCategory_Success(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	catResp := env.doPost(t, "/api/v1/categories", map[string]any{
 		"display_name": "Coffee",
@@ -951,7 +945,7 @@ func TestAPI_ResetTransactionCategory_Success(t *testing.T) {
 	env := setupTestEnv(t)
 	seedUncategorized(t, env.Queries)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	// Create and set category
 	catResp := env.doPost(t, "/api/v1/categories", map[string]any{
@@ -1286,7 +1280,7 @@ func TestAPI_GetReview_NotFound(t *testing.T) {
 func TestAPI_EnqueueReview_Success(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	resp := env.doPost(t, "/api/v1/reviews/enqueue", map[string]string{
 		"transaction_id": txnID,
@@ -1315,7 +1309,7 @@ func TestAPI_EnqueueReview_TransactionNotFound(t *testing.T) {
 func TestAPI_EnqueueReview_DuplicatePending(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	resp := env.doPost(t, "/api/v1/reviews/enqueue", map[string]string{
 		"transaction_id": txnID,
@@ -1332,7 +1326,7 @@ func TestAPI_EnqueueReview_DuplicatePending(t *testing.T) {
 func TestAPI_SubmitReview_Approve(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	resp := env.doPost(t, "/api/v1/reviews/enqueue", map[string]string{
 		"transaction_id": txnID,
@@ -1355,7 +1349,7 @@ func TestAPI_SubmitReview_Approve(t *testing.T) {
 func TestAPI_SubmitReview_Reject(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	resp := env.doPost(t, "/api/v1/reviews/enqueue", map[string]string{
 		"transaction_id": txnID,
@@ -1378,7 +1372,7 @@ func TestAPI_SubmitReview_Reject(t *testing.T) {
 func TestAPI_SubmitReview_Skip(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	resp := env.doPost(t, "/api/v1/reviews/enqueue", map[string]string{
 		"transaction_id": txnID,
@@ -1401,7 +1395,7 @@ func TestAPI_SubmitReview_Skip(t *testing.T) {
 func TestAPI_SubmitReview_InvalidDecision(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	resp := env.doPost(t, "/api/v1/reviews/enqueue", map[string]string{
 		"transaction_id": txnID,
@@ -1419,7 +1413,7 @@ func TestAPI_SubmitReview_InvalidDecision(t *testing.T) {
 func TestAPI_SubmitReview_AlreadyResolved(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	resp := env.doPost(t, "/api/v1/reviews/enqueue", map[string]string{
 		"transaction_id": txnID,
@@ -1441,7 +1435,7 @@ func TestAPI_SubmitReview_AlreadyResolved(t *testing.T) {
 func TestAPI_DismissReview_Success(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	resp := env.doPost(t, "/api/v1/reviews/enqueue", map[string]string{
 		"transaction_id": txnID,
@@ -1469,7 +1463,7 @@ func TestAPI_DismissReview_NotFound(t *testing.T) {
 func TestAPI_CreateComment_Success(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	resp := env.doPost(t, "/api/v1/transactions/"+txnID+"/comments", map[string]string{
 		"content": "This is a test comment",
@@ -1495,7 +1489,7 @@ func TestAPI_CreateComment_TransactionNotFound(t *testing.T) {
 func TestAPI_ListComments_Empty(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	resp := env.doGet(t, "/api/v1/transactions/"+txnID+"/comments")
 	assertStatus(t, resp, http.StatusOK)
@@ -1510,7 +1504,7 @@ func TestAPI_ListComments_Empty(t *testing.T) {
 func TestAPI_ListComments_WithData(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	env.doPost(t, "/api/v1/transactions/"+txnID+"/comments", map[string]string{
 		"content": "First comment",
@@ -1674,7 +1668,7 @@ func TestAPI_MergeCategories_MissingTargetID(t *testing.T) {
 func TestAPI_BatchCategorize_Success(t *testing.T) {
 	env := setupTestEnv(t)
 	_, _, txn := seedFixture(t, env.Queries)
-	txnID := fmtUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	env.doPost(t, "/api/v1/categories", map[string]any{
 		"display_name": "Dining",

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
@@ -114,11 +115,11 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRende
 			return
 		}
 
-		sm.Put(r.Context(), sessionKeyAccountID, formatUUID(account.ID))
+		sm.Put(r.Context(), sessionKeyAccountID, pgconv.FormatUUID(account.ID))
 		sm.Put(r.Context(), sessionKeyAccountUsername, account.Username)
 		sm.Put(r.Context(), sessionKeyAccountRole, account.Role)
 		if account.UserID.Valid {
-			sm.Put(r.Context(), sessionKeyUserID, formatUUID(account.UserID))
+			sm.Put(r.Context(), sessionKeyUserID, pgconv.FormatUUID(account.UserID))
 		} else {
 			sm.Remove(r.Context(), sessionKeyUserID)
 		}

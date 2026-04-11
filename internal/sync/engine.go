@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/provider"
 
 	"github.com/jackc/pgx/v5"
@@ -62,7 +63,7 @@ func NewEngine(queries *db.Queries, pool *pgxpool.Pool, providers map[string]pro
 
 // Sync runs an incremental transaction sync for a single bank connection.
 func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.SyncTrigger) error {
-	connIDStr := formatUUID(connectionID)
+	connIDStr := pgconv.FormatUUID(connectionID)
 	logger := e.logger.With("connection_id", connIDStr, "trigger", string(trigger))
 
 	// Acquire per-connection lock. If already locked, skip.
@@ -184,7 +185,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		ProviderName:         string(conn.Provider),
 		ExternalID:           conn.ExternalID.String,
 		EncryptedCredentials: conn.EncryptedCredentials,
-		UserID:               formatUUID(conn.UserID),
+		UserID:               pgconv.FormatUUID(conn.UserID),
 	}
 
 	// Track cursors for pagination.
@@ -221,7 +222,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 	} else {
 		for _, acct := range connAccounts {
 			accountIDCache[acct.ExternalAccountID] = acct.ID
-			key := formatUUID(acct.ID)
+			key := pgconv.FormatUUID(acct.ID)
 			if acct.DisplayName.Valid && acct.DisplayName.String != "" {
 				accountNameCache[key] = acct.DisplayName.String
 			} else {
@@ -568,8 +569,8 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		Amount:     txn.Amount.InexactFloat64(),
 		Pending:    txn.Pending,
 		Provider:   providerName,
-		AccountID:  formatUUID(accountID),
-		UserID:     formatUUID(userID),
+		AccountID:  pgconv.FormatUUID(accountID),
+		UserID:     pgconv.FormatUUID(userID),
 		UserName:   userName,
 	}
 	if txn.MerchantName != nil {
@@ -758,7 +759,7 @@ func (e *Engine) SyncAll(ctx context.Context, trigger db.SyncTrigger) error {
 			defer func() { <-sem }()
 
 			if err := e.Sync(ctx, connID, trigger); err != nil {
-				e.logger.Error("sync connection failed", "connection_id", formatUUID(connID), "error", err)
+				e.logger.Error("sync connection failed", "connection_id", pgconv.FormatUUID(connID), "error", err)
 			}
 		}()
 	}
@@ -774,7 +775,7 @@ func (e *Engine) Matcher() *Matcher {
 
 // trackAccountCount increments the per-account counter for the given operation type.
 func (e *Engine) trackAccountCount(ctx context.Context, perAccount map[string]*accountSyncCounts, accountID pgtype.UUID, nameCache map[string]string, op string) {
-	key := formatUUID(accountID)
+	key := pgconv.FormatUUID(accountID)
 	if key == "" {
 		return
 	}
@@ -895,10 +896,3 @@ func optionalDecimalToNumeric(d *decimal.Decimal) pgtype.Numeric {
 	return decimalToNumeric(*d)
 }
 
-func formatUUID(u pgtype.UUID) string {
-	if !u.Valid {
-		return ""
-	}
-	b := u.Bytes
-	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
-}

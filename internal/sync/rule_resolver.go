@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 
+	"breadbox/internal/pgconv"
+
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -155,14 +157,14 @@ func loadRules(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) ([]
 		var cond Condition
 		if err := json.Unmarshal(rr.conditions, &cond); err != nil {
 			logger.Warn("skipping rule with invalid conditions JSON",
-				"rule_id", formatUUID(rr.id), "error", err)
+				"rule_id", pgconv.FormatUUID(rr.id), "error", err)
 			continue
 		}
 
 		cc, err := compileCondition(&cond)
 		if err != nil {
 			logger.Warn("skipping rule with invalid condition",
-				"rule_id", formatUUID(rr.id), "error", err)
+				"rule_id", pgconv.FormatUUID(rr.id), "error", err)
 			continue
 		}
 
@@ -290,7 +292,7 @@ func (r *RuleResolver) HitCountsJSON() []byte {
 	result := make(map[string]int, len(r.hitCounts))
 	for uuidBytes, count := range r.hitCounts {
 		id := pgtype.UUID{Bytes: uuidBytes, Valid: true}
-		result[formatUUID(id)] = count
+		result[pgconv.FormatUUID(id)] = count
 	}
 
 	data, err := json.Marshal(result)
@@ -313,7 +315,7 @@ func (r *RuleResolver) FlushHitCounts(ctx context.Context, pool *pgxpool.Pool) e
 			"UPDATE transaction_rules SET hit_count = hit_count + $1, last_hit_at = NOW() WHERE id = $2",
 			count, id)
 		if err != nil {
-			return fmt.Errorf("update hit count for rule %s: %w", formatUUID(id), err)
+			return fmt.Errorf("update hit count for rule %s: %w", pgconv.FormatUUID(id), err)
 		}
 	}
 

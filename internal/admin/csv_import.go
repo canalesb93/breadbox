@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"breadbox/internal/app"
+	"breadbox/internal/pgconv"
 	csvpkg "breadbox/internal/provider/csv"
 	"breadbox/internal/service"
 
@@ -55,7 +56,7 @@ func CSVImportPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 				conn, err := a.Queries.GetBankConnection(ctx, connUUID)
 				if err == nil {
 					data["ExistingConnectionName"] = conn.InstitutionName.String
-					data["ExistingUserID"] = formatUUID(conn.UserID)
+					data["ExistingUserID"] = pgconv.FormatUUID(conn.UserID)
 					data["ExistingUserName"] = conn.UserName
 					breadcrumbs = append(breadcrumbs, Breadcrumb{Label: conn.InstitutionName.String, Href: "/connections/" + connectionID})
 				}

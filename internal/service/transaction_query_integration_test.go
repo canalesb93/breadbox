@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/testutil"
 
@@ -268,7 +269,7 @@ func TestGetTransactionSummary_AccountFilter(t *testing.T) {
 
 	start := testutil.MustParseDate("2025-01-01")
 	end := testutil.MustParseDate("2025-02-01")
-	acct1ID := formatUUID(acct1.ID)
+	acct1ID := pgconv.FormatUUID(acct1.ID)
 
 	result, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
 		GroupBy:   "day",
@@ -302,7 +303,7 @@ func TestGetTransactionSummary_UserFilter(t *testing.T) {
 
 	start := testutil.MustParseDate("2025-01-01")
 	end := testutil.MustParseDate("2025-02-01")
-	aliceID := formatUUID(alice.ID)
+	aliceID := pgconv.FormatUUID(alice.ID)
 
 	result, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
 		GroupBy:   "day",
@@ -527,7 +528,7 @@ func TestListTransactions_UserFilter(t *testing.T) {
 	testutil.MustCreateTransaction(t, queries, acctA.ID, "txn_alice", "Alice Purchase", 1000, "2025-01-15")
 	testutil.MustCreateTransaction(t, queries, acctB.ID, "txn_bob", "Bob Purchase", 2000, "2025-01-15")
 
-	aliceID := formatUUID(alice.ID)
+	aliceID := pgconv.FormatUUID(alice.ID)
 	result, err := svc.ListTransactions(ctx, service.TransactionListParams{UserID: &aliceID})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -554,7 +555,7 @@ func TestListTransactions_AccountFilter(t *testing.T) {
 	testutil.MustCreateTransaction(t, queries, acct1.ID, "txn_c", "Checking Txn", 1000, "2025-01-15")
 	testutil.MustCreateTransaction(t, queries, acct2.ID, "txn_s", "Savings Txn", 2000, "2025-01-15")
 
-	acct1ID := formatUUID(acct1.ID)
+	acct1ID := pgconv.FormatUUID(acct1.ID)
 	result, err := svc.ListTransactions(ctx, service.TransactionListParams{AccountID: &acct1ID})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -852,7 +853,7 @@ func TestCountTransactionsFiltered_UserFilter(t *testing.T) {
 	testutil.MustCreateTransaction(t, queries, acctA.ID, "txn_a", "Alice Txn", 100, "2025-01-15")
 	testutil.MustCreateTransaction(t, queries, acctB.ID, "txn_b", "Bob Txn", 200, "2025-01-15")
 
-	aliceID := formatUUID(alice.ID)
+	aliceID := pgconv.FormatUUID(alice.ID)
 	count, err := svc.CountTransactionsFiltered(ctx, service.TransactionCountParams{UserID: &aliceID})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1012,7 +1013,7 @@ func TestGetTransaction_WithCategory(t *testing.T) {
 
 	txn := upsertTxnWithCategory(t, queries, acctID, "txn_get", "Whole Foods", 2500, "2025-01-15", child.ID)
 
-	resp, err := svc.GetTransaction(ctx, formatUUID(txn.ID))
+	resp, err := svc.GetTransaction(ctx, pgconv.FormatUUID(txn.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1118,7 +1119,7 @@ func TestGetTransactionSummary_ValidAccountIDFilter(t *testing.T) {
 
 	start := testutil.MustParseDate("2025-01-01")
 	end := testutil.MustParseDate("2025-02-01")
-	acctIDStr := formatTestUUID(acctID)
+	acctIDStr := pgconv.FormatUUID(acctID)
 
 	result, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
 		GroupBy:   "month",
@@ -1146,7 +1147,7 @@ func TestGetTransactionSummary_ValidUserIDFilter(t *testing.T) {
 
 	start := testutil.MustParseDate("2025-01-01")
 	end := testutil.MustParseDate("2025-02-01")
-	userIDStr := formatTestUUID(user.ID)
+	userIDStr := pgconv.FormatUUID(user.ID)
 
 	result, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
 		GroupBy:   "month",
@@ -1206,12 +1207,6 @@ func upsertTxnWithAmount(t *testing.T, q *db.Queries, acctID pgtype.UUID, extID,
 // isInvalidParam checks if an error wraps service.ErrInvalidParameter.
 func isInvalidParam(err error) bool {
 	return errors.Is(err, service.ErrInvalidParameter)
-}
-
-// formatTestUUID converts a pgtype.UUID to a standard UUID string.
-func formatTestUUID(u pgtype.UUID) string {
-	b := u.Bytes
-	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
 func upsertTxnWithMerchant(t *testing.T, q *db.Queries, acctID pgtype.UUID, extID, name, merchant string, amountCents int64, date string) db.Transaction {
