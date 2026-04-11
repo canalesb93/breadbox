@@ -56,54 +56,55 @@ func (p *PlaidProvider) SyncTransactions(ctx context.Context, conn provider.Conn
 
 // syncWithRetry calls TransactionsSync with exponential backoff on rate limits.
 func (p *PlaidProvider) syncWithRetry(ctx context.Context, req *plaidgo.TransactionsSyncRequest) (plaidgo.TransactionsSyncResponse, *http.Response, error) {
-	const maxRetries = 5
-	delay := 2 * time.Second
+	var (
+		resp     plaidgo.TransactionsSyncResponse
+		httpResp *http.Response
+	)
 
-	var zero plaidgo.TransactionsSyncResponse
+	// DefaultRetryConfig uses MaxRetries=5, giving 6 total attempts (1 initial + 5 retries).
+	// This aligns with Teller's retry behavior. The original Plaid-specific loop used
+	// attempt <= maxRetries which gave 7 attempts — that was an off-by-one bug.
+	cfg := provider.DefaultRetryConfig()
+	var retryCount int
 
-	for attempt := 0; ; attempt++ {
-		resp, httpResp, err := p.client.PlaidApi.
+	err := provider.DoWithRetry(ctx, cfg, func() (bool, error) {
+		var err error
+		resp, httpResp, err = p.client.PlaidApi.
 			TransactionsSync(ctx).
 			TransactionsSyncRequest(*req).
 			Execute()
 		if err == nil {
-			return resp, httpResp, nil
+			return false, nil
 		}
 
-		// Check for Plaid-specific errors.
+		// Check for Plaid-specific errors (non-retriable).
 		if plaidErr := extractPlaidError(err); plaidErr != nil {
 			switch plaidErr.GetErrorCode() {
 			case "TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION":
-				return zero, nil, ErrMutationDuringPagination
+				return false, ErrMutationDuringPagination
 			case "ITEM_LOGIN_REQUIRED", "INVALID_CREDENTIALS", "ITEM_LOCKED":
-				return zero, nil, ErrItemReauthRequired
+				return false, ErrItemReauthRequired
 			}
 		}
 
 		// Retry on rate limits (HTTP 429).
-		if httpResp != nil && httpResp.StatusCode == http.StatusTooManyRequests && attempt <= maxRetries {
+		if httpResp != nil && httpResp.StatusCode == http.StatusTooManyRequests {
 			httpResp.Body.Close()
+			retryCount++
 			p.logger.WarnContext(ctx, "plaid rate limited, retrying",
-				"attempt", attempt+1,
-				"delay", delay,
+				"attempt", retryCount,
+				"maxRetries", cfg.MaxRetries,
 			)
-			select {
-			case <-ctx.Done():
-				return zero, nil, ctx.Err()
-			case <-time.After(delay):
-			}
-			delay *= 2
-			if delay > 60*time.Second {
-				delay = 60 * time.Second
-			}
-			continue
+			return true, err
 		}
 
 		if httpResp != nil {
 			httpResp.Body.Close()
 		}
-		return zero, nil, fmt.Errorf("plaid transactions sync: %w", err)
-	}
+		return false, fmt.Errorf("plaid transactions sync: %w", err)
+	})
+
+	return resp, httpResp, err
 }
 
 // extractPlaidError attempts to extract a PlaidError from a Plaid API error.
