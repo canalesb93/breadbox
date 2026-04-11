@@ -139,18 +139,27 @@ type CompiledCondition struct {
 	Value interface{}
 	Regex *regexp.Regexp
 
+	// Pre-lowercased expected value for case-insensitive string comparisons.
+	// Set at compile time so evalString avoids repeated ToLower on the expected side.
+	lowerValue string
+	// Pre-lowercased set for the "in" operator, avoiding per-evaluation ToLower + slice conversion.
+	lowerInSet []string
+
 	And []*CompiledCondition
 	Or  []*CompiledCondition
 	Not *CompiledCondition
 }
 
-// CompileCondition pre-compiles regex patterns in a condition tree.
+// CompileCondition pre-compiles regex patterns and pre-lowercases string
+// expected values in a condition tree for faster evaluation.
 func CompileCondition(c Condition) (*CompiledCondition, error) {
 	cc := &CompiledCondition{
 		Field: c.Field,
 		Op:    c.Op,
 		Value: c.Value,
 	}
+
+	fieldType := validConditionFields[c.Field]
 
 	if c.Field != "" && c.Op == "matches" {
 		s, _ := c.Value.(string)
@@ -159,6 +168,23 @@ func CompileCondition(c Condition) (*CompiledCondition, error) {
 			return nil, fmt.Errorf("compile regex for field %q: %w", c.Field, err)
 		}
 		cc.Regex = re
+	}
+
+	// Pre-lowercase string expected values at compile time.
+	if fieldType == "string" && c.Field != "" {
+		switch c.Op {
+		case "eq", "neq", "contains", "not_contains":
+			if s, ok := c.Value.(string); ok {
+				cc.lowerValue = strings.ToLower(s)
+			}
+		case "in":
+			if vals, ok := toStringSlice(c.Value); ok {
+				cc.lowerInSet = make([]string, len(vals))
+				for i, v := range vals {
+					cc.lowerInSet[i] = strings.ToLower(v)
+				}
+			}
+		}
 	}
 
 	for _, sub := range c.And {
@@ -244,30 +270,27 @@ func evaluateLeaf(c *CompiledCondition, tctx TransactionContext) bool {
 }
 
 func evalString(c *CompiledCondition, actual string) bool {
-	expected, _ := c.Value.(string)
-	actualLower := strings.ToLower(actual)
-	expectedLower := strings.ToLower(expected)
-
 	switch c.Op {
 	case "eq":
-		return actualLower == expectedLower
+		// EqualFold avoids allocating lowercased copies of both strings.
+		return strings.EqualFold(actual, c.lowerValue)
 	case "neq":
-		return actualLower != expectedLower
+		return !strings.EqualFold(actual, c.lowerValue)
 	case "contains":
-		return strings.Contains(actualLower, expectedLower)
+		// Only ToLower the actual value; expected was pre-lowercased at compile time.
+		return strings.Contains(strings.ToLower(actual), c.lowerValue)
 	case "not_contains":
-		return !strings.Contains(actualLower, expectedLower)
+		return !strings.Contains(strings.ToLower(actual), c.lowerValue)
 	case "matches":
 		if c.Regex != nil {
 			return c.Regex.MatchString(actual)
 		}
 		return false
 	case "in":
-		if vals, ok := toStringSlice(c.Value); ok {
-			for _, v := range vals {
-				if strings.ToLower(v) == actualLower {
-					return true
-				}
+		// Use pre-lowercased set built at compile time; EqualFold avoids ToLower on actual.
+		for _, v := range c.lowerInSet {
+			if strings.EqualFold(actual, v) {
+				return true
 			}
 		}
 		return false
