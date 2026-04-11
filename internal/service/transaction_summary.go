@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -103,32 +105,35 @@ func (s *Service) GetTransactionSummary(ctx context.Context, params TransactionS
 		joinCategories = true
 	}
 
-	query := fmt.Sprintf(`SELECT %s, SUM(t.amount) AS total_amount, COUNT(*) AS transaction_count
-FROM transactions t
-JOIN accounts a ON t.account_id = a.id
-LEFT JOIN bank_connections bc ON a.connection_id = bc.id`, selectCols)
-	if joinCategories {
-		query += "\nLEFT JOIN categories cat ON t.category_id = cat.id"
-	}
-	query += "\nWHERE t.deleted_at IS NULL"
-	query += " AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))"
-
-	args := []any{}
+	var buf strings.Builder
+	buf.Grow(512)
+	args := make([]any, 0, 8)
 	argN := 1
 
+	buf.WriteString("SELECT ")
+	buf.WriteString(selectCols)
+	buf.WriteString(", SUM(t.amount) AS total_amount, COUNT(*) AS transaction_count\nFROM transactions t\nJOIN accounts a ON t.account_id = a.id\nLEFT JOIN bank_connections bc ON a.connection_id = bc.id")
+	if joinCategories {
+		buf.WriteString("\nLEFT JOIN categories cat ON t.category_id = cat.id")
+	}
+	buf.WriteString("\nWHERE t.deleted_at IS NULL")
+	buf.WriteString(" AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))")
+
 	if !params.IncludePending {
-		query += " AND t.pending = false"
+		buf.WriteString(" AND t.pending = false")
 	}
 
 	if params.SpendingOnly {
-		query += " AND t.amount > 0"
+		buf.WriteString(" AND t.amount > 0")
 	}
 
-	query += fmt.Sprintf(" AND t.date >= $%d", argN)
+	buf.WriteString(" AND t.date >= $")
+	buf.WriteString(strconv.Itoa(argN))
 	args = append(args, *params.StartDate)
 	argN++
 
-	query += fmt.Sprintf(" AND t.date < $%d", argN)
+	buf.WriteString(" AND t.date < $")
+	buf.WriteString(strconv.Itoa(argN))
 	args = append(args, *params.EndDate)
 	argN++
 
@@ -137,7 +142,8 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`, selectCols)
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid account_id", ErrInvalidParameter)
 		}
-		query += fmt.Sprintf(" AND t.account_id = $%d", argN)
+		buf.WriteString(" AND t.account_id = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, aid)
 		argN++
 	}
@@ -147,18 +153,26 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`, selectCols)
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid user_id", ErrInvalidParameter)
 		}
-		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
+		buf.WriteString(" AND COALESCE(t.attributed_user_id, bc.user_id) = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, uid)
 		argN++
 	}
 
 	if params.Category != nil {
-		query += fmt.Sprintf(" AND t.category_primary = $%d", argN)
+		buf.WriteString(" AND t.category_primary = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.Category)
 		argN++ //nolint:ineffassign // kept for consistency with other filters
 	}
 
-	query += fmt.Sprintf(" GROUP BY %s ORDER BY %s LIMIT 1000", groupCols, orderCols)
+	buf.WriteString(" GROUP BY ")
+	buf.WriteString(groupCols)
+	buf.WriteString(" ORDER BY ")
+	buf.WriteString(orderCols)
+	buf.WriteString(" LIMIT 1000")
+
+	query := buf.String()
 
 	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
@@ -236,7 +250,12 @@ func (s *Service) GetMerchantSummary(ctx context.Context, params MerchantSummary
 		params.MinCount = 1
 	}
 
-	query := `SELECT COALESCE(t.merchant_name, t.name) AS merchant,
+	var buf strings.Builder
+	buf.Grow(512)
+	args := make([]any, 0, 12)
+	argN := 1
+
+	buf.WriteString(`SELECT COALESCE(t.merchant_name, t.name) AS merchant,
 		COUNT(*) AS transaction_count,
 		SUM(t.amount) AS total_amount,
 		AVG(t.amount) AS avg_amount,
@@ -245,32 +264,31 @@ func (s *Service) GetMerchantSummary(ctx context.Context, params MerchantSummary
 		t.iso_currency_code
 FROM transactions t
 JOIN accounts a ON t.account_id = a.id
-LEFT JOIN bank_connections bc ON a.connection_id = bc.id`
+LEFT JOIN bank_connections bc ON a.connection_id = bc.id`)
 
 	joinCategories := false
 	if params.CategorySlug != nil {
 		joinCategories = true
 	}
 	if joinCategories {
-		query += "\nLEFT JOIN categories c ON t.category_id = c.id"
+		buf.WriteString("\nLEFT JOIN categories c ON t.category_id = c.id")
 	}
 
-	query += "\nWHERE t.deleted_at IS NULL"
-	query += " AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))"
-	query += " AND t.pending = false"
-
-	args := []any{}
-	argN := 1
+	buf.WriteString("\nWHERE t.deleted_at IS NULL")
+	buf.WriteString(" AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))")
+	buf.WriteString(" AND t.pending = false")
 
 	if params.SpendingOnly {
-		query += " AND t.amount > 0"
+		buf.WriteString(" AND t.amount > 0")
 	}
 
-	query += fmt.Sprintf(" AND t.date >= $%d", argN)
+	buf.WriteString(" AND t.date >= $")
+	buf.WriteString(strconv.Itoa(argN))
 	args = append(args, *params.StartDate)
 	argN++
 
-	query += fmt.Sprintf(" AND t.date < $%d", argN)
+	buf.WriteString(" AND t.date < $")
+	buf.WriteString(strconv.Itoa(argN))
 	args = append(args, *params.EndDate)
 	argN++
 
@@ -279,7 +297,8 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid account_id", ErrInvalidParameter)
 		}
-		query += fmt.Sprintf(" AND t.account_id = $%d", argN)
+		buf.WriteString(" AND t.account_id = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, aid)
 		argN++
 	}
@@ -289,7 +308,8 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid user_id", ErrInvalidParameter)
 		}
-		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
+		buf.WriteString(" AND COALESCE(t.attributed_user_id, bc.user_id) = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, uid)
 		argN++
 	}
@@ -300,25 +320,33 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`
 			// Unknown slug — no results
 			return &MerchantSummaryResult{Merchants: []MerchantSummaryRow{}, Totals: MerchantSummaryTotals{}, Filters: MerchantSummaryFilters{MinCount: params.MinCount}}, nil
 		}
+		n := strconv.Itoa(argN)
 		if !catRow.ParentID.Valid {
-			query += fmt.Sprintf(" AND (c.id = $%d OR c.parent_id = $%d)", argN, argN)
+			buf.WriteString(" AND (c.id = $")
+			buf.WriteString(n)
+			buf.WriteString(" OR c.parent_id = $")
+			buf.WriteString(n)
+			buf.WriteByte(')')
 			args = append(args, catRow.ID)
 			argN++
 		} else {
-			query += fmt.Sprintf(" AND t.category_id = $%d", argN)
+			buf.WriteString(" AND t.category_id = $")
+			buf.WriteString(n)
 			args = append(args, catRow.ID)
 			argN++
 		}
 	}
 
 	if params.MinAmount != nil {
-		query += fmt.Sprintf(" AND t.amount >= $%d", argN)
+		buf.WriteString(" AND t.amount >= $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.MinAmount)
 		argN++
 	}
 
 	if params.MaxAmount != nil {
-		query += fmt.Sprintf(" AND t.amount <= $%d", argN)
+		buf.WriteString(" AND t.amount <= $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.MaxAmount)
 		argN++
 	}
@@ -329,24 +357,27 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`
 			mode = *params.SearchMode
 		}
 		sc := BuildSearchClause(*params.Search, mode, TransactionSearchColumns, TransactionNullableColumns, argN)
-		query += sc.SQL
+		buf.WriteString(sc.SQL)
 		args = append(args, sc.Args...)
 		argN = sc.ArgN
 	}
 
 	if params.ExcludeSearch != nil {
 		ec := BuildExcludeSearchClause(*params.ExcludeSearch, TransactionSearchColumns, TransactionNullableColumns, argN)
-		query += ec.SQL
+		buf.WriteString(ec.SQL)
 		args = append(args, ec.Args...)
 		argN = ec.ArgN
 	}
 
-	query += " GROUP BY COALESCE(t.merchant_name, t.name), t.iso_currency_code"
-	query += fmt.Sprintf(" HAVING COUNT(*) >= $%d", argN)
+	buf.WriteString(" GROUP BY COALESCE(t.merchant_name, t.name), t.iso_currency_code")
+	buf.WriteString(" HAVING COUNT(*) >= $")
+	buf.WriteString(strconv.Itoa(argN))
 	args = append(args, params.MinCount)
 	argN++ //nolint:ineffassign // kept for consistency with other filters
 
-	query += " ORDER BY COUNT(*) DESC LIMIT 500"
+	buf.WriteString(" ORDER BY COUNT(*) DESC LIMIT 500")
+
+	query := buf.String()
 
 	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
