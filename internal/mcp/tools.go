@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -1266,13 +1267,8 @@ func jsonResult(v any) (*mcpsdk.CallToolResult, any, error) {
 
 	// Compact IDs for MCP responses: replace "id" with short_id value, drop "short_id" field.
 	// This reduces token usage by ~75% per ID without changing the schema agents see.
-	var raw any
-	if err := json.Unmarshal(data, &raw); err == nil {
-		compactIDs(raw)
-		if compacted, err := json.Marshal(raw); err == nil {
-			data = compacted
-		}
-	}
+	// Operates directly on JSON bytes to avoid unmarshal→remarshal overhead.
+	data = compactIDsBytes(data)
 
 	return &mcpsdk.CallToolResult{
 		Content: []mcpsdk.Content{
@@ -1301,6 +1297,267 @@ func compactIDs(v any) {
 			compactIDs(item)
 		}
 	}
+}
+
+// compactIDsBytes performs the id/short_id compaction directly on JSON bytes,
+// avoiding the unmarshal→walk→remarshal cycle. It scans the byte stream for
+// objects containing "id" and "short_id" keys, replaces the id value with
+// the short_id value, and removes the short_id entry.
+//
+// ORDERING ASSUMPTION: This function requires "id" to appear before "short_id"
+// in each JSON object. If "short_id" is encountered first, it is dropped but
+// the "id" value is NOT replaced. This assumption holds for json.Marshal output
+// because: (1) map keys are sorted alphabetically ("id" < "short_id"), and
+// (2) struct fields are marshaled in declaration order (all Breadbox response
+// structs declare ID before ShortID). See TestCompactIDsBytesFieldOrdering.
+func compactIDsBytes(data []byte) []byte {
+	// Quick check: if no short_id key exists, return as-is.
+	if !bytes.Contains(data, []byte(`"short_id"`)) {
+		return data
+	}
+
+	out := make([]byte, 0, len(data))
+	out = compactIDsScan(data, out)
+	return out
+}
+
+// compactIDsScan scans JSON bytes for objects with "id"+"short_id" pairs and
+// performs the compaction. The input must be valid JSON (from json.Marshal).
+// Returns the appended output.
+func compactIDsScan(data []byte, out []byte) []byte {
+	i := 0
+	n := len(data)
+
+	for i < n {
+		b := data[i]
+		if b == '{' {
+			i, out = compactIDsScanObject(data, i, out)
+		} else if b == '[' {
+			i, out = compactIDsScanArray(data, i, out)
+		} else {
+			// Copy byte as-is (outside objects/arrays — top-level scalars, whitespace).
+			out = append(out, b)
+			i++
+		}
+	}
+	return out
+}
+
+// compactIDsScanObject processes a JSON object starting at data[pos] (the '{').
+// It looks for "id" and "short_id" key-value pairs to perform the swap.
+func compactIDsScanObject(data []byte, pos int, out []byte) (int, []byte) {
+	out = append(out, '{')
+	pos++ // skip '{'
+
+	// Track id value replacement state.
+	var idValueStart, idValueEnd int // byte range of the "id" value in out
+	hasID := false
+	firstEntry := true
+
+	for pos < len(data) && data[pos] != '}' {
+		// Skip comma between entries.
+		if data[pos] == ',' {
+			pos++
+		}
+
+		// Read key (must be a string).
+		keyStart := pos
+		key, keyEnd := scanJSONString(data, pos)
+		pos = keyEnd
+
+		// Skip colon.
+		if pos < len(data) && data[pos] == ':' {
+			pos++
+		}
+
+		// Check what key this is.
+		if key == "id" {
+			// Write the key, remember where the value starts in output.
+			if !firstEntry {
+				out = append(out, ',')
+			}
+			firstEntry = false
+			out = append(out, data[keyStart:keyEnd]...)
+			out = append(out, ':')
+			idValueStart = len(out)
+			pos, out = copyJSONValue(data, pos, out)
+			idValueEnd = len(out)
+			hasID = true
+		} else if key == "short_id" {
+			// Read the short_id value.
+			valStart := pos
+			valEnd := skipJSONValue(data, pos)
+			pos = valEnd
+
+			if hasID {
+				// Replace the id value in output with short_id value.
+				shortIDVal := data[valStart:valEnd]
+				// Rebuild output: everything before id value + short_id value + everything after id value.
+				tail := make([]byte, len(out)-idValueEnd)
+				copy(tail, out[idValueEnd:])
+				out = out[:idValueStart]
+				out = append(out, shortIDVal...)
+				out = append(out, tail...)
+			}
+			// Drop short_id from output (don't write it).
+		} else {
+			// Regular key: copy key + colon + value.
+			if !firstEntry {
+				out = append(out, ',')
+			}
+			firstEntry = false
+			out = append(out, data[keyStart:keyEnd]...)
+			out = append(out, ':')
+			pos, out = copyJSONValue(data, pos, out)
+		}
+	}
+
+	// Skip closing '}'.
+	if pos < len(data) {
+		pos++
+	}
+	out = append(out, '}')
+	return pos, out
+}
+
+// compactIDsScanArray processes a JSON array starting at data[pos] (the '[').
+func compactIDsScanArray(data []byte, pos int, out []byte) (int, []byte) {
+	out = append(out, '[')
+	pos++ // skip '['
+	first := true
+
+	for pos < len(data) && data[pos] != ']' {
+		if data[pos] == ',' {
+			pos++
+		}
+		if !first {
+			out = append(out, ',')
+		}
+		first = false
+		pos, out = copyJSONValue(data, pos, out)
+	}
+
+	if pos < len(data) {
+		pos++ // skip ']'
+	}
+	out = append(out, ']')
+	return pos, out
+}
+
+// copyJSONValue copies a single JSON value from data[pos] to out, recursively
+// processing nested objects for compaction. Returns the new position and output.
+func copyJSONValue(data []byte, pos int, out []byte) (int, []byte) {
+	if pos >= len(data) {
+		return pos, out
+	}
+	switch data[pos] {
+	case '{':
+		return compactIDsScanObject(data, pos, out)
+	case '[':
+		return compactIDsScanArray(data, pos, out)
+	case '"':
+		end := skipJSONString(data, pos)
+		out = append(out, data[pos:end]...)
+		return end, out
+	default:
+		// Number, bool, null — scan to next delimiter.
+		end := pos
+		for end < len(data) && data[end] != ',' && data[end] != '}' && data[end] != ']' {
+			end++
+		}
+		out = append(out, data[pos:end]...)
+		return end, out
+	}
+}
+
+// skipJSONValue skips over a complete JSON value at data[pos] and returns
+// the position after the value. Does not produce output.
+func skipJSONValue(data []byte, pos int) int {
+	if pos >= len(data) {
+		return pos
+	}
+	switch data[pos] {
+	case '{':
+		return skipJSONObject(data, pos)
+	case '[':
+		return skipJSONArray(data, pos)
+	case '"':
+		return skipJSONString(data, pos)
+	default:
+		end := pos
+		for end < len(data) && data[end] != ',' && data[end] != '}' && data[end] != ']' {
+			end++
+		}
+		return end
+	}
+}
+
+// skipJSONObject skips a JSON object at data[pos].
+func skipJSONObject(data []byte, pos int) int {
+	pos++ // skip '{'
+	for pos < len(data) && data[pos] != '}' {
+		if data[pos] == ',' {
+			pos++
+		}
+		pos = skipJSONString(data, pos) // key
+		if pos < len(data) && data[pos] == ':' {
+			pos++
+		}
+		pos = skipJSONValue(data, pos) // value
+	}
+	if pos < len(data) {
+		pos++ // skip '}'
+	}
+	return pos
+}
+
+// skipJSONArray skips a JSON array at data[pos].
+func skipJSONArray(data []byte, pos int) int {
+	pos++ // skip '['
+	for pos < len(data) && data[pos] != ']' {
+		if data[pos] == ',' {
+			pos++
+		}
+		pos = skipJSONValue(data, pos)
+	}
+	if pos < len(data) {
+		pos++ // skip ']'
+	}
+	return pos
+}
+
+// skipJSONString skips a JSON string at data[pos] (including quotes).
+func skipJSONString(data []byte, pos int) int {
+	pos++ // skip opening '"'
+	for pos < len(data) {
+		if data[pos] == '\\' {
+			pos += 2 // skip escape sequence
+			continue
+		}
+		if data[pos] == '"' {
+			return pos + 1
+		}
+		pos++
+	}
+	return pos
+}
+
+// scanJSONString reads a JSON string at data[pos], returning the unquoted value
+// and the position after the closing quote. Uses direct byte comparison for
+// the common case (no escape sequences) to avoid json.Unmarshal allocation.
+func scanJSONString(data []byte, pos int) (string, int) {
+	end := skipJSONString(data, pos)
+	raw := data[pos+1 : end-1] // strip quotes
+	// Fast path: no backslash means no escape sequences — direct conversion.
+	if bytes.IndexByte(raw, '\\') < 0 {
+		return string(raw), end
+	}
+	// Slow path: contains escape sequences, use json.Unmarshal.
+	var s string
+	if err := json.Unmarshal(data[pos:end], &s); err != nil {
+		return string(raw), end
+	}
+	return s, end
 }
 
 func errorResult(err error) *mcpsdk.CallToolResult {
