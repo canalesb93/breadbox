@@ -24,7 +24,6 @@ import (
 	"breadbox/internal/testutil"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

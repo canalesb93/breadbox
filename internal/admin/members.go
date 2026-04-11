@@ -8,6 +8,7 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
@@ -300,7 +301,7 @@ func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc
 		}
 
 		// Update session so the change takes effect immediately.
-		sm.Put(ctx, sessionKeyUserID, formatUUID(userID))
+		sm.Put(ctx, sessionKeyUserID, pgconv.FormatUUID(userID))
 
 		SetFlash(ctx, sm, "success", "Account linked to household member.")
 		http.Redirect(w, r, "/my-account", http.StatusSeeOther)
