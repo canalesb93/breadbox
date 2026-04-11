@@ -6,10 +6,63 @@
   </div>
 </div>
 
-{{if .Flash}}
-<div role="alert" class="alert {{if eq .Flash.Type "success"}}alert-success{{else if eq .Flash.Type "error"}}alert-error{{else}}alert-info{{end}} rounded-xl mb-6">
-  {{if eq .Flash.Type "success"}}<i data-lucide="check-circle" class="w-5 h-5"></i>{{else if eq .Flash.Type "error"}}<i data-lucide="alert-circle" class="w-5 h-5"></i>{{else}}<i data-lucide="info" class="w-5 h-5"></i>{{end}}
-  <span>{{.Flash.Message}}</span>
+{{if .IsUnlinked}}
+<div class="bb-card mb-6 border-warning/30" x-data="{ mode: 'create' }">
+  <div class="p-5 border-b border-warning/30">
+    <h2 class="font-semibold text-base flex items-center gap-2">
+      <i data-lucide="user-plus" class="w-4 h-4 text-warning"></i>
+      Link to Household Member
+    </h2>
+  </div>
+  <div class="p-5">
+    <p class="text-sm text-base-content/60 mb-4">
+      Your admin account isn't linked to a household member yet. Link it to manage bank connections and view your financial data.
+    </p>
+
+    {{if .UnlinkedUsers}}
+    <div class="flex gap-1 mb-4">
+      <button type="button" @click="mode = 'create'"
+        :class="mode === 'create' ? 'btn-primary' : 'btn-ghost'" class="btn btn-xs rounded-lg">Create New</button>
+      <button type="button" @click="mode = 'existing'"
+        :class="mode === 'existing' ? 'btn-primary' : 'btn-ghost'" class="btn btn-xs rounded-lg">Link Existing</button>
+    </div>
+    {{end}}
+
+    <form method="POST" action="/my-account/link-user" x-show="mode === 'create'">
+      {{if $.CSRFToken}}<input type="hidden" name="_csrf" value="{{$.CSRFToken}}">{{end}}
+      <input type="hidden" name="mode" value="create">
+      <div class="mb-3">
+        <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="link_name">Your Name</label>
+        <input type="text" id="link_name" name="name" required placeholder="Your name"
+               class="input w-full rounded-lg text-sm bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40">
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm rounded-lg">
+        <i data-lucide="user-plus" class="w-4 h-4"></i>
+        Create & Link
+      </button>
+    </form>
+
+    {{if .UnlinkedUsers}}
+    <form method="POST" action="/my-account/link-user" x-show="mode === 'existing'" x-cloak>
+      {{if $.CSRFToken}}<input type="hidden" name="_csrf" value="{{$.CSRFToken}}">{{end}}
+      <input type="hidden" name="mode" value="existing">
+      <div class="mb-3">
+        <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="link_user_id">Household Member</label>
+        <select id="link_user_id" name="user_id" required
+                class="select w-full rounded-lg text-sm bg-base-200 border-base-300 focus:bg-base-100 focus:border-primary/40">
+          <option value="">Select a member...</option>
+          {{range .UnlinkedUsers}}
+          <option value="{{formatUUID .ID}}">{{.Name}}</option>
+          {{end}}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm rounded-lg">
+        <i data-lucide="link" class="w-4 h-4"></i>
+        Link Account
+      </button>
+    </form>
+    {{end}}
+  </div>
 </div>
 {{end}}
 

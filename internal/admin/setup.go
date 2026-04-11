@@ -1,28 +1,33 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/mail"
 	"strconv"
 	"strings"
 
+	"breadbox/internal/app"
 	"breadbox/internal/db"
 	plaidprovider "breadbox/internal/provider/plaid"
 
 	"github.com/alexedwards/scs/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // CreateAdminHandler handles GET/POST /admin/setup — Create Admin Account.
 // This is the minimal first-run page that replaces the multi-step wizard.
-func CreateAdminHandler(queries *db.Queries, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+// Creates both a household user and an admin auth account in a single transaction.
+func CreateAdminHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
 		// If auth accounts already exist, redirect to dashboard.
-		count, err := queries.CountAuthAccounts(ctx)
+		count, err := a.Queries.CountAuthAccounts(ctx)
 		if err == nil && count > 0 {
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
@@ -30,8 +35,9 @@ func CreateAdminHandler(queries *db.Queries, sm *scs.SessionManager, tr *Templat
 
 		if r.Method == http.MethodGet {
 			data := map[string]any{
-				"PageTitle": "Create Admin Account",
+				"PageTitle": "Welcome",
 				"CSRFToken": "",
+				"Name":      "",
 				"Username":  "",
 				"Error":     "",
 				"Errors":    map[string]string{},
@@ -41,30 +47,35 @@ func CreateAdminHandler(queries *db.Queries, sm *scs.SessionManager, tr *Templat
 		}
 
 		// POST: validate and create account.
+		name := strings.TrimSpace(r.FormValue("name"))
 		username := strings.TrimSpace(r.FormValue("username"))
 		password := r.FormValue("password")
-		confirmPassword := r.FormValue("confirm_password")
 
 		errors := map[string]string{}
 
+		if name == "" {
+			errors["Name"] = "Name is required"
+		} else if len(name) > 100 {
+			errors["Name"] = "Name must be 100 characters or fewer"
+		}
+
 		if username == "" {
-			errors["Username"] = "Username is required"
+			errors["Username"] = "Email is required"
+		} else if _, err := mail.ParseAddress(username); err != nil {
+			errors["Username"] = "Please enter a valid email address"
 		} else if len(username) > 64 {
-			errors["Username"] = "Username must be 64 characters or fewer"
+			errors["Username"] = "Email must be 64 characters or fewer"
 		}
 
 		if len(password) < 8 {
 			errors["Password"] = "Password must be at least 8 characters"
 		}
 
-		if password != confirmPassword {
-			errors["ConfirmPassword"] = "Passwords do not match"
-		}
-
 		if len(errors) > 0 {
 			data := map[string]any{
-				"PageTitle": "Create Admin Account",
+				"PageTitle": "Welcome",
 				"CSRFToken": "",
+				"Name":      name,
 				"Username":  username,
 				"Error":     "",
 				"Errors":    errors,
@@ -76,8 +87,9 @@ func CreateAdminHandler(queries *db.Queries, sm *scs.SessionManager, tr *Templat
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 		if err != nil {
 			data := map[string]any{
-				"PageTitle": "Create Admin Account",
+				"PageTitle": "Welcome",
 				"CSRFToken": "",
+				"Name":      name,
 				"Username":  username,
 				"Error":     "Failed to hash password",
 				"Errors":    map[string]string{},
@@ -86,15 +98,12 @@ func CreateAdminHandler(queries *db.Queries, sm *scs.SessionManager, tr *Templat
 			return
 		}
 
-		_, err = queries.CreateAuthAccount(ctx, db.CreateAuthAccountParams{
-			Username:       username,
-			HashedPassword: hashedPassword,
-			Role:           RoleAdmin,
-		})
-		if err != nil {
+		// Create household user + admin account in a single transaction.
+		if err := createLinkedAdmin(ctx, a, name, username, hashedPassword); err != nil {
 			data := map[string]any{
-				"PageTitle": "Create Admin Account",
+				"PageTitle": "Welcome",
 				"CSRFToken": "",
+				"Name":      name,
 				"Username":  username,
 				"Error":     "Failed to create admin account",
 				"Errors":    map[string]string{},
@@ -109,8 +118,40 @@ func CreateAdminHandler(queries *db.Queries, sm *scs.SessionManager, tr *Templat
 	}
 }
 
+// createLinkedAdmin creates a household user and linked admin auth account in a single transaction.
+func createLinkedAdmin(ctx context.Context, a *app.App, name, username string, hashedPassword []byte) error {
+	tx, err := a.DB.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := db.New(tx)
+
+	user, err := qtx.CreateUser(ctx, db.CreateUserParams{
+		Name:  name,
+		Email: pgtype.Text{String: username, Valid: true},
+	})
+	if err != nil {
+		return fmt.Errorf("create user: %w", err)
+	}
+
+	_, err = qtx.CreateAuthAccount(ctx, db.CreateAuthAccountParams{
+		UserID:         user.ID,
+		Username:       username,
+		HashedPassword: hashedPassword,
+		Role:           RoleAdmin,
+	})
+	if err != nil {
+		return fmt.Errorf("create auth account: %w", err)
+	}
+
+	return tx.Commit(ctx)
+}
+
 // programmaticSetupRequest is the JSON body for POST /admin/api/setup.
 type programmaticSetupRequest struct {
+	Name                string `json:"name"`
 	Username            string `json:"username"`
 	Password            string `json:"password"`
 	PlaidClientID       string `json:"plaid_client_id"`
@@ -122,12 +163,12 @@ type programmaticSetupRequest struct {
 
 // ProgrammaticSetupHandler handles POST /admin/api/setup — all-in-one setup.
 // Only works if no auth accounts exist (returns 409 otherwise).
-func ProgrammaticSetupHandler(queries *db.Queries, sm *scs.SessionManager) http.HandlerFunc {
+func ProgrammaticSetupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
 		// Guard: only works when no auth accounts exist.
-		count, _ := queries.CountAuthAccounts(ctx)
+		count, _ := a.Queries.CountAuthAccounts(ctx)
 		if count > 0 {
 			writeJSON(w, http.StatusConflict, map[string]string{
 				"error": "Admin account already exists",
@@ -146,8 +187,15 @@ func ProgrammaticSetupHandler(queries *db.Queries, sm *scs.SessionManager) http.
 		// Validate required fields.
 		var validationErrors []string
 
-		if strings.TrimSpace(req.Username) == "" {
-			validationErrors = append(validationErrors, "username is required")
+		req.Name = strings.TrimSpace(req.Name)
+		if req.Name == "" {
+			validationErrors = append(validationErrors, "name is required")
+		}
+		req.Username = strings.TrimSpace(req.Username)
+		if req.Username == "" {
+			validationErrors = append(validationErrors, "email is required")
+		} else if _, err := mail.ParseAddress(req.Username); err != nil {
+			validationErrors = append(validationErrors, "username must be a valid email address")
 		}
 		if len(req.Password) < 8 {
 			validationErrors = append(validationErrors, "password must be at least 8 characters")
@@ -202,7 +250,7 @@ func ProgrammaticSetupHandler(queries *db.Queries, sm *scs.SessionManager) http.
 			}
 		}
 
-		// Create admin account.
+		// Create admin account + household user.
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), 12)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{
@@ -211,12 +259,7 @@ func ProgrammaticSetupHandler(queries *db.Queries, sm *scs.SessionManager) http.
 			return
 		}
 
-		_, err = queries.CreateAuthAccount(ctx, db.CreateAuthAccountParams{
-			Username:       strings.TrimSpace(req.Username),
-			HashedPassword: hashedPassword,
-			Role:           RoleAdmin,
-		})
-		if err != nil {
+		if err := createLinkedAdmin(ctx, a, req.Name, req.Username, hashedPassword); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{
 				"error": "Failed to create admin account",
 			})
@@ -241,7 +284,7 @@ func ProgrammaticSetupHandler(queries *db.Queries, sm *scs.SessionManager) http.
 		}
 
 		for _, entry := range configEntries {
-			if err := queries.SetAppConfig(ctx, entry); err != nil {
+			if err := a.Queries.SetAppConfig(ctx, entry); err != nil {
 				writeJSON(w, http.StatusInternalServerError, map[string]string{
 					"error": "Failed to save configuration: " + entry.Key,
 				})
