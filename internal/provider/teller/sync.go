@@ -120,7 +120,7 @@ func (p *TellerProvider) fetchTransactionsForAccount(
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
-			return nil, fmt.Errorf("teller transactions get: status %d: %s", resp.StatusCode, body)
+			return nil, classifyHTTPError("transactions get", resp.StatusCode, body)
 		}
 
 		var page []tellerTransaction

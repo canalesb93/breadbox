@@ -88,7 +88,7 @@ func (p *TellerProvider) fetchAccounts(ctx context.Context, accessToken string) 
 	}
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("teller accounts get: status %d: %s", resp.StatusCode, body)
+		return nil, classifyHTTPError("accounts get", resp.StatusCode, body)
 	}
 
 	var tellerAccounts []tellerAccount

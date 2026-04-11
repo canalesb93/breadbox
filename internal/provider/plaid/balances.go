@@ -3,6 +3,7 @@ package plaid
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"breadbox/internal/crypto"
 	"breadbox/internal/provider"
@@ -19,7 +20,7 @@ func (p *PlaidProvider) GetBalances(ctx context.Context, conn provider.Connectio
 	}
 
 	req := plaidgo.NewAccountsGetRequest(string(accessToken))
-	resp, _, err := p.client.PlaidApi.
+	resp, httpResp, err := p.client.PlaidApi.
 		AccountsGet(ctx).
 		AccountsGetRequest(*req).
 		Execute()
@@ -28,6 +29,12 @@ func (p *PlaidProvider) GetBalances(ctx context.Context, conn provider.Connectio
 			switch plaidErr.GetErrorCode() {
 			case "ITEM_LOGIN_REQUIRED", "INVALID_CREDENTIALS", "ITEM_LOCKED":
 				return nil, ErrItemReauthRequired
+			}
+		}
+		// Classify HTTP-level errors as retryable when appropriate.
+		if httpResp != nil {
+			if httpResp.StatusCode == http.StatusTooManyRequests || httpResp.StatusCode >= 500 {
+				return nil, fmt.Errorf("plaid accounts get: status %d: %w", httpResp.StatusCode, provider.ErrSyncRetryable)
 			}
 		}
 		return nil, fmt.Errorf("plaid accounts get: %w", err)

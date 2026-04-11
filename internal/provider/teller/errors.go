@@ -39,3 +39,18 @@ func isReauthResponse(resp *http.Response) bool {
 	}
 	return false
 }
+
+// classifyHTTPError returns an appropriate sentinel-wrapped error for non-OK
+// Teller API responses. Server errors (5xx) and rate limits (429) are wrapped
+// with ErrSyncRetryable so the sync engine can retry. Other errors are returned
+// as-is with context.
+func classifyHTTPError(operation string, statusCode int, body []byte) error {
+	switch {
+	case statusCode == http.StatusTooManyRequests:
+		return fmt.Errorf("teller %s: rate limited (status %d): %w", operation, statusCode, provider.ErrSyncRetryable)
+	case statusCode >= 500:
+		return fmt.Errorf("teller %s: server error (status %d): %s: %w", operation, statusCode, body, provider.ErrSyncRetryable)
+	default:
+		return fmt.Errorf("teller %s: status %d: %s", operation, statusCode, body)
+	}
+}
