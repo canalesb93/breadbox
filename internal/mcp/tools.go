@@ -1304,8 +1304,12 @@ func compactIDs(v any) {
 // objects containing "id" and "short_id" keys, replaces the id value with
 // the short_id value, and removes the short_id entry.
 //
-// Relies on json.Marshal producing "id" before "short_id" (true for both
-// struct field order and alphabetical map key sorting).
+// ORDERING ASSUMPTION: This function requires "id" to appear before "short_id"
+// in each JSON object. If "short_id" is encountered first, it is dropped but
+// the "id" value is NOT replaced. This assumption holds for json.Marshal output
+// because: (1) map keys are sorted alphabetically ("id" < "short_id"), and
+// (2) struct fields are marshaled in declaration order (all Breadbox response
+// structs declare ID before ShortID). See TestCompactIDsBytesFieldOrdering.
 func compactIDsBytes(data []byte) []byte {
 	// Quick check: if no short_id key exists, return as-is.
 	if !bytes.Contains(data, []byte(`"short_id"`)) {
