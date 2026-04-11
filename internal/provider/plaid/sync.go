@@ -61,7 +61,13 @@ func (p *PlaidProvider) syncWithRetry(ctx context.Context, req *plaidgo.Transact
 		httpResp *http.Response
 	)
 
-	err := provider.DoWithRetry(ctx, provider.DefaultRetryConfig(), func() (bool, error) {
+	// DefaultRetryConfig uses MaxRetries=5, giving 6 total attempts (1 initial + 5 retries).
+	// This aligns with Teller's retry behavior. The original Plaid-specific loop used
+	// attempt <= maxRetries which gave 7 attempts — that was an off-by-one bug.
+	cfg := provider.DefaultRetryConfig()
+	var retryCount int
+
+	err := provider.DoWithRetry(ctx, cfg, func() (bool, error) {
 		var err error
 		resp, httpResp, err = p.client.PlaidApi.
 			TransactionsSync(ctx).
@@ -84,7 +90,11 @@ func (p *PlaidProvider) syncWithRetry(ctx context.Context, req *plaidgo.Transact
 		// Retry on rate limits (HTTP 429).
 		if httpResp != nil && httpResp.StatusCode == http.StatusTooManyRequests {
 			httpResp.Body.Close()
-			p.logger.WarnContext(ctx, "plaid rate limited, retrying")
+			retryCount++
+			p.logger.WarnContext(ctx, "plaid rate limited, retrying",
+				"attempt", retryCount,
+				"maxRetries", cfg.MaxRetries,
+			)
 			return true, err
 		}
 
