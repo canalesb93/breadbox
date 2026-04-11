@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
@@ -17,48 +16,18 @@ func ListReviewsHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 
-		// Parse limit (1-500, default 50).
-		limit := 50
-		if v := q.Get("limit"); v != "" {
-			parsed, err := strconv.Atoi(v)
-			if err != nil || parsed < 1 || parsed > 500 {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "limit must be between 1 and 500")
-				return
-			}
-			limit = parsed
-		}
-
-		var status *string
-		if v := q.Get("status"); v != "" {
-			status = &v
-		}
-
-		var reviewType *string
-		if v := q.Get("review_type"); v != "" {
-			reviewType = &v
-		}
-
-		var accountID *string
-		if v := q.Get("account_id"); v != "" {
-			accountID = &v
-		}
-
-		var userID *string
-		if v := q.Get("user_id"); v != "" {
-			userID = &v
-		}
-
-		var categoryPrimaryRaw *string
-		if v := q.Get("category_primary_raw"); v != "" {
-			categoryPrimaryRaw = &v
+		limit, err := parseIntParam(q, "limit", 50, 1, 500)
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
 		}
 
 		result, err := svc.ListReviews(r.Context(), service.ReviewListParams{
-			Status:             status,
-			ReviewType:         reviewType,
-			AccountID:          accountID,
-			UserID:             userID,
-			CategoryPrimaryRaw: categoryPrimaryRaw,
+			Status:             parseOptionalStringParam(q, "status"),
+			ReviewType:         parseOptionalStringParam(q, "review_type"),
+			AccountID:          parseOptionalStringParam(q, "account_id"),
+			UserID:             parseOptionalStringParam(q, "user_id"),
+			CategoryPrimaryRaw: parseOptionalStringParam(q, "category_primary_raw"),
 			Limit:              limit,
 			Cursor:             q.Get("cursor"),
 		})

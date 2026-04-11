@@ -13,135 +13,110 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// parseTransactionFilters extracts the common filter parameters shared by
+// ListTransactions and CountTransactions. It writes an error response and
+// returns false when any parameter is invalid.
+func parseTransactionFilters(w http.ResponseWriter, r *http.Request) (
+	startDate, endDate *time.Time,
+	accountID, userID, categorySlug *string,
+	minAmount, maxAmount *float64,
+	pending *bool,
+	search, searchMode, excludeSearch *string,
+	ok bool,
+) {
+	q := r.URL.Query()
+
+	var err error
+
+	startDate, err = parseDateParam(q, "start_date")
+	if err != nil {
+		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		return
+	}
+
+	endDate, err = parseDateParam(q, "end_date")
+	if err != nil {
+		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		return
+	}
+
+	if startDate != nil && endDate != nil && !startDate.Before(*endDate) {
+		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be before end_date")
+		return
+	}
+
+	accountID = parseOptionalStringParam(q, "account_id")
+	userID = parseOptionalStringParam(q, "user_id")
+	categorySlug = parseOptionalStringParam(q, "category_slug")
+
+	minAmount, err = parseFloatParam(q, "min_amount")
+	if err != nil {
+		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		return
+	}
+
+	maxAmount, err = parseFloatParam(q, "max_amount")
+	if err != nil {
+		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		return
+	}
+
+	if minAmount != nil && maxAmount != nil && *minAmount > *maxAmount {
+		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "min_amount must be less than or equal to max_amount")
+		return
+	}
+
+	pending, err = parseBoolParam(q, "pending")
+	if err != nil {
+		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		return
+	}
+
+	search, err = parseMinLengthStringParam(q, "search", 2)
+	if err != nil {
+		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		return
+	}
+
+	if v := q.Get("search_mode"); v != "" {
+		if !service.ValidateSearchMode(v) {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "search_mode must be one of: contains, words, fuzzy")
+			return
+		}
+		searchMode = &v
+	}
+
+	excludeSearch, err = parseMinLengthStringParam(q, "exclude_search", 2)
+	if err != nil {
+		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		return
+	}
+
+	ok = true
+	return
+}
+
 // ListTransactionsHandler returns a paginated, filterable list of transactions.
 func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 
-		// Parse limit (1-500, default 100).
-		limit := 100
-		if v := q.Get("limit"); v != "" {
-			parsed, err := strconv.Atoi(v)
-			if err != nil || parsed < 1 || parsed > 500 {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "limit must be between 1 and 500")
-				return
-			}
-			limit = parsed
-		}
-
-		// Parse cursor.
-		cursor := q.Get("cursor")
-
-		// Parse start_date (YYYY-MM-DD, inclusive).
-		var startDate *time.Time
-		if v := q.Get("start_date"); v != "" {
-			t, err := time.Parse("2006-01-02", v)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be in YYYY-MM-DD format")
-				return
-			}
-			startDate = &t
-		}
-
-		// Parse end_date (YYYY-MM-DD, exclusive).
-		var endDate *time.Time
-		if v := q.Get("end_date"); v != "" {
-			t, err := time.Parse("2006-01-02", v)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "end_date must be in YYYY-MM-DD format")
-				return
-			}
-			endDate = &t
-		}
-
-		// Validate start_date < end_date.
-		if startDate != nil && endDate != nil && !startDate.Before(*endDate) {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be before end_date")
+		limit, err := parseIntParam(q, "limit", 100, 1, 500)
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 
-		// Parse account_id.
-		var accountID *string
-		if v := q.Get("account_id"); v != "" {
-			accountID = &v
-		}
-
-		// Parse user_id.
-		var userID *string
-		if v := q.Get("user_id"); v != "" {
-			userID = &v
-		}
-
-		// Parse category_slug.
-		var categorySlug *string
-		if v := q.Get("category_slug"); v != "" {
-			categorySlug = &v
-		}
-
-		// Parse min_amount.
-		var minAmount *float64
-		if v := q.Get("min_amount"); v != "" {
-			f, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "min_amount must be a valid number")
-				return
-			}
-			minAmount = &f
-		}
-
-		// Parse max_amount.
-		var maxAmount *float64
-		if v := q.Get("max_amount"); v != "" {
-			f, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "max_amount must be a valid number")
-				return
-			}
-			maxAmount = &f
-		}
-
-		// Validate min <= max.
-		if minAmount != nil && maxAmount != nil && *minAmount > *maxAmount {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "min_amount must be less than or equal to max_amount")
+		startDate, endDate, accountID, userID, categorySlug, minAmount, maxAmount, pending, search, searchMode, excludeSearch, ok := parseTransactionFilters(w, r)
+		if !ok {
 			return
-		}
-
-		// Parse pending (true/false).
-		var pending *bool
-		if v := q.Get("pending"); v != "" {
-			switch v {
-			case "true":
-				b := true
-				pending = &b
-			case "false":
-				b := false
-				pending = &b
-			default:
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "pending must be true or false")
-				return
-			}
-		}
-
-		// Parse search (min 2 chars).
-		var search *string
-		if v := q.Get("search"); v != "" {
-			if len(v) < 2 {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "search must be at least 2 characters")
-				return
-			}
-			search = &v
 		}
 
 		// Parse sort_by.
-		var sortBy *string
-		if v := q.Get("sort_by"); v != "" {
-			switch v {
-			case "date", "amount", "name":
-				sortBy = &v
-			default:
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "sort_by must be one of: date, amount, name")
-				return
-			}
+		sortBy, err := parseEnumParam(q, "sort_by", []string{"date", "amount", "name"})
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
 		}
 
 		// Parse sort_order.
@@ -156,26 +131,8 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			}
 		}
 
-		var searchMode *string
-		if v := q.Get("search_mode"); v != "" {
-			if !service.ValidateSearchMode(v) {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "search_mode must be one of: contains, words, fuzzy")
-				return
-			}
-			searchMode = &v
-		}
-
-		var excludeSearch *string
-		if v := q.Get("exclude_search"); v != "" {
-			if len(v) < 2 {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "exclude_search must be at least 2 characters")
-				return
-			}
-			excludeSearch = &v
-		}
-
 		params := service.TransactionListParams{
-			Cursor:        cursor,
+			Cursor:        q.Get("cursor"),
 			Limit:         limit,
 			StartDate:     startDate,
 			EndDate:       endDate,
@@ -230,113 +187,9 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 // CountTransactionsHandler returns the number of transactions matching optional filters.
 func CountTransactionsHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		q := r.URL.Query()
-
-		var startDate *time.Time
-		if v := q.Get("start_date"); v != "" {
-			t, err := time.Parse("2006-01-02", v)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be in YYYY-MM-DD format")
-				return
-			}
-			startDate = &t
-		}
-
-		var endDate *time.Time
-		if v := q.Get("end_date"); v != "" {
-			t, err := time.Parse("2006-01-02", v)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "end_date must be in YYYY-MM-DD format")
-				return
-			}
-			endDate = &t
-		}
-
-		if startDate != nil && endDate != nil && !startDate.Before(*endDate) {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be before end_date")
+		startDate, endDate, accountID, userID, categorySlug, minAmount, maxAmount, pending, search, searchMode, excludeSearch, ok := parseTransactionFilters(w, r)
+		if !ok {
 			return
-		}
-
-		var accountID *string
-		if v := q.Get("account_id"); v != "" {
-			accountID = &v
-		}
-
-		var userID *string
-		if v := q.Get("user_id"); v != "" {
-			userID = &v
-		}
-
-		var categorySlug *string
-		if v := q.Get("category_slug"); v != "" {
-			categorySlug = &v
-		}
-
-		var minAmount *float64
-		if v := q.Get("min_amount"); v != "" {
-			f, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "min_amount must be a valid number")
-				return
-			}
-			minAmount = &f
-		}
-
-		var maxAmount *float64
-		if v := q.Get("max_amount"); v != "" {
-			f, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "max_amount must be a valid number")
-				return
-			}
-			maxAmount = &f
-		}
-
-		if minAmount != nil && maxAmount != nil && *minAmount > *maxAmount {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "min_amount must be less than or equal to max_amount")
-			return
-		}
-
-		var pending *bool
-		if v := q.Get("pending"); v != "" {
-			switch v {
-			case "true":
-				b := true
-				pending = &b
-			case "false":
-				b := false
-				pending = &b
-			default:
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "pending must be true or false")
-				return
-			}
-		}
-
-		var search *string
-		if v := q.Get("search"); v != "" {
-			if len(v) < 2 {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "search must be at least 2 characters")
-				return
-			}
-			search = &v
-		}
-
-		var searchMode *string
-		if v := q.Get("search_mode"); v != "" {
-			if !service.ValidateSearchMode(v) {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "search_mode must be one of: contains, words, fuzzy")
-				return
-			}
-			searchMode = &v
-		}
-
-		var excludeSearch *string
-		if es := q.Get("exclude_search"); es != "" {
-			if len(es) < 2 {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "exclude_search must be at least 2 characters")
-				return
-			}
-			excludeSearch = &es
 		}
 
 		params := service.TransactionCountParams{
@@ -408,33 +261,22 @@ func TransactionSummaryHandler(svc *service.Service) http.HandlerFunc {
 			GroupBy: groupBy,
 		}
 
-		if v := q.Get("start_date"); v != "" {
-			t, err := time.Parse("2006-01-02", v)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be in YYYY-MM-DD format")
-				return
-			}
-			params.StartDate = &t
+		var err error
+		params.StartDate, err = parseDateParam(q, "start_date")
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
 		}
 
-		if v := q.Get("end_date"); v != "" {
-			t, err := time.Parse("2006-01-02", v)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "end_date must be in YYYY-MM-DD format")
-				return
-			}
-			params.EndDate = &t
+		params.EndDate, err = parseDateParam(q, "end_date")
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
 		}
 
-		if v := q.Get("account_id"); v != "" {
-			params.AccountID = &v
-		}
-		if v := q.Get("user_id"); v != "" {
-			params.UserID = &v
-		}
-		if v := q.Get("category"); v != "" {
-			params.Category = &v
-		}
+		params.AccountID = parseOptionalStringParam(q, "account_id")
+		params.UserID = parseOptionalStringParam(q, "user_id")
+		params.Category = parseOptionalStringParam(q, "category")
 		if q.Get("include_pending") == "true" {
 			params.IncludePending = true
 		}
@@ -463,54 +305,40 @@ func MerchantSummaryHandler(svc *service.Service) http.HandlerFunc {
 
 		params := service.MerchantSummaryParams{}
 
-		if v := q.Get("start_date"); v != "" {
-			t, err := time.Parse("2006-01-02", v)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be in YYYY-MM-DD format")
-				return
-			}
-			params.StartDate = &t
+		var err error
+
+		params.StartDate, err = parseDateParam(q, "start_date")
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
 		}
 
-		if v := q.Get("end_date"); v != "" {
-			t, err := time.Parse("2006-01-02", v)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "end_date must be in YYYY-MM-DD format")
-				return
-			}
-			params.EndDate = &t
+		params.EndDate, err = parseDateParam(q, "end_date")
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
 		}
 
-		if v := q.Get("account_id"); v != "" {
-			params.AccountID = &v
-		}
-		if v := q.Get("user_id"); v != "" {
-			params.UserID = &v
-		}
-		if v := q.Get("category_slug"); v != "" {
-			params.CategorySlug = &v
+		params.AccountID = parseOptionalStringParam(q, "account_id")
+		params.UserID = parseOptionalStringParam(q, "user_id")
+		params.CategorySlug = parseOptionalStringParam(q, "category_slug")
+
+		params.MinAmount, err = parseFloatParam(q, "min_amount")
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
 		}
 
-		if v := q.Get("min_amount"); v != "" {
-			f, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "min_amount must be a valid number")
-				return
-			}
-			params.MinAmount = &f
+		params.MaxAmount, err = parseFloatParam(q, "max_amount")
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
 		}
 
-		if v := q.Get("max_amount"); v != "" {
-			f, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "max_amount must be a valid number")
-				return
-			}
-			params.MaxAmount = &f
-		}
-
-		if v := q.Get("search"); v != "" {
-			params.Search = &v
+		params.Search, err = parseMinLengthStringParam(q, "search", 2)
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
 		}
 		if v := q.Get("search_mode"); v != "" {
 			if !service.ValidateSearchMode(v) {
@@ -519,17 +347,16 @@ func MerchantSummaryHandler(svc *service.Service) http.HandlerFunc {
 			}
 			params.SearchMode = &v
 		}
-		if v := q.Get("exclude_search"); v != "" {
-			if len(v) < 2 {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "exclude_search must be at least 2 characters")
-				return
-			}
-			params.ExcludeSearch = &v
+
+		params.ExcludeSearch, err = parseMinLengthStringParam(q, "exclude_search", 2)
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
 		}
 
 		if v := q.Get("min_count"); v != "" {
-			n, err := strconv.Atoi(v)
-			if err != nil || n < 1 {
+			n, parseErr := strconv.Atoi(v)
+			if parseErr != nil || n < 1 {
 				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "min_count must be a positive integer")
 				return
 			}
