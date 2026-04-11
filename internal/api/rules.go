@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 
 	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
@@ -17,34 +16,24 @@ func ListRulesHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 
-		limit := 50
-		if v := q.Get("limit"); v != "" {
-			parsed, err := strconv.Atoi(v)
-			if err != nil || parsed < 1 || parsed > 500 {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "limit must be between 1 and 500")
-				return
-			}
-			limit = parsed
+		limit, err := parseIntParam(q, "limit", 50, 1, 500)
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
+		}
+
+		enabled, err := parseBoolParam(q, "enabled")
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
 		}
 
 		params := service.TransactionRuleListParams{
-			Limit:  limit,
-			Cursor: q.Get("cursor"),
-		}
-
-		if v := q.Get("category_slug"); v != "" {
-			params.CategorySlug = &v
-		}
-		if v := q.Get("enabled"); v != "" {
-			b, err := strconv.ParseBool(v)
-			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "enabled must be true or false")
-				return
-			}
-			params.Enabled = &b
-		}
-		if v := q.Get("search"); v != "" {
-			params.Search = &v
+			Limit:        limit,
+			Cursor:       q.Get("cursor"),
+			CategorySlug: parseOptionalStringParam(q, "category_slug"),
+			Enabled:      enabled,
+			Search:       parseOptionalStringParam(q, "search"),
 		}
 
 		result, err := svc.ListTransactionRules(r.Context(), params)
