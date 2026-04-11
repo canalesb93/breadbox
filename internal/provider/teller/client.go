@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"breadbox/internal/provider"
 )
 
 // Client is an mTLS HTTP client for the Teller API.
@@ -69,34 +71,30 @@ func (c *Client) doWithAuth(ctx context.Context, method, path, accessToken strin
 // doWithRetry sends an authenticated request with exponential backoff on 429
 // responses. The body is passed as a string so it can be re-read on retry.
 func (c *Client) doWithRetry(ctx context.Context, method, path, accessToken, bodyStr string) (*http.Response, error) {
-	const maxRetries = 5
-	delay := 2 * time.Second
+	var resp *http.Response
 
-	for attempt := 0; ; attempt++ {
+	err := provider.DoWithRetry(ctx, provider.DefaultRetryConfig(), func() (bool, error) {
 		var body io.Reader
 		if bodyStr != "" {
 			body = strings.NewReader(bodyStr)
 		}
 
-		resp, err := c.doWithAuth(ctx, method, path, accessToken, body)
+		var err error
+		resp, err = c.doWithAuth(ctx, method, path, accessToken, body)
 		if err != nil {
-			return nil, err
+			return false, err
 		}
 
-		if resp.StatusCode != http.StatusTooManyRequests || attempt >= maxRetries {
-			return resp, nil
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			return true, fmt.Errorf("teller rate limited: %d", resp.StatusCode)
 		}
 
-		resp.Body.Close()
-
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(delay):
-		}
-		delay *= 2
-		if delay > 60*time.Second {
-			delay = 60 * time.Second
-		}
+		return false, nil
+	})
+	if err != nil {
+		return nil, err
 	}
+
+	return resp, nil
 }
