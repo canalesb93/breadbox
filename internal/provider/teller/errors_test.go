@@ -8,36 +8,39 @@ import (
 	"breadbox/internal/provider"
 )
 
-func TestClassifyHTTPError_ServerErrors(t *testing.T) {
+func TestClassifyHTTPError_ServerAndRateLimitErrors_NoSyncRetryable(t *testing.T) {
+	// Server errors (5xx) and rate limits (429) must NOT wrap ErrSyncRetryable.
+	// Teller retry is handled by DoWithRetry at the HTTP call site, not by the
+	// sync engine's cursor-reset loop (which is only for Plaid's mutation-during-pagination).
 	tests := []struct {
 		name       string
 		statusCode int
 		body       string
-		wantIs     error
+		wantSubstr string
 	}{
 		{
-			name:       "500 internal server error wraps ErrSyncRetryable",
+			name:       "500 internal server error",
 			statusCode: http.StatusInternalServerError,
 			body:       "internal error",
-			wantIs:     provider.ErrSyncRetryable,
+			wantSubstr: "server error (status 500)",
 		},
 		{
-			name:       "502 bad gateway wraps ErrSyncRetryable",
+			name:       "502 bad gateway",
 			statusCode: http.StatusBadGateway,
 			body:       "bad gateway",
-			wantIs:     provider.ErrSyncRetryable,
+			wantSubstr: "server error (status 502)",
 		},
 		{
-			name:       "503 service unavailable wraps ErrSyncRetryable",
+			name:       "503 service unavailable",
 			statusCode: http.StatusServiceUnavailable,
 			body:       "service unavailable",
-			wantIs:     provider.ErrSyncRetryable,
+			wantSubstr: "server error (status 503)",
 		},
 		{
-			name:       "429 rate limited wraps ErrSyncRetryable",
+			name:       "429 rate limited",
 			statusCode: http.StatusTooManyRequests,
-			body:       "rate limited",
-			wantIs:     provider.ErrSyncRetryable,
+			body:       "",
+			wantSubstr: "rate limited (status 429)",
 		},
 	}
 
@@ -47,8 +50,14 @@ func TestClassifyHTTPError_ServerErrors(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
-			if !errors.Is(err, tt.wantIs) {
-				t.Errorf("errors.Is(err, %v) = false, want true; err = %v", tt.wantIs, err)
+			if errors.Is(err, provider.ErrSyncRetryable) {
+				t.Errorf("errors.Is(err, ErrSyncRetryable) = true for status %d, want false", tt.statusCode)
+			}
+			if errors.Is(err, provider.ErrReauthRequired) {
+				t.Errorf("errors.Is(err, ErrReauthRequired) = true for status %d, want false", tt.statusCode)
+			}
+			if !containsSubstring(err.Error(), tt.wantSubstr) {
+				t.Errorf("error %q does not contain %q", err.Error(), tt.wantSubstr)
 			}
 		})
 	}

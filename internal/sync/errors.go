@@ -33,8 +33,8 @@ var knownErrors = []errorMapping{
 	{pattern: "enrollment.disconnected", message: "This bank connection has been disconnected. Please re-authenticate."},
 	{pattern: "teller transactions get: status 403", message: "Teller rejected the request. The connection may need re-authentication."},
 	{pattern: "teller transactions get: status 404", message: "Teller could not find the account. It may have been closed or removed."},
-	{pattern: "teller transactions get: status 429", message: "Too many requests to Teller. Will retry later."},
-	{pattern: "teller transactions get: status 5", message: "Teller is experiencing issues. Will retry later."},
+	{pattern: "rate limited (status 429)", message: "Too many requests to Teller. Will retry later."},
+	{pattern: "server error (status 5", message: "Teller is experiencing issues. Will retry later."},
 	{pattern: "teller: fetch accounts for sync", message: "Could not retrieve accounts from Teller."},
 	{pattern: "teller transactions decode", message: "Received unexpected data from Teller."},
 

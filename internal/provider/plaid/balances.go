@@ -31,10 +31,10 @@ func (p *PlaidProvider) GetBalances(ctx context.Context, conn provider.Connectio
 				return nil, ErrItemReauthRequired
 			}
 		}
-		// Classify HTTP-level errors as retryable when appropriate.
+		// Report HTTP-level errors with context.
 		if httpResp != nil {
 			if httpResp.StatusCode == http.StatusTooManyRequests || httpResp.StatusCode >= 500 {
-				return nil, fmt.Errorf("plaid accounts get: status %d: %w", httpResp.StatusCode, provider.ErrSyncRetryable)
+				return nil, fmt.Errorf("plaid accounts get: status %d", httpResp.StatusCode)
 			}
 		}
 		return nil, fmt.Errorf("plaid accounts get: %w", err)
