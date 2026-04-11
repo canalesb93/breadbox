@@ -6,13 +6,6 @@
   </div>
 </div>
 
-{{if .Flash}}
-<div role="alert" class="alert {{if eq .Flash.Type "success"}}alert-success{{else if eq .Flash.Type "error"}}alert-error{{else}}alert-info{{end}} rounded-xl mb-6">
-  {{if eq .Flash.Type "success"}}<i data-lucide="check-circle" class="w-5 h-5"></i>{{else if eq .Flash.Type "error"}}<i data-lucide="alert-circle" class="w-5 h-5"></i>{{else}}<i data-lucide="info" class="w-5 h-5"></i>{{end}}
-  <span>{{.Flash.Message}}</span>
-</div>
-{{end}}
-
 {{if .IsUnlinked}}
 <div class="bb-card mb-6 border-warning/30" x-data="{ mode: 'create' }">
   <div class="p-5 border-b border-warning/30">
