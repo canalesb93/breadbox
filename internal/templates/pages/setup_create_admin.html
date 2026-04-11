@@ -1,7 +1,7 @@
 {{define "content"}}
 <div class="text-center mb-8">
-  <h1 class="text-xl font-semibold tracking-tight">Create your account</h1>
-  <p class="text-sm text-base-content/50 mt-1.5">Set up your account to get started with Breadbox</p>
+  <h1 class="text-xl font-semibold tracking-tight">Welcome to Breadbox</h1>
+  <p class="text-sm text-base-content/50 mt-1.5">Create your account to start managing your household's finances</p>
 </div>
 
 {{if .Error}}
@@ -17,15 +17,15 @@
   <div>
     <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="name">Your Name</label>
     <input type="text" id="name" name="name" value="{{.Name}}" required autocomplete="name"
-           placeholder="Your name"
+           placeholder="e.g. Alex"
            class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200{{if .Errors.Name}} input-error{{end}}">
     {{if .Errors.Name}}<p class="text-xs text-error mt-1.5">{{.Errors.Name}}</p>{{end}}
   </div>
 
   <div>
-    <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="username">Username</label>
-    <input type="text" id="username" name="username" value="{{.Username}}" required autocomplete="username"
-           placeholder="Choose a username"
+    <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="username">Email</label>
+    <input type="email" id="username" name="username" value="{{.Username}}" required autocomplete="email"
+           placeholder="you@example.com"
            class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200{{if .Errors.Username}} input-error{{end}}">
     {{if .Errors.Username}}<p class="text-xs text-error mt-1.5">{{.Errors.Username}}</p>{{end}}
   </div>
@@ -35,20 +35,14 @@
     <input type="password" id="password" name="password" required autocomplete="new-password" minlength="8"
            placeholder="Create a password"
            class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200{{if .Errors.Password}} input-error{{end}}">
-    <p class="text-xs text-base-content/40 mt-1.5">Minimum 8 characters</p>
+    <p class="text-xs text-base-content/40 mt-1.5">At least 8 characters</p>
     {{if .Errors.Password}}<p class="text-xs text-error mt-1">{{.Errors.Password}}</p>{{end}}
   </div>
 
-  <div>
-    <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="confirm_password">Confirm Password</label>
-    <input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password"
-           placeholder="Confirm your password"
-           class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200{{if .Errors.ConfirmPassword}} input-error{{end}}">
-    {{if .Errors.ConfirmPassword}}<p class="text-xs text-error mt-1.5">{{.Errors.ConfirmPassword}}</p>{{end}}
-  </div>
+  <p class="text-xs text-base-content/40 text-center">You'll be able to add other family members after setup.</p>
 
   <button type="submit" class="btn btn-primary w-full h-12 rounded-xl text-base font-semibold transition-colors duration-150 mt-1">
-    Create Account
+    Get Started
     <i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
   </button>
 </form>

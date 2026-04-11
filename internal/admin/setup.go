@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/mail"
 	"strconv"
 	"strings"
 
@@ -34,7 +35,7 @@ func CreateAdminHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 
 		if r.Method == http.MethodGet {
 			data := map[string]any{
-				"PageTitle": "Create Admin Account",
+				"PageTitle": "Welcome",
 				"CSRFToken": "",
 				"Name":      "",
 				"Username":  "",
@@ -49,7 +50,6 @@ func CreateAdminHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		name := strings.TrimSpace(r.FormValue("name"))
 		username := strings.TrimSpace(r.FormValue("username"))
 		password := r.FormValue("password")
-		confirmPassword := r.FormValue("confirm_password")
 
 		errors := map[string]string{}
 
@@ -60,22 +60,20 @@ func CreateAdminHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		}
 
 		if username == "" {
-			errors["Username"] = "Username is required"
+			errors["Username"] = "Email is required"
+		} else if _, err := mail.ParseAddress(username); err != nil {
+			errors["Username"] = "Please enter a valid email address"
 		} else if len(username) > 64 {
-			errors["Username"] = "Username must be 64 characters or fewer"
+			errors["Username"] = "Email must be 64 characters or fewer"
 		}
 
 		if len(password) < 8 {
 			errors["Password"] = "Password must be at least 8 characters"
 		}
 
-		if password != confirmPassword {
-			errors["ConfirmPassword"] = "Passwords do not match"
-		}
-
 		if len(errors) > 0 {
 			data := map[string]any{
-				"PageTitle": "Create Admin Account",
+				"PageTitle": "Welcome",
 				"CSRFToken": "",
 				"Name":      name,
 				"Username":  username,
@@ -89,7 +87,7 @@ func CreateAdminHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 		if err != nil {
 			data := map[string]any{
-				"PageTitle": "Create Admin Account",
+				"PageTitle": "Welcome",
 				"CSRFToken": "",
 				"Name":      name,
 				"Username":  username,
@@ -103,7 +101,7 @@ func CreateAdminHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		// Create household user + admin account in a single transaction.
 		if err := createLinkedAdmin(ctx, a, name, username, hashedPassword); err != nil {
 			data := map[string]any{
-				"PageTitle": "Create Admin Account",
+				"PageTitle": "Welcome",
 				"CSRFToken": "",
 				"Name":      name,
 				"Username":  username,
@@ -131,7 +129,8 @@ func createLinkedAdmin(ctx context.Context, a *app.App, name, username string, h
 	qtx := db.New(tx)
 
 	user, err := qtx.CreateUser(ctx, db.CreateUserParams{
-		Name: name,
+		Name:  name,
+		Email: pgtype.Text{String: username, Valid: true},
 	})
 	if err != nil {
 		return fmt.Errorf("create user: %w", err)
@@ -192,8 +191,11 @@ func ProgrammaticSetupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFu
 		if req.Name == "" {
 			validationErrors = append(validationErrors, "name is required")
 		}
-		if strings.TrimSpace(req.Username) == "" {
-			validationErrors = append(validationErrors, "username is required")
+		req.Username = strings.TrimSpace(req.Username)
+		if req.Username == "" {
+			validationErrors = append(validationErrors, "email is required")
+		} else if _, err := mail.ParseAddress(req.Username); err != nil {
+			validationErrors = append(validationErrors, "username must be a valid email address")
 		}
 		if len(req.Password) < 8 {
 			validationErrors = append(validationErrors, "password must be at least 8 characters")
@@ -257,7 +259,7 @@ func ProgrammaticSetupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFu
 			return
 		}
 
-		if err := createLinkedAdmin(ctx, a, req.Name, strings.TrimSpace(req.Username), hashedPassword); err != nil {
+		if err := createLinkedAdmin(ctx, a, req.Name, req.Username, hashedPassword); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{
 				"error": "Failed to create admin account",
 			})
