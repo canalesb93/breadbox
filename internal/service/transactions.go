@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -12,8 +14,13 @@ import (
 )
 
 func (s *Service) ListTransactions(ctx context.Context, params TransactionListParams) (*TransactionListResult, error) {
-	// Build dynamic SQL query
-	query := "SELECT t.id, t.short_id, t.account_id, t.external_transaction_id, t.pending_transaction_id, " +
+	// Build dynamic SQL query using strings.Builder to reduce allocations.
+	var buf strings.Builder
+	buf.Grow(1024)
+	args := make([]any, 0, 16)
+	argN := 1
+
+	buf.WriteString("SELECT t.id, t.short_id, t.account_id, t.external_transaction_id, t.pending_transaction_id, " +
 		"t.amount, t.iso_currency_code, t.unofficial_currency_code, t.date, t.authorized_date, " +
 		"t.datetime, t.authorized_datetime, t.name, t.merchant_name, " +
 		"t.category_primary, t.category_detailed, t.category_confidence, " +
@@ -31,10 +38,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		"LEFT JOIN users u ON bc.user_id = u.id " +
 		"LEFT JOIN users au ON t.attributed_user_id = au.id " +
 		"LEFT JOIN categories c ON t.category_id = c.id " +
-		"LEFT JOIN categories pc ON c.parent_id = pc.id"
-
-	var args []any
-	argN := 1
+		"LEFT JOIN categories pc ON c.parent_id = pc.id")
 
 	limit := params.Limit
 	if limit <= 0 {
@@ -44,11 +48,11 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		limit = 500
 	}
 
-	query += " WHERE t.deleted_at IS NULL"
+	buf.WriteString(" WHERE t.deleted_at IS NULL")
 
 	// Exclude matched dependent transactions (but keep unmatched ones visible).
 	if !params.IncludeDependent {
-		query += " AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))"
+		buf.WriteString(" AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))")
 	}
 
 	if params.UserID != nil {
@@ -57,7 +61,8 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			return nil, fmt.Errorf("invalid user id: %w", err)
 		}
 		// Attribution-aware: use attributed_user_id if set, otherwise connection user.
-		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
+		buf.WriteString(" AND COALESCE(t.attributed_user_id, bc.user_id) = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, uid)
 		argN++
 	}
@@ -67,19 +72,22 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		if err != nil {
 			return nil, fmt.Errorf("invalid account id: %w", err)
 		}
-		query += fmt.Sprintf(" AND t.account_id = $%d", argN)
+		buf.WriteString(" AND t.account_id = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, aid)
 		argN++
 	}
 
 	if params.StartDate != nil {
-		query += fmt.Sprintf(" AND t.date >= $%d", argN)
+		buf.WriteString(" AND t.date >= $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, pgtype.Date{Time: *params.StartDate, Valid: true})
 		argN++
 	}
 
 	if params.EndDate != nil {
-		query += fmt.Sprintf(" AND t.date < $%d", argN)
+		buf.WriteString(" AND t.date < $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, pgtype.Date{Time: *params.EndDate, Valid: true})
 		argN++
 	}
@@ -90,33 +98,42 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			// Unknown slug — no results
 			return &TransactionListResult{Transactions: []TransactionResponse{}, Limit: limit}, nil
 		}
+		n := strconv.Itoa(argN)
 		if !catRow.ParentID.Valid {
 			// Parent category — include self and all children
-			query += fmt.Sprintf(" AND (c.id = $%d OR c.parent_id = $%d)", argN, argN)
+			buf.WriteString(" AND (c.id = $")
+			buf.WriteString(n)
+			buf.WriteString(" OR c.parent_id = $")
+			buf.WriteString(n)
+			buf.WriteByte(')')
 			args = append(args, catRow.ID)
 			argN++
 		} else {
 			// Child category — exact match
-			query += fmt.Sprintf(" AND t.category_id = $%d", argN)
+			buf.WriteString(" AND t.category_id = $")
+			buf.WriteString(n)
 			args = append(args, catRow.ID)
 			argN++
 		}
 	}
 
 	if params.MinAmount != nil {
-		query += fmt.Sprintf(" AND t.amount >= $%d", argN)
+		buf.WriteString(" AND t.amount >= $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.MinAmount)
 		argN++
 	}
 
 	if params.MaxAmount != nil {
-		query += fmt.Sprintf(" AND t.amount <= $%d", argN)
+		buf.WriteString(" AND t.amount <= $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.MaxAmount)
 		argN++
 	}
 
 	if params.Pending != nil {
-		query += fmt.Sprintf(" AND t.pending = $%d", argN)
+		buf.WriteString(" AND t.pending = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.Pending)
 		argN++
 	}
@@ -127,14 +144,14 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			mode = *params.SearchMode
 		}
 		sc := BuildSearchClause(*params.Search, mode, TransactionSearchColumns, TransactionNullableColumns, argN)
-		query += sc.SQL
+		buf.WriteString(sc.SQL)
 		args = append(args, sc.Args...)
 		argN = sc.ArgN
 	}
 
 	if params.ExcludeSearch != nil {
 		ec := BuildExcludeSearchClause(*params.ExcludeSearch, TransactionSearchColumns, TransactionNullableColumns, argN)
-		query += ec.SQL
+		buf.WriteString(ec.SQL)
 		args = append(args, ec.Args...)
 		argN = ec.ArgN
 	}
@@ -148,7 +165,11 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		if err != nil {
 			return nil, ErrInvalidCursor
 		}
-		query += fmt.Sprintf(" AND (t.date, t.id) < ($%d, $%d)", argN, argN+1)
+		buf.WriteString(" AND (t.date, t.id) < ($")
+		buf.WriteString(strconv.Itoa(argN))
+		buf.WriteString(", $")
+		buf.WriteString(strconv.Itoa(argN + 1))
+		buf.WriteByte(')')
 		args = append(args, pgtype.Date{Time: cursorDate, Valid: true}, cursorUUID)
 		argN += 2
 	}
@@ -171,12 +192,18 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		sortDir = "ASC"
 	}
 
-	query += fmt.Sprintf(" ORDER BY %s %s, t.id DESC", sortCol, sortDir)
+	buf.WriteString(" ORDER BY ")
+	buf.WriteString(sortCol)
+	buf.WriteByte(' ')
+	buf.WriteString(sortDir)
+	buf.WriteString(", t.id DESC")
 
 	// Fetch one extra to detect has_more
-	query += fmt.Sprintf(" LIMIT $%d", argN)
+	buf.WriteString(" LIMIT $")
+	buf.WriteString(strconv.Itoa(argN))
 	args = append(args, limit+1)
 
+	query := buf.String()
 	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query transactions: %w", err)
@@ -334,19 +361,21 @@ func (s *Service) CountUncategorizedTransactions(ctx context.Context) (int64, er
 }
 
 func (s *Service) CountTransactionsFiltered(ctx context.Context, params TransactionCountParams) (int64, error) {
-	query := "SELECT COUNT(*) FROM transactions t " +
+	var buf strings.Builder
+	buf.Grow(512)
+	args := make([]any, 0, 12)
+	argN := 1
+
+	buf.WriteString("SELECT COUNT(*) FROM transactions t " +
 		"JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
 		"LEFT JOIN users u ON bc.user_id = u.id " +
-		"LEFT JOIN categories c ON t.category_id = c.id"
+		"LEFT JOIN categories c ON t.category_id = c.id")
 
-	var args []any
-	argN := 1
-
-	query += " WHERE t.deleted_at IS NULL"
+	buf.WriteString(" WHERE t.deleted_at IS NULL")
 
 	if !params.IncludeDependent {
-		query += " AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))"
+		buf.WriteString(" AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))")
 	}
 
 	if params.UserID != nil {
@@ -354,7 +383,8 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 		if err != nil {
 			return 0, fmt.Errorf("invalid user id: %w", err)
 		}
-		query += fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
+		buf.WriteString(" AND COALESCE(t.attributed_user_id, bc.user_id) = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, uid)
 		argN++
 	}
@@ -364,19 +394,22 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 		if err != nil {
 			return 0, fmt.Errorf("invalid account id: %w", err)
 		}
-		query += fmt.Sprintf(" AND t.account_id = $%d", argN)
+		buf.WriteString(" AND t.account_id = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, aid)
 		argN++
 	}
 
 	if params.StartDate != nil {
-		query += fmt.Sprintf(" AND t.date >= $%d", argN)
+		buf.WriteString(" AND t.date >= $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, pgtype.Date{Time: *params.StartDate, Valid: true})
 		argN++
 	}
 
 	if params.EndDate != nil {
-		query += fmt.Sprintf(" AND t.date < $%d", argN)
+		buf.WriteString(" AND t.date < $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, pgtype.Date{Time: *params.EndDate, Valid: true})
 		argN++
 	}
@@ -387,33 +420,42 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 			// Unknown slug — 0 count
 			return 0, nil
 		}
+		n := strconv.Itoa(argN)
 		if !catRow.ParentID.Valid {
 			// Parent category — include self and all children
-			query += fmt.Sprintf(" AND (c.id = $%d OR c.parent_id = $%d)", argN, argN)
+			buf.WriteString(" AND (c.id = $")
+			buf.WriteString(n)
+			buf.WriteString(" OR c.parent_id = $")
+			buf.WriteString(n)
+			buf.WriteByte(')')
 			args = append(args, catRow.ID)
 			argN++
 		} else {
 			// Child category — exact match
-			query += fmt.Sprintf(" AND t.category_id = $%d", argN)
+			buf.WriteString(" AND t.category_id = $")
+			buf.WriteString(n)
 			args = append(args, catRow.ID)
 			argN++
 		}
 	}
 
 	if params.MinAmount != nil {
-		query += fmt.Sprintf(" AND t.amount >= $%d", argN)
+		buf.WriteString(" AND t.amount >= $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.MinAmount)
 		argN++
 	}
 
 	if params.MaxAmount != nil {
-		query += fmt.Sprintf(" AND t.amount <= $%d", argN)
+		buf.WriteString(" AND t.amount <= $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.MaxAmount)
 		argN++
 	}
 
 	if params.Pending != nil {
-		query += fmt.Sprintf(" AND t.pending = $%d", argN)
+		buf.WriteString(" AND t.pending = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.Pending)
 		argN++
 	}
@@ -424,18 +466,20 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 			mode = *params.SearchMode
 		}
 		sc := BuildSearchClause(*params.Search, mode, TransactionSearchColumns, TransactionNullableColumns, argN)
-		query += sc.SQL
+		buf.WriteString(sc.SQL)
 		args = append(args, sc.Args...)
 		argN = sc.ArgN
 	}
 
 	if params.ExcludeSearch != nil {
 		ec := BuildExcludeSearchClause(*params.ExcludeSearch, TransactionSearchColumns, TransactionNullableColumns, argN)
-		query += ec.SQL
+		buf.WriteString(ec.SQL)
 		args = append(args, ec.Args...)
 		argN = ec.ArgN
 	}
 
+	_ = argN // keep for consistency
+	query := buf.String()
 	var count int64
 	err := s.Pool.QueryRow(ctx, query, args...).Scan(&count)
 	if err != nil {
@@ -445,7 +489,12 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 }
 
 func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransactionListParams) (*AdminTransactionListResult, error) {
-	selectPrefix := "SELECT t.id, t.account_id, COALESCE(a.display_name, a.name, ''), " +
+	var buf strings.Builder
+	buf.Grow(2048)
+	args := make([]any, 0, 16)
+	argN := 1
+
+	buf.WriteString("SELECT t.id, t.account_id, COALESCE(a.display_name, a.name, ''), " +
 		"COALESCE(bc.institution_name, ''), COALESCE(au.name, u.name, ''), " +
 		"t.date, t.name, t.merchant_name, t.amount, t.iso_currency_code, " +
 		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
@@ -453,27 +502,24 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		"EXISTS(SELECT 1 FROM review_queue rq WHERE rq.transaction_id = t.id AND rq.reviewer_type = 'agent' AND rq.status IN ('approved', 'rejected')) AS agent_reviewed, " +
 		"EXISTS(SELECT 1 FROM review_queue rq WHERE rq.transaction_id = t.id AND rq.status = 'pending') AS has_pending_review, " +
 		"t.created_at, t.updated_at, " +
-		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id "
-	fromClause := "FROM transactions t " +
+		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id " +
+		"FROM transactions t " +
 		"LEFT JOIN accounts a ON t.account_id = a.id " +
 		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
 		"LEFT JOIN users u ON bc.user_id = u.id " +
 		"LEFT JOIN users au ON t.attributed_user_id = au.id " +
 		"LEFT JOIN categories c ON t.category_id = c.id " +
-		"LEFT JOIN categories pc ON c.parent_id = pc.id "
-	query := selectPrefix + fromClause + "WHERE t.deleted_at IS NULL"
+		"LEFT JOIN categories pc ON c.parent_id = pc.id " +
+		"WHERE t.deleted_at IS NULL")
 
 	// Track which JOINs are needed for the WHERE clause (used by the count query).
 	var needAccountJoin, needConnectionJoin, needUserJoin, needCategoryJoin bool
 
-	var args []any
-	argN := 1
-	whereClauses := ""
+	// Record where WHERE clauses start so we can extract them for the count query.
+	whereStart := buf.Len()
 
 	// Exclude matched dependent transactions (keep unmatched visible).
-	depClause := " AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))"
-	query += depClause
-	whereClauses += depClause
+	buf.WriteString(" AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))")
 	needAccountJoin = true
 
 	if params.UserID != nil {
@@ -481,9 +527,8 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		if err != nil {
 			return nil, fmt.Errorf("invalid user id: %w", err)
 		}
-		clause := fmt.Sprintf(" AND COALESCE(t.attributed_user_id, bc.user_id) = $%d", argN)
-		query += clause
-		whereClauses += clause
+		buf.WriteString(" AND COALESCE(t.attributed_user_id, bc.user_id) = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, uid)
 		argN++
 		needAccountJoin = true
@@ -496,9 +541,8 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		if err != nil {
 			return nil, fmt.Errorf("invalid connection id: %w", err)
 		}
-		clause := fmt.Sprintf(" AND a.connection_id = $%d", argN)
-		query += clause
-		whereClauses += clause
+		buf.WriteString(" AND a.connection_id = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, cid)
 		argN++
 		needAccountJoin = true
@@ -509,25 +553,22 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		if err != nil {
 			return nil, fmt.Errorf("invalid account id: %w", err)
 		}
-		clause := fmt.Sprintf(" AND t.account_id = $%d", argN)
-		query += clause
-		whereClauses += clause
+		buf.WriteString(" AND t.account_id = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, aid)
 		argN++
 	}
 
 	if params.StartDate != nil {
-		clause := fmt.Sprintf(" AND t.date >= $%d", argN)
-		query += clause
-		whereClauses += clause
+		buf.WriteString(" AND t.date >= $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, pgtype.Date{Time: *params.StartDate, Valid: true})
 		argN++
 	}
 
 	if params.EndDate != nil {
-		clause := fmt.Sprintf(" AND t.date < $%d", argN)
-		query += clause
-		whereClauses += clause
+		buf.WriteString(" AND t.date < $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, pgtype.Date{Time: *params.EndDate, Valid: true})
 		argN++
 	}
@@ -538,42 +579,41 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			// Unknown slug — no results
 			return &AdminTransactionListResult{Transactions: []AdminTransactionRow{}, Total: 0, Page: 1, PageSize: params.PageSize, TotalPages: 0}, nil
 		}
+		n := strconv.Itoa(argN)
 		if !catRow.ParentID.Valid {
-			clause := fmt.Sprintf(" AND (c.id = $%d OR c.parent_id = $%d)", argN, argN)
-			query += clause
-			whereClauses += clause
+			buf.WriteString(" AND (c.id = $")
+			buf.WriteString(n)
+			buf.WriteString(" OR c.parent_id = $")
+			buf.WriteString(n)
+			buf.WriteByte(')')
 			args = append(args, catRow.ID)
 			argN++
 			needCategoryJoin = true
 		} else {
-			clause := fmt.Sprintf(" AND t.category_id = $%d", argN)
-			query += clause
-			whereClauses += clause
+			buf.WriteString(" AND t.category_id = $")
+			buf.WriteString(n)
 			args = append(args, catRow.ID)
 			argN++
 		}
 	}
 
 	if params.MinAmount != nil {
-		clause := fmt.Sprintf(" AND t.amount >= $%d", argN)
-		query += clause
-		whereClauses += clause
+		buf.WriteString(" AND t.amount >= $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.MinAmount)
 		argN++
 	}
 
 	if params.MaxAmount != nil {
-		clause := fmt.Sprintf(" AND t.amount <= $%d", argN)
-		query += clause
-		whereClauses += clause
+		buf.WriteString(" AND t.amount <= $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.MaxAmount)
 		argN++
 	}
 
 	if params.Pending != nil {
-		clause := fmt.Sprintf(" AND t.pending = $%d", argN)
-		query += clause
-		whereClauses += clause
+		buf.WriteString(" AND t.pending = $")
+		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.Pending)
 		argN++
 	}
@@ -585,35 +625,41 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		}
 		cols, nullCols := resolveSearchField(params.SearchField)
 		sc := BuildSearchClause(*params.Search, mode, cols, nullCols, argN)
-		query += sc.SQL
-		whereClauses += sc.SQL
+		buf.WriteString(sc.SQL)
 		args = append(args, sc.Args...)
 		argN = sc.ArgN
 	}
 
 	if params.ExcludeSearch != nil {
 		ec := BuildExcludeSearchClause(*params.ExcludeSearch, TransactionSearchColumns, TransactionNullableColumns, argN)
-		query += ec.SQL
-		whereClauses += ec.SQL
+		buf.WriteString(ec.SQL)
 		args = append(args, ec.Args...)
 		argN = ec.ArgN
 	}
 
+	// Extract WHERE clauses for count query from the builder.
+	mainSoFar := buf.String()
+	whereClauses := mainSoFar[whereStart:]
+
 	// Build a minimal count query with only the JOINs needed for WHERE filters.
-	countFrom := "FROM transactions t "
+	var countBuf strings.Builder
+	countBuf.Grow(256)
+	countBuf.WriteString("SELECT COUNT(*) FROM transactions t ")
 	if needAccountJoin || needConnectionJoin || needUserJoin {
-		countFrom += "LEFT JOIN accounts a ON t.account_id = a.id "
+		countBuf.WriteString("LEFT JOIN accounts a ON t.account_id = a.id ")
 	}
 	if needConnectionJoin || needUserJoin {
-		countFrom += "LEFT JOIN bank_connections bc ON a.connection_id = bc.id "
+		countBuf.WriteString("LEFT JOIN bank_connections bc ON a.connection_id = bc.id ")
 	}
 	if needUserJoin {
-		countFrom += "LEFT JOIN users u ON bc.user_id = u.id "
+		countBuf.WriteString("LEFT JOIN users u ON bc.user_id = u.id ")
 	}
 	if needCategoryJoin {
-		countFrom += "LEFT JOIN categories c ON t.category_id = c.id "
+		countBuf.WriteString("LEFT JOIN categories c ON t.category_id = c.id ")
 	}
-	countQuery := "SELECT COUNT(*) " + countFrom + "WHERE t.deleted_at IS NULL" + whereClauses
+	countBuf.WriteString("WHERE t.deleted_at IS NULL")
+	countBuf.WriteString(whereClauses)
+	countQuery := countBuf.String()
 
 	var total int64
 	if err := s.Pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
@@ -624,7 +670,10 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	if params.SortOrder == "asc" {
 		sortOrder = "ASC"
 	}
-	query += fmt.Sprintf(" ORDER BY t.date %s, t.id %s", sortOrder, sortOrder)
+	buf.WriteString(" ORDER BY t.date ")
+	buf.WriteString(sortOrder)
+	buf.WriteString(", t.id ")
+	buf.WriteString(sortOrder)
 
 	pageSize := params.PageSize
 	if pageSize == 0 {
@@ -637,10 +686,14 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 
 	// PageSize -1 means export all (no pagination).
 	if pageSize > 0 {
-		query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argN, argN+1)
+		buf.WriteString(" LIMIT $")
+		buf.WriteString(strconv.Itoa(argN))
+		buf.WriteString(" OFFSET $")
+		buf.WriteString(strconv.Itoa(argN + 1))
 		args = append(args, pageSize, (page-1)*pageSize)
 	}
 
+	query := buf.String()
 	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query admin transactions: %w", err)
