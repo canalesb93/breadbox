@@ -98,8 +98,13 @@ func (p *PlaidProvider) syncWithRetry(ctx context.Context, req *plaidgo.Transact
 			return true, err
 		}
 
+		// Close response body and report server errors with context.
 		if httpResp != nil {
+			statusCode := httpResp.StatusCode
 			httpResp.Body.Close()
+			if statusCode >= 500 {
+				return false, fmt.Errorf("plaid transactions sync: server error (status %d)", statusCode)
+			}
 		}
 		return false, fmt.Errorf("plaid transactions sync: %w", err)
 	})

@@ -39,3 +39,20 @@ func isReauthResponse(resp *http.Response) bool {
 	}
 	return false
 }
+
+// classifyHTTPError returns a contextual error for non-OK Teller API responses.
+// Reauth cases (403, enrollment.disconnected) are handled separately by
+// isReauthResponse. Rate limits and server errors are NOT wrapped with
+// ErrSyncRetryable — Teller retry is handled by the DoWithRetry helper at the
+// HTTP call site, not by the sync engine's cursor-reset loop (which is designed
+// only for Plaid's mutation-during-pagination).
+func classifyHTTPError(operation string, statusCode int, body []byte) error {
+	switch {
+	case statusCode == http.StatusTooManyRequests:
+		return fmt.Errorf("teller %s: rate limited (status %d)", operation, statusCode)
+	case statusCode >= 500:
+		return fmt.Errorf("teller %s: server error (status %d): %s", operation, statusCode, body)
+	default:
+		return fmt.Errorf("teller %s: status %d: %s", operation, statusCode, body)
+	}
+}

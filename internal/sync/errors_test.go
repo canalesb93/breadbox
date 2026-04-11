@@ -55,8 +55,20 @@ func TestFriendlyError(t *testing.T) {
 			wantHit: true,
 		},
 		{
-			name:    "teller 500",
-			rawErr:  "teller transactions get: status 500: internal server error",
+			name:    "teller 429 new format",
+			rawErr:  "teller transactions get: rate limited (status 429)",
+			wantMsg: "Too many requests to Teller. Will retry later.",
+			wantHit: true,
+		},
+		{
+			name:    "teller 500 new format",
+			rawErr:  "teller transactions get: server error (status 500): internal server error",
+			wantMsg: "Teller is experiencing issues. Will retry later.",
+			wantHit: true,
+		},
+		{
+			name:    "teller balance 502",
+			rawErr:  "teller balance get: server error (status 502): bad gateway",
 			wantMsg: "Teller is experiencing issues. Will retry later.",
 			wantHit: true,
 		},

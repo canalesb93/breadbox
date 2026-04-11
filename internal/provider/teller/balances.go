@@ -54,7 +54,7 @@ func (p *TellerProvider) GetBalances(ctx context.Context, conn provider.Connecti
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
-			return nil, fmt.Errorf("teller balance get: status %d: %s", resp.StatusCode, body)
+			return nil, classifyHTTPError("balance get", resp.StatusCode, body)
 		}
 
 		var bal tellerBalance
