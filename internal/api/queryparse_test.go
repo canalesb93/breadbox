@@ -137,9 +137,13 @@ func TestParseBoolParam(t *testing.T) {
 		{"true", "pending=true", "pending", boolPtr(true), false},
 		{"false", "pending=false", "pending", boolPtr(false), false},
 		{"invalid value", "pending=yes", "pending", nil, true},
-		{"numeric 1", "pending=1", "pending", nil, true},
-		{"numeric 0", "pending=0", "pending", nil, true},
-		{"capitalized", "pending=True", "pending", nil, true},
+		{"numeric 1", "pending=1", "pending", boolPtr(true), false},
+		{"numeric 0", "pending=0", "pending", boolPtr(false), false},
+		{"capitalized", "pending=True", "pending", boolPtr(true), false},
+		{"all caps TRUE", "pending=TRUE", "pending", boolPtr(true), false},
+		{"all caps FALSE", "pending=FALSE", "pending", boolPtr(false), false},
+		{"short t", "pending=t", "pending", boolPtr(true), false},
+		{"short f", "pending=f", "pending", boolPtr(false), false},
 	}
 
 	for _, tt := range tests {

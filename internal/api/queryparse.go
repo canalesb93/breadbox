@@ -55,22 +55,17 @@ func parseFloatParam(q url.Values, key string) (*float64, error) {
 
 // parseBoolParam parses a boolean query parameter. Returns nil when the
 // parameter is absent. Returns an error with a user-facing message when the
-// value is not "true" or "false".
+// value is not a valid boolean (accepts 1, t, TRUE, true, 0, f, FALSE, false, etc.).
 func parseBoolParam(q url.Values, key string) (*bool, error) {
 	v := q.Get(key)
 	if v == "" {
 		return nil, nil
 	}
-	switch v {
-	case "true":
-		b := true
-		return &b, nil
-	case "false":
-		b := false
-		return &b, nil
-	default:
+	b, err := strconv.ParseBool(v)
+	if err != nil {
 		return nil, fmt.Errorf("%s must be true or false", key)
 	}
+	return &b, nil
 }
 
 // parseOptionalStringParam returns a pointer to the query parameter value, or

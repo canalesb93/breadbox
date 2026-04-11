@@ -335,7 +335,11 @@ func MerchantSummaryHandler(svc *service.Service) http.HandlerFunc {
 			return
 		}
 
-		params.Search = parseOptionalStringParam(q, "search")
+		params.Search, err = parseMinLengthStringParam(q, "search", 2)
+		if err != nil {
+			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			return
+		}
 		if v := q.Get("search_mode"); v != "" {
 			if !service.ValidateSearchMode(v) {
 				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "search_mode must be one of: contains, words, fuzzy")
