@@ -47,11 +47,7 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		syncLogCount, _ := a.Service.CountSyncLogs(ctx)
 
 		// Check onboarding dismissed state for help section.
-		onboardingDismissed := false
-		dismissedCfg, _ := a.Queries.GetAppConfig(ctx, "onboarding_dismissed")
-		if dismissedCfg.Value.Valid && dismissedCfg.Value.String == "true" {
-			onboardingDismissed = true
-		}
+		onboardingDismissed := GetConfigBool(ctx, a.Queries, "onboarding_dismissed")
 
 		data := map[string]any{
 			"PageTitle":           "Settings",

@@ -77,11 +77,7 @@ func GettingStartedHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRende
 		}
 
 		// Check if onboarding is dismissed (for the nav badge display).
-		dismissed := false
-		dismissedCfg, _ := a.Queries.GetAppConfig(ctx, "onboarding_dismissed")
-		if dismissedCfg.Value.Valid && dismissedCfg.Value.String == "true" {
-			dismissed = true
-		}
+		dismissed := GetConfigBool(ctx, a.Queries, "onboarding_dismissed")
 
 		data := BaseTemplateData(r, sm, "getting-started", "Getting Started")
 		data["HasMember"] = hasMember

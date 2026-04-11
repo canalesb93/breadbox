@@ -71,12 +71,7 @@ func ReviewsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		categories, _ := svc.ListCategoryTree(ctx)
 
 		// Load review settings from app_config.
-		reviewAutoEnqueue := false // reviews are off by default
-		if cfg, err := a.Queries.GetAppConfig(ctx, "review_auto_enqueue"); err == nil && cfg.Value.Valid {
-			if v, err := strconv.ParseBool(cfg.Value.String); err == nil {
-				reviewAutoEnqueue = v
-			}
-		}
+		reviewAutoEnqueue := GetConfigBool(ctx, a.Queries, "review_auto_enqueue")
 
 		data := BaseTemplateData(r, sm, "reviews", "Reviews")
 		data["ReviewAutoEnqueue"] = reviewAutoEnqueue

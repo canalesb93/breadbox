@@ -31,7 +31,7 @@ func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Han
 			badges := NavBadges{}
 
 			// Check if reviews are enabled before counting.
-			if cfg, err := queries.GetAppConfig(ctx, "review_auto_enqueue"); err == nil && cfg.Value.Valid && cfg.Value.String == "true" {
+			if GetConfigBool(ctx, queries, "review_auto_enqueue") {
 				badges.ReviewsEnabled = true
 				if pending, err := queries.CountPendingReviews(ctx); err == nil {
 					badges.PendingReviews = pending
@@ -53,8 +53,7 @@ func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Han
 			}
 
 			// Check if getting started guide should show in nav.
-			dismissed, _ := queries.GetAppConfig(ctx, "onboarding_dismissed")
-			badges.ShowGettingStarted = !(dismissed.Value.Valid && dismissed.Value.String == "true")
+			badges.ShowGettingStarted = !GetConfigBool(ctx, queries, "onboarding_dismissed")
 
 			ctx = context.WithValue(ctx, navBadgesKey, badges)
 			next.ServeHTTP(w, r.WithContext(ctx))
