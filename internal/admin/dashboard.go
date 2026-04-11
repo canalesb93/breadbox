@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"breadbox/internal/app"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 )
 
@@ -315,7 +316,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				errorCount++
 			}
 
-			connID := formatUUID(conn.ID)
+			connID := pgconv.FormatUUID(conn.ID)
 
 			var rawTime time.Time
 			if conn.LastSyncedAt.Valid {

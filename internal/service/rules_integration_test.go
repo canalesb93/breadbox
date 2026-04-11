@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/testutil"
 )
@@ -730,7 +731,7 @@ func TestCreateAccountLink_SelfLinkRejected(t *testing.T) {
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
 	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Acct")
 
-	acctID := formatUUIDForTest(acct.ID)
+	acctID := pgconv.FormatUUID(acct.ID)
 	_, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
 		PrimaryAccountID:   acctID,
 		DependentAccountID: acctID,
@@ -753,8 +754,8 @@ func TestGetAccountLink_MatchCounts(t *testing.T) {
 	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_2", "Dependent")
 
 	link, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(acct1.ID),
-		DependentAccountID: formatUUIDForTest(acct2.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct2.ID),
 	})
 	if err != nil {
 		t.Fatalf("create link: %v", err)
@@ -769,11 +770,11 @@ func TestGetAccountLink_MatchCounts(t *testing.T) {
 	txnD2 := testutil.MustCreateTransaction(t, queries, acct2.ID, "d2", "Store B", 2000, "2025-01-16")
 	_ = testutil.MustCreateTransaction(t, queries, acct2.ID, "d3", "Store C", 3000, "2025-01-17")
 
-	_, err = svc.ManualMatch(context.Background(), link.ID, formatUUIDForTest(txnP1.ID), formatUUIDForTest(txnD1.ID))
+	_, err = svc.ManualMatch(context.Background(), link.ID, pgconv.FormatUUID(txnP1.ID), pgconv.FormatUUID(txnD1.ID))
 	if err != nil {
 		t.Fatalf("match 1: %v", err)
 	}
-	_, err = svc.ManualMatch(context.Background(), link.ID, formatUUIDForTest(txnP2.ID), formatUUIDForTest(txnD2.ID))
+	_, err = svc.ManualMatch(context.Background(), link.ID, pgconv.FormatUUID(txnP2.ID), pgconv.FormatUUID(txnD2.ID))
 	if err != nil {
 		t.Fatalf("match 2: %v", err)
 	}

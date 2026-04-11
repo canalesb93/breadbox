@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"breadbox/internal/pgconv"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -767,8 +769,8 @@ func TestHitCountsJSON_WithHits(t *testing.T) {
 		t.Errorf("expected 2 entries, got %d", len(parsed))
 	}
 
-	ruleAID := formatUUID(ruleA)
-	ruleBID := formatUUID(ruleB)
+	ruleAID := pgconv.FormatUUID(ruleA)
+	ruleBID := pgconv.FormatUUID(ruleB)
 
 	if parsed[ruleAID] != 5 {
 		t.Errorf("expected 5 hits for rule A, got %d", parsed[ruleAID])
@@ -810,7 +812,7 @@ func TestHitCountsJSON_IntegrationWithResolveWithContext(t *testing.T) {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
 
-	ruleIDStr := formatUUID(ruleID)
+	ruleIDStr := pgconv.FormatUUID(ruleID)
 	if parsed[ruleIDStr] != 3 {
 		t.Errorf("expected 3 hits, got %d", parsed[ruleIDStr])
 	}

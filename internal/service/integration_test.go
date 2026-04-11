@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/testutil"
 
@@ -141,7 +142,7 @@ func TestListAccounts_FilterByUser(t *testing.T) {
 	testutil.MustCreateAccount(t, queries, connA.ID, "ext_a1", "Alice Checking")
 	testutil.MustCreateAccount(t, queries, connB.ID, "ext_b1", "Bob Checking")
 
-	aliceID := formatUUID(alice.ID)
+	aliceID := pgconv.FormatUUID(alice.ID)
 	accounts, err := svc.ListAccounts(ctx, &aliceID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -868,15 +869,6 @@ func TestImportCategoriesTSV_MergeNonexistentSource(t *testing.T) {
 
 // --- Helpers ---
 
-func formatUUID(u pgtype.UUID) string {
-	if !u.Valid {
-		return ""
-	}
-	b := u.Bytes
-	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
-		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
-}
-
 // --- Connection Deletion Soft-Deletes Transactions ---
 
 func TestSoftDeleteTransactionsByConnectionID(t *testing.T) {
@@ -941,8 +933,8 @@ func TestBatchSetTransactionCategory_Success(t *testing.T) {
 	}
 
 	result, err := svc.BatchSetTransactionCategory(ctx, []service.BatchCategorizeItem{
-		{TransactionID: formatUUID(txn1.ID), CategorySlug: "food_and_drink"},
-		{TransactionID: formatUUID(txn2.ID), CategorySlug: "transportation"},
+		{TransactionID: pgconv.FormatUUID(txn1.ID), CategorySlug: "food_and_drink"},
+		{TransactionID: pgconv.FormatUUID(txn2.ID), CategorySlug: "transportation"},
 	})
 	if err != nil {
 		t.Fatalf("BatchSetTransactionCategory: %v", err)
@@ -1000,7 +992,7 @@ func TestBatchSetTransactionCategory_InvalidTxnID(t *testing.T) {
 
 	// Nonexistent transaction ID now correctly reports as failed (ErrNotFound).
 	result, err := svc.BatchSetTransactionCategory(ctx, []service.BatchCategorizeItem{
-		{TransactionID: formatUUID(txn1.ID), CategorySlug: "food_and_drink"},
+		{TransactionID: pgconv.FormatUUID(txn1.ID), CategorySlug: "food_and_drink"},
 		{TransactionID: "00000000-0000-0000-0000-000000000099", CategorySlug: "food_and_drink"},
 	})
 	if err != nil {

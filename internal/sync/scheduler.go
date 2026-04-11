@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/robfig/cron/v3"
@@ -155,7 +156,7 @@ func (s *Scheduler) syncAllScheduled(ctx context.Context, globalIntervalMinutes 
 			syncCtx, cancel := context.WithTimeout(ctx, s.syncTimeout)
 			defer cancel()
 			if err := s.engine.Sync(syncCtx, connID, db.SyncTriggerCron); err != nil {
-				s.logger.Error("scheduled sync failed", "connection_id", formatUUID(connID), "error", err)
+				s.logger.Error("scheduled sync failed", "connection_id", pgconv.FormatUUID(connID), "error", err)
 			}
 		}()
 		synced++
@@ -199,7 +200,7 @@ func (s *Scheduler) RunStartupSync(ctx context.Context, globalIntervalMinutes in
 			syncCtx, cancel := context.WithTimeout(ctx, s.syncTimeout)
 			if err := s.engine.Sync(syncCtx, conn.ID, db.SyncTriggerCron); err != nil {
 				s.logger.Error("startup sync: connection failed",
-					"connection_id", formatUUID(conn.ID),
+					"connection_id", pgconv.FormatUUID(conn.ID),
 					"error", err,
 				)
 			}

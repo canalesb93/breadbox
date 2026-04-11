@@ -7,35 +7,12 @@ import (
 	"errors"
 	"testing"
 
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/testutil"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
-
-
-// formatUUIDForTest converts a pgtype.UUID to a string for test assertions.
-func formatUUIDForTest(u pgtype.UUID) string {
-	if !u.Valid {
-		return ""
-	}
-	b := u.Bytes
-	return bytesToUUIDString(b)
-}
-
-func bytesToUUIDString(b [16]byte) string {
-	return hexEncode(b[0:4]) + "-" + hexEncode(b[4:6]) + "-" + hexEncode(b[6:8]) + "-" + hexEncode(b[8:10]) + "-" + hexEncode(b[10:16])
-}
-
-func hexEncode(b []byte) string {
-	const hex = "0123456789abcdef"
-	result := make([]byte, len(b)*2)
-	for i, v := range b {
-		result[i*2] = hex[v>>4]
-		result[i*2+1] = hex[v&0x0f]
-	}
-	return string(result)
-}
 
 // --- CreateAccountLink ---
 
@@ -50,8 +27,8 @@ func TestCreateAccountLink_Success(t *testing.T) {
 	dependentAcct := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_dependent", "Dependent Card")
 
 	link, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(primaryAcct.ID),
-		DependentAccountID: formatUUIDForTest(dependentAcct.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(primaryAcct.ID),
+		DependentAccountID: pgconv.FormatUUID(dependentAcct.ID),
 		MatchStrategy:      "date_amount_name",
 		MatchToleranceDays: 1,
 	})
@@ -62,10 +39,10 @@ func TestCreateAccountLink_Success(t *testing.T) {
 	if link.ID == "" {
 		t.Error("expected non-empty ID")
 	}
-	if link.PrimaryAccountID != formatUUIDForTest(primaryAcct.ID) {
-		t.Errorf("primary account mismatch: got %s, want %s", link.PrimaryAccountID, formatUUIDForTest(primaryAcct.ID))
+	if link.PrimaryAccountID != pgconv.FormatUUID(primaryAcct.ID) {
+		t.Errorf("primary account mismatch: got %s, want %s", link.PrimaryAccountID, pgconv.FormatUUID(primaryAcct.ID))
 	}
-	if link.DependentAccountID != formatUUIDForTest(dependentAcct.ID) {
+	if link.DependentAccountID != pgconv.FormatUUID(dependentAcct.ID) {
 		t.Errorf("dependent account mismatch")
 	}
 	if link.MatchStrategy != "date_amount_name" {
@@ -99,8 +76,8 @@ func TestCreateAccountLink_DefaultStrategy(t *testing.T) {
 	dependentAcct := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_dependent", "Dependent Card")
 
 	link, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(primaryAcct.ID),
-		DependentAccountID: formatUUIDForTest(dependentAcct.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(primaryAcct.ID),
+		DependentAccountID: pgconv.FormatUUID(dependentAcct.ID),
 		// No strategy specified — should default to "date_amount_name"
 	})
 	if err != nil {
@@ -119,7 +96,7 @@ func TestCreateAccountLink_InvalidPrimaryAccount(t *testing.T) {
 
 	_, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
 		PrimaryAccountID:   "00000000-0000-0000-0000-000000000001",
-		DependentAccountID: formatUUIDForTest(acct.ID),
+		DependentAccountID: pgconv.FormatUUID(acct.ID),
 	})
 	if err == nil {
 		t.Fatal("expected error for nonexistent primary account")
@@ -136,7 +113,7 @@ func TestCreateAccountLink_InvalidDependentAccount(t *testing.T) {
 	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Real Account")
 
 	_, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(acct.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(acct.ID),
 		DependentAccountID: "00000000-0000-0000-0000-000000000001",
 	})
 	if err == nil {
@@ -173,8 +150,8 @@ func TestCreateAccountLink_DuplicateLink(t *testing.T) {
 	dependentAcct := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_dependent", "Dependent Card")
 
 	params := service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(primaryAcct.ID),
-		DependentAccountID: formatUUIDForTest(dependentAcct.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(primaryAcct.ID),
+		DependentAccountID: pgconv.FormatUUID(dependentAcct.ID),
 	}
 
 	_, err := svc.CreateAccountLink(context.Background(), params)
@@ -195,7 +172,7 @@ func TestCreateAccountLink_SelfLink(t *testing.T) {
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
 	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_1", "Acct")
 
-	acctID := formatUUIDForTest(acct.ID)
+	acctID := pgconv.FormatUUID(acct.ID)
 	_, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
 		PrimaryAccountID:   acctID,
 		DependentAccountID: acctID,
@@ -218,8 +195,8 @@ func TestCreateAccountLink_CircularLinkRejected(t *testing.T) {
 	conn2 := testutil.MustCreateConnection(t, queries, user2.ID, "item_b")
 	acctB := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_b", "Account B")
 
-	acctAID := formatUUIDForTest(acctA.ID)
-	acctBID := formatUUIDForTest(acctB.ID)
+	acctAID := pgconv.FormatUUID(acctA.ID)
+	acctBID := pgconv.FormatUUID(acctB.ID)
 
 	// Create A→B link (A is primary, B is dependent).
 	_, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
@@ -258,8 +235,8 @@ func TestGetAccountLink_Success(t *testing.T) {
 	dependentAcct := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_dependent", "Dependent Card")
 
 	created, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(primaryAcct.ID),
-		DependentAccountID: formatUUIDForTest(dependentAcct.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(primaryAcct.ID),
+		DependentAccountID: pgconv.FormatUUID(dependentAcct.ID),
 		MatchToleranceDays: 2,
 	})
 	if err != nil {
@@ -337,15 +314,15 @@ func TestListAccountLinks_WithData(t *testing.T) {
 	acct3 := testutil.MustCreateAccount(t, queries, conn3.ID, "ext_3", "Acct3")
 
 	_, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(acct1.ID),
-		DependentAccountID: formatUUIDForTest(acct2.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct2.ID),
 	})
 	if err != nil {
 		t.Fatalf("CreateAccountLink 1: %v", err)
 	}
 	_, err = svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(acct1.ID),
-		DependentAccountID: formatUUIDForTest(acct3.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct3.ID),
 	})
 	if err != nil {
 		t.Fatalf("CreateAccountLink 2: %v", err)
@@ -373,8 +350,8 @@ func TestUpdateAccountLink_Success(t *testing.T) {
 	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_2", "Acct2")
 
 	created, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(acct1.ID),
-		DependentAccountID: formatUUIDForTest(acct2.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct2.ID),
 		MatchToleranceDays: 0,
 	})
 	if err != nil {
@@ -411,8 +388,8 @@ func TestUpdateAccountLink_Disable(t *testing.T) {
 	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_2", "Acct2")
 
 	created, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(acct1.ID),
-		DependentAccountID: formatUUIDForTest(acct2.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct2.ID),
 	})
 	if err != nil {
 		t.Fatalf("CreateAccountLink: %v", err)
@@ -450,8 +427,8 @@ func TestUpdateAccountLink_ReEnable(t *testing.T) {
 	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_2", "Acct2")
 
 	created, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(acct1.ID),
-		DependentAccountID: formatUUIDForTest(acct2.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct2.ID),
 	})
 	if err != nil {
 		t.Fatalf("CreateAccountLink: %v", err)
@@ -509,8 +486,8 @@ func TestDeleteAccountLink_Success(t *testing.T) {
 	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_2", "Acct2")
 
 	created, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(acct1.ID),
-		DependentAccountID: formatUUIDForTest(acct2.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct2.ID),
 	})
 	if err != nil {
 		t.Fatalf("CreateAccountLink: %v", err)
@@ -559,8 +536,8 @@ func TestManualMatch_Success(t *testing.T) {
 	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_dependent", "Dependent Card")
 
 	link, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(acct1.ID),
-		DependentAccountID: formatUUIDForTest(acct2.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct2.ID),
 	})
 	if err != nil {
 		t.Fatalf("CreateAccountLink: %v", err)
@@ -569,7 +546,7 @@ func TestManualMatch_Success(t *testing.T) {
 	txn1 := testutil.MustCreateTransaction(t, queries, acct1.ID, "txn_p1", "Coffee Shop", 550, "2025-01-15")
 	txn2 := testutil.MustCreateTransaction(t, queries, acct2.ID, "txn_d1", "Coffee Shop", 550, "2025-01-15")
 
-	match, err := svc.ManualMatch(context.Background(), link.ID, formatUUIDForTest(txn1.ID), formatUUIDForTest(txn2.ID))
+	match, err := svc.ManualMatch(context.Background(), link.ID, pgconv.FormatUUID(txn1.ID), pgconv.FormatUUID(txn2.ID))
 	if err != nil {
 		t.Fatalf("ManualMatch: %v", err)
 	}
@@ -583,10 +560,10 @@ func TestManualMatch_Success(t *testing.T) {
 	if len(match.MatchedOn) != 1 || match.MatchedOn[0] != "manual" {
 		t.Errorf("matched_on: got %v, want [manual]", match.MatchedOn)
 	}
-	if match.PrimaryTransactionID != formatUUIDForTest(txn1.ID) {
+	if match.PrimaryTransactionID != pgconv.FormatUUID(txn1.ID) {
 		t.Error("primary transaction ID mismatch")
 	}
-	if match.DependentTransactionID != formatUUIDForTest(txn2.ID) {
+	if match.DependentTransactionID != pgconv.FormatUUID(txn2.ID) {
 		t.Error("dependent transaction ID mismatch")
 	}
 }
@@ -628,8 +605,8 @@ func TestConfirmMatch_Success(t *testing.T) {
 	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_2", "Acct2")
 
 	link, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(acct1.ID),
-		DependentAccountID: formatUUIDForTest(acct2.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct2.ID),
 	})
 	if err != nil {
 		t.Fatalf("CreateAccountLink: %v", err)
@@ -638,7 +615,7 @@ func TestConfirmMatch_Success(t *testing.T) {
 	txn1 := testutil.MustCreateTransaction(t, queries, acct1.ID, "txn_1", "Store", 1000, "2025-01-15")
 	txn2 := testutil.MustCreateTransaction(t, queries, acct2.ID, "txn_2", "Store", 1000, "2025-01-15")
 
-	match, err := svc.ManualMatch(context.Background(), link.ID, formatUUIDForTest(txn1.ID), formatUUIDForTest(txn2.ID))
+	match, err := svc.ManualMatch(context.Background(), link.ID, pgconv.FormatUUID(txn1.ID), pgconv.FormatUUID(txn2.ID))
 	if err != nil {
 		t.Fatalf("ManualMatch: %v", err)
 	}
@@ -670,8 +647,8 @@ func TestRejectMatch_Success(t *testing.T) {
 	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_2", "Acct2")
 
 	link, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(acct1.ID),
-		DependentAccountID: formatUUIDForTest(acct2.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct2.ID),
 	})
 	if err != nil {
 		t.Fatalf("CreateAccountLink: %v", err)
@@ -680,7 +657,7 @@ func TestRejectMatch_Success(t *testing.T) {
 	txn1 := testutil.MustCreateTransaction(t, queries, acct1.ID, "txn_1", "Store", 1000, "2025-01-15")
 	txn2 := testutil.MustCreateTransaction(t, queries, acct2.ID, "txn_2", "Store", 1000, "2025-01-15")
 
-	match, err := svc.ManualMatch(context.Background(), link.ID, formatUUIDForTest(txn1.ID), formatUUIDForTest(txn2.ID))
+	match, err := svc.ManualMatch(context.Background(), link.ID, pgconv.FormatUUID(txn1.ID), pgconv.FormatUUID(txn2.ID))
 	if err != nil {
 		t.Fatalf("ManualMatch: %v", err)
 	}
@@ -722,8 +699,8 @@ func TestListTransactionMatches_Empty(t *testing.T) {
 	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_2", "Acct2")
 
 	link, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(acct1.ID),
-		DependentAccountID: formatUUIDForTest(acct2.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct2.ID),
 	})
 	if err != nil {
 		t.Fatalf("CreateAccountLink: %v", err)
@@ -749,8 +726,8 @@ func TestListTransactionMatches_WithData(t *testing.T) {
 	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_2", "Acct2")
 
 	link, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(acct1.ID),
-		DependentAccountID: formatUUIDForTest(acct2.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct2.ID),
 	})
 	if err != nil {
 		t.Fatalf("CreateAccountLink: %v", err)
@@ -759,7 +736,7 @@ func TestListTransactionMatches_WithData(t *testing.T) {
 	txn1 := testutil.MustCreateTransaction(t, queries, acct1.ID, "txn_1", "Store A", 1000, "2025-01-15")
 	txn2 := testutil.MustCreateTransaction(t, queries, acct2.ID, "txn_2", "Store A", 1000, "2025-01-15")
 
-	_, err = svc.ManualMatch(context.Background(), link.ID, formatUUIDForTest(txn1.ID), formatUUIDForTest(txn2.ID))
+	_, err = svc.ManualMatch(context.Background(), link.ID, pgconv.FormatUUID(txn1.ID), pgconv.FormatUUID(txn2.ID))
 	if err != nil {
 		t.Fatalf("ManualMatch: %v", err)
 	}
@@ -804,8 +781,8 @@ func TestDeleteAccountLink_ClearsAttribution(t *testing.T) {
 	acct2 := testutil.MustCreateAccount(t, queries, conn2.ID, "ext_2", "Dependent Card")
 
 	link, err := svc.CreateAccountLink(context.Background(), service.CreateAccountLinkParams{
-		PrimaryAccountID:   formatUUIDForTest(acct1.ID),
-		DependentAccountID: formatUUIDForTest(acct2.ID),
+		PrimaryAccountID:   pgconv.FormatUUID(acct1.ID),
+		DependentAccountID: pgconv.FormatUUID(acct2.ID),
 	})
 	if err != nil {
 		t.Fatalf("CreateAccountLink: %v", err)
@@ -814,7 +791,7 @@ func TestDeleteAccountLink_ClearsAttribution(t *testing.T) {
 	txn1 := testutil.MustCreateTransaction(t, queries, acct1.ID, "txn_p1", "Coffee", 550, "2025-01-15")
 	txn2 := testutil.MustCreateTransaction(t, queries, acct2.ID, "txn_d1", "Coffee", 550, "2025-01-15")
 
-	_, err = svc.ManualMatch(context.Background(), link.ID, formatUUIDForTest(txn1.ID), formatUUIDForTest(txn2.ID))
+	_, err = svc.ManualMatch(context.Background(), link.ID, pgconv.FormatUUID(txn1.ID), pgconv.FormatUUID(txn2.ID))
 	if err != nil {
 		t.Fatalf("ManualMatch: %v", err)
 	}

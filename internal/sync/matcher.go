@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -40,7 +41,7 @@ func (m *Matcher) ReconcileLink(ctx context.Context, link db.AccountLink) (int, 
 		return 0, nil
 	}
 
-	logger := m.logger.With("link_id", formatUUID(link.ID))
+	logger := m.logger.With("link_id", pgconv.FormatUUID(link.ID))
 
 	// Resolve the dependent account's user ID for attribution.
 	depUserID, err := m.queries.GetDependentUserID(ctx, link.DependentAccountID)
@@ -108,7 +109,7 @@ func (m *Matcher) ReconcileLink(ctx context.Context, link db.AccountLink) (int, 
 		candidateRows, err := m.pool.Query(ctx, candidateQuery,
 			link.PrimaryAccountID, dep.Amount, dep.Date, tolerance)
 		if err != nil {
-			logger.Error("query candidates", "dep_id", formatUUID(dep.ID), "error", err)
+			logger.Error("query candidates", "dep_id", pgconv.FormatUUID(dep.ID), "error", err)
 			continue
 		}
 
@@ -141,7 +142,7 @@ func (m *Matcher) ReconcileLink(ctx context.Context, link db.AccountLink) (int, 
 
 		if bestCandidate == nil {
 			logger.Debug("ambiguous match, skipping",
-				"dep_id", formatUUID(dep.ID),
+				"dep_id", pgconv.FormatUUID(dep.ID),
 				"candidates", len(candidates))
 			continue
 		}
@@ -159,7 +160,7 @@ func (m *Matcher) ReconcileLink(ctx context.Context, link db.AccountLink) (int, 
 		})
 		if err != nil {
 			// ON CONFLICT DO NOTHING — already matched.
-			logger.Debug("match insert skipped (conflict)", "dep_id", formatUUID(dep.ID))
+			logger.Debug("match insert skipped (conflict)", "dep_id", pgconv.FormatUUID(dep.ID))
 			continue
 		}
 
@@ -168,7 +169,7 @@ func (m *Matcher) ReconcileLink(ctx context.Context, link db.AccountLink) (int, 
 			ID:               bestCandidate.ID,
 			AttributedUserID: depUserID,
 		}); err != nil {
-			logger.Error("set attribution", "primary_id", formatUUID(bestCandidate.ID), "error", err)
+			logger.Error("set attribution", "primary_id", pgconv.FormatUUID(bestCandidate.ID), "error", err)
 		}
 
 		newMatches++
@@ -192,7 +193,7 @@ func (m *Matcher) ReconcileForConnection(ctx context.Context, connectionID pgtyp
 
 	for _, link := range links {
 		if _, err := m.ReconcileLink(ctx, link); err != nil {
-			m.logger.Error("reconcile link", "link_id", formatUUID(link.ID), "error", err)
+			m.logger.Error("reconcile link", "link_id", pgconv.FormatUUID(link.ID), "error", err)
 		}
 	}
 }

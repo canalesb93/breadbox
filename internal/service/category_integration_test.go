@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/testutil"
 
@@ -342,7 +343,7 @@ func TestDeleteCategory_CannotDeleteUncategorized(t *testing.T) {
 	ctx := context.Background()
 
 	uncat := mustSeedUncategorized(t, q)
-	_, err := svc.DeleteCategory(ctx, formatUUID(uncat.ID))
+	_, err := svc.DeleteCategory(ctx, pgconv.FormatUUID(uncat.ID))
 	if !errors.Is(err, service.ErrCategoryUndeletable) {
 		t.Errorf("expected ErrCategoryUndeletable, got: %v", err)
 	}
@@ -612,7 +613,7 @@ func TestSetTransactionCategory_Success(t *testing.T) {
 	acctID := seedTxnFixture(t, q)
 	txn := mustCreateTransactionWithCategory(t, q, acctID, uncat.ID, "txn_manual", "Manual Txn", 500, "2025-02-01")
 
-	err := svc.SetTransactionCategory(ctx, formatUUID(txn.ID), target.ID)
+	err := svc.SetTransactionCategory(ctx, pgconv.FormatUUID(txn.ID), target.ID)
 	if err != nil {
 		t.Fatalf("SetTransactionCategory: %v", err)
 	}
@@ -652,7 +653,7 @@ func TestSetTransactionCategory_InvalidCategory(t *testing.T) {
 	acctID := seedTxnFixture(t, q)
 	txn := mustCreateTransactionWithCategory(t, q, acctID, uncat.ID, "txn_badcat", "Bad Cat", 100, "2025-02-01")
 
-	err := svc.SetTransactionCategory(ctx, formatUUID(txn.ID), "00000000-0000-0000-0000-000000000000")
+	err := svc.SetTransactionCategory(ctx, pgconv.FormatUUID(txn.ID), "00000000-0000-0000-0000-000000000000")
 	if !errors.Is(err, service.ErrCategoryNotFound) {
 		t.Errorf("expected ErrCategoryNotFound, got: %v", err)
 	}
@@ -682,7 +683,7 @@ func TestBatchSetTransactionCategory_SetsOverrideFlag(t *testing.T) {
 	txn1 := mustCreateTransactionWithCategory(t, q, acctID, uncat.ID, "batch_txn_1", "Txn 1", 100, "2025-01-10")
 
 	result, err := svc.BatchSetTransactionCategory(ctx, []service.BatchCategorizeItem{
-		{TransactionID: formatUUID(txn1.ID), CategorySlug: "batch_groceries"},
+		{TransactionID: pgconv.FormatUUID(txn1.ID), CategorySlug: "batch_groceries"},
 	})
 	if err != nil {
 		t.Fatalf("BatchSetTransactionCategory: %v", err)
@@ -713,8 +714,8 @@ func TestBatchSetTransactionCategory_PartialFailure(t *testing.T) {
 	txn := mustCreateTransactionWithCategory(t, q, acctID, uncat.ID, "batch_partial", "Partial", 100, "2025-01-10")
 
 	result, err := svc.BatchSetTransactionCategory(ctx, []service.BatchCategorizeItem{
-		{TransactionID: formatUUID(txn.ID), CategorySlug: "batch_good"},
-		{TransactionID: formatUUID(txn.ID), CategorySlug: "nonexistent_slug"},
+		{TransactionID: pgconv.FormatUUID(txn.ID), CategorySlug: "batch_good"},
+		{TransactionID: pgconv.FormatUUID(txn.ID), CategorySlug: "nonexistent_slug"},
 	})
 	if err != nil {
 		t.Fatalf("BatchSetTransactionCategory: %v", err)

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -156,18 +157,18 @@ func TestFormatUUID_Valid(t *testing.T) {
 		Bytes: [16]byte{0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0},
 		Valid: true,
 	}
-	got := formatUUID(u)
+	got := pgconv.FormatUUID(u)
 	want := "12345678-9abc-def0-1234-56789abcdef0"
 	if got != want {
-		t.Errorf("formatUUID() = %q, want %q", got, want)
+		t.Errorf("pgconv.FormatUUID() = %q, want %q", got, want)
 	}
 }
 
 func TestFormatUUID_Invalid(t *testing.T) {
 	u := pgtype.UUID{Valid: false}
-	got := formatUUID(u)
+	got := pgconv.FormatUUID(u)
 	if got != "" {
-		t.Errorf("formatUUID(invalid) = %q, want empty", got)
+		t.Errorf("pgconv.FormatUUID(invalid) = %q, want empty", got)
 	}
 }
 

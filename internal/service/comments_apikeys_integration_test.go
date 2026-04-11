@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/testutil"
 
@@ -24,7 +25,7 @@ func TestCreateComment_Success(t *testing.T) {
 
 	actor := service.Actor{Type: "agent", ID: "key-123", Name: "TestBot"}
 	comment, err := svc.CreateComment(ctx, service.CreateCommentParams{
-		TransactionID: formatUUID(txn.ID),
+		TransactionID: pgconv.FormatUUID(txn.ID),
 		Content:       "This is a test comment",
 		Actor:         actor,
 	})
@@ -40,7 +41,7 @@ func TestCreateComment_Success(t *testing.T) {
 	if comment.AuthorName != "TestBot" {
 		t.Errorf("author_name = %q, want %q", comment.AuthorName, "TestBot")
 	}
-	if comment.TransactionID != formatUUID(txn.ID) {
+	if comment.TransactionID != pgconv.FormatUUID(txn.ID) {
 		t.Errorf("transaction_id mismatch")
 	}
 }
@@ -52,7 +53,7 @@ func TestCreateComment_EmptyContent(t *testing.T) {
 	txn := seedTransaction(t, queries, acctID, "ext_comment_2", "Coffee", 100, "2024-06-01")
 
 	_, err := svc.CreateComment(ctx, service.CreateCommentParams{
-		TransactionID: formatUUID(txn.ID),
+		TransactionID: pgconv.FormatUUID(txn.ID),
 		Content:       "",
 		Actor:         service.SystemActor(),
 	})
@@ -68,7 +69,7 @@ func TestCreateComment_WhitespaceOnlyContent(t *testing.T) {
 	txn := seedTransaction(t, queries, acctID, "ext_comment_ws", "Coffee", 100, "2024-06-01")
 
 	_, err := svc.CreateComment(ctx, service.CreateCommentParams{
-		TransactionID: formatUUID(txn.ID),
+		TransactionID: pgconv.FormatUUID(txn.ID),
 		Content:       "   \t\n  ",
 		Actor:         service.SystemActor(),
 	})
@@ -85,7 +86,7 @@ func TestCreateComment_TooLong(t *testing.T) {
 
 	longContent := strings.Repeat("x", 10001)
 	_, err := svc.CreateComment(ctx, service.CreateCommentParams{
-		TransactionID: formatUUID(txn.ID),
+		TransactionID: pgconv.FormatUUID(txn.ID),
 		Content:       longContent,
 		Actor:         service.SystemActor(),
 	})
@@ -102,7 +103,7 @@ func TestCreateComment_MaxLength(t *testing.T) {
 
 	maxContent := strings.Repeat("x", 10000)
 	comment, err := svc.CreateComment(ctx, service.CreateCommentParams{
-		TransactionID: formatUUID(txn.ID),
+		TransactionID: pgconv.FormatUUID(txn.ID),
 		Content:       maxContent,
 		Actor:         service.SystemActor(),
 	})
@@ -148,7 +149,7 @@ func TestListComments_Empty(t *testing.T) {
 	acctID := seedTxnFixture(t, queries)
 	txn := seedTransaction(t, queries, acctID, "ext_no_comments", "Coffee", 100, "2024-06-01")
 
-	comments, err := svc.ListComments(ctx, formatUUID(txn.ID))
+	comments, err := svc.ListComments(ctx, pgconv.FormatUUID(txn.ID))
 	if err != nil {
 		t.Fatalf("ListComments failed: %v", err)
 	}
@@ -162,7 +163,7 @@ func TestListComments_OrderByCreatedAt(t *testing.T) {
 	ctx := context.Background()
 	acctID := seedTxnFixture(t, queries)
 	txn := seedTransaction(t, queries, acctID, "ext_multi_comment", "Coffee", 100, "2024-06-01")
-	txnID := formatUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	// Create comments in order
 	_, err := svc.CreateComment(ctx, service.CreateCommentParams{
@@ -211,7 +212,7 @@ func TestUpdateComment_Success(t *testing.T) {
 
 	actor := service.Actor{Type: "agent", ID: "key-456", Name: "Bot"}
 	comment, err := svc.CreateComment(ctx, service.CreateCommentParams{
-		TransactionID: formatUUID(txn.ID),
+		TransactionID: pgconv.FormatUUID(txn.ID),
 		Content:       "Original content",
 		Actor:         actor,
 	})
@@ -239,7 +240,7 @@ func TestUpdateComment_ForbiddenForDifferentAgent(t *testing.T) {
 
 	author := service.Actor{Type: "agent", ID: "key-100", Name: "BotA"}
 	comment, err := svc.CreateComment(ctx, service.CreateCommentParams{
-		TransactionID: formatUUID(txn.ID),
+		TransactionID: pgconv.FormatUUID(txn.ID),
 		Content:       "Author's comment",
 		Actor:         author,
 	})
@@ -266,7 +267,7 @@ func TestUpdateComment_AdminCanModerate(t *testing.T) {
 
 	agent := service.Actor{Type: "agent", ID: "key-300", Name: "Bot"}
 	comment, err := svc.CreateComment(ctx, service.CreateCommentParams{
-		TransactionID: formatUUID(txn.ID),
+		TransactionID: pgconv.FormatUUID(txn.ID),
 		Content:       "Agent comment",
 		Actor:         agent,
 	})
@@ -309,7 +310,7 @@ func TestDeleteComment_Success(t *testing.T) {
 
 	actor := service.Actor{Type: "agent", ID: "key-500", Name: "Bot"}
 	comment, err := svc.CreateComment(ctx, service.CreateCommentParams{
-		TransactionID: formatUUID(txn.ID),
+		TransactionID: pgconv.FormatUUID(txn.ID),
 		Content:       "To be deleted",
 		Actor:         actor,
 	})
@@ -323,7 +324,7 @@ func TestDeleteComment_Success(t *testing.T) {
 	}
 
 	// Verify it's gone
-	comments, err := svc.ListComments(ctx, formatUUID(txn.ID))
+	comments, err := svc.ListComments(ctx, pgconv.FormatUUID(txn.ID))
 	if err != nil {
 		t.Fatalf("ListComments after delete: %v", err)
 	}
@@ -340,7 +341,7 @@ func TestDeleteComment_ForbiddenForDifferentAgent(t *testing.T) {
 
 	author := service.Actor{Type: "agent", ID: "key-600", Name: "BotA"}
 	comment, err := svc.CreateComment(ctx, service.CreateCommentParams{
-		TransactionID: formatUUID(txn.ID),
+		TransactionID: pgconv.FormatUUID(txn.ID),
 		Content:       "Protected comment",
 		Actor:         author,
 	})
@@ -372,7 +373,7 @@ func TestCreateComment_ContentTrimmed(t *testing.T) {
 	txn := seedTransaction(t, queries, acctID, "ext_trim", "Coffee", 100, "2024-06-01")
 
 	comment, err := svc.CreateComment(ctx, service.CreateCommentParams{
-		TransactionID: formatUUID(txn.ID),
+		TransactionID: pgconv.FormatUUID(txn.ID),
 		Content:       "  trimmed content  ",
 		Actor:         service.SystemActor(),
 	})

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/testutil"
 
@@ -22,7 +23,7 @@ func TestCreateLoginAccount_Success(t *testing.T) {
 	user := testutil.MustCreateUser(t, queries, "Alice")
 
 	member, err := svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID:   formatUUID(user.ID),
+		UserID:   pgconv.FormatUUID(user.ID),
 		Username: "alice",
 		Role:     "viewer",
 	})
@@ -51,7 +52,7 @@ func TestCreateLoginAccount_AdminRole(t *testing.T) {
 	user := testutil.MustCreateUser(t, queries, "Bob")
 
 	member, err := svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID:   formatUUID(user.ID),
+		UserID:   pgconv.FormatUUID(user.ID),
 		Username: "bob_admin",
 		Role:     "admin",
 	})
@@ -71,7 +72,7 @@ func TestCreateLoginAccount_EditorRole(t *testing.T) {
 	user := testutil.MustCreateUser(t, queries, "Carol")
 
 	member, err := svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID:   formatUUID(user.ID),
+		UserID:   pgconv.FormatUUID(user.ID),
 		Username: "carol_editor",
 		Role:     "editor",
 	})
@@ -91,7 +92,7 @@ func TestCreateLoginAccount_DuplicateUser(t *testing.T) {
 	user := testutil.MustCreateUser(t, queries, "Alice")
 
 	_, err := svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID:   formatUUID(user.ID),
+		UserID:   pgconv.FormatUUID(user.ID),
 		Username: "alice1",
 		Role:     "viewer",
 	})
@@ -101,7 +102,7 @@ func TestCreateLoginAccount_DuplicateUser(t *testing.T) {
 
 	// Second account for same user should fail.
 	_, err = svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID:   formatUUID(user.ID),
+		UserID:   pgconv.FormatUUID(user.ID),
 		Username: "alice2",
 		Role:     "viewer",
 	})
@@ -118,7 +119,7 @@ func TestCreateLoginAccount_DuplicateUsername(t *testing.T) {
 	user2 := testutil.MustCreateUser(t, queries, "Bob")
 
 	_, err := svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID:   formatUUID(user1.ID),
+		UserID:   pgconv.FormatUUID(user1.ID),
 		Username: "shared_name",
 		Role:     "viewer",
 	})
@@ -128,7 +129,7 @@ func TestCreateLoginAccount_DuplicateUsername(t *testing.T) {
 
 	// Same username should fail.
 	_, err = svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID:   formatUUID(user2.ID),
+		UserID:   pgconv.FormatUUID(user2.ID),
 		Username: "shared_name",
 		Role:     "viewer",
 	})
@@ -156,7 +157,7 @@ func TestCreateLoginAccount_UsernameConflictsWithExisting(t *testing.T) {
 
 	// Try to create a login account with same username as admin.
 	_, err = svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID:   formatUUID(user.ID),
+		UserID:   pgconv.FormatUUID(user.ID),
 		Username: "admin_user",
 		Role:     "viewer",
 	})
@@ -172,7 +173,7 @@ func TestCreateLoginAccount_InvalidRole(t *testing.T) {
 	user := testutil.MustCreateUser(t, queries, "Alice")
 
 	_, err := svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID:   formatUUID(user.ID),
+		UserID:   pgconv.FormatUUID(user.ID),
 		Username: "alice",
 		Role:     "superuser",
 	})
@@ -201,10 +202,10 @@ func TestListLoginAccounts_WithData(t *testing.T) {
 	user2 := testutil.MustCreateUser(t, queries, "Bob")
 
 	_, _ = svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID: formatUUID(user1.ID), Username: "alice", Role: "viewer",
+		UserID: pgconv.FormatUUID(user1.ID), Username: "alice", Role: "viewer",
 	})
 	_, _ = svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID: formatUUID(user2.ID), Username: "bob", Role: "admin",
+		UserID: pgconv.FormatUUID(user2.ID), Username: "bob", Role: "admin",
 	})
 
 	members, err := svc.ListLoginAccounts(ctx)
@@ -226,7 +227,7 @@ func TestUpdateLoginAccountRole(t *testing.T) {
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
 	member, _ := svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID: formatUUID(user.ID), Username: "alice", Role: "viewer",
+		UserID: pgconv.FormatUUID(user.ID), Username: "alice", Role: "viewer",
 	})
 
 	if err := svc.UpdateLoginAccountRole(ctx, member.ID, "editor"); err != nil {
@@ -246,7 +247,7 @@ func TestUpdateLoginAccountRole_ToAdmin(t *testing.T) {
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
 	member, _ := svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID: formatUUID(user.ID), Username: "alice", Role: "viewer",
+		UserID: pgconv.FormatUUID(user.ID), Username: "alice", Role: "viewer",
 	})
 
 	if err := svc.UpdateLoginAccountRole(ctx, member.ID, "admin"); err != nil {
@@ -265,7 +266,7 @@ func TestUpdateLoginAccountRole_InvalidRole(t *testing.T) {
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
 	member, _ := svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID: formatUUID(user.ID), Username: "alice", Role: "viewer",
+		UserID: pgconv.FormatUUID(user.ID), Username: "alice", Role: "viewer",
 	})
 
 	if err := svc.UpdateLoginAccountRole(ctx, member.ID, "superuser"); err == nil {
@@ -279,7 +280,7 @@ func TestDeleteLoginAccount(t *testing.T) {
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
 	member, _ := svc.CreateLoginAccount(ctx, service.CreateLoginAccountParams{
-		UserID: formatUUID(user.ID), Username: "alice", Role: "viewer",
+		UserID: pgconv.FormatUUID(user.ID), Username: "alice", Role: "viewer",
 	})
 
 	if err := svc.DeleteLoginAccount(ctx, member.ID); err != nil {
@@ -308,7 +309,7 @@ func TestWipeUserData(t *testing.T) {
 	testutil.MustCreateTransaction(t, queries, acct.ID, "txn_1", "Coffee", 500, "2026-01-15")
 	testutil.MustCreateTransaction(t, queries, acct.ID, "txn_2", "Lunch", 1200, "2026-01-16")
 
-	txnCount, err := svc.WipeUserData(ctx, formatUUID(user.ID))
+	txnCount, err := svc.WipeUserData(ctx, pgconv.FormatUUID(user.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -335,7 +336,7 @@ func TestWipeUserData_NoData(t *testing.T) {
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
 
-	txnCount, err := svc.WipeUserData(ctx, formatUUID(user.ID))
+	txnCount, err := svc.WipeUserData(ctx, pgconv.FormatUUID(user.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -360,13 +361,13 @@ func TestWipeUserData_DoesNotAffectOtherUsers(t *testing.T) {
 	testutil.MustCreateTransaction(t, queries, bobAcct.ID, "bob_txn", "Bob Coffee", 600, "2026-01-15")
 
 	// Wipe Alice's data.
-	_, err := svc.WipeUserData(ctx, formatUUID(alice.ID))
+	_, err := svc.WipeUserData(ctx, pgconv.FormatUUID(alice.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Bob's data should be untouched.
-	bobID := formatUUID(bob.ID)
+	bobID := pgconv.FormatUUID(bob.ID)
 	conns, _ := svc.ListConnections(ctx, &bobID)
 	if len(conns) != 1 {
 		t.Errorf("expected Bob to still have 1 connection, got %d", len(conns))

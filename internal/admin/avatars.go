@@ -13,6 +13,7 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/avatar"
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -46,7 +47,7 @@ func AvatarHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		seed := formatUUID(uid)
+		seed := pgconv.FormatUUID(uid)
 		if row.AvatarSeed.Valid && row.AvatarSeed.String != "" {
 			seed = row.AvatarSeed.String
 		}
@@ -253,7 +254,7 @@ func processAndStoreAvatar(a *app.App, w http.ResponseWriter, r *http.Request, u
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to save avatar"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "avatar_url": "/avatars/" + formatUUID(userID)})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "avatar_url": "/avatars/" + pgconv.FormatUUID(userID)})
 }
 
 func parseAvatarUpload(a *app.App, w http.ResponseWriter, r *http.Request) ([]byte, string, bool) {

@@ -11,6 +11,7 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/provider"
 	"breadbox/internal/service"
 
@@ -96,7 +97,7 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 
 			accounts, err := a.Queries.ListAccountsByConnection(ctx, conn.ID)
 			if err != nil {
-				a.Logger.Error("list accounts for connection", "error", err, "connection_id", formatUUID(conn.ID))
+				a.Logger.Error("list accounts for connection", "error", err, "connection_id", pgconv.FormatUUID(conn.ID))
 			} else {
 				for _, acct := range accounts {
 					ca := ConnectionAccount{Account: acct}
@@ -414,7 +415,7 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 			}
 		}
 
-		connID := formatUUID(bankConn.ID)
+		connID := pgconv.FormatUUID(bankConn.ID)
 
 		writeJSON(w, http.StatusCreated, exchangeTokenResponse{
 			ConnectionID:    connID,
@@ -446,7 +447,7 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 		// IDOR check: viewers can only view their own connections. Editors+ see all.
 		if !IsEditor(sm, r) {
 			memberUID := SessionUserID(sm, r)
-			connUserID := formatUUID(conn.UserID)
+			connUserID := pgconv.FormatUUID(conn.UserID)
 			if connUserID == "" || connUserID != memberUID {
 				tr.RenderNotFound(w, r)
 				return
@@ -701,7 +702,7 @@ func ConnectionReauthAPIHandler(a *app.App) http.HandlerFunc {
 			ProviderName:         string(conn.Provider),
 			ExternalID:           conn.ExternalID.String,
 			EncryptedCredentials: conn.EncryptedCredentials,
-			UserID:               formatUUID(conn.UserID),
+			UserID:               pgconv.FormatUUID(conn.UserID),
 		}
 
 		session, err := prov.CreateReauthSession(ctx, provConn)
@@ -766,7 +767,7 @@ func DeleteConnectionHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 					ProviderName:         string(conn.Provider),
 					ExternalID:           conn.ExternalID.String,
 					EncryptedCredentials: conn.EncryptedCredentials,
-					UserID:               formatUUID(conn.UserID),
+					UserID:               pgconv.FormatUUID(conn.UserID),
 				}
 				if removeErr := prov.RemoveConnection(ctx, provConn); removeErr != nil {
 					a.Logger.Error("remove connection from provider", "error", removeErr)
@@ -1105,12 +1106,3 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
-// formatUUID converts a pgtype.UUID to its string representation.
-func formatUUID(u pgtype.UUID) string {
-	if !u.Valid {
-		return ""
-	}
-	b := u.Bytes
-	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
-		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
-}

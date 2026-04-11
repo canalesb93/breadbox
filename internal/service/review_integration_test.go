@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/testutil"
 
@@ -59,7 +60,7 @@ func TestEnqueueManualReview_Success(t *testing.T) {
 	ctx := context.Background()
 
 	txn := reviewTestFixture(t, queries)
-	txnID := formatUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	review, err := svc.EnqueueManualReview(ctx, txnID, testActor)
 	if err != nil {
@@ -82,7 +83,7 @@ func TestEnqueueManualReview_DuplicatePending(t *testing.T) {
 	ctx := context.Background()
 
 	txn := reviewTestFixture(t, queries)
-	txnID := formatUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	// First enqueue succeeds
 	_, err := svc.EnqueueManualReview(ctx, txnID, testActor)
@@ -102,7 +103,7 @@ func TestEnqueueManualReview_SoftDeletedTransaction(t *testing.T) {
 	ctx := context.Background()
 
 	txn := reviewTestFixture(t, queries)
-	txnID := formatUUID(txn.ID)
+	txnID := pgconv.FormatUUID(txn.ID)
 
 	// Soft-delete the transaction
 	_, err := pool.Exec(ctx, "UPDATE transactions SET deleted_at = NOW() WHERE id = $1", txn.ID)
@@ -135,13 +136,13 @@ func TestGetReview_Success(t *testing.T) {
 	txn := reviewTestFixture(t, queries)
 	review := mustEnqueueReview(t, queries, txn.ID, "new_transaction")
 
-	result, err := svc.GetReview(ctx, formatUUID(review.ID))
+	result, err := svc.GetReview(ctx, pgconv.FormatUUID(review.ID))
 	if err != nil {
 		t.Fatalf("GetReview: %v", err)
 	}
 
-	if result.ID != formatUUID(review.ID) {
-		t.Errorf("expected id=%s, got %s", formatUUID(review.ID), result.ID)
+	if result.ID != pgconv.FormatUUID(review.ID) {
+		t.Errorf("expected id=%s, got %s", pgconv.FormatUUID(review.ID), result.ID)
 	}
 	if result.ReviewType != "new_transaction" {
 		t.Errorf("expected review_type=new_transaction, got %s", result.ReviewType)
@@ -308,7 +309,7 @@ func TestSubmitReview_Approve(t *testing.T) {
 	review := mustEnqueueReview(t, queries, txn.ID, "new_transaction")
 
 	result, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
-		ReviewID: formatUUID(review.ID),
+		ReviewID: pgconv.FormatUUID(review.ID),
 		Decision: "approved",
 		Actor:    testActor,
 	})
@@ -334,7 +335,7 @@ func TestSubmitReview_Reject(t *testing.T) {
 	review := mustEnqueueReview(t, queries, txn.ID, "new_transaction")
 
 	result, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
-		ReviewID: formatUUID(review.ID),
+		ReviewID: pgconv.FormatUUID(review.ID),
 		Decision: "rejected",
 		Actor:    testActor,
 	})
@@ -354,7 +355,7 @@ func TestSubmitReview_Skip(t *testing.T) {
 	review := mustEnqueueReview(t, queries, txn.ID, "new_transaction")
 
 	result, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
-		ReviewID: formatUUID(review.ID),
+		ReviewID: pgconv.FormatUUID(review.ID),
 		Decision: "skipped",
 		Actor:    testActor,
 	})
@@ -374,7 +375,7 @@ func TestSubmitReview_InvalidDecision(t *testing.T) {
 	review := mustEnqueueReview(t, queries, txn.ID, "new_transaction")
 
 	_, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
-		ReviewID: formatUUID(review.ID),
+		ReviewID: pgconv.FormatUUID(review.ID),
 		Decision: "invalid",
 		Actor:    testActor,
 	})
@@ -392,7 +393,7 @@ func TestSubmitReview_AlreadyResolved(t *testing.T) {
 
 	// First submit succeeds
 	_, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
-		ReviewID: formatUUID(review.ID),
+		ReviewID: pgconv.FormatUUID(review.ID),
 		Decision: "approved",
 		Actor:    testActor,
 	})
@@ -402,7 +403,7 @@ func TestSubmitReview_AlreadyResolved(t *testing.T) {
 
 	// Second submit should fail
 	_, err = svc.SubmitReview(ctx, service.SubmitReviewParams{
-		ReviewID: formatUUID(review.ID),
+		ReviewID: pgconv.FormatUUID(review.ID),
 		Decision: "rejected",
 		Actor:    testActor,
 	})
@@ -420,11 +421,11 @@ func TestSubmitReview_WithCategoryOverride(t *testing.T) {
 
 	// Create a category
 	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
-	catID := formatUUID(cat.ID)
+	catID := pgconv.FormatUUID(cat.ID)
 
 	// Approve with explicit category
 	result, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
-		ReviewID:   formatUUID(review.ID),
+		ReviewID:   pgconv.FormatUUID(review.ID),
 		Decision:   "approved",
 		CategoryID: &catID,
 		Actor:      testActor,
@@ -446,8 +447,8 @@ func TestSubmitReview_WithCategoryOverride(t *testing.T) {
 	if !txnCatID.Valid {
 		t.Error("expected transaction category_id to be set")
 	}
-	if formatUUID(txnCatID) != catID {
-		t.Errorf("expected transaction category_id=%s, got %s", catID, formatUUID(txnCatID))
+	if pgconv.FormatUUID(txnCatID) != catID {
+		t.Errorf("expected transaction category_id=%s, got %s", catID, pgconv.FormatUUID(txnCatID))
 	}
 	if !catOverride {
 		t.Error("expected category_override=true after review approval with category")
@@ -463,7 +464,7 @@ func TestSubmitReview_WithNote(t *testing.T) {
 
 	note := "This looks like a duplicate charge"
 	result, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
-		ReviewID: formatUUID(review.ID),
+		ReviewID: pgconv.FormatUUID(review.ID),
 		Decision: "rejected",
 		Note:     &note,
 		Actor:    testActor,
@@ -508,8 +509,8 @@ func TestBulkSubmitReviews_Success(t *testing.T) {
 
 	result, err := svc.BulkSubmitReviews(ctx, service.BulkSubmitReviewParams{
 		Reviews: []service.BulkReviewItem{
-			{ReviewID: formatUUID(r1.ID), Decision: "approved"},
-			{ReviewID: formatUUID(r2.ID), Decision: "rejected"},
+			{ReviewID: pgconv.FormatUUID(r1.ID), Decision: "approved"},
+			{ReviewID: pgconv.FormatUUID(r2.ID), Decision: "rejected"},
 		},
 		Actor: testActor,
 	})
@@ -533,7 +534,7 @@ func TestBulkSubmitReviews_PartialFailure(t *testing.T) {
 
 	result, err := svc.BulkSubmitReviews(ctx, service.BulkSubmitReviewParams{
 		Reviews: []service.BulkReviewItem{
-			{ReviewID: formatUUID(review.ID), Decision: "approved"},
+			{ReviewID: pgconv.FormatUUID(review.ID), Decision: "approved"},
 			{ReviewID: "00000000-0000-0000-0000-000000000000", Decision: "approved"}, // nonexistent
 		},
 		Actor: testActor,
@@ -571,13 +572,13 @@ func TestDismissReview_Success(t *testing.T) {
 	txn := reviewTestFixture(t, queries)
 	review := mustEnqueueReview(t, queries, txn.ID, "new_transaction")
 
-	err := svc.DismissReview(ctx, formatUUID(review.ID), testActor)
+	err := svc.DismissReview(ctx, pgconv.FormatUUID(review.ID), testActor)
 	if err != nil {
 		t.Fatalf("DismissReview: %v", err)
 	}
 
 	// Verify it's gone
-	_, err = svc.GetReview(ctx, formatUUID(review.ID))
+	_, err = svc.GetReview(ctx, pgconv.FormatUUID(review.ID))
 	if !errors.Is(err, service.ErrNotFound) {
 		t.Errorf("expected ErrNotFound after dismiss, got %v", err)
 	}
@@ -592,7 +593,7 @@ func TestDismissReview_AlreadyResolved(t *testing.T) {
 
 	// Resolve it first
 	_, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
-		ReviewID: formatUUID(review.ID),
+		ReviewID: pgconv.FormatUUID(review.ID),
 		Decision: "approved",
 		Actor:    testActor,
 	})
@@ -601,7 +602,7 @@ func TestDismissReview_AlreadyResolved(t *testing.T) {
 	}
 
 	// Now try to dismiss
-	err = svc.DismissReview(ctx, formatUUID(review.ID), testActor)
+	err = svc.DismissReview(ctx, pgconv.FormatUUID(review.ID), testActor)
 	if !errors.Is(err, service.ErrReviewAlreadyResolved) {
 		t.Errorf("expected ErrReviewAlreadyResolved, got %v", err)
 	}
@@ -699,7 +700,7 @@ func TestGetReviewCounts_WithData(t *testing.T) {
 
 	// Approve r3 (this makes it approved today)
 	_, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
-		ReviewID: formatUUID(r3.ID),
+		ReviewID: pgconv.FormatUUID(r3.ID),
 		Decision: "approved",
 		Actor:    testActor,
 	})
@@ -880,11 +881,11 @@ func TestSubmitReview_RejectWithCategoryDoesNotModifyTransaction(t *testing.T) {
 
 	// Create a category
 	cat := mustCreateCategory(t, queries, "reject_test_cat", "Reject Test Category")
-	catID := formatUUID(cat.ID)
+	catID := pgconv.FormatUUID(cat.ID)
 
 	// Reject with an explicit category — the category should NOT be applied
 	result, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
-		ReviewID:   formatUUID(review.ID),
+		ReviewID:   pgconv.FormatUUID(review.ID),
 		Decision:   "rejected",
 		CategoryID: &catID,
 		Actor:      testActor,
@@ -905,7 +906,7 @@ func TestSubmitReview_RejectWithCategoryDoesNotModifyTransaction(t *testing.T) {
 		t.Fatalf("query transaction: %v", err)
 	}
 	if txnCatID.Valid {
-		t.Errorf("expected transaction category_id to remain NULL after rejection, got %s", formatUUID(txnCatID))
+		t.Errorf("expected transaction category_id to remain NULL after rejection, got %s", pgconv.FormatUUID(txnCatID))
 	}
 	if catOverride {
 		t.Error("expected category_override=false after rejection, but got true")
@@ -924,11 +925,11 @@ func TestSubmitReview_SkipWithCategoryDoesNotModifyTransaction(t *testing.T) {
 	review := mustEnqueueReview(t, queries, txn.ID, "uncategorized")
 
 	cat := mustCreateCategory(t, queries, "skip_test_cat", "Skip Test Category")
-	catID := formatUUID(cat.ID)
+	catID := pgconv.FormatUUID(cat.ID)
 
 	// Skip with an explicit category — the category should NOT be applied
 	result, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
-		ReviewID:   formatUUID(review.ID),
+		ReviewID:   pgconv.FormatUUID(review.ID),
 		Decision:   "skipped",
 		CategoryID: &catID,
 		Actor:      testActor,
@@ -948,7 +949,7 @@ func TestSubmitReview_SkipWithCategoryDoesNotModifyTransaction(t *testing.T) {
 		t.Fatalf("query transaction: %v", err)
 	}
 	if txnCatID.Valid {
-		t.Errorf("expected transaction category_id to remain NULL after skip, got %s", formatUUID(txnCatID))
+		t.Errorf("expected transaction category_id to remain NULL after skip, got %s", pgconv.FormatUUID(txnCatID))
 	}
 	if catOverride {
 		t.Error("expected category_override=false after skip, but got true")
