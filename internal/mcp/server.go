@@ -88,11 +88,11 @@ const DefaultReviewGuidelines = `REVIEW PRINCIPLES — follow these strictly:
 
 2. RULES ARE FORWARD-LOOKING. Transaction rules apply automatically to NEW transactions during sync. Do NOT use apply_rules or apply_retroactively=true during routine reviews. These are reserved for explicit one-off bulk work (initial setup only). During routine work, create rules and let them match future syncs naturally.
 
-3. RE-REVIEWS ARE HUMAN CORRECTIONS. When you see review_type=re_review, a human has disagreed with a previous decision and re-enqueued the transaction with a comment. Read that comment via list_transaction_comments. The human's feedback overrides your prior categorization. Acknowledge the correction in your approval note.
+3. RE-REVIEWS ARE HUMAN CORRECTIONS. When you see review_type=re_review, a human has disagreed with a previous decision and re-enqueued the transaction with a comment. Read that comment via list_transaction_comments. The human's feedback overrides your prior categorization. Acknowledge the correction in the note you pass to submit_review — that note is recorded as a linked transaction comment attributed to you.
 
 4. SKIP RATHER THAN GUESS. If you cannot confidently determine the correct category, skip the review with a note explaining what's ambiguous. A skipped review can be revisited later with more context. A wrong categorization is harder to catch.
 
-5. COMMENT ON NON-OBVIOUS DECISIONS. When you approve a review with a category that isn't immediately obvious from the transaction name, add a brief note explaining why. This helps humans understand your reasoning and provides context if the transaction is later re-reviewed.
+5. EXPLAIN NON-OBVIOUS DECISIONS VIA THE REVIEW NOTE. When you approve a review with a category that isn't immediately obvious from the transaction name, pass a brief note to submit_review explaining why. The note is stored as a transaction comment linked to this review and rendered inline on the resolution event in the activity timeline — do NOT also call add_transaction_comment for the same narrative, as that produces duplicate entries. Reserve add_transaction_comment for free-standing narrative that isn't tied to a specific review decision.
 
 6. NEVER BULK-APPROVE WITHOUT EXAMINATION. Do not use batch_submit_reviews to approve all remaining reviews with a default category. Each item in the batch must have been individually assessed with the correct category assigned.
 
@@ -303,7 +303,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"Remove a manual category override from a transaction and re-resolve its category from the automatic mapping rules. Use this to undo a categorize_transaction action.",
 			s.handleResetTransactionCategory, svc),
 		makeToolDefLogged("add_transaction_comment", ToolWrite,
-			"Add a comment to a transaction. Use this to explain categorization decisions, flag unusual transactions, or leave notes for the family. Comments are visible on the transaction detail page and to other agents. Supports markdown formatting.",
+			"Add a free-standing comment to a transaction — narrative that's independent of any specific review decision (flagging unusual charges, noting shared expenses, cross-references, context that outlives a single review cycle). Supports markdown. IMPORTANT: when your comment is the rationale for a review decision, pass it via the 'note' parameter on submit_review / batch_submit_reviews instead; that note is stored as a linked comment and shown inline on the review resolution, so using both tools for the same narrative produces duplicate activity-log entries.",
 			s.handleAddTransactionComment, svc),
 		makeToolDefLogged("list_transaction_comments", ToolRead,
 			"List all comments on a transaction, ordered chronologically. Check comments before making changes to understand prior context and decisions by other agents or family members.",
@@ -324,7 +324,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"List pending transaction reviews in the review queue. Reviews are created automatically during sync for new and uncategorized transactions (when enabled). Returns empty with a note if reviews are disabled. Use limit to control batch size — review 10-20 at a time unless instructed otherwise. Filter by review_type (new_transaction, uncategorized, manual, re_review) and account_id. Each review includes the full transaction details and suggested category.",
 			s.handleListPendingReviews, svc),
 		makeToolDefLogged("submit_review", ToolWrite,
-			"Submit a decision on a pending review. Returns error if reviews are disabled. Decision: 'approved' or 'skipped'. Use 'approved' to resolve the review — you MUST provide the correct category via category_slug (e.g. 'food_and_drink_groceries') or category_id. Look at the transaction's name, merchant, and raw category fields to determine the right category — use list_categories to find valid slugs. If the review's suggested_category_slug looks correct, use that. If the transaction is miscategorized, provide the correct category_slug to fix it. Use 'skipped' only if you cannot confidently determine the correct category. Include a note when changing the category or skipping to explain your reasoning.",
+			"Submit a decision on a pending review. Returns error if reviews are disabled. Decision: 'approved' or 'skipped'. Use 'approved' to resolve the review — you MUST provide the correct category via category_slug (e.g. 'food_and_drink_groceries') or category_id. Look at the transaction's name, merchant, and raw category fields to determine the right category — use list_categories to find valid slugs. If the review's suggested_category_slug looks correct, use that. If the transaction is miscategorized, provide the correct category_slug to fix it. Use 'skipped' only if you cannot confidently determine the correct category. When you need to explain your reasoning (category change, skip, unusual decision), pass a 'note' — it is recorded as a transaction comment attributed to you and shown inline on this resolution in the activity timeline, so do NOT also call add_transaction_comment for the same narrative.",
 			s.handleSubmitReview, svc),
 		makeToolDefLogged("create_transaction_rule", ToolWrite,
 			"Create a transaction rule for automatic categorization. Rules match conditions against transaction fields and apply to ALL future transactions during sync. IMPORTANT: Before creating, check list_transaction_rules to avoid duplicates. Prefer broader patterns (contains) over exact matches. Conditions use a JSON tree with AND/OR/NOT logic. Available fields: name, merchant_name, amount, category_primary (raw provider category), category_detailed, pending, provider, account_id, user_id. Operators: eq, neq, contains, not_contains, matches (regex), gt, gte, lt, lte, in.",
@@ -339,7 +339,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"Delete a transaction rule by ID.",
 			s.handleDeleteTransactionRule, svc),
 		makeToolDefLogged("batch_submit_reviews", ToolWrite,
-			"Submit decisions on multiple pending reviews at once. Returns error if reviews are disabled. Each review needs a decision (approved or skipped) and optionally a category_slug or category_id. More efficient than submitting reviews one at a time.",
+			"Submit decisions on multiple pending reviews at once. Returns error if reviews are disabled. Each review needs a decision (approved or skipped) and optionally a category_slug or category_id. Each item may include a per-transaction 'note' — stored as a transaction comment linked to that review and shown inline on its resolution, so do NOT separately call add_transaction_comment for the same narrative. More efficient than submitting reviews one at a time.",
 			s.handleBatchSubmitReviews, svc),
 		makeToolDefLogged("batch_create_rules", ToolWrite,
 			"Create multiple transaction rules at once. Each rule needs a name, category_slug, and conditions object. More efficient than creating rules one at a time. Returns created rules and any errors.",

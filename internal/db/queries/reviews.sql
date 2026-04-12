@@ -22,8 +22,7 @@ SET status = $2,
     reviewer_type = $3,
     reviewer_id = $4,
     reviewer_name = $5,
-    review_note = $6,
-    resolved_category_id = $7,
+    resolved_category_id = $6,
     reviewed_at = NOW()
 WHERE id = $1 AND status = 'pending'
 RETURNING *;

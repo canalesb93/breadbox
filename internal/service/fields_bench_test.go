@@ -74,7 +74,6 @@ func benchReviewResponse() ReviewResponse {
 	reviewerType := "agent"
 	reviewerID := "agent-1"
 	reviewerName := "auto-review"
-	note := "matched recurring merchant rule"
 	resolvedSlug := "food_and_drink_groceries"
 	resolvedDisplayName := "Groceries"
 	reviewedAt := "2026-04-03T10:00:00Z"
@@ -92,7 +91,6 @@ func benchReviewResponse() ReviewResponse {
 		ReviewerType:                 &reviewerType,
 		ReviewerID:                   &reviewerID,
 		ReviewerName:                 &reviewerName,
-		ReviewNote:                   &note,
 		ResolvedCategory:             &resolvedSlug,
 		ResolvedCategoryDisplayName:  &resolvedDisplayName,
 		CreatedAt:                    "2026-04-02T14:32:00Z",

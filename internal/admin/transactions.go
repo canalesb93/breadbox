@@ -761,6 +761,15 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.CommentResponse, ruleApps []service.TransactionRuleApplicationDetail) []service.ActivityEntry {
 	var entries []service.ActivityEntry
 
+	// Index comments that belong to a review resolution so we can render their
+	// content inline on the resolution event and skip them as standalone entries.
+	commentsByReview := make(map[string]service.CommentResponse, len(comments))
+	for _, c := range comments {
+		if c.ReviewID != nil && *c.ReviewID != "" {
+			commentsByReview[*c.ReviewID] = c
+		}
+	}
+
 	// Convert reviews — for resolved reviews, emit both the enqueue and resolution events
 	for _, r := range reviews {
 		// Always emit the "enqueued" event (using CreatedAt)
@@ -816,15 +825,22 @@ func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.
 				e.ReviewStatus = "skipped"
 				e.Summary = "Skipped"
 			}
-			if r.ReviewNote != nil && *r.ReviewNote != "" {
-				e.Detail = *r.ReviewNote
+			if linked, ok := commentsByReview[r.ID]; ok {
+				e.Detail = linked.Content
+				e.CommentID = linked.ID
 			}
 			entries = append(entries, e)
 		}
 	}
 
-	// Convert comments (filter out [Review: ...] duplicates from legacy data)
+	// Convert free-standing comments. Linked review-note comments were already
+	// rendered as the Detail of their resolution event above; skip them here
+	// to avoid double-surfacing. Filter legacy [Review: ...] prefix duplicates
+	// from pre-consolidation imports.
 	for _, c := range comments {
+		if c.ReviewID != nil && *c.ReviewID != "" {
+			continue
+		}
 		if strings.HasPrefix(c.Content, "[Review: ") {
 			continue
 		}

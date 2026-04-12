@@ -105,7 +105,7 @@ type resetTransactionCategoryInput struct {
 type addTransactionCommentInput struct {
 	WriteSessionContext
 	TransactionID string `json:"transaction_id" jsonschema:"required,UUID of the transaction to comment on"`
-	Content       string `json:"content" jsonschema:"required,Comment text (markdown supported, max 10000 chars)"`
+	Content       string `json:"content" jsonschema:"required,Free-standing comment about the transaction (markdown supported, max 10000 chars). For rationale tied to a specific review decision, pass 'note' to submit_review or batch_submit_reviews instead — that narrative is recorded as a comment linked to the review so it appears inline on the resolution event and is not duplicated."`
 }
 
 type listTransactionCommentsInput struct {
@@ -157,7 +157,7 @@ type submitReviewInput struct {
 	Decision     string `json:"decision" jsonschema:"required,Decision: approved or skipped"`
 	CategoryID   string `json:"category_id,omitempty" jsonschema:"Category ID to assign. Provide either category_id or category_slug (not both)."`
 	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Category slug to assign (e.g. food_and_drink_groceries). Alternative to category_id — the slug is resolved to an ID automatically."`
-	Note         string `json:"note,omitempty" jsonschema:"Optional note explaining the decision"`
+	Note         string `json:"note,omitempty" jsonschema:"Optional short rationale for this decision. Recorded as a transaction comment attributed to you and shown inline on the review resolution in the transaction's activity timeline. Do NOT also call add_transaction_comment for the same transaction — pass the narrative here instead."`
 }
 
 type listCategoriesInput struct {
@@ -799,7 +799,7 @@ type batchReviewItem struct {
 	Decision     string  `json:"decision" jsonschema:"required,Decision: approved or skipped"`
 	CategorySlug *string `json:"category_slug,omitempty" jsonschema:"Category slug to assign (alternative to category_id). Use list_categories to find slugs."`
 	CategoryID   *string `json:"category_id,omitempty" jsonschema:"Category ID to assign (alternative to category_slug)"`
-	Note         *string `json:"note,omitempty" jsonschema:"Optional note explaining the decision"`
+	Note         *string `json:"note,omitempty" jsonschema:"Optional short rationale for this decision. Recorded as a transaction comment attributed to you and shown inline on the review resolution in the transaction's activity timeline. Do NOT also call add_transaction_comment for the same transaction — pass the narrative here instead."`
 }
 
 func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.CallToolRequest, input createTransactionRuleInput) (*mcpsdk.CallToolResult, any, error) {

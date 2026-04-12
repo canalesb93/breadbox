@@ -96,7 +96,6 @@ var validReviewFields = map[string]bool{
 	"reviewer_type":           true,
 	"reviewer_id":             true,
 	"reviewer_name":           true,
-	"review_note":             true,
 	"resolved_category_slug":  true,
 	"created_at":              true,
 	"reviewed_at":             true,
@@ -231,8 +230,6 @@ func FilterReviewFields(r ReviewResponse, fields map[string]bool) map[string]any
 			m["reviewer_id"] = r.ReviewerID
 		case "reviewer_name":
 			m["reviewer_name"] = r.ReviewerName
-		case "review_note":
-			m["review_note"] = r.ReviewNote
 		case "resolved_category_slug":
 			m["resolved_category_slug"] = r.ResolvedCategory
 		case "created_at":

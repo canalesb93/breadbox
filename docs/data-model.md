@@ -624,7 +624,6 @@ The following keys are seeded during initial migration and used by the applicati
 | `reviewer_type` | `TEXT` | Yes | `NULL` | Who reviewed: `user` or `agent`. Set on resolution. |
 | `reviewer_id` | `TEXT` | Yes | `NULL` | ID of the reviewer (admin user ID or API key prefix). |
 | `reviewer_name` | `TEXT` | Yes | `NULL` | Display name of the reviewer. |
-| `review_note` | `TEXT` | Yes | `NULL` | Optional note from the reviewer. |
 | `resolved_category_id` | `UUID` | Yes | `NULL` | FK → `categories(id)`. Category chosen by the reviewer (may differ from suggested). |
 | `created_at` | `TIMESTAMPTZ` | No | `NOW()` | When the review was enqueued. |
 | `reviewed_at` | `TIMESTAMPTZ` | Yes | `NULL` | When the review was resolved. |

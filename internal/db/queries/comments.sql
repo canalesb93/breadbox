@@ -1,6 +1,6 @@
 -- name: CreateComment :one
-INSERT INTO transaction_comments (transaction_id, author_type, author_id, author_name, content)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO transaction_comments (transaction_id, author_type, author_id, author_name, content, review_id)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: ListCommentsByTransaction :many
@@ -10,6 +10,9 @@ ORDER BY created_at ASC;
 
 -- name: GetComment :one
 SELECT * FROM transaction_comments WHERE id = $1;
+
+-- name: GetCommentByReviewID :one
+SELECT * FROM transaction_comments WHERE review_id = $1 LIMIT 1;
 
 -- name: GetCommentUUIDByShortID :one
 SELECT id FROM transaction_comments WHERE short_id = $1;

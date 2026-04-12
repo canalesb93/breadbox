@@ -44,12 +44,22 @@ func (s *Service) CreateComment(ctx context.Context, params CreateCommentParams)
 		authorID = pgtype.Text{String: params.Actor.ID, Valid: true}
 	}
 
+	var reviewID pgtype.UUID
+	if params.ReviewID != "" {
+		parsed, err := parseUUID(params.ReviewID)
+		if err != nil {
+			return nil, fmt.Errorf("%w: invalid review_id", ErrInvalidParameter)
+		}
+		reviewID = parsed
+	}
+
 	comment, err := s.Queries.CreateComment(ctx, db.CreateCommentParams{
 		TransactionID: txnID,
 		AuthorType:    params.Actor.Type,
 		AuthorID:      authorID,
 		AuthorName:    params.Actor.Name,
 		Content:       content,
+		ReviewID:      reviewID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create comment: %w", err)
@@ -151,7 +161,7 @@ func canModifyComment(comment db.TransactionComment, actor Actor) bool {
 }
 
 func commentFromRow(c db.TransactionComment) CommentResponse {
-	return CommentResponse{
+	resp := CommentResponse{
 		ID:            formatUUID(c.ID),
 		ShortID:       c.ShortID,
 		TransactionID: formatUUID(c.TransactionID),
@@ -162,4 +172,9 @@ func commentFromRow(c db.TransactionComment) CommentResponse {
 		CreatedAt:     c.CreatedAt.Time.UTC().Format(time.RFC3339),
 		UpdatedAt:     c.UpdatedAt.Time.UTC().Format(time.RFC3339),
 	}
+	if c.ReviewID.Valid {
+		rid := formatUUID(c.ReviewID)
+		resp.ReviewID = &rid
+	}
+	return resp
 }
