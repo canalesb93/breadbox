@@ -145,7 +145,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/onboarding/dismiss", DismissGettingStartedHandler(a, sm))
 
 		r.Route("/users", func(r chi.Router) {
-			r.Get("/", UsersListHandler(a, tr))
+			r.Get("/", UsersListHandler(a, sm, tr))
 			r.Get("/new", NewUserHandler(a, tr))
 			r.Get("/{id}/edit", EditUserHandler(a, tr))
 			r.Get("/{id}/create-login", CreateLoginPageHandler(a, tr))

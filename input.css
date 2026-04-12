@@ -153,8 +153,8 @@
 
 /* ─── shadcn-inspired global overrides ─── */
 @layer base {
-  /* Ensure Lucide SVG icons inside interactive elements don't steal clicks. */
-  a svg, button svg { pointer-events: none; }
+  /* Ensure Lucide SVG icons don't steal clicks from interactive parents. */
+  svg.lucide { pointer-events: none; }
 
   html { scroll-behavior: smooth; }
 
@@ -283,6 +283,33 @@
       border-color: oklch(0.35 0 0);
     }
   }
+
+  /* ── Form card primitives ── */
+  /* Icon-header: colored tile + title + optional subtitle.
+     Used at the top of sectioned form cards (bb-card p-0 overflow-hidden). */
+  .bb-icon-header { @apply flex items-center gap-3 mb-5; }
+  .bb-icon-header__tile { @apply flex items-center justify-center w-10 h-10 rounded-xl shrink-0; }
+  .bb-icon-header__text { @apply min-w-0; }
+
+  /* Color modifiers for the icon tile. Pair with .bb-icon-header__tile. */
+  .bb-icon-tile--primary { @apply bg-primary/8 text-primary; }
+  .bb-icon-tile--success { @apply bg-success/10 text-success; }
+  .bb-icon-tile--warning { @apply bg-warning/10 text-warning; }
+  .bb-icon-tile--error   { @apply bg-error/10 text-error; }
+
+  /* Action row at the bottom of a sectioned form card.
+     Holds Cancel + primary (Save/Create) buttons right-aligned. */
+  .bb-action-row { @apply p-4 sm:p-5 border-t border-base-300 bg-base-200/20 flex items-center justify-end gap-2; }
+
+  /* Form inputs/selects with subtle base-200 bg that clears on focus. */
+  .bb-form-input { @apply input w-full rounded-xl bg-base-200/50 focus:bg-base-100 transition-colors; }
+  .bb-form-select { @apply select w-full rounded-xl bg-base-200; }
+
+  /* Inline error alert inside a form card (pairs with alert-circle icon). */
+  .bb-form-error { @apply flex items-center gap-3 rounded-xl bg-error/10 text-error px-4 py-3 text-sm; }
+
+  /* Danger-zone card tint — combine with .bb-card for destructive-action cards. */
+  .bb-danger-card { @apply border-error/20 bg-error/[0.02]; }
 
   /* ── Mobile Navbar (glassmorphism) ── */
   .bb-mobile-navbar {

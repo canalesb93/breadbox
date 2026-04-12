@@ -6,9 +6,6 @@
     <h1 class="bb-page-title">{{if .IsEdit}}Edit {{.User.Name}}{{else}}Add Member{{end}}</h1>
     <p class="text-sm text-base-content/50 mt-1">{{if .IsEdit}}Update member details{{else}}Add a new person to your household{{end}}</p>
   </div>
-  <a href="/users" class="btn btn-sm btn-ghost rounded-xl gap-2">
-    <i data-lucide="arrow-left" class="w-4 h-4"></i> Household
-  </a>
 </div>
 
 {{if not .IsEdit}}
@@ -237,72 +234,88 @@ function userForm() {
 {{else}}
 <!-- Edit mode with avatar upload -->
 <div x-data="avatarEditor('{{.UserID}}')" class="max-w-lg">
-  <div class="bb-card p-8">
-    <!-- Avatar + header -->
-    <div class="flex items-center gap-4 mb-6">
-      <div class="relative group">
-        <img :src="avatarSrc" alt="" class="w-14 h-14 rounded-full object-cover ring-2 ring-base-300">
-        <button type="button" @click="$refs.fileInput.click()"
-          class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-          <i data-lucide="camera" class="w-5 h-5 text-white"></i>
-        </button>
-        <input type="file" x-ref="fileInput" accept="image/png,image/jpeg,image/gif" class="hidden" @change="onFileSelect">
-      </div>
-      <div>
-        <h2 class="text-base font-semibold">{{.User.Name}}</h2>
-        <p class="text-xs text-base-content/45">
-          <span class="inline-flex items-center gap-1.5">
-            <button type="button" @click="$refs.fileInput.click()" class="link link-hover text-xs">Upload photo</button>
+  <form @submit.prevent="submitForm()" class="bb-card p-0 overflow-hidden">
+    <!-- Header + fields -->
+    <div class="p-5 sm:p-6">
+      <!-- Avatar header -->
+      <div class="bb-icon-header">
+        <div class="relative group shrink-0">
+          <img :src="avatarSrc" alt="" class="w-10 h-10 rounded-full object-cover ring-2 ring-base-300">
+          <button type="button" @click="$refs.fileInput.click()"
+            class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            title="Upload photo">
+            <i data-lucide="camera" class="w-4 h-4 text-white"></i>
+          </button>
+          <input type="file" x-ref="fileInput" accept="image/png,image/jpeg,image/gif" class="hidden" @change="onFileSelect">
+        </div>
+        <div class="bb-icon-header__text">
+          <h2 class="text-sm font-semibold truncate">{{.User.Name}}</h2>
+          <p class="text-xs text-base-content/45">
+            <button type="button" @click="$refs.fileInput.click()" class="link link-hover inline-flex items-center gap-1"><i data-lucide="upload" class="w-3 h-3"></i>Upload photo</button>
             <span class="text-base-content/20">&middot;</span>
-            <button type="button" @click="regenerate()" class="link link-hover text-xs">Regenerate</button>
+            <button type="button" @click="regenerate()" class="link link-hover inline-flex items-center gap-1"><i data-lucide="refresh-cw" class="w-3 h-3"></i>Regenerate</button>
             <template x-if="hasCustomAvatar">
               <span>
                 <span class="text-base-content/20">&middot;</span>
-                <button type="button" @click="removeAvatar()" class="link link-hover text-xs text-error/70 hover:text-error">Remove</button>
+                <button type="button" @click="removeAvatar()" class="link link-hover text-error/70 hover:text-error">Remove</button>
               </span>
             </template>
-          </span>
+          </p>
+        </div>
+      </div>
+
+      <template x-if="avatarError">
+        <div role="alert" class="bb-form-error mb-4">
+          <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+          <span x-text="avatarError"></span>
+        </div>
+      </template>
+      <template x-if="avatarUploading">
+        <p class="text-xs text-base-content/50 mb-4 inline-flex items-center gap-1.5">
+          <span class="loading loading-spinner loading-xs"></span>
+          Uploading photo...
         </p>
-        <template x-if="avatarError">
-          <p class="text-xs text-error mt-1" x-text="avatarError"></p>
-        </template>
-        <template x-if="avatarUploading">
-          <p class="text-xs text-base-content/50 mt-1">Uploading...</p>
+      </template>
+
+      <!-- Form fields -->
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="name">
+            Name <span class="text-error">*</span>
+          </label>
+          <input type="text" id="name" name="name" class="bb-form-input"
+                 required maxlength="128"
+                 value="{{.User.Name}}"
+                 placeholder="e.g., Alex Canales">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="email">
+            Email <span class="text-base-content/30">(optional)</span>
+          </label>
+          <input type="email" id="email" name="email" class="bb-form-input"
+                 value="{{if .User.Email.Valid}}{{.User.Email.String}}{{end}}"
+                 placeholder="e.g., alex@example.com">
+        </div>
+
+        <template x-if="formError">
+          <div role="alert" class="bb-form-error">
+            <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+            <span x-text="formError"></span>
+          </div>
         </template>
       </div>
     </div>
 
-    <form @submit.prevent="submitForm()">
-      <fieldset class="fieldset mb-5">
-        <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="name">
-          Name <span class="text-error text-xs">*</span>
-        </label>
-        <input type="text" id="name" name="name" class="input input-bordered w-full rounded-xl" required maxlength="128"
-          value="{{.User.Name}}"
-          placeholder="e.g., Alex Canales">
-      </fieldset>
-
-      <fieldset class="fieldset mb-5">
-        <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="email">
-          Email <span class="text-xs text-base-content/30">(optional)</span>
-        </label>
-        <input type="email" id="email" name="email" class="input input-bordered w-full rounded-xl"
-          value="{{if .User.Email.Valid}}{{.User.Email.String}}{{end}}"
-          placeholder="e.g., alex@example.com">
-      </fieldset>
-
-      <template x-if="formError">
-        <div class="rounded-xl bg-error/10 border border-error/20 text-error text-sm px-4 py-3 mb-4" x-text="formError"></div>
-      </template>
-
-      <div class="flex gap-3 pt-2">
-        <button type="submit" class="btn btn-primary btn-sm rounded-xl whitespace-nowrap">
-          <span class="inline-flex items-center gap-1.5"><i data-lucide="save" class="w-4 h-4"></i> Save Changes</span>
-        </button>
-        <a href="/users" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
-      </div>
-    </form>
-  </div>
+    <!-- Action row -->
+    <div class="bb-action-row">
+      <a href="/users" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
+      <button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32" :disabled="submitting">
+        <span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save Changes</span>
+        <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+      </button>
+    </div>
+  </form>
 </div>
 
 <script>
