@@ -45,7 +45,7 @@ type EnrichedUser struct {
 }
 
 // UsersListHandler serves GET /admin/users.
-func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
+func UsersListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -147,6 +147,16 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			loginAccountMap[pgconv.FormatUUID(la.UserID)] = la
 		}
 
+		// Check if the current admin is unlinked (no household member).
+		userIDStr := SessionUserID(sm, r)
+		isUnlinked := userIDStr == ""
+		var unlinkedUsers []db.User
+		if isUnlinked {
+			if uu, err := a.Queries.ListUsersWithoutAuthAccount(ctx); err == nil {
+				unlinkedUsers = uu
+			}
+		}
+
 		data := map[string]any{
 			"PageTitle":        "Household",
 			"CurrentPage":      "users",
@@ -155,6 +165,8 @@ func UsersListHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			"LoginAccountMap":  loginAccountMap,
 			"CSRFToken":        GetCSRFToken(r),
 			"Created":          r.URL.Query().Get("created") == "1",
+			"IsUnlinked":       isUnlinked,
+			"UnlinkedUsers":    unlinkedUsers,
 		}
 		tr.Render(w, r, "users.html", data)
 	}

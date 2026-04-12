@@ -289,13 +289,13 @@
     <!-- Actions -->
     <div class="flex items-center gap-0.5 flex-shrink-0">
       <button class="btn btn-ghost btn-xs btn-square rounded-lg" title="{{if .Enabled}}Disable{{else}}Enable{{end}}" @click.stop="toggleRule('{{.ID}}')">
-        {{if .Enabled}}<i data-lucide="pause" class="w-3.5 h-3.5 pointer-events-none"></i>{{else}}<i data-lucide="play" class="w-3.5 h-3.5 pointer-events-none"></i>{{end}}
+        {{if .Enabled}}<i data-lucide="pause" class="w-3.5 h-3.5"></i>{{else}}<i data-lucide="play" class="w-3.5 h-3.5"></i>{{end}}
       </button>
       <a href="/rules/{{.ID}}/edit" class="btn btn-ghost btn-xs btn-square rounded-lg" title="Edit" @click.stop>
-        <i data-lucide="pencil" class="w-3.5 h-3.5 pointer-events-none"></i>
+        <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
       </a>
       <button class="btn btn-ghost btn-xs btn-square rounded-lg text-error/60" title="Delete" :disabled="deleting" @click.stop="deleteRule('{{.ID}}', $el)">
-        <i data-lucide="trash-2" class="w-3.5 h-3.5 pointer-events-none"></i>
+        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
       </button>
     </div>
   </div>

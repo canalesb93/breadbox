@@ -180,6 +180,25 @@ Base class: `bb-card` — provides `bg-base-100 rounded-xl border border-base-30
 
 **Interactive cards** add `bb-card--interactive` for hover effects (cursor change, background shift).
 
+**Danger-zone cards** add `bb-danger-card` (soft error tint: `border-error/20 bg-error/[0.02]`) — use for destructive-action cards placed below the main form card.
+
+### Icon Tiles (`bb-icon-tile--*`)
+
+Colored 40×40 rounded squares used inside card headers to ground the page's purpose. Pair `.bb-icon-header__tile` (geometry) with a color modifier; the icon inside inherits `currentColor`, so don't set a text color on it.
+
+| Modifier | Background | Text |
+|---|---|---|
+| `.bb-icon-tile--primary` | `bg-primary/8` | `text-primary` |
+| `.bb-icon-tile--success` | `bg-success/10` | `text-success` |
+| `.bb-icon-tile--warning` | `bg-warning/10` | `text-warning` |
+| `.bb-icon-tile--error` | `bg-error/10` | `text-error` |
+
+```html
+<div class="bb-icon-header__tile bb-icon-tile--primary">
+  <i data-lucide="user-plus" class="w-5 h-5"></i>
+</div>
+```
+
 ### Modals
 
 All `<dialog>` elements use:
@@ -331,6 +350,73 @@ For filtered "no results" states (e.g., transactions with active filters), a com
 </div>
 ```
 
+### Form Card Pattern
+
+The canonical pattern for create/edit/settings forms. A sectioned card with a colored icon header on top, form fields in the middle, and a subtle action row (Cancel + Save/Create) at the bottom. Use `max-w-lg` for the container.
+
+**Reference implementations:** `internal/templates/pages/create_login.html` (both create and manage modes) and `internal/templates/pages/user_form.html` (edit mode).
+
+```html
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Create Login</h1>
+    <p class="text-sm text-base-content/50 mt-1">Create a sign-in account for {{.User.Name}}</p>
+  </div>
+</div>
+
+<div class="max-w-lg">
+  <form @submit.prevent="submit()" class="bb-card p-0 overflow-hidden">
+    <!-- Top section: icon header + fields -->
+    <div class="p-5 sm:p-6">
+      <div class="bb-icon-header">
+        <div class="bb-icon-header__tile bb-icon-tile--primary">
+          <i data-lucide="user-plus" class="w-5 h-5"></i>
+        </div>
+        <div class="bb-icon-header__text">
+          <h2 class="text-sm font-semibold">New login account</h2>
+          <p class="text-xs text-base-content/45">They'll receive a link to set their password</p>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="email">Email</label>
+          <input type="email" id="email" class="bb-form-input" required placeholder="e.g., alex@example.com">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="role">Role</label>
+          <select id="role" class="bb-form-select">…</select>
+        </div>
+        <template x-if="error">
+          <div role="alert" class="bb-form-error">
+            <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+            <span x-text="error"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Bottom action row -->
+    <div class="bb-action-row">
+      <a href="/users" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
+      <button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32" :disabled="submitting">
+        <span x-show="!submitting" class="inline-flex items-center gap-1.5">
+          <i data-lucide="save" class="w-3.5 h-3.5"></i>Save Changes
+        </span>
+        <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+      </button>
+    </div>
+  </form>
+</div>
+```
+
+**Conventions:**
+- Top section uses `p-5 sm:p-6` (mobile/desktop). Do **not** use `p-8` — that was the old centered-card style.
+- Field groups use `space-y-4`. Labels use `text-xs font-medium text-base-content/50 mb-1.5 block`.
+- Primary submit button gets `min-w-32` so it doesn't jitter between its label and the loading spinner.
+- Icons inside the primary button are `w-3.5 h-3.5` (not `w-4 h-4`) to match the compact `btn-sm` weight.
+- For destructive operations, add a **separate** `bb-card bb-danger-card` below — never mix the save action with the delete action in one card.
+
 ## 6. Table Guidelines
 
 ### Base Table
@@ -434,6 +520,89 @@ Use DaisyUI form control patterns:
   <span class="label-text-alt text-error">Password must be at least 8 characters</span>
 </label>
 ```
+
+### Dirty-State Form Tracking (Alpine)
+
+For settings-style edit screens where Save is explicit (not auto-save on change), the canonical pattern is an Alpine-local `initialX` / `x` / computed `dirty` / `save()` model. The Save button stays disabled until something changes, and a transient "Saved" indicator confirms success for 2 seconds.
+
+**Reference:** manage-login mode in `create_login.html`.
+
+```html
+<div class="bb-card p-0 overflow-hidden" x-data="{
+  initialRole: '{{.LoginAccount.Role}}',
+  role: '{{.LoginAccount.Role}}',
+  saving: false,
+  saved: false,
+  error: '',
+  get dirty() { return this.role !== this.initialRole; },
+  save() {
+    this.error = '';
+    this.saving = true;
+    var self = this;
+    fetch('…', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({role: this.role}) })
+      .then(function(r) {
+        if (!r.ok) return r.json().then(function(d) { throw d; });
+        self.initialRole = self.role;
+        self.saving = false;
+        self.saved = true;
+        setTimeout(function() { self.saved = false; }, 2000);
+      })
+      .catch(function(e) {
+        self.saving = false;
+        self.error = (e && e.error && e.error.message) || 'Failed to save changes';
+      });
+  }
+}">
+  <!-- top section: fields bound with x-model -->
+  <div class="bb-action-row">
+    <span x-show="saved" x-transition.opacity class="text-xs text-success inline-flex items-center gap-1 mr-2">
+      <i data-lucide="check" class="w-3.5 h-3.5"></i> Saved
+    </span>
+    <a href="/users" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
+    <button @click="save()" :disabled="!dirty || saving" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32">
+      <span x-show="!saving" class="inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save Changes</span>
+      <span x-show="saving" class="loading loading-spinner loading-xs"></span>
+    </button>
+  </div>
+</div>
+```
+
+### Danger Zone Card
+
+Destructive operations (delete, revoke, disconnect) go in a **separate** `bb-card bb-danger-card` placed below the main form card — never inside the primary Save row. Horizontal layout on desktop, stacked on mobile.
+
+```html
+<div class="bb-card bb-danger-card p-5 sm:p-6 mt-4">
+  <div class="flex items-start justify-between gap-4 flex-col sm:flex-row sm:items-center">
+    <div>
+      <h3 class="text-sm font-semibold text-error/80">Delete login account</h3>
+      <p class="text-xs text-base-content/50 mt-0.5">{{.Name}} will no longer be able to sign in. This cannot be undone.</p>
+    </div>
+    <button class="btn btn-error btn-soft btn-sm rounded-xl shrink-0" @click="…">
+      <i data-lucide="user-x" class="w-4 h-4"></i>
+      Delete Login
+    </button>
+  </div>
+</div>
+```
+
+### Overflow Action Menu
+
+When a card has ≥2 secondary actions (Edit, Manage, Transactions, Delete, …) prefer a single `ellipsis-vertical` dropdown over a cluster of icon buttons. Used on member cards in `/users`, also in `categories.html` and `rules.html`.
+
+```html
+<div class="dropdown dropdown-end">
+  <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square rounded-lg opacity-40 hover:opacity-100 transition-opacity">
+    <i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
+  </div>
+  <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
+    <li><a href="…"><i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit profile</a></li>
+    <li><a href="…"><i data-lucide="settings" class="w-3.5 h-3.5"></i> Manage login</a></li>
+  </ul>
+</div>
+```
+
+Keep icons at `w-3.5 h-3.5` in dropdown rows to match the `btn-xs` baseline weight of menu items.
 
 ## 8. Icon System
 
@@ -541,6 +710,17 @@ fetch('/api/...').then(() => {
 
 ## 12. Alerts
 
-All alerts use: `<div role="alert" class="alert alert-{type} rounded-xl mb-6">`.
+**Page-level alerts** use: `<div role="alert" class="alert alert-{type} rounded-xl mb-6">`.
 
 Flash messages (`partials/flash.html`) and inline alerts follow the same pattern. Use `alert-soft` for less prominent inline warnings.
+
+**Form-level errors** inside a `.bb-card` use the `.bb-form-error` inline variant — softer, tighter, and sits flush with the form fields rather than the page chrome:
+
+```html
+<div role="alert" class="bb-form-error">
+  <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+  <span x-text="error"></span>
+</div>
+```
+
+Always pair with an `alert-circle` icon so the error reads at a glance. This is the canonical pattern for inline Alpine-driven form validation errors.
