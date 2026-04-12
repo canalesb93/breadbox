@@ -154,10 +154,10 @@
         <span class="font-semibold text-sm truncate">{{.Name}}</span>
         {{if .Enabled}}
           {{if and .ExpiresAt (expired .ExpiresAt)}}
-          <span class="badge badge-warning badge-xs rounded-lg">Expired</span>
+          <span class="badge badge-warning badge-xs">Expired</span>
           {{end}}
         {{else}}
-        <span class="badge badge-ghost badge-xs rounded-lg">Disabled</span>
+        <span class="badge badge-ghost badge-xs">Disabled</span>
         {{end}}
       </div>
       <div class="text-xs text-base-content/40 mt-0.5 truncate" title="{{conditionSummary .Conditions}}">{{conditionSummary .Conditions}}</div>

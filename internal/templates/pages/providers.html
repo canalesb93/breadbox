@@ -23,14 +23,14 @@
       </div>
       <div class="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
         {{if and $plaidHealth.LastSyncTime (eq $plaidHealth.LastSyncStatus "error")}}
-          <span class="badge badge-soft badge-error badge-sm rounded-lg">Sync Error</span>
+          <span class="badge badge-soft badge-error badge-sm">Sync Error</span>
         {{else if and $plaidHealth.LastSyncTime (eq $plaidHealth.LastSyncStatus "success")}}
-          <span class="badge badge-soft badge-success badge-sm rounded-lg">Healthy</span>
+          <span class="badge badge-soft badge-success badge-sm">Healthy</span>
         {{end}}
         {{if .PlaidConfigured}}
-          <span class="badge badge-success badge-sm rounded-lg">Configured</span>
+          <span class="badge badge-success badge-sm">Configured</span>
         {{else}}
-          <span class="badge badge-ghost badge-sm rounded-lg">Not Configured</span>
+          <span class="badge badge-ghost badge-sm">Not Configured</span>
         {{end}}
       </div>
     </div>
@@ -149,14 +149,14 @@
       </div>
       <div class="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
         {{if and $tellerHealth.LastSyncTime (eq $tellerHealth.LastSyncStatus "error")}}
-          <span class="badge badge-soft badge-error badge-sm rounded-lg">Sync Error</span>
+          <span class="badge badge-soft badge-error badge-sm">Sync Error</span>
         {{else if and $tellerHealth.LastSyncTime (eq $tellerHealth.LastSyncStatus "success")}}
-          <span class="badge badge-soft badge-success badge-sm rounded-lg">Healthy</span>
+          <span class="badge badge-soft badge-success badge-sm">Healthy</span>
         {{end}}
         {{if .TellerConfigured}}
-          <span class="badge badge-success badge-sm rounded-lg">Configured</span>
+          <span class="badge badge-success badge-sm">Configured</span>
         {{else}}
-          <span class="badge badge-ghost badge-sm rounded-lg">Not Configured</span>
+          <span class="badge badge-ghost badge-sm">Not Configured</span>
         {{end}}
       </div>
     </div>
@@ -298,7 +298,7 @@
           <p class="text-xs text-base-content/40 truncate">Import transactions from bank-exported files</p>
         </div>
       </div>
-      <span class="badge badge-success badge-sm rounded-lg flex-shrink-0">Always Available</span>
+      <span class="badge badge-success badge-sm flex-shrink-0">Always Available</span>
     </div>
 
     <div class="px-4 sm:px-5 py-4 space-y-4">

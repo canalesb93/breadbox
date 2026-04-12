@@ -422,8 +422,8 @@ function syncBtn(connId) {
 </div><!-- /links tab -->
 
 <!-- Create Account Link Modal -->
-<dialog id="create-link-modal" class="modal">
-  <div class="modal-box rounded-2xl">
+<dialog id="create-link-modal" class="modal modal-bottom sm:modal-middle">
+  <div class="modal-box rounded-xl max-w-lg">
     <h3 class="font-bold text-lg">Create Account Link</h3>
     <p class="text-sm text-base-content/50 mt-1">Link a dependent (authorized user) account to the primary cardholder's account.</p>
     <form method="POST" action="/-/account-links" class="mt-4 space-y-4" x-data="{ loading: false }" @submit="loading = true">
