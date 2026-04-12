@@ -14,10 +14,14 @@ import (
 func NewSessionManager(pool *pgxpool.Pool, isSecure bool) *scs.SessionManager {
 	sm := scs.New()
 	sm.Store = pgxstore.New(pool)
-	sm.Lifetime = 12 * time.Hour
+	sm.Lifetime = 30 * 24 * time.Hour
+	sm.IdleTimeout = 14 * 24 * time.Hour
 	sm.Cookie.HttpOnly = true
 	sm.Cookie.SameSite = http.SameSiteLaxMode
 	sm.Cookie.Secure = isSecure
 	sm.Cookie.Path = "/"
+	// Default to a browser-session cookie; LoginHandler flips this to a
+	// persistent cookie when the user opts into "Keep me signed in".
+	sm.Cookie.Persist = false
 	return sm
 }
