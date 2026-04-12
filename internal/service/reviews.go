@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"breadbox/internal/db"
@@ -10,8 +11,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
-
-const maxReviewNoteLength = 2000
 
 // IsReviewsEnabled checks if review auto-enqueue is enabled in app_config.
 // Returns false by default (reviews are off unless explicitly enabled).
@@ -76,7 +75,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 	// Build the dynamic query with transaction context
 	query := `SELECT rq.id, rq.transaction_id, rq.review_type, rq.status,
 		rq.short_id AS rq_short_id, rq.suggested_category_id, rq.confidence_score,
-		rq.reviewer_type, rq.reviewer_id, rq.reviewer_name, rq.review_note,
+		rq.reviewer_type, rq.reviewer_id, rq.reviewer_name,
 		rq.resolved_category_id, rq.created_at, rq.reviewed_at,
 		sc.slug AS suggested_slug, sc.display_name AS suggested_display_name, scp.display_name AS suggested_parent_display_name,
 		rc.slug AS resolved_slug, rc.display_name AS resolved_display_name, rcp.display_name AS resolved_parent_display_name,
@@ -200,7 +199,6 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			rReviewerType         pgtype.Text
 			rReviewerID           pgtype.Text
 			rReviewerName         pgtype.Text
-			rReviewNote           pgtype.Text
 			rResolvedCategoryID   pgtype.UUID
 			rCreatedAt            pgtype.Timestamptz
 			rReviewedAt           pgtype.Timestamptz
@@ -238,7 +236,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 		if err := rows.Scan(
 			&rID, &rTransactionID, &rReviewType, &rStatus,
 			&rqShortID, &rSuggestedCategoryID, &rConfidenceScore,
-			&rReviewerType, &rReviewerID, &rReviewerName, &rReviewNote,
+			&rReviewerType, &rReviewerID, &rReviewerName,
 			&rResolvedCategoryID, &rCreatedAt, &rReviewedAt,
 			&suggestedSlug, &suggestedDisplayName, &suggestedParentDisplayName,
 			&resolvedSlug, &resolvedDisplayName, &resolvedParentDisplayName,
@@ -311,7 +309,6 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			ReviewerType:                 textPtr(rReviewerType),
 			ReviewerID:                   textPtr(rReviewerID),
 			ReviewerName:                 textPtr(rReviewerName),
-			ReviewNote:                   textPtr(rReviewNote),
 			ResolvedCategoryID:           uuidPtr(rResolvedCategoryID),
 			ResolvedCategory:             textPtr(resolvedSlug),
 			ResolvedCategoryDisplayName:  buildCategoryDisplayName(resolvedDisplayName, resolvedParentDisplayName),
@@ -424,7 +421,7 @@ func (s *Service) ListReviewsByTransactionID(ctx context.Context, transactionID 
 
 	query := `SELECT id, short_id, transaction_id, review_type, status,
 		suggested_category_id, confidence_score,
-		reviewer_type, reviewer_id, reviewer_name, review_note,
+		reviewer_type, reviewer_id, reviewer_name,
 		resolved_category_id, created_at, reviewed_at
 		FROM review_queue
 		WHERE transaction_id = $1
@@ -449,7 +446,6 @@ func (s *Service) ListReviewsByTransactionID(ctx context.Context, transactionID 
 			rReviewerType       pgtype.Text
 			rReviewerID         pgtype.Text
 			rReviewerName       pgtype.Text
-			rReviewNote         pgtype.Text
 			rResolvedCatID      pgtype.UUID
 			rCreatedAt          pgtype.Timestamptz
 			rReviewedAt         pgtype.Timestamptz
@@ -457,7 +453,7 @@ func (s *Service) ListReviewsByTransactionID(ctx context.Context, transactionID 
 		if err := rows.Scan(
 			&rID, &rShortID, &rTransactionID, &rReviewType, &rStatus,
 			&rSuggestedCatID, &rConfidenceScore,
-			&rReviewerType, &rReviewerID, &rReviewerName, &rReviewNote,
+			&rReviewerType, &rReviewerID, &rReviewerName,
 			&rResolvedCatID, &rCreatedAt, &rReviewedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan review row: %w", err)
@@ -471,7 +467,6 @@ func (s *Service) ListReviewsByTransactionID(ctx context.Context, transactionID 
 			Status:        rStatus,
 			ReviewerType:  textPtr(rReviewerType),
 			ReviewerName:  textPtr(rReviewerName),
-			ReviewNote:    textPtr(rReviewNote),
 		}
 		if rSuggestedCatID.Valid {
 			s := formatUUID(rSuggestedCatID)
@@ -571,11 +566,6 @@ func (s *Service) SubmitReview(ctx context.Context, params SubmitReviewParams) (
 		return nil, ErrInvalidDecision
 	}
 
-	// Validate note length
-	if params.Note != nil && len(*params.Note) > maxReviewNoteLength {
-		return nil, fmt.Errorf("%w: review note exceeds %d characters", ErrInvalidParameter, maxReviewNoteLength)
-	}
-
 	reviewID, err := s.resolveReviewID(ctx, params.ReviewID)
 	if err != nil {
 		return nil, ErrNotFound
@@ -634,19 +624,35 @@ func (s *Service) SubmitReview(ctx context.Context, params SubmitReviewParams) (
 	if params.Actor.Name != "" {
 		reviewerName = pgtype.Text{String: params.Actor.Name, Valid: true}
 	}
-	var reviewNote pgtype.Text
+
+	// Pre-validate the note's trimmed length so we fail before any writes.
+	// Actual persistence happens atomically with the review update below.
+	var trimmedNote string
 	if params.Note != nil {
-		reviewNote = pgtype.Text{String: *params.Note, Valid: true}
+		trimmedNote = strings.TrimSpace(*params.Note)
+		if len(trimmedNote) > maxCommentLength {
+			return nil, fmt.Errorf("%w: review note exceeds %d characters", ErrInvalidParameter, maxCommentLength)
+		}
 	}
 
-	// Update the review
-	updated, err := s.Queries.UpdateReviewDecision(ctx, db.UpdateReviewDecisionParams{
+	// Atomically update the review and (if present) persist the note as a
+	// linked transaction comment. Bundling these in one tx preserves the
+	// pre-consolidation guarantee that a resolved review and its narrative
+	// commit together — a comment-insert failure must roll back the decision
+	// rather than silently drop the note.
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin review submit: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.Queries.WithTx(tx)
+
+	updated, err := qtx.UpdateReviewDecision(ctx, db.UpdateReviewDecisionParams{
 		ID:                 reviewID,
 		Status:             params.Decision,
 		ReviewerType:       reviewerType,
 		ReviewerID:         reviewerID,
 		ReviewerName:       reviewerName,
-		ReviewNote:         reviewNote,
 		ResolvedCategoryID: resolvedCategoryID,
 	})
 	if err != nil {
@@ -656,18 +662,37 @@ func (s *Service) SubmitReview(ctx context.Context, params SubmitReviewParams) (
 		return nil, fmt.Errorf("update review: %w", err)
 	}
 
-	// Apply category override to transaction only when approving.
-	// Rejected/skipped reviews should never modify the transaction's category.
+	if trimmedNote != "" {
+		var authorID pgtype.Text
+		if params.Actor.ID != "" {
+			authorID = pgtype.Text{String: params.Actor.ID, Valid: true}
+		}
+		if _, err := qtx.CreateComment(ctx, db.CreateCommentParams{
+			TransactionID: existing.TransactionID,
+			AuthorType:    params.Actor.Type,
+			AuthorID:      authorID,
+			AuthorName:    params.Actor.Name,
+			Content:       trimmedNote,
+			ReviewID:      reviewID,
+		}); err != nil {
+			return nil, fmt.Errorf("create review note comment: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit review submit: %w", err)
+	}
+
+	// Apply category override to the transaction only when approving. This
+	// stays outside the tx above: a categorization failure is logged and
+	// swallowed (preserving the prior behavior where a resolved review is
+	// not rolled back by a downstream categorize error).
 	txnID := formatUUID(existing.TransactionID)
 	if categoryToApply != nil && params.Decision == "approved" {
 		if err := s.SetTransactionCategory(ctx, txnID, *categoryToApply); err != nil {
 			s.Logger.Warn("failed to set transaction category from review", "error", err, "transaction_id", txnID)
 		}
 	}
-
-	// Note: Review notes are stored on the review itself (review_note column)
-	// and displayed in the unified Activity timeline. No separate comment is
-	// created to avoid duplicates.
 
 	resp := s.reviewFromRow(ctx, updated)
 	return &resp, nil
@@ -895,7 +920,6 @@ func (s *Service) AutoApproveCategorizedReviews(ctx context.Context, actor Actor
 			ReviewerType:       reviewerType,
 			ReviewerID:         reviewerID,
 			ReviewerName:       reviewerName,
-			ReviewNote:         pgtype.Text{String: "Auto-approved: transaction already categorized by rules", Valid: true},
 			ResolvedCategoryID: m.categoryID,
 		})
 		if err == nil {
@@ -1051,7 +1075,6 @@ func (s *Service) reviewFromRow(ctx context.Context, r db.ReviewQueue) ReviewRes
 		ReviewerType:        textPtr(r.ReviewerType),
 		ReviewerID:          textPtr(r.ReviewerID),
 		ReviewerName:        textPtr(r.ReviewerName),
-		ReviewNote:          textPtr(r.ReviewNote),
 		ResolvedCategoryID:  uuidPtr(r.ResolvedCategoryID),
 		CreatedAt:           r.CreatedAt.Time.UTC().Format(time.RFC3339),
 		ReviewedAt:          timestampStr(r.ReviewedAt),

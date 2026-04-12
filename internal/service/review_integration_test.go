@@ -472,8 +472,75 @@ func TestSubmitReview_WithNote(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SubmitReview: %v", err)
 	}
-	if result.ReviewNote == nil || *result.ReviewNote != note {
-		t.Error("expected review_note to be set")
+	if result.Status != "rejected" {
+		t.Errorf("expected status=rejected, got %s", result.Status)
+	}
+
+	// The note should materialize as a transaction comment linked back to
+	// the review, not as a field on the review row.
+	comments, err := svc.ListComments(ctx, pgconv.FormatUUID(txn.ID))
+	if err != nil {
+		t.Fatalf("ListComments: %v", err)
+	}
+	var found *service.CommentResponse
+	for i := range comments {
+		if comments[i].ReviewID != nil && *comments[i].ReviewID == result.ID {
+			found = &comments[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatal("expected a comment linked to the review, got none")
+	}
+	if found.Content != note {
+		t.Errorf("comment content = %q, want %q", found.Content, note)
+	}
+	if found.AuthorType != testActor.Type || found.AuthorName != testActor.Name {
+		t.Errorf("comment actor = (%s,%s), want (%s,%s)",
+			found.AuthorType, found.AuthorName, testActor.Type, testActor.Name)
+	}
+}
+
+func TestSubmitReview_CommentFailureRollsBackDecision(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	txn := reviewTestFixture(t, queries)
+	review := mustEnqueueReview(t, queries, txn.ID, "new_transaction")
+
+	// Pre-seed a linked comment to force a UNIQUE (review_id) violation when
+	// SubmitReview tries to insert its own linked comment. The atomic tx
+	// must roll back the review decision instead of leaving it resolved
+	// without its narrative.
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO transaction_comments
+			(transaction_id, author_type, author_name, content, review_id)
+		VALUES ($1, 'user', 'seed', 'pre-existing linked note', $2)
+	`, txn.ID, review.ID); err != nil {
+		t.Fatalf("seed linked comment: %v", err)
+	}
+
+	note := "this should not land"
+	_, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
+		ReviewID: pgconv.FormatUUID(review.ID),
+		Decision: "approved",
+		Note:     &note,
+		Actor:    testActor,
+	})
+	if err == nil {
+		t.Fatal("expected SubmitReview to fail on duplicate linked comment, got nil")
+	}
+
+	// Review must still be pending — the atomic tx must have rolled back.
+	after, err := queries.GetReviewByID(ctx, review.ID)
+	if err != nil {
+		t.Fatalf("GetReviewByID: %v", err)
+	}
+	if after.Status != "pending" {
+		t.Errorf("expected review status=pending after rollback, got %q", after.Status)
+	}
+	if after.ReviewedAt.Valid {
+		t.Errorf("expected reviewed_at to stay NULL after rollback, got %v", after.ReviewedAt.Time)
 	}
 }
 
@@ -488,6 +555,110 @@ func TestSubmitReview_NotFound(t *testing.T) {
 	})
 	if !errors.Is(err, service.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestSubmitReview_EmptyNote_NoComment(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	txn := reviewTestFixture(t, queries)
+	review := mustEnqueueReview(t, queries, txn.ID, "new_transaction")
+
+	result, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
+		ReviewID: pgconv.FormatUUID(review.ID),
+		Decision: "skipped",
+		Actor:    testActor,
+	})
+	if err != nil {
+		t.Fatalf("SubmitReview: %v", err)
+	}
+
+	comments, err := svc.ListComments(ctx, pgconv.FormatUUID(txn.ID))
+	if err != nil {
+		t.Fatalf("ListComments: %v", err)
+	}
+	for _, c := range comments {
+		if c.ReviewID != nil && *c.ReviewID == result.ID {
+			t.Fatalf("expected no linked comment when note is absent, got %q", c.Content)
+		}
+	}
+}
+
+func TestSubmitReview_AgentActor_CommentAttributed(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	txn := reviewTestFixture(t, queries)
+	review := mustEnqueueReview(t, queries, txn.ID, "uncategorized")
+
+	agent := service.Actor{Type: "agent", ID: "api-key-123", Name: "auto-review-bot"}
+	note := "merchant matches recurring grocery pattern"
+	result, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
+		ReviewID: pgconv.FormatUUID(review.ID),
+		Decision: "skipped",
+		Note:     &note,
+		Actor:    agent,
+	})
+	if err != nil {
+		t.Fatalf("SubmitReview: %v", err)
+	}
+
+	comments, err := svc.ListComments(ctx, pgconv.FormatUUID(txn.ID))
+	if err != nil {
+		t.Fatalf("ListComments: %v", err)
+	}
+	var linked *service.CommentResponse
+	for i := range comments {
+		if comments[i].ReviewID != nil && *comments[i].ReviewID == result.ID {
+			linked = &comments[i]
+			break
+		}
+	}
+	if linked == nil {
+		t.Fatal("expected linked comment, got none")
+	}
+	if linked.AuthorType != "agent" {
+		t.Errorf("author_type = %q, want agent", linked.AuthorType)
+	}
+	if linked.AuthorName != agent.Name {
+		t.Errorf("author_name = %q, want %q", linked.AuthorName, agent.Name)
+	}
+	if linked.AuthorID == nil || *linked.AuthorID != agent.ID {
+		got := "<nil>"
+		if linked.AuthorID != nil {
+			got = *linked.AuthorID
+		}
+		t.Errorf("author_id = %q, want %q", got, agent.ID)
+	}
+}
+
+func TestSubmitReview_WhitespaceNote_NoComment(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	txn := reviewTestFixture(t, queries)
+	review := mustEnqueueReview(t, queries, txn.ID, "new_transaction")
+
+	note := "   \n\t  "
+	result, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
+		ReviewID: pgconv.FormatUUID(review.ID),
+		Decision: "skipped",
+		Note:     &note,
+		Actor:    testActor,
+	})
+	if err != nil {
+		t.Fatalf("SubmitReview: %v", err)
+	}
+
+	comments, err := svc.ListComments(ctx, pgconv.FormatUUID(txn.ID))
+	if err != nil {
+		t.Fatalf("ListComments: %v", err)
+	}
+	for _, c := range comments {
+		if c.ReviewID != nil && *c.ReviewID == result.ID {
+			t.Fatalf("expected whitespace-only note to be ignored, got comment %q", c.Content)
+		}
 	}
 }
 
@@ -561,6 +732,69 @@ func TestBulkSubmitReviews_EmptyArray(t *testing.T) {
 	if !errors.Is(err, service.ErrInvalidParameter) {
 		t.Errorf("expected ErrInvalidParameter for empty reviews, got %v", err)
 	}
+}
+
+func TestBulkSubmitReviews_NotesPerItem(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_bulk_notes")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_bulk_notes", "Checking")
+
+	txn1 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_bn1", "T1", 100, "2025-02-01")
+	txn2 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_bn2", "T2", 200, "2025-02-02")
+	txn3 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_bn3", "T3", 300, "2025-02-03")
+
+	r1 := mustEnqueueReview(t, queries, txn1.ID, "new_transaction")
+	r2 := mustEnqueueReview(t, queries, txn2.ID, "new_transaction")
+	r3 := mustEnqueueReview(t, queries, txn3.ID, "new_transaction")
+
+	note1 := "duplicate of last week"
+	note3 := "flagged for follow-up"
+	result, err := svc.BulkSubmitReviews(ctx, service.BulkSubmitReviewParams{
+		Reviews: []service.BulkReviewItem{
+			{ReviewID: pgconv.FormatUUID(r1.ID), Decision: "rejected", Note: &note1},
+			{ReviewID: pgconv.FormatUUID(r2.ID), Decision: "skipped"},
+			{ReviewID: pgconv.FormatUUID(r3.ID), Decision: "skipped", Note: &note3},
+		},
+		Actor: testActor,
+	})
+	if err != nil {
+		t.Fatalf("BulkSubmitReviews: %v", err)
+	}
+	if result.Succeeded != 3 {
+		t.Fatalf("expected 3 succeeded, got %d (failed=%v)", result.Succeeded, result.Failed)
+	}
+
+	countLinkedFor := func(txnID pgtype.UUID, want string) {
+		t.Helper()
+		comments, err := svc.ListComments(ctx, pgconv.FormatUUID(txnID))
+		if err != nil {
+			t.Fatalf("ListComments: %v", err)
+		}
+		var linked []service.CommentResponse
+		for _, c := range comments {
+			if c.ReviewID != nil && *c.ReviewID != "" {
+				linked = append(linked, c)
+			}
+		}
+		if want == "" {
+			if len(linked) != 0 {
+				t.Fatalf("expected no linked comments, got %d", len(linked))
+			}
+			return
+		}
+		if len(linked) != 1 {
+			t.Fatalf("expected 1 linked comment, got %d", len(linked))
+		}
+		if linked[0].Content != want {
+			t.Errorf("linked comment content = %q, want %q", linked[0].Content, want)
+		}
+	}
+	countLinkedFor(txn1.ID, note1)
+	countLinkedFor(txn2.ID, "")
+	countLinkedFor(txn3.ID, note3)
 }
 
 // --- DismissReview ---

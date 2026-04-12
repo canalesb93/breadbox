@@ -3,6 +3,8 @@ package admin
 import (
 	"net/http"
 	"testing"
+
+	"breadbox/internal/service"
 )
 
 func TestBuildPaginationBase_URLEncodesValues(t *testing.T) {
@@ -83,4 +85,90 @@ func searchString(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+func TestBuildActivityTimeline_LinkedCommentRendersInResolution(t *testing.T) {
+	reviewID := "rev-1"
+	resolvedName := "Groceries"
+	reviewerType := "agent"
+	reviewerName := "auto-review"
+	reviewedAt := "2026-04-03T10:00:00Z"
+	reviews := []service.ReviewResponse{{
+		ID:                          reviewID,
+		ReviewType:                  "uncategorized",
+		Status:                      "approved",
+		ReviewerType:                &reviewerType,
+		ReviewerName:                &reviewerName,
+		ResolvedCategoryDisplayName: &resolvedName,
+		CreatedAt:                   "2026-04-03T09:00:00Z",
+		ReviewedAt:                  &reviewedAt,
+	}}
+	linkedID := reviewID
+	comments := []service.CommentResponse{{
+		ID:         "comment-linked",
+		AuthorName: reviewerName,
+		AuthorType: reviewerType,
+		Content:    "matched recurring merchant rule",
+		ReviewID:   &linkedID,
+		CreatedAt:  "2026-04-03T10:00:00Z",
+	}}
+
+	entries := buildActivityTimeline(reviews, comments, nil)
+
+	var resolution *service.ActivityEntry
+	for i := range entries {
+		if entries[i].Type == "comment" {
+			t.Fatalf("linked review-note comment should not render as a standalone entry, got %+v", entries[i])
+		}
+		if entries[i].ReviewStatus == "approved" {
+			resolution = &entries[i]
+		}
+	}
+	if resolution == nil {
+		t.Fatal("expected an approved resolution entry")
+	}
+	if resolution.Detail != "matched recurring merchant rule" {
+		t.Errorf("resolution Detail = %q, want linked comment content", resolution.Detail)
+	}
+	if resolution.CommentID != "comment-linked" {
+		t.Errorf("resolution CommentID = %q, want comment-linked (so delete affordance is preserved)", resolution.CommentID)
+	}
+}
+
+func TestBuildActivityTimeline_FreeStandingCommentStillEmitted(t *testing.T) {
+	comments := []service.CommentResponse{{
+		ID:         "comment-free",
+		AuthorName: "Alice",
+		AuthorType: "user",
+		Content:    "split with Bob",
+		CreatedAt:  "2026-04-04T12:00:00Z",
+	}}
+
+	entries := buildActivityTimeline(nil, comments, nil)
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].Type != "comment" {
+		t.Errorf("expected comment entry, got type=%q", entries[0].Type)
+	}
+	if entries[0].CommentID != "comment-free" {
+		t.Errorf("expected CommentID=comment-free, got %q", entries[0].CommentID)
+	}
+}
+
+func TestBuildActivityTimeline_LegacyPrefixCommentSuppressed(t *testing.T) {
+	comments := []service.CommentResponse{{
+		ID:         "comment-legacy",
+		AuthorName: "Legacy",
+		AuthorType: "system",
+		Content:    "[Review: Some note migrated before consolidation]",
+		CreatedAt:  "2026-03-01T00:00:00Z",
+	}}
+
+	entries := buildActivityTimeline(nil, comments, nil)
+
+	if len(entries) != 0 {
+		t.Fatalf("expected legacy [Review: ...] comment to be suppressed, got %d entries", len(entries))
+	}
 }

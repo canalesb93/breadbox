@@ -324,6 +324,7 @@ type CreateCommentParams struct {
 	TransactionID string
 	Content       string
 	Actor         Actor
+	ReviewID      string // optional: links comment to a review resolution
 }
 
 type UpdateCommentParams struct {
@@ -339,6 +340,7 @@ type CommentResponse struct {
 	AuthorID      *string `json:"author_id"`
 	AuthorName    string  `json:"author_name"`
 	Content       string  `json:"content"`
+	ReviewID      *string `json:"review_id,omitempty"`
 	CreatedAt     string  `json:"created_at"`
 	UpdatedAt     string  `json:"updated_at"`
 }
@@ -359,7 +361,6 @@ type ReviewResponse struct {
 	ReviewerType                 *string              `json:"reviewer_type,omitempty"`
 	ReviewerID                   *string              `json:"reviewer_id,omitempty"`
 	ReviewerName                 *string              `json:"reviewer_name,omitempty"`
-	ReviewNote                   *string              `json:"review_note,omitempty"`
 	ResolvedCategoryID           *string              `json:"resolved_category_id,omitempty"`
 	ResolvedCategory             *string              `json:"resolved_category_slug,omitempty"`
 	ResolvedCategoryDisplayName  *string              `json:"resolved_category_display_name,omitempty"`
