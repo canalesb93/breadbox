@@ -74,23 +74,23 @@
       <div>
         <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="current_password">Current Password</label>
         <input type="password" id="current_password" name="current_password" required autocomplete="current-password"
-               class="input w-full rounded-lg text-sm bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40">
+               class="input w-full rounded-xl text-sm bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40">
       </div>
 
       <div>
         <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="new_password">New Password</label>
         <input type="password" id="new_password" name="new_password" required autocomplete="new-password" minlength="8"
-               class="input w-full rounded-lg text-sm bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40">
+               class="input w-full rounded-xl text-sm bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40">
         <p class="text-xs text-base-content/40 mt-1">Minimum 8 characters</p>
       </div>
 
       <div>
         <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="confirm_password">Confirm New Password</label>
         <input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password"
-               class="input w-full rounded-lg text-sm bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40">
+               class="input w-full rounded-xl text-sm bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40">
       </div>
 
-      <button type="submit" class="btn btn-primary btn-sm rounded-lg">Update Password</button>
+      <button type="submit" class="btn btn-primary btn-sm rounded-xl">Update Password</button>
     </form>
   </div>
 
@@ -135,7 +135,7 @@
         This action cannot be undone.
       </p>
       <template x-if="!confirmWipe">
-        <button @click="confirmWipe = true" class="btn btn-error btn-sm btn-outline rounded-lg">
+        <button @click="confirmWipe = true" class="btn btn-error btn-sm btn-outline rounded-xl">
           <i data-lucide="trash-2" class="w-4 h-4"></i>
           Wipe My Data
         </button>
@@ -146,9 +146,9 @@
           <div class="flex gap-2">
             <form method="POST" action="/my-account/wipe-data">
               {{if $.CSRFToken}}<input type="hidden" name="_csrf" value="{{$.CSRFToken}}">{{end}}
-              <button type="submit" class="btn btn-error btn-sm rounded-lg">Yes, wipe my data</button>
+              <button type="submit" class="btn btn-error btn-sm rounded-xl">Yes, wipe my data</button>
             </form>
-            <button @click="confirmWipe = false" class="btn btn-ghost btn-sm rounded-lg">Cancel</button>
+            <button @click="confirmWipe = false" class="btn btn-ghost btn-sm rounded-xl">Cancel</button>
           </div>
         </div>
       </template>
