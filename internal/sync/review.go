@@ -54,5 +54,7 @@ func (e *Engine) enqueueForReview(ctx context.Context, txQueries *db.Queries, tx
 	}
 
 	// ON CONFLICT DO NOTHING handles the unique pending constraint
-	_, _ = txQueries.EnqueueReview(ctx, params)
+	if _, err := txQueries.EnqueueReview(ctx, params); err != nil {
+		e.logger.Error("enqueue review", "transaction_id", txnResult.ID, "review_type", reviewType, "error", err)
+	}
 }

@@ -14,6 +14,7 @@ import (
 	"breadbox/internal/pgconv"
 	"breadbox/internal/provider"
 	"breadbox/internal/service"
+	bsync "breadbox/internal/sync"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -840,6 +841,75 @@ func SyncConnectionHandler(a *app.App) http.HandlerFunc {
 	}
 }
 
+// SyncConnectionStatusHandler serves GET /-/connections/{id}/sync-status.
+// Returns a compact JSON payload describing the most recent sync log for the
+// connection — used by the detail page to poll progress without full reloads.
+func SyncConnectionStatusHandler(a *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "id")
+
+		var connID pgtype.UUID
+		if err := connID.Scan(idStr); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid connection ID"})
+			return
+		}
+
+		logs, err := a.Queries.GetSyncLogsByConnection(r.Context(), db.GetSyncLogsByConnectionParams{
+			ConnectionID: connID,
+			Limit:        1,
+		})
+		if err != nil {
+			a.Logger.Error("sync-status: query sync logs", "connection_id", idStr, "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to read sync status"})
+			return
+		}
+
+		if len(logs) == 0 {
+			writeJSON(w, http.StatusOK, map[string]any{"status": "none"})
+			return
+		}
+
+		log := logs[0]
+
+		resp := map[string]any{
+			"short_id":        log.ShortID,
+			"trigger":         string(log.Trigger),
+			"status":          string(log.Status),
+			"added_count":     log.AddedCount,
+			"modified_count":  log.ModifiedCount,
+			"removed_count":   log.RemovedCount,
+			"unchanged_count": log.UnchangedCount,
+		}
+		if log.StartedAt.Valid {
+			resp["started_at"] = log.StartedAt.Time.Format(time.RFC3339)
+		}
+		if log.CompletedAt.Valid {
+			resp["completed_at"] = log.CompletedAt.Time.Format(time.RFC3339)
+		}
+		var durationMs int32
+		var hasDuration bool
+		if log.DurationMs.Valid {
+			durationMs = log.DurationMs.Int32
+			hasDuration = true
+		} else if log.StartedAt.Valid && log.CompletedAt.Valid {
+			durationMs = int32(log.CompletedAt.Time.Sub(log.StartedAt.Time).Milliseconds())
+			hasDuration = true
+		}
+		if hasDuration {
+			resp["duration_ms"] = durationMs
+			resp["duration_label"] = formatSyncStatusDuration(durationMs)
+		}
+		if log.ErrorMessage.Valid {
+			resp["error_message"] = log.ErrorMessage.String
+			if friendly := bsync.FriendlyError(log.ErrorMessage.String); friendly != "" {
+				resp["friendly_error_message"] = friendly
+			}
+		}
+
+		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
 // SyncAllConnectionsHandler serves POST /-/connections/sync-all.
 // It triggers a manual sync for all active, non-CSV connections.
 func SyncAllConnectionsHandler(a *app.App) http.HandlerFunc {
@@ -1097,6 +1167,24 @@ func relativeTimeUntil(target, now time.Time) string {
 	default:
 		return "in <1m"
 	}
+}
+
+// formatSyncStatusDuration mirrors the "formatDurationMs" template helper so
+// the sync-status JSON payload carries a preformatted label the client can
+// render without duplicating the formatting logic.
+func formatSyncStatusDuration(ms int32) string {
+	if ms < 1000 {
+		return fmt.Sprintf("%dms", ms)
+	}
+	if ms < 60000 {
+		return fmt.Sprintf("%.1fs", float64(ms)/1000)
+	}
+	mins := ms / 60000
+	secs := (ms % 60000) / 1000
+	if secs == 0 {
+		return fmt.Sprintf("%dm", mins)
+	}
+	return fmt.Sprintf("%dm %ds", mins, secs)
 }
 
 // writeJSON writes a JSON response with the given status code.
