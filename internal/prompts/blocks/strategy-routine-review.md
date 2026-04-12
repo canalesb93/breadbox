@@ -11,8 +11,8 @@ STEP-BY-STEP:
 3. List pending reviews (fields=triage, limit 30)
 4. Review each transaction:
    a. Determine the correct category from the transaction name, merchant, amount, and raw category fields
-   b. Approve with the correct category_slug. Add a note for non-obvious decisions.
-   c. Skip if genuinely uncertain — note what's ambiguous
+   b. Approve with the correct category_slug. Pass a note to submit_review for non-obvious decisions — it becomes a visible transaction comment attributed to you.
+   c. Skip if genuinely uncertain — pass a note explaining what's ambiguous
 5. After reviewing, check if any new merchants appeared 2+ times (use merchant_summary if needed) — create rules for recurring patterns
 6. Submit a brief report
 
@@ -26,4 +26,4 @@ ACCURACY OVER SPEED:
 - There are fewer items, so take time on each one
 - Prefer contains over exact match for merchant name rules
 - Check list_transaction_rules before creating to avoid duplicates
-- Comment on non-obvious categorization decisions
+- Record your reasoning on non-obvious categorizations via the submit_review note — do NOT also call add_transaction_comment for the same narrative

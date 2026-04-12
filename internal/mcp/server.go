@@ -88,11 +88,11 @@ const DefaultReviewGuidelines = `REVIEW PRINCIPLES — follow these strictly:
 
 2. RULES ARE FORWARD-LOOKING. Transaction rules apply automatically to NEW transactions during sync. Do NOT use apply_rules or apply_retroactively=true during routine reviews. These are reserved for explicit one-off bulk work (initial setup only). During routine work, create rules and let them match future syncs naturally.
 
-3. RE-REVIEWS ARE HUMAN CORRECTIONS. When you see review_type=re_review, a human has disagreed with a previous decision and re-enqueued the transaction with a comment. Read that comment via list_transaction_comments. The human's feedback overrides your prior categorization. Acknowledge the correction in your approval note.
+3. RE-REVIEWS ARE HUMAN CORRECTIONS. When you see review_type=re_review, a human has disagreed with a previous decision and re-enqueued the transaction with a comment. Read that comment via list_transaction_comments. The human's feedback overrides your prior categorization. Acknowledge the correction in the note you pass to submit_review — that note is recorded as a linked transaction comment attributed to you.
 
 4. SKIP RATHER THAN GUESS. If you cannot confidently determine the correct category, skip the review with a note explaining what's ambiguous. A skipped review can be revisited later with more context. A wrong categorization is harder to catch.
 
-5. COMMENT ON NON-OBVIOUS DECISIONS. When you approve a review with a category that isn't immediately obvious from the transaction name, add a brief note explaining why. This helps humans understand your reasoning and provides context if the transaction is later re-reviewed.
+5. EXPLAIN NON-OBVIOUS DECISIONS VIA THE REVIEW NOTE. When you approve a review with a category that isn't immediately obvious from the transaction name, pass a brief note to submit_review explaining why. The note is stored as a transaction comment linked to this review and rendered inline on the resolution event in the activity timeline — do NOT also call add_transaction_comment for the same narrative, as that produces duplicate entries. Reserve add_transaction_comment for free-standing narrative that isn't tied to a specific review decision.
 
 6. NEVER BULK-APPROVE WITHOUT EXAMINATION. Do not use batch_submit_reviews to approve all remaining reviews with a default category. Each item in the batch must have been individually assessed with the correct category assigned.
 
