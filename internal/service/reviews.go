@@ -78,10 +78,13 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 		rq.reviewer_type, rq.reviewer_id, rq.reviewer_name,
 		rq.resolved_category_id, rq.created_at, rq.reviewed_at,
 		sc.slug AS suggested_slug, sc.display_name AS suggested_display_name, scp.display_name AS suggested_parent_display_name,
+		sc.short_id AS suggested_short_id,
 		rc.slug AS resolved_slug, rc.display_name AS resolved_display_name, rcp.display_name AS resolved_parent_display_name,
+		rc.short_id AS resolved_short_id,
 		t.amount, t.iso_currency_code, t.date, t.name, t.merchant_name,
 		t.category_primary, t.category_detailed, t.pending, t.created_at AS t_created_at, t.updated_at AS t_updated_at,
 		t.short_id AS t_short_id, t.account_id, COALESCE(a.display_name, a.name) AS account_name,
+		a.short_id AS account_short_id,
 		COALESCE(au.name, u.name) AS user_name,
 		t.category_id, t.category_override,
 		c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, c.color AS cat_color,
@@ -205,9 +208,11 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			suggestedSlug              pgtype.Text
 			suggestedDisplayName       pgtype.Text
 			suggestedParentDisplayName pgtype.Text
+			suggestedShortID           pgtype.Text
 			resolvedSlug               pgtype.Text
 			resolvedDisplayName        pgtype.Text
 			resolvedParentDisplayName  pgtype.Text
+			resolvedShortID            pgtype.Text
 			tAmount               pgtype.Numeric
 			tIsoCurrencyCode      pgtype.Text
 			tDate                 pgtype.Date
@@ -221,6 +226,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			tShortID              string
 			tAccountID            pgtype.UUID
 			accountName           string
+			accountShortID        string
 			userName              pgtype.Text
 			tCategoryID           pgtype.UUID
 			tCategoryOverride     bool
@@ -239,10 +245,12 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			&rReviewerType, &rReviewerID, &rReviewerName,
 			&rResolvedCategoryID, &rCreatedAt, &rReviewedAt,
 			&suggestedSlug, &suggestedDisplayName, &suggestedParentDisplayName,
+			&suggestedShortID,
 			&resolvedSlug, &resolvedDisplayName, &resolvedParentDisplayName,
+			&resolvedShortID,
 			&tAmount, &tIsoCurrencyCode, &tDate, &tName, &tMerchantName,
 			&tCategoryPrimary, &tCategoryDetailed, &tPending, &tCreatedAt, &tUpdatedAt,
-			&tShortID, &tAccountID, &accountName, &userName,
+			&tShortID, &tAccountID, &accountName, &accountShortID, &userName,
 			&tCategoryID, &tCategoryOverride,
 			&catSlug, &catDisplayName, &catIcon, &catColor,
 			&catPrimarySlug, &catPrimaryDisplayName,
@@ -275,10 +283,12 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			}
 		}
 
+		accountShortIDVal := accountShortID
 		txnResp := &TransactionResponse{
 			ID:                  formatUUID(rTransactionID),
 			ShortID:             tShortID,
 			AccountID:           uuidPtr(tAccountID),
+			AccountShortID:      &accountShortIDVal,
 			AccountName:         &accountName,
 			UserName:            textPtr(userName),
 			Amount:              amountVal,
@@ -295,14 +305,17 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			UpdatedAt:           tUpdatedAt.Time.UTC().Format(time.RFC3339),
 		}
 
+		txnShortIDVal := tShortID
 		review := ReviewResponse{
 			ID:                           formatUUID(rID),
 			ShortID:                      rqShortID,
 			TransactionID:                formatUUID(rTransactionID),
+			TransactionShortID:           &txnShortIDVal,
 			ReviewType:                   rReviewType,
 			Status:                       rStatus,
 			Provider:                     textPtr(connectionProvider),
 			SuggestedCategoryID:          uuidPtr(rSuggestedCategoryID),
+			SuggestedCategoryShortID:     textPtr(suggestedShortID),
 			SuggestedCategory:            textPtr(suggestedSlug),
 			SuggestedCategoryDisplayName: buildCategoryDisplayName(suggestedDisplayName, suggestedParentDisplayName),
 			ConfidenceScore:              numericFloat(rConfidenceScore),
@@ -310,6 +323,7 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 			ReviewerID:                   textPtr(rReviewerID),
 			ReviewerName:                 textPtr(rReviewerName),
 			ResolvedCategoryID:           uuidPtr(rResolvedCategoryID),
+			ResolvedCategoryShortID:      textPtr(resolvedShortID),
 			ResolvedCategory:             textPtr(resolvedSlug),
 			ResolvedCategoryDisplayName:  buildCategoryDisplayName(resolvedDisplayName, resolvedParentDisplayName),
 			CreatedAt:                    rCreatedAt.Time.UTC().Format(time.RFC3339),

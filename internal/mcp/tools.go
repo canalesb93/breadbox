@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"breadbox/internal/service"
@@ -1277,18 +1278,16 @@ func jsonResult(v any) (*mcpsdk.CallToolResult, any, error) {
 	}, nil, nil
 }
 
-// compactIDs recursively walks a JSON structure and replaces "id" with the
-// "short_id" value wherever both fields exist in the same object, then removes
-// "short_id". This makes MCP responses use compact 8-char IDs by default.
+// compactIDs recursively walks a JSON structure and compacts ID pairs in place.
+// For every key ending in "_short_id" (or the bare "short_id") with a non-null
+// string value, the sibling "{prefix}_id" (or bare "id") field is replaced with
+// the short_id value and the "_short_id" key is removed. This covers both an
+// object's own id/short_id pair and its FK references (e.g. account_id +
+// account_short_id → account_id=<short>).
 func compactIDs(v any) {
 	switch val := v.(type) {
 	case map[string]any:
-		if shortID, ok := val["short_id"]; ok {
-			if _, hasID := val["id"]; hasID {
-				val["id"] = shortID
-			}
-			delete(val, "short_id")
-		}
+		compactIDPairs(val)
 		for _, child := range val {
 			compactIDs(child)
 		}
@@ -1299,20 +1298,60 @@ func compactIDs(v any) {
 	}
 }
 
-// compactIDsBytes performs the id/short_id compaction directly on JSON bytes,
-// avoiding the unmarshal→walk→remarshal cycle. It scans the byte stream for
-// objects containing "id" and "short_id" keys, replaces the id value with
-// the short_id value, and removes the short_id entry.
+// compactIDPairs applies id/short_id compaction to a single object map.
+func compactIDPairs(m map[string]any) {
+	for key, val := range m {
+		prefix, ok := shortIDPrefix(key)
+		if !ok {
+			continue
+		}
+		shortVal, isString := val.(string)
+		if !isString || shortVal == "" {
+			// Non-string or null short_id: drop the sibling short_id key but
+			// leave the id value intact (compaction is ambiguous without a
+			// concrete short value).
+			delete(m, key)
+			continue
+		}
+		idKey := "id"
+		if prefix != "" {
+			idKey = prefix + "_id"
+		}
+		if _, hasID := m[idKey]; hasID {
+			m[idKey] = shortVal
+		}
+		delete(m, key)
+	}
+}
+
+// shortIDPrefix reports whether key names a short-id sibling and returns its
+// prefix. "short_id" → ("", true); "account_short_id" → ("account", true);
+// anything else → ("", false).
+func shortIDPrefix(key string) (string, bool) {
+	if key == "short_id" {
+		return "", true
+	}
+	if strings.HasSuffix(key, "_short_id") && len(key) > len("_short_id") {
+		return key[:len(key)-len("_short_id")], true
+	}
+	return "", false
+}
+
+// compactIDsBytes performs id/short_id compaction directly on JSON bytes,
+// avoiding the unmarshal→walk→remarshal cycle. It scans the byte stream and
+// collapses short-id sibling pairs:
 //
-// ORDERING ASSUMPTION: This function requires "id" to appear before "short_id"
-// in each JSON object. If "short_id" is encountered first, it is dropped but
-// the "id" value is NOT replaced. This assumption holds for json.Marshal output
-// because: (1) map keys are sorted alphabetically ("id" < "short_id"), and
-// (2) struct fields are marshaled in declaration order (all Breadbox response
-// structs declare ID before ShortID). See TestCompactIDsBytesFieldOrdering.
+//   - own id: {"id":"<uuid>","short_id":"<short>"} → {"id":"<short>"}
+//   - FK id:  {"account_id":"<uuid>","account_short_id":"<short>"} →
+//             {"account_id":"<short>"}
+//
+// Any key ending in "_short_id" (or the bare "short_id") triggers the rewrite;
+// the "_short_id" key is always dropped. If the sibling id field is missing or
+// the short-id value is null, the id value is left untouched.
 func compactIDsBytes(data []byte) []byte {
-	// Quick check: if no short_id key exists, return as-is.
-	if !bytes.Contains(data, []byte(`"short_id"`)) {
+	// Quick check: if no short_id key exists anywhere, return as-is. Matches
+	// both "short_id" and any "*_short_id" suffix.
+	if !bytes.Contains(data, []byte(`short_id"`)) {
 		return data
 	}
 
@@ -1343,81 +1382,119 @@ func compactIDsScan(data []byte, out []byte) []byte {
 	return out
 }
 
-// compactIDsScanObject processes a JSON object starting at data[pos] (the '{').
-// It looks for "id" and "short_id" key-value pairs to perform the swap.
+// compactIDsScanObject processes a JSON object starting at data[pos] (the '{')
+// and compacts any id/short_id pairs within it (including FK pairs like
+// account_id/account_short_id). Operates in two phases: collect each entry's
+// key and value range, then emit — replacing id values with their sibling
+// short-id value when present, and dropping *_short_id keys.
 func compactIDsScanObject(data []byte, pos int, out []byte) (int, []byte) {
-	out = append(out, '{')
 	pos++ // skip '{'
 
-	// Track id value replacement state.
-	var idValueStart, idValueEnd int // byte range of the "id" value in out
-	hasID := false
-	firstEntry := true
+	type objEntry struct {
+		keyStart, keyEnd int // raw quoted key bytes in data
+		key              string
+		valStart, valEnd int
+	}
+
+	var entries []objEntry
+	// Small stack allocation for common case (≤8 fields typical; most responses fit within 32).
+	var entriesBuf [32]objEntry
+	entries = entriesBuf[:0]
 
 	for pos < len(data) && data[pos] != '}' {
-		// Skip comma between entries.
 		if data[pos] == ',' {
 			pos++
 		}
-
-		// Read key (must be a string).
 		keyStart := pos
 		key, keyEnd := scanJSONString(data, pos)
 		pos = keyEnd
-
-		// Skip colon.
 		if pos < len(data) && data[pos] == ':' {
 			pos++
 		}
-
-		// Check what key this is.
-		if key == "id" {
-			// Write the key, remember where the value starts in output.
-			if !firstEntry {
-				out = append(out, ',')
-			}
-			firstEntry = false
-			out = append(out, data[keyStart:keyEnd]...)
-			out = append(out, ':')
-			idValueStart = len(out)
-			pos, out = copyJSONValue(data, pos, out)
-			idValueEnd = len(out)
-			hasID = true
-		} else if key == "short_id" {
-			// Read the short_id value.
-			valStart := pos
-			valEnd := skipJSONValue(data, pos)
-			pos = valEnd
-
-			if hasID {
-				// Replace the id value in output with short_id value.
-				shortIDVal := data[valStart:valEnd]
-				// Rebuild output: everything before id value + short_id value + everything after id value.
-				tail := make([]byte, len(out)-idValueEnd)
-				copy(tail, out[idValueEnd:])
-				out = out[:idValueStart]
-				out = append(out, shortIDVal...)
-				out = append(out, tail...)
-			}
-			// Drop short_id from output (don't write it).
-		} else {
-			// Regular key: copy key + colon + value.
-			if !firstEntry {
-				out = append(out, ',')
-			}
-			firstEntry = false
-			out = append(out, data[keyStart:keyEnd]...)
-			out = append(out, ':')
-			pos, out = copyJSONValue(data, pos, out)
-		}
+		valStart := pos
+		valEnd := skipJSONValue(data, pos)
+		pos = valEnd
+		entries = append(entries, objEntry{keyStart, keyEnd, key, valStart, valEnd})
+	}
+	if pos < len(data) {
+		pos++ // skip '}'
 	}
 
-	// Skip closing '}'.
-	if pos < len(data) {
-		pos++
+	// Build prefix → entry index for *_short_id keys (only non-null string values
+	// are eligible; null/non-string short_ids can't replace an id value).
+	var shortByPrefix map[string]int
+	for i := range entries {
+		e := &entries[i]
+		prefix, ok := shortIDPrefix(e.key)
+		if !ok {
+			continue
+		}
+		// Skip if value is null — we still drop the short_id key below, but
+		// don't compact the id.
+		val := data[e.valStart:e.valEnd]
+		if len(val) == 0 || val[0] != '"' {
+			continue
+		}
+		if shortByPrefix == nil {
+			shortByPrefix = make(map[string]int, 4)
+		}
+		shortByPrefix[prefix] = i
+	}
+
+	// Emit entries, skipping short_id keys and swapping id values when paired.
+	out = append(out, '{')
+	first := true
+	for i := range entries {
+		e := &entries[i]
+		if _, isShort := shortIDPrefix(e.key); isShort {
+			continue // drop short_id/*_short_id keys
+		}
+
+		vs, ve := e.valStart, e.valEnd
+		if shortByPrefix != nil {
+			if prefix, isIDKey := idKeyPrefix(e.key); isIDKey {
+				if idx, ok := shortByPrefix[prefix]; ok {
+					vs, ve = entries[idx].valStart, entries[idx].valEnd
+				}
+			}
+		}
+
+		if !first {
+			out = append(out, ',')
+		}
+		first = false
+		out = append(out, data[e.keyStart:e.keyEnd]...)
+		out = append(out, ':')
+
+		// If the value source is the original id position (not swapped), scan
+		// for nested compaction. When swapped, the short-id value is a plain
+		// string so we can copy verbatim.
+		if vs == e.valStart && ve == e.valEnd && ve > vs {
+			switch data[vs] {
+			case '{':
+				_, out = compactIDsScanObject(data, vs, out)
+				continue
+			case '[':
+				_, out = compactIDsScanArray(data, vs, out)
+				continue
+			}
+		}
+		out = append(out, data[vs:ve]...)
 	}
 	out = append(out, '}')
 	return pos, out
+}
+
+// idKeyPrefix reports whether key names an id sibling and returns its prefix.
+// "id" → ("", true); "account_id" → ("account", true); else ("", false).
+func idKeyPrefix(key string) (string, bool) {
+	if key == "id" {
+		return "", true
+	}
+	if strings.HasSuffix(key, "_id") && len(key) > len("_id") {
+		return key[:len(key)-len("_id")], true
+	}
+	return "", false
 }
 
 // compactIDsScanArray processes a JSON array starting at data[pos] (the '[').

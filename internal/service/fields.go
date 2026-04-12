@@ -212,6 +212,9 @@ func FilterReviewFields(r ReviewResponse, fields map[string]bool) map[string]any
 			m["short_id"] = r.ShortID
 		case "transaction_id":
 			m["transaction_id"] = r.TransactionID
+			if r.TransactionShortID != nil {
+				m["transaction_short_id"] = r.TransactionShortID
+			}
 		case "review_type":
 			m["review_type"] = r.ReviewType
 		case "status":
@@ -289,6 +292,9 @@ func FilterTransactionFields(t TransactionResponse, fields map[string]bool) map[
 			m["short_id"] = t.ShortID
 		case "account_id":
 			m["account_id"] = t.AccountID
+			if t.AccountShortID != nil {
+				m["account_short_id"] = t.AccountShortID
+			}
 		case "account_name":
 			m["account_name"] = t.AccountName
 		case "user_name":
