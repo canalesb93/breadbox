@@ -446,6 +446,34 @@ func ToggleRuleAdminHandler(svc *service.Service) http.HandlerFunc {
 	}
 }
 
+// PreviewRuleAdminHandler handles POST /-/rules/preview.
+// Evaluates conditions against existing transactions without modifying anything.
+// Used by the rule form's live preview — no API key required, admin session only.
+func PreviewRuleAdminHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var input struct {
+			Conditions service.Condition `json:"conditions"`
+			SampleSize int               `json:"sample_size"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+			return
+		}
+
+		result, err := svc.PreviewRule(r.Context(), input.Conditions, input.SampleSize)
+		if err != nil {
+			if errors.Is(err, service.ErrInvalidParameter) {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to preview rule"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, result)
+	}
+}
+
 // ApplyRuleAdminHandler handles POST /-/rules/{id}/apply.
 func ApplyRuleAdminHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
