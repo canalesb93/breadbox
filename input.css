@@ -648,6 +648,14 @@
     }
   }
 
+  /* Disable entrance animations on small/touch screens — feels sluggish on mobile */
+  @media (max-width: 640px), (hover: none) and (pointer: coarse) {
+    .bb-page-enter,
+    .bb-stagger > * {
+      animation: none !important;
+    }
+  }
+
   /* ── Financial Health Score ring ── */
   .bb-health-ring {
     stroke: currentColor;
