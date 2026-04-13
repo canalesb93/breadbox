@@ -47,10 +47,6 @@ type rejectMatchInput struct {
 	MatchID string `json:"match_id" jsonschema:"The transaction match ID to reject"`
 }
 
-type pendingReviewsOverviewInput struct {
-	ReadSessionContext
-}
-
 // --- Handlers ---
 
 func (s *MCPServer) handleListAccountLinks(_ context.Context, _ *mcpsdk.CallToolRequest, _ listAccountLinksInput) (*mcpsdk.CallToolResult, any, error) {
@@ -145,23 +141,4 @@ func (s *MCPServer) handleRejectMatch(ctx context.Context, _ *mcpsdk.CallToolReq
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(map[string]string{"status": "rejected"})
-}
-
-func (s *MCPServer) handlePendingReviewsOverview(_ context.Context, _ *mcpsdk.CallToolRequest, _ pendingReviewsOverviewInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-
-	if !s.svc.IsReviewsEnabled(ctx) {
-		return jsonResult(map[string]any{
-			"total_pending":   0,
-			"counts_by_type":  []any{},
-			"category_groups": []any{},
-			"note":            "Transaction reviews are currently disabled. Enable them in the admin dashboard at /reviews.",
-		})
-	}
-
-	result, err := s.svc.GetPendingReviewsOverview(ctx)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(result)
 }
