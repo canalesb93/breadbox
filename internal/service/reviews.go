@@ -62,8 +62,8 @@ func (s *Service) ListReviews(ctx context.Context, params ReviewListParams) (*Re
 	// Validate review_type enum if provided
 	if params.ReviewType != nil && *params.ReviewType != "" {
 		switch *params.ReviewType {
-		case "new_transaction", "uncategorized", "low_confidence", "manual", "re_review":
-			// valid — low_confidence is accepted for filtering historical data
+		case "new_transaction", "uncategorized", "manual", "re_review":
+			// valid
 		default:
 			return nil, fmt.Errorf("%w: invalid review_type %q, must be one of: new_transaction, uncategorized, manual, re_review", ErrInvalidParameter, *params.ReviewType)
 		}

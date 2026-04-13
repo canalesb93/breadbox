@@ -777,8 +777,6 @@ func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.
 		switch r.ReviewType {
 		case "uncategorized":
 			enqueueReason = "Uncategorized transaction"
-		case "low_confidence":
-			enqueueReason = "Low confidence categorization"
 		case "new_transaction":
 			enqueueReason = "New transaction"
 		case "re_review":
