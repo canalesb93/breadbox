@@ -689,7 +689,7 @@ func (s *MCPServer) handleSubmitReview(ctx context.Context, _ *mcpsdk.CallToolRe
 	}
 
 	if !s.svc.IsReviewsEnabled(context.Background()) {
-		return errorResult(fmt.Errorf("transaction reviews are currently disabled. Enable them in the admin dashboard at /reviews")), nil, nil
+		return errorResult(ErrReviewsDisabled), nil, nil
 	}
 
 	if input.ReviewID == "" || input.Decision == "" {
@@ -992,7 +992,7 @@ func (s *MCPServer) handleBatchSubmitReviews(ctx context.Context, _ *mcpsdk.Call
 	}
 
 	if !s.svc.IsReviewsEnabled(context.Background()) {
-		return errorResult(fmt.Errorf("transaction reviews are currently disabled. Enable them in the admin dashboard at /reviews")), nil, nil
+		return errorResult(ErrReviewsDisabled), nil, nil
 	}
 
 	if len(input.Reviews) == 0 {
@@ -1637,12 +1637,3 @@ func scanJSONString(data []byte, pos int) (string, int) {
 	return s, end
 }
 
-func errorResult(err error) *mcpsdk.CallToolResult {
-	errJSON, _ := json.Marshal(map[string]string{"error": err.Error()})
-	return &mcpsdk.CallToolResult{
-		IsError: true,
-		Content: []mcpsdk.Content{
-			&mcpsdk.TextContent{Text: string(errJSON)},
-		},
-	}
-}
