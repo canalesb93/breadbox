@@ -297,7 +297,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"Trigger a manual sync of bank data from the provider (Plaid or Teller). Optionally specify a connection_id to sync a single connection; otherwise syncs all active connections. Returns immediately — the sync runs in the background. Check get_sync_status for results.",
 			s.handleTriggerSync, svc),
 		makeToolDefLogged("categorize_transaction", ToolWrite,
-			"Manually override a transaction's category. Use list_categories to find the category ID, then pass both the transaction_id and category_id. This creates a permanent override that won't be changed by automatic sync.",
+			"Manually override a transaction's category. Pass transaction_id plus either category_id or category_slug (e.g. 'food_and_drink_groceries'). Use list_categories to find valid slugs/IDs. This creates a permanent override that won't be changed by automatic sync.",
 			s.handleCategorizeTransaction, svc),
 		makeToolDefLogged("reset_transaction_category", ToolWrite,
 			"Remove a manual category override from a transaction and re-resolve its category from the automatic mapping rules. Use this to undo a categorize_transaction action.",

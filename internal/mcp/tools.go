@@ -95,7 +95,8 @@ type triggerSyncInput struct {
 type categorizeTransactionInput struct {
 	WriteSessionContext
 	TransactionID string `json:"transaction_id" jsonschema:"The transaction ID to categorize"`
-	CategoryID    string `json:"category_id" jsonschema:"The category ID to assign (use list_categories to find IDs)"`
+	CategoryID    string `json:"category_id,omitempty" jsonschema:"Category ID to assign. Provide either category_id or category_slug (not both)."`
+	CategorySlug  string `json:"category_slug,omitempty" jsonschema:"Category slug to assign (e.g. food_and_drink_groceries). Alternative to category_id — the slug is resolved to an ID automatically."`
 }
 
 type resetTransactionCategoryInput struct {
@@ -422,10 +423,24 @@ func (s *MCPServer) handleCategorizeTransaction(ctx context.Context, _ *mcpsdk.C
 		return errorResult(err), nil, nil
 	}
 	ctx = context.Background()
-	if input.TransactionID == "" || input.CategoryID == "" {
-		return errorResult(fmt.Errorf("transaction_id and category_id are required")), nil, nil
+	if input.TransactionID == "" {
+		return errorResult(fmt.Errorf("transaction_id is required")), nil, nil
 	}
-	if err := s.svc.SetTransactionCategory(ctx, input.TransactionID, input.CategoryID); err != nil {
+	if input.CategoryID == "" && input.CategorySlug == "" {
+		return errorResult(fmt.Errorf("either category_id or category_slug is required")), nil, nil
+	}
+
+	// Resolve category_slug to category_id if provided. category_id takes precedence.
+	categoryID := input.CategoryID
+	if categoryID == "" && input.CategorySlug != "" {
+		cat, err := s.svc.GetCategoryBySlug(ctx, input.CategorySlug)
+		if err != nil {
+			return errorResult(fmt.Errorf("invalid category_slug %q: %w", input.CategorySlug, err)), nil, nil
+		}
+		categoryID = cat.ID
+	}
+
+	if err := s.svc.SetTransactionCategory(ctx, input.TransactionID, categoryID); err != nil {
 		return errorResult(err), nil, nil
 	}
 	return &mcpsdk.CallToolResult{
