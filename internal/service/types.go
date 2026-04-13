@@ -37,6 +37,7 @@ type TransactionResponse struct {
 	ID                  string                   `json:"id"`
 	ShortID             string                   `json:"short_id"`
 	AccountID           *string                  `json:"account_id"`
+	AccountShortID      *string                  `json:"account_short_id,omitempty"`
 	AccountName         *string                  `json:"account_name"`
 	UserName            *string                  `json:"user_name"`
 	AttributedUserID    *string                  `json:"attributed_user_id,omitempty"`
@@ -348,13 +349,15 @@ type CommentResponse struct {
 // Review queue types
 
 type ReviewResponse struct {
-	ID                  string               `json:"id"`
-	ShortID             string               `json:"short_id"`
-	TransactionID       string               `json:"transaction_id"`
-	ReviewType          string               `json:"review_type"`
-	Status              string               `json:"status"`
-	Provider            *string              `json:"provider,omitempty"`
+	ID                 string  `json:"id"`
+	ShortID            string  `json:"short_id"`
+	TransactionID      string  `json:"transaction_id"`
+	TransactionShortID *string `json:"transaction_short_id,omitempty"`
+	ReviewType         string  `json:"review_type"`
+	Status             string  `json:"status"`
+	Provider           *string `json:"provider,omitempty"`
 	SuggestedCategoryID          *string              `json:"suggested_category_id,omitempty"`
+	SuggestedCategoryShortID     *string              `json:"suggested_category_short_id,omitempty"`
 	SuggestedCategory            *string              `json:"suggested_category_slug,omitempty"`
 	SuggestedCategoryDisplayName *string              `json:"suggested_category_display_name,omitempty"`
 	ConfidenceScore              *float64             `json:"confidence_score,omitempty"`
@@ -362,6 +365,7 @@ type ReviewResponse struct {
 	ReviewerID                   *string              `json:"reviewer_id,omitempty"`
 	ReviewerName                 *string              `json:"reviewer_name,omitempty"`
 	ResolvedCategoryID           *string              `json:"resolved_category_id,omitempty"`
+	ResolvedCategoryShortID      *string              `json:"resolved_category_short_id,omitempty"`
 	ResolvedCategory             *string              `json:"resolved_category_slug,omitempty"`
 	ResolvedCategoryDisplayName  *string              `json:"resolved_category_display_name,omitempty"`
 	CreatedAt           string               `json:"created_at"`

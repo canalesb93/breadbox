@@ -26,6 +26,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		"t.category_primary, t.category_detailed, t.category_confidence, " +
 		"t.payment_channel, t.pending, t.deleted_at, t.created_at, t.updated_at, " +
 		"COALESCE(a.display_name, a.name) AS account_name, " +
+		"a.short_id AS account_short_id, " +
 		"COALESCE(au.name, u.name) AS user_name, " +
 		"t.category_id, t.category_override, " +
 		"c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, c.color AS cat_color, " +
@@ -236,6 +237,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			createdAt              pgtype.Timestamptz
 			updatedAt              pgtype.Timestamptz
 			accountName            string
+			accountShortID         string
 			userName               pgtype.Text
 			categoryID             pgtype.UUID
 			categoryOverride       bool
@@ -257,7 +259,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			&name, &merchantName, &categoryPrimary, &categoryDetailed,
 			&categoryConfidence, &paymentChannel, &pending,
 			&deletedAt, &createdAt, &updatedAt,
-			&accountName, &userName,
+			&accountName, &accountShortID, &userName,
 			&categoryID, &categoryOverride,
 			&catSlug, &catDisplayName, &catIcon, &catColor,
 			&catPrimarySlug, &catPrimaryDisplayName,
@@ -293,10 +295,12 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			}
 		}
 
+		accountShortIDVal := accountShortID
 		transactions = append(transactions, TransactionResponse{
 			ID:                  formatUUID(id),
 			ShortID:             shortID,
 			AccountID:           uuidPtr(accountID),
+			AccountShortID:      &accountShortIDVal,
 			AccountName:         &accountName,
 			UserName:            textPtr(userName),
 			AttributedUserID:    uuidPtr(attributedUserID),

@@ -245,47 +245,35 @@ func benchmarkJsonResultN(b *testing.B, n int) {
 	}
 }
 
-// TestCompactIDsBytesFieldOrdering verifies behavior when "short_id" appears
-// before "id" in the JSON byte stream. json.Marshal guarantees "id" < "short_id"
-// alphabetically for maps and by declaration order for structs, but this test
-// documents what happens if that assumption is violated.
+// TestCompactIDsBytesFieldOrdering verifies that compaction works regardless
+// of whether "short_id" appears before or after "id" in the JSON byte stream.
+// The two-phase object scanner collects all entries before emitting, so
+// ordering does not matter.
 func TestCompactIDsBytesFieldOrdering(t *testing.T) {
-	// Case 1: Normal order (id before short_id) — should compact.
-	normalJSON := []byte(`{"id":"uuid-123","short_id":"abc","name":"test"}`)
-	normalGot := compactIDsBytes(normalJSON)
-	var normalParsed map[string]any
-	if err := json.Unmarshal(normalGot, &normalParsed); err != nil {
-		t.Fatalf("unmarshal normal: %v", err)
+	cases := []struct {
+		name string
+		json string
+	}{
+		{"id_before_short_id", `{"id":"uuid-123","short_id":"abc","name":"test"}`},
+		{"short_id_before_id", `{"short_id":"abc","id":"uuid-123","name":"test"}`},
 	}
-	if normalParsed["id"] != "abc" {
-		t.Errorf("normal order: expected id='abc', got id=%q", normalParsed["id"])
-	}
-	if _, hasShort := normalParsed["short_id"]; hasShort {
-		t.Error("normal order: short_id should be removed")
-	}
-
-	// Case 2: Reversed order (short_id before id) — compaction does NOT happen
-	// because the scanner has not yet seen "id" when it encounters "short_id".
-	// The short_id field is still dropped, but id retains its original value.
-	// This documents the ordering assumption; if this test fails, the scanner
-	// has been updated to handle reversed order (which is fine).
-	reversedJSON := []byte(`{"short_id":"abc","id":"uuid-123","name":"test"}`)
-	reversedGot := compactIDsBytes(reversedJSON)
-	var reversedParsed map[string]any
-	if err := json.Unmarshal(reversedGot, &reversedParsed); err != nil {
-		t.Fatalf("unmarshal reversed: %v", err)
-	}
-	if _, hasShort := reversedParsed["short_id"]; hasShort {
-		t.Error("reversed order: short_id should be removed")
-	}
-	// id keeps its original UUID value — compaction requires id before short_id.
-	if reversedParsed["id"] != "uuid-123" {
-		t.Errorf("reversed order: expected id='uuid-123' (no compaction), got id=%q", reversedParsed["id"])
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := compactIDsBytes([]byte(tc.json))
+			var parsed map[string]any
+			if err := json.Unmarshal(got, &parsed); err != nil {
+				t.Fatalf("unmarshal: %v", err)
+			}
+			if parsed["id"] != "abc" {
+				t.Errorf("expected id='abc', got id=%q", parsed["id"])
+			}
+			if _, hasShort := parsed["short_id"]; hasShort {
+				t.Error("short_id should be removed")
+			}
+		})
 	}
 
-	// Case 3: Struct with ShortID declared before ID — verify json.Marshal
-	// still produces "id" before "short_id" (struct tags control JSON key names,
-	// and declaration order determines marshal order).
+	// Struct with ShortID declared before ID — compaction still applies.
 	type ReversedDeclOrder struct {
 		ShortID string `json:"short_id"`
 		ID      string `json:"id"`
@@ -293,19 +281,64 @@ func TestCompactIDsBytesFieldOrdering(t *testing.T) {
 	}
 	s := ReversedDeclOrder{ShortID: "compact1", ID: "full-uuid", Name: "test"}
 	data, _ := json.Marshal(s)
-
-	// With this struct, json.Marshal produces short_id BEFORE id,
-	// so compactIDsBytes will NOT perform the id replacement.
 	got := compactIDsBytes(data)
 	var parsed map[string]any
 	if err := json.Unmarshal(got, &parsed); err != nil {
 		t.Fatalf("unmarshal struct: %v", err)
 	}
+	if parsed["id"] != "compact1" {
+		t.Errorf("struct: expected id='compact1', got id=%q", parsed["id"])
+	}
 	if _, hasShort := parsed["short_id"]; hasShort {
 		t.Error("struct: short_id should be removed")
 	}
-	// Compaction does not occur because short_id appears first in marshal output.
-	if parsed["id"] != "full-uuid" {
-		t.Errorf("struct: expected id='full-uuid' (no compaction), got id=%q", parsed["id"])
+}
+
+// TestCompactIDsBytesFKPairs verifies that FK sibling pairs like
+// account_id/account_short_id are collapsed to a single account_id carrying
+// the short value.
+func TestCompactIDsBytesFKPairs(t *testing.T) {
+	input := []byte(`{"id":"own-uuid","short_id":"ownshort","account_id":"acct-uuid","account_short_id":"acctshort","category_id":"cat-uuid","category_short_id":"catshort","name":"t1"}`)
+	got := compactIDsBytes(input)
+	var parsed map[string]any
+	if err := json.Unmarshal(got, &parsed); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	want := map[string]string{
+		"id":          "ownshort",
+		"account_id":  "acctshort",
+		"category_id": "catshort",
+		"name":        "t1",
+	}
+	for k, v := range want {
+		if parsed[k] != v {
+			t.Errorf("%s: got %v want %q", k, parsed[k], v)
+		}
+	}
+	for _, k := range []string{"short_id", "account_short_id", "category_short_id"} {
+		if _, has := parsed[k]; has {
+			t.Errorf("%s should be removed", k)
+		}
+	}
+}
+
+// TestCompactIDsBytesFKNullShort verifies that a null short_id sibling drops
+// the _short_id key but leaves the _id value untouched (compaction would
+// otherwise discard a valid UUID).
+func TestCompactIDsBytesFKNullShort(t *testing.T) {
+	input := []byte(`{"id":"own-uuid","short_id":"ownshort","account_id":"acct-uuid","account_short_id":null}`)
+	got := compactIDsBytes(input)
+	var parsed map[string]any
+	if err := json.Unmarshal(got, &parsed); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if parsed["id"] != "ownshort" {
+		t.Errorf("id: got %v", parsed["id"])
+	}
+	if parsed["account_id"] != "acct-uuid" {
+		t.Errorf("account_id: expected preserved UUID, got %v", parsed["account_id"])
+	}
+	if _, has := parsed["account_short_id"]; has {
+		t.Error("account_short_id should be removed even when null")
 	}
 }
