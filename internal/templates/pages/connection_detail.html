@@ -325,78 +325,49 @@
     <h2 class="text-sm font-semibold text-base-content/70">Sync History</h2>
     <span class="text-xs text-base-content/30">Last 10</span>
   </div>
-  <!-- Skeleton shown during sync -->
-  <div id="sync-history-skeleton" class="px-4 sm:px-5 pb-4" style="display:none">
-    <div class="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/10 mb-2">
-      <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-        <span class="loading loading-spinner loading-xs text-primary"></span>
-      </div>
-      <div>
-        <div class="text-sm font-medium">Syncing in progress</div>
-        <div class="text-xs text-base-content/40">Fetching latest transactions...</div>
-      </div>
-    </div>
-    {{template "skeleton-sync-list" .}}
-  </div>
   <div id="sync-history-content">
-  {{if .SyncLogs}}
-  <div class="px-4 sm:px-5 pb-4">
+  <div id="sync-history-list" class="px-4 sm:px-5 pb-4{{if not .SyncLogs}} hidden{{end}}">
     {{range .SyncLogs}}
-    <div class="flex gap-3 py-3 border-b border-base-300/30 last:border-0">
-      <!-- Timeline dot -->
-      <div class="flex flex-col items-center shrink-0 pt-0.5">
+    <div class="flex gap-3 py-3 border-b border-base-300/30 last:border-0"
+         data-sync-log-row="{{.ShortID}}"
+         data-sync-log-status="{{printf "%s" .Status}}">
+      <div class="flex flex-col items-center shrink-0 pt-0.5" data-sync-log-icon>
         <div class="w-6 h-6 rounded-full flex items-center justify-center
           {{if eq (printf "%s" .Status) "success"}}bg-success/12
           {{else if eq (printf "%s" .Status) "error"}}bg-error/12
           {{else}}bg-base-200{{end}}">
           {{if eq (printf "%s" .Status) "success"}}<i data-lucide="check" class="w-3 h-3 text-success"></i>
           {{else if eq (printf "%s" .Status) "error"}}<i data-lucide="x" class="w-3 h-3 text-error"></i>
-          {{else}}<i data-lucide="loader" class="w-3 h-3 text-base-content/40 animate-spin"></i>{{end}}
+          {{else}}<span class="loading loading-spinner loading-xs text-primary"></span>{{end}}
         </div>
       </div>
-      <!-- Content -->
       <div class="flex-1 min-w-0 flex items-center justify-between gap-2">
         <div class="min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-sm font-medium capitalize">{{.Trigger}}</span>
-            <span class="text-xs text-base-content/35 tabular-nums">{{relativeTime .StartedAt}}</span>
-            {{if .DurationMs.Valid}}
-            <span class="text-[0.6rem] text-base-content/25 tabular-nums bg-base-200/50 px-1.5 py-0.5 rounded-full">{{formatDurationMs .DurationMs.Int32}}</span>
-            {{else if and .StartedAt.Valid .CompletedAt.Valid}}
-            <span class="text-[0.6rem] text-base-content/25 tabular-nums bg-base-200/50 px-1.5 py-0.5 rounded-full">{{syncDuration .StartedAt.Time .CompletedAt.Time}}</span>
-            {{end}}
+            <span class="text-xs text-base-content/35 tabular-nums" data-sync-log-time>{{relativeTime .StartedAt}}</span>
+            <span class="text-[0.6rem] text-base-content/25 tabular-nums bg-base-200/50 px-1.5 py-0.5 rounded-full{{if not .DurationMs.Valid}}{{if not (and .StartedAt.Valid .CompletedAt.Valid)}} hidden{{end}}{{end}}" data-sync-log-duration>{{if .DurationMs.Valid}}{{formatDurationMs .DurationMs.Int32}}{{else if and .StartedAt.Valid .CompletedAt.Valid}}{{syncDuration .StartedAt.Time .CompletedAt.Time}}{{end}}</span>
           </div>
-          {{if and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid}}
-          {{$friendly := syncFriendlyError .ErrorMessage.String}}
-          {{if $friendly}}
-          <p class="text-xs text-error/60 mt-0.5 max-w-md truncate" title="{{.ErrorMessage.String}}">{{$friendly}}</p>
-          {{else}}
-          <p class="text-xs text-error/60 mt-0.5 max-w-md truncate" title="{{.ErrorMessage.String}}">{{.ErrorMessage.String}}</p>
-          {{end}}
-          {{end}}
+          <p class="text-xs text-error/60 mt-0.5 max-w-md truncate{{if not (and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid)}} hidden{{end}}" data-sync-log-error title="{{if .ErrorMessage.Valid}}{{.ErrorMessage.String}}{{end}}">{{if and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid}}{{$friendly := syncFriendlyError .ErrorMessage.String}}{{if $friendly}}{{$friendly}}{{else}}{{.ErrorMessage.String}}{{end}}{{end}}</p>
         </div>
-        <div class="flex items-center gap-2.5 tabular-nums text-xs shrink-0">
-          {{if or .AddedCount .ModifiedCount .RemovedCount}}
-          <div class="flex items-center gap-1.5">
-            {{if .AddedCount}}<span class="text-success font-medium">+{{.AddedCount}}</span>{{end}}
-            {{if .ModifiedCount}}<span class="text-info font-medium">~{{.ModifiedCount}}</span>{{end}}
-            {{if .RemovedCount}}<span class="text-error font-medium">-{{.RemovedCount}}</span>{{end}}
+        <div class="flex items-center gap-2.5 tabular-nums text-xs shrink-0" data-sync-log-counts>
+          <div class="flex items-center gap-1.5{{if not (or .AddedCount .ModifiedCount .RemovedCount)}} hidden{{end}}" data-sync-log-counts-main>
+            <span class="text-success font-medium{{if not .AddedCount}} hidden{{end}}" data-sync-log-added>{{if .AddedCount}}+{{.AddedCount}}{{end}}</span>
+            <span class="text-info font-medium{{if not .ModifiedCount}} hidden{{end}}" data-sync-log-modified>{{if .ModifiedCount}}~{{.ModifiedCount}}{{end}}</span>
+            <span class="text-error font-medium{{if not .RemovedCount}} hidden{{end}}" data-sync-log-removed>{{if .RemovedCount}}-{{.RemovedCount}}{{end}}</span>
           </div>
-          {{end}}
-          {{if .UnchangedCount}}<span class="text-base-content/25 text-[0.6rem]" title="{{.UnchangedCount}} unchanged">={{.UnchangedCount}}</span>{{end}}
+          <span class="text-base-content/25 text-[0.6rem]{{if not .UnchangedCount}} hidden{{end}}" data-sync-log-unchanged title="{{.UnchangedCount}} unchanged">{{if .UnchangedCount}}={{.UnchangedCount}}{{end}}</span>
         </div>
       </div>
     </div>
     {{end}}
   </div>
-  {{else}}
-  <div class="px-4 sm:px-5 pb-4">
+  <div id="sync-history-empty" class="px-4 sm:px-5 pb-4{{if .SyncLogs}} hidden{{end}}">
     <div class="flex flex-col items-center justify-center py-10 text-base-content/30">
       <i data-lucide="refresh-cw" class="w-10 h-10 mb-3 opacity-50"></i>
       <p class="text-sm">No sync history yet</p>
     </div>
   </div>
-  {{end}}
   </div><!-- /sync-history-content -->
 </div>
 
@@ -405,49 +376,220 @@ function showToast(message, type) {
   window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type || 'error' } }));
 }
 
-function syncConnection() {
+var SYNC_POLL_INTERVAL_MS = 1500;
+var SYNC_POLL_MAX_MS = 5 * 60 * 1000;
+var syncPollTimer = null;
+var syncPollStartedAt = 0;
+
+function setSyncButtonIdle() {
   var btn = document.getElementById('sync-btn');
+  if (!btn) return;
+  btn.disabled = false;
+  btn.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Sync Now';
+  lucide.createIcons({nodes: [btn]});
+}
+
+function setSyncButtonBusy() {
+  var btn = document.getElementById('sync-btn');
+  if (!btn) return;
   btn.disabled = true;
   btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Syncing...';
+}
 
-  var syncHistory = document.getElementById('sync-history-content');
-  var syncSkeleton = document.getElementById('sync-history-skeleton');
-  if (syncHistory && syncSkeleton) {
-    syncHistory.classList.add('bb-loading-fade');
-    syncSkeleton.style.display = 'block';
+function buildSyncLogRow(payload) {
+  var row = document.createElement('div');
+  row.className = 'flex gap-3 py-3 border-b border-base-300/30 last:border-0';
+  row.setAttribute('data-sync-log-row', payload.short_id || 'pending');
+  row.setAttribute('data-sync-log-status', payload.status || 'in_progress');
+  row.innerHTML = ''
+    + '<div class="flex flex-col items-center shrink-0 pt-0.5" data-sync-log-icon>'
+    +   '<div class="w-6 h-6 rounded-full flex items-center justify-center bg-base-200">'
+    +     '<span class="loading loading-spinner loading-xs text-primary"></span>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="flex-1 min-w-0 flex items-center justify-between gap-2">'
+    +   '<div class="min-w-0">'
+    +     '<div class="flex items-center gap-2 flex-wrap">'
+    +       '<span class="text-sm font-medium capitalize"></span>'
+    +       '<span class="text-xs text-base-content/35 tabular-nums" data-sync-log-time>just now</span>'
+    +       '<span class="text-[0.6rem] text-base-content/25 tabular-nums bg-base-200/50 px-1.5 py-0.5 rounded-full hidden" data-sync-log-duration></span>'
+    +     '</div>'
+    +     '<p class="text-xs text-error/60 mt-0.5 max-w-md truncate hidden" data-sync-log-error></p>'
+    +   '</div>'
+    +   '<div class="flex items-center gap-2.5 tabular-nums text-xs shrink-0" data-sync-log-counts>'
+    +     '<div class="flex items-center gap-1.5 hidden" data-sync-log-counts-main>'
+    +       '<span class="text-success font-medium hidden" data-sync-log-added></span>'
+    +       '<span class="text-info font-medium hidden" data-sync-log-modified></span>'
+    +       '<span class="text-error font-medium hidden" data-sync-log-removed></span>'
+    +     '</div>'
+    +     '<span class="text-base-content/25 text-[0.6rem] hidden" data-sync-log-unchanged></span>'
+    +   '</div>'
+    + '</div>';
+  row.querySelector('span.capitalize').textContent = payload.trigger || 'manual';
+  return row;
+}
+
+function toggleHidden(el, hidden) {
+  if (!el) return;
+  if (hidden) el.classList.add('hidden'); else el.classList.remove('hidden');
+}
+
+function updateSyncLogRow(row, payload) {
+  if (!row) return;
+  var status = payload.status || 'in_progress';
+  row.setAttribute('data-sync-log-status', status);
+  if (payload.short_id) row.setAttribute('data-sync-log-row', payload.short_id);
+
+  var iconWrap = row.querySelector('[data-sync-log-icon] > div');
+  if (iconWrap) {
+    var iconHTML, iconClass;
+    if (status === 'success') {
+      iconClass = 'bg-success/12';
+      iconHTML = '<i data-lucide="check" class="w-3 h-3 text-success"></i>';
+    } else if (status === 'error') {
+      iconClass = 'bg-error/12';
+      iconHTML = '<i data-lucide="x" class="w-3 h-3 text-error"></i>';
+    } else {
+      iconClass = 'bg-base-200';
+      iconHTML = '<span class="loading loading-spinner loading-xs text-primary"></span>';
+    }
+    iconWrap.className = 'w-6 h-6 rounded-full flex items-center justify-center ' + iconClass;
+    iconWrap.innerHTML = iconHTML;
+    if (status === 'success' || status === 'error') lucide.createIcons({nodes: [iconWrap]});
   }
 
-  if (window.bbProgress) window.bbProgress.start();
-
-  fetch("/-/connections/{{.ConnID}}/sync", { method: "POST" })
-  .then(function(res) {
-    if (res.ok) {
-      btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i> Synced!';
-      lucide.createIcons({nodes: [btn]});
-      if (window.bbProgress) window.bbProgress.finish();
-      setTimeout(function() { window.location.reload(); }, 3000);
+  var dur = row.querySelector('[data-sync-log-duration]');
+  if (dur) {
+    if (payload.duration_label) {
+      dur.textContent = payload.duration_label;
+      toggleHidden(dur, false);
     } else {
-      return res.json().then(function(data) {
-        showToast(data.error || "Failed to trigger sync.");
-        btn.disabled = false;
-        btn.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Sync Now';
-        lucide.createIcons({nodes: [btn]});
-        if (syncHistory) syncHistory.classList.remove('bb-loading-fade');
-        if (syncSkeleton) syncSkeleton.style.display = 'none';
-        if (window.bbProgress) window.bbProgress.finish();
-      });
+      toggleHidden(dur, true);
     }
-  })
-  .catch(function() {
-    showToast("Network error. Please try again.");
-    btn.disabled = false;
-    btn.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Sync Now';
-    lucide.createIcons({nodes: [btn]});
-    if (syncHistory) syncHistory.classList.remove('bb-loading-fade');
-    if (syncSkeleton) syncSkeleton.style.display = 'none';
-    if (window.bbProgress) window.bbProgress.finish();
-  });
+  }
+
+  var err = row.querySelector('[data-sync-log-error]');
+  if (err) {
+    if (status === 'error' && (payload.friendly_error_message || payload.error_message)) {
+      err.textContent = payload.friendly_error_message || payload.error_message;
+      err.title = payload.error_message || '';
+      toggleHidden(err, false);
+    } else {
+      toggleHidden(err, true);
+    }
+  }
+
+  var added = payload.added_count || 0;
+  var modified = payload.modified_count || 0;
+  var removed = payload.removed_count || 0;
+  var unchanged = payload.unchanged_count || 0;
+  var addedEl = row.querySelector('[data-sync-log-added]');
+  var modEl = row.querySelector('[data-sync-log-modified]');
+  var remEl = row.querySelector('[data-sync-log-removed]');
+  var unchEl = row.querySelector('[data-sync-log-unchanged]');
+  var main = row.querySelector('[data-sync-log-counts-main]');
+  if (addedEl) { addedEl.textContent = added ? '+' + added : ''; toggleHidden(addedEl, !added); }
+  if (modEl)   { modEl.textContent   = modified ? '~' + modified : ''; toggleHidden(modEl, !modified); }
+  if (remEl)   { remEl.textContent   = removed ? '-' + removed : ''; toggleHidden(remEl, !removed); }
+  if (unchEl)  { unchEl.textContent  = unchanged ? '=' + unchanged : ''; unchEl.title = unchanged + ' unchanged'; toggleHidden(unchEl, !unchanged); }
+  toggleHidden(main, !(added || modified || removed));
 }
+
+function findPollTargetRow() {
+  var list = document.getElementById('sync-history-list');
+  if (!list) return null;
+  var pending = list.querySelector('[data-sync-log-row="pending"]');
+  if (pending) return pending;
+  var first = list.querySelector('[data-sync-log-row]');
+  if (first && first.getAttribute('data-sync-log-status') === 'in_progress') return first;
+  return null;
+}
+
+function stopSyncPoll() {
+  if (syncPollTimer) { clearTimeout(syncPollTimer); syncPollTimer = null; }
+}
+
+function pollSyncStatus() {
+  stopSyncPoll();
+  if (!syncPollStartedAt) syncPollStartedAt = Date.now();
+
+  fetch('/-/connections/{{.ConnID}}/sync-status', { headers: { 'Accept': 'application/json' } })
+    .then(function(res) { return res.ok ? res.json() : null; })
+    .then(function(payload) {
+      if (!payload || payload.status === 'none') {
+        syncPollTimer = setTimeout(pollSyncStatus, SYNC_POLL_INTERVAL_MS);
+        return;
+      }
+
+      var row = findPollTargetRow();
+      if (row) updateSyncLogRow(row, payload);
+
+      if (payload.status === 'in_progress') {
+        if (Date.now() - syncPollStartedAt > SYNC_POLL_MAX_MS) {
+          showToast('Sync is taking longer than expected — refresh to check status.', 'warning');
+          syncPollStartedAt = 0;
+          setSyncButtonIdle();
+          return;
+        }
+        syncPollTimer = setTimeout(pollSyncStatus, SYNC_POLL_INTERVAL_MS);
+        return;
+      }
+
+      syncPollStartedAt = 0;
+      setSyncButtonIdle();
+      if (payload.status === 'error') {
+        showToast(payload.friendly_error_message || payload.error_message || 'Sync failed.', 'error');
+      }
+    })
+    .catch(function() {
+      syncPollTimer = setTimeout(pollSyncStatus, SYNC_POLL_INTERVAL_MS);
+    });
+}
+
+function syncConnection() {
+  setSyncButtonBusy();
+
+  var list = document.getElementById('sync-history-list');
+  var empty = document.getElementById('sync-history-empty');
+  if (list && !list.querySelector('[data-sync-log-row="pending"]')) {
+    var pending = buildSyncLogRow({ status: 'in_progress', trigger: 'manual' });
+    if (list.firstElementChild) list.insertBefore(pending, list.firstElementChild);
+    else list.appendChild(pending);
+    toggleHidden(list, false);
+    toggleHidden(empty, true);
+  }
+
+  fetch('/-/connections/{{.ConnID}}/sync', { method: 'POST' })
+    .then(function(res) {
+      if (res.ok) {
+        syncPollStartedAt = Date.now();
+        pollSyncStatus();
+        return;
+      }
+      return res.json().then(function(data) {
+        showToast((data && data.error) || 'Failed to trigger sync.');
+        var p = list && list.querySelector('[data-sync-log-row="pending"]');
+        if (p) p.remove();
+        if (list && !list.firstElementChild) { toggleHidden(list, true); toggleHidden(empty, false); }
+        setSyncButtonIdle();
+      });
+    })
+    .catch(function() {
+      showToast('Network error. Please try again.');
+      var p = list && list.querySelector('[data-sync-log-row="pending"]');
+      if (p) p.remove();
+      if (list && !list.firstElementChild) { toggleHidden(list, true); toggleHidden(empty, false); }
+      setSyncButtonIdle();
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var first = document.querySelector('#sync-history-list [data-sync-log-row]');
+  if (first && first.getAttribute('data-sync-log-status') === 'in_progress') {
+    setSyncButtonBusy();
+    pollSyncStatus();
+  }
+});
 
 function removeConnection() {
   if (window.bbProgress) window.bbProgress.start();

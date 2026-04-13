@@ -281,6 +281,13 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		}
 		defer tx.Rollback(ctx)
 
+		// Sanity: confirm the tx is usable immediately after BEGIN. If this fails
+		// we know the pool handed us a poisoned connection rather than a later
+		// statement being the root cause of a 25P02 cascade.
+		if _, err := tx.Exec(ctx, "SELECT 1"); err != nil {
+			logger.Error("tx sanity check failed", "error", err)
+		}
+
 		txQueries := e.db.WithTx(tx)
 
 		// Process removed FIRST.
@@ -356,13 +363,15 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 
 		// Batch-insert rule application records.
 		for _, app := range ruleApplications {
-			_, _ = tx.Exec(ctx,
+			if _, err := tx.Exec(ctx,
 				`INSERT INTO transaction_rule_applications (transaction_id, rule_id, action_field, action_value, applied_by)
 				VALUES ($1, $2, $3, $4, 'sync')
 				ON CONFLICT (transaction_id, rule_id, action_field) DO UPDATE
 				SET applied_at = NOW(), action_value = EXCLUDED.action_value
 				WHERE transaction_rule_applications.action_value IS DISTINCT FROM EXCLUDED.action_value`,
-				app.txnID, app.ruleID, app.actionField, app.actionValue)
+				app.txnID, app.ruleID, app.actionField, app.actionValue); err != nil {
+				logger.Error("insert rule application", "transaction_id", app.txnID, "rule_id", app.ruleID, "error", err)
+			}
 		}
 
 		if skipped > 0 {
