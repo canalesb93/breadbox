@@ -354,7 +354,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"Categorize multiple transactions at once. Each item needs a transaction_id and category_slug. Max 500 items per request. Sets category_override=true on each transaction. More efficient than calling categorize_transaction repeatedly. Returns succeeded count and any per-item errors.",
 			s.handleBatchCategorize, svc),
 		makeToolDefLogged("bulk_recategorize", ToolWrite,
-			"Recategorize all transactions matching a filter to a new category. Requires target_category_slug and at least one filter (safety requirement). Sets category_override=true since this is an explicit action. Use this for bulk corrections — e.g., recategorize all transactions currently tagged 'general_merchandise' in a date range to 'groceries'. Returns matched/updated counts.",
+			"Moves transactions matching `from_category` (and other filters) to `to_category`. Requires `to_category` and at least one filter (safety requirement). Sets category_override=true since this is an explicit action. Use this for bulk corrections — e.g., move all transactions currently in `general_merchandise` within a date range to `groceries`. Returns matched/updated counts. Note: the legacy params `target_category_slug` and `category_slug` are still accepted but deprecated — prefer `to_category`/`from_category`.",
 			s.handleBulkRecategorize, svc),
 		makeToolDefLogged("list_account_links", ToolRead,
 			"List account links between primary and dependent/authorized-user accounts. Account links deduplicate transactions that appear in both a primary cardholder and authorized user's bank feeds. Returns link details, match counts, and unmatched transaction counts.",

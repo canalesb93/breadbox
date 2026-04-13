@@ -1113,17 +1113,20 @@ type batchCategorizeItemInput struct {
 
 type bulkRecategorizeInput struct {
 	WriteSessionContext
-	TargetCategorySlug string   `json:"target_category_slug" jsonschema:"required,Category slug to assign to all matching transactions"`
+	FromCategory       string   `json:"from_category,omitempty" jsonschema:"Source category slug — only transactions currently in this category are matched. Optional if other filters are provided."`
+	ToCategory         string   `json:"to_category,omitempty" jsonschema:"Destination category slug — matching transactions are moved here. Required (or provide target_category_slug)."`
 	StartDate          string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
 	EndDate            string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
 	AccountID          string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
 	UserID             string   `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
-	CategorySlug       string   `json:"category_slug,omitempty" jsonschema:"Filter by current category slug"`
 	MinAmount          *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount (positive=debit, negative=credit)"`
 	MaxAmount          *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount (positive=debit, negative=credit)"`
 	Pending            *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
 	Search             string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant"`
 	NameContains       string   `json:"name_contains,omitempty" jsonschema:"Filter transactions whose name contains this string"`
+	// Deprecated fields — retained for backward compatibility with older agent sessions.
+	TargetCategorySlug string `json:"target_category_slug,omitempty" jsonschema:"Deprecated: use to_category instead. Destination category slug."`
+	CategorySlug       string `json:"category_slug,omitempty" jsonschema:"Deprecated: use from_category instead. Source category slug filter."`
 }
 
 func (s *MCPServer) handleBatchCategorize(ctx context.Context, _ *mcpsdk.CallToolRequest, input batchCategorizeInput) (*mcpsdk.CallToolResult, any, error) {
@@ -1153,12 +1156,23 @@ func (s *MCPServer) handleBulkRecategorize(ctx context.Context, _ *mcpsdk.CallTo
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
-	if input.TargetCategorySlug == "" {
-		return errorResult(fmt.Errorf("target_category_slug is required")), nil, nil
+
+	// Prefer new param names; fall back to deprecated aliases for backward compatibility.
+	toCategory := input.ToCategory
+	if toCategory == "" {
+		toCategory = input.TargetCategorySlug
+	}
+	fromCategory := input.FromCategory
+	if fromCategory == "" {
+		fromCategory = input.CategorySlug
+	}
+
+	if toCategory == "" {
+		return errorResult(fmt.Errorf("to_category is required")), nil, nil
 	}
 
 	params := service.BulkRecategorizeParams{
-		TargetCategorySlug: input.TargetCategorySlug,
+		TargetCategorySlug: toCategory,
 	}
 
 	if input.StartDate != "" {
@@ -1181,8 +1195,8 @@ func (s *MCPServer) handleBulkRecategorize(ctx context.Context, _ *mcpsdk.CallTo
 	if input.UserID != "" {
 		params.UserID = &input.UserID
 	}
-	if input.CategorySlug != "" {
-		params.CategorySlug = &input.CategorySlug
+	if fromCategory != "" {
+		params.CategorySlug = &fromCategory
 	}
 	if input.MinAmount != nil {
 		params.MinAmount = input.MinAmount

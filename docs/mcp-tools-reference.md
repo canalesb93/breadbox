@@ -126,12 +126,15 @@ Categorize multiple transactions at once. Max 500 items per call.
 
 ### bulk_recategorize (Write)
 
-Server-side UPDATE of all transactions matching filters. Requires at least one filter for safety.
+Server-side UPDATE of all transactions matching filters. Requires at least one filter for safety. Moves transactions matching `from_category` (and other filters) to `to_category`.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `category_slug` | string | Target category slug |
+| `to_category` | string | Destination category slug (required) |
+| `from_category` | string | Optional source category slug filter |
 | Plus filters | | Same as `query_transactions` |
+| `target_category_slug` | string | Deprecated — use `to_category` |
+| `category_slug` | string | Deprecated — use `from_category` |
 
 ### import_categories (Write)
 
