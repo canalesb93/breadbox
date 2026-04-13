@@ -225,9 +225,9 @@
             {{end}}
           </div>
           {{if and (eq .Status "error") .FriendlyErrorMessage}}
-          <div class="mt-1 text-xs text-error/60 truncate max-w-md">{{deref .FriendlyErrorMessage}}</div>
+          <div class="mt-1 text-xs text-error/60 truncate" title="{{deref .FriendlyErrorMessage}}">{{deref .FriendlyErrorMessage}}</div>
           {{else if and (eq .Status "error") .ErrorMessage}}
-          <div class="mt-1 text-xs text-error/60 truncate max-w-md font-mono">{{deref .ErrorMessage}}</div>
+          <div class="mt-1 text-xs text-error/60 truncate font-mono" title="{{deref .ErrorMessage}}">{{deref .ErrorMessage}}</div>
           {{end}}
         </div>
       </div>

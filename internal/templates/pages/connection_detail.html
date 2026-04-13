@@ -348,7 +348,7 @@
             <span class="text-xs text-base-content/35 tabular-nums" data-sync-log-time>{{relativeTime .StartedAt}}</span>
             <span class="text-[0.6rem] text-base-content/25 tabular-nums bg-base-200/50 px-1.5 py-0.5 rounded-full{{if not .DurationMs.Valid}}{{if not (and .StartedAt.Valid .CompletedAt.Valid)}} hidden{{end}}{{end}}" data-sync-log-duration>{{if .DurationMs.Valid}}{{formatDurationMs .DurationMs.Int32}}{{else if and .StartedAt.Valid .CompletedAt.Valid}}{{syncDuration .StartedAt.Time .CompletedAt.Time}}{{end}}</span>
           </div>
-          <p class="text-xs text-error/60 mt-0.5 max-w-md truncate{{if not (and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid)}} hidden{{end}}" data-sync-log-error title="{{if .ErrorMessage.Valid}}{{.ErrorMessage.String}}{{end}}">{{if and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid}}{{$friendly := syncFriendlyError .ErrorMessage.String}}{{if $friendly}}{{$friendly}}{{else}}{{.ErrorMessage.String}}{{end}}{{end}}</p>
+          <p class="text-xs text-error/60 mt-0.5 truncate{{if not (and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid)}} hidden{{end}}" data-sync-log-error title="{{if .ErrorMessage.Valid}}{{.ErrorMessage.String}}{{end}}">{{if and (eq (printf "%s" .Status) "error") .ErrorMessage.Valid}}{{$friendly := syncFriendlyError .ErrorMessage.String}}{{if $friendly}}{{$friendly}}{{else}}{{.ErrorMessage.String}}{{end}}{{end}}</p>
         </div>
         <div class="flex items-center gap-2.5 tabular-nums text-xs shrink-0" data-sync-log-counts>
           <div class="flex items-center gap-1.5{{if not (or .AddedCount .ModifiedCount .RemovedCount)}} hidden{{end}}" data-sync-log-counts-main>
@@ -414,7 +414,7 @@ function buildSyncLogRow(payload) {
     +       '<span class="text-xs text-base-content/35 tabular-nums" data-sync-log-time>just now</span>'
     +       '<span class="text-[0.6rem] text-base-content/25 tabular-nums bg-base-200/50 px-1.5 py-0.5 rounded-full hidden" data-sync-log-duration></span>'
     +     '</div>'
-    +     '<p class="text-xs text-error/60 mt-0.5 max-w-md truncate hidden" data-sync-log-error></p>'
+    +     '<p class="text-xs text-error/60 mt-0.5 truncate hidden" data-sync-log-error></p>'
     +   '</div>'
     +   '<div class="flex items-center gap-2.5 tabular-nums text-xs shrink-0" data-sync-log-counts>'
     +     '<div class="flex items-center gap-1.5 hidden" data-sync-log-counts-main>'
