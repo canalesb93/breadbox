@@ -818,6 +818,10 @@ type batchReviewItem struct {
 	Note         *string `json:"note,omitempty" jsonschema:"Optional short rationale for this decision. Recorded as a transaction comment attributed to you and shown inline on the review resolution in the transaction's activity timeline. Do NOT also call add_transaction_comment for the same transaction — pass the narrative here instead."`
 }
 
+type pendingReviewsOverviewInput struct {
+	ReadSessionContext
+}
+
 func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.CallToolRequest, input createTransactionRuleInput) (*mcpsdk.CallToolResult, any, error) {
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
@@ -1041,6 +1045,25 @@ func (s *MCPServer) handleBatchSubmitReviews(ctx context.Context, _ *mcpsdk.Call
 		Reviews: items,
 		Actor:   actor,
 	})
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(result)
+}
+
+func (s *MCPServer) handlePendingReviewsOverview(_ context.Context, _ *mcpsdk.CallToolRequest, _ pendingReviewsOverviewInput) (*mcpsdk.CallToolResult, any, error) {
+	ctx := context.Background()
+
+	if !s.svc.IsReviewsEnabled(ctx) {
+		return jsonResult(map[string]any{
+			"total_pending":   0,
+			"counts_by_type":  []any{},
+			"category_groups": []any{},
+			"note":            "Transaction reviews are currently disabled. Enable them in the admin dashboard at /reviews.",
+		})
+	}
+
+	result, err := s.svc.GetPendingReviewsOverview(ctx)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
