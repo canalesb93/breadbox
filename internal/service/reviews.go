@@ -781,7 +781,7 @@ func (s *Service) EnqueueManualReview(ctx context.Context, transactionID string,
 		reviewType = "re_review"
 	}
 
-	review, err := s.Queries.EnqueueReview(ctx, db.EnqueueReviewParams{
+	review, err := s.Queries.EnqueueReviewManual(ctx, db.EnqueueReviewManualParams{
 		TransactionID: txnID,
 		ReviewType:    reviewType,
 	})

@@ -440,8 +440,9 @@ type ActivityEntry struct {
 	Type      string `json:"type"`      // "review", "comment", "rule"
 	Timestamp string `json:"timestamp"` // RFC3339
 
-	ActorName string `json:"actor_name"`
-	ActorType string `json:"actor_type"` // "user", "agent", "system"
+	ActorName string  `json:"actor_name"`
+	ActorType string  `json:"actor_type"`         // "user", "agent", "system"
+	ActorID   *string `json:"actor_id,omitempty"` // user UUID when available (for avatar rendering)
 
 	Summary string `json:"summary"`          // Short: "Approved as Food & Drink"
 	Detail  string `json:"detail,omitempty"` // Longer text (review note or comment body)

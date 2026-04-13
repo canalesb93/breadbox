@@ -98,6 +98,43 @@ func TestEnqueueManualReview_DuplicatePending(t *testing.T) {
 	}
 }
 
+func TestEnqueueManualReview_ReReviewAfterResolved(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	txn := reviewTestFixture(t, queries)
+	txnID := pgconv.FormatUUID(txn.ID)
+
+	// Enqueue and then resolve (approve) a review — simulating the normal lifecycle.
+	first, err := svc.EnqueueManualReview(ctx, txnID, testActor)
+	if err != nil {
+		t.Fatalf("first EnqueueManualReview: %v", err)
+	}
+	if _, err := svc.SubmitReview(ctx, service.SubmitReviewParams{
+		ReviewID: first.ID,
+		Decision: "approved",
+		Actor:    testActor,
+	}); err != nil {
+		t.Fatalf("SubmitReview approve: %v", err)
+	}
+
+	// Manually re-enqueue. Prior behavior: ErrReviewAlreadyPending (bug).
+	// Expected: a fresh pending review with review_type=re_review.
+	second, err := svc.EnqueueManualReview(ctx, txnID, testActor)
+	if err != nil {
+		t.Fatalf("re-enqueue after resolve: %v", err)
+	}
+	if second.Status != "pending" {
+		t.Errorf("expected status=pending, got %s", second.Status)
+	}
+	if second.ReviewType != "re_review" {
+		t.Errorf("expected review_type=re_review, got %s", second.ReviewType)
+	}
+	if second.ID == first.ID {
+		t.Error("expected a new review row, got the same review ID as the resolved one")
+	}
+}
+
 func TestEnqueueManualReview_SoftDeletedTransaction(t *testing.T) {
 	svc, queries, pool := newService(t)
 	ctx := context.Background()
