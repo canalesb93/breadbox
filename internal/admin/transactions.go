@@ -810,6 +810,10 @@ func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.
 			if r.ReviewerType != nil {
 				e.ActorType = *r.ReviewerType
 			}
+			if r.ReviewerID != nil && *r.ReviewerID != "" {
+				id := *r.ReviewerID
+				e.ActorID = &id
+			}
 			switch r.Status {
 			case "approved":
 				e.ReviewStatus = "approved"
@@ -844,14 +848,19 @@ func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.
 		if strings.HasPrefix(c.Content, "[Review: ") {
 			continue
 		}
-		entries = append(entries, service.ActivityEntry{
+		entry := service.ActivityEntry{
 			Type:      "comment",
 			Timestamp: c.CreatedAt,
 			ActorName: c.AuthorName,
 			ActorType: c.AuthorType,
 			Detail:    c.Content,
 			CommentID: c.ID,
-		})
+		}
+		if c.AuthorID != nil && *c.AuthorID != "" {
+			id := *c.AuthorID
+			entry.ActorID = &id
+		}
+		entries = append(entries, entry)
 	}
 
 	// Convert rule applications

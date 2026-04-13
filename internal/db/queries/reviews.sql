@@ -1,9 +1,21 @@
 -- name: EnqueueReview :one
+-- Used by sync to auto-enqueue. Skips transactions that already have any review
+-- (pending or resolved) to avoid re-flagging previously-seen transactions on every sync.
 INSERT INTO review_queue (transaction_id, review_type, suggested_category_id, confidence_score)
 SELECT $1, $2, $3, $4
 WHERE NOT EXISTS (
   SELECT 1 FROM review_queue WHERE transaction_id = $1
 )
+ON CONFLICT (transaction_id) WHERE status = 'pending' DO NOTHING
+RETURNING *;
+
+-- name: EnqueueReviewManual :one
+-- Used for manual enqueue (user/agent-triggered). Allows creating a new pending
+-- review even when prior resolved reviews exist (for re_review workflow). The
+-- partial unique index on (transaction_id) WHERE status = 'pending' still
+-- prevents duplicate pending reviews.
+INSERT INTO review_queue (transaction_id, review_type, suggested_category_id, confidence_score)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT (transaction_id) WHERE status = 'pending' DO NOTHING
 RETURNING *;
 
