@@ -156,7 +156,7 @@ type listPendingReviewsInput struct {
 type submitReviewInput struct {
 	WriteSessionContext
 	ReviewID     string `json:"review_id" jsonschema:"required,UUID of the review to submit"`
-	Decision     string `json:"decision" jsonschema:"required,Decision: approved or skipped"`
+	Decision     string `json:"decision" jsonschema:"required,Decision: approved, rejected, or skipped"`
 	CategoryID   string `json:"category_id,omitempty" jsonschema:"Category ID to assign. Provide either category_id or category_slug (not both)."`
 	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Category slug to assign (e.g. food_and_drink_groceries). Alternative to category_id — the slug is resolved to an ID automatically."`
 	Note         string `json:"note,omitempty" jsonschema:"Optional short rationale for this decision. Recorded as a transaction comment attributed to you and shown inline on the review resolution in the transaction's activity timeline. Do NOT also call add_transaction_comment for the same transaction — pass the narrative here instead."`
@@ -812,7 +812,7 @@ type batchSubmitReviewsInput struct {
 
 type batchReviewItem struct {
 	ReviewID     string  `json:"review_id" jsonschema:"required,UUID of the review"`
-	Decision     string  `json:"decision" jsonschema:"required,Decision: approved or skipped"`
+	Decision     string  `json:"decision" jsonschema:"required,Decision: approved, rejected, or skipped"`
 	CategorySlug *string `json:"category_slug,omitempty" jsonschema:"Category slug to assign (alternative to category_id). Use list_categories to find slugs."`
 	CategoryID   *string `json:"category_id,omitempty" jsonschema:"Category ID to assign (alternative to category_slug)"`
 	Note         *string `json:"note,omitempty" jsonschema:"Optional short rationale for this decision. Recorded as a transaction comment attributed to you and shown inline on the review resolution in the transaction's activity timeline. Do NOT also call add_transaction_comment for the same transaction — pass the narrative here instead."`
