@@ -617,7 +617,7 @@ The following keys are seeded during initial migration and used by the applicati
 |---|---|---|---|---|
 | `id` | `UUID` | No | `gen_random_uuid()` | Primary key. |
 | `transaction_id` | `UUID` | No | — | FK → `transactions(id)`. The transaction under review. |
-| `review_type` | `TEXT` | No | — | Why the review was created: `new_transaction`, `uncategorized`, `low_confidence`, `manual`. |
+| `review_type` | `TEXT` | No | — | Why the review was created: `new_transaction`, `uncategorized`, `manual`, `re_review`. |
 | `status` | `TEXT` | No | `'pending'` | Current state: `pending`, `approved`, `rejected`, `skipped`. |
 | `suggested_category_id` | `UUID` | Yes | `NULL` | FK → `categories(id)`. Category suggested by the system at enqueue time. |
 | `confidence_score` | `NUMERIC(5,4)` | Yes | `NULL` | Normalized confidence score (0.0–1.0) from the provider. |
