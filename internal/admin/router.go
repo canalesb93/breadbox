@@ -234,10 +234,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// Transaction bulk categorize
 			r.Post("/transactions/batch-categorize", BatchSetTransactionCategoryAdminHandler(svc))
 
-			// Review queue (submit/dismiss)
-			r.Post("/reviews/{id}/submit", SubmitReviewAdminHandler(a, sm, svc))
-			r.Post("/reviews/{id}/dismiss", DismissReviewAdminHandler(a, sm, svc))
-
 			// API keys — editors can list and create (revoke is admin-only below).
 			r.Get("/api-keys", ListAPIKeysHandler(svc))
 			r.Post("/api-keys", CreateAPIKeyHandler(svc))
@@ -302,11 +298,8 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// Transaction CSV export
 			r.Get("/transactions/export-csv", ExportTransactionsCSVHandler(a, svc))
 
-			// Review queue (admin-only bulk operations)
-			r.Post("/reviews/dismiss-all", DismissAllReviewsAdminHandler(a, sm, svc))
+			// Review enqueue (phase-3 shim — adds the needs-review tag).
 			r.Post("/reviews/enqueue", EnqueueReviewAdminHandler(a, sm, svc))
-			r.Post("/reviews/enqueue-existing", EnqueueExistingReviewsHandler(a, sm, svc))
-			r.Post("/reviews/settings", ReviewSettingsHandler(a, sm))
 
 			// Transaction rules
 			r.Post("/rules", CreateRuleAdminHandler(svc, sm))

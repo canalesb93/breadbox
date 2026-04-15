@@ -297,6 +297,13 @@ func (s *Service) getOrCreateTagBySlug(ctx context.Context, q *db.Queries, slug 
 	return created, nil
 }
 
+// CountTransactionsTag returns how many active transactions currently carry
+// the given tag slug (excluding matched dependent transactions). Shared by
+// admin handlers that used to call the retired GetReviewCounts helper.
+func (s *Service) CountTransactionsTag(ctx context.Context, slug string) (int64, error) {
+	return s.Queries.CountTransactionsWithTagSlug(ctx, slug)
+}
+
 // tagFromRow converts a db.Tag to a TagResponse.
 func tagFromRow(t db.Tag) TagResponse {
 	return TagResponse{

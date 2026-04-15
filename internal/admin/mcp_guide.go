@@ -51,8 +51,8 @@ func MCPGuideHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateR
 
 		// Step 3 contextual data: pending reviews, uncategorized count, rule count.
 		var pendingReviews, uncategorizedCount, ruleCount int64
-		if counts, err := svc.GetReviewCounts(ctx); err == nil {
-			pendingReviews = counts.Pending
+		if n, err := pendingReviewsCount(ctx, svc); err == nil {
+			pendingReviews = n
 		}
 		if cnt, err := svc.CountUncategorizedTransactions(ctx); err == nil {
 			uncategorizedCount = cnt

@@ -646,29 +646,26 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			}
 		}
 
-		// Phase 2: read the activity timeline from annotations (the canonical
-		// source). Reviews are still queried separately because their own
-		// lifecycle events (enqueue, resolve) aren't modeled as annotations.
+		// Phase 3: annotations are the canonical activity-timeline source.
+		// Review lifecycle events now flow through tag_added / tag_removed
+		// annotations for the needs-review tag.
 		annotations, err := svc.ListAnnotations(ctx, idStr)
 		if err != nil && !errors.Is(err, service.ErrNotFound) {
 			a.Logger.Error("list transaction annotations", "error", err)
 		}
 
-		// Still needed for pending-review UI state and the review enqueue events.
-		reviews, err := svc.ListReviewsByTransactionID(ctx, idStr)
-		if err != nil && !errors.Is(err, service.ErrNotFound) {
-			a.Logger.Error("list transaction reviews", "error", err)
-		}
+		// Build unified activity timeline from annotations.
+		activity := buildActivityTimeline(annotations)
 
-		// Build unified activity timeline from annotations + review lifecycle.
-		activity := buildActivityTimeline(reviews, annotations)
-
-		// Check if there's a pending review (to disable re-enqueue)
+		// Check if the transaction currently carries the needs-review tag (to
+		// disable re-enqueue).
 		hasPendingReview := false
-		for _, r := range reviews {
-			if r.Status == "pending" {
-				hasPendingReview = true
-				break
+		if tags, tagErr := svc.ListTransactionTags(ctx, idStr); tagErr == nil {
+			for _, tag := range tags {
+				if tag.Slug == "needs-review" {
+					hasPendingReview = true
+					break
+				}
 			}
 		}
 
@@ -757,100 +754,18 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 // buildActivityTimeline merges the review lifecycle (enqueue + resolution)
 // with the annotation-driven timeline into a sorted activity list.
 //
-// Phase 2: annotations are the canonical source for comments, tag operations,
-// rule-driven category/tag/comment changes, and manual category sets. Reviews
-// still own their own enqueue/resolve lifecycle events because those aren't
-// (currently) modeled as annotations.
-func buildActivityTimeline(reviews []service.ReviewResponse, annotations []service.Annotation) []service.ActivityEntry {
+// Phase 3: annotations are the sole source of timeline events. The old
+// review_queue-derived "review" entries are gone; tag_added/tag_removed for
+// the needs-review tag fill the same role. Comment annotations that were
+// originally review notes (identified by payload.review_id) still render
+// inline on resolution events surfaced via the needs-review tag-lifecycle.
+func buildActivityTimeline(annotations []service.Annotation) []service.ActivityEntry {
 	var entries []service.ActivityEntry
-
-	// Index review-linked comment annotations by review_id so we can render
-	// them inline on the resolution event and skip them as standalone entries.
-	reviewLinkedComments := make(map[string]service.Annotation)
-	for _, a := range annotations {
-		if a.Kind != "comment" || a.Payload == nil {
-			continue
-		}
-		if rid, ok := a.Payload["review_id"].(string); ok && rid != "" {
-			reviewLinkedComments[rid] = a
-		}
-	}
-
-	// Review lifecycle events.
-	for _, r := range reviews {
-		var enqueueReason string
-		switch r.ReviewType {
-		case "uncategorized":
-			enqueueReason = "Uncategorized transaction"
-		case "new_transaction":
-			enqueueReason = "New transaction"
-		case "re_review":
-			enqueueReason = "Sent back for review"
-		case "manual":
-			enqueueReason = "Manually flagged"
-		default:
-			enqueueReason = "Flagged for review"
-		}
-		entries = append(entries, service.ActivityEntry{
-			Type:         "review",
-			Timestamp:    r.CreatedAt,
-			ActorName:    "System",
-			ActorType:    "system",
-			Summary:      enqueueReason,
-			Detail:       "Added to review queue",
-			ReviewStatus: "pending",
-		})
-
-		if r.Status != "pending" && r.ReviewedAt != nil {
-			e := service.ActivityEntry{
-				Type:      "review",
-				Timestamp: *r.ReviewedAt,
-			}
-			if r.ReviewerName != nil {
-				e.ActorName = *r.ReviewerName
-			}
-			if r.ReviewerType != nil {
-				e.ActorType = *r.ReviewerType
-			}
-			if r.ReviewerID != nil && *r.ReviewerID != "" {
-				id := *r.ReviewerID
-				e.ActorID = &id
-			}
-			switch r.Status {
-			case "approved":
-				e.ReviewStatus = "approved"
-				e.Summary = "Approved"
-				if r.ResolvedCategoryDisplayName != nil {
-					e.Summary = "Approved as " + *r.ResolvedCategoryDisplayName
-					e.CategoryName = *r.ResolvedCategoryDisplayName
-				}
-			case "rejected":
-				e.ReviewStatus = "rejected"
-				e.Summary = "Rejected"
-			case "skipped":
-				e.ReviewStatus = "skipped"
-				e.Summary = "Skipped"
-			}
-			if linked, ok := reviewLinkedComments[r.ID]; ok {
-				if content, _ := linked.Payload["content"].(string); content != "" {
-					e.Detail = content
-				}
-				if cid, _ := linked.Payload["comment_id"].(string); cid != "" {
-					e.CommentID = cid
-				}
-			}
-			entries = append(entries, e)
-		}
-	}
 
 	// Annotations.
 	for _, a := range annotations {
 		switch a.Kind {
 		case "comment":
-			// Skip review-linked comments (rendered inline on the resolution event).
-			if rid, _ := a.Payload["review_id"].(string); rid != "" {
-				continue
-			}
 			content, _ := a.Payload["content"].(string)
 			// Filter legacy [Review: ...] prefix duplicates from pre-consolidation imports.
 			if strings.HasPrefix(content, "[Review: ") {

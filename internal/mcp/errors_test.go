@@ -21,10 +21,6 @@ func TestErrorCode_Mapping(t *testing.T) {
 		{"not found", service.ErrNotFound, CodeNotFound},
 		{"category not found", service.ErrCategoryNotFound, CodeNotFound},
 		{"forbidden", service.ErrForbidden, CodeForbidden},
-		{"review already pending", service.ErrReviewAlreadyPending, CodeReviewAlreadyPending},
-		{"review already resolved", service.ErrReviewAlreadyResolved, CodeReviewAlreadyResolved},
-		{"reviews disabled", ErrReviewsDisabled, CodeReviewsDisabled},
-		{"invalid decision", service.ErrInvalidDecision, CodeInvalidDecision},
 		{"invalid cursor", service.ErrInvalidCursor, CodeInvalidCursor},
 		{"invalid parameter", service.ErrInvalidParameter, CodeInvalidParameter},
 		{"sync in progress", service.ErrSyncInProgress, CodeSyncInProgress},
@@ -48,14 +44,14 @@ func TestErrorCode_WrappedError(t *testing.T) {
 		t.Fatalf("ErrorCode(wrapped ErrCategoryNotFound) = %q, want %q", got, CodeNotFound)
 	}
 
-	deeper := fmt.Errorf("outer: %w", fmt.Errorf("inner: %w", service.ErrReviewAlreadyResolved))
-	if got := ErrorCode(deeper); got != CodeReviewAlreadyResolved {
-		t.Fatalf("ErrorCode(deeply wrapped ErrReviewAlreadyResolved) = %q, want %q", got, CodeReviewAlreadyResolved)
+	deeper := fmt.Errorf("outer: %w", fmt.Errorf("inner: %w", service.ErrCategoryNotFound))
+	if got := ErrorCode(deeper); got != CodeNotFound {
+		t.Fatalf("ErrorCode(deeply wrapped ErrCategoryNotFound) = %q, want %q", got, CodeNotFound)
 	}
 }
 
 func TestErrorResult_EnvelopeShape(t *testing.T) {
-	res := errorResult(service.ErrReviewAlreadyResolved)
+	res := errorResult(service.ErrCategoryNotFound)
 	if !res.IsError {
 		t.Fatal("expected IsError=true")
 	}
@@ -71,11 +67,11 @@ func TestErrorResult_EnvelopeShape(t *testing.T) {
 	if err := json.Unmarshal([]byte(tc.Text), &payload); err != nil {
 		t.Fatalf("envelope is not valid JSON: %v. raw=%q", err, tc.Text)
 	}
-	if payload["code"] != CodeReviewAlreadyResolved {
-		t.Fatalf("code = %q, want %q", payload["code"], CodeReviewAlreadyResolved)
+	if payload["code"] != CodeNotFound {
+		t.Fatalf("code = %q, want %q", payload["code"], CodeNotFound)
 	}
-	if payload["error"] != service.ErrReviewAlreadyResolved.Error() {
-		t.Fatalf("error message = %q, want %q", payload["error"], service.ErrReviewAlreadyResolved.Error())
+	if payload["error"] != service.ErrCategoryNotFound.Error() {
+		t.Fatalf("error message = %q, want %q", payload["error"], service.ErrCategoryNotFound.Error())
 	}
 }
 

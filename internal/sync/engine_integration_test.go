@@ -683,9 +683,8 @@ func TestSync_RuleCategoryDuringSync(t *testing.T) {
 
 // TestSync_ReviewEnqueueNewTransaction and TestSync_ReviewDisabled_NoEnqueue
 // were removed in Phase 1 (Rule Actions v2): the sync engine no longer
-// auto-enqueues review_queue rows, so there's nothing to assert. Phase 2
-// reintroduces the review surface via a seeded "needs-review" tag rule, and
-// new tests will land there.
+// auto-enqueues review rows. Phase 2 reintroduced the review surface via a
+// seeded "needs-review" tag rule; Phase 3 dropped the review_queue table.
 
 func TestSync_Pagination_BuffersThenFlushes(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
@@ -1213,8 +1212,8 @@ func TestSync_SyncTriggerTypes(t *testing.T) {
 
 // TestSync_UncategorizedReviewType and TestSync_CategorizedNewTransaction were
 // removed in Phase 1 (Rule Actions v2): the sync engine no longer enqueues
-// review_queue rows automatically. Phase 2 reintroduces equivalent coverage via
-// the seeded "needs-review" tag rule and `field: "tags"` filtering.
+// reviews automatically. Phase 2 reintroduced equivalent coverage via the
+// seeded "needs-review" tag rule. Phase 3 removed the review_queue entirely.
 
 func TestSync_UnchangedTransactions_SkipRuleReapplication(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
@@ -1269,11 +1268,15 @@ func TestSync_UnchangedTransactions_SkipRuleReapplication(t *testing.T) {
 		t.Fatalf("first sync: %v", err)
 	}
 
-	// Verify rule was applied and record the applied_at timestamp.
+	// Verify rule was applied (via annotations, Phase 3) and record the
+	// created_at timestamp.
 	var appliedAt1 time.Time
 	err = pool.QueryRow(ctx,
-		`SELECT applied_at FROM transaction_rule_applications
-		 WHERE transaction_id = (SELECT id FROM transactions WHERE external_transaction_id = 'txn_coffee')`,
+		`SELECT created_at FROM annotations
+		 WHERE kind = 'rule_applied'
+		   AND transaction_id = (SELECT id FROM transactions WHERE external_transaction_id = 'txn_coffee')
+		 ORDER BY created_at ASC
+		 LIMIT 1`,
 	).Scan(&appliedAt1)
 	if err != nil {
 		t.Fatalf("query rule application after first sync: %v", err)
@@ -1303,17 +1306,23 @@ func TestSync_UnchangedTransactions_SkipRuleReapplication(t *testing.T) {
 		t.Fatalf("second sync: %v", err)
 	}
 
-	// Verify applied_at was NOT bumped.
+	// Verify the original annotation is still there — no new annotation
+	// should have been written for the unchanged re-sync (only 1 row).
 	var appliedAt2 time.Time
+	var annotationCount int
 	err = pool.QueryRow(ctx,
-		`SELECT applied_at FROM transaction_rule_applications
-		 WHERE transaction_id = (SELECT id FROM transactions WHERE external_transaction_id = 'txn_coffee')`,
-	).Scan(&appliedAt2)
+		`SELECT COUNT(*), MIN(created_at) FROM annotations
+		 WHERE kind = 'rule_applied'
+		   AND transaction_id = (SELECT id FROM transactions WHERE external_transaction_id = 'txn_coffee')`,
+	).Scan(&annotationCount, &appliedAt2)
 	if err != nil {
-		t.Fatalf("query rule application after second sync: %v", err)
+		t.Fatalf("query rule annotation after second sync: %v", err)
+	}
+	if annotationCount != 1 {
+		t.Errorf("expected exactly 1 rule_applied annotation after unchanged re-sync, got %d", annotationCount)
 	}
 	if !appliedAt2.Equal(appliedAt1) {
-		t.Errorf("rule application applied_at was bumped on unchanged transaction: first=%v, second=%v", appliedAt1, appliedAt2)
+		t.Errorf("rule_applied annotation created_at changed unexpectedly: first=%v, second=%v", appliedAt1, appliedAt2)
 	}
 
 	// Verify hit count was NOT incremented again.

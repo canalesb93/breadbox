@@ -15,28 +15,18 @@ import (
 // internal/api so that agents can programmatically distinguish error
 // conditions without parsing the human-readable message.
 const (
-	CodeNotFound              = "NOT_FOUND"
-	CodeForbidden             = "FORBIDDEN"
-	CodeInvalidParameter      = "INVALID_PARAMETER"
-	CodeInvalidCategory       = "INVALID_CATEGORY"
-	CodeInvalidCursor         = "INVALID_CURSOR"
-	CodeInvalidDecision       = "INVALID_DECISION"
-	CodeReviewAlreadyPending  = "REVIEW_ALREADY_PENDING"
-	CodeReviewAlreadyResolved = "REVIEW_ALREADY_RESOLVED"
-	CodeReviewsDisabled       = "REVIEWS_DISABLED"
-	CodeSyncInProgress        = "SYNC_IN_PROGRESS"
-	CodeSlugConflict          = "SLUG_CONFLICT"
-	CodeCategoryUndeletable   = "CATEGORY_UNDELETABLE"
-	CodeInvalidAPIKey         = "INVALID_API_KEY"
-	CodeRevokedAPIKey         = "REVOKED_API_KEY"
-	CodeInternalError         = "INTERNAL_ERROR"
+	CodeNotFound            = "NOT_FOUND"
+	CodeForbidden           = "FORBIDDEN"
+	CodeInvalidParameter    = "INVALID_PARAMETER"
+	CodeInvalidCategory     = "INVALID_CATEGORY"
+	CodeInvalidCursor       = "INVALID_CURSOR"
+	CodeSyncInProgress      = "SYNC_IN_PROGRESS"
+	CodeSlugConflict        = "SLUG_CONFLICT"
+	CodeCategoryUndeletable = "CATEGORY_UNDELETABLE"
+	CodeInvalidAPIKey       = "INVALID_API_KEY"
+	CodeRevokedAPIKey       = "REVOKED_API_KEY"
+	CodeInternalError       = "INTERNAL_ERROR"
 )
-
-// ErrReviewsDisabled is a sentinel for use by MCP tool handlers when
-// the review queue is disabled. The service layer exposes a boolean
-// (IsReviewsEnabled) rather than returning an error, but we want a
-// stable sentinel for ErrorCode to match against.
-var ErrReviewsDisabled = errors.New("transaction reviews are currently disabled. Enable them in the admin dashboard at /reviews")
 
 // ErrorCode maps a Go error to a stable UPPER_SNAKE_CASE code string.
 //
@@ -54,14 +44,6 @@ func ErrorCode(err error) string {
 		return CodeNotFound
 	case errors.Is(err, service.ErrForbidden):
 		return CodeForbidden
-	case errors.Is(err, service.ErrReviewAlreadyPending):
-		return CodeReviewAlreadyPending
-	case errors.Is(err, service.ErrReviewAlreadyResolved):
-		return CodeReviewAlreadyResolved
-	case errors.Is(err, ErrReviewsDisabled):
-		return CodeReviewsDisabled
-	case errors.Is(err, service.ErrInvalidDecision):
-		return CodeInvalidDecision
 	case errors.Is(err, service.ErrInvalidCursor):
 		return CodeInvalidCursor
 	case errors.Is(err, service.ErrInvalidParameter):

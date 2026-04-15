@@ -294,8 +294,8 @@ func benchBuildAdminListQuery(params benchAdminListParams) (string, []any) {
 		"t.date, t.name, t.merchant_name, t.amount, t.iso_currency_code, " +
 		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
 		"t.category_override, t.pending, " +
-		"EXISTS(SELECT 1 FROM review_queue rq WHERE rq.transaction_id = t.id AND rq.reviewer_type = 'agent' AND rq.status IN ('approved', 'rejected')) AS agent_reviewed, " +
-		"EXISTS(SELECT 1 FROM review_queue rq WHERE rq.transaction_id = t.id AND rq.status = 'pending') AS has_pending_review, " +
+		"EXISTS(SELECT 1 FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'category_set' AND ann.actor_type = 'agent') AS agent_reviewed, " +
+		"EXISTS(SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = 'needs-review') AS has_pending_review, " +
 		"t.created_at, t.updated_at, " +
 		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id " +
 		"FROM transactions t " +
