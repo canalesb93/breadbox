@@ -14,3 +14,18 @@ ORDER BY created_at ASC;
 -- name: CountAnnotationsByTransactionAndKind :one
 SELECT COUNT(*) FROM annotations
 WHERE transaction_id = $1 AND kind = $2;
+
+-- name: GetAnnotationByID :one
+SELECT * FROM annotations WHERE id = $1;
+
+-- name: GetAnnotationUUIDByShortID :one
+SELECT id FROM annotations WHERE short_id = $1;
+
+-- name: UpdateAnnotationPayload :one
+UPDATE annotations
+SET payload = $2
+WHERE id = $1
+RETURNING *;
+
+-- name: DeleteAnnotation :exec
+DELETE FROM annotations WHERE id = $1;

@@ -365,23 +365,12 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			ruleApplications = append(ruleApplications, result.ruleApplications...)
 		}
 
-		// Batch-insert rule application records, and dual-write the matching
-		// rule_applied annotation (Phase 2 bridge — transaction_rule_applications
-		// is retired in Phase 3).
+		// Write rule_applied annotations per transaction-rule pair. Phase 3
+		// retired transaction_rule_applications; annotations are the sole
+		// record. actor_type="system" (annotations constrain actor_type to
+		// user|agent|system — rule_id in the dedicated column carries the rule
+		// back-reference).
 		for _, app := range ruleApplications {
-			if _, err := tx.Exec(ctx,
-				`INSERT INTO transaction_rule_applications (transaction_id, rule_id, action_field, action_value, applied_by)
-				VALUES ($1, $2, $3, $4, 'sync')
-				ON CONFLICT (transaction_id, rule_id, action_field) DO UPDATE
-				SET applied_at = NOW(), action_value = EXCLUDED.action_value
-				WHERE transaction_rule_applications.action_value IS DISTINCT FROM EXCLUDED.action_value`,
-				app.txnID, app.ruleID, app.actionField, app.actionValue); err != nil {
-				logger.Error("insert rule application", "transaction_id", app.txnID, "rule_id", app.ruleID, "error", err)
-				continue
-			}
-			// rule_applied annotation. actor_type="system" (annotations constrain
-			// actor_type to user|agent|system — rule_id in the dedicated column
-			// carries the rule back-reference).
 			payload := map[string]any{
 				"rule_id":      app.ruleShortID,
 				"rule_name":    app.ruleName,
@@ -534,10 +523,9 @@ func (e *Engine) processTransaction(ctx context.Context, txn *provider.Transacti
 
 	// Apply rules to new or changed transactions.
 	//
-	// Phase 1: review auto-enqueue is gone. The trigger column on rules
-	// decides which rules fire for isNew vs !isNew; the sync engine no
-	// longer calls enqueueForReview — Phase 2 reintroduces the review flow
-	// via a seeded "needs-review" rule + tag.
+	// Phase 3: the seeded "needs-review" rule+tag drives the review flow.
+	// The trigger column on rules decides which rules fire for isNew vs
+	// !isNew; the sync engine never writes to review_queue.
 	if isNew || isChanged {
 		sources, ruleErr := e.applyRulesToTransaction(ctx, opts.tx, txn, dbTxn, opts.accountIDCache, opts.providerName, opts.resolver, opts.userID, opts.userName, providerAdded && isNew)
 		if ruleErr != nil {
@@ -603,11 +591,9 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 // isNew is threaded through to ResolveWithContext so trigger filtering
 // (on_create / on_update / always) decides which rules fire.
 //
-// Phase 2: set_category, add_tag, and add_comment actions all persist to the
-// transactions / transaction_tags / transaction_comments tables inside the
-// sync tx. Each persistent change writes an accompanying annotation row so the
-// activity timeline (backed by annotations) captures every effect.
-// transaction_comments + transaction_rule_applications are retired in Phase 3.
+// Phase 3: set_category updates transactions.category_id, add_tag persists to
+// transaction_tags, add_comment writes an annotation. Every persistent change
+// also writes a kind-specific annotation row (the canonical activity timeline).
 func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *provider.Transaction, dbTxn db.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *RuleResolver, userID pgtype.UUID, userName string, isNew bool) ([]RuleActionSource, error) {
 	if resolver == nil {
 		return nil, nil
@@ -703,9 +689,8 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		}
 	}
 
-	// add_comment: dual-write to transaction_comments (legacy) and annotations
-	// (Phase 2 source of truth). Rule-authored comments attribute to the rule
-	// via rule_id back-reference.
+	// add_comment: persist as a comment annotation. Rule-authored comments
+	// attribute to the rule via rule_id back-reference.
 	for _, content := range result.Comments {
 		src := sourceByKey["comment|"+content]
 		if err := e.applyCommentFromRule(ctx, tx, dbTxn.ID, content, src.ruleID, src.ruleShortID, src.ruleName); err != nil {
@@ -813,19 +798,9 @@ func (e *Engine) applyTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.U
 	return nil
 }
 
-// applyCommentFromRule dual-writes a rule-authored comment to
-// transaction_comments and the annotations table (Phase 2 bridge).
+// applyCommentFromRule writes a rule-authored comment annotation. Phase 3
+// retired transaction_comments; annotations are now the sole record.
 func (e *Engine) applyCommentFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, content string, ruleID pgtype.UUID, ruleShortID, ruleName string) error {
-	// Legacy comment row. AuthorType=system so the existing activity timeline
-	// renderers keep working during the bridge.
-	_, err := tx.Exec(ctx,
-		`INSERT INTO transaction_comments (transaction_id, author_type, author_id, author_name, content)
-		VALUES ($1, 'system', $2, $3, $4)`,
-		txnID, ruleShortID, ruleName, content)
-	if err != nil {
-		return fmt.Errorf("insert rule comment: %w", err)
-	}
-
 	payload := map[string]any{
 		"content":   content,
 		"source":    "rule",

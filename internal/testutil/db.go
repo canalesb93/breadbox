@@ -277,20 +277,6 @@ func MustCreateAPIKey(t *testing.T, q *db.Queries, name string) db.ApiKey {
 	return key
 }
 
-// MustCreateReview enqueues a review for a transaction and fatals on error.
-// reviewType should be one of: new_transaction, uncategorized, manual, re_review.
-func MustCreateReview(t *testing.T, q *db.Queries, txnID pgtype.UUID, reviewType string) db.ReviewQueue {
-	t.Helper()
-	review, err := q.EnqueueReview(context.Background(), db.EnqueueReviewParams{
-		TransactionID: txnID,
-		ReviewType:    reviewType,
-	})
-	if err != nil {
-		t.Fatalf("MustCreateReview(%q): %v", reviewType, err)
-	}
-	return review
-}
-
 // MustCreateTag inserts a tag row and fatals on error. lifecycle defaults to
 // "persistent" if empty.
 func MustCreateTag(t *testing.T, q *db.Queries, slug, displayName, lifecycle string) db.Tag {

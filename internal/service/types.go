@@ -357,86 +357,8 @@ type CommentResponse struct {
 	UpdatedAt     string  `json:"updated_at"`
 }
 
-// Review queue types
-
-type ReviewResponse struct {
-	ID                 string  `json:"id"`
-	ShortID            string  `json:"short_id"`
-	TransactionID      string  `json:"transaction_id"`
-	TransactionShortID *string `json:"transaction_short_id,omitempty"`
-	ReviewType         string  `json:"review_type"`
-	Status             string  `json:"status"`
-	Provider           *string `json:"provider,omitempty"`
-	SuggestedCategoryID          *string              `json:"suggested_category_id,omitempty"`
-	SuggestedCategoryShortID     *string              `json:"suggested_category_short_id,omitempty"`
-	SuggestedCategory            *string              `json:"suggested_category_slug,omitempty"`
-	SuggestedCategoryDisplayName *string              `json:"suggested_category_display_name,omitempty"`
-	ConfidenceScore              *float64             `json:"confidence_score,omitempty"`
-	ReviewerType                 *string              `json:"reviewer_type,omitempty"`
-	ReviewerID                   *string              `json:"reviewer_id,omitempty"`
-	ReviewerName                 *string              `json:"reviewer_name,omitempty"`
-	ResolvedCategoryID           *string              `json:"resolved_category_id,omitempty"`
-	ResolvedCategoryShortID      *string              `json:"resolved_category_short_id,omitempty"`
-	ResolvedCategory             *string              `json:"resolved_category_slug,omitempty"`
-	ResolvedCategoryDisplayName  *string              `json:"resolved_category_display_name,omitempty"`
-	CreatedAt           string               `json:"created_at"`
-	ReviewedAt          *string              `json:"reviewed_at,omitempty"`
-	Transaction         *TransactionResponse `json:"transaction,omitempty"`
-}
-
-type ReviewListParams struct {
-	Status             *string
-	ReviewType         *string
-	AccountID          *string
-	UserID             *string
-	CategoryPrimaryRaw *string
-	Limit              int
-	Cursor             string
-}
-
-type ReviewListResult struct {
-	Reviews    []ReviewResponse `json:"reviews"`
-	NextCursor string           `json:"next_cursor,omitempty"`
-	HasMore    bool             `json:"has_more"`
-	Total      int64            `json:"total"`
-}
-
-type SubmitReviewParams struct {
-	ReviewID   string
-	Decision   string
-	CategoryID *string
-	Note       *string
-	Actor      Actor
-}
-
-type BulkSubmitReviewParams struct {
-	Reviews []BulkReviewItem
-	Actor   Actor
-}
-
-type BulkReviewItem struct {
-	ReviewID   string  `json:"review_id"`
-	Decision   string  `json:"decision"`
-	CategoryID *string `json:"category_id,omitempty"`
-	Note       *string `json:"note,omitempty"`
-}
-
-type BulkReviewResult struct {
-	Succeeded int              `json:"succeeded"`
-	Failed    []BulkReviewError `json:"failed,omitempty"`
-}
-
-type BulkReviewError struct {
-	ReviewID string `json:"review_id"`
-	Error    string `json:"error"`
-}
-
-type ReviewCountsResponse struct {
-	Pending       int64 `json:"pending"`
-	ApprovedToday int64 `json:"approved_today"`
-	RejectedToday int64 `json:"rejected_today"`
-	SkippedToday  int64 `json:"skipped_today"`
-}
+// Review-queue types (retired in Phase 3) have been removed. The remaining
+// MCP shims translate review-shaped inputs onto tag + annotation operations.
 
 // Transaction rule types
 

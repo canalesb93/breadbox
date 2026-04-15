@@ -30,11 +30,12 @@ func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Han
 			ctx := r.Context()
 			badges := NavBadges{}
 
-			// Phase 1 (Rule Actions v2): the review queue is always on — the
-			// review_auto_enqueue config flag was removed. Count pending
-			// reviews unconditionally so the nav badge reflects reality.
+			// Phase 3: the review queue is backed by the needs-review tag.
+			// Count transactions currently carrying that tag (excluding matched
+			// dependent transactions, matching the semantics of the old
+			// review_queue count).
 			badges.ReviewsEnabled = true
-			if pending, err := queries.CountPendingReviews(ctx); err == nil {
+			if pending, err := countPendingReviewsFromTags(ctx, queries); err == nil {
 				badges.PendingReviews = pending
 			} else {
 				logger.Debug("nav badges: count pending reviews", "error", err)
@@ -67,6 +68,26 @@ func getNavBadges(ctx context.Context) NavBadges {
 		return badges
 	}
 	return NavBadges{}
+}
+
+// countPendingReviewsFromTags returns the number of transactions currently
+// tagged "needs-review" (excluding matched dependent transactions). This
+// replaces the Phase 2 review_queue count after Phase 3 retired that table.
+func countPendingReviewsFromTags(ctx context.Context, queries *db.Queries) (int64, error) {
+	return queries.CountTransactionsWithTagSlug(ctx, "needs-review")
+}
+
+// pendingReviewsCount returns the count of transactions currently tagged
+// "needs-review". Shared across agent_wizard / agents_page / mcp_guide.
+func pendingReviewsCount(ctx context.Context, svc pendingReviewCountSource) (int64, error) {
+	return svc.CountTransactionsTag(ctx, "needs-review")
+}
+
+// pendingReviewCountSource is satisfied by *service.Service via its
+// CountTransactionsTag helper. Narrow interface so middleware.go doesn't pull
+// service into the admin package indirectly.
+type pendingReviewCountSource interface {
+	CountTransactionsTag(ctx context.Context, slug string) (int64, error)
 }
 
 // RequireAuth is chi middleware that checks for an authenticated session.

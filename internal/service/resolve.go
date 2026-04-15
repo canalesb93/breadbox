@@ -57,11 +57,6 @@ func (s *Service) resolveConnectionID(ctx context.Context, idOrShort string) (pg
 	return s.resolveID(ctx, idOrShort, s.Queries.GetConnectionUUIDByShortID, ErrNotFound)
 }
 
-// resolveReviewID accepts either a UUID string or a short ID.
-func (s *Service) resolveReviewID(ctx context.Context, idOrShort string) (pgtype.UUID, error) {
-	return s.resolveID(ctx, idOrShort, s.Queries.GetReviewUUIDByShortID, ErrNotFound)
-}
-
 // resolveRuleID accepts either a UUID string or a short ID.
 func (s *Service) resolveRuleID(ctx context.Context, idOrShort string) (pgtype.UUID, error) {
 	return s.resolveID(ctx, idOrShort, s.Queries.GetRuleUUIDByShortID, ErrNotFound)
@@ -77,7 +72,8 @@ func (s *Service) resolveMatchID(ctx context.Context, idOrShort string) (pgtype.
 	return s.resolveID(ctx, idOrShort, s.Queries.GetMatchUUIDByShortID, ErrNotFound)
 }
 
-// resolveCommentID accepts either a UUID string or a short ID.
-func (s *Service) resolveCommentID(ctx context.Context, idOrShort string) (pgtype.UUID, error) {
-	return s.resolveID(ctx, idOrShort, s.Queries.GetCommentUUIDByShortID, ErrNotFound)
+// resolveAnnotationID accepts either a UUID string or a short ID.
+// Phase 3 retired transaction_comments; comment IDs are now annotation IDs.
+func (s *Service) resolveAnnotationID(ctx context.Context, idOrShort string) (pgtype.UUID, error) {
+	return s.resolveID(ctx, idOrShort, s.Queries.GetAnnotationUUIDByShortID, ErrNotFound)
 }

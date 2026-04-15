@@ -1458,11 +1458,14 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 		WHERE t.deleted_at IS NULL AND t.category_override = FALSE
 		AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
-	// When previewing for a specific rule's detail page, exclude transactions already applied by this rule
+	// When previewing for a specific rule's detail page, exclude transactions
+	// already applied by this rule. Phase 3 retired
+	// transaction_rule_applications; the annotations table carries the same
+	// audit trail via kind='rule_applied'.
 	var baseArgs []any
 	baseArgN := 1
 	if excludeRuleID != nil {
-		baseQuery += fmt.Sprintf(" AND NOT EXISTS (SELECT 1 FROM transaction_rule_applications tra WHERE tra.transaction_id = t.id AND tra.rule_id = $%d)", baseArgN)
+		baseQuery += fmt.Sprintf(" AND NOT EXISTS (SELECT 1 FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'rule_applied' AND ann.rule_id = $%d)", baseArgN)
 		baseArgs = append(baseArgs, *excludeRuleID)
 		baseArgN++
 	}
@@ -1706,23 +1709,15 @@ func (s *Service) convertRuleRows(ctx context.Context, scanned []ruleRow) []Tran
 	return rules
 }
 
-// recordRuleApplications inserts rule application records for a batch of
-// transactions. Phase 2 also dual-writes a matching rule_applied annotation
-// per transaction so the activity timeline (backed by annotations) stays
-// complete. transaction_rule_applications is retired in Phase 3.
+// recordRuleApplications writes a rule_applied annotation per transaction.
+// Phase 3 retired the transaction_rule_applications table; annotations are now
+// the canonical record of which rules touched which transactions.
 func (s *Service) recordRuleApplications(ctx context.Context, ruleID pgtype.UUID, txnIDs []pgtype.UUID, actionField, actionValue, appliedBy string) {
 	// Look up rule metadata for annotation actor fields.
 	var ruleShortID, ruleName string
 	_ = s.Pool.QueryRow(ctx, `SELECT short_id, name FROM transaction_rules WHERE id = $1`, ruleID).Scan(&ruleShortID, &ruleName)
 
 	for _, txnID := range txnIDs {
-		_, _ = s.Pool.Exec(ctx,
-			`INSERT INTO transaction_rule_applications (transaction_id, rule_id, action_field, action_value, applied_by)
-			VALUES ($1, $2, $3, $4, $5)
-			ON CONFLICT (transaction_id, rule_id, action_field) DO UPDATE SET applied_at = NOW(), action_value = EXCLUDED.action_value, applied_by = EXCLUDED.applied_by`,
-			txnID, ruleID, actionField, actionValue, appliedBy)
-
-		// rule_applied annotation.
 		payload := map[string]interface{}{
 			"rule_id":      ruleShortID,
 			"rule_name":    ruleName,
@@ -1884,7 +1879,9 @@ type RuleStats struct {
 	RetroApplications    int64  `json:"retro_applications"`
 }
 
-// GetRuleStats returns aggregate stats about a rule's applications.
+// GetRuleStats returns aggregate stats about a rule's applications. Phase 3
+// sources these from the annotations table (kind='rule_applied') now that
+// transaction_rule_applications is gone.
 func (s *Service) GetRuleStats(ctx context.Context, ruleID string) (*RuleStats, error) {
 	ruleUUID, err := s.resolveRuleID(ctx, ruleID)
 	if err != nil {
@@ -1895,11 +1892,11 @@ func (s *Service) GetRuleStats(ctx context.Context, ruleID string) (*RuleStats, 
 	err = s.Pool.QueryRow(ctx, `SELECT
 		COUNT(*) AS total,
 		COUNT(DISTINCT transaction_id) AS unique_txns,
-		COALESCE(MIN(applied_at)::text, ''),
-		COALESCE(MAX(applied_at)::text, ''),
-		COUNT(*) FILTER (WHERE applied_by = 'sync'),
-		COUNT(*) FILTER (WHERE applied_by = 'retroactive')
-		FROM transaction_rule_applications WHERE rule_id = $1`, ruleUUID).Scan(
+		COALESCE(MIN(created_at)::text, ''),
+		COALESCE(MAX(created_at)::text, ''),
+		COUNT(*) FILTER (WHERE payload->>'applied_by' = 'sync'),
+		COUNT(*) FILTER (WHERE payload->>'applied_by' = 'retroactive')
+		FROM annotations WHERE kind = 'rule_applied' AND rule_id = $1`, ruleUUID).Scan(
 		&stats.TotalApplications,
 		&stats.UniqueTransactions,
 		&stats.FirstAppliedAt,
@@ -1914,6 +1911,7 @@ func (s *Service) GetRuleStats(ctx context.Context, ruleID string) (*RuleStats, 
 }
 
 // ListRuleApplications returns transactions affected by a rule, paginated.
+// Sources from annotations(kind='rule_applied') after Phase 3.
 func (s *Service) ListRuleApplications(ctx context.Context, ruleID string, limit int, cursor string) ([]RuleApplicationRow, bool, error) {
 	ruleUUID, err := s.resolveRuleID(ctx, ruleID)
 	if err != nil {
@@ -1927,10 +1925,14 @@ func (s *Service) ListRuleApplications(ctx context.Context, ruleID string, limit
 		limit = 100
 	}
 
-	query := `SELECT tra.id, tra.transaction_id, t.name, t.amount, t.date, tra.action_field, tra.action_value, tra.applied_by, tra.applied_at
-		FROM transaction_rule_applications tra
-		JOIN transactions t ON tra.transaction_id = t.id
-		WHERE tra.rule_id = $1`
+	query := `SELECT ann.id, ann.transaction_id, t.name, t.amount, t.date,
+		COALESCE(ann.payload->>'action_field', ''),
+		COALESCE(ann.payload->>'action_value', ''),
+		COALESCE(ann.payload->>'applied_by', 'sync'),
+		ann.created_at
+		FROM annotations ann
+		JOIN transactions t ON ann.transaction_id = t.id
+		WHERE ann.kind = 'rule_applied' AND ann.rule_id = $1`
 
 	args := []any{ruleUUID}
 	argN := 2
@@ -1944,12 +1946,12 @@ func (s *Service) ListRuleApplications(ctx context.Context, ruleID string, limit
 		if err != nil {
 			return nil, false, ErrInvalidCursor
 		}
-		query += fmt.Sprintf(" AND (tra.applied_at, tra.id) < ($%d, $%d)", argN, argN+1)
+		query += fmt.Sprintf(" AND (ann.created_at, ann.id) < ($%d, $%d)", argN, argN+1)
 		args = append(args, pgtype.Timestamptz{Time: cursorTime, Valid: true}, cursorUUID)
 		argN += 2
 	}
 
-	query += " ORDER BY tra.applied_at DESC, tra.id DESC"
+	query += " ORDER BY ann.created_at DESC, ann.id DESC"
 	query += fmt.Sprintf(" LIMIT $%d", argN)
 	args = append(args, limit+1)
 
@@ -1998,7 +2000,7 @@ func (s *Service) CountRuleApplications(ctx context.Context, ruleID string) (int
 		return 0, nil
 	}
 	var count int64
-	err = s.Pool.QueryRow(ctx, "SELECT COUNT(DISTINCT transaction_id) FROM transaction_rule_applications WHERE rule_id = $1", ruleUUID).Scan(&count)
+	err = s.Pool.QueryRow(ctx, "SELECT COUNT(DISTINCT transaction_id) FROM annotations WHERE kind = 'rule_applied' AND rule_id = $1", ruleUUID).Scan(&count)
 	return count, err
 }
 
@@ -2058,20 +2060,25 @@ type TransactionRuleApplicationDetail struct {
 	AppliedAt           string `json:"applied_at"`
 }
 
-// ListRuleApplicationsByTransactionID returns all rules that applied actions to a transaction.
+// ListRuleApplicationsByTransactionID returns all rules that applied actions
+// to a transaction. Phase 3 reads from annotations(kind='rule_applied').
 func (s *Service) ListRuleApplicationsByTransactionID(ctx context.Context, transactionID string) ([]TransactionRuleApplicationDetail, error) {
 	txnUUID, err := s.resolveTransactionID(ctx, transactionID)
 	if err != nil {
 		return nil, nil
 	}
 
-	rows, err := s.Pool.Query(ctx, `SELECT tra.rule_id, tr.name, tra.action_field, tra.action_value,
-		COALESCE(c.display_name, ''), tra.applied_by, tra.applied_at
-		FROM transaction_rule_applications tra
-		JOIN transaction_rules tr ON tr.id = tra.rule_id
-		LEFT JOIN categories c ON tra.action_field = 'category' AND c.slug = tra.action_value
-		WHERE tra.transaction_id = $1
-		ORDER BY tra.applied_at ASC`, txnUUID)
+	rows, err := s.Pool.Query(ctx, `SELECT ann.rule_id, COALESCE(tr.name, 'Deleted rule'),
+		COALESCE(ann.payload->>'action_field', ''),
+		COALESCE(ann.payload->>'action_value', ''),
+		COALESCE(c.display_name, ''),
+		COALESCE(ann.payload->>'applied_by', 'sync'),
+		ann.created_at
+		FROM annotations ann
+		LEFT JOIN transaction_rules tr ON tr.id = ann.rule_id
+		LEFT JOIN categories c ON ann.payload->>'action_field' = 'category' AND c.slug = ann.payload->>'action_value'
+		WHERE ann.kind = 'rule_applied' AND ann.transaction_id = $1
+		ORDER BY ann.created_at ASC`, txnUUID)
 	if err != nil {
 		return nil, fmt.Errorf("query rule applications by txn: %w", err)
 	}

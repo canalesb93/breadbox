@@ -23,9 +23,9 @@ func AgentWizardHandler(svc *service.Service, sm *scs.SessionManager, tr *Templa
 
 		var stats AgentWizardStats
 
-		// Fetch pending review count.
-		if counts, err := svc.GetReviewCounts(ctx); err == nil {
-			stats.PendingReviews = counts.Pending
+		// Fetch pending review count (transactions tagged needs-review).
+		if n, err := pendingReviewsCount(ctx, svc); err == nil {
+			stats.PendingReviews = n
 		}
 
 		// Fetch total active rules.

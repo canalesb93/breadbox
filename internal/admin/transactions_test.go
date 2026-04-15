@@ -87,56 +87,10 @@ func searchString(s, sub string) bool {
 	return false
 }
 
-func TestBuildActivityTimeline_LinkedCommentRendersInResolution(t *testing.T) {
-	reviewID := "rev-1"
-	resolvedName := "Groceries"
-	reviewerType := "agent"
-	reviewerName := "auto-review"
-	reviewedAt := "2026-04-03T10:00:00Z"
-	reviews := []service.ReviewResponse{{
-		ID:                          reviewID,
-		ReviewType:                  "uncategorized",
-		Status:                      "approved",
-		ReviewerType:                &reviewerType,
-		ReviewerName:                &reviewerName,
-		ResolvedCategoryDisplayName: &resolvedName,
-		CreatedAt:                   "2026-04-03T09:00:00Z",
-		ReviewedAt:                  &reviewedAt,
-	}}
-	annotations := []service.Annotation{{
-		ID:        "ann-linked",
-		Kind:      "comment",
-		ActorName: reviewerName,
-		ActorType: reviewerType,
-		Payload: map[string]interface{}{
-			"content":    "matched recurring merchant rule",
-			"comment_id": "comment-linked",
-			"review_id":  reviewID,
-		},
-		CreatedAt: "2026-04-03T10:00:00Z",
-	}}
-
-	entries := buildActivityTimeline(reviews, annotations)
-
-	var resolution *service.ActivityEntry
-	for i := range entries {
-		if entries[i].Type == "comment" {
-			t.Fatalf("linked review-note comment should not render as a standalone entry, got %+v", entries[i])
-		}
-		if entries[i].ReviewStatus == "approved" {
-			resolution = &entries[i]
-		}
-	}
-	if resolution == nil {
-		t.Fatal("expected an approved resolution entry")
-	}
-	if resolution.Detail != "matched recurring merchant rule" {
-		t.Errorf("resolution Detail = %q, want linked comment content", resolution.Detail)
-	}
-	if resolution.CommentID != "comment-linked" {
-		t.Errorf("resolution CommentID = %q, want comment-linked (so delete affordance is preserved)", resolution.CommentID)
-	}
-}
+// Phase 3: review_queue is gone. The activity timeline is built purely from
+// annotations now — comments, tag_added/tag_removed, rule_applied, category_set.
+// The "linked comment rendered inline on a review resolution" path no longer
+// exists (review resolutions are no longer a distinct timeline event type).
 
 func TestBuildActivityTimeline_FreeStandingCommentStillEmitted(t *testing.T) {
 	annotations := []service.Annotation{{
@@ -151,7 +105,7 @@ func TestBuildActivityTimeline_FreeStandingCommentStillEmitted(t *testing.T) {
 		CreatedAt: "2026-04-04T12:00:00Z",
 	}}
 
-	entries := buildActivityTimeline(nil, annotations)
+	entries := buildActivityTimeline(annotations)
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
@@ -177,7 +131,7 @@ func TestBuildActivityTimeline_LegacyPrefixCommentSuppressed(t *testing.T) {
 		CreatedAt: "2026-03-01T00:00:00Z",
 	}}
 
-	entries := buildActivityTimeline(nil, annotations)
+	entries := buildActivityTimeline(annotations)
 
 	if len(entries) != 0 {
 		t.Fatalf("expected legacy [Review: ...] comment to be suppressed, got %d entries", len(entries))

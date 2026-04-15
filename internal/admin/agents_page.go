@@ -57,8 +57,8 @@ func AgentsPageHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer, s
 		data["HasOAuthClients"] = hasOAuthClients
 
 		var pendingReviews, uncategorizedCount, ruleCount int64
-		if counts, err := svc.GetReviewCounts(ctx); err == nil {
-			pendingReviews = counts.Pending
+		if n, err := pendingReviewsCount(ctx, svc); err == nil {
+			pendingReviews = n
 		}
 		if cnt, err := svc.CountUncategorizedTransactions(ctx); err == nil {
 			uncategorizedCount = cnt
