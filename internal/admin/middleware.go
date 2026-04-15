@@ -30,14 +30,14 @@ func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Han
 			ctx := r.Context()
 			badges := NavBadges{}
 
-			// Check if reviews are enabled before counting.
-			if GetConfigBool(ctx, queries, "review_auto_enqueue") {
-				badges.ReviewsEnabled = true
-				if pending, err := queries.CountPendingReviews(ctx); err == nil {
-					badges.PendingReviews = pending
-				} else {
-					logger.Debug("nav badges: count pending reviews", "error", err)
-				}
+			// Phase 1 (Rule Actions v2): the review queue is always on — the
+			// review_auto_enqueue config flag was removed. Count pending
+			// reviews unconditionally so the nav badge reflects reality.
+			badges.ReviewsEnabled = true
+			if pending, err := queries.CountPendingReviews(ctx); err == nil {
+				badges.PendingReviews = pending
+			} else {
+				logger.Debug("nav badges: count pending reviews", "error", err)
 			}
 
 			if attn, err := queries.CountConnectionsNeedingAttention(ctx); err == nil {

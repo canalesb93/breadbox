@@ -240,8 +240,19 @@ function ruleForm() {
       conditions = [emptyCondition()];
     }
 
-    // Parse actions
-    let actions = (existingRule.actions || []).map(a => ({ field: a.field, value: a.value }));
+    // Parse actions (Phase 1 typed shape: {type, category_slug|tag_slug|content})
+    let actions = (existingRule.actions || []).map(a => {
+      if (a.type === 'set_category' || a.field === 'category') {
+        return { field: 'category', value: a.category_slug || a.value || '' };
+      }
+      if (a.type === 'add_tag') {
+        return { field: 'tag', value: a.tag_slug || '' };
+      }
+      if (a.type === 'add_comment') {
+        return { field: 'comment', value: a.content || '' };
+      }
+      return { field: a.type || a.field || 'category', value: a.category_slug || a.value || '' };
+    });
     if (actions.length === 0 && existingRule.category_slug) {
       actions = [{ field: 'category', value: existingRule.category_slug }];
     }
@@ -384,8 +395,13 @@ function ruleForm() {
         }
       }
 
-      // Build actions array
-      const actions = this.form.actions.filter(a => a.field && a.value);
+      // Build typed actions array for the API
+      const actions = this.form.actions.filter(a => a.field && a.value).map(a => {
+        if (a.field === 'category') return { type: 'set_category', category_slug: a.value };
+        if (a.field === 'tag') return { type: 'add_tag', tag_slug: a.value };
+        if (a.field === 'comment') return { type: 'add_comment', content: a.value };
+        return { type: a.field, category_slug: a.value };
+      });
       if (actions.length === 0) {
         this.formError = 'At least one action is required';
         this.submitting = false;

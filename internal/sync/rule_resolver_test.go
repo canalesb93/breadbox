@@ -384,12 +384,16 @@ func TestEvaluateCondition_EmptyFieldValue(t *testing.T) {
 }
 
 func TestEvaluateCondition_EmptyCondition(t *testing.T) {
-	// A condition with no field, no AND, no OR, no NOT is an empty leaf.
-	// An empty leaf with no op should return false (unknown op).
+	// Phase 1 (Rule Actions v2): an empty Condition{} compiles to nil and
+	// evaluates to true (match-all). This is the natural extension of the
+	// "NULL conditions == match every transaction" DB semantic.
 	cc := mustCompile(t, &Condition{})
+	if cc != nil {
+		t.Fatalf("expected empty condition to compile to nil, got %+v", cc)
+	}
 	tctx := TransactionContext{Name: "anything"}
-	if evaluateCondition(cc, tctx) {
-		t.Error("expected empty condition leaf to return false")
+	if !evaluateCondition(cc, tctx) {
+		t.Error("expected nil compiled condition to evaluate as match-all (true)")
 	}
 }
 
@@ -412,21 +416,20 @@ func TestEvaluateCondition_CategoryDetailed(t *testing.T) {
 }
 
 func TestResolveWithContext_PriorityOrdering(t *testing.T) {
-	catA := testUUID(1)
-	catB := testUUID(2)
-
 	r := &RuleResolver{
 		hitCounts: make(map[[16]byte]int),
 		rules: []compiledRule{
 			{
-				id:         testUUID(10),
-				actions: RuleActions{CategoryID: catA},
-				condition:  mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+				id:        testUUID(10),
+				actions:   []typedAction{{Type: "set_category", CategorySlug: "catA"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
 			},
 			{
-				id:         testUUID(11),
-				actions: RuleActions{CategoryID: catB},
-				condition:  mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+				id:        testUUID(11),
+				actions:   []typedAction{{Type: "set_category", CategorySlug: "catB"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
 			},
 		},
 		uncategorizedID: testUUID(99),
@@ -434,9 +437,9 @@ func TestResolveWithContext_PriorityOrdering(t *testing.T) {
 
 	// Both rules match; first (higher priority) sets category.
 	tctx := TransactionContext{Name: "Coffee Shop", Provider: "plaid"}
-	result := r.ResolveWithContext("plaid", tctx)
-	if result == nil || result.CategoryID != catA {
-		t.Errorf("expected higher priority rule's category to win, got %v", result)
+	result := r.ResolveWithContext("plaid", tctx, true)
+	if result == nil || result.CategorySlug != "catA" {
+		t.Errorf("expected higher priority rule's category to win, got %+v", result)
 	}
 }
 
@@ -445,9 +448,10 @@ func TestResolveWithContext_NoRuleMatchFallsBackToUncategorized(t *testing.T) {
 		hitCounts: make(map[[16]byte]int),
 		rules: []compiledRule{
 			{
-				id:         testUUID(10),
-				actions: RuleActions{CategoryID: testUUID(1)},
-				condition:  mustCompile(t, &Condition{Field: "name", Op: "eq", Value: "Starbucks"}),
+				id:        testUUID(10),
+				actions:   []typedAction{{Type: "set_category", CategorySlug: "catX"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "name", Op: "eq", Value: "Starbucks"}),
 			},
 		},
 		uncategorizedID: testUUID(99),
@@ -459,7 +463,7 @@ func TestResolveWithContext_NoRuleMatchFallsBackToUncategorized(t *testing.T) {
 		CategoryPrimary: "FOOD_AND_DRINK",
 		Provider:        "plaid",
 	}
-	result := r.ResolveWithContext("plaid", tctx)
+	result := r.ResolveWithContext("plaid", tctx, true)
 	if result != nil {
 		t.Errorf("expected nil for no match, got %v", result)
 	}
@@ -478,7 +482,7 @@ func TestResolveWithContext_FallbackToUncategorized(t *testing.T) {
 		Name:     "Random Store",
 		Provider: "plaid",
 	}
-	result := r.ResolveWithContext("plaid", tctx)
+	result := r.ResolveWithContext("plaid", tctx, true)
 	if result != nil {
 		t.Errorf("expected nil for no match, got %v", result)
 	}
@@ -486,15 +490,15 @@ func TestResolveWithContext_FallbackToUncategorized(t *testing.T) {
 
 func TestResolveWithContext_HitCountTracking(t *testing.T) {
 	ruleID := testUUID(10)
-	catA := testUUID(1)
 
 	r := &RuleResolver{
 		hitCounts: make(map[[16]byte]int),
 		rules: []compiledRule{
 			{
-				id:         ruleID,
-				actions: RuleActions{CategoryID: catA},
-				condition:  mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+				id:        ruleID,
+				actions:   []typedAction{{Type: "set_category", CategorySlug: "catA"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
 			},
 		},
 		uncategorizedID: testUUID(99),
@@ -502,8 +506,8 @@ func TestResolveWithContext_HitCountTracking(t *testing.T) {
 
 	// Two matching transactions.
 	tctx := TransactionContext{Name: "Coffee Shop", Provider: "plaid"}
-	r.ResolveWithContext("plaid", tctx)
-	r.ResolveWithContext("plaid", tctx)
+	r.ResolveWithContext("plaid", tctx, true)
+	r.ResolveWithContext("plaid", tctx, true)
 
 	if r.hitCounts[ruleID.Bytes] != 2 {
 		t.Errorf("expected 2 hits, got %d", r.hitCounts[ruleID.Bytes])
@@ -511,8 +515,6 @@ func TestResolveWithContext_HitCountTracking(t *testing.T) {
 }
 
 func TestResolveWithContext_MergeNonConflictingActions(t *testing.T) {
-	catA := testUUID(1)
-	catB := testUUID(2)
 	ruleAID := testUUID(10)
 	ruleBID := testUUID(11)
 
@@ -521,13 +523,15 @@ func TestResolveWithContext_MergeNonConflictingActions(t *testing.T) {
 		rules: []compiledRule{
 			{
 				id:        ruleAID,
-				actions:   RuleActions{CategoryID: catA},
+				actions:   []typedAction{{Type: "set_category", CategorySlug: "catA"}},
+				trigger:   "always",
 				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
 			},
 			{
 				// Lower priority rule with same field — category already set by rule A
 				id:        ruleBID,
-				actions:   RuleActions{CategoryID: catB},
+				actions:   []typedAction{{Type: "set_category", CategorySlug: "catB"}},
+				trigger:   "always",
 				condition: mustCompile(t, &Condition{Field: "provider", Op: "eq", Value: "plaid"}),
 			},
 		},
@@ -535,14 +539,14 @@ func TestResolveWithContext_MergeNonConflictingActions(t *testing.T) {
 	}
 
 	tctx := TransactionContext{Name: "Coffee Shop", Provider: "plaid"}
-	result := r.ResolveWithContext("plaid", tctx)
+	result := r.ResolveWithContext("plaid", tctx, true)
 
 	// Both rules match — first to set category wins
 	if result == nil {
 		t.Fatal("expected non-nil result")
 	}
-	if result.CategoryID != catA {
-		t.Errorf("expected category from higher priority rule, got %v", result.CategoryID)
+	if result.CategorySlug != "catA" {
+		t.Errorf("expected category from higher priority rule, got %v", result.CategorySlug)
 	}
 	// Both rules should get hit counts
 	if r.hitCounts[ruleAID.Bytes] != 1 {
@@ -554,7 +558,6 @@ func TestResolveWithContext_MergeNonConflictingActions(t *testing.T) {
 }
 
 func TestResolveWithContext_NoShortCircuit(t *testing.T) {
-	catA := testUUID(1)
 	ruleAID := testUUID(10)
 	ruleBID := testUUID(11)
 
@@ -563,13 +566,15 @@ func TestResolveWithContext_NoShortCircuit(t *testing.T) {
 		rules: []compiledRule{
 			{
 				id:        ruleAID,
-				actions:   RuleActions{CategoryID: catA},
+				actions:   []typedAction{{Type: "set_category", CategorySlug: "catA"}},
+				trigger:   "always",
 				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
 			},
 			{
-				// Rule B matches but has no category (future: could set another field)
+				// Rule B matches but has no actions (future: could set another field)
 				id:        ruleBID,
-				actions:   RuleActions{}, // no category action
+				actions:   nil,
+				trigger:   "always",
 				condition: mustCompile(t, &Condition{Field: "provider", Op: "eq", Value: "plaid"}),
 			},
 		},
@@ -577,13 +582,13 @@ func TestResolveWithContext_NoShortCircuit(t *testing.T) {
 	}
 
 	tctx := TransactionContext{Name: "Coffee Shop", Provider: "plaid"}
-	result := r.ResolveWithContext("plaid", tctx)
+	result := r.ResolveWithContext("plaid", tctx, true)
 
 	if result == nil {
 		t.Fatal("expected non-nil result")
 	}
-	if result.CategoryID != catA {
-		t.Errorf("expected category from rule A, got %v", result.CategoryID)
+	if result.CategorySlug != "catA" {
+		t.Errorf("expected category from rule A, got %v", result.CategorySlug)
 	}
 	// Both rules matched and got hits (no short-circuit)
 	if r.hitCounts[ruleAID.Bytes] != 1 {
@@ -782,15 +787,15 @@ func TestHitCountsJSON_WithHits(t *testing.T) {
 
 func TestHitCountsJSON_IntegrationWithResolveWithContext(t *testing.T) {
 	ruleID := testUUID(10)
-	catA := testUUID(1)
 
 	r := &RuleResolver{
 		hitCounts: make(map[[16]byte]int),
 		rules: []compiledRule{
 			{
-				id:         ruleID,
-				actions: RuleActions{CategoryID: catA},
-				condition:  mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+				id:        ruleID,
+				actions:   []typedAction{{Type: "set_category", CategorySlug: "catA"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
 			},
 		},
 		uncategorizedID: testUUID(99),
@@ -798,9 +803,9 @@ func TestHitCountsJSON_IntegrationWithResolveWithContext(t *testing.T) {
 
 	// Trigger hits.
 	tctx := TransactionContext{Name: "Coffee Shop", Provider: "plaid"}
-	r.ResolveWithContext("plaid", tctx)
-	r.ResolveWithContext("plaid", tctx)
-	r.ResolveWithContext("plaid", tctx)
+	r.ResolveWithContext("plaid", tctx, true)
+	r.ResolveWithContext("plaid", tctx, true)
+	r.ResolveWithContext("plaid", tctx, true)
 
 	result := r.HitCountsJSON()
 	if result == nil {

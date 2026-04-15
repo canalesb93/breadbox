@@ -12,15 +12,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// IsReviewsEnabled checks if review auto-enqueue is enabled in app_config.
-// Returns false by default (reviews are off unless explicitly enabled).
-func (s *Service) IsReviewsEnabled(ctx context.Context) bool {
-	cfg, err := s.Queries.GetAppConfig(ctx, "review_auto_enqueue")
-	if err != nil || !cfg.Value.Valid {
-		return false
-	}
-	return cfg.Value.String == "true"
-}
+// Phase 1 (Rule Actions v2) removed the review_auto_enqueue config flag and the
+// IsReviewsEnabled() service helper. Reviews are always on. Phase 2 reintroduces
+// the review surface via a seeded "needs-review" tag rule; Phase 4 drops this
+// review-queue service module entirely in favor of tag-filtered queries.
 
 // buildCategoryDisplayName builds a human-readable category display name
 // with optional parent prefix (e.g., "Food & Drink › Restaurants").

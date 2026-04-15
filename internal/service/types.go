@@ -429,10 +429,17 @@ type ReviewCountsResponse struct {
 
 // Transaction rule types
 
-// RuleAction represents a single action a rule performs when matched.
+// RuleAction is the typed action shape (Phase 1: Rule Actions v2).
+//
+// Type values:
+//   - "set_category": requires CategorySlug.
+//   - "add_tag":      requires TagSlug. (Phase 1 validates slug format; tag persistence lands in Phase 2.)
+//   - "add_comment":  requires Content.
 type RuleAction struct {
-	Field string `json:"field"`
-	Value string `json:"value"`
+	Type         string `json:"type"`
+	CategorySlug string `json:"category_slug,omitempty"`
+	TagSlug      string `json:"tag_slug,omitempty"`
+	Content      string `json:"content,omitempty"`
 }
 
 // ActivityEntry represents a single event in a transaction's activity timeline.
@@ -476,29 +483,39 @@ type TransactionContext struct {
 	AccountID        string
 	UserID           string
 	UserName         string
+	// Tags is nil in Phase 1. Phase 2 populates this from transaction_tags
+	// so tag-based conditions (field: "tags") can match against it.
+	Tags []string
 }
 
 type TransactionRuleResponse struct {
-	ID            string       `json:"id"`
-	ShortID       string       `json:"short_id"`
-	Name          string       `json:"name"`
+	ID      string `json:"id"`
+	ShortID string `json:"short_id"`
+	Name    string `json:"name"`
+	// Conditions may be a zero-value Condition{} to mean "match all transactions"
+	// (stored as NULL in the DB, Phase 1).
 	Conditions    Condition    `json:"conditions"`
 	Actions       []RuleAction `json:"actions"`
-	CategoryID    *string      `json:"category_id,omitempty"`
-	CategorySlug  *string      `json:"category_slug,omitempty"`
-	CategoryName  *string      `json:"category_display_name,omitempty"`
-	CategoryIcon  *string      `json:"category_icon,omitempty"`
-	CategoryColor *string      `json:"category_color,omitempty"`
-	Priority      int          `json:"priority"`
-	Enabled       bool         `json:"enabled"`
-	ExpiresAt     *string      `json:"expires_at,omitempty"`
-	CreatedByType string       `json:"created_by_type"`
-	CreatedByID   *string      `json:"created_by_id,omitempty"`
-	CreatedByName string       `json:"created_by_name"`
-	HitCount      int          `json:"hit_count"`
-	LastHitAt     *string      `json:"last_hit_at,omitempty"`
-	CreatedAt     string       `json:"created_at"`
-	UpdatedAt     string       `json:"updated_at"`
+	Trigger       string       `json:"trigger"`
+	// CategoryID/CategorySlug/CategoryName/CategoryIcon/CategoryColor are derived
+	// from the first set_category action in Actions (kept for API back-compat and
+	// admin UI convenience). Category info is no longer a denormalized column on
+	// transaction_rules — these are populated at response time.
+	CategoryID    *string `json:"category_id,omitempty"`
+	CategorySlug  *string `json:"category_slug,omitempty"`
+	CategoryName  *string `json:"category_display_name,omitempty"`
+	CategoryIcon  *string `json:"category_icon,omitempty"`
+	CategoryColor *string `json:"category_color,omitempty"`
+	Priority      int     `json:"priority"`
+	Enabled       bool    `json:"enabled"`
+	ExpiresAt     *string `json:"expires_at,omitempty"`
+	CreatedByType string  `json:"created_by_type"`
+	CreatedByID   *string `json:"created_by_id,omitempty"`
+	CreatedByName string  `json:"created_by_name"`
+	HitCount      int     `json:"hit_count"`
+	LastHitAt     *string `json:"last_hit_at,omitempty"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
 }
 
 type TransactionRuleListParams struct {
@@ -525,20 +542,24 @@ type TransactionRuleListResult struct {
 }
 
 type CreateTransactionRuleParams struct {
-	Name         string
+	Name string
+	// Conditions: a zero-value Condition{} (no Field/And/Or/Not) means "match all".
 	Conditions   Condition
 	Actions      []RuleAction // if set, takes precedence over CategorySlug
-	CategorySlug string       // sugar for actions: [{"field": "category", "value": slug}]
+	CategorySlug string       // sugar for actions: [{"type":"set_category","category_slug":slug}]
+	Trigger      string       // "on_create" (default), "on_update", or "always"
 	Priority     int
 	ExpiresIn    string // e.g., "30d", "24h"
 	Actor        Actor
 }
 
 type UpdateTransactionRuleParams struct {
-	Name         *string
+	Name *string
+	// Conditions: nil means "don't change"; non-nil zero-value Condition means match-all.
 	Conditions   *Condition
 	Actions      *[]RuleAction // if set, replaces actions entirely
-	CategorySlug *string       // sugar: replaces category action, keeps others
+	CategorySlug *string       // sugar: replaces set_category action, keeps others
+	Trigger      *string       // optional trigger change
 	Priority     *int
 	Enabled      *bool
 	ExpiresAt    *string // ISO timestamp or empty to clear

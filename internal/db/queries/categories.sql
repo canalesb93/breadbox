@@ -59,8 +59,7 @@ UPDATE transactions
 SET category_override = FALSE, updated_at = NOW()
 WHERE id = $1;
 
--- name: ReassignRulesCategory :exec
-UPDATE transaction_rules
-SET category_id = $2, updated_at = NOW()
-WHERE category_id = $1;
+-- ReassignRulesCategory was removed in 20260415070000_rule_actions_v2 — rule
+-- category targets now live inside the actions JSONB. Reassignment is handled
+-- in the service layer via pool.Exec to keep sqlc happy with JSONB subqueries.
 

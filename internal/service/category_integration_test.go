@@ -4,6 +4,7 @@ package service_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math/big"
 	"strings"
@@ -504,16 +505,32 @@ func TestMergeCategories_ReassignsRulesInsteadOfDeleting(t *testing.T) {
 		t.Errorf("rule category_slug should be reassigned to target; got %q, want %q", got, "merge_rule_tgt")
 	}
 
-	// Double-check via direct DB query that the rule's category_id matches target.
-	tgtUID, _ := parseUUIDForTest(target.ID)
+	// Phase 1 (Rule Actions v2): the denormalized transaction_rules.category_id
+	// column was dropped. Verify via the typed actions JSONB shape that the
+	// set_category action's category_slug now points at the target.
+	_ = target
 	ruleUID, _ := parseUUIDForTest(rule.ID)
-	var ruleCatID pgtype.UUID
-	err = pool.QueryRow(ctx, "SELECT category_id FROM transaction_rules WHERE id = $1", ruleUID).Scan(&ruleCatID)
+	var actionsRaw []byte
+	err = pool.QueryRow(ctx, "SELECT actions FROM transaction_rules WHERE id = $1", ruleUID).Scan(&actionsRaw)
 	if err != nil {
-		t.Fatalf("query rule category: %v", err)
+		t.Fatalf("query rule actions: %v", err)
 	}
-	if ruleCatID != tgtUID {
-		t.Errorf("rule category_id should be target UUID")
+	if len(actionsRaw) == 0 {
+		t.Fatal("expected non-empty actions JSONB on reassigned rule")
+	}
+	var parsed []map[string]any
+	if err := json.Unmarshal(actionsRaw, &parsed); err != nil {
+		t.Fatalf("unmarshal actions JSONB: %v", err)
+	}
+	var foundSlug string
+	for _, a := range parsed {
+		if t, _ := a["type"].(string); t == "set_category" {
+			foundSlug, _ = a["category_slug"].(string)
+			break
+		}
+	}
+	if foundSlug != "merge_rule_tgt" {
+		t.Errorf("rule actions[set_category].category_slug should be %q, got %q", "merge_rule_tgt", foundSlug)
 	}
 }
 

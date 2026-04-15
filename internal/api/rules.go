@@ -55,9 +55,10 @@ func CreateRuleHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var input struct {
 			Name         string               `json:"name"`
-			Conditions   service.Condition     `json:"conditions"`
+			Conditions   *service.Condition    `json:"conditions"`
 			Actions      []service.RuleAction  `json:"actions"`
 			CategorySlug string                `json:"category_slug"`
+			Trigger      string                `json:"trigger"`
 			Priority     int                   `json:"priority"`
 			ExpiresIn    string                `json:"expires_in"`
 		}
@@ -77,15 +78,20 @@ func CreateRuleHandler(svc *service.Service) http.HandlerFunc {
 
 		actor := service.ActorFromContext(r.Context())
 
-		rule, err := svc.CreateTransactionRule(r.Context(), service.CreateTransactionRuleParams{
+		params := service.CreateTransactionRuleParams{
 			Name:         input.Name,
-			Conditions:   input.Conditions,
 			Actions:      input.Actions,
 			CategorySlug: input.CategorySlug,
+			Trigger:      input.Trigger,
 			Priority:     input.Priority,
 			ExpiresIn:    input.ExpiresIn,
 			Actor:        actor,
-		})
+		}
+		if input.Conditions != nil {
+			params.Conditions = *input.Conditions
+		}
+
+		rule, err := svc.CreateTransactionRule(r.Context(), params)
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidParameter) {
 				mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
@@ -132,6 +138,7 @@ func UpdateRuleHandler(svc *service.Service) http.HandlerFunc {
 			Conditions   *service.Condition     `json:"conditions,omitempty"`
 			Actions      *[]service.RuleAction  `json:"actions,omitempty"`
 			CategorySlug *string                `json:"category_slug,omitempty"`
+			Trigger      *string                `json:"trigger,omitempty"`
 			Priority     *int                   `json:"priority,omitempty"`
 			Enabled      *bool                  `json:"enabled,omitempty"`
 			ExpiresAt    *string                `json:"expires_at,omitempty"`
@@ -146,6 +153,7 @@ func UpdateRuleHandler(svc *service.Service) http.HandlerFunc {
 			Conditions:   input.Conditions,
 			Actions:      input.Actions,
 			CategorySlug: input.CategorySlug,
+			Trigger:      input.Trigger,
 			Priority:     input.Priority,
 			Enabled:      input.Enabled,
 			ExpiresAt:    input.ExpiresAt,

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
 	gosync "sync"
 	"time"
 
@@ -202,13 +201,9 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		resolver = nil
 	}
 
-	// Read review queue config.
-	reviewAutoEnqueue := false // reviews are off by default
-	if cfg, err := e.db.GetAppConfig(ctx, "review_auto_enqueue"); err == nil && cfg.Value.Valid {
-		if v, err := strconv.ParseBool(cfg.Value.String); err == nil {
-			reviewAutoEnqueue = v
-		}
-	}
+	// Phase 1 (Rule Actions v2): review_auto_enqueue is removed. Phase 2 will
+	// reintroduce the review flow via a seeded rule + tag; until then sync
+	// does not auto-enqueue transactions for review.
 
 	// Pre-fetch all account IDs and display names for this connection in one query.
 	// This eliminates per-transaction DB lookups during the sync loop. The caches
@@ -324,7 +319,6 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			resolver:         resolver,
 			userID:           conn.UserID,
 			userName:         userName,
-			reviewAutoEnqueue: reviewAutoEnqueue,
 			upsertStart:      upsertStart,
 			perAccount:       perAccount,
 			logger:           logger,
@@ -442,7 +436,6 @@ type processTransactionOpts struct {
 	resolver         *RuleResolver
 	userID           pgtype.UUID
 	userName         string
-	reviewAutoEnqueue bool
 	upsertStart      time.Time
 	perAccount       map[string]*accountSyncCounts
 	logger           *slog.Logger
@@ -506,8 +499,13 @@ func (e *Engine) processTransaction(ctx context.Context, txn *provider.Transacti
 	}
 
 	// Apply rules to new or changed transactions.
+	//
+	// Phase 1: review auto-enqueue is gone. The trigger column on rules
+	// decides which rules fire for isNew vs !isNew; the sync engine no
+	// longer calls enqueueForReview — Phase 2 reintroduces the review flow
+	// via a seeded "needs-review" rule + tag.
 	if isNew || isChanged {
-		sources, ruleErr := e.applyRulesToTransaction(ctx, opts.tx, txn, dbTxn, opts.accountIDCache, opts.providerName, opts.resolver, opts.userID, opts.userName)
+		sources, ruleErr := e.applyRulesToTransaction(ctx, opts.tx, txn, dbTxn, opts.accountIDCache, opts.providerName, opts.resolver, opts.userID, opts.userName, providerAdded && isNew)
 		if ruleErr != nil {
 			opts.logger.Error("apply rules to "+label+" txn", "external_id", txn.ExternalID, "error", ruleErr)
 		}
@@ -516,11 +514,6 @@ func (e *Engine) processTransaction(ctx context.Context, txn *provider.Transacti
 				txnID: dbTxn.ID, ruleID: src.RuleID, actionField: src.ActionField, actionValue: src.ActionValue,
 			})
 		}
-	}
-
-	// Enqueue for review if enabled and transaction is new or changed.
-	if opts.reviewAutoEnqueue && (isNew || isChanged) {
-		e.enqueueForReview(ctx, opts.txQueries, dbTxn, providerAdded && isNew, opts.resolver)
 	}
 
 	// Track per-account counts.
@@ -567,20 +560,26 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 
 // applyRulesToTransaction evaluates rules against a transaction and updates the
 // category if a rule matches. Called only for new or changed transactions.
-func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *provider.Transaction, dbTxn db.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *RuleResolver, userID pgtype.UUID, userName string) ([]RuleActionSource, error) {
+//
+// isNew is threaded through to ResolveWithContext so trigger filtering
+// (on_create / on_update / always) decides which rules fire. Only set_category
+// actions materialize to the transactions table in Phase 1; add_tag and
+// add_comment actions are captured in Sources (for audit) but their
+// persistence to transaction_tags / transaction_comments lands in Phase 2.
+func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *provider.Transaction, dbTxn db.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *RuleResolver, userID pgtype.UUID, userName string, isNew bool) ([]RuleActionSource, error) {
 	if resolver == nil {
 		return nil, nil
 	}
 
 	accountID, _ := e.resolveAccountID(ctx, txn.AccountExternalID, cache)
 	tctx := TransactionContext{
-		Name:       txn.Name,
-		Amount:     txn.Amount.InexactFloat64(),
-		Pending:    txn.Pending,
-		Provider:   providerName,
-		AccountID:  pgconv.FormatUUID(accountID),
-		UserID:     pgconv.FormatUUID(userID),
-		UserName:   userName,
+		Name:      txn.Name,
+		Amount:    txn.Amount.InexactFloat64(),
+		Pending:   txn.Pending,
+		Provider:  providerName,
+		AccountID: pgconv.FormatUUID(accountID),
+		UserID:    pgconv.FormatUUID(userID),
+		UserName:  userName,
 	}
 	if txn.MerchantName != nil {
 		tctx.MerchantName = *txn.MerchantName
@@ -592,21 +591,28 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		tctx.CategoryDetailed = *txn.CategoryDetailed
 	}
 
-	result := resolver.ResolveWithContext(providerName, tctx)
+	result := resolver.ResolveWithContext(providerName, tctx, isNew)
 	if result == nil {
 		return nil, nil
 	}
 
-	// Only update category_id when a rule explicitly matched and the
-	// transaction doesn't have a manual override.
-	if result.CategoryID.Valid && !dbTxn.CategoryOverride {
-		_, err := tx.Exec(ctx,
-			`UPDATE transactions SET category_id = $1 WHERE id = $2 AND NOT category_override`,
-			result.CategoryID, dbTxn.ID)
-		if err != nil {
-			return result.Sources, fmt.Errorf("apply rule category: %w", err)
+	// set_category: write category_id when a rule matched and the transaction
+	// doesn't have a manual override. Respects the "user wins" semantic.
+	if result.CategorySlug != "" && !dbTxn.CategoryOverride {
+		catID := resolver.CategoryIDForSlug(result.CategorySlug)
+		if catID.Valid {
+			_, err := tx.Exec(ctx,
+				`UPDATE transactions SET category_id = $1 WHERE id = $2 AND NOT category_override`,
+				catID, dbTxn.ID)
+			if err != nil {
+				return result.Sources, fmt.Errorf("apply rule category: %w", err)
+			}
 		}
 	}
+
+	// TODO(phase-2): persist result.TagsToAdd to transaction_tags and
+	// result.Comments to transaction_comments inside the sync transaction.
+	// Phase 1 plumbs these but they're no-ops.
 
 	return result.Sources, nil
 }
