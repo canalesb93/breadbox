@@ -215,13 +215,21 @@ func MustCreateCategory(t *testing.T, q *db.Queries, slug, displayName string) d
 }
 
 // MustCreateTransactionRule creates an enabled transaction rule and fatals on error.
-// conditions should be valid JSON (e.g., json.RawMessage(`{"field":"name","operator":"contains","value":"coffee"}`)).
-func MustCreateTransactionRule(t *testing.T, q *db.Queries, name string, categoryID pgtype.UUID, conditions []byte) db.TransactionRule {
+// conditions and actions should be valid JSON; pass nil conditions to mean match-all.
+// trigger defaults to "on_create" when empty.
+func MustCreateTransactionRule(t *testing.T, q *db.Queries, name string, conditions, actions []byte, trigger string) db.TransactionRule {
 	t.Helper()
+	if trigger == "" {
+		trigger = "on_create"
+	}
+	if actions == nil {
+		actions = []byte(`[]`)
+	}
 	rule, err := q.InsertTransactionRule(context.Background(), db.InsertTransactionRuleParams{
 		Name:          name,
 		Conditions:    conditions,
-		CategoryID:    categoryID,
+		Actions:       actions,
+		Trigger:       trigger,
 		Priority:      100,
 		Enabled:       true,
 		CreatedByType: "system",

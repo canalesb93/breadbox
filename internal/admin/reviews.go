@@ -7,12 +7,10 @@ import (
 	"strconv"
 
 	"breadbox/internal/app"
-	"breadbox/internal/db"
 	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // ReviewsPageHandler serves GET /admin/reviews.
@@ -70,11 +68,11 @@ func ReviewsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		// Load category tree for the category picker component.
 		categories, _ := svc.ListCategoryTree(ctx)
 
-		// Load review settings from app_config.
-		reviewAutoEnqueue := GetConfigBool(ctx, a.Queries, "review_auto_enqueue")
-
+		// Phase 1 (Rule Actions v2): the review queue page is always enabled.
+		// The enable/disable gate (review_auto_enqueue) was removed; Phase 4
+		// drops the page entirely in favor of a tag-driven transactions view.
 		data := BaseTemplateData(r, sm, "reviews", "Reviews")
-		data["ReviewAutoEnqueue"] = reviewAutoEnqueue
+		data["ReviewAutoEnqueue"] = true
 		data["Reviews"] = result.Reviews
 		data["HasMore"] = result.HasMore
 		data["NextCursor"] = result.NextCursor
@@ -222,27 +220,12 @@ func EnqueueExistingReviewsHandler(a *app.App, sm *scs.SessionManager, svc *serv
 }
 
 // ReviewSettingsHandler handles POST /admin/api/reviews/settings.
+//
+// Phase 1 (Rule Actions v2): the review_auto_enqueue config flag was removed.
+// The endpoint is kept (and returns ok) only so existing JS clients that POST
+// here don't break; the body is ignored.
 func ReviewSettingsHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var body struct {
-			AutoEnqueue bool `json:"auto_enqueue"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
-			return
-		}
-
-		ctx := r.Context()
-
-		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
-			Key:   "review_auto_enqueue",
-			Value: pgtype.Text{String: strconv.FormatBool(body.AutoEnqueue), Valid: true},
-		}); err != nil {
-			a.Logger.Error("save review_auto_enqueue", "error", err)
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to save settings"})
-			return
-		}
-
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	}
 }

@@ -272,10 +272,10 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		// Sync history where this rule matched
 		syncHistory, _ := svc.GetRuleSyncHistory(ctx, id, 10)
 
-		// Resolve category display name for the action description
+		// Resolve category display name for the action description (Phase 1: typed actions).
 		var actionCategoryName string
 		for _, a := range rule.Actions {
-			if a.Field == "category" && rule.CategoryName != nil {
+			if a.Type == "set_category" && rule.CategoryName != nil {
 				actionCategoryName = *rule.CategoryName
 				break
 			}
@@ -313,9 +313,10 @@ func CreateRuleAdminHandler(svc *service.Service, sm *scs.SessionManager) http.H
 
 		var body struct {
 			Name         string               `json:"name"`
-			Conditions   service.Condition     `json:"conditions"`
+			Conditions   *service.Condition    `json:"conditions"`
 			Actions      []service.RuleAction  `json:"actions"`
 			CategorySlug string                `json:"category_slug"`
+			Trigger      string                `json:"trigger"`
 			Priority     int                   `json:"priority"`
 			ExpiresIn    string                `json:"expires_in"`
 		}
@@ -333,15 +334,20 @@ func CreateRuleAdminHandler(svc *service.Service, sm *scs.SessionManager) http.H
 			return
 		}
 
-		rule, err := svc.CreateTransactionRule(r.Context(), service.CreateTransactionRuleParams{
+		params := service.CreateTransactionRuleParams{
 			Name:         body.Name,
-			Conditions:   body.Conditions,
 			Actions:      body.Actions,
 			CategorySlug: body.CategorySlug,
+			Trigger:      body.Trigger,
 			Priority:     body.Priority,
 			ExpiresIn:    body.ExpiresIn,
 			Actor:        actor,
-		})
+		}
+		if body.Conditions != nil {
+			params.Conditions = *body.Conditions
+		}
+
+		rule, err := svc.CreateTransactionRule(r.Context(), params)
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidParameter) {
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
@@ -365,6 +371,7 @@ func UpdateRuleAdminHandler(svc *service.Service, sm *scs.SessionManager) http.H
 			Conditions   *service.Condition     `json:"conditions,omitempty"`
 			Actions      *[]service.RuleAction  `json:"actions,omitempty"`
 			CategorySlug *string                `json:"category_slug,omitempty"`
+			Trigger      *string                `json:"trigger,omitempty"`
 			Priority     *int                   `json:"priority,omitempty"`
 			Enabled      *bool                  `json:"enabled,omitempty"`
 			ExpiresAt    *string                `json:"expires_at,omitempty"`
@@ -379,6 +386,7 @@ func UpdateRuleAdminHandler(svc *service.Service, sm *scs.SessionManager) http.H
 			Conditions:   body.Conditions,
 			Actions:      body.Actions,
 			CategorySlug: body.CategorySlug,
+			Trigger:      body.Trigger,
 			Priority:     body.Priority,
 			Enabled:      body.Enabled,
 			ExpiresAt:    body.ExpiresAt,

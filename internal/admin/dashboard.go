@@ -32,15 +32,14 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			needsAttention = 0
 		}
 
-		// Only count pending reviews if reviews are enabled.
-		var reviewPending int64
-		reviewsEnabled := GetConfigBool(ctx, a.Queries, "review_auto_enqueue")
-		if reviewsEnabled {
-			reviewPending, err = a.Queries.CountPendingReviews(ctx)
-			if err != nil {
-				a.Logger.Error("count pending reviews", "error", err)
-				reviewPending = 0
-			}
+		// Phase 1 (Rule Actions v2): the review_auto_enqueue gate was removed.
+		// The review queue is always available from the dashboard until Phase 4
+		// replaces it with a tag-driven transactions view.
+		reviewsEnabled := true
+		reviewPending, err := a.Queries.CountPendingReviews(ctx)
+		if err != nil {
+			a.Logger.Error("count pending reviews", "error", err)
+			reviewPending = 0
 		}
 
 		// Recent transactions (last 8).

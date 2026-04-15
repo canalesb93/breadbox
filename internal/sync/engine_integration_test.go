@@ -628,11 +628,13 @@ func TestSync_RuleCategoryDuringSync(t *testing.T) {
 	_, food := seedCategoriesWithFood(t, queries)
 
 	// Create a transaction rule that matches "Restaurant" → food_and_drink.
-	_, err := pool.Exec(ctx, `INSERT INTO transaction_rules (name, conditions, category_id, priority, enabled, created_by_type, created_by_name)
-		VALUES ('Food Rule', '{"field":"name","op":"contains","value":"Restaurant"}', $1, 100, true, 'system', 'test')`, food.ID)
-	if err != nil {
-		t.Fatalf("create rule: %v", err)
-	}
+	// Phase 1: actions JSONB stores typed shape; trigger explicitly set.
+	testutil.MustCreateTransactionRule(
+		t, queries, "Food Rule",
+		[]byte(`{"field":"name","op":"contains","value":"Restaurant"}`),
+		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"}]`),
+		"on_create",
+	)
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
@@ -665,7 +667,7 @@ func TestSync_RuleCategoryDuringSync(t *testing.T) {
 
 	// Verify category was resolved via transaction rule.
 	var categoryID pgtype.UUID
-	err = pool.QueryRow(ctx,
+	err := pool.QueryRow(ctx,
 		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_food'",
 	).Scan(&categoryID)
 	if err != nil {
@@ -679,111 +681,11 @@ func TestSync_RuleCategoryDuringSync(t *testing.T) {
 	}
 }
 
-func TestSync_ReviewEnqueueNewTransaction(t *testing.T) {
-	pool, queries := testutil.ServicePool(t)
-	ctx := context.Background()
-
-	seedCategories(t, queries)
-
-	// Enable review auto-enqueue.
-	if err := queries.SetAppConfig(ctx, db.SetAppConfigParams{
-		Key: "review_auto_enqueue", Value: pgtype.Text{String: "true", Valid: true},
-	}); err != nil {
-		t.Fatalf("set app config: %v", err)
-	}
-
-	user := testutil.MustCreateUser(t, queries, "Alice")
-	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
-	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
-
-	mock := &mockProvider{
-		syncResult: provider.SyncResult{
-			Added: []provider.Transaction{
-				{
-					ExternalID:        "txn_new",
-					AccountExternalID: "ext_acct_1",
-					Amount:            decimal.NewFromFloat(10.00),
-					Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
-					Name:              "New Purchase",
-					ISOCurrencyCode:   "USD",
-				},
-			},
-			Cursor: "cursor_1",
-		},
-	}
-
-	providers := map[string]provider.Provider{"plaid": mock}
-	engine := newEngine(t, pool, queries, providers)
-
-	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
-		t.Fatalf("Sync() error: %v", err)
-	}
-
-	// Verify review was enqueued.
-	var reviewCount int
-	err := pool.QueryRow(ctx,
-		"SELECT count(*) FROM review_queue WHERE status = 'pending'",
-	).Scan(&reviewCount)
-	if err != nil {
-		t.Fatalf("count reviews: %v", err)
-	}
-	if reviewCount == 0 {
-		t.Error("expected at least one review to be enqueued for new transaction")
-	}
-}
-
-func TestSync_ReviewDisabled_NoEnqueue(t *testing.T) {
-	pool, queries := testutil.ServicePool(t)
-	ctx := context.Background()
-
-	seedCategories(t, queries)
-
-	// Disable review auto-enqueue.
-	if err := queries.SetAppConfig(ctx, db.SetAppConfigParams{
-		Key: "review_auto_enqueue", Value: pgtype.Text{String: "false", Valid: true},
-	}); err != nil {
-		t.Fatalf("set app config: %v", err)
-	}
-
-	user := testutil.MustCreateUser(t, queries, "Alice")
-	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
-	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
-
-	mock := &mockProvider{
-		syncResult: provider.SyncResult{
-			Added: []provider.Transaction{
-				{
-					ExternalID:        "txn_new",
-					AccountExternalID: "ext_acct_1",
-					Amount:            decimal.NewFromFloat(10.00),
-					Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
-					Name:              "New Purchase",
-					ISOCurrencyCode:   "USD",
-				},
-			},
-			Cursor: "cursor_1",
-		},
-	}
-
-	providers := map[string]provider.Provider{"plaid": mock}
-	engine := newEngine(t, pool, queries, providers)
-
-	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
-		t.Fatalf("Sync() error: %v", err)
-	}
-
-	// Verify no review was enqueued.
-	var reviewCount int
-	err := pool.QueryRow(ctx,
-		"SELECT count(*) FROM review_queue WHERE status = 'pending'",
-	).Scan(&reviewCount)
-	if err != nil {
-		t.Fatalf("count reviews: %v", err)
-	}
-	if reviewCount != 0 {
-		t.Errorf("expected 0 reviews when auto-enqueue is disabled, got %d", reviewCount)
-	}
-}
+// TestSync_ReviewEnqueueNewTransaction and TestSync_ReviewDisabled_NoEnqueue
+// were removed in Phase 1 (Rule Actions v2): the sync engine no longer
+// auto-enqueues review_queue rows, so there's nothing to assert. Phase 2
+// reintroduces the review surface via a seeded "needs-review" tag rule, and
+// new tests will land there.
 
 func TestSync_Pagination_BuffersThenFlushes(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
@@ -1196,16 +1098,16 @@ func TestSync_RuleBasedCategorization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create coffee category: %v", err)
 	}
+	_ = coffeeCat
 
 	// Create a rule that matches "coffee" in name.
-	_, err = pool.Exec(ctx,
-		`INSERT INTO transaction_rules (name, conditions, category_id, priority, enabled, created_by_type, created_by_name)
-		 VALUES ('Coffee Rule', '{"field":"name","op":"contains","value":"coffee"}', $1, 100, true, 'system', 'test')`,
-		coffeeCat.ID,
+	// Phase 1: actions JSONB stores typed shape; trigger explicitly set.
+	testutil.MustCreateTransactionRule(
+		t, queries, "Coffee Rule",
+		[]byte(`{"field":"name","op":"contains","value":"coffee"}`),
+		[]byte(`[{"type":"set_category","category_slug":"coffee_shops"}]`),
+		"on_create",
 	)
-	if err != nil {
-		t.Fatalf("create rule: %v", err)
-	}
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
@@ -1309,121 +1211,10 @@ func TestSync_SyncTriggerTypes(t *testing.T) {
 	}
 }
 
-func TestSync_UncategorizedReviewType(t *testing.T) {
-	pool, queries := testutil.ServicePool(t)
-	ctx := context.Background()
-
-	seedCategories(t, queries)
-
-	// Enable review auto-enqueue.
-	if err := queries.SetAppConfig(ctx, db.SetAppConfigParams{
-		Key: "review_auto_enqueue", Value: pgtype.Text{String: "true", Valid: true},
-	}); err != nil {
-		t.Fatalf("set app config: %v", err)
-	}
-
-	user := testutil.MustCreateUser(t, queries, "Alice")
-	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
-	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
-
-	// Transaction with no category mapping should be enqueued as "uncategorized".
-	mock := &mockProvider{
-		syncResult: provider.SyncResult{
-			Added: []provider.Transaction{
-				{
-					ExternalID:        "txn_uncat",
-					AccountExternalID: "ext_acct_1",
-					Amount:            decimal.NewFromFloat(10.00),
-					Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
-					Name:              "Unknown Store",
-					ISOCurrencyCode:   "USD",
-				},
-			},
-			Cursor: "cursor_1",
-		},
-	}
-
-	providers := map[string]provider.Provider{"plaid": mock}
-	engine := newEngine(t, pool, queries, providers)
-
-	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
-		t.Fatalf("Sync() error: %v", err)
-	}
-
-	// Verify review type is "uncategorized" (since it resolves to the uncategorized fallback category).
-	var reviewType string
-	err := pool.QueryRow(ctx,
-		`SELECT rq.review_type FROM review_queue rq
-		 JOIN transactions t ON t.id = rq.transaction_id
-		 WHERE t.external_transaction_id = 'txn_uncat' AND rq.status = 'pending'`,
-	).Scan(&reviewType)
-	if err != nil {
-		t.Fatalf("query review: %v", err)
-	}
-	if reviewType != "uncategorized" {
-		t.Errorf("expected review_type 'uncategorized', got %q", reviewType)
-	}
-}
-
-func TestSync_CategorizedNewTransaction(t *testing.T) {
-	pool, queries := testutil.ServicePool(t)
-	ctx := context.Background()
-
-	_, food := seedCategoriesWithFood(t, queries)
-	_ = food
-
-	// Enable review auto-enqueue.
-	if err := queries.SetAppConfig(ctx, db.SetAppConfigParams{
-		Key: "review_auto_enqueue", Value: pgtype.Text{String: "true", Valid: true},
-	}); err != nil {
-		t.Fatalf("set app config: %v", err)
-	}
-
-	user := testutil.MustCreateUser(t, queries, "Alice")
-	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
-	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
-
-	catPrimary := "FOOD_AND_DRINK"
-	lowConfidence := "LOW"
-	mock := &mockProvider{
-		syncResult: provider.SyncResult{
-			Added: []provider.Transaction{
-				{
-					ExternalID:         "txn_categorized_new",
-					AccountExternalID:  "ext_acct_1",
-					Amount:             decimal.NewFromFloat(25.00),
-					Date:               time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
-					Name:               "Restaurant",
-					CategoryPrimary:    &catPrimary,
-					CategoryConfidence: &lowConfidence,
-					ISOCurrencyCode:    "USD",
-				},
-			},
-			Cursor: "cursor_1",
-		},
-	}
-
-	providers := map[string]provider.Provider{"plaid": mock}
-	engine := newEngine(t, pool, queries, providers)
-
-	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
-		t.Fatalf("Sync() error: %v", err)
-	}
-
-	// With confidence threshold removed, a categorized transaction gets "new_transaction" type.
-	var reviewType string
-	err := pool.QueryRow(ctx,
-		`SELECT rq.review_type FROM review_queue rq
-		 JOIN transactions t ON t.id = rq.transaction_id
-		 WHERE t.external_transaction_id = 'txn_categorized_new' AND rq.status = 'pending'`,
-	).Scan(&reviewType)
-	if err != nil {
-		t.Fatalf("query review: %v", err)
-	}
-	if reviewType != "new_transaction" {
-		t.Errorf("expected review_type 'new_transaction', got %q", reviewType)
-	}
-}
+// TestSync_UncategorizedReviewType and TestSync_CategorizedNewTransaction were
+// removed in Phase 1 (Rule Actions v2): the sync engine no longer enqueues
+// review_queue rows automatically. Phase 2 reintroduces equivalent coverage via
+// the seeded "needs-review" tag rule and `field: "tags"` filtering.
 
 func TestSync_UnchangedTransactions_SkipRuleReapplication(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
@@ -1438,15 +1229,15 @@ func TestSync_UnchangedTransactions_SkipRuleReapplication(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create coffee category: %v", err)
 	}
+	_ = coffeeCat
 
-	_, err = pool.Exec(ctx,
-		`INSERT INTO transaction_rules (name, conditions, category_id, priority, enabled, created_by_type, created_by_name)
-		 VALUES ('Coffee Rule', '{"field":"name","op":"contains","value":"coffee"}', $1, 100, true, 'system', 'test')`,
-		coffeeCat.ID,
+	// Phase 1: actions JSONB stores typed shape; trigger explicitly set.
+	testutil.MustCreateTransactionRule(
+		t, queries, "Coffee Rule",
+		[]byte(`{"field":"name","op":"contains","value":"coffee"}`),
+		[]byte(`[{"type":"set_category","category_slug":"coffee_shops"}]`),
+		"on_create",
 	)
-	if err != nil {
-		t.Fatalf("create rule: %v", err)
-	}
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
@@ -1553,5 +1344,333 @@ func TestSync_UnchangedTransactions_SkipRuleReapplication(t *testing.T) {
 	}
 	if unchangedCount != 1 {
 		t.Errorf("expected unchanged_count 1 on re-sync, got %d", unchangedCount)
+	}
+}
+
+// --- Phase 1 (Rule Actions v2): rule trigger + null-conditions coverage ---
+
+// TestRule_NullConditions_MatchesAll verifies that a rule with NULL conditions
+// (Conditions=nil in storage) compiles to "match every transaction" and applies
+// its set_category action to a brand-new transaction.
+func TestRule_NullConditions_MatchesAll(t *testing.T) {
+	pool, queries := testutil.ServicePool(t)
+	ctx := context.Background()
+
+	_, food := seedCategoriesWithFood(t, queries)
+
+	// Rule with NULL conditions = match-all; trigger=on_create.
+	testutil.MustCreateTransactionRule(
+		t, queries, "Match-All Rule",
+		nil, // NULL conditions → match every transaction
+		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"}]`),
+		"on_create",
+	)
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
+
+	mock := &mockProvider{
+		syncResult: provider.SyncResult{
+			Added: []provider.Transaction{
+				{
+					ExternalID:        "txn_match_all",
+					AccountExternalID: "ext_acct_1",
+					Amount:            decimal.NewFromFloat(10.00),
+					Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+					Name:              "Random Merchant Name",
+					ISOCurrencyCode:   "USD",
+				},
+			},
+			Cursor: "cursor_1",
+		},
+	}
+
+	providers := map[string]provider.Provider{"plaid": mock}
+	engine := newEngine(t, pool, queries, providers)
+
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("Sync() error: %v", err)
+	}
+
+	var categoryID pgtype.UUID
+	err := pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_match_all'",
+	).Scan(&categoryID)
+	if err != nil {
+		t.Fatalf("query transaction: %v", err)
+	}
+	if !categoryID.Valid {
+		t.Fatal("expected match-all rule to set category_id, got NULL")
+	}
+	if categoryID != food.ID {
+		t.Errorf("expected category_id %v (food), got %v", food.ID, categoryID)
+	}
+}
+
+// TestRule_Trigger_OnCreate_SkipsOnUpdate verifies that a rule with
+// trigger="on_create" fires on the initial sync but does NOT re-fire when the
+// same transaction is modified by a subsequent sync.
+func TestRule_Trigger_OnCreate_SkipsOnUpdate(t *testing.T) {
+	pool, queries := testutil.ServicePool(t)
+	ctx := context.Background()
+
+	_, food := seedCategoriesWithFood(t, queries)
+	other, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "other_cat", DisplayName: "Other",
+	})
+	if err != nil {
+		t.Fatalf("create other category: %v", err)
+	}
+
+	// First rule fires on create only.
+	testutil.MustCreateTransactionRule(
+		t, queries, "On-Create Rule",
+		[]byte(`{"field":"name","op":"contains","value":"Coffee"}`),
+		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"}]`),
+		"on_create",
+	)
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
+
+	mock := &mockProvider{
+		syncResult: provider.SyncResult{
+			Added: []provider.Transaction{
+				{
+					ExternalID:        "txn_on_create",
+					AccountExternalID: "ext_acct_1",
+					Amount:            decimal.NewFromFloat(5.00),
+					Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+					Name:              "Coffee Shop",
+					ISOCurrencyCode:   "USD",
+					Pending:           true,
+				},
+			},
+			Cursor: "cursor_1",
+		},
+	}
+
+	providers := map[string]provider.Provider{"plaid": mock}
+	engine := newEngine(t, pool, queries, providers)
+
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("first sync: %v", err)
+	}
+
+	// Verify rule fired on create.
+	var initialCatID pgtype.UUID
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_on_create'",
+	).Scan(&initialCatID)
+	if err != nil {
+		t.Fatalf("query transaction after first sync: %v", err)
+	}
+	if initialCatID != food.ID {
+		t.Fatalf("expected on_create rule to set food category, got %v", initialCatID)
+	}
+
+	// Manually move the transaction to a different category so we can detect
+	// re-fires (an on_update fire would overwrite our manual move).
+	_, err = pool.Exec(ctx,
+		"UPDATE transactions SET category_id = $1 WHERE external_transaction_id = 'txn_on_create'",
+		other.ID,
+	)
+	if err != nil {
+		t.Fatalf("manual category update: %v", err)
+	}
+
+	// Second sync: change the transaction so isChanged=true (still not isNew).
+	mock.syncResult = provider.SyncResult{
+		Modified: []provider.Transaction{
+			{
+				ExternalID:        "txn_on_create",
+				AccountExternalID: "ext_acct_1",
+				Amount:            decimal.NewFromFloat(5.00),
+				Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+				Name:              "Coffee Shop",
+				ISOCurrencyCode:   "USD",
+				Pending:           false, // change pending → triggers isChanged
+			},
+		},
+		Cursor: "cursor_2",
+	}
+
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("second sync: %v", err)
+	}
+
+	// on_create rule should NOT have re-fired — manual category should remain.
+	var finalCatID pgtype.UUID
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_on_create'",
+	).Scan(&finalCatID)
+	if err != nil {
+		t.Fatalf("query transaction after second sync: %v", err)
+	}
+	if finalCatID != other.ID {
+		t.Errorf("on_create rule re-fired on update path; expected manual category %v to remain, got %v", other.ID, finalCatID)
+	}
+}
+
+// TestRule_Trigger_OnUpdate_SkipsOnCreate verifies that a rule with
+// trigger="on_update" does NOT fire on the initial insert (isNew=true).
+func TestRule_Trigger_OnUpdate_SkipsOnCreate(t *testing.T) {
+	pool, queries := testutil.ServicePool(t)
+	ctx := context.Background()
+
+	seedCategoriesWithFood(t, queries)
+
+	testutil.MustCreateTransactionRule(
+		t, queries, "On-Update Rule",
+		[]byte(`{"field":"name","op":"contains","value":"Coffee"}`),
+		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"}]`),
+		"on_update",
+	)
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
+
+	mock := &mockProvider{
+		syncResult: provider.SyncResult{
+			Added: []provider.Transaction{
+				{
+					ExternalID:        "txn_only_on_update",
+					AccountExternalID: "ext_acct_1",
+					Amount:            decimal.NewFromFloat(5.00),
+					Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+					Name:              "Coffee Shop",
+					ISOCurrencyCode:   "USD",
+				},
+			},
+			Cursor: "cursor_1",
+		},
+	}
+
+	providers := map[string]provider.Provider{"plaid": mock}
+	engine := newEngine(t, pool, queries, providers)
+
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("Sync() error: %v", err)
+	}
+
+	// Rule did NOT fire on create — category should remain NULL.
+	var categoryID pgtype.UUID
+	err := pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_only_on_update'",
+	).Scan(&categoryID)
+	if err != nil {
+		t.Fatalf("query transaction: %v", err)
+	}
+	if categoryID.Valid {
+		t.Errorf("expected on_update rule NOT to fire on create; got category_id=%v", categoryID)
+	}
+}
+
+// TestRule_TypedActions_SetCategory_RespectsOverride verifies that a rule with a
+// typed set_category action does not overwrite a transaction whose
+// category_override flag is true.
+func TestRule_TypedActions_SetCategory_RespectsOverride(t *testing.T) {
+	pool, queries := testutil.ServicePool(t)
+	ctx := context.Background()
+
+	_, food := seedCategoriesWithFood(t, queries)
+	other, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "user_pick", DisplayName: "User Pick",
+	})
+	if err != nil {
+		t.Fatalf("create user_pick category: %v", err)
+	}
+
+	testutil.MustCreateTransactionRule(
+		t, queries, "Override Rule",
+		[]byte(`{"field":"name","op":"contains","value":"Coffee"}`),
+		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"}]`),
+		"always",
+	)
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
+
+	// First sync inserts the transaction.
+	mock := &mockProvider{
+		syncResult: provider.SyncResult{
+			Added: []provider.Transaction{
+				{
+					ExternalID:        "txn_override",
+					AccountExternalID: "ext_acct_1",
+					Amount:            decimal.NewFromFloat(5.00),
+					Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+					Name:              "Coffee Shop",
+					ISOCurrencyCode:   "USD",
+					Pending:           true,
+				},
+			},
+			Cursor: "cursor_1",
+		},
+	}
+
+	providers := map[string]provider.Provider{"plaid": mock}
+	engine := newEngine(t, pool, queries, providers)
+
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("first sync: %v", err)
+	}
+
+	// Sanity: rule fired on initial insert.
+	var initialCatID pgtype.UUID
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_override'",
+	).Scan(&initialCatID)
+	if err != nil {
+		t.Fatalf("query transaction after first sync: %v", err)
+	}
+	if initialCatID != food.ID {
+		t.Fatalf("expected initial category=%v, got %v", food.ID, initialCatID)
+	}
+
+	// Set a manual override pointing at the other category.
+	_, err = pool.Exec(ctx,
+		"UPDATE transactions SET category_id = $1, category_override = TRUE WHERE external_transaction_id = 'txn_override'",
+		other.ID,
+	)
+	if err != nil {
+		t.Fatalf("set override: %v", err)
+	}
+
+	// Second sync changes the transaction so the rule is re-evaluated. Because
+	// the rule trigger is "always" and the data changed (isChanged=true), the
+	// rule fires — but the override must be respected.
+	mock.syncResult = provider.SyncResult{
+		Modified: []provider.Transaction{
+			{
+				ExternalID:        "txn_override",
+				AccountExternalID: "ext_acct_1",
+				Amount:            decimal.NewFromFloat(5.00),
+				Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+				Name:              "Coffee Shop",
+				ISOCurrencyCode:   "USD",
+				Pending:           false, // change pending → isChanged
+			},
+		},
+		Cursor: "cursor_2",
+	}
+
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("second sync: %v", err)
+	}
+
+	var finalCatID pgtype.UUID
+	err = pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_override'",
+	).Scan(&finalCatID)
+	if err != nil {
+		t.Fatalf("query transaction after second sync: %v", err)
+	}
+	if finalCatID != other.ID {
+		t.Errorf("rule overwrote category_override=true; expected %v, got %v", other.ID, finalCatID)
 	}
 }
