@@ -157,6 +157,27 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		argN = ec.ArgN
 	}
 
+	// Tag filters (Phase 2). Tags is AND semantics (transaction has every
+	// slug), AnyTag is OR (transaction has at least one).
+	if len(params.Tags) > 0 {
+		// For each tag in Tags, require an EXISTS — this is tractable because
+		// common usage is 1-2 tags per filter.
+		for _, slug := range params.Tags {
+			buf.WriteString(" AND EXISTS (SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = $")
+			buf.WriteString(strconv.Itoa(argN))
+			buf.WriteByte(')')
+			args = append(args, slug)
+			argN++
+		}
+	}
+	if len(params.AnyTag) > 0 {
+		buf.WriteString(" AND EXISTS (SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = ANY($")
+		buf.WriteString(strconv.Itoa(argN))
+		buf.WriteString("))")
+		args = append(args, params.AnyTag)
+		argN++
+	}
+
 	if params.Cursor != "" {
 		cursorDate, cursorID, err := DecodeCursor(params.Cursor)
 		if err != nil {
@@ -334,6 +355,12 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		transactions = transactions[:limit]
 	}
 
+	// Attach tags in one extra round-trip for the full result page. Uses ANY()
+	// so it's a single query regardless of page size.
+	if err := s.attachTagsToTransactions(ctx, transactions); err != nil {
+		s.Logger.Warn("attach tags to transactions", "error", err)
+	}
+
 	var nextCursor string
 	isDefaultSort := params.SortBy == nil || *params.SortBy == "date"
 	if hasMore && len(transactions) > 0 && isDefaultSort {
@@ -348,6 +375,49 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		HasMore:      hasMore,
 		Limit:        limit,
 	}, nil
+}
+
+// attachTagsToTransactions fills in the Tags field on each TransactionResponse
+// in-place using a single ANY() query.
+func (s *Service) attachTagsToTransactions(ctx context.Context, txns []TransactionResponse) error {
+	if len(txns) == 0 {
+		return nil
+	}
+	ids := make([]pgtype.UUID, 0, len(txns))
+	idx := make(map[string]int, len(txns))
+	for i, t := range txns {
+		uid, err := parseUUID(t.ID)
+		if err != nil {
+			continue
+		}
+		ids = append(ids, uid)
+		idx[t.ID] = i
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	rows, err := s.Pool.Query(ctx, `
+		SELECT tt.transaction_id, tag.slug
+		FROM transaction_tags tt
+		JOIN tags tag ON tag.id = tt.tag_id
+		WHERE tt.transaction_id = ANY($1)
+		ORDER BY tt.added_at ASC`, ids)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var txnID pgtype.UUID
+		var slug string
+		if err := rows.Scan(&txnID, &slug); err != nil {
+			return err
+		}
+		key := formatUUID(txnID)
+		if i, ok := idx[key]; ok {
+			txns[i].Tags = append(txns[i].Tags, slug)
+		}
+	}
+	return rows.Err()
 }
 
 func (s *Service) CountTransactions(ctx context.Context) (int64, error) {
@@ -480,6 +550,24 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 		buf.WriteString(ec.SQL)
 		args = append(args, ec.Args...)
 		argN = ec.ArgN
+	}
+
+	// Tag filters (Phase 2).
+	if len(params.Tags) > 0 {
+		for _, slug := range params.Tags {
+			buf.WriteString(" AND EXISTS (SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = $")
+			buf.WriteString(strconv.Itoa(argN))
+			buf.WriteByte(')')
+			args = append(args, slug)
+			argN++
+		}
+	}
+	if len(params.AnyTag) > 0 {
+		buf.WriteString(" AND EXISTS (SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = ANY($")
+		buf.WriteString(strconv.Itoa(argN))
+		buf.WriteString("))")
+		args = append(args, params.AnyTag)
+		argN++
 	}
 
 	_ = argN // keep for consistency

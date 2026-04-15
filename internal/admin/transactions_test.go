@@ -103,17 +103,20 @@ func TestBuildActivityTimeline_LinkedCommentRendersInResolution(t *testing.T) {
 		CreatedAt:                   "2026-04-03T09:00:00Z",
 		ReviewedAt:                  &reviewedAt,
 	}}
-	linkedID := reviewID
-	comments := []service.CommentResponse{{
-		ID:         "comment-linked",
-		AuthorName: reviewerName,
-		AuthorType: reviewerType,
-		Content:    "matched recurring merchant rule",
-		ReviewID:   &linkedID,
-		CreatedAt:  "2026-04-03T10:00:00Z",
+	annotations := []service.Annotation{{
+		ID:        "ann-linked",
+		Kind:      "comment",
+		ActorName: reviewerName,
+		ActorType: reviewerType,
+		Payload: map[string]interface{}{
+			"content":    "matched recurring merchant rule",
+			"comment_id": "comment-linked",
+			"review_id":  reviewID,
+		},
+		CreatedAt: "2026-04-03T10:00:00Z",
 	}}
 
-	entries := buildActivityTimeline(reviews, comments, nil)
+	entries := buildActivityTimeline(reviews, annotations)
 
 	var resolution *service.ActivityEntry
 	for i := range entries {
@@ -136,15 +139,19 @@ func TestBuildActivityTimeline_LinkedCommentRendersInResolution(t *testing.T) {
 }
 
 func TestBuildActivityTimeline_FreeStandingCommentStillEmitted(t *testing.T) {
-	comments := []service.CommentResponse{{
-		ID:         "comment-free",
-		AuthorName: "Alice",
-		AuthorType: "user",
-		Content:    "split with Bob",
-		CreatedAt:  "2026-04-04T12:00:00Z",
+	annotations := []service.Annotation{{
+		ID:        "ann-free",
+		Kind:      "comment",
+		ActorName: "Alice",
+		ActorType: "user",
+		Payload: map[string]interface{}{
+			"content":    "split with Bob",
+			"comment_id": "comment-free",
+		},
+		CreatedAt: "2026-04-04T12:00:00Z",
 	}}
 
-	entries := buildActivityTimeline(nil, comments, nil)
+	entries := buildActivityTimeline(nil, annotations)
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
@@ -158,15 +165,19 @@ func TestBuildActivityTimeline_FreeStandingCommentStillEmitted(t *testing.T) {
 }
 
 func TestBuildActivityTimeline_LegacyPrefixCommentSuppressed(t *testing.T) {
-	comments := []service.CommentResponse{{
-		ID:         "comment-legacy",
-		AuthorName: "Legacy",
-		AuthorType: "system",
-		Content:    "[Review: Some note migrated before consolidation]",
-		CreatedAt:  "2026-03-01T00:00:00Z",
+	annotations := []service.Annotation{{
+		ID:        "ann-legacy",
+		Kind:      "comment",
+		ActorName: "Legacy",
+		ActorType: "system",
+		Payload: map[string]interface{}{
+			"content":    "[Review: Some note migrated before consolidation]",
+			"comment_id": "comment-legacy",
+		},
+		CreatedAt: "2026-03-01T00:00:00Z",
 	}}
 
-	entries := buildActivityTimeline(nil, comments, nil)
+	entries := buildActivityTimeline(nil, annotations)
 
 	if len(entries) != 0 {
 		t.Fatalf("expected legacy [Review: ...] comment to be suppressed, got %d entries", len(entries))

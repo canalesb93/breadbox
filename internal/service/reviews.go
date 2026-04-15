@@ -676,15 +676,59 @@ func (s *Service) SubmitReview(ctx context.Context, params SubmitReviewParams) (
 		if params.Actor.ID != "" {
 			authorID = pgtype.Text{String: params.Actor.ID, Valid: true}
 		}
-		if _, err := qtx.CreateComment(ctx, db.CreateCommentParams{
+		comment, err := qtx.CreateComment(ctx, db.CreateCommentParams{
 			TransactionID: existing.TransactionID,
 			AuthorType:    params.Actor.Type,
 			AuthorID:      authorID,
 			AuthorName:    params.Actor.Name,
 			Content:       trimmedNote,
 			ReviewID:      reviewID,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, fmt.Errorf("create review note comment: %w", err)
+		}
+
+		// Annotation dual-write for the review note.
+		notePayload := map[string]interface{}{
+			"content":    trimmedNote,
+			"comment_id": comment.ShortID,
+			"review_id":  formatUUID(reviewID),
+		}
+		if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
+			TransactionID: existing.TransactionID,
+			Kind:          "comment",
+			ActorType:     normalizeAnnotationActorType(params.Actor.Type),
+			ActorID:       params.Actor.ID,
+			ActorName:     params.Actor.Name,
+			Payload:       notePayload,
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	// Annotation for the resolved category choice (only when approving + a
+	// category was resolved). The legacy transactions.category_override +
+	// SetTransactionCategory path fires outside this tx (see below), but the
+	// annotation belongs with the review decision for the timeline.
+	if params.Decision == "approved" && categoryToApply != nil {
+		catSlug := ""
+		if cat, err := s.GetCategory(ctx, *categoryToApply); err == nil {
+			catSlug = cat.Slug
+		}
+		payload := map[string]interface{}{
+			"category_slug": catSlug,
+			"source":        "review",
+			"review_id":     formatUUID(reviewID),
+		}
+		if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
+			TransactionID: existing.TransactionID,
+			Kind:          "category_set",
+			ActorType:     normalizeAnnotationActorType(params.Actor.Type),
+			ActorID:       params.Actor.ID,
+			ActorName:     params.Actor.Name,
+			Payload:       payload,
+		}); err != nil {
+			return nil, err
 		}
 	}
 

@@ -291,6 +291,52 @@ func MustCreateReview(t *testing.T, q *db.Queries, txnID pgtype.UUID, reviewType
 	return review
 }
 
+// MustCreateTag inserts a tag row and fatals on error. lifecycle defaults to
+// "persistent" if empty.
+func MustCreateTag(t *testing.T, q *db.Queries, slug, displayName, lifecycle string) db.Tag {
+	t.Helper()
+	if lifecycle == "" {
+		lifecycle = "persistent"
+	}
+	tag, err := q.InsertTag(context.Background(), db.InsertTagParams{
+		Slug:        slug,
+		DisplayName: displayName,
+		Lifecycle:   lifecycle,
+	})
+	if err != nil {
+		t.Fatalf("MustCreateTag(%q): %v", slug, err)
+	}
+	return tag
+}
+
+// MustCreateTransactionTag attaches a tag to a transaction and fatals on error.
+func MustCreateTransactionTag(t *testing.T, q *db.Queries, txnID, tagID pgtype.UUID) {
+	t.Helper()
+	_, err := q.AddTransactionTag(context.Background(), db.AddTransactionTagParams{
+		TransactionID: txnID,
+		TagID:         tagID,
+		AddedByType:   "system",
+		AddedByName:   "test",
+	})
+	if err != nil {
+		t.Fatalf("MustCreateTransactionTag: %v", err)
+	}
+}
+
+// MustCountAnnotations returns the number of annotations of a given kind for
+// a transaction. Fatals on error.
+func MustCountAnnotations(t *testing.T, q *db.Queries, txnID pgtype.UUID, kind string) int {
+	t.Helper()
+	n, err := q.CountAnnotationsByTransactionAndKind(context.Background(), db.CountAnnotationsByTransactionAndKindParams{
+		TransactionID: txnID,
+		Kind:          kind,
+	})
+	if err != nil {
+		t.Fatalf("MustCountAnnotations(%q): %v", kind, err)
+	}
+	return int(n)
+}
+
 // MustCreateAgentReport creates an agent report and fatals on error.
 func MustCreateAgentReport(t *testing.T, q *db.Queries, title, body string) db.AgentReport {
 	t.Helper()
