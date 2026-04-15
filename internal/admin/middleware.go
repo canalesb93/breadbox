@@ -15,8 +15,9 @@ const navBadgesKey contextKey = "navBadges"
 
 // NavBadges holds notification counts displayed in the sidebar navigation.
 type NavBadges struct {
+	// PendingReviews is the count of transactions currently tagged
+	// "needs-review". Displayed next to the Tags nav link.
 	PendingReviews       int64
-	ReviewsEnabled       bool
 	ConnectionsAttention int64
 	UnreadReports        int64
 	ShowGettingStarted   bool
@@ -30,11 +31,8 @@ func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Han
 			ctx := r.Context()
 			badges := NavBadges{}
 
-			// Phase 3: the review queue is backed by the needs-review tag.
-			// Count transactions currently carrying that tag (excluding matched
-			// dependent transactions, matching the semantics of the old
-			// review_queue count).
-			badges.ReviewsEnabled = true
+			// Count transactions currently tagged "needs-review" — this is
+			// the review backlog surfaced in the Tags nav badge.
 			if pending, err := countPendingReviewsFromTags(ctx, queries); err == nil {
 				badges.PendingReviews = pending
 			} else {

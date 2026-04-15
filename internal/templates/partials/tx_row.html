@@ -69,6 +69,19 @@
         <span class="sm:hidden text-base-content/25 truncate shrink-0">Uncategorized</span>
         {{end}}
       </div>
+      <!-- Tag chips -->
+      {{if .Tags}}
+      <div class="flex flex-wrap gap-1 mt-1">
+        {{range .Tags}}
+        <a href="/transactions?tags={{.Slug}}" @click.stop class="badge badge-soft badge-xs rounded-md gap-1 no-underline"
+          {{if .Color}}style="background-color: {{safeCSS (deref .Color)}}1a; color: {{safeCSS (deref .Color)}}; border-color: {{safeCSS (deref .Color)}}40;"{{end}}
+          title="{{.Slug}}">
+          {{if .Icon}}<i data-lucide="{{deref .Icon}}" class="w-2.5 h-2.5"></i>{{end}}
+          <span>{{.DisplayName}}</span>
+        </a>
+        {{end}}
+      </div>
+      {{end}}
     </div>
 
     <!-- Category Picker (inline column) -->

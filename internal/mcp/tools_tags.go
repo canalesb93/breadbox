@@ -35,6 +35,31 @@ type removeTransactionTagInput struct {
 	Note          string `json:"note,omitempty" jsonschema:"Required when the tag's lifecycle is 'ephemeral'. Short rationale for removal."`
 }
 
+type createTagInput struct {
+	WriteSessionContext
+	Slug        string  `json:"slug" jsonschema:"required,Tag slug. Lowercase alphanumerics with hyphens/colons, e.g. 'needs-review' or 'subscription:monthly'."`
+	DisplayName string  `json:"display_name" jsonschema:"required,Human-readable name (e.g. 'Needs Review')."`
+	Description string  `json:"description,omitempty" jsonschema:"Optional description."`
+	Color       *string `json:"color,omitempty" jsonschema:"Optional CSS color (e.g. '#4f46e5') used for chip rendering."`
+	Icon        *string `json:"icon,omitempty" jsonschema:"Optional Lucide icon name (e.g. 'inbox')."`
+	Lifecycle   string  `json:"lifecycle,omitempty" jsonschema:"'persistent' (default) or 'ephemeral'. Ephemeral tags require a note on removal."`
+}
+
+type updateTagInput struct {
+	WriteSessionContext
+	ID          string  `json:"id" jsonschema:"required,Tag UUID, short ID, or slug."`
+	DisplayName *string `json:"display_name,omitempty" jsonschema:"New display name."`
+	Description *string `json:"description,omitempty" jsonschema:"New description."`
+	Color       *string `json:"color,omitempty" jsonschema:"New color (pass empty string to clear)."`
+	Icon        *string `json:"icon,omitempty" jsonschema:"New icon (pass empty string to clear)."`
+	Lifecycle   *string `json:"lifecycle,omitempty" jsonschema:"'persistent' or 'ephemeral'."`
+}
+
+type deleteTagInput struct {
+	WriteSessionContext
+	ID string `json:"id" jsonschema:"required,Tag UUID, short ID, or slug."`
+}
+
 // --- Handlers ---
 
 func (s *MCPServer) handleListTags(_ context.Context, _ *mcpsdk.CallToolRequest, _ listTagsInput) (*mcpsdk.CallToolResult, any, error) {
@@ -98,5 +123,70 @@ func (s *MCPServer) handleRemoveTransactionTag(ctx context.Context, _ *mcpsdk.Ca
 		"already_absent": alreadyAbsent,
 		"tag_slug":       input.TagSlug,
 		"transaction_id": input.TransactionID,
+	})
+}
+
+func (s *MCPServer) handleCreateTag(ctx context.Context, _ *mcpsdk.CallToolRequest, input createTagInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.Slug == "" || input.DisplayName == "" {
+		return errorResult(fmt.Errorf("slug and display_name are required")), nil, nil
+	}
+	params := service.CreateTagParams{
+		Slug:        input.Slug,
+		DisplayName: input.DisplayName,
+		Description: input.Description,
+		Color:       input.Color,
+		Icon:        input.Icon,
+		Lifecycle:   input.Lifecycle,
+	}
+	tag, err := s.svc.CreateTag(context.Background(), params)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(tag)
+}
+
+func (s *MCPServer) handleUpdateTag(ctx context.Context, _ *mcpsdk.CallToolRequest, input updateTagInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.ID == "" {
+		return errorResult(fmt.Errorf("id is required")), nil, nil
+	}
+	params := service.UpdateTagParams{
+		DisplayName: input.DisplayName,
+		Description: input.Description,
+		Color:       input.Color,
+		Icon:        input.Icon,
+		Lifecycle:   input.Lifecycle,
+	}
+	tag, err := s.svc.UpdateTag(context.Background(), input.ID, params)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return errorResult(fmt.Errorf("tag not found")), nil, nil
+		}
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(tag)
+}
+
+func (s *MCPServer) handleDeleteTag(ctx context.Context, _ *mcpsdk.CallToolRequest, input deleteTagInput) (*mcpsdk.CallToolResult, any, error) {
+	if err := s.checkWritePermission(ctx); err != nil {
+		return errorResult(err), nil, nil
+	}
+	if input.ID == "" {
+		return errorResult(fmt.Errorf("id is required")), nil, nil
+	}
+	if err := s.svc.DeleteTag(context.Background(), input.ID); err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			return errorResult(fmt.Errorf("tag not found")), nil, nil
+		}
+		return errorResult(err), nil, nil
+	}
+	return jsonResult(map[string]any{
+		"deleted": true,
+		"id":      input.ID,
 	})
 }

@@ -362,8 +362,9 @@ func runMCPStdio() error {
 	defer cancel()
 
 	// Set agent actor identity so ActorFromContext returns "agent" (not "system").
-	// Stdio has no API key middleware, but write actions like submit_review
-	// require reviewer_type to be "user" or "agent".
+	// Stdio has no API key middleware, but write actions like update_transactions
+	// (and the rest of the tag/annotation surface) require actor_type to be
+	// "user" or "agent" to satisfy annotation check constraints.
 	ctx = service.ContextWithAPIKey(ctx, "stdio", "MCP Stdio")
 
 	a, err := app.New(ctx, cfg, logger)

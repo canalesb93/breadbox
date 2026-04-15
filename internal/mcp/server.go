@@ -24,7 +24,8 @@ DATA MODEL:
 - Transactions: individual financial transactions belonging to an account
 - Categories: 2-level hierarchy (primary → subcategory), identified by slug (e.g., food_and_drink_groceries)
 - Transaction Rules: pattern-matching conditions that pre-categorize new transactions during sync
-- Reviews: queue of transactions awaiting agent or human assessment
+- Tags: open-ended labels attached to transactions. Each tag has a slug (stable identifier), display_name, and lifecycle ("persistent" or "ephemeral"). Tags coordinate work between agents and humans.
+- Annotations: the activity timeline for a transaction. Every tag change, category set, rule application, and comment is an annotation.
 
 AMOUNT CONVENTION (critical):
 - Positive amounts = money out (debits, purchases, payments)
@@ -33,7 +34,7 @@ AMOUNT CONVENTION (critical):
 
 ID CONVENTION:
 - Entity IDs in responses are compact 8-character alphanumeric strings (e.g., "k7Xm9pQ2").
-- Use these compact IDs in all tool inputs (transaction_id, account_id, user_id, category_id, review_id, rule_id, etc.).
+- Use these compact IDs in all tool inputs (transaction_id, account_id, user_id, category_id, rule_id, tag_id, etc.).
 - Full UUIDs are also accepted as input for backward compatibility.
 
 GETTING STARTED:
@@ -41,7 +42,7 @@ GETTING STARTED:
 2. Check get_sync_status to verify data freshness
 
 QUERYING:
-- query_transactions: filters (date, account, user, category, amount, search), cursor pagination. Use fields= to control response size (aliases: minimal, core, category, timestamps). id always included.
+- query_transactions: filters (date, account, user, category, amount, search, tags, any_tag), cursor pagination. Use fields= to control response size (aliases: minimal, core, category, timestamps). id always included. tags=["needs-review"] returns the review backlog.
 - count_transactions: same filters, returns count. Use before paginating.
 - transaction_summary: aggregated totals by category, month, week, day, or category_month. Use for spending analysis.
 - merchant_summary: merchant-level stats (count, total, avg, date range). Set min_count=2 for recurring, 3 for subscriptions.
@@ -53,13 +54,23 @@ SEARCH MODES (on query_transactions, count_transactions, merchant_summary, list_
 - fuzzy: typo-tolerant — "starbuks" matches "Starbucks"
 - Comma-separated search values are ORed: search=starbucks,dunkin
 
-REVIEWS & RULES:
-- Tools: pending_reviews_overview, list_pending_reviews, submit_review, batch_submit_reviews, create_transaction_rule, batch_create_rules, preview_rule, apply_rules
-- Reviews can be disabled by the user. If disabled, review tools return empty results or errors with a note. Check pending_reviews_overview first.
+REVIEW WORKFLOW (tag-based):
+- The "review queue" is just transactions tagged "needs-review". Fresh installs have a seeded rule that auto-tags new transactions on sync.
+- find-work: query_transactions(tags=["needs-review"])
+- do-work: update_transactions(operations: [...]) — atomic compound op per transaction. Each operation can set_category + add/remove tags + attach a comment in a single write. Max 50 operations per call.
+- signal-done: the update_transactions operation's tags_to_remove entry is how you close a review. A note is REQUIRED when removing an ephemeral tag like needs-review — it lands on the audit trail.
+- If you can't confidently categorize a transaction, leave the tag on it. The tag IS the queue.
+- Tag tools: list_tags, add_transaction_tag (single), remove_transaction_tag (single), list_annotations (activity timeline), plus update_transactions for compound ops.
 - Before processing reviews or creating rules, read breadbox://review-guidelines for detailed guidelines.
+
+RULES:
+- Tools: create_transaction_rule, batch_create_rules, list_transaction_rules, update_transaction_rule, delete_transaction_rule, preview_rule, apply_rules
+- Rules fire during sync on new transactions (or re-sync updates). Actions are typed: set_category, add_tag, add_comment.
+- The seeded "add needs-review tag on new transactions" rule is what keeps the review queue populated. Disabling it turns off auto-review.
 
 CATEGORIES:
 - list_categories: full taxonomy tree with slugs
+- update_transactions: compound write (preferred for review-driven categorization — combines category set + tag changes + comment in one atomic op per transaction, max 50 ops per call)
 - categorize_transaction / batch_categorize_transactions: manual override (sets category_override=true)
 - bulk_recategorize: move all matching transactions to a new category
 - export_categories / import_categories: bulk taxonomy editing via TSV
@@ -71,12 +82,13 @@ ACCOUNT LINKING:
 - reconcile_account_link: re-run matching. confirm_match / reject_match: correct errors.
 
 REPORTS & COMMUNICATION:
-- Tools: submit_report, add_transaction_comment, list_transaction_comments
+- Tools: submit_report, add_transaction_comment, list_transaction_comments, list_annotations
+- list_annotations returns the full activity timeline for a transaction (comments + tag events + rule applications + category sets). Use it to see prior context before acting.
 - Before submitting reports, read breadbox://report-format for report structure and formatting guidelines.
 
 USER ROLES:
 - admin: Full access. Can manage connections, settings, users, rules, and all data.
-- editor: Can view and edit ALL household members' transactions (categorize, review, comment). Cannot manage connections, settings, users, or system config.
+- editor: Can view and edit ALL household members' transactions (categorize, tag, comment). Cannot manage connections, settings, users, or system config.
 - viewer: Can only see their own connections, accounts, and transactions. Read-only for their own data.
 - The permissions section in breadbox://overview shows what the current session can do.`
 
@@ -84,21 +96,23 @@ USER ROLES:
 // User-editable via the MCP Settings page.
 const DefaultReviewGuidelines = `REVIEW PRINCIPLES — follow these strictly:
 
-1. EVERY REVIEW MUST BE INDIVIDUALLY ASSESSED. You must look at each transaction before approving it. Even when processing in batches via batch_submit_reviews, you must have examined each transaction's name, amount, and context to determine the correct category. There is no auto-approve mechanism — categorization quality depends on your judgment.
+1. THE REVIEW QUEUE IS A TAG. Transactions tagged "needs-review" are the queue. Find them with query_transactions(tags=["needs-review"]). Close them with update_transactions operations that remove the needs-review tag (with a required note). The "needs-review" tag's lifecycle is ephemeral — removing it always requires a non-empty note explaining the decision.
 
-2. RULES ARE FORWARD-LOOKING. Transaction rules apply automatically to NEW transactions during sync. Do NOT use apply_rules or apply_retroactively=true during routine reviews. These are reserved for explicit one-off bulk work (initial setup only). During routine work, create rules and let them match future syncs naturally.
+2. EVERY REVIEW MUST BE INDIVIDUALLY ASSESSED. You must look at each transaction before closing it. Even when processing in batches via update_transactions (max 50 operations per call), you must have examined each transaction's name, amount, and context to determine the correct category. There is no auto-close mechanism — quality depends on your judgment.
 
-3. RE-REVIEWS ARE HUMAN CORRECTIONS. When you see review_type=re_review, a human has disagreed with a previous decision and re-enqueued the transaction with a comment. Read that comment via list_transaction_comments. The human's feedback overrides your prior categorization. Acknowledge the correction in the note you pass to submit_review — that note is recorded as a linked transaction comment attributed to you.
+3. RULES ARE FORWARD-LOOKING. Transaction rules apply automatically to NEW transactions during sync. Do NOT use apply_rules or apply_retroactively=true during routine reviews. These are reserved for explicit one-off bulk work (initial setup only). During routine work, create rules and let them match future syncs naturally.
 
-4. SKIP RATHER THAN GUESS. If you cannot confidently determine the correct category, skip the review with a note explaining what's ambiguous. A skipped review can be revisited later with more context. A wrong categorization is harder to catch.
+4. PRIOR ANNOTATIONS ARE HUMAN CORRECTIONS. When a transaction has a history (list_annotations shows prior comments, rule applications, or category sets authored by humans), read that context first. A human's explicit decision overrides your prior categorization. Acknowledge the correction in the note you pass on the update_transactions tags_to_remove entry — that note lands on the audit trail.
 
-5. EXPLAIN NON-OBVIOUS DECISIONS VIA THE REVIEW NOTE. When you approve a review with a category that isn't immediately obvious from the transaction name, pass a brief note to submit_review explaining why. The note is stored as a transaction comment linked to this review and rendered inline on the resolution event in the activity timeline — do NOT also call add_transaction_comment for the same narrative, as that produces duplicate entries. Reserve add_transaction_comment for free-standing narrative that isn't tied to a specific review decision.
+5. LEAVE THE TAG ON RATHER THAN GUESS. If you cannot confidently determine the correct category, do NOT remove the needs-review tag. Leaving it attached keeps the transaction in the queue for a future pass. Never remove the tag with a placeholder note just to "clear" the queue.
 
-6. NEVER BULK-APPROVE WITHOUT EXAMINATION. Do not use batch_submit_reviews to approve all remaining reviews with a default category. Each item in the batch must have been individually assessed with the correct category assigned.
+6. EXPLAIN NON-OBVIOUS DECISIONS VIA THE TAG REMOVAL NOTE. The note you pass on tags_to_remove[{slug: "needs-review", note: "..."}] is the primary audit artifact for the review decision. You can also attach an optional 'comment' in the same update_transactions operation for longer narrative, but don't double-write the same explanation.
 
-7. ALWAYS USE CATEGORY_SLUG. When approving reviews, use category_slug (e.g., "food_and_drink_groceries") not category_id. Slugs are human-readable, stable, and consistent across sessions.
+7. NEVER BULK-CLOSE WITHOUT EXAMINATION. Do not batch 50 update_transactions operations with a default category and a generic "approved" note. Each item in the batch must have been individually assessed with the correct category assigned and a specific rationale.
 
-8. SKIPPED REVIEWS STAY IN THE QUEUE. When you skip a review, it remains pending and will appear again in future review sessions. Skip freely when uncertain.
+8. ALWAYS USE CATEGORY_SLUG. When setting categories, use category_slug (e.g., "food_and_drink_groceries") not category_id. Slugs are human-readable, stable, and consistent across sessions.
+
+9. SKIPPED TRANSACTIONS STAY TAGGED. To "skip" a review: do nothing with the tag — leave it attached. The transaction stays in the queue and will appear again next session. There is no separate "skipped" status.
 
 RULE CREATION:
 - Rules auto-categorize new transactions during sync. Good rules dramatically reduce future review work.
@@ -303,7 +317,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"Remove a manual category override from a transaction and re-resolve its category from the automatic mapping rules. Use this to undo a categorize_transaction action.",
 			s.handleResetTransactionCategory, svc),
 		makeToolDefLogged("add_transaction_comment", ToolWrite,
-			"Add a free-standing comment to a transaction — narrative that's independent of any specific review decision (flagging unusual charges, noting shared expenses, cross-references, context that outlives a single review cycle). Supports markdown. IMPORTANT: when your comment is the rationale for a review decision, pass it via the 'note' parameter on submit_review / batch_submit_reviews instead; that note is stored as a linked comment and shown inline on the review resolution, so using both tools for the same narrative produces duplicate activity-log entries.",
+			"Add a free-standing comment to a transaction — narrative that's independent of any specific review decision (flagging unusual charges, noting shared expenses, cross-references, context that outlives a single review cycle). Supports markdown. IMPORTANT: when the comment is the rationale for a tag change or category set, pass it as part of an update_transactions operation (inline `comment`, or `note` on a tags_to_add/tags_to_remove entry) instead — those paths write a single linked annotation so the activity log doesn't double up.",
 			s.handleAddTransactionComment, svc),
 		makeToolDefLogged("list_transaction_comments", ToolRead,
 			"List all comments on a transaction, ordered chronologically. Check comments before making changes to understand prior context and decisions by other agents or family members.",
@@ -320,12 +334,6 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDefLogged("import_categories", ToolWrite,
 			"Import category definitions from TSV text. Existing slugs are updated (display_name, icon, color, sort_order, hidden). New slugs are created. Missing slugs are NOT deleted. Parents must appear before children. Use export_categories to get the current state, edit it, then import the modified version. To merge/consolidate categories, set the merge_into column to the target category slug — all transactions and mappings from the source are reassigned to the target, then the source is deleted. This is useful for simplifying a complex taxonomy without losing transaction categorization.",
 			s.handleImportCategories, svc),
-		makeToolDefLogged("list_pending_reviews", ToolRead,
-			"[DEPRECATED] Use query_transactions(tags=[\"needs-review\"]) instead. This is a compatibility shim over the new tag-based review flow: it lists transactions currently tagged 'needs-review'. review_type is always 'manual' and status is always 'pending' in the shim response (the old review_queue dimensions are gone). Filters: account_id, user_id. Each entry includes full transaction details.",
-			s.handleListPendingReviews, svc),
-		makeToolDefLogged("submit_review", ToolWrite,
-			"[DEPRECATED] Use remove_transaction_tag(transaction_id, 'needs-review', note) — optionally preceded by a category update via categorize_transaction / update_transactions. This is a compatibility shim that translates your submit_review call onto those primitives: it interprets 'review_id' as the transaction_id, sets the category on approved (via category_slug/category_id), writes 'note' as a comment annotation, then removes the needs-review tag with a rationale.",
-			s.handleSubmitReview, svc),
 		makeToolDefLogged("create_transaction_rule", ToolWrite,
 			"Create a transaction rule for automatic categorization. Rules match conditions against transaction fields and apply to ALL future transactions during sync. IMPORTANT: Before creating, check list_transaction_rules to avoid duplicates. Prefer broader patterns (contains) over exact matches. Conditions use a JSON tree with AND/OR/NOT logic. Available fields: name, merchant_name, amount, category_primary (raw provider category), category_detailed, pending, provider, account_id, user_id. Operators: eq, neq, contains, not_contains, matches (regex), gt, gte, lt, lte, in.",
 			s.handleCreateTransactionRule, svc),
@@ -338,9 +346,6 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDefLogged("delete_transaction_rule", ToolWrite,
 			"Delete a transaction rule by ID.",
 			s.handleDeleteTransactionRule, svc),
-		makeToolDefLogged("batch_submit_reviews", ToolWrite,
-			"[DEPRECATED] Loop remove_transaction_tag(needs-review) + (optional) categorize_transaction per item instead. This is a compatibility shim: it loops the submit_review shim across up to 500 items and returns per-item successes/failures. 'review_id' is interpreted as transaction_id.",
-			s.handleBatchSubmitReviews, svc),
 		makeToolDefLogged("batch_create_rules", ToolWrite,
 			"Create multiple transaction rules at once. Each rule needs a name, category_slug, and conditions object. More efficient than creating rules one at a time. Returns created rules and any errors.",
 			s.handleBatchCreateRules, svc),
@@ -377,9 +382,6 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDefLogged("reject_match", ToolWrite,
 			"Reject a false auto-match between two transactions. Removes the match record and restores the primary transaction's original user attribution.",
 			s.handleRejectMatch, svc),
-		makeToolDefLogged("pending_reviews_overview", ToolRead,
-			"[DEPRECATED] Use count_transactions(tags=[\"needs-review\"]) plus transaction_summary for category breakdown. This compatibility shim returns total_pending (count of transactions tagged 'needs-review'), a counts_by_type array that only ever contains the 'manual' bucket, and a category breakdown with sample transaction names.",
-			s.handlePendingReviewsOverview, svc),
 		makeToolDefLogged("submit_report", ToolWrite,
 			"Send a message to the family's dashboard. The title is the main message — write it as a concise, self-contained 1-2 sentence summary the family can understand at a glance without expanding. The body provides the detailed breakdown (markdown with headers, bullets, transaction links). Use priority to signal urgency and author to identify your role.",
 			s.handleSubmitReport, svc),
@@ -396,6 +398,18 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDefLogged("remove_transaction_tag", ToolWrite,
 			"Remove a tag from a transaction. For ephemeral tags (lifecycle='ephemeral', like 'needs-review'), a non-empty note is REQUIRED — it's recorded on the tag_removed annotation so the reason for removal is auditable. For persistent tags, the note is optional. Idempotent: returns already_absent=true if the tag wasn't attached.",
 			s.handleRemoveTransactionTag, svc),
+		makeToolDefLogged("update_transactions", ToolWrite,
+			"Compound write for up to 50 transactions at once. Each operation can: set a category (category_slug), add tags (tags_to_add), remove tags (tags_to_remove), and attach a comment — all atomically per transaction, with annotations written for every change. The preferred tool for closing review work (set category + remove needs-review + explain) in one call. Example operation: {\"transaction_id\":\"k7Xm9pQ2\",\"category_slug\":\"food_and_drink_groceries\",\"tags_to_remove\":[{\"slug\":\"needs-review\",\"note\":\"clearly groceries\"}],\"comment\":\"Costco run\"}. on_error: 'continue' (default — each op in its own DB tx, partial failures OK) or 'abort' (one DB tx, rolls back on first error). Ephemeral tags (needs-review) REQUIRE a non-empty note on removal.",
+			s.handleUpdateTransactions, svc),
+		makeToolDefLogged("create_tag", ToolWrite,
+			"Register a new tag in the system. Admin-only write — agents can auto-create persistent tags implicitly via add_transaction_tag (pass a new slug), so use create_tag only when users need to set display_name/color/lifecycle up front. Slug regex: ^[a-z0-9][a-z0-9\\-:]*[a-z0-9]$. Lifecycle defaults to 'persistent' (user-defined, long-lived). Use 'ephemeral' for tags whose removal requires a note (workflow trigger tags like needs-review).",
+			s.handleCreateTag, svc),
+		makeToolDefLogged("update_tag", ToolWrite,
+			"Update a tag's mutable fields (display_name, description, color, icon, lifecycle). Slug is immutable — to rename, create a new tag + bulk re-tag + delete old. Identify the tag by UUID, short ID, or slug.",
+			s.handleUpdateTag, svc),
+		makeToolDefLogged("delete_tag", ToolWrite,
+			"Delete a tag. Cascades to transaction_tags (removes the tag from every transaction). Annotations that reference the tag keep their rows with tag_id=NULL (preserves audit trail). Identify the tag by UUID, short ID, or slug.",
+			s.handleDeleteTag, svc),
 	}
 }
 

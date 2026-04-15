@@ -285,6 +285,10 @@ type AdminTransactionListParams struct {
 	SearchField   *string // "all" (default), "name", "merchant"
 	ExcludeSearch *string
 	SortOrder     string // "desc" (default) or "asc"
+	// Tags filter — AND semantics (must have every slug). Empty = no constraint.
+	Tags []string
+	// AnyTag filter — OR semantics (must have at least one slug). Empty = no constraint.
+	AnyTag []string
 }
 
 type AdminTransactionRow struct {
@@ -310,6 +314,18 @@ type AdminTransactionRow struct {
 	HasPendingReview    bool
 	CreatedAt           string
 	UpdatedAt           string
+	// Tags attached to this transaction. Populated as a separate batched
+	// lookup keyed by transaction id so list pages can render chips.
+	Tags []AdminTransactionTag
+}
+
+// AdminTransactionTag is a compact tag descriptor for list-row rendering.
+type AdminTransactionTag struct {
+	Slug        string
+	DisplayName string
+	Color       *string
+	Icon        *string
+	Lifecycle   string
 }
 
 type AdminTransactionListResult struct {
