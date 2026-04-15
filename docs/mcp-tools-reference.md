@@ -355,7 +355,7 @@ Submit a report for human review. Reports appear on the admin dashboard.
 
 ### create_session (Write)
 
-Establish a session. Returns dataset context (users, accounts, connection status, pending review count) and server instructions. Call this first.
+Establish a session. Returns dataset context (users, accounts, connection status, pending transaction count) and server instructions. Call this first.
 
 ### trigger_sync (Write)
 
@@ -369,7 +369,7 @@ In addition to tools, Breadbox exposes three MCP resources that provide passive 
 
 | URI | Description |
 |-----|-------------|
-| `breadbox://overview` | Live dataset summary (users, accounts, spending, pending reviews) |
+| `breadbox://overview` | Live dataset summary (users, accounts, spending, pending transactions) |
 | `breadbox://review-guidelines` | Guidelines for reviewing transactions and creating rules |
 | `breadbox://report-format` | Report structure templates and formatting guidelines |
 
