@@ -551,7 +551,7 @@ function rulesPage() {
       <!-- Live preview -->
       <div class="flex items-center gap-3 p-4 bg-base-200/40 rounded-xl">
         <div class="w-9 h-9 rounded-xl flex items-center justify-center" :style="'background-color:' + (color || '#6366f1') + '15'">
-          <template x-if="icon"><i :data-lucide="icon" class="w-4.5 h-4.5" :style="'color:' + (color || '#6366f1')"></i></template>
+          <template x-if="icon"><i :data-lucide="icon" class="w-5 h-5" :style="'color:' + (color || '#6366f1')"></i></template>
           <template x-if="!icon"><span class="w-2.5 h-2.5 rounded-full" :style="'background-color:' + (color || '#6366f1')"></span></template>
         </div>
         <span class="font-semibold text-sm" x-text="displayName || 'Category Name'"></span>
@@ -633,7 +633,7 @@ function rulesPage() {
       <!-- Live preview -->
       <div class="flex items-center gap-3 p-4 bg-base-200/40 rounded-xl">
         <div class="w-9 h-9 rounded-xl flex items-center justify-center" :style="'background-color:' + (editColor || '#6366f1') + '15'">
-          <template x-if="editIcon"><i :data-lucide="editIcon" class="w-4.5 h-4.5" :style="'color:' + (editColor || '#6366f1')"></i></template>
+          <template x-if="editIcon"><i :data-lucide="editIcon" class="w-5 h-5" :style="'color:' + (editColor || '#6366f1')"></i></template>
           <template x-if="!editIcon"><span class="w-2.5 h-2.5 rounded-full" :style="'background-color:' + (editColor || '#6366f1')"></span></template>
         </div>
         <span class="font-semibold text-sm" x-text="editDisplayName || 'Category Name'"></span>

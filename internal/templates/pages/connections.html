@@ -3,14 +3,14 @@
      x-init="$watch('tab', function(v) { var u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); })">
 
 <!-- Page Header -->
-<div class="flex items-center justify-between mb-6">
+<div class="bb-page-header">
   <div class="flex items-baseline gap-3">
     <h1 class="bb-page-title">Connections</h1>
     {{if .Connections}}
     <span class="text-sm text-base-content/40" x-show="tab === 'connections'">{{len .Connections}} bank{{if ne (len .Connections) 1}}s{{end}}</span>
     {{end}}
   </div>
-  <div class="flex items-center gap-2">
+  <div class="flex items-center gap-2 flex-wrap">
     <div x-show="tab === 'connections'" x-cloak class="flex items-center gap-2">
       {{if .Connections}}
       <div x-data="syncAllBtn()">

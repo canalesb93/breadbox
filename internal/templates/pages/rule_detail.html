@@ -189,7 +189,7 @@
           <td class="text-sm"><a href="/transactions/{{.TransactionID}}" class="hover:text-primary">{{.TransactionName}}</a></td>
           <td class="text-sm text-right tabular-nums bb-amount">{{printf "%.2f" .Amount}}</td>
           <td class="text-sm text-base-content/60">{{.Date}}</td>
-          <td class="text-sm"><span class="badge badge-outline badge-xs">{{.ActionValue}}</span></td>
+          <td class="text-sm"><span class="badge badge-ghost badge-xs">{{.ActionValue}}</span></td>
           <td class="text-sm text-base-content/60">
             {{if eq .AppliedBy "sync"}}During sync{{else if eq .AppliedBy "retroactive"}}Retroactive{{else}}Manual{{end}}
           </td>
@@ -235,7 +235,7 @@
           <td class="text-sm text-base-content/60">{{.Date}}</td>
           <td class="text-sm">
             {{if .CurrentCategorySlug}}
-            <span class="badge badge-outline badge-xs">{{.CurrentCategorySlug}}</span>
+            <span class="badge badge-ghost badge-xs">{{.CurrentCategorySlug}}</span>
             {{else}}
             <span class="text-base-content/30">Uncategorized</span>
             {{end}}

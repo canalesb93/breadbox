@@ -13,7 +13,7 @@
 
 {{if not (or .HasPlaid .HasTeller)}}
 <!-- No providers configured -->
-<div class="bb-card p-8 max-w-lg">
+<div class="bb-card p-5 sm:p-6 max-w-lg">
   <div class="flex flex-col items-center text-center">
     <div class="w-16 h-16 rounded-xl bg-warning/10 flex items-center justify-center mb-4">
       <i data-lucide="plug-zap" class="w-8 h-8 text-warning"></i>
@@ -27,12 +27,12 @@
 </div>
 {{else}}
 <div id="step-select" {{if .ShowLink}}class="hidden"{{end}}>
-  <div class="bb-card p-8 max-w-lg">
-    <div class="flex items-center gap-3 mb-6">
-      <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/8">
-        <i data-lucide="user-plus" class="w-5 h-5 text-primary"></i>
+  <div class="bb-card p-5 sm:p-6 max-w-lg">
+    <div class="bb-icon-header">
+      <div class="bb-icon-header__tile bb-icon-tile--primary">
+        <i data-lucide="user-plus" class="w-5 h-5"></i>
       </div>
-      <div>
+      <div class="bb-icon-header__text">
         <h2 class="text-base font-semibold">Select Details</h2>
         <p class="text-xs text-base-content/45">Choose provider and family member</p>
       </div>
@@ -93,7 +93,7 @@
 </div>
 
 <div id="step-link" class="hidden">
-  <div class="bb-card p-8 max-w-lg">
+  <div class="bb-card p-5 sm:p-6 max-w-lg">
     <div class="flex flex-col items-center text-center">
       <div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
         <i data-lucide="link" class="w-8 h-8 text-primary"></i>

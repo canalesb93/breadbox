@@ -12,7 +12,7 @@
 <div x-data="userForm()" class="max-w-lg">
   <!-- Success state: show setup URL after login creation -->
   <template x-if="setupURL">
-    <div class="bb-card p-8">
+    <div class="bb-card p-5 sm:p-6">
       <div class="flex items-center gap-3 mb-6">
         <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-success/10">
           <i data-lucide="check-circle" class="w-5 h-5 text-success"></i>
@@ -47,7 +47,7 @@
 
   <!-- Form state -->
   <template x-if="!setupURL">
-    <div class="bb-card p-8">
+    <div class="bb-card p-5 sm:p-6">
       <!-- Avatar preview + header -->
       <div class="flex items-center gap-4 mb-6">
         <div class="relative group">
