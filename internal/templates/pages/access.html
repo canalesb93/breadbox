@@ -27,48 +27,40 @@
   {{if .Clients}}
   <!-- Active clients -->
   {{if .ActiveClients}}
-  <div class="bb-card overflow-hidden">
-    <table class="table table-sm">
-      <tbody>
-        {{range .ActiveClients}}
-        <tr class="hover:bg-base-200/30" x-data="{ confirming: false }">
-          <td class="w-8 pr-0">
-            <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10">
-              <i data-lucide="fingerprint" class="w-3.5 h-3.5 text-primary"></i>
-            </div>
-          </td>
-          <td>
-            <div class="font-semibold text-sm">{{.Name}}</div>
-            <div class="flex items-center gap-2 mt-0.5">
-              <code class="font-mono text-[0.65rem] text-base-content/40">{{.ClientIDPrefix}}...</code>
-              <span class="text-xs text-base-content/35">Created {{formatDateShort .CreatedAt}}</span>
-            </div>
-          </td>
-          <td class="w-24 text-center">
-            {{if eq .Scope "read_only"}}
-            <span class="badge badge-soft badge-warning badge-xs">Read Only</span>
-            {{else}}
-            <span class="badge badge-soft badge-primary badge-xs">Full Access</span>
-            {{end}}
-          </td>
-          <td class="w-28 text-right">
-            {{if $.IsAdmin}}
-            <form method="POST" action="/oauth-clients/{{.ID}}/revoke" class="inline">
-              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
-              <button type="button" class="btn btn-ghost btn-xs rounded-lg text-base-content/40 hover:text-error" x-show="!confirming" @click="confirming = true">
-                Revoke
-              </button>
-              <span x-show="confirming" x-cloak class="flex items-center gap-1.5 justify-end">
-                <button type="submit" class="btn btn-error btn-xs btn-soft rounded-lg">Confirm</button>
-                <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="confirming = false">Cancel</button>
-              </span>
-            </form>
-            {{end}}
-          </td>
-        </tr>
-        {{end}}
-      </tbody>
-    </table>
+  <div class="bb-card divide-y divide-base-300">
+    {{range .ActiveClients}}
+    <div class="flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-base-200/30 transition-colors" x-data="{ confirming: false }">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 shrink-0">
+        <i data-lucide="fingerprint" class="w-3.5 h-3.5 text-primary"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="font-semibold text-sm truncate">{{.Name}}</span>
+          {{if eq .Scope "read_only"}}
+          <span class="badge badge-soft badge-warning badge-xs shrink-0">Read Only</span>
+          {{else}}
+          <span class="badge badge-soft badge-primary badge-xs shrink-0">Full Access</span>
+          {{end}}
+        </div>
+        <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+          <code class="font-mono text-[0.65rem] text-base-content/40">{{.ClientIDPrefix}}...</code>
+          <span class="text-xs text-base-content/35">Created {{formatDateShort .CreatedAt}}</span>
+        </div>
+      </div>
+      {{if $.IsAdmin}}
+      <form method="POST" action="/oauth-clients/{{.ID}}/revoke" class="shrink-0">
+        <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+        <button type="button" class="btn btn-ghost btn-xs rounded-lg text-base-content/40 hover:text-error" x-show="!confirming" @click="confirming = true">
+          Revoke
+        </button>
+        <span x-show="confirming" x-cloak class="flex items-center gap-1.5 justify-end">
+          <button type="submit" class="btn btn-error btn-xs btn-soft rounded-lg">Confirm</button>
+          <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="confirming = false">Cancel</button>
+        </span>
+      </form>
+      {{end}}
+    </div>
+    {{end}}
   </div>
   {{end}}
 
@@ -80,31 +72,24 @@
       {{len .RevokedClients}} revoked
     </button>
     <div x-show="open" x-cloak x-collapse class="mt-1">
-      <div class="bb-card overflow-hidden opacity-60">
-        <table class="table table-sm">
-          <tbody>
-            {{range .RevokedClients}}
-            <tr>
-              <td class="w-8 pr-0">
-                <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/40">
-                  <i data-lucide="fingerprint" class="w-3.5 h-3.5 text-base-content/25"></i>
-                </div>
-              </td>
-              <td>
-                <div class="font-semibold text-sm text-base-content/40 line-through">{{.Name}}</div>
-                <div class="flex items-center gap-2 mt-0.5">
-                  <code class="font-mono text-[0.65rem] text-base-content/30">{{.ClientIDPrefix}}...</code>
-                  <span class="text-xs text-base-content/30">Created {{formatDateShort .CreatedAt}}</span>
-                </div>
-              </td>
-              <td class="w-24 text-center">
-                <span class="badge badge-soft badge-error badge-xs">Revoked</span>
-              </td>
-              <td class="w-28"></td>
-            </tr>
-            {{end}}
-          </tbody>
-        </table>
+      <div class="bb-card divide-y divide-base-300 opacity-60">
+        {{range .RevokedClients}}
+        <div class="flex items-center gap-3 px-3 sm:px-4 py-3">
+          <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/40 shrink-0">
+            <i data-lucide="fingerprint" class="w-3.5 h-3.5 text-base-content/25"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-semibold text-sm text-base-content/40 line-through truncate">{{.Name}}</span>
+              <span class="badge badge-soft badge-error badge-xs shrink-0">Revoked</span>
+            </div>
+            <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+              <code class="font-mono text-[0.65rem] text-base-content/30">{{.ClientIDPrefix}}...</code>
+              <span class="text-xs text-base-content/30">Created {{formatDateShort .CreatedAt}}</span>
+            </div>
+          </div>
+        </div>
+        {{end}}
       </div>
     </div>
   </div>
@@ -148,49 +133,41 @@
   {{if .Keys}}
   <!-- Active keys -->
   {{if .ActiveKeys}}
-  <div class="bb-card overflow-hidden">
-    <table class="table table-sm">
-      <tbody>
-        {{range .ActiveKeys}}
-        <tr class="hover:bg-base-200/30" x-data="{ confirming: false }">
-          <td class="w-8 pr-0">
-            <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/8">
-              <i data-lucide="key" class="w-3.5 h-3.5 text-primary"></i>
-            </div>
-          </td>
-          <td>
-            <div class="font-semibold text-sm">{{.Name}}</div>
-            <div class="flex items-center gap-2 mt-0.5">
-              <code class="font-mono text-[0.65rem] text-base-content/40">{{.KeyPrefix}}...</code>
-              <span class="text-xs text-base-content/35">Created {{formatDateShort .CreatedAt}}</span>
-              {{if .LastUsedAt}}<span class="text-xs text-base-content/35">Last used {{relativeTime .LastUsedAt}}</span>{{end}}
-            </div>
-          </td>
-          <td class="w-24 text-center">
-            {{if eq .Scope "read_only"}}
-            <span class="badge badge-soft badge-warning badge-xs">Read Only</span>
-            {{else}}
-            <span class="badge badge-soft badge-primary badge-xs">Full Access</span>
-            {{end}}
-          </td>
-          <td class="w-28 text-right">
-            {{if $.IsAdmin}}
-            <form method="POST" action="/api-keys/{{.ID}}/revoke" class="inline">
-              <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
-              <button type="button" class="btn btn-ghost btn-xs rounded-lg text-base-content/40 hover:text-error" x-show="!confirming" @click="confirming = true">
-                Revoke
-              </button>
-              <span x-show="confirming" x-cloak class="flex items-center gap-1.5 justify-end">
-                <button type="submit" class="btn btn-error btn-xs btn-soft rounded-lg">Confirm</button>
-                <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="confirming = false">Cancel</button>
-              </span>
-            </form>
-            {{end}}
-          </td>
-        </tr>
-        {{end}}
-      </tbody>
-    </table>
+  <div class="bb-card divide-y divide-base-300">
+    {{range .ActiveKeys}}
+    <div class="flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-base-200/30 transition-colors" x-data="{ confirming: false }">
+      <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/8 shrink-0">
+        <i data-lucide="key" class="w-3.5 h-3.5 text-primary"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="font-semibold text-sm truncate">{{.Name}}</span>
+          {{if eq .Scope "read_only"}}
+          <span class="badge badge-soft badge-warning badge-xs shrink-0">Read Only</span>
+          {{else}}
+          <span class="badge badge-soft badge-primary badge-xs shrink-0">Full Access</span>
+          {{end}}
+        </div>
+        <div class="flex items-center gap-x-2 gap-y-0.5 mt-0.5 flex-wrap">
+          <code class="font-mono text-[0.65rem] text-base-content/40">{{.KeyPrefix}}...</code>
+          <span class="text-xs text-base-content/35">Created {{formatDateShort .CreatedAt}}</span>
+          {{if .LastUsedAt}}<span class="text-xs text-base-content/35">Last used {{relativeTime .LastUsedAt}}</span>{{end}}
+        </div>
+      </div>
+      {{if $.IsAdmin}}
+      <form method="POST" action="/api-keys/{{.ID}}/revoke" class="shrink-0">
+        <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+        <button type="button" class="btn btn-ghost btn-xs rounded-lg text-base-content/40 hover:text-error" x-show="!confirming" @click="confirming = true">
+          Revoke
+        </button>
+        <span x-show="confirming" x-cloak class="flex items-center gap-1.5 justify-end">
+          <button type="submit" class="btn btn-error btn-xs btn-soft rounded-lg">Confirm</button>
+          <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="confirming = false">Cancel</button>
+        </span>
+      </form>
+      {{end}}
+    </div>
+    {{end}}
   </div>
   {{end}}
 
@@ -202,31 +179,24 @@
       {{len .RevokedKeys}} revoked
     </button>
     <div x-show="open" x-cloak x-collapse class="mt-1">
-      <div class="bb-card overflow-hidden opacity-60">
-        <table class="table table-sm">
-          <tbody>
-            {{range .RevokedKeys}}
-            <tr>
-              <td class="w-8 pr-0">
-                <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/40">
-                  <i data-lucide="key" class="w-3.5 h-3.5 text-base-content/25"></i>
-                </div>
-              </td>
-              <td>
-                <div class="font-semibold text-sm text-base-content/40 line-through">{{.Name}}</div>
-                <div class="flex items-center gap-2 mt-0.5">
-                  <code class="font-mono text-[0.65rem] text-base-content/30">{{.KeyPrefix}}...</code>
-                  <span class="text-xs text-base-content/30">Created {{formatDateShort .CreatedAt}}</span>
-                </div>
-              </td>
-              <td class="w-24 text-center">
-                <span class="badge badge-soft badge-error badge-xs">Revoked</span>
-              </td>
-              <td class="w-28"></td>
-            </tr>
-            {{end}}
-          </tbody>
-        </table>
+      <div class="bb-card divide-y divide-base-300 opacity-60">
+        {{range .RevokedKeys}}
+        <div class="flex items-center gap-3 px-3 sm:px-4 py-3">
+          <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-base-200/40 shrink-0">
+            <i data-lucide="key" class="w-3.5 h-3.5 text-base-content/25"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-semibold text-sm text-base-content/40 line-through truncate">{{.Name}}</span>
+              <span class="badge badge-soft badge-error badge-xs shrink-0">Revoked</span>
+            </div>
+            <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+              <code class="font-mono text-[0.65rem] text-base-content/30">{{.KeyPrefix}}...</code>
+              <span class="text-xs text-base-content/30">Created {{formatDateShort .CreatedAt}}</span>
+            </div>
+          </div>
+        </div>
+        {{end}}
       </div>
     </div>
   </div>
