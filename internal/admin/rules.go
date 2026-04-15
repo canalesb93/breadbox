@@ -211,9 +211,13 @@ func RuleFormPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		categories, _ := svc.ListCategoryTree(ctx)
+		// Tags feed the add_tag autocomplete in the form. Best-effort — empty
+		// list just means no datalist suggestions.
+		tags, _ := svc.ListTags(ctx)
 
 		data := BaseTemplateData(r, sm, "rules", "New Rule")
 		data["FlatCategories"] = flattenCategories(categories)
+		data["Tags"] = tags
 		data["IsEdit"] = false
 		data["Breadcrumbs"] = []Breadcrumb{
 			{Label: "Rules", Href: "/rules"},

@@ -341,6 +341,16 @@ func TestConditionSummary(t *testing.T) {
 		expected string
 	}{
 		{
+			name:     "match-all empty condition",
+			cond:     Condition{},
+			expected: "All transactions",
+		},
+		{
+			name:     "match-all empty And slice",
+			cond:     Condition{And: []Condition{}},
+			expected: "All transactions",
+		},
+		{
 			name:     "simple contains",
 			cond:     Condition{Field: "name", Op: "contains", Value: "uber"},
 			expected: `name contains "uber"`,
@@ -374,6 +384,73 @@ func TestConditionSummary(t *testing.T) {
 				t.Errorf("ConditionSummary() = %q, want %q", result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestActionsSummary(t *testing.T) {
+	tests := []struct {
+		name     string
+		actions  []RuleAction
+		catName  string
+		expected string
+	}{
+		{
+			name:     "empty",
+			actions:  nil,
+			expected: "(no actions)",
+		},
+		{
+			name:     "single set_category with display name",
+			actions:  []RuleAction{{Type: "set_category", CategorySlug: "food_and_drink_groceries"}},
+			catName:  "Groceries",
+			expected: "Set category: Groceries",
+		},
+		{
+			name:     "single set_category falls back to slug",
+			actions:  []RuleAction{{Type: "set_category", CategorySlug: "food_and_drink_groceries"}},
+			expected: "Set category: food_and_drink_groceries",
+		},
+		{
+			name:     "single add_tag",
+			actions:  []RuleAction{{Type: "add_tag", TagSlug: "needs-review"}},
+			expected: "Add tag needs-review",
+		},
+		{
+			name:     "single add_comment",
+			actions:  []RuleAction{{Type: "add_comment", Content: "investigate"}},
+			expected: "Add comment",
+		},
+		{
+			name: "multiple actions returns count",
+			actions: []RuleAction{
+				{Type: "set_category", CategorySlug: "x"},
+				{Type: "add_tag", TagSlug: "y"},
+			},
+			expected: "2 actions",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ActionsSummary(tt.actions, tt.catName)
+			if got != tt.expected {
+				t.Errorf("ActionsSummary() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestTriggerLabel(t *testing.T) {
+	tests := map[string]string{
+		"":          "On create",
+		"on_create": "On create",
+		"on_update": "On update",
+		"always":    "Always",
+		"weird":     "weird",
+	}
+	for in, want := range tests {
+		if got := TriggerLabel(in); got != want {
+			t.Errorf("TriggerLabel(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
 
