@@ -657,7 +657,7 @@ All three resources are registered via `s.registerResources()` in `internal/mcp/
 
 ### Resource: `breadbox://overview`
 
-Returns a lightweight summary of the household's financial data — users, connections with account counts, accounts by type, transaction counts, date range, 30-day spending summary with top categories, and pending review count. This gives an LLM ambient context about the financial state without a round-trip tool call.
+Returns a lightweight summary of the household's financial data — users, connections with account counts, accounts by type, transaction counts, date range, 30-day spending summary with top categories, and pending transaction count. This gives an LLM ambient context about the financial state without a round-trip tool call.
 
 Backed by `service.GetOverviewStats()`.
 

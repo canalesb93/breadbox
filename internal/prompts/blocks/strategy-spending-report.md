@@ -37,5 +37,5 @@ ANALYSIS TIPS:
 IMPORTANT:
 - Always specify the date range and currency in your report
 - Use transaction links [Name](/transactions/ID) for notable items
-- This is a read-only task — do NOT create rules, modify categories, or process reviews
+- This is a read-only task — do NOT create rules, modify categories, or alter tags
 - Set priority to 'info' unless something genuinely concerning surfaces

@@ -112,31 +112,11 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | PUT | `/transactions/{id}/comments/{comment_id}` | Write | Update a comment |
 | DELETE | `/transactions/{id}/comments/{comment_id}` | Write | Delete a comment |
 
-## Reviews
+## Tags & Reviews
 
-The review queue surfaces transactions that need human or agent assessment (new, uncategorized, low-confidence).
+The review queue is a tag. Transactions carrying the seeded `needs-review` tag (or any operator-defined trigger tag) are the backlog. A seeded `on_create` system rule auto-attaches `needs-review` to every newly-synced transaction; disable that rule to opt out. Ephemeral tags (lifecycle `ephemeral`) require a note on removal — recorded on the `tag_removed` annotation.
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/reviews` | Read | List reviews with filters and pagination |
-| GET | `/reviews/counts` | Read | Count of reviews by status |
-| GET | `/reviews/summary` | Read | Overview of pending reviews |
-| GET | `/reviews/{id}` | Read | Get a single review with transaction details |
-| POST | `/reviews/{id}/submit` | Write | Submit a review (approve/reject/skip with optional category) |
-| POST | `/reviews/bulk` | Write | Batch submit multiple reviews (max 500) |
-| POST | `/reviews/enqueue` | Write | Manually enqueue a transaction for review |
-| POST | `/reviews/auto-approve` | Write | Auto-approve all pending reviews that have categories |
-| DELETE | `/reviews/{id}` | Write | Dismiss a review |
-
-### Review Query Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `status` | string | `pending`, `approved`, `rejected`, `skipped` |
-| `review_type` | string | `new_transaction`, `uncategorized`, `manual`, `re_review` |
-| `account_id` | string | Filter by account |
-| `user_id` | string | Filter by user |
-| `fields` | string | Field selection. Aliases: `triage`, `review_core`, `transaction_core` |
+Tag management is exposed via the MCP tools (`list_tags`, `add_transaction_tag`, `remove_transaction_tag`, `create_tag`, `update_tag`, `delete_tag`, `update_transactions`, `list_annotations`) and the admin dashboard (`/tags`, `/transactions/:id/edit`, bulk actions on `/transactions`). The retired `/api/v1/reviews/*` endpoints have no REST successor — MCP covers the same workflow.
 
 ## Transaction Rules
 

@@ -732,6 +732,24 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		argN = ec.ArgN
 	}
 
+	// Tag filters.
+	if len(params.Tags) > 0 {
+		for _, slug := range params.Tags {
+			buf.WriteString(" AND EXISTS (SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = $")
+			buf.WriteString(strconv.Itoa(argN))
+			buf.WriteByte(')')
+			args = append(args, slug)
+			argN++
+		}
+	}
+	if len(params.AnyTag) > 0 {
+		buf.WriteString(" AND EXISTS (SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = ANY($")
+		buf.WriteString(strconv.Itoa(argN))
+		buf.WriteString("))")
+		args = append(args, params.AnyTag)
+		argN++
+	}
+
 	// Extract WHERE clauses for count query from the builder.
 	mainSoFar := buf.String()
 	whereClauses := mainSoFar[whereStart:]
@@ -876,6 +894,48 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate admin transactions: %w", err)
+	}
+
+	// Batched tag lookup for the rendered page.
+	if len(transactions) > 0 {
+		ids := make([]pgtype.UUID, 0, len(transactions))
+		idIdx := make(map[string]int, len(transactions))
+		for i, tx := range transactions {
+			var u pgtype.UUID
+			if err := u.Scan(tx.ID); err == nil {
+				ids = append(ids, u)
+				idIdx[tx.ID] = i
+			}
+		}
+		if len(ids) > 0 {
+			tagRows, err := s.Pool.Query(ctx, `
+				SELECT tt.transaction_id, t.slug, t.display_name, t.color, t.icon, t.lifecycle
+				FROM transaction_tags tt
+				JOIN tags t ON t.id = tt.tag_id
+				WHERE tt.transaction_id = ANY($1)
+				ORDER BY tt.added_at ASC`, ids)
+			if err == nil {
+				defer tagRows.Close()
+				for tagRows.Next() {
+					var txnID pgtype.UUID
+					var slug, displayName, lifecycle string
+					var color, icon pgtype.Text
+					if scanErr := tagRows.Scan(&txnID, &slug, &displayName, &color, &icon, &lifecycle); scanErr != nil {
+						continue
+					}
+					tag := AdminTransactionTag{
+						Slug:        slug,
+						DisplayName: displayName,
+						Color:       textPtr(color),
+						Icon:        textPtr(icon),
+						Lifecycle:   lifecycle,
+					}
+					if idx, ok := idIdx[formatUUID(txnID)]; ok {
+						transactions[idx].Tags = append(transactions[idx].Tags, tag)
+					}
+				}
+			}
+		}
 	}
 
 	totalPages := 1

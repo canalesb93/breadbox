@@ -35,6 +35,8 @@ Query transactions with composable filters and cursor pagination.
 | `exclude_search` | string | Exclude matching name/merchant |
 | `search_mode` | string | `contains` (default), `words`, `fuzzy` |
 | `pending` | bool | Filter by pending status |
+| `tags` | array | AND filter — must have every slug. Use `["needs-review"]` to fetch the review backlog. |
+| `any_tag` | array | OR filter — must have at least one slug. |
 | `sort_by` | string | `date` (default), `amount`, `name` |
 | `sort_order` | string | `desc` (default), `asc` |
 | `fields` | string | Field selection. Aliases: `minimal`, `core`, `category`, `timestamps` |
@@ -142,43 +144,60 @@ Import categories from TSV format. Creates or updates categories.
 
 ---
 
-## Review Tools
+## Tag & Annotation Tools
 
-### list_pending_reviews (Read)
+### list_tags (Read)
 
-List reviews awaiting assessment. Supports field selection.
+List all registered tags.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `status` | string | `pending` (default), `approved`, `rejected`, `skipped` |
-| `review_type` | string | `new_transaction`, `uncategorized`, `manual`, `re_review` |
-| `account_id` | string | Filter by account |
-| `user_id` | string | Filter by user |
-| `fields` | string | Aliases: `triage`, `review_core`, `transaction_core` |
-| `limit` | int | Max 500 |
+### add_transaction_tag (Write)
 
-### pending_reviews_overview (Read)
-
-Quick overview of pending review counts by type and status. Use this to check workload before diving in.
-
-### submit_review (Write)
-
-Submit a review decision for a single transaction.
+Attach a tag to a transaction. Auto-creates a persistent tag if the slug is unknown. Idempotent.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `review_id` | string | Review ID |
-| `action` | string | `approve`, `reject`, `skip` |
-| `category_slug` | string | Optional — set category when approving |
-| `comment` | string | Optional note |
+| `transaction_id` | string | UUID or short ID |
+| `tag_slug` | string | Tag slug |
+| `note` | string | Optional rationale (recorded on the `tag_added` annotation) |
 
-### batch_submit_reviews (Write)
+### remove_transaction_tag (Write)
 
-Submit multiple review decisions at once. Max 500 items.
+Remove a tag from a transaction. For ephemeral tags (`needs-review`), the `note` is REQUIRED.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `items` | array | Array of `{ review_id, action, category_slug?, comment? }` |
+| `transaction_id` | string | UUID or short ID |
+| `tag_slug` | string | Tag slug |
+| `note` | string | Required for ephemeral tags. Optional for persistent. |
+
+### update_transactions (Write)
+
+Compound batch write — set category, add tags, remove tags, and attach a comment per transaction in a single atomic call. Max 50 operations per request.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `operations` | array | Array of operations (see below). |
+| `on_error` | string | `continue` (default — per-op tx) or `abort` (single tx, rolls back on first error). |
+
+Each operation:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `transaction_id` | string | UUID or short ID. Required. |
+| `category_slug` | string | Optional category to set. Sets `category_override=true`. |
+| `tags_to_add` | array | `[{slug, note?}, ...]`. Auto-creates persistent tags. |
+| `tags_to_remove` | array | `[{slug, note?}, ...]`. `note` REQUIRED when the tag is ephemeral. |
+| `comment` | string | Optional comment annotation. |
+
+Use this to close a review entry: `set category + remove needs-review (with note) + comment` in one call.
+
+### list_annotations (Read)
+
+Return the activity timeline for a transaction. Each row is one of: `comment`, `tag_added`, `tag_removed`, `rule_applied`, `category_set`.
+
+### create_tag / update_tag / delete_tag (Write)
+
+Admin-only tag CRUD. Agents typically don't need these — `add_transaction_tag` auto-creates persistent tags. Use these to set display name, color, lifecycle, or cascade-delete a tag.
 
 ---
 
@@ -336,7 +355,7 @@ Submit a report for human review. Reports appear on the admin dashboard.
 
 ### create_session (Write)
 
-Establish a session. Returns dataset context (users, accounts, connection status, pending review count) and server instructions. Call this first.
+Establish a session. Returns dataset context (users, accounts, connection status, pending transaction count) and server instructions. Call this first.
 
 ### trigger_sync (Write)
 
@@ -350,7 +369,7 @@ In addition to tools, Breadbox exposes three MCP resources that provide passive 
 
 | URI | Description |
 |-----|-------------|
-| `breadbox://overview` | Live dataset summary (users, accounts, spending, pending reviews) |
+| `breadbox://overview` | Live dataset summary (users, accounts, spending, pending transactions) |
 | `breadbox://review-guidelines` | Guidelines for reviewing transactions and creating rules |
 | `breadbox://report-format` | Report structure templates and formatting guidelines |
 

@@ -47,13 +47,11 @@
   </a>
   {{end}}
   {{if .IsEditor}}
-  <a href="/reviews" class="bb-sidebar-link{{if eq .CurrentPage "reviews"}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="clipboard-check"></i>
-    <span class="flex-1">Review Queue</span>
-    {{if and .NavBadges .NavBadges.ReviewsEnabled (gt .NavBadges.PendingReviews 0)}}
-    <span class="bb-nav-badge" title="{{.NavBadges.PendingReviews}} pending reviews">{{badgeCount .NavBadges.PendingReviews}}</span>
-    {{else if and .NavBadges (not .NavBadges.ReviewsEnabled)}}
-    <span class="badge badge-ghost badge-xs">Off</span>
+  <a href="/tags" class="bb-sidebar-link{{if eq .CurrentPage "tags"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="tags"></i>
+    <span class="flex-1">Tags</span>
+    {{if and .NavBadges (gt .NavBadges.PendingReviews 0)}}
+    <a href="/transactions?tags=needs-review" class="bb-nav-badge" title="{{.NavBadges.PendingReviews}} transactions tagged needs-review" onclick="event.stopPropagation()">{{badgeCount .NavBadges.PendingReviews}}</a>
     {{end}}
   </a>
   {{end}}

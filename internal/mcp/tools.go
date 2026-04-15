@@ -111,7 +111,7 @@ type resetTransactionCategoryInput struct {
 type addTransactionCommentInput struct {
 	WriteSessionContext
 	TransactionID string `json:"transaction_id" jsonschema:"required,UUID of the transaction to comment on"`
-	Content       string `json:"content" jsonschema:"required,Free-standing comment about the transaction (markdown supported, max 10000 chars). For rationale tied to a specific review decision, pass 'note' to submit_review or batch_submit_reviews instead — that narrative is recorded as a comment linked to the review so it appears inline on the resolution event and is not duplicated."`
+	Content       string `json:"content" jsonschema:"required,Free-standing comment about the transaction (markdown supported, max 10000 chars). For rationale tied to a tag change or category set, pass it via update_transactions — either as the inline 'comment' field or the 'note' on a tags_to_add/tags_to_remove entry — so the audit trail stays as a single linked annotation."`
 }
 
 type listTransactionCommentsInput struct {
@@ -144,26 +144,6 @@ type merchantSummaryInput struct {
 	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude merchants matching this text. Comma-separated values are ORed."`
 	MinCount      int      `json:"min_count,omitempty" jsonschema:"Minimum transaction count to include a merchant (default 1). Set to 2+ to find recurring charges."`
 	SpendingOnly  *bool    `json:"spending_only,omitempty" jsonschema:"Only include spending (positive amounts). Default false."`
-}
-
-type listPendingReviewsInput struct {
-	ReadSessionContext
-	ReviewType         string `json:"review_type,omitempty" jsonschema:"Filter by review type: new_transaction, uncategorized, manual, re_review"`
-	AccountID          string `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
-	UserID             string `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
-	CategoryPrimaryRaw string `json:"category_primary_raw,omitempty" jsonschema:"Filter by raw provider category (e.g., dining, groceries, general). Useful for batch processing reviews by category."`
-	Limit              int    `json:"limit,omitempty" jsonschema:"Max results (default 20, max 500)"`
-	Cursor             string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
-	Fields             string `json:"fields,omitempty" jsonschema:"Comma-separated fields to include. Aliases: triage (id+type+status+key transaction fields), review_core (id+type+status+confidence+created_at), transaction_core (transaction id+name+amount+date+category+account+user). Supports transaction.* fields (e.g. transaction.name, transaction.amount). Default: all fields."`
-}
-
-type submitReviewInput struct {
-	WriteSessionContext
-	ReviewID     string `json:"review_id" jsonschema:"required,UUID of the review to submit"`
-	Decision     string `json:"decision" jsonschema:"required,Decision: approved, rejected, or skipped"`
-	CategoryID   string `json:"category_id,omitempty" jsonschema:"Category ID to assign. Provide either category_id or category_slug (not both)."`
-	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Category slug to assign (e.g. food_and_drink_groceries). Alternative to category_id — the slug is resolved to an ID automatically."`
-	Note         string `json:"note,omitempty" jsonschema:"Optional short rationale for this decision. Recorded as a transaction comment attributed to you and shown inline on the review resolution in the transaction's activity timeline. Do NOT also call add_transaction_comment for the same transaction — pass the narrative here instead."`
 }
 
 type listCategoriesInput struct {
@@ -643,166 +623,6 @@ func (s *MCPServer) handleImportCategories(ctx context.Context, _ *mcpsdk.CallTo
 	return jsonResult(result)
 }
 
-// --- Review Queue (Phase 3 deprecation shims) ---
-//
-// Phase 3 retired review_queue. The following handlers remain as compatibility
-// shims that translate the old review-queue API onto the tag + annotation
-// substrate, so existing agent prompts continue to work for one release. They
-// are all marked [DEPRECATED] in their tool descriptions.
-
-// handleListPendingReviews is the Phase 3 shim: it calls QueryTransactions
-// filtered to the needs-review tag and shapes the response to mimic the old
-// ReviewResponse layout (id, short_id, transaction_id, review_type=manual,
-// status=pending, created_at, plus the nested transaction).
-func (s *MCPServer) handleListPendingReviews(_ context.Context, _ *mcpsdk.CallToolRequest, input listPendingReviewsInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-
-	limit := input.Limit
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 500 {
-		limit = 500
-	}
-
-	sortBy := "date"
-	sortOrder := "desc"
-	params := service.TransactionListParams{
-		Tags:      []string{"needs-review"},
-		Limit:     limit,
-		Cursor:    input.Cursor,
-		SortBy:    &sortBy,
-		SortOrder: &sortOrder,
-	}
-	if input.AccountID != "" {
-		params.AccountID = &input.AccountID
-	}
-	if input.UserID != "" {
-		params.UserID = &input.UserID
-	}
-	// CategoryPrimaryRaw is not a filter on TransactionListParams; ignore it
-	// silently in the shim. Phase 4's tag filter UI will replace this shim.
-	_ = input.CategoryPrimaryRaw
-
-	result, err := s.svc.ListTransactions(ctx, params)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	// Shape each transaction as a ReviewResponse-ish envelope so legacy
-	// callers don't break.
-	reviews := make([]map[string]any, 0, len(result.Transactions))
-	for _, t := range result.Transactions {
-		service.NormalizeTransactionAttribution(&t)
-		txnCopy := t
-		review := map[string]any{
-			"id":                  t.ID, // MCP id compaction replaces with short_id.
-			"short_id":            t.ShortID,
-			"transaction_id":      t.ID,
-			"transaction_short_id": t.ShortID,
-			"review_type":         "manual",
-			"status":              "pending",
-			"created_at":          t.CreatedAt,
-			"transaction":         &txnCopy,
-		}
-		if t.Category != nil && t.Category.Slug != nil {
-			review["suggested_category_slug"] = *t.Category.Slug
-		}
-		reviews = append(reviews, review)
-	}
-
-	return jsonResult(map[string]any{
-		"reviews":     reviews,
-		"next_cursor": result.NextCursor,
-		"has_more":    result.HasMore,
-		"total":       int64(len(reviews)),
-		"note":        "DEPRECATED shim: reviews are now driven by the 'needs-review' tag. Prefer query_transactions(tags=[\"needs-review\"]).",
-	})
-}
-
-// handleSubmitReview is the Phase 3 shim: translates a (review_id, decision,
-// category, note) call into SetTransactionCategory + RemoveTransactionTag +
-// optional comment annotation. The 'review_id' parameter is reinterpreted as
-// the transaction id (UUID or short_id) — the legacy review_queue short_id
-// format is not recoverable, so callers must now pass the transaction id.
-func (s *MCPServer) handleSubmitReview(ctx context.Context, _ *mcpsdk.CallToolRequest, input submitReviewInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if input.ReviewID == "" || input.Decision == "" {
-		return errorResult(fmt.Errorf("review_id (now interpreted as transaction_id) and decision are required")), nil, nil
-	}
-	switch input.Decision {
-	case "approved", "rejected", "skipped":
-	default:
-		return errorResult(fmt.Errorf("decision must be one of approved, rejected, skipped")), nil, nil
-	}
-	actor := service.ActorFromContext(ctx)
-
-	// Resolve category_slug to category_id if provided.
-	categoryID := input.CategoryID
-	categorySlug := input.CategorySlug
-	if categoryID == "" && categorySlug != "" {
-		cat, err := s.svc.GetCategoryBySlug(ctx, categorySlug)
-		if err != nil {
-			return errorResult(fmt.Errorf("invalid category_slug %q: %w", categorySlug, err)), nil, nil
-		}
-		categoryID = cat.ID
-	}
-
-	txnID := input.ReviewID // Legacy parameter name. See comment above.
-
-	// On approved + category provided, set the category.
-	if input.Decision == "approved" && categoryID != "" {
-		if err := s.svc.SetTransactionCategory(ctx, txnID, categoryID); err != nil {
-			return errorResult(fmt.Errorf("set category: %w", err)), nil, nil
-		}
-	}
-
-	// Write the note as a comment annotation (if provided) so the audit trail
-	// preserves the agent's rationale the same way the old SubmitReview did.
-	note := strings.TrimSpace(input.Note)
-	if note != "" {
-		if _, err := s.svc.CreateComment(ctx, service.CreateCommentParams{
-			TransactionID: txnID,
-			Content:       note,
-			Actor:         actor,
-		}); err != nil {
-			return errorResult(fmt.Errorf("record review note: %w", err)), nil, nil
-		}
-	}
-
-	// Remove the needs-review tag. The note (if any) is also attached to the
-	// tag_removed annotation so the removal reason is always explicit.
-	// Ephemeral-tag removal requires a note; default to a terse decision label
-	// if the caller didn't supply one.
-	removalNote := note
-	if removalNote == "" {
-		switch input.Decision {
-		case "approved":
-			removalNote = "Approved via deprecated submit_review shim"
-		case "rejected":
-			removalNote = "Rejected via deprecated submit_review shim"
-		case "skipped":
-			removalNote = "Skipped via deprecated submit_review shim"
-		}
-	}
-	removed, alreadyAbsent, err := s.svc.RemoveTransactionTag(ctx, txnID, "needs-review", actor, removalNote)
-	if err != nil {
-		return errorResult(fmt.Errorf("remove needs-review tag: %w", err)), nil, nil
-	}
-
-	return jsonResult(map[string]any{
-		"id":             txnID,
-		"transaction_id": txnID,
-		"decision":       input.Decision,
-		"status":         input.Decision, // echoes legacy shape
-		"tag_removed":    removed,
-		"already_absent": alreadyAbsent,
-		"note":           "DEPRECATED shim: call remove_transaction_tag(transaction_id, 'needs-review', note) + (optional) set_transaction_category instead.",
-	})
-}
-
 // --- Transaction Rules ---
 
 type createTransactionRuleInput struct {
@@ -869,23 +689,6 @@ type previewRuleInput struct {
 	ReadSessionContext
 	Conditions map[string]any `json:"conditions" jsonschema:"required,Condition tree to evaluate against existing transactions (same format as create_transaction_rule conditions)."`
 	SampleSize int            `json:"sample_size,omitempty" jsonschema:"Number of sample matching transactions to return (default 10, max 50)."`
-}
-
-type batchSubmitReviewsInput struct {
-	WriteSessionContext
-	Reviews []batchReviewItem `json:"reviews" jsonschema:"required,Array of review decisions to submit"`
-}
-
-type batchReviewItem struct {
-	ReviewID     string  `json:"review_id" jsonschema:"required,UUID of the review"`
-	Decision     string  `json:"decision" jsonschema:"required,Decision: approved, rejected, or skipped"`
-	CategorySlug *string `json:"category_slug,omitempty" jsonschema:"Category slug to assign (alternative to category_id). Use list_categories to find slugs."`
-	CategoryID   *string `json:"category_id,omitempty" jsonschema:"Category ID to assign (alternative to category_slug)"`
-	Note         *string `json:"note,omitempty" jsonschema:"Optional short rationale for this decision. Recorded as a transaction comment attributed to you and shown inline on the review resolution in the transaction's activity timeline. Do NOT also call add_transaction_comment for the same transaction — pass the narrative here instead."`
-}
-
-type pendingReviewsOverviewInput struct {
-	ReadSessionContext
 }
 
 func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.CallToolRequest, input createTransactionRuleInput) (*mcpsdk.CallToolResult, any, error) {
@@ -1065,109 +868,6 @@ func (s *MCPServer) handlePreviewRule(_ context.Context, _ *mcpsdk.CallToolReque
 	}
 
 	result, err := s.svc.PreviewRule(ctx, conditions, input.SampleSize)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(result)
-}
-
-// handleBatchSubmitReviews is the Phase 3 shim: loops handleSubmitReview per
-// item. Same semantics as the single-item tool but aggregates results.
-func (s *MCPServer) handleBatchSubmitReviews(ctx context.Context, _ *mcpsdk.CallToolRequest, input batchSubmitReviewsInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	if len(input.Reviews) == 0 {
-		return errorResult(fmt.Errorf("reviews array is required and must not be empty")), nil, nil
-	}
-	if len(input.Reviews) > 500 {
-		return errorResult(fmt.Errorf("maximum 500 reviews per batch")), nil, nil
-	}
-
-	actor := service.ActorFromContext(ctx)
-
-	succeeded := 0
-	failed := []map[string]string{}
-
-	for _, r := range input.Reviews {
-		if r.ReviewID == "" {
-			failed = append(failed, map[string]string{"review_id": "", "error": "review_id is required"})
-			continue
-		}
-		switch r.Decision {
-		case "approved", "rejected", "skipped":
-		default:
-			failed = append(failed, map[string]string{"review_id": r.ReviewID, "error": "decision must be approved, rejected, or skipped"})
-			continue
-		}
-
-		categoryID := ""
-		if r.CategoryID != nil && *r.CategoryID != "" {
-			categoryID = *r.CategoryID
-		} else if r.CategorySlug != nil && *r.CategorySlug != "" {
-			cat, err := s.svc.GetCategoryBySlug(ctx, *r.CategorySlug)
-			if err != nil {
-				failed = append(failed, map[string]string{"review_id": r.ReviewID, "error": fmt.Sprintf("category slug %q not found", *r.CategorySlug)})
-				continue
-			}
-			categoryID = cat.ID
-		}
-
-		txnID := r.ReviewID // Legacy parameter name — now interpreted as transaction_id.
-
-		if r.Decision == "approved" && categoryID != "" {
-			if err := s.svc.SetTransactionCategory(ctx, txnID, categoryID); err != nil {
-				failed = append(failed, map[string]string{"review_id": r.ReviewID, "error": fmt.Sprintf("set category: %v", err)})
-				continue
-			}
-		}
-
-		note := ""
-		if r.Note != nil {
-			note = strings.TrimSpace(*r.Note)
-		}
-		if note != "" {
-			if _, err := s.svc.CreateComment(ctx, service.CreateCommentParams{
-				TransactionID: txnID,
-				Content:       note,
-				Actor:         actor,
-			}); err != nil {
-				failed = append(failed, map[string]string{"review_id": r.ReviewID, "error": fmt.Sprintf("record note: %v", err)})
-				continue
-			}
-		}
-
-		removalNote := note
-		if removalNote == "" {
-			switch r.Decision {
-			case "approved":
-				removalNote = "Approved via deprecated batch_submit_reviews shim"
-			case "rejected":
-				removalNote = "Rejected via deprecated batch_submit_reviews shim"
-			case "skipped":
-				removalNote = "Skipped via deprecated batch_submit_reviews shim"
-			}
-		}
-		if _, _, err := s.svc.RemoveTransactionTag(ctx, txnID, "needs-review", actor, removalNote); err != nil {
-			failed = append(failed, map[string]string{"review_id": r.ReviewID, "error": fmt.Sprintf("remove tag: %v", err)})
-			continue
-		}
-		succeeded++
-	}
-
-	return jsonResult(map[string]any{
-		"succeeded": succeeded,
-		"failed":    failed,
-		"note":      "DEPRECATED shim: prefer add_transaction_tag / remove_transaction_tag + set_transaction_category.",
-	})
-}
-
-func (s *MCPServer) handlePendingReviewsOverview(_ context.Context, _ *mcpsdk.CallToolRequest, _ pendingReviewsOverviewInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-
-	// Phase 3: reviews live in the needs-review tag now.
-	result, err := s.svc.PendingReviewsOverviewFromTags(ctx)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}

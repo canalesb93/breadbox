@@ -14,7 +14,7 @@ paths:
 ## Tool registry
 
 `MCPServer.allTools []ToolDef` is the master list. Each `ToolDef` has:
-- `Name` (snake_case verb_noun: `list_transactions`, `submit_review`)
+- `Name` (snake_case verb_noun: `list_transactions`, `update_transactions`)
 - `Description` (domain-rich — see below)
 - `Classification`: `ToolRead` or `ToolWrite`
 - `Handler` with typed input/output structs
@@ -63,6 +63,10 @@ Good descriptions are load-bearing — they're the only documentation agents see
 
 `/mcp` dashboard has four cards: global mode, per-tool enable/disable, server instructions, API key scope info. Nav icon: `bot`.
 
-## Disabled-feature behavior
+## Tag-based review workflow
 
-When review queue is off (`review_auto_enqueue=false`), review MCP tools return empty results with an explanatory note (read tools) or an error (write tools) — they don't just disappear from the registry. This keeps tool-count stable for agents.
+The "review queue" is just transactions tagged `needs-review`. A seeded system rule (NULL conditions, `trigger=on_create`, action `add_tag: needs-review`) auto-tags every newly-synced transaction. Disable that rule to opt out of auto-review.
+
+Agents follow a uniform loop: `query_transactions(tags=["needs-review"])` to find work, `update_transactions(operations=[…])` to set category + remove the tag (with a required note since `needs-review` is ephemeral) atomically per transaction. Max 50 ops per call.
+
+Tag/annotation tools: `list_tags`, `add_transaction_tag`, `remove_transaction_tag`, `list_annotations`, plus tag CRUD admin tools (`create_tag`, `update_tag`, `delete_tag`).
