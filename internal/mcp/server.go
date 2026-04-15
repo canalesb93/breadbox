@@ -383,6 +383,19 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDefLogged("submit_report", ToolWrite,
 			"Send a message to the family's dashboard. The title is the main message — write it as a concise, self-contained 1-2 sentence summary the family can understand at a glance without expanding. The body provides the detailed breakdown (markdown with headers, bullets, transaction links). Use priority to signal urgency and author to identify your role.",
 			s.handleSubmitReport, svc),
+		// --- Phase 2 tags + annotations ---
+		makeToolDefLogged("list_tags", ToolRead,
+			"List all tags registered in the system. Each tag has a slug (stable identifier), display_name, and lifecycle ('persistent' or 'ephemeral'). Ephemeral tags (e.g. 'needs-review') require a note on removal. Tags attached to transactions can be queried via the tags / any_tag filters on query_transactions.",
+			s.handleListTags, svc),
+		makeToolDefLogged("list_annotations", ToolRead,
+			"List the activity timeline for a transaction. Each annotation is a single event: comment, tag_added, tag_removed, rule_applied, or category_set. Ordered by created_at ASC. Payload carries kind-specific fields (content for comments, slug for tags, rule_name for rule applications).",
+			s.handleListAnnotations, svc),
+		makeToolDefLogged("add_transaction_tag", ToolWrite,
+			"Attach a tag to a transaction. Tags are an open-ended labeling system — auto-creates a persistent tag if the slug doesn't exist yet. Use note to attach a short rationale that is stored on the tag_added annotation. Idempotent: returns already_present=true if the tag was already attached.",
+			s.handleAddTransactionTag, svc),
+		makeToolDefLogged("remove_transaction_tag", ToolWrite,
+			"Remove a tag from a transaction. For ephemeral tags (lifecycle='ephemeral', like 'needs-review'), a non-empty note is REQUIRED — it's recorded on the tag_removed annotation so the reason for removal is auditable. For persistent tags, the note is optional. Idempotent: returns already_absent=true if the tag wasn't attached.",
+			s.handleRemoveTransactionTag, svc),
 	}
 }
 

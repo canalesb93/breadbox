@@ -1057,15 +1057,25 @@ func (s *Service) ListActiveRulesForSync(ctx context.Context) ([]TransactionRule
 
 // transactionContextQuery is the base query for loading transactions with full context
 // (JOIN through accounts → bank_connections → users) for rule evaluation.
+//
+// Phase 2: aggregates tag slugs from transaction_tags so tag-based conditions
+// work during retroactive apply. GROUP BY t.id is required because of the
+// LEFT JOIN onto the tag pivot.
 const transactionContextQuery = `SELECT t.id, t.name, COALESCE(t.merchant_name, ''), t.amount,
 	COALESCE(t.category_primary, ''), COALESCE(t.category_detailed, ''),
-	t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, '')
+	t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
+	COALESCE(array_agg(DISTINCT tag.slug) FILTER (WHERE tag.slug IS NOT NULL), ARRAY[]::text[])
 	FROM transactions t
 	JOIN accounts a ON t.account_id = a.id
 	JOIN bank_connections bc ON a.connection_id = bc.id
 	LEFT JOIN users u ON bc.user_id = u.id
+	LEFT JOIN transaction_tags tt ON tt.transaction_id = t.id
+	LEFT JOIN tags tag ON tag.id = tt.tag_id
 	WHERE t.deleted_at IS NULL AND t.category_override = FALSE
 	AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
+
+// transactionContextGroupBy is the GROUP BY clause matching transactionContextQuery.
+const transactionContextGroupBy = ` GROUP BY t.id, t.name, t.merchant_name, t.amount, t.category_primary, t.category_detailed, t.pending, bc.provider, t.account_id, u.id, u.name`
 
 // transactionContextRow holds a scanned transaction row for rule evaluation.
 type transactionContextRow struct {
@@ -1087,6 +1097,7 @@ func scanTransactionContextRow(dest []any) *transactionContextRow {
 	dest[8] = &r.tctx.AccountID
 	dest[9] = &r.tctx.UserID
 	dest[10] = &r.tctx.UserName
+	dest[11] = &r.tctx.Tags
 	return r
 }
 
@@ -1141,6 +1152,7 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 			args = append(args, lastID)
 			argN++
 		}
+		query += transactionContextGroupBy
 		query += " ORDER BY t.id ASC"
 		query += fmt.Sprintf(" LIMIT $%d", argN)
 		args = append(args, 1000)
@@ -1155,7 +1167,7 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 
 		for rows.Next() {
 			rowCount++
-			dest := make([]any, 11)
+			dest := make([]any, 12)
 			r := scanTransactionContextRow(dest)
 			if err := rows.Scan(dest...); err != nil {
 				rows.Close()
@@ -1278,6 +1290,7 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 			args = append(args, lastID)
 			argN++
 		}
+		query += transactionContextGroupBy
 		query += " ORDER BY t.id ASC"
 		query += fmt.Sprintf(" LIMIT $%d", argN)
 		args = append(args, 1000)
@@ -1300,7 +1313,7 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 
 		for rows.Next() {
 			rowCount++
-			dest := make([]any, 11)
+			dest := make([]any, 12)
 			r := scanTransactionContextRow(dest)
 			if err := rows.Scan(dest...); err != nil {
 				rows.Close()
@@ -1693,14 +1706,39 @@ func (s *Service) convertRuleRows(ctx context.Context, scanned []ruleRow) []Tran
 	return rules
 }
 
-// recordRuleApplications inserts rule application records for a batch of transactions.
+// recordRuleApplications inserts rule application records for a batch of
+// transactions. Phase 2 also dual-writes a matching rule_applied annotation
+// per transaction so the activity timeline (backed by annotations) stays
+// complete. transaction_rule_applications is retired in Phase 3.
 func (s *Service) recordRuleApplications(ctx context.Context, ruleID pgtype.UUID, txnIDs []pgtype.UUID, actionField, actionValue, appliedBy string) {
+	// Look up rule metadata for annotation actor fields.
+	var ruleShortID, ruleName string
+	_ = s.Pool.QueryRow(ctx, `SELECT short_id, name FROM transaction_rules WHERE id = $1`, ruleID).Scan(&ruleShortID, &ruleName)
+
 	for _, txnID := range txnIDs {
 		_, _ = s.Pool.Exec(ctx,
 			`INSERT INTO transaction_rule_applications (transaction_id, rule_id, action_field, action_value, applied_by)
 			VALUES ($1, $2, $3, $4, $5)
 			ON CONFLICT (transaction_id, rule_id, action_field) DO UPDATE SET applied_at = NOW(), action_value = EXCLUDED.action_value, applied_by = EXCLUDED.applied_by`,
 			txnID, ruleID, actionField, actionValue, appliedBy)
+
+		// rule_applied annotation.
+		payload := map[string]interface{}{
+			"rule_id":      ruleShortID,
+			"rule_name":    ruleName,
+			"action_field": actionField,
+			"action_value": actionValue,
+			"applied_by":   appliedBy,
+		}
+		_ = writeAnnotation(ctx, s.Queries, writeAnnotationParams{
+			TransactionID: txnID,
+			Kind:          "rule_applied",
+			ActorType:     "system",
+			ActorID:       ruleShortID,
+			ActorName:     ruleName,
+			Payload:       payload,
+			RuleID:        ruleID,
+		})
 	}
 }
 

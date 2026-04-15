@@ -65,6 +65,8 @@ type queryTransactionsInput struct {
 	Search        string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant. Comma-separated values are ORed (e.g. starbucks,amazon matches either)."`
 	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"How to match the search term: contains (default, substring match), words (all words must match, good for multi-word queries), fuzzy (typo-tolerant via trigram similarity)"`
 	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions whose name or merchant matches this text. Comma-separated values are ORed. Use to filter out known merchants."`
+	Tags          []string `json:"tags,omitempty" jsonschema:"Filter to transactions that have EVERY tag slug in this list (AND semantics). Use list_tags to see available tags."`
+	AnyTag        []string `json:"any_tag,omitempty" jsonschema:"Filter to transactions that have AT LEAST ONE tag slug in this list (OR semantics)."`
 	Limit         int      `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
 	Cursor        string   `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
 	SortBy        string   `json:"sort_by,omitempty" jsonschema:"Sort: date (default), amount, name"`
@@ -85,6 +87,8 @@ type countTransactionsInput struct {
 	Search        string   `json:"search,omitempty" jsonschema:"Search name or merchant. Comma-separated values are ORed."`
 	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy"`
 	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions matching this text"`
+	Tags          []string `json:"tags,omitempty" jsonschema:"Filter to transactions that have EVERY tag slug in this list (AND semantics)."`
+	AnyTag        []string `json:"any_tag,omitempty" jsonschema:"Filter to transactions that have AT LEAST ONE tag slug in this list (OR semantics)."`
 }
 
 type triggerSyncInput struct {
@@ -266,6 +270,12 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 	if input.ExcludeSearch != "" {
 		params.ExcludeSearch = &input.ExcludeSearch
 	}
+	if len(input.Tags) > 0 {
+		params.Tags = input.Tags
+	}
+	if len(input.AnyTag) > 0 {
+		params.AnyTag = input.AnyTag
+	}
 	if input.SortBy != "" {
 		params.SortBy = &input.SortBy
 	}
@@ -353,6 +363,12 @@ func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToo
 	}
 	if input.ExcludeSearch != "" {
 		params.ExcludeSearch = &input.ExcludeSearch
+	}
+	if len(input.Tags) > 0 {
+		params.Tags = input.Tags
+	}
+	if len(input.AnyTag) > 0 {
+		params.AnyTag = input.AnyTag
 	}
 
 	count, err := s.svc.CountTransactionsFiltered(ctx, params)

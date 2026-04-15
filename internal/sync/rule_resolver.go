@@ -42,8 +42,12 @@ type TransactionContext struct {
 }
 
 // RuleActionSource tracks which rule contributed which action for audit.
+// RuleName and RuleShortID are populated so the sync engine can write
+// annotations with human-readable actor fields (Phase 2).
 type RuleActionSource struct {
 	RuleID      pgtype.UUID
+	RuleShortID string
+	RuleName    string
 	ActionField string // "category", "tag", "comment"
 	ActionValue string // slug for category/tag, content for comment
 }
@@ -87,6 +91,8 @@ type RuleResolver struct {
 
 type compiledRule struct {
 	id        pgtype.UUID
+	shortID   string
+	name      string
 	actions   []typedAction
 	trigger   string // "on_create", "on_update", or "always"
 	condition *compiledCondition
@@ -105,6 +111,8 @@ type compiledCondition struct {
 // ruleRow holds the raw data from the transaction_rules table query.
 type ruleRow struct {
 	id          pgtype.UUID
+	shortID     string
+	name        string
 	conditions  []byte // may be NULL (match-all)
 	actionsJSON []byte
 	trigger     string
@@ -157,7 +165,7 @@ func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, l
 // compiles their conditions, parses actions, and returns them sorted by
 // priority DESC, created_at DESC.
 func loadRules(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) ([]compiledRule, error) {
-	query := `SELECT id, conditions, actions, trigger
+	query := `SELECT id, short_id, name, conditions, actions, trigger
 		FROM transaction_rules
 		WHERE enabled = true
 		  AND (expires_at IS NULL OR expires_at > NOW())
@@ -172,7 +180,7 @@ func loadRules(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) ([]
 	var rawRules []ruleRow
 	for rows.Next() {
 		var rr ruleRow
-		if err := rows.Scan(&rr.id, &rr.conditions, &rr.actionsJSON, &rr.trigger); err != nil {
+		if err := rows.Scan(&rr.id, &rr.shortID, &rr.name, &rr.conditions, &rr.actionsJSON, &rr.trigger); err != nil {
 			return nil, fmt.Errorf("scan transaction rule: %w", err)
 		}
 		rawRules = append(rawRules, rr)
@@ -212,6 +220,8 @@ func loadRules(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) ([]
 
 		compiled = append(compiled, compiledRule{
 			id:        rr.id,
+			shortID:   rr.shortID,
+			name:      rr.name,
 			actions:   actions,
 			trigger:   trigger,
 			condition: cc,
@@ -387,6 +397,8 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 					result.CategorySlug = a.CategorySlug
 					result.Sources = append(result.Sources, RuleActionSource{
 						RuleID:      rule.id,
+						RuleShortID: rule.shortID,
+						RuleName:    rule.name,
 						ActionField: "category",
 						ActionValue: a.CategorySlug,
 					})
@@ -399,6 +411,8 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 					result.TagsToAdd = append(result.TagsToAdd, a.TagSlug)
 					result.Sources = append(result.Sources, RuleActionSource{
 						RuleID:      rule.id,
+						RuleShortID: rule.shortID,
+						RuleName:    rule.name,
 						ActionField: "tag",
 						ActionValue: a.TagSlug,
 					})
@@ -410,6 +424,8 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 				result.Comments = append(result.Comments, a.Content)
 				result.Sources = append(result.Sources, RuleActionSource{
 					RuleID:      rule.id,
+					RuleShortID: rule.shortID,
+					RuleName:    rule.name,
 					ActionField: "comment",
 					ActionValue: a.Content,
 				})

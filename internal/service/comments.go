@@ -14,7 +14,10 @@ import (
 
 const maxCommentLength = 10000
 
-// CreateComment adds a comment to a transaction.
+// CreateComment adds a comment to a transaction. Phase 2 dual-writes an
+// annotation row with kind='comment' in the same DB transaction so the
+// annotations table is the canonical timeline. transaction_comments is
+// retired in Phase 3 once every read-path is migrated.
 func (s *Service) CreateComment(ctx context.Context, params CreateCommentParams) (*CommentResponse, error) {
 	content := strings.TrimSpace(params.Content)
 	if content == "" || len(content) > maxCommentLength {
@@ -53,7 +56,14 @@ func (s *Service) CreateComment(ctx context.Context, params CreateCommentParams)
 		reviewID = parsed
 	}
 
-	comment, err := s.Queries.CreateComment(ctx, db.CreateCommentParams{
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin create_comment: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	qtx := s.Queries.WithTx(tx)
+
+	comment, err := qtx.CreateComment(ctx, db.CreateCommentParams{
 		TransactionID: txnID,
 		AuthorType:    params.Actor.Type,
 		AuthorID:      authorID,
@@ -65,8 +75,50 @@ func (s *Service) CreateComment(ctx context.Context, params CreateCommentParams)
 		return nil, fmt.Errorf("create comment: %w", err)
 	}
 
+	// Annotation dual-write. actor_type maps user|agent|system; values outside
+	// the constraint set are forced to "user" to stay valid.
+	actorType := normalizeAnnotationActorType(params.Actor.Type)
+	payload := map[string]interface{}{
+		"content":    content,
+		"comment_id": comment.ShortID,
+	}
+	if params.ReviewID != "" {
+		payload["review_id"] = params.ReviewID
+	}
+	if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
+		TransactionID: txnID,
+		Kind:          "comment",
+		ActorType:     actorType,
+		ActorID:       params.Actor.ID,
+		ActorName:     params.Actor.Name,
+		Payload:       payload,
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit create_comment: %w", err)
+	}
+
 	resp := commentFromRow(comment)
 	return &resp, nil
+}
+
+// normalizeAnnotationActorType coerces a free-form actor type string into one
+// of the values the annotations.actor_type CHECK constraint accepts.
+func normalizeAnnotationActorType(t string) string {
+	switch t {
+	case "user", "agent", "system":
+		return t
+	case "rule":
+		// Rule-originated annotations have their own rule_id column — the
+		// actor_type still uses "system" in that case. Phase 2 sync path
+		// passes actor_type="system" directly; this branch catches any
+		// external caller that might pass "rule".
+		return "system"
+	default:
+		return "user"
+	}
 }
 
 // ListComments returns all comments for a transaction, ordered by created_at ASC.

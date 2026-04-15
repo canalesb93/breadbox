@@ -646,25 +646,22 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			}
 		}
 
-		comments, err := svc.ListComments(ctx, idStr)
+		// Phase 2: read the activity timeline from annotations (the canonical
+		// source). Reviews are still queried separately because their own
+		// lifecycle events (enqueue, resolve) aren't modeled as annotations.
+		annotations, err := svc.ListAnnotations(ctx, idStr)
 		if err != nil && !errors.Is(err, service.ErrNotFound) {
-			a.Logger.Error("list transaction comments", "error", err)
+			a.Logger.Error("list transaction annotations", "error", err)
 		}
 
-		// Fetch review history for this transaction.
+		// Still needed for pending-review UI state and the review enqueue events.
 		reviews, err := svc.ListReviewsByTransactionID(ctx, idStr)
 		if err != nil && !errors.Is(err, service.ErrNotFound) {
 			a.Logger.Error("list transaction reviews", "error", err)
 		}
 
-		// Fetch rule applications for this transaction.
-		ruleApps, err := svc.ListRuleApplicationsByTransactionID(ctx, idStr)
-		if err != nil {
-			a.Logger.Error("list transaction rule applications", "error", err)
-		}
-
-		// Build unified activity timeline.
-		activity := buildActivityTimeline(reviews, comments, ruleApps)
+		// Build unified activity timeline from annotations + review lifecycle.
+		activity := buildActivityTimeline(reviews, annotations)
 
 		// Check if there's a pending review (to disable re-enqueue)
 		hasPendingReview := false
@@ -757,22 +754,30 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 	}
 }
 
-// buildActivityTimeline merges reviews, comments, and rule applications into a sorted timeline.
-func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.CommentResponse, ruleApps []service.TransactionRuleApplicationDetail) []service.ActivityEntry {
+// buildActivityTimeline merges the review lifecycle (enqueue + resolution)
+// with the annotation-driven timeline into a sorted activity list.
+//
+// Phase 2: annotations are the canonical source for comments, tag operations,
+// rule-driven category/tag/comment changes, and manual category sets. Reviews
+// still own their own enqueue/resolve lifecycle events because those aren't
+// (currently) modeled as annotations.
+func buildActivityTimeline(reviews []service.ReviewResponse, annotations []service.Annotation) []service.ActivityEntry {
 	var entries []service.ActivityEntry
 
-	// Index comments that belong to a review resolution so we can render their
-	// content inline on the resolution event and skip them as standalone entries.
-	commentsByReview := make(map[string]service.CommentResponse, len(comments))
-	for _, c := range comments {
-		if c.ReviewID != nil && *c.ReviewID != "" {
-			commentsByReview[*c.ReviewID] = c
+	// Index review-linked comment annotations by review_id so we can render
+	// them inline on the resolution event and skip them as standalone entries.
+	reviewLinkedComments := make(map[string]service.Annotation)
+	for _, a := range annotations {
+		if a.Kind != "comment" || a.Payload == nil {
+			continue
+		}
+		if rid, ok := a.Payload["review_id"].(string); ok && rid != "" {
+			reviewLinkedComments[rid] = a
 		}
 	}
 
-	// Convert reviews — for resolved reviews, emit both the enqueue and resolution events
+	// Review lifecycle events.
 	for _, r := range reviews {
-		// Always emit the "enqueued" event (using CreatedAt)
 		var enqueueReason string
 		switch r.ReviewType {
 		case "uncategorized":
@@ -796,7 +801,6 @@ func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.
 			ReviewStatus: "pending",
 		})
 
-		// For resolved reviews, also emit the resolution event
 		if r.Status != "pending" && r.ReviewedAt != nil {
 			e := service.ActivityEntry{
 				Type:      "review",
@@ -827,68 +831,153 @@ func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.
 				e.ReviewStatus = "skipped"
 				e.Summary = "Skipped"
 			}
-			if linked, ok := commentsByReview[r.ID]; ok {
-				e.Detail = linked.Content
-				e.CommentID = linked.ID
+			if linked, ok := reviewLinkedComments[r.ID]; ok {
+				if content, _ := linked.Payload["content"].(string); content != "" {
+					e.Detail = content
+				}
+				if cid, _ := linked.Payload["comment_id"].(string); cid != "" {
+					e.CommentID = cid
+				}
 			}
 			entries = append(entries, e)
 		}
 	}
 
-	// Convert free-standing comments. Linked review-note comments were already
-	// rendered as the Detail of their resolution event above; skip them here
-	// to avoid double-surfacing. Filter legacy [Review: ...] prefix duplicates
-	// from pre-consolidation imports.
-	for _, c := range comments {
-		if c.ReviewID != nil && *c.ReviewID != "" {
-			continue
+	// Annotations.
+	for _, a := range annotations {
+		switch a.Kind {
+		case "comment":
+			// Skip review-linked comments (rendered inline on the resolution event).
+			if rid, _ := a.Payload["review_id"].(string); rid != "" {
+				continue
+			}
+			content, _ := a.Payload["content"].(string)
+			// Filter legacy [Review: ...] prefix duplicates from pre-consolidation imports.
+			if strings.HasPrefix(content, "[Review: ") {
+				continue
+			}
+			entry := service.ActivityEntry{
+				Type:      "comment",
+				Timestamp: a.CreatedAt,
+				ActorName: a.ActorName,
+				ActorType: a.ActorType,
+				Detail:    content,
+			}
+			if cid, _ := a.Payload["comment_id"].(string); cid != "" {
+				entry.CommentID = cid
+			}
+			if a.ActorID != nil && *a.ActorID != "" {
+				id := *a.ActorID
+				entry.ActorID = &id
+			}
+			entries = append(entries, entry)
+
+		case "rule_applied":
+			ruleName, _ := a.Payload["rule_name"].(string)
+			field, _ := a.Payload["action_field"].(string)
+			value, _ := a.Payload["action_value"].(string)
+			appliedBy, _ := a.Payload["applied_by"].(string)
+			summary := "Rule \"" + ruleName + "\" applied"
+			switch field {
+			case "category":
+				summary = "Rule \"" + ruleName + "\" set category to " + value
+			case "tag":
+				summary = "Rule \"" + ruleName + "\" added tag " + value
+			case "comment":
+				summary = "Rule \"" + ruleName + "\" added a comment"
+			}
+			how := "during sync"
+			if appliedBy == "retroactive" {
+				how = "retroactively"
+			}
+			entries = append(entries, service.ActivityEntry{
+				Type:      "rule",
+				Timestamp: a.CreatedAt,
+				ActorName: how,
+				ActorType: "system",
+				Summary:   summary,
+				RuleName:  ruleName,
+				RuleID:    derefOr(a.RuleID, ""),
+			})
+
+		case "tag_added":
+			slug, _ := a.Payload["slug"].(string)
+			note, _ := a.Payload["note"].(string)
+			summary := "Added tag " + slug
+			entry := service.ActivityEntry{
+				Type:      "tag",
+				Timestamp: a.CreatedAt,
+				ActorName: a.ActorName,
+				ActorType: a.ActorType,
+				Summary:   summary,
+				Detail:    note,
+				TagSlug:   slug,
+			}
+			if a.ActorID != nil && *a.ActorID != "" {
+				id := *a.ActorID
+				entry.ActorID = &id
+			}
+			entries = append(entries, entry)
+
+		case "tag_removed":
+			slug, _ := a.Payload["slug"].(string)
+			note, _ := a.Payload["note"].(string)
+			summary := "Removed tag " + slug
+			entry := service.ActivityEntry{
+				Type:      "tag",
+				Timestamp: a.CreatedAt,
+				ActorName: a.ActorName,
+				ActorType: a.ActorType,
+				Summary:   summary,
+				Detail:    note,
+				TagSlug:   slug,
+			}
+			if a.ActorID != nil && *a.ActorID != "" {
+				id := *a.ActorID
+				entry.ActorID = &id
+			}
+			entries = append(entries, entry)
+
+		case "category_set":
+			slug, _ := a.Payload["category_slug"].(string)
+			source, _ := a.Payload["source"].(string)
+			summary := "Category set to " + slug
+			if source == "rule" {
+				// Represented separately via the rule_applied annotation
+				// written alongside category_set during sync. Skip to avoid
+				// double-rendering.
+				continue
+			}
+			entry := service.ActivityEntry{
+				Type:      "category",
+				Timestamp: a.CreatedAt,
+				ActorName: a.ActorName,
+				ActorType: a.ActorType,
+				Summary:   summary,
+				CategoryName: slug,
+			}
+			if a.ActorID != nil && *a.ActorID != "" {
+				id := *a.ActorID
+				entry.ActorID = &id
+			}
+			entries = append(entries, entry)
 		}
-		if strings.HasPrefix(c.Content, "[Review: ") {
-			continue
-		}
-		entry := service.ActivityEntry{
-			Type:      "comment",
-			Timestamp: c.CreatedAt,
-			ActorName: c.AuthorName,
-			ActorType: c.AuthorType,
-			Detail:    c.Content,
-			CommentID: c.ID,
-		}
-		if c.AuthorID != nil && *c.AuthorID != "" {
-			id := *c.AuthorID
-			entry.ActorID = &id
-		}
-		entries = append(entries, entry)
 	}
 
-	// Convert rule applications
-	for _, ra := range ruleApps {
-		summary := "Rule \"" + ra.RuleName + "\" set category"
-		if ra.CategoryDisplayName != "" {
-			summary = "Rule \"" + ra.RuleName + "\" set category to " + ra.CategoryDisplayName
-		}
-		how := "during sync"
-		if ra.AppliedBy == "retroactive" {
-			how = "retroactively"
-		}
-		entries = append(entries, service.ActivityEntry{
-			Type:      "rule",
-			Timestamp: ra.AppliedAt,
-			ActorName: how,
-			ActorType: "system",
-			Summary:   summary,
-			RuleName:  ra.RuleName,
-			RuleID:    ra.RuleID,
-			CategoryName: ra.CategoryDisplayName,
-		})
-	}
-
-	// Sort by timestamp descending (newest first)
+	// Sort by timestamp descending (newest first).
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Timestamp > entries[j].Timestamp
 	})
 
 	return entries
+}
+
+// derefOr returns *p if non-nil, else def.
+func derefOr(p *string, def string) string {
+	if p == nil {
+		return def
+	}
+	return *p
 }
 
 // CreateTransactionCommentHandler serves POST /admin/api/transactions/{id}/comments.

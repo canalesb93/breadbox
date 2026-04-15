@@ -60,6 +60,11 @@ type TransactionResponse struct {
 	Pending             bool                     `json:"pending"`
 	CreatedAt           string                   `json:"created_at"`
 	UpdatedAt           string                   `json:"updated_at"`
+
+	// Tags attached to this transaction (slug list). Empty slice when none are
+	// attached. Populated by ListTransactions / GetTransaction when the Phase 2
+	// tags subsystem is active.
+	Tags []string `json:"tags,omitempty"`
 }
 
 type TransactionListResult struct {
@@ -86,6 +91,10 @@ type TransactionListParams struct {
 	SortBy           *string
 	SortOrder        *string
 	IncludeDependent bool
+	// Tags (AND) — transaction must have EVERY tag in this list.
+	Tags []string
+	// AnyTag (OR) — transaction must have AT LEAST ONE tag in this list.
+	AnyTag []string
 }
 
 type TransactionCountParams struct {
@@ -101,6 +110,8 @@ type TransactionCountParams struct {
 	SearchMode       *string
 	ExcludeSearch    *string
 	IncludeDependent bool
+	Tags             []string
+	AnyTag           []string
 }
 
 type CategoryPair struct {
@@ -444,7 +455,7 @@ type RuleAction struct {
 
 // ActivityEntry represents a single event in a transaction's activity timeline.
 type ActivityEntry struct {
-	Type      string `json:"type"`      // "review", "comment", "rule"
+	Type      string `json:"type"`      // "review", "comment", "rule", "tag", "category"
 	Timestamp string `json:"timestamp"` // RFC3339
 
 	ActorName string  `json:"actor_name"`
@@ -460,6 +471,7 @@ type ActivityEntry struct {
 	RuleName     string `json:"rule_name,omitempty"`
 	RuleID       string `json:"rule_id,omitempty"`
 	CommentID    string `json:"comment_id,omitempty"`
+	TagSlug      string `json:"tag_slug,omitempty"` // for tag_added / tag_removed entries
 }
 
 type Condition struct {
