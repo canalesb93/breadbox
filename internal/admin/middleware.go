@@ -69,8 +69,7 @@ func getNavBadges(ctx context.Context) NavBadges {
 }
 
 // countPendingReviewsFromTags returns the number of transactions currently
-// tagged "needs-review" (excluding matched dependent transactions). This
-// replaces the Phase 2 review_queue count after Phase 3 retired that table.
+// tagged "needs-review" (excluding matched dependent transactions).
 func countPendingReviewsFromTags(ctx context.Context, queries *db.Queries) (int64, error) {
 	return queries.CountTransactionsWithTagSlug(ctx, "needs-review")
 }

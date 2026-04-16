@@ -116,7 +116,7 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 
 The review queue is a tag. Transactions carrying the seeded `needs-review` tag (or any operator-defined trigger tag) are the backlog. A seeded `on_create` system rule auto-attaches `needs-review` to every newly-synced transaction; disable that rule to opt out. Ephemeral tags (lifecycle `ephemeral`) require a note on removal — recorded on the `tag_removed` annotation.
 
-Tag management is exposed via the MCP tools (`list_tags`, `add_transaction_tag`, `remove_transaction_tag`, `create_tag`, `update_tag`, `delete_tag`, `update_transactions`, `list_annotations`) and the admin dashboard (`/tags`, `/transactions/:id/edit`, bulk actions on `/transactions`). The retired `/api/v1/reviews/*` endpoints have no REST successor — MCP covers the same workflow.
+Tag management is exposed via the MCP tools (`list_tags`, `add_transaction_tag`, `remove_transaction_tag`, `create_tag`, `update_tag`, `delete_tag`, `update_transactions`, `list_annotations`) and the admin dashboard (`/tags`, `/transactions/:id/edit`, bulk actions on `/transactions`).
 
 ## Transaction Rules
 

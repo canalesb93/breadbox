@@ -14,10 +14,9 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// TestSync_AddTagAction_PersistsTag exercises the Phase 2 add_tag wiring: a
-// rule with an add_tag action fires during sync, and the tag is attached to
-// the transaction with provenance. A matching tag_added annotation row is
-// also written.
+// TestSync_AddTagAction_PersistsTag exercises add_tag wiring: a rule with an
+// add_tag action fires during sync, the tag is attached to the transaction
+// with provenance, and a matching tag_added annotation row is written.
 func TestSync_AddTagAction_PersistsTag(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
 	ctx := context.Background()
@@ -105,10 +104,9 @@ func TestSync_AddTagAction_PersistsTag(t *testing.T) {
 	}
 }
 
-// TestSync_SeededRule_TagsAllNewTransactions verifies the behavior the
-// Phase 2 migration's seed rule intends: a rule with match-all conditions
-// (NULL) and a single add_tag action tagging newly-synced transactions with
-// 'needs-review'.
+// TestSync_SeededRule_TagsAllNewTransactions verifies the seeded review rule:
+// match-all conditions (NULL) with a single add_tag action tagging
+// newly-synced transactions with 'needs-review'.
 //
 // Testutil truncates all tables between tests, so the migration's seeded
 // rows are wiped. We re-seed the tag + rule here mirroring the migration

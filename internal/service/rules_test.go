@@ -71,10 +71,9 @@ func TestValidateCondition_Simple(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			// Phase 1 (Rule Actions v2): an empty Condition{} now means "match
-			// every transaction" and is stored as NULL in the DB. Rules with no
-			// conditions are valid (they fire on every transaction matching the
-			// trigger).
+			// An empty Condition{} means "match every transaction" and is
+			// stored as NULL in the DB. Rules with no conditions fire on every
+			// transaction matching the trigger.
 			name:    "empty condition",
 			cond:    Condition{},
 			wantErr: false,

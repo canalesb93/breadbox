@@ -44,8 +44,7 @@ func seedTxnFixture(t *testing.T, queries *db.Queries) pgtype.UUID {
 }
 
 // mustCreateCategory is a test helper that inserts a category row and fatals
-// on error. Re-hosted here after Phase 3 retired review_integration_test.go
-// (which used to own it).
+// on error.
 func mustCreateCategory(t *testing.T, queries *db.Queries, slug, displayName string) db.Category {
 	t.Helper()
 	cat, err := queries.InsertCategory(context.Background(), db.InsertCategoryParams{

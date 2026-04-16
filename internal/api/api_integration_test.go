@@ -1226,10 +1226,6 @@ func TestAPI_PreviewRule_NoMatches(t *testing.T) {
 	}
 }
 
-// Phase 3 retired the /api/v1/reviews/* endpoints. Their equivalent coverage
-// is exercised via the tag + annotation tests in tags_integration_test.go and
-// the transaction detail page integration tests.
-
 // ============================================================
 // Comment Handler Tests
 // ============================================================

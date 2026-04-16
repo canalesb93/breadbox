@@ -15,11 +15,9 @@ import (
 
 const maxCommentLength = 10000
 
-// Phase 3 of the review-system redesign retired the transaction_comments
-// table. Comments are now stored exclusively as annotations with kind='comment'.
-// CreateComment / ListComments / UpdateComment / DeleteComment continue to
-// exist as service-layer operations so REST/MCP callers don't change, but they
-// now read/write the annotations table directly.
+// Comments are stored as annotations with kind='comment'. CreateComment /
+// ListComments / UpdateComment / DeleteComment read and write the annotations
+// table directly; REST and MCP callers see the same API surface.
 
 // CreateComment adds a comment annotation to a transaction.
 func (s *Service) CreateComment(ctx context.Context, params CreateCommentParams) (*CommentResponse, error) {

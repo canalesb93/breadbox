@@ -17,9 +17,9 @@ import (
 
 // validConditionFields lists the fields available for rule conditions.
 //
-// The "tags" field is a slice (TransactionContext.Tags). It supports contains,
-// not_contains, and "in" (any-of). Phase 1 keeps Tags empty, so contains→false,
-// not_contains→true, in→false; this is the natural match-all/no-match behavior.
+// The "tags" field is a slice (TransactionContext.Tags) populated from
+// transaction_tags at evaluation time. It supports contains, not_contains,
+// and "in" (any-of).
 var validConditionFields = map[string]string{
 	"name":              "string",
 	"merchant_name":     "string",
@@ -66,8 +66,8 @@ func conditionIsEmpty(c Condition) bool {
 // ValidateCondition recursively validates a condition tree.
 //
 // A zero-value Condition{} (no Field, no And/Or/Not) is accepted as "match all"
-// and returns nil — this is the Phase 1 match-all semantic for rules that want to
-// fire on every transaction.
+// and returns nil — the match-all semantic for rules that fire on every
+// transaction.
 func ValidateCondition(c Condition) error {
 	if conditionIsEmpty(c) {
 		return nil
@@ -339,7 +339,6 @@ func evaluateLeaf(c *CompiledCondition, tctx TransactionContext) bool {
 }
 
 // evalTags handles contains / not_contains / in for the tags slice field.
-// Phase 1: tctx.Tags is nil in sync. contains→false, not_contains→true, in→false.
 func evalTags(c *CompiledCondition, tags []string) bool {
 	switch c.Op {
 	case "contains":
@@ -501,11 +500,11 @@ var validActionTypes = map[string]bool{
 // optional hyphens/colons between, e.g. "needs-review", "subscription:monthly".
 var tagSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9\-:]*[a-z0-9]$`)
 
-// ValidateActions validates a slice of rule actions for the typed Phase 1 shape.
+// ValidateActions validates a slice of typed rule actions.
 //
-// Rules must have at least one action. set_category validates the category slug
-// exists; add_tag validates the slug format only (tag persistence lands in Phase
-// 2); add_comment requires non-empty content. Unknown Type values are rejected.
+// Rules must have at least one action. set_category validates the category
+// slug exists; add_tag validates the slug format; add_comment requires
+// non-empty content. Unknown Type values are rejected.
 func (s *Service) ValidateActions(ctx context.Context, actions []RuleAction) error {
 	if len(actions) == 0 {
 		return fmt.Errorf("%w: at least one action is required", ErrInvalidParameter)
@@ -576,9 +575,9 @@ func normalizeTrigger(trigger string) (string, error) {
 
 // --- Service methods ---
 
-// ruleSelectQuery is the base SELECT for transaction rules. Phase 1 dropped the
-// denormalized transaction_rules.category_id column — category info is derived
-// from actions[{type:"set_category"}] at response time via categorySlug lookup.
+// ruleSelectQuery is the base SELECT for transaction rules. Category info is
+// derived from actions[{type:"set_category"}] at response time via
+// categorySlug lookup (no denormalized category_id column).
 const ruleSelectQuery = `SELECT tr.id, tr.short_id, tr.name, tr.conditions, tr.actions, tr.trigger,
 	tr.priority, tr.enabled, tr.expires_at, tr.created_by_type, tr.created_by_id, tr.created_by_name,
 	tr.hit_count, tr.last_hit_at, tr.created_at, tr.updated_at
@@ -590,10 +589,10 @@ const ruleSelectColumnCount = 16
 
 // CreateTransactionRule creates a new transaction rule.
 //
-// Phase 1: category info is not a denormalized column anymore; it's derived
-// from actions[{type:"set_category"}] at response time. conditions may be a
-// zero-value Condition{} (= match all; stored as NULL). trigger defaults to
-// "on_create" and must be one of on_create|on_update|always.
+// Category info is derived from actions[{type:"set_category"}] at response
+// time. conditions may be a zero-value Condition{} (= match all; stored as
+// NULL). trigger defaults to "on_create" and must be one of
+// on_create|on_update|always.
 func (s *Service) CreateTransactionRule(ctx context.Context, params CreateTransactionRuleParams) (*TransactionRuleResponse, error) {
 	// Validate conditions (zero-value => match-all)
 	if err := ValidateCondition(params.Conditions); err != nil {
@@ -713,8 +712,8 @@ func (s *Service) GetTransactionRule(ctx context.Context, id string) (*Transacti
 
 // ListTransactionRules returns a filtered, paginated list of transaction rules.
 //
-// Phase 1: category filtering matches against the set_category action inside
-// the actions JSONB array (since the denormalized category_id column is gone).
+// Category filtering matches against the set_category action inside the
+// actions JSONB array.
 func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRuleListParams) (*TransactionRuleListResult, error) {
 	limit := params.Limit
 	if limit <= 0 {
@@ -1055,12 +1054,11 @@ func (s *Service) ListActiveRulesForSync(ctx context.Context) ([]TransactionRule
 	return s.convertRuleRows(ctx, scanned), nil
 }
 
-// transactionContextQuery is the base query for loading transactions with full context
-// (JOIN through accounts → bank_connections → users) for rule evaluation.
-//
-// Phase 2: aggregates tag slugs from transaction_tags so tag-based conditions
-// work during retroactive apply. GROUP BY t.id is required because of the
-// LEFT JOIN onto the tag pivot.
+// transactionContextQuery is the base query for loading transactions with full
+// context (JOIN through accounts → bank_connections → users) for rule
+// evaluation. Aggregates tag slugs from transaction_tags so tag-based
+// conditions work during retroactive apply. GROUP BY t.id is required because
+// of the LEFT JOIN onto the tag pivot.
 const transactionContextQuery = `SELECT t.id, t.name, COALESCE(t.merchant_name, ''), t.amount,
 	COALESCE(t.category_primary, ''), COALESCE(t.category_detailed, ''),
 	t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
@@ -1101,12 +1099,10 @@ func scanTransactionContextRow(dest []any) *transactionContextRow {
 	return r
 }
 
-// ApplyRuleRetroactively applies a single rule to all existing non-deleted, non-overridden
-// transactions. Returns count of affected rows.
-//
-// Phase 1: rule.Actions uses typed shape. Only set_category actions translate
-// to UPDATE SQL; add_tag and add_comment are plumbed but no-op retroactively
-// (their persistence lands in Phase 2).
+// ApplyRuleRetroactively applies a single rule to all existing non-deleted,
+// non-overridden transactions. Returns count of affected rows. Only
+// set_category actions translate to UPDATE SQL — add_tag and add_comment are
+// skipped retroactively (they only fire during sync).
 func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (int64, error) {
 	rule, err := s.GetTransactionRule(ctx, ruleID)
 	if err != nil {
@@ -1228,10 +1224,8 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 	return totalAffected, nil
 }
 
-// actionAuditFields returns (action_field, action_value) for the audit trail.
-// It maps the typed Phase 1 action shape onto the legacy
-// transaction_rule_applications.(action_field, action_value) columns so the
-// junction table and downstream analytics keep working unchanged.
+// actionAuditFields returns (action_field, action_value) for the audit trail,
+// carrying the action's semantic intent onto the annotation payload.
 func actionAuditFields(a RuleAction) (string, string) {
 	switch a.Type {
 	case "set_category":
@@ -1322,9 +1316,8 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 			lastID = r.id
 
 			// Merge actions from all matching rules (first to set a field wins).
-			// Phase 1: only set_category is materialized to the transactions
-			// table; add_tag/add_comment are counted as hits but no-op here
-			// (their persistence lands in Phase 2).
+			// Only set_category is materialized to the transactions table here;
+			// add_tag/add_comment are counted as hits but skipped retroactively.
 			var mergedCatID pgtype.UUID
 			var winningRuleID string
 			var winningSlug string
@@ -1459,9 +1452,8 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 		AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
 	// When previewing for a specific rule's detail page, exclude transactions
-	// already applied by this rule. Phase 3 retired
-	// transaction_rule_applications; the annotations table carries the same
-	// audit trail via kind='rule_applied'.
+	// already applied by this rule (audit trail lives in annotations with
+	// kind='rule_applied').
 	var baseArgs []any
 	baseArgN := 1
 	if excludeRuleID != nil {
@@ -1562,9 +1554,9 @@ func (s *Service) BatchIncrementHitCounts(ctx context.Context, hits map[string]i
 
 // --- Helpers ---
 
-// ruleRow holds the scanned columns for a transaction rule row.
-// Phase 1: no JOINed category columns — category info is populated at
-// response time by looking up the set_category action's slug.
+// ruleRow holds the scanned columns for a transaction rule row. Category info
+// is populated at response time by looking up the set_category action's slug
+// (no JOINed category columns).
 type ruleRow struct {
 	id             pgtype.UUID
 	shortID        string
@@ -1709,8 +1701,7 @@ func (s *Service) convertRuleRows(ctx context.Context, scanned []ruleRow) []Tran
 	return rules
 }
 
-// recordRuleApplications writes a rule_applied annotation per transaction.
-// Phase 3 retired the transaction_rule_applications table; annotations are now
+// recordRuleApplications writes a rule_applied annotation per transaction —
 // the canonical record of which rules touched which transactions.
 func (s *Service) recordRuleApplications(ctx context.Context, ruleID pgtype.UUID, txnIDs []pgtype.UUID, actionField, actionValue, appliedBy string) {
 	// Look up rule metadata for annotation actor fields.
@@ -1738,10 +1729,9 @@ func (s *Service) recordRuleApplications(ctx context.Context, ruleID pgtype.UUID
 }
 
 // buildActionSetClause converts rule actions into SQL SET clause components.
-// Returns setClauses (e.g., ["category_id = $1"]), args, and error.
-//
-// Phase 1: only set_category materializes to the transactions table. add_tag
-// and add_comment are no-ops here — their persistence lands in Phase 2.
+// Returns setClauses (e.g., ["category_id = $1"]), args, and error. Only
+// set_category materializes here — add_tag and add_comment are skipped for
+// retroactive apply.
 func (s *Service) buildActionSetClause(ctx context.Context, actions []RuleAction) ([]string, []any, error) {
 	var setClauses []string
 	var args []any
@@ -1759,7 +1749,7 @@ func (s *Service) buildActionSetClause(ctx context.Context, actions []RuleAction
 				args = append(args, catID)
 				argN++
 			}
-			// "add_tag" / "add_comment" are Phase 2; skip for retroactive apply.
+			// "add_tag" / "add_comment" are sync-only; skip for retroactive apply.
 		}
 	}
 
@@ -1809,10 +1799,10 @@ func parseDuration(s string) (time.Duration, error) {
 
 // ConditionSummary returns a human-readable summary of a condition tree.
 //
-// A zero-value (empty) Condition renders as "All transactions" — this matches
-// the Phase 1 match-all semantic, where rules with NULL conditions fire on
-// every transaction. UI surfaces (rules list, detail page, preview banner)
-// rely on this string to communicate the catch-all behaviour.
+// A zero-value (empty) Condition renders as "All transactions" — the
+// match-all semantic for rules with NULL conditions. UI surfaces (rules list,
+// detail page, preview banner) rely on this string to communicate the
+// catch-all behaviour.
 func ConditionSummary(c Condition) string {
 	if conditionIsEmpty(c) {
 		return "All transactions"
@@ -1936,9 +1926,8 @@ type RuleStats struct {
 	RetroApplications    int64  `json:"retro_applications"`
 }
 
-// GetRuleStats returns aggregate stats about a rule's applications. Phase 3
-// sources these from the annotations table (kind='rule_applied') now that
-// transaction_rule_applications is gone.
+// GetRuleStats returns aggregate stats about a rule's applications, sourced
+// from annotations (kind='rule_applied').
 func (s *Service) GetRuleStats(ctx context.Context, ruleID string) (*RuleStats, error) {
 	ruleUUID, err := s.resolveRuleID(ctx, ruleID)
 	if err != nil {
@@ -1967,8 +1956,8 @@ func (s *Service) GetRuleStats(ctx context.Context, ruleID string) (*RuleStats, 
 	return stats, nil
 }
 
-// ListRuleApplications returns transactions affected by a rule, paginated.
-// Sources from annotations(kind='rule_applied') after Phase 3.
+// ListRuleApplications returns transactions affected by a rule, paginated,
+// sourced from annotations(kind='rule_applied').
 func (s *Service) ListRuleApplications(ctx context.Context, ruleID string, limit int, cursor string) ([]RuleApplicationRow, bool, error) {
 	ruleUUID, err := s.resolveRuleID(ctx, ruleID)
 	if err != nil {
@@ -2118,7 +2107,7 @@ type TransactionRuleApplicationDetail struct {
 }
 
 // ListRuleApplicationsByTransactionID returns all rules that applied actions
-// to a transaction. Phase 3 reads from annotations(kind='rule_applied').
+// to a transaction, sourced from annotations(kind='rule_applied').
 func (s *Service) ListRuleApplicationsByTransactionID(ctx context.Context, transactionID string) ([]TransactionRuleApplicationDetail, error) {
 	txnUUID, err := s.resolveTransactionID(ctx, transactionID)
 	if err != nil {

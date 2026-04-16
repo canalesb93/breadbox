@@ -87,10 +87,9 @@ func searchString(s, sub string) bool {
 	return false
 }
 
-// Phase 3: review_queue is gone. The activity timeline is built purely from
-// annotations now — comments, tag_added/tag_removed, rule_applied, category_set.
-// The "linked comment rendered inline on a review resolution" path no longer
-// exists (review resolutions are no longer a distinct timeline event type).
+// The activity timeline is built purely from annotations — comments,
+// tag_added/tag_removed, rule_applied, category_set. Review resolutions are
+// not a distinct timeline event type.
 
 func TestBuildActivityTimeline_FreeStandingCommentStillEmitted(t *testing.T) {
 	annotations := []service.Annotation{{

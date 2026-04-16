@@ -65,9 +65,6 @@ func benchTransactionResponse() TransactionResponse {
 	}
 }
 
-// benchReviewResponse was the Phase 2 benchmark fixture. Phase 3 retired
-// ReviewResponse; the review-field benchmarks were removed along with it.
-
 // mustParseFields panics on error; used in benchmark setup only.
 func mustParseFields(b *testing.B, raw string) map[string]bool {
 	b.Helper()
@@ -140,4 +137,3 @@ func BenchmarkFilterTransaction_Large_Core(b *testing.B) {
 	}
 }
 
-// BenchmarkFilterReview_* were removed along with ReviewResponse in Phase 3.

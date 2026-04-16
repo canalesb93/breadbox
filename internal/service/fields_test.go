@@ -187,9 +187,6 @@ func TestFilterTransactionFields_SelectsCorrectly(t *testing.T) {
 	}
 }
 
-// Phase 3 retired ParseReviewFields / FilterReviewFields along with the
-// review_queue. Their tests have moved out with them.
-
 func strPtr(s string) *string { return &s }
 
 func TestFilterTransactionFields_AllFields(t *testing.T) {

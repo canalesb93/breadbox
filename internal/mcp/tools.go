@@ -898,7 +898,7 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 			continue
 		}
 
-		// Empty conditions == match-all in Phase 1.
+		// Empty conditions == match-all.
 		conditions, err := parseConditions(r.Conditions)
 		if err != nil {
 			errors = append(errors, map[string]string{
@@ -1096,9 +1096,9 @@ func (s *MCPServer) handleSubmitReport(reqCtx context.Context, _ *mcpsdk.CallToo
 // parseConditions converts a map[string]any (from MCP input) to a service.Condition.
 // convertMCPActions converts MCP action maps to service RuleAction slice.
 //
-// Phase 1: accepts typed shape {type, category_slug|tag_slug|content}. For
-// back-compat during migration, legacy shape {field:"category", value:"<slug>"}
-// is auto-translated to {type:"set_category", category_slug:"<slug>"}.
+// Accepts the typed shape {type, category_slug|tag_slug|content}. Legacy
+// shape {field:"category", value:"<slug>"} is auto-translated to
+// {type:"set_category", category_slug:"<slug>"} for back-compat.
 func convertMCPActions(actions []map[string]string) []service.RuleAction {
 	if len(actions) == 0 {
 		return nil

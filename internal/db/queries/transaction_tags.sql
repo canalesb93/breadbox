@@ -23,8 +23,8 @@ ORDER BY t.slug ASC;
 
 -- name: CountTransactionsWithTagSlug :one
 -- Returns how many non-deleted, non-matched-dependent transactions currently
--- carry the given tag slug. Used by the admin nav "pending reviews" badge and
--- dashboard card after Phase 3 retired review_queue.
+-- carry the given tag slug. Powers the admin nav "pending reviews" badge and
+-- dashboard card (scoped to the needs-review tag).
 SELECT COUNT(*)
 FROM transaction_tags tt
 JOIN tags tag ON tag.id = tt.tag_id

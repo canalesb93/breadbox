@@ -62,8 +62,7 @@ type TransactionResponse struct {
 	UpdatedAt           string                   `json:"updated_at"`
 
 	// Tags attached to this transaction (slug list). Empty slice when none are
-	// attached. Populated by ListTransactions / GetTransaction when the Phase 2
-	// tags subsystem is active.
+	// attached. Populated by ListTransactions / GetTransaction.
 	Tags []string `json:"tags,omitempty"`
 }
 
@@ -373,16 +372,13 @@ type CommentResponse struct {
 	UpdatedAt     string  `json:"updated_at"`
 }
 
-// Review-queue types (retired in Phase 3) have been removed. The remaining
-// MCP shims translate review-shaped inputs onto tag + annotation operations.
-
 // Transaction rule types
 
-// RuleAction is the typed action shape (Phase 1: Rule Actions v2).
+// RuleAction is the typed action shape for transaction rules.
 //
 // Type values:
 //   - "set_category": requires CategorySlug.
-//   - "add_tag":      requires TagSlug. (Phase 1 validates slug format; tag persistence lands in Phase 2.)
+//   - "add_tag":      requires TagSlug (validated slug format).
 //   - "add_comment":  requires Content.
 type RuleAction struct {
 	Type         string `json:"type"`
@@ -433,8 +429,8 @@ type TransactionContext struct {
 	AccountID        string
 	UserID           string
 	UserName         string
-	// Tags is nil in Phase 1. Phase 2 populates this from transaction_tags
-	// so tag-based conditions (field: "tags") can match against it.
+	// Tags is populated from transaction_tags so tag-based conditions
+	// (field: "tags") can match against the transaction's current tags.
 	Tags []string
 }
 
@@ -443,7 +439,7 @@ type TransactionRuleResponse struct {
 	ShortID string `json:"short_id"`
 	Name    string `json:"name"`
 	// Conditions may be a zero-value Condition{} to mean "match all transactions"
-	// (stored as NULL in the DB, Phase 1).
+	// (stored as NULL in the DB).
 	Conditions    Condition    `json:"conditions"`
 	Actions       []RuleAction `json:"actions"`
 	Trigger       string       `json:"trigger"`

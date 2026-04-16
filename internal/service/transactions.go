@@ -157,8 +157,8 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		argN = ec.ArgN
 	}
 
-	// Tag filters (Phase 2). Tags is AND semantics (transaction has every
-	// slug), AnyTag is OR (transaction has at least one).
+	// Tag filters. Tags is AND semantics (transaction has every slug), AnyTag
+	// is OR (transaction has at least one).
 	if len(params.Tags) > 0 {
 		// For each tag in Tags, require an EXISTS — this is tractable because
 		// common usage is 1-2 tags per filter.
@@ -552,7 +552,7 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 		argN = ec.ArgN
 	}
 
-	// Tag filters (Phase 2).
+	// Tag filters.
 	if len(params.Tags) > 0 {
 		for _, slug := range params.Tags {
 			buf.WriteString(" AND EXISTS (SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = $")
@@ -591,9 +591,9 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		"t.date, t.name, t.merchant_name, t.amount, t.iso_currency_code, " +
 		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
 		"t.category_override, t.pending, " +
-		// Phase 3: review_queue retired. "Agent reviewed" is inferred from a
-		// category_set annotation authored by an agent. "Pending review" is
-		// the presence of the needs-review tag.
+		// "Agent reviewed" is inferred from a category_set annotation authored
+		// by an agent. "Pending review" is the presence of the needs-review
+		// tag.
 		"EXISTS(SELECT 1 FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'category_set' AND ann.actor_type = 'agent') AS agent_reviewed, " +
 		"EXISTS(SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = 'needs-review') AS has_pending_review, " +
 		"t.created_at, t.updated_at, " +

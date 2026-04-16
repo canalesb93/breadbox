@@ -11,10 +11,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// Annotation is the canonical timeline event for a transaction. Phase 2 starts
-// dual-writing annotations alongside the legacy transaction_comments and
-// transaction_rule_applications tables; Phase 3 retires those tables in favor
-// of this single source of truth.
+// Annotation is the canonical timeline event for a transaction — the single
+// source of truth for comments, rule applications, tag changes, and category
+// sets.
 type Annotation struct {
 	ID            string                 `json:"id"`
 	ShortID       string                 `json:"short_id"`
