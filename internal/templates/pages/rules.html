@@ -5,7 +5,7 @@
 <div class="bb-page-header">
   <div>
     <h1 class="bb-page-title">Rules & Categories</h1>
-    <p class="text-sm text-base-content/50 mt-1" x-show="rcTab === 'rules'">Auto-categorize future transactions based on pattern matching</p>
+    <p class="text-sm text-base-content/50 mt-1" x-show="rcTab === 'rules'">Automatically categorize, tag, or comment on transactions during sync</p>
     <p class="text-sm text-base-content/50 mt-1" x-show="rcTab === 'categories'" x-cloak>Organize transactions with a two-level category taxonomy</p>
   </div>
   <div class="flex items-center gap-2">
@@ -115,7 +115,7 @@
       <i data-lucide="list-filter" class="w-8 h-8 text-primary"></i>
     </div>
     <h2 class="text-lg font-semibold mb-1">No rules yet</h2>
-    <p class="text-base-content/50 text-sm mb-4">Create a rule to start auto-categorizing transactions.</p>
+    <p class="text-base-content/50 text-sm mb-4 max-w-sm">Create a rule to automatically categorize, tag, or comment on transactions during sync.</p>
     <a href="/rules/new" class="btn btn-primary btn-sm rounded-xl">
       <i data-lucide="plus" class="w-4 h-4"></i> Create Rule
     </a>
@@ -125,9 +125,11 @@
 
 <div class="space-y-3 bb-stagger">
 {{range .Rules}}
+{{$matchAll := isMatchAllCondition .Conditions}}
+{{$isSystem := eq .CreatedByType "system"}}
 <div class="bb-card p-0 overflow-hidden cursor-pointer hover:shadow-md transition-shadow{{if not .Enabled}} opacity-60{{end}}" x-data="{deleting: false}" @click="window.location.href='/rules/{{.ID}}'">
   <div class="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4">
-    <!-- Category avatar -->
+    <!-- Avatar (category icon when set, else action-type icon) -->
     <div class="flex-shrink-0">
       {{if and .CategoryIcon .Enabled (not (and .ExpiresAt (expired .ExpiresAt)))}}
       <div class="bb-tx-avatar" style="--avatar-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}oklch(0.65 0 0){{end}}">
@@ -141,6 +143,10 @@
       <div class="w-9 h-9 rounded-xl bg-base-200 flex items-center justify-center">
         <i data-lucide="pause" class="w-5 h-5 text-base-content/30"></i>
       </div>
+      {{else if $isSystem}}
+      <div class="w-9 h-9 rounded-xl bg-info/10 flex items-center justify-center" title="System rule">
+        <i data-lucide="shield" class="w-5 h-5 text-info"></i>
+      </div>
       {{else}}
       <div class="w-9 h-9 rounded-xl bg-success/10 flex items-center justify-center">
         <i data-lucide="zap" class="w-5 h-5 text-success"></i>
@@ -150,8 +156,14 @@
 
     <!-- Main info -->
     <div class="flex-1 min-w-0">
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
         <span class="font-semibold text-sm truncate">{{.Name}}</span>
+        {{if $isSystem}}
+        <span class="badge badge-soft badge-info badge-xs gap-1" title="Built-in system rule">
+          <i data-lucide="shield" class="w-2.5 h-2.5"></i>
+          System
+        </span>
+        {{end}}
         {{if .Enabled}}
           {{if and .ExpiresAt (expired .ExpiresAt)}}
           <span class="badge badge-warning badge-xs">Expired</span>
@@ -160,15 +172,18 @@
         <span class="badge badge-ghost badge-xs">Disabled</span>
         {{end}}
       </div>
-      <div class="text-xs text-base-content/40 mt-0.5 truncate" title="{{conditionSummary .Conditions}}">{{conditionSummary .Conditions}}</div>
-      <!-- Mobile-only: category + stats inline -->
-      <div class="flex items-center gap-2 mt-1.5 sm:hidden flex-wrap">
-        {{if .CategoryName}}
-        <span class="bb-rule-cat-badge" {{if .CategoryColor}}style="--cat-color: {{safeCSS (deref .CategoryColor)}}"{{end}}>
-          <span class="bb-rule-cat-dot"></span>
-          {{deref .CategoryName}}
-        </span>
+      <div class="text-xs text-base-content/40 mt-0.5 truncate flex items-center gap-1.5" title="{{conditionSummary .Conditions}}">
+        {{if $matchAll}}
+        <i data-lucide="infinity" class="w-3 h-3 text-base-content/40"></i>
+        <span class="italic">All transactions</span>
+        {{else}}
+        <span>{{conditionSummary .Conditions}}</span>
         {{end}}
+      </div>
+      <!-- Mobile-only: action summary + stats inline -->
+      <div class="flex items-center gap-2 mt-1.5 sm:hidden flex-wrap">
+        <span class="text-xs text-base-content/60">{{actionsSummary .}}</span>
+        <span class="text-xs text-base-content/30">&middot;</span>
         <span class="text-xs text-base-content/40 tabular-nums">{{.HitCount}} hits</span>
         <span class="text-xs text-base-content/30">&middot;</span>
         <span class="text-xs text-base-content/40 tabular-nums">p{{.Priority}}</span>
@@ -179,16 +194,10 @@
       </div>
     </div>
 
-    <!-- Category (tablet+) -->
-    <div class="hidden sm:flex items-center gap-1.5 flex-shrink-0">
-      {{if .CategoryName}}
-      <span class="bb-rule-cat-badge" {{if .CategoryColor}}style="--cat-color: {{safeCSS (deref .CategoryColor)}}"{{end}}>
-        <span class="bb-rule-cat-dot"></span>
-        {{deref .CategoryName}}
-      </span>
-      {{else}}
-      <span class="text-base-content/30 text-xs">&mdash;</span>
-      {{end}}
+    <!-- Action summary (tablet+) -->
+    <div class="hidden sm:flex flex-col items-end gap-0.5 flex-shrink-0 max-w-48 min-w-32">
+      <span class="text-xs font-medium text-base-content/70 truncate text-right" title="{{actionsSummary .}}">{{actionsSummary .}}</span>
+      <span class="text-[0.65rem] text-base-content/40 uppercase tracking-wider">{{triggerLabel .Trigger}}</span>
     </div>
 
     <!-- Stats (desktop+) -->
@@ -223,7 +232,7 @@
       </span>
       {{else}}
       <span class="bb-rule-creator-badge" title="Created by system">
-        <i data-lucide="settings" class="w-3 h-3"></i>
+        <i data-lucide="shield" class="w-3 h-3"></i>
         system
       </span>
       {{end}}
@@ -237,9 +246,15 @@
       <a href="/rules/{{.ID}}/edit" class="btn btn-ghost btn-xs btn-square rounded-lg" title="Edit" @click.stop>
         <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
       </a>
+      {{if $isSystem}}
+      <button class="btn btn-ghost btn-xs btn-square rounded-lg text-base-content/20 cursor-not-allowed" title="System rules cannot be deleted (you can disable them instead)" disabled>
+        <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+      </button>
+      {{else}}
       <button class="btn btn-ghost btn-xs btn-square rounded-lg text-error/60" title="Delete" :disabled="deleting" @click.stop="deleteRule('{{.ID}}', $el)">
         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
       </button>
+      {{end}}
     </div>
   </div>
 </div>

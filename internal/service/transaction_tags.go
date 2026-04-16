@@ -117,8 +117,7 @@ func (s *Service) AddTransactionTag(ctx context.Context, txnID, slug string, act
 	return true, false, nil
 }
 
-// RemoveTransactionTag removes a tag from a transaction. For tags whose
-// lifecycle is "ephemeral", a non-empty note is required. Returns:
+// RemoveTransactionTag removes a tag from a transaction. Returns:
 //   - removed:      true when the (transaction, tag) pair was deleted.
 //   - alreadyAbsent: true when the pair wasn't present (no-op, no error).
 func (s *Service) RemoveTransactionTag(ctx context.Context, txnID, slug string, actor Actor, note string) (removed bool, alreadyAbsent bool, _ error) {
@@ -133,7 +132,6 @@ func (s *Service) RemoveTransactionTag(ctx context.Context, txnID, slug string, 
 		actor = SystemActor()
 	}
 
-	// Fetch the tag first — we need lifecycle to enforce the note-required rule.
 	tag, err := s.Queries.GetTagBySlug(ctx, slug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -143,9 +141,6 @@ func (s *Service) RemoveTransactionTag(ctx context.Context, txnID, slug string, 
 	}
 
 	trimmedNote := strings.TrimSpace(note)
-	if tag.Lifecycle == "ephemeral" && trimmedNote == "" {
-		return false, false, fmt.Errorf("%w: note is required when removing ephemeral tag %q", ErrInvalidParameter, slug)
-	}
 
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {

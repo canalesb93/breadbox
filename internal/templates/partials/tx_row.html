@@ -25,14 +25,12 @@
         <span>{{firstChar .Name}}</span>
       </div>
       {{end}}
-      {{if .HasPendingReview}}<span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-info ring-2 ring-base-100" title="Pending review"></span>{{end}}
     </div>
 
     <!-- Description + Details -->
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
         <a href="/transactions/{{.ID}}" @click.stop class="font-medium text-sm hover:text-primary transition-colors truncate">{{.Name}}</a>
-        {{if .Pending}}<span class="text-[0.6rem] font-medium text-warning/80 bg-warning/10 px-1.5 py-0.5 rounded-full leading-none">Pending</span>{{end}}
       </div>
       <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40">
         {{if .UserName}}
@@ -69,16 +67,20 @@
         <span class="sm:hidden text-base-content/25 truncate shrink-0">Uncategorized</span>
         {{end}}
       </div>
-      <!-- Tag chips -->
-      {{if .Tags}}
-      <div class="flex flex-wrap gap-1 mt-1">
+      <!-- Status pills + tag chips -->
+      {{if or .Pending .Tags}}
+      <div class="flex flex-wrap items-center gap-1 mt-1" x-data="{removing: {}}">
+        {{if .Pending}}<span class="badge badge-soft badge-xs badge-warning rounded-md">Pending</span>{{end}}
         {{range .Tags}}
-        <a href="/transactions?tags={{.Slug}}" @click.stop class="badge badge-soft badge-xs rounded-md gap-1 no-underline"
+        <span class="group/tag badge badge-soft badge-xs rounded-md gap-0.5 cursor-pointer"
           {{if .Color}}style="background-color: {{safeCSS (deref .Color)}}1a; color: {{safeCSS (deref .Color)}}; border-color: {{safeCSS (deref .Color)}}40;"{{end}}
-          title="{{.Slug}}">
+          x-show="!removing['{{.Slug}}']"
+          @click.stop="removeTag($el, '{{$.ID}}', '{{.Slug}}', '{{.DisplayName}}')"
+          title="{{.Slug}} — click to remove">
           {{if .Icon}}<i data-lucide="{{deref .Icon}}" class="w-2.5 h-2.5"></i>{{end}}
           <span>{{.DisplayName}}</span>
-        </a>
+          <i data-lucide="x" class="w-2.5 h-2.5 opacity-0 group-hover/tag:opacity-60 transition-opacity"></i>
+        </span>
         {{end}}
       </div>
       {{end}}

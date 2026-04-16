@@ -1808,7 +1808,15 @@ func parseDuration(s string) (time.Duration, error) {
 }
 
 // ConditionSummary returns a human-readable summary of a condition tree.
+//
+// A zero-value (empty) Condition renders as "All transactions" — this matches
+// the Phase 1 match-all semantic, where rules with NULL conditions fire on
+// every transaction. UI surfaces (rules list, detail page, preview banner)
+// rely on this string to communicate the catch-all behaviour.
 func ConditionSummary(c Condition) string {
+	if conditionIsEmpty(c) {
+		return "All transactions"
+	}
 	if len(c.And) > 0 {
 		parts := make([]string, len(c.And))
 		for i, sub := range c.And {
@@ -1851,6 +1859,55 @@ func ConditionSummary(c Condition) string {
 		return fmt.Sprintf("%s in %v", c.Field, c.Value)
 	default:
 		return fmt.Sprintf("%s %s %q", c.Field, c.Op, valStr)
+	}
+}
+
+// ActionsSummary returns a short human-readable summary of a rule's actions.
+//
+//   - 1 action  → "Set category: Groceries" / "Add tag needs-review" / "Add comment"
+//   - 2+ actions → "3 actions"
+//   - Empty   → "(no actions)" — should never happen for a valid rule.
+//
+// The optional categoryName arg is used when an action is a set_category and
+// the caller has already resolved the friendly category display name (kept on
+// the response struct via TransactionRuleResponse.CategoryName). When empty,
+// the slug is used.
+func ActionsSummary(actions []RuleAction, categoryName string) string {
+	if len(actions) == 0 {
+		return "(no actions)"
+	}
+	if len(actions) > 1 {
+		return fmt.Sprintf("%d actions", len(actions))
+	}
+	a := actions[0]
+	switch a.Type {
+	case "set_category":
+		label := a.CategorySlug
+		if categoryName != "" {
+			label = categoryName
+		}
+		return "Set category: " + label
+	case "add_tag":
+		return "Add tag " + a.TagSlug
+	case "add_comment":
+		return "Add comment"
+	default:
+		return a.Type
+	}
+}
+
+// TriggerLabel returns the human-readable label for a rule trigger value.
+// Falls back to the raw value (or "On create" when empty) for unknown values.
+func TriggerLabel(trigger string) string {
+	switch trigger {
+	case "", "on_create":
+		return "On create"
+	case "on_update":
+		return "On update"
+	case "always":
+		return "Always"
+	default:
+		return trigger
 	}
 }
 

@@ -261,13 +261,44 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return service.ConditionSummary(v)
 				case *service.Condition:
 					if v == nil {
-						return ""
+						return service.ConditionSummary(service.Condition{})
 					}
 					return service.ConditionSummary(*v)
 				default:
-					return ""
+					return service.ConditionSummary(service.Condition{})
 				}
 			},
+			"isMatchAllCondition": func(c any) bool {
+				switch v := c.(type) {
+				case service.Condition:
+					return v.Field == "" && len(v.And) == 0 && len(v.Or) == 0 && v.Not == nil
+				case *service.Condition:
+					if v == nil {
+						return true
+					}
+					return v.Field == "" && len(v.And) == 0 && len(v.Or) == 0 && v.Not == nil
+				default:
+					return false
+				}
+			},
+			"actionsSummary": func(rule any) string {
+				if r, ok := rule.(*service.TransactionRuleResponse); ok && r != nil {
+					name := ""
+					if r.CategoryName != nil {
+						name = *r.CategoryName
+					}
+					return service.ActionsSummary(r.Actions, name)
+				}
+				if r, ok := rule.(service.TransactionRuleResponse); ok {
+					name := ""
+					if r.CategoryName != nil {
+						name = *r.CategoryName
+					}
+					return service.ActionsSummary(r.Actions, name)
+				}
+				return ""
+			},
+			"triggerLabel": service.TriggerLabel,
 			"badgeCount": func(n int64) string {
 				if n > 99 {
 					return "99+"

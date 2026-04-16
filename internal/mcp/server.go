@@ -58,7 +58,7 @@ REVIEW WORKFLOW (tag-based):
 - The "review queue" is just transactions tagged "needs-review". Fresh installs have a seeded rule that auto-tags new transactions on sync.
 - find-work: query_transactions(tags=["needs-review"])
 - do-work: update_transactions(operations: [...]) — atomic compound op per transaction. Each operation can set_category + add/remove tags + attach a comment in a single write. Max 50 operations per call.
-- signal-done: the update_transactions operation's tags_to_remove entry is how you close a review. A note is REQUIRED when removing an ephemeral tag like needs-review — it lands on the audit trail.
+- signal-done: the update_transactions operation's tags_to_remove entry is how you close a review. Including a note is strongly recommended — it lands on the audit trail.
 - If you can't confidently categorize a transaction, leave the tag on it. The tag IS the queue.
 - Tag tools: list_tags, add_transaction_tag (single), remove_transaction_tag (single), list_annotations (activity timeline), plus update_transactions for compound ops.
 - Before processing reviews or creating rules, read breadbox://review-guidelines for detailed guidelines.
@@ -96,7 +96,7 @@ USER ROLES:
 // User-editable via the MCP Settings page.
 const DefaultReviewGuidelines = `REVIEW PRINCIPLES — follow these strictly:
 
-1. THE REVIEW QUEUE IS A TAG. Transactions tagged "needs-review" are the queue. Find them with query_transactions(tags=["needs-review"]). Close them with update_transactions operations that remove the needs-review tag (with a required note). The "needs-review" tag's lifecycle is ephemeral — removing it always requires a non-empty note explaining the decision.
+1. THE REVIEW QUEUE IS A TAG. Transactions tagged "needs-review" are the queue. Find them with query_transactions(tags=["needs-review"]). Close them with update_transactions operations that remove the needs-review tag. Including a note explaining the decision is strongly recommended — it lands on the audit trail.
 
 2. EVERY REVIEW MUST BE INDIVIDUALLY ASSESSED. You must look at each transaction before closing it. Even when processing in batches via update_transactions (max 50 operations per call), you must have examined each transaction's name, amount, and context to determine the correct category. There is no auto-close mechanism — quality depends on your judgment.
 
@@ -387,7 +387,7 @@ func (s *MCPServer) buildToolRegistry() {
 			s.handleSubmitReport, svc),
 		// --- Phase 2 tags + annotations ---
 		makeToolDefLogged("list_tags", ToolRead,
-			"List all tags registered in the system. Each tag has a slug (stable identifier), display_name, and lifecycle ('persistent' or 'ephemeral'). Ephemeral tags (e.g. 'needs-review') require a note on removal. Tags attached to transactions can be queried via the tags / any_tag filters on query_transactions.",
+			"List all tags registered in the system. Each tag has a slug (stable identifier), display_name, and lifecycle ('persistent' or 'ephemeral'). Tags attached to transactions can be queried via the tags / any_tag filters on query_transactions.",
 			s.handleListTags, svc),
 		makeToolDefLogged("list_annotations", ToolRead,
 			"List the activity timeline for a transaction. Each annotation is a single event: comment, tag_added, tag_removed, rule_applied, or category_set. Ordered by created_at ASC. Payload carries kind-specific fields (content for comments, slug for tags, rule_name for rule applications).",
@@ -396,13 +396,13 @@ func (s *MCPServer) buildToolRegistry() {
 			"Attach a tag to a transaction. Tags are an open-ended labeling system — auto-creates a persistent tag if the slug doesn't exist yet. Use note to attach a short rationale that is stored on the tag_added annotation. Idempotent: returns already_present=true if the tag was already attached.",
 			s.handleAddTransactionTag, svc),
 		makeToolDefLogged("remove_transaction_tag", ToolWrite,
-			"Remove a tag from a transaction. For ephemeral tags (lifecycle='ephemeral', like 'needs-review'), a non-empty note is REQUIRED — it's recorded on the tag_removed annotation so the reason for removal is auditable. For persistent tags, the note is optional. Idempotent: returns already_absent=true if the tag wasn't attached.",
+			"Remove a tag from a transaction. A note is recommended (it's recorded on the tag_removed annotation for auditability) but not required. Idempotent: returns already_absent=true if the tag wasn't attached.",
 			s.handleRemoveTransactionTag, svc),
 		makeToolDefLogged("update_transactions", ToolWrite,
 			"Compound write for up to 50 transactions at once. Each operation can: set a category (category_slug), add tags (tags_to_add), remove tags (tags_to_remove), and attach a comment — all atomically per transaction, with annotations written for every change. The preferred tool for closing review work (set category + remove needs-review + explain) in one call. Example operation: {\"transaction_id\":\"k7Xm9pQ2\",\"category_slug\":\"food_and_drink_groceries\",\"tags_to_remove\":[{\"slug\":\"needs-review\",\"note\":\"clearly groceries\"}],\"comment\":\"Costco run\"}. on_error: 'continue' (default — each op in its own DB tx, partial failures OK) or 'abort' (one DB tx, rolls back on first error). Ephemeral tags (needs-review) REQUIRE a non-empty note on removal.",
 			s.handleUpdateTransactions, svc),
 		makeToolDefLogged("create_tag", ToolWrite,
-			"Register a new tag in the system. Admin-only write — agents can auto-create persistent tags implicitly via add_transaction_tag (pass a new slug), so use create_tag only when users need to set display_name/color/lifecycle up front. Slug regex: ^[a-z0-9][a-z0-9\\-:]*[a-z0-9]$. Lifecycle defaults to 'persistent' (user-defined, long-lived). Use 'ephemeral' for tags whose removal requires a note (workflow trigger tags like needs-review).",
+			"Register a new tag in the system. Admin-only write — agents can auto-create persistent tags implicitly via add_transaction_tag (pass a new slug), so use create_tag only when users need to set display_name/color/lifecycle up front. Slug regex: ^[a-z0-9][a-z0-9\\-:]*[a-z0-9]$. Lifecycle defaults to 'persistent' (user-defined, long-lived). Use 'ephemeral' for workflow trigger tags like needs-review.",
 			s.handleCreateTag, svc),
 		makeToolDefLogged("update_tag", ToolWrite,
 			"Update a tag's mutable fields (display_name, description, color, icon, lifecycle). Slug is immutable — to rename, create a new tag + bulk re-tag + delete old. Identify the tag by UUID, short ID, or slug.",

@@ -22,14 +22,14 @@ type transactionOperationInput struct {
 	TransactionID string           `json:"transaction_id" jsonschema:"required,UUID or short ID."`
 	CategorySlug  *string          `json:"category_slug,omitempty" jsonschema:"Category slug to set (e.g. 'food_and_drink_groceries'). Sets category_override=true. Omit to leave the category unchanged."`
 	TagsToAdd     []tagOpEntryInput `json:"tags_to_add,omitempty" jsonschema:"List of tags to add. Each item: {slug, note?}. Auto-creates persistent tags if the slug is unknown."`
-	TagsToRemove  []tagOpEntryInput `json:"tags_to_remove,omitempty" jsonschema:"List of tags to remove. Each item: {slug, note?}. note is REQUIRED when the tag's lifecycle is 'ephemeral' (e.g. needs-review)."`
+	TagsToRemove  []tagOpEntryInput `json:"tags_to_remove,omitempty" jsonschema:"List of tags to remove. Each item: {slug, note?}. note is recommended for auditability."`
 	Comment       *string          `json:"comment,omitempty" jsonschema:"Optional free-form comment written as an annotation attributed to you. Max 10000 chars. Prefer including narrative inline here instead of a separate add_transaction_comment call."`
 }
 
 // tagOpEntryInput is a single tag add/remove entry.
 type tagOpEntryInput struct {
 	Slug string `json:"slug" jsonschema:"required,Tag slug (lowercase alphanumerics with hyphens/colons)."`
-	Note string `json:"note,omitempty" jsonschema:"Short rationale. REQUIRED for removing ephemeral tags."`
+	Note string `json:"note,omitempty" jsonschema:"Short rationale. Recommended for auditability."`
 }
 
 // handleUpdateTransactions runs the compound batch.

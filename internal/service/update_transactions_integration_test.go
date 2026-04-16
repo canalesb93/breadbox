@@ -5,7 +5,6 @@ package service_test
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 
 	"breadbox/internal/service"
@@ -176,9 +175,9 @@ func TestUpdateTransactions_AbortMode_RollsBack(t *testing.T) {
 	}
 }
 
-// TestUpdateTransactions_EphemeralRemovalRequiresNote verifies that removing
-// an ephemeral tag without a note returns a per-op error.
-func TestUpdateTransactions_EphemeralRemovalRequiresNote(t *testing.T) {
+// TestUpdateTransactions_EphemeralRemovalWithoutNote verifies that removing
+// an ephemeral tag without a note succeeds (note is optional).
+func TestUpdateTransactions_EphemeralRemovalWithoutNote(t *testing.T) {
 	svc, queries, _ := newService(t)
 	ctx := context.Background()
 	acctID := seedTxnFixture(t, queries)
@@ -199,26 +198,15 @@ func TestUpdateTransactions_EphemeralRemovalRequiresNote(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateTransactions: %v", err)
 	}
-	if len(results) != 1 || results[0].Status != "error" {
-		t.Fatalf("expected per-op error, got %+v", results)
-	}
-	if results[0].Error == nil || results[0].Error.Code != "INVALID_PARAMETER" {
-		t.Errorf("expected INVALID_PARAMETER code, got %+v", results[0].Error)
-	}
-	if !strings.Contains(results[0].Error.Message, "note is required") {
-		t.Errorf("expected error to mention 'note is required', got %v", results[0].Error.Message)
+	if len(results) != 1 || results[0].Status != "ok" {
+		t.Fatalf("expected per-op ok, got %+v", results)
 	}
 
-	// Tag should still be attached.
 	tags, _ := svc.ListTransactionTags(ctx, txn.ShortID)
-	hasReview := false
-	for _, t := range tags {
-		if t.Slug == "needs-review" {
-			hasReview = true
+	for _, tg := range tags {
+		if tg.Slug == "needs-review" {
+			t.Error("expected needs-review tag to be removed")
 		}
-	}
-	if !hasReview {
-		t.Error("expected needs-review tag to remain attached after failed removal")
 	}
 }
 

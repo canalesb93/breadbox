@@ -3,14 +3,18 @@
 
 <div x-data="ruleDetail()">
 
+{{$isSystem := eq .Rule.CreatedByType "system"}}
+{{$matchAll := isMatchAllCondition .Rule.Conditions}}
 <!-- Header -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
   <div class="flex items-center gap-4">
-    <div class="w-12 h-12 rounded-xl flex items-center justify-center {{if .Rule.Enabled}}bg-success/10{{else}}bg-base-200{{end}}">
-      {{if .Rule.Enabled}}
-      <i data-lucide="zap" class="w-6 h-6 text-success"></i>
-      {{else}}
+    <div class="w-12 h-12 rounded-xl flex items-center justify-center {{if not .Rule.Enabled}}bg-base-200{{else if $isSystem}}bg-info/10{{else}}bg-success/10{{end}}">
+      {{if not .Rule.Enabled}}
       <i data-lucide="pause" class="w-6 h-6 text-base-content/30"></i>
+      {{else if $isSystem}}
+      <i data-lucide="shield" class="w-6 h-6 text-info"></i>
+      {{else}}
+      <i data-lucide="zap" class="w-6 h-6 text-success"></i>
       {{end}}
     </div>
     <div>
@@ -21,9 +25,16 @@
         {{else}}
         <span class="badge badge-ghost badge-sm">Disabled</span>
         {{end}}
+        {{if $isSystem}}
+        <span class="badge badge-soft badge-info badge-sm gap-1" title="Built-in system rule">
+          <i data-lucide="shield" class="w-3 h-3"></i>
+          System rule
+        </span>
+        {{end}}
+        <span class="badge badge-ghost badge-sm" title="When this rule fires">{{triggerLabel .Rule.Trigger}}</span>
         <span class="text-xs text-base-content/40">Priority {{.Rule.Priority}}</span>
         <span class="text-xs text-base-content/40">&middot;</span>
-        <span class="text-xs text-base-content/40">{{if eq .Rule.CreatedByType "agent"}}Created automatically{{else if eq .Rule.CreatedByType "system"}}System rule{{else}}Created manually{{end}}</span>
+        <span class="text-xs text-base-content/40">{{if eq .Rule.CreatedByType "agent"}}Created automatically{{else if $isSystem}}Built-in{{else}}Created manually{{end}}</span>
         {{if .Rule.ExpiresAt}}
         <span class="text-xs text-base-content/40">&middot;</span>
         <span class="text-xs text-warning">Expires {{deref .Rule.ExpiresAt}}</span>
@@ -51,7 +62,17 @@
     <div>
       <span class="text-xs text-base-content/40 uppercase tracking-wider">When</span>
       <div class="mt-1 space-y-1">
-        {{if .Rule.Conditions.And}}
+        {{if $matchAll}}
+        <div class="flex items-center gap-3 p-3 bg-info/5 border border-info/15 rounded-xl">
+          <div class="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
+            <i data-lucide="infinity" class="w-4 h-4 text-info"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium">All transactions</p>
+            <p class="text-xs text-base-content/50">No conditions &mdash; this rule fires on every transaction.</p>
+          </div>
+        </div>
+        {{else if .Rule.Conditions.And}}
         <p class="text-xs text-base-content/50 mb-1"><strong>All</strong> of these match:</p>
         {{range .Rule.Conditions.And}}
         <div class="flex items-center gap-2 p-2 bg-base-200/40 rounded-lg">
@@ -88,20 +109,42 @@
       <span class="text-xs text-base-content/40 uppercase tracking-wider">Then</span>
       <div class="mt-1 space-y-1">
         {{range .Rule.Actions}}
-        <div class="flex items-center gap-2 p-2.5 bg-base-200/40 rounded-xl">
+        <div class="flex items-center gap-3 p-3 bg-base-200/40 rounded-xl">
           {{if eq .Type "set_category"}}
-          <i data-lucide="tag" class="w-3.5 h-3.5 text-base-content/40"></i>
-          <span class="text-sm">Set category to <span class="font-semibold">{{if $.ActionCategoryName}}{{$.ActionCategoryName}}{{else}}{{.CategorySlug}}{{end}}</span></span>
-          {{if $.ActionCategoryName}}<span class="text-xs text-base-content/30 ml-1">({{.CategorySlug}})</span>{{end}}
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" {{if $.Rule.CategoryColor}}style="background-color: {{safeCSS (deref $.Rule.CategoryColor)}}1a"{{else}}style="background-color: rgba(99, 102, 241, 0.1)"{{end}}>
+            {{if $.Rule.CategoryIcon}}
+            <i data-lucide="{{deref $.Rule.CategoryIcon}}" class="w-4 h-4" {{if $.Rule.CategoryColor}}style="color: {{safeCSS (deref $.Rule.CategoryColor)}}"{{end}}></i>
+            {{else}}
+            <i data-lucide="tag" class="w-4 h-4 text-base-content/50"></i>
+            {{end}}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm">Set category to <span class="font-semibold">{{if $.ActionCategoryName}}{{$.ActionCategoryName}}{{else}}{{.CategorySlug}}{{end}}</span></p>
+            {{if $.ActionCategoryName}}<p class="text-xs text-base-content/40">{{.CategorySlug}}</p>{{end}}
+          </div>
           {{else if eq .Type "add_tag"}}
-          <i data-lucide="hash" class="w-3.5 h-3.5 text-base-content/40"></i>
-          <span class="text-sm">Add tag <span class="font-semibold">{{.TagSlug}}</span></span>
+          <div class="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+            <i data-lucide="hash" class="w-4 h-4 text-warning"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm">Add tag <span class="font-semibold">{{.TagSlug}}</span></p>
+            <p class="text-xs text-base-content/40">Tag is attached to matching transactions during sync.</p>
+          </div>
           {{else if eq .Type "add_comment"}}
-          <i data-lucide="message-square" class="w-3.5 h-3.5 text-base-content/40"></i>
-          <span class="text-sm">Add comment: <span class="font-semibold">{{.Content}}</span></span>
+          <div class="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
+            <i data-lucide="message-square" class="w-4 h-4 text-secondary"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm">Add comment</p>
+            <p class="text-xs text-base-content/60 mt-0.5 italic">&ldquo;{{.Content}}&rdquo;</p>
+          </div>
           {{else}}
-          <i data-lucide="settings" class="w-3.5 h-3.5 text-base-content/40"></i>
-          <span class="text-sm">Unknown action type: <span class="font-semibold">{{.Type}}</span></span>
+          <div class="w-8 h-8 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
+            <i data-lucide="settings" class="w-4 h-4 text-base-content/40"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm">Unknown action type: <span class="font-semibold">{{.Type}}</span></p>
+          </div>
           {{end}}
         </div>
         {{end}}
@@ -131,7 +174,7 @@
       </div>
       <div>
         <div class="text-2xl font-semibold tabular-nums leading-none">{{commaInt .Stats.UniqueTransactions}}</div>
-        <div class="text-xs text-base-content/40 mt-0.5">Categorized</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Transactions affected</div>
       </div>
     </div>
   </div>
@@ -143,7 +186,7 @@
       </div>
       <div>
         <div class="text-2xl font-semibold tabular-nums leading-none">{{if .Preview}}{{commaInt .Preview.MatchCount}}{{else}}0{{end}}</div>
-        <div class="text-xs text-base-content/40 mt-0.5">Pending</div>
+        <div class="text-xs text-base-content/40 mt-0.5">Untouched matches</div>
       </div>
     </div>
   </div>
@@ -168,14 +211,14 @@
 {{if and (gt .Rule.HitCount 0) (eq .Stats.UniqueTransactions 0)}}
 <p class="text-xs text-base-content/40 mb-4 px-1">
   <i data-lucide="info" class="w-3 h-3 inline-block -mt-0.5"></i>
-  Per-transaction tracking was recently enabled. The "Categorized" count will update as this rule runs in future syncs.
+  Per-transaction tracking was recently enabled. The "Transactions affected" count will update as this rule runs in future syncs.
 </p>
 {{end}}
 
-<!-- Recent Categorizations -->
+<!-- Recent Applications -->
 <div class="bb-card p-5 mb-4">
-  <span class="label-text text-sm font-medium">Recent Categorizations</span>
-  <p class="text-xs text-base-content/40 mb-3">Transactions categorized by this rule during syncs</p>
+  <span class="label-text text-sm font-medium">Recent Applications</span>
+  <p class="text-xs text-base-content/40 mb-3">Transactions this rule has touched during syncs</p>
 
   {{if .Applications}}
   <div class="overflow-x-auto">
@@ -185,7 +228,7 @@
           <th class="text-xs">Transaction</th>
           <th class="text-xs text-right">Amount</th>
           <th class="text-xs">Date</th>
-          <th class="text-xs">Category</th>
+          <th class="text-xs">Action</th>
           <th class="text-xs">How</th>
         </tr>
       </thead>
@@ -195,7 +238,17 @@
           <td class="text-sm"><a href="/transactions/{{.TransactionID}}" class="hover:text-primary">{{.TransactionName}}</a></td>
           <td class="text-sm text-right tabular-nums bb-amount">{{printf "%.2f" .Amount}}</td>
           <td class="text-sm text-base-content/60">{{.Date}}</td>
-          <td class="text-sm"><span class="badge badge-outline badge-xs">{{.ActionValue}}</span></td>
+          <td class="text-sm">
+            {{if eq .ActionField "category"}}
+            <span class="inline-flex items-center gap-1"><i data-lucide="tag" class="w-3 h-3 text-base-content/40"></i><span class="badge badge-outline badge-xs">{{.ActionValue}}</span></span>
+            {{else if eq .ActionField "tag"}}
+            <span class="inline-flex items-center gap-1"><i data-lucide="hash" class="w-3 h-3 text-warning"></i><span class="badge badge-soft badge-warning badge-xs">{{.ActionValue}}</span></span>
+            {{else if eq .ActionField "comment"}}
+            <span class="inline-flex items-center gap-1"><i data-lucide="message-square" class="w-3 h-3 text-secondary"></i><span class="text-xs text-base-content/60">comment added</span></span>
+            {{else}}
+            <span class="badge badge-outline badge-xs">{{.ActionValue}}</span>
+            {{end}}
+          </td>
           <td class="text-sm text-base-content/60">
             {{if eq .AppliedBy "sync"}}During sync{{else if eq .AppliedBy "retroactive"}}Retroactive{{else}}Manual{{end}}
           </td>
@@ -209,13 +262,15 @@
   {{end}}
   {{else}}
   <div class="text-center py-6 text-base-content/40 text-sm">
-    <p>No categorization records yet. This rule will categorize matching transactions during the next sync.</p>
+    <p>No applications yet. This rule will run on matching transactions during the next sync.</p>
   </div>
   {{end}}
 </div>
 
-<!-- Pending Matches (retroactive section — de-emphasized) -->
-{{if and .Preview (gt .Preview.MatchCount 0)}}
+<!-- Pending Matches (only meaningful for category rules — retroactive apply
+     materializes set_category to transactions.category_id; tag/comment actions
+     are no-ops in retroactive). Hide for non-category-only rules. -->
+{{if and .Preview (gt .Preview.MatchCount 0) .Rule.CategorySlug}}
 <div class="bb-card p-5 mb-4">
   <div class="flex items-center justify-between mb-1">
     <span class="label-text text-sm font-medium">Uncategorized Matches</span>

@@ -10,326 +10,238 @@
 </div>
 
 <form @submit.prevent="submitRule()" class="max-w-2xl">
-  <div class="bb-card p-0 overflow-hidden">
 
   <!-- Name -->
-  <div class="p-5 sm:p-6">
-    <div class="bb-icon-header">
-      <div class="bb-icon-header__tile bb-icon-tile--primary">
-        <i data-lucide="tag" class="w-5 h-5"></i>
-      </div>
-      <div class="bb-icon-header__text">
-        <h2 class="text-sm font-semibold">Rule name</h2>
-        <p class="text-xs text-base-content/45">A descriptive name to identify this rule</p>
-      </div>
-    </div>
+  <div class="bb-card p-5 mb-4">
+    <label class="label"><span class="label-text text-sm font-medium">Rule Name</span></label>
     <div class="relative">
-      <input type="text" x-model="form.name" x-ref="nameInput" @focus="nameFocused = true" @blur="setTimeout(() => nameFocused = false, 150)" class="bb-form-input pr-16" placeholder="e.g., Uber Eats → Food Delivery" required />
+      <input type="text" x-model="form.name" x-ref="nameInput" @focus="nameFocused = true" @blur="setTimeout(() => nameFocused = false, 150)" class="input input-bordered input-sm rounded-xl w-full bg-base-200/50 pr-16" placeholder="e.g., Uber Eats → Food Delivery" required />
       <button type="button" x-show="nameFocused" x-cloak x-transition.opacity class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-base-content/30 hover:text-base-content/50 transition-colors" @mousedown.prevent="insertArrow()" title="Insert arrow">insert →</button>
     </div>
+    <p class="text-xs text-base-content/40 mt-1">A descriptive name to identify this rule</p>
   </div>
 
-  <!-- Rule logic (When + Then) -->
-  <div class="p-5 sm:p-6 border-t border-base-300">
-    <div class="bb-icon-header">
-      <div class="bb-icon-header__tile bb-icon-tile--primary">
-        <i data-lucide="git-branch" class="w-5 h-5"></i>
-      </div>
-      <div class="bb-icon-header__text">
-        <h2 class="text-sm font-semibold">Rule logic</h2>
-        <p class="text-xs text-base-content/45">When transactions match, apply these actions.</p>
-      </div>
-    </div>
-
-    <!-- WHEN sub-section -->
-    <div class="mb-5">
-      <div class="flex items-center justify-between mb-2.5">
-        <span class="text-[0.65rem] font-semibold tracking-wider uppercase text-base-content/45">When</span>
-        <div class="flex items-center gap-2">
-          <div class="flex items-center gap-1 bg-base-200/60 rounded-lg p-0.5" x-show="form.conditions.length > 1">
-            <button type="button" class="px-2.5 py-0.5 text-xs font-medium rounded-md transition-colors"
-              :class="form.logic === 'and' ? 'bg-base-100 shadow-sm text-base-content' : 'text-base-content/40 hover:text-base-content/60'"
-              @click="form.logic = 'and'; syncToJson()">AND</button>
-            <button type="button" class="px-2.5 py-0.5 text-xs font-medium rounded-md transition-colors"
-              :class="form.logic === 'or' ? 'bg-base-100 shadow-sm text-base-content' : 'text-base-content/40 hover:text-base-content/60'"
-              @click="form.logic = 'or'; syncToJson()">OR</button>
-          </div>
-          <button type="button" class="btn btn-ghost btn-xs rounded-lg gap-1.5" @click="addCondition()">
-            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add
-          </button>
+  <!-- Conditions -->
+  <div class="bb-card p-5 mb-4">
+    <div class="flex items-center justify-between mb-1">
+      <span class="label-text text-sm font-medium">When</span>
+      <div class="flex items-center gap-2">
+        <!-- AND/OR toggle -->
+        <div class="flex items-center gap-1 bg-base-200/60 rounded-lg p-0.5" x-show="form.conditions.length > 1">
+          <button type="button" class="px-2.5 py-0.5 text-xs font-medium rounded-md transition-colors"
+            :class="form.logic === 'and' ? 'bg-base-100 shadow-sm text-base-content' : 'text-base-content/40 hover:text-base-content/60'"
+            @click="form.logic = 'and'; syncToJson()">AND</button>
+          <button type="button" class="px-2.5 py-0.5 text-xs font-medium rounded-md transition-colors"
+            :class="form.logic === 'or' ? 'bg-base-100 shadow-sm text-base-content' : 'text-base-content/40 hover:text-base-content/60'"
+            @click="form.logic = 'or'; syncToJson()">OR</button>
         </div>
-      </div>
-
-      <!-- Condition rows -->
-      <div class="space-y-2">
-        <template x-for="(cond, idx) in form.conditions" :key="idx">
-          <div class="flex items-center gap-2 p-2.5 bg-base-200/40 rounded-xl">
-            <!-- Conjunction label -->
-            <div class="w-10 shrink-0 text-center">
-              <span x-show="idx === 0" class="text-[0.65rem] font-semibold tracking-wider uppercase text-base-content/30">IF</span>
-              <span x-show="idx > 0" class="text-[0.65rem] font-semibold tracking-wider uppercase" :class="form.logic === 'or' ? 'text-warning' : 'text-base-content/30'" x-text="form.logic"></span>
-            </div>
-            <!-- Field -->
-            <select x-model="cond.field" @change="onFieldChange(idx)" class="select select-bordered select-xs rounded-lg bg-base-100 flex-1 min-w-0">
-              <option value="">Field...</option>
-              <option value="name">Name</option>
-              <option value="merchant_name">Merchant</option>
-              <option value="amount">Amount</option>
-              <option value="category_primary">Category (raw)</option>
-              <option value="category_detailed">Category detail</option>
-              <option value="provider">Provider</option>
-              <option value="user_name">Family member</option>
-              <option value="pending">Pending</option>
-            </select>
-            <!-- Operator -->
-            <select x-model="cond.op" @change="syncToJson()" class="select select-bordered select-xs rounded-lg bg-base-100 w-28 shrink-0">
-              <option value="contains" x-show="fieldType(cond.field) === 'string'">contains</option>
-              <option value="eq" x-show="fieldType(cond.field) === 'string'">equals</option>
-              <option value="neq" x-show="fieldType(cond.field) === 'string'">not equals</option>
-              <option value="not_contains" x-show="fieldType(cond.field) === 'string'">not contains</option>
-              <option value="matches" x-show="fieldType(cond.field) === 'string'">regex</option>
-              <option value="in" x-show="fieldType(cond.field) === 'string'">in list</option>
-              <option value="gte" x-show="fieldType(cond.field) === 'numeric'">&ge;</option>
-              <option value="lte" x-show="fieldType(cond.field) === 'numeric'">&le;</option>
-              <option value="eq" x-show="fieldType(cond.field) === 'numeric'">=</option>
-              <option value="gt" x-show="fieldType(cond.field) === 'numeric'">&gt;</option>
-              <option value="lt" x-show="fieldType(cond.field) === 'numeric'">&lt;</option>
-              <option value="neq" x-show="fieldType(cond.field) === 'numeric'">&ne;</option>
-              <option value="eq" x-show="fieldType(cond.field) === 'bool'">is</option>
-              <option value="neq" x-show="fieldType(cond.field) === 'bool'">is not</option>
-            </select>
-            <!-- Value -->
-            <select x-model="cond.value" x-show="fieldType(cond.field) === 'bool'" @change="syncToJson()" class="select select-bordered select-xs rounded-lg bg-base-100 w-20 shrink-0">
-              <option value="true">true</option>
-              <option value="false">false</option>
-            </select>
-            <input type="number" x-model="cond.value" step="0.01" x-show="fieldType(cond.field) === 'numeric'" @input="syncToJson()" class="input input-bordered input-xs rounded-lg bg-base-100 w-24 shrink-0" placeholder="0.00" />
-            <input type="text" x-model="cond.value" x-show="fieldType(cond.field) === 'string'" @input="syncToJson()" class="input input-bordered input-xs rounded-lg bg-base-100 flex-1 min-w-0" placeholder="value..." />
-            <!-- Remove -->
-            <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg shrink-0" @click="removeCondition(idx)" x-show="form.conditions.length > 1">
-              <i data-lucide="x" class="w-3.5 h-3.5 text-base-content/40"></i>
-            </button>
-          </div>
-        </template>
-      </div>
-
-      <!-- Advanced JSON toggle -->
-      <div class="mt-3">
-        <button type="button" class="text-xs text-base-content/40 hover:text-base-content/60 flex items-center gap-1" @click="showJsonEditor = !showJsonEditor">
-          <i data-lucide="code-2" class="w-3 h-3"></i>
-          <span x-text="showJsonEditor ? 'Hide JSON' : 'Edit as JSON'"></span>
-        </button>
-        <div x-show="showJsonEditor" x-cloak class="mt-2">
-          <textarea x-model="form.conditions_json" @input="syncFromJson()" class="textarea textarea-bordered textarea-sm font-mono text-xs rounded-xl w-full bg-base-200/50" rows="5" placeholder='{"field": "name", "op": "contains", "value": "uber"}'></textarea>
-          <p class="text-xs text-base-content/40 mt-1">Supports nested AND/OR/NOT trees. Visual builder handles simple cases.</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- THEN sub-section -->
-    <div>
-      <div class="flex items-center justify-between mb-2.5">
-        <span class="text-[0.65rem] font-semibold tracking-wider uppercase text-base-content/45">Then</span>
-        <button type="button" class="btn btn-ghost btn-xs rounded-lg gap-1.5" @click="addAction()" :disabled="availableActionTypes().length === 0">
+        <button type="button" class="btn btn-ghost btn-xs rounded-lg gap-1.5" @click="addCondition()">
           <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add
         </button>
       </div>
+    </div>
+    <p class="text-xs text-base-content/40 mb-3">
+      <span x-show="form.conditions.length === 0">No conditions &mdash; this rule will fire on <strong>every transaction</strong></span>
+      <span x-show="form.conditions.length === 1">Match transactions where</span>
+      <span x-show="form.conditions.length > 1 && form.logic === 'and'">Match transactions where <strong>all</strong> conditions are true</span>
+      <span x-show="form.conditions.length > 1 && form.logic === 'or'">Match transactions where <strong>any</strong> condition is true</span>
+    </p>
 
-      <div class="space-y-2">
-        <template x-for="(action, idx) in form.actions" :key="idx">
-          <div class="flex items-center gap-2 p-2.5 bg-base-200/40 rounded-xl">
-            <div class="w-10 shrink-0 text-center">
-              <span class="text-[0.65rem] font-semibold tracking-wider uppercase text-base-content/30">DO</span>
-            </div>
-            <!-- Action type selector -->
-            <select x-model="action.field" @change="onActionTypeChange(idx)" class="select select-bordered select-xs rounded-lg bg-base-100 w-36 shrink-0">
-              <template x-for="at in actionTypes" :key="at.value">
-                <option :value="at.value" x-text="at.label" :disabled="at.value !== action.field && isActionUsed(at.value)"></option>
-              </template>
-            </select>
+    <!-- Match-all banner -->
+    <div x-show="form.conditions.length === 0" class="flex items-center gap-3 p-3 bg-info/5 border border-info/15 rounded-xl mb-2">
+      <div class="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
+        <i data-lucide="infinity" class="w-4 h-4 text-info"></i>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium">All transactions</p>
+        <p class="text-xs text-base-content/50">This rule will apply to every transaction. Use sparingly.</p>
+      </div>
+      <button type="button" class="btn btn-xs btn-outline rounded-lg" @click="addCondition()">
+        <i data-lucide="plus" class="w-3 h-3"></i> Add condition
+      </button>
+    </div>
 
-            <!-- Value: category picker -->
-            <template x-if="action.field === 'category'">
-              <select x-model="action.value" class="select select-bordered select-xs rounded-lg bg-base-100 flex-1 min-w-0">
-                <option value="">Select category...</option>
-                {{range .FlatCategories}}
-                <option value="{{.Slug}}">{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
-                {{end}}
-              </select>
-            </template>
-
-            <!-- Remove -->
-            <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg shrink-0" @click="removeAction(idx)" x-show="form.actions.length > 1">
-              <i data-lucide="x" class="w-3.5 h-3.5 text-base-content/40"></i>
-            </button>
+    <!-- Condition rows -->
+    <div class="space-y-2">
+      <template x-for="(cond, idx) in form.conditions" :key="idx">
+        <div class="flex items-center gap-2 p-2.5 bg-base-200/40 rounded-xl">
+          <!-- Conjunction label -->
+          <div class="w-10 shrink-0 text-center">
+            <span x-show="idx === 0" class="text-xs text-base-content/30 font-medium">IF</span>
+            <span x-show="idx > 0" class="text-xs font-medium" :class="form.logic === 'or' ? 'text-warning' : 'text-base-content/30'" x-text="form.logic.toUpperCase()"></span>
           </div>
-        </template>
-      </div>
+          <!-- Field -->
+          <select x-model="cond.field" @change="onFieldChange(idx)" class="select select-bordered select-xs rounded-lg bg-base-100 flex-1 min-w-0">
+            <option value="">Field...</option>
+            <option value="name">Name</option>
+            <option value="merchant_name">Merchant</option>
+            <option value="amount">Amount</option>
+            <option value="category_primary">Category (raw)</option>
+            <option value="category_detailed">Category detail</option>
+            <option value="provider">Provider</option>
+            <option value="user_name">Family member</option>
+            <option value="pending">Pending</option>
+          </select>
+          <!-- Operator -->
+          <select x-model="cond.op" @change="syncToJson()" class="select select-bordered select-xs rounded-lg bg-base-100 w-28 shrink-0">
+            <option value="contains" x-show="fieldType(cond.field) === 'string'">contains</option>
+            <option value="eq" x-show="fieldType(cond.field) === 'string'">equals</option>
+            <option value="neq" x-show="fieldType(cond.field) === 'string'">not equals</option>
+            <option value="not_contains" x-show="fieldType(cond.field) === 'string'">not contains</option>
+            <option value="matches" x-show="fieldType(cond.field) === 'string'">regex</option>
+            <option value="in" x-show="fieldType(cond.field) === 'string'">in list</option>
+            <option value="gte" x-show="fieldType(cond.field) === 'numeric'">&ge;</option>
+            <option value="lte" x-show="fieldType(cond.field) === 'numeric'">&le;</option>
+            <option value="eq" x-show="fieldType(cond.field) === 'numeric'">=</option>
+            <option value="gt" x-show="fieldType(cond.field) === 'numeric'">&gt;</option>
+            <option value="lt" x-show="fieldType(cond.field) === 'numeric'">&lt;</option>
+            <option value="neq" x-show="fieldType(cond.field) === 'numeric'">&ne;</option>
+            <option value="eq" x-show="fieldType(cond.field) === 'bool'">is</option>
+            <option value="neq" x-show="fieldType(cond.field) === 'bool'">is not</option>
+          </select>
+          <!-- Value -->
+          <select x-model="cond.value" x-show="fieldType(cond.field) === 'bool'" @change="syncToJson()" class="select select-bordered select-xs rounded-lg bg-base-100 w-20 shrink-0">
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+          <input type="number" x-model="cond.value" step="0.01" x-show="fieldType(cond.field) === 'numeric'" @input="syncToJson()" class="input input-bordered input-xs rounded-lg bg-base-100 w-24 shrink-0" placeholder="0.00" />
+          <input type="text" x-model="cond.value" x-show="fieldType(cond.field) === 'string'" @input="syncToJson()" class="input input-bordered input-xs rounded-lg bg-base-100 flex-1 min-w-0" placeholder="value..." />
+          <!-- Remove (always available — removing the last one switches to match-all) -->
+          <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg shrink-0" @click="removeCondition(idx)" :title="form.conditions.length === 1 ? 'Remove (rule will match all transactions)' : 'Remove'">
+            <i data-lucide="x" class="w-3.5 h-3.5 text-base-content/40"></i>
+          </button>
+        </div>
+      </template>
+    </div>
 
-      <div x-show="form.actions.length === 0" class="text-xs text-base-content/40 text-center py-4">
-        No actions configured. Click "Add" to add an action.
+    <!-- Advanced JSON toggle -->
+    <div class="mt-3">
+      <button type="button" class="text-xs text-base-content/40 hover:text-base-content/60 flex items-center gap-1" @click="showJsonEditor = !showJsonEditor">
+        <i data-lucide="code-2" class="w-3 h-3"></i>
+        <span x-text="showJsonEditor ? 'Hide JSON' : 'Edit as JSON'"></span>
+      </button>
+      <div x-show="showJsonEditor" x-cloak class="mt-2">
+        <textarea x-model="form.conditions_json" @input="syncFromJson()" class="textarea textarea-bordered textarea-sm font-mono text-xs rounded-xl w-full bg-base-200/50" rows="5" placeholder='{"field": "name", "op": "contains", "value": "uber"}'></textarea>
+        <p class="text-xs text-base-content/40 mt-1">Supports nested AND/OR/NOT trees. Visual builder handles simple cases.</p>
       </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="bb-card p-5 mb-4">
+    <div class="flex items-center justify-between mb-1">
+      <span class="label-text text-sm font-medium">Then</span>
+      <button type="button" class="btn btn-ghost btn-xs rounded-lg gap-1.5" @click="addAction()" :disabled="availableActionTypes().length === 0" :title="availableActionTypes().length === 0 ? 'All action types in use' : 'Add another action'">
+        <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add action
+      </button>
+    </div>
+    <p class="text-xs text-base-content/40 mb-3">Each rule can run one of each action type (set category, add tag, add comment).</p>
+
+    <div class="space-y-2">
+      <template x-for="(action, idx) in form.actions" :key="idx">
+        <div class="flex items-start gap-2 p-2.5 bg-base-200/40 rounded-xl">
+          <!-- Action type selector -->
+          <select x-model="action.field" @change="onActionTypeChange(idx)" class="select select-bordered select-xs rounded-lg bg-base-100 w-36 shrink-0 mt-px">
+            <template x-for="at in actionTypes" :key="at.value">
+              <option :value="at.value" x-text="at.label" :disabled="at.value !== action.field && isActionUsed(at.value)"></option>
+            </template>
+          </select>
+
+          <!-- Value: category picker -->
+          <template x-if="action.field === 'category'">
+            <select x-model="action.value" class="select select-bordered select-xs rounded-lg bg-base-100 flex-1 min-w-0 mt-px">
+              <option value="">Select category...</option>
+              {{range .FlatCategories}}
+              <option value="{{.Slug}}">{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
+              {{end}}
+            </select>
+          </template>
+
+          <!-- Value: tag slug input with autocomplete -->
+          <template x-if="action.field === 'tag'">
+            <div class="flex-1 min-w-0">
+              <input type="text" x-model="action.value" @input="validateTagSlug(idx)" list="bb-tag-slugs"
+                class="input input-bordered input-xs rounded-lg bg-base-100 w-full mt-px"
+                placeholder="needs-review, subscription:monthly, ..."
+                pattern="^[a-z0-9][a-z0-9\-:]*[a-z0-9]$" />
+              <p x-show="action.error" x-cloak class="text-[0.65rem] text-error mt-1" x-text="action.error"></p>
+              <p x-show="!action.error" class="text-[0.65rem] text-base-content/40 mt-1">Lowercase, hyphens or colons. e.g. <code>needs-review</code></p>
+            </div>
+          </template>
+
+          <!-- Value: comment textarea -->
+          <template x-if="action.field === 'comment'">
+            <div class="flex-1 min-w-0">
+              <textarea x-model="action.value" rows="2"
+                class="textarea textarea-bordered textarea-xs rounded-lg bg-base-100 w-full text-xs"
+                placeholder="Comment to attach to matching transactions..."></textarea>
+              <p class="text-[0.65rem] text-base-content/40 mt-1">Plain text. The comment is attributed to this rule.</p>
+            </div>
+          </template>
+
+          <!-- Remove -->
+          <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg shrink-0 mt-px" @click="removeAction(idx)" :disabled="form.actions.length === 1" :title="form.actions.length === 1 ? 'A rule needs at least one action' : 'Remove this action'">
+            <i data-lucide="x" class="w-3.5 h-3.5 text-base-content/40"></i>
+          </button>
+        </div>
+      </template>
+    </div>
+
+    <!-- Datalist for tag autocomplete -->
+    {{if .Tags}}
+    <datalist id="bb-tag-slugs">
+      {{range .Tags}}<option value="{{.Slug}}">{{.DisplayName}}</option>{{end}}
+    </datalist>
+    {{end}}
+
+    <div x-show="form.actions.length === 0" class="text-xs text-base-content/40 text-center py-4">
+      No actions configured. Click "Add action" to add one.
     </div>
   </div>
 
   <!-- Settings -->
-  <div class="p-5 sm:p-6 border-t border-base-300">
-    <div class="bb-icon-header">
-      <div class="bb-icon-header__tile bb-icon-tile--primary">
-        <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+  <div class="bb-card p-5 mb-6">
+    <span class="label-text text-sm font-medium">Settings</span>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+      <div class="form-control">
+        <label class="label" for="rule-trigger"><span class="label-text text-xs text-base-content/60">Trigger</span></label>
+        <select id="rule-trigger" x-model="form.trigger" class="select select-bordered select-sm rounded-xl bg-base-200">
+          <option value="on_create">On create</option>
+          <option value="on_update">On update</option>
+          <option value="always">Always</option>
+        </select>
+        <p class="text-xs text-base-content/40 mt-1" x-show="form.trigger === 'on_create'">Fires only when a transaction is first synced.</p>
+        <p class="text-xs text-base-content/40 mt-1" x-show="form.trigger === 'on_update'">Fires only when an existing transaction changes.</p>
+        <p class="text-xs text-base-content/40 mt-1" x-show="form.trigger === 'always'">Fires on every sync that touches the transaction.</p>
       </div>
-      <div class="bb-icon-header__text">
-        <h2 class="text-sm font-semibold">Settings</h2>
-        <p class="text-xs text-base-content/45">Rule priority</p>
+      <div class="form-control">
+        <label class="label" for="rule-priority"><span class="label-text text-xs text-base-content/60">Priority</span></label>
+        <input id="rule-priority" type="number" x-model.number="form.priority" class="input input-bordered input-sm rounded-xl bg-base-200/50" min="0" max="1000" />
+        <p class="text-xs text-base-content/40 mt-1">Higher priority wins when multiple rules set the same field</p>
       </div>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="rule_priority">Priority</label>
-      <input type="number" id="rule_priority" x-model.number="form.priority" class="bb-form-input" min="0" max="1000" />
-      <p class="text-xs text-base-content/40 mt-1.5">Higher priority wins when multiple rules set the same field</p>
+      <div class="form-control" x-show="!isEdit">
+        <label class="label" for="rule-expires-in"><span class="label-text text-xs text-base-content/60">Expires in</span></label>
+        <input id="rule-expires-in" type="text" x-model="form.expires_in" class="input input-bordered input-sm rounded-xl bg-base-200/50" placeholder="e.g., 30d" />
+        <p class="text-xs text-base-content/40 mt-1">24h, 7d, 4w, or leave empty for never</p>
+      </div>
     </div>
   </div>
 
-  <!-- Review & save -->
-  <div class="p-5 sm:p-6 border-t border-base-300">
-    <!-- Rule summary -->
-    <div class="p-3 rounded-xl bg-base-200/40 border border-base-300/50 mb-4">
-      <p class="text-[0.65rem] font-semibold tracking-wider uppercase text-base-content/40 mb-1.5 flex items-center gap-1.5">
-        <i data-lucide="sparkles" class="w-3 h-3"></i>
-        Rule summary
-      </p>
-      <p class="text-sm text-base-content/70 leading-snug" x-html="ruleSummary"></p>
-    </div>
-
-    <!-- Apply retroactively -->
-    <label class="flex items-start gap-3 p-3 rounded-xl bg-base-200/40 border border-base-300/50 cursor-pointer hover:bg-base-200/60 transition-colors">
-      <input type="checkbox" x-model="form.apply_retroactively" class="checkbox checkbox-sm checkbox-primary mt-0.5" />
-      <span class="flex-1">
-        <span class="text-sm font-medium block">Apply to existing transactions</span>
-        <span class="text-xs text-base-content/50">Re-categorize matching transactions already in your database. Otherwise the rule only applies to future syncs.</span>
-      </span>
-    </label>
-
-    <template x-if="formError">
-      <div role="alert" class="bb-form-error mt-4">
-        <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
-        <span x-text="formError"></span>
-      </div>
-    </template>
+  <!-- Error -->
+  <div x-show="formError" x-cloak role="alert" class="alert alert-error text-sm mb-4 rounded-xl">
+    <span x-text="formError"></span>
   </div>
 
-  <!-- Action row -->
-  <div class="bb-action-row justify-between">
-    <button type="button" @click="previewMatches()" :disabled="previewing || !canPreview" class="btn btn-sm btn-ghost rounded-xl gap-1.5">
-      <i data-lucide="play" class="w-3.5 h-3.5" x-show="!previewing"></i>
-      <span x-show="previewing" class="loading loading-spinner loading-xs"></span>
-      <span x-text="previewing ? 'Previewing…' : 'Run preview'"></span>
+  <!-- Submit -->
+  <div class="flex items-center justify-end gap-3">
+    <a href="/rules" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
+    <button type="submit" class="btn btn-primary btn-sm rounded-xl" :disabled="submitting">
+      <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+      <span x-text="isEdit ? 'Save Changes' : 'Create Rule'"></span>
     </button>
-    <div class="flex items-center gap-2">
-      <a href="/rules" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
-      <button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32" :disabled="submitting">
-        <span x-show="!submitting" class="inline-flex items-center gap-1.5">
-          <i data-lucide="save" class="w-3.5 h-3.5" x-show="isEdit"></i>
-          <i data-lucide="plus" class="w-3.5 h-3.5" x-show="!isEdit"></i>
-          <span x-text="isEdit ? 'Save Changes' : 'Create Rule'"></span>
-        </span>
-        <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-      </button>
-    </div>
   </div>
 
-  </div>
 </form>
-
-<!-- Preview modal — teleported to <body> because main has a transform which
-     creates a new containing block for position:fixed, making the dialog's
-     bounds shrink to main's width when it leaves the top layer on close. -->
-<template x-teleport="body">
-<dialog id="rule-preview-modal" class="modal modal-bottom sm:modal-middle">
-  <div class="modal-box rounded-xl max-w-lg">
-    <div class="bb-icon-header">
-      <div class="bb-icon-header__tile bb-icon-tile--success">
-        <i data-lucide="search" class="w-5 h-5"></i>
-      </div>
-      <div class="bb-icon-header__text">
-        <h2 class="text-sm font-semibold">Preview matches</h2>
-        <p class="text-xs text-base-content/45">Dry-run against existing transactions — nothing is changed.</p>
-      </div>
-    </div>
-
-    <template x-if="previewError">
-      <div role="alert" class="bb-form-error">
-        <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
-        <span x-text="previewError"></span>
-      </div>
-    </template>
-
-    <template x-if="previewing && !previewResult && !previewError">
-      <div class="flex items-center justify-center py-6">
-        <span class="loading loading-spinner loading-md text-base-content/40"></span>
-      </div>
-    </template>
-
-    <template x-if="previewResult">
-      <div>
-        <!-- Match count -->
-        <div class="flex items-baseline gap-2 mb-3">
-          <span class="text-2xl font-semibold tabular-nums" x-text="previewResult.match_count.toLocaleString()"></span>
-          <span class="text-sm text-base-content/50">
-            <span x-text="previewResult.match_count === 1 ? 'transaction' : 'transactions'"></span>
-            would match
-            <span class="text-base-content/30">· scanned <span x-text="previewResult.total_scanned.toLocaleString()"></span></span>
-          </span>
-        </div>
-
-        <!-- Sample list -->
-        <template x-if="previewResult.sample_matches && previewResult.sample_matches.length > 0">
-          <div class="rounded-xl border border-base-300/60 overflow-hidden divide-y divide-base-300/50">
-            <template x-for="sample in previewResult.sample_matches" :key="sample.transaction_id">
-              <div class="px-3 py-2 flex items-center gap-3 bg-base-100">
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium truncate" x-text="sample.name"></p>
-                  <p class="text-xs text-base-content/40 truncate">
-                    <span x-text="sample.date"></span>
-                    <template x-if="sample.current_category_slug">
-                      <span>
-                        <span class="text-base-content/20">·</span>
-                        current: <span class="font-mono text-[0.7rem]" x-text="sample.current_category_slug"></span>
-                      </span>
-                    </template>
-                    <template x-if="!sample.current_category_slug && sample.category_primary_raw">
-                      <span>
-                        <span class="text-base-content/20">·</span>
-                        <span class="font-mono text-[0.7rem]" x-text="sample.category_primary_raw"></span>
-                      </span>
-                    </template>
-                  </p>
-                </div>
-                <span class="text-sm font-semibold tabular-nums shrink-0" :class="sample.amount < 0 ? 'text-success' : ''" x-text="formatAmount(sample.amount)"></span>
-              </div>
-            </template>
-          </div>
-        </template>
-
-        <template x-if="previewResult.match_count > previewResult.sample_matches.length">
-          <p class="text-xs text-base-content/40 mt-2" x-text="'+ ' + (previewResult.match_count - previewResult.sample_matches.length).toLocaleString() + ' more match' + (previewResult.match_count - previewResult.sample_matches.length === 1 ? '' : 'es')"></p>
-        </template>
-
-        <template x-if="previewResult.match_count === 0">
-          <p class="text-sm text-base-content/45 italic">No transactions currently match these conditions.</p>
-        </template>
-      </div>
-    </template>
-
-    <div class="modal-action mt-6">
-      <form method="dialog">
-        <button class="btn btn-sm btn-ghost rounded-xl">Close</button>
-      </form>
-    </div>
-  </div>
-</dialog>
-</template>
 </div>
 
 <script>
@@ -340,39 +252,38 @@ function ruleForm() {
     pending: 'bool', provider: 'string', account_id: 'string',
     user_id: 'string', user_name: 'string'
   };
-  const fieldLabels = {
-    name: 'name', merchant_name: 'merchant', amount: 'amount',
-    category_primary: 'raw category', category_detailed: 'category detail',
-    pending: 'pending', provider: 'provider',
-    user_name: 'family member', user_id: 'family member',
-    account_id: 'account'
-  };
-  const opLabels = {
-    contains: 'contains', not_contains: 'does not contain',
-    eq: 'equals', neq: 'does not equal',
-    matches: 'matches regex', in: 'is one of',
-    gte: '≥', lte: '≤', gt: '>', lt: '<'
-  };
   const defaultOps = { string: 'contains', numeric: 'gte', bool: 'eq' };
   const emptyCondition = () => ({ field: 'name', op: 'contains', value: '' });
 
-  // Action type registry — extend this as new action types are added
+  // Action type registry — first-class typed actions match the API's three
+  // supported action.type values (set_category | add_tag | add_comment).
+  // The internal "field" name is a UI alias; we map back at submit time.
   const actionTypes = [
     { value: 'category', label: 'Set category' },
-    // future: { value: 'merchant_name', label: 'Set merchant name' },
-    // future: { value: 'notes', label: 'Add note' },
+    { value: 'tag',      label: 'Add tag' },
+    { value: 'comment',  label: 'Add comment' },
   ];
+
+  // Tag slug regex must match the server-side validator in
+  // internal/service/rules.go (tagSlugPattern).
+  const tagSlugRegex = /^[a-z0-9][a-z0-9\-:]*[a-z0-9]$/;
 
   const existingRule = {{ if .IsEdit }}{{ toJSON .Rule }}{{ else }}null{{ end }};
 
-  // Category slug -> display name lookup for live summary + preview
-  const flatCategories = {{ toJSON .FlatCategories }} || [];
-  const categoryNames = Object.fromEntries(flatCategories.map(c => {
-    const label = c.parent_display_name ? c.parent_display_name + ' › ' + c.display_name : c.display_name;
-    return [c.slug, label];
-  }));
-
-  const escapeHtml = (s) => String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[ch]));
+  // Map the API's typed action shape onto the form's UI-side {field,value} pair.
+  function actionToForm(a) {
+    if (a.type === 'set_category' || a.field === 'category') {
+      return { field: 'category', value: a.category_slug || a.value || '', error: '' };
+    }
+    if (a.type === 'add_tag') {
+      return { field: 'tag', value: a.tag_slug || '', error: '' };
+    }
+    if (a.type === 'add_comment') {
+      return { field: 'comment', value: a.content || '', error: '' };
+    }
+    // Tolerate unknown types so the form still loads — validation happens at submit.
+    return { field: a.type || a.field || 'category', value: a.category_slug || a.tag_slug || a.content || a.value || '', error: '' };
+  }
 
   // Initialize form from existing rule or defaults
   function initForm() {
@@ -380,16 +291,18 @@ function ruleForm() {
       return {
         name: '',
         priority: 10,
+        trigger: 'on_create',
         logic: 'and',
         conditions: [emptyCondition()],
         conditions_json: '',
-        actions: [{ field: 'category', value: '' }],
-        apply_retroactively: false
+        actions: [{ field: 'category', value: '', error: '' }],
+        expires_in: ''
       };
     }
 
-    // Parse conditions
-    let conditions, logic = 'and';
+    // Parse conditions. NULL/empty conditions = match-all → empty conditions array
+    // and the form renders the "All transactions" banner.
+    let conditions = [], logic = 'and';
     const c = existingRule.conditions;
     if (c && c.and) {
       conditions = c.and.map(sub => ({ field: sub.field || '', op: sub.op || 'contains', value: String(sub.value ?? '') }));
@@ -399,38 +312,27 @@ function ruleForm() {
       logic = 'or';
     } else if (c && c.field) {
       conditions = [{ field: c.field, op: c.op || 'contains', value: String(c.value ?? '') }];
-    } else {
-      conditions = [emptyCondition()];
     }
+    // else: NULL or empty {} → conditions stays [] (match-all)
 
     // Parse actions (Phase 1 typed shape: {type, category_slug|tag_slug|content})
-    let actions = (existingRule.actions || []).map(a => {
-      if (a.type === 'set_category' || a.field === 'category') {
-        return { field: 'category', value: a.category_slug || a.value || '' };
-      }
-      if (a.type === 'add_tag') {
-        return { field: 'tag', value: a.tag_slug || '' };
-      }
-      if (a.type === 'add_comment') {
-        return { field: 'comment', value: a.content || '' };
-      }
-      return { field: a.type || a.field || 'category', value: a.category_slug || a.value || '' };
-    });
+    let actions = (existingRule.actions || []).map(actionToForm);
     if (actions.length === 0 && existingRule.category_slug) {
-      actions = [{ field: 'category', value: existingRule.category_slug }];
+      actions = [{ field: 'category', value: existingRule.category_slug, error: '' }];
     }
     if (actions.length === 0) {
-      actions = [{ field: 'category', value: '' }];
+      actions = [{ field: 'category', value: '', error: '' }];
     }
 
     return {
       name: existingRule.name,
       priority: existingRule.priority,
+      trigger: existingRule.trigger || 'on_create',
       logic,
       conditions,
-      conditions_json: JSON.stringify(existingRule.conditions, null, 2),
+      conditions_json: existingRule.conditions ? JSON.stringify(existingRule.conditions, null, 2) : '',
       actions,
-      apply_retroactively: false
+      expires_in: ''
     };
   }
 
@@ -441,93 +343,10 @@ function ruleForm() {
     showJsonEditor: false,
     submitting: false,
     formError: '',
-    previewing: false,
-    previewResult: null,
-    previewError: '',
     actionTypes,
     form: initForm(),
 
     fieldType(field) { return fieldTypes[field] || 'string'; },
-
-    formatAmount(n) {
-      const abs = Math.abs(n);
-      const sign = n < 0 ? '−' : '';
-      return sign + '$' + abs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    },
-
-    // Computed: can the preview button run?
-    get canPreview() {
-      return this.form.conditions.some(c => c.field && c.value !== '');
-    },
-
-    // Computed: natural-language summary of the rule
-    get ruleSummary() {
-      const validConditions = this.form.conditions.filter(c => c.field && c.value !== '');
-      const validActions = this.form.actions.filter(a => a.field && a.value);
-
-      const fmtVal = (field, value) => {
-        const t = this.fieldType(field);
-        if (t === 'numeric') return '<span class="font-semibold">' + escapeHtml(value) + '</span>';
-        if (t === 'bool') return '<span class="font-semibold">' + (value === 'true' ? 'true' : 'false') + '</span>';
-        return '<span class="font-semibold">"' + escapeHtml(value) + '"</span>';
-      };
-
-      if (validConditions.length === 0) {
-        return '<span class="italic text-base-content/40">Add at least one condition to see the rule.</span>';
-      }
-
-      const condParts = validConditions.map(c => {
-        const field = '<span class="font-medium text-base-content">' + escapeHtml(fieldLabels[c.field] || c.field) + '</span>';
-        const op = escapeHtml(opLabels[c.op] || c.op);
-        return field + ' ' + op + ' ' + fmtVal(c.field, c.value);
-      });
-
-      const conj = this.form.logic === 'or' ? 'or' : 'and';
-      const conditionPart = condParts.join(' <span class="text-base-content/40">' + conj + '</span> ');
-
-      if (validActions.length === 0) {
-        return '<span class="text-base-content/40">When</span> ' + conditionPart + ', <span class="italic text-base-content/40">add an action to complete the rule.</span>';
-      }
-
-      const actionParts = validActions.map(a => {
-        if (a.field === 'category') {
-          const label = categoryNames[a.value] || a.value;
-          return 'set category to <span class="font-semibold">' + escapeHtml(label) + '</span>';
-        }
-        return escapeHtml(a.field) + ' = ' + escapeHtml(a.value);
-      });
-
-      return '<span class="text-base-content/40">When</span> ' + conditionPart + ', <span class="text-base-content/40">then</span> ' + actionParts.join(', ') + '.';
-    },
-
-    async previewMatches() {
-      if (!this.canPreview) return;
-      this.previewing = true;
-      this.previewError = '';
-      this.previewResult = null;
-      // Open the modal immediately so the user sees the loading state there
-      const modal = document.getElementById('rule-preview-modal');
-      if (modal && typeof modal.showModal === 'function') modal.showModal();
-      try {
-        const conditions = this.buildConditionsJSON();
-        const resp = await fetch('/-/rules/preview', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conditions, sample_size: 5 })
-        });
-        const data = await resp.json();
-        if (!resp.ok) {
-          this.previewError = data.error?.message || data.error || 'Preview failed';
-        } else {
-          this.previewResult = data;
-          this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
-        }
-      } catch (e) {
-        this.previewError = 'Network error: ' + e.message;
-      } finally {
-        this.previewing = false;
-      }
-    },
 
     restorePageState() {
       const main = document.querySelector('main');
@@ -572,7 +391,7 @@ function ruleForm() {
     addAction() {
       const available = this.availableActionTypes();
       if (available.length > 0) {
-        this.form.actions.push({ field: available[0].value, value: '' });
+        this.form.actions.push({ field: available[0].value, value: '', error: '' });
         this.$nextTick(() => lucide.createIcons());
       }
     },
@@ -581,6 +400,17 @@ function ruleForm() {
     },
     onActionTypeChange(idx) {
       this.form.actions[idx].value = '';
+      this.form.actions[idx].error = '';
+    },
+    // Validate tag slug inline so the error renders before submit
+    validateTagSlug(idx) {
+      const a = this.form.actions[idx];
+      if (!a) return;
+      if (a.value && !tagSlugRegex.test(a.value)) {
+        a.error = 'Lowercase letters, numbers, hyphens, or colons (e.g. needs-review)';
+      } else {
+        a.error = '';
+      }
     },
 
     // JSON sync
@@ -603,9 +433,12 @@ function ruleForm() {
       } catch (e) { /* let them type freely */ }
     },
 
+    // Build the JSON shape the API expects from the visual condition rows.
+    // Returns null when the user has no conditions (match-all), so the JSON
+    // body sends `conditions: null` and the server stores NULL.
     buildConditionsJSON() {
       const conds = this.form.conditions.filter(c => c.field && c.value !== '');
-      if (conds.length === 0) return {};
+      if (conds.length === 0) return null;
       const mapped = conds.map(c => {
         let val = c.value;
         if (this.fieldType(c.field) === 'numeric') val = parseFloat(val) || 0;
@@ -625,6 +458,10 @@ function ruleForm() {
       if (this.showJsonEditor && this.form.conditions_json.trim()) {
         try {
           conditions = JSON.parse(this.form.conditions_json);
+          // Treat empty object as match-all (server stores NULL).
+          if (conditions && typeof conditions === 'object' && Object.keys(conditions).length === 0) {
+            conditions = null;
+          }
         } catch (e) {
           this.formError = 'Invalid JSON in conditions: ' + e.message;
           this.submitting = false;
@@ -632,24 +469,35 @@ function ruleForm() {
           return;
         }
       } else {
-        conditions = this.buildConditionsJSON();
-        if (!conditions || Object.keys(conditions).length === 0) {
-          this.formError = 'At least one condition with a value is required';
-          this.submitting = false;
-          this.restorePageState();
-          return;
+        conditions = this.buildConditionsJSON(); // null when no conditions = match-all
+      }
+
+      // Per-action validation (tag slug shape, missing values).
+      let actionError = '';
+      this.form.actions.forEach(a => {
+        if (a.field === 'tag' && a.value && !tagSlugRegex.test(a.value)) {
+          a.error = 'Lowercase letters, numbers, hyphens, or colons (e.g. needs-review)';
+          actionError = actionError || 'Fix the tag slug before saving.';
         }
+      });
+      if (actionError) {
+        this.formError = actionError;
+        this.submitting = false;
+        this.restorePageState();
+        return;
       }
 
       // Build typed actions array for the API
-      const actions = this.form.actions.filter(a => a.field && a.value).map(a => {
-        if (a.field === 'category') return { type: 'set_category', category_slug: a.value };
-        if (a.field === 'tag') return { type: 'add_tag', tag_slug: a.value };
-        if (a.field === 'comment') return { type: 'add_comment', content: a.value };
-        return { type: a.field, category_slug: a.value };
-      });
+      const actions = this.form.actions
+        .filter(a => a.field && (a.value !== undefined && a.value !== ''))
+        .map(a => {
+          if (a.field === 'category') return { type: 'set_category', category_slug: a.value };
+          if (a.field === 'tag') return { type: 'add_tag', tag_slug: a.value };
+          if (a.field === 'comment') return { type: 'add_comment', content: a.value };
+          return { type: a.field, category_slug: a.value };
+        });
       if (actions.length === 0) {
-        this.formError = 'At least one action is required';
+        this.formError = 'At least one action with a value is required';
         this.submitting = false;
         this.restorePageState();
         return;
@@ -660,8 +508,12 @@ function ruleForm() {
           name: this.form.name,
           conditions,
           actions,
+          trigger: this.form.trigger || 'on_create',
           priority: this.form.priority,
         };
+        if (!this.isEdit) {
+          body.expires_in = this.form.expires_in || undefined;
+        }
 
         const url = this.isEdit ? '/-/rules/' + this.editingId : '/-/rules';
         const method = this.isEdit ? 'PUT' : 'POST';
@@ -678,19 +530,6 @@ function ruleForm() {
           this.submitting = false;
           this.restorePageState();
           return;
-        }
-
-        // If the user asked to apply the rule retroactively, do that now.
-        if (this.form.apply_retroactively) {
-          const saved = await resp.json();
-          const ruleId = saved.id || this.editingId;
-          if (ruleId) {
-            try {
-              await fetch('/-/rules/' + ruleId + '/apply', { method: 'POST' });
-            } catch (_) {
-              // Non-fatal: the rule is saved, the apply step just failed silently.
-            }
-          }
         }
 
         window.location.href = '/rules';
