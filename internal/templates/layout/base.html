@@ -138,7 +138,10 @@
     </template>
   </div>
 
-  <!-- Global toast (centered floating pill) -->
+  <!-- Global toast (centered floating pill). Also flushes any
+       session-persisted toast (e.g. queued before a full-page reload by the
+       bulk action bar), which dispatching bb-toast from a DOMContentLoaded
+       handler is too early to deliver reliably. -->
   <div class="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none"
        x-data="{ toasts: [] }"
        @bb-toast.window="
