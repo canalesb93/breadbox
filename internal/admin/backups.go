@@ -37,6 +37,7 @@ func BackupsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 
 		schedule := a.Service.GetBackupSchedule(ctx)
 		retentionDays := a.Service.GetBackupRetentionDays(ctx)
+		preflight := a.BackupService.Preflight(ctx)
 
 		data := BaseTemplateData(r, sm, "backups", "Backups")
 		data["Backups"] = backups
@@ -47,6 +48,8 @@ func BackupsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		data["HasEncryptionKey"] = len(a.Config.EncryptionKey) > 0
 		data["DatabaseName"] = service.ParseDatabaseName(a.Config.DatabaseURL)
 		data["BackupDir"] = a.BackupService.BackupDir()
+		data["PreflightOK"] = preflight.OK
+		data["PreflightMessage"] = preflight.Message
 		tr.Render(w, r, "backups.html", data)
 	}
 }

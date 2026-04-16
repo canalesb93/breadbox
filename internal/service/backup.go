@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,9 +60,8 @@ func (bs *BackupService) CreateBackup(ctx context.Context, trigger string) (stri
 		return "", fmt.Errorf("create backup directory: %w", err)
 	}
 
-	// Check that pg_dump is available.
-	if _, err := exec.LookPath("pg_dump"); err != nil {
-		return "", fmt.Errorf("pg_dump not found on PATH: %w", err)
+	if pf := bs.Preflight(ctx); !pf.OK {
+		return "", fmt.Errorf("%s", pf.Message)
 	}
 
 	timestamp := time.Now().UTC().Format("20060102_150405")
@@ -370,6 +370,94 @@ func parseTriggerFromFilename(filename string) string {
 		}
 	}
 	return "unknown"
+}
+
+// PreflightResult reports whether backup tooling is usable on this host.
+type PreflightResult struct {
+	OK              bool
+	PgDumpAvailable bool
+	PsqlAvailable   bool
+	PgDumpMajor     int
+	PsqlMajor       int
+	ServerMajor     int
+	Message         string
+}
+
+var pgVersionRe = regexp.MustCompile(`\b(\d+)\.\d+`)
+
+// Preflight checks that pg_dump and psql are on PATH and that their major
+// version is at least the server's. pg_dump refuses to dump a newer server,
+// so a mismatch is a blocker, not a warning.
+func (bs *BackupService) Preflight(ctx context.Context) PreflightResult {
+	var res PreflightResult
+
+	if _, err := exec.LookPath("pg_dump"); err == nil {
+		res.PgDumpAvailable = true
+		res.PgDumpMajor = parseClientMajor(ctx, "pg_dump")
+	}
+	if _, err := exec.LookPath("psql"); err == nil {
+		res.PsqlAvailable = true
+		res.PsqlMajor = parseClientMajor(ctx, "psql")
+	}
+
+	if !res.PgDumpAvailable || !res.PsqlAvailable {
+		var missing []string
+		if !res.PgDumpAvailable {
+			missing = append(missing, "pg_dump")
+		}
+		if !res.PsqlAvailable {
+			missing = append(missing, "psql")
+		}
+		res.Message = fmt.Sprintf("Missing tool(s) on PATH: %s. Install the PostgreSQL client (e.g. postgresql-client package) on the host.", strings.Join(missing, ", "))
+		return res
+	}
+
+	res.ServerMajor = queryServerMajor(ctx, bs.databaseURL)
+
+	if res.ServerMajor > 0 && res.PgDumpMajor > 0 && res.PgDumpMajor < res.ServerMajor {
+		res.Message = fmt.Sprintf(
+			"pg_dump is version %d but the database server is version %d. pg_dump refuses to dump a newer server. Install postgresql-client ≥ %d on the host.",
+			res.PgDumpMajor, res.ServerMajor, res.ServerMajor,
+		)
+		return res
+	}
+
+	res.OK = true
+	return res
+}
+
+// parseClientMajor runs `<tool> --version` and extracts the major version.
+// Returns 0 if parsing fails — callers treat that as "unknown, proceed".
+func parseClientMajor(ctx context.Context, tool string) int {
+	out, err := exec.CommandContext(ctx, tool, "--version").Output()
+	if err != nil {
+		return 0
+	}
+	m := pgVersionRe.FindStringSubmatch(string(out))
+	if len(m) < 2 {
+		return 0
+	}
+	major, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0
+	}
+	return major
+}
+
+// queryServerMajor asks the server for its version via `psql -t -c 'SHOW server_version_num'`.
+// server_version_num is formatted as MMmmpp since PG 10 (e.g. 160013 → major 16).
+// Returns 0 on any failure.
+func queryServerMajor(ctx context.Context, databaseURL string) int {
+	cmd := exec.CommandContext(ctx, "psql", "-t", "-A", "-X", "-c", "SHOW server_version_num", databaseURL)
+	out, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+	verNum, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil || verNum == 0 {
+		return 0
+	}
+	return verNum / 10000
 }
 
 // FormatBytes formats a byte count into a human-readable string.
