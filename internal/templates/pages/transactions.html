@@ -569,27 +569,27 @@ document.addEventListener('DOMContentLoaded', function() {
   bar.id = 'bb-bulk-bar';
   bar.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;z-index:40;opacity:0;transform:translateX(-50%) translateY(1rem);pointer-events:none;transition:opacity 0.2s ease,transform 0.2s ease';
   bar.innerHTML = '<div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-2xl shadow-lg px-4 py-2.5 max-w-[calc(100vw-2rem)]">'
-    + '<div class="flex items-center gap-2 text-sm shrink-0">'
-    + '<span id="bb-bulk-count" class="flex items-center justify-center w-6 h-6 bg-primary text-primary-content rounded-lg text-xs font-bold tabular-nums">0</span>'
-    + '<span class="text-base-content/70 font-medium hidden sm:inline">selected</span>'
-    + '</div>'
-    + '<div class="w-px h-6 bg-base-300"></div>'
-    + '<button type="button" id="bb-bulk-uncat" class="btn btn-ghost btn-sm rounded-xl text-xs gap-2" title="Select all uncategorized on this page">'
-    + '<i data-lucide="circle-off" class="w-3.5 h-3.5"></i>'
-    + '<span class="hidden sm:inline">Uncategorized</span>'
+    + '<button type="button" id="bb-bulk-count-toggle" class="flex items-center gap-2 text-sm shrink-0 px-1 -mx-1 rounded-lg hover:bg-base-200 transition-colors cursor-pointer" title="Select all / clear">'
+    +   '<span id="bb-bulk-count" class="flex items-center justify-center w-6 h-6 bg-base-200 text-base-content rounded-lg text-xs font-bold tabular-nums">0</span>'
+    +   '<span class="text-base-content/70 font-medium hidden sm:inline">selected</span>'
     + '</button>'
     + '<div class="w-px h-6 bg-base-300"></div>'
-    + '<button type="button" id="bb-bulk-categorize" class="btn btn-primary btn-sm rounded-xl gap-2">'
-    + '<i data-lucide="tags" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Categorize</span>'
-    + '</button>'
     + '<button type="button" id="bb-bulk-tag" class="btn btn-ghost btn-sm rounded-xl gap-2" title="Tag selected">'
-    + '<i data-lucide="tag" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Tag</span>'
+    +   '<i data-lucide="tag" class="w-3.5 h-3.5"></i>'
+    +   '<span class="hidden sm:inline">Tag</span>'
+    +   '<kbd class="bb-kbd">t</kbd>'
     + '</button>'
     + '<button type="button" id="bb-bulk-comment" class="btn btn-ghost btn-sm rounded-xl gap-2" title="Add comment">'
-    + '<i data-lucide="message-square" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Comment</span>'
+    +   '<i data-lucide="message-square" class="w-3.5 h-3.5"></i>'
+    +   '<span class="hidden sm:inline">Comment</span>'
     + '</button>'
-    + '<button type="button" id="bb-bulk-clear" class="btn btn-ghost btn-sm btn-square rounded-xl" title="Clear selection">'
-    + '<i data-lucide="x" class="w-4 h-4"></i>'
+    + '<button type="button" id="bb-bulk-categorize" class="btn btn-ghost btn-sm rounded-xl gap-2" title="Categorize selected">'
+    +   '<i data-lucide="tags" class="w-3.5 h-3.5"></i>'
+    +   '<span class="hidden sm:inline">Categorize</span>'
+    +   '<kbd class="bb-kbd">c</kbd>'
+    + '</button>'
+    + '<button type="button" id="bb-bulk-clear" class="btn btn-ghost btn-sm btn-square rounded-xl" title="Exit select mode">'
+    +   '<i data-lucide="x" class="w-4 h-4"></i>'
     + '</button>'
     + '</div>';
   document.body.appendChild(bar);
@@ -616,8 +616,11 @@ document.addEventListener('DOMContentLoaded', function() {
     + '</dialog>';
   document.body.appendChild(modal);
 
-  document.getElementById('bb-bulk-uncat').addEventListener('click', function() {
-    Alpine.store('bulk').selectUncategorized();
+  document.getElementById('bb-bulk-count-toggle').addEventListener('click', function() {
+    // Gmail-style: clicking the count toggles between "select all on this page"
+    // and "clear all". Gives the user a one-click path to each extreme without
+    // hunting for a menu.
+    Alpine.store('bulk').toggleAll();
   });
   document.getElementById('bb-bulk-categorize').addEventListener('click', function() {
     window.dispatchEvent(new CustomEvent('open-category-picker', {
@@ -807,23 +810,45 @@ document.addEventListener('alpine:init', function() {
       this._updateBar();
     },
 
-    selectUncategorized() {
-      var uncatIds = (window.__bbTxMeta || []).filter(function(t) { return !t.hasCat; }).map(function(t) { return t.id; });
-      if (uncatIds.length === 0) {
-        window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'All transactions on this page are categorized', type:'info'}}));
-        return;
-      }
-      var self = this;
-      uncatIds.forEach(function(id) { self.selSet.add(id); });
-      this._syncAllRows();
-      this._updateBar();
-      window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: uncatIds.length + ' uncategorized selected', type:'success'}}));
-    },
-
     clear() {
       this.selSet = new Set();
       this._syncAllRows();
       this._updateBar();
+    },
+
+    // Persist selection to sessionStorage so bulk actions that require a page
+    // reload (categorize, comment) can restore it afterward. Keyed and TTL'd
+    // so stale state doesn't leak across unrelated navigation.
+    _persistSelection() {
+      try {
+        sessionStorage.setItem('bb-bulk-selection', JSON.stringify({
+          ids: this.sel,
+          ts: Date.now(),
+          path: location.pathname + location.search,
+        }));
+      } catch (e) { /* quota / private mode — selection is nice-to-have */ }
+    },
+
+    _restoreSelection() {
+      try {
+        var raw = sessionStorage.getItem('bb-bulk-selection');
+        if (!raw) return;
+        sessionStorage.removeItem('bb-bulk-selection');
+        var saved = JSON.parse(raw);
+        if (!saved || !saved.ids || !saved.ids.length) return;
+        // Only restore if this is the same list view within the last 30s —
+        // beyond that it's almost certainly stale.
+        if (Date.now() - saved.ts > 30000) return;
+        if (saved.path !== location.pathname + location.search) return;
+        var onPage = new Set((window.__bbTxMeta || []).map(function(t) { return t.id; }));
+        var restored = saved.ids.filter(function(id) { return onPage.has(id); });
+        if (restored.length === 0) return;
+        this.selSet = new Set(restored);
+        this.selecting = true;
+        this._updateBar();
+        this._updateRowVisibility();
+        this._syncAllRows();
+      } catch (e) {}
     },
 
     categorize(categoryId) {
@@ -847,6 +872,7 @@ document.addEventListener('alpine:init', function() {
               type: data.failed > 0 ? 'warning' : 'success'
             }
           }));
+          self._persistSelection();
           setTimeout(function() { window.location.reload(); }, 800);
         } else {
           window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Failed to categorize transactions', type:'error'}}));
@@ -898,10 +924,13 @@ document.addEventListener('alpine:init', function() {
           self.processing = false;
           var msg = totalSucceeded + ' transaction' + (totalSucceeded === 1 ? '' : 's') + ' updated' + (totalFailed > 0 ? ' (' + totalFailed + ' failed)' : '');
           window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: msg, type: totalFailed > 0 ? 'warning' : 'success'}}));
-          // Tag-only updates already reflect in the DOM — skip the reload.
-          if (totalSucceeded > 0 && !isTagOnly) setTimeout(function() { window.location.reload(); }, 800);
-          // After applying a bulk action, drop selection mode so the bar collapses.
-          if (isTagOnly && totalSucceeded > 0 && self.selecting) self.toggleMode();
+          // Tag-only updates already reflect in the DOM — skip the reload. For
+          // category/comment changes we reload but persist selection across the
+          // round-trip so the user can chain more bulk actions.
+          if (totalSucceeded > 0 && !isTagOnly) {
+            self._persistSelection();
+            setTimeout(function() { window.location.reload(); }, 800);
+          }
           return;
         }
         var ops = chunks[idx].map(function(id) {
@@ -1052,7 +1081,9 @@ document.addEventListener('alpine:init', function() {
   });
 
   // Prime the bulk store's DOM state so newly-mounted rows reflect the current
-  // selection (e.g. after in-place replacement of #bb-tx-results).
+  // selection (e.g. after in-place replacement of #bb-tx-results). The restore
+  // call rehydrates selection across category/comment bulk reloads.
+  Alpine.store('bulk')._restoreSelection();
   Alpine.store('bulk')._updateRowVisibility();
   Alpine.store('bulk')._syncAllRows();
 
@@ -1094,8 +1125,18 @@ document.addEventListener('alpine:init', function() {
       case 'e': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.toggleExpand(); } break;
       case 'x': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.toggleSelect(); } break;
       case 'Escape':
-        if (nav.focusedIdx >= 0) { nav.clearFocus(); }
-        else if (Alpine.store('bulk').selecting) { Alpine.store('bulk').toggleMode(); }
+        // Escape is two-stage when in select mode: first press deselects
+        // everything but keeps the bar up, second press exits select mode.
+        // The j/k focus ring is cleared first if present.
+        if (nav.focusedIdx >= 0) {
+          nav.clearFocus();
+        } else if (Alpine.store('bulk').selecting) {
+          if (Alpine.store('bulk').sel.length > 0) {
+            Alpine.store('bulk').clear();
+          } else {
+            Alpine.store('bulk').toggleMode();
+          }
+        }
         break;
     }
   });
