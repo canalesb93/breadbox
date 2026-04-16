@@ -1103,17 +1103,16 @@ document.addEventListener('alpine:init', function() {
       case 'e': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.toggleExpand(); } break;
       case 'x': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.toggleSelect(); } break;
       case 'Escape':
-        // Escape is two-stage when in select mode: first press deselects
-        // everything but keeps the bar up, second press exits select mode.
-        // The j/k focus ring is cleared first if present.
-        if (nav.focusedIdx >= 0) {
-          nav.clearFocus();
+        // Escape priority: deselect bulk → exit select mode → clear j/k
+        // focus. Bulk state wins over the focus ring because it's the
+        // heavier piece of state the user is likely to want to back out of
+        // first; clearing focus is quietest and goes last.
+        if (Alpine.store('bulk').selecting && Alpine.store('bulk').sel.length > 0) {
+          Alpine.store('bulk').clear();
         } else if (Alpine.store('bulk').selecting) {
-          if (Alpine.store('bulk').sel.length > 0) {
-            Alpine.store('bulk').clear();
-          } else {
-            Alpine.store('bulk').toggleMode();
-          }
+          Alpine.store('bulk').toggleMode();
+        } else if (nav.focusedIdx >= 0) {
+          nav.clearFocus();
         }
         break;
     }
@@ -1248,7 +1247,10 @@ function updateRowCategory(txId, slug) {
   }
 
   // 2) Update the inline cat picker (Alpine reactive — updating selectedId
-  // re-derives displayLabel/displayColor/displayIcon).
+  // re-derives displayLabel/displayColor/displayIcon). The picker has an
+  // x-init $watch on selectedId that fires quickSetCategory; that watcher
+  // checks $store.bulk.processing and skips when bulk ops are in flight, so
+  // we don't double-call the API or double-toast on top of the bulk action.
   var pickerEl = row.querySelector('.bb-cat-picker');
   if (pickerEl && window.Alpine && Alpine.$data) {
     var data = Alpine.$data(pickerEl);
