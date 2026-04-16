@@ -3,6 +3,8 @@ package admin
 import (
 	"net/http"
 	"testing"
+
+	"breadbox/internal/service"
 )
 
 func TestBuildPaginationBase_URLEncodesValues(t *testing.T) {
@@ -83,4 +85,55 @@ func searchString(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+// Phase 3: review_queue is gone. The activity timeline is built purely from
+// annotations now — comments, tag_added/tag_removed, rule_applied, category_set.
+// The "linked comment rendered inline on a review resolution" path no longer
+// exists (review resolutions are no longer a distinct timeline event type).
+
+func TestBuildActivityTimeline_FreeStandingCommentStillEmitted(t *testing.T) {
+	annotations := []service.Annotation{{
+		ID:        "ann-free",
+		Kind:      "comment",
+		ActorName: "Alice",
+		ActorType: "user",
+		Payload: map[string]interface{}{
+			"content":    "split with Bob",
+			"comment_id": "comment-free",
+		},
+		CreatedAt: "2026-04-04T12:00:00Z",
+	}}
+
+	entries := buildActivityTimeline(annotations)
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].Type != "comment" {
+		t.Errorf("expected comment entry, got type=%q", entries[0].Type)
+	}
+	if entries[0].CommentID != "comment-free" {
+		t.Errorf("expected CommentID=comment-free, got %q", entries[0].CommentID)
+	}
+}
+
+func TestBuildActivityTimeline_LegacyPrefixCommentSuppressed(t *testing.T) {
+	annotations := []service.Annotation{{
+		ID:        "ann-legacy",
+		Kind:      "comment",
+		ActorName: "Legacy",
+		ActorType: "system",
+		Payload: map[string]interface{}{
+			"content":    "[Review: Some note migrated before consolidation]",
+			"comment_id": "comment-legacy",
+		},
+		CreatedAt: "2026-03-01T00:00:00Z",
+	}}
+
+	entries := buildActivityTimeline(annotations)
+
+	if len(entries) != 0 {
+		t.Fatalf("expected legacy [Review: ...] comment to be suppressed, got %d entries", len(entries))
+	}
 }

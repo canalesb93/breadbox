@@ -332,14 +332,15 @@ func (s *Service) MergeCategories(ctx context.Context, sourceID, targetID string
 		return ErrCategoryNotFound
 	}
 
-	// Verify both exist before starting the transaction.
-	if _, err := s.Queries.GetCategoryByID(ctx, srcUID); err != nil {
+	src, err := s.Queries.GetCategoryByID(ctx, srcUID)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrCategoryNotFound
 		}
 		return fmt.Errorf("get source: %w", err)
 	}
-	if _, err := s.Queries.GetCategoryByID(ctx, tgtUID); err != nil {
+	tgt, err := s.Queries.GetCategoryByID(ctx, tgtUID)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrCategoryNotFound
 		}
@@ -357,7 +358,7 @@ func (s *Service) MergeCategories(ctx context.Context, sourceID, targetID string
 
 	// Reassign children first: if the source is a parent category, its children
 	// would be CASCADE-deleted when the source is deleted. We must reassign their
-	// transactions, mappings, and rules to the target before that happens.
+	// transactions and rules to the target before that happens.
 	childIDs, err := qtx.ListChildCategoryIDs(ctx, srcUID)
 	if err != nil {
 		return fmt.Errorf("list child categories: %w", err)
@@ -369,10 +370,11 @@ func (s *Service) MergeCategories(ctx context.Context, sourceID, targetID string
 		}); err != nil {
 			return fmt.Errorf("reassign child transactions: %w", err)
 		}
-		if err := qtx.ReassignRulesCategory(ctx, db.ReassignRulesCategoryParams{
-			CategoryID:   childUID,
-			CategoryID_2: tgtUID,
-		}); err != nil {
+		childRow, getErr := qtx.GetCategoryByID(ctx, childUID)
+		if getErr != nil {
+			return fmt.Errorf("get child category: %w", getErr)
+		}
+		if err := reassignRulesCategorySlug(ctx, tx, childRow.Slug, tgt.Slug); err != nil {
 			return fmt.Errorf("reassign child rules: %w", err)
 		}
 	}
@@ -384,12 +386,7 @@ func (s *Service) MergeCategories(ctx context.Context, sourceID, targetID string
 		return fmt.Errorf("reassign transactions: %w", err)
 	}
 
-	// Reassign transaction rules so they are re-pointed to the target category
-	// instead of being silently deleted by the ON DELETE CASCADE FK constraint.
-	if err := qtx.ReassignRulesCategory(ctx, db.ReassignRulesCategoryParams{
-		CategoryID:   srcUID,
-		CategoryID_2: tgtUID,
-	}); err != nil {
+	if err := reassignRulesCategorySlug(ctx, tx, src.Slug, tgt.Slug); err != nil {
 		return fmt.Errorf("reassign rules: %w", err)
 	}
 
@@ -1032,4 +1029,26 @@ func parseTSV(content string, minCols, maxCols int) ([][]string, error) {
 	}
 
 	return rows, nil
+}
+
+// reassignRulesCategorySlug rewrites every transaction_rules.actions array,
+// remapping set_category actions whose category_slug equals srcSlug to point at tgtSlug.
+// Lives outside sqlc because the JSONB subquery confuses sqlc's parser.
+func reassignRulesCategorySlug(ctx context.Context, tx pgx.Tx, srcSlug, tgtSlug string) error {
+	const sqlStr = `
+UPDATE transaction_rules
+SET actions = (
+    SELECT jsonb_agg(
+        CASE
+            WHEN elem->>'type' = 'set_category' AND elem->>'category_slug' = $1
+                THEN jsonb_set(elem, '{category_slug}', to_jsonb($2::text))
+            ELSE elem
+        END
+    )
+    FROM jsonb_array_elements(actions) elem
+), updated_at = NOW()
+WHERE actions @> jsonb_build_array(jsonb_build_object('type', 'set_category', 'category_slug', $1::text))
+`
+	_, err := tx.Exec(ctx, sqlStr, srcSlug, tgtSlug)
+	return err
 }

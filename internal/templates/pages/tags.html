@@ -1,0 +1,305 @@
+{{define "content"}}
+<!-- Page Header -->
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">Tags</h1>
+    <p class="text-sm text-base-content/50 mt-1 hidden sm:block">Open-ended labels for coordinating work on transactions</p>
+  </div>
+  <div class="flex items-center gap-2">
+    <button class="btn btn-sm btn-primary rounded-xl gap-2" onclick="document.getElementById('create-tag-modal').showModal()">
+      <i data-lucide="plus" class="w-4 h-4"></i>
+      Add Tag
+    </button>
+  </div>
+</div>
+
+<div x-data="{filter: ''}" class="space-y-4">
+
+  <!-- Search bar -->
+  <div class="relative">
+    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/30 pointer-events-none"></i>
+    <input type="text" placeholder="Filter tags..." x-model="filter"
+      class="input input-bordered w-full pl-9 rounded-xl h-10 text-sm">
+  </div>
+
+  {{if .Tags}}
+  <div class="bb-card overflow-hidden">
+    <!-- Table header -->
+    <div class="hidden sm:grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 px-5 py-2.5 border-b border-base-300/50 text-xs font-medium text-base-content/40 uppercase tracking-wider">
+      <div class="w-32">Chip</div>
+      <div>Details</div>
+      <div class="w-24 text-right">Transactions</div>
+      <div class="w-20">Lifecycle</div>
+      <div class="w-20"></div>
+    </div>
+
+    <div class="divide-y divide-base-300/40">
+      {{range .Tags}}
+      <div class="group grid grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3"
+        x-show="!filter || '{{.Slug}} {{.DisplayName}} {{.Description}}'.toLowerCase().includes(filter.toLowerCase())">
+        <!-- Chip preview -->
+        <div class="w-32 shrink-0">
+          <span class="badge badge-soft rounded-lg gap-1 text-xs max-w-full"
+            {{if .Color}}style="background-color: {{safeCSS (deref .Color)}}1a; color: {{safeCSS (deref .Color)}}; border-color: {{safeCSS (deref .Color)}}40;"{{end}}>
+            {{if .Icon}}<i data-lucide="{{deref .Icon}}" class="w-3 h-3"></i>{{end}}
+            <span class="truncate">{{.DisplayName}}</span>
+          </span>
+        </div>
+        <!-- Details -->
+        <div class="min-w-0">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <code class="font-mono text-xs text-base-content/60 bg-base-200/50 px-1.5 py-0.5 rounded">{{.Slug}}</code>
+          </div>
+          {{if .Description}}
+          <p class="text-xs text-base-content/50 mt-1 truncate">{{.Description}}</p>
+          {{end}}
+        </div>
+        <!-- Transaction count -->
+        <div class="text-right text-xs text-base-content/60 tabular-nums w-24 hidden sm:block">
+          {{if gt .TransactionCount 0}}
+          <a href="/transactions?tags={{.Slug}}" class="link link-hover">{{commaInt .TransactionCount}}</a>
+          {{else}}
+          <span class="text-base-content/25">&mdash;</span>
+          {{end}}
+        </div>
+        <!-- Lifecycle -->
+        <div class="w-20 hidden sm:block">
+          {{if eq .Lifecycle "ephemeral"}}
+          <span class="badge badge-soft badge-warning badge-xs">ephemeral</span>
+          {{else}}
+          <span class="badge badge-ghost badge-xs">persistent</span>
+          {{end}}
+        </div>
+        <!-- Actions -->
+        <div class="flex items-center justify-end w-20 gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <button class="btn btn-ghost btn-xs rounded-lg"
+            data-id="{{.ID}}" data-short-id="{{.ShortID}}" data-slug="{{.Slug}}" data-display-name="{{.DisplayName}}" data-description="{{.Description}}"
+            data-color="{{if .Color}}{{deref .Color}}{{end}}" data-icon="{{if .Icon}}{{deref .Icon}}{{end}}" data-lifecycle="{{.Lifecycle}}"
+            @click="window.dispatchEvent(new CustomEvent('bb-edit-tag', {detail: {id: $el.dataset.id, shortId: $el.dataset.shortId, slug: $el.dataset.slug, displayName: $el.dataset.displayName, description: $el.dataset.description, color: $el.dataset.color, icon: $el.dataset.icon, lifecycle: $el.dataset.lifecycle}}))"
+            title="Edit"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+          <button class="btn btn-ghost btn-xs rounded-lg text-error"
+            data-id="{{.ID}}" data-slug="{{.Slug}}" data-count="{{.TransactionCount}}"
+            @click="window.dispatchEvent(new CustomEvent('bb-delete-tag', {detail: {id: $el.dataset.id, slug: $el.dataset.slug, count: parseInt($el.dataset.count) || 0}}))"
+            title="Delete"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{else}}
+  <!-- Empty state -->
+  <div class="bb-card">
+    <div class="flex flex-col items-center text-center py-16 px-6">
+      <div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+        <i data-lucide="tags" class="w-8 h-8 text-primary"></i>
+      </div>
+      <h2 class="text-lg font-semibold mb-1">No tags yet</h2>
+      <p class="text-base-content/50 text-sm mb-6 max-w-sm">Tags coordinate work on transactions — add "needs-review" to flag items for follow-up, or custom tags to group related charges.</p>
+      <button class="btn btn-primary btn-sm rounded-xl gap-2" onclick="document.getElementById('create-tag-modal').showModal()">
+        <i data-lucide="plus" class="w-4 h-4"></i> Add Tag
+      </button>
+    </div>
+  </div>
+  {{end}}
+</div>
+
+<!-- ═══════════ Create Tag Modal ═══════════ -->
+<dialog id="create-tag-modal" class="modal modal-bottom sm:modal-middle">
+  <form class="modal-box rounded-xl max-w-lg" x-data="{
+    slug: '', displayName: '', description: '', color: '#6366f1', icon: '', lifecycle: 'persistent', submitting: false,
+    presetColors: ['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#64748b','#78716c']
+  }" @submit.prevent="
+    submitting = true;
+    fetch('/-/tags', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({slug: slug, display_name: displayName, description: description, color: color || null, icon: icon || null, lifecycle: lifecycle})})
+    .then(r => { if(r.ok) location.reload(); else r.json().then(d => { window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error?.message || 'Error creating tag', type:'error'}})); submitting = false; }); })
+    .catch(() => { submitting = false; })
+  ">
+    <h3 class="text-lg font-bold">Add Tag</h3>
+    <p class="text-sm text-base-content/50 mt-1">Create a new tag for coordinating transaction work</p>
+    <div class="space-y-4 mt-6">
+      <!-- Preview chip -->
+      <div class="flex items-center gap-3 p-4 bg-base-200/40 rounded-xl">
+        <span class="badge badge-soft rounded-lg gap-1"
+          :style="'background-color: ' + (color || '#6366f1') + '1a; color: ' + (color || '#6366f1') + '; border-color: ' + (color || '#6366f1') + '40'">
+          <template x-if="icon"><i :data-lucide="icon" class="w-3 h-3"></i></template>
+          <span x-text="displayName || slug || 'tag-preview'"></span>
+        </span>
+      </div>
+
+      <label class="form-control w-full">
+        <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Slug</span></div>
+        <input type="text" x-model="slug" class="input input-bordered w-full rounded-xl font-mono text-sm" required
+          pattern="^[a-z0-9]([a-z0-9\-:]*[a-z0-9])?$" placeholder="needs-review">
+        <div class="label"><span class="label-text-alt text-xs text-base-content/40">Lowercase, hyphens/colons only. Immutable after creation.</span></div>
+      </label>
+
+      <label class="form-control w-full">
+        <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Display Name</span></div>
+        <input type="text" x-model="displayName" class="input input-bordered w-full rounded-xl" required placeholder="Needs Review">
+      </label>
+
+      <label class="form-control w-full">
+        <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Description</span></div>
+        <input type="text" x-model="description" class="input input-bordered w-full rounded-xl" placeholder="Optional">
+      </label>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="form-control">
+          <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Icon (Lucide)</span></div>
+          <input type="text" x-model="icon" class="input input-bordered w-full rounded-xl" placeholder="e.g. inbox">
+        </div>
+        <div class="form-control">
+          <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Color</span></div>
+          <div class="flex flex-wrap gap-1.5">
+            <template x-for="c in presetColors">
+              <button type="button" class="w-7 h-7 rounded-full border-2 transition-all duration-150 hover:scale-110" :style="'background-color:' + c" :class="color === c ? 'border-base-content scale-110 shadow-sm' : 'border-transparent'" @click="color = c"></button>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-control">
+        <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Lifecycle</span></div>
+        <div class="flex gap-2">
+          <label class="flex-1 cursor-pointer">
+            <input type="radio" x-model="lifecycle" value="persistent" class="peer sr-only">
+            <div class="border-2 border-base-300 peer-checked:border-primary peer-checked:bg-primary/5 rounded-xl p-3">
+              <div class="font-medium text-sm">Persistent</div>
+              <div class="text-xs text-base-content/50 mt-0.5">Long-lived label (subscription, shared)</div>
+            </div>
+          </label>
+          <label class="flex-1 cursor-pointer">
+            <input type="radio" x-model="lifecycle" value="ephemeral" class="peer sr-only">
+            <div class="border-2 border-base-300 peer-checked:border-warning peer-checked:bg-warning/5 rounded-xl p-3">
+              <div class="font-medium text-sm">Ephemeral</div>
+              <div class="text-xs text-base-content/50 mt-0.5">Workflow trigger, removal requires note</div>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost rounded-xl" @click="document.getElementById('create-tag-modal').close()">Cancel</button>
+      <button type="submit" class="btn btn-primary rounded-xl" :disabled="submitting">
+        <span x-show="!submitting">Add Tag</span>
+        <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+      </button>
+    </div>
+  </form>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- ═══════════ Edit Tag Modal ═══════════ -->
+<dialog id="edit-tag-modal" class="modal modal-bottom sm:modal-middle" x-data="{
+  id: '', slug: '', displayName: '', description: '', color: '', icon: '', lifecycle: 'persistent', submitting: false,
+  presetColors: ['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#64748b','#78716c']
+}" @bb-edit-tag.window="
+  id = $event.detail.id; slug = $event.detail.slug; displayName = $event.detail.displayName; description = $event.detail.description; color = $event.detail.color || '#6366f1'; icon = $event.detail.icon || ''; lifecycle = $event.detail.lifecycle || 'persistent';
+  $el.showModal();
+  $nextTick(() => lucide.createIcons());
+">
+  <form class="modal-box rounded-xl max-w-lg" @submit.prevent="
+    submitting = true;
+    fetch('/-/tags/' + id, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({display_name: displayName, description: description, color: color || null, icon: icon || null, lifecycle: lifecycle})})
+    .then(r => { if(r.ok) location.reload(); else r.json().then(d => { window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error?.message || 'Error updating tag', type:'error'}})); submitting = false; }); })
+    .catch(() => { submitting = false; })
+  ">
+    <h3 class="text-lg font-bold">Edit Tag</h3>
+    <p class="text-sm text-base-content/50 mt-1">Slug is immutable — other fields can be changed.</p>
+    <div class="space-y-4 mt-6">
+      <div class="flex items-center gap-3 p-4 bg-base-200/40 rounded-xl">
+        <span class="badge badge-soft rounded-lg gap-1"
+          :style="'background-color: ' + (color || '#6366f1') + '1a; color: ' + (color || '#6366f1') + '; border-color: ' + (color || '#6366f1') + '40'">
+          <template x-if="icon"><i :data-lucide="icon" class="w-3 h-3"></i></template>
+          <span x-text="displayName || slug"></span>
+        </span>
+      </div>
+
+      <div class="form-control w-full">
+        <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Slug (immutable)</span></div>
+        <code class="bg-base-200/50 px-3 py-2 rounded-xl font-mono text-sm text-base-content/60" x-text="slug"></code>
+      </div>
+
+      <label class="form-control w-full">
+        <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Display Name</span></div>
+        <input type="text" x-model="displayName" class="input input-bordered w-full rounded-xl" required>
+      </label>
+
+      <label class="form-control w-full">
+        <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Description</span></div>
+        <input type="text" x-model="description" class="input input-bordered w-full rounded-xl">
+      </label>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="form-control">
+          <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Icon (Lucide)</span></div>
+          <input type="text" x-model="icon" class="input input-bordered w-full rounded-xl" placeholder="e.g. inbox">
+        </div>
+        <div class="form-control">
+          <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Color</span></div>
+          <div class="flex flex-wrap gap-1.5">
+            <template x-for="c in presetColors">
+              <button type="button" class="w-7 h-7 rounded-full border-2 transition-all duration-150 hover:scale-110" :style="'background-color:' + c" :class="color === c ? 'border-base-content scale-110 shadow-sm' : 'border-transparent'" @click="color = c"></button>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-control">
+        <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Lifecycle</span></div>
+        <div class="flex gap-2">
+          <label class="flex-1 cursor-pointer">
+            <input type="radio" x-model="lifecycle" value="persistent" class="peer sr-only">
+            <div class="border-2 border-base-300 peer-checked:border-primary peer-checked:bg-primary/5 rounded-xl p-3">
+              <div class="font-medium text-sm">Persistent</div>
+              <div class="text-xs text-base-content/50 mt-0.5">Long-lived label</div>
+            </div>
+          </label>
+          <label class="flex-1 cursor-pointer">
+            <input type="radio" x-model="lifecycle" value="ephemeral" class="peer sr-only">
+            <div class="border-2 border-base-300 peer-checked:border-warning peer-checked:bg-warning/5 rounded-xl p-3">
+              <div class="font-medium text-sm">Ephemeral</div>
+              <div class="text-xs text-base-content/50 mt-0.5">Removal requires note</div>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost rounded-xl" @click="document.getElementById('edit-tag-modal').close()">Cancel</button>
+      <button type="submit" class="btn btn-primary rounded-xl" :disabled="submitting">
+        <span x-show="!submitting">Save</span>
+        <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+      </button>
+    </div>
+  </form>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Delete confirmation uses bbConfirm utility -->
+<script>
+window.addEventListener('bb-delete-tag', function(e) {
+  var detail = e.detail;
+  var msg = 'Delete tag "' + detail.slug + '"?';
+  if (detail.count > 0) {
+    msg += '\n\nThis will remove the tag from ' + detail.count + ' transaction' + (detail.count === 1 ? '' : 's') + '. Activity annotations are preserved.';
+  }
+  bbConfirm({title: 'Delete tag?', message: msg, confirmLabel: 'Delete', variant: 'danger'}).then(function(ok) {
+    if (!ok) return;
+    fetch('/-/tags/' + detail.id, {method: 'DELETE'})
+      .then(function(r) {
+        if (r.ok) {
+          window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Tag deleted', type:'success'}}));
+          setTimeout(function() { location.reload(); }, 400);
+        } else {
+          r.json().then(function(d) {
+            window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error?.message || 'Delete failed', type:'error'}}));
+          });
+        }
+      });
+  });
+});
+</script>
+{{end}}

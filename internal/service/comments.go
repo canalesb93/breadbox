@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -14,7 +15,13 @@ import (
 
 const maxCommentLength = 10000
 
-// CreateComment adds a comment to a transaction.
+// Phase 3 of the review-system redesign retired the transaction_comments
+// table. Comments are now stored exclusively as annotations with kind='comment'.
+// CreateComment / ListComments / UpdateComment / DeleteComment continue to
+// exist as service-layer operations so REST/MCP callers don't change, but they
+// now read/write the annotations table directly.
+
+// CreateComment adds a comment annotation to a transaction.
 func (s *Service) CreateComment(ctx context.Context, params CreateCommentParams) (*CommentResponse, error) {
 	content := strings.TrimSpace(params.Content)
 	if content == "" || len(content) > maxCommentLength {
@@ -39,127 +46,211 @@ func (s *Service) CreateComment(ctx context.Context, params CreateCommentParams)
 		return nil, ErrNotFound
 	}
 
-	var authorID pgtype.Text
-	if params.Actor.ID != "" {
-		authorID = pgtype.Text{String: params.Actor.ID, Valid: true}
+	actorType := normalizeAnnotationActorType(params.Actor.Type)
+	payload := map[string]interface{}{
+		"content": content,
+	}
+	if params.ReviewID != "" {
+		payload["review_id"] = params.ReviewID
 	}
 
-	comment, err := s.Queries.CreateComment(ctx, db.CreateCommentParams{
+	actorID := pgtype.Text{}
+	if params.Actor.ID != "" {
+		actorID = pgtype.Text{String: params.Actor.ID, Valid: true}
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal comment payload: %w", err)
+	}
+
+	ann, err := s.Queries.InsertAnnotation(ctx, db.InsertAnnotationParams{
 		TransactionID: txnID,
-		AuthorType:    params.Actor.Type,
-		AuthorID:      authorID,
-		AuthorName:    params.Actor.Name,
-		Content:       content,
+		Kind:          "comment",
+		ActorType:     actorType,
+		ActorID:       actorID,
+		ActorName:     params.Actor.Name,
+		Payload:       payloadBytes,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("create comment: %w", err)
+		return nil, fmt.Errorf("insert comment annotation: %w", err)
 	}
 
-	resp := commentFromRow(comment)
+	resp := commentFromAnnotation(ann, content, params.ReviewID)
 	return &resp, nil
 }
 
-// ListComments returns all comments for a transaction, ordered by created_at ASC.
+// normalizeAnnotationActorType coerces a free-form actor type string into one
+// of the values the annotations.actor_type CHECK constraint accepts.
+func normalizeAnnotationActorType(t string) string {
+	switch t {
+	case "user", "agent", "system":
+		return t
+	case "rule":
+		// Rule-originated annotations have their own rule_id column — the
+		// actor_type still uses "system" in that case.
+		return "system"
+	default:
+		return "user"
+	}
+}
+
+// ListComments returns all comment annotations for a transaction, ordered by
+// created_at ASC.
 func (s *Service) ListComments(ctx context.Context, transactionID string) ([]CommentResponse, error) {
 	txnID, err := s.resolveTransactionID(ctx, transactionID)
 	if err != nil {
 		return nil, ErrNotFound
 	}
 
-	rows, err := s.Queries.ListCommentsByTransaction(ctx, txnID)
+	rows, err := s.Queries.ListAnnotationsByTransaction(ctx, txnID)
 	if err != nil {
 		return nil, fmt.Errorf("list comments: %w", err)
 	}
 
-	result := make([]CommentResponse, len(rows))
-	for i, r := range rows {
-		result[i] = commentFromRow(r)
+	result := make([]CommentResponse, 0, len(rows))
+	for _, r := range rows {
+		if r.Kind != "comment" {
+			continue
+		}
+		content, reviewID := contentFromAnnotationPayload(r.Payload)
+		result = append(result, commentFromAnnotation(r, content, reviewID))
 	}
 	return result, nil
 }
 
-// UpdateComment updates the content of an existing comment.
+// UpdateComment updates the content of an existing comment annotation. Comments
+// are identified by the annotation's short_id or UUID.
 func (s *Service) UpdateComment(ctx context.Context, id string, params UpdateCommentParams) (*CommentResponse, error) {
 	content := strings.TrimSpace(params.Content)
 	if content == "" || len(content) > maxCommentLength {
 		return nil, fmt.Errorf("content must be between 1 and %d characters", maxCommentLength)
 	}
 
-	commentID, err := s.resolveCommentID(ctx, id)
+	annID, err := s.resolveAnnotationID(ctx, id)
 	if err != nil {
 		return nil, ErrNotFound
 	}
 
-	existing, err := s.Queries.GetComment(ctx, commentID)
+	existing, err := s.Queries.GetAnnotationByID(ctx, annID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrNotFound
 		}
-		return nil, fmt.Errorf("get comment: %w", err)
+		return nil, fmt.Errorf("get annotation: %w", err)
+	}
+
+	if existing.Kind != "comment" {
+		return nil, ErrNotFound
 	}
 
 	// Check authorization: author match or admin.
-	if !canModifyComment(existing, params.Actor) {
+	if !canModifyAnnotation(existing, params.Actor) {
 		return nil, ErrForbidden
 	}
 
-	updated, err := s.Queries.UpdateComment(ctx, db.UpdateCommentParams{
-		ID:      commentID,
-		Content: content,
-	})
+	// Merge content into existing payload preserving review_id etc.
+	var payload map[string]interface{}
+	if len(existing.Payload) > 0 {
+		_ = json.Unmarshal(existing.Payload, &payload)
+	}
+	if payload == nil {
+		payload = map[string]interface{}{}
+	}
+	payload["content"] = content
+	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("update comment: %w", err)
+		return nil, fmt.Errorf("marshal updated comment payload: %w", err)
 	}
 
-	resp := commentFromRow(updated)
+	updated, err := s.Queries.UpdateAnnotationPayload(ctx, db.UpdateAnnotationPayloadParams{
+		ID:      annID,
+		Payload: payloadBytes,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update comment annotation: %w", err)
+	}
+
+	updatedContent, reviewID := contentFromAnnotationPayload(updated.Payload)
+	resp := commentFromAnnotation(updated, updatedContent, reviewID)
 	return &resp, nil
 }
 
-// DeleteComment hard-deletes a comment.
+// DeleteComment hard-deletes a comment annotation.
 func (s *Service) DeleteComment(ctx context.Context, id string, actor Actor) error {
-	commentID, err := s.resolveCommentID(ctx, id)
+	annID, err := s.resolveAnnotationID(ctx, id)
 	if err != nil {
 		return ErrNotFound
 	}
 
-	existing, err := s.Queries.GetComment(ctx, commentID)
+	existing, err := s.Queries.GetAnnotationByID(ctx, annID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrNotFound
 		}
-		return fmt.Errorf("get comment: %w", err)
+		return fmt.Errorf("get annotation: %w", err)
 	}
 
-	if !canModifyComment(existing, actor) {
+	if existing.Kind != "comment" {
+		return ErrNotFound
+	}
+
+	if !canModifyAnnotation(existing, actor) {
 		return ErrForbidden
 	}
 
-	if err := s.Queries.DeleteComment(ctx, commentID); err != nil {
-		return fmt.Errorf("delete comment: %w", err)
+	if err := s.Queries.DeleteAnnotation(ctx, annID); err != nil {
+		return fmt.Errorf("delete comment annotation: %w", err)
 	}
 
 	return nil
 }
 
-// canModifyComment checks if the actor can edit/delete a comment.
+// canModifyAnnotation checks if the actor can edit/delete an annotation.
 // The original author can always modify. Admins (user type) can moderate.
-func canModifyComment(comment db.TransactionComment, actor Actor) bool {
+func canModifyAnnotation(ann db.Annotation, actor Actor) bool {
 	if actor.Type == "user" {
 		return true // admins can moderate
 	}
-	return comment.AuthorType == actor.Type && comment.AuthorID.Valid && comment.AuthorID.String == actor.ID
+	return ann.ActorType == actor.Type && ann.ActorID.Valid && ann.ActorID.String == actor.ID
 }
 
-func commentFromRow(c db.TransactionComment) CommentResponse {
-	return CommentResponse{
-		ID:            formatUUID(c.ID),
-		ShortID:       c.ShortID,
-		TransactionID: formatUUID(c.TransactionID),
-		AuthorType:    c.AuthorType,
-		AuthorID:      textPtr(c.AuthorID),
-		AuthorName:    c.AuthorName,
-		Content:       c.Content,
-		CreatedAt:     c.CreatedAt.Time.UTC().Format(time.RFC3339),
-		UpdatedAt:     c.UpdatedAt.Time.UTC().Format(time.RFC3339),
+// contentFromAnnotationPayload pulls the content + optional review_id out of a
+// comment annotation's payload.
+func contentFromAnnotationPayload(raw []byte) (content string, reviewID string) {
+	if len(raw) == 0 {
+		return "", ""
 	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return "", ""
+	}
+	if v, ok := payload["content"].(string); ok {
+		content = v
+	}
+	if v, ok := payload["review_id"].(string); ok {
+		reviewID = v
+	}
+	return content, reviewID
+}
+
+// commentFromAnnotation converts a comment annotation into a CommentResponse.
+// The content + review_id are extracted from the annotation payload.
+func commentFromAnnotation(a db.Annotation, content, reviewID string) CommentResponse {
+	resp := CommentResponse{
+		ID:            formatUUID(a.ID),
+		ShortID:       a.ShortID,
+		TransactionID: formatUUID(a.TransactionID),
+		AuthorType:    a.ActorType,
+		AuthorID:      textPtr(a.ActorID),
+		AuthorName:    a.ActorName,
+		Content:       content,
+		CreatedAt:     a.CreatedAt.Time.UTC().Format(time.RFC3339),
+		UpdatedAt:     a.CreatedAt.Time.UTC().Format(time.RFC3339),
+	}
+	if reviewID != "" {
+		rid := reviewID
+		resp.ReviewID = &rid
+	}
+	return resp
 }

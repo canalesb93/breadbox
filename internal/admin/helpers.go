@@ -2,12 +2,27 @@ package admin
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"breadbox/internal/db"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// splitCSV splits a comma-separated string into trimmed non-empty entries.
+// Used by URL params that accept multi-value lists (e.g. ?tags=a,b,c).
+func splitCSV(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		t := strings.TrimSpace(p)
+		if t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
 
 // GetConfigBool reads a boolean config key from app_config.
 // Returns false if the key doesn't exist, has a null value, or can't be parsed.

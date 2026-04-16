@@ -79,6 +79,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/transactions", TransactionListHandler(a, sm, tr, svc))
 		r.Get("/transactions/search", TransactionSearchHandler(a, sm, tr, svc))
 		r.Get("/transactions/{id}", TransactionDetailHandler(a, sm, tr, svc))
+		r.Get("/transactions/{id}/edit", EditTransactionPageHandler(a, sm, tr, svc))
 		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
 
 		// Member account self-service pages.
@@ -94,15 +95,16 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/settings/password", ChangePasswordHandler(a, sm))
 	})
 
-	// Editor+ authenticated routes (HTML pages) — editors can view reviews,
-	// access/agents pages, and create (but not revoke) API keys and OAuth clients.
+	// Editor+ authenticated routes (HTML pages) — editors can view the tag
+	// admin, access/agents pages, and create (but not revoke) API keys and
+	// OAuth clients.
 	r.Group(func(r chi.Router) {
 		r.Use(RequireAuth(sm, a.Queries))
 		r.Use(RequireEditor(sm))
 		r.Use(CSRFMiddleware(sm))
 		r.Use(NavBadgesMiddleware(a.Queries, a.Logger))
 
-		r.Get("/reviews", ReviewsPageHandler(a, sm, tr, svc))
+		r.Get("/tags", TagsPageHandler(svc, sm, tr))
 
 		// Access page (API Keys + OAuth Clients) — editors can view and create.
 		r.Get("/access", AccessPageHandler(svc, sm, tr))
@@ -223,7 +225,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Post("/transactions/{id}/comments", CreateTransactionCommentHandler(a, sm, svc))
 		r.Delete("/transactions/{id}/comments/{comment_id}", DeleteTransactionCommentHandler(a, sm, svc))
 
-		// Editor+ API routes (categorization, reviews, access management).
+		// Editor+ API routes (categorization, tagging, access management).
 		r.Group(func(r chi.Router) {
 			r.Use(RequireEditor(sm))
 
@@ -231,12 +233,18 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc))
 			r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc))
 
+			// Compound transaction update (category + tags + comment in one atomic op).
+			r.Post("/transactions/{id}/update", UpdateTransactionFormHandler(a, sm, svc))
+
 			// Transaction bulk categorize
 			r.Post("/transactions/batch-categorize", BatchSetTransactionCategoryAdminHandler(svc))
 
-			// Review queue (submit/dismiss)
-			r.Post("/reviews/{id}/submit", SubmitReviewAdminHandler(a, sm, svc))
-			r.Post("/reviews/{id}/dismiss", DismissReviewAdminHandler(a, sm, svc))
+			// Batch compound update (bulk actions on transactions list).
+			r.Post("/transactions/batch-update", BulkUpdateTransactionsAdminHandler(a, sm, svc))
+
+			// Single-transaction tag operations (used by detail page chip UI).
+			r.Post("/transactions/{id}/tags", AddTransactionTagAdminHandler(a, sm, svc))
+			r.Delete("/transactions/{id}/tags/{slug}", RemoveTransactionTagAdminHandler(a, sm, svc))
 
 			// API keys — editors can list and create (revoke is admin-only below).
 			r.Get("/api-keys", ListAPIKeysHandler(svc))
@@ -256,6 +264,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Post("/connections/{id}/reauth", ConnectionReauthAPIHandler(a))
 			r.Post("/connections/{id}/reauth-complete", ConnectionReauthCompleteHandler(a))
 			r.Post("/connections/{id}/sync", SyncConnectionHandler(a))
+			r.Get("/connections/{id}/sync-status", SyncConnectionStatusHandler(a))
 			r.Post("/connections/sync-all", SyncAllConnectionsHandler(a))
 			r.Post("/connections/{id}/paused", UpdateConnectionPausedHandler(a, sm))
 			r.Post("/connections/{id}/sync-interval", UpdateConnectionSyncIntervalHandler(a, sm))
@@ -301,11 +310,10 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// Transaction CSV export
 			r.Get("/transactions/export-csv", ExportTransactionsCSVHandler(a, svc))
 
-			// Review queue (admin-only bulk operations)
-			r.Post("/reviews/dismiss-all", DismissAllReviewsAdminHandler(a, sm, svc))
-			r.Post("/reviews/enqueue", EnqueueReviewAdminHandler(a, sm, svc))
-			r.Post("/reviews/enqueue-existing", EnqueueExistingReviewsHandler(a, sm, svc))
-			r.Post("/reviews/settings", ReviewSettingsHandler(a, sm))
+			// Tag CRUD (admin-only).
+			r.Post("/tags", CreateTagAdminHandler(svc))
+			r.Put("/tags/{id}", UpdateTagAdminHandler(svc))
+			r.Delete("/tags/{id}", DeleteTagAdminHandler(svc))
 
 			// Transaction rules
 			r.Post("/rules", CreateRuleAdminHandler(svc, sm))

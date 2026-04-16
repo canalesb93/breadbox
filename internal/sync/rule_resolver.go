@@ -36,35 +36,65 @@ type TransactionContext struct {
 	AccountID        string  // UUID string
 	UserID           string  // UUID string
 	UserName         string  // family member name
+	// Tags is nil in Phase 1. Phase 2 populates this from transaction_tags so
+	// tag-based conditions (field: "tags") can match against it.
+	Tags []string
 }
 
-// RuleActionSource tracks which rule contributed which action.
+// RuleActionSource tracks which rule contributed which action for audit.
+// RuleName and RuleShortID are populated so the sync engine can write
+// annotations with human-readable actor fields (Phase 2).
 type RuleActionSource struct {
 	RuleID      pgtype.UUID
-	ActionField string // e.g., "category"
-	ActionValue string // e.g., "food_and_drink_coffee"
+	RuleShortID string
+	RuleName    string
+	ActionField string // "category", "tag", "comment"
+	ActionValue string // slug for category/tag, content for comment
 }
 
-// RuleActions holds the merged actions to apply to a transaction.
+// RuleActions holds the merged actions to apply to a transaction after resolving
+// all matching rules. First-writer-wins per action category (set_category fires
+// at most once; add_tag and add_comment accumulate across rules).
 type RuleActions struct {
-	CategoryID pgtype.UUID
-	// future: MerchantName pgtype.Text, etc.
+	// CategorySlug is the slug chosen by the first rule whose set_category
+	// action matched. Empty when no rule set a category.
+	CategorySlug string
+	// TagsToAdd is the accumulated list of unique tag slugs from add_tag
+	// actions. Phase 1: plumbed but not persisted; Phase 2 wires persistence.
+	TagsToAdd []string
+	// Comments is the accumulated list of comment content strings from
+	// add_comment actions. Phase 1: plumbed but not persisted.
+	Comments []string
+	// Sources records per-action provenance for the audit trail.
+	Sources []RuleActionSource
+}
 
-	Sources []RuleActionSource // tracks which rule set which field
+// typedAction is the in-package parsed shape of a rule action (Phase 1).
+// Kept local so the sync package doesn't import service (preserves the
+// one-way service → sync dependency direction).
+type typedAction struct {
+	Type         string
+	CategorySlug string
+	TagSlug      string
+	Content      string
 }
 
 // RuleResolver loads transaction rules and evaluates them during sync.
 // All matching rules contribute actions (merge non-conflicting).
 type RuleResolver struct {
 	rules           []compiledRule
-	slugCache       map[[16]byte]string // category UUID bytes -> slug
+	slugCache       map[[16]byte]string      // category UUID bytes -> slug
+	slugToID        map[string]pgtype.UUID   // category slug -> UUID (reverse cache)
 	uncategorizedID pgtype.UUID
 	hitCounts       map[[16]byte]int // rule UUID bytes -> hit count accumulator
 }
 
 type compiledRule struct {
 	id        pgtype.UUID
-	actions   RuleActions
+	shortID   string
+	name      string
+	actions   []typedAction
+	trigger   string // "on_create", "on_update", or "always"
 	condition *compiledCondition
 }
 
@@ -80,9 +110,12 @@ type compiledCondition struct {
 
 // ruleRow holds the raw data from the transaction_rules table query.
 type ruleRow struct {
-	id         pgtype.UUID
-	categoryID pgtype.UUID
-	conditions []byte
+	id          pgtype.UUID
+	shortID     string
+	name        string
+	conditions  []byte // may be NULL (match-all)
+	actionsJSON []byte
+	trigger     string
 }
 
 // NewRuleResolver creates a resolver pre-loaded with transaction rules.
@@ -90,6 +123,7 @@ type ruleRow struct {
 func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, logger *slog.Logger) (*RuleResolver, error) {
 	r := &RuleResolver{
 		slugCache: make(map[[16]byte]string),
+		slugToID:  make(map[string]pgtype.UUID),
 		hitCounts: make(map[[16]byte]int),
 	}
 
@@ -107,7 +141,8 @@ func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, l
 		return nil, fmt.Errorf("load uncategorized category: %w", err)
 	}
 
-	// Load category slug cache for suggestion filtering.
+	// Load category slug cache — populate both id→slug and slug→id maps in the
+	// same pass so slug lookups are O(1) without requiring a separate query.
 	slugRows, err := pool.Query(ctx, "SELECT id, slug FROM categories")
 	if err != nil {
 		return nil, fmt.Errorf("load category slugs: %w", err)
@@ -120,15 +155,17 @@ func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, l
 			return nil, fmt.Errorf("scan category slug: %w", err)
 		}
 		r.slugCache[id.Bytes] = slug
+		r.slugToID[slug] = id
 	}
 
 	return r, nil
 }
 
 // loadRules queries the transaction_rules table for active, non-expired rules,
-// compiles their conditions, and returns them sorted by priority DESC, created_at DESC.
+// compiles their conditions, parses actions, and returns them sorted by
+// priority DESC, created_at DESC.
 func loadRules(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) ([]compiledRule, error) {
-	query := `SELECT id, category_id, conditions
+	query := `SELECT id, short_id, name, conditions, actions, trigger
 		FROM transaction_rules
 		WHERE enabled = true
 		  AND (expires_at IS NULL OR expires_at > NOW())
@@ -143,7 +180,7 @@ func loadRules(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) ([]
 	var rawRules []ruleRow
 	for rows.Next() {
 		var rr ruleRow
-		if err := rows.Scan(&rr.id, &rr.categoryID, &rr.conditions); err != nil {
+		if err := rows.Scan(&rr.id, &rr.shortID, &rr.name, &rr.conditions, &rr.actionsJSON, &rr.trigger); err != nil {
 			return nil, fmt.Errorf("scan transaction rule: %w", err)
 		}
 		rawRules = append(rawRules, rr)
@@ -154,23 +191,39 @@ func loadRules(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) ([]
 
 	compiled := make([]compiledRule, 0, len(rawRules))
 	for _, rr := range rawRules {
-		var cond Condition
-		if err := json.Unmarshal(rr.conditions, &cond); err != nil {
-			logger.Warn("skipping rule with invalid conditions JSON",
-				"rule_id", pgconv.FormatUUID(rr.id), "error", err)
-			continue
+		// NULL or empty conditions == match-all.
+		var cc *compiledCondition
+		if len(rr.conditions) > 0 {
+			var cond Condition
+			if err := json.Unmarshal(rr.conditions, &cond); err != nil {
+				logger.Warn("skipping rule with invalid conditions JSON",
+					"rule_id", pgconv.FormatUUID(rr.id), "error", err)
+				continue
+			}
+			compiled2, err := compileCondition(&cond)
+			if err != nil {
+				logger.Warn("skipping rule with invalid condition",
+					"rule_id", pgconv.FormatUUID(rr.id), "error", err)
+				continue
+			}
+			cc = compiled2
 		}
 
-		cc, err := compileCondition(&cond)
-		if err != nil {
-			logger.Warn("skipping rule with invalid condition",
-				"rule_id", pgconv.FormatUUID(rr.id), "error", err)
-			continue
+		// Parse typed actions JSONB. Unknown types are skipped with a warning
+		// (read-time tolerance — so unknown future types don't brick sync).
+		actions := parseTypedActions(rr.actionsJSON, rr.id, logger)
+
+		trigger := rr.trigger
+		if trigger == "" {
+			trigger = "on_create"
 		}
 
 		compiled = append(compiled, compiledRule{
 			id:        rr.id,
-			actions:   RuleActions{CategoryID: rr.categoryID},
+			shortID:   rr.shortID,
+			name:      rr.name,
+			actions:   actions,
+			trigger:   trigger,
 			condition: cc,
 		})
 	}
@@ -178,9 +231,54 @@ func loadRules(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) ([]
 	return compiled, nil
 }
 
+// parseTypedActions unmarshals the actions JSONB column into typedAction
+// values, tolerating unknown types (logged warning, skipped).
+func parseTypedActions(raw []byte, ruleID pgtype.UUID, logger *slog.Logger) []typedAction {
+	if len(raw) == 0 {
+		return nil
+	}
+	var rawActions []map[string]any
+	if err := json.Unmarshal(raw, &rawActions); err != nil {
+		logger.Warn("rule actions invalid JSON",
+			"rule_id", pgconv.FormatUUID(ruleID), "error", err)
+		return nil
+	}
+	out := make([]typedAction, 0, len(rawActions))
+	for _, m := range rawActions {
+		t, _ := m["type"].(string)
+		switch t {
+		case "set_category":
+			slug, _ := m["category_slug"].(string)
+			out = append(out, typedAction{Type: t, CategorySlug: slug})
+		case "add_tag":
+			slug, _ := m["tag_slug"].(string)
+			out = append(out, typedAction{Type: t, TagSlug: slug})
+		case "add_comment":
+			content, _ := m["content"].(string)
+			out = append(out, typedAction{Type: t, Content: content})
+		default:
+			logger.Warn("skipping unknown rule action type",
+				"rule_id", pgconv.FormatUUID(ruleID), "type", t)
+		}
+	}
+	return out
+}
+
 // compileCondition converts a parsed Condition into a compiledCondition tree,
 // pre-compiling regexes for "matches" operators.
+//
+// Returns (nil, nil) for a zero-value Condition{} — a nil compiledCondition
+// evaluates to true (match-all).
 func compileCondition(c *Condition) (*compiledCondition, error) {
+	if c == nil {
+		return nil, nil
+	}
+	isLogical := len(c.And) > 0 || len(c.Or) > 0 || c.Not != nil
+	if !isLogical && c.Field == "" {
+		// Empty match-all sentinel.
+		return nil, nil
+	}
+
 	cc := &compiledCondition{}
 
 	// Branch: AND
@@ -253,32 +351,102 @@ func (r *RuleResolver) CategorySlug(id pgtype.UUID) string {
 	return r.slugCache[id.Bytes]
 }
 
-// ResolveWithContext evaluates all transaction rules in priority order.
-// All matching rules contribute actions — first rule to set a field wins.
+// CategoryIDForSlug returns the pgtype.UUID for a category slug. If the slug
+// is unknown, the returned UUID has Valid=false.
+func (r *RuleResolver) CategoryIDForSlug(slug string) pgtype.UUID {
+	if slug == "" {
+		return pgtype.UUID{}
+	}
+	return r.slugToID[slug]
+}
+
+// ResolveWithContext evaluates all transaction rules in priority order and
+// returns the merged actions. Rules whose trigger doesn't match isNew are
+// skipped.
+//
+// Trigger semantics:
+//   - "on_create": fires only when isNew is true.
+//   - "on_update": fires only when isNew is false (caller decides isChanged).
+//   - "always":    fires regardless.
+//
+// Action merging:
+//   - set_category: first-writer-wins by priority DESC.
+//   - add_tag:      accumulates unique slugs across matching rules.
+//   - add_comment:  accumulates all content strings.
+//
 // Returns nil when no rule matches.
-func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionContext) *RuleActions {
+func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionContext, isNew bool) *RuleActions {
 	var result *RuleActions
 	for i := range r.rules {
 		rule := &r.rules[i]
-		if evaluateCondition(rule.condition, txn) {
-			r.hitCounts[rule.id.Bytes]++
-			if result == nil {
-				result = &RuleActions{}
-			}
-			// Merge: first rule to set a field wins
-			if !result.CategoryID.Valid && rule.actions.CategoryID.Valid {
-				result.CategoryID = rule.actions.CategoryID
-				slug := r.CategorySlug(rule.actions.CategoryID)
+		if !triggerMatches(rule.trigger, isNew) {
+			continue
+		}
+		if !evaluateCondition(rule.condition, txn) {
+			continue
+		}
+		r.hitCounts[rule.id.Bytes]++
+		if result == nil {
+			result = &RuleActions{}
+		}
+		for _, a := range rule.actions {
+			switch a.Type {
+			case "set_category":
+				// First set_category wins.
+				if result.CategorySlug == "" && a.CategorySlug != "" {
+					result.CategorySlug = a.CategorySlug
+					result.Sources = append(result.Sources, RuleActionSource{
+						RuleID:      rule.id,
+						RuleShortID: rule.shortID,
+						RuleName:    rule.name,
+						ActionField: "category",
+						ActionValue: a.CategorySlug,
+					})
+				}
+			case "add_tag":
+				if a.TagSlug == "" {
+					continue
+				}
+				if !stringSliceContains(result.TagsToAdd, a.TagSlug) {
+					result.TagsToAdd = append(result.TagsToAdd, a.TagSlug)
+					result.Sources = append(result.Sources, RuleActionSource{
+						RuleID:      rule.id,
+						RuleShortID: rule.shortID,
+						RuleName:    rule.name,
+						ActionField: "tag",
+						ActionValue: a.TagSlug,
+					})
+				}
+			case "add_comment":
+				if a.Content == "" {
+					continue
+				}
+				result.Comments = append(result.Comments, a.Content)
 				result.Sources = append(result.Sources, RuleActionSource{
 					RuleID:      rule.id,
-					ActionField: "category",
-					ActionValue: slug,
+					RuleShortID: rule.shortID,
+					RuleName:    rule.name,
+					ActionField: "comment",
+					ActionValue: a.Content,
 				})
 			}
-			// future: same pattern for other fields
 		}
 	}
 	return result
+}
+
+// triggerMatches reports whether a rule with the given trigger should fire
+// given an isNew signal from the sync classification.
+func triggerMatches(trigger string, isNew bool) bool {
+	switch trigger {
+	case "on_create":
+		return isNew
+	case "on_update":
+		return !isNew
+	case "always", "":
+		return true
+	}
+	return false
 }
 
 // HitCountsJSON returns the per-rule hit counts from this sync run as JSON bytes
@@ -323,7 +491,12 @@ func (r *RuleResolver) FlushHitCounts(ctx context.Context, pool *pgxpool.Pool) e
 }
 
 // evaluateCondition recursively evaluates a compiled condition tree against a transaction context.
+// A nil receiver means match-all and returns true.
 func evaluateCondition(c *compiledCondition, tctx TransactionContext) bool {
+	if c == nil {
+		return true
+	}
+
 	// Branch: AND (short-circuit on first false)
 	if c.and != nil {
 		for _, child := range c.and {
@@ -376,6 +549,8 @@ func evaluateLeaf(c *compiledCondition, tctx TransactionContext) bool {
 		return evaluateString(c, tctx.UserID)
 	case "user_name":
 		return evaluateString(c, tctx.UserName)
+	case "tags":
+		return evaluateTags(c, tctx.Tags)
 	default:
 		return false // unknown field
 	}
@@ -435,6 +610,36 @@ func evaluateBool(c *compiledCondition, fieldVal bool) bool {
 		return fieldVal == v
 	case "neq":
 		return fieldVal != v
+	default:
+		return false
+	}
+}
+
+// evaluateTags applies slice operators for the tags field.
+//
+// In Phase 1, tctx.Tags is nil during sync. This means:
+//   - contains → false ("no tags" never contains the target)
+//   - not_contains → true
+//   - in → false
+//
+// Phase 2 populates tctx.Tags and these operators exercise real semantics.
+func evaluateTags(c *compiledCondition, tags []string) bool {
+	switch c.op {
+	case "contains":
+		return stringSliceContainsFold(tags, toString(c.value))
+	case "not_contains":
+		return !stringSliceContainsFold(tags, toString(c.value))
+	case "in":
+		list, ok := c.value.([]interface{})
+		if !ok {
+			return false
+		}
+		for _, item := range list {
+			if stringSliceContainsFold(tags, toString(item)) {
+				return true
+			}
+		}
+		return false
 	default:
 		return false
 	}
@@ -515,4 +720,27 @@ func stringInList(fieldVal string, v interface{}) bool {
 		// Single value comparison
 		return strings.EqualFold(fieldVal, toString(v))
 	}
+}
+
+// stringSliceContains reports whether slice contains target (case-sensitive).
+func stringSliceContains(slice []string, target string) bool {
+	for _, s := range slice {
+		if s == target {
+			return true
+		}
+	}
+	return false
+}
+
+// stringSliceContainsFold reports whether slice contains target (case-insensitive).
+func stringSliceContainsFold(slice []string, target string) bool {
+	if target == "" {
+		return false
+	}
+	for _, s := range slice {
+		if strings.EqualFold(s, target) {
+			return true
+		}
+	}
+	return false
 }

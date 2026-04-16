@@ -20,6 +20,9 @@ This document defines the complete PostgreSQL database schema for the Breadbox M
    - [sync_logs](#26-sync_logs)
    - [api_keys](#27-api_keys)
    - [app_config](#28-app_config)
+   - [tags](#29-tags)
+   - [transaction_tags](#210-transaction_tags)
+   - [annotations](#211-annotations)
 3. [Plaid Field Mapping](#3-plaid-field-mapping)
 4. [Key Design Decisions](#4-key-design-decisions)
 5. [Indexes](#5-indexes)
@@ -41,6 +44,9 @@ This document defines the complete PostgreSQL database schema for the Breadbox M
 | `sync_logs` | Immutable audit trail of every sync operation attempt. |
 | `api_keys` | Hashed API keys for REST API and MCP access. |
 | `app_config` | Key-value store for runtime configuration set during the first-run setup wizard. |
+| `tags` | Reusable labels attached to transactions (e.g. `needs-review`). Ephemeral tags require a note on removal. |
+| `transaction_tags` | Many-to-many join between transactions and tags with attribution metadata. |
+| `annotations` | Unified activity timeline per transaction (comments, tag events, rule applications, category sets). |
 
 ### 1.2 Entity Relationship Diagram
 
@@ -603,31 +609,127 @@ The following keys are seeded during initial migration and used by the applicati
 | `webhook_url` | `(empty)` | Publicly accessible URL for Plaid webhooks. Optional. |
 | `sync_interval_hours` | `12` | How often the cron sync runs, in hours. |
 | `setup_complete` | `false` | Whether the first-run setup wizard has been completed. |
-| `review_auto_enqueue` | `false` | When true, sync auto-enqueues transactions for review. Off by default. |
 
 ---
 
-### 2.9 `review_queue`
+### 2.9 `tags`
 
-**Purpose:** Queue for human or agent review of transactions. Items are auto-enqueued during sync (for new or uncategorized transactions) when enabled, or manually enqueued. Reviewers approve, reject, or skip items.
+**Purpose:** Reusable labels attached to transactions. Tags are the coordination primitive for the review workflow and for agent-to-agent handoffs. The seeded `needs-review` tag is the queue: transactions carrying it are awaiting assessment. Operators can create additional tags from the `/tags` admin page or via the `create_tag` MCP tool. Defined in migration `20260415075421_tags_and_annotations.sql`.
 
 #### Columns
 
 | Column | Type | Nullable | Default | Description |
 |---|---|---|---|---|
 | `id` | `UUID` | No | `gen_random_uuid()` | Primary key. |
-| `transaction_id` | `UUID` | No | — | FK → `transactions(id)`. The transaction under review. |
-| `review_type` | `TEXT` | No | — | Why the review was created: `new_transaction`, `uncategorized`, `low_confidence`, `manual`. |
-| `status` | `TEXT` | No | `'pending'` | Current state: `pending`, `approved`, `rejected`, `skipped`. |
-| `suggested_category_id` | `UUID` | Yes | `NULL` | FK → `categories(id)`. Category suggested by the system at enqueue time. |
-| `confidence_score` | `NUMERIC(5,4)` | Yes | `NULL` | Normalized confidence score (0.0–1.0) from the provider. |
-| `reviewer_type` | `TEXT` | Yes | `NULL` | Who reviewed: `user` or `agent`. Set on resolution. |
-| `reviewer_id` | `TEXT` | Yes | `NULL` | ID of the reviewer (admin user ID or API key prefix). |
-| `reviewer_name` | `TEXT` | Yes | `NULL` | Display name of the reviewer. |
-| `review_note` | `TEXT` | Yes | `NULL` | Optional note from the reviewer. |
-| `resolved_category_id` | `UUID` | Yes | `NULL` | FK → `categories(id)`. Category chosen by the reviewer (may differ from suggested). |
-| `created_at` | `TIMESTAMPTZ` | No | `NOW()` | When the review was enqueued. |
-| `reviewed_at` | `TIMESTAMPTZ` | Yes | `NULL` | When the review was resolved. |
+| `short_id` | `TEXT` | No | trigger-generated | 8-character base62 alias. |
+| `slug` | `TEXT` | No | — | Lowercase alphanumerics with optional hyphens/colons (e.g. `needs-review`, `subscription:monthly`). Immutable after creation. Globally unique. |
+| `display_name` | `TEXT` | No | — | Human-readable label (e.g. "Needs Review"). Mutable. |
+| `description` | `TEXT` | No | `''` | Operator-facing description. |
+| `color` | `TEXT` | Yes | `NULL` | CSS color used when rendering the tag chip. |
+| `icon` | `TEXT` | Yes | `NULL` | Lucide icon name for chip rendering. |
+| `lifecycle` | `TEXT` | No | `'persistent'` | `persistent` or `ephemeral`. Ephemeral tags require a non-empty note on removal (enforced by service layer, recorded on the `tag_removed` annotation payload). |
+| `created_at` | `TIMESTAMPTZ` | No | `NOW()` | Record creation timestamp. |
+| `updated_at` | `TIMESTAMPTZ` | No | `NOW()` | Last modification timestamp. |
+
+#### Primary Key
+
+`id`
+
+#### Unique Constraints
+
+```sql
+UNIQUE (slug)
+UNIQUE (short_id)
+```
+
+#### Check Constraints
+
+```sql
+CHECK (lifecycle IN ('persistent', 'ephemeral'))
+```
+
+#### Seeds
+
+| Slug | Display Name | Lifecycle | Purpose |
+|---|---|---|---|
+| `needs-review` | Needs Review | `ephemeral` | Marks transactions awaiting initial categorization review. The seeded `on_create` system rule auto-attaches this tag during sync. |
+
+#### Indexes
+
+| Index | Columns | Type | Rationale |
+|---|---|---|---|
+| `tags_pkey` | `id` | B-tree (implicit PK) | Primary key lookup. |
+| `tags_slug_key` | `slug` | B-tree (unique) | Slug lookup (MCP tools resolve by slug). |
+| `tags_short_id_key` | `short_id` | B-tree (unique) | Short ID lookup. |
+
+---
+
+### 2.10 `transaction_tags`
+
+**Purpose:** Many-to-many join between transactions and tags, with attribution metadata. One row means "this tag is currently on this transaction." Phase 3 backfill populated rows from pending `review_queue` entries using the seeded `needs-review` tag.
+
+#### Columns
+
+| Column | Type | Nullable | Default | Description |
+|---|---|---|---|---|
+| `transaction_id` | `UUID` | No | — | FK → `transactions(id)`. CASCADE DELETE. |
+| `tag_id` | `UUID` | No | — | FK → `tags(id)`. CASCADE DELETE. |
+| `added_by_type` | `TEXT` | No | — | `user`, `agent`, `rule`, or `system`. |
+| `added_by_id` | `TEXT` | Yes | `NULL` | Attribution ID (admin user ID, API key prefix, rule short_id, etc.). |
+| `added_by_name` | `TEXT` | No | `''` | Display name of the attributor. |
+| `added_at` | `TIMESTAMPTZ` | No | `NOW()` | When the tag was attached. |
+
+#### Primary Key
+
+```sql
+PRIMARY KEY (transaction_id, tag_id)
+```
+
+The composite PK enforces one-tag-per-transaction idempotency — re-adding an already-attached tag is a no-op (handled by `ON CONFLICT DO NOTHING` in the service layer).
+
+#### Foreign Keys
+
+| Column | References | On Delete |
+|---|---|---|
+| `transaction_id` | `transactions(id)` | `CASCADE` |
+| `tag_id` | `tags(id)` | `CASCADE` |
+
+#### Check Constraints
+
+```sql
+CHECK (added_by_type IN ('user', 'agent', 'rule', 'system'))
+```
+
+#### Indexes
+
+| Index | Columns | Type | Rationale |
+|---|---|---|---|
+| `transaction_tags_pkey` | `(transaction_id, tag_id)` | B-tree (implicit PK) | Idempotent upsert; transaction → tag lookup. |
+| `transaction_tags_tag_idx` | `tag_id` | B-tree | Reverse lookup: "all transactions with this tag" (e.g. the `needs-review` backlog query). |
+| `transaction_tags_recent_idx` | `(tag_id, added_at DESC)` | B-tree | Most-recently-tagged queries for a specific tag. |
+
+---
+
+### 2.11 `annotations`
+
+**Purpose:** Canonical activity timeline for every transaction. Replaces the retired `transaction_comments` and `transaction_rule_applications` tables (both dropped in the Phase 3 cutover migration `20260415083233_cutover_review_queue.sql`). Each row is one event: a free-form comment, a rule firing, a tag add/remove, or a category being set. `list_annotations(transaction_id)` returns the full ordered history.
+
+#### Columns
+
+| Column | Type | Nullable | Default | Description |
+|---|---|---|---|---|
+| `id` | `UUID` | No | `gen_random_uuid()` | Primary key. |
+| `short_id` | `TEXT` | No | trigger-generated | 8-character base62 alias. |
+| `transaction_id` | `UUID` | No | — | FK → `transactions(id)`. CASCADE DELETE. |
+| `kind` | `TEXT` | No | — | One of `comment`, `rule_applied`, `tag_added`, `tag_removed`, `category_set`. |
+| `actor_type` | `TEXT` | No | — | `user`, `agent`, or `system`. |
+| `actor_id` | `TEXT` | Yes | `NULL` | Attribution ID (admin user ID, API key prefix, etc.). |
+| `actor_name` | `TEXT` | No | — | Display name of the actor. |
+| `session_id` | `UUID` | Yes | `NULL` | FK → `mcp_sessions(id)`. Links the event back to the originating MCP session when applicable. |
+| `payload` | `JSONB` | No | `'{}'` | Event-specific payload. For `comment`: `{content}`. For `tag_added`/`tag_removed`: `{note, tag_slug}`. For `rule_applied`: `{action_field, action_value, rule_id, rule_name}`. For `category_set`: `{category_slug, previous_category_slug}`. |
+| `tag_id` | `UUID` | Yes | `NULL` | FK → `tags(id)`. SET NULL on delete. Populated for `tag_added`/`tag_removed` events. |
+| `rule_id` | `UUID` | Yes | `NULL` | FK → `transaction_rules(id)`. SET NULL on delete. Populated for `rule_applied` events. |
+| `created_at` | `TIMESTAMPTZ` | No | `NOW()` | When the event occurred. Timeline is ordered by this column. |
 
 #### Primary Key
 
@@ -638,25 +740,31 @@ The following keys are seeded during initial migration and used by the applicati
 | Column | References | On Delete |
 |---|---|---|
 | `transaction_id` | `transactions(id)` | `CASCADE` |
-| `suggested_category_id` | `categories(id)` | `SET NULL` |
-| `resolved_category_id` | `categories(id)` | `SET NULL` |
+| `session_id` | `mcp_sessions(id)` | (FK only, no cascade specified) |
+| `tag_id` | `tags(id)` | `SET NULL` |
+| `rule_id` | `transaction_rules(id)` | `SET NULL` |
 
 #### Unique Constraints
 
-| Name | Columns | Condition |
-|---|---|---|
-| `review_queue_pending_unique_idx` | `transaction_id` | `WHERE status = 'pending'` |
+```sql
+UNIQUE (short_id)
+```
 
-Only one pending review per transaction at a time.
+#### Check Constraints
+
+```sql
+CHECK (kind IN ('comment', 'rule_applied', 'tag_added', 'tag_removed', 'category_set'))
+CHECK (actor_type IN ('user', 'agent', 'system'))
+```
 
 #### Indexes
 
 | Index | Columns | Type | Rationale |
 |---|---|---|---|
-| `review_queue_pkey` | `id` | B-tree (implicit PK) | Primary key lookup. |
-| `review_queue_pending_unique_idx` | `transaction_id` | Partial unique (WHERE status='pending') | Enforce single pending review per transaction. |
-| `review_queue_status_created_idx` | `status, created_at` | B-tree | List pending reviews in FIFO order; filter by status. |
-| `review_queue_transaction_id_idx` | `transaction_id` | B-tree | Look up reviews for a specific transaction. |
+| `annotations_pkey` | `id` | B-tree (implicit PK) | Primary key lookup. |
+| `annotations_short_id_key` | `short_id` | B-tree (unique) | Short ID lookup. |
+| `annotations_txn_idx` | `(transaction_id, created_at ASC)` | B-tree | Timeline query for a single transaction (ASC ordering matches UI rendering). |
+| `annotations_kind_idx` | `(kind, created_at DESC)` | B-tree | Cross-transaction queries by event kind (e.g. "recent rule applications"). |
 
 ---
 

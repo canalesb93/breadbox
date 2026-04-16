@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"breadbox/internal/service"
@@ -64,6 +65,8 @@ type queryTransactionsInput struct {
 	Search        string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant. Comma-separated values are ORed (e.g. starbucks,amazon matches either)."`
 	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"How to match the search term: contains (default, substring match), words (all words must match, good for multi-word queries), fuzzy (typo-tolerant via trigram similarity)"`
 	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions whose name or merchant matches this text. Comma-separated values are ORed. Use to filter out known merchants."`
+	Tags          []string `json:"tags,omitempty" jsonschema:"Filter to transactions that have EVERY tag slug in this list (AND semantics). Use list_tags to see available tags."`
+	AnyTag        []string `json:"any_tag,omitempty" jsonschema:"Filter to transactions that have AT LEAST ONE tag slug in this list (OR semantics)."`
 	Limit         int      `json:"limit,omitempty" jsonschema:"Max results (default 50, max 500)"`
 	Cursor        string   `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
 	SortBy        string   `json:"sort_by,omitempty" jsonschema:"Sort: date (default), amount, name"`
@@ -84,6 +87,8 @@ type countTransactionsInput struct {
 	Search        string   `json:"search,omitempty" jsonschema:"Search name or merchant. Comma-separated values are ORed."`
 	SearchMode    string   `json:"search_mode,omitempty" jsonschema:"Search mode: contains (default), words, fuzzy"`
 	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude transactions matching this text"`
+	Tags          []string `json:"tags,omitempty" jsonschema:"Filter to transactions that have EVERY tag slug in this list (AND semantics)."`
+	AnyTag        []string `json:"any_tag,omitempty" jsonschema:"Filter to transactions that have AT LEAST ONE tag slug in this list (OR semantics)."`
 }
 
 type triggerSyncInput struct {
@@ -94,7 +99,8 @@ type triggerSyncInput struct {
 type categorizeTransactionInput struct {
 	WriteSessionContext
 	TransactionID string `json:"transaction_id" jsonschema:"The transaction ID to categorize"`
-	CategoryID    string `json:"category_id" jsonschema:"The category ID to assign (use list_categories to find IDs)"`
+	CategoryID    string `json:"category_id,omitempty" jsonschema:"Category ID to assign. Provide either category_id or category_slug (not both)."`
+	CategorySlug  string `json:"category_slug,omitempty" jsonschema:"Category slug to assign (e.g. food_and_drink_groceries). Alternative to category_id — the slug is resolved to an ID automatically."`
 }
 
 type resetTransactionCategoryInput struct {
@@ -105,7 +111,7 @@ type resetTransactionCategoryInput struct {
 type addTransactionCommentInput struct {
 	WriteSessionContext
 	TransactionID string `json:"transaction_id" jsonschema:"required,UUID of the transaction to comment on"`
-	Content       string `json:"content" jsonschema:"required,Comment text (markdown supported, max 10000 chars)"`
+	Content       string `json:"content" jsonschema:"required,Free-standing comment about the transaction (markdown supported, max 10000 chars). For rationale tied to a tag change or category set, pass it via update_transactions — either as the inline 'comment' field or the 'note' on a tags_to_add/tags_to_remove entry — so the audit trail stays as a single linked annotation."`
 }
 
 type listTransactionCommentsInput struct {
@@ -138,26 +144,6 @@ type merchantSummaryInput struct {
 	ExcludeSearch string   `json:"exclude_search,omitempty" jsonschema:"Exclude merchants matching this text. Comma-separated values are ORed."`
 	MinCount      int      `json:"min_count,omitempty" jsonschema:"Minimum transaction count to include a merchant (default 1). Set to 2+ to find recurring charges."`
 	SpendingOnly  *bool    `json:"spending_only,omitempty" jsonschema:"Only include spending (positive amounts). Default false."`
-}
-
-type listPendingReviewsInput struct {
-	ReadSessionContext
-	ReviewType         string `json:"review_type,omitempty" jsonschema:"Filter by review type: new_transaction, uncategorized, manual, re_review"`
-	AccountID          string `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
-	UserID             string `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
-	CategoryPrimaryRaw string `json:"category_primary_raw,omitempty" jsonschema:"Filter by raw provider category (e.g., dining, groceries, general). Useful for batch processing reviews by category."`
-	Limit              int    `json:"limit,omitempty" jsonschema:"Max results (default 20, max 500)"`
-	Cursor             string `json:"cursor,omitempty" jsonschema:"Pagination cursor from previous result"`
-	Fields             string `json:"fields,omitempty" jsonschema:"Comma-separated fields to include. Aliases: triage (id+type+status+key transaction fields), review_core (id+type+status+confidence+created_at), transaction_core (transaction id+name+amount+date+category+account+user). Supports transaction.* fields (e.g. transaction.name, transaction.amount). Default: all fields."`
-}
-
-type submitReviewInput struct {
-	WriteSessionContext
-	ReviewID     string `json:"review_id" jsonschema:"required,UUID of the review to submit"`
-	Decision     string `json:"decision" jsonschema:"required,Decision: approved or skipped"`
-	CategoryID   string `json:"category_id,omitempty" jsonschema:"Category ID to assign. Provide either category_id or category_slug (not both)."`
-	CategorySlug string `json:"category_slug,omitempty" jsonschema:"Category slug to assign (e.g. food_and_drink_groceries). Alternative to category_id — the slug is resolved to an ID automatically."`
-	Note         string `json:"note,omitempty" jsonschema:"Optional note explaining the decision"`
 }
 
 type listCategoriesInput struct {
@@ -264,6 +250,12 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 	if input.ExcludeSearch != "" {
 		params.ExcludeSearch = &input.ExcludeSearch
 	}
+	if len(input.Tags) > 0 {
+		params.Tags = input.Tags
+	}
+	if len(input.AnyTag) > 0 {
+		params.AnyTag = input.AnyTag
+	}
 	if input.SortBy != "" {
 		params.SortBy = &input.SortBy
 	}
@@ -352,6 +344,12 @@ func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToo
 	if input.ExcludeSearch != "" {
 		params.ExcludeSearch = &input.ExcludeSearch
 	}
+	if len(input.Tags) > 0 {
+		params.Tags = input.Tags
+	}
+	if len(input.AnyTag) > 0 {
+		params.AnyTag = input.AnyTag
+	}
 
 	count, err := s.svc.CountTransactionsFiltered(ctx, params)
 	if err != nil {
@@ -421,10 +419,24 @@ func (s *MCPServer) handleCategorizeTransaction(ctx context.Context, _ *mcpsdk.C
 		return errorResult(err), nil, nil
 	}
 	ctx = context.Background()
-	if input.TransactionID == "" || input.CategoryID == "" {
-		return errorResult(fmt.Errorf("transaction_id and category_id are required")), nil, nil
+	if input.TransactionID == "" {
+		return errorResult(fmt.Errorf("transaction_id is required")), nil, nil
 	}
-	if err := s.svc.SetTransactionCategory(ctx, input.TransactionID, input.CategoryID); err != nil {
+	if input.CategoryID == "" && input.CategorySlug == "" {
+		return errorResult(fmt.Errorf("either category_id or category_slug is required")), nil, nil
+	}
+
+	// Resolve category_slug to category_id if provided. category_id takes precedence.
+	categoryID := input.CategoryID
+	if categoryID == "" && input.CategorySlug != "" {
+		cat, err := s.svc.GetCategoryBySlug(ctx, input.CategorySlug)
+		if err != nil {
+			return errorResult(fmt.Errorf("invalid category_slug %q: %w", input.CategorySlug, err)), nil, nil
+		}
+		categoryID = cat.ID
+	}
+
+	if err := s.svc.SetTransactionCategory(ctx, input.TransactionID, categoryID); err != nil {
 		return errorResult(err), nil, nil
 	}
 	return &mcpsdk.CallToolResult{
@@ -611,127 +623,15 @@ func (s *MCPServer) handleImportCategories(ctx context.Context, _ *mcpsdk.CallTo
 	return jsonResult(result)
 }
 
-// --- Review Queue ---
-
-func (s *MCPServer) handleListPendingReviews(_ context.Context, _ *mcpsdk.CallToolRequest, input listPendingReviewsInput) (*mcpsdk.CallToolResult, any, error) {
-	ctx := context.Background()
-
-	if !s.svc.IsReviewsEnabled(ctx) {
-		return jsonResult(map[string]any{
-			"reviews":  []any{},
-			"total":    0,
-			"has_more": false,
-			"note":     "Transaction reviews are currently disabled. Enable them in the admin dashboard at /reviews.",
-		})
-	}
-
-	status := "pending"
-	params := service.ReviewListParams{
-		Status: &status,
-		Limit:  20,
-		Cursor: input.Cursor,
-	}
-	if input.ReviewType != "" {
-		params.ReviewType = &input.ReviewType
-	}
-	if input.AccountID != "" {
-		params.AccountID = &input.AccountID
-	}
-	if input.UserID != "" {
-		params.UserID = &input.UserID
-	}
-	if input.CategoryPrimaryRaw != "" {
-		params.CategoryPrimaryRaw = &input.CategoryPrimaryRaw
-	}
-	if input.Limit > 0 {
-		if input.Limit > 500 {
-			input.Limit = 500
-		}
-		params.Limit = input.Limit
-	}
-
-	fieldSet, err := service.ParseReviewFields(input.Fields)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	result, err := s.svc.ListReviews(ctx, params)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	// Normalize attribution on nested transactions.
-	for i := range result.Reviews {
-		if result.Reviews[i].Transaction != nil {
-			service.NormalizeTransactionAttribution(result.Reviews[i].Transaction)
-		}
-	}
-
-	if fieldSet != nil {
-		filtered := make([]map[string]any, len(result.Reviews))
-		for i, r := range result.Reviews {
-			filtered[i] = service.FilterReviewFields(r, fieldSet)
-		}
-		return jsonResult(map[string]any{
-			"reviews":     filtered,
-			"next_cursor": result.NextCursor,
-			"has_more":    result.HasMore,
-			"total":       result.Total,
-		})
-	}
-	return jsonResult(result)
-}
-
-func (s *MCPServer) handleSubmitReview(ctx context.Context, _ *mcpsdk.CallToolRequest, input submitReviewInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	if !s.svc.IsReviewsEnabled(context.Background()) {
-		return errorResult(fmt.Errorf("transaction reviews are currently disabled. Enable them in the admin dashboard at /reviews")), nil, nil
-	}
-
-	if input.ReviewID == "" || input.Decision == "" {
-		return errorResult(fmt.Errorf("review_id and decision are required")), nil, nil
-	}
-	actor := service.ActorFromContext(ctx)
-
-	// Resolve category_slug to category_id if provided.
-	categoryID := input.CategoryID
-	if categoryID == "" && input.CategorySlug != "" {
-		cat, err := s.svc.GetCategoryBySlug(ctx, input.CategorySlug)
-		if err != nil {
-			return errorResult(fmt.Errorf("invalid category_slug %q: %w", input.CategorySlug, err)), nil, nil
-		}
-		categoryID = cat.ID
-	}
-
-	params := service.SubmitReviewParams{
-		ReviewID: input.ReviewID,
-		Decision: input.Decision,
-		Actor:    actor,
-	}
-	if categoryID != "" {
-		params.CategoryID = &categoryID
-	}
-	if input.Note != "" {
-		params.Note = &input.Note
-	}
-	result, err := s.svc.SubmitReview(ctx, params)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(result)
-}
-
 // --- Transaction Rules ---
 
 type createTransactionRuleInput struct {
 	WriteSessionContext
 	Name               string              `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
-	Conditions         map[string]any      `json:"conditions" jsonschema:"required,JSON condition object. Simple: {\"field\": \"name\", \"op\": \"contains\", \"value\": \"uber\"}. AND: {\"and\": [{...}, {...}]}. OR: {\"or\": [{...}, {...}]}. NOT: {\"not\": {...}}. Fields: name merchant_name amount category_primary category_detailed pending provider account_id user_id user_name. Ops: eq neq contains not_contains matches(regex) gt gte lt lte in."`
-	Actions            []map[string]string `json:"actions,omitempty" jsonschema:"Array of actions to perform when rule matches. Each action: {\"field\": \"category\", \"value\": \"food_and_drink_restaurant\"}. Supported fields: category. If omitted, use category_slug instead."`
-	CategorySlug       string              `json:"category_slug,omitempty" jsonschema:"Shorthand for actions: [{\"field\": \"category\", \"value\": \"<slug>\"}]. Either actions or category_slug is required."`
+	Conditions         map[string]any      `json:"conditions,omitempty" jsonschema:"JSON condition object. Omit or pass {} to match every transaction. Simple: {\"field\":\"name\",\"op\":\"contains\",\"value\":\"uber\"}. AND/OR/NOT. Fields: name merchant_name amount category_primary category_detailed pending provider account_id user_id user_name tags. Ops: eq neq contains not_contains matches(regex) gt gte lt lte in."`
+	Actions            []map[string]string `json:"actions,omitempty" jsonschema:"Array of typed actions. {\"type\":\"set_category\",\"category_slug\":\"...\"}, {\"type\":\"add_tag\",\"tag_slug\":\"...\"}, or {\"type\":\"add_comment\",\"content\":\"...\"}. If omitted, use category_slug instead."`
+	CategorySlug       string              `json:"category_slug,omitempty" jsonschema:"Shorthand for actions: [{\"type\":\"set_category\",\"category_slug\":\"<slug>\"}]. Either actions or category_slug is required."`
+	Trigger            string              `json:"trigger,omitempty" jsonschema:"When the rule fires: 'on_create' (default — new transactions), 'on_update' (only on re-sync changes), 'always' (both)."`
 	Priority           int                 `json:"priority,omitempty" jsonschema:"Priority (higher wins when multiple rules set the same field). Default 10."`
 	ExpiresIn          string              `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
 	ApplyRetroactively bool                `json:"apply_retroactively,omitempty" jsonschema:"If true, immediately apply this rule to all existing non-overridden transactions after creation."`
@@ -751,9 +651,10 @@ type updateTransactionRuleInput struct {
 	WriteSessionContext
 	ID           string               `json:"id" jsonschema:"required,UUID of the rule to update"`
 	Name         *string              `json:"name,omitempty" jsonschema:"New name for the rule"`
-	Conditions   map[string]any       `json:"conditions,omitempty" jsonschema:"New condition tree (same format as create)"`
-	Actions      *[]map[string]string `json:"actions,omitempty" jsonschema:"Replace actions array. Each action: {\"field\": \"category\", \"value\": \"slug\"}. Supported fields: category."`
-	CategorySlug *string              `json:"category_slug,omitempty" jsonschema:"Shorthand: replace the category action. Other actions are kept."`
+	Conditions   map[string]any       `json:"conditions,omitempty" jsonschema:"New condition tree (same format as create). Pass {} to change to match-all."`
+	Actions      *[]map[string]string `json:"actions,omitempty" jsonschema:"Replace actions array with typed actions. Each: {\"type\":\"set_category\",\"category_slug\":\"...\"} or {\"type\":\"add_tag\",\"tag_slug\":\"...\"} or {\"type\":\"add_comment\",\"content\":\"...\"}."`
+	CategorySlug *string              `json:"category_slug,omitempty" jsonschema:"Shorthand: replace the set_category action. Other actions are kept."`
+	Trigger      *string              `json:"trigger,omitempty" jsonschema:"New trigger: on_create, on_update, or always."`
 	Priority     *int                 `json:"priority,omitempty" jsonschema:"New priority"`
 	Enabled      *bool                `json:"enabled,omitempty" jsonschema:"Enable or disable the rule"`
 	ExpiresAt    *string              `json:"expires_at,omitempty" jsonschema:"New expiry timestamp (RFC3339) or empty string to clear"`
@@ -771,9 +672,10 @@ type batchCreateRulesInput struct {
 
 type batchRuleItem struct {
 	Name         string              `json:"name" jsonschema:"required,Human-readable rule name"`
-	Actions      []map[string]string `json:"actions,omitempty" jsonschema:"Actions array (same format as create_transaction_rule)"`
-	CategorySlug string              `json:"category_slug,omitempty" jsonschema:"Shorthand for category action. Either actions or category_slug required."`
-	Conditions   map[string]any      `json:"conditions" jsonschema:"required,Condition tree as JSON object"`
+	Actions      []map[string]string `json:"actions,omitempty" jsonschema:"Actions array (typed — same format as create_transaction_rule)"`
+	CategorySlug string              `json:"category_slug,omitempty" jsonschema:"Shorthand for set_category action. Either actions or category_slug required."`
+	Conditions   map[string]any      `json:"conditions,omitempty" jsonschema:"Condition tree as JSON object. Omit or {} for match-all."`
+	Trigger      string              `json:"trigger,omitempty" jsonschema:"on_create (default), on_update, or always."`
 	Priority     int                 `json:"priority,omitempty" jsonschema:"Priority (default 10)"`
 	ExpiresIn    string              `json:"expires_in,omitempty" jsonschema:"Optional expiry duration"`
 }
@@ -787,19 +689,6 @@ type previewRuleInput struct {
 	ReadSessionContext
 	Conditions map[string]any `json:"conditions" jsonschema:"required,Condition tree to evaluate against existing transactions (same format as create_transaction_rule conditions)."`
 	SampleSize int            `json:"sample_size,omitempty" jsonschema:"Number of sample matching transactions to return (default 10, max 50)."`
-}
-
-type batchSubmitReviewsInput struct {
-	WriteSessionContext
-	Reviews []batchReviewItem `json:"reviews" jsonschema:"required,Array of review decisions to submit"`
-}
-
-type batchReviewItem struct {
-	ReviewID     string  `json:"review_id" jsonschema:"required,UUID of the review"`
-	Decision     string  `json:"decision" jsonschema:"required,Decision: approved or skipped"`
-	CategorySlug *string `json:"category_slug,omitempty" jsonschema:"Category slug to assign (alternative to category_id). Use list_categories to find slugs."`
-	CategoryID   *string `json:"category_id,omitempty" jsonschema:"Category ID to assign (alternative to category_slug)"`
-	Note         *string `json:"note,omitempty" jsonschema:"Optional note explaining the decision"`
 }
 
 func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.CallToolRequest, input createTransactionRuleInput) (*mcpsdk.CallToolResult, any, error) {
@@ -829,6 +718,7 @@ func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.C
 		Conditions:   conditions,
 		Actions:      convertMCPActions(input.Actions),
 		CategorySlug: input.CategorySlug,
+		Trigger:      input.Trigger,
 		Priority:     priority,
 		ExpiresIn:    input.ExpiresIn,
 		Actor:        actor,
@@ -907,6 +797,7 @@ func (s *MCPServer) handleUpdateTransactionRule(ctx context.Context, _ *mcpsdk.C
 		Conditions:   conditionsPtr,
 		Actions:      actionsPtr,
 		CategorySlug: input.CategorySlug,
+		Trigger:      input.Trigger,
 		Priority:     input.Priority,
 		Enabled:      input.Enabled,
 		ExpiresAt:    input.ExpiresAt,
@@ -969,62 +860,14 @@ func (s *MCPServer) handleApplyRules(ctx context.Context, _ *mcpsdk.CallToolRequ
 func (s *MCPServer) handlePreviewRule(_ context.Context, _ *mcpsdk.CallToolRequest, input previewRuleInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
 
-	if len(input.Conditions) == 0 {
-		return errorResult(fmt.Errorf("conditions are required")), nil, nil
-	}
-
+	// An empty conditions object is allowed (match-all) — service layer accepts
+	// a zero-value Condition as "match every transaction".
 	conditions, err := parseConditions(input.Conditions)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
 
 	result, err := s.svc.PreviewRule(ctx, conditions, input.SampleSize)
-	if err != nil {
-		return errorResult(err), nil, nil
-	}
-	return jsonResult(result)
-}
-
-func (s *MCPServer) handleBatchSubmitReviews(ctx context.Context, _ *mcpsdk.CallToolRequest, input batchSubmitReviewsInput) (*mcpsdk.CallToolResult, any, error) {
-	if err := s.checkWritePermission(ctx); err != nil {
-		return errorResult(err), nil, nil
-	}
-
-	if !s.svc.IsReviewsEnabled(context.Background()) {
-		return errorResult(fmt.Errorf("transaction reviews are currently disabled. Enable them in the admin dashboard at /reviews")), nil, nil
-	}
-
-	if len(input.Reviews) == 0 {
-		return errorResult(fmt.Errorf("reviews array is required and must not be empty")), nil, nil
-	}
-
-	actor := service.ActorFromContext(ctx)
-
-	// Resolve category slugs to IDs
-	items := make([]service.BulkReviewItem, len(input.Reviews))
-	for i, r := range input.Reviews {
-		items[i] = service.BulkReviewItem{
-			ReviewID: r.ReviewID,
-			Decision: r.Decision,
-			Note:     r.Note,
-		}
-
-		// CategoryID takes precedence over CategorySlug
-		if r.CategoryID != nil && *r.CategoryID != "" {
-			items[i].CategoryID = r.CategoryID
-		} else if r.CategorySlug != nil && *r.CategorySlug != "" {
-			cat, err := s.svc.GetCategoryBySlug(ctx, *r.CategorySlug)
-			if err != nil {
-				return errorResult(fmt.Errorf("review %s: category slug %q not found", r.ReviewID, *r.CategorySlug)), nil, nil
-			}
-			items[i].CategoryID = &cat.ID
-		}
-	}
-
-	result, err := s.svc.BulkSubmitReviews(ctx, service.BulkSubmitReviewParams{
-		Reviews: items,
-		Actor:   actor,
-	})
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
@@ -1047,14 +890,15 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 	var errors []map[string]string
 
 	for i, r := range input.Rules {
-		if r.Name == "" || (len(r.Actions) == 0 && r.CategorySlug == "") || len(r.Conditions) == 0 {
+		if r.Name == "" || (len(r.Actions) == 0 && r.CategorySlug == "") {
 			errors = append(errors, map[string]string{
 				"index": fmt.Sprintf("%d", i),
-				"error": "name, conditions, and either actions or category_slug are required",
+				"error": "name and either actions or category_slug are required",
 			})
 			continue
 		}
 
+		// Empty conditions == match-all in Phase 1.
 		conditions, err := parseConditions(r.Conditions)
 		if err != nil {
 			errors = append(errors, map[string]string{
@@ -1075,6 +919,7 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 			Conditions:   conditions,
 			Actions:      convertMCPActions(r.Actions),
 			CategorySlug: r.CategorySlug,
+			Trigger:      r.Trigger,
 			Priority:     priority,
 			ExpiresIn:    r.ExpiresIn,
 			Actor:        actor,
@@ -1112,17 +957,20 @@ type batchCategorizeItemInput struct {
 
 type bulkRecategorizeInput struct {
 	WriteSessionContext
-	TargetCategorySlug string   `json:"target_category_slug" jsonschema:"required,Category slug to assign to all matching transactions"`
+	FromCategory       string   `json:"from_category,omitempty" jsonschema:"Source category slug — only transactions currently in this category are matched. Optional if other filters are provided."`
+	ToCategory         string   `json:"to_category,omitempty" jsonschema:"Destination category slug — matching transactions are moved here. Required (or provide target_category_slug)."`
 	StartDate          string   `json:"start_date,omitempty" jsonschema:"Start date (YYYY-MM-DD) inclusive"`
 	EndDate            string   `json:"end_date,omitempty" jsonschema:"End date (YYYY-MM-DD) exclusive"`
 	AccountID          string   `json:"account_id,omitempty" jsonschema:"Filter by account ID"`
 	UserID             string   `json:"user_id,omitempty" jsonschema:"Filter by user ID (family member)"`
-	CategorySlug       string   `json:"category_slug,omitempty" jsonschema:"Filter by current category slug"`
 	MinAmount          *float64 `json:"min_amount,omitempty" jsonschema:"Minimum amount (positive=debit, negative=credit)"`
 	MaxAmount          *float64 `json:"max_amount,omitempty" jsonschema:"Maximum amount (positive=debit, negative=credit)"`
 	Pending            *bool    `json:"pending,omitempty" jsonschema:"Filter by pending status"`
 	Search             string   `json:"search,omitempty" jsonschema:"Search transaction name or merchant"`
 	NameContains       string   `json:"name_contains,omitempty" jsonschema:"Filter transactions whose name contains this string"`
+	// Deprecated fields — retained for backward compatibility with older agent sessions.
+	TargetCategorySlug string `json:"target_category_slug,omitempty" jsonschema:"Deprecated: use to_category instead. Destination category slug."`
+	CategorySlug       string `json:"category_slug,omitempty" jsonschema:"Deprecated: use from_category instead. Source category slug filter."`
 }
 
 func (s *MCPServer) handleBatchCategorize(ctx context.Context, _ *mcpsdk.CallToolRequest, input batchCategorizeInput) (*mcpsdk.CallToolResult, any, error) {
@@ -1152,12 +1000,23 @@ func (s *MCPServer) handleBulkRecategorize(ctx context.Context, _ *mcpsdk.CallTo
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
-	if input.TargetCategorySlug == "" {
-		return errorResult(fmt.Errorf("target_category_slug is required")), nil, nil
+
+	// Prefer new param names; fall back to deprecated aliases for backward compatibility.
+	toCategory := input.ToCategory
+	if toCategory == "" {
+		toCategory = input.TargetCategorySlug
+	}
+	fromCategory := input.FromCategory
+	if fromCategory == "" {
+		fromCategory = input.CategorySlug
+	}
+
+	if toCategory == "" {
+		return errorResult(fmt.Errorf("to_category is required")), nil, nil
 	}
 
 	params := service.BulkRecategorizeParams{
-		TargetCategorySlug: input.TargetCategorySlug,
+		TargetCategorySlug: toCategory,
 	}
 
 	if input.StartDate != "" {
@@ -1180,8 +1039,8 @@ func (s *MCPServer) handleBulkRecategorize(ctx context.Context, _ *mcpsdk.CallTo
 	if input.UserID != "" {
 		params.UserID = &input.UserID
 	}
-	if input.CategorySlug != "" {
-		params.CategorySlug = &input.CategorySlug
+	if fromCategory != "" {
+		params.CategorySlug = &fromCategory
 	}
 	if input.MinAmount != nil {
 		params.MinAmount = input.MinAmount
@@ -1236,13 +1095,30 @@ func (s *MCPServer) handleSubmitReport(reqCtx context.Context, _ *mcpsdk.CallToo
 
 // parseConditions converts a map[string]any (from MCP input) to a service.Condition.
 // convertMCPActions converts MCP action maps to service RuleAction slice.
+//
+// Phase 1: accepts typed shape {type, category_slug|tag_slug|content}. For
+// back-compat during migration, legacy shape {field:"category", value:"<slug>"}
+// is auto-translated to {type:"set_category", category_slug:"<slug>"}.
 func convertMCPActions(actions []map[string]string) []service.RuleAction {
 	if len(actions) == 0 {
 		return nil
 	}
 	result := make([]service.RuleAction, len(actions))
 	for i, a := range actions {
-		result[i] = service.RuleAction{Field: a["field"], Value: a["value"]}
+		act := service.RuleAction{
+			Type:         a["type"],
+			CategorySlug: a["category_slug"],
+			TagSlug:      a["tag_slug"],
+			Content:      a["content"],
+		}
+		// Legacy shape: {"field":"category","value":"<slug>"}.
+		if act.Type == "" {
+			if field, ok := a["field"]; ok && field == "category" {
+				act.Type = "set_category"
+				act.CategorySlug = a["value"]
+			}
+		}
+		result[i] = act
 	}
 	return result
 }
@@ -1277,18 +1153,16 @@ func jsonResult(v any) (*mcpsdk.CallToolResult, any, error) {
 	}, nil, nil
 }
 
-// compactIDs recursively walks a JSON structure and replaces "id" with the
-// "short_id" value wherever both fields exist in the same object, then removes
-// "short_id". This makes MCP responses use compact 8-char IDs by default.
+// compactIDs recursively walks a JSON structure and compacts ID pairs in place.
+// For every key ending in "_short_id" (or the bare "short_id") with a non-null
+// string value, the sibling "{prefix}_id" (or bare "id") field is replaced with
+// the short_id value and the "_short_id" key is removed. This covers both an
+// object's own id/short_id pair and its FK references (e.g. account_id +
+// account_short_id → account_id=<short>).
 func compactIDs(v any) {
 	switch val := v.(type) {
 	case map[string]any:
-		if shortID, ok := val["short_id"]; ok {
-			if _, hasID := val["id"]; hasID {
-				val["id"] = shortID
-			}
-			delete(val, "short_id")
-		}
+		compactIDPairs(val)
 		for _, child := range val {
 			compactIDs(child)
 		}
@@ -1299,20 +1173,60 @@ func compactIDs(v any) {
 	}
 }
 
-// compactIDsBytes performs the id/short_id compaction directly on JSON bytes,
-// avoiding the unmarshal→walk→remarshal cycle. It scans the byte stream for
-// objects containing "id" and "short_id" keys, replaces the id value with
-// the short_id value, and removes the short_id entry.
+// compactIDPairs applies id/short_id compaction to a single object map.
+func compactIDPairs(m map[string]any) {
+	for key, val := range m {
+		prefix, ok := shortIDPrefix(key)
+		if !ok {
+			continue
+		}
+		shortVal, isString := val.(string)
+		if !isString || shortVal == "" {
+			// Non-string or null short_id: drop the sibling short_id key but
+			// leave the id value intact (compaction is ambiguous without a
+			// concrete short value).
+			delete(m, key)
+			continue
+		}
+		idKey := "id"
+		if prefix != "" {
+			idKey = prefix + "_id"
+		}
+		if _, hasID := m[idKey]; hasID {
+			m[idKey] = shortVal
+		}
+		delete(m, key)
+	}
+}
+
+// shortIDPrefix reports whether key names a short-id sibling and returns its
+// prefix. "short_id" → ("", true); "account_short_id" → ("account", true);
+// anything else → ("", false).
+func shortIDPrefix(key string) (string, bool) {
+	if key == "short_id" {
+		return "", true
+	}
+	if strings.HasSuffix(key, "_short_id") && len(key) > len("_short_id") {
+		return key[:len(key)-len("_short_id")], true
+	}
+	return "", false
+}
+
+// compactIDsBytes performs id/short_id compaction directly on JSON bytes,
+// avoiding the unmarshal→walk→remarshal cycle. It scans the byte stream and
+// collapses short-id sibling pairs:
 //
-// ORDERING ASSUMPTION: This function requires "id" to appear before "short_id"
-// in each JSON object. If "short_id" is encountered first, it is dropped but
-// the "id" value is NOT replaced. This assumption holds for json.Marshal output
-// because: (1) map keys are sorted alphabetically ("id" < "short_id"), and
-// (2) struct fields are marshaled in declaration order (all Breadbox response
-// structs declare ID before ShortID). See TestCompactIDsBytesFieldOrdering.
+//   - own id: {"id":"<uuid>","short_id":"<short>"} → {"id":"<short>"}
+//   - FK id:  {"account_id":"<uuid>","account_short_id":"<short>"} →
+//             {"account_id":"<short>"}
+//
+// Any key ending in "_short_id" (or the bare "short_id") triggers the rewrite;
+// the "_short_id" key is always dropped. If the sibling id field is missing or
+// the short-id value is null, the id value is left untouched.
 func compactIDsBytes(data []byte) []byte {
-	// Quick check: if no short_id key exists, return as-is.
-	if !bytes.Contains(data, []byte(`"short_id"`)) {
+	// Quick check: if no short_id key exists anywhere, return as-is. Matches
+	// both "short_id" and any "*_short_id" suffix.
+	if !bytes.Contains(data, []byte(`short_id"`)) {
 		return data
 	}
 
@@ -1343,81 +1257,119 @@ func compactIDsScan(data []byte, out []byte) []byte {
 	return out
 }
 
-// compactIDsScanObject processes a JSON object starting at data[pos] (the '{').
-// It looks for "id" and "short_id" key-value pairs to perform the swap.
+// compactIDsScanObject processes a JSON object starting at data[pos] (the '{')
+// and compacts any id/short_id pairs within it (including FK pairs like
+// account_id/account_short_id). Operates in two phases: collect each entry's
+// key and value range, then emit — replacing id values with their sibling
+// short-id value when present, and dropping *_short_id keys.
 func compactIDsScanObject(data []byte, pos int, out []byte) (int, []byte) {
-	out = append(out, '{')
 	pos++ // skip '{'
 
-	// Track id value replacement state.
-	var idValueStart, idValueEnd int // byte range of the "id" value in out
-	hasID := false
-	firstEntry := true
+	type objEntry struct {
+		keyStart, keyEnd int // raw quoted key bytes in data
+		key              string
+		valStart, valEnd int
+	}
+
+	var entries []objEntry
+	// Small stack allocation for common case (≤8 fields typical; most responses fit within 32).
+	var entriesBuf [32]objEntry
+	entries = entriesBuf[:0]
 
 	for pos < len(data) && data[pos] != '}' {
-		// Skip comma between entries.
 		if data[pos] == ',' {
 			pos++
 		}
-
-		// Read key (must be a string).
 		keyStart := pos
 		key, keyEnd := scanJSONString(data, pos)
 		pos = keyEnd
-
-		// Skip colon.
 		if pos < len(data) && data[pos] == ':' {
 			pos++
 		}
-
-		// Check what key this is.
-		if key == "id" {
-			// Write the key, remember where the value starts in output.
-			if !firstEntry {
-				out = append(out, ',')
-			}
-			firstEntry = false
-			out = append(out, data[keyStart:keyEnd]...)
-			out = append(out, ':')
-			idValueStart = len(out)
-			pos, out = copyJSONValue(data, pos, out)
-			idValueEnd = len(out)
-			hasID = true
-		} else if key == "short_id" {
-			// Read the short_id value.
-			valStart := pos
-			valEnd := skipJSONValue(data, pos)
-			pos = valEnd
-
-			if hasID {
-				// Replace the id value in output with short_id value.
-				shortIDVal := data[valStart:valEnd]
-				// Rebuild output: everything before id value + short_id value + everything after id value.
-				tail := make([]byte, len(out)-idValueEnd)
-				copy(tail, out[idValueEnd:])
-				out = out[:idValueStart]
-				out = append(out, shortIDVal...)
-				out = append(out, tail...)
-			}
-			// Drop short_id from output (don't write it).
-		} else {
-			// Regular key: copy key + colon + value.
-			if !firstEntry {
-				out = append(out, ',')
-			}
-			firstEntry = false
-			out = append(out, data[keyStart:keyEnd]...)
-			out = append(out, ':')
-			pos, out = copyJSONValue(data, pos, out)
-		}
+		valStart := pos
+		valEnd := skipJSONValue(data, pos)
+		pos = valEnd
+		entries = append(entries, objEntry{keyStart, keyEnd, key, valStart, valEnd})
+	}
+	if pos < len(data) {
+		pos++ // skip '}'
 	}
 
-	// Skip closing '}'.
-	if pos < len(data) {
-		pos++
+	// Build prefix → entry index for *_short_id keys (only non-null string values
+	// are eligible; null/non-string short_ids can't replace an id value).
+	var shortByPrefix map[string]int
+	for i := range entries {
+		e := &entries[i]
+		prefix, ok := shortIDPrefix(e.key)
+		if !ok {
+			continue
+		}
+		// Skip if value is null — we still drop the short_id key below, but
+		// don't compact the id.
+		val := data[e.valStart:e.valEnd]
+		if len(val) == 0 || val[0] != '"' {
+			continue
+		}
+		if shortByPrefix == nil {
+			shortByPrefix = make(map[string]int, 4)
+		}
+		shortByPrefix[prefix] = i
+	}
+
+	// Emit entries, skipping short_id keys and swapping id values when paired.
+	out = append(out, '{')
+	first := true
+	for i := range entries {
+		e := &entries[i]
+		if _, isShort := shortIDPrefix(e.key); isShort {
+			continue // drop short_id/*_short_id keys
+		}
+
+		vs, ve := e.valStart, e.valEnd
+		if shortByPrefix != nil {
+			if prefix, isIDKey := idKeyPrefix(e.key); isIDKey {
+				if idx, ok := shortByPrefix[prefix]; ok {
+					vs, ve = entries[idx].valStart, entries[idx].valEnd
+				}
+			}
+		}
+
+		if !first {
+			out = append(out, ',')
+		}
+		first = false
+		out = append(out, data[e.keyStart:e.keyEnd]...)
+		out = append(out, ':')
+
+		// If the value source is the original id position (not swapped), scan
+		// for nested compaction. When swapped, the short-id value is a plain
+		// string so we can copy verbatim.
+		if vs == e.valStart && ve == e.valEnd && ve > vs {
+			switch data[vs] {
+			case '{':
+				_, out = compactIDsScanObject(data, vs, out)
+				continue
+			case '[':
+				_, out = compactIDsScanArray(data, vs, out)
+				continue
+			}
+		}
+		out = append(out, data[vs:ve]...)
 	}
 	out = append(out, '}')
 	return pos, out
+}
+
+// idKeyPrefix reports whether key names an id sibling and returns its prefix.
+// "id" → ("", true); "account_id" → ("account", true); else ("", false).
+func idKeyPrefix(key string) (string, bool) {
+	if key == "id" {
+		return "", true
+	}
+	if strings.HasSuffix(key, "_id") && len(key) > len("_id") {
+		return key[:len(key)-len("_id")], true
+	}
+	return "", false
 }
 
 // compactIDsScanArray processes a JSON array starting at data[pos] (the '[').
@@ -1560,12 +1512,3 @@ func scanJSONString(data []byte, pos int) (string, int) {
 	return s, end
 }
 
-func errorResult(err error) *mcpsdk.CallToolResult {
-	errJSON, _ := json.Marshal(map[string]string{"error": err.Error()})
-	return &mcpsdk.CallToolResult{
-		IsError: true,
-		Content: []mcpsdk.Content{
-			&mcpsdk.TextContent{Text: string(errJSON)},
-		},
-	}
-}

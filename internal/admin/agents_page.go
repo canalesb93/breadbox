@@ -57,8 +57,8 @@ func AgentsPageHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer, s
 		data["HasOAuthClients"] = hasOAuthClients
 
 		var pendingReviews, uncategorizedCount, ruleCount int64
-		if counts, err := svc.GetReviewCounts(ctx); err == nil {
-			pendingReviews = counts.Pending
+		if n, err := pendingReviewsCount(ctx, svc); err == nil {
+			pendingReviews = n
 		}
 		if cnt, err := svc.CountUncategorizedTransactions(ctx); err == nil {
 			uncategorizedCount = cnt
@@ -118,10 +118,14 @@ func AgentsPageHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer, s
 			"reset_transaction_category":    "Categorization",
 			"batch_categorize_transactions": "Categorization",
 			"bulk_recategorize":             "Categorization",
-			"pending_reviews_overview":      "Reviews",
-			"list_pending_reviews":          "Reviews",
-			"submit_review":                 "Reviews",
-			"batch_submit_reviews":          "Reviews",
+			"list_tags":                     "Tags",
+			"create_tag":                    "Tags",
+			"update_tag":                    "Tags",
+			"delete_tag":                    "Tags",
+			"add_transaction_tag":           "Tags",
+			"remove_transaction_tag":        "Tags",
+			"update_transactions":           "Tags",
+			"list_annotations":              "Tags",
 			"list_transaction_rules":        "Rules",
 			"create_transaction_rule":       "Rules",
 			"update_transaction_rule":       "Rules",
@@ -143,7 +147,7 @@ func AgentsPageHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer, s
 		}
 		groupOrder := []string{
 			"Session", "Accounts & Data", "Transactions", "Categories", "Categorization",
-			"Reviews", "Rules", "Account Links", "Comments & Reports",
+			"Tags", "Rules", "Account Links", "Comments & Reports",
 		}
 
 		toolsByGroup := make(map[string][]toolInfo)

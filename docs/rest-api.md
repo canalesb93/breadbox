@@ -2,7 +2,7 @@
 
 **Version:** 0.1.0
 
-> **Note:** This document covers the core API endpoints (health, accounts, transactions, users, connections, sync). For a complete list of all endpoints including reviews, rules, account links, reports, and batch operations, see the [API Quick Reference](api-reference.md).
+> **Note:** This document covers the core API endpoints (health, accounts, transactions, users, connections, sync). For a complete list of all endpoints including comments, rules, account links, reports, and batch operations, see the [API Quick Reference](api-reference.md).
 
 ---
 

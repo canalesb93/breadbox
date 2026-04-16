@@ -52,63 +52,6 @@
 <div x-show="rcTab === 'rules'">
 <div x-data="rulesPage()">
 
-<!-- Summary Stats Cards -->
-{{if .Rules}}
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 bb-stagger">
-  <!-- Total Rules -->
-  <div class="bb-card p-4">
-    <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
-        <i data-lucide="list-filter" class="w-4 h-4 text-base-content/40"></i>
-      </div>
-      <div>
-        <div class="text-2xl font-semibold tabular-nums leading-none">{{.Total}}</div>
-        <div class="text-xs text-base-content/40 mt-0.5">Total rules</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Active Rules -->
-  <div class="bb-card p-4">
-    <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 {{if gt .ActiveCount 0}}bg-success/10{{else}}bg-base-200/60{{end}}">
-        <i data-lucide="zap" class="w-4 h-4 {{if gt .ActiveCount 0}}text-success{{else}}text-base-content/40{{end}}"></i>
-      </div>
-      <div>
-        <div class="text-2xl font-semibold tabular-nums leading-none {{if gt .ActiveCount 0}}text-success{{end}}">{{.ActiveCount}}</div>
-        <div class="text-xs text-base-content/40 mt-0.5">Active</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Total Hits -->
-  <div class="bb-card p-4">
-    <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-        <i data-lucide="target" class="w-4 h-4 text-primary"></i>
-      </div>
-      <div>
-        <div class="text-2xl font-semibold tabular-nums leading-none">{{commaInt .TotalHits}}</div>
-        <div class="text-xs text-base-content/40 mt-0.5">Total hits</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Agent Created -->
-  <div class="bb-card p-4">
-    <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 {{if gt .AgentCreated 0}}bg-info/10{{else}}bg-base-200/60{{end}}">
-        <i data-lucide="bot" class="w-4 h-4 {{if gt .AgentCreated 0}}text-info{{else}}text-base-content/40{{end}}"></i>
-      </div>
-      <div>
-        <div class="text-2xl font-semibold tabular-nums leading-none">{{.AgentCreated}}</div>
-        <div class="text-xs text-base-content/40 mt-0.5">Agent-created</div>
-      </div>
-    </div>
-  </div>
-</div>
-{{end}}
-
 <!-- Filters Card -->
 <div class="bb-card mb-6" x-data="{ filtersOpen: {{if or .SearchFilter .CategoryFilter .EnabledFilter}}true{{else}}false{{end}} }">
   <div class="p-0">
@@ -211,10 +154,10 @@
         <span class="font-semibold text-sm truncate">{{.Name}}</span>
         {{if .Enabled}}
           {{if and .ExpiresAt (expired .ExpiresAt)}}
-          <span class="badge badge-warning badge-xs rounded-lg">Expired</span>
+          <span class="badge badge-warning badge-xs">Expired</span>
           {{end}}
         {{else}}
-        <span class="badge badge-ghost badge-xs rounded-lg">Disabled</span>
+        <span class="badge badge-ghost badge-xs">Disabled</span>
         {{end}}
       </div>
       <div class="text-xs text-base-content/40 mt-0.5 truncate" title="{{conditionSummary .Conditions}}">{{conditionSummary .Conditions}}</div>

@@ -15,8 +15,9 @@ const navBadgesKey contextKey = "navBadges"
 
 // NavBadges holds notification counts displayed in the sidebar navigation.
 type NavBadges struct {
+	// PendingReviews is the count of transactions currently tagged
+	// "needs-review". Displayed next to the Tags nav link.
 	PendingReviews       int64
-	ReviewsEnabled       bool
 	ConnectionsAttention int64
 	UnreadReports        int64
 	ShowGettingStarted   bool
@@ -30,14 +31,12 @@ func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Han
 			ctx := r.Context()
 			badges := NavBadges{}
 
-			// Check if reviews are enabled before counting.
-			if GetConfigBool(ctx, queries, "review_auto_enqueue") {
-				badges.ReviewsEnabled = true
-				if pending, err := queries.CountPendingReviews(ctx); err == nil {
-					badges.PendingReviews = pending
-				} else {
-					logger.Debug("nav badges: count pending reviews", "error", err)
-				}
+			// Count transactions currently tagged "needs-review" — this is
+			// the review backlog surfaced in the Tags nav badge.
+			if pending, err := countPendingReviewsFromTags(ctx, queries); err == nil {
+				badges.PendingReviews = pending
+			} else {
+				logger.Debug("nav badges: count pending reviews", "error", err)
 			}
 
 			if attn, err := queries.CountConnectionsNeedingAttention(ctx); err == nil {
@@ -67,6 +66,26 @@ func getNavBadges(ctx context.Context) NavBadges {
 		return badges
 	}
 	return NavBadges{}
+}
+
+// countPendingReviewsFromTags returns the number of transactions currently
+// tagged "needs-review" (excluding matched dependent transactions). This
+// replaces the Phase 2 review_queue count after Phase 3 retired that table.
+func countPendingReviewsFromTags(ctx context.Context, queries *db.Queries) (int64, error) {
+	return queries.CountTransactionsWithTagSlug(ctx, "needs-review")
+}
+
+// pendingReviewsCount returns the count of transactions currently tagged
+// "needs-review". Shared across agent_wizard / agents_page / mcp_guide.
+func pendingReviewsCount(ctx context.Context, svc pendingReviewCountSource) (int64, error) {
+	return svc.CountTransactionsTag(ctx, "needs-review")
+}
+
+// pendingReviewCountSource is satisfied by *service.Service via its
+// CountTransactionsTag helper. Narrow interface so middleware.go doesn't pull
+// service into the admin package indirectly.
+type pendingReviewCountSource interface {
+	CountTransactionsTag(ctx context.Context, slug string) (int64, error)
 }
 
 // RequireAuth is chi middleware that checks for an authenticated session.

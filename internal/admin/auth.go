@@ -115,6 +115,8 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRende
 			return
 		}
 
+		sm.RememberMe(r.Context(), r.FormValue("remember_me") != "")
+
 		sm.Put(r.Context(), sessionKeyAccountID, pgconv.FormatUUID(account.ID))
 		sm.Put(r.Context(), sessionKeyAccountUsername, account.Username)
 		sm.Put(r.Context(), sessionKeyAccountRole, account.Role)

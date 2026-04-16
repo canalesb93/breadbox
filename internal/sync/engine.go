@@ -2,10 +2,10 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
 	gosync "sync"
 	"time"
 
@@ -19,6 +19,12 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// jsonMarshalMap marshals a map[string]any into JSON bytes. Tiny wrapper to
+// keep callers concise.
+func jsonMarshalMap(m map[string]any) ([]byte, error) {
+	return json.Marshal(m)
+}
+
 // accountSyncCounts tracks per-account transaction counts during a sync.
 type accountSyncCounts struct {
 	AccountID   pgtype.UUID
@@ -30,10 +36,13 @@ type accountSyncCounts struct {
 }
 
 // pendingApplication holds a deferred rule application record to be batch-inserted
-// after the transaction processing loops complete.
+// after the transaction processing loops complete. Phase 2 also uses this to
+// drive the matching `rule_applied` annotation row (dual-write bridge).
 type pendingApplication struct {
 	txnID       pgtype.UUID
 	ruleID      pgtype.UUID
+	ruleShortID string
+	ruleName    string
 	actionField string
 	actionValue string
 }
@@ -202,13 +211,9 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		resolver = nil
 	}
 
-	// Read review queue config.
-	reviewAutoEnqueue := false // reviews are off by default
-	if cfg, err := e.db.GetAppConfig(ctx, "review_auto_enqueue"); err == nil && cfg.Value.Valid {
-		if v, err := strconv.ParseBool(cfg.Value.String); err == nil {
-			reviewAutoEnqueue = v
-		}
-	}
+	// Phase 1 (Rule Actions v2): review_auto_enqueue is removed. Phase 2 will
+	// reintroduce the review flow via a seeded rule + tag; until then sync
+	// does not auto-enqueue transactions for review.
 
 	// Pre-fetch all account IDs and display names for this connection in one query.
 	// This eliminates per-transaction DB lookups during the sync loop. The caches
@@ -281,6 +286,13 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		}
 		defer tx.Rollback(ctx)
 
+		// Sanity: confirm the tx is usable immediately after BEGIN. If this fails
+		// we know the pool handed us a poisoned connection rather than a later
+		// statement being the root cause of a 25P02 cascade.
+		if _, err := tx.Exec(ctx, "SELECT 1"); err != nil {
+			logger.Error("tx sanity check failed", "error", err)
+		}
+
 		txQueries := e.db.WithTx(tx)
 
 		// Process removed FIRST.
@@ -317,7 +329,6 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			resolver:         resolver,
 			userID:           conn.UserID,
 			userName:         userName,
-			reviewAutoEnqueue: reviewAutoEnqueue,
 			upsertStart:      upsertStart,
 			perAccount:       perAccount,
 			logger:           logger,
@@ -354,15 +365,30 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			ruleApplications = append(ruleApplications, result.ruleApplications...)
 		}
 
-		// Batch-insert rule application records.
+		// Write rule_applied annotations per transaction-rule pair. Phase 3
+		// retired transaction_rule_applications; annotations are the sole
+		// record. actor_type="system" (annotations constrain actor_type to
+		// user|agent|system — rule_id in the dedicated column carries the rule
+		// back-reference).
 		for _, app := range ruleApplications {
-			_, _ = tx.Exec(ctx,
-				`INSERT INTO transaction_rule_applications (transaction_id, rule_id, action_field, action_value, applied_by)
-				VALUES ($1, $2, $3, $4, 'sync')
-				ON CONFLICT (transaction_id, rule_id, action_field) DO UPDATE
-				SET applied_at = NOW(), action_value = EXCLUDED.action_value
-				WHERE transaction_rule_applications.action_value IS DISTINCT FROM EXCLUDED.action_value`,
-				app.txnID, app.ruleID, app.actionField, app.actionValue)
+			payload := map[string]any{
+				"rule_id":      app.ruleShortID,
+				"rule_name":    app.ruleName,
+				"action_field": app.actionField,
+				"action_value": app.actionValue,
+				"applied_by":   "sync",
+			}
+			if err := writeSyncAnnotation(ctx, tx, writeSyncAnnotationParams{
+				TransactionID: app.txnID,
+				Kind:          "rule_applied",
+				ActorType:     "system",
+				ActorID:       app.ruleShortID,
+				ActorName:     app.ruleName,
+				Payload:       payload,
+				RuleID:        app.ruleID,
+			}); err != nil {
+				logger.Error("insert rule_applied annotation", "transaction_id", app.txnID, "rule_id", app.ruleID, "error", err)
+			}
 		}
 
 		if skipped > 0 {
@@ -433,7 +459,6 @@ type processTransactionOpts struct {
 	resolver         *RuleResolver
 	userID           pgtype.UUID
 	userName         string
-	reviewAutoEnqueue bool
 	upsertStart      time.Time
 	perAccount       map[string]*accountSyncCounts
 	logger           *slog.Logger
@@ -497,21 +522,25 @@ func (e *Engine) processTransaction(ctx context.Context, txn *provider.Transacti
 	}
 
 	// Apply rules to new or changed transactions.
+	//
+	// Phase 3: the seeded "needs-review" rule+tag drives the review flow.
+	// The trigger column on rules decides which rules fire for isNew vs
+	// !isNew; the sync engine never writes to review_queue.
 	if isNew || isChanged {
-		sources, ruleErr := e.applyRulesToTransaction(ctx, opts.tx, txn, dbTxn, opts.accountIDCache, opts.providerName, opts.resolver, opts.userID, opts.userName)
+		sources, ruleErr := e.applyRulesToTransaction(ctx, opts.tx, txn, dbTxn, opts.accountIDCache, opts.providerName, opts.resolver, opts.userID, opts.userName, providerAdded && isNew)
 		if ruleErr != nil {
 			opts.logger.Error("apply rules to "+label+" txn", "external_id", txn.ExternalID, "error", ruleErr)
 		}
 		for _, src := range sources {
 			result.ruleApplications = append(result.ruleApplications, pendingApplication{
-				txnID: dbTxn.ID, ruleID: src.RuleID, actionField: src.ActionField, actionValue: src.ActionValue,
+				txnID:       dbTxn.ID,
+				ruleID:      src.RuleID,
+				ruleShortID: src.RuleShortID,
+				ruleName:    src.RuleName,
+				actionField: src.ActionField,
+				actionValue: src.ActionValue,
 			})
 		}
-	}
-
-	// Enqueue for review if enabled and transaction is new or changed.
-	if opts.reviewAutoEnqueue && (isNew || isChanged) {
-		e.enqueueForReview(ctx, opts.txQueries, dbTxn, providerAdded && isNew, opts.resolver)
 	}
 
 	// Track per-account counts.
@@ -556,22 +585,29 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 	return q.UpsertTransaction(ctx, params)
 }
 
-// applyRulesToTransaction evaluates rules against a transaction and updates the
-// category if a rule matches. Called only for new or changed transactions.
-func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *provider.Transaction, dbTxn db.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *RuleResolver, userID pgtype.UUID, userName string) ([]RuleActionSource, error) {
+// applyRulesToTransaction evaluates rules against a transaction and applies
+// their actions. Called only for new or changed transactions.
+//
+// isNew is threaded through to ResolveWithContext so trigger filtering
+// (on_create / on_update / always) decides which rules fire.
+//
+// Phase 3: set_category updates transactions.category_id, add_tag persists to
+// transaction_tags, add_comment writes an annotation. Every persistent change
+// also writes a kind-specific annotation row (the canonical activity timeline).
+func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *provider.Transaction, dbTxn db.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *RuleResolver, userID pgtype.UUID, userName string, isNew bool) ([]RuleActionSource, error) {
 	if resolver == nil {
 		return nil, nil
 	}
 
 	accountID, _ := e.resolveAccountID(ctx, txn.AccountExternalID, cache)
 	tctx := TransactionContext{
-		Name:       txn.Name,
-		Amount:     txn.Amount.InexactFloat64(),
-		Pending:    txn.Pending,
-		Provider:   providerName,
-		AccountID:  pgconv.FormatUUID(accountID),
-		UserID:     pgconv.FormatUUID(userID),
-		UserName:   userName,
+		Name:      txn.Name,
+		Amount:    txn.Amount.InexactFloat64(),
+		Pending:   txn.Pending,
+		Provider:  providerName,
+		AccountID: pgconv.FormatUUID(accountID),
+		UserID:    pgconv.FormatUUID(userID),
+		UserName:  userName,
 	}
 	if txn.MerchantName != nil {
 		tctx.MerchantName = *txn.MerchantName
@@ -583,23 +619,272 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		tctx.CategoryDetailed = *txn.CategoryDetailed
 	}
 
-	result := resolver.ResolveWithContext(providerName, tctx)
+	// For changed transactions, load the current tag slugs so tag-based
+	// conditions can match. New transactions start with empty tags (any tags
+	// added by this sync pass are not visible to other rules in the same call).
+	if !isNew {
+		if slugs, err := e.loadTagSlugsInTx(ctx, tx, dbTxn.ID); err == nil {
+			tctx.Tags = slugs
+		}
+	}
+
+	result := resolver.ResolveWithContext(providerName, tctx, isNew)
 	if result == nil {
 		return nil, nil
 	}
 
-	// Only update category_id when a rule explicitly matched and the
-	// transaction doesn't have a manual override.
-	if result.CategoryID.Valid && !dbTxn.CategoryOverride {
-		_, err := tx.Exec(ctx,
-			`UPDATE transactions SET category_id = $1 WHERE id = $2 AND NOT category_override`,
-			result.CategoryID, dbTxn.ID)
-		if err != nil {
-			return result.Sources, fmt.Errorf("apply rule category: %w", err)
+	// Build quick lookup of Source rule-metadata by (field, value) so the tag /
+	// comment / category persistence below can attach the right rule_id, name,
+	// and short_id to each annotation.
+	type ruleRef struct {
+		ruleID      pgtype.UUID
+		ruleShortID string
+		ruleName    string
+	}
+	sourceByKey := make(map[string]ruleRef, len(result.Sources))
+	for _, src := range result.Sources {
+		key := src.ActionField + "|" + src.ActionValue
+		if _, exists := sourceByKey[key]; !exists {
+			sourceByKey[key] = ruleRef{src.RuleID, src.RuleShortID, src.RuleName}
+		}
+	}
+
+	// set_category: write category_id when a rule matched and the transaction
+	// doesn't have a manual override. Respects the "user wins" semantic.
+	if result.CategorySlug != "" && !dbTxn.CategoryOverride {
+		catID := resolver.CategoryIDForSlug(result.CategorySlug)
+		if catID.Valid {
+			_, err := tx.Exec(ctx,
+				`UPDATE transactions SET category_id = $1 WHERE id = $2 AND NOT category_override`,
+				catID, dbTxn.ID)
+			if err != nil {
+				return result.Sources, fmt.Errorf("apply rule category: %w", err)
+			}
+
+			src := sourceByKey["category|"+result.CategorySlug]
+			if err := writeSyncAnnotation(ctx, tx, writeSyncAnnotationParams{
+				TransactionID: dbTxn.ID,
+				Kind:          "category_set",
+				ActorType:     "system",
+				ActorID:       src.ruleShortID,
+				ActorName:     src.ruleName,
+				Payload: map[string]any{
+					"category_slug": result.CategorySlug,
+					"source":        "rule",
+				},
+				RuleID: src.ruleID,
+			}); err != nil {
+				return result.Sources, fmt.Errorf("annotate category_set: %w", err)
+			}
+		}
+	}
+
+	// add_tag: persist each tag to transaction_tags (auto-create missing tags)
+	// and write a matching tag_added annotation. Using the sync tx keeps the
+	// tag rows, annotations, and rule_applications all atomic together.
+	for _, slug := range result.TagsToAdd {
+		src := sourceByKey["tag|"+slug]
+		if err := e.applyTagFromRule(ctx, tx, dbTxn.ID, slug, src.ruleID, src.ruleShortID, src.ruleName); err != nil {
+			return result.Sources, err
+		}
+	}
+
+	// add_comment: persist as a comment annotation. Rule-authored comments
+	// attribute to the rule via rule_id back-reference.
+	for _, content := range result.Comments {
+		src := sourceByKey["comment|"+content]
+		if err := e.applyCommentFromRule(ctx, tx, dbTxn.ID, content, src.ruleID, src.ruleShortID, src.ruleName); err != nil {
+			return result.Sources, err
 		}
 	}
 
 	return result.Sources, nil
+}
+
+// loadTagSlugsInTx returns the current tag slugs for a transaction using the
+// sync DB transaction. Used by applyRulesToTransaction for changed txns so
+// tag-based conditions can match real data.
+func (e *Engine) loadTagSlugsInTx(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID) ([]string, error) {
+	rows, err := tx.Query(ctx, `
+		SELECT t.slug
+		FROM tags t
+		JOIN transaction_tags tt ON tt.tag_id = t.id
+		WHERE tt.transaction_id = $1
+		ORDER BY t.slug ASC`, txnID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var slugs []string
+	for rows.Next() {
+		var slug string
+		if err := rows.Scan(&slug); err != nil {
+			return nil, err
+		}
+		slugs = append(slugs, slug)
+	}
+	return slugs, rows.Err()
+}
+
+// applyTagFromRule upserts a (transaction, tag) row and writes the matching
+// tag_added annotation. Auto-creates the tag if its slug isn't registered yet.
+// All DB writes share the sync tx.
+func (e *Engine) applyTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, slug string, ruleID pgtype.UUID, ruleShortID, ruleName string) error {
+	// Ensure the tag exists. INSERT ON CONFLICT DO NOTHING + RETURNING is
+	// awkward when the row already exists (no row returned), so we do a
+	// two-step upsert: SELECT, then insert if missing. Short id trigger
+	// populates short_id on insert.
+	var tagID pgtype.UUID
+	err := tx.QueryRow(ctx, `SELECT id FROM tags WHERE slug = $1`, slug).Scan(&tagID)
+	if err != nil {
+		// Either no row (auto-create) or some other error.
+		err2 := tx.QueryRow(ctx, `
+			INSERT INTO tags (slug, display_name, lifecycle)
+			VALUES ($1, $2, 'persistent')
+			ON CONFLICT (slug) DO UPDATE SET updated_at = tags.updated_at
+			RETURNING id`, slug, titleCaseSlugForRule(slug)).Scan(&tagID)
+		if err2 != nil {
+			return fmt.Errorf("get or create tag %q: %w", slug, err2)
+		}
+	}
+
+	// Upsert transaction_tags. ON CONFLICT DO NOTHING keeps the first-wins
+	// semantic: if a prior add already recorded provenance, don't overwrite.
+	_, err = tx.Exec(ctx,
+		`INSERT INTO transaction_tags (transaction_id, tag_id, added_by_type, added_by_id, added_by_name)
+		VALUES ($1, $2, 'rule', $3, $4)
+		ON CONFLICT (transaction_id, tag_id) DO NOTHING`,
+		txnID, tagID, ruleShortID, ruleName)
+	if err != nil {
+		return fmt.Errorf("upsert transaction_tag: %w", err)
+	}
+
+	// Annotation. Only write when the tag was actually newly attached (we
+	// always write here since the upsert may be idempotent — the ON CONFLICT
+	// path means we might double-annotate across syncs, but that's OK for the
+	// bridge era; Phase 3 can dedupe if it matters).
+	//
+	// To avoid noise, check whether the row existed already by looking for a
+	// prior tag_added annotation within the same tag scope.
+	var exists bool
+	if err := tx.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM annotations WHERE transaction_id = $1 AND kind = 'tag_added' AND tag_id = $2)`,
+		txnID, tagID).Scan(&exists); err != nil {
+		return fmt.Errorf("check prior tag_added annotation: %w", err)
+	}
+	if exists {
+		return nil
+	}
+
+	payload := map[string]any{
+		"slug":      slug,
+		"source":    "rule",
+		"rule_id":   ruleShortID,
+		"rule_name": ruleName,
+	}
+	if err := writeSyncAnnotation(ctx, tx, writeSyncAnnotationParams{
+		TransactionID: txnID,
+		Kind:          "tag_added",
+		ActorType:     "system",
+		ActorID:       ruleShortID,
+		ActorName:     ruleName,
+		Payload:       payload,
+		TagID:         tagID,
+		RuleID:        ruleID,
+	}); err != nil {
+		return fmt.Errorf("annotate tag_added: %w", err)
+	}
+	return nil
+}
+
+// applyCommentFromRule writes a rule-authored comment annotation. Phase 3
+// retired transaction_comments; annotations are now the sole record.
+func (e *Engine) applyCommentFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, content string, ruleID pgtype.UUID, ruleShortID, ruleName string) error {
+	payload := map[string]any{
+		"content":   content,
+		"source":    "rule",
+		"rule_id":   ruleShortID,
+		"rule_name": ruleName,
+	}
+	if err := writeSyncAnnotation(ctx, tx, writeSyncAnnotationParams{
+		TransactionID: txnID,
+		Kind:          "comment",
+		ActorType:     "system",
+		ActorID:       ruleShortID,
+		ActorName:     ruleName,
+		Payload:       payload,
+		RuleID:        ruleID,
+	}); err != nil {
+		return fmt.Errorf("annotate rule comment: %w", err)
+	}
+	return nil
+}
+
+// titleCaseSlugForRule converts a slug ("needs-review") to a display name
+// ("Needs Review") for auto-created tags during sync. Mirrors
+// service.titleCaseSlug; duplicated here to keep sync → service dependency
+// direction one-way.
+func titleCaseSlugForRule(slug string) string {
+	out := make([]byte, 0, len(slug))
+	capitalize := true
+	for i := 0; i < len(slug); i++ {
+		c := slug[i]
+		if c == '-' || c == ':' || c == '_' {
+			out = append(out, ' ')
+			capitalize = true
+			continue
+		}
+		if capitalize && c >= 'a' && c <= 'z' {
+			out = append(out, c-32)
+			capitalize = false
+			continue
+		}
+		out = append(out, c)
+		capitalize = false
+	}
+	return string(out)
+}
+
+// writeSyncAnnotationParams is the sync-package-local mirror of
+// service.writeAnnotationParams — the sync package can't import service
+// without breaking the one-way dep direction. Only the fields the sync engine
+// needs are included.
+type writeSyncAnnotationParams struct {
+	TransactionID pgtype.UUID
+	Kind          string
+	ActorType     string
+	ActorID       string
+	ActorName     string
+	Payload       map[string]any
+	TagID         pgtype.UUID
+	RuleID        pgtype.UUID
+}
+
+// writeSyncAnnotation inserts an annotation row using the supplied sync tx.
+func writeSyncAnnotation(ctx context.Context, tx pgx.Tx, params writeSyncAnnotationParams) error {
+	var payloadJSON []byte
+	if params.Payload == nil {
+		payloadJSON = []byte(`{}`)
+	} else {
+		b, err := jsonMarshalMap(params.Payload)
+		if err != nil {
+			return fmt.Errorf("marshal payload: %w", err)
+		}
+		payloadJSON = b
+	}
+
+	actorID := pgtype.Text{}
+	if params.ActorID != "" {
+		actorID = pgtype.Text{String: params.ActorID, Valid: true}
+	}
+
+	_, err := tx.Exec(ctx,
+		`INSERT INTO annotations (transaction_id, kind, actor_type, actor_id, actor_name, session_id, payload, tag_id, rule_id)
+		VALUES ($1, $2, $3, $4, $5, NULL, $6::jsonb, $7, $8)`,
+		params.TransactionID, params.Kind, params.ActorType, actorID, params.ActorName, payloadJSON,
+		params.TagID, params.RuleID)
+	return err
 }
 
 // updateBalancesWithRetry fetches balances with 1 retry on transient errors.

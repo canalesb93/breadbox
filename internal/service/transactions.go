@@ -26,6 +26,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		"t.category_primary, t.category_detailed, t.category_confidence, " +
 		"t.payment_channel, t.pending, t.deleted_at, t.created_at, t.updated_at, " +
 		"COALESCE(a.display_name, a.name) AS account_name, " +
+		"a.short_id AS account_short_id, " +
 		"COALESCE(au.name, u.name) AS user_name, " +
 		"t.category_id, t.category_override, " +
 		"c.slug AS cat_slug, c.display_name AS cat_display_name, c.icon AS cat_icon, c.color AS cat_color, " +
@@ -156,6 +157,27 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		argN = ec.ArgN
 	}
 
+	// Tag filters (Phase 2). Tags is AND semantics (transaction has every
+	// slug), AnyTag is OR (transaction has at least one).
+	if len(params.Tags) > 0 {
+		// For each tag in Tags, require an EXISTS — this is tractable because
+		// common usage is 1-2 tags per filter.
+		for _, slug := range params.Tags {
+			buf.WriteString(" AND EXISTS (SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = $")
+			buf.WriteString(strconv.Itoa(argN))
+			buf.WriteByte(')')
+			args = append(args, slug)
+			argN++
+		}
+	}
+	if len(params.AnyTag) > 0 {
+		buf.WriteString(" AND EXISTS (SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = ANY($")
+		buf.WriteString(strconv.Itoa(argN))
+		buf.WriteString("))")
+		args = append(args, params.AnyTag)
+		argN++
+	}
+
 	if params.Cursor != "" {
 		cursorDate, cursorID, err := DecodeCursor(params.Cursor)
 		if err != nil {
@@ -236,6 +258,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			createdAt              pgtype.Timestamptz
 			updatedAt              pgtype.Timestamptz
 			accountName            string
+			accountShortID         string
 			userName               pgtype.Text
 			categoryID             pgtype.UUID
 			categoryOverride       bool
@@ -257,7 +280,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			&name, &merchantName, &categoryPrimary, &categoryDetailed,
 			&categoryConfidence, &paymentChannel, &pending,
 			&deletedAt, &createdAt, &updatedAt,
-			&accountName, &userName,
+			&accountName, &accountShortID, &userName,
 			&categoryID, &categoryOverride,
 			&catSlug, &catDisplayName, &catIcon, &catColor,
 			&catPrimarySlug, &catPrimaryDisplayName,
@@ -293,10 +316,12 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			}
 		}
 
+		accountShortIDVal := accountShortID
 		transactions = append(transactions, TransactionResponse{
 			ID:                  formatUUID(id),
 			ShortID:             shortID,
 			AccountID:           uuidPtr(accountID),
+			AccountShortID:      &accountShortIDVal,
 			AccountName:         &accountName,
 			UserName:            textPtr(userName),
 			AttributedUserID:    uuidPtr(attributedUserID),
@@ -330,6 +355,12 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		transactions = transactions[:limit]
 	}
 
+	// Attach tags in one extra round-trip for the full result page. Uses ANY()
+	// so it's a single query regardless of page size.
+	if err := s.attachTagsToTransactions(ctx, transactions); err != nil {
+		s.Logger.Warn("attach tags to transactions", "error", err)
+	}
+
 	var nextCursor string
 	isDefaultSort := params.SortBy == nil || *params.SortBy == "date"
 	if hasMore && len(transactions) > 0 && isDefaultSort {
@@ -344,6 +375,49 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		HasMore:      hasMore,
 		Limit:        limit,
 	}, nil
+}
+
+// attachTagsToTransactions fills in the Tags field on each TransactionResponse
+// in-place using a single ANY() query.
+func (s *Service) attachTagsToTransactions(ctx context.Context, txns []TransactionResponse) error {
+	if len(txns) == 0 {
+		return nil
+	}
+	ids := make([]pgtype.UUID, 0, len(txns))
+	idx := make(map[string]int, len(txns))
+	for i, t := range txns {
+		uid, err := parseUUID(t.ID)
+		if err != nil {
+			continue
+		}
+		ids = append(ids, uid)
+		idx[t.ID] = i
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	rows, err := s.Pool.Query(ctx, `
+		SELECT tt.transaction_id, tag.slug
+		FROM transaction_tags tt
+		JOIN tags tag ON tag.id = tt.tag_id
+		WHERE tt.transaction_id = ANY($1)
+		ORDER BY tt.added_at ASC`, ids)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var txnID pgtype.UUID
+		var slug string
+		if err := rows.Scan(&txnID, &slug); err != nil {
+			return err
+		}
+		key := formatUUID(txnID)
+		if i, ok := idx[key]; ok {
+			txns[i].Tags = append(txns[i].Tags, slug)
+		}
+	}
+	return rows.Err()
 }
 
 func (s *Service) CountTransactions(ctx context.Context) (int64, error) {
@@ -478,6 +552,24 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 		argN = ec.ArgN
 	}
 
+	// Tag filters (Phase 2).
+	if len(params.Tags) > 0 {
+		for _, slug := range params.Tags {
+			buf.WriteString(" AND EXISTS (SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = $")
+			buf.WriteString(strconv.Itoa(argN))
+			buf.WriteByte(')')
+			args = append(args, slug)
+			argN++
+		}
+	}
+	if len(params.AnyTag) > 0 {
+		buf.WriteString(" AND EXISTS (SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = ANY($")
+		buf.WriteString(strconv.Itoa(argN))
+		buf.WriteString("))")
+		args = append(args, params.AnyTag)
+		argN++
+	}
+
 	_ = argN // keep for consistency
 	query := buf.String()
 	var count int64
@@ -499,8 +591,11 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		"t.date, t.name, t.merchant_name, t.amount, t.iso_currency_code, " +
 		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
 		"t.category_override, t.pending, " +
-		"EXISTS(SELECT 1 FROM review_queue rq WHERE rq.transaction_id = t.id AND rq.reviewer_type = 'agent' AND rq.status IN ('approved', 'rejected')) AS agent_reviewed, " +
-		"EXISTS(SELECT 1 FROM review_queue rq WHERE rq.transaction_id = t.id AND rq.status = 'pending') AS has_pending_review, " +
+		// Phase 3: review_queue retired. "Agent reviewed" is inferred from a
+		// category_set annotation authored by an agent. "Pending review" is
+		// the presence of the needs-review tag.
+		"EXISTS(SELECT 1 FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'category_set' AND ann.actor_type = 'agent') AS agent_reviewed, " +
+		"EXISTS(SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = 'needs-review') AS has_pending_review, " +
 		"t.created_at, t.updated_at, " +
 		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id " +
 		"FROM transactions t " +
@@ -635,6 +730,24 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		buf.WriteString(ec.SQL)
 		args = append(args, ec.Args...)
 		argN = ec.ArgN
+	}
+
+	// Tag filters.
+	if len(params.Tags) > 0 {
+		for _, slug := range params.Tags {
+			buf.WriteString(" AND EXISTS (SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = $")
+			buf.WriteString(strconv.Itoa(argN))
+			buf.WriteByte(')')
+			args = append(args, slug)
+			argN++
+		}
+	}
+	if len(params.AnyTag) > 0 {
+		buf.WriteString(" AND EXISTS (SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = ANY($")
+		buf.WriteString(strconv.Itoa(argN))
+		buf.WriteString("))")
+		args = append(args, params.AnyTag)
+		argN++
 	}
 
 	// Extract WHERE clauses for count query from the builder.
@@ -781,6 +894,48 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate admin transactions: %w", err)
+	}
+
+	// Batched tag lookup for the rendered page.
+	if len(transactions) > 0 {
+		ids := make([]pgtype.UUID, 0, len(transactions))
+		idIdx := make(map[string]int, len(transactions))
+		for i, tx := range transactions {
+			var u pgtype.UUID
+			if err := u.Scan(tx.ID); err == nil {
+				ids = append(ids, u)
+				idIdx[tx.ID] = i
+			}
+		}
+		if len(ids) > 0 {
+			tagRows, err := s.Pool.Query(ctx, `
+				SELECT tt.transaction_id, t.slug, t.display_name, t.color, t.icon, t.lifecycle
+				FROM transaction_tags tt
+				JOIN tags t ON t.id = tt.tag_id
+				WHERE tt.transaction_id = ANY($1)
+				ORDER BY tt.added_at ASC`, ids)
+			if err == nil {
+				defer tagRows.Close()
+				for tagRows.Next() {
+					var txnID pgtype.UUID
+					var slug, displayName, lifecycle string
+					var color, icon pgtype.Text
+					if scanErr := tagRows.Scan(&txnID, &slug, &displayName, &color, &icon, &lifecycle); scanErr != nil {
+						continue
+					}
+					tag := AdminTransactionTag{
+						Slug:        slug,
+						DisplayName: displayName,
+						Color:       textPtr(color),
+						Icon:        textPtr(icon),
+						Lifecycle:   lifecycle,
+					}
+					if idx, ok := idIdx[formatUUID(txnID)]; ok {
+						transactions[idx].Tags = append(transactions[idx].Tags, tag)
+					}
+				}
+			}
+		}
 	}
 
 	totalPages := 1

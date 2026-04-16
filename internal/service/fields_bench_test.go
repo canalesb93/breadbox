@@ -65,41 +65,8 @@ func benchTransactionResponse() TransactionResponse {
 	}
 }
 
-// benchReviewResponse returns a ReviewResponse with nested transaction populated.
-func benchReviewResponse() ReviewResponse {
-	provider := "plaid"
-	suggestedSlug := "food_and_drink_groceries"
-	suggestedDisplayName := "Groceries"
-	confidence := 0.92
-	reviewerType := "agent"
-	reviewerID := "agent-1"
-	reviewerName := "auto-review"
-	note := "matched recurring merchant rule"
-	resolvedSlug := "food_and_drink_groceries"
-	resolvedDisplayName := "Groceries"
-	reviewedAt := "2026-04-03T10:00:00Z"
-	txn := benchTransactionResponse()
-	return ReviewResponse{
-		ID:                           "rev-abcdefgh",
-		ShortID:                      "Q2mP7xK9",
-		TransactionID:                "txn-abcdefgh",
-		ReviewType:                   "uncategorized",
-		Status:                       "pending",
-		Provider:                     &provider,
-		SuggestedCategory:            &suggestedSlug,
-		SuggestedCategoryDisplayName: &suggestedDisplayName,
-		ConfidenceScore:              &confidence,
-		ReviewerType:                 &reviewerType,
-		ReviewerID:                   &reviewerID,
-		ReviewerName:                 &reviewerName,
-		ReviewNote:                   &note,
-		ResolvedCategory:             &resolvedSlug,
-		ResolvedCategoryDisplayName:  &resolvedDisplayName,
-		CreatedAt:                    "2026-04-02T14:32:00Z",
-		ReviewedAt:                   &reviewedAt,
-		Transaction:                  &txn,
-	}
-}
+// benchReviewResponse was the Phase 2 benchmark fixture. Phase 3 retired
+// ReviewResponse; the review-field benchmarks were removed along with it.
 
 // mustParseFields panics on error; used in benchmark setup only.
 func mustParseFields(b *testing.B, raw string) map[string]bool {
@@ -107,15 +74,6 @@ func mustParseFields(b *testing.B, raw string) map[string]bool {
 	f, err := ParseFields(raw)
 	if err != nil {
 		b.Fatalf("ParseFields(%q): %v", raw, err)
-	}
-	return f
-}
-
-func mustParseReviewFields(b *testing.B, raw string) map[string]bool {
-	b.Helper()
-	f, err := ParseReviewFields(raw)
-	if err != nil {
-		b.Fatalf("ParseReviewFields(%q): %v", raw, err)
 	}
 	return f
 }
@@ -182,34 +140,4 @@ func BenchmarkFilterTransaction_Large_Core(b *testing.B) {
 	}
 }
 
-func BenchmarkFilterReview_Large_Triage(b *testing.B) {
-	const n = 500
-	reviews := make([]ReviewResponse, n)
-	for i := range reviews {
-		reviews[i] = benchReviewResponse()
-	}
-	fields := mustParseReviewFields(b, "triage")
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		for j := range reviews {
-			_ = FilterReviewFields(reviews[j], fields)
-		}
-	}
-}
-
-func BenchmarkFilterReview_Medium_ReviewCore(b *testing.B) {
-	const n = 50
-	reviews := make([]ReviewResponse, n)
-	for i := range reviews {
-		reviews[i] = benchReviewResponse()
-	}
-	fields := mustParseReviewFields(b, "review_core")
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		for j := range reviews {
-			_ = FilterReviewFields(reviews[j], fields)
-		}
-	}
-}
+// BenchmarkFilterReview_* were removed along with ReviewResponse in Phase 3.

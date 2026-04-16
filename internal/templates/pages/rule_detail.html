@@ -89,13 +89,19 @@
       <div class="mt-1 space-y-1">
         {{range .Rule.Actions}}
         <div class="flex items-center gap-2 p-2.5 bg-base-200/40 rounded-xl">
-          {{if eq .Field "category"}}
+          {{if eq .Type "set_category"}}
           <i data-lucide="tag" class="w-3.5 h-3.5 text-base-content/40"></i>
-          <span class="text-sm">Set category to <span class="font-semibold">{{if $.ActionCategoryName}}{{$.ActionCategoryName}}{{else}}{{.Value}}{{end}}</span></span>
-          {{if $.ActionCategoryName}}<span class="text-xs text-base-content/30 ml-1">({{.Value}})</span>{{end}}
+          <span class="text-sm">Set category to <span class="font-semibold">{{if $.ActionCategoryName}}{{$.ActionCategoryName}}{{else}}{{.CategorySlug}}{{end}}</span></span>
+          {{if $.ActionCategoryName}}<span class="text-xs text-base-content/30 ml-1">({{.CategorySlug}})</span>{{end}}
+          {{else if eq .Type "add_tag"}}
+          <i data-lucide="hash" class="w-3.5 h-3.5 text-base-content/40"></i>
+          <span class="text-sm">Add tag <span class="font-semibold">{{.TagSlug}}</span></span>
+          {{else if eq .Type "add_comment"}}
+          <i data-lucide="message-square" class="w-3.5 h-3.5 text-base-content/40"></i>
+          <span class="text-sm">Add comment: <span class="font-semibold">{{.Content}}</span></span>
           {{else}}
           <i data-lucide="settings" class="w-3.5 h-3.5 text-base-content/40"></i>
-          <span class="text-sm">Set {{.Field}} to <span class="font-semibold">{{.Value}}</span></span>
+          <span class="text-sm">Unknown action type: <span class="font-semibold">{{.Type}}</span></span>
           {{end}}
         </div>
         {{end}}

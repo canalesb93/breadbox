@@ -168,6 +168,14 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			params.SortOrder = "asc"
 		}
 
+		// Tag filters. ?tags=needs-review,foo (AND) and ?any_tag=a,b (OR).
+		if v := r.URL.Query().Get("tags"); v != "" {
+			params.Tags = splitCSV(v)
+		}
+		if v := r.URL.Query().Get("any_tag"); v != "" {
+			params.AnyTag = splitCSV(v)
+		}
+
 		// Scope to viewer's own data. Editors and admins see all.
 		if !IsEditor(sm, r) {
 			if uid := SessionUserID(sm, r); uid != "" {
@@ -234,6 +242,9 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 		// Group transactions by date for the modern list view.
 		dateGroups := groupTransactionsByDate(result.Transactions)
 
+		// Pull the registered tag list for the multi-select filter UI.
+		allTags, _ := svc.ListTags(ctx)
+
 		data := map[string]any{
 			"PageTitle":         "Transactions",
 			"CurrentPage":      "transactions",
@@ -245,6 +256,7 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			"Users":            users,
 			"Categories":       categoryTree,
 			"Connections":      connections,
+			"AllTags":          allTags,
 			"Page":             result.Page,
 			"PageSize":         result.PageSize,
 			"TotalPages":       result.TotalPages,
@@ -266,6 +278,8 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			"FilterSearchMode":  r.URL.Query().Get("search_mode"),
 			"FilterSearchField": r.URL.Query().Get("search_field"),
 			"FilterSort":        r.URL.Query().Get("sort"),
+			"FilterTags":        params.Tags,
+			"FilterAnyTag":      params.AnyTag,
 		}
 		tr.Render(w, r, "transactions.html", data)
 	}
@@ -343,6 +357,13 @@ func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 		}
 		if v := r.URL.Query().Get("sort"); v == "asc" {
 			params.SortOrder = "asc"
+		}
+
+		if v := r.URL.Query().Get("tags"); v != "" {
+			params.Tags = splitCSV(v)
+		}
+		if v := r.URL.Query().Get("any_tag"); v != "" {
+			params.AnyTag = splitCSV(v)
 		}
 
 		// Scope to viewer's own data. Editors and admins see all.
@@ -646,30 +667,33 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			}
 		}
 
-		comments, err := svc.ListComments(ctx, idStr)
+		// Phase 3: annotations are the canonical activity-timeline source.
+		// Review lifecycle events now flow through tag_added / tag_removed
+		// annotations for the needs-review tag.
+		annotations, err := svc.ListAnnotations(ctx, idStr)
 		if err != nil && !errors.Is(err, service.ErrNotFound) {
-			a.Logger.Error("list transaction comments", "error", err)
+			a.Logger.Error("list transaction annotations", "error", err)
 		}
 
-		// Fetch review history for this transaction.
-		reviews, err := svc.ListReviewsByTransactionID(ctx, idStr)
-		if err != nil && !errors.Is(err, service.ErrNotFound) {
-			a.Logger.Error("list transaction reviews", "error", err)
-		}
+		// Build unified activity timeline from annotations.
+		activity := buildActivityTimeline(annotations)
 
-		// Fetch rule applications for this transaction.
-		ruleApps, err := svc.ListRuleApplicationsByTransactionID(ctx, idStr)
+		// Load tags currently attached + the registered-tag list (for the inline
+		// add-tag suggestion datalist). Also derive HasPendingReview from the
+		// presence of the needs-review tag.
+		currentTags, err := svc.ListTransactionTags(ctx, idStr)
 		if err != nil {
-			a.Logger.Error("list transaction rule applications", "error", err)
+			a.Logger.Error("list transaction tags for detail", "error", err)
+			currentTags = []service.TransactionTagResponse{}
 		}
-
-		// Build unified activity timeline.
-		activity := buildActivityTimeline(reviews, comments, ruleApps)
-
-		// Check if there's a pending review (to disable re-enqueue)
+		availableTags, err := svc.ListTags(ctx)
+		if err != nil {
+			a.Logger.Error("list tags for detail", "error", err)
+			availableTags = []service.TagResponse{}
+		}
 		hasPendingReview := false
-		for _, r := range reviews {
-			if r.Status == "pending" {
+		for _, tag := range currentTags {
+			if tag.Slug == "needs-review" {
 				hasPendingReview = true
 				break
 			}
@@ -750,6 +774,8 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			"Account":         account,
 			"Activity":          activity,
 			"HasPendingReview":  hasPendingReview,
+			"CurrentTags":       currentTags,
+			"AvailableTags":     availableTags,
 			"Categories":      categoryTree,
 			"Breadcrumbs":     breadcrumbs,
 		}
@@ -757,115 +783,148 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 	}
 }
 
-// buildActivityTimeline merges reviews, comments, and rule applications into a sorted timeline.
-func buildActivityTimeline(reviews []service.ReviewResponse, comments []service.CommentResponse, ruleApps []service.TransactionRuleApplicationDetail) []service.ActivityEntry {
+// buildActivityTimeline merges the review lifecycle (enqueue + resolution)
+// with the annotation-driven timeline into a sorted activity list.
+//
+// Phase 3: annotations are the sole source of timeline events. The old
+// review_queue-derived "review" entries are gone; tag_added/tag_removed for
+// the needs-review tag fill the same role. Comment annotations that were
+// originally review notes (identified by payload.review_id) still render
+// inline on resolution events surfaced via the needs-review tag-lifecycle.
+func buildActivityTimeline(annotations []service.Annotation) []service.ActivityEntry {
 	var entries []service.ActivityEntry
 
-	// Convert reviews — for resolved reviews, emit both the enqueue and resolution events
-	for _, r := range reviews {
-		// Always emit the "enqueued" event (using CreatedAt)
-		var enqueueReason string
-		switch r.ReviewType {
-		case "uncategorized":
-			enqueueReason = "Uncategorized transaction"
-		case "low_confidence":
-			enqueueReason = "Low confidence categorization"
-		case "new_transaction":
-			enqueueReason = "New transaction"
-		case "re_review":
-			enqueueReason = "Sent back for review"
-		case "manual":
-			enqueueReason = "Manually flagged"
-		default:
-			enqueueReason = "Flagged for review"
-		}
-		entries = append(entries, service.ActivityEntry{
-			Type:         "review",
-			Timestamp:    r.CreatedAt,
-			ActorName:    "System",
-			ActorType:    "system",
-			Summary:      enqueueReason,
-			Detail:       "Added to review queue",
-			ReviewStatus: "pending",
-		})
+	// Annotations.
+	for _, a := range annotations {
+		switch a.Kind {
+		case "comment":
+			content, _ := a.Payload["content"].(string)
+			// Filter legacy [Review: ...] prefix duplicates from pre-consolidation imports.
+			if strings.HasPrefix(content, "[Review: ") {
+				continue
+			}
+			entry := service.ActivityEntry{
+				Type:      "comment",
+				Timestamp: a.CreatedAt,
+				ActorName: a.ActorName,
+				ActorType: a.ActorType,
+				Detail:    content,
+			}
+			if cid, _ := a.Payload["comment_id"].(string); cid != "" {
+				entry.CommentID = cid
+			}
+			if a.ActorID != nil && *a.ActorID != "" {
+				id := *a.ActorID
+				entry.ActorID = &id
+			}
+			entries = append(entries, entry)
 
-		// For resolved reviews, also emit the resolution event
-		if r.Status != "pending" && r.ReviewedAt != nil {
-			e := service.ActivityEntry{
-				Type:      "review",
-				Timestamp: *r.ReviewedAt,
+		case "rule_applied":
+			ruleName, _ := a.Payload["rule_name"].(string)
+			field, _ := a.Payload["action_field"].(string)
+			value, _ := a.Payload["action_value"].(string)
+			appliedBy, _ := a.Payload["applied_by"].(string)
+			summary := "Rule \"" + ruleName + "\" applied"
+			switch field {
+			case "category":
+				summary = "Rule \"" + ruleName + "\" set category to " + value
+			case "tag":
+				summary = "Rule \"" + ruleName + "\" added tag " + value
+			case "comment":
+				summary = "Rule \"" + ruleName + "\" added a comment"
 			}
-			if r.ReviewerName != nil {
-				e.ActorName = *r.ReviewerName
+			how := "during sync"
+			if appliedBy == "retroactive" {
+				how = "retroactively"
 			}
-			if r.ReviewerType != nil {
-				e.ActorType = *r.ReviewerType
+			entries = append(entries, service.ActivityEntry{
+				Type:      "rule",
+				Timestamp: a.CreatedAt,
+				ActorName: how,
+				ActorType: "system",
+				Summary:   summary,
+				RuleName:  ruleName,
+				RuleID:    derefOr(a.RuleID, ""),
+			})
+
+		case "tag_added":
+			slug, _ := a.Payload["slug"].(string)
+			note, _ := a.Payload["note"].(string)
+			summary := "Added tag " + slug
+			entry := service.ActivityEntry{
+				Type:      "tag",
+				Timestamp: a.CreatedAt,
+				ActorName: a.ActorName,
+				ActorType: a.ActorType,
+				Summary:   summary,
+				Detail:    note,
+				TagSlug:   slug,
 			}
-			switch r.Status {
-			case "approved":
-				e.ReviewStatus = "approved"
-				e.Summary = "Approved"
-				if r.ResolvedCategoryDisplayName != nil {
-					e.Summary = "Approved as " + *r.ResolvedCategoryDisplayName
-					e.CategoryName = *r.ResolvedCategoryDisplayName
-				}
-			case "rejected":
-				e.ReviewStatus = "rejected"
-				e.Summary = "Rejected"
-			case "skipped":
-				e.ReviewStatus = "skipped"
-				e.Summary = "Skipped"
+			if a.ActorID != nil && *a.ActorID != "" {
+				id := *a.ActorID
+				entry.ActorID = &id
 			}
-			if r.ReviewNote != nil && *r.ReviewNote != "" {
-				e.Detail = *r.ReviewNote
+			entries = append(entries, entry)
+
+		case "tag_removed":
+			slug, _ := a.Payload["slug"].(string)
+			note, _ := a.Payload["note"].(string)
+			summary := "Removed tag " + slug
+			entry := service.ActivityEntry{
+				Type:      "tag",
+				Timestamp: a.CreatedAt,
+				ActorName: a.ActorName,
+				ActorType: a.ActorType,
+				Summary:   summary,
+				Detail:    note,
+				TagSlug:   slug,
 			}
-			entries = append(entries, e)
+			if a.ActorID != nil && *a.ActorID != "" {
+				id := *a.ActorID
+				entry.ActorID = &id
+			}
+			entries = append(entries, entry)
+
+		case "category_set":
+			slug, _ := a.Payload["category_slug"].(string)
+			source, _ := a.Payload["source"].(string)
+			summary := "Category set to " + slug
+			if source == "rule" {
+				// Represented separately via the rule_applied annotation
+				// written alongside category_set during sync. Skip to avoid
+				// double-rendering.
+				continue
+			}
+			entry := service.ActivityEntry{
+				Type:      "category",
+				Timestamp: a.CreatedAt,
+				ActorName: a.ActorName,
+				ActorType: a.ActorType,
+				Summary:   summary,
+				CategoryName: slug,
+			}
+			if a.ActorID != nil && *a.ActorID != "" {
+				id := *a.ActorID
+				entry.ActorID = &id
+			}
+			entries = append(entries, entry)
 		}
 	}
 
-	// Convert comments (filter out [Review: ...] duplicates from legacy data)
-	for _, c := range comments {
-		if strings.HasPrefix(c.Content, "[Review: ") {
-			continue
-		}
-		entries = append(entries, service.ActivityEntry{
-			Type:      "comment",
-			Timestamp: c.CreatedAt,
-			ActorName: c.AuthorName,
-			ActorType: c.AuthorType,
-			Detail:    c.Content,
-			CommentID: c.ID,
-		})
-	}
-
-	// Convert rule applications
-	for _, ra := range ruleApps {
-		summary := "Rule \"" + ra.RuleName + "\" set category"
-		if ra.CategoryDisplayName != "" {
-			summary = "Rule \"" + ra.RuleName + "\" set category to " + ra.CategoryDisplayName
-		}
-		how := "during sync"
-		if ra.AppliedBy == "retroactive" {
-			how = "retroactively"
-		}
-		entries = append(entries, service.ActivityEntry{
-			Type:      "rule",
-			Timestamp: ra.AppliedAt,
-			ActorName: how,
-			ActorType: "system",
-			Summary:   summary,
-			RuleName:  ra.RuleName,
-			RuleID:    ra.RuleID,
-			CategoryName: ra.CategoryDisplayName,
-		})
-	}
-
-	// Sort by timestamp descending (newest first)
+	// Sort by timestamp descending (newest first).
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Timestamp > entries[j].Timestamp
 	})
 
 	return entries
+}
+
+// derefOr returns *p if non-nil, else def.
+func derefOr(p *string, def string) string {
+	if p == nil {
+		return def
+	}
+	return *p
 }
 
 // CreateTransactionCommentHandler serves POST /admin/api/transactions/{id}/comments.
@@ -935,6 +994,7 @@ func buildPaginationBase(r *http.Request) string {
 		"start_date", "end_date", "account_id", "user_id",
 		"connection_id", "category", "min_amount", "max_amount",
 		"pending", "search", "search_mode", "search_field", "sort", "per_page",
+		"tags", "any_tag",
 	}
 	q := r.URL.Query()
 	qs := make([]string, 0, len(paginationParams))
@@ -956,6 +1016,7 @@ func buildExportURL(r *http.Request) string {
 		"start_date", "end_date", "account_id", "user_id",
 		"connection_id", "category", "min_amount", "max_amount",
 		"pending", "search", "search_mode", "search_field", "sort",
+		"tags", "any_tag",
 	}
 	q := r.URL.Query()
 	qs := make([]string, 0, len(exportParams))
@@ -988,6 +1049,261 @@ func buildAccountPaginationBase(r *http.Request, accountID string) string {
 		base = "/accounts/" + accountID + "?" + strings.Join(qs, "&") + "&page="
 	}
 	return base
+}
+
+// EditTransactionPageHandler serves GET /transactions/{id}/edit.
+// Renders the form-based transaction editor (category, tags, comment) which
+// submits via the /-/transactions/{id}/update endpoint using update_transactions
+// semantics.
+func EditTransactionPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		idStr := chi.URLParam(r, "id")
+
+		txn, err := svc.GetTransaction(ctx, idStr)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				tr.RenderNotFound(w, r)
+				return
+			}
+			a.Logger.Error("get transaction for edit", "error", err)
+			tr.RenderError(w, r)
+			return
+		}
+
+		// IDOR check: viewers can only view transactions belonging to their user.
+		if !IsEditor(sm, r) {
+			memberUID := SessionUserID(sm, r)
+			ownerMatch := false
+			if txn.AccountID != nil {
+				acctCheck, acctErr := svc.GetAccount(ctx, *txn.AccountID)
+				if acctErr == nil && acctCheck.UserID != nil && *acctCheck.UserID == memberUID {
+					ownerMatch = true
+				}
+			}
+			if !ownerMatch {
+				tr.RenderNotFound(w, r)
+				return
+			}
+		}
+
+		// Load tags currently on this transaction + the full tag list for the add picker.
+		currentTags, err := svc.ListTransactionTags(ctx, idStr)
+		if err != nil {
+			a.Logger.Error("list transaction tags for edit", "error", err)
+			currentTags = []service.TransactionTagResponse{}
+		}
+		availableTags, err := svc.ListTags(ctx)
+		if err != nil {
+			a.Logger.Error("list tags for edit", "error", err)
+			availableTags = []service.TagResponse{}
+		}
+
+		// Account context (for breadcrumb + hero).
+		var accountID, accountName string
+		if txn.AccountID != nil {
+			accountID = *txn.AccountID
+			if acct, acctErr := svc.GetAccount(ctx, accountID); acctErr == nil {
+				accountName = acct.Name
+			}
+		}
+		if accountName == "" && txn.AccountName != nil {
+			accountName = *txn.AccountName
+		}
+
+		// Categories for the picker.
+		categoryTree, err := svc.ListCategoryTree(ctx)
+		if err != nil {
+			a.Logger.Error("list categories for edit", "error", err)
+		}
+
+		breadcrumbs := []Breadcrumb{
+			{Label: "Transactions", Href: "/transactions"},
+			{Label: txn.Name, Href: "/transactions/" + idStr},
+			{Label: "Edit"},
+		}
+
+		data := BaseTemplateData(r, sm, "transactions", "Edit "+txn.Name)
+		data["Transaction"] = txn
+		data["TransactionID"] = idStr
+		data["AccountID"] = accountID
+		data["AccountName"] = accountName
+		data["Categories"] = categoryTree
+		data["CurrentTags"] = currentTags
+		data["AvailableTags"] = availableTags
+		data["Breadcrumbs"] = breadcrumbs
+		tr.Render(w, r, "transaction_edit.html", data)
+	}
+}
+
+// UpdateTransactionFormHandler serves POST /-/transactions/{id}/update.
+// Accepts an update_transactions-style body with operations[] targeting this
+// transaction. The transaction_id in the path must match the operation's
+// transaction_id (or the op is rejected).
+func UpdateTransactionFormHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		txnID := chi.URLParam(r, "id")
+		actor := ActorFromSession(sm, r)
+
+		var body struct {
+			Operations []struct {
+				TransactionID string  `json:"transaction_id"`
+				CategorySlug  *string `json:"category_slug,omitempty"`
+				TagsToAdd     []struct {
+					Slug string `json:"slug"`
+					Note string `json:"note,omitempty"`
+				} `json:"tags_to_add,omitempty"`
+				TagsToRemove []struct {
+					Slug string `json:"slug"`
+					Note string `json:"note,omitempty"`
+				} `json:"tags_to_remove,omitempty"`
+				Comment *string `json:"comment,omitempty"`
+			} `json:"operations"`
+			OnError string `json:"on_error,omitempty"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid body"})
+			return
+		}
+		if len(body.Operations) == 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "operations required"})
+			return
+		}
+
+		ops := make([]service.UpdateTransactionsOp, len(body.Operations))
+		for i, op := range body.Operations {
+			// Only allow operations targeting the path transaction — safety net
+			// so the form can't be tricked into editing another record.
+			if op.TransactionID != "" && op.TransactionID != txnID {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "operation transaction_id does not match path"})
+				return
+			}
+			ops[i] = service.UpdateTransactionsOp{
+				TransactionID: txnID,
+				CategorySlug:  op.CategorySlug,
+				Comment:       op.Comment,
+			}
+			for _, t := range op.TagsToAdd {
+				ops[i].TagsToAdd = append(ops[i].TagsToAdd, service.UpdateTransactionsTagOp{Slug: t.Slug, Note: t.Note})
+			}
+			for _, t := range op.TagsToRemove {
+				ops[i].TagsToRemove = append(ops[i].TagsToRemove, service.UpdateTransactionsTagOp{Slug: t.Slug, Note: t.Note})
+			}
+		}
+
+		results, err := svc.UpdateTransactions(r.Context(), service.UpdateTransactionsParams{
+			Operations: ops,
+			OnError:    body.OnError,
+			Actor:      actor,
+		})
+		succeeded := 0
+		failed := 0
+		for _, r := range results {
+			if r.Status == "ok" {
+				succeeded++
+			} else {
+				failed++
+			}
+		}
+		payload := map[string]any{
+			"results":   results,
+			"succeeded": succeeded,
+			"failed":    failed,
+		}
+		if err != nil {
+			payload["aborted"] = true
+			payload["error"] = err.Error()
+			a.Logger.Warn("update transaction (edit form) aborted", "id", txnID, "error", err)
+			writeJSON(w, http.StatusUnprocessableEntity, payload)
+			return
+		}
+		if failed > 0 {
+			writeJSON(w, http.StatusUnprocessableEntity, payload)
+			return
+		}
+		writeJSON(w, http.StatusOK, payload)
+	}
+}
+
+// BulkUpdateTransactionsAdminHandler serves POST /-/transactions/batch-update.
+// Accepts an update_transactions-style body and applies it across many
+// transactions. Used by the transactions list's bulk-action bar.
+func BulkUpdateTransactionsAdminHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		actor := ActorFromSession(sm, r)
+
+		var body struct {
+			Operations []struct {
+				TransactionID string  `json:"transaction_id"`
+				CategorySlug  *string `json:"category_slug,omitempty"`
+				TagsToAdd     []struct {
+					Slug string `json:"slug"`
+					Note string `json:"note,omitempty"`
+				} `json:"tags_to_add,omitempty"`
+				TagsToRemove []struct {
+					Slug string `json:"slug"`
+					Note string `json:"note,omitempty"`
+				} `json:"tags_to_remove,omitempty"`
+				Comment *string `json:"comment,omitempty"`
+			} `json:"operations"`
+			OnError string `json:"on_error,omitempty"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid body"})
+			return
+		}
+		if len(body.Operations) == 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "operations required"})
+			return
+		}
+		if len(body.Operations) > 50 {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "maximum 50 operations per batch"})
+			return
+		}
+
+		ops := make([]service.UpdateTransactionsOp, len(body.Operations))
+		for i, op := range body.Operations {
+			ops[i] = service.UpdateTransactionsOp{
+				TransactionID: op.TransactionID,
+				CategorySlug:  op.CategorySlug,
+				Comment:       op.Comment,
+			}
+			for _, t := range op.TagsToAdd {
+				ops[i].TagsToAdd = append(ops[i].TagsToAdd, service.UpdateTransactionsTagOp{Slug: t.Slug, Note: t.Note})
+			}
+			for _, t := range op.TagsToRemove {
+				ops[i].TagsToRemove = append(ops[i].TagsToRemove, service.UpdateTransactionsTagOp{Slug: t.Slug, Note: t.Note})
+			}
+		}
+
+		results, err := svc.UpdateTransactions(r.Context(), service.UpdateTransactionsParams{
+			Operations: ops,
+			OnError:    body.OnError,
+			Actor:      actor,
+		})
+		succeeded := 0
+		failed := 0
+		for _, rr := range results {
+			if rr.Status == "ok" {
+				succeeded++
+			} else {
+				failed++
+			}
+		}
+		payload := map[string]any{
+			"results":   results,
+			"succeeded": succeeded,
+			"failed":    failed,
+		}
+		if err != nil {
+			payload["aborted"] = true
+			payload["error"] = err.Error()
+			a.Logger.Warn("bulk update transactions aborted", "error", err)
+			writeJSON(w, http.StatusUnprocessableEntity, payload)
+			return
+		}
+		writeJSON(w, http.StatusOK, payload)
+	}
 }
 
 // QuickSearchTransactionsHandler serves GET /-/search/transactions.

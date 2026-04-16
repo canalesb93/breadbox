@@ -32,15 +32,13 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			needsAttention = 0
 		}
 
-		// Only count pending reviews if reviews are enabled.
-		var reviewPending int64
-		reviewsEnabled := GetConfigBool(ctx, a.Queries, "review_auto_enqueue")
-		if reviewsEnabled {
-			reviewPending, err = a.Queries.CountPendingReviews(ctx)
-			if err != nil {
-				a.Logger.Error("count pending reviews", "error", err)
-				reviewPending = 0
-			}
+		// Phase 3: review queue is backed by the needs-review tag. Count
+		// transactions currently tagged for review.
+		reviewsEnabled := true
+		reviewPending, err := a.Queries.CountTransactionsWithTagSlug(ctx, "needs-review")
+		if err != nil {
+			a.Logger.Error("count pending reviews", "error", err)
+			reviewPending = 0
 		}
 
 		// Recent transactions (last 8).

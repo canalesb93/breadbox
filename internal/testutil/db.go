@@ -215,13 +215,21 @@ func MustCreateCategory(t *testing.T, q *db.Queries, slug, displayName string) d
 }
 
 // MustCreateTransactionRule creates an enabled transaction rule and fatals on error.
-// conditions should be valid JSON (e.g., json.RawMessage(`{"field":"name","operator":"contains","value":"coffee"}`)).
-func MustCreateTransactionRule(t *testing.T, q *db.Queries, name string, categoryID pgtype.UUID, conditions []byte) db.TransactionRule {
+// conditions and actions should be valid JSON; pass nil conditions to mean match-all.
+// trigger defaults to "on_create" when empty.
+func MustCreateTransactionRule(t *testing.T, q *db.Queries, name string, conditions, actions []byte, trigger string) db.TransactionRule {
 	t.Helper()
+	if trigger == "" {
+		trigger = "on_create"
+	}
+	if actions == nil {
+		actions = []byte(`[]`)
+	}
 	rule, err := q.InsertTransactionRule(context.Background(), db.InsertTransactionRuleParams{
 		Name:          name,
 		Conditions:    conditions,
-		CategoryID:    categoryID,
+		Actions:       actions,
+		Trigger:       trigger,
 		Priority:      100,
 		Enabled:       true,
 		CreatedByType: "system",
@@ -269,18 +277,50 @@ func MustCreateAPIKey(t *testing.T, q *db.Queries, name string) db.ApiKey {
 	return key
 }
 
-// MustCreateReview enqueues a review for a transaction and fatals on error.
-// reviewType should be one of: new_transaction, uncategorized, manual, re_review.
-func MustCreateReview(t *testing.T, q *db.Queries, txnID pgtype.UUID, reviewType string) db.ReviewQueue {
+// MustCreateTag inserts a tag row and fatals on error. lifecycle defaults to
+// "persistent" if empty.
+func MustCreateTag(t *testing.T, q *db.Queries, slug, displayName, lifecycle string) db.Tag {
 	t.Helper()
-	review, err := q.EnqueueReview(context.Background(), db.EnqueueReviewParams{
-		TransactionID: txnID,
-		ReviewType:    reviewType,
+	if lifecycle == "" {
+		lifecycle = "persistent"
+	}
+	tag, err := q.InsertTag(context.Background(), db.InsertTagParams{
+		Slug:        slug,
+		DisplayName: displayName,
+		Lifecycle:   lifecycle,
 	})
 	if err != nil {
-		t.Fatalf("MustCreateReview(%q): %v", reviewType, err)
+		t.Fatalf("MustCreateTag(%q): %v", slug, err)
 	}
-	return review
+	return tag
+}
+
+// MustCreateTransactionTag attaches a tag to a transaction and fatals on error.
+func MustCreateTransactionTag(t *testing.T, q *db.Queries, txnID, tagID pgtype.UUID) {
+	t.Helper()
+	_, err := q.AddTransactionTag(context.Background(), db.AddTransactionTagParams{
+		TransactionID: txnID,
+		TagID:         tagID,
+		AddedByType:   "system",
+		AddedByName:   "test",
+	})
+	if err != nil {
+		t.Fatalf("MustCreateTransactionTag: %v", err)
+	}
+}
+
+// MustCountAnnotations returns the number of annotations of a given kind for
+// a transaction. Fatals on error.
+func MustCountAnnotations(t *testing.T, q *db.Queries, txnID pgtype.UUID, kind string) int {
+	t.Helper()
+	n, err := q.CountAnnotationsByTransactionAndKind(context.Background(), db.CountAnnotationsByTransactionAndKindParams{
+		TransactionID: txnID,
+		Kind:          kind,
+	})
+	if err != nil {
+		t.Fatalf("MustCountAnnotations(%q): %v", kind, err)
+	}
+	return int(n)
 }
 
 // MustCreateAgentReport creates an agent report and fatals on error.

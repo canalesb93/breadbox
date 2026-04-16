@@ -37,6 +37,7 @@ type TransactionResponse struct {
 	ID                  string                   `json:"id"`
 	ShortID             string                   `json:"short_id"`
 	AccountID           *string                  `json:"account_id"`
+	AccountShortID      *string                  `json:"account_short_id,omitempty"`
 	AccountName         *string                  `json:"account_name"`
 	UserName            *string                  `json:"user_name"`
 	AttributedUserID    *string                  `json:"attributed_user_id,omitempty"`
@@ -59,6 +60,11 @@ type TransactionResponse struct {
 	Pending             bool                     `json:"pending"`
 	CreatedAt           string                   `json:"created_at"`
 	UpdatedAt           string                   `json:"updated_at"`
+
+	// Tags attached to this transaction (slug list). Empty slice when none are
+	// attached. Populated by ListTransactions / GetTransaction when the Phase 2
+	// tags subsystem is active.
+	Tags []string `json:"tags,omitempty"`
 }
 
 type TransactionListResult struct {
@@ -85,6 +91,10 @@ type TransactionListParams struct {
 	SortBy           *string
 	SortOrder        *string
 	IncludeDependent bool
+	// Tags (AND) — transaction must have EVERY tag in this list.
+	Tags []string
+	// AnyTag (OR) — transaction must have AT LEAST ONE tag in this list.
+	AnyTag []string
 }
 
 type TransactionCountParams struct {
@@ -100,6 +110,8 @@ type TransactionCountParams struct {
 	SearchMode       *string
 	ExcludeSearch    *string
 	IncludeDependent bool
+	Tags             []string
+	AnyTag           []string
 }
 
 type CategoryPair struct {
@@ -273,6 +285,10 @@ type AdminTransactionListParams struct {
 	SearchField   *string // "all" (default), "name", "merchant"
 	ExcludeSearch *string
 	SortOrder     string // "desc" (default) or "asc"
+	// Tags filter — AND semantics (must have every slug). Empty = no constraint.
+	Tags []string
+	// AnyTag filter — OR semantics (must have at least one slug). Empty = no constraint.
+	AnyTag []string
 }
 
 type AdminTransactionRow struct {
@@ -298,6 +314,18 @@ type AdminTransactionRow struct {
 	HasPendingReview    bool
 	CreatedAt           string
 	UpdatedAt           string
+	// Tags attached to this transaction. Populated as a separate batched
+	// lookup keyed by transaction id so list pages can render chips.
+	Tags []AdminTransactionTag
+}
+
+// AdminTransactionTag is a compact tag descriptor for list-row rendering.
+type AdminTransactionTag struct {
+	Slug        string
+	DisplayName string
+	Color       *string
+	Icon        *string
+	Lifecycle   string
 }
 
 type AdminTransactionListResult struct {
@@ -324,6 +352,7 @@ type CreateCommentParams struct {
 	TransactionID string
 	Content       string
 	Actor         Actor
+	ReviewID      string // optional: links comment to a review resolution
 }
 
 type UpdateCommentParams struct {
@@ -339,104 +368,37 @@ type CommentResponse struct {
 	AuthorID      *string `json:"author_id"`
 	AuthorName    string  `json:"author_name"`
 	Content       string  `json:"content"`
+	ReviewID      *string `json:"review_id,omitempty"`
 	CreatedAt     string  `json:"created_at"`
 	UpdatedAt     string  `json:"updated_at"`
 }
 
-// Review queue types
-
-type ReviewResponse struct {
-	ID                  string               `json:"id"`
-	ShortID             string               `json:"short_id"`
-	TransactionID       string               `json:"transaction_id"`
-	ReviewType          string               `json:"review_type"`
-	Status              string               `json:"status"`
-	Provider            *string              `json:"provider,omitempty"`
-	SuggestedCategoryID          *string              `json:"suggested_category_id,omitempty"`
-	SuggestedCategory            *string              `json:"suggested_category_slug,omitempty"`
-	SuggestedCategoryDisplayName *string              `json:"suggested_category_display_name,omitempty"`
-	ConfidenceScore              *float64             `json:"confidence_score,omitempty"`
-	ReviewerType                 *string              `json:"reviewer_type,omitempty"`
-	ReviewerID                   *string              `json:"reviewer_id,omitempty"`
-	ReviewerName                 *string              `json:"reviewer_name,omitempty"`
-	ReviewNote                   *string              `json:"review_note,omitempty"`
-	ResolvedCategoryID           *string              `json:"resolved_category_id,omitempty"`
-	ResolvedCategory             *string              `json:"resolved_category_slug,omitempty"`
-	ResolvedCategoryDisplayName  *string              `json:"resolved_category_display_name,omitempty"`
-	CreatedAt           string               `json:"created_at"`
-	ReviewedAt          *string              `json:"reviewed_at,omitempty"`
-	Transaction         *TransactionResponse `json:"transaction,omitempty"`
-}
-
-type ReviewListParams struct {
-	Status             *string
-	ReviewType         *string
-	AccountID          *string
-	UserID             *string
-	CategoryPrimaryRaw *string
-	Limit              int
-	Cursor             string
-}
-
-type ReviewListResult struct {
-	Reviews    []ReviewResponse `json:"reviews"`
-	NextCursor string           `json:"next_cursor,omitempty"`
-	HasMore    bool             `json:"has_more"`
-	Total      int64            `json:"total"`
-}
-
-type SubmitReviewParams struct {
-	ReviewID   string
-	Decision   string
-	CategoryID *string
-	Note       *string
-	Actor      Actor
-}
-
-type BulkSubmitReviewParams struct {
-	Reviews []BulkReviewItem
-	Actor   Actor
-}
-
-type BulkReviewItem struct {
-	ReviewID   string  `json:"review_id"`
-	Decision   string  `json:"decision"`
-	CategoryID *string `json:"category_id,omitempty"`
-	Note       *string `json:"note,omitempty"`
-}
-
-type BulkReviewResult struct {
-	Succeeded int              `json:"succeeded"`
-	Failed    []BulkReviewError `json:"failed,omitempty"`
-}
-
-type BulkReviewError struct {
-	ReviewID string `json:"review_id"`
-	Error    string `json:"error"`
-}
-
-type ReviewCountsResponse struct {
-	Pending       int64 `json:"pending"`
-	ApprovedToday int64 `json:"approved_today"`
-	RejectedToday int64 `json:"rejected_today"`
-	SkippedToday  int64 `json:"skipped_today"`
-}
+// Review-queue types (retired in Phase 3) have been removed. The remaining
+// MCP shims translate review-shaped inputs onto tag + annotation operations.
 
 // Transaction rule types
 
-// RuleAction represents a single action a rule performs when matched.
+// RuleAction is the typed action shape (Phase 1: Rule Actions v2).
+//
+// Type values:
+//   - "set_category": requires CategorySlug.
+//   - "add_tag":      requires TagSlug. (Phase 1 validates slug format; tag persistence lands in Phase 2.)
+//   - "add_comment":  requires Content.
 type RuleAction struct {
-	Field string `json:"field"`
-	Value string `json:"value"`
+	Type         string `json:"type"`
+	CategorySlug string `json:"category_slug,omitempty"`
+	TagSlug      string `json:"tag_slug,omitempty"`
+	Content      string `json:"content,omitempty"`
 }
 
 // ActivityEntry represents a single event in a transaction's activity timeline.
 type ActivityEntry struct {
-	Type      string `json:"type"`      // "review", "comment", "rule"
+	Type      string `json:"type"`      // "review", "comment", "rule", "tag", "category"
 	Timestamp string `json:"timestamp"` // RFC3339
 
-	ActorName string `json:"actor_name"`
-	ActorType string `json:"actor_type"` // "user", "agent", "system"
+	ActorName string  `json:"actor_name"`
+	ActorType string  `json:"actor_type"`         // "user", "agent", "system"
+	ActorID   *string `json:"actor_id,omitempty"` // user UUID when available (for avatar rendering)
 
 	Summary string `json:"summary"`          // Short: "Approved as Food & Drink"
 	Detail  string `json:"detail,omitempty"` // Longer text (review note or comment body)
@@ -447,6 +409,7 @@ type ActivityEntry struct {
 	RuleName     string `json:"rule_name,omitempty"`
 	RuleID       string `json:"rule_id,omitempty"`
 	CommentID    string `json:"comment_id,omitempty"`
+	TagSlug      string `json:"tag_slug,omitempty"` // for tag_added / tag_removed entries
 }
 
 type Condition struct {
@@ -470,29 +433,39 @@ type TransactionContext struct {
 	AccountID        string
 	UserID           string
 	UserName         string
+	// Tags is nil in Phase 1. Phase 2 populates this from transaction_tags
+	// so tag-based conditions (field: "tags") can match against it.
+	Tags []string
 }
 
 type TransactionRuleResponse struct {
-	ID            string       `json:"id"`
-	ShortID       string       `json:"short_id"`
-	Name          string       `json:"name"`
+	ID      string `json:"id"`
+	ShortID string `json:"short_id"`
+	Name    string `json:"name"`
+	// Conditions may be a zero-value Condition{} to mean "match all transactions"
+	// (stored as NULL in the DB, Phase 1).
 	Conditions    Condition    `json:"conditions"`
 	Actions       []RuleAction `json:"actions"`
-	CategoryID    *string      `json:"category_id,omitempty"`
-	CategorySlug  *string      `json:"category_slug,omitempty"`
-	CategoryName  *string      `json:"category_display_name,omitempty"`
-	CategoryIcon  *string      `json:"category_icon,omitempty"`
-	CategoryColor *string      `json:"category_color,omitempty"`
-	Priority      int          `json:"priority"`
-	Enabled       bool         `json:"enabled"`
-	ExpiresAt     *string      `json:"expires_at,omitempty"`
-	CreatedByType string       `json:"created_by_type"`
-	CreatedByID   *string      `json:"created_by_id,omitempty"`
-	CreatedByName string       `json:"created_by_name"`
-	HitCount      int          `json:"hit_count"`
-	LastHitAt     *string      `json:"last_hit_at,omitempty"`
-	CreatedAt     string       `json:"created_at"`
-	UpdatedAt     string       `json:"updated_at"`
+	Trigger       string       `json:"trigger"`
+	// CategoryID/CategorySlug/CategoryName/CategoryIcon/CategoryColor are derived
+	// from the first set_category action in Actions (kept for API back-compat and
+	// admin UI convenience). Category info is no longer a denormalized column on
+	// transaction_rules — these are populated at response time.
+	CategoryID    *string `json:"category_id,omitempty"`
+	CategorySlug  *string `json:"category_slug,omitempty"`
+	CategoryName  *string `json:"category_display_name,omitempty"`
+	CategoryIcon  *string `json:"category_icon,omitempty"`
+	CategoryColor *string `json:"category_color,omitempty"`
+	Priority      int     `json:"priority"`
+	Enabled       bool    `json:"enabled"`
+	ExpiresAt     *string `json:"expires_at,omitempty"`
+	CreatedByType string  `json:"created_by_type"`
+	CreatedByID   *string `json:"created_by_id,omitempty"`
+	CreatedByName string  `json:"created_by_name"`
+	HitCount      int     `json:"hit_count"`
+	LastHitAt     *string `json:"last_hit_at,omitempty"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
 }
 
 type TransactionRuleListParams struct {
@@ -519,20 +492,24 @@ type TransactionRuleListResult struct {
 }
 
 type CreateTransactionRuleParams struct {
-	Name         string
+	Name string
+	// Conditions: a zero-value Condition{} (no Field/And/Or/Not) means "match all".
 	Conditions   Condition
 	Actions      []RuleAction // if set, takes precedence over CategorySlug
-	CategorySlug string       // sugar for actions: [{"field": "category", "value": slug}]
+	CategorySlug string       // sugar for actions: [{"type":"set_category","category_slug":slug}]
+	Trigger      string       // "on_create" (default), "on_update", or "always"
 	Priority     int
 	ExpiresIn    string // e.g., "30d", "24h"
 	Actor        Actor
 }
 
 type UpdateTransactionRuleParams struct {
-	Name         *string
+	Name *string
+	// Conditions: nil means "don't change"; non-nil zero-value Condition means match-all.
 	Conditions   *Condition
 	Actions      *[]RuleAction // if set, replaces actions entirely
-	CategorySlug *string       // sugar: replaces category action, keeps others
+	CategorySlug *string       // sugar: replaces set_category action, keeps others
+	Trigger      *string       // optional trigger change
 	Priority     *int
 	Enabled      *bool
 	ExpiresAt    *string // ISO timestamp or empty to clear
