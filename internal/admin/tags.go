@@ -46,6 +46,44 @@ func TagsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateR
 	}
 }
 
+// TagNewPageHandler serves GET /tags/new — renders the empty create form.
+func TagNewPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		data := BaseTemplateData(r, sm, "tags", "Add Tag")
+		data["IsEdit"] = false
+		data["Breadcrumbs"] = []Breadcrumb{
+			{Label: "Tags", Href: "/tags"},
+			{Label: "Add Tag"},
+		}
+		tr.Render(w, r, "tag_form.html", data)
+	}
+}
+
+// TagEditPageHandler serves GET /tags/{id}/edit — renders the form populated from DB.
+func TagEditPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		tag, err := svc.GetTag(r.Context(), id)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				tr.RenderNotFound(w, r)
+				return
+			}
+			tr.RenderError(w, r)
+			return
+		}
+
+		data := BaseTemplateData(r, sm, "tags", "Edit "+tag.DisplayName)
+		data["IsEdit"] = true
+		data["Tag"] = tag
+		data["Breadcrumbs"] = []Breadcrumb{
+			{Label: "Tags", Href: "/tags"},
+			{Label: tag.DisplayName},
+		}
+		tr.Render(w, r, "tag_form.html", data)
+	}
+}
+
 // CreateTagAdminHandler handles POST /-/tags.
 func CreateTagAdminHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

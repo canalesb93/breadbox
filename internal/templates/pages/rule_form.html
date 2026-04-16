@@ -233,11 +233,14 @@
   </div>
 
   <!-- Submit -->
-  <div class="flex items-center justify-end gap-3">
-    <a href="/rules" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
-    <button type="submit" class="btn btn-primary btn-sm rounded-xl" :disabled="submitting">
+  <div class="flex items-center justify-end gap-2 pt-2">
+    <a href="/rules" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
+    <button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32" :disabled="submitting">
+      <span x-show="!submitting" class="inline-flex items-center gap-1.5">
+        <i data-lucide="save" class="w-3.5 h-3.5"></i>
+        <span x-text="isEdit ? 'Save Changes' : 'Create Rule'"></span>
+      </span>
       <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-      <span x-text="isEdit ? 'Save Changes' : 'Create Rule'"></span>
     </button>
   </div>
 

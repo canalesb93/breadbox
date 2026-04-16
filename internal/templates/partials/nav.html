@@ -51,7 +51,7 @@
     <i data-lucide="tags"></i>
     <span class="flex-1">Tags</span>
     {{if and .NavBadges (gt .NavBadges.PendingReviews 0)}}
-    <a href="/transactions?tags=needs-review" class="bb-nav-badge" title="{{.NavBadges.PendingReviews}} transactions tagged needs-review" onclick="event.stopPropagation()">{{badgeCount .NavBadges.PendingReviews}}</a>
+    <span class="bb-nav-badge" title="{{.NavBadges.PendingReviews}} transactions tagged needs-review">{{badgeCount .NavBadges.PendingReviews}}</span>
     {{end}}
   </a>
   {{end}}

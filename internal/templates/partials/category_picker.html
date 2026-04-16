@@ -26,7 +26,9 @@ function categoryPicker(config) {
         items.push({ id: cat.id, slug: cat.slug, label: cat.display_name, isParent: true, indent: false, icon: cat.icon, color: cat.color, hidden: cat.hidden || false });
         if (cat.children) {
           for (const child of cat.children) {
-            items.push({ id: child.id, slug: child.slug, label: child.display_name, isParent: false, indent: true, icon: child.icon, color: child.color, hidden: child.hidden || false, parentLabel: cat.display_name });
+            // Children inherit the parent color when they don't define their own,
+            // so colored dots render consistently regardless of category depth.
+            items.push({ id: child.id, slug: child.slug, label: child.display_name, isParent: false, indent: true, icon: child.icon || cat.icon, color: child.color || cat.color, hidden: child.hidden || false, parentLabel: cat.display_name });
           }
         }
       }

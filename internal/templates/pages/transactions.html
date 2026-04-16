@@ -215,11 +215,11 @@
       <div class="flex flex-wrap gap-1.5">
         <template x-for="t in availableTags" :key="t.slug">
           <button type="button"
-            class="badge badge-soft rounded-lg gap-1 cursor-pointer transition-opacity"
-            :class="!isSelected(t.slug) && 'opacity-30'"
-            :style="t.color ? ('background-color:' + t.color + '1a;color:' + t.color + ';border-color:' + t.color + '40') : ''"
+            class="bb-tag bb-tag-interactive"
+            :class="!isSelected(t.slug) && 'bb-tag-ghost'"
+            :style="t.color ? ('--tag-color:' + t.color) : ''"
             @click="toggle(t.slug)">
-            <template x-if="t.icon"><i :data-lucide="t.icon" class="w-3 h-3" x-init="$nextTick(() => lucide.createIcons())"></i></template>
+            <template x-if="t.icon"><i :data-lucide="t.icon"></i></template>
             <span x-text="t.display_name || t.slug"></span>
           </button>
         </template>
@@ -242,12 +242,12 @@
 <div x-data class="space-y-1">
   <!-- Toolbar: select-all + keyboard hints -->
   <div class="flex items-center gap-3 px-2 pb-2">
-    <!-- Select all (visible in selection mode) -->
+    <!-- Select all (visible in selection mode). Visibility + checked/indeterminate
+         state are set imperatively by the bulk store to avoid reactive churn. -->
     <div x-show="$store.bulk.selecting" x-cloak>
       <label class="flex items-center gap-2 cursor-pointer" @click.stop>
         <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
-          :checked="$store.bulk.sel.length === window.__bbTxMeta.length && window.__bbTxMeta.length > 0"
-          :indeterminate="$store.bulk.sel.length > 0 && $store.bulk.sel.length < window.__bbTxMeta.length"
+          data-tx-selectall-checkbox
           @change="$store.bulk.toggleAll()">
         <span class="text-xs text-base-content/40">Select all</span>
       </label>
@@ -258,6 +258,7 @@
       <span class="flex items-center gap-1"><kbd class="bb-kbd">j</kbd><kbd class="bb-kbd">k</kbd> navigate</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">Enter</kbd> open</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">c</kbd> category</span>
+      <span class="flex items-center gap-1"><kbd class="bb-kbd">t</kbd> tag</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">e</kbd> expand</span>
       <span class="flex items-center gap-1"><kbd class="bb-kbd">x</kbd> select</span>
     </div>
@@ -581,11 +582,8 @@ document.addEventListener('DOMContentLoaded', function() {
     + '<button type="button" id="bb-bulk-categorize" class="btn btn-primary btn-sm rounded-xl gap-2">'
     + '<i data-lucide="tags" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Categorize</span>'
     + '</button>'
-    + '<button type="button" id="bb-bulk-add-tag" class="btn btn-ghost btn-sm rounded-xl gap-2" title="Add tag">'
-    + '<i data-lucide="plus" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Tag</span>'
-    + '</button>'
-    + '<button type="button" id="bb-bulk-remove-tag" class="btn btn-ghost btn-sm rounded-xl gap-2" title="Remove tag">'
-    + '<i data-lucide="minus" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Untag</span>'
+    + '<button type="button" id="bb-bulk-tag" class="btn btn-ghost btn-sm rounded-xl gap-2" title="Tag selected">'
+    + '<i data-lucide="tag" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Tag</span>'
     + '</button>'
     + '<button type="button" id="bb-bulk-comment" class="btn btn-ghost btn-sm rounded-xl gap-2" title="Add comment">'
     + '<i data-lucide="message-square" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Comment</span>'
@@ -597,46 +595,12 @@ document.addEventListener('DOMContentLoaded', function() {
   document.body.appendChild(bar);
   if (typeof lucide !== 'undefined') lucide.createIcons({ nameAttr: 'data-lucide', attrs: {}, namePrefix: '' });
 
-  // Inject the bulk tag/comment modals into <body>.
+  // Inject the bulk comment modal. Tag add/remove both go through the global
+  // tag picker (see bb-bulk-tag click handler below), so no tag modal is needed.
   var modal = document.createElement('div');
   modal.id = 'bb-bulk-modal-root';
   modal.innerHTML =
-    '<dialog id="bb-bulk-add-tag-modal" class="modal modal-bottom sm:modal-middle">'
-    + '<div class="modal-box rounded-xl max-w-md">'
-    + '<h3 class="text-lg font-bold">Add tag to selected</h3>'
-    + '<p class="text-sm text-base-content/50 mt-1">Adds a tag to <span id="bb-add-tag-count" class="font-semibold">0</span> selected transactions.</p>'
-    + '<div class="space-y-3 mt-4">'
-    + '<label class="text-xs font-medium text-base-content/60">Tag slug</label>'
-    + '<input id="bb-add-tag-slug" type="text" list="bb-bulk-tag-suggestions" class="input input-bordered w-full rounded-xl text-sm" placeholder="e.g. needs-review" pattern="^[a-z0-9]([a-z0-9\\-:]*[a-z0-9])?$">'
-    + '<datalist id="bb-bulk-tag-suggestions"></datalist>'
-    + '<label class="text-xs font-medium text-base-content/60 mt-2">Note (optional)</label>'
-    + '<input id="bb-add-tag-note" type="text" class="input input-bordered w-full rounded-xl text-sm" placeholder="Optional rationale">'
-    + '</div>'
-    + '<div class="modal-action">'
-    + '<button type="button" class="btn btn-ghost rounded-xl" onclick="document.getElementById(\'bb-bulk-add-tag-modal\').close()">Cancel</button>'
-    + '<button type="button" id="bb-add-tag-confirm" class="btn btn-primary rounded-xl">Add tag</button>'
-    + '</div>'
-    + '</div>'
-    + '<form method="dialog" class="modal-backdrop"><button>close</button></form>'
-    + '</dialog>'
-    + '<dialog id="bb-bulk-remove-tag-modal" class="modal modal-bottom sm:modal-middle">'
-    + '<div class="modal-box rounded-xl max-w-md">'
-    + '<h3 class="text-lg font-bold">Remove tag from selected</h3>'
-    + '<p class="text-sm text-base-content/50 mt-1">Removes a tag from <span id="bb-remove-tag-count" class="font-semibold">0</span> selected transactions. Note required for ephemeral tags.</p>'
-    + '<div class="space-y-3 mt-4">'
-    + '<label class="text-xs font-medium text-base-content/60">Tag slug</label>'
-    + '<input id="bb-remove-tag-slug" type="text" list="bb-bulk-tag-suggestions" class="input input-bordered w-full rounded-xl text-sm" placeholder="e.g. needs-review">'
-    + '<label class="text-xs font-medium text-base-content/60 mt-2">Note</label>'
-    + '<input id="bb-remove-tag-note" type="text" class="input input-bordered w-full rounded-xl text-sm" placeholder="Required for ephemeral tags">'
-    + '</div>'
-    + '<div class="modal-action">'
-    + '<button type="button" class="btn btn-ghost rounded-xl" onclick="document.getElementById(\'bb-bulk-remove-tag-modal\').close()">Cancel</button>'
-    + '<button type="button" id="bb-remove-tag-confirm" class="btn btn-primary rounded-xl">Remove tag</button>'
-    + '</div>'
-    + '</div>'
-    + '<form method="dialog" class="modal-backdrop"><button>close</button></form>'
-    + '</dialog>'
-    + '<dialog id="bb-bulk-comment-modal" class="modal modal-bottom sm:modal-middle">'
+    '<dialog id="bb-bulk-comment-modal" class="modal modal-bottom sm:modal-middle">'
     + '<div class="modal-box rounded-xl max-w-md">'
     + '<h3 class="text-lg font-bold">Add comment to selected</h3>'
     + '<p class="text-sm text-base-content/50 mt-1">Adds the same comment annotation to <span id="bb-comment-count" class="font-semibold">0</span> selected transactions.</p>'
@@ -652,15 +616,6 @@ document.addEventListener('DOMContentLoaded', function() {
     + '</dialog>';
   document.body.appendChild(modal);
 
-  // Populate the shared tag suggestions datalist.
-  var suggestions = document.getElementById('bb-bulk-tag-suggestions');
-  (window.__bbAllTags || []).forEach(function(t) {
-    var opt = document.createElement('option');
-    opt.value = t.slug;
-    opt.label = t.display_name;
-    suggestions.appendChild(opt);
-  });
-
   document.getElementById('bb-bulk-uncat').addEventListener('click', function() {
     Alpine.store('bulk').selectUncategorized();
   });
@@ -675,38 +630,36 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }));
   });
-  document.getElementById('bb-bulk-add-tag').addEventListener('click', function() {
-    document.getElementById('bb-add-tag-count').textContent = Alpine.store('bulk').sel.length;
-    document.getElementById('bb-add-tag-slug').value = '';
-    document.getElementById('bb-add-tag-note').value = '';
-    document.getElementById('bb-bulk-add-tag-modal').showModal();
+
+  // Single bulk "Tag" button — opens the global tag picker in multi-select mode
+  // with an Add/Remove toggle so users can either tag or untag in one flow.
+  document.getElementById('bb-bulk-tag').addEventListener('click', function() {
+    var count = Alpine.store('bulk').sel.length;
+    window.dispatchEvent(new CustomEvent('open-tag-picker', {
+      detail: {
+        mode: 'multi',
+        sourceId: 'bulk-tag',
+        availableTags: window.__bbAllTags || [],
+        showBulkToggle: true,
+        placeholder: 'Filter tags or type to create…',
+        commitLabel: 'Apply to ' + count,
+      }
+    }));
   });
-  document.getElementById('bb-add-tag-confirm').addEventListener('click', function() {
-    var slug = (document.getElementById('bb-add-tag-slug').value || '').trim().toLowerCase();
-    var note = (document.getElementById('bb-add-tag-note').value || '').trim();
-    if (!slug) {
-      window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Tag slug required', type:'error'}}));
-      return;
+  // Commit handler: mode indicates whether to add or remove the selected tags.
+  window.addEventListener('tag-selection-commit', function(e) {
+    var d = e && e.detail;
+    if (!d || d.sourceId !== 'bulk-tag') return;
+    if (!d.slugs || d.slugs.length === 0) return;
+    var payload = {};
+    if (d.mode === 'remove') {
+      payload.tags_to_remove = d.slugs.map(function(slug) { return {slug: slug, note: ''}; });
+    } else {
+      payload.tags_to_add = d.slugs.map(function(slug) { return {slug: slug, note: ''}; });
     }
-    Alpine.store('bulk').runBatchUpdate({tags_to_add: [{slug: slug, note: note}]});
-    document.getElementById('bb-bulk-add-tag-modal').close();
+    Alpine.store('bulk').runBatchUpdate(payload);
   });
-  document.getElementById('bb-bulk-remove-tag').addEventListener('click', function() {
-    document.getElementById('bb-remove-tag-count').textContent = Alpine.store('bulk').sel.length;
-    document.getElementById('bb-remove-tag-slug').value = '';
-    document.getElementById('bb-remove-tag-note').value = '';
-    document.getElementById('bb-bulk-remove-tag-modal').showModal();
-  });
-  document.getElementById('bb-remove-tag-confirm').addEventListener('click', function() {
-    var slug = (document.getElementById('bb-remove-tag-slug').value || '').trim().toLowerCase();
-    var note = (document.getElementById('bb-remove-tag-note').value || '').trim();
-    if (!slug) {
-      window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Tag slug required', type:'error'}}));
-      return;
-    }
-    Alpine.store('bulk').runBatchUpdate({tags_to_remove: [{slug: slug, note: note}]});
-    document.getElementById('bb-bulk-remove-tag-modal').close();
-  });
+
   document.getElementById('bb-bulk-comment').addEventListener('click', function() {
     document.getElementById('bb-comment-count').textContent = Alpine.store('bulk').sel.length;
     document.getElementById('bb-comment-content').value = '';
@@ -734,17 +687,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /* ── Alpine Store: Bulk Selection State ── */
 document.addEventListener('alpine:init', function() {
+  /*
+   * Bulk selection store. Selection state is stored in a Set for O(1) membership
+   * tests and the DOM is updated imperatively — no per-row Alpine reactivity.
+   * With ~50 rows on screen, a reactive `isIn(id)` binding on every row caused
+   * the checkbox draw animation to compete with Alpine's reconciliation.
+   */
   Alpine.store('bulk', {
-    sel: [],
+    selSet: new Set(),
+    get sel() { return Array.from(this.selSet); },
+    set sel(v) { this.selSet = new Set(v || []); this._syncAllRows(); },
     selecting: false,
     processing: false,
 
     toggleMode() {
       this.selecting = !this.selecting;
-      if (!this.selecting) {
-        this.sel = [];
-      }
+      if (!this.selecting) { this.selSet = new Set(); this._syncAllRows(); }
       this._updateBar();
+      this._updateRowVisibility();
     },
 
     _updateBar() {
@@ -755,49 +715,86 @@ document.addEventListener('alpine:init', function() {
       bar.style.transform = 'translateX(-50%) translateY(' + (show ? '0' : '1rem') + ')';
       bar.style.pointerEvents = show ? 'auto' : 'none';
       var countEl = document.getElementById('bb-bulk-count');
-      if (countEl) countEl.textContent = this.sel.length;
+      if (countEl) countEl.textContent = this.selSet.size;
+    },
+
+    // Show/hide the per-row checkbox labels when selection mode toggles.
+    // Done once globally instead of 50 reactive x-show bindings.
+    // Set display explicitly (not '') so inline style wins over Tailwind `.flex`.
+    _updateRowVisibility() {
+      var on = this.selecting;
+      document.querySelectorAll('.bb-tx-checkbox').forEach(function(el) {
+        el.style.display = on ? 'flex' : 'none';
+      });
+    },
+
+    // Update a single row's checkbox + selected attribute without touching others.
+    _syncRow(id) {
+      var row = document.querySelector('.bb-tx-row[data-tx-id="' + CSS.escape(id) + '"]');
+      if (!row) return;
+      var on = this.selSet.has(id);
+      if (on) row.setAttribute('data-tx-selected', ''); else row.removeAttribute('data-tx-selected');
+      var cb = row.querySelector('[data-tx-checkbox]');
+      if (cb) cb.checked = on;
+    },
+
+    // Resync every row (used after bulk operations like selectAll / toggleMode).
+    _syncAllRows() {
+      var self = this;
+      document.querySelectorAll('.bb-tx-row').forEach(function(row) {
+        var id = row.dataset.txId;
+        var on = self.selSet.has(id);
+        if (on) row.setAttribute('data-tx-selected', ''); else row.removeAttribute('data-tx-selected');
+        var cb = row.querySelector('[data-tx-checkbox]');
+        if (cb) cb.checked = on;
+      });
+      // Update the select-all indeterminate/checked state too.
+      var all = document.querySelector('[data-tx-selectall-checkbox]');
+      if (all) {
+        var total = (window.__bbTxMeta || []).length;
+        all.checked = self.selSet.size === total && total > 0;
+        all.indeterminate = self.selSet.size > 0 && self.selSet.size < total;
+      }
     },
 
     isIn(id) {
-      return this.sel.indexOf(id) !== -1;
+      return this.selSet.has(id);
     },
 
     toggle(id) {
-      var idx = this.sel.indexOf(id);
-      if (idx !== -1) {
-        this.sel = this.sel.filter(function(x) { return x !== id; });
-      } else {
-        this.sel = this.sel.concat([id]);
-      }
+      if (this.selSet.has(id)) this.selSet.delete(id);
+      else this.selSet.add(id);
+      this._syncRow(id);
       this._updateBar();
     },
 
     toggleAll() {
-      if (this.sel.length === window.__bbTxMeta.length) {
-        this.sel = [];
+      var total = (window.__bbTxMeta || []).length;
+      if (this.selSet.size === total) {
+        this.selSet = new Set();
       } else {
-        this.sel = window.__bbTxMeta.map(function(t) { return t.id; });
+        this.selSet = new Set((window.__bbTxMeta || []).map(function(t) { return t.id; }));
       }
+      this._syncAllRows();
       this._updateBar();
     },
 
     selectUncategorized() {
-      var uncatIds = window.__bbTxMeta.filter(function(t) { return !t.hasCat; }).map(function(t) { return t.id; });
+      var uncatIds = (window.__bbTxMeta || []).filter(function(t) { return !t.hasCat; }).map(function(t) { return t.id; });
       if (uncatIds.length === 0) {
         window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'All transactions on this page are categorized', type:'info'}}));
         return;
       }
-      var current = this.sel.slice();
-      uncatIds.forEach(function(id) {
-        if (current.indexOf(id) === -1) current.push(id);
-      });
-      this.sel = current;
+      var self = this;
+      uncatIds.forEach(function(id) { self.selSet.add(id); });
+      this._syncAllRows();
       this._updateBar();
       window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: uncatIds.length + ' uncategorized selected', type:'success'}}));
     },
 
     clear() {
-      this.sel = [];
+      this.selSet = new Set();
+      this._syncAllRows();
       this._updateBar();
     },
 
@@ -835,11 +832,16 @@ document.addEventListener('alpine:init', function() {
 
     /* runBatchUpdate dispatches a batch update_transactions call applying the
      * same op (sans transaction_id) to every selected transaction. The op may
-     * include category_slug, tags_to_add, tags_to_remove, and comment. */
+     * include category_slug, tags_to_add, tags_to_remove, and comment.
+     *
+     * If the op is tag-only (no category or comment change), rows are updated
+     * in place without a full reload. Category/comment changes still reload
+     * because the row template depends on them server-side. */
     runBatchUpdate(op) {
       if (this.sel.length === 0) return;
       var self = this;
       var ids = self.sel.slice();
+      var isTagOnly = !op.category_slug && !op.comment && (op.tags_to_add || op.tags_to_remove);
       // The /-/transactions/batch-update endpoint caps each call at 50 ops,
       // matching the MCP update_transactions tool. Chunk to respect that.
       var CHUNK = 50;
@@ -850,12 +852,23 @@ document.addEventListener('alpine:init', function() {
       self.processing = true;
       var totalSucceeded = 0, totalFailed = 0;
 
+      // Apply optimistic tag changes to every selected row right away; rolled
+      // back per-row on API failure below.
+      if (isTagOnly) {
+        var addSlugs = (op.tags_to_add || []).map(function(t) { return t.slug; });
+        var removeSlugs = (op.tags_to_remove || []).map(function(t) { return t.slug; });
+        ids.forEach(function(id) { updateRowTags(id, {add: addSlugs, remove: removeSlugs}); });
+      }
+
       function runOne(idx) {
         if (idx >= chunks.length) {
           self.processing = false;
           var msg = totalSucceeded + ' transaction' + (totalSucceeded === 1 ? '' : 's') + ' updated' + (totalFailed > 0 ? ' (' + totalFailed + ' failed)' : '');
           window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: msg, type: totalFailed > 0 ? 'warning' : 'success'}}));
-          if (totalSucceeded > 0) setTimeout(function() { window.location.reload(); }, 800);
+          // Tag-only updates already reflect in the DOM — skip the reload.
+          if (totalSucceeded > 0 && !isTagOnly) setTimeout(function() { window.location.reload(); }, 800);
+          // After applying a bulk action, drop selection mode so the bar collapses.
+          if (isTagOnly && totalSucceeded > 0 && self.selecting) self.toggleMode();
           return;
         }
         var ops = chunks[idx].map(function(id) {
@@ -933,6 +946,24 @@ document.addEventListener('alpine:init', function() {
       if (btn) btn.click();
     },
 
+    openTagPicker() {
+      var row = this._getRows()[this.focusedIdx];
+      if (!row) return;
+      var link = row.querySelector('a[href*="/transactions/"]');
+      if (!link) return;
+      var id = link.href.split('/').pop();
+      // Filter out tags already attached to this row so the picker doesn't offer duplicates.
+      var existing = [];
+      row.querySelectorAll('.bb-tag').forEach(function(el) {
+        var title = el.getAttribute('title');
+        if (title) existing.push(title);
+      });
+      var offered = (window.__bbAllTags || []).filter(function(t) { return existing.indexOf(t.slug) === -1; });
+      window.dispatchEvent(new CustomEvent('open-tag-picker', {
+        detail: { mode: 'single', sourceId: 'txrow-' + id, availableTags: offered }
+      }));
+    },
+
     toggleExpand() {
       var row = this._getRows()[this.focusedIdx];
       if (!row) return;
@@ -950,6 +981,18 @@ document.addEventListener('alpine:init', function() {
       Alpine.store('bulk').toggle(id);
     },
 
+    // Jump the keyboard focus ring onto the clicked row so j/k continues from there.
+    focusRow(row) {
+      var rows = this._getRows();
+      var idx = rows.indexOf(row);
+      if (idx === -1) return;
+      var old = this.focusedIdx;
+      this.focusedIdx = idx;
+      // Don't auto-scroll on click — the user is already looking at this row.
+      if (old >= 0 && rows[old]) rows[old].classList.remove('bb-tx-row--focused');
+      rows[idx].classList.add('bb-tx-row--focused');
+    },
+
     clearFocus() {
       var rows = this._getRows();
       if (this.focusedIdx >= 0 && rows[this.focusedIdx]) {
@@ -959,10 +1002,38 @@ document.addEventListener('alpine:init', function() {
     }
   });
 
+  // Prime the bulk store's DOM state so newly-mounted rows reflect the current
+  // selection (e.g. after in-place replacement of #bb-tx-results).
+  Alpine.store('bulk')._updateRowVisibility();
+  Alpine.store('bulk')._syncAllRows();
+
+  // When the user clicks a row to expand/collapse, move the j/k focus ring to
+  // that row so keyboard nav picks up from where the user was looking.
+  document.addEventListener('click', function(e) {
+    // Ignore clicks on interactive descendants (checkboxes, buttons, pickers, links)
+    // — those have their own handlers and we don't want to yank focus out from under them.
+    if (e.target.closest('button, a, input, label, .bb-cat-picker, .bb-tagpicker-dialog, .bb-catpicker-dialog')) return;
+    var row = e.target.closest('.bb-tx-row');
+    if (!row) return;
+    var nav = Alpine.store('txNav');
+    if (nav) nav.focusRow(row);
+  });
+
   // Keyboard handler
   document.addEventListener('keydown', function(e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    // Skip while any picker overlay is open so their own shortcuts can fire.
+    // Alpine's x-show toggles display:none on the wrapper, not the dialog — and the
+    // dialog itself is position:fixed which makes offsetParent always null. Check
+    // the wrapper's computed display instead.
     if (document.querySelector('.bb-cat-overlay[style*="block"]')) return;
+    var pickerOpen = function(dialogSel) {
+      var d = document.querySelector(dialogSel);
+      if (!d || !d.parentElement) return false;
+      return window.getComputedStyle(d.parentElement).display !== 'none';
+    };
+    if (pickerOpen('.bb-catpicker-dialog')) return;
+    if (pickerOpen('.bb-tagpicker-dialog')) return;
 
     var nav = Alpine.store('txNav');
     switch(e.key) {
@@ -970,6 +1041,7 @@ document.addEventListener('alpine:init', function() {
       case 'k': e.preventDefault(); nav.prev(); break;
       case 'Enter': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.openDetail(); } break;
       case 'c': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.openCategorize(); } break;
+      case 't': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.openTagPicker(); } break;
       case 'e': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.toggleExpand(); } break;
       case 'x': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.toggleSelect(); } break;
       case 'Escape':
@@ -977,6 +1049,36 @@ document.addEventListener('alpine:init', function() {
         else if (Alpine.store('bulk').selecting) { Alpine.store('bulk').toggleMode(); }
         break;
     }
+  });
+
+  // Apply a picked tag from the tag picker to whichever row opened it.
+  // sourceId convention: 'txrow-' + transactionId
+  window.addEventListener('tag-picked', function(e) {
+    var detail = e && e.detail;
+    if (!detail || !detail.sourceId || detail.sourceId.indexOf('txrow-') !== 0) return;
+    var txnId = detail.sourceId.slice('txrow-'.length);
+    var slug = detail.tag && detail.tag.slug;
+    if (!txnId || !slug) return;
+    // Optimistic UI: show the chip immediately, roll back on failure.
+    updateRowTags(txnId, {add: [slug]});
+    fetch('/-/transactions/' + txnId + '/tags', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({slug: slug, note: ''})
+    })
+    .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, body: d}; }); })
+    .then(function(res) {
+      if (!res.ok) {
+        updateRowTags(txnId, {remove: [slug]});
+        window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: (res.body && res.body.error && res.body.error.message) || 'Failed to add tag', type: 'error'}}));
+        return;
+      }
+      window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Tag added', type: 'success'}}));
+    })
+    .catch(function() {
+      updateRowTags(txnId, {remove: [slug]});
+      window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Network error', type: 'error'}}));
+    });
   });
 });
 
@@ -993,6 +1095,68 @@ function removeTag(el, txnId, slug, displayName) {
       window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error || 'Failed to remove tag', type:'error'}}));
     }
   });
+}
+
+/* ── In-place tag update on a row ──
+ *
+ * Adjusts the tag chips shown in a transaction row without a full page reload,
+ * mirroring the category quick-set UX. Driven by the global tag cache
+ * (`window.__bbAllTags`) for color/icon/display_name lookup.
+ *
+ *   updateRowTags(txId, { add: ['needs-review'], remove: ['suspicious'] })
+ */
+function updateRowTags(txId, changes) {
+  if (!txId) return;
+  var row = document.querySelector('.bb-tx-row[data-tx-id="' + CSS.escape(txId) + '"]');
+  if (!row) return;
+  var container = row.querySelector('[data-tx-tag-container]');
+  if (!container) return;
+
+  var add = (changes && changes.add) || [];
+  var remove = (changes && changes.remove) || [];
+
+  // Remove existing chips by slug (title attribute is the stable slug identifier
+  // set by the tag-chip-sm partial).
+  remove.forEach(function(slug) {
+    var chip = container.querySelector('.bb-tag[title="' + CSS.escape(slug) + '"]');
+    if (chip) chip.remove();
+  });
+
+  // Add chips, skipping any that are already present.
+  add.forEach(function(slug) {
+    if (container.querySelector('.bb-tag[title="' + CSS.escape(slug) + '"]')) return;
+    var meta = (window.__bbAllTags || []).find(function(t) { return t.slug === slug; }) || {};
+    var chip = document.createElement('span');
+    chip.className = 'bb-tag bb-tag-sm';
+    chip.title = slug;
+    if (meta.color) chip.style.setProperty('--tag-color', meta.color);
+    if (meta.icon) {
+      var i = document.createElement('i');
+      i.setAttribute('data-lucide', meta.icon);
+      chip.appendChild(i);
+    }
+    var label = document.createElement('span');
+    label.className = 'truncate';
+    label.textContent = meta.display_name || slug;
+    chip.appendChild(label);
+    container.appendChild(chip);
+  });
+
+  // Toggle the leading separator so it only exists when there are tags.
+  var sep = container.querySelector('[data-tx-tag-sep]');
+  var hasChips = container.querySelector('.bb-tag');
+  if (hasChips && !sep) {
+    sep = document.createElement('span');
+    sep.className = 'text-base-content/20';
+    sep.setAttribute('data-tx-tag-sep', '');
+    sep.textContent = '·';
+    container.insertBefore(sep, container.firstChild);
+  } else if (!hasChips && sep) {
+    sep.remove();
+  }
+
+  // Render any newly-added Lucide icons.
+  if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [container] });
 }
 
 /* ── Single transaction category quick-set ── */

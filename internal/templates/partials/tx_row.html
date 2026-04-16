@@ -1,16 +1,22 @@
 {{define "tx-row"}}
+<!-- `data-tx-selected` is updated imperatively by the bulk store on toggle, not
+     via Alpine's reactive `:class` binding. With 50+ rows, a reactive selection
+     class triggered a re-render on every checkbox click that competed with the
+     DaisyUI checkbox draw animation. -->
 <div class="bb-tx-row group" x-data="{ expanded: false }"
+  data-tx-id="{{.ID}}"
   data-tx-name="{{lower .Name}}"
   data-tx-merchant="{{if .MerchantName}}{{lower (deref .MerchantName)}}{{end}}"
   data-tx-account="{{lower .AccountName}}"
-  data-tx-amount="{{printf "%.2f" .Amount}}"
-  :class="$store.bulk.isIn('{{.ID}}') && 'bg-primary/5'">
+  data-tx-amount="{{printf "%.2f" .Amount}}">
   <!-- Main Row -->
   <div class="flex items-center gap-3 px-4 py-3 cursor-pointer" @click="expanded = !expanded">
-    <!-- Checkbox (selection mode only) -->
-    <label x-show="$store.bulk.selecting" x-cloak class="flex items-center shrink-0 cursor-pointer" @click.stop>
+    <!-- Checkbox (selection mode only) — visibility + checked state driven
+         imperatively by the bulk store; avoids per-row Alpine reactivity when
+         hundreds of rows are on screen. -->
+    <label class="bb-tx-checkbox flex items-center shrink-0 cursor-pointer" @click.stop>
       <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
-        :checked="$store.bulk.isIn('{{.ID}}')"
+        data-tx-checkbox
         @change="$store.bulk.toggle('{{.ID}}')">
     </label>
 
@@ -31,6 +37,7 @@
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
         <a href="/transactions/{{.ID}}" @click.stop class="font-medium text-sm hover:text-primary transition-colors truncate">{{.Name}}</a>
+        {{if .Pending}}<span class="badge badge-soft badge-xs badge-warning rounded-md shrink-0">Pending</span>{{end}}
       </div>
       <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40">
         {{if .UserName}}
@@ -43,7 +50,6 @@
           <span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{{firstChar .UserName}}</span>
         </span>
         {{end}}
-        <span class="text-base-content/20">&middot;</span>
         {{end}}
         <span class="truncate">{{.AccountName}}</span>
         {{if and .MerchantName (not (eqFold .Name (deref .MerchantName)))}}
@@ -56,6 +62,17 @@
           <i data-lucide="bot" class="w-3 h-3"></i>
         </span>
         {{end}}
+        <!-- Tag container — updated in place by JS on add/remove. The leading
+             middot separator is part of this container so it vanishes when the
+             last tag is removed. -->
+        <span class="bb-tx-tag-container contents" data-tx-tag-container>
+          {{if .Tags}}
+          <span class="text-base-content/20" data-tx-tag-sep>&middot;</span>
+          {{range .Tags}}
+          {{template "tag-chip-sm" .}}
+          {{end}}
+          {{end}}
+        </span>
         <!-- Mobile category label (hidden on desktop where the picker column shows) -->
         <span class="sm:hidden text-base-content/20">&middot;</span>
         {{if .CategoryDisplayName}}
@@ -67,23 +84,6 @@
         <span class="sm:hidden text-base-content/25 truncate shrink-0">Uncategorized</span>
         {{end}}
       </div>
-      <!-- Status pills + tag chips -->
-      {{if or .Pending .Tags}}
-      <div class="flex flex-wrap items-center gap-1 mt-1" x-data="{removing: {}}">
-        {{if .Pending}}<span class="badge badge-soft badge-xs badge-warning rounded-md">Pending</span>{{end}}
-        {{range .Tags}}
-        <span class="group/tag badge badge-soft badge-xs rounded-md gap-0.5 cursor-pointer"
-          {{if .Color}}style="background-color: {{safeCSS (deref .Color)}}1a; color: {{safeCSS (deref .Color)}}; border-color: {{safeCSS (deref .Color)}}40;"{{end}}
-          x-show="!removing['{{.Slug}}']"
-          @click.stop="removeTag($el, '{{$.ID}}', '{{.Slug}}', '{{.DisplayName}}')"
-          title="{{.Slug}} — click to remove">
-          {{if .Icon}}<i data-lucide="{{deref .Icon}}" class="w-2.5 h-2.5"></i>{{end}}
-          <span>{{.DisplayName}}</span>
-          <i data-lucide="x" class="w-2.5 h-2.5 opacity-0 group-hover/tag:opacity-60 transition-opacity"></i>
-        </span>
-        {{end}}
-      </div>
-      {{end}}
     </div>
 
     <!-- Category Picker (inline column) -->
@@ -108,42 +108,49 @@
       </span>
     </div>
 
-    <!-- Expand chevron (desktop only) -->
-    <i data-lucide="chevron-down" class="w-4 h-4 text-base-content/20 shrink-0 transition-transform duration-200 hidden sm:block" :class="expanded ? 'rotate-180' : ''"></i>
+    <!-- Expand chevron (desktop only) — closed: right (→), open: down (↓).
+         Rotation class on wrapper since Lucide rewrites the <i> into an <svg>. -->
+    <span class="inline-flex text-base-content/20 shrink-0 transition-transform duration-200 hidden sm:block"
+      :class="expanded ? 'rotate-90' : ''">
+      <i data-lucide="chevron-right" class="w-4 h-4"></i>
+    </span>
   </div>
 
-  <!-- Expanded Detail Panel -->
-  <div x-show="expanded" x-cloak
-    x-transition:enter="transition ease-out duration-150"
-    x-transition:enter-start="opacity-0"
-    x-transition:enter-end="opacity-100"
-    x-transition:leave="transition ease-in duration-100"
-    x-transition:leave-start="opacity-100"
-    x-transition:leave-end="opacity-0"
-    class="border-t border-base-300/50 bg-base-200/20 px-4 py-3">
-    <div class="flex flex-col sm:flex-row sm:items-start gap-4">
-      <!-- Detail Fields -->
-      <div class="flex flex-wrap gap-x-6 gap-y-2 text-xs">
-        {{if .MerchantName}}
-        <div>
-          <span class="text-base-content/30">Merchant</span>
-          <span class="text-base-content/60 ml-1.5">{{titleCase (deref .MerchantName)}}</span>
+  <!-- Expanded Detail Panel — `max-height` transition with a cap of 16rem
+       (well above the ~4rem content). Grid-template-rows transitions look
+       clean but are paint-hostile at scale; max-height is composited cheaply
+       once the layer is promoted. -->
+  <div class="overflow-hidden transition-[max-height] duration-200 ease-out"
+    :class="expanded ? 'max-h-64' : 'max-h-0'"
+    aria-hidden="!expanded">
+    <div class="transition-opacity duration-150"
+      :class="expanded ? 'opacity-100' : 'opacity-0'">
+      <div class="border-t border-base-300/50 bg-base-200/20 px-4 py-3">
+        <div class="flex flex-col sm:flex-row sm:items-start gap-4">
+          <!-- Detail Fields -->
+          <div class="flex flex-wrap gap-x-6 gap-y-2 text-xs">
+            {{if .MerchantName}}
+            <div>
+              <span class="text-base-content/30">Merchant</span>
+              <span class="text-base-content/60 ml-1.5">{{titleCase (deref .MerchantName)}}</span>
+            </div>
+            {{end}}
+            <div>
+              <span class="text-base-content/30">Account</span>
+              <span class="text-base-content/60 ml-1.5">{{.AccountName}} ({{.InstitutionName}})</span>
+            </div>
+            <div>
+              <span class="text-base-content/30">Member</span>
+              <span class="text-base-content/60 ml-1.5">{{if .UserName}}{{.UserName}}{{else}}&mdash;{{end}}</span>
+            </div>
+            <div>
+              <span class="text-base-content/30">ID</span>
+              <code class="font-mono text-[0.65rem] bg-base-200 px-1.5 py-0.5 rounded ml-1.5">{{.ID}}</code>
+            </div>
+          </div>
         </div>
-        {{end}}
-        <div>
-          <span class="text-base-content/30">Account</span>
-          <span class="text-base-content/60 ml-1.5">{{.AccountName}} ({{.InstitutionName}})</span>
-        </div>
-        <div>
-          <span class="text-base-content/30">Member</span>
-          <span class="text-base-content/60 ml-1.5">{{if .UserName}}{{.UserName}}{{else}}&mdash;{{end}}</span>
-        </div>
-        <div>
-          <span class="text-base-content/30">ID</span>
-          <code class="font-mono text-[0.65rem] bg-base-200 px-1.5 py-0.5 rounded ml-1.5">{{.ID}}</code>
-        </div>
-      </div>
-    </div>
-  </div>
+      </div><!-- /visual panel -->
+    </div><!-- /opacity inner -->
+  </div><!-- /grid animation outer -->
 </div>
 {{end}}

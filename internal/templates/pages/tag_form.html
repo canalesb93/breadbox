@@ -1,0 +1,250 @@
+{{define "content"}}
+{{template "breadcrumb" .}}
+
+<div class="bb-page-header">
+  <div>
+    <h1 class="bb-page-title">{{if .IsEdit}}Edit Tag{{else}}Add Tag{{end}}</h1>
+    <p class="text-sm text-base-content/50 mt-1">
+      {{if .IsEdit}}Slug is immutable &mdash; other fields can be changed.{{else}}Create a new tag for coordinating transaction work.{{end}}
+    </p>
+  </div>
+</div>
+
+<div class="max-w-lg" x-data="tagForm()">
+  <form @submit.prevent="submit()" class="bb-card p-0 overflow-hidden">
+    <!-- Top section: icon header + fields -->
+    <div class="p-5 sm:p-6">
+      <div class="bb-icon-header">
+        <div class="bb-icon-header__tile bb-icon-tile--primary">
+          <i data-lucide="tag" class="w-5 h-5"></i>
+        </div>
+        <div class="bb-icon-header__text">
+          <h2 class="text-sm font-semibold">{{if .IsEdit}}{{.Tag.DisplayName}}{{else}}New tag{{end}}</h2>
+          <p class="text-xs text-base-content/45">
+            {{if .IsEdit}}<code class="font-mono text-xs">{{.Tag.Slug}}</code>{{else}}Open-ended label for transactions{{end}}
+          </p>
+        </div>
+      </div>
+
+      <!-- Live preview chip -->
+      <div class="flex items-center gap-3 p-3 bg-base-200/40 rounded-xl mb-5">
+        <span class="text-[11px] uppercase tracking-wider text-base-content/40 font-medium shrink-0">Preview</span>
+        <span class="bb-tag" :style="'--tag-color:' + (color || '#6366f1')">
+          <template x-if="icon"><i :data-lucide="icon"></i></template>
+          <span x-text="displayName || slug || 'tag-preview'"></span>
+        </span>
+      </div>
+
+      <div class="space-y-4">
+        <!-- Slug -->
+        <div>
+          <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="slug">
+            Slug {{if not .IsEdit}}<span class="text-error">*</span>{{end}}
+          </label>
+          {{if .IsEdit}}
+          <code class="block bg-base-200/50 px-3 py-2 rounded-xl font-mono text-sm text-base-content/60">{{.Tag.Slug}}</code>
+          <p class="text-xs text-base-content/40 mt-1.5">Slugs are immutable after creation.</p>
+          {{else}}
+          <input type="text" id="slug" x-model="slug" class="bb-form-input font-mono text-sm" required
+            pattern="^[a-z0-9]([a-z0-9\-:]*[a-z0-9])?$" placeholder="needs-review" maxlength="64">
+          <p class="text-xs text-base-content/40 mt-1.5">Lowercase, hyphens or colons. Immutable after creation.</p>
+          {{end}}
+        </div>
+
+        <!-- Display name -->
+        <div>
+          <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="display_name">
+            Display Name <span class="text-error">*</span>
+          </label>
+          <input type="text" id="display_name" x-model="displayName" class="bb-form-input" required
+            maxlength="128" placeholder="Needs Review">
+        </div>
+
+        <!-- Description -->
+        <div>
+          <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="description">
+            Description <span class="text-base-content/30">(optional)</span>
+          </label>
+          <input type="text" id="description" x-model="description" class="bb-form-input"
+            maxlength="256" placeholder="Short explanation of when to use this tag">
+        </div>
+
+        <!-- Icon + Color row -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="icon">
+              Icon <span class="text-base-content/30">(Lucide)</span>
+            </label>
+            <input type="text" id="icon" x-model="icon" class="bb-form-input"
+              placeholder="e.g. inbox" maxlength="32">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-base-content/50 mb-1.5">Color</label>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <template x-for="c in presetColors" :key="c">
+                <button type="button"
+                  class="w-7 h-7 rounded-full border-2 transition-all duration-150 hover:scale-110"
+                  :style="'background-color:' + c"
+                  :class="color === c ? 'border-base-content scale-110 shadow-sm' : 'border-transparent'"
+                  @click="color = c"
+                  :title="c"></button>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lifecycle -->
+        <div>
+          <label class="block text-xs font-medium text-base-content/50 mb-1.5">Lifecycle</label>
+          <div class="flex gap-2">
+            <label class="flex-1 cursor-pointer">
+              <input type="radio" x-model="lifecycle" value="persistent" class="peer sr-only">
+              <div class="border-2 border-base-300 peer-checked:border-primary peer-checked:bg-primary/5 rounded-xl p-3 transition-colors">
+                <div class="font-medium text-sm">Persistent</div>
+                <div class="text-xs text-base-content/50 mt-0.5">Long-lived label (subscription, shared)</div>
+              </div>
+            </label>
+            <label class="flex-1 cursor-pointer">
+              <input type="radio" x-model="lifecycle" value="ephemeral" class="peer sr-only">
+              <div class="border-2 border-base-300 peer-checked:border-warning peer-checked:bg-warning/5 rounded-xl p-3 transition-colors">
+                <div class="font-medium text-sm">Ephemeral</div>
+                <div class="text-xs text-base-content/50 mt-0.5">Workflow trigger, removal requires note</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <template x-if="error">
+          <div role="alert" class="bb-form-error">
+            <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+            <span x-text="error"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Sticky action row -->
+    <div class="bb-action-row">
+      <a href="/tags" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
+      <button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32" :disabled="submitting">
+        <span x-show="!submitting" class="inline-flex items-center gap-1.5">
+          <i data-lucide="save" class="w-3.5 h-3.5"></i>
+          <span>{{if .IsEdit}}Save Changes{{else}}Create Tag{{end}}</span>
+        </span>
+        <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+function tagForm() {
+  var isEdit = {{if .IsEdit}}true{{else}}false{{end}};
+  var tagId = {{if .IsEdit}}'{{.Tag.ID}}'{{else}}''{{end}};
+  var initial = {
+    slug: {{if .IsEdit}}'{{.Tag.Slug}}'{{else}}''{{end}},
+    displayName: {{if .IsEdit}}{{toJSON .Tag.DisplayName}}{{else}}''{{end}},
+    description: {{if .IsEdit}}{{toJSON .Tag.Description}}{{else}}''{{end}},
+    color: {{if .IsEdit}}{{if .Tag.Color}}'{{deref .Tag.Color}}'{{else}}'#6366f1'{{end}}{{else}}'#6366f1'{{end}},
+    icon: {{if .IsEdit}}{{if .Tag.Icon}}'{{deref .Tag.Icon}}'{{else}}''{{end}}{{else}}''{{end}},
+    lifecycle: {{if .IsEdit}}'{{.Tag.Lifecycle}}'{{else}}'persistent'{{end}}
+  };
+  return {
+    isEdit: isEdit,
+    tagId: tagId,
+    slug: initial.slug,
+    displayName: initial.displayName,
+    description: initial.description,
+    color: initial.color,
+    icon: initial.icon,
+    lifecycle: initial.lifecycle,
+    submitting: false,
+    error: '',
+    presetColors: ['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#64748b','#78716c'],
+
+    restorePageState: function() {
+      if (window.bbProgress) window.bbProgress.finish();
+      var main = document.querySelector('main');
+      if (main) { main.style.opacity = ''; main.style.filter = ''; main.style.pointerEvents = ''; }
+    },
+
+    submit: function() {
+      this.error = '';
+      var displayName = (this.displayName || '').trim();
+      var slug = (this.slug || '').trim();
+      if (!this.isEdit && !slug) {
+        this.error = 'Slug is required.';
+        return;
+      }
+      if (!displayName) {
+        this.error = 'Display name is required.';
+        return;
+      }
+
+      var body;
+      var url;
+      var method;
+      if (this.isEdit) {
+        url = '/-/tags/' + this.tagId;
+        method = 'PUT';
+        body = {
+          display_name: displayName,
+          description: this.description || '',
+          color: this.color || null,
+          icon: this.icon || null,
+          lifecycle: this.lifecycle
+        };
+      } else {
+        url = '/-/tags';
+        method = 'POST';
+        body = {
+          slug: slug,
+          display_name: displayName,
+          description: this.description || '',
+          color: this.color || null,
+          icon: this.icon || null,
+          lifecycle: this.lifecycle
+        };
+      }
+
+      var self = this;
+      self.submitting = true;
+
+      fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      .then(function(res) {
+        if (res.ok) {
+          window.location.href = '/tags';
+          return;
+        }
+        return res.json().then(function(data) {
+          self.submitting = false;
+          self.restorePageState();
+          var msg = 'Failed to save tag.';
+          if (data && data.error) {
+            if (typeof data.error === 'object' && data.error.message) {
+              msg = data.error.message;
+            } else if (typeof data.error === 'string') {
+              msg = data.error;
+            }
+          }
+          self.error = msg;
+        }).catch(function() {
+          self.submitting = false;
+          self.restorePageState();
+          self.error = 'Failed to save tag.';
+        });
+      })
+      .catch(function() {
+        self.submitting = false;
+        self.restorePageState();
+        self.error = 'Network error. Please try again.';
+      });
+    }
+  };
+}
+</script>
+{{end}}

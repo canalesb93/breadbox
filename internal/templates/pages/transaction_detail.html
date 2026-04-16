@@ -163,48 +163,41 @@
     <div x-data="tagManager()">
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-sm font-semibold text-base-content/50">Tags</h2>
-        <a href="/transactions/{{.TransactionID}}/edit" class="text-xs text-base-content/40 hover:text-primary">Edit all</a>
       </div>
-      <div class="flex flex-wrap gap-1.5 mb-3 min-h-[1.5rem]">
+      <div class="flex flex-wrap gap-1.5 min-h-[1.5rem] items-center">
         <template x-for="t in tags" :key="t.slug">
-          <span class="badge badge-soft rounded-lg gap-1 group/chip"
-            :style="t.color ? ('background-color:' + t.color + '1a;color:' + t.color + ';border-color:' + t.color + '40') : ''"
+          <span class="bb-tag relative"
+            :style="t.color ? ('--tag-color:' + t.color) : ''"
             x-data="{showRemoveNote: false, note: ''}">
-            <template x-if="t.icon"><i :data-lucide="t.icon" class="w-3 h-3" x-init="$nextTick(() => lucide.createIcons())"></i></template>
+            <template x-if="t.icon"><i :data-lucide="t.icon" ></i></template>
             <a :href="'/transactions?tags=' + t.slug" class="hover:underline" x-text="t.displayName || t.slug"></a>
-            <button type="button" class="opacity-0 group-hover/chip:opacity-70 hover:opacity-100 ml-0.5 transition-opacity"
-              @click="t.lifecycle === 'ephemeral' ? showRemoveNote = !showRemoveNote : removeTag(t, '')" title="Remove">
-              <i data-lucide="x" class="w-3 h-3"></i>
+            <button type="button" class="bb-tag-remove"
+              @click.prevent.stop="t.lifecycle === 'ephemeral' ? (showRemoveNote = !showRemoveNote) : removeTag(t, '')"
+              title="Remove tag">
+              <i data-lucide="x" ></i>
             </button>
-            <template x-if="showRemoveNote && t.lifecycle === 'ephemeral'">
-              <div class="absolute left-0 top-full mt-1 bg-base-100 border border-base-300 rounded-xl p-2 shadow-lg z-10 w-64" @click.outside="showRemoveNote = false">
-                <p class="text-xs text-warning mb-1.5">Removing ephemeral tag — note required:</p>
-                <input type="text" x-model="note" class="input input-bordered input-xs rounded-lg w-full mb-1.5" placeholder="Why removing?" @keydown.enter="if(note.trim()) { removeTag(t, note); showRemoveNote = false; }">
-                <div class="flex gap-1 justify-end">
-                  <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="showRemoveNote = false">Cancel</button>
-                  <button type="button" class="btn btn-error btn-xs rounded-lg" :disabled="!note.trim()" @click="if(note.trim()) { removeTag(t, note); showRemoveNote = false; }">Remove</button>
-                </div>
+            <div x-show="showRemoveNote && t.lifecycle === 'ephemeral'" x-cloak
+              class="absolute left-0 top-full mt-1 bg-base-100 border border-base-300 rounded-xl p-2 shadow-lg z-10 w-64"
+              @click.outside="showRemoveNote = false">
+              <p class="text-xs text-warning mb-1.5">Removing ephemeral tag — note required:</p>
+              <input type="text" x-model="note" class="input input-bordered input-xs rounded-lg w-full mb-1.5" placeholder="Why removing?" @keydown.enter="if(note.trim()) { removeTag(t, note); showRemoveNote = false; }">
+              <div class="flex gap-1 justify-end">
+                <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="showRemoveNote = false">Cancel</button>
+                <button type="button" class="btn btn-error btn-xs rounded-lg" :disabled="!note.trim()" @click="if(note.trim()) { removeTag(t, note); showRemoveNote = false; }">Remove</button>
               </div>
-            </template>
+            </div>
           </span>
         </template>
-        <span x-show="!tags.length" class="text-xs text-base-content/30 italic py-1">No tags</span>
+        <!-- Add-tag sits in the same wrapping row as its siblings (ghost chip). -->
+        <button type="button"
+          class="bb-tag bb-tag-add"
+          @click="openTagPicker()"
+          @tag-picked.window="if ($event.detail.sourceId === 'txd-tag') { addTagBySlug($event.detail.tag.slug) }"
+          title="Add tag">
+          <i data-lucide="plus"></i>
+          <span>Add tag</span>
+        </button>
       </div>
-      <div class="flex gap-2" x-show="addingTag" x-cloak>
-        <input type="text" x-model="newTagSlug" list="add-tag-suggestions" class="input input-bordered input-xs rounded-lg flex-1"
-          placeholder="Tag slug" pattern="^[a-z0-9]([a-z0-9\-:]*[a-z0-9])?$"
-          @keydown.enter.prevent="addTag()" @keydown.escape="addingTag = false; newTagSlug = ''">
-        <datalist id="add-tag-suggestions">
-          <template x-for="t in availableTags" :key="t.slug">
-            <option :value="t.slug" :label="t.display_name"></option>
-          </template>
-        </datalist>
-        <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="addTag()" :disabled="!newTagSlug">Add</button>
-        <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="addingTag = false; newTagSlug = ''">Cancel</button>
-      </div>
-      <button type="button" x-show="!addingTag" class="btn btn-ghost btn-xs rounded-lg gap-1 text-base-content/50" @click="addingTag = true; $nextTick(() => $el.parentElement.querySelector('input').focus())">
-        <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add tag
-      </button>
     </div>
   </div>
 </div>
@@ -219,22 +212,13 @@
     {{end}}
   </div>
 
-  <!-- Add Note + quick "Add needs-review" -->
+  <!-- Add Note -->
   <div class="px-4 sm:px-5 pb-4">
     <div class="flex gap-2 items-center">
       <input type="text" x-model="newComment" placeholder="Add a note..." class="input input-bordered input-sm h-9 flex-1 bg-base-200/50 rounded-xl" @keydown.enter.prevent="newComment.trim() && addComment()" />
       <button @click="addComment()" class="btn btn-sm h-9 rounded-xl btn-primary btn-square" :disabled="!newComment.trim()">
         <i data-lucide="send" class="w-3.5 h-3.5"></i>
       </button>
-    </div>
-    <div class="flex items-center mt-1.5 pl-1 gap-3">
-      {{if .HasPendingReview}}
-      <span class="text-xs text-info inline-flex items-center gap-1"><i data-lucide="inbox" class="w-3 h-3"></i>Tagged needs-review</span>
-      {{else}}
-      <button type="button" class="text-xs text-base-content/50 hover:text-info inline-flex items-center gap-1" @click="addNeedsReview()">
-        <i data-lucide="inbox" class="w-3 h-3"></i> Tag for review
-      </button>
-      {{end}}
     </div>
   </div>
 
@@ -315,6 +299,9 @@
 
 {{template "category-picker-script" .}}
 <script>
+// Populate global tag cache so the picker works without a re-fetch.
+window.__bbAllTags = {{toJSON .AvailableTags}} || [];
+
 function txCategoryEditor() {
   return {
     saving: false,
@@ -366,37 +353,6 @@ function showToast(message, type) {
 function commentManager() {
   return {
     newComment: '',
-    addNeedsReview() {
-      var self = this;
-      var note = this.newComment.trim();
-      fetch('/-/transactions/{{.TransactionID}}/tags', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({slug: 'needs-review', note: note}),
-      })
-      .then(function(res) { return res.json().then(function(d) { return {ok: res.ok, body: d}; }); })
-      .then(function(r) {
-        if (r.ok) {
-          // If a note was supplied, also write a comment so reviewers see context.
-          var followups = [];
-          if (note) {
-            followups.push(fetch('/-/transactions/{{.TransactionID}}/comments', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({content: note}),
-            }));
-          }
-          Promise.all(followups).then(function() {
-            self.newComment = '';
-            showToast('Tagged needs-review.', 'success');
-            location.reload();
-          });
-        } else {
-          showToast(r.body.error || 'Failed to tag.');
-        }
-      })
-      .catch(function() { showToast('Network error.'); });
-    },
     addComment() {
       var self = this;
       var content = this.newComment.trim();
@@ -442,25 +398,31 @@ function commentManager() {
 }
 
 function tagManager() {
+  // Go marshals nil slices as `null`, so guard with `|| []` to keep the Alpine
+  // scope usable when the transaction has no tags / no registered tags.
   return {
-    tags: {{toJSON .CurrentTags}}.map(function(t) { return {
+    tags: ({{toJSON .CurrentTags}} || []).map(function(t) { return {
       slug: t.slug,
       displayName: t.display_name,
       color: t.color,
       icon: t.icon,
       lifecycle: t.lifecycle,
     }; }),
-    availableTags: {{toJSON .AvailableTags}},
-    addingTag: false,
-    newTagSlug: '',
+    availableTags: {{toJSON .AvailableTags}} || [],
 
-    addTag() {
-      var slug = (this.newTagSlug || '').trim().toLowerCase();
+    openTagPicker() {
+      window.dispatchEvent(new CustomEvent('open-tag-picker', {
+        detail: {
+          mode: 'single',
+          sourceId: 'txd-tag',
+          availableTags: this.availableTags.filter(t => !this.tags.some(cur => cur.slug === t.slug)),
+        }
+      }));
+    },
+
+    addTagBySlug(slug) {
+      slug = (slug || '').trim().toLowerCase();
       if (!slug) return;
-      if (!/^[a-z0-9]([a-z0-9\-:]*[a-z0-9])?$/.test(slug)) {
-        showToast('Invalid slug format');
-        return;
-      }
       var self = this;
       fetch('/-/transactions/{{.TransactionID}}/tags', {
         method: 'POST',
@@ -470,12 +432,10 @@ function tagManager() {
       .then(function(res) { return res.json().then(function(d) { return {ok: res.ok, body: d}; }); })
       .then(function(r) {
         if (r.ok) {
-          self.newTagSlug = '';
-          self.addingTag = false;
           showToast('Tag added.', 'success');
           location.reload();
         } else {
-          showToast(r.body.error || 'Failed to add tag.');
+          showToast((r.body && r.body.error) || 'Failed to add tag.');
         }
       })
       .catch(function() { showToast('Network error.'); });
