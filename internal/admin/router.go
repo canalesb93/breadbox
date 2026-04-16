@@ -79,7 +79,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/transactions", TransactionListHandler(a, sm, tr, svc))
 		r.Get("/transactions/search", TransactionSearchHandler(a, sm, tr, svc))
 		r.Get("/transactions/{id}", TransactionDetailHandler(a, sm, tr, svc))
-		r.Get("/transactions/{id}/edit", EditTransactionPageHandler(a, sm, tr, svc))
 		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
 
 		// Member account self-service pages.
@@ -187,6 +186,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/rules/{id}", RuleDetailPageHandler(svc, sm, tr))
 		r.Get("/rules/{id}/edit", RuleFormPageHandler(svc, sm, tr))
 
+		// Tag create/edit pages — the /tags list itself is accessible to editors,
+		// but the admin-only JSON endpoints back the form submit. Keep the
+		// modal-era POST /-/tags endpoint untouched so the transaction tag
+		// picker's quick-create path keeps working.
+		r.Get("/tags/new", TagNewPageHandler(sm, tr))
+		r.Get("/tags/{id}/edit", TagEditPageHandler(svc, sm, tr))
+
 		r.Get("/categories", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/rules?tab=categories", http.StatusMovedPermanently)
 		})
@@ -232,9 +238,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			// Transaction category override
 			r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc))
 			r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc))
-
-			// Compound transaction update (category + tags + comment in one atomic op).
-			r.Post("/transactions/{id}/update", UpdateTransactionFormHandler(a, sm, svc))
 
 			// Transaction bulk categorize
 			r.Post("/transactions/batch-categorize", BatchSetTransactionCategoryAdminHandler(svc))

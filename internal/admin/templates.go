@@ -755,6 +755,7 @@ var templatePartials = []string{
 	"partials/breadcrumb.html",
 	"partials/tx_row.html",
 	"partials/tx_results.html",
+	"partials/tag_chip.html",
 }
 
 func (tr *TemplateRenderer) parseTemplates() error {
@@ -785,7 +786,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/mcp_settings.html",
 		"pages/rules.html",
 		"pages/tags.html",
-		"pages/transaction_edit.html",
+		"pages/tag_form.html",
 		"pages/rule_form.html",
 		"pages/rule_detail.html",
 		"pages/insights.html",

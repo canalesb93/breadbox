@@ -389,6 +389,120 @@
     </div>
   </div>
 
+  <!-- Global Tag Picker Overlay -->
+  <div x-data="globalTagPicker()" x-show="open" x-cloak
+       @open-tag-picker.window="openPicker($event.detail)"
+       @keydown.window.escape="if (open) { closePicker(); $event.stopPropagation(); }">
+    <!-- Reuse catpicker backdrop styling -->
+    <div class="bb-catpicker-backdrop" @click="closePicker()"></div>
+    <div class="bb-tagpicker-dialog"
+         @click.stop
+         @keydown.escape.prevent="closePicker()"
+         @keydown.enter.prevent="enterPressed()">
+      <!-- Search / create input -->
+      <div class="bb-catpicker-input-wrap gap-2">
+        <i data-lucide="tag"></i>
+        <input type="text"
+          class="bb-catpicker-input"
+          :placeholder="placeholder"
+          x-ref="tagPickerInput"
+          x-model="search"
+          autocomplete="off"
+          spellcheck="false">
+        <!-- Bulk-mode add/remove toggle, only shown when the consumer asks for it. -->
+        <div x-show="showBulkToggle" class="inline-flex items-center rounded-lg bg-base-200 p-0.5 text-[0.65rem] font-medium">
+          <button type="button" class="px-2 py-1 rounded-md transition-colors"
+            :class="bulkMode === 'add' ? 'bg-base-100 text-success shadow-sm' : 'text-base-content/50 hover:text-base-content'"
+            @click="bulkMode = 'add'">+ Add</button>
+          <button type="button" class="px-2 py-1 rounded-md transition-colors"
+            :class="bulkMode === 'remove' ? 'bg-base-100 text-error shadow-sm' : 'text-base-content/50 hover:text-base-content'"
+            @click="bulkMode = 'remove'">− Remove</button>
+        </div>
+        <div class="bb-cmdk-kbd" style="font-size:0.6rem" @click="closePicker()">esc</div>
+      </div>
+
+      <!-- Body: flat wrapping grid of chips + optional inline create row -->
+      <div class="bb-tagpicker-body" x-ref="tagPickerBody"
+           x-effect="filteredTags; $nextTick(() => { if (typeof lucide !== 'undefined' && $refs.tagPickerBody) lucide.createIcons({ nodes: [$refs.tagPickerBody] }); })">
+
+        <template x-if="filteredTags.length > 0">
+          <div class="bb-tagpicker-grid">
+            <template x-for="tag in filteredTags" :key="tag.slug">
+              <button type="button"
+                class="bb-tag bb-tag-interactive bb-tagpicker-chip"
+                :class="(multi && !isSelected(tag.slug)) && 'bb-tag-ghost'"
+                :data-selected="isSelected(tag.slug)"
+                :style="tag.color ? ('--tag-color:' + tag.color) : ''"
+                @click="chooseTag(tag)"
+                :title="tag.slug">
+                <template x-if="tag.icon">
+                  <i :data-lucide="tag.icon"></i>
+                </template>
+                <template x-if="multi && isSelected(tag.slug)">
+                  <i data-lucide="check"></i>
+                </template>
+                <span x-text="tag.display_name || tag.slug"></span>
+              </button>
+            </template>
+          </div>
+        </template>
+
+        <!-- Inline "Create 'slug'" — appears only on no-match + valid slug.
+             Simpler than before: one button, no section label, no swatches. -->
+        <template x-if="canCreate">
+          <button type="button" class="bb-tagpicker-create-inline"
+            :class="filteredTags.length > 0 && 'mt-3'"
+            :disabled="creating"
+            @click="createAndPick()">
+            <i data-lucide="plus"></i>
+            <span>Create</span>
+            <code class="font-mono bg-base-100/60 px-1.5 py-0.5 rounded text-[0.7rem]" x-text="normalizedQuery"></code>
+            <span x-show="!creating" class="ml-auto text-[0.65rem] text-base-content/40">
+              <kbd>&crarr;</kbd>
+            </span>
+            <span x-show="creating" class="ml-auto loading loading-spinner loading-xs"></span>
+          </button>
+        </template>
+
+        <!-- Empty state when no query and no tags at all -->
+        <template x-if="!search && filteredTags.length === 0 && availableTags.length === 0">
+          <div class="bb-tagpicker-empty">
+            <i data-lucide="tags"></i>
+            <div class="text-sm">No tags yet</div>
+            <div class="text-xs">Type a slug to create the first one.</div>
+          </div>
+        </template>
+
+        <!-- No match + not a valid slug (for create fallback) -->
+        <template x-if="search && filteredTags.length === 0 && !canCreate">
+          <div class="bb-tagpicker-empty">
+            <i data-lucide="search-x"></i>
+            <div class="text-sm">No matching tags</div>
+            <div class="text-[0.65rem]">Slug must be lowercase letters, numbers, hyphens or colons.</div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Footer -->
+      <div class="bb-catpicker-footer">
+        <div class="flex items-center gap-3 flex-wrap">
+          <span x-show="!multi"><kbd>&crarr;</kbd> select first</span>
+          <span x-show="multi && selectedSlugs.length > 0"><span x-text="selectedSlugs.length"></span> selected</span>
+          <span x-show="canCreate && filteredTags.length === 0"><kbd>&crarr;</kbd> create</span>
+          <span><kbd>esc</kbd> close</span>
+        </div>
+        <div x-show="multi" class="flex items-center gap-2">
+          <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="closePicker()">Cancel</button>
+          <button type="button" class="btn btn-primary btn-xs rounded-lg"
+            :disabled="selectedSlugs.length === 0"
+            @click="closeAndCommit()">
+            <span x-text="commitLabel"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Command Palette (Cmd+K) -->
   <div x-data="commandPalette()" x-show="open" x-cloak
        @open-cmdk.window="openPalette()"
@@ -487,16 +601,38 @@
     // Auto-render Lucide icons when new elements are added to the DOM.
     // Prevents icons from missing when Alpine.js x-if templates or
     // fetch-based content adds data-lucide elements after initial render.
-    // Note: lucide.createIcons() replaces [data-lucide] with <svg>, which
-    // adds nodes and would re-trigger this observer. We debounce and check
-    // for unprocessed [data-lucide] elements to avoid an infinite loop.
+    //
+    // PERF: Lucide's createIcons() replaces `<i data-lucide="x">` with a
+    // `<svg data-lucide="x">`, preserving the attribute on the generated node.
+    // So a naive `querySelector('[data-lucide]')` guard ALWAYS matches after
+    // the first render, creating an infinite replace → mutation → replace loop
+    // that ticks every ~50ms forever. It surfaces as window-resize lag,
+    // sluggish interactions, and idle CPU churn.
+    //
+    // Fix: only match unprocessed nodes (`<i>` or `<span>`, never `<svg>`).
+    // Also filter mutations: only schedule a sweep if the mutation added a
+    // non-SVG node somewhere, so Lucide's own SVG output never re-triggers us.
     (function() {
       var iconTimer = null;
-      new MutationObserver(function() {
+      var UNPROCESSED_SELECTOR = '[data-lucide]:not(svg)';
+      new MutationObserver(function(mutations) {
+        // Bail if every mutation is Lucide replacing icons with SVGs.
+        var sawPotentialIcon = false;
+        for (var i = 0; i < mutations.length && !sawPotentialIcon; i++) {
+          var added = mutations[i].addedNodes;
+          for (var j = 0; j < added.length; j++) {
+            var n = added[j];
+            if (n.nodeType !== 1) continue;
+            if (n.tagName === 'SVG' || n.tagName === 'svg') continue;
+            sawPotentialIcon = true;
+            break;
+          }
+        }
+        if (!sawPotentialIcon) return;
         if (iconTimer) return;
         iconTimer = setTimeout(function() {
           iconTimer = null;
-          if (document.querySelector('[data-lucide]')) {
+          if (document.querySelector(UNPROCESSED_SELECTOR)) {
             lucide.createIcons();
           }
         }, 50);
@@ -726,6 +862,189 @@
             detail: { id: item.id, slug: item.slug, label: item.label, value: value, sourceId: this.sourceId }
           }));
           this.closePicker();
+        }
+      };
+    }
+
+    // ── Global Tag Picker ──
+    //
+    // Opens via `window.dispatchEvent(new CustomEvent('open-tag-picker', { detail: {...} }))`.
+    //
+    // Consumer-facing options (all in the event detail):
+    //   mode:             'single' | 'multi'          — single closes on first pick. Default 'single'.
+    //   sourceId:         string                      — echoed in outbound events so listeners can route.
+    //   availableTags:    TagLite[]                   — overrides the global `window.__bbAllTags` snapshot.
+    //   selectedSlugs:    string[]                    — pre-selected slugs (multi mode).
+    //   showBulkToggle:   boolean                     — expose the Add/Remove segmented control at the top.
+    //   placeholder:      string                      — input placeholder copy.
+    //   commitLabel:      string                      — label on the primary Done button (multi mode).
+    //
+    // Outbound events:
+    //   tag-picked                 { sourceId, tag }          — single-mode selection.
+    //   tag-selection-commit       { sourceId, slugs, mode }  — multi-mode Done. `mode` is 'add' or 'remove'
+    //                                                           when showBulkToggle is on, otherwise 'add'.
+    //   tag-created                { tag }                    — newly created tag (fired in both modes).
+    //
+    // Keyboard:
+    //   Enter — if typing a valid new slug and no existing match, creates & picks. Otherwise in
+    //           single mode selects the first filtered chip. In multi mode this is a no-op so
+    //           users can tab/click chips freely. Arrow-grid navigation was removed — wrapping
+    //           h-stack made it confusing; mouse + Tab do the job.
+    //   Esc   — close without committing.
+    function globalTagPicker() {
+      var SLUG_RE = /^[a-z0-9]([a-z0-9\-:]*[a-z0-9])?$/;
+      // Used when quick-creating so the new tag has *some* color. Users can change it later on /tags/:id/edit.
+      var DEFAULT_COLORS = ['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#64748b','#78716c'];
+      return {
+        open: false,
+        multi: false,
+        search: '',
+        sourceId: '',
+        availableTags: [],
+        selectedSlugs: [],
+        showBulkToggle: false,
+        bulkMode: 'add',                 // only meaningful when showBulkToggle
+        placeholder: 'Pick or create a tag…',
+        commitLabel: 'Apply',
+        creating: false,
+
+        get normalizedQuery() {
+          return (this.search || '').trim().toLowerCase();
+        },
+
+        get filteredTags() {
+          var q = this.normalizedQuery;
+          if (!q) return this.availableTags;
+          return this.availableTags.filter(function(t) {
+            return (t.slug && t.slug.toLowerCase().indexOf(q) !== -1) ||
+                   (t.display_name && t.display_name.toLowerCase().indexOf(q) !== -1) ||
+                   (t.description && t.description.toLowerCase().indexOf(q) !== -1);
+          });
+        },
+
+        get canCreate() {
+          var q = this.normalizedQuery;
+          if (!q || !SLUG_RE.test(q)) return false;
+          // Don't offer to create if an exact slug match already exists in the list.
+          return !this.availableTags.some(function(t) { return t.slug === q; });
+        },
+
+        isSelected(slug) {
+          return this.selectedSlugs.indexOf(slug) !== -1;
+        },
+
+        openPicker(detail) {
+          detail = detail || {};
+          // Accept legacy `mode: 'multi'` but also the explicit boolean `multi`.
+          this.multi = detail.multi === true || detail.mode === 'multi';
+          this.sourceId = detail.sourceId || '';
+          this.availableTags = (detail.availableTags && detail.availableTags.slice()) || (window.__bbAllTags ? window.__bbAllTags.slice() : []);
+          this.selectedSlugs = (detail.selectedSlugs || []).slice();
+          this.showBulkToggle = !!detail.showBulkToggle;
+          this.bulkMode = detail.bulkMode === 'remove' ? 'remove' : 'add';
+          this.placeholder = detail.placeholder || (this.multi ? 'Filter or type to create…' : 'Pick or create a tag…');
+          this.commitLabel = detail.commitLabel || 'Apply';
+          this.search = '';
+          this.open = true;
+          window.bbLockScroll && window.bbLockScroll();
+          var self = this;
+          setTimeout(function() {
+            if (self.$refs.tagPickerInput) self.$refs.tagPickerInput.focus();
+            var dialog = document.querySelector('.bb-tagpicker-dialog');
+            if (dialog && typeof lucide !== 'undefined') lucide.createIcons({ nodes: [dialog] });
+          }, 50);
+        },
+
+        closePicker() {
+          this.open = false;
+          this.search = '';
+          this.creating = false;
+          window.bbUnlockScroll && window.bbUnlockScroll();
+        },
+
+        closeAndCommit() {
+          if (!this.multi) { this.closePicker(); return; }
+          window.dispatchEvent(new CustomEvent('tag-selection-commit', {
+            detail: {
+              sourceId: this.sourceId,
+              slugs: this.selectedSlugs.slice(),
+              mode: this.showBulkToggle ? this.bulkMode : 'add',
+            }
+          }));
+          this.closePicker();
+        },
+
+        chooseTag(tag) {
+          if (this.multi) {
+            // Toggle selection — unselect by clicking again.
+            var i = this.selectedSlugs.indexOf(tag.slug);
+            if (i === -1) this.selectedSlugs.push(tag.slug);
+            else this.selectedSlugs.splice(i, 1);
+            return;
+          }
+          window.dispatchEvent(new CustomEvent('tag-picked', {
+            detail: { sourceId: this.sourceId, tag: tag }
+          }));
+          this.closePicker();
+        },
+
+        enterPressed() {
+          // Always prefer Create when the query is a new valid slug — it's the primary intent.
+          if (this.canCreate) { this.createAndPick(); return; }
+          // In single mode, convenience: Enter picks the first match.
+          if (!this.multi && this.filteredTags.length > 0) {
+            this.chooseTag(this.filteredTags[0]);
+          }
+        },
+
+        createAndPick() {
+          if (!this.canCreate || this.creating) return;
+          var slug = this.normalizedQuery;
+          // Titleize the slug so the default display name reads nicely (user can edit later on /tags/:id/edit).
+          var displayName = slug.split(/[-:]/).map(function(w) {
+            return w.charAt(0).toUpperCase() + w.slice(1);
+          }).join(' ');
+          // Pseudo-random color from the preset list — deterministic per slug so reopening the
+          // picker on the same intended slug doesn't churn the color. Users can refine it later.
+          var hash = 0;
+          for (var i = 0; i < slug.length; i++) { hash = (hash * 31 + slug.charCodeAt(i)) | 0; }
+          var color = DEFAULT_COLORS[Math.abs(hash) % DEFAULT_COLORS.length];
+          var self = this;
+          this.creating = true;
+          fetch('/-/tags', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              slug: slug, display_name: displayName, description: '',
+              color: color, icon: null, lifecycle: 'persistent'
+            })
+          })
+          .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, body: d}; }); })
+          .then(function(res) {
+            self.creating = false;
+            if (!res.ok) {
+              window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: (res.body && res.body.error && res.body.error.message) || 'Could not create tag', type: 'error'}}));
+              return;
+            }
+            var t = res.body;
+            var tag = {
+              id: t.id, slug: t.slug, display_name: t.display_name,
+              description: t.description || '', color: t.color || color,
+              icon: t.icon || null, lifecycle: t.lifecycle || 'persistent'
+            };
+            self.availableTags.push(tag);
+            if (window.__bbAllTags && !window.__bbAllTags.some(function(x) { return x.slug === tag.slug; })) {
+              window.__bbAllTags.push(tag);
+            }
+            window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Created ' + tag.slug, type: 'success'}}));
+            window.dispatchEvent(new CustomEvent('tag-created', {detail: {tag: tag}}));
+            self.search = '';
+            self.chooseTag(tag);
+          })
+          .catch(function() {
+            self.creating = false;
+            window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Network error creating tag', type: 'error'}}));
+          });
         }
       };
     }

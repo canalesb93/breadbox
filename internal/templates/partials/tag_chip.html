@@ -1,0 +1,25 @@
+{{/*
+  Tag chip partials — canonical rendering for tags across the app.
+  Always pill-shaped (bb-tag) to differentiate from status badges.
+
+  Expects a tag value with .Slug, .DisplayName, .Color (*string), .Icon (*string).
+  Works with either service.TagResponse or any struct sharing those fields.
+
+  Variants:
+    {{template "tag-chip"       .}}  — default size
+    {{template "tag-chip-sm"    .}}  — compact (for transaction rows / dense lists)
+*/}}
+
+{{define "tag-chip"}}
+<span class="bb-tag"{{if .Color}} style="--tag-color: {{safeCSS (deref .Color)}}"{{end}} title="{{.Slug}}">
+  {{if .Icon}}<i data-lucide="{{deref .Icon}}"></i>{{end}}
+  <span class="truncate">{{.DisplayName}}</span>
+</span>
+{{end}}
+
+{{define "tag-chip-sm"}}
+<span class="bb-tag bb-tag-sm"{{if .Color}} style="--tag-color: {{safeCSS (deref .Color)}}"{{end}} title="{{.Slug}}">
+  {{if .Icon}}<i data-lucide="{{deref .Icon}}"></i>{{end}}
+  <span class="truncate">{{.DisplayName}}</span>
+</span>
+{{end}}
