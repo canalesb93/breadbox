@@ -75,7 +75,7 @@
         <span class="group/tag badge badge-soft badge-xs rounded-md gap-0.5 cursor-pointer"
           {{if .Color}}style="background-color: {{safeCSS (deref .Color)}}1a; color: {{safeCSS (deref .Color)}}; border-color: {{safeCSS (deref .Color)}}40;"{{end}}
           x-show="!removing['{{.Slug}}']"
-          @click.stop="removeTag($el, '{{$.ID}}', '{{.Slug}}', '{{.DisplayName}}', '{{.Lifecycle}}')"
+          @click.stop="removeTag($el, '{{$.ID}}', '{{.Slug}}', '{{.DisplayName}}')"
           title="{{.Slug}} — click to remove">
           {{if .Icon}}<i data-lucide="{{deref .Icon}}" class="w-2.5 h-2.5"></i>{{end}}
           <span>{{.DisplayName}}</span>

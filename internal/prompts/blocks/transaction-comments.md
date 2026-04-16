@@ -9,7 +9,7 @@ THREE WRITE PATHS — pick the right one:
 Don't double-write: if you have an update_transactions op with `tags_to_remove: [{slug: "needs-review", note: "..."}]`, the note you pass there captures "why I closed this review". Do NOT also call add_transaction_comment for the same narrative — you'll produce two annotations saying the same thing.
 
 WHEN TO ADD NARRATIVE:
-- Removing an ephemeral tag (needs-review): ALWAYS — the note is required by the server, and it's the audit trail for why the tag came off.
+- Removing an ephemeral tag (needs-review): strongly recommended — the note lands on the audit trail explaining why the tag came off.
 - Confirming a non-obvious category — explain your reasoning
 - Flagging a transaction for human attention — explain what looks suspicious
 - An ambiguous transaction where you're making a judgment call

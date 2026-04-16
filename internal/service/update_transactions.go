@@ -275,9 +275,6 @@ func (s *Service) runUpdateOpInTx(ctx context.Context, tx pgx.Tx, op UpdateTrans
 			return fmt.Errorf("get tag %q: %w", slug, err)
 		}
 		trimmedNote := strings.TrimSpace(t.Note)
-		if tag.Lifecycle == "ephemeral" && trimmedNote == "" {
-			return fmt.Errorf("%w: note is required when removing ephemeral tag %q", ErrInvalidParameter, slug)
-		}
 		rows, err := qtx.RemoveTransactionTag(ctx, db.RemoveTransactionTagParams{
 			TransactionID: txnUID,
 			TagID:         tag.ID,

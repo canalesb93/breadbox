@@ -981,15 +981,8 @@ document.addEventListener('alpine:init', function() {
 });
 
 /* ── Remove tag from a transaction row ── */
-function removeTag(el, txnId, slug, displayName, lifecycle) {
-  var note = '';
-  if (lifecycle === 'ephemeral') {
-    note = prompt('Note required to remove "' + displayName + '":', 'Reviewed');
-    if (note === null || !note.trim()) return;
-  }
-  var url = '/-/transactions/' + txnId + '/tags/' + encodeURIComponent(slug);
-  if (note) url += '?note=' + encodeURIComponent(note.trim());
-  fetch(url, { method: 'DELETE' })
+function removeTag(el, txnId, slug, displayName) {
+  fetch('/-/transactions/' + txnId + '/tags/' + encodeURIComponent(slug), { method: 'DELETE' })
   .then(function(r) { return r.json(); })
   .then(function(d) {
     if (d.ok || d.removed) {

@@ -4,8 +4,6 @@ package service_test
 
 import (
 	"context"
-	"errors"
-	"strings"
 	"testing"
 
 	"breadbox/internal/service"
@@ -120,9 +118,9 @@ func TestAddTransactionTag_WritesAnnotation(t *testing.T) {
 	}
 }
 
-// TestRemoveTransactionTag_EphemeralRequiresNote verifies that removing a
-// tag whose lifecycle is ephemeral requires a non-empty note.
-func TestRemoveTransactionTag_EphemeralRequiresNote(t *testing.T) {
+// TestRemoveTransactionTag_EphemeralNoNote verifies that ephemeral tags
+// can be removed without a note (note is optional, not required).
+func TestRemoveTransactionTag_EphemeralNoNote(t *testing.T) {
 	svc, queries, _ := newService(t)
 	ctx := context.Background()
 	acctID := seedTxnFixture(t, queries)
@@ -130,27 +128,13 @@ func TestRemoveTransactionTag_EphemeralRequiresNote(t *testing.T) {
 
 	testutil.MustCreateTag(t, queries, "needs-review", "Needs Review", "ephemeral")
 
-	// First add the tag.
 	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", Name: "A"}, ""); err != nil {
 		t.Fatalf("AddTransactionTag: %v", err)
 	}
 
-	// Remove without note → error.
-	_, _, err := svc.RemoveTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", Name: "A"}, "")
-	if err == nil {
-		t.Fatal("expected error when removing ephemeral tag without note")
-	}
-	if !errors.Is(err, service.ErrInvalidParameter) {
-		t.Errorf("expected ErrInvalidParameter, got %v", err)
-	}
-	if !strings.Contains(err.Error(), "note is required") {
-		t.Errorf("expected error to mention 'note is required', got: %v", err)
-	}
-
-	// With note → succeeds.
-	removed, _, err := svc.RemoveTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", Name: "A"}, "reviewed")
+	removed, _, err := svc.RemoveTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", Name: "A"}, "")
 	if err != nil {
-		t.Fatalf("RemoveTransactionTag with note: %v", err)
+		t.Fatalf("RemoveTransactionTag without note should succeed: %v", err)
 	}
 	if !removed {
 		t.Error("expected removed=true")
