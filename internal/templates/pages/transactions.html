@@ -631,33 +631,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }));
   });
 
-  // Single bulk "Tag" button — opens the global tag picker in multi-select mode
-  // with an Add/Remove toggle so users can either tag or untag in one flow.
+  // Bulk "Tag" button — opens the global tag picker for every selected row.
+  // The picker is always multi + always diff-based, so the same contract is
+  // used for 1 selected row and N selected rows.
   document.getElementById('bb-bulk-tag').addEventListener('click', function() {
-    var count = Alpine.store('bulk').sel.length;
+    var ids = Alpine.store('bulk').sel.slice();
     window.dispatchEvent(new CustomEvent('open-tag-picker', {
       detail: {
-        mode: 'multi',
         sourceId: 'bulk-tag',
+        transactionIds: ids,
+        txCount: ids.length,
+        appliedCounts: computeAppliedCounts(ids),
         availableTags: window.__bbAllTags || [],
-        showBulkToggle: true,
-        placeholder: 'Filter tags or type to create…',
-        commitLabel: 'Apply to ' + count,
       }
     }));
-  });
-  // Commit handler: mode indicates whether to add or remove the selected tags.
-  window.addEventListener('tag-selection-commit', function(e) {
-    var d = e && e.detail;
-    if (!d || d.sourceId !== 'bulk-tag') return;
-    if (!d.slugs || d.slugs.length === 0) return;
-    var payload = {};
-    if (d.mode === 'remove') {
-      payload.tags_to_remove = d.slugs.map(function(slug) { return {slug: slug, note: ''}; });
-    } else {
-      payload.tags_to_add = d.slugs.map(function(slug) { return {slug: slug, note: ''}; });
-    }
-    Alpine.store('bulk').runBatchUpdate(payload);
   });
 
   document.getElementById('bb-bulk-comment').addEventListener('click', function() {
@@ -683,7 +670,48 @@ document.addEventListener('DOMContentLoaded', function() {
       Alpine.store('bulk').categorize(e.detail.id);
     }
   });
+
+  // Unified tag-picker commit listener. Every caller that opens the picker
+  // (bulk bar, row 't' shortcut, tx detail) receives the same diff event here
+  // and routes through runBatchUpdate — optimistic UI + chunking + toasts all
+  // handled in one place.
+  window.addEventListener('tag-selection-commit', function(e) {
+    var d = e && e.detail;
+    if (!d) return;
+    // The transaction detail page commits its own diff (it needs to reload for
+    // the activity timeline). Let that handler claim its sourceId.
+    if (d.sourceId === 'txd-tag') return;
+    var ids = (d.transactionIds && d.transactionIds.length) ? d.transactionIds : Alpine.store('bulk').sel;
+    if (!ids || ids.length === 0) return;
+    var op = {};
+    if (d.adds && d.adds.length) op.tags_to_add = d.adds.map(function(s) { return {slug: s, note: ''}; });
+    if (d.removes && d.removes.length) op.tags_to_remove = d.removes.map(function(s) { return {slug: s, note: ''}; });
+    if (!op.tags_to_add && !op.tags_to_remove) return;
+    Alpine.store('bulk').runBatchUpdate(op, ids);
+  });
 });
+
+/*
+ * Count tag memberships across a set of transaction IDs by reading each row's
+ * rendered .bb-tag chips. Drives the picker's chip states: slug with count 0
+ * is absent, count === ids.length is present, anything in between is mixed.
+ *
+ * We source the DOM instead of a server call because all selected rows are
+ * already rendered on the page (bulk selection only covers the current view).
+ */
+function computeAppliedCounts(ids) {
+  var counts = {};
+  (ids || []).forEach(function(id) {
+    var row = document.querySelector('.bb-tx-row[data-tx-id="' + CSS.escape(id) + '"]');
+    if (!row) return;
+    row.querySelectorAll('[data-tx-tag-container] .bb-tag').forEach(function(chip) {
+      var slug = chip.getAttribute('title');
+      if (!slug) return;
+      counts[slug] = (counts[slug] || 0) + 1;
+    });
+  });
+  return counts;
+}
 
 /* ── Alpine Store: Bulk Selection State ── */
 document.addEventListener('alpine:init', function() {
@@ -831,16 +859,21 @@ document.addEventListener('alpine:init', function() {
     },
 
     /* runBatchUpdate dispatches a batch update_transactions call applying the
-     * same op (sans transaction_id) to every selected transaction. The op may
+     * same op (sans transaction_id) to every listed transaction. The op may
      * include category_slug, tags_to_add, tags_to_remove, and comment.
+     *
+     * `ids` defaults to the current bulk selection, but can be overridden so
+     * the same code path handles single-transaction tag diffs (row shortcut,
+     * detail page) as bulk tag diffs — keeping optimistic UI + chunking in one
+     * place.
      *
      * If the op is tag-only (no category or comment change), rows are updated
      * in place without a full reload. Category/comment changes still reload
      * because the row template depends on them server-side. */
-    runBatchUpdate(op) {
-      if (this.sel.length === 0) return;
+    runBatchUpdate(op, ids) {
+      ids = ids && ids.length ? ids.slice() : this.sel.slice();
+      if (ids.length === 0) return;
       var self = this;
-      var ids = self.sel.slice();
       var isTagOnly = !op.category_slug && !op.comment && (op.tags_to_add || op.tags_to_remove);
       // The /-/transactions/batch-update endpoint caps each call at 50 ops,
       // matching the MCP update_transactions tool. Chunk to respect that.
@@ -952,15 +985,17 @@ document.addEventListener('alpine:init', function() {
       var link = row.querySelector('a[href*="/transactions/"]');
       if (!link) return;
       var id = link.href.split('/').pop();
-      // Filter out tags already attached to this row so the picker doesn't offer duplicates.
-      var existing = [];
-      row.querySelectorAll('.bb-tag').forEach(function(el) {
-        var title = el.getAttribute('title');
-        if (title) existing.push(title);
-      });
-      var offered = (window.__bbAllTags || []).filter(function(t) { return existing.indexOf(t.slug) === -1; });
+      // Single-tx picker uses the same bulk contract: every tag is offered, and
+      // chips on the row render as "present" via appliedCounts so the user can
+      // add or remove in one session.
       window.dispatchEvent(new CustomEvent('open-tag-picker', {
-        detail: { mode: 'single', sourceId: 'txrow-' + id, availableTags: offered }
+        detail: {
+          sourceId: 'txrow-' + id,
+          transactionIds: [id],
+          txCount: 1,
+          appliedCounts: computeAppliedCounts([id]),
+          availableTags: window.__bbAllTags || [],
+        }
       }));
     },
 
@@ -1051,35 +1086,6 @@ document.addEventListener('alpine:init', function() {
     }
   });
 
-  // Apply a picked tag from the tag picker to whichever row opened it.
-  // sourceId convention: 'txrow-' + transactionId
-  window.addEventListener('tag-picked', function(e) {
-    var detail = e && e.detail;
-    if (!detail || !detail.sourceId || detail.sourceId.indexOf('txrow-') !== 0) return;
-    var txnId = detail.sourceId.slice('txrow-'.length);
-    var slug = detail.tag && detail.tag.slug;
-    if (!txnId || !slug) return;
-    // Optimistic UI: show the chip immediately, roll back on failure.
-    updateRowTags(txnId, {add: [slug]});
-    fetch('/-/transactions/' + txnId + '/tags', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({slug: slug, note: ''})
-    })
-    .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, body: d}; }); })
-    .then(function(res) {
-      if (!res.ok) {
-        updateRowTags(txnId, {remove: [slug]});
-        window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: (res.body && res.body.error && res.body.error.message) || 'Failed to add tag', type: 'error'}}));
-        return;
-      }
-      window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Tag added', type: 'success'}}));
-    })
-    .catch(function() {
-      updateRowTags(txnId, {remove: [slug]});
-      window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Network error', type: 'error'}}));
-    });
-  });
 });
 
 /* ── Remove tag from a transaction row ── */
