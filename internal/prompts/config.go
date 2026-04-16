@@ -153,12 +153,18 @@ func LoadBlock(id string) (Block, error) {
 		body = strings.TrimSpace(lines[3])
 	}
 
+	// Prepend the title as an H1 so it appears in the composed prompt, not just the UI.
+	content = body
+	if title != "" {
+		content = "# " + title + "\n\n" + body
+	}
+
 	return Block{
 		ID:              id,
 		Title:           title,
 		Description:     description,
-		Content:         body,
-		OriginalContent: body,
+		Content:         content,
+		OriginalContent: content,
 	}, nil
 }
 
