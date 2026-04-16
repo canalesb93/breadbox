@@ -20,6 +20,7 @@ paths:
 - `make css` compiles `input.css` → `static/css/styles.css`.
 - `make css-watch` for dev (rebuilds on change).
 - Dockerfile runs `make css` in the build stage. Don't commit `styles.css` changes — it's a build artifact.
+- **CSS is embedded into the binary** via `static/embed.go` (`//go:embed all:css favicon.svg`). After `make css` you must **restart the server** for changes to take effect — a browser hard-reload alone won't help because the running binary still serves the stale embedded copy.
 
 ## Footguns
 
