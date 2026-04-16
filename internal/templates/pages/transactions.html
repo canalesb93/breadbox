@@ -569,27 +569,27 @@ document.addEventListener('DOMContentLoaded', function() {
   bar.id = 'bb-bulk-bar';
   bar.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;z-index:40;opacity:0;transform:translateX(-50%) translateY(1rem);pointer-events:none;transition:opacity 0.2s ease,transform 0.2s ease';
   bar.innerHTML = '<div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-2xl shadow-lg px-4 py-2.5 max-w-[calc(100vw-2rem)]">'
-    + '<div class="flex items-center gap-2 text-sm shrink-0">'
-    + '<span id="bb-bulk-count" class="flex items-center justify-center w-6 h-6 bg-primary text-primary-content rounded-lg text-xs font-bold tabular-nums">0</span>'
-    + '<span class="text-base-content/70 font-medium hidden sm:inline">selected</span>'
-    + '</div>'
-    + '<div class="w-px h-6 bg-base-300"></div>'
-    + '<button type="button" id="bb-bulk-uncat" class="btn btn-ghost btn-sm rounded-xl text-xs gap-2" title="Select all uncategorized on this page">'
-    + '<i data-lucide="circle-off" class="w-3.5 h-3.5"></i>'
-    + '<span class="hidden sm:inline">Uncategorized</span>'
+    + '<button type="button" id="bb-bulk-count-toggle" class="btn btn-ghost btn-sm rounded-xl gap-1.5" title="Select all / clear">'
+    +   '<span id="bb-bulk-count" class="font-bold tabular-nums">0</span>'
+    +   '<span class="hidden sm:inline text-base-content/60 font-normal">selected</span>'
     + '</button>'
     + '<div class="w-px h-6 bg-base-300"></div>'
-    + '<button type="button" id="bb-bulk-categorize" class="btn btn-primary btn-sm rounded-xl gap-2">'
-    + '<i data-lucide="tags" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Categorize</span>'
+    + '<button type="button" id="bb-bulk-comment" class="btn btn-ghost btn-sm rounded-xl gap-2" title="Add comment">'
+    +   '<i data-lucide="message-square" class="w-3.5 h-3.5"></i>'
+    +   '<span class="hidden sm:inline">Comment</span>'
     + '</button>'
     + '<button type="button" id="bb-bulk-tag" class="btn btn-ghost btn-sm rounded-xl gap-2" title="Tag selected">'
-    + '<i data-lucide="tag" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Tag</span>'
+    +   '<i data-lucide="tag" class="w-3.5 h-3.5"></i>'
+    +   '<span class="hidden sm:inline">Tag</span>'
+    +   '<span class="hidden sm:inline ml-1 text-[10px] opacity-50 border border-current/30 rounded px-1 leading-none py-0.5">T</span>'
     + '</button>'
-    + '<button type="button" id="bb-bulk-comment" class="btn btn-ghost btn-sm rounded-xl gap-2" title="Add comment">'
-    + '<i data-lucide="message-square" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Comment</span>'
+    + '<button type="button" id="bb-bulk-categorize" class="btn btn-primary btn-sm rounded-xl gap-2" title="Categorize selected">'
+    +   '<i data-lucide="tags" class="w-3.5 h-3.5"></i>'
+    +   '<span class="hidden sm:inline">Categorize</span>'
+    +   '<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5">C</span>'
     + '</button>'
-    + '<button type="button" id="bb-bulk-clear" class="btn btn-ghost btn-sm btn-square rounded-xl" title="Clear selection">'
-    + '<i data-lucide="x" class="w-4 h-4"></i>'
+    + '<button type="button" id="bb-bulk-clear" class="btn btn-ghost btn-sm btn-square rounded-xl" title="Exit select mode">'
+    +   '<i data-lucide="x" class="w-4 h-4"></i>'
     + '</button>'
     + '</div>';
   document.body.appendChild(bar);
@@ -616,8 +616,11 @@ document.addEventListener('DOMContentLoaded', function() {
     + '</dialog>';
   document.body.appendChild(modal);
 
-  document.getElementById('bb-bulk-uncat').addEventListener('click', function() {
-    Alpine.store('bulk').selectUncategorized();
+  document.getElementById('bb-bulk-count-toggle').addEventListener('click', function() {
+    // Gmail-style: clicking the count toggles between "select all on this page"
+    // and "clear all". Gives the user a one-click path to each extreme without
+    // hunting for a menu.
+    Alpine.store('bulk').toggleAll();
   });
   document.getElementById('bb-bulk-categorize').addEventListener('click', function() {
     window.dispatchEvent(new CustomEvent('open-category-picker', {
@@ -631,33 +634,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }));
   });
 
-  // Single bulk "Tag" button — opens the global tag picker in multi-select mode
-  // with an Add/Remove toggle so users can either tag or untag in one flow.
+  // Bulk "Tag" button — opens the global tag picker for every selected row.
+  // The picker is always multi + always diff-based, so the same contract is
+  // used for 1 selected row and N selected rows.
   document.getElementById('bb-bulk-tag').addEventListener('click', function() {
-    var count = Alpine.store('bulk').sel.length;
+    var ids = Alpine.store('bulk').sel.slice();
     window.dispatchEvent(new CustomEvent('open-tag-picker', {
       detail: {
-        mode: 'multi',
         sourceId: 'bulk-tag',
+        transactionIds: ids,
+        txCount: ids.length,
+        appliedCounts: computeAppliedCounts(ids),
         availableTags: window.__bbAllTags || [],
-        showBulkToggle: true,
-        placeholder: 'Filter tags or type to create…',
-        commitLabel: 'Apply to ' + count,
       }
     }));
-  });
-  // Commit handler: mode indicates whether to add or remove the selected tags.
-  window.addEventListener('tag-selection-commit', function(e) {
-    var d = e && e.detail;
-    if (!d || d.sourceId !== 'bulk-tag') return;
-    if (!d.slugs || d.slugs.length === 0) return;
-    var payload = {};
-    if (d.mode === 'remove') {
-      payload.tags_to_remove = d.slugs.map(function(slug) { return {slug: slug, note: ''}; });
-    } else {
-      payload.tags_to_add = d.slugs.map(function(slug) { return {slug: slug, note: ''}; });
-    }
-    Alpine.store('bulk').runBatchUpdate(payload);
   });
 
   document.getElementById('bb-bulk-comment').addEventListener('click', function() {
@@ -683,7 +673,56 @@ document.addEventListener('DOMContentLoaded', function() {
       Alpine.store('bulk').categorize(e.detail.id);
     }
   });
+
+  // Unified tag-picker commit listener. Every caller that opens the picker
+  // (bulk bar, row 't' shortcut, tx detail) receives the same diff event here
+  // and routes through runBatchUpdate — optimistic UI + chunking + toasts all
+  // handled in one place.
+  window.addEventListener('tag-selection-commit', function(e) {
+    var d = e && e.detail;
+    if (!d) return;
+    // The transaction detail page commits its own diff (it needs to reload for
+    // the activity timeline). Let that handler claim its sourceId.
+    if (d.sourceId === 'txd-tag') return;
+    var ids = (d.transactionIds && d.transactionIds.length) ? d.transactionIds : Alpine.store('bulk').sel;
+    if (!ids || ids.length === 0) return;
+    var op = {};
+    if (d.adds && d.adds.length) op.tags_to_add = d.adds.map(function(s) { return {slug: s, note: ''}; });
+    if (d.removes && d.removes.length) op.tags_to_remove = d.removes.map(function(s) { return {slug: s, note: ''}; });
+    if (!op.tags_to_add && !op.tags_to_remove) return;
+    Alpine.store('bulk').runBatchUpdate(op, ids);
+  });
+
+  // Sync the bulk store's DOM state once the bar is actually in the DOM.
+  // alpine:init fires earlier but #bb-bulk-bar doesn't exist yet; if we
+  // ever take that earlier path the bar styles would never apply.
+  if (window.Alpine && Alpine.store && Alpine.store('bulk')) {
+    Alpine.store('bulk')._updateRowVisibility();
+    Alpine.store('bulk')._syncAllRows();
+  }
 });
+
+/*
+ * Count tag memberships across a set of transaction IDs by reading each row's
+ * rendered .bb-tag chips. Drives the picker's chip states: slug with count 0
+ * is absent, count === ids.length is present, anything in between is mixed.
+ *
+ * We source the DOM instead of a server call because all selected rows are
+ * already rendered on the page (bulk selection only covers the current view).
+ */
+function computeAppliedCounts(ids) {
+  var counts = {};
+  (ids || []).forEach(function(id) {
+    var row = document.querySelector('.bb-tx-row[data-tx-id="' + CSS.escape(id) + '"]');
+    if (!row) return;
+    row.querySelectorAll('[data-tx-tag-container] .bb-tag').forEach(function(chip) {
+      var slug = chip.getAttribute('title');
+      if (!slug) return;
+      counts[slug] = (counts[slug] || 0) + 1;
+    });
+  });
+  return counts;
+}
 
 /* ── Alpine Store: Bulk Selection State ── */
 document.addEventListener('alpine:init', function() {
@@ -779,31 +818,34 @@ document.addEventListener('alpine:init', function() {
       this._updateBar();
     },
 
-    selectUncategorized() {
-      var uncatIds = (window.__bbTxMeta || []).filter(function(t) { return !t.hasCat; }).map(function(t) { return t.id; });
-      if (uncatIds.length === 0) {
-        window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'All transactions on this page are categorized', type:'info'}}));
-        return;
-      }
-      var self = this;
-      uncatIds.forEach(function(id) { self.selSet.add(id); });
-      this._syncAllRows();
-      this._updateBar();
-      window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: uncatIds.length + ' uncategorized selected', type:'success'}}));
-    },
-
     clear() {
       this.selSet = new Set();
       this._syncAllRows();
       this._updateBar();
     },
 
+
     categorize(categoryId) {
       if (!categoryId || this.sel.length === 0) return;
       var self = this;
       self.processing = true;
-      var items = self.sel.map(function(id) { return { transaction_id: id, category_id: categoryId }; });
+      var ids = self.sel.slice();
+      // Look up the slug for the picked id so updateRowCategory can resolve
+      // color/icon/name from window.__bbCategories.
+      var slug = '';
+      var cats = window.__bbCategories || [];
+      outer: for (var i = 0; i < cats.length; i++) {
+        if (cats[i].id === categoryId) { slug = cats[i].slug; break; }
+        if (cats[i].children) {
+          for (var j = 0; j < cats[i].children.length; j++) {
+            if (cats[i].children[j].id === categoryId) { slug = cats[i].children[j].slug; break outer; }
+          }
+        }
+      }
+      // Optimistic in-place update for every selected row.
+      if (slug) ids.forEach(function(id) { updateRowCategory(id, slug); });
 
+      var items = ids.map(function(id) { return { transaction_id: id, category_id: categoryId }; });
       fetch('/-/transactions/batch-categorize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -813,13 +855,8 @@ document.addEventListener('alpine:init', function() {
       .then(function(data) {
         self.processing = false;
         if (data.succeeded > 0) {
-          window.dispatchEvent(new CustomEvent('bb-toast', {
-            detail: {
-              message: data.succeeded + ' transaction' + (data.succeeded === 1 ? '' : 's') + ' categorized' + (data.failed > 0 ? ' (' + data.failed + ' failed)' : ''),
-              type: data.failed > 0 ? 'warning' : 'success'
-            }
-          }));
-          setTimeout(function() { window.location.reload(); }, 800);
+          var msg = data.succeeded + ' transaction' + (data.succeeded === 1 ? '' : 's') + ' categorized' + (data.failed > 0 ? ' (' + data.failed + ' failed)' : '');
+          window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: msg, type: data.failed > 0 ? 'warning' : 'success'}}));
         } else {
           window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Failed to categorize transactions', type:'error'}}));
         }
@@ -831,19 +868,22 @@ document.addEventListener('alpine:init', function() {
     },
 
     /* runBatchUpdate dispatches a batch update_transactions call applying the
-     * same op (sans transaction_id) to every selected transaction. The op may
+     * same op (sans transaction_id) to every listed transaction. The op may
      * include category_slug, tags_to_add, tags_to_remove, and comment.
      *
-     * If the op is tag-only (no category or comment change), rows are updated
-     * in place without a full reload. Category/comment changes still reload
-     * because the row template depends on them server-side. */
-    runBatchUpdate(op) {
-      if (this.sel.length === 0) return;
+     * `ids` defaults to the current bulk selection, but can be overridden so
+     * the same code path handles single-transaction tag diffs (row shortcut,
+     * detail page) as bulk tag diffs — keeping optimistic UI + chunking in
+     * one place.
+     *
+     * All visible row state (tags, category) is updated in place — no reload.
+     * Comments are background-only (not shown on this list). The selection
+     * stays intact so the user can chain more bulk ops on the same set. */
+    runBatchUpdate(op, ids) {
+      ids = ids && ids.length ? ids.slice() : this.sel.slice();
+      if (ids.length === 0) return;
       var self = this;
-      var ids = self.sel.slice();
-      var isTagOnly = !op.category_slug && !op.comment && (op.tags_to_add || op.tags_to_remove);
-      // The /-/transactions/batch-update endpoint caps each call at 50 ops,
-      // matching the MCP update_transactions tool. Chunk to respect that.
+      // The /-/transactions/batch-update endpoint caps each call at 50 ops.
       var CHUNK = 50;
       var chunks = [];
       for (var i = 0; i < ids.length; i += CHUNK) {
@@ -852,23 +892,25 @@ document.addEventListener('alpine:init', function() {
       self.processing = true;
       var totalSucceeded = 0, totalFailed = 0;
 
-      // Apply optimistic tag changes to every selected row right away; rolled
-      // back per-row on API failure below.
-      if (isTagOnly) {
+      // Optimistic in-place updates. Rolled back per-row on API failure
+      // would be ideal, but the batch endpoint reports succeeded/failed
+      // counts without per-row mapping — and the user already sees the
+      // toast count, so partial-rollback complexity isn't worth it.
+      if (op.tags_to_add || op.tags_to_remove) {
         var addSlugs = (op.tags_to_add || []).map(function(t) { return t.slug; });
         var removeSlugs = (op.tags_to_remove || []).map(function(t) { return t.slug; });
         ids.forEach(function(id) { updateRowTags(id, {add: addSlugs, remove: removeSlugs}); });
       }
+      if (op.category_slug) {
+        ids.forEach(function(id) { updateRowCategory(id, op.category_slug); });
+      }
+      // op.comment has no visible row state to update.
 
       function runOne(idx) {
         if (idx >= chunks.length) {
           self.processing = false;
           var msg = totalSucceeded + ' transaction' + (totalSucceeded === 1 ? '' : 's') + ' updated' + (totalFailed > 0 ? ' (' + totalFailed + ' failed)' : '');
           window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: msg, type: totalFailed > 0 ? 'warning' : 'success'}}));
-          // Tag-only updates already reflect in the DOM — skip the reload.
-          if (totalSucceeded > 0 && !isTagOnly) setTimeout(function() { window.location.reload(); }, 800);
-          // After applying a bulk action, drop selection mode so the bar collapses.
-          if (isTagOnly && totalSucceeded > 0 && self.selecting) self.toggleMode();
           return;
         }
         var ops = chunks[idx].map(function(id) {
@@ -940,27 +982,43 @@ document.addEventListener('alpine:init', function() {
     },
 
     openCategorize() {
+      // If there's a bulk selection, the shortcut should act on the whole set.
+      // Route through the bulk-categorize button so the same picker + commit
+      // path runs (keeps sourceId + listener wiring in one place).
+      var bulk = Alpine.store('bulk');
+      if (bulk.selecting && bulk.sel.length > 0) {
+        var btn = document.getElementById('bb-bulk-categorize');
+        if (btn) btn.click();
+        return;
+      }
       var row = this._getRows()[this.focusedIdx];
       if (!row) return;
-      var btn = row.querySelector('.bb-cat-picker button');
-      if (btn) btn.click();
+      var inline = row.querySelector('.bb-cat-picker button');
+      if (inline) inline.click();
     },
 
     openTagPicker() {
+      // Bulk selection wins — 't' on any focused row should edit tags for the
+      // whole selection, not just the focused one.
+      var bulk = Alpine.store('bulk');
+      if (bulk.selecting && bulk.sel.length > 0) {
+        var btn = document.getElementById('bb-bulk-tag');
+        if (btn) btn.click();
+        return;
+      }
       var row = this._getRows()[this.focusedIdx];
       if (!row) return;
       var link = row.querySelector('a[href*="/transactions/"]');
       if (!link) return;
       var id = link.href.split('/').pop();
-      // Filter out tags already attached to this row so the picker doesn't offer duplicates.
-      var existing = [];
-      row.querySelectorAll('.bb-tag').forEach(function(el) {
-        var title = el.getAttribute('title');
-        if (title) existing.push(title);
-      });
-      var offered = (window.__bbAllTags || []).filter(function(t) { return existing.indexOf(t.slug) === -1; });
       window.dispatchEvent(new CustomEvent('open-tag-picker', {
-        detail: { mode: 'single', sourceId: 'txrow-' + id, availableTags: offered }
+        detail: {
+          sourceId: 'txrow-' + id,
+          transactionIds: [id],
+          txCount: 1,
+          appliedCounts: computeAppliedCounts([id]),
+          availableTags: window.__bbAllTags || [],
+        }
       }));
     },
 
@@ -1002,10 +1060,10 @@ document.addEventListener('alpine:init', function() {
     }
   });
 
-  // Prime the bulk store's DOM state so newly-mounted rows reflect the current
-  // selection (e.g. after in-place replacement of #bb-tx-results).
-  Alpine.store('bulk')._updateRowVisibility();
-  Alpine.store('bulk')._syncAllRows();
+  // Priming happens in the DOMContentLoaded handler below, after the bulk bar
+  // has been appended — `alpine:init` runs before DOMContentLoaded handlers,
+  // so _updateBar() would otherwise early-return (bar element not yet in DOM)
+  // and the bar would stay opacity:0 even when selection was restored.
 
   // When the user clicks a row to expand/collapse, move the j/k focus ring to
   // that row so keyboard nav picks up from where the user was looking.
@@ -1045,41 +1103,21 @@ document.addEventListener('alpine:init', function() {
       case 'e': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.toggleExpand(); } break;
       case 'x': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.toggleSelect(); } break;
       case 'Escape':
-        if (nav.focusedIdx >= 0) { nav.clearFocus(); }
-        else if (Alpine.store('bulk').selecting) { Alpine.store('bulk').toggleMode(); }
+        // Escape priority: deselect bulk → exit select mode → clear j/k
+        // focus. Bulk state wins over the focus ring because it's the
+        // heavier piece of state the user is likely to want to back out of
+        // first; clearing focus is quietest and goes last.
+        if (Alpine.store('bulk').selecting && Alpine.store('bulk').sel.length > 0) {
+          Alpine.store('bulk').clear();
+        } else if (Alpine.store('bulk').selecting) {
+          Alpine.store('bulk').toggleMode();
+        } else if (nav.focusedIdx >= 0) {
+          nav.clearFocus();
+        }
         break;
     }
   });
 
-  // Apply a picked tag from the tag picker to whichever row opened it.
-  // sourceId convention: 'txrow-' + transactionId
-  window.addEventListener('tag-picked', function(e) {
-    var detail = e && e.detail;
-    if (!detail || !detail.sourceId || detail.sourceId.indexOf('txrow-') !== 0) return;
-    var txnId = detail.sourceId.slice('txrow-'.length);
-    var slug = detail.tag && detail.tag.slug;
-    if (!txnId || !slug) return;
-    // Optimistic UI: show the chip immediately, roll back on failure.
-    updateRowTags(txnId, {add: [slug]});
-    fetch('/-/transactions/' + txnId + '/tags', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({slug: slug, note: ''})
-    })
-    .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, body: d}; }); })
-    .then(function(res) {
-      if (!res.ok) {
-        updateRowTags(txnId, {remove: [slug]});
-        window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: (res.body && res.body.error && res.body.error.message) || 'Failed to add tag', type: 'error'}}));
-        return;
-      }
-      window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Tag added', type: 'success'}}));
-    })
-    .catch(function() {
-      updateRowTags(txnId, {remove: [slug]});
-      window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Network error', type: 'error'}}));
-    });
-  });
 });
 
 /* ── Remove tag from a transaction row ── */
@@ -1157,6 +1195,81 @@ function updateRowTags(txId, changes) {
 
   // Render any newly-added Lucide icons.
   if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [container] });
+}
+
+/* ── In-place category update on a row ──
+ *
+ * Updates a row's displayed category (avatar icon + color, mobile label, and
+ * inline cat-picker label) from the global category cache, without a reload.
+ * Pass the empty string or null to clear the category back to "Uncategorized".
+ *
+ *   updateRowCategory(txId, 'food_and_drink_groceries')
+ *   updateRowCategory(txId, '')   // reset
+ */
+function updateRowCategory(txId, slug) {
+  if (!txId) return;
+  var row = document.querySelector('.bb-tx-row[data-tx-id="' + CSS.escape(txId) + '"]');
+  if (!row) return;
+
+  // Look up the category metadata (icon, color, display_name, id) by slug.
+  // window.__bbCategories is the parent → children tree; flatten on the fly.
+  var meta = null, parentMeta = null;
+  if (slug) {
+    var cats = window.__bbCategories || [];
+    for (var i = 0; i < cats.length && !meta; i++) {
+      if (cats[i].slug === slug) { meta = cats[i]; break; }
+      if (cats[i].children) {
+        for (var j = 0; j < cats[i].children.length; j++) {
+          if (cats[i].children[j].slug === slug) {
+            meta = cats[i].children[j];
+            parentMeta = cats[i];
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // 1) Update the avatar (or convert a letter-avatar to an icon-avatar).
+  var avatarWrap = row.querySelector('.bb-tx-avatar')?.parentElement;
+  if (avatarWrap) {
+    var color = (meta && (meta.color || (parentMeta && parentMeta.color))) || 'oklch(0.65 0 0)';
+    var icon = meta && (meta.icon || (parentMeta && parentMeta.icon));
+    if (icon) {
+      avatarWrap.innerHTML = '<div class="bb-tx-avatar" style="--avatar-color: ' + color + '">'
+        + '<i data-lucide="' + icon + '" class="w-4 h-4"></i></div>';
+      if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [avatarWrap] });
+    } else {
+      // Fall back to letter avatar (no category icon resolved).
+      var name = row.querySelector('a[href*="/transactions/"]')?.textContent?.trim() || '?';
+      avatarWrap.innerHTML = '<div class="bb-tx-avatar bb-tx-avatar--letter"><span>' + name.charAt(0).toUpperCase() + '</span></div>';
+    }
+  }
+
+  // 2) Update the inline cat picker (Alpine reactive — updating selectedId
+  // re-derives displayLabel/displayColor/displayIcon). The picker has an
+  // x-init $watch on selectedId that fires quickSetCategory; that watcher
+  // checks $store.bulk.processing and skips when bulk ops are in flight, so
+  // we don't double-call the API or double-toast on top of the bulk action.
+  var pickerEl = row.querySelector('.bb-cat-picker');
+  if (pickerEl && window.Alpine && Alpine.$data) {
+    var data = Alpine.$data(pickerEl);
+    if (data) data.selectedId = (meta && meta.id) || '';
+  }
+
+  // 3) Update the mobile category label (server-rendered span).
+  var mobileLabel = row.querySelector('span.sm\\:hidden.inline-flex.items-center.gap-1, span.sm\\:hidden.text-base-content\\/25');
+  if (mobileLabel) {
+    if (meta) {
+      var labelColor = (meta.color || (parentMeta && parentMeta.color)) || '';
+      mobileLabel.outerHTML = '<span class="sm:hidden inline-flex items-center gap-1 shrink-0 min-w-0">'
+        + (labelColor ? '<span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: ' + labelColor + '"></span>' : '')
+        + '<span class="text-base-content/50 truncate max-w-24">' + (meta.display_name || meta.slug) + '</span>'
+        + '</span>';
+    } else {
+      mobileLabel.outerHTML = '<span class="sm:hidden text-base-content/25 truncate shrink-0">Uncategorized</span>';
+    }
+  }
 }
 
 /* ── Single transaction category quick-set ── */

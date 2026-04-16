@@ -138,7 +138,10 @@
     </template>
   </div>
 
-  <!-- Global toast (centered floating pill) -->
+  <!-- Global toast (centered floating pill). Also flushes any
+       session-persisted toast (e.g. queued before a full-page reload by the
+       bulk action bar), which dispatching bb-toast from a DOMContentLoaded
+       handler is too early to deliver reliably. -->
   <div class="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none"
        x-data="{ toasts: [] }"
        @bb-toast.window="
@@ -389,71 +392,81 @@
     </div>
   </div>
 
-  <!-- Global Tag Picker Overlay -->
+  <!-- Global Tag Picker Overlay
+       Always multi + bulk: the picker edits tags for 1+ transactions at a time.
+       Each chip carries its own state (absent / present / mixed) and cycles
+       through a pending-add or pending-remove intent on click. Apply emits a
+       diff; nothing fires until commit. -->
   <div x-data="globalTagPicker()" x-show="open" x-cloak
        @open-tag-picker.window="openPicker($event.detail)"
        @keydown.window.escape="if (open) { closePicker(); $event.stopPropagation(); }">
-    <!-- Reuse catpicker backdrop styling -->
     <div class="bb-catpicker-backdrop" @click="closePicker()"></div>
     <div class="bb-tagpicker-dialog"
          @click.stop
          @keydown.escape.prevent="closePicker()"
          @keydown.enter.prevent="enterPressed()">
+
       <!-- Search / create input -->
       <div class="bb-catpicker-input-wrap gap-2">
         <i data-lucide="tag"></i>
         <input type="text"
           class="bb-catpicker-input"
-          :placeholder="placeholder"
+          placeholder="Filter tags or type to create…"
           x-ref="tagPickerInput"
           x-model="search"
           autocomplete="off"
           spellcheck="false">
-        <!-- Bulk-mode add/remove toggle, only shown when the consumer asks for it. -->
-        <div x-show="showBulkToggle" class="inline-flex items-center rounded-lg bg-base-200 p-0.5 text-[0.65rem] font-medium">
-          <button type="button" class="px-2 py-1 rounded-md transition-colors"
-            :class="bulkMode === 'add' ? 'bg-base-100 text-success shadow-sm' : 'text-base-content/50 hover:text-base-content'"
-            @click="bulkMode = 'add'">+ Add</button>
-          <button type="button" class="px-2 py-1 rounded-md transition-colors"
-            :class="bulkMode === 'remove' ? 'bg-base-100 text-error shadow-sm' : 'text-base-content/50 hover:text-base-content'"
-            @click="bulkMode = 'remove'">− Remove</button>
-        </div>
         <div class="bb-cmdk-kbd" style="font-size:0.6rem" @click="closePicker()">esc</div>
       </div>
 
-      <!-- Body: flat wrapping grid of chips + optional inline create row -->
-      <div class="bb-tagpicker-body" x-ref="tagPickerBody"
-           x-effect="filteredTags; $nextTick(() => { if (typeof lucide !== 'undefined' && $refs.tagPickerBody) lucide.createIcons({ nodes: [$refs.tagPickerBody] }); })">
+      <!-- Context strip: which transactions are being edited -->
+      <div class="bb-tagpicker-context" x-show="txCount > 0">
+        <i data-lucide="receipt"></i>
+        <template x-if="txCount === 1">
+          <span>Editing tags for <strong>1</strong> transaction</span>
+        </template>
+        <template x-if="txCount > 1">
+          <span>Editing tags for <strong x-text="txCount"></strong> transactions</span>
+        </template>
+      </div>
 
-        <template x-if="filteredTags.length > 0">
+      <!-- Body: chip grid + inline create -->
+      <div class="bb-tagpicker-body" x-ref="tagPickerBody"
+           x-effect="visibleChips; $nextTick(() => { if (typeof lucide !== 'undefined' && $refs.tagPickerBody) lucide.createIcons({ nodes: [$refs.tagPickerBody] }); })">
+
+        <template x-if="visibleChips.length > 0">
           <div class="bb-tagpicker-grid">
-            <template x-for="tag in filteredTags" :key="tag.slug">
+            <template x-for="chip in visibleChips" :key="chip.slug">
               <button type="button"
                 class="bb-tag bb-tag-interactive bb-tagpicker-chip"
-                :class="(multi && !isSelected(tag.slug)) && 'bb-tag-ghost'"
-                :data-selected="isSelected(tag.slug)"
-                :style="tag.color ? ('--tag-color:' + tag.color) : ''"
-                @click="chooseTag(tag)"
-                :title="tag.slug">
-                <template x-if="tag.icon">
-                  <i :data-lucide="tag.icon"></i>
-                </template>
-                <template x-if="multi && isSelected(tag.slug)">
-                  <i data-lucide="check"></i>
-                </template>
-                <span x-text="tag.display_name || tag.slug"></span>
+                :class="{
+                  'bb-tagpicker-chip--absent':         chip.state === 'absent',
+                  'bb-tagpicker-chip--present':        chip.state === 'present',
+                  'bb-tagpicker-chip--mixed':          chip.state === 'mixed',
+                  'bb-tagpicker-chip--pending-add':    chip.state === 'pending-add',
+                  'bb-tagpicker-chip--pending-remove': chip.state === 'pending-remove',
+                }"
+                :style="chip.color ? ('--tag-color:' + chip.color) : ''"
+                @click="cycleChip(chip)"
+                x-effect="syncChipGlyph($el, chip.state, chip.icon)"
+                :title="chip.slug">
+                <!-- Glyph slot — rewritten imperatively on state change.
+                     Can't use <template x-if> + lucide here: lucide replaces
+                     <i data-lucide> with <svg>, which Alpine no longer tracks,
+                     so the old svg lingers after the condition flips. -->
+                <span class="bb-tagpicker-chip-glyph"></span>
+                <span class="truncate" x-text="chip.display_name || chip.slug"></span>
               </button>
             </template>
           </div>
         </template>
 
-        <!-- Inline "Create 'slug'" — appears only on no-match + valid slug.
-             Simpler than before: one button, no section label, no swatches. -->
+        <!-- Inline "Create 'slug'" — creates + stages as pending-add, no auto-commit. -->
         <template x-if="canCreate">
           <button type="button" class="bb-tagpicker-create-inline"
-            :class="filteredTags.length > 0 && 'mt-3'"
+            :class="visibleChips.length > 0 && 'mt-3'"
             :disabled="creating"
-            @click="createAndPick()">
+            @click="createAndStage()">
             <i data-lucide="plus"></i>
             <span>Create</span>
             <code class="font-mono bg-base-100/60 px-1.5 py-0.5 rounded text-[0.7rem]" x-text="normalizedQuery"></code>
@@ -464,8 +477,8 @@
           </button>
         </template>
 
-        <!-- Empty state when no query and no tags at all -->
-        <template x-if="!search && filteredTags.length === 0 && availableTags.length === 0">
+        <!-- Empty: no tags yet at all -->
+        <template x-if="!search && visibleChips.length === 0 && chips.length === 0">
           <div class="bb-tagpicker-empty">
             <i data-lucide="tags"></i>
             <div class="text-sm">No tags yet</div>
@@ -473,8 +486,8 @@
           </div>
         </template>
 
-        <!-- No match + not a valid slug (for create fallback) -->
-        <template x-if="search && filteredTags.length === 0 && !canCreate">
+        <!-- No match + not a valid slug -->
+        <template x-if="search && visibleChips.length === 0 && !canCreate">
           <div class="bb-tagpicker-empty">
             <i data-lucide="search-x"></i>
             <div class="text-sm">No matching tags</div>
@@ -483,21 +496,37 @@
         </template>
       </div>
 
+      <!-- Diff strip — only when there's pending work -->
+      <div class="bb-tagpicker-diff" x-show="pendingAddCount + pendingRemoveCount > 0">
+        <span class="bb-tagpicker-diff-pill bb-tagpicker-diff-pill--add" x-show="pendingAddCount > 0">
+          <i data-lucide="plus"></i>
+          <span x-text="pendingAddCount"></span>
+          <span>to add</span>
+        </span>
+        <span class="bb-tagpicker-diff-pill bb-tagpicker-diff-pill--remove" x-show="pendingRemoveCount > 0">
+          <i data-lucide="x"></i>
+          <span x-text="pendingRemoveCount"></span>
+          <span>to remove</span>
+        </span>
+        <button type="button" class="bb-tagpicker-diff-revert ml-auto" @click="revertAll()">Revert</button>
+      </div>
+
       <!-- Footer -->
       <div class="bb-catpicker-footer">
         <div class="flex items-center gap-3 flex-wrap">
-          <span x-show="!multi"><kbd>&crarr;</kbd> select first</span>
-          <span x-show="multi && selectedSlugs.length > 0"><span x-text="selectedSlugs.length"></span> selected</span>
-          <span x-show="canCreate && filteredTags.length === 0"><kbd>&crarr;</kbd> create</span>
-          <span><kbd>esc</kbd> close</span>
+          <template x-if="canCreate">
+            <span><kbd>&crarr;</kbd> create</span>
+          </template>
+          <template x-if="!canCreate">
+            <span><kbd>&crarr;</kbd> apply</span>
+          </template>
+          <span><kbd>esc</kbd> cancel</span>
         </div>
-        <div x-show="multi" class="flex items-center gap-2">
+        <div class="flex items-center gap-2">
           <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="closePicker()">Cancel</button>
           <button type="button" class="btn btn-primary btn-xs rounded-lg"
-            :disabled="selectedSlugs.length === 0"
-            @click="closeAndCommit()">
-            <span x-text="commitLabel"></span>
-          </button>
+            :disabled="pendingAddCount + pendingRemoveCount === 0"
+            @click="apply()">Apply</button>
         </div>
       </div>
     </div>
@@ -876,82 +905,110 @@
 
     // ── Global Tag Picker ──
     //
+    // Always multi + bulk. Edits tags for 1+ transactions through a single shared UX.
+    //
     // Opens via `window.dispatchEvent(new CustomEvent('open-tag-picker', { detail: {...} }))`.
     //
-    // Consumer-facing options (all in the event detail):
-    //   mode:             'single' | 'multi'          — single closes on first pick. Default 'single'.
-    //   sourceId:         string                      — echoed in outbound events so listeners can route.
-    //   availableTags:    TagLite[]                   — overrides the global `window.__bbAllTags` snapshot.
-    //   selectedSlugs:    string[]                    — pre-selected slugs (multi mode).
-    //   showBulkToggle:   boolean                     — expose the Add/Remove segmented control at the top.
-    //   placeholder:      string                      — input placeholder copy.
-    //   commitLabel:      string                      — label on the primary Done button (multi mode).
+    //   sourceId:         string         — echoed in outbound events so listeners can route.
+    //   transactionIds:   string[]       — optional; echoed back on commit for caller convenience.
+    //   txCount:          number         — count of transactions being edited (drives context strip).
+    //                                       Derived from transactionIds.length when not provided.
+    //   appliedCounts:    { slug: n }    — how many of the selected txs already have each tag.
+    //                                       Drives chip state: n=0 absent, n=txCount present, else mixed.
+    //   availableTags:    TagLite[]      — override the global `window.__bbAllTags` snapshot.
     //
     // Outbound events:
-    //   tag-picked                 { sourceId, tag }          — single-mode selection.
-    //   tag-selection-commit       { sourceId, slugs, mode }  — multi-mode Done. `mode` is 'add' or 'remove'
-    //                                                           when showBulkToggle is on, otherwise 'add'.
-    //   tag-created                { tag }                    — newly created tag (fired in both modes).
+    //   tag-selection-commit { sourceId, transactionIds, adds, removes } — Apply pressed.
+    //   tag-created          { tag }                                     — quick-created tag.
     //
-    // Keyboard:
-    //   Enter — if typing a valid new slug and no existing match, creates & picks. Otherwise in
-    //           single mode selects the first filtered chip. In multi mode this is a no-op so
-    //           users can tab/click chips freely. Arrow-grid navigation was removed — wrapping
-    //           h-stack made it confusing; mouse + Tab do the job.
-    //   Esc   — close without committing.
+    // Chip states: absent | present | mixed | pending-add | pending-remove.
+    // Click cycle: absent → pending-add → absent; present → pending-remove → present;
+    //              mixed → pending-add → pending-remove → mixed.
+    //
+    // Keyboard: Enter creates (when search is a valid new slug) else applies. Esc cancels.
     function globalTagPicker() {
       var SLUG_RE = /^[a-z0-9]([a-z0-9\-:]*[a-z0-9])?$/;
-      // Used when quick-creating so the new tag has *some* color. Users can change it later on /tags/:id/edit.
+      // Deterministic color palette for quick-create so the same slug always gets the same color.
       var DEFAULT_COLORS = ['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#64748b','#78716c'];
+
+      // Sort priority for stable chip ordering (pre-click original state).
+      // Lower = higher in the list.
+      var ORDER = {present: 0, mixed: 1, absent: 2};
+
       return {
         open: false,
-        multi: false,
         search: '',
         sourceId: '',
-        availableTags: [],
-        selectedSlugs: [],
-        showBulkToggle: false,
-        bulkMode: 'add',                 // only meaningful when showBulkToggle
-        placeholder: 'Pick or create a tag…',
-        commitLabel: 'Apply',
+        transactionIds: [],
+        txCount: 0,
+        // Per-chip: {slug, display_name, color, icon, original, state}
+        // `original` is one of absent|present|mixed, set on openPicker and never mutated.
+        // `state` is one of absent|present|mixed|pending-add|pending-remove, toggled by the user.
+        chips: [],
         creating: false,
 
         get normalizedQuery() {
           return (this.search || '').trim().toLowerCase();
         },
 
-        get filteredTags() {
+        get visibleChips() {
           var q = this.normalizedQuery;
-          if (!q) return this.availableTags;
-          return this.availableTags.filter(function(t) {
-            return (t.slug && t.slug.toLowerCase().indexOf(q) !== -1) ||
-                   (t.display_name && t.display_name.toLowerCase().indexOf(q) !== -1) ||
-                   (t.description && t.description.toLowerCase().indexOf(q) !== -1);
+          if (!q) return this.chips;
+          return this.chips.filter(function(c) {
+            return (c.slug && c.slug.toLowerCase().indexOf(q) !== -1) ||
+                   (c.display_name && c.display_name.toLowerCase().indexOf(q) !== -1) ||
+                   (c.description && c.description.toLowerCase().indexOf(q) !== -1);
           });
         },
 
         get canCreate() {
           var q = this.normalizedQuery;
           if (!q || !SLUG_RE.test(q)) return false;
-          // Don't offer to create if an exact slug match already exists in the list.
-          return !this.availableTags.some(function(t) { return t.slug === q; });
+          return !this.chips.some(function(c) { return c.slug === q; });
         },
 
-        isSelected(slug) {
-          return this.selectedSlugs.indexOf(slug) !== -1;
+        get pendingAddCount() {
+          return this.chips.filter(function(c) { return c.state === 'pending-add'; }).length;
+        },
+
+        get pendingRemoveCount() {
+          return this.chips.filter(function(c) { return c.state === 'pending-remove'; }).length;
         },
 
         openPicker(detail) {
           detail = detail || {};
-          // Accept legacy `mode: 'multi'` but also the explicit boolean `multi`.
-          this.multi = detail.multi === true || detail.mode === 'multi';
           this.sourceId = detail.sourceId || '';
-          this.availableTags = (detail.availableTags && detail.availableTags.slice()) || (window.__bbAllTags ? window.__bbAllTags.slice() : []);
-          this.selectedSlugs = (detail.selectedSlugs || []).slice();
-          this.showBulkToggle = !!detail.showBulkToggle;
-          this.bulkMode = detail.bulkMode === 'remove' ? 'remove' : 'add';
-          this.placeholder = detail.placeholder || (this.multi ? 'Filter or type to create…' : 'Pick or create a tag…');
-          this.commitLabel = detail.commitLabel || 'Apply';
+          this.transactionIds = (detail.transactionIds || []).slice();
+          this.txCount = typeof detail.txCount === 'number'
+            ? detail.txCount
+            : this.transactionIds.length;
+          var applied = detail.appliedCounts || {};
+          var tags = (detail.availableTags && detail.availableTags.slice()) ||
+                     (window.__bbAllTags ? window.__bbAllTags.slice() : []);
+          var n = this.txCount;
+          this.chips = tags.map(function(t) {
+            var count = applied[t.slug] || 0;
+            var original;
+            if (count === 0 || n === 0) original = 'absent';
+            else if (count >= n) original = 'present';
+            else original = 'mixed';
+            return {
+              slug: t.slug,
+              display_name: t.display_name,
+              color: t.color || null,
+              icon: t.icon || null,
+              description: t.description || '',
+              original: original,
+              state: original,
+            };
+          });
+          // Sort once on open by original state, then alpha. Chips never move on click.
+          this.chips.sort(function(a, b) {
+            if (ORDER[a.original] !== ORDER[b.original]) return ORDER[a.original] - ORDER[b.original];
+            var an = (a.display_name || a.slug).toLowerCase();
+            var bn = (b.display_name || b.slug).toLowerCase();
+            return an < bn ? -1 : an > bn ? 1 : 0;
+          });
           this.search = '';
           this.open = true;
           window.bbLockScroll && window.bbLockScroll();
@@ -970,50 +1027,87 @@
           window.bbUnlockScroll && window.bbUnlockScroll();
         },
 
-        closeAndCommit() {
-          if (!this.multi) { this.closePicker(); return; }
+        // State cycle. A chip never transitions into a permanent state — the commit
+        // happens on Apply, which reads `chips` and derives adds/removes.
+        cycleChip(chip) {
+          var s = chip.state;
+          var o = chip.original;
+          if (o === 'absent') {
+            chip.state = (s === 'absent') ? 'pending-add' : 'absent';
+          } else if (o === 'present') {
+            chip.state = (s === 'present') ? 'pending-remove' : 'present';
+          } else /* mixed */ {
+            // mixed → pending-add → pending-remove → mixed
+            if (s === 'mixed') chip.state = 'pending-add';
+            else if (s === 'pending-add') chip.state = 'pending-remove';
+            else chip.state = 'mixed';
+          }
+        },
+
+        revertAll() {
+          this.chips.forEach(function(c) { c.state = c.original; });
+        },
+
+        // Rewrites the chip's glyph slot when state (or its own icon) changes.
+        // We can't use <template x-if> with lucide icons here: lucide mutates the
+        // <i data-lucide> into <svg>, Alpine loses its node reference, and on
+        // condition-flip the stale <svg> is left behind — stacking glyphs.
+        // Instead: one stable .bb-tagpicker-chip-glyph span per chip, innerHTML
+        // replaced imperatively so nothing leaks.
+        syncChipGlyph(el, state, tagIcon) {
+          var slot = el.querySelector('.bb-tagpicker-chip-glyph');
+          if (!slot) return;
+          var icon = null;
+          if (state === 'present') icon = 'check';
+          else if (state === 'mixed') icon = 'minus';
+          else if (state === 'pending-add') icon = 'plus';
+          else if (state === 'pending-remove') icon = 'x';
+          else if (state === 'absent' && tagIcon) icon = tagIcon;
+          if (!icon) { slot.innerHTML = ''; return; }
+          slot.innerHTML = '<i data-lucide="' + icon + '"></i>';
+          if (typeof lucide !== 'undefined') {
+            lucide.createIcons({ nodes: [slot] });
+          }
+        },
+
+        apply() {
+          var adds = [], removes = [];
+          this.chips.forEach(function(c) {
+            if (c.state === 'pending-add') adds.push(c.slug);
+            else if (c.state === 'pending-remove') removes.push(c.slug);
+          });
+          if (adds.length + removes.length === 0) { this.closePicker(); return; }
           window.dispatchEvent(new CustomEvent('tag-selection-commit', {
             detail: {
               sourceId: this.sourceId,
-              slugs: this.selectedSlugs.slice(),
-              mode: this.showBulkToggle ? this.bulkMode : 'add',
+              transactionIds: this.transactionIds.slice(),
+              adds: adds,
+              removes: removes,
             }
           }));
           this.closePicker();
         },
 
-        chooseTag(tag) {
-          if (this.multi) {
-            // Toggle selection — unselect by clicking again.
-            var i = this.selectedSlugs.indexOf(tag.slug);
-            if (i === -1) this.selectedSlugs.push(tag.slug);
-            else this.selectedSlugs.splice(i, 1);
+        enterPressed() {
+          // Priority 1: staging a newly typed slug.
+          if (this.canCreate) { this.createAndStage(); return; }
+          // Priority 2: single filtered chip — treat Enter as a one-click toggle.
+          if (this.search && this.visibleChips.length === 1) {
+            this.cycleChip(this.visibleChips[0]);
             return;
           }
-          window.dispatchEvent(new CustomEvent('tag-picked', {
-            detail: { sourceId: this.sourceId, tag: tag }
-          }));
-          this.closePicker();
-        },
-
-        enterPressed() {
-          // Always prefer Create when the query is a new valid slug — it's the primary intent.
-          if (this.canCreate) { this.createAndPick(); return; }
-          // In single mode, convenience: Enter picks the first match.
-          if (!this.multi && this.filteredTags.length > 0) {
-            this.chooseTag(this.filteredTags[0]);
+          // Priority 3: commit whatever is pending.
+          if (this.pendingAddCount + this.pendingRemoveCount > 0) {
+            this.apply();
           }
         },
 
-        createAndPick() {
+        createAndStage() {
           if (!this.canCreate || this.creating) return;
           var slug = this.normalizedQuery;
-          // Titleize the slug so the default display name reads nicely (user can edit later on /tags/:id/edit).
           var displayName = slug.split(/[-:]/).map(function(w) {
             return w.charAt(0).toUpperCase() + w.slice(1);
           }).join(' ');
-          // Pseudo-random color from the preset list — deterministic per slug so reopening the
-          // picker on the same intended slug doesn't churn the color. Users can refine it later.
           var hash = 0;
           for (var i = 0; i < slug.length; i++) { hash = (hash * 31 + slug.charCodeAt(i)) | 0; }
           var color = DEFAULT_COLORS[Math.abs(hash) % DEFAULT_COLORS.length];
@@ -1040,14 +1134,22 @@
               description: t.description || '', color: t.color || color,
               icon: t.icon || null, lifecycle: t.lifecycle || 'persistent'
             };
-            self.availableTags.push(tag);
             if (window.__bbAllTags && !window.__bbAllTags.some(function(x) { return x.slug === tag.slug; })) {
               window.__bbAllTags.push(tag);
             }
+            // Inject the new chip in pending-add state. Original is 'absent' (not applied yet).
+            self.chips.push({
+              slug: tag.slug,
+              display_name: tag.display_name,
+              color: tag.color,
+              icon: tag.icon,
+              description: tag.description,
+              original: 'absent',
+              state: 'pending-add',
+            });
             window.dispatchEvent(new CustomEvent('bb-toast', {detail: {message: 'Created ' + tag.slug, type: 'success'}}));
             window.dispatchEvent(new CustomEvent('tag-created', {detail: {tag: tag}}));
             self.search = '';
-            self.chooseTag(tag);
           })
           .catch(function() {
             self.creating = false;

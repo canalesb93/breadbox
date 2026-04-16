@@ -1723,20 +1723,69 @@
   }
 
   /*
-   * Chip states inside the picker — we rely on the base .bb-tag styling and only
-   * layer in selected/unselected visual treatment here.
-   *
-   *   data-selected="true"   → bolder ring, solid color (selected in multi mode)
-   *   .bb-tag-ghost          → dimmer (unselected in multi mode, see base .bb-tag-ghost)
+   * Chip states inside the picker. Base .bb-tag styling (background/border via --tag-color)
+   * is reused; these modifier classes layer in the interaction state. Five visual states
+   * are expressed — absent, present, mixed, pending-add, pending-remove — one modifier at
+   * a time. Transitions are kept cheap (box-shadow + opacity only).
    */
   .bb-tagpicker-chip {
     cursor: pointer;
     outline: none;
-    transition: box-shadow 0.1s ease, filter 0.1s ease;
+    transition: box-shadow 0.1s ease, opacity 0.1s ease, background-color 0.1s ease;
   }
 
-  .bb-tagpicker-chip[data-selected="true"] {
+  /* Absent: faded, hover restores to read as discoverable. */
+  .bb-tagpicker-chip--absent { opacity: 0.35; }
+  .bb-tagpicker-chip--absent:hover { opacity: 0.75; }
+
+  /* Present: solid 1.5px ring in the tag's own color. */
+  .bb-tagpicker-chip--present {
     box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--tag-color, oklch(0.65 0 0)) 55%, transparent);
+  }
+
+  /* Mixed: dashed ring signals indeterminate, like Finder/macOS checkboxes. */
+  .bb-tagpicker-chip--mixed {
+    background-color: color-mix(in srgb, var(--tag-color) 6%, transparent);
+    border-style: dashed;
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--tag-color, oklch(0.65 0 0)) 45%, transparent);
+  }
+
+  /* Pending add: green ring + glyph in success. Chip pre-renders as "applied". */
+  .bb-tagpicker-chip--pending-add {
+    box-shadow: 0 0 0 1.5px var(--color-success);
+    background-color: color-mix(in srgb, var(--color-success) 10%, color-mix(in srgb, var(--tag-color) 10%, transparent));
+  }
+  .bb-tagpicker-chip--pending-add .bb-tagpicker-chip-glyph {
+    color: var(--color-success);
+  }
+
+  /* Pending remove: red ring, strikethrough label, overall fade. */
+  .bb-tagpicker-chip--pending-remove {
+    opacity: 0.65;
+    box-shadow: 0 0 0 1.5px var(--color-error);
+    background-color: color-mix(in srgb, var(--color-error) 8%, color-mix(in srgb, var(--tag-color) 10%, transparent));
+  }
+  .bb-tagpicker-chip--pending-remove .truncate {
+    text-decoration: line-through;
+  }
+  .bb-tagpicker-chip--pending-remove .bb-tagpicker-chip-glyph {
+    color: var(--color-error);
+  }
+
+  /* Glyph slot: empty when absent-without-icon, otherwise holds a lucide <svg>.
+     Matches the existing .bb-tag inner icon sizing so the chip doesn't shift. */
+  .bb-tagpicker-chip-glyph {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .bb-tagpicker-chip-glyph:empty {
+    display: none;
+  }
+  .bb-tagpicker-chip-glyph > i,
+  .bb-tagpicker-chip-glyph > svg {
+    width: 0.75rem;
+    height: 0.75rem;
   }
 
   .bb-tagpicker-empty {
@@ -1763,6 +1812,53 @@
   .bb-tagpicker-create-inline > i,
   .bb-tagpicker-create-inline > svg {
     @apply w-3.5 h-3.5 text-primary shrink-0;
+  }
+
+  /*
+   * Context strip: sits immediately under the search input, visually attached by a
+   * shared border. Tells the user how many transactions they're editing so the
+   * single-vs-bulk distinction doesn't need to live elsewhere.
+   */
+  .bb-tagpicker-context {
+    @apply flex items-center gap-2 px-4 py-1.5 border-b border-base-300
+           text-xs text-base-content/55;
+  }
+  .bb-tagpicker-context svg,
+  .bb-tagpicker-context i {
+    @apply w-3.5 h-3.5 opacity-60 shrink-0;
+  }
+  .bb-tagpicker-context strong {
+    @apply font-semibold text-base-content/85;
+  }
+
+  /*
+   * Diff strip: renders between body and footer when the user has pending changes.
+   * Pills mirror the chip states (green add / red remove) so the diff is legible
+   * even without looking at the grid.
+   */
+  .bb-tagpicker-diff {
+    @apply flex items-center gap-2 px-4 py-2 border-t border-base-300
+           text-[0.65rem] text-base-content/70;
+    background-color: color-mix(in srgb, var(--color-base-200) 45%, transparent);
+  }
+  .bb-tagpicker-diff-pill {
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-medium;
+  }
+  .bb-tagpicker-diff-pill svg,
+  .bb-tagpicker-diff-pill i {
+    @apply w-3 h-3 shrink-0;
+  }
+  .bb-tagpicker-diff-pill--add {
+    @apply text-success;
+    background-color: color-mix(in srgb, var(--color-success) 12%, transparent);
+  }
+  .bb-tagpicker-diff-pill--remove {
+    @apply text-error;
+    background-color: color-mix(in srgb, var(--color-error) 12%, transparent);
+  }
+  .bb-tagpicker-diff-revert {
+    @apply text-base-content/50 underline-offset-2 cursor-pointer
+           hover:text-base-content hover:underline;
   }
 
   /* ─── Navigation Progress Bar (YouTube/GitHub style) ─── */

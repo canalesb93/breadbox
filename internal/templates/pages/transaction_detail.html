@@ -188,14 +188,16 @@
             </div>
           </span>
         </template>
-        <!-- Add-tag sits in the same wrapping row as its siblings (ghost chip). -->
+        <!-- Edit-tags chip sits in the same wrapping row as its siblings. Opens the
+             shared tag picker; current tags render as "present" chips so the user
+             can add, remove, or both from one session. -->
         <button type="button"
           class="bb-tag bb-tag-add"
           @click="openTagPicker()"
-          @tag-picked.window="if ($event.detail.sourceId === 'txd-tag') { addTagBySlug($event.detail.tag.slug) }"
-          title="Add tag">
+          @tag-selection-commit.window="if ($event.detail.sourceId === 'txd-tag') { applyTagDiff($event.detail.adds, $event.detail.removes) }"
+          title="Edit tags">
           <i data-lucide="plus"></i>
-          <span>Add tag</span>
+          <span x-text="tags.length === 0 ? 'Add tag' : 'Edit tags'"></span>
         </button>
       </div>
     </div>
@@ -411,38 +413,51 @@ function tagManager() {
     availableTags: {{toJSON .AvailableTags}} || [],
 
     openTagPicker() {
+      // Picker uses the same contract as the bulk bar: the tx's current tags
+      // render as "present" so the user can add and remove in one commit.
+      var counts = {};
+      this.tags.forEach(function(t) { counts[t.slug] = 1; });
       window.dispatchEvent(new CustomEvent('open-tag-picker', {
         detail: {
-          mode: 'single',
           sourceId: 'txd-tag',
-          availableTags: this.availableTags.filter(t => !this.tags.some(cur => cur.slug === t.slug)),
+          transactionIds: ['{{.TransactionID}}'],
+          txCount: 1,
+          appliedCounts: counts,
+          availableTags: this.availableTags,
         }
       }));
     },
 
-    addTagBySlug(slug) {
-      slug = (slug || '').trim().toLowerCase();
-      if (!slug) return;
-      var self = this;
-      fetch('/-/transactions/{{.TransactionID}}/tags', {
+    applyTagDiff(adds, removes) {
+      adds = adds || []; removes = removes || [];
+      if (adds.length + removes.length === 0) return;
+      var op = {};
+      if (adds.length) op.tags_to_add = adds.map(function(s) { return {slug: s, note: ''}; });
+      if (removes.length) op.tags_to_remove = removes.map(function(s) { return {slug: s, note: ''}; });
+      fetch('/-/transactions/batch-update', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({slug: slug, note: ''})
+        body: JSON.stringify({
+          operations: [Object.assign({transaction_id: '{{.TransactionID}}'}, op)],
+          on_error: 'continue',
+        }),
       })
-      .then(function(res) { return res.json().then(function(d) { return {ok: res.ok, body: d}; }); })
-      .then(function(r) {
-        if (r.ok) {
-          showToast('Tag added.', 'success');
+      .then(function(r) { return r.json().then(function(d) { return {ok: r.ok || r.status === 422, body: d}; }); })
+      .then(function(res) {
+        if (res.ok && res.body && res.body.succeeded > 0) {
+          showToast('Tags updated.', 'success');
           location.reload();
         } else {
-          showToast((r.body && r.body.error) || 'Failed to add tag.');
+          var msg = (res.body && res.body.error && res.body.error.message) || 'Failed to update tags.';
+          showToast(msg);
         }
       })
       .catch(function() { showToast('Network error.'); });
     },
 
     removeTag(tag, note) {
-      var self = this;
+      // Inline × on a tag chip — direct DELETE (keeps the note path for
+      // ephemeral tags, which the picker doesn't surface).
       var url = '/-/transactions/{{.TransactionID}}/tags/' + encodeURIComponent(tag.slug);
       fetch(url, {
         method: 'DELETE',

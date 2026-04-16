@@ -89,7 +89,7 @@
 
     <!-- Category Picker (inline column) -->
     <div class="shrink-0 hidden sm:block" @click.stop>
-      <div class="bb-cat-picker" data-picker-source="tx-cat-{{.ID}}" x-data="categoryPicker({categories: window.__bbCategories, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', sourceId: 'tx-cat-{{.ID}}'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old) { quickSetCategory('{{.ID}}', v) } })">
+      <div class="bb-cat-picker" data-picker-source="tx-cat-{{.ID}}" x-data="categoryPicker({categories: window.__bbCategories, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', sourceId: 'tx-cat-{{.ID}}'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old && !($store.bulk && $store.bulk.processing)) { quickSetCategory('{{.ID}}', v) } })">
         <button type="button" class="btn btn-ghost btn-xs gap-1.5 rounded-lg" @click="openPicker()">
           <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
           <span x-text="displayLabel" class="text-xs" :class="!selectedId && 'text-base-content/30'">{{if .CategoryDisplayName}}{{deref .CategoryDisplayName}}{{else}}Uncategorized{{end}}</span>
