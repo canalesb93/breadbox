@@ -504,6 +504,16 @@
     height: 0.65rem;
   }
 
+  /* On mobile (<sm), transaction-row tag chips collapse into a single icon +
+     count pill rendered beside the container (see data-tx-tag-mobile in
+     tx_row.html). Chips stay in the DOM so the bulk picker's
+     computeAppliedCounts() can still read them; they're just visually hidden. */
+  @media (max-width: 639.98px) {
+    .bb-tx-tag-container .bb-tag {
+      display: none;
+    }
+  }
+
   /* Filter/selector state: faded when unselected */
   .bb-tag-ghost {
     opacity: 0.35;

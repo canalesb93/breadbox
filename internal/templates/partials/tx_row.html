@@ -65,15 +65,29 @@
         {{end}}
         <!-- Tag container — updated in place by JS on add/remove. The leading
              middot separator is part of this container so it vanishes when the
-             last tag is removed. -->
+             last tag is removed. Chips themselves are hidden on mobile by CSS
+             (`.bb-tx-tag-container .bb-tag` inside the max-width:639px query);
+             the mobile-only count pill below takes their place. -->
         <span class="bb-tx-tag-container contents" data-tx-tag-container>
           {{if .Tags}}
-          <span class="text-base-content/20" data-tx-tag-sep>&middot;</span>
+          <span class="text-base-content/20 hidden sm:inline" data-tx-tag-sep>&middot;</span>
           {{range .Tags}}
           {{template "tag-chip-sm" .}}
           {{end}}
           {{end}}
         </span>
+        <!-- Mobile tag indicator: single pill with tag icon + count. Kept in
+             sync by updateRowTags(). Rendered only when tags exist so the
+             leading middot doesn't orphan. -->
+        {{if .Tags}}
+        <span class="sm:hidden inline-flex items-center gap-0.5 text-base-content/40 shrink-0"
+              data-tx-tag-mobile
+              title="{{len .Tags}} tag{{if ne (len .Tags) 1}}s{{end}}">
+          <span class="text-base-content/20 mr-0.5">&middot;</span>
+          <i data-lucide="tag" class="w-3 h-3"></i>
+          <span class="text-[0.65rem] tabular-nums font-medium" data-tx-tag-count>{{len .Tags}}</span>
+        </span>
+        {{end}}
         <!-- Mobile category label (hidden on desktop where the picker column shows) -->
         <span class="sm:hidden text-base-content/20">&middot;</span>
         {{if .CategoryDisplayName}}
