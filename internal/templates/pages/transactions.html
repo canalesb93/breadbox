@@ -980,6 +980,28 @@ document.addEventListener('alpine:init', function() {
   });
 });
 
+/* ── Remove tag from a transaction row ── */
+function removeTag(el, txnId, slug, displayName, lifecycle) {
+  var note = '';
+  if (lifecycle === 'ephemeral') {
+    note = prompt('Note required to remove "' + displayName + '":', 'Reviewed');
+    if (note === null || !note.trim()) return;
+  }
+  var url = '/-/transactions/' + txnId + '/tags/' + encodeURIComponent(slug);
+  if (note) url += '?note=' + encodeURIComponent(note.trim());
+  fetch(url, { method: 'DELETE' })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.ok || d.removed) {
+      el.style.transition = 'opacity 150ms'; el.style.opacity = '0';
+      setTimeout(function() { el.remove(); }, 160);
+      window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: displayName + ' removed', type:'success'}}));
+    } else {
+      window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error || 'Failed to remove tag', type:'error'}}));
+    }
+  });
+}
+
 /* ── Single transaction category quick-set ── */
 function quickSetCategory(txId, categoryId) {
   if (!categoryId) {
