@@ -1052,8 +1052,9 @@
         // We can't use <template x-if> with lucide icons here: lucide mutates the
         // <i data-lucide> into <svg>, Alpine loses its node reference, and on
         // condition-flip the stale <svg> is left behind — stacking glyphs.
-        // Instead: one stable .bb-tagpicker-chip-glyph span per chip, innerHTML
-        // replaced imperatively so nothing leaks.
+        // Instead: one stable .bb-tagpicker-chip-glyph span per chip, replaced
+        // imperatively so nothing leaks. Build the <i> via createElement so the
+        // tag icon (admin-controlled) can't escape the data-lucide attribute.
         syncChipGlyph(el, state, tagIcon) {
           var slot = el.querySelector('.bb-tagpicker-chip-glyph');
           if (!slot) return;
@@ -1062,9 +1063,12 @@
           else if (state === 'mixed') icon = 'minus';
           else if (state === 'pending-add') icon = 'plus';
           else if (state === 'pending-remove') icon = 'x';
-          else if (state === 'absent' && tagIcon) icon = tagIcon;
-          if (!icon) { slot.innerHTML = ''; return; }
-          slot.innerHTML = '<i data-lucide="' + icon + '"></i>';
+          else if (state === 'absent' && tagIcon && /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(tagIcon)) icon = tagIcon;
+          slot.replaceChildren();
+          if (!icon) return;
+          var i = document.createElement('i');
+          i.setAttribute('data-lucide', icon);
+          slot.appendChild(i);
           if (typeof lucide !== 'undefined') {
             lucide.createIcons({ nodes: [slot] });
           }

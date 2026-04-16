@@ -851,10 +851,15 @@ document.addEventListener('alpine:init', function() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: items })
       })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
+      // Catch JSON parse failures (non-JSON 5xx from a proxy, etc) here so
+      // they reach the outer .catch — without this guard the throw bypasses
+      // the catch and `processing` stays true forever, silently wedging the
+      // per-row category-picker $watch guard for the rest of the session.
+      .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, body: d}; }); })
+      .then(function(res) {
         self.processing = false;
-        if (data.succeeded > 0) {
+        var data = res.body || {};
+        if (res.ok && data.succeeded > 0) {
           var msg = data.succeeded + ' transaction' + (data.succeeded === 1 ? '' : 's') + ' categorized' + (data.failed > 0 ? ' (' + data.failed + ' failed)' : '');
           window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: msg, type: data.failed > 0 ? 'warning' : 'success'}}));
         } else {
@@ -1008,9 +1013,11 @@ document.addEventListener('alpine:init', function() {
       }
       var row = this._getRows()[this.focusedIdx];
       if (!row) return;
-      var link = row.querySelector('a[href*="/transactions/"]');
-      if (!link) return;
-      var id = link.href.split('/').pop();
+      // Read the id from data-tx-id (set on every row), not the link href —
+      // splitting href on '/' would break silently if the URL ever grew a
+      // query string or fragment.
+      var id = row.dataset.txId;
+      if (!id) return;
       window.dispatchEvent(new CustomEvent('open-tag-picker', {
         detail: {
           sourceId: 'txrow-' + id,
@@ -1032,9 +1039,8 @@ document.addEventListener('alpine:init', function() {
     toggleSelect() {
       var row = this._getRows()[this.focusedIdx];
       if (!row) return;
-      var link = row.querySelector('a[href*="/transactions/"]');
-      if (!link) return;
-      var id = link.href.split('/').pop();
+      var id = row.dataset.txId;
+      if (!id) return;
       if (!Alpine.store('bulk').selecting) Alpine.store('bulk').toggleMode();
       Alpine.store('bulk').toggle(id);
     },
@@ -1231,18 +1237,32 @@ function updateRowCategory(txId, slug) {
   }
 
   // 1) Update the avatar (or convert a letter-avatar to an icon-avatar).
+  // Build via DOM APIs (textContent / safe icon-name whitelist) instead of
+  // string-concat innerHTML — display_name is admin-controlled and could
+  // otherwise smuggle stored XSS through the category metadata.
   var avatarWrap = row.querySelector('.bb-tx-avatar')?.parentElement;
   if (avatarWrap) {
     var color = (meta && (meta.color || (parentMeta && parentMeta.color))) || 'oklch(0.65 0 0)';
     var icon = meta && (meta.icon || (parentMeta && parentMeta.icon));
-    if (icon) {
-      avatarWrap.innerHTML = '<div class="bb-tx-avatar" style="--avatar-color: ' + color + '">'
-        + '<i data-lucide="' + icon + '" class="w-4 h-4"></i></div>';
+    var avatar = document.createElement('div');
+    if (_safeLucideName(icon)) {
+      avatar.className = 'bb-tx-avatar';
+      avatar.style.setProperty('--avatar-color', color);
+      var iconEl = document.createElement('i');
+      iconEl.setAttribute('data-lucide', icon);
+      iconEl.className = 'w-4 h-4';
+      avatar.appendChild(iconEl);
+      avatarWrap.replaceChildren(avatar);
       if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [avatarWrap] });
     } else {
-      // Fall back to letter avatar (no category icon resolved).
+      // Fall back to letter avatar (no category icon resolved or icon name
+      // failed validation — the latter shouldn't happen for trusted data).
       var name = row.querySelector('a[href*="/transactions/"]')?.textContent?.trim() || '?';
-      avatarWrap.innerHTML = '<div class="bb-tx-avatar bb-tx-avatar--letter"><span>' + name.charAt(0).toUpperCase() + '</span></div>';
+      avatar.className = 'bb-tx-avatar bb-tx-avatar--letter';
+      var letter = document.createElement('span');
+      letter.textContent = name.charAt(0).toUpperCase();
+      avatar.appendChild(letter);
+      avatarWrap.replaceChildren(avatar);
     }
   }
 
@@ -1257,19 +1277,40 @@ function updateRowCategory(txId, slug) {
     if (data) data.selectedId = (meta && meta.id) || '';
   }
 
-  // 3) Update the mobile category label (server-rendered span).
+  // 3) Update the mobile category label. Use textContent for the
+  // display_name (admin-controlled) so HTML in a category name can't
+  // execute via the bulk update path.
   var mobileLabel = row.querySelector('span.sm\\:hidden.inline-flex.items-center.gap-1, span.sm\\:hidden.text-base-content\\/25');
   if (mobileLabel) {
+    var newLabel = document.createElement('span');
     if (meta) {
+      newLabel.className = 'sm:hidden inline-flex items-center gap-1 shrink-0 min-w-0';
       var labelColor = (meta.color || (parentMeta && parentMeta.color)) || '';
-      mobileLabel.outerHTML = '<span class="sm:hidden inline-flex items-center gap-1 shrink-0 min-w-0">'
-        + (labelColor ? '<span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: ' + labelColor + '"></span>' : '')
-        + '<span class="text-base-content/50 truncate max-w-24">' + (meta.display_name || meta.slug) + '</span>'
-        + '</span>';
+      if (labelColor) {
+        var dot = document.createElement('span');
+        dot.className = 'w-1.5 h-1.5 rounded-full shrink-0';
+        dot.style.backgroundColor = labelColor;
+        newLabel.appendChild(dot);
+      }
+      var name = document.createElement('span');
+      name.className = 'text-base-content/50 truncate max-w-24';
+      name.textContent = meta.display_name || meta.slug;
+      newLabel.appendChild(name);
     } else {
-      mobileLabel.outerHTML = '<span class="sm:hidden text-base-content/25 truncate shrink-0">Uncategorized</span>';
+      newLabel.className = 'sm:hidden text-base-content/25 truncate shrink-0';
+      newLabel.textContent = 'Uncategorized';
     }
+    mobileLabel.replaceWith(newLabel);
   }
+}
+
+// Lucide icon names are slug-shaped (e.g. "trending-up", "circle-off"). Reject
+// anything else so a malicious icon value can't break out of the data-lucide
+// attribute and inject scripts when set via innerHTML in `syncChipGlyph` or
+// the avatar update above. Returns the icon if safe, null otherwise.
+function _safeLucideName(name) {
+  if (!name || typeof name !== 'string') return null;
+  return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(name) ? name : null;
 }
 
 /* ── Single transaction category quick-set ── */
