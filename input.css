@@ -154,7 +154,7 @@
 /* ─── shadcn-inspired global overrides ─── */
 @layer base {
   /* Ensure Lucide SVG icons don't steal clicks from interactive parents. */
-  svg.lucide { pointer-events: none; }
+  svg.lucide, svg.lucide * { pointer-events: none; }
 
   html { scroll-behavior: smooth; }
 
