@@ -32,8 +32,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			needsAttention = 0
 		}
 
-		// Phase 3: review queue is backed by the needs-review tag. Count
-		// transactions currently tagged for review.
+		// Review queue is backed by the needs-review tag.
 		reviewsEnabled := true
 		reviewPending, err := a.Queries.CountTransactionsWithTagSlug(ctx, "needs-review")
 		if err != nil {

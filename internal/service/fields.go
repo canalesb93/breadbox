@@ -81,10 +81,6 @@ func ParseFields(raw string) (map[string]bool, error) {
 	return fields, nil
 }
 
-// Phase 3 retired ParseReviewFields / FilterReviewFields along with the
-// review_queue table. Review-field selection on the deprecated MCP shims is
-// dropped — the shims return tag-filtered transactions in their entirety.
-
 // NormalizeTransactionAttribution merges attributed_user into user_name and
 // clears the attributed_user_* fields. This gives MCP consumers a single
 // "user_name" that always reflects the effective user (attributed or owner).

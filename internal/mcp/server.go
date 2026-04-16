@@ -385,7 +385,7 @@ func (s *MCPServer) buildToolRegistry() {
 		makeToolDefLogged("submit_report", ToolWrite,
 			"Send a message to the family's dashboard. The title is the main message — write it as a concise, self-contained 1-2 sentence summary the family can understand at a glance without expanding. The body provides the detailed breakdown (markdown with headers, bullets, transaction links). Use priority to signal urgency and author to identify your role.",
 			s.handleSubmitReport, svc),
-		// --- Phase 2 tags + annotations ---
+		// --- Tags + annotations ---
 		makeToolDefLogged("list_tags", ToolRead,
 			"List all tags registered in the system. Each tag has a slug (stable identifier), display_name, and lifecycle ('persistent' or 'ephemeral'). Tags attached to transactions can be queried via the tags / any_tag filters on query_transactions.",
 			s.handleListTags, svc),

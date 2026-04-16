@@ -73,7 +73,7 @@ func (s *Service) resolveMatchID(ctx context.Context, idOrShort string) (pgtype.
 }
 
 // resolveAnnotationID accepts either a UUID string or a short ID.
-// Phase 3 retired transaction_comments; comment IDs are now annotation IDs.
+// Comment IDs are annotation IDs (the annotations table is the sole store).
 func (s *Service) resolveAnnotationID(ctx context.Context, idOrShort string) (pgtype.UUID, error) {
 	return s.resolveID(ctx, idOrShort, s.Queries.GetAnnotationUUIDByShortID, ErrNotFound)
 }

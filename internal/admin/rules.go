@@ -276,7 +276,7 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		// Sync history where this rule matched
 		syncHistory, _ := svc.GetRuleSyncHistory(ctx, id, 10)
 
-		// Resolve category display name for the action description (Phase 1: typed actions).
+		// Resolve category display name for the action description.
 		var actionCategoryName string
 		for _, a := range rule.Actions {
 			if a.Type == "set_category" && rule.CategoryName != nil {

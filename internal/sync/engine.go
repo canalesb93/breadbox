@@ -36,8 +36,7 @@ type accountSyncCounts struct {
 }
 
 // pendingApplication holds a deferred rule application record to be batch-inserted
-// after the transaction processing loops complete. Phase 2 also uses this to
-// drive the matching `rule_applied` annotation row (dual-write bridge).
+// as a `rule_applied` annotation after the transaction processing loops complete.
 type pendingApplication struct {
 	txnID       pgtype.UUID
 	ruleID      pgtype.UUID
@@ -211,9 +210,8 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		resolver = nil
 	}
 
-	// Phase 1 (Rule Actions v2): review_auto_enqueue is removed. Phase 2 will
-	// reintroduce the review flow via a seeded rule + tag; until then sync
-	// does not auto-enqueue transactions for review.
+	// Review enqueue is driven by the seeded `needs-review` tag rule, not a
+	// separate code path — sync itself does not auto-enqueue for review.
 
 	// Pre-fetch all account IDs and display names for this connection in one query.
 	// This eliminates per-transaction DB lookups during the sync loop. The caches
@@ -365,9 +363,8 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 			ruleApplications = append(ruleApplications, result.ruleApplications...)
 		}
 
-		// Write rule_applied annotations per transaction-rule pair. Phase 3
-		// retired transaction_rule_applications; annotations are the sole
-		// record. actor_type="system" (annotations constrain actor_type to
+		// Write rule_applied annotations per transaction-rule pair.
+		// actor_type="system" (annotations constrain actor_type to
 		// user|agent|system — rule_id in the dedicated column carries the rule
 		// back-reference).
 		for _, app := range ruleApplications {
@@ -521,11 +518,9 @@ func (e *Engine) processTransaction(ctx context.Context, txn *provider.Transacti
 		result.unchanged = 1
 	}
 
-	// Apply rules to new or changed transactions.
-	//
-	// Phase 3: the seeded "needs-review" rule+tag drives the review flow.
-	// The trigger column on rules decides which rules fire for isNew vs
-	// !isNew; the sync engine never writes to review_queue.
+	// Apply rules to new or changed transactions. The seeded `needs-review`
+	// rule+tag drives the review flow; the trigger column on rules decides
+	// which rules fire for isNew vs !isNew.
 	if isNew || isChanged {
 		sources, ruleErr := e.applyRulesToTransaction(ctx, opts.tx, txn, dbTxn, opts.accountIDCache, opts.providerName, opts.resolver, opts.userID, opts.userName, providerAdded && isNew)
 		if ruleErr != nil {
@@ -591,7 +586,7 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 // isNew is threaded through to ResolveWithContext so trigger filtering
 // (on_create / on_update / always) decides which rules fire.
 //
-// Phase 3: set_category updates transactions.category_id, add_tag persists to
+// set_category updates transactions.category_id, add_tag persists to
 // transaction_tags, add_comment writes an annotation. Every persistent change
 // also writes a kind-specific annotation row (the canonical activity timeline).
 func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *provider.Transaction, dbTxn db.Transaction, cache map[string]pgtype.UUID, providerName string, resolver *RuleResolver, userID pgtype.UUID, userName string, isNew bool) ([]RuleActionSource, error) {
@@ -760,13 +755,9 @@ func (e *Engine) applyTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.U
 		return fmt.Errorf("upsert transaction_tag: %w", err)
 	}
 
-	// Annotation. Only write when the tag was actually newly attached (we
-	// always write here since the upsert may be idempotent — the ON CONFLICT
-	// path means we might double-annotate across syncs, but that's OK for the
-	// bridge era; Phase 3 can dedupe if it matters).
-	//
-	// To avoid noise, check whether the row existed already by looking for a
-	// prior tag_added annotation within the same tag scope.
+	// Annotation. The upsert is idempotent, so avoid double-annotating across
+	// syncs by checking for a prior tag_added annotation within the same tag
+	// scope before writing.
 	var exists bool
 	if err := tx.QueryRow(ctx,
 		`SELECT EXISTS (SELECT 1 FROM annotations WHERE transaction_id = $1 AND kind = 'tag_added' AND tag_id = $2)`,
@@ -798,8 +789,7 @@ func (e *Engine) applyTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.U
 	return nil
 }
 
-// applyCommentFromRule writes a rule-authored comment annotation. Phase 3
-// retired transaction_comments; annotations are now the sole record.
+// applyCommentFromRule writes a rule-authored comment annotation.
 func (e *Engine) applyCommentFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, content string, ruleID pgtype.UUID, ruleShortID, ruleName string) error {
 	payload := map[string]any{
 		"content":   content,

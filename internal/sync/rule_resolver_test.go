@@ -384,9 +384,8 @@ func TestEvaluateCondition_EmptyFieldValue(t *testing.T) {
 }
 
 func TestEvaluateCondition_EmptyCondition(t *testing.T) {
-	// Phase 1 (Rule Actions v2): an empty Condition{} compiles to nil and
-	// evaluates to true (match-all). This is the natural extension of the
-	// "NULL conditions == match every transaction" DB semantic.
+	// An empty Condition{} compiles to nil and evaluates to true (match-all),
+	// matching the "NULL conditions == match every transaction" DB semantic.
 	cc := mustCompile(t, &Condition{})
 	if cc != nil {
 		t.Fatalf("expected empty condition to compile to nil, got %+v", cc)

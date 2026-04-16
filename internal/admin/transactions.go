@@ -667,9 +667,9 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			}
 		}
 
-		// Phase 3: annotations are the canonical activity-timeline source.
-		// Review lifecycle events now flow through tag_added / tag_removed
-		// annotations for the needs-review tag.
+		// Annotations are the canonical activity-timeline source. Review
+		// lifecycle events flow through tag_added / tag_removed annotations
+		// for the needs-review tag.
 		annotations, err := svc.ListAnnotations(ctx, idStr)
 		if err != nil && !errors.Is(err, service.ErrNotFound) {
 			a.Logger.Error("list transaction annotations", "error", err)
@@ -783,14 +783,10 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 	}
 }
 
-// buildActivityTimeline merges the review lifecycle (enqueue + resolution)
-// with the annotation-driven timeline into a sorted activity list.
-//
-// Phase 3: annotations are the sole source of timeline events. The old
-// review_queue-derived "review" entries are gone; tag_added/tag_removed for
-// the needs-review tag fill the same role. Comment annotations that were
-// originally review notes (identified by payload.review_id) still render
-// inline on resolution events surfaced via the needs-review tag-lifecycle.
+// buildActivityTimeline produces a sorted activity list from annotations.
+// Review lifecycle events surface as tag_added/tag_removed on the
+// needs-review tag. Comment annotations originally authored as review notes
+// (identified by payload.review_id) render inline on their resolution event.
 func buildActivityTimeline(annotations []service.Annotation) []service.ActivityEntry {
 	var entries []service.ActivityEntry
 

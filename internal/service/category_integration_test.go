@@ -505,9 +505,9 @@ func TestMergeCategories_ReassignsRulesInsteadOfDeleting(t *testing.T) {
 		t.Errorf("rule category_slug should be reassigned to target; got %q, want %q", got, "merge_rule_tgt")
 	}
 
-	// Phase 1 (Rule Actions v2): the denormalized transaction_rules.category_id
-	// column was dropped. Verify via the typed actions JSONB shape that the
-	// set_category action's category_slug now points at the target.
+	// Verify via the typed actions JSONB shape that the set_category action's
+	// category_slug now points at the target (no denormalized category_id
+	// column).
 	_ = target
 	ruleUID, _ := parseUUIDForTest(rule.ID)
 	var actionsRaw []byte

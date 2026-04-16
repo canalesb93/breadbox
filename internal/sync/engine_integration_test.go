@@ -628,7 +628,6 @@ func TestSync_RuleCategoryDuringSync(t *testing.T) {
 	_, food := seedCategoriesWithFood(t, queries)
 
 	// Create a transaction rule that matches "Restaurant" → food_and_drink.
-	// Phase 1: actions JSONB stores typed shape; trigger explicitly set.
 	testutil.MustCreateTransactionRule(
 		t, queries, "Food Rule",
 		[]byte(`{"field":"name","op":"contains","value":"Restaurant"}`),
@@ -680,11 +679,6 @@ func TestSync_RuleCategoryDuringSync(t *testing.T) {
 		t.Errorf("expected category_id %v, got %v", food.ID, categoryID)
 	}
 }
-
-// TestSync_ReviewEnqueueNewTransaction and TestSync_ReviewDisabled_NoEnqueue
-// were removed in Phase 1 (Rule Actions v2): the sync engine no longer
-// auto-enqueues review rows. Phase 2 reintroduced the review surface via a
-// seeded "needs-review" tag rule; Phase 3 dropped the review_queue table.
 
 func TestSync_Pagination_BuffersThenFlushes(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
@@ -1100,7 +1094,6 @@ func TestSync_RuleBasedCategorization(t *testing.T) {
 	_ = coffeeCat
 
 	// Create a rule that matches "coffee" in name.
-	// Phase 1: actions JSONB stores typed shape; trigger explicitly set.
 	testutil.MustCreateTransactionRule(
 		t, queries, "Coffee Rule",
 		[]byte(`{"field":"name","op":"contains","value":"coffee"}`),
@@ -1210,11 +1203,6 @@ func TestSync_SyncTriggerTypes(t *testing.T) {
 	}
 }
 
-// TestSync_UncategorizedReviewType and TestSync_CategorizedNewTransaction were
-// removed in Phase 1 (Rule Actions v2): the sync engine no longer enqueues
-// reviews automatically. Phase 2 reintroduced equivalent coverage via the
-// seeded "needs-review" tag rule. Phase 3 removed the review_queue entirely.
-
 func TestSync_UnchangedTransactions_SkipRuleReapplication(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
 	ctx := context.Background()
@@ -1230,7 +1218,6 @@ func TestSync_UnchangedTransactions_SkipRuleReapplication(t *testing.T) {
 	}
 	_ = coffeeCat
 
-	// Phase 1: actions JSONB stores typed shape; trigger explicitly set.
 	testutil.MustCreateTransactionRule(
 		t, queries, "Coffee Rule",
 		[]byte(`{"field":"name","op":"contains","value":"coffee"}`),
@@ -1268,8 +1255,8 @@ func TestSync_UnchangedTransactions_SkipRuleReapplication(t *testing.T) {
 		t.Fatalf("first sync: %v", err)
 	}
 
-	// Verify rule was applied (via annotations, Phase 3) and record the
-	// created_at timestamp.
+	// Verify rule was applied (via annotations) and record the created_at
+	// timestamp.
 	var appliedAt1 time.Time
 	err = pool.QueryRow(ctx,
 		`SELECT created_at FROM annotations
@@ -1356,7 +1343,7 @@ func TestSync_UnchangedTransactions_SkipRuleReapplication(t *testing.T) {
 	}
 }
 
-// --- Phase 1 (Rule Actions v2): rule trigger + null-conditions coverage ---
+// --- Rule trigger + null-conditions coverage ---
 
 // TestRule_NullConditions_MatchesAll verifies that a rule with NULL conditions
 // (Conditions=nil in storage) compiles to "match every transaction" and applies

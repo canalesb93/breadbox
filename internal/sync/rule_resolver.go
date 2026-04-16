@@ -36,14 +36,14 @@ type TransactionContext struct {
 	AccountID        string  // UUID string
 	UserID           string  // UUID string
 	UserName         string  // family member name
-	// Tags is nil in Phase 1. Phase 2 populates this from transaction_tags so
-	// tag-based conditions (field: "tags") can match against it.
+	// Tags is populated from transaction_tags so tag-based conditions
+	// (field: "tags") can match against the transaction's current tags.
 	Tags []string
 }
 
 // RuleActionSource tracks which rule contributed which action for audit.
 // RuleName and RuleShortID are populated so the sync engine can write
-// annotations with human-readable actor fields (Phase 2).
+// annotations with human-readable actor fields.
 type RuleActionSource struct {
 	RuleID      pgtype.UUID
 	RuleShortID string
@@ -59,17 +59,16 @@ type RuleActions struct {
 	// CategorySlug is the slug chosen by the first rule whose set_category
 	// action matched. Empty when no rule set a category.
 	CategorySlug string
-	// TagsToAdd is the accumulated list of unique tag slugs from add_tag
-	// actions. Phase 1: plumbed but not persisted; Phase 2 wires persistence.
+	// TagsToAdd is the accumulated list of unique tag slugs from add_tag actions.
 	TagsToAdd []string
 	// Comments is the accumulated list of comment content strings from
-	// add_comment actions. Phase 1: plumbed but not persisted.
+	// add_comment actions.
 	Comments []string
 	// Sources records per-action provenance for the audit trail.
 	Sources []RuleActionSource
 }
 
-// typedAction is the in-package parsed shape of a rule action (Phase 1).
+// typedAction is the in-package parsed shape of a rule action.
 // Kept local so the sync package doesn't import service (preserves the
 // one-way service → sync dependency direction).
 type typedAction struct {
@@ -615,14 +614,8 @@ func evaluateBool(c *compiledCondition, fieldVal bool) bool {
 	}
 }
 
-// evaluateTags applies slice operators for the tags field.
-//
-// In Phase 1, tctx.Tags is nil during sync. This means:
-//   - contains → false ("no tags" never contains the target)
-//   - not_contains → true
-//   - in → false
-//
-// Phase 2 populates tctx.Tags and these operators exercise real semantics.
+// evaluateTags applies slice operators for the tags field against the
+// transaction's current tag slugs.
 func evaluateTags(c *compiledCondition, tags []string) bool {
 	switch c.op {
 	case "contains":
