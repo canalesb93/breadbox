@@ -973,21 +973,35 @@ document.addEventListener('alpine:init', function() {
     },
 
     openCategorize() {
+      // If there's a bulk selection, the shortcut should act on the whole set.
+      // Route through the bulk-categorize button so the same picker + commit
+      // path runs (keeps sourceId + listener wiring in one place).
+      var bulk = Alpine.store('bulk');
+      if (bulk.selecting && bulk.sel.length > 0) {
+        var btn = document.getElementById('bb-bulk-categorize');
+        if (btn) btn.click();
+        return;
+      }
       var row = this._getRows()[this.focusedIdx];
       if (!row) return;
-      var btn = row.querySelector('.bb-cat-picker button');
-      if (btn) btn.click();
+      var inline = row.querySelector('.bb-cat-picker button');
+      if (inline) inline.click();
     },
 
     openTagPicker() {
+      // Bulk selection wins — 't' on any focused row should edit tags for the
+      // whole selection, not just the focused one.
+      var bulk = Alpine.store('bulk');
+      if (bulk.selecting && bulk.sel.length > 0) {
+        var btn = document.getElementById('bb-bulk-tag');
+        if (btn) btn.click();
+        return;
+      }
       var row = this._getRows()[this.focusedIdx];
       if (!row) return;
       var link = row.querySelector('a[href*="/transactions/"]');
       if (!link) return;
       var id = link.href.split('/').pop();
-      // Single-tx picker uses the same bulk contract: every tag is offered, and
-      // chips on the row render as "present" via appliedCounts so the user can
-      // add or remove in one session.
       window.dispatchEvent(new CustomEvent('open-tag-picker', {
         detail: {
           sourceId: 'txrow-' + id,
