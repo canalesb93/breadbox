@@ -1181,11 +1181,14 @@ function updateRowTags(txId, changes) {
   });
 
   // Toggle the leading separator so it only exists when there are tags.
+  // The sep is desktop-only — on mobile the count pill below carries its own
+  // leading middot.
   var sep = container.querySelector('[data-tx-tag-sep]');
-  var hasChips = container.querySelector('.bb-tag');
+  var chips = container.querySelectorAll('.bb-tag');
+  var hasChips = chips.length > 0;
   if (hasChips && !sep) {
     sep = document.createElement('span');
-    sep.className = 'text-base-content/20';
+    sep.className = 'text-base-content/20 hidden sm:inline';
     sep.setAttribute('data-tx-tag-sep', '');
     sep.textContent = '·';
     container.insertBefore(sep, container.firstChild);
@@ -1193,8 +1196,29 @@ function updateRowTags(txId, changes) {
     sep.remove();
   }
 
-  // Render any newly-added Lucide icons.
-  if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [container] });
+  // Sync the mobile-only tag count pill. Lives as a sibling of the container
+  // so it can be `sm:hidden` without fighting the container's `contents`
+  // display. Created on demand, removed when the row has no tags.
+  var mobile = row.querySelector('[data-tx-tag-mobile]');
+  if (hasChips) {
+    if (!mobile) {
+      mobile = document.createElement('span');
+      mobile.className = 'sm:hidden inline-flex items-center gap-0.5 text-base-content/40 shrink-0';
+      mobile.setAttribute('data-tx-tag-mobile', '');
+      mobile.innerHTML = '<span class="text-base-content/20 mr-0.5">·</span>'
+        + '<i data-lucide="tag" class="w-3 h-3"></i>'
+        + '<span class="text-[0.65rem] tabular-nums font-medium" data-tx-tag-count></span>';
+      container.parentNode.insertBefore(mobile, container.nextSibling);
+    }
+    var countEl = mobile.querySelector('[data-tx-tag-count]');
+    if (countEl) countEl.textContent = chips.length;
+    mobile.setAttribute('title', chips.length + ' tag' + (chips.length === 1 ? '' : 's'));
+  } else if (mobile) {
+    mobile.remove();
+  }
+
+  // Render any newly-added Lucide icons (container chips + mobile pill icon).
+  if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [row] });
 }
 
 /* ── In-place category update on a row ──
