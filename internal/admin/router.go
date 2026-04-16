@@ -317,6 +317,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 			// Transaction rules
 			r.Post("/rules", CreateRuleAdminHandler(svc, sm))
+			r.Post("/rules/preview", PreviewRuleAdminHandler(svc))
 			r.Put("/rules/{id}", UpdateRuleAdminHandler(svc, sm))
 			r.Delete("/rules/{id}", DeleteRuleAdminHandler(svc))
 			r.Post("/rules/{id}/toggle", ToggleRuleAdminHandler(svc))
