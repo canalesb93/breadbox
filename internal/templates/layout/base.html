@@ -692,6 +692,8 @@
         cancelLabel: 'Cancel',
         variant: 'danger',
         _resolve: null,
+        _onConfirm: null,
+        _onCancel: null,
 
         showConfirm(detail) {
           this.title = detail.title || 'Are you sure?';
@@ -700,6 +702,8 @@
           this.cancelLabel = detail.cancelLabel || 'Cancel';
           this.variant = detail.variant || 'danger';
           this._resolve = detail.resolve || null;
+          this._onConfirm = typeof detail.onConfirm === 'function' ? detail.onConfirm : null;
+          this._onCancel = typeof detail.onCancel === 'function' ? detail.onCancel : null;
           this.visible = true;
           var self = this;
           setTimeout(function() {
@@ -711,14 +715,18 @@
 
         confirm() {
           this.visible = false;
-          if (this._resolve) this._resolve(true);
-          this._resolve = null;
+          var resolve = this._resolve, onConfirm = this._onConfirm;
+          this._resolve = this._onConfirm = this._onCancel = null;
+          if (resolve) resolve(true);
+          if (onConfirm) onConfirm();
         },
 
         cancel() {
           this.visible = false;
-          if (this._resolve) this._resolve(false);
-          this._resolve = null;
+          var resolve = this._resolve, onCancel = this._onCancel;
+          this._resolve = this._onConfirm = this._onCancel = null;
+          if (resolve) resolve(false);
+          if (onCancel) onCancel();
         }
       };
     }

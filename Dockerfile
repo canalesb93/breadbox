@@ -32,7 +32,10 @@ FROM alpine:3.21
 
 # CA certificates: required for TLS connections to Plaid API and PostgreSQL
 # tzdata: required for cron schedule timezone handling
-RUN apk --no-cache add ca-certificates tzdata
+# postgresql16-client: required by the /backups page for pg_dump and psql.
+#   Must match the server major version (postgres:16-alpine in compose) —
+#   pg_dump refuses to dump a newer server.
+RUN apk --no-cache add ca-certificates tzdata postgresql16-client
 
 WORKDIR /app
 COPY --from=builder /breadbox /app/breadbox
