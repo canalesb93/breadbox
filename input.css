@@ -902,15 +902,19 @@
   }
 
   /*
-   * The per-row checkbox label starts hidden and is shown by the bulk store
-   * when selection mode is active. Replaces a reactive `x-show` on every row.
-   *
-   * Use a compound selector so this beats Tailwind's `.flex` utility (equal
-   * specificity but Tailwind layers later in the cascade). The row renders the
-   * checkbox with `class="bb-tx-checkbox flex ..."`, so without this compound
-   * `.flex`'s `display: flex` wins and the checkbox is visible on load.
+   * Per-row checkbox label. Visibility is toggled imperatively by the bulk
+   * store's `_updateRowVisibility()`. All styling lives here rather than via
+   * Tailwind utilities on the element: utilities live in `@layer utilities`
+   * and beat anything in `@layer components` regardless of specificity, which
+   * means a naive `label.bb-tx-checkbox { display: none }` loses to `.flex`
+   * on the same element.
    */
-  label.bb-tx-checkbox { display: none; }
+  .bb-tx-checkbox {
+    display: none;
+    align-items: center;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
 
   /*
    * DaisyUI 5's `.checkbox` ships with `transition: all`, which animated every
