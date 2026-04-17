@@ -18,7 +18,7 @@ This replaces the old `screencapture` / AppleScript / `sips` pipeline. No OS per
 
 ## Prerequisites
 
-- Breadbox running locally. Main repo: `http://localhost:8080`. Worktrees get a port in `8081–8099` from `.claude/hooks/session-start.sh` (read `$PORT` or `curl` each to find the live one).
+- Breadbox running locally. Main repo: `http://localhost:8080`. Worktrees get a port in `8081–8099` from `.claude/hooks/session-start.sh`, which exports both `$PORT` (consumed by the Makefile) and `$SERVER_PORT` (consumed by the binary) — either works. If neither is set, `curl` each port to find the live one.
 - Chrome DevTools MCP tools available under `mcp__plugin_chrome-devtools-mcp_chrome-devtools__*`.
 
 ## Steps

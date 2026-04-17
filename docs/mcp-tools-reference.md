@@ -162,13 +162,13 @@ Attach a tag to a transaction. Auto-creates a persistent tag if the slug is unkn
 
 ### remove_transaction_tag (Write)
 
-Remove a tag from a transaction. For ephemeral tags (`needs-review`), the `note` is REQUIRED.
+Remove a tag from a transaction. A `note` is strongly recommended for ephemeral tags (`needs-review`) — it lands on the `tag_removed` annotation. Idempotent.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `transaction_id` | string | UUID or short ID |
 | `tag_slug` | string | Tag slug |
-| `note` | string | Required for ephemeral tags. Optional for persistent. |
+| `note` | string | Optional. Recommended for ephemeral tags so the rationale lands on the audit trail. |
 
 ### update_transactions (Write)
 
@@ -186,7 +186,7 @@ Each operation:
 | `transaction_id` | string | UUID or short ID. Required. |
 | `category_slug` | string | Optional category to set. Sets `category_override=true`. |
 | `tags_to_add` | array | `[{slug, note?}, ...]`. Auto-creates persistent tags. |
-| `tags_to_remove` | array | `[{slug, note?}, ...]`. `note` REQUIRED when the tag is ephemeral. |
+| `tags_to_remove` | array | `[{slug, note?}, ...]`. `note` is optional but strongly recommended for ephemeral tags — lands on the `tag_removed` annotation. |
 | `comment` | string | Optional comment annotation. |
 
 Use this to close a review entry: `set category + remove needs-review (with note) + comment` in one call.
@@ -218,7 +218,8 @@ Create a rule that fires during sync. Actions compose (`set_category` + `add_tag
 | `actions` | array | Typed actions: `set_category`, `add_tag`, `remove_tag`, `add_comment`. Either this or `category_slug` is required. |
 | `category_slug` | string | Shorthand for `actions=[{type:set_category,category_slug:...}]` |
 | `trigger` | string | `on_create` (default) / `on_change` / `always`. `on_update` accepted as legacy alias. |
-| `priority` | int | Pipeline stage, 0–1000. Lower runs first. Typical: 0 (baseline), 10 (standard), 50 (refinement), 100 (override). |
+| `stage` | string | **Preferred.** Semantic pipeline stage: `baseline` / `standard` / `refinement` / `override`. Resolves to priority `0 / 10 / 50 / 100`. |
+| `priority` | int | Raw pipeline-stage integer, 0–1000. Use for fine-grained slotting within a stage. If both `stage` and `priority` are supplied, `priority` wins. Defaults to `10` (standard) if neither is provided. |
 | `enabled` | bool | Default true |
 | `expires_in` | string | Optional duration (e.g., `24h`, `30d`, `1w`) |
 | `apply_retroactively` | bool | Also back-fill matching existing transactions (materializes `set_category` / `add_tag` / `remove_tag`; `add_comment` is sync-only) |
@@ -235,7 +236,7 @@ List rules with optional filters. Returns actions, priority, hit_count, last_hit
 
 ### update_transaction_rule (Write)
 
-Every field is optional; omit to leave unchanged. Pass `conditions={}` to explicitly switch to match-all; pass `actions=[...]` to replace the entire action set; pass `expires_at=""` to clear expiry.
+Every field is optional; omit to leave unchanged. Pass `conditions={}` to explicitly switch to match-all; pass `actions=[...]` to replace the entire action set; pass `expires_at=""` to clear expiry. Pass `stage` (`baseline` | `standard` | `refinement` | `override`) to re-slot a rule into a canonical pipeline stage without guessing a raw `priority`. If both `stage` and `priority` are supplied, `priority` wins.
 
 ### delete_transaction_rule (Write)
 
@@ -260,7 +261,7 @@ Dry-run a condition tree against existing transactions. **Isolation semantics** 
 
 ### batch_create_rules (Write)
 
-Create multiple rules in one call. Ideal for composable pipelines — use the priority field to order rules so earlier-stage rules set up tags/categories that later-stage rules react to. Returns per-item success + errors.
+Create multiple rules in one call. Ideal for composable pipelines — use `stage` (preferred) or raw `priority` on each item to order rules so earlier-stage rules set up tags/categories that later-stage rules react to. `stage` resolves to priority `0 / 10 / 50 / 100`; if both `stage` and `priority` are supplied on an item, `priority` wins. Returns per-item success + errors.
 
 Example pipeline (3 rules that chain):
 
@@ -269,19 +270,19 @@ Example pipeline (3 rules that chain):
   "rules": [
     {
       "name": "Tag coffee shops",
-      "priority": 0,
+      "stage": "baseline",
       "conditions": { "field": "merchant_name", "op": "contains", "value": "starbucks" },
       "actions": [ { "type": "add_tag", "tag_slug": "coffee" } ]
     },
     {
       "name": "Categorize coffee-tagged transactions",
-      "priority": 10,
+      "stage": "standard",
       "conditions": { "field": "tags", "op": "contains", "value": "coffee" },
       "actions": [ { "type": "set_category", "category_slug": "food_and_drink_coffee" } ]
     },
     {
       "name": "Flag expensive coffee",
-      "priority": 50,
+      "stage": "refinement",
       "conditions": {
         "and": [
           { "field": "tags", "op": "contains", "value": "coffee" },

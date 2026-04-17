@@ -79,16 +79,10 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 			}
 		}
 
-		tab := r.URL.Query().Get("tab")
-		if tab != "categories" {
-			tab = "rules"
-		}
-
 		// Build pagination base URL (all params except page).
 		paginationBase := buildRulesPaginationBase(r)
 
-		data := BaseTemplateData(r, sm, "rules", "Rules & Categories")
-		data["Tab"] = tab
+		data := BaseTemplateData(r, sm, "rules", "Rules")
 		data["Rules"] = result.Rules
 		data["Total"] = result.Total
 		data["Page"] = result.Page
@@ -105,91 +99,8 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 		data["CategoryFilter"] = r.URL.Query().Get("category_slug")
 		data["EnabledFilter"] = r.URL.Query().Get("enabled")
 		data["SortBy"] = sortBy
-		data["Categories"] = categories
 		data["FlatCategories"] = flattenCategories(categories)
 		data["Version"] = version
-
-		// Categories tab data.
-		{
-			type catSpending struct {
-				Amount           float64
-				TransactionCount int64
-				Percent          float64
-			}
-			spendingByCategory := make(map[string]catSpending)
-			var totalSpending float64
-			var maxCategorySpend float64
-
-			spendingDays := 30
-			if d := r.URL.Query().Get("days"); d != "" {
-				switch d {
-				case "7":
-					spendingDays = 7
-				case "30":
-					spendingDays = 30
-				case "90":
-					spendingDays = 90
-				case "365":
-					spendingDays = 365
-				}
-			}
-			spendingStart := time.Now().AddDate(0, 0, -spendingDays)
-
-			catSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
-				GroupBy:      "category",
-				StartDate:    &spendingStart,
-				SpendingOnly: true,
-			})
-			if err == nil && catSummary != nil {
-				for _, row := range catSummary.Summary {
-					name := "Uncategorized"
-					if row.Category != nil && *row.Category != "" {
-						name = *row.Category
-					}
-					spendingByCategory[name] = catSpending{
-						Amount:           row.TotalAmount,
-						TransactionCount: row.TransactionCount,
-					}
-					totalSpending += row.TotalAmount
-				}
-
-				for _, parent := range categories {
-					var parentAmount float64
-					var parentCount int64
-					if ps, ok := spendingByCategory[parent.DisplayName]; ok {
-						parentAmount += ps.Amount
-						parentCount += ps.TransactionCount
-					}
-					for _, child := range parent.Children {
-						if cs, ok := spendingByCategory[child.DisplayName]; ok {
-							parentAmount += cs.Amount
-							parentCount += cs.TransactionCount
-						}
-					}
-					if parentAmount > 0 || parentCount > 0 {
-						spendingByCategory[parent.DisplayName] = catSpending{
-							Amount:           parentAmount,
-							TransactionCount: parentCount,
-						}
-					}
-					if parentAmount > maxCategorySpend {
-						maxCategorySpend = parentAmount
-					}
-				}
-
-				if totalSpending > 0 {
-					for name, cs := range spendingByCategory {
-						cs.Percent = (cs.Amount / totalSpending) * 100
-						spendingByCategory[name] = cs
-					}
-				}
-			}
-
-			data["SpendingByCategory"] = spendingByCategory
-			data["TotalSpending"] = totalSpending
-			data["MaxCategorySpend"] = maxCategorySpend
-			data["SpendingDays"] = spendingDays
-		}
 
 		tr.Render(w, r, "rules.html", data)
 	}
@@ -279,6 +190,84 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		// Recent applications
 		applications, hasMoreApps, _ := svc.ListRuleApplications(ctx, id, 10, "")
 
+		// Category tree powers (a) the inline category picker on tx-row, and
+		// (b) slug → display-name resolution for the action meta line shown
+		// above each Recent Applications row.
+		categories, _ := svc.ListCategoryTree(ctx)
+		type catMeta struct {
+			DisplayName string
+			Color       *string
+			Icon        *string
+		}
+		catBySlug := make(map[string]catMeta)
+		for _, p := range categories {
+			catBySlug[p.Slug] = catMeta{DisplayName: p.DisplayName, Color: p.Color, Icon: p.Icon}
+			for _, c := range p.Children {
+				catBySlug[c.Slug] = catMeta{DisplayName: c.DisplayName, Color: c.Color, Icon: c.Icon}
+			}
+		}
+
+		// Hydrate application rows with AdminTransactionRow data so the shared
+		// tx-row partial can render them (category avatar, account, user,
+		// agent-reviewed flag, pending state). Preserves order. ApplicationMeta
+		// carries the per-application action so the rule_detail template can
+		// prefix each row with a prominent "what happened" pill.
+		applicationTxns := make([]service.AdminTransactionRow, 0, len(applications))
+		applicationMeta := make(map[string]struct {
+			ActionField        string
+			ActionValue        string
+			ActionDisplay      string
+			ActionCategoryColor *string
+			ActionCategoryIcon  *string
+			AppliedBy          string
+		}, len(applications))
+		if len(applications) > 0 {
+			txnIDs := make([]string, 0, len(applications))
+			for _, a := range applications {
+				txnIDs = append(txnIDs, a.TransactionID)
+				display := a.ActionValue
+				var cColor, cIcon *string
+				if a.ActionField == "category" {
+					if m, ok := catBySlug[a.ActionValue]; ok {
+						display = m.DisplayName
+						cColor = m.Color
+						cIcon = m.Icon
+					}
+				}
+				applicationMeta[a.TransactionID] = struct {
+					ActionField        string
+					ActionValue        string
+					ActionDisplay      string
+					ActionCategoryColor *string
+					ActionCategoryIcon  *string
+					AppliedBy          string
+				}{
+					ActionField:        a.ActionField,
+					ActionValue:        a.ActionValue,
+					ActionDisplay:      display,
+					ActionCategoryColor: cColor,
+					ActionCategoryIcon:  cIcon,
+					AppliedBy:          a.AppliedBy,
+				}
+			}
+			if rows, err := svc.GetAdminTransactionRowsByIDs(ctx, txnIDs); err == nil {
+				applicationTxns = rows
+			}
+		}
+
+		// Hydrate preview matches the same way so the pending-matches table can
+		// reuse the compact partial.
+		var previewTxns []service.AdminTransactionRow
+		if preview != nil && len(preview.SampleMatches) > 0 {
+			txnIDs := make([]string, 0, len(preview.SampleMatches))
+			for _, m := range preview.SampleMatches {
+				txnIDs = append(txnIDs, m.TransactionID)
+			}
+			if rows, err := svc.GetAdminTransactionRowsByIDs(ctx, txnIDs); err == nil {
+				previewTxns = rows
+			}
+		}
+
 		// Sync history where this rule matched
 		syncHistory, _ := svc.GetRuleSyncHistory(ctx, id, 10)
 
@@ -296,9 +285,15 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		data["Preview"] = preview
 		data["Stats"] = stats
 		data["Applications"] = applications
+		data["ApplicationTxns"] = applicationTxns
+		data["ApplicationMeta"] = applicationMeta
+		data["PreviewTxns"] = previewTxns
 		data["HasMoreApplications"] = hasMoreApps
 		data["SyncHistory"] = syncHistory
 		data["ActionCategoryName"] = actionCategoryName
+		// Categories feed window.__bbCategories for the inline category picker
+		// on tx-row partials used in Recent Applications and Matching sections.
+		data["Categories"] = categories
 
 		// Parse last_hit_at for relative time display
 		if rule.LastHitAt != nil {

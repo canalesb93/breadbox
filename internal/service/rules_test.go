@@ -667,3 +667,56 @@ func TestParseDuration(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveRulePriority(t *testing.T) {
+	intPtr := func(i int) *int { return &i }
+
+	tests := []struct {
+		name     string
+		stage    string
+		priority *int
+		want     int
+		wantErr  bool
+	}{
+		// Neither supplied -> default standard (10).
+		{name: "empty stage, nil priority defaults to standard", stage: "", priority: nil, want: 10},
+
+		// Stage names map to canonical priorities.
+		{name: "baseline maps to 0", stage: "baseline", priority: nil, want: 0},
+		{name: "standard maps to 10", stage: "standard", priority: nil, want: 10},
+		{name: "refinement maps to 50", stage: "refinement", priority: nil, want: 50},
+		{name: "override maps to 100", stage: "override", priority: nil, want: 100},
+
+		// Case-insensitive + trimmed.
+		{name: "uppercase stage accepted", stage: "OVERRIDE", priority: nil, want: 100},
+		{name: "mixed-case stage accepted", stage: "Refinement", priority: nil, want: 50},
+		{name: "stage with whitespace trimmed", stage: "  standard  ", priority: nil, want: 10},
+
+		// Priority wins on conflict. Note: stage is still validated —
+		// both-supplied callers must pass a valid stage if any stage is
+		// passed. To pass an arbitrary priority, leave stage empty.
+		{name: "explicit priority wins over stage", stage: "override", priority: intPtr(7), want: 7},
+		{name: "explicit priority of 0 respected", stage: "override", priority: intPtr(0), want: 0},
+		{name: "explicit priority with empty stage", stage: "", priority: intPtr(42), want: 42},
+		{name: "priority above canonical range accepted", stage: "", priority: intPtr(500), want: 500},
+
+		// Unknown stage -> validation error.
+		{name: "unknown stage rejected", stage: "bogus", priority: nil, want: 0, wantErr: true},
+		{name: "empty-string stage with spaces is treated as empty", stage: "   ", priority: nil, want: 10},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ResolveRulePriority(tt.stage, tt.priority)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ResolveRulePriority(%q, %v) error = %v, wantErr %v", tt.stage, tt.priority, err, tt.wantErr)
+			}
+			if tt.wantErr {
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ResolveRulePriority(%q, %v) = %d, want %d", tt.stage, tt.priority, got, tt.want)
+			}
+		})
+	}
+}

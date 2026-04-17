@@ -253,53 +253,7 @@
     {{if .RecentTransactions}}
     <div class="px-3 sm:px-4 py-2">
       {{range .RecentTransactions}}
-      <a href="/transactions/{{.ID}}" class="flex items-center gap-3 py-2.5 px-1 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline">
-        <div class="relative shrink-0">
-          {{if .CategoryIcon}}
-          <div class="bb-tx-avatar bb-tx-avatar--sm" style="--avatar-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}oklch(0.65 0 0){{end}}">
-            <i data-lucide="{{deref .CategoryIcon}}" class="w-3.5 h-3.5"></i>
-          </div>
-          {{else}}
-          <div class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--letter">
-            <span>{{firstChar .Name}}</span>
-          </div>
-          {{end}}
-        </div>
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-1.5 min-w-0">
-            <span class="text-sm font-medium truncate">{{.Name}}</span>
-            {{if .Pending}}<span class="text-[0.6rem] font-medium text-warning/80 bg-warning/10 px-1.5 py-0.5 rounded-full leading-none shrink-0">Pending</span>{{end}}
-          </div>
-          <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40 overflow-hidden">
-            {{if .UserName}}
-            {{if .EffectiveUserID}}
-            <img src="{{avatarURL .EffectiveUserID}}" alt="" class="w-4 h-4 rounded-full object-cover shrink-0" title="{{.UserName}}">
-            {{else}}
-            <span class="w-4 h-4 rounded-full bg-primary/10 inline-flex items-center justify-center shrink-0" title="{{.UserName}}">
-              <span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{{firstChar .UserName}}</span>
-            </span>
-            {{end}}
-            {{end}}
-            <span class="truncate shrink min-w-0">{{.AccountName}} · {{relativeDate .Date}}</span>
-            {{if .CategoryDisplayName}}
-            <span class="text-base-content/20 shrink-0 hidden sm:inline">&middot;</span>
-            <span class="items-center gap-1 shrink-0 hidden sm:inline-flex">
-              <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}{{safeCSS "oklch(0.65 0 0)"}}{{end}}"></span>
-              <span class="text-base-content/50 truncate max-w-24">{{deref .CategoryDisplayName}}</span>
-            </span>
-            {{end}}
-            {{if .AgentReviewed}}
-            <span class="text-base-content/20 shrink-0">&middot;</span>
-            <span class="inline-flex items-center gap-0.5 text-primary/60 shrink-0" title="Categorized by AI agent">
-              <i data-lucide="bot" class="w-3 h-3"></i>
-            </span>
-            {{end}}
-          </div>
-        </div>
-        <span class="bb-tx-amount shrink-0{{if lt .Amount 0.0}} bb-tx-amount--income{{end}}">
-          {{formatAmount .Amount}}
-        </span>
-      </a>
+      {{template "tx-row-compact" .}}
       {{end}}
     </div>
     {{else}}

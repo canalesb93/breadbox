@@ -1,0 +1,61 @@
+{{define "tx-row-compact"}}
+<!-- Compact transaction row — lightweight sibling of `tx-row`.
+     Used in dense contexts (dashboard recent txns, rule detail tables) where
+     selection, inline category picker, and expand panels are not needed.
+     Input: service.AdminTransactionRow as dot. -->
+<a href="/transactions/{{.ID}}" class="bb-tx-row-compact flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline">
+  <!-- Category avatar (same style as tx-row, smaller size) -->
+  <div class="relative shrink-0">
+    {{if .CategoryIcon}}
+    <div class="bb-tx-avatar bb-tx-avatar--sm" style="--avatar-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}oklch(0.65 0 0){{end}}">
+      <i data-lucide="{{deref .CategoryIcon}}" class="w-3.5 h-3.5"></i>
+    </div>
+    {{else}}
+    <div class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--letter">
+      <span>{{firstChar .Name}}</span>
+    </div>
+    {{end}}
+  </div>
+
+  <!-- Name + meta line -->
+  <div class="min-w-0 flex-1">
+    <div class="flex items-center gap-1.5 min-w-0">
+      <span class="text-sm font-medium truncate">{{.Name}}</span>
+      {{if .Pending}}<span class="badge badge-soft badge-xs badge-warning rounded-md shrink-0">Pending</span>{{end}}
+    </div>
+    <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40 overflow-hidden">
+      {{if .UserName}}
+      {{if .EffectiveUserID}}
+      <img src="{{avatarURL .EffectiveUserID}}" alt="" class="w-4 h-4 rounded-full object-cover shrink-0" title="{{.UserName}}">
+      {{else}}
+      <span class="w-4 h-4 rounded-full bg-primary/10 inline-flex items-center justify-center shrink-0" title="{{.UserName}}">
+        <span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{{firstChar .UserName}}</span>
+      </span>
+      {{end}}
+      {{end}}
+      <span class="truncate shrink min-w-0">{{.AccountName}}</span>
+      {{if .CategoryDisplayName}}
+      <span class="text-base-content/20 shrink-0 hidden sm:inline">&middot;</span>
+      <span class="items-center gap-1 shrink-0 hidden sm:inline-flex">
+        <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {{if .CategoryColor}}{{safeCSS (deref .CategoryColor)}}{{else}}{{safeCSS "oklch(0.65 0 0)"}}{{end}}"></span>
+        <span class="text-base-content/50 truncate max-w-24">{{deref .CategoryDisplayName}}</span>
+      </span>
+      {{end}}
+      {{if .AgentReviewed}}
+      <span class="text-base-content/20 shrink-0">&middot;</span>
+      <span class="inline-flex items-center gap-0.5 text-primary/60 shrink-0" title="Categorized by AI agent">
+        <i data-lucide="bot" class="w-3 h-3"></i>
+      </span>
+      {{end}}
+    </div>
+  </div>
+
+  <!-- Date + Amount (right-aligned stack) -->
+  <div class="shrink-0 text-right flex flex-col items-end gap-0.5">
+    <span class="bb-tx-amount tabular-nums{{if lt .Amount 0.0}} bb-tx-amount--income{{end}}">
+      {{formatAmount .Amount}}
+    </span>
+    <span class="text-[0.65rem] text-base-content/40 tabular-nums">{{relativeDate .Date}}</span>
+  </div>
+</a>
+{{end}}

@@ -771,6 +771,7 @@ var templatePartials = []string{
 	"partials/skeletons.html",
 	"partials/breadcrumb.html",
 	"partials/tx_row.html",
+	"partials/tx_row_compact.html",
 	"partials/tx_results.html",
 	"partials/tag_chip.html",
 	"partials/condition_row.html",

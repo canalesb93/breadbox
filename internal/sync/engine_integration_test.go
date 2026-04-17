@@ -1670,3 +1670,358 @@ func TestRule_TypedActions_SetCategory_RespectsOverride(t *testing.T) {
 		t.Errorf("rule overwrote category_override=true; expected %v, got %v", other.ID, finalCatID)
 	}
 }
+
+// --- Audit §D rule tests ---
+
+// TestRule_ExpiredRule_NotFired verifies that rules past their expires_at time
+// are excluded by ListActiveRulesForSync and do not fire during sync. The
+// transaction lands uncategorized and no rule_applied annotation is written.
+func TestRule_ExpiredRule_NotFired(t *testing.T) {
+	pool, queries := testutil.ServicePool(t)
+	ctx := context.Background()
+
+	seedCategoriesWithFood(t, queries)
+
+	rule := testutil.MustCreateTransactionRule(
+		t, queries, "Expired Rule",
+		[]byte(`{"field":"name","op":"contains","value":"Coffee"}`),
+		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"}]`),
+		"on_create",
+	)
+
+	// Backdate expires_at so ListActiveRulesForSync filters this rule out.
+	if _, err := pool.Exec(ctx,
+		"UPDATE transaction_rules SET expires_at = NOW() - INTERVAL '1 hour' WHERE id = $1",
+		rule.ID,
+	); err != nil {
+		t.Fatalf("expire rule: %v", err)
+	}
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
+
+	mock := &mockProvider{
+		syncResult: provider.SyncResult{
+			Added: []provider.Transaction{{
+				ExternalID:        "txn_expired",
+				AccountExternalID: "ext_acct_1",
+				Amount:            decimal.NewFromFloat(5.00),
+				Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+				Name:              "Coffee Shop",
+				ISOCurrencyCode:   "USD",
+			}},
+			Cursor: "cursor_1",
+		},
+	}
+
+	providers := map[string]provider.Provider{"plaid": mock}
+	engine := newEngine(t, pool, queries, providers)
+
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	var catID pgtype.UUID
+	if err := pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_expired'",
+	).Scan(&catID); err != nil {
+		t.Fatalf("query transaction: %v", err)
+	}
+	if catID.Valid {
+		t.Errorf("expired rule fired; expected category_id=NULL, got %v", catID)
+	}
+
+	var annCount int
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM annotations WHERE kind = 'rule_applied' AND rule_id = $1`,
+		rule.ID,
+	).Scan(&annCount); err != nil {
+		t.Fatalf("count rule_applied annotations: %v", err)
+	}
+	if annCount != 0 {
+		t.Errorf("expected 0 rule_applied annotations for expired rule, got %d", annCount)
+	}
+
+	var hitCount int
+	if err := pool.QueryRow(ctx,
+		"SELECT hit_count FROM transaction_rules WHERE id = $1", rule.ID,
+	).Scan(&hitCount); err != nil {
+		t.Fatalf("query hit count: %v", err)
+	}
+	if hitCount != 0 {
+		t.Errorf("expected hit_count 0 for expired rule, got %d", hitCount)
+	}
+}
+
+// TestRule_DisabledRule_NotFired_DuringSync verifies that rules with
+// enabled=false are excluded by ListActiveRulesForSync and do not fire during
+// sync.
+func TestRule_DisabledRule_NotFired_DuringSync(t *testing.T) {
+	pool, queries := testutil.ServicePool(t)
+	ctx := context.Background()
+
+	seedCategoriesWithFood(t, queries)
+
+	rule := testutil.MustCreateTransactionRule(
+		t, queries, "Disabled Rule",
+		[]byte(`{"field":"name","op":"contains","value":"Coffee"}`),
+		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"}]`),
+		"on_create",
+	)
+
+	// Disable the rule after creation.
+	if _, err := pool.Exec(ctx,
+		"UPDATE transaction_rules SET enabled = FALSE WHERE id = $1", rule.ID,
+	); err != nil {
+		t.Fatalf("disable rule: %v", err)
+	}
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
+
+	mock := &mockProvider{
+		syncResult: provider.SyncResult{
+			Added: []provider.Transaction{{
+				ExternalID:        "txn_disabled",
+				AccountExternalID: "ext_acct_1",
+				Amount:            decimal.NewFromFloat(5.00),
+				Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+				Name:              "Coffee Shop",
+				ISOCurrencyCode:   "USD",
+			}},
+			Cursor: "cursor_1",
+		},
+	}
+
+	providers := map[string]provider.Provider{"plaid": mock}
+	engine := newEngine(t, pool, queries, providers)
+
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	var catID pgtype.UUID
+	if err := pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_disabled'",
+	).Scan(&catID); err != nil {
+		t.Fatalf("query transaction: %v", err)
+	}
+	if catID.Valid {
+		t.Errorf("disabled rule fired; expected category_id=NULL, got %v", catID)
+	}
+
+	var annCount int
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM annotations WHERE kind = 'rule_applied' AND rule_id = $1`,
+		rule.ID,
+	).Scan(&annCount); err != nil {
+		t.Fatalf("count rule_applied annotations: %v", err)
+	}
+	if annCount != 0 {
+		t.Errorf("expected 0 rule_applied annotations for disabled rule, got %d", annCount)
+	}
+}
+
+// TestRule_OverrideSuppressesSetCategoryButNotOthers verifies that when a
+// transaction has category_override=TRUE, a rule that set_category + add_tag
+// still applies the tag — override only suppresses the category write.
+func TestRule_OverrideSuppressesSetCategoryButNotOthers(t *testing.T) {
+	pool, queries := testutil.ServicePool(t)
+	ctx := context.Background()
+
+	_, food := seedCategoriesWithFood(t, queries)
+	overrideCat, err := queries.InsertCategory(ctx, db.InsertCategoryParams{
+		Slug: "user_pick", DisplayName: "User Pick",
+	})
+	if err != nil {
+		t.Fatalf("create override category: %v", err)
+	}
+
+	rule := testutil.MustCreateTransactionRule(
+		t, queries, "Coffee combo",
+		[]byte(`{"field":"name","op":"contains","value":"Coffee"}`),
+		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"},{"type":"add_tag","tag_slug":"caffeine"}]`),
+		"always",
+	)
+	_ = rule
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
+
+	// First sync inserts the transaction; rule fires normally and picks up both
+	// actions on the new row.
+	mock := &mockProvider{
+		syncResult: provider.SyncResult{
+			Added: []provider.Transaction{{
+				ExternalID:        "txn_override_combo",
+				AccountExternalID: "ext_acct_1",
+				Amount:            decimal.NewFromFloat(5.00),
+				Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+				Name:              "Coffee Shop",
+				ISOCurrencyCode:   "USD",
+				Pending:           true,
+			}},
+			Cursor: "cursor_1",
+		},
+	}
+	providers := map[string]provider.Provider{"plaid": mock}
+	engine := newEngine(t, pool, queries, providers)
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("first sync: %v", err)
+	}
+
+	// Pin a manual override on the row, swap the user's category, and remove
+	// the tag so the second sync has a clean slate to re-apply it.
+	if _, err := pool.Exec(ctx,
+		"UPDATE transactions SET category_id = $1, category_override = TRUE WHERE external_transaction_id = 'txn_override_combo'",
+		overrideCat.ID,
+	); err != nil {
+		t.Fatalf("set override: %v", err)
+	}
+	if _, err := pool.Exec(ctx,
+		`DELETE FROM transaction_tags WHERE transaction_id = (SELECT id FROM transactions WHERE external_transaction_id = 'txn_override_combo')`,
+	); err != nil {
+		t.Fatalf("clear tags: %v", err)
+	}
+
+	// Second sync modifies the transaction so the "always" rule re-evaluates.
+	mock.syncResult = provider.SyncResult{
+		Modified: []provider.Transaction{{
+			ExternalID:        "txn_override_combo",
+			AccountExternalID: "ext_acct_1",
+			Amount:            decimal.NewFromFloat(5.00),
+			Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+			Name:              "Coffee Shop",
+			ISOCurrencyCode:   "USD",
+			Pending:           false, // changed field triggers isChanged=true
+		}},
+		Cursor: "cursor_2",
+	}
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("second sync: %v", err)
+	}
+
+	// Category override should still be pointing at the user's choice, not
+	// the rule's food_and_drink.
+	var finalCatID pgtype.UUID
+	if err := pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_override_combo'",
+	).Scan(&finalCatID); err != nil {
+		t.Fatalf("query transaction: %v", err)
+	}
+	if finalCatID != overrideCat.ID {
+		t.Errorf("override suppressed failed; expected %v, got %v (food=%v)", overrideCat.ID, finalCatID, food.ID)
+	}
+
+	// But the add_tag action should have still run — tag is attached.
+	var tagAttached int
+	if err := pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM transaction_tags tt
+		JOIN tags t ON tt.tag_id = t.id
+		JOIN transactions tr ON tt.transaction_id = tr.id
+		WHERE tr.external_transaction_id = 'txn_override_combo' AND t.slug = 'caffeine'`,
+	).Scan(&tagAttached); err != nil {
+		t.Fatalf("count tag attachment: %v", err)
+	}
+	if tagAttached != 1 {
+		t.Errorf("expected add_tag to succeed despite category override, got %d attachments", tagAttached)
+	}
+}
+
+// TestRule_HitCountMatchesWrites_TagOnly verifies a rule whose only action is
+// add_tag increments hit_count on match, and the rule_applied annotation's
+// action_field records "tag".
+func TestRule_HitCountMatchesWrites_TagOnly(t *testing.T) {
+	pool, queries := testutil.ServicePool(t)
+	ctx := context.Background()
+
+	seedCategories(t, queries)
+
+	rule := testutil.MustCreateTransactionRule(
+		t, queries, "Tag-only Rule",
+		[]byte(`{"field":"name","op":"contains","value":"Tagged"}`),
+		[]byte(`[{"type":"add_tag","tag_slug":"auto-tagged"}]`),
+		"on_create",
+	)
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
+
+	mock := &mockProvider{
+		syncResult: provider.SyncResult{
+			Added: []provider.Transaction{
+				{
+					ExternalID:        "txn_tag_1",
+					AccountExternalID: "ext_acct_1",
+					Amount:            decimal.NewFromFloat(1.00),
+					Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+					Name:              "Tagged Purchase A",
+					ISOCurrencyCode:   "USD",
+				},
+				{
+					ExternalID:        "txn_tag_2",
+					AccountExternalID: "ext_acct_1",
+					Amount:            decimal.NewFromFloat(2.00),
+					Date:              time.Date(2025, 3, 2, 0, 0, 0, 0, time.UTC),
+					Name:              "Tagged Purchase B",
+					ISOCurrencyCode:   "USD",
+				},
+				{
+					ExternalID:        "txn_ignore",
+					AccountExternalID: "ext_acct_1",
+					Amount:            decimal.NewFromFloat(3.00),
+					Date:              time.Date(2025, 3, 3, 0, 0, 0, 0, time.UTC),
+					Name:              "Other Thing",
+					ISOCurrencyCode:   "USD",
+				},
+			},
+			Cursor: "cursor_1",
+		},
+	}
+	providers := map[string]provider.Provider{"plaid": mock}
+	engine := newEngine(t, pool, queries, providers)
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	// hit_count reflects only matches, not the non-matching txn.
+	var hitCount int
+	if err := pool.QueryRow(ctx,
+		"SELECT hit_count FROM transaction_rules WHERE id = $1", rule.ID,
+	).Scan(&hitCount); err != nil {
+		t.Fatalf("query hit count: %v", err)
+	}
+	if hitCount != 2 {
+		t.Errorf("expected hit_count=2 (two matches), got %d", hitCount)
+	}
+
+	// rule_applied annotation written with action_field=tag for both matches.
+	var appliedWithTag int
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM annotations
+		 WHERE kind = 'rule_applied'
+		   AND rule_id = $1
+		   AND payload->>'action_field' = 'tag'`,
+		rule.ID,
+	).Scan(&appliedWithTag); err != nil {
+		t.Fatalf("count rule_applied annotations: %v", err)
+	}
+	if appliedWithTag != 2 {
+		t.Errorf("expected 2 rule_applied rows with action_field=tag, got %d", appliedWithTag)
+	}
+}
+
+// TestRule_AllActionsAtomicInSyncTx is a placeholder: the sync engine currently
+// logs rule-application errors but does not abort the per-connection tx on a
+// rule-write failure, so the "force failure + assert rollback" shape isn't
+// achievable from test fixtures alone. Re-introduce this test if the sync
+// engine gains opt-in strict-mode error propagation.
+//
+// See #433 — skipped with reason documented here.
+func TestRule_AllActionsAtomicInSyncTx(t *testing.T) {
+	t.Skip("sync engine logs rule errors without tx rollback; atomicity is per-row upsert, not per-rule-action. Needs production code change to assert cleanly.")
+}

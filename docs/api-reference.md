@@ -114,7 +114,7 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 
 ## Tags & Reviews
 
-The review queue is a tag. Transactions carrying the seeded `needs-review` tag (or any operator-defined trigger tag) are the backlog. A seeded `on_create` system rule auto-attaches `needs-review` to every newly-synced transaction; disable that rule to opt out. Ephemeral tags (lifecycle `ephemeral`) require a note on removal — recorded on the `tag_removed` annotation.
+The review queue is a tag. Transactions carrying the seeded `needs-review` tag (or any operator-defined trigger tag) are the backlog. A seeded `on_create` system rule auto-attaches `needs-review` to every newly-synced transaction; disable that rule to opt out. When removing an ephemeral tag (lifecycle `ephemeral`), passing a rationale `note` is strongly recommended — it's recorded on the `tag_removed` annotation.
 
 Tag management is exposed via the MCP tools (`list_tags`, `add_transaction_tag`, `remove_transaction_tag`, `create_tag`, `update_tag`, `delete_tag`, `update_transactions`, `list_annotations`) and the admin dashboard (`/tags`, `/transactions/:id/edit`, bulk actions on `/transactions`).
 
@@ -154,6 +154,17 @@ Rules use a recursive JSON condition tree supporting AND/OR/NOT logic:
 **Numeric operators:** `eq`, `neq`, `gt`, `gte`, `lt`, `lte`
 
 **Boolean operators:** `eq`, `neq`
+
+### Pipeline stage (priority)
+
+`POST /rules` and `PUT /rules/{id}` accept either `stage` (semantic) or `priority` (raw integer) on the request body:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `stage` | string | `baseline` / `standard` / `refinement` / `override`. Resolves to priority `0 / 10 / 50 / 100`. |
+| `priority` | int | Raw pipeline-stage integer, `0..1000`. Lower runs first. |
+
+If both are supplied, `priority` wins. If neither is supplied on create, the rule defaults to `standard` (priority `10`). Stage names are case-insensitive; unknown stage strings return `400 VALIDATION_ERROR`. See [`docs/rule-dsl.md`](rule-dsl.md) for the full priority-as-pipeline-stage model.
 
 ## Account Links
 
