@@ -47,7 +47,7 @@
     <!-- Action toolbar -->
     <div class="flex items-center gap-1 px-3 sm:px-4 py-2 border-t border-base-200/60 bg-base-200/20 rounded-b-2xl">
       <button type="button" @click="toggleRead()" class="btn btn-ghost btn-xs rounded-lg text-xs">
-        <i :data-lucide="isRead ? 'mail' : 'mail-open'" class="w-3.5 h-3.5"></i>
+        <i :data-lucide="isRead ? 'rotate-ccw' : 'check'" class="w-3.5 h-3.5"></i>
         <span x-text="isRead ? 'Mark unread' : 'Mark read'"></span>
       </button>
       <button type="button" @click="copyLink()" class="btn btn-ghost btn-xs rounded-lg text-xs">
