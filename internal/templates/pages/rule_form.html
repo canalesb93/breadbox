@@ -73,14 +73,25 @@
           <!-- Field -->
           <select x-model="cond.field" @change="onFieldChange(idx)" class="select select-bordered select-xs rounded-lg bg-base-100 flex-1 min-w-0">
             <option value="">Field...</option>
-            <option value="name">Name</option>
-            <option value="merchant_name">Merchant</option>
-            <option value="amount">Amount</option>
-            <option value="category_primary">Category (raw)</option>
-            <option value="category_detailed">Category detail</option>
-            <option value="provider">Provider</option>
-            <option value="user_name">Family member</option>
-            <option value="pending">Pending</option>
+            <optgroup label="Transaction">
+              <option value="name">Name</option>
+              <option value="merchant_name">Merchant</option>
+              <option value="amount">Amount</option>
+              <option value="pending">Pending</option>
+            </optgroup>
+            <optgroup label="Category">
+              <option value="category">Category (assigned)</option>
+              <option value="category_primary">Category (raw primary)</option>
+              <option value="category_detailed">Category (raw detail)</option>
+            </optgroup>
+            <optgroup label="Tags">
+              <option value="tags">Tag</option>
+            </optgroup>
+            <optgroup label="Account / User">
+              <option value="account_name">Account name</option>
+              <option value="user_name">Family member</option>
+              <option value="provider">Provider</option>
+            </optgroup>
           </select>
           <!-- Operator -->
           <select x-model="cond.op" @change="syncToJson()" class="select select-bordered select-xs rounded-lg bg-base-100 w-28 shrink-0">
@@ -98,6 +109,9 @@
             <option value="neq" x-show="fieldType(cond.field) === 'numeric'">&ne;</option>
             <option value="eq" x-show="fieldType(cond.field) === 'bool'">is</option>
             <option value="neq" x-show="fieldType(cond.field) === 'bool'">is not</option>
+            <option value="contains" x-show="fieldType(cond.field) === 'tags'">has</option>
+            <option value="not_contains" x-show="fieldType(cond.field) === 'tags'">does not have</option>
+            <option value="in" x-show="fieldType(cond.field) === 'tags'">has any of</option>
           </select>
           <!-- Value -->
           <select x-model="cond.value" x-show="fieldType(cond.field) === 'bool'" @change="syncToJson()" class="select select-bordered select-xs rounded-lg bg-base-100 w-20 shrink-0">
@@ -106,6 +120,7 @@
           </select>
           <input type="number" x-model="cond.value" step="0.01" x-show="fieldType(cond.field) === 'numeric'" @input="syncToJson()" class="input input-bordered input-xs rounded-lg bg-base-100 w-24 shrink-0" placeholder="0.00" />
           <input type="text" x-model="cond.value" x-show="fieldType(cond.field) === 'string'" @input="syncToJson()" class="input input-bordered input-xs rounded-lg bg-base-100 flex-1 min-w-0" placeholder="value..." />
+          <input type="text" x-model="cond.value" x-show="fieldType(cond.field) === 'tags'" list="bb-tag-slugs" @input="syncToJson()" class="input input-bordered input-xs rounded-lg bg-base-100 flex-1 min-w-0" :placeholder="cond.op === 'in' ? 'slug1, slug2, ...' : 'tag-slug'" />
           <!-- Remove (always available — removing the last one switches to match-all) -->
           <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg shrink-0" @click="removeCondition(idx)" :title="form.conditions.length === 1 ? 'Remove (rule will match all transactions)' : 'Remove'">
             <i data-lucide="x" class="w-3.5 h-3.5 text-base-content/40"></i>
@@ -213,12 +228,32 @@
         </select>
         <p class="text-xs text-base-content/40 mt-1" x-show="form.trigger === 'on_create'">Fires only when a transaction is first synced.</p>
         <p class="text-xs text-base-content/40 mt-1" x-show="form.trigger === 'on_change' || form.trigger === 'on_update'">Fires only when an existing transaction changes on re-sync.</p>
-        <p class="text-xs text-base-content/40 mt-1" x-show="form.trigger === 'always'">Fires on every sync that touches the transaction.</p>
+        <p class="text-xs text-warning/80 mt-1" x-show="form.trigger === 'always'" x-cloak>
+          <i data-lucide="alert-triangle" class="w-3 h-3 inline-block -mt-0.5 mr-0.5"></i>
+          Fires on every sync that touches this transaction — use sparingly.
+        </p>
       </div>
       <div class="form-control">
-        <label class="label" for="rule-priority"><span class="label-text text-xs text-base-content/60">Priority</span></label>
-        <input id="rule-priority" type="number" x-model.number="form.priority" class="input input-bordered input-sm rounded-xl bg-base-200/50" min="0" max="1000" />
-        <p class="text-xs text-base-content/40 mt-1">Higher priority wins when multiple rules set the same field</p>
+        <label class="label" for="rule-priority">
+          <span class="label-text text-xs text-base-content/60">Pipeline stage</span>
+          <span class="tooltip tooltip-left" data-tip="Lower stages run first (baseline). Higher stages run later and win set_category. Tags accumulate across all stages.">
+            <i data-lucide="info" class="w-3 h-3 text-base-content/30"></i>
+          </span>
+        </label>
+        <div class="flex items-center gap-1 bg-base-200/60 rounded-xl p-1">
+          <template x-for="preset in priorityPresets" :key="preset.value">
+            <button type="button"
+              class="flex-1 text-xs font-medium py-1 px-2 rounded-lg transition-colors"
+              :class="form.priority === preset.value ? 'bg-base-100 shadow-sm text-base-content' : 'text-base-content/50 hover:text-base-content/70'"
+              @click="form.priority = preset.value"
+              :title="preset.hint"
+              x-text="preset.label"></button>
+          </template>
+        </div>
+        <div class="flex items-center gap-2 mt-1">
+          <input id="rule-priority" type="number" x-model.number="form.priority" class="input input-bordered input-xs rounded-lg bg-base-200/50 w-20" min="0" max="1000" />
+          <p class="text-xs text-base-content/40" x-text="priorityLabel(form.priority)"></p>
+        </div>
       </div>
       <div class="form-control" x-show="!isEdit">
         <label class="label" for="rule-expires-in"><span class="label-text text-xs text-base-content/60">Expires in</span></label>
@@ -253,10 +288,13 @@ function ruleForm() {
   const fieldTypes = {
     name: 'string', merchant_name: 'string', amount: 'numeric',
     category_primary: 'string', category_detailed: 'string',
-    pending: 'bool', provider: 'string', account_id: 'string',
-    user_id: 'string', user_name: 'string'
+    category: 'string',
+    pending: 'bool', provider: 'string',
+    account_id: 'string', account_name: 'string',
+    user_id: 'string', user_name: 'string',
+    tags: 'tags',
   };
-  const defaultOps = { string: 'contains', numeric: 'gte', bool: 'eq' };
+  const defaultOps = { string: 'contains', numeric: 'gte', bool: 'eq', tags: 'contains' };
   const emptyCondition = () => ({ field: 'name', op: 'contains', value: '' });
 
   // Action type registry — first-class typed actions match the API's
@@ -348,6 +386,24 @@ function ruleForm() {
     };
   }
 
+  // Pipeline-stage presets. Numeric values are conventional, not enforced —
+  // users can still pick any integer 0..1000 in the fallback number input.
+  // Under priority-ASC ordering, lower stages run first.
+  const priorityPresets = [
+    { value: 0,   label: 'Baseline',   hint: 'Runs first — broad defaults, seeded rules' },
+    { value: 10,  label: 'Standard',   hint: 'Default rule stage' },
+    { value: 50,  label: 'Refinement', hint: 'Runs after standard rules — reacts to their output' },
+    { value: 100, label: 'Override',   hint: 'Runs last — wins set_category conflicts' },
+  ];
+  function priorityLabelFor(p) {
+    const match = priorityPresets.find(x => x.value === p);
+    if (match) return match.hint;
+    if (p < 10) return 'Runs very early — before standard rules';
+    if (p < 50) return 'Runs with standard rules';
+    if (p < 100) return 'Runs as a refinement';
+    return 'Runs very late — has the final word';
+  }
+
   return {
     isEdit: {{ if .IsEdit }}true{{ else }}false{{ end }},
     editingId: existingRule?.id || '',
@@ -356,9 +412,11 @@ function ruleForm() {
     submitting: false,
     formError: '',
     actionTypes,
+    priorityPresets,
     form: initForm(),
 
     fieldType(field) { return fieldTypes[field] || 'string'; },
+    priorityLabel(p) { return priorityLabelFor(p); },
 
     restorePageState() {
       const main = document.querySelector('main');
@@ -453,8 +511,15 @@ function ruleForm() {
       if (conds.length === 0) return null;
       const mapped = conds.map(c => {
         let val = c.value;
-        if (this.fieldType(c.field) === 'numeric') val = parseFloat(val) || 0;
-        else if (this.fieldType(c.field) === 'bool') val = val === 'true';
+        const type = this.fieldType(c.field);
+        if (type === 'numeric') val = parseFloat(val) || 0;
+        else if (type === 'bool') val = val === 'true';
+        else if (type === 'tags' && c.op === 'in') {
+          // Tags `in` takes an array; UI collects a comma-separated string.
+          val = String(val).split(',').map(s => s.trim()).filter(Boolean);
+        }
+        // string `in` op isn't exposed via the visual builder — advanced
+        // users use the JSON editor for that shape.
         return { field: c.field, op: c.op, value: val };
       });
       if (mapped.length === 1) return mapped[0];
