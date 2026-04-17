@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -950,6 +951,158 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		PageSize:     pageSize,
 		TotalPages:   totalPages,
 	}, nil
+}
+
+// GetAdminTransactionRowsByIDs returns AdminTransactionRow records for the
+// given transaction IDs (UUIDs or short IDs), preserving the input order.
+// Missing IDs are silently skipped. Intended for callers that already hold a
+// list of txn IDs (rule applications, preview matches, search results) and
+// need to render them with the shared tx-row partials.
+func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string) ([]AdminTransactionRow, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	uuids := make([]pgtype.UUID, 0, len(ids))
+	order := make(map[string]int, len(ids))
+	for i, raw := range ids {
+		if raw == "" {
+			continue
+		}
+		u, err := s.resolveTransactionID(ctx, raw)
+		if err != nil {
+			continue
+		}
+		uuids = append(uuids, u)
+		order[formatUUID(u)] = i
+	}
+	if len(uuids) == 0 {
+		return nil, nil
+	}
+
+	query := "SELECT t.id, t.account_id, COALESCE(a.display_name, a.name, ''), " +
+		"COALESCE(bc.institution_name, ''), COALESCE(au.name, u.name, ''), " +
+		"t.date, t.name, t.merchant_name, t.amount, t.iso_currency_code, " +
+		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
+		"t.category_override, t.pending, " +
+		"EXISTS(SELECT 1 FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'category_set' AND ann.actor_type = 'agent') AS agent_reviewed, " +
+		"EXISTS(SELECT 1 FROM transaction_tags tt JOIN tags tag ON tag.id = tt.tag_id WHERE tt.transaction_id = t.id AND tag.slug = 'needs-review') AS has_pending_review, " +
+		"t.created_at, t.updated_at, " +
+		"COALESCE(t.attributed_user_id, bc.user_id) AS effective_user_id " +
+		"FROM transactions t " +
+		"LEFT JOIN accounts a ON t.account_id = a.id " +
+		"LEFT JOIN bank_connections bc ON a.connection_id = bc.id " +
+		"LEFT JOIN users u ON bc.user_id = u.id " +
+		"LEFT JOIN users au ON t.attributed_user_id = au.id " +
+		"LEFT JOIN categories c ON t.category_id = c.id " +
+		"LEFT JOIN categories pc ON c.parent_id = pc.id " +
+		"WHERE t.deleted_at IS NULL AND t.id = ANY($1)"
+
+	rows, err := s.Pool.Query(ctx, query, uuids)
+	if err != nil {
+		return nil, fmt.Errorf("query admin transactions by ids: %w", err)
+	}
+	defer rows.Close()
+
+	byID := make(map[string]AdminTransactionRow, len(uuids))
+	for rows.Next() {
+		var (
+			id               pgtype.UUID
+			accountID        pgtype.UUID
+			accountName      string
+			institutionName  string
+			userName         string
+			date             pgtype.Date
+			name             string
+			merchantName     pgtype.Text
+			amount           pgtype.Numeric
+			isoCurrencyCode  pgtype.Text
+			categoryID       pgtype.UUID
+			catDisplayName   pgtype.Text
+			catSlug          pgtype.Text
+			catIcon          pgtype.Text
+			catColor         pgtype.Text
+			categoryOverride bool
+			pending          bool
+			agentReviewed    bool
+			hasPendingReview bool
+			createdAt        pgtype.Timestamptz
+			updatedAt        pgtype.Timestamptz
+			effectiveUserID  pgtype.UUID
+		)
+		if err := rows.Scan(
+			&id, &accountID, &accountName,
+			&institutionName, &userName,
+			&date, &name, &merchantName, &amount, &isoCurrencyCode,
+			&categoryID, &catDisplayName, &catSlug, &catIcon, &catColor,
+			&categoryOverride, &pending, &agentReviewed, &hasPendingReview, &createdAt, &updatedAt,
+			&effectiveUserID,
+		); err != nil {
+			return nil, fmt.Errorf("scan admin transaction: %w", err)
+		}
+
+		amountVal := 0.0
+		if f := numericFloat(amount); f != nil {
+			amountVal = *f
+		}
+		var dateVal string
+		if ds := dateStr(date); ds != nil {
+			dateVal = *ds
+		}
+		var catIDPtr *string
+		if categoryID.Valid {
+			s := formatUUID(categoryID)
+			catIDPtr = &s
+		}
+		row := AdminTransactionRow{
+			ID:                  formatUUID(id),
+			AccountID:           formatUUID(accountID),
+			AccountName:         accountName,
+			InstitutionName:     institutionName,
+			UserName:            userName,
+			EffectiveUserID:     uuidPtr(effectiveUserID),
+			Date:                dateVal,
+			Name:                name,
+			MerchantName:        textPtr(merchantName),
+			Amount:              amountVal,
+			IsoCurrencyCode:     textPtr(isoCurrencyCode),
+			CategoryID:          catIDPtr,
+			CategoryDisplayName: textPtr(catDisplayName),
+			CategorySlug:        textPtr(catSlug),
+			CategoryIcon:        textPtr(catIcon),
+			CategoryColor:       textPtr(catColor),
+			CategoryOverride:    categoryOverride,
+			Pending:             pending,
+			AgentReviewed:       agentReviewed,
+			HasPendingReview:    hasPendingReview,
+			CreatedAt:           createdAt.Time.UTC().Format(time.RFC3339),
+			UpdatedAt:           updatedAt.Time.UTC().Format(time.RFC3339),
+		}
+		byID[row.ID] = row
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate admin transactions by ids: %w", err)
+	}
+
+	// Reassemble in input order, skipping IDs that didn't resolve or were not
+	// found. Avoid re-resolving short IDs by sorting on the pre-built order map.
+	out := make([]AdminTransactionRow, 0, len(byID))
+	indexed := make([]struct {
+		idx int
+		row AdminTransactionRow
+	}, 0, len(byID))
+	for id, row := range byID {
+		indexed = append(indexed, struct {
+			idx int
+			row AdminTransactionRow
+		}{idx: order[id], row: row})
+	}
+	sort.Slice(indexed, func(i, j int) bool { return indexed[i].idx < indexed[j].idx })
+	for _, item := range indexed {
+		out = append(out, item.row)
+	}
+	_ = order // used above
+	return out, nil
 }
 
 func (s *Service) ListDistinctCategories(ctx context.Context) ([]CategoryPair, error) {

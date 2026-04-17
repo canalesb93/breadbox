@@ -279,6 +279,43 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		// Recent applications
 		applications, hasMoreApps, _ := svc.ListRuleApplications(ctx, id, 10, "")
 
+		// Hydrate application rows with AdminTransactionRow data so the shared
+		// tx-row-compact partial can render them (category avatar, account, user,
+		// agent-reviewed flag, pending state). Preserves order.
+		applicationTxns := make([]service.AdminTransactionRow, 0, len(applications))
+		applicationMeta := make(map[string]struct {
+			ActionField string
+			ActionValue string
+			AppliedBy   string
+		}, len(applications))
+		if len(applications) > 0 {
+			txnIDs := make([]string, 0, len(applications))
+			for _, a := range applications {
+				txnIDs = append(txnIDs, a.TransactionID)
+				applicationMeta[a.TransactionID] = struct {
+					ActionField string
+					ActionValue string
+					AppliedBy   string
+				}{ActionField: a.ActionField, ActionValue: a.ActionValue, AppliedBy: a.AppliedBy}
+			}
+			if rows, err := svc.GetAdminTransactionRowsByIDs(ctx, txnIDs); err == nil {
+				applicationTxns = rows
+			}
+		}
+
+		// Hydrate preview matches the same way so the pending-matches table can
+		// reuse the compact partial.
+		var previewTxns []service.AdminTransactionRow
+		if preview != nil && len(preview.SampleMatches) > 0 {
+			txnIDs := make([]string, 0, len(preview.SampleMatches))
+			for _, m := range preview.SampleMatches {
+				txnIDs = append(txnIDs, m.TransactionID)
+			}
+			if rows, err := svc.GetAdminTransactionRowsByIDs(ctx, txnIDs); err == nil {
+				previewTxns = rows
+			}
+		}
+
 		// Sync history where this rule matched
 		syncHistory, _ := svc.GetRuleSyncHistory(ctx, id, 10)
 
@@ -296,6 +333,9 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		data["Preview"] = preview
 		data["Stats"] = stats
 		data["Applications"] = applications
+		data["ApplicationTxns"] = applicationTxns
+		data["ApplicationMeta"] = applicationMeta
+		data["PreviewTxns"] = previewTxns
 		data["HasMoreApplications"] = hasMoreApps
 		data["SyncHistory"] = syncHistory
 		data["ActionCategoryName"] = actionCategoryName

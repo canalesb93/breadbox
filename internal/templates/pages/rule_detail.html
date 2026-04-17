@@ -229,45 +229,38 @@
   <span class="label-text text-sm font-medium">Recent Applications</span>
   <p class="text-xs text-base-content/40 mb-3">Transactions this rule has touched during syncs</p>
 
-  {{if .Applications}}
-  <div class="overflow-x-auto">
-    <table class="table table-sm">
-      <thead>
-        <tr>
-          <th class="text-xs">Transaction</th>
-          <th class="text-xs text-right">Amount</th>
-          <th class="text-xs">Date</th>
-          <th class="text-xs">Action</th>
-          <th class="text-xs">How</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{range .Applications}}
-        <tr>
-          <td class="text-sm"><a href="/transactions/{{.TransactionID}}" class="hover:text-primary">{{.TransactionName}}</a></td>
-          <td class="text-sm text-right tabular-nums bb-amount">{{printf "%.2f" .Amount}}</td>
-          <td class="text-sm text-base-content/60">{{.Date}}</td>
-          <td class="text-sm">
-            {{if eq .ActionField "category"}}
-            <span class="inline-flex items-center gap-1"><i data-lucide="tag" class="w-3 h-3 text-base-content/40"></i><span class="badge badge-outline badge-xs">{{.ActionValue}}</span></span>
-            {{else if eq .ActionField "tag"}}
-            <span class="inline-flex items-center gap-1"><i data-lucide="hash" class="w-3 h-3 text-warning"></i><span class="badge badge-soft badge-warning badge-xs">{{.ActionValue}}</span></span>
-            {{else if eq .ActionField "comment"}}
-            <span class="inline-flex items-center gap-1"><i data-lucide="message-square" class="w-3 h-3 text-secondary"></i><span class="text-xs text-base-content/60">comment added</span></span>
-            {{else}}
-            <span class="badge badge-outline badge-xs">{{.ActionValue}}</span>
-            {{end}}
-          </td>
-          <td class="text-sm text-base-content/60">
-            {{if eq .AppliedBy "sync"}}During sync{{else if eq .AppliedBy "retroactive"}}Retroactive{{else}}Manual{{end}}
-          </td>
-        </tr>
-        {{end}}
-      </tbody>
-    </table>
+  {{if .ApplicationTxns}}
+  <div class="px-1">
+    {{range .ApplicationTxns}}
+    {{$meta := index $.ApplicationMeta .ID}}
+    {{template "tx-row-compact" .}}
+    <!-- Action + how: thin secondary row under the compact txn. -->
+    <div class="flex items-center gap-2 pl-11 pr-2 -mt-1 mb-1 text-[0.65rem] text-base-content/40">
+      {{if eq $meta.ActionField "category"}}
+      <span class="inline-flex items-center gap-1">
+        <i data-lucide="tag" class="w-3 h-3"></i>
+        <span class="truncate">Set category <span class="text-base-content/60">{{$meta.ActionValue}}</span></span>
+      </span>
+      {{else if eq $meta.ActionField "tag"}}
+      <span class="inline-flex items-center gap-1 text-warning/70">
+        <i data-lucide="hash" class="w-3 h-3"></i>
+        <span class="truncate">Tag <span class="font-medium">{{$meta.ActionValue}}</span></span>
+      </span>
+      {{else if eq $meta.ActionField "comment"}}
+      <span class="inline-flex items-center gap-1">
+        <i data-lucide="message-square" class="w-3 h-3"></i>
+        <span>Comment added</span>
+      </span>
+      {{end}}
+      <span class="text-base-content/20">&middot;</span>
+      <span class="uppercase tracking-wider text-base-content/30">
+        {{if eq $meta.AppliedBy "sync"}}sync{{else if eq $meta.AppliedBy "retroactive"}}retro{{else}}manual{{end}}
+      </span>
+    </div>
+    {{end}}
   </div>
   {{if .HasMoreApplications}}
-  <p class="text-xs text-base-content/40 mt-2">Showing most recent 10</p>
+  <p class="text-xs text-base-content/40 mt-2 px-1">Showing most recent 10</p>
   {{end}}
   {{else}}
   <div class="text-center py-6 text-base-content/40 text-sm">
@@ -288,6 +281,13 @@
   </div>
   <p class="text-xs text-base-content/40 mb-3">These existing transactions match the rule but haven't been touched by it yet.</p>
 
+  {{if .PreviewTxns}}
+  <div class="px-1">
+    {{range .PreviewTxns}}
+    {{template "tx-row-compact" .}}
+    {{end}}
+  </div>
+  {{else}}
   <div class="overflow-x-auto">
     <table class="table table-sm">
       <thead>
@@ -316,6 +316,7 @@
       </tbody>
     </table>
   </div>
+  {{end}}
   {{if gt .Preview.MatchCount 10}}
   <p class="text-xs text-base-content/40 mt-2">Showing 10 of {{commaInt .Preview.MatchCount}}</p>
   {{end}}
