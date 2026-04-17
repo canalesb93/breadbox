@@ -27,59 +27,65 @@
 
 <!-- Reports Inbox -->
 {{if .Reports}}
-<div class="bb-card overflow-hidden bb-stagger" x-data="reportsPage()">
+<div class="bb-card bb-stagger" x-data="reportsPage()">
   <div class="divide-y divide-base-200/60">
     {{range .Reports}}
     <a href="/reports/{{.ID}}"
-      class="group relative flex items-start gap-3 px-4 sm:px-5 py-4 hover:bg-base-200/40 transition-all duration-300 no-underline
-        {{if eq .Priority "critical"}}border-l-[3px] border-l-error/80
-        {{else if eq .Priority "warning"}}border-l-[3px] border-l-warning/80
-        {{else if not .IsRead}}border-l-[3px] border-l-primary/60
-        {{else}}border-l-[3px] border-l-transparent{{end}}"
-      :class="dismissed['{{.ID}}'] ? 'opacity-0 h-0 overflow-hidden !p-0 !border-l-0' : ''"
+      class="group relative block px-4 sm:px-5 py-4 hover:bg-base-200/30 transition-all duration-300 no-underline"
+      :class="dismissed['{{.ID}}'] ? 'opacity-0 h-0 overflow-hidden !p-0' : ''"
       id="report-{{.ID}}">
+      <div class="flex items-start gap-3">
 
-      <!-- Avatar -->
-      <div class="relative shrink-0 mt-0.5">
-        <div class="w-10 h-10 rounded-xl flex items-center justify-center
-          {{if eq .Priority "critical"}}bg-error/15 text-error
-          {{else if eq .Priority "warning"}}bg-warning/15 text-warning
-          {{else}}bg-primary/10 text-primary{{end}}">
+        <!-- Avatar -->
+        <div class="w-9 h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-primary/10 text-primary">
           <i data-lucide="bot" class="w-4 h-4"></i>
         </div>
-        {{if not .IsRead}}
-        <span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary ring-2 ring-base-100"></span>
-        {{end}}
-      </div>
 
-      <!-- Message content -->
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center flex-wrap gap-2 text-xs mb-1">
-          <span class="font-semibold text-base-content/80">{{.DisplayAuthor}}</span>
-          {{if eq .Priority "critical"}}
-          <span class="text-[0.6rem] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-error/10 text-error/90">Critical</span>
-          {{else if eq .Priority "warning"}}
-          <span class="text-[0.6rem] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-warning/15 text-warning">Warning</span>
-          {{end}}
-          {{range .Tags}}
-          <span class="text-[0.6rem] px-1.5 py-0.5 rounded-full bg-base-200/80 text-base-content/50">{{.}}</span>
-          {{end}}
-          <span class="ml-auto text-base-content/30 shrink-0">{{.CreatedAt}}</span>
+        <!-- Message content -->
+        <div class="flex-1 min-w-0">
+          <!-- Meta row -->
+          <div class="flex items-center flex-wrap gap-2 text-xs mb-1.5">
+            <span class="font-semibold text-base-content/80">{{.DisplayAuthor}}</span>
+            <span class="text-base-content/30">{{.CreatedAt}}</span>
+            {{if eq .Priority "critical"}}
+            <span class="relative inline-flex w-2 h-2 shrink-0">
+              <span class="animate-ping absolute inline-flex w-full h-full rounded-full bg-error/60"></span>
+              <span class="relative inline-flex w-2 h-2 rounded-full bg-error"></span>
+            </span>
+            <span class="text-[0.6rem] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-error/10 text-error/90">Critical</span>
+            {{else if eq .Priority "warning"}}
+            <span class="w-2 h-2 rounded-full bg-warning shrink-0"></span>
+            <span class="text-[0.6rem] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-warning/15 text-warning">Warning</span>
+            {{end}}
+            {{range .Tags}}
+            <span class="text-[0.6rem] px-1.5 py-0.5 rounded-full bg-base-200/80 text-base-content/50">{{.}}</span>
+            {{end}}
+            {{if not .IsRead}}
+            <span class="w-1.5 h-1.5 rounded-full bg-primary shrink-0" title="Unread"></span>
+            {{end}}
+          </div>
+
+          <!-- Title as message bubble -->
+          <div class="inline-block max-w-full rounded-2xl rounded-tl-sm shadow-sm px-3.5 py-2.5 transition-colors
+            {{if eq .Priority "critical"}}bg-error/10 group-hover:bg-error/15
+            {{else if eq .Priority "warning"}}bg-warning/10 group-hover:bg-warning/15
+            {{else}}bg-base-200/70 group-hover:bg-base-200/90{{end}}">
+            <p class="text-sm leading-relaxed {{if .IsRead}}text-base-content/70{{else}}text-base-content{{end}} group-hover:text-base-content transition-colors">{{.Title}}</p>
+            {{if .Preview}}
+            <p class="text-xs text-base-content/40 mt-1 line-clamp-1">{{.Preview}}</p>
+            {{end}}
+          </div>
         </div>
-        <p class="text-[0.975rem] leading-snug {{if .IsRead}}text-base-content/70{{else}}text-base-content font-medium{{end}} group-hover:text-base-content transition-colors">{{.Title}}</p>
-        {{if .Preview}}
-        <p class="text-xs text-base-content/40 mt-1 line-clamp-1">{{.Preview}}</p>
-        {{end}}
-      </div>
 
-      <!-- Actions -->
-      <div class="flex items-center gap-1 shrink-0 self-center">
-        {{if not .IsRead}}
-        <button @click.prevent.stop="markRead('{{.ID}}')" class="btn btn-ghost btn-xs rounded-lg cursor-pointer text-base-content/40 hover:text-success hover:bg-success/10" title="Mark as read">
-          <i data-lucide="check" class="w-4 h-4"></i>
-        </button>
-        {{end}}
-        <i data-lucide="chevron-right" class="w-4 h-4 text-base-content/25 group-hover:text-base-content/50 transition-colors"></i>
+        <!-- Actions -->
+        <div class="flex items-center gap-1 shrink-0 self-center">
+          {{if not .IsRead}}
+          <button @click.prevent.stop="markRead('{{.ID}}')" class="btn btn-ghost btn-xs rounded-lg cursor-pointer text-base-content/40 hover:text-success hover:bg-success/10" title="Mark as read">
+            <i data-lucide="check" class="w-4 h-4"></i>
+          </button>
+          {{end}}
+          <i data-lucide="chevron-right" class="w-4 h-4 text-base-content/25 group-hover:text-base-content/50 transition-colors"></i>
+        </div>
       </div>
     </a>
     {{end}}
