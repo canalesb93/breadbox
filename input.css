@@ -1252,7 +1252,7 @@
   }
 
   .bb-cmdk-item {
-    @apply flex items-center gap-3 px-4 py-2 mx-2 rounded-lg text-sm cursor-pointer;
+    @apply mx-2 rounded-lg text-sm cursor-pointer;
     transition: background-color 0.1s ease, color 0.1s ease;
   }
 
@@ -1269,6 +1269,10 @@
     .bb-cmdk-item[data-active="true"] {
       @apply bg-primary/12;
     }
+  }
+
+  .bb-cmdk-generic {
+    @apply flex items-center gap-3 px-4 py-2;
   }
 
   .bb-cmdk-item-icon {
@@ -1303,6 +1307,63 @@
 
   .bb-cmdk-item-shortcut {
     @apply flex items-center gap-1 shrink-0;
+  }
+
+  /* ── Transaction result variant — mirrors the main tx-row layout ── */
+  .bb-cmdk-tx {
+    @apply flex items-center gap-3 px-4 py-2;
+  }
+
+  .bb-cmdk-tx-avatar {
+    --avatar-color: oklch(0.65 0 0);
+    @apply w-8 h-8 rounded-lg flex items-center justify-center shrink-0;
+    background-color: color-mix(in srgb, var(--avatar-color) 15%, transparent);
+    color: var(--avatar-color);
+  }
+
+  .bb-cmdk-tx-avatar svg,
+  .bb-cmdk-tx-avatar i {
+    @apply w-4 h-4;
+  }
+
+  .bb-cmdk-tx-main {
+    @apply flex-1 min-w-0;
+  }
+
+  .bb-cmdk-tx-title-row {
+    @apply flex items-center gap-2;
+  }
+
+  .bb-cmdk-tx-title {
+    @apply text-sm font-medium truncate;
+  }
+
+  .bb-cmdk-tx-meta {
+    @apply flex items-center gap-1.5 mt-0.5 text-xs text-base-content/45 min-w-0;
+  }
+
+  .bb-cmdk-tx-meta > .truncate {
+    @apply min-w-0;
+  }
+
+  .bb-cmdk-tx-user {
+    @apply text-base-content/55 shrink-0;
+  }
+
+  .bb-cmdk-tx-sep {
+    @apply text-base-content/20 shrink-0;
+  }
+
+  .bb-cmdk-tx-cat {
+    @apply inline-flex items-center gap-1 shrink-0 min-w-0;
+  }
+
+  .bb-cmdk-tx-right {
+    @apply flex flex-col items-end shrink-0 leading-tight;
+  }
+
+  .bb-cmdk-tx-date {
+    @apply text-[0.65rem] text-base-content/40 tabular-nums;
   }
 
   .bb-cmdk-kbd {

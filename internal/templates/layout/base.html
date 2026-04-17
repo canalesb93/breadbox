@@ -569,39 +569,97 @@
             <template x-if="group._loading">
               <div>
                 <div class="bb-cmdk-item" style="pointer-events:none">
-                  <div class="bb-cmdk-item-icon"><div class="w-4 h-4 bg-base-300/40 rounded animate-pulse"></div></div>
-                  <div class="bb-cmdk-item-label"><div class="h-3.5 bg-base-300/40 rounded w-36 animate-pulse"></div><div class="h-2.5 bg-base-300/30 rounded w-48 mt-1.5 animate-pulse"></div></div>
+                  <div class="bb-cmdk-generic">
+                    <div class="bb-cmdk-item-icon"><div class="w-4 h-4 bg-base-300/40 rounded animate-pulse"></div></div>
+                    <div class="bb-cmdk-item-label"><div class="h-3.5 bg-base-300/40 rounded w-36 animate-pulse"></div><div class="h-2.5 bg-base-300/30 rounded w-48 mt-1.5 animate-pulse"></div></div>
+                  </div>
                 </div>
                 <div class="bb-cmdk-item" style="pointer-events:none">
-                  <div class="bb-cmdk-item-icon"><div class="w-4 h-4 bg-base-300/40 rounded animate-pulse"></div></div>
-                  <div class="bb-cmdk-item-label"><div class="h-3.5 bg-base-300/40 rounded w-44 animate-pulse"></div><div class="h-2.5 bg-base-300/30 rounded w-40 mt-1.5 animate-pulse"></div></div>
+                  <div class="bb-cmdk-generic">
+                    <div class="bb-cmdk-item-icon"><div class="w-4 h-4 bg-base-300/40 rounded animate-pulse"></div></div>
+                    <div class="bb-cmdk-item-label"><div class="h-3.5 bg-base-300/40 rounded w-44 animate-pulse"></div><div class="h-2.5 bg-base-300/30 rounded w-40 mt-1.5 animate-pulse"></div></div>
+                  </div>
                 </div>
                 <div class="bb-cmdk-item" style="pointer-events:none">
-                  <div class="bb-cmdk-item-icon"><div class="w-4 h-4 bg-base-300/40 rounded animate-pulse"></div></div>
-                  <div class="bb-cmdk-item-label"><div class="h-3.5 bg-base-300/40 rounded w-32 animate-pulse"></div><div class="h-2.5 bg-base-300/30 rounded w-52 mt-1.5 animate-pulse"></div></div>
+                  <div class="bb-cmdk-generic">
+                    <div class="bb-cmdk-item-icon"><div class="w-4 h-4 bg-base-300/40 rounded animate-pulse"></div></div>
+                    <div class="bb-cmdk-item-label"><div class="h-3.5 bg-base-300/40 rounded w-32 animate-pulse"></div><div class="h-2.5 bg-base-300/30 rounded w-52 mt-1.5 animate-pulse"></div></div>
+                  </div>
                 </div>
               </div>
             </template>
             <!-- Real items -->
             <template x-for="(item, ii) in group.items" :key="item.id">
               <div class="bb-cmdk-item"
+                   :class="item._kind === 'tx' ? 'bb-cmdk-item--tx' : ''"
                    :data-active="activeIndex === item._flatIndex"
                    :data-cmdk-idx="item._flatIndex"
                    @click="go(item)"
                    @mouseenter="activeIndex = item._flatIndex">
-                <div class="bb-cmdk-item-icon" :style="item.iconColor ? 'background-color: color-mix(in srgb, ' + item.iconColor + ' 15%, transparent); color: ' + item.iconColor : ''">
-                  <i :data-lucide="item.icon"></i>
-                </div>
-                <div class="bb-cmdk-item-label">
-                  <div class="bb-cmdk-item-title" x-text="item.title"></div>
-                  <template x-if="item.desc">
-                    <div class="bb-cmdk-item-desc" x-text="item.desc"></div>
-                  </template>
-                </div>
-                <template x-if="item.shortcut">
-                  <div class="bb-cmdk-item-shortcut">
-                    <template x-for="k in item.shortcut" :key="k">
-                      <span class="bb-cmdk-kbd" x-text="k"></span>
+                <!-- Transaction variant: mirrors the tx-row layout in the list -->
+                <template x-if="item._kind === 'tx'">
+                  <div class="bb-cmdk-tx">
+                    <div class="bb-cmdk-tx-avatar"
+                         :style="item.iconColor ? '--avatar-color: ' + item.iconColor : ''">
+                      <i :data-lucide="item.icon"></i>
+                    </div>
+                    <div class="bb-cmdk-tx-main">
+                      <div class="bb-cmdk-tx-title-row">
+                        <span class="bb-cmdk-tx-title" x-text="item.title"></span>
+                        <template x-if="item.tx.pending">
+                          <span class="badge badge-soft badge-xs badge-warning rounded-md shrink-0">Pending</span>
+                        </template>
+                      </div>
+                      <div class="bb-cmdk-tx-meta">
+                        <template x-if="item.tx.userName">
+                          <span class="bb-cmdk-tx-user" x-text="item.tx.userName.split(' ')[0]"></span>
+                        </template>
+                        <template x-if="item.tx.userName && item.tx.account">
+                          <span class="bb-cmdk-tx-sep">&middot;</span>
+                        </template>
+                        <template x-if="item.tx.account">
+                          <span class="truncate" x-text="item.tx.account"></span>
+                        </template>
+                        <template x-if="item.tx.categoryName">
+                          <span class="bb-cmdk-tx-sep">&middot;</span>
+                        </template>
+                        <template x-if="item.tx.categoryName">
+                          <span class="bb-cmdk-tx-cat">
+                            <template x-if="item.tx.categoryColor">
+                              <span class="bb-cat-dot" :style="'background-color:' + item.tx.categoryColor"></span>
+                            </template>
+                            <span class="truncate" x-text="item.tx.categoryName"></span>
+                          </span>
+                        </template>
+                      </div>
+                    </div>
+                    <div class="bb-cmdk-tx-right">
+                      <div class="bb-cmdk-tx-date" x-text="item.tx.dateLabel"></div>
+                      <div class="bb-tx-amount tabular-nums"
+                           :class="item.tx.amount < 0 ? 'bb-tx-amount--income' : ''"
+                           x-text="item.tx.amountLabel"></div>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Generic command / action variant -->
+                <template x-if="item._kind !== 'tx'">
+                  <div class="bb-cmdk-generic">
+                    <div class="bb-cmdk-item-icon" :style="item.iconColor ? 'background-color: color-mix(in srgb, ' + item.iconColor + ' 15%, transparent); color: ' + item.iconColor : ''">
+                      <i :data-lucide="item.icon"></i>
+                    </div>
+                    <div class="bb-cmdk-item-label">
+                      <div class="bb-cmdk-item-title" x-text="item.title"></div>
+                      <template x-if="item.desc">
+                        <div class="bb-cmdk-item-desc" x-text="item.desc"></div>
+                      </template>
+                    </div>
+                    <template x-if="item.shortcut">
+                      <div class="bb-cmdk-item-shortcut">
+                        <template x-for="k in item.shortcut" :key="k">
+                          <span class="bb-cmdk-kbd" x-text="k"></span>
+                        </template>
+                      </div>
                     </template>
                   </div>
                 </template>
@@ -1307,19 +1365,25 @@
             .then(function(items) {
               self._txLoading = false;
               self._txResults = items.map(function(tx) {
-                var sign = tx.amount >= 0 ? '-' : '+';
-                var abs = Math.abs(tx.amount).toFixed(2);
-                var desc = sign + '$' + abs + '  ·  ' + tx.date;
-                if (tx.account) desc += '  ·  ' + tx.account;
                 return {
                   id: 'tx-' + tx.id,
                   group: 'Transactions',
+                  _kind: 'tx',
                   title: tx.name,
-                  desc: desc,
-                  icon: tx.pending ? 'clock' : (tx.category_icon || 'receipt'),
+                  icon: tx.category_icon || 'receipt',
                   iconColor: tx.category_color || null,
                   href: '/transactions/' + tx.id,
-                  keywords: ''
+                  keywords: '',
+                  tx: {
+                    amount: tx.amount,
+                    amountLabel: tx.amount_label,
+                    dateLabel: tx.date_label,
+                    account: tx.account || '',
+                    userName: tx.user_name || '',
+                    pending: !!tx.pending,
+                    categoryName: tx.category_display_name || '',
+                    categoryColor: tx.category_color || ''
+                  }
                 };
               });
               setTimeout(function() {

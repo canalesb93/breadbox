@@ -1156,29 +1156,46 @@ func QuickSearchTransactionsHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		type txResult struct {
-			ID            string  `json:"id"`
-			Name          string  `json:"name"`
-			Amount        float64 `json:"amount"`
-			Date          string  `json:"date"`
-			Account       string  `json:"account"`
-			Merchant      *string `json:"merchant,omitempty"`
-			Pending       bool    `json:"pending,omitempty"`
-			CategoryIcon  *string `json:"category_icon,omitempty"`
-			CategoryColor *string `json:"category_color,omitempty"`
+			ID                  string  `json:"id"`
+			Name                string  `json:"name"`
+			Amount              float64 `json:"amount"`
+			AmountLabel         string  `json:"amount_label"`
+			Date                string  `json:"date"`
+			DateLabel           string  `json:"date_label"`
+			Account             string  `json:"account"`
+			Merchant            *string `json:"merchant,omitempty"`
+			UserName            string  `json:"user_name,omitempty"`
+			Pending             bool    `json:"pending,omitempty"`
+			CategoryIcon        *string `json:"category_icon,omitempty"`
+			CategoryColor       *string `json:"category_color,omitempty"`
+			CategoryDisplayName *string `json:"category_display_name,omitempty"`
 		}
 
 		items := make([]txResult, 0, len(result.Transactions))
 		for _, tx := range result.Transactions {
+			amountAbs := math.Abs(tx.Amount)
+			amountLabel := formatCurrency(amountAbs)
+			if tx.Amount < 0 {
+				amountLabel = "-" + amountLabel
+			}
+			dateLabel := tx.Date
+			if t, err := time.Parse("2006-01-02", tx.Date); err == nil {
+				dateLabel = t.Format("Jan 2")
+			}
 			items = append(items, txResult{
-				ID:            tx.ID,
-				Name:          tx.Name,
-				Amount:        tx.Amount,
-				Date:          tx.Date,
-				Account:       tx.AccountName,
-				Merchant:      tx.MerchantName,
-				Pending:       tx.Pending,
-				CategoryIcon:  tx.CategoryIcon,
-				CategoryColor: tx.CategoryColor,
+				ID:                  tx.ID,
+				Name:                tx.Name,
+				Amount:              tx.Amount,
+				AmountLabel:         amountLabel,
+				Date:                tx.Date,
+				DateLabel:           dateLabel,
+				Account:             tx.AccountName,
+				Merchant:            tx.MerchantName,
+				UserName:            tx.UserName,
+				Pending:             tx.Pending,
+				CategoryIcon:        tx.CategoryIcon,
+				CategoryColor:       tx.CategoryColor,
+				CategoryDisplayName: tx.CategoryDisplayName,
 			})
 		}
 
