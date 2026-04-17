@@ -442,13 +442,44 @@ func TestTriggerLabel(t *testing.T) {
 	tests := map[string]string{
 		"":          "On create",
 		"on_create": "On create",
-		"on_update": "On update",
+		"on_change": "On change",
+		"on_update": "On change", // legacy alias
 		"always":    "Always",
 		"weird":     "weird",
 	}
 	for in, want := range tests {
 		if got := TriggerLabel(in); got != want {
 			t.Errorf("TriggerLabel(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestNormalizeTrigger(t *testing.T) {
+	cases := []struct {
+		in     string
+		out    string
+		errful bool
+	}{
+		{"", "on_create", false},
+		{"on_create", "on_create", false},
+		{"on_change", "on_change", false},
+		{"on_update", "on_change", false}, // legacy alias normalized
+		{"always", "always", false},
+		{"nonsense", "", true},
+	}
+	for _, tc := range cases {
+		got, err := normalizeTrigger(tc.in)
+		if tc.errful {
+			if err == nil {
+				t.Errorf("normalizeTrigger(%q) expected error", tc.in)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("normalizeTrigger(%q) unexpected err: %v", tc.in, err)
+		}
+		if got != tc.out {
+			t.Errorf("normalizeTrigger(%q) = %q want %q", tc.in, got, tc.out)
 		}
 	}
 }

@@ -493,7 +493,7 @@ type CreateTransactionRuleParams struct {
 	Conditions   Condition
 	Actions      []RuleAction // if set, takes precedence over CategorySlug
 	CategorySlug string       // sugar for actions: [{"type":"set_category","category_slug":slug}]
-	Trigger      string       // "on_create" (default), "on_update", or "always"
+	Trigger      string       // "on_create" (default), "on_change", or "always" ("on_update" accepted as alias)
 	Priority     int
 	ExpiresIn    string // e.g., "30d", "24h"
 	Actor        Actor

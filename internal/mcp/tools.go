@@ -631,7 +631,7 @@ type createTransactionRuleInput struct {
 	Conditions         map[string]any      `json:"conditions,omitempty" jsonschema:"JSON condition object. Omit or pass {} to match every transaction. Simple: {\"field\":\"name\",\"op\":\"contains\",\"value\":\"uber\"}. AND/OR/NOT. Fields: name merchant_name amount category_primary category_detailed pending provider account_id user_id user_name tags. Ops: eq neq contains not_contains matches(regex) gt gte lt lte in."`
 	Actions            []map[string]string `json:"actions,omitempty" jsonschema:"Array of typed actions. {\"type\":\"set_category\",\"category_slug\":\"...\"}, {\"type\":\"add_tag\",\"tag_slug\":\"...\"}, or {\"type\":\"add_comment\",\"content\":\"...\"}. If omitted, use category_slug instead."`
 	CategorySlug       string              `json:"category_slug,omitempty" jsonschema:"Shorthand for actions: [{\"type\":\"set_category\",\"category_slug\":\"<slug>\"}]. Either actions or category_slug is required."`
-	Trigger            string              `json:"trigger,omitempty" jsonschema:"When the rule fires: 'on_create' (default — new transactions), 'on_update' (only on re-sync changes), 'always' (both)."`
+	Trigger            string              `json:"trigger,omitempty" jsonschema:"When the rule fires: 'on_create' (default — new transactions), 'on_change' (only on re-sync changes), 'always' (both). 'on_update' is accepted as a legacy alias for 'on_change'."`
 	Priority           int                 `json:"priority,omitempty" jsonschema:"Priority (higher wins when multiple rules set the same field). Default 10."`
 	ExpiresIn          string              `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
 	ApplyRetroactively bool                `json:"apply_retroactively,omitempty" jsonschema:"If true, immediately apply this rule to all existing non-overridden transactions after creation."`
@@ -654,7 +654,7 @@ type updateTransactionRuleInput struct {
 	Conditions   map[string]any       `json:"conditions,omitempty" jsonschema:"New condition tree (same format as create). Pass {} to change to match-all."`
 	Actions      *[]map[string]string `json:"actions,omitempty" jsonschema:"Replace actions array with typed actions. Each: {\"type\":\"set_category\",\"category_slug\":\"...\"} or {\"type\":\"add_tag\",\"tag_slug\":\"...\"} or {\"type\":\"add_comment\",\"content\":\"...\"}."`
 	CategorySlug *string              `json:"category_slug,omitempty" jsonschema:"Shorthand: replace the set_category action. Other actions are kept."`
-	Trigger      *string              `json:"trigger,omitempty" jsonschema:"New trigger: on_create, on_update, or always."`
+	Trigger      *string              `json:"trigger,omitempty" jsonschema:"New trigger: on_create, on_change, or always. 'on_update' accepted as alias for on_change."`
 	Priority     *int                 `json:"priority,omitempty" jsonschema:"New priority"`
 	Enabled      *bool                `json:"enabled,omitempty" jsonschema:"Enable or disable the rule"`
 	ExpiresAt    *string              `json:"expires_at,omitempty" jsonschema:"New expiry timestamp (RFC3339) or empty string to clear"`
@@ -675,7 +675,7 @@ type batchRuleItem struct {
 	Actions      []map[string]string `json:"actions,omitempty" jsonschema:"Actions array (typed — same format as create_transaction_rule)"`
 	CategorySlug string              `json:"category_slug,omitempty" jsonschema:"Shorthand for set_category action. Either actions or category_slug required."`
 	Conditions   map[string]any      `json:"conditions,omitempty" jsonschema:"Condition tree as JSON object. Omit or {} for match-all."`
-	Trigger      string              `json:"trigger,omitempty" jsonschema:"on_create (default), on_update, or always."`
+	Trigger      string              `json:"trigger,omitempty" jsonschema:"on_create (default), on_change, or always. 'on_update' accepted as alias for on_change."`
 	Priority     int                 `json:"priority,omitempty" jsonschema:"Priority (default 10)"`
 	ExpiresIn    string              `json:"expires_in,omitempty" jsonschema:"Optional expiry duration"`
 }

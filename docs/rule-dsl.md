@@ -158,10 +158,12 @@ The `trigger` field controls when the rule runs during sync.
 | Trigger     | Fires on new (first-synced) transactions | Fires on changed re-synced transactions |
 | ----------- | :--------------------------------------: | :-------------------------------------: |
 | `on_create` |                    ✅                    |                   ❌                    |
-| `on_update` |                    ❌                    |                   ✅                    |
+| `on_change` |                    ❌                    |                   ✅                    |
 | `always`    |                    ✅                    |                   ✅                    |
 
 A transaction is "changed" when the provider returned a different version of an existing row; a truly-unchanged re-sync runs no rules. Default trigger when omitted: `on_create`.
+
+> **Legacy alias.** `on_update` is accepted as a synonym for `on_change` in all inputs (admin UI, MCP, REST). The service normalizes it to `on_change` on write. Pre-existing rows stored as `on_update` continue to fire — the sync resolver treats both values identically.
 
 Retroactive apply (`apply_rules`) ignores trigger — it's a bulk operation intended to evaluate a rule's condition across the entire history regardless of when the transaction was ingested.
 
@@ -206,7 +208,6 @@ The rule engine has two entry points. They share condition evaluation and priori
 
 ## Roadmap (not yet shipped)
 
-- **`on_change` trigger.** `on_update` will be renamed to `on_change` with a DB-level alias for back-compat. Semantics unchanged.
 - **New condition fields.** `category` (assigned category slug, distinct from `category_primary` raw provider field) and `account_name`. *Note:* the resolver already mutates a local `Category` slot during chaining; the public condition field is wired up in the next phase.
 - **New action.** `remove_tag`, symmetric with `add_tag`; useful for clearing transient tags like `needs-review` once a higher-priority-stage rule has pre-categorized the transaction.
 

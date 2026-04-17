@@ -555,20 +555,29 @@ func categoryActionSlug(actions []RuleAction) string {
 }
 
 // validTriggers lists accepted values for transaction_rules.trigger.
+// "on_update" is retained as a back-compat alias for "on_change" — inputs
+// are normalized to "on_change" before being persisted, but rows previously
+// stored as "on_update" continue to function (both sync and retroactive
+// paths accept either value).
 var validTriggers = map[string]bool{
 	"on_create": true,
-	"on_update": true,
+	"on_change": true,
+	"on_update": true, // alias for on_change
 	"always":    true,
 }
 
-// normalizeTrigger returns the trigger string if valid, defaulting to
-// "on_create" on empty input, and an error for unknown values.
+// normalizeTrigger returns the canonical trigger string, defaulting to
+// "on_create" on empty input. "on_update" is accepted and rewritten to
+// "on_change". Returns an error for unknown values.
 func normalizeTrigger(trigger string) (string, error) {
 	if trigger == "" {
 		return "on_create", nil
 	}
+	if trigger == "on_update" {
+		return "on_change", nil
+	}
 	if !validTriggers[trigger] {
-		return "", fmt.Errorf("%w: invalid trigger %q (expected on_create|on_update|always)", ErrInvalidParameter, trigger)
+		return "", fmt.Errorf("%w: invalid trigger %q (expected on_create|on_change|always)", ErrInvalidParameter, trigger)
 	}
 	return trigger, nil
 }
@@ -592,7 +601,7 @@ const ruleSelectColumnCount = 16
 // Category info is derived from actions[{type:"set_category"}] at response
 // time. conditions may be a zero-value Condition{} (= match all; stored as
 // NULL). trigger defaults to "on_create" and must be one of
-// on_create|on_update|always.
+// on_create|on_change|always ("on_update" accepted as legacy alias).
 func (s *Service) CreateTransactionRule(ctx context.Context, params CreateTransactionRuleParams) (*TransactionRuleResponse, error) {
 	// Validate conditions (zero-value => match-all)
 	if err := ValidateCondition(params.Conditions); err != nil {
@@ -1888,12 +1897,13 @@ func ActionsSummary(actions []RuleAction, categoryName string) string {
 
 // TriggerLabel returns the human-readable label for a rule trigger value.
 // Falls back to the raw value (or "On create" when empty) for unknown values.
+// "on_update" is accepted as a back-compat alias for "on_change".
 func TriggerLabel(trigger string) string {
 	switch trigger {
 	case "", "on_create":
 		return "On create"
-	case "on_update":
-		return "On update"
+	case "on_change", "on_update":
+		return "On change"
 	case "always":
 		return "Always"
 	default:
