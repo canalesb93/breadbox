@@ -100,8 +100,13 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
       done
 
       if [ "$PORT" -le 8099 ]; then
+        # Export both: PORT is consumed by the Makefile (which maps it to
+        # SERVER_PORT when invoking `go run`), and SERVER_PORT is what the
+        # binary itself reads — so direct `go run ./cmd/breadbox serve`
+        # also picks up the right port.
         echo "PORT=$PORT" >> "$CLAUDE_ENV_FILE"
-        echo "    Set PORT=$PORT (use 'make dev' to start server)"
+        echo "SERVER_PORT=$PORT" >> "$CLAUDE_ENV_FILE"
+        echo "    Assigned port $PORT (PORT + SERVER_PORT exported)"
       else
         echo "WARN: no available port in 8081-8099"
       fi
