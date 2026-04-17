@@ -157,15 +157,16 @@
             </select>
           </template>
 
-          <!-- Value: tag slug input with autocomplete -->
-          <template x-if="action.field === 'tag'">
+          <!-- Value: tag slug input with autocomplete (add_tag or remove_tag) -->
+          <template x-if="action.field === 'tag' || action.field === 'tag_remove'">
             <div class="flex-1 min-w-0">
               <input type="text" x-model="action.value" @input="validateTagSlug(idx)" list="bb-tag-slugs"
                 class="input input-bordered input-xs rounded-lg bg-base-100 w-full mt-px"
                 placeholder="needs-review, subscription:monthly, ..."
                 pattern="^[a-z0-9][a-z0-9\-:]*[a-z0-9]$" />
               <p x-show="action.error" x-cloak class="text-[0.65rem] text-error mt-1" x-text="action.error"></p>
-              <p x-show="!action.error" class="text-[0.65rem] text-base-content/40 mt-1">Lowercase, hyphens or colons. e.g. <code>needs-review</code></p>
+              <p x-show="!action.error && action.field === 'tag'" class="text-[0.65rem] text-base-content/40 mt-1">Lowercase, hyphens or colons. e.g. <code>needs-review</code></p>
+              <p x-show="!action.error && action.field === 'tag_remove'" class="text-[0.65rem] text-base-content/40 mt-1">Tag to remove from matching transactions.</p>
             </div>
           </template>
 
@@ -258,13 +259,15 @@ function ruleForm() {
   const defaultOps = { string: 'contains', numeric: 'gte', bool: 'eq' };
   const emptyCondition = () => ({ field: 'name', op: 'contains', value: '' });
 
-  // Action type registry — first-class typed actions match the API's three
-  // supported action.type values (set_category | add_tag | add_comment).
-  // The internal "field" name is a UI alias; we map back at submit time.
+  // Action type registry — first-class typed actions match the API's
+  // supported action.type values (set_category | add_tag | remove_tag |
+  // add_comment). The internal "field" name is a UI alias; we map back
+  // at submit time.
   const actionTypes = [
-    { value: 'category', label: 'Set category' },
-    { value: 'tag',      label: 'Add tag' },
-    { value: 'comment',  label: 'Add comment' },
+    { value: 'category',   label: 'Set category' },
+    { value: 'tag',        label: 'Add tag' },
+    { value: 'tag_remove', label: 'Remove tag' },
+    { value: 'comment',    label: 'Add comment' },
   ];
 
   // Tag slug regex must match the server-side validator in
@@ -280,6 +283,9 @@ function ruleForm() {
     }
     if (a.type === 'add_tag') {
       return { field: 'tag', value: a.tag_slug || '', error: '' };
+    }
+    if (a.type === 'remove_tag') {
+      return { field: 'tag_remove', value: a.tag_slug || '', error: '' };
     }
     if (a.type === 'add_comment') {
       return { field: 'comment', value: a.content || '', error: '' };
@@ -499,6 +505,7 @@ function ruleForm() {
         .map(a => {
           if (a.field === 'category') return { type: 'set_category', category_slug: a.value };
           if (a.field === 'tag') return { type: 'add_tag', tag_slug: a.value };
+          if (a.field === 'tag_remove') return { type: 'remove_tag', tag_slug: a.value };
           if (a.field === 'comment') return { type: 'add_comment', content: a.value };
           return { type: a.field, category_slug: a.value };
         });

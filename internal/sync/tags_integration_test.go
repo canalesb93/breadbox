@@ -104,6 +104,113 @@ func TestSync_AddTagAction_PersistsTag(t *testing.T) {
 	}
 }
 
+// TestSync_RemoveTagAction_DeletesTagAndAnnotates exercises the remove_tag
+// action end-to-end. The test pre-seeds a transaction with `needs-review`,
+// then re-syncs with a rule that fires on "always" and removes the tag.
+// Verifies the transaction_tags row is deleted and a tag_removed annotation
+// is written with the rule as the actor.
+func TestSync_RemoveTagAction_DeletesTagAndAnnotates(t *testing.T) {
+	pool, queries := testutil.ServicePool(t)
+	ctx := context.Background()
+
+	seedCategories(t, queries)
+
+	// Pre-seed tag and rule.
+	tag := testutil.MustCreateTag(t, queries, "needs-review", "Needs Review", "ephemeral")
+	testutil.MustCreateTransactionRule(
+		t, queries, "Clear review flag for coffee",
+		[]byte(`{"field":"name","op":"contains","value":"Starbucks"}`),
+		[]byte(`[{"type":"remove_tag","tag_slug":"needs-review"}]`),
+		"always",
+	)
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_1")
+	testutil.MustCreateAccount(t, queries, conn.ID, "ext_acct_1", "Checking")
+
+	// First sync: creates the transaction. Our rule (trigger=always) tags
+	// nothing but the absence of a pre-existing needs-review means the
+	// remove is a no-op here.
+	mock := &mockProvider{
+		syncResult: provider.SyncResult{
+			Added: []provider.Transaction{
+				{
+					ExternalID:        "txn_sbx",
+					AccountExternalID: "ext_acct_1",
+					Amount:            decimal.NewFromFloat(5.50),
+					Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+					Name:              "Starbucks Coffee",
+					ISOCurrencyCode:   "USD",
+				},
+			},
+			Cursor: "cursor_1",
+		},
+	}
+	providers := map[string]provider.Provider{"plaid": mock}
+	engine := newEngine(t, pool, queries, providers)
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("first Sync() error: %v", err)
+	}
+
+	// Manually attach needs-review to the transaction (simulates a prior
+	// sync pass or user action).
+	_, err := pool.Exec(ctx, `
+		INSERT INTO transaction_tags (transaction_id, tag_id, added_by_type, added_by_name)
+		SELECT t.id, $1, 'user', 'Alice'
+		FROM transactions t WHERE t.external_transaction_id = 'txn_sbx'`, tag.ID)
+	if err != nil {
+		t.Fatalf("attach needs-review: %v", err)
+	}
+
+	// Second sync: provider returns the same transaction with an updated
+	// balance / amount, causing an isChanged path that re-runs rules.
+	mock.syncResult = provider.SyncResult{
+		Modified: []provider.Transaction{
+			{
+				ExternalID:        "txn_sbx",
+				AccountExternalID: "ext_acct_1",
+				Amount:            decimal.NewFromFloat(5.75), // changed
+				Date:              time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+				Name:              "Starbucks Coffee",
+				ISOCurrencyCode:   "USD",
+			},
+		},
+		Cursor: "cursor_2",
+	}
+	if err := engine.Sync(ctx, conn.ID, db.SyncTriggerManual); err != nil {
+		t.Fatalf("second Sync() error: %v", err)
+	}
+
+	// Verify transaction_tags row is gone.
+	var ttCount int
+	err = pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM transaction_tags tt
+		JOIN transactions t ON tt.transaction_id = t.id
+		WHERE t.external_transaction_id = 'txn_sbx' AND tt.tag_id = $1`, tag.ID).Scan(&ttCount)
+	if err != nil {
+		t.Fatalf("count transaction_tags: %v", err)
+	}
+	if ttCount != 0 {
+		t.Errorf("expected needs-review tag removed, %d row(s) remain", ttCount)
+	}
+
+	// Verify tag_removed annotation with rule back-reference.
+	var annCount int
+	err = pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM annotations a
+		JOIN transactions t ON a.transaction_id = t.id
+		WHERE t.external_transaction_id = 'txn_sbx'
+		  AND a.kind = 'tag_removed'
+		  AND a.tag_id = $1
+		  AND a.rule_id IS NOT NULL`, tag.ID).Scan(&annCount)
+	if err != nil {
+		t.Fatalf("count annotations: %v", err)
+	}
+	if annCount != 1 {
+		t.Errorf("expected 1 tag_removed annotation, got %d", annCount)
+	}
+}
+
 // TestSync_SeededRule_TagsAllNewTransactions verifies the seeded review rule:
 // match-all conditions (NULL) with a single add_tag action tagging
 // newly-synced transactions with 'needs-review'.
