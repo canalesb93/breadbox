@@ -11,27 +11,12 @@
   </div>
 
   <!-- Message header card -->
-  <div class="bb-card overflow-hidden mb-5
-    {{if eq .Report.Priority "critical"}}border-l-[3px] border-l-error/80
-    {{else if eq .Report.Priority "warning"}}border-l-[3px] border-l-warning/80
-    {{else}}border-l-[3px] border-l-primary/40{{end}}">
-
+  <div class="bb-card mb-5">
     <div class="px-5 sm:px-6 pt-5 pb-4">
       <!-- Author row -->
-      <div class="flex items-start gap-3 mb-4">
-        <div class="relative shrink-0">
-          <div class="w-12 h-12 rounded-2xl flex items-center justify-center
-            {{if eq .Report.Priority "critical"}}bg-error/15 text-error
-            {{else if eq .Report.Priority "warning"}}bg-warning/15 text-warning
-            {{else}}bg-primary/10 text-primary{{end}}">
-            <i data-lucide="bot" class="w-5 h-5"></i>
-          </div>
-          {{if eq .Report.Priority "critical"}}
-          <span class="absolute -top-1 -right-1 flex w-3 h-3">
-            <span class="animate-ping absolute inline-flex w-full h-full rounded-full bg-error/60"></span>
-            <span class="relative inline-flex w-3 h-3 rounded-full bg-error ring-2 ring-base-100"></span>
-          </span>
-          {{end}}
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-primary/10 text-primary">
+          <i data-lucide="bot" class="w-4.5 h-4.5"></i>
         </div>
         <div class="flex-1 min-w-0">
           <div class="flex items-center flex-wrap gap-2 mb-0.5">
@@ -51,12 +36,19 @@
         </div>
       </div>
 
-      <!-- Title: rendered as the message -->
-      <h1 class="text-xl sm:text-2xl font-semibold text-base-content leading-snug">{{.Report.Title}}</h1>
+      <!-- Title as the message bubble -->
+      <div class="pl-[3.25rem]">
+        <div class="inline-block max-w-full rounded-2xl rounded-tl-sm shadow-sm px-4 py-3
+          {{if eq .Report.Priority "critical"}}bg-error/10
+          {{else if eq .Report.Priority "warning"}}bg-warning/10
+          {{else}}bg-base-200/70{{end}}">
+          <p class="text-base sm:text-lg font-medium text-base-content leading-snug">{{.Report.Title}}</p>
+        </div>
+      </div>
     </div>
 
     <!-- Action toolbar -->
-    <div class="flex items-center gap-1 px-3 sm:px-4 py-2 border-t border-base-200/60 bg-base-200/20">
+    <div class="flex items-center gap-1 px-3 sm:px-4 py-2 border-t border-base-200/60 bg-base-200/20 rounded-b-2xl">
       <button type="button" @click="toggleRead()" class="btn btn-ghost btn-xs rounded-lg text-xs">
         <i :data-lucide="isRead ? 'mail' : 'mail-open'" class="w-3.5 h-3.5"></i>
         <span x-text="isRead ? 'Mark unread' : 'Mark read'"></span>
@@ -79,7 +71,7 @@
   <!-- Body card -->
   <div class="bb-card">
     <div class="px-5 sm:px-7 py-5 sm:py-6">
-      <div class="bb-report-body prose prose-sm sm:prose max-w-none text-base-content/85 leading-relaxed" data-markdown="{{.Report.Body}}"></div>
+      <div class="bb-report-body" data-markdown="{{.Report.Body}}"></div>
     </div>
   </div>
 </div>
@@ -123,59 +115,20 @@ function reportDetail(id, initialRead) {
   };
 }
 
+// Styling handled in input.css via .bb-report-body rules. Script only handles
+// external-link targeting and secure noopener. No separator lines under headings,
+// no heavy custom styling — keeps standard markdown rendering clean.
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.bb-report-body').forEach(function(el) {
     var md = el.getAttribute('data-markdown');
     if (!md) return;
     el.innerHTML = DOMPurify.sanitize(marked.parse(md));
     el.querySelectorAll('a').forEach(function(a) {
-      a.classList.add('link', 'link-primary');
-      if (a.href && !a.href.startsWith(window.location.origin) && !a.getAttribute('href').startsWith('/')) {
+      var href = a.getAttribute('href') || '';
+      if (a.href && !a.href.startsWith(window.location.origin) && !href.startsWith('/')) {
         a.setAttribute('target', '_blank');
         a.setAttribute('rel', 'noopener');
       }
-    });
-    el.querySelectorAll('ul').forEach(function(list) {
-      list.classList.add('list-disc', 'pl-5', 'space-y-1', 'my-2');
-    });
-    el.querySelectorAll('ol').forEach(function(list) {
-      list.classList.add('list-decimal', 'pl-5', 'space-y-1', 'my-2');
-    });
-    el.querySelectorAll('p').forEach(function(p) {
-      p.classList.add('mb-3');
-    });
-    el.querySelectorAll('strong').forEach(function(s) {
-      s.classList.add('text-base-content', 'font-semibold');
-    });
-    el.querySelectorAll('h1, h2, h3, h4').forEach(function(h) {
-      h.classList.add('text-base-content', 'font-semibold', 'mt-5', 'mb-2', 'pb-1', 'border-b', 'border-base-200/70');
-    });
-    el.querySelectorAll('h3, h4').forEach(function(h) {
-      h.classList.remove('border-b', 'border-base-200/70', 'pb-1');
-      h.classList.add('text-sm', 'uppercase', 'tracking-wider', 'text-base-content/60');
-    });
-    el.querySelectorAll('code').forEach(function(c) {
-      if (c.parentElement.tagName !== 'PRE') {
-        c.classList.add('bg-base-200/60', 'px-1.5', 'py-0.5', 'rounded', 'text-xs', 'font-mono');
-      }
-    });
-    el.querySelectorAll('pre').forEach(function(pre) {
-      pre.classList.add('bg-base-200/40', 'rounded-xl', 'p-4', 'my-3', 'overflow-x-auto', 'text-xs', 'border', 'border-base-200/60');
-    });
-    el.querySelectorAll('blockquote').forEach(function(bq) {
-      bq.classList.add('border-l-2', 'border-primary/30', 'pl-3', 'my-3', 'text-base-content/60', 'italic');
-    });
-    el.querySelectorAll('table').forEach(function(tbl) {
-      tbl.classList.add('w-full', 'my-3', 'text-sm', 'border-collapse');
-      tbl.querySelectorAll('th').forEach(function(th) {
-        th.classList.add('text-left', 'font-semibold', 'text-base-content/70', 'text-xs', 'uppercase', 'tracking-wider', 'px-3', 'py-2', 'border-b', 'border-base-200');
-      });
-      tbl.querySelectorAll('td').forEach(function(td) {
-        td.classList.add('px-3', 'py-2', 'border-b', 'border-base-200/60');
-      });
-    });
-    el.querySelectorAll('hr').forEach(function(hr) {
-      hr.classList.add('my-5', 'border-base-200/60');
     });
     var lastChild = el.lastElementChild;
     if (lastChild) lastChild.classList.add('!mb-0');

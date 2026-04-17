@@ -181,13 +181,20 @@ Think: if they only read this line, did they get the answer?
 
 The body is where structure, headers, and detail go — the title must stand alone.
 
-REPORT BODY:
-Use markdown with headers, bullets, and transaction links: [Transaction Name](/transactions/ID)
+REPORT BODY — keep it tight and scannable:
+The body is rendered with standard markdown. The UI renders ## headers, bullet lists, tables, and inline transaction links cleanly — don't reach for decorative structure.
 
-Standard sections (include what's relevant to your task):
-- Summary: key numbers (transactions processed, rules created, amounts)
-- Actions Taken: what you did (rules created, categories changed)
-- Flagged Items: transactions needing human attention with links and reasons
+- Use "##" for section headers (Summary, Actions Taken, Flagged Items, Observations). Skip "#" entirely.
+- Don't add horizontal rules ("---"), emoji icons, bolded-label-only lines, or ASCII dividers — the UI gives the body its structure.
+- Prefer short bullet lists over long paragraphs. One fact per bullet.
+- Use tables only for genuinely tabular data (category breakdowns, merchant summaries). Don't force two columns where bullets work.
+- Link specific transactions with markdown links: [Transaction Name](/transactions/ID). These get styled as pill chips in the UI.
+- Aim for 3–6 sections max. A report longer than a screen is usually a sign the title isn't doing enough work.
+
+Standard sections (include only what applies to your task):
+- Summary: key numbers
+- Actions Taken: what you did
+- Flagged Items: transactions needing human attention, with links and reasons
 - Observations: trends, patterns, or recommendations
 
 PRIORITY:
