@@ -68,9 +68,7 @@
           <!-- Title as message bubble -->
           <div class="inline-block max-w-full rounded-2xl rounded-tl-sm shadow-sm px-3.5 py-2.5 bg-base-200/70 group-hover:bg-base-200/90 transition-colors">
             <p class="text-sm leading-relaxed {{if .IsRead}}text-base-content/70{{else}}text-base-content{{end}} group-hover:text-base-content transition-colors">{{.Title}}</p>
-            {{if .Preview}}
-            <p class="text-xs text-base-content/40 mt-1 line-clamp-1">{{.Preview}}</p>
-            {{end}}
+            <span class="text-xs text-base-content/30 group-hover:text-primary/60 transition-colors">View report &rarr;</span>
           </div>
         </div>
 
