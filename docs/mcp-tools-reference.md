@@ -162,13 +162,13 @@ Attach a tag to a transaction. Auto-creates a persistent tag if the slug is unkn
 
 ### remove_transaction_tag (Write)
 
-Remove a tag from a transaction. For ephemeral tags (`needs-review`), the `note` is REQUIRED.
+Remove a tag from a transaction. A `note` is strongly recommended for ephemeral tags (`needs-review`) — it lands on the `tag_removed` annotation. Idempotent.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `transaction_id` | string | UUID or short ID |
 | `tag_slug` | string | Tag slug |
-| `note` | string | Required for ephemeral tags. Optional for persistent. |
+| `note` | string | Optional. Recommended for ephemeral tags so the rationale lands on the audit trail. |
 
 ### update_transactions (Write)
 
@@ -186,7 +186,7 @@ Each operation:
 | `transaction_id` | string | UUID or short ID. Required. |
 | `category_slug` | string | Optional category to set. Sets `category_override=true`. |
 | `tags_to_add` | array | `[{slug, note?}, ...]`. Auto-creates persistent tags. |
-| `tags_to_remove` | array | `[{slug, note?}, ...]`. `note` REQUIRED when the tag is ephemeral. |
+| `tags_to_remove` | array | `[{slug, note?}, ...]`. `note` is optional but strongly recommended for ephemeral tags — lands on the `tag_removed` annotation. |
 | `comment` | string | Optional comment annotation. |
 
 Use this to close a review entry: `set category + remove needs-review (with note) + comment` in one call.
