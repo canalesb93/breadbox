@@ -1129,7 +1129,9 @@ func BulkUpdateTransactionsAdminHandler(a *app.App, sm *scs.SessionManager, svc 
 }
 
 // QuickSearchTransactionsHandler serves GET /-/search/transactions.
-// Returns a lightweight JSON array for the command palette.
+// Returns []service.TransactionSummary — the shared DTO used by every
+// "transaction-as-a-card" preview surface (command palette, future rule
+// preview modal, etc.). Formatting lives in service.ToTransactionSummary.
 func QuickSearchTransactionsHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := strings.TrimSpace(r.URL.Query().Get("q"))
@@ -1155,48 +1157,9 @@ func QuickSearchTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			return
 		}
 
-		type txResult struct {
-			ID                  string  `json:"id"`
-			Name                string  `json:"name"`
-			Amount              float64 `json:"amount"`
-			AmountLabel         string  `json:"amount_label"`
-			Date                string  `json:"date"`
-			DateLabel           string  `json:"date_label"`
-			Account             string  `json:"account"`
-			Merchant            *string `json:"merchant,omitempty"`
-			UserName            string  `json:"user_name,omitempty"`
-			Pending             bool    `json:"pending,omitempty"`
-			CategoryIcon        *string `json:"category_icon,omitempty"`
-			CategoryColor       *string `json:"category_color,omitempty"`
-			CategoryDisplayName *string `json:"category_display_name,omitempty"`
-		}
-
-		items := make([]txResult, 0, len(result.Transactions))
+		items := make([]service.TransactionSummary, 0, len(result.Transactions))
 		for _, tx := range result.Transactions {
-			amountAbs := math.Abs(tx.Amount)
-			amountLabel := formatCurrency(amountAbs)
-			if tx.Amount < 0 {
-				amountLabel = "-" + amountLabel
-			}
-			dateLabel := tx.Date
-			if t, err := time.Parse("2006-01-02", tx.Date); err == nil {
-				dateLabel = t.Format("Jan 2")
-			}
-			items = append(items, txResult{
-				ID:                  tx.ID,
-				Name:                tx.Name,
-				Amount:              tx.Amount,
-				AmountLabel:         amountLabel,
-				Date:                tx.Date,
-				DateLabel:           dateLabel,
-				Account:             tx.AccountName,
-				Merchant:            tx.MerchantName,
-				UserName:            tx.UserName,
-				Pending:             tx.Pending,
-				CategoryIcon:        tx.CategoryIcon,
-				CategoryColor:       tx.CategoryColor,
-				CategoryDisplayName: tx.CategoryDisplayName,
-			})
+			items = append(items, service.ToTransactionSummary(tx))
 		}
 
 		w.Header().Set("Content-Type", "application/json")

@@ -598,33 +598,33 @@
                    @mouseenter="activeIndex = item._flatIndex">
                 <!-- Transaction variant: mirrors the tx-row layout in the list -->
                 <template x-if="item._kind === 'tx'">
-                  <div class="bb-cmdk-tx">
-                    <div class="bb-cmdk-tx-avatar"
+                  <div class="bb-tx-card">
+                    <div class="bb-tx-card-avatar"
                          :style="item.iconColor ? '--avatar-color: ' + item.iconColor : ''">
                       <i :data-lucide="item.icon"></i>
                     </div>
-                    <div class="bb-cmdk-tx-main">
-                      <div class="bb-cmdk-tx-title-row">
-                        <span class="bb-cmdk-tx-title" x-text="item.title"></span>
+                    <div class="bb-tx-card-main">
+                      <div class="bb-tx-card-title-row">
+                        <span class="bb-tx-card-title" x-text="item.title"></span>
                         <template x-if="item.tx.pending">
                           <span class="badge badge-soft badge-xs badge-warning rounded-md shrink-0">Pending</span>
                         </template>
                       </div>
-                      <div class="bb-cmdk-tx-meta">
+                      <div class="bb-tx-card-meta">
                         <template x-if="item.tx.userName">
-                          <span class="bb-cmdk-tx-user" x-text="item.tx.userName.split(' ')[0]"></span>
+                          <span class="bb-tx-card-user" x-text="item.tx.userName.split(' ')[0]"></span>
                         </template>
                         <template x-if="item.tx.userName && item.tx.account">
-                          <span class="bb-cmdk-tx-sep">&middot;</span>
+                          <span class="bb-tx-card-sep">&middot;</span>
                         </template>
                         <template x-if="item.tx.account">
                           <span class="truncate" x-text="item.tx.account"></span>
                         </template>
                         <template x-if="item.tx.categoryName">
-                          <span class="bb-cmdk-tx-sep">&middot;</span>
+                          <span class="bb-tx-card-sep">&middot;</span>
                         </template>
                         <template x-if="item.tx.categoryName">
-                          <span class="bb-cmdk-tx-cat">
+                          <span class="bb-tx-card-cat">
                             <template x-if="item.tx.categoryColor">
                               <span class="bb-cat-dot" :style="'background-color:' + item.tx.categoryColor"></span>
                             </template>
@@ -633,8 +633,8 @@
                         </template>
                       </div>
                     </div>
-                    <div class="bb-cmdk-tx-right">
-                      <div class="bb-cmdk-tx-date" x-text="item.tx.dateLabel"></div>
+                    <div class="bb-tx-card-right">
+                      <div class="bb-tx-card-date" x-text="item.tx.dateLabel"></div>
                       <div class="bb-tx-amount tabular-nums"
                            :class="item.tx.amount < 0 ? 'bb-tx-amount--income' : ''"
                            x-text="item.tx.amountLabel"></div>

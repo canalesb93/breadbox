@@ -1061,22 +1061,11 @@ func (tr *TemplateRenderer) SetVersionChecker(vc *version.Checker) {
 	tr.versionChecker = vc
 }
 
-// formatCurrency formats a non-negative float as "$X,XXX.XX".
+// formatCurrency formats a non-negative float as "$X,XXX.XX". Delegates to
+// service.FormatCurrency so preview DTOs and template rendering share one
+// format.
 func formatCurrency(abs float64) string {
-	whole := int(abs)
-	cents := int(math.Round((abs - float64(whole)) * 100))
-	s := fmt.Sprintf("%d", whole)
-	if len(s) > 3 {
-		result := ""
-		for i, c := range s {
-			if i > 0 && (len(s)-i)%3 == 0 {
-				result += ","
-			}
-			result += string(c)
-		}
-		s = result
-	}
-	return fmt.Sprintf("$%s.%02d", s, cents)
+	return service.FormatCurrency(abs)
 }
 
 // titleCaseMerchant converts ALL-CAPS merchant names from bank feeds into

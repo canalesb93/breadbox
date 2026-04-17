@@ -1309,60 +1309,69 @@
     @apply flex items-center gap-1 shrink-0;
   }
 
-  /* ── Transaction result variant — mirrors the main tx-row layout ── */
-  .bb-cmdk-tx {
-    @apply flex items-center gap-3 px-4 py-2;
+  /* ── Shared transaction card — used by every "transaction-as-card"
+     preview surface (command palette, rule preview modal, etc.).
+     Pairs with service.TransactionSummary on the backend.
+     Palette-specific padding/hover stays on `.bb-cmdk-item`. ── */
+  .bb-tx-card {
+    @apply flex items-center gap-3;
   }
 
-  .bb-cmdk-tx-avatar {
+  /* Command palette keeps its tight horizontal padding; other surfaces
+     apply their own spacing via the parent container. */
+  .bb-cmdk-item .bb-tx-card {
+    @apply px-4 py-2;
+  }
+
+  .bb-tx-card-avatar {
     --avatar-color: oklch(0.65 0 0);
     @apply w-8 h-8 rounded-lg flex items-center justify-center shrink-0;
     background-color: color-mix(in srgb, var(--avatar-color) 15%, transparent);
     color: var(--avatar-color);
   }
 
-  .bb-cmdk-tx-avatar svg,
-  .bb-cmdk-tx-avatar i {
+  .bb-tx-card-avatar svg,
+  .bb-tx-card-avatar i {
     @apply w-4 h-4;
   }
 
-  .bb-cmdk-tx-main {
+  .bb-tx-card-main {
     @apply flex-1 min-w-0;
   }
 
-  .bb-cmdk-tx-title-row {
+  .bb-tx-card-title-row {
     @apply flex items-center gap-2;
   }
 
-  .bb-cmdk-tx-title {
+  .bb-tx-card-title {
     @apply text-sm font-medium truncate;
   }
 
-  .bb-cmdk-tx-meta {
+  .bb-tx-card-meta {
     @apply flex items-center gap-1.5 mt-0.5 text-xs text-base-content/45 min-w-0;
   }
 
-  .bb-cmdk-tx-meta > .truncate {
+  .bb-tx-card-meta > .truncate {
     @apply min-w-0;
   }
 
-  .bb-cmdk-tx-user {
+  .bb-tx-card-user {
     @apply text-base-content/55 shrink-0;
   }
 
-  .bb-cmdk-tx-sep {
+  .bb-tx-card-sep {
     @apply text-base-content/20 shrink-0;
   }
 
-  .bb-cmdk-tx-cat {
+  .bb-tx-card-cat {
     @apply inline-flex items-center gap-1 shrink-0 min-w-0;
   }
 
-  .bb-cmdk-tx-right {
+  .bb-tx-card-right {
     @apply flex flex-col items-end shrink-0 leading-tight;
   }
 
-  .bb-cmdk-tx-date {
+  .bb-tx-card-date {
     @apply text-[0.65rem] text-base-content/40 tabular-nums;
   }
 
