@@ -27,8 +27,8 @@
 
 <!-- Reports Inbox -->
 {{if .Reports}}
-<div class="bb-card bb-stagger" x-data="reportsPage()">
-  <div class="divide-y divide-base-200/60">
+<div class="bb-card" x-data="reportsPage()">
+  <div class="divide-y divide-base-200/60 bb-stagger">
     {{range .Reports}}
     <a href="/reports/{{.ID}}"
       class="group relative block px-4 sm:px-5 py-4 hover:bg-base-200/30 transition-all duration-300 no-underline"
