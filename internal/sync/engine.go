@@ -584,7 +584,8 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 // their actions. Called only for new or changed transactions.
 //
 // isNew is threaded through to ResolveWithContext so trigger filtering
-// (on_create / on_update / always) decides which rules fire.
+// (on_create / on_change / always; "on_update" accepted as alias) decides
+// which rules fire.
 //
 // set_category updates transactions.category_id, add_tag persists to
 // transaction_tags, add_comment writes an annotation. Every persistent change

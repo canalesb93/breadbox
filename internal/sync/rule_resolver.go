@@ -499,12 +499,13 @@ func dropCategorySource(src []RuleActionSource) []RuleActionSource {
 }
 
 // triggerMatches reports whether a rule with the given trigger should fire
-// given an isNew signal from the sync classification.
+// given an isNew signal from the sync classification. `on_update` is accepted
+// as a back-compat alias for `on_change` (the preferred canonical name).
 func triggerMatches(trigger string, isNew bool) bool {
 	switch trigger {
 	case "on_create":
 		return isNew
-	case "on_update":
+	case "on_change", "on_update":
 		return !isNew
 	case "always", "":
 		return true

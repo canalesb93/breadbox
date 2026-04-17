@@ -207,11 +207,11 @@
         <label class="label" for="rule-trigger"><span class="label-text text-xs text-base-content/60">Trigger</span></label>
         <select id="rule-trigger" x-model="form.trigger" class="select select-bordered select-sm rounded-xl bg-base-200">
           <option value="on_create">On create</option>
-          <option value="on_update">On update</option>
+          <option value="on_change">On change</option>
           <option value="always">Always</option>
         </select>
         <p class="text-xs text-base-content/40 mt-1" x-show="form.trigger === 'on_create'">Fires only when a transaction is first synced.</p>
-        <p class="text-xs text-base-content/40 mt-1" x-show="form.trigger === 'on_update'">Fires only when an existing transaction changes.</p>
+        <p class="text-xs text-base-content/40 mt-1" x-show="form.trigger === 'on_change' || form.trigger === 'on_update'">Fires only when an existing transaction changes on re-sync.</p>
         <p class="text-xs text-base-content/40 mt-1" x-show="form.trigger === 'always'">Fires on every sync that touches the transaction.</p>
       </div>
       <div class="form-control">
@@ -327,10 +327,13 @@ function ruleForm() {
       actions = [{ field: 'category', value: '', error: '' }];
     }
 
+    // Normalize legacy on_update → on_change so the <select> binds cleanly.
+    const trigger = existingRule.trigger === 'on_update' ? 'on_change' : (existingRule.trigger || 'on_create');
+
     return {
       name: existingRule.name,
       priority: existingRule.priority,
-      trigger: existingRule.trigger || 'on_create',
+      trigger,
       logic,
       conditions,
       conditions_json: existingRule.conditions ? JSON.stringify(existingRule.conditions, null, 2) : '',

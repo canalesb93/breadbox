@@ -758,7 +758,9 @@ func TestResolveWithContext_TriggerMatrix(t *testing.T) {
 	}{
 		{"on_create", true, true},
 		{"on_create", false, false},
-		{"on_update", true, false},
+		{"on_change", true, false},
+		{"on_change", false, true},
+		{"on_update", true, false}, // legacy alias — same behavior as on_change
 		{"on_update", false, true},
 		{"always", true, true},
 		{"always", false, true},
