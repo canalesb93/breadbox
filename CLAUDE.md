@@ -93,6 +93,7 @@ Canonical specs in `docs/`:
 - `architecture.md` — provider interface and layer boundaries
 - `api-reference.md` — REST endpoints
 - `mcp-tools-reference.md` — MCP tools
+- `rule-dsl.md` — **canonical transaction-rule DSL**: condition grammar, actions, triggers, pipeline-stage priority, sync-vs-retroactive, chaining
 - `design-system.md` — CSS framework, components, icons
 - `plaid-integration.md`, `teller-integration.md`, `csv-import.md` — provider specifics
 - `admin-dashboard.md`, `mcp-server.md`, `rest-api.md`, `backup.md` — subsystem details
