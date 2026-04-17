@@ -96,20 +96,25 @@
           <!-- Operator — options are driven by fieldType so string / numeric /
                bool / tags each have their own label set with no duplicate
                <option value="..."> across groups (duplicates break <select>
-               display in Chrome/Safari). -->
-          <select x-model="cond.op" @change="syncToJson()" class="select select-bordered select-xs rounded-lg bg-base-100 w-28 shrink-0">
+               display in Chrome/Safari). Disabled until a field is picked. -->
+          <select x-model="cond.op" @change="syncToJson()" :disabled="!cond.field"
+            class="select select-bordered select-xs rounded-lg bg-base-100 w-28 shrink-0 disabled:bg-base-200 disabled:opacity-70">
+            <option value="" x-show="!cond.field">Operator...</option>
             <template x-for="opt in operatorOptions(cond.field)" :key="opt.value">
               <option :value="opt.value" x-text="opt.label"></option>
             </template>
           </select>
-          <!-- Value -->
-          <select x-model="cond.value" x-show="fieldType(cond.field) === 'bool'" @change="syncToJson()" class="select select-bordered select-xs rounded-lg bg-base-100 w-20 shrink-0">
+          <!-- Value — disabled placeholder when no field picked, otherwise
+               switches by fieldType. -->
+          <input type="text" disabled x-show="!cond.field"
+            class="input input-bordered input-xs rounded-lg bg-base-200 opacity-70 flex-1 min-w-0" placeholder="value..." />
+          <select x-model="cond.value" x-show="cond.field && fieldType(cond.field) === 'bool'" @change="syncToJson()" class="select select-bordered select-xs rounded-lg bg-base-100 w-20 shrink-0">
             <option value="true">true</option>
             <option value="false">false</option>
           </select>
-          <input type="number" x-model="cond.value" step="0.01" x-show="fieldType(cond.field) === 'numeric'" @input="syncToJson()" class="input input-bordered input-xs rounded-lg bg-base-100 w-24 shrink-0" placeholder="0.00" />
-          <input type="text" x-model="cond.value" x-show="fieldType(cond.field) === 'string'" @input="syncToJson()" class="input input-bordered input-xs rounded-lg bg-base-100 flex-1 min-w-0" placeholder="value..." />
-          <input type="text" x-model="cond.value" x-show="fieldType(cond.field) === 'tags'" list="bb-tag-slugs" @input="syncToJson()" class="input input-bordered input-xs rounded-lg bg-base-100 flex-1 min-w-0" :placeholder="cond.op === 'in' ? 'slug1, slug2, ...' : 'tag-slug'" />
+          <input type="number" x-model="cond.value" step="0.01" x-show="cond.field && fieldType(cond.field) === 'numeric'" @input="syncToJson()" class="input input-bordered input-xs rounded-lg bg-base-100 w-24 shrink-0" placeholder="0.00" />
+          <input type="text" x-model="cond.value" x-show="cond.field && fieldType(cond.field) === 'string'" @input="syncToJson()" class="input input-bordered input-xs rounded-lg bg-base-100 flex-1 min-w-0" placeholder="value..." />
+          <input type="text" x-model="cond.value" x-show="cond.field && fieldType(cond.field) === 'tags'" list="bb-tag-slugs" @input="syncToJson()" class="input input-bordered input-xs rounded-lg bg-base-100 flex-1 min-w-0" :placeholder="cond.op === 'in' ? 'slug1, slug2, ...' : 'tag-slug'" />
           <!-- Remove (always available — removing the last one switches to match-all) -->
           <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg shrink-0" @click="removeCondition(idx)" :title="form.conditions.length === 1 ? 'Remove (rule will match all transactions)' : 'Remove'">
             <i data-lucide="x" class="w-3.5 h-3.5 text-base-content/40"></i>
