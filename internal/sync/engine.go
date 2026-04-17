@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	gosync "sync"
 	"time"
 
@@ -658,7 +659,14 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 	// doesn't have a manual override. Respects the "user wins" semantic.
 	if result.CategorySlug != "" && !dbTxn.CategoryOverride {
 		catID := resolver.CategoryIDForSlug(result.CategorySlug)
-		if catID.Valid {
+		if !catID.Valid {
+			// Unknown slug — most commonly a category was deleted after the
+			// rule was authored. Log once so operators can spot stale rules,
+			// but don't break the sync.
+			src := sourceByKey["category|"+result.CategorySlug]
+			e.logger.Warn("rule references unknown category slug; skipping set_category",
+				"rule_id", src.ruleShortID, "rule_name", src.ruleName, "slug", result.CategorySlug)
+		} else {
 			_, err := tx.Exec(ctx,
 				`UPDATE transactions SET category_id = $1 WHERE id = $2 AND NOT category_override`,
 				catID, dbTxn.ID)
@@ -743,10 +751,21 @@ func (e *Engine) loadTagSlugsInTx(ctx context.Context, tx pgx.Tx, txnID pgtype.U
 	return slugs, rows.Err()
 }
 
+// ruleTagSlugPattern is a belt-and-suspenders check at sync time. Write-time
+// validation (internal/service/rules.go tagSlugPattern) already enforces this,
+// but a direct DB write could sneak a malformed slug past it — we log + skip
+// instead of persisting a bad row.
+var ruleTagSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9\-:]*[a-z0-9]$`)
+
 // applyTagFromRule upserts a (transaction, tag) row and writes the matching
 // tag_added annotation. Auto-creates the tag if its slug isn't registered yet.
-// All DB writes share the sync tx.
+// All DB writes share the sync tx. Malformed slugs are logged and skipped.
 func (e *Engine) applyTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, slug string, ruleID pgtype.UUID, ruleShortID, ruleName string) error {
+	if !ruleTagSlugPattern.MatchString(slug) {
+		e.logger.Warn("rule add_tag slug fails regex; skipping",
+			"rule_id", pgconv.FormatUUID(ruleID), "rule_name", ruleName, "slug", slug)
+		return nil
+	}
 	// Ensure the tag exists. INSERT ON CONFLICT DO NOTHING + RETURNING is
 	// awkward when the row already exists (no row returned), so we do a
 	// two-step upsert: SELECT, then insert if missing. Short id trigger

@@ -286,6 +286,35 @@ func TestEvaluateCondition_NumericEq(t *testing.T) {
 	}
 }
 
+// TestEvaluateCondition_NumericEq_RoundTripPrecision pins Q19 from the audit:
+// amounts pass through pgtype.Numeric (DECIMAL(12,2)) → float64, and rule
+// values also arrive as float64. Since NUMERIC is scaled to 2 decimal places
+// and float64 exactly represents hundredths up to ~2^53, `42.50 == 42.5` and
+// both come out equal via ==. Any future change to the evaluation path (e.g.
+// a tolerance window or string-path normalisation) would need to preserve
+// this property to remain sync-parity correct.
+func TestEvaluateCondition_NumericEq_RoundTripPrecision(t *testing.T) {
+	cases := []struct {
+		rule   float64
+		actual float64
+		eq     bool
+	}{
+		{42.5, 42.50, true},
+		{42.50, 42.5, true},
+		{100, 100.00, true},
+		{0.01, 0.01, true},
+		{42.5, 42.51, false},
+	}
+	for _, tc := range cases {
+		cc := mustCompile(t, &Condition{Field: "amount", Op: "eq", Value: tc.rule})
+		tctx := TransactionContext{Amount: tc.actual}
+		got := evaluateCondition(cc, tctx)
+		if got != tc.eq {
+			t.Errorf("amount eq rule=%v actual=%v: got %v want %v", tc.rule, tc.actual, got, tc.eq)
+		}
+	}
+}
+
 func TestEvaluateCondition_BoolEq(t *testing.T) {
 	cc := mustCompile(t, &Condition{Field: "pending", Op: "eq", Value: true})
 
