@@ -24,11 +24,13 @@ var validConditionFields = map[string]string{
 	"name":              "string",
 	"merchant_name":     "string",
 	"amount":            "numeric",
-	"category_primary":  "string",
-	"category_detailed": "string",
+	"category_primary":  "string", // raw provider primary category
+	"category_detailed": "string", // raw provider detailed category
+	"category":          "string", // assigned category slug (distinct from provider raw)
 	"pending":           "bool",
 	"provider":          "string",
 	"account_id":        "string",
+	"account_name":      "string",
 	"user_id":           "string",
 	"user_name":         "string",
 	"tags":              "tags",
@@ -322,12 +324,16 @@ func evaluateLeaf(c *CompiledCondition, tctx TransactionContext) bool {
 		return evalString(c, tctx.CategoryPrimary)
 	case "category_detailed":
 		return evalString(c, tctx.CategoryDetailed)
+	case "category":
+		return evalString(c, tctx.Category)
 	case "pending":
 		return evalBool(c, tctx.Pending)
 	case "provider":
 		return evalString(c, tctx.Provider)
 	case "account_id":
 		return evalString(c, tctx.AccountID)
+	case "account_name":
+		return evalString(c, tctx.AccountName)
 	case "user_id":
 		return evalString(c, tctx.UserID)
 	case "user_name":

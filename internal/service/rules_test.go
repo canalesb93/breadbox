@@ -564,6 +564,56 @@ func TestEvaluateCondition_TagsField(t *testing.T) {
 	}
 }
 
+func TestValidateCondition_NewFields(t *testing.T) {
+	cases := []struct {
+		name    string
+		cond    Condition
+		wantErr bool
+	}{
+		{"category contains", Condition{Field: "category", Op: "contains", Value: "coffee"}, false},
+		{"category eq", Condition{Field: "category", Op: "eq", Value: "food_and_drink_coffee"}, false},
+		{"account_name contains", Condition{Field: "account_name", Op: "contains", Value: "chase"}, false},
+		{"account_name in", Condition{Field: "account_name", Op: "in", Value: []interface{}{"Checking", "Savings"}}, false},
+		{"category numeric op rejected", Condition{Field: "category", Op: "gt", Value: "x"}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateCondition(tc.cond)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("ValidateCondition err=%v wantErr=%v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestEvaluateCondition_CategoryAndAccountName(t *testing.T) {
+	tctx := TransactionContext{
+		Category:    "food_and_drink_coffee",
+		AccountName: "Chase Freedom",
+	}
+
+	cc := mustCompileSvc(t, Condition{Field: "category", Op: "eq", Value: "food_and_drink_coffee"})
+	if !EvaluateCondition(cc, tctx) {
+		t.Error("expected category eq to match")
+	}
+
+	cc = mustCompileSvc(t, Condition{Field: "category", Op: "contains", Value: "coffee"})
+	if !EvaluateCondition(cc, tctx) {
+		t.Error("expected category contains to match")
+	}
+
+	cc = mustCompileSvc(t, Condition{Field: "account_name", Op: "contains", Value: "chase"})
+	if !EvaluateCondition(cc, tctx) {
+		t.Error("expected account_name contains to match (case-insensitive)")
+	}
+
+	// Empty fields shouldn't match contains of a non-empty value.
+	emptyCtx := TransactionContext{}
+	if EvaluateCondition(cc, emptyCtx) {
+		t.Error("expected account_name contains to fail on empty AccountName")
+	}
+}
+
 func TestEvaluateCondition_TagsField_EmptyTransactionTags(t *testing.T) {
 	tctx := TransactionContext{Tags: nil}
 

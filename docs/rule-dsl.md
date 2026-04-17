@@ -63,14 +63,16 @@ Combinators nest. Max depth: **10**. Empty / zero-value condition (`{}`) means *
 | `amount`            | numeric | Transaction amount (positive = debit, negative = credit)        |
 | `category_primary`  | string  | **Raw provider** primary category (Plaid/Teller classification) |
 | `category_detailed` | string  | **Raw provider** detailed category                              |
+| `category`          | string  | **Assigned** category slug (reflects Breadbox/rule/user writes) |
 | `pending`           | bool    | Provider-reported pending flag                                  |
 | `provider`          | string  | `plaid`, `teller`, or `csv`                                     |
 | `account_id`        | string  | Account UUID                                                    |
+| `account_name`      | string  | Account display name (or bank-reported name if unset)           |
 | `user_id`           | string  | Family member UUID                                              |
 | `user_name`         | string  | Family member display name                                      |
 | `tags`              | tags    | List of current transaction tag slugs (special, see below)      |
 
-> **Raw vs assigned category.** `category_primary` / `category_detailed` reflect what the provider *said*; they don't change when Breadbox (or a user) reassigns the category. If you need to filter by the *assigned* category, see the roadmap note at the bottom of this doc.
+> **Raw vs assigned category.** `category_primary` / `category_detailed` are the provider's classification — they don't change when Breadbox, a rule, or the user reassigns. Use `category` when you want to react to the *current* category, including mid-pass rule updates (see "Rule chaining" below).
 
 ### Operators per field type
 
@@ -90,16 +92,24 @@ Unknown field or unknown op → condition evaluates to false (the rule simply wo
 
 `matches` uses Go's [RE2](https://pkg.go.dev/regexp/syntax) — no backreferences, no lookaround, linear-time guaranteed. Patterns are not anchored automatically; use `^` and `$` if you want full-match semantics. Use `(?i)` for case-insensitive matching.
 
-### Tag conditions and rule chaining
+### Rule chaining (tags + category)
 
-The `tags` field reflects the transaction's current tag set from two sources, combined live during resolution:
+Rules evaluate in pipeline order — lower `priority` runs first. As each matching rule applies its actions, a local mutable copy of the transaction context updates and feeds into subsequent rules' condition evaluation:
 
-1. Tags already persisted on the transaction (loaded for re-synced rows; empty for brand-new rows).
-2. Tags that **earlier-stage rules in the same pass** added via `add_tag`.
+- `add_tag` appends to the tag slice that `tags contains / not_contains / in` reads from.
+- `set_category` updates the slug that `field="category"` reads from.
 
-Rules evaluate in pipeline order — lower `priority` runs first. As each matching rule applies its actions, a local mutable copy of the transaction context updates: `add_tag` appends to `Tags`; `set_category` updates the assigned category. Later-stage rules see those mutations. This enables composition: rule A tags a transaction as `coffee`; rule B conditioned on `tags contains "coffee"` picks a category.
+This enables composition. For example, a pipeline of three rules:
 
-Mutations are scoped to the resolver run and do not leak back to the caller's `TransactionContext`.
+1. `priority: 0`, `name contains "starbucks"` → `add_tag: coffee`
+2. `priority: 10`, `tags contains "coffee"` → `set_category: food_and_drink_coffee`
+3. `priority: 50`, `category eq "food_and_drink_coffee"` → `add_tag: dining`
+
+Rule 2 sees rule 1's tag. Rule 3 sees rule 2's category. All three fire in a single sync pass; the engine emits the combined `category_set`, `tag_added` (`coffee`, `dining`) annotations atomically.
+
+The `tags` slice starts from tags already persisted on the row (loaded during sync for re-synced transactions; empty for brand-new ones) and the `category` slug starts from the transaction's currently assigned category (or empty if none yet).
+
+Mutations are scoped to the resolver run — the caller's `TransactionContext` (and the incoming tag slice) are not modified.
 
 ## Actions
 
@@ -208,7 +218,6 @@ The rule engine has two entry points. They share condition evaluation and priori
 
 ## Roadmap (not yet shipped)
 
-- **New condition fields.** `category` (assigned category slug, distinct from `category_primary` raw provider field) and `account_name`. *Note:* the resolver already mutates a local `Category` slot during chaining; the public condition field is wired up in the next phase.
 - **New action.** `remove_tag`, symmetric with `add_tag`; useful for clearing transient tags like `needs-review` once a higher-priority-stage rule has pre-categorized the transaction.
 
 Tag-based chaining is already live in the resolver. The remaining roadmap items polish the surface.

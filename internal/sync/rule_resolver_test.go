@@ -653,6 +653,64 @@ func TestResolveWithContext_AddCommentAccumulation(t *testing.T) {
 	}
 }
 
+func TestEvaluateCondition_CategoryAndAccountName(t *testing.T) {
+	// category (assigned) and account_name are Phase 1c additions. Both are
+	// plain string fields using the standard string operators.
+	tctx := TransactionContext{
+		Category:    "food_and_drink_coffee",
+		AccountName: "Chase Freedom Checking",
+	}
+
+	cc := mustCompile(t, &Condition{Field: "category", Op: "eq", Value: "food_and_drink_coffee"})
+	if !evaluateCondition(cc, tctx) {
+		t.Error("expected category eq to match")
+	}
+
+	cc = mustCompile(t, &Condition{Field: "account_name", Op: "contains", Value: "checking"})
+	if !evaluateCondition(cc, tctx) {
+		t.Error("expected account_name contains to match (case-insensitive)")
+	}
+
+	cc = mustCompile(t, &Condition{Field: "account_name", Op: "neq", Value: "Savings"})
+	if !evaluateCondition(cc, tctx) {
+		t.Error("expected account_name neq to match when different")
+	}
+}
+
+func TestResolveWithContext_ChainingCategoryVisibleToLaterRule(t *testing.T) {
+	// Rule A (earlier stage) sets category to "coffee". Rule B (later stage)
+	// conditions on `category eq "coffee"` — it should observe the mutation.
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        testUUID(10),
+				actions:   []typedAction{{Type: "set_category", CategorySlug: "food_and_drink_coffee"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "starbucks"}),
+			},
+			{
+				id:        testUUID(11),
+				actions:   []typedAction{{Type: "add_tag", TagSlug: "dining"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "category", Op: "eq", Value: "food_and_drink_coffee"}),
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	result := r.ResolveWithContext("plaid", TransactionContext{Name: "Starbucks 123"}, true)
+	if result == nil {
+		t.Fatal("expected result")
+	}
+	if result.CategorySlug != "food_and_drink_coffee" {
+		t.Errorf("expected category set by rule A, got %q", result.CategorySlug)
+	}
+	if len(result.TagsToAdd) != 1 || result.TagsToAdd[0] != "dining" {
+		t.Errorf("expected later rule to observe rule A's category and add 'dining' tag, got %v", result.TagsToAdd)
+	}
+}
+
 func TestResolveWithContext_ChainingTagsVisibleToLaterRule(t *testing.T) {
 	// Rule A (earlier stage) adds tag "coffee".
 	// Rule B (later stage) has condition `tags contains "coffee"` — it
