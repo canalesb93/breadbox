@@ -39,8 +39,11 @@
   </a>
   {{end}}
   {{if .IsAdmin}}
-  <a href="/rules" class="bb-sidebar-link{{if or (eq .CurrentPage "rules") (eq .CurrentPage "categories")}} bb-sidebar-link--active{{end}}">
-    <i data-lucide="list-filter"></i> Rules & Categories
+  <a href="/rules" class="bb-sidebar-link{{if eq .CurrentPage "rules"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="list-filter"></i> Rules
+  </a>
+  <a href="/categories" class="bb-sidebar-link{{if eq .CurrentPage "categories"}} bb-sidebar-link--active{{end}}">
+    <i data-lucide="folder"></i> Categories
   </a>
   {{end}}
   {{if .IsEditor}}

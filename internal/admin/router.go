@@ -193,9 +193,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/tags/new", TagNewPageHandler(sm, tr))
 		r.Get("/tags/{id}/edit", TagEditPageHandler(svc, sm, tr))
 
-		r.Get("/categories", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/rules?tab=categories", http.StatusMovedPermanently)
-		})
+		r.Get("/categories", CategoriesPageHandler(svc, sm, tr))
 
 		r.Route("/mcp-settings", func(r chi.Router) {
 			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
