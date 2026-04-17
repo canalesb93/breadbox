@@ -267,16 +267,17 @@
   {{end}}
 </div>
 
-<!-- Pending Matches (only meaningful for category rules — retroactive apply
-     materializes set_category to transactions.category_id; tag/comment actions
-     are no-ops in retroactive). Hide for non-category-only rules. -->
-{{if and .Preview (gt .Preview.MatchCount 0) .Rule.CategorySlug}}
+<!-- Pending Matches: existing transactions that would match this rule's
+     condition but haven't been touched by it yet. Retroactive apply runs
+     set_category + add_tag + remove_tag (add_comment is sync-only). Shown
+     for any rule with at least one applicable action. -->
+{{if and .Preview (gt .Preview.MatchCount 0) (ruleHasRetroactiveAction .Rule.Actions)}}
 <div class="bb-card p-5 mb-4">
   <div class="flex items-center justify-between mb-1">
-    <span class="label-text text-sm font-medium">Uncategorized Matches</span>
+    <span class="label-text text-sm font-medium">Matching transactions</span>
     <span class="badge badge-soft badge-warning badge-sm">{{commaInt .Preview.MatchCount}} pending</span>
   </div>
-  <p class="text-xs text-base-content/40 mb-3">These existing transactions match the rule but were imported before it was created</p>
+  <p class="text-xs text-base-content/40 mb-3">These existing transactions match the rule but haven't been touched by it yet.</p>
 
   <div class="overflow-x-auto">
     <table class="table table-sm">
@@ -312,7 +313,7 @@
 
   <div class="mt-4 flex items-center justify-between">
     <p class="text-xs text-base-content/40">Apply this rule to categorize these existing transactions</p>
-    <button class="btn btn-sm btn-outline rounded-xl" @click="applyRetroactively()" :disabled="applying">
+    <button class="btn btn-sm btn-outline rounded-xl" @click="openApplyModal()" :disabled="applying">
       <span x-show="applying" class="loading loading-spinner loading-xs"></span>
       <i data-lucide="play" class="w-3.5 h-3.5" x-show="!applying"></i>
       Categorize as {{if .ActionCategoryName}}{{.ActionCategoryName}}{{else}}matched category{{end}}
@@ -325,6 +326,47 @@
   <div x-show="applyError" x-cloak role="alert" class="alert alert-error text-sm mt-3 rounded-xl">
     <span x-text="applyError"></span>
   </div>
+
+  <!-- Retroactive apply confirmation modal — teleported to <body> so the
+       SPA progress bar's filter/opacity on <main> doesn't break the
+       fixed-positioning containing block. -->
+  <template x-teleport="body">
+  <div x-show="showApplyModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" @click.self="closeApplyModal()">
+    <div class="bb-card max-w-md w-full p-6 bg-base-100 shadow-xl rounded-2xl" role="dialog" aria-modal="true" @keydown.escape.window="closeApplyModal()">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
+          <i data-lucide="alert-triangle" class="w-5 h-5 text-warning"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-base font-semibold">Apply this rule retroactively?</h3>
+          <p class="text-sm text-base-content/60 mt-1">
+            This will run the rule's actions against <strong>{{commaInt .Preview.MatchCount}}</strong>
+            matching {{if eq .Preview.MatchCount 1}}transaction{{else}}transactions{{end}}.
+          </p>
+          <ul class="mt-3 text-xs text-base-content/50 space-y-1 list-disc pl-4">
+            <li><code class="text-[10px]">set_category</code> skips transactions where you've set a manual override.</li>
+            <li><code class="text-[10px]">add_tag</code> / <code class="text-[10px]">remove_tag</code> apply to every match regardless of override.</li>
+            <li><code class="text-[10px]">add_comment</code> is sync-only — it won't fire retroactively.</li>
+          </ul>
+          <div class="form-control mt-4">
+            <label class="label cursor-pointer justify-start gap-2 py-1">
+              <input type="checkbox" x-model="confirmApply" class="checkbox checkbox-sm checkbox-warning" />
+              <span class="label-text text-xs">I understand this cannot be undone in bulk.</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 mt-5">
+        <button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="closeApplyModal()">Cancel</button>
+        <button type="button" class="btn btn-sm btn-warning rounded-xl" :disabled="!confirmApply || applying" @click="applyRetroactively()">
+          <span x-show="applying" class="loading loading-spinner loading-xs"></span>
+          <i data-lucide="play" class="w-3.5 h-3.5" x-show="!applying"></i>
+          Apply to {{commaInt .Preview.MatchCount}}
+        </button>
+      </div>
+    </div>
+  </div>
+  </template>
 </div>
 {{end}}
 
@@ -372,7 +414,20 @@ function ruleDetail() {
     applying: false,
     applyResult: '',
     applyError: '',
+    showApplyModal: false,
+    confirmApply: false,
+    openApplyModal() {
+      this.confirmApply = false;
+      this.applyError = '';
+      this.applyResult = '';
+      this.showApplyModal = true;
+    },
+    closeApplyModal() {
+      if (this.applying) return;
+      this.showApplyModal = false;
+    },
     async applyRetroactively() {
+      if (!this.confirmApply) return;
       this.applying = true;
       this.applyResult = '';
       this.applyError = '';
@@ -384,8 +439,9 @@ function ruleDetail() {
           this.applying = false;
           return;
         }
-        this.applyResult = 'Categorized ' + (data.affected_count || 0) + ' transactions';
+        this.applyResult = 'Applied to ' + (data.affected_count || 0) + ' transactions';
         this.applying = false;
+        this.showApplyModal = false;
         setTimeout(() => location.reload(), 1500);
       } catch (e) {
         this.applyError = 'Network error: ' + e.message;

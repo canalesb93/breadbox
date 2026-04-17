@@ -299,6 +299,18 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				return ""
 			},
 			"triggerLabel": service.TriggerLabel,
+			"ruleHasRetroactiveAction": func(actions []service.RuleAction) bool {
+				// Retroactive apply materializes set_category / add_tag / remove_tag.
+				// add_comment is sync-only. A rule with only comments isn't
+				// usefully apply-able retroactively.
+				for _, a := range actions {
+					switch a.Type {
+					case "set_category", "add_tag", "remove_tag":
+						return true
+					}
+				}
+				return false
+			},
 			"badgeCount": func(n int64) string {
 				if n > 99 {
 					return "99+"
