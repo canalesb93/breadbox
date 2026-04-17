@@ -90,9 +90,16 @@ Unknown field or unknown op → condition evaluates to false (the rule simply wo
 
 `matches` uses Go's [RE2](https://pkg.go.dev/regexp/syntax) — no backreferences, no lookaround, linear-time guaranteed. Patterns are not anchored automatically; use `^` and `$` if you want full-match semantics. Use `(?i)` for case-insensitive matching.
 
-### Tag conditions and timing
+### Tag conditions and rule chaining
 
-The `tags` field reflects the transaction's current tag set. For a brand-new transaction (first sync), a rule's tag condition can only see tags added by **earlier-priority rules in the same sync pass** (see "Rule chaining" below). For a re-synced transaction, it sees the tags already persisted on the row.
+The `tags` field reflects the transaction's current tag set from two sources, combined live during resolution:
+
+1. Tags already persisted on the transaction (loaded for re-synced rows; empty for brand-new rows).
+2. Tags that **earlier-stage rules in the same pass** added via `add_tag`.
+
+Rules evaluate in pipeline order — lower `priority` runs first. As each matching rule applies its actions, a local mutable copy of the transaction context updates: `add_tag` appends to `Tags`; `set_category` updates the assigned category. Later-stage rules see those mutations. This enables composition: rule A tags a transaction as `coffee`; rule B conditioned on `tags contains "coffee"` picks a category.
+
+Mutations are scoped to the resolver run and do not leak back to the caller's `TransactionContext`.
 
 ## Actions
 
@@ -158,13 +165,20 @@ A transaction is "changed" when the provider returned a different version of an 
 
 Retroactive apply (`apply_rules`) ignores trigger — it's a bulk operation intended to evaluate a rule's condition across the entire history regardless of when the transaction was ingested.
 
-## Priority and rule ordering
+## Priority as pipeline stage
 
-`priority` is an integer (default `10`, range `0..1000`). Rules load and evaluate in `priority DESC, created_at DESC` order — higher-priority rules run first. Within the same priority, the most-recently-created rule wins.
+`priority` is an integer pipeline stage (default `10`, range `0..1000`). Rules load and evaluate in `priority ASC, created_at ASC` order — **lower priority runs first**. Think of priority as the stage number in a pipeline:
 
-For `set_category`, the **first rule to match** wins (higher priority = wins). For accumulator actions (`add_tag`, `add_comment`), every matching rule contributes.
+- **0** — baseline / foundation (system defaults, broad classifications)
+- **10** — standard rules
+- **50** — refinements
+- **100** — overrides (have the final say)
 
-`hit_count` increments on every condition match, regardless of whether the rule's action was suppressed (e.g. second `set_category` in the same pass).
+For `set_category`, the **last rule to match wins** (higher-priority stage has final say). For accumulator actions (`add_tag`, `add_comment`), every matching rule contributes.
+
+`hit_count` increments on every condition match, regardless of whether the rule's action was ultimately superseded by a later stage.
+
+> *Historical note:* before April 2026, rules evaluated in `priority DESC` order with first-writer-wins `set_category`. The inversion to pipeline-stage semantics preserves "higher priority wins set_category" in meaning, but the mechanism changes from "speaks first" to "speaks last." Outcomes for pre-flip rules are unchanged (the winner of a conflict is the same rule either way) — only the mental model shifts.
 
 ## Expiry and enabled state
 
@@ -192,10 +206,8 @@ The rule engine has two entry points. They share condition evaluation and priori
 
 ## Roadmap (not yet shipped)
 
-- **Rule chaining.** Lower-priority-stage rules will see the effects of higher-priority-stage rules within a single sync pass (tags added, categories set). Currently, each rule evaluates against a static snapshot of the transaction.
-- **Priority inversion to pipeline-stage semantics.** Ordering will flip to `priority ASC` (lower = earlier), with `set_category` becoming last-writer-wins. Outcome for existing rules is unchanged, but the mental model (and docs) changes to "pipeline stage."
 - **`on_change` trigger.** `on_update` will be renamed to `on_change` with a DB-level alias for back-compat. Semantics unchanged.
-- **New condition fields.** `category` (assigned category slug, distinct from `category_primary` raw provider field) and `account_name`.
-- **New action.** `remove_tag`, symmetric with `add_tag`; useful for clearing transient tags like `needs-review` once a rule's conditions pre-categorize.
+- **New condition fields.** `category` (assigned category slug, distinct from `category_primary` raw provider field) and `account_name`. *Note:* the resolver already mutates a local `Category` slot during chaining; the public condition field is wired up in the next phase.
+- **New action.** `remove_tag`, symmetric with `add_tag`; useful for clearing transient tags like `needs-review` once a higher-priority-stage rule has pre-categorized the transaction.
 
-Until those ship, rules see the raw, pre-rule transaction state each time they evaluate. Compose via explicit conditions (e.g. `and` with all the required clauses) rather than relying on inter-rule state.
+Tag-based chaining is already live in the resolver. The remaining roadmap items polish the surface.

@@ -653,6 +653,102 @@ func TestResolveWithContext_AddCommentAccumulation(t *testing.T) {
 	}
 }
 
+func TestResolveWithContext_ChainingTagsVisibleToLaterRule(t *testing.T) {
+	// Rule A (earlier stage) adds tag "coffee".
+	// Rule B (later stage) has condition `tags contains "coffee"` — it
+	// should observe the tag that rule A just added, even though the
+	// incoming transaction carried no tags.
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        testUUID(10), // earlier
+				actions:   []typedAction{{Type: "add_tag", TagSlug: "coffee"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "starbucks"}),
+			},
+			{
+				id:      testUUID(11), // later
+				actions: []typedAction{{Type: "set_category", CategorySlug: "food_and_drink_coffee"}},
+				trigger: "always",
+				condition: mustCompile(t, &Condition{
+					Field: "tags", Op: "contains", Value: "coffee",
+				}),
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	tctx := TransactionContext{Name: "STARBUCKS #1234", Provider: "plaid"} // Tags nil
+	result := r.ResolveWithContext("plaid", tctx, true)
+
+	if result == nil {
+		t.Fatal("expected chained result")
+	}
+	if len(result.TagsToAdd) != 1 || result.TagsToAdd[0] != "coffee" {
+		t.Errorf("expected tags [coffee], got %v", result.TagsToAdd)
+	}
+	if result.CategorySlug != "food_and_drink_coffee" {
+		t.Errorf("expected later rule to observe earlier rule's tag, got category %q", result.CategorySlug)
+	}
+}
+
+func TestResolveWithContext_ChainingDoesNotLeakIntoCallerContext(t *testing.T) {
+	// The caller's TransactionContext (passed by value) should not reflect
+	// resolver-internal mutations. In particular, Tags mid-resolve append
+	// should not leak back if the caller kept a reference to the slice.
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        testUUID(10),
+				actions:   []typedAction{{Type: "add_tag", TagSlug: "new-tag"}},
+				trigger:   "always",
+				condition: nil, // match-all
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	originalTags := []string{"pre-existing"}
+	tctx := TransactionContext{Tags: originalTags}
+	_ = r.ResolveWithContext("plaid", tctx, true)
+
+	// originalTags slice must not have been appended to.
+	if len(originalTags) != 1 || originalTags[0] != "pre-existing" {
+		t.Errorf("expected caller's Tags slice to be untouched, got %v", originalTags)
+	}
+	// Caller's tctx.Tags header also unchanged (pointer identity preserved).
+	if len(tctx.Tags) != 1 {
+		t.Errorf("expected caller's tctx.Tags len=1, got %d", len(tctx.Tags))
+	}
+}
+
+func TestResolveWithContext_ChainingExistingTagsVisible(t *testing.T) {
+	// A re-synced transaction already carries `needs-review`. A rule whose
+	// condition asks `tags contains "needs-review"` should match it.
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:      testUUID(10),
+				actions: []typedAction{{Type: "set_category", CategorySlug: "flagged"}},
+				trigger: "always",
+				condition: mustCompile(t, &Condition{
+					Field: "tags", Op: "contains", Value: "needs-review",
+				}),
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	tctx := TransactionContext{Name: "X", Tags: []string{"needs-review"}}
+	result := r.ResolveWithContext("plaid", tctx, true)
+	if result == nil || result.CategorySlug != "flagged" {
+		t.Errorf("expected rule to fire on existing tag, got %+v", result)
+	}
+}
+
 func TestResolveWithContext_TriggerMatrix(t *testing.T) {
 	// Matrix: trigger × isNew. Each cell checks whether the rule fires.
 	cases := []struct {
@@ -696,18 +792,22 @@ func TestResolveWithContext_TriggerMatrix(t *testing.T) {
 	}
 }
 
-func TestResolveWithContext_PriorityOrdering(t *testing.T) {
+func TestResolveWithContext_PriorityOrdering_LastWins(t *testing.T) {
+	// Rules are ordered in the slice as loadRules would return them after
+	// ORDER BY priority ASC, created_at ASC — so the LATER entry is the
+	// higher-priority rule. Under last-writer-wins (Phase 1a chaining),
+	// the later rule's set_category wins.
 	r := &RuleResolver{
 		hitCounts: make(map[[16]byte]int),
 		rules: []compiledRule{
 			{
-				id:        testUUID(10),
+				id:        testUUID(10), // lower priority — runs first
 				actions:   []typedAction{{Type: "set_category", CategorySlug: "catA"}},
 				trigger:   "always",
 				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
 			},
 			{
-				id:        testUUID(11),
+				id:        testUUID(11), // higher priority — runs last, wins
 				actions:   []typedAction{{Type: "set_category", CategorySlug: "catB"}},
 				trigger:   "always",
 				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
@@ -716,11 +816,23 @@ func TestResolveWithContext_PriorityOrdering(t *testing.T) {
 		uncategorizedID: testUUID(99),
 	}
 
-	// Both rules match; first (higher priority) sets category.
 	tctx := TransactionContext{Name: "Coffee Shop", Provider: "plaid"}
 	result := r.ResolveWithContext("plaid", tctx, true)
-	if result == nil || result.CategorySlug != "catA" {
-		t.Errorf("expected higher priority rule's category to win, got %+v", result)
+	if result == nil || result.CategorySlug != "catB" {
+		t.Errorf("expected higher-priority (later) rule's category to win, got %+v", result)
+	}
+	// Only the winning rule's source should remain for the category field.
+	var catSources int
+	for _, s := range result.Sources {
+		if s.ActionField == "category" {
+			catSources++
+			if s.ActionValue != "catB" {
+				t.Errorf("expected remaining category source to be catB, got %q", s.ActionValue)
+			}
+		}
+	}
+	if catSources != 1 {
+		t.Errorf("expected exactly 1 category source after last-wins merge, got %d", catSources)
 	}
 }
 
@@ -803,13 +915,15 @@ func TestResolveWithContext_MergeNonConflictingActions(t *testing.T) {
 		hitCounts: make(map[[16]byte]int),
 		rules: []compiledRule{
 			{
+				// Earlier-stage (lower priority) rule — runs first.
 				id:        ruleAID,
 				actions:   []typedAction{{Type: "set_category", CategorySlug: "catA"}},
 				trigger:   "always",
 				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
 			},
 			{
-				// Lower priority rule with same field — category already set by rule A
+				// Later-stage (higher priority) rule — runs last and wins
+				// set_category under pipeline-stage semantics.
 				id:        ruleBID,
 				actions:   []typedAction{{Type: "set_category", CategorySlug: "catB"}},
 				trigger:   "always",
@@ -822,14 +936,14 @@ func TestResolveWithContext_MergeNonConflictingActions(t *testing.T) {
 	tctx := TransactionContext{Name: "Coffee Shop", Provider: "plaid"}
 	result := r.ResolveWithContext("plaid", tctx, true)
 
-	// Both rules match — first to set category wins
 	if result == nil {
 		t.Fatal("expected non-nil result")
 	}
-	if result.CategorySlug != "catA" {
-		t.Errorf("expected category from higher priority rule, got %v", result.CategorySlug)
+	if result.CategorySlug != "catB" {
+		t.Errorf("expected last-wins category, got %v", result.CategorySlug)
 	}
-	// Both rules should get hit counts
+	// Both rules match, so both bump hit_count even though rule A's
+	// set_category was superseded.
 	if r.hitCounts[ruleAID.Bytes] != 1 {
 		t.Errorf("expected 1 hit for rule A, got %d", r.hitCounts[ruleAID.Bytes])
 	}

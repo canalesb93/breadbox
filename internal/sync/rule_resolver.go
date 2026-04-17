@@ -31,13 +31,19 @@ type TransactionContext struct {
 	Amount           float64
 	CategoryPrimary  string  // raw provider category
 	CategoryDetailed string  // raw provider detailed category
-	Pending          bool
-	Provider         string  // "plaid", "teller", "csv"
-	AccountID        string  // UUID string
-	UserID           string  // UUID string
-	UserName         string  // family member name
+	// Category is the transaction's *assigned* category slug (distinct from
+	// CategoryPrimary's raw provider value). It updates mid-resolver as
+	// earlier-stage rules' set_category actions fire, so later-stage rules
+	// can condition on the current category via field="category".
+	Category  string
+	Pending   bool
+	Provider  string // "plaid", "teller", "csv"
+	AccountID string // UUID string
+	UserID    string // UUID string
+	UserName  string // family member name
 	// Tags is populated from transaction_tags so tag-based conditions
 	// (field: "tags") can match against the transaction's current tags.
+	// Updated mid-resolver as earlier-stage add_tag actions apply.
 	Tags []string
 }
 
@@ -53,10 +59,19 @@ type RuleActionSource struct {
 }
 
 // RuleActions holds the merged actions to apply to a transaction after resolving
-// all matching rules. First-writer-wins per action category (set_category fires
-// at most once; add_tag and add_comment accumulate across rules).
+// all matching rules under pipeline-stage (priority ASC) ordering.
+//
+// Merge semantics:
+//   - set_category: last-writer-wins. Lower-priority rules run first (baseline),
+//     higher-priority rules run later and may overwrite the category.
+//   - add_tag: accumulates unique slugs across matching rules.
+//   - add_comment: accumulates all content strings across matching rules.
+//
+// Rules evaluate against a live-mutating TransactionContext, so later-priority
+// rules can react to earlier rules' tag and category changes via the `tags`
+// and `category_primary` / `category` condition fields.
 type RuleActions struct {
-	// CategorySlug is the slug chosen by the first rule whose set_category
+	// CategorySlug is the slug chosen by the last rule whose set_category
 	// action matched. Empty when no rule set a category.
 	CategorySlug string
 	// TagsToAdd is the accumulated list of unique tag slugs from add_tag actions.
@@ -64,7 +79,8 @@ type RuleActions struct {
 	// Comments is the accumulated list of comment content strings from
 	// add_comment actions.
 	Comments []string
-	// Sources records per-action provenance for the audit trail.
+	// Sources records per-action provenance for the audit trail. For
+	// set_category, only the winning (last) rule's source is retained.
 	Sources []RuleActionSource
 }
 
@@ -162,13 +178,15 @@ func NewRuleResolver(ctx context.Context, pool *pgxpool.Pool, provider string, l
 
 // loadRules queries the transaction_rules table for active, non-expired rules,
 // compiles their conditions, parses actions, and returns them sorted by
-// priority DESC, created_at DESC.
+// priority ASC, created_at ASC — pipeline-stage order. Lower priority runs
+// first (baseline / foundation), higher priority runs last and wins
+// set_category under the last-writer-wins resolver merge.
 func loadRules(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) ([]compiledRule, error) {
 	query := `SELECT id, short_id, name, conditions, actions, trigger
 		FROM transaction_rules
 		WHERE enabled = true
 		  AND (expires_at IS NULL OR expires_at > NOW())
-		ORDER BY priority DESC, created_at DESC`
+		ORDER BY priority ASC, created_at ASC`
 
 	rows, err := pool.Query(ctx, query)
 	if err != nil {
@@ -359,29 +377,45 @@ func (r *RuleResolver) CategoryIDForSlug(slug string) pgtype.UUID {
 	return r.slugToID[slug]
 }
 
-// ResolveWithContext evaluates all transaction rules in priority order and
-// returns the merged actions. Rules whose trigger doesn't match isNew are
-// skipped.
+// ResolveWithContext evaluates all transaction rules in pipeline-stage order
+// (priority ASC, created_at ASC) and returns the merged actions. Rules whose
+// trigger doesn't match isNew are skipped.
 //
 // Trigger semantics:
 //   - "on_create": fires only when isNew is true.
 //   - "on_update": fires only when isNew is false (caller decides isChanged).
 //   - "always":    fires regardless.
 //
+// Chaining: rules operate against a live-mutating copy of TransactionContext.
+// As earlier-stage rules apply their add_tag / set_category actions, the
+// local context updates so later-stage rules' conditions can observe them.
+// This enables composition ("rule A tags 'coffee'; rule B reacts to the tag
+// and picks a category"). `category_override=true` on the transaction
+// suppresses set_category both in the local context mutation and downstream
+// in the engine's DB write.
+//
 // Action merging:
-//   - set_category: first-writer-wins by priority DESC.
+//   - set_category: last-writer-wins. The highest-priority matching rule
+//     owns the category; its source is the only one retained for the
+//     category field in the audit trail.
 //   - add_tag:      accumulates unique slugs across matching rules.
 //   - add_comment:  accumulates all content strings.
 //
 // Returns nil when no rule matches.
 func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionContext, isNew bool) *RuleActions {
+	// Work on a local copy so chaining mutations don't leak back to the caller.
+	tctx := txn
+	if len(txn.Tags) > 0 {
+		tctx.Tags = append([]string(nil), txn.Tags...)
+	}
+
 	var result *RuleActions
 	for i := range r.rules {
 		rule := &r.rules[i]
 		if !triggerMatches(rule.trigger, isNew) {
 			continue
 		}
-		if !evaluateCondition(rule.condition, txn) {
+		if !evaluateCondition(rule.condition, tctx) {
 			continue
 		}
 		r.hitCounts[rule.id.Bytes]++
@@ -391,17 +425,25 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 		for _, a := range rule.actions {
 			switch a.Type {
 			case "set_category":
-				// First set_category wins.
-				if result.CategorySlug == "" && a.CategorySlug != "" {
-					result.CategorySlug = a.CategorySlug
-					result.Sources = append(result.Sources, RuleActionSource{
-						RuleID:      rule.id,
-						RuleShortID: rule.shortID,
-						RuleName:    rule.name,
-						ActionField: "category",
-						ActionValue: a.CategorySlug,
-					})
+				if a.CategorySlug == "" {
+					continue
 				}
+				// Last-writer-wins: overwrite prior category and drop the
+				// superseded source so the audit trail reflects only the
+				// rule that actually owns the final category.
+				result.CategorySlug = a.CategorySlug
+				result.Sources = dropCategorySource(result.Sources)
+				result.Sources = append(result.Sources, RuleActionSource{
+					RuleID:      rule.id,
+					RuleShortID: rule.shortID,
+					RuleName:    rule.name,
+					ActionField: "category",
+					ActionValue: a.CategorySlug,
+				})
+				// Mirror the new category into the live context so later
+				// rules referencing the `category` field (assigned slug)
+				// observe this pipeline-stage result.
+				tctx.Category = a.CategorySlug
 			case "add_tag":
 				if a.TagSlug == "" {
 					continue
@@ -415,6 +457,11 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 						ActionField: "tag",
 						ActionValue: a.TagSlug,
 					})
+				}
+				// Mirror into live context so later rules' tags conditions
+				// can observe the addition.
+				if !stringSliceContains(tctx.Tags, a.TagSlug) {
+					tctx.Tags = append(tctx.Tags, a.TagSlug)
 				}
 			case "add_comment":
 				if a.Content == "" {
@@ -432,6 +479,23 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 		}
 	}
 	return result
+}
+
+// dropCategorySource removes any prior category source so the final
+// RuleActionSource slice records only the winning (last) rule's provenance
+// for set_category. Non-category sources are preserved.
+func dropCategorySource(src []RuleActionSource) []RuleActionSource {
+	if len(src) == 0 {
+		return src
+	}
+	kept := src[:0]
+	for _, s := range src {
+		if s.ActionField == "category" {
+			continue
+		}
+		kept = append(kept, s)
+	}
+	return kept
 }
 
 // triggerMatches reports whether a rule with the given trigger should fire
