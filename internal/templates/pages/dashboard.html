@@ -223,10 +223,7 @@
               {{end}}
               <button @click.stop="markRead('{{.ID}}')" class="text-[0.65rem] text-base-content/30 hover:text-success transition-colors cursor-pointer ml-auto shrink-0">Mark read</button>
             </div>
-            <a href="/reports/{{.ID}}" class="rounded-2xl rounded-tl-sm shadow-sm px-3.5 py-2.5 inline-block max-w-full no-underline group transition-colors
-              {{if eq .Priority "critical"}}bg-error/10 hover:bg-error/15
-              {{else if eq .Priority "warning"}}bg-warning/10 hover:bg-warning/15
-              {{else}}bg-base-200/70 hover:bg-base-200/90{{end}}">
+            <a href="/reports/{{.ID}}" class="rounded-2xl rounded-tl-sm shadow-sm px-3.5 py-2.5 inline-block max-w-full no-underline group bg-base-200/70 hover:bg-base-200/90 transition-colors">
               <p class="text-sm leading-relaxed text-base-content/80 group-hover:text-base-content transition-colors">{{.Title}}</p>
               <span class="text-xs text-base-content/30 group-hover:text-primary/60 transition-colors">View report &rarr;</span>
             </a>

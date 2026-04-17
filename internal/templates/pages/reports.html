@@ -66,10 +66,7 @@
           </div>
 
           <!-- Title as message bubble -->
-          <div class="inline-block max-w-full rounded-2xl rounded-tl-sm shadow-sm px-3.5 py-2.5 transition-colors
-            {{if eq .Priority "critical"}}bg-error/10 group-hover:bg-error/15
-            {{else if eq .Priority "warning"}}bg-warning/10 group-hover:bg-warning/15
-            {{else}}bg-base-200/70 group-hover:bg-base-200/90{{end}}">
+          <div class="inline-block max-w-full rounded-2xl rounded-tl-sm shadow-sm px-3.5 py-2.5 bg-base-200/70 group-hover:bg-base-200/90 transition-colors">
             <p class="text-sm leading-relaxed {{if .IsRead}}text-base-content/70{{else}}text-base-content{{end}} group-hover:text-base-content transition-colors">{{.Title}}</p>
             {{if .Preview}}
             <p class="text-xs text-base-content/40 mt-1 line-clamp-1">{{.Preview}}</p>
