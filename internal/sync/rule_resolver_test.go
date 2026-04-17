@@ -782,6 +782,175 @@ func TestResolveWithContext_ChainingDoesNotLeakIntoCallerContext(t *testing.T) {
 	}
 }
 
+func TestResolveWithContext_RemoveTag_PresentOnTransaction(t *testing.T) {
+	// Transaction carries `needs-review`. Rule's remove_tag deletes it.
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        testUUID(10),
+				actions:   []typedAction{{Type: "remove_tag", TagSlug: "needs-review"}},
+				trigger:   "always",
+				condition: nil, // match-all
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	tctx := TransactionContext{Tags: []string{"needs-review", "other"}}
+	result := r.ResolveWithContext("plaid", tctx, false)
+	if result == nil {
+		t.Fatal("expected result")
+	}
+	if len(result.TagsToRemove) != 1 || result.TagsToRemove[0] != "needs-review" {
+		t.Errorf("expected TagsToRemove=[needs-review], got %v", result.TagsToRemove)
+	}
+	if len(result.TagsToAdd) != 0 {
+		t.Errorf("expected no adds, got %v", result.TagsToAdd)
+	}
+}
+
+func TestResolveWithContext_RemoveTag_NotPresentIsNoOp(t *testing.T) {
+	// Transaction has no tags. Rule's remove_tag is a no-op.
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        testUUID(10),
+				actions:   []typedAction{{Type: "remove_tag", TagSlug: "needs-review"}},
+				trigger:   "always",
+				condition: nil,
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	result := r.ResolveWithContext("plaid", TransactionContext{}, true)
+	// Rule matched (hit_count bumped), but produced no side-effect.
+	if result == nil {
+		t.Fatal("expected result with hit_count bump")
+	}
+	if len(result.TagsToRemove) != 0 {
+		t.Errorf("expected no removes for absent slug, got %v", result.TagsToRemove)
+	}
+}
+
+func TestResolveWithContext_AddThenRemoveCancelsOut(t *testing.T) {
+	// Earlier rule adds "coffee"; later rule removes it. Net: no DB write.
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        testUUID(10),
+				actions:   []typedAction{{Type: "add_tag", TagSlug: "coffee"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "starbucks"}),
+			},
+			{
+				id:        testUUID(11),
+				actions:   []typedAction{{Type: "remove_tag", TagSlug: "coffee"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "amount", Op: "lt", Value: float64(1)}),
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	// Both rules match; they should cancel.
+	tctx := TransactionContext{Name: "Starbucks", Amount: 0.50}
+	result := r.ResolveWithContext("plaid", tctx, true)
+	if result == nil {
+		t.Fatal("expected result with hits")
+	}
+	if len(result.TagsToAdd) != 0 {
+		t.Errorf("expected TagsToAdd cancelled, got %v", result.TagsToAdd)
+	}
+	if len(result.TagsToRemove) != 0 {
+		t.Errorf("expected TagsToRemove cancelled, got %v", result.TagsToRemove)
+	}
+	// No tag-related sources should remain.
+	for _, s := range result.Sources {
+		if s.ActionField == "tag" || s.ActionField == "tag_remove" {
+			t.Errorf("unexpected cancelled-action source: %+v", s)
+		}
+	}
+}
+
+func TestResolveWithContext_RemoveThenAddReAdds(t *testing.T) {
+	// Earlier rule removes tag; later rule re-adds same tag. Net: tag present.
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        testUUID(10),
+				actions:   []typedAction{{Type: "remove_tag", TagSlug: "needs-review"}},
+				trigger:   "always",
+				condition: nil,
+			},
+			{
+				id:        testUUID(11),
+				actions:   []typedAction{{Type: "add_tag", TagSlug: "needs-review"}},
+				trigger:   "always",
+				condition: nil,
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	tctx := TransactionContext{Tags: []string{"needs-review"}}
+	result := r.ResolveWithContext("plaid", tctx, false)
+	if result == nil {
+		t.Fatal("expected result")
+	}
+	// Remove cancelled by re-add; the final state should preserve the tag
+	// without any DB writes (nothing added, nothing removed — the prior
+	// remove's queued delete is dropped when the later add fires).
+	if len(result.TagsToRemove) != 0 {
+		t.Errorf("expected TagsToRemove cancelled, got %v", result.TagsToRemove)
+	}
+	// The add might still be queued if it's genuinely a "new" add. Under
+	// our semantics, add checks for presence in tctx.Tags first — the
+	// earlier remove stripped it from tctx.Tags, so the add sees it as
+	// absent and queues a new insert. That's reasonable: we re-add.
+	if len(result.TagsToAdd) != 1 || result.TagsToAdd[0] != "needs-review" {
+		t.Errorf("expected TagsToAdd=[needs-review] as re-add, got %v", result.TagsToAdd)
+	}
+}
+
+func TestResolveWithContext_RemoveTagVisibleToLaterRule(t *testing.T) {
+	// Rule A removes "needs-review". Rule B conditions on `tags not_contains "needs-review"`
+	// — it should observe the removal and fire.
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        testUUID(10),
+				actions:   []typedAction{{Type: "remove_tag", TagSlug: "needs-review"}},
+				trigger:   "always",
+				condition: nil,
+			},
+			{
+				id:        testUUID(11),
+				actions:   []typedAction{{Type: "set_category", CategorySlug: "reviewed"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{
+					Field: "tags", Op: "not_contains", Value: "needs-review",
+				}),
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	tctx := TransactionContext{Tags: []string{"needs-review"}}
+	result := r.ResolveWithContext("plaid", tctx, false)
+	if result == nil {
+		t.Fatal("expected result")
+	}
+	if result.CategorySlug != "reviewed" {
+		t.Errorf("expected later rule to observe removal and set category, got %q", result.CategorySlug)
+	}
+}
+
 func TestResolveWithContext_ChainingExistingTagsVisible(t *testing.T) {
 	// A re-synced transaction already carries `needs-review`. A rule whose
 	// condition asks `tags contains "needs-review"` should match it.

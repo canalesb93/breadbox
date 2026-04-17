@@ -694,6 +694,17 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		}
 	}
 
+	// remove_tag: delete the (transaction, tag) row and write a tag_removed
+	// annotation. Only slugs that survived net-diff cancellation at the
+	// resolver are here — an earlier-stage add-then-later-stage-remove pair
+	// produces no DB write.
+	for _, slug := range result.TagsToRemove {
+		src := sourceByKey["tag_remove|"+slug]
+		if err := e.removeTagFromRule(ctx, tx, dbTxn.ID, slug, src.ruleID, src.ruleShortID, src.ruleName); err != nil {
+			return result.Sources, err
+		}
+	}
+
 	// add_comment: persist as a comment annotation. Rule-authored comments
 	// attribute to the rule via rule_id back-reference.
 	for _, content := range result.Comments {
@@ -795,6 +806,52 @@ func (e *Engine) applyTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.U
 		RuleID:        ruleID,
 	}); err != nil {
 		return fmt.Errorf("annotate tag_added: %w", err)
+	}
+	return nil
+}
+
+// removeTagFromRule deletes a (transaction, tag) row and writes the matching
+// tag_removed annotation. No-op if the tag slug doesn't exist. The rule's
+// name is used as the removal note so ephemeral-tag removal has a source
+// attribution visible in the activity timeline.
+func (e *Engine) removeTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, slug string, ruleID pgtype.UUID, ruleShortID, ruleName string) error {
+	var tagID pgtype.UUID
+	err := tx.QueryRow(ctx, `SELECT id FROM tags WHERE slug = $1`, slug).Scan(&tagID)
+	if err != nil {
+		// Tag doesn't exist — no-op.
+		return nil
+	}
+
+	cmd, err := tx.Exec(ctx,
+		`DELETE FROM transaction_tags WHERE transaction_id = $1 AND tag_id = $2`,
+		txnID, tagID)
+	if err != nil {
+		return fmt.Errorf("delete transaction_tag: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		// Nothing was attached; skip the annotation so we don't pollute
+		// the timeline with phantom removals.
+		return nil
+	}
+
+	payload := map[string]any{
+		"slug":      slug,
+		"source":    "rule",
+		"rule_id":   ruleShortID,
+		"rule_name": ruleName,
+		"note":      fmt.Sprintf("Removed by rule: %s", ruleName),
+	}
+	if err := writeSyncAnnotation(ctx, tx, writeSyncAnnotationParams{
+		TransactionID: txnID,
+		Kind:          "tag_removed",
+		ActorType:     "system",
+		ActorID:       ruleShortID,
+		ActorName:     ruleName,
+		Payload:       payload,
+		TagID:         tagID,
+		RuleID:        ruleID,
+	}); err != nil {
+		return fmt.Errorf("annotate tag_removed: %w", err)
 	}
 	return nil
 }
