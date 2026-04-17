@@ -595,15 +595,16 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 		return nil, nil
 	}
 
-	accountID, _ := e.resolveAccountID(ctx, txn.AccountExternalID, cache)
+	accountID, accountName := e.resolveAccountIDAndName(ctx, txn.AccountExternalID, cache)
 	tctx := TransactionContext{
-		Name:      txn.Name,
-		Amount:    txn.Amount.InexactFloat64(),
-		Pending:   txn.Pending,
-		Provider:  providerName,
-		AccountID: pgconv.FormatUUID(accountID),
-		UserID:    pgconv.FormatUUID(userID),
-		UserName:  userName,
+		Name:        txn.Name,
+		Amount:      txn.Amount.InexactFloat64(),
+		Pending:     txn.Pending,
+		Provider:    providerName,
+		AccountID:   pgconv.FormatUUID(accountID),
+		AccountName: accountName,
+		UserID:      pgconv.FormatUUID(userID),
+		UserName:    userName,
 	}
 	if txn.MerchantName != nil {
 		tctx.MerchantName = *txn.MerchantName
@@ -613,6 +614,14 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 	}
 	if txn.CategoryDetailed != nil {
 		tctx.CategoryDetailed = *txn.CategoryDetailed
+	}
+	// Seed the assigned-category slug from the transaction's currently
+	// assigned category. Later-stage rules can read this via field="category";
+	// earlier-stage set_category actions mutate it live within the resolver.
+	if dbTxn.CategoryID.Valid {
+		if slug := resolver.CategorySlug(dbTxn.CategoryID); slug != "" {
+			tctx.Category = slug
+		}
 	}
 
 	// For changed transactions, load the current tag slugs so tag-based
@@ -1002,6 +1011,23 @@ func (e *Engine) resolveAccountID(ctx context.Context, externalAccountID string,
 	}
 	cache[externalAccountID] = id
 	return id, nil
+}
+
+// resolveAccountIDAndName returns both the account UUID and its display name
+// for rule conditions referencing account_name. The id cache is reused; the
+// name lookup is best-effort (returns empty string on error).
+func (e *Engine) resolveAccountIDAndName(ctx context.Context, externalAccountID string, cache map[string]pgtype.UUID) (pgtype.UUID, string) {
+	row, err := e.db.GetAccountIDAndNameByExternalAccountID(ctx, externalAccountID)
+	if err != nil {
+		// Fall back to the id-only cache path so rule AccountID still works.
+		if id, cacheOK := cache[externalAccountID]; cacheOK {
+			return id, ""
+		}
+		id, _ := e.db.GetAccountIDByExternalAccountID(ctx, externalAccountID)
+		return id, ""
+	}
+	cache[externalAccountID] = row.ID
+	return row.ID, row.Name
 }
 
 // getOrCreateMutex returns the per-connection mutex, creating one if needed.

@@ -27,6 +27,10 @@ WHERE external_account_id = $1;
 -- name: GetAccountIDByExternalAccountID :one
 SELECT id FROM accounts WHERE external_account_id = $1;
 
+-- name: GetAccountIDAndNameByExternalAccountID :one
+SELECT id, COALESCE(display_name, name) AS name
+FROM accounts WHERE external_account_id = $1;
+
 -- name: GetAccountUUIDByShortID :one
 SELECT id FROM accounts WHERE short_id = $1;
 
