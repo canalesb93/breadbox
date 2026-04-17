@@ -327,7 +327,10 @@
     <span x-text="applyError"></span>
   </div>
 
-  <!-- Retroactive apply confirmation modal -->
+  <!-- Retroactive apply confirmation modal — teleported to <body> so the
+       SPA progress bar's filter/opacity on <main> doesn't break the
+       fixed-positioning containing block. -->
+  <template x-teleport="body">
   <div x-show="showApplyModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" @click.self="closeApplyModal()">
     <div class="bb-card max-w-md w-full p-6 bg-base-100 shadow-xl rounded-2xl" role="dialog" aria-modal="true" @keydown.escape.window="closeApplyModal()">
       <div class="flex items-start gap-3">
@@ -363,6 +366,7 @@
       </div>
     </div>
   </div>
+  </template>
 </div>
 {{end}}
 
