@@ -2312,16 +2312,18 @@ func ActionsSummary(actions []RuleAction, categoryName string) string {
 }
 
 // TriggerLabel returns the human-readable label for a rule trigger value.
-// Falls back to the raw value (or "On create" when empty) for unknown values.
-// "on_update" is accepted as a back-compat alias for "on_change".
+// The "On sync …" phrasing makes it explicit that rules fire during provider
+// sync, not on arbitrary admin edits. "on_update" is accepted as a back-compat
+// alias for "on_change". Falls back to the raw value for unknown triggers and
+// "On sync create" when the value is empty.
 func TriggerLabel(trigger string) string {
 	switch trigger {
 	case "", "on_create":
-		return "On create"
+		return "On sync create"
 	case "on_change", "on_update":
-		return "On change"
+		return "On sync change"
 	case "always":
-		return "Always"
+		return "Every sync"
 	default:
 		return trigger
 	}

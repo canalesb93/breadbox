@@ -84,7 +84,7 @@
       <!-- Condition rows -->
       <div class="space-y-2" x-show="form.conditions.length > 0">
         <template x-for="(cond, idx) in form.conditions" :key="idx">
-          <div class="flex items-center gap-2 p-2.5 bg-base-200/40 rounded-xl">
+          <div class="flex items-center gap-2 p-2.5 bg-base-200/50 border border-base-content/10 rounded-xl">
             <!-- Conjunction label -->
             <div class="w-10 shrink-0 text-center">
               <span x-show="idx === 0" class="text-xs text-base-content/30 font-medium">IF</span>
@@ -172,7 +172,7 @@
       <div class="flex items-center justify-between mb-2">
         <div>
           <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/60">Then</h3>
-          <p class="text-xs text-base-content/40 mt-1">Up to one of each action type (set category, add tag, remove tag, add comment).</p>
+          <p class="text-xs text-base-content/40 mt-1">Add one or more. Only "Set category" is limited to a single action per rule.</p>
         </div>
         <button type="button" class="btn btn-ghost btn-xs rounded-lg gap-1.5 shrink-0" @click="addAction()"
                 :disabled="!canAddAction()"
@@ -183,8 +183,8 @@
 
       <div class="space-y-2">
         <template x-for="(action, idx) in form.actions" :key="idx">
-          <div class="flex items-start gap-2 p-2.5 rounded-xl transition-colors"
-               :class="action.field === 'tag_remove' ? 'bg-error/5 border border-error/15' : 'bg-base-200/40'">
+          <div class="flex items-start gap-2 p-2.5 rounded-xl border transition-colors"
+               :class="action.field === 'tag_remove' ? 'bg-error/5 border-error/25' : 'bg-base-200/50 border-base-300/70'">
             <!-- Action type selector -->
             <select x-model="action.field" @change="onActionTypeChange(idx)"
                     class="select select-bordered select-xs rounded-lg bg-base-100 w-36 shrink-0 mt-px"
@@ -279,15 +279,15 @@
         <div>
           <label class="block text-xs font-medium text-base-content/50 mb-1.5" for="rule-trigger">Trigger</label>
           <select id="rule-trigger" x-model="form.trigger" class="bb-form-select select-sm">
-            <option value="on_create">On create</option>
-            <option value="on_change">On change</option>
-            <option value="always">Always</option>
+            <option value="on_create">On sync create</option>
+            <option value="on_change">On sync change</option>
+            <option value="always">Every sync</option>
           </select>
-          <p class="text-xs text-base-content/40 mt-1.5" x-show="form.trigger === 'on_create'">Fires only when a transaction is first synced.</p>
-          <p class="text-xs text-base-content/40 mt-1.5" x-show="form.trigger === 'on_change' || form.trigger === 'on_update'">Fires only when an existing transaction changes on re-sync.</p>
+          <p class="text-xs text-base-content/40 mt-1.5" x-show="form.trigger === 'on_create'">Fires when a provider first syncs the transaction.</p>
+          <p class="text-xs text-base-content/40 mt-1.5" x-show="form.trigger === 'on_change' || form.trigger === 'on_update'">Fires when a provider re-syncs and the transaction changed.</p>
           <p class="text-xs text-warning/80 mt-1.5" x-show="form.trigger === 'always'" x-cloak>
             <i data-lucide="alert-triangle" class="w-3 h-3 inline-block -mt-0.5 mr-0.5"></i>
-            Fires on every sync that touches this transaction &mdash; use sparingly.
+            Fires on every provider sync that touches this transaction &mdash; use sparingly.
           </p>
         </div>
         <div>
@@ -549,22 +549,19 @@ function ruleForm() {
       this.syncToJson();
     },
 
-    // Action helpers
+    // Action helpers. Only set_category is singleton (backend enforces one
+    // per rule); add_tag / remove_tag / add_comment may repeat.
     isActionUsed(field) {
+      if (field !== 'category') return false;
       return this.form.actions.some(a => a.field === field);
     },
-    // Disable the "Add action" button when every type is already in use
-    // OR there's still an unpicked draft row waiting for a type.
+    // Block "Add action" only while there's an unpicked draft row.
     canAddAction() {
-      const distinct = new Set(this.form.actions.filter(a => a.field).map(a => a.field));
-      if (distinct.size >= actionTypes.length) return false;
       if (this.form.actions.some(a => !a.field)) return false;
       return true;
     },
     addActionTooltip() {
       if (this.form.actions.some(a => !a.field)) return 'Pick an action type first';
-      const distinct = new Set(this.form.actions.filter(a => a.field).map(a => a.field));
-      if (distinct.size >= actionTypes.length) return 'All action types in use';
       return 'Add another action';
     },
     addAction() {

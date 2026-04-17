@@ -60,48 +60,49 @@
   <div class="mt-3 space-y-3">
     <!-- Conditions -->
     <div>
-      <span class="text-xs text-base-content/40 uppercase tracking-wider">When</span>
-      <div class="mt-1 space-y-1">
-        {{if $matchAll}}
-        <div class="flex items-center gap-3 p-3 bg-info/5 border border-info/15 rounded-xl">
-          <div class="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
-            <i data-lucide="infinity" class="w-4 h-4 text-info"></i>
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium">All transactions</p>
-            <p class="text-xs text-base-content/50">No conditions &mdash; this rule fires on every transaction.</p>
-          </div>
-        </div>
-        {{else if .Rule.Conditions.And}}
-        <p class="text-xs text-base-content/50 mb-1"><strong>All</strong> of these match:</p>
-        {{range .Rule.Conditions.And}}
-        <div class="flex items-center gap-2 p-2 bg-base-200/40 rounded-lg">
-          <span class="text-sm text-base-content/60 w-28 shrink-0 capitalize">{{.Field}}</span>
-          <span class="text-xs font-mono text-base-content/40 w-20 shrink-0">{{.Op}}</span>
-          <span class="text-sm font-medium">{{.Value}}</span>
-        </div>
-        {{end}}
-        {{else if .Rule.Conditions.Or}}
-        <p class="text-xs text-base-content/50 mb-1"><strong>Any</strong> of these match:</p>
-        {{range .Rule.Conditions.Or}}
-        <div class="flex items-center gap-2 p-2 bg-base-200/40 rounded-lg">
-          <span class="text-sm text-base-content/60 w-28 shrink-0 capitalize">{{.Field}}</span>
-          <span class="text-xs font-mono text-base-content/40 w-20 shrink-0">{{.Op}}</span>
-          <span class="text-sm font-medium">{{.Value}}</span>
-        </div>
-        {{end}}
-        {{else if .Rule.Conditions.Field}}
-        <div class="flex items-center gap-2 p-2 bg-base-200/40 rounded-lg">
-          <span class="text-sm text-base-content/60 w-28 shrink-0 capitalize">{{.Rule.Conditions.Field}}</span>
-          <span class="text-xs font-mono text-base-content/40 w-20 shrink-0">{{.Rule.Conditions.Op}}</span>
-          <span class="text-sm font-medium">{{.Rule.Conditions.Value}}</span>
-        </div>
-        {{else}}
-        <div class="p-3 bg-base-200/40 rounded-xl">
-          <code class="text-xs font-mono text-base-content/70">{{.ConditionSummary}}</code>
-        </div>
+      {{- $conj := "" -}}{{- $conjClass := "text-base-content/30" -}}
+      {{- if .Rule.Conditions.And -}}{{- $conj = "AND" -}}{{- end -}}
+      {{- if .Rule.Conditions.Or -}}{{- $conj = "OR" -}}{{- $conjClass = "text-warning" -}}{{- end -}}
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs text-base-content/40 uppercase tracking-wider">When</span>
+        {{if $conj}}
+        <span class="text-[0.65rem] font-medium uppercase tracking-wider {{$conjClass}}">
+          {{if eq $conj "AND"}}All must match{{else}}Any may match{{end}}
+        </span>
         {{end}}
       </div>
+
+      {{if $matchAll}}
+      <div class="flex items-center gap-3 p-3 bg-info/5 border border-info/15 rounded-xl">
+        <div class="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
+          <i data-lucide="infinity" class="w-4 h-4 text-info"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium">All transactions</p>
+          <p class="text-xs text-base-content/50">No conditions &mdash; this rule fires on every transaction.</p>
+        </div>
+      </div>
+      {{else if .Rule.Conditions.And}}
+      <div class="space-y-1.5">
+        {{range $i, $c := .Rule.Conditions.And}}
+        {{template "condition-row" dict "Cond" $c "Idx" $i "Conj" "AND"}}
+        {{end}}
+      </div>
+      {{else if .Rule.Conditions.Or}}
+      <div class="space-y-1.5">
+        {{range $i, $c := .Rule.Conditions.Or}}
+        {{template "condition-row" dict "Cond" $c "Idx" $i "Conj" "OR"}}
+        {{end}}
+      </div>
+      {{else if .Rule.Conditions.Field}}
+      <div class="space-y-1.5">
+        {{template "condition-row" dict "Cond" .Rule.Conditions "Idx" 0 "Conj" ""}}
+      </div>
+      {{else}}
+      <div class="p-3 bg-base-200/50 border border-base-content/10 rounded-xl">
+        <code class="text-xs font-mono text-base-content/70">{{.ConditionSummary}}</code>
+      </div>
+      {{end}}
     </div>
 
     <!-- Actions -->
@@ -130,9 +131,17 @@
             <p class="text-sm">Add tag <span class="font-semibold">{{.TagSlug}}</span></p>
             <p class="text-xs text-base-content/40">Tag is attached to matching transactions during sync.</p>
           </div>
+          {{else if eq .Type "remove_tag"}}
+          <div class="w-8 h-8 rounded-lg bg-error/10 flex items-center justify-center shrink-0">
+            <i data-lucide="minus-circle" class="w-4 h-4 text-error"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm">Remove tag <span class="font-semibold">{{.TagSlug}}</span></p>
+            <p class="text-xs text-base-content/40">Tag is removed from matching transactions during sync.</p>
+          </div>
           {{else if eq .Type "add_comment"}}
-          <div class="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
-            <i data-lucide="message-square" class="w-4 h-4 text-secondary"></i>
+          <div class="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
+            <i data-lucide="message-square" class="w-4 h-4 text-info"></i>
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-sm">Add comment</p>

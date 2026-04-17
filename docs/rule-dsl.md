@@ -174,7 +174,7 @@ A rule can carry multiple actions of different types. Override (`category_overri
 
 #### Which combinations make sense
 
-A single rule is limited to **one action per type** (at most one `set_category`, one `add_tag`, one `remove_tag`, one `add_comment`). The admin UI enforces this by disabling already-picked types in the action dropdown. To apply more than one tag, create additional rules — their outputs accumulate at the tag layer.
+Only `set_category` is singleton per rule — repeating it is rejected at write time. `add_tag`, `remove_tag`, and `add_comment` can appear multiple times in one rule (e.g. add two tags at once, or add one and remove another). The admin UI disables a second `set_category` dropdown option once one is picked; tag and comment rows are freely repeatable.
 
 Useful combinations:
 
