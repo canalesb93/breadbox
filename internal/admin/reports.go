@@ -3,6 +3,8 @@ package admin
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"breadbox/internal/app"
@@ -11,6 +13,43 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 )
+
+// markdown-preview scrubbing: replace links [text](url) with their text, drop bold/italic/code markers.
+var (
+	previewLinkRe   = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`)
+	previewItalicRe = regexp.MustCompile(`\*([^*\n]+)\*`)
+)
+
+// bodyPreview returns a short, plain-text preview of a markdown report body:
+// strips common markdown markers, collapses whitespace, and trims to ~160 chars.
+func bodyPreview(body string) string {
+	var sb strings.Builder
+	for _, line := range strings.Split(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "|") || strings.HasPrefix(trimmed, "```") {
+			continue
+		}
+		trimmed = strings.TrimPrefix(trimmed, "- ")
+		trimmed = strings.TrimPrefix(trimmed, "* ")
+		trimmed = strings.ReplaceAll(trimmed, "**", "")
+		trimmed = strings.ReplaceAll(trimmed, "`", "")
+		// Convert markdown links and italics to plain text.
+		trimmed = previewLinkRe.ReplaceAllString(trimmed, "$1")
+		trimmed = previewItalicRe.ReplaceAllString(trimmed, "$1")
+		if sb.Len() > 0 {
+			sb.WriteString(" · ")
+		}
+		sb.WriteString(trimmed)
+		if sb.Len() >= 200 {
+			break
+		}
+	}
+	out := sb.String()
+	if len(out) > 160 {
+		out = strings.TrimSpace(out[:160]) + "…"
+	}
+	return out
+}
 
 // ReportsPageHandler handles GET /reports.
 func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
@@ -50,6 +89,7 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 			ID            string
 			Title         string
 			Body          string
+			Preview       string
 			Priority      string
 			Tags          []string
 			DisplayAuthor string
@@ -67,6 +107,7 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 				ID:            r.ID,
 				Title:         r.Title,
 				Body:          r.Body,
+				Preview:       bodyPreview(r.Body),
 				Priority:      r.Priority,
 				Tags:          r.Tags,
 				DisplayAuthor: displayAuthor,
@@ -151,6 +192,20 @@ func MarkReportReadAdminHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		if err := svc.MarkAgentReportRead(r.Context(), id); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	}
+}
+
+// MarkReportUnreadAdminHandler handles POST /-/reports/{id}/unread.
+func MarkReportUnreadAdminHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		if err := svc.MarkAgentReportUnread(r.Context(), id); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return

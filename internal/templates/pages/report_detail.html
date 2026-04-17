@@ -1,35 +1,128 @@
 {{define "content"}}
 {{template "breadcrumb" .}}
 
-<div class="bb-page-header">
-  <div>
-    <h1 class="bb-page-title">{{.Report.Title}}</h1>
-    <div class="flex items-center flex-wrap gap-2 mt-1.5">
-      <span class="text-sm text-base-content/50">{{.Report.DisplayAuthor}}</span>
-      <span class="text-base-content/20">&middot;</span>
-      <span class="text-sm text-base-content/40" title="{{.Report.CreatedAt}}">{{.Report.CreatedAtRel}}</span>
-      {{if eq .Report.Priority "critical"}}
-      <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-error/10 text-error/80">critical</span>
-      {{else if eq .Report.Priority "warning"}}
-      <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-warning/10 text-warning">warning</span>
-      {{end}}
-      {{range .Report.Tags}}
-      <span class="text-xs px-2 py-0.5 rounded-full bg-base-200/80 text-base-content/50">{{.}}</span>
-      {{end}}
+<div x-data="reportDetail('{{.Report.ID}}', {{.Report.IsRead}})" class="max-w-4xl">
+  <!-- Toast for copy + mark-unread feedback -->
+  <div class="toast toast-top toast-center z-50" x-show="toast" x-cloak x-transition.opacity>
+    <div class="alert alert-success text-xs rounded-xl shadow-md">
+      <i data-lucide="check" class="w-3.5 h-3.5"></i>
+      <span x-text="toast"></span>
+    </div>
+  </div>
+
+  <!-- Message header card -->
+  <div class="bb-card overflow-hidden mb-5
+    {{if eq .Report.Priority "critical"}}border-l-[3px] border-l-error/80
+    {{else if eq .Report.Priority "warning"}}border-l-[3px] border-l-warning/80
+    {{else}}border-l-[3px] border-l-primary/40{{end}}">
+
+    <div class="px-5 sm:px-6 pt-5 pb-4">
+      <!-- Author row -->
+      <div class="flex items-start gap-3 mb-4">
+        <div class="relative shrink-0">
+          <div class="w-12 h-12 rounded-2xl flex items-center justify-center
+            {{if eq .Report.Priority "critical"}}bg-error/15 text-error
+            {{else if eq .Report.Priority "warning"}}bg-warning/15 text-warning
+            {{else}}bg-primary/10 text-primary{{end}}">
+            <i data-lucide="bot" class="w-5 h-5"></i>
+          </div>
+          {{if eq .Report.Priority "critical"}}
+          <span class="absolute -top-1 -right-1 flex w-3 h-3">
+            <span class="animate-ping absolute inline-flex w-full h-full rounded-full bg-error/60"></span>
+            <span class="relative inline-flex w-3 h-3 rounded-full bg-error ring-2 ring-base-100"></span>
+          </span>
+          {{end}}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center flex-wrap gap-2 mb-0.5">
+            <span class="font-semibold text-base-content">{{.Report.DisplayAuthor}}</span>
+            {{if eq .Report.Priority "critical"}}
+            <span class="text-[0.65rem] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-error/10 text-error/90">Critical</span>
+            {{else if eq .Report.Priority "warning"}}
+            <span class="text-[0.65rem] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-warning/15 text-warning">Warning</span>
+            {{end}}
+            {{range .Report.Tags}}
+            <span class="text-[0.65rem] px-1.5 py-0.5 rounded-full bg-base-200/80 text-base-content/50">{{.}}</span>
+            {{end}}
+          </div>
+          <p class="text-xs text-base-content/50" title="{{.Report.CreatedAt}}">
+            Sent {{.Report.CreatedAtRel}}
+          </p>
+        </div>
+      </div>
+
+      <!-- Title: rendered as the message -->
+      <h1 class="text-xl sm:text-2xl font-semibold text-base-content leading-snug">{{.Report.Title}}</h1>
+    </div>
+
+    <!-- Action toolbar -->
+    <div class="flex items-center gap-1 px-3 sm:px-4 py-2 border-t border-base-200/60 bg-base-200/20">
+      <button type="button" @click="toggleRead()" class="btn btn-ghost btn-xs rounded-lg text-xs">
+        <i :data-lucide="isRead ? 'mail' : 'mail-open'" class="w-3.5 h-3.5"></i>
+        <span x-text="isRead ? 'Mark unread' : 'Mark read'"></span>
+      </button>
+      <button type="button" @click="copyLink()" class="btn btn-ghost btn-xs rounded-lg text-xs">
+        <i data-lucide="link" class="w-3.5 h-3.5"></i>
+        <span>Copy link</span>
+      </button>
+      <div class="ml-auto">
+        <a href="/agents?tab=settings#report-format" class="btn btn-ghost btn-xs rounded-lg text-xs no-underline" title="Edit the guidelines agents follow when writing reports">
+          <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Manage report format</span>
+          <span class="sm:hidden">Format</span>
+          <i data-lucide="arrow-up-right" class="w-3 h-3 opacity-60"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Body card -->
+  <div class="bb-card">
+    <div class="px-5 sm:px-7 py-5 sm:py-6">
+      <div class="bb-report-body prose prose-sm sm:prose max-w-none text-base-content/85 leading-relaxed" data-markdown="{{.Report.Body}}"></div>
     </div>
   </div>
 </div>
 
-<div class="bb-card">
-  <div class="p-5 sm:p-6">
-    <div class="bb-report-body prose prose-sm max-w-none text-base-content/80 leading-relaxed" data-markdown="{{.Report.Body}}"></div>
-  </div>
-</div>
-
-<!-- Markdown rendering -->
+<!-- Alpine component + Markdown rendering -->
 <script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <script>
+function reportDetail(id, initialRead) {
+  return {
+    id: id,
+    isRead: initialRead,
+    toast: '',
+    _toastTimer: null,
+    flash(msg) {
+      this.toast = msg;
+      clearTimeout(this._toastTimer);
+      this._toastTimer = setTimeout(() => { this.toast = ''; }, 1800);
+    },
+    async toggleRead() {
+      const endpoint = this.isRead ? 'unread' : 'read';
+      try {
+        const res = await fetch('/-/reports/' + this.id + '/' + endpoint, { method: 'POST' });
+        if (!res.ok) throw new Error(String(res.status));
+        this.isRead = !this.isRead;
+        this.flash(this.isRead ? 'Marked as read' : 'Marked as unread');
+        // Re-render the icon for the toggled state.
+        this.$nextTick(() => window.lucide && window.lucide.createIcons && window.lucide.createIcons());
+      } catch (e) {
+        this.flash('Could not update — try again');
+      }
+    },
+    copyLink() {
+      try {
+        navigator.clipboard.writeText(window.location.href);
+        this.flash('Link copied');
+      } catch (e) {
+        this.flash('Copy failed');
+      }
+    }
+  };
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.bb-report-body').forEach(function(el) {
     var md = el.getAttribute('data-markdown');
@@ -49,13 +142,17 @@ document.addEventListener('DOMContentLoaded', function() {
       list.classList.add('list-decimal', 'pl-5', 'space-y-1', 'my-2');
     });
     el.querySelectorAll('p').forEach(function(p) {
-      p.classList.add('mb-2');
+      p.classList.add('mb-3');
     });
     el.querySelectorAll('strong').forEach(function(s) {
       s.classList.add('text-base-content', 'font-semibold');
     });
     el.querySelectorAll('h1, h2, h3, h4').forEach(function(h) {
-      h.classList.add('text-base-content', 'font-semibold', 'mt-3', 'mb-1');
+      h.classList.add('text-base-content', 'font-semibold', 'mt-5', 'mb-2', 'pb-1', 'border-b', 'border-base-200/70');
+    });
+    el.querySelectorAll('h3, h4').forEach(function(h) {
+      h.classList.remove('border-b', 'border-base-200/70', 'pb-1');
+      h.classList.add('text-sm', 'uppercase', 'tracking-wider', 'text-base-content/60');
     });
     el.querySelectorAll('code').forEach(function(c) {
       if (c.parentElement.tagName !== 'PRE') {
@@ -63,10 +160,22 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
     el.querySelectorAll('pre').forEach(function(pre) {
-      pre.classList.add('bg-base-200/40', 'rounded-lg', 'p-3', 'my-2', 'overflow-x-auto', 'text-xs');
+      pre.classList.add('bg-base-200/40', 'rounded-xl', 'p-4', 'my-3', 'overflow-x-auto', 'text-xs', 'border', 'border-base-200/60');
     });
     el.querySelectorAll('blockquote').forEach(function(bq) {
-      bq.classList.add('border-l-2', 'border-primary/30', 'pl-3', 'my-2', 'text-base-content/60', 'italic');
+      bq.classList.add('border-l-2', 'border-primary/30', 'pl-3', 'my-3', 'text-base-content/60', 'italic');
+    });
+    el.querySelectorAll('table').forEach(function(tbl) {
+      tbl.classList.add('w-full', 'my-3', 'text-sm', 'border-collapse');
+      tbl.querySelectorAll('th').forEach(function(th) {
+        th.classList.add('text-left', 'font-semibold', 'text-base-content/70', 'text-xs', 'uppercase', 'tracking-wider', 'px-3', 'py-2', 'border-b', 'border-base-200');
+      });
+      tbl.querySelectorAll('td').forEach(function(td) {
+        td.classList.add('px-3', 'py-2', 'border-b', 'border-base-200/60');
+      });
+    });
+    el.querySelectorAll('hr').forEach(function(hr) {
+      hr.classList.add('my-5', 'border-base-200/60');
     });
     var lastChild = el.lastElementChild;
     if (lastChild) lastChild.classList.add('!mb-0');

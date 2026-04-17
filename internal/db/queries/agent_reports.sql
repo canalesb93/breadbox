@@ -18,5 +18,8 @@ SELECT COUNT(*) FROM agent_reports WHERE read_at IS NULL;
 -- name: MarkAgentReportRead :exec
 UPDATE agent_reports SET read_at = NOW() WHERE id = $1 AND read_at IS NULL;
 
+-- name: MarkAgentReportUnread :exec
+UPDATE agent_reports SET read_at = NULL WHERE id = $1;
+
 -- name: MarkAllAgentReportsRead :exec
 UPDATE agent_reports SET read_at = NOW() WHERE read_at IS NULL;

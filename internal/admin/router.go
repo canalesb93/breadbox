@@ -335,6 +335,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 
 			// Agent reports
 			r.Post("/reports/{id}/read", MarkReportReadAdminHandler(svc))
+			r.Post("/reports/{id}/unread", MarkReportUnreadAdminHandler(svc))
 			r.Post("/reports/read-all", MarkAllReportsReadAdminHandler(svc))
 
 			// Login account management

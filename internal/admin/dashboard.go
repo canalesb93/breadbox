@@ -373,20 +373,19 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			DisplayAuthor string
 			CreatedAt     string // relative time
 		}
+		const dashboardReportsVisible = 8
 		var agentReports []DashboardReport
-		var totalUnread int
-		rawReports, err := svc.ListUnreadAgentReports(ctx, 50)
+		rawReports, err := svc.ListUnreadAgentReports(ctx, dashboardReportsVisible)
 		if err != nil {
 			a.Logger.Error("list unread agent reports", "error", err)
 		}
-		totalUnread = len(rawReports)
-		now := time.Now()
-		for i, r := range rawReports {
+		totalUnreadCount, err := svc.CountUnreadAgentReports(ctx)
+		if err != nil {
+			a.Logger.Error("count unread agent reports", "error", err)
+		}
+		totalUnread := int(totalUnreadCount)
+		for _, r := range rawReports {
 			t, _ := time.Parse(time.RFC3339, r.CreatedAt)
-			// Show first 5, plus any additional within 24 hours
-			if i >= 5 && now.Sub(t) > 24*time.Hour {
-				continue
-			}
 			displayAuthor := r.CreatedByName
 			if r.Author != nil && *r.Author != "" {
 				displayAuthor = *r.Author
@@ -403,6 +402,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			})
 		}
 		hasMoreReports := totalUnread > len(agentReports)
+		moreReportsCount := totalUnread - len(agentReports)
 
 		// Quick stats for the status bar.
 		accountCount, err := a.Queries.CountAccounts(ctx)
@@ -465,6 +465,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"HasAttentionItems": attentionCount > 0,
 			"AgentReports":       agentReports,
 			"HasMoreReports":     hasMoreReports,
+			"MoreReportsCount":   moreReportsCount,
 			"TotalUnreadReports": totalUnread,
 		}
 		tr.Render(w, r, "dashboard.html", data)

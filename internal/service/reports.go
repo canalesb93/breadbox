@@ -158,6 +158,15 @@ func (s *Service) MarkAgentReportRead(ctx context.Context, reportID string) erro
 	return s.Queries.MarkAgentReportRead(ctx, uid)
 }
 
+// MarkAgentReportUnread clears read_at on a single report, returning it to the unread queue.
+func (s *Service) MarkAgentReportUnread(ctx context.Context, reportID string) error {
+	uid, err := parseUUID(reportID)
+	if err != nil {
+		return fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
+	}
+	return s.Queries.MarkAgentReportUnread(ctx, uid)
+}
+
 // MarkAllAgentReportsRead marks all unread reports as read.
 func (s *Service) MarkAllAgentReportsRead(ctx context.Context) error {
 	return s.Queries.MarkAllAgentReportsRead(ctx)

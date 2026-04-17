@@ -179,10 +179,10 @@
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 
   <!-- Agent Reports -->
-  <div class="bb-card" x-data="{ ...agentReports() }">
+  <div class="bb-card overflow-hidden" x-data="{ ...agentReports() }">
     <div class="px-5 py-4 flex items-center justify-between border-b border-base-200/60">
       <div class="flex items-center gap-2">
-        <i data-lucide="bot" class="w-4 h-4 text-primary/70"></i>
+        <i data-lucide="inbox" class="w-4 h-4 text-primary/70"></i>
         <h2 class="text-sm font-semibold text-base-content/80">Agent Reports</h2>
         {{if .AgentReports}}
         <span class="text-[0.65rem] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">{{.TotalUnreadReports}} unread</span>
@@ -190,56 +190,71 @@
       </div>
       <div class="flex items-center gap-3">
         {{if .AgentReports}}
-        <span class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors cursor-pointer"
+        <button type="button" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors cursor-pointer"
           @click="markAllRead()">
           Mark all read
-        </span>
+        </button>
         {{end}}
         <a href="/reports" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
       </div>
     </div>
 
     {{if .AgentReports}}
-    <div class="px-4 sm:px-5 py-4 space-y-3">
+    <div class="divide-y divide-base-200/60">
       {{range .AgentReports}}
-      <div class="transition-all duration-300"
-        :class="dismissed['{{.ID}}'] ? 'opacity-0 h-0 overflow-hidden !my-0' : ''"
+      <a href="/reports/{{.ID}}"
+        class="group relative flex items-start gap-3 px-4 sm:px-5 py-3.5 hover:bg-base-200/40 transition-colors no-underline
+          {{if eq .Priority "critical"}}border-l-[3px] border-l-error/80{{else if eq .Priority "warning"}}border-l-[3px] border-l-warning/80{{else}}border-l-[3px] border-l-transparent{{end}}
+          transition-all duration-300"
+        :class="dismissed['{{.ID}}'] ? 'opacity-0 h-0 overflow-hidden !py-0 !border-l-0' : ''"
         id="report-{{.ID}}">
-        <div class="flex items-start gap-2.5">
-          <div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-            <i data-lucide="bot" class="w-3.5 h-3.5 text-primary"></i>
+        <div class="relative shrink-0 mt-0.5">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center
+            {{if eq .Priority "critical"}}bg-error/15 text-error{{else if eq .Priority "warning"}}bg-warning/15 text-warning{{else}}bg-primary/10 text-primary{{end}}">
+            <i data-lucide="bot" class="w-4 h-4"></i>
           </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
-              <span class="text-xs font-semibold text-base-content/70">{{.DisplayAuthor}}</span>
-              <span class="text-[0.65rem] text-base-content/30">{{.CreatedAt}}</span>
-              {{if eq .Priority "critical"}}
-              <span class="flex w-2 h-2"><span class="animate-ping absolute w-2 h-2 rounded-full bg-error/60"></span><span class="relative w-2 h-2 rounded-full bg-error"></span></span>
-              {{else if eq .Priority "warning"}}
-              <span class="w-2 h-2 rounded-full bg-warning shrink-0"></span>
-              {{end}}
-              <button @click.stop="markRead('{{.ID}}')" class="text-[0.65rem] text-base-content/30 hover:text-success transition-colors cursor-pointer ml-auto shrink-0 mr-1">Mark read</button>
-            </div>
-            <a href="/reports/{{.ID}}" class="rounded-2xl rounded-tl-sm bg-base-200/70 shadow-sm px-3.5 py-2.5 hover:bg-base-200/90 transition-colors inline-block max-w-full no-underline group">
-              <p class="text-sm text-base-content/80 leading-relaxed group-hover:text-base-content transition-colors">{{.Title}}</p>
-              <span class="text-xs text-base-content/30 group-hover:text-primary/60 transition-colors">View report &rarr;</span>
-            </a>
-          </div>
+          {{if eq .Priority "critical"}}
+          <span class="absolute -top-0.5 -right-0.5 flex w-2.5 h-2.5">
+            <span class="animate-ping absolute inline-flex w-full h-full rounded-full bg-error/60"></span>
+            <span class="relative inline-flex w-2.5 h-2.5 rounded-full bg-error ring-2 ring-base-100"></span>
+          </span>
+          {{end}}
         </div>
-      </div>
-      {{end}}
-      {{if .HasMoreReports}}
-      <div class="pt-3 border-t border-base-200/60 text-center">
-        <a href="/reports" class="text-xs text-primary/70 hover:text-primary transition-colors">View all {{.TotalUnreadReports}} unread reports &rarr;</a>
-      </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-0.5 text-[0.7rem]">
+            <span class="font-semibold text-base-content/70 truncate">{{.DisplayAuthor}}</span>
+            {{if eq .Priority "critical"}}
+            <span class="text-[0.6rem] font-semibold px-1.5 py-0.5 rounded-full bg-error/10 text-error/90 shrink-0">CRITICAL</span>
+            {{else if eq .Priority "warning"}}
+            <span class="text-[0.6rem] font-semibold px-1.5 py-0.5 rounded-full bg-warning/15 text-warning shrink-0">WARNING</span>
+            {{end}}
+            <span class="text-base-content/30 shrink-0 ml-auto">{{.CreatedAt}}</span>
+          </div>
+          <p class="text-[0.95rem] leading-snug text-base-content/90 group-hover:text-base-content transition-colors">{{.Title}}</p>
+        </div>
+        <button type="button"
+          @click.prevent.stop="markRead('{{.ID}}')"
+          title="Mark as read"
+          class="shrink-0 self-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity w-7 h-7 rounded-lg hover:bg-success/15 hover:text-success text-base-content/30 flex items-center justify-center cursor-pointer">
+          <i data-lucide="check" class="w-4 h-4"></i>
+        </button>
+      </a>
       {{end}}
     </div>
+    {{if .HasMoreReports}}
+    <a href="/reports?status=unread" class="flex items-center justify-center gap-1.5 px-5 py-3 text-xs font-medium text-primary/80 hover:text-primary hover:bg-primary/5 transition-colors border-t border-base-200/60 no-underline">
+      <i data-lucide="arrow-down" class="w-3.5 h-3.5"></i>
+      {{.MoreReportsCount}} more unread
+    </a>
+    {{end}}
     {{else}}
-    <div class="px-5 py-8 text-center">
-      <i data-lucide="bot" class="w-8 h-8 mx-auto mb-2 text-base-content/15"></i>
-      <p class="text-sm text-base-content/40 mb-1">No unread reports</p>
-      <p class="text-xs text-base-content/30">Agent reports appear here when AI agents submit findings about your finances.</p>
-      <a href="/agents" class="text-xs text-primary/60 hover:text-primary transition-colors mt-2 inline-block">Set up an agent &rarr;</a>
+    <div class="px-5 py-10 text-center">
+      <div class="w-12 h-12 rounded-2xl bg-base-200/50 mx-auto mb-3 flex items-center justify-center">
+        <i data-lucide="inbox" class="w-5 h-5 text-base-content/25"></i>
+      </div>
+      <p class="text-sm font-medium text-base-content/60 mb-1">Inbox zero</p>
+      <p class="text-xs text-base-content/40 max-w-[18rem] mx-auto">Messages from your AI agents will land here when they finish a task or spot something worth sharing.</p>
+      <a href="/agents" class="text-xs text-primary/70 hover:text-primary transition-colors mt-3 inline-block font-medium">Set up an agent &rarr;</a>
     </div>
     {{end}}
   </div>

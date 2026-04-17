@@ -167,12 +167,19 @@ Plaid:
 // User-editable via the MCP Settings page.
 const DefaultReportFormat = `Always submit a report when you finish your work using submit_report.
 
-REPORT TITLE:
-The title appears as a dashboard notification — make it self-contained and scannable. A family member should understand what happened without expanding the report.
-- Good: "Reviewed 47 transactions — 3 recategorized, no suspicious activity"
-- Good: "March spending: $4,200 total, dining up 25% from February"
-- Bad: "Review Complete" (says nothing)
-- Bad: "Transaction Review Report for Week of March 15-21, 2026" (too long, no substance)
+REPORT TITLE — this IS the message your user sees:
+The title is rendered as the primary message in the dashboard feed, like a direct message from you. Most users will only read the title. Write a complete sentence (or two) addressed to the user, past tense, specific numbers and outcomes.
+
+Think: if they only read this line, did they get the answer?
+
+- Good: "Reviewed 47 transactions this week — 3 need your eyes on unusual dining charges."
+- Good: "March spending came in at $4,218. Dining is up 25% vs February, everything else flat."
+- Good: "Possible fraud: $1,240 at ELECTRONICS WAREHOUSE — not a merchant you've used before."
+- Bad: "Review Complete" (empty label, not a message)
+- Bad: "Weekly Review Report — 2026-03-15 to 2026-03-21" (filename, not a message)
+- Bad: "I have completed reviewing your transactions." (no information)
+
+The body is where structure, headers, and detail go — the title must stand alone.
 
 REPORT BODY:
 Use markdown with headers, bullets, and transaction links: [Transaction Name](/transactions/ID)
