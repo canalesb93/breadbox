@@ -1475,3 +1475,102 @@ func TestHitCountsJSON_IntegrationWithResolveWithContext(t *testing.T) {
 		t.Errorf("expected 3 hits, got %d", parsed[ruleIDStr])
 	}
 }
+
+// --- Audit §D resolver coverage ---
+
+// TestResolveWithContext_AddCommentAccumulation_Dedup pins the current
+// accumulator behavior for duplicate comment content across rules: comments
+// are appended in rule order with no dedup. The test doubles as regression
+// cover — if we ever add dedup, this will fail loudly and needs updating.
+func TestResolveWithContext_AddCommentAccumulation_Dedup(t *testing.T) {
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        testUUID(10),
+				shortID:   "rule0001",
+				name:      "rule-A",
+				actions:   []typedAction{{Type: "add_comment", Content: "same-text"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "x"}),
+			},
+			{
+				id:        testUUID(11),
+				shortID:   "rule0002",
+				name:      "rule-B",
+				actions:   []typedAction{{Type: "add_comment", Content: "same-text"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "provider", Op: "eq", Value: "plaid"}),
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	result := r.ResolveWithContext("plaid", TransactionContext{Name: "x thing", Provider: "plaid"}, true)
+	if result == nil {
+		t.Fatal("expected result")
+	}
+
+	// Current behavior: both rules contribute their identical comment text;
+	// Comments is an append-only accumulator (no dedup).
+	if len(result.Comments) != 2 {
+		t.Fatalf("expected 2 comments (no dedup on identical content), got %d (%v)", len(result.Comments), result.Comments)
+	}
+	for _, c := range result.Comments {
+		if c != "same-text" {
+			t.Errorf("unexpected comment content: %q", c)
+		}
+	}
+
+	// Every comment carries a Source so the sync persist path can attribute
+	// each write to its originating rule. With two comments there must be two
+	// comment-flavored sources.
+	commentSources := 0
+	for _, s := range result.Sources {
+		if s.ActionField == "comment" {
+			commentSources++
+		}
+	}
+	if commentSources != 2 {
+		t.Errorf("expected 2 comment sources (one per rule firing), got %d", commentSources)
+	}
+}
+
+// TestResolveWithContext_RuleWithOnlyTagAction_NoCategoryWrite verifies that
+// a matching rule whose only action is add_tag does not populate
+// CategorySlug — the resolver must not silently synthesize a category from a
+// tag-only rule.
+func TestResolveWithContext_RuleWithOnlyTagAction_NoCategoryWrite(t *testing.T) {
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        testUUID(42),
+				shortID:   "rule00tg",
+				name:      "tag-only",
+				actions:   []typedAction{{Type: "add_tag", TagSlug: "review"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	result := r.ResolveWithContext("plaid", TransactionContext{Name: "Coffee Shop"}, true)
+	if result == nil {
+		t.Fatal("expected non-nil result (rule matched)")
+	}
+	if result.CategorySlug != "" {
+		t.Errorf("tag-only rule populated CategorySlug %q; expected empty", result.CategorySlug)
+	}
+	if len(result.TagsToAdd) != 1 || result.TagsToAdd[0] != "review" {
+		t.Errorf("expected TagsToAdd=[review], got %v", result.TagsToAdd)
+	}
+	// No Source should carry ActionField="category" — the audit trail would
+	// otherwise imply a category write that never happened.
+	for _, s := range result.Sources {
+		if s.ActionField == "category" {
+			t.Errorf("unexpected category source emitted for tag-only rule: %+v", s)
+		}
+	}
+}

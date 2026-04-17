@@ -1361,3 +1361,296 @@ func TestApplyRuleRetroactively_HitCountMatchesSync(t *testing.T) {
 func init() {
 	_ = db.InsertCategoryParams{}
 }
+
+// --- Audit §D retroactive coverage ---
+
+// TestApplyRuleRetroactively_Expired_Rejected verifies that calling
+// ApplyRuleRetroactively on a rule whose expires_at is in the past returns
+// ErrInvalidParameter and leaves the DB untouched.
+func TestApplyRuleRetroactively_Expired_Rejected(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	_ = mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+
+	acctID := seedTxnFixture(t, queries)
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_exp_1", "Starbucks Coffee", 500, "2025-01-15")
+
+	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:         "Expired Coffee Rule",
+		CategorySlug: "food_and_drink",
+		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "Starbucks"},
+		Priority:     10,
+		Actor:        service.Actor{Type: "system", Name: "test"},
+	})
+	if err != nil {
+		t.Fatalf("CreateTransactionRule: %v", err)
+	}
+
+	// Backdate expires_at so the rule is expired.
+	if _, err := pool.Exec(ctx,
+		"UPDATE transaction_rules SET expires_at = NOW() - INTERVAL '1 hour' WHERE id = $1::uuid",
+		rule.ID,
+	); err != nil {
+		t.Fatalf("expire rule: %v", err)
+	}
+
+	matched, err := svc.ApplyRuleRetroactively(ctx, rule.ID)
+	if err == nil {
+		t.Fatal("expected error for expired rule, got nil")
+	}
+	if !errors.Is(err, service.ErrInvalidParameter) {
+		t.Errorf("expected ErrInvalidParameter, got %v", err)
+	}
+	if matched != 0 {
+		t.Errorf("expected matched=0, got %d", matched)
+	}
+
+	// DB untouched.
+	var annCount int
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM annotations WHERE rule_id = $1::uuid`, rule.ID,
+	).Scan(&annCount); err != nil {
+		t.Fatalf("count annotations: %v", err)
+	}
+	if annCount != 0 {
+		t.Errorf("expected 0 annotations for rejected rule, got %d", annCount)
+	}
+}
+
+// TestApplyRuleRetroactively_Disabled_Rejected verifies that calling
+// ApplyRuleRetroactively on a disabled rule returns ErrInvalidParameter.
+func TestApplyRuleRetroactively_Disabled_Rejected(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	_ = mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+
+	acctID := seedTxnFixture(t, queries)
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_dis_1", "Starbucks Coffee", 500, "2025-01-15")
+
+	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:         "Disabled Coffee Rule",
+		CategorySlug: "food_and_drink",
+		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "Starbucks"},
+		Priority:     10,
+		Actor:        service.Actor{Type: "system", Name: "test"},
+	})
+	if err != nil {
+		t.Fatalf("CreateTransactionRule: %v", err)
+	}
+
+	enabled := false
+	if _, err := svc.UpdateTransactionRule(ctx, rule.ID, service.UpdateTransactionRuleParams{
+		Enabled: &enabled,
+	}); err != nil {
+		t.Fatalf("disable rule: %v", err)
+	}
+
+	matched, err := svc.ApplyRuleRetroactively(ctx, rule.ID)
+	if err == nil {
+		t.Fatal("expected error for disabled rule, got nil")
+	}
+	if !errors.Is(err, service.ErrInvalidParameter) {
+		t.Errorf("expected ErrInvalidParameter, got %v", err)
+	}
+	if matched != 0 {
+		t.Errorf("expected matched=0, got %d", matched)
+	}
+
+	var annCount int
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM annotations WHERE rule_id = $1::uuid`, rule.ID,
+	).Scan(&annCount); err != nil {
+		t.Fatalf("count annotations: %v", err)
+	}
+	if annCount != 0 {
+		t.Errorf("expected 0 annotations for rejected rule, got %d", annCount)
+	}
+}
+
+// TestApplyAllRulesRetroactively_SamePriorityTie verifies that when two rules
+// share the same priority and target the same transaction with set_category,
+// the ordering tie-break (created_at ASC → later rule processed last → last
+// writer wins) produces a deterministic winner.
+func TestApplyAllRulesRetroactively_SamePriorityTie(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	catA := mustCreateCategory(t, queries, "cat_a", "Cat A")
+	catB := mustCreateCategory(t, queries, "cat_b", "Cat B")
+
+	acctID := seedTxnFixture(t, queries)
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_tie", "Starbucks Coffee", 500, "2025-01-15")
+
+	// Rule A created first, Rule B created second. Same priority. ListActive
+	// orders by created_at ASC within a priority bucket, so Rule B runs last
+	// and wins set_category under last-writer-wins.
+	ruleA, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:         "Rule A (first)",
+		CategorySlug: "cat_a",
+		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "Starbucks"},
+		Priority:     50,
+		Actor:        service.Actor{Type: "system", Name: "test"},
+	})
+	if err != nil {
+		t.Fatalf("create rule A: %v", err)
+	}
+	// Brief sleep so created_at ordering is unambiguous between the two rules.
+	if _, err := pool.Exec(ctx, "SELECT pg_sleep(0.05)"); err != nil {
+		t.Fatalf("pg_sleep: %v", err)
+	}
+	ruleB, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:         "Rule B (second)",
+		CategorySlug: "cat_b",
+		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "Starbucks"},
+		Priority:     50,
+		Actor:        service.Actor{Type: "system", Name: "test"},
+	})
+	if err != nil {
+		t.Fatalf("create rule B: %v", err)
+	}
+	_ = ruleA
+
+	hitCounts, err := svc.ApplyAllRulesRetroactively(ctx)
+	if err != nil {
+		t.Fatalf("ApplyAllRulesRetroactively: %v", err)
+	}
+
+	// Both rules matched. hitCounts is keyed by rule.ID (UUID string).
+	if hitCounts[ruleA.ID] != 1 {
+		t.Errorf("rule A hit count: got %d, want 1", hitCounts[ruleA.ID])
+	}
+	if hitCounts[ruleB.ID] != 1 {
+		t.Errorf("rule B hit count: got %d, want 1", hitCounts[ruleB.ID])
+	}
+
+	// Later-created rule B wins the category assignment.
+	var winningCat pgtype.UUID
+	if err := pool.QueryRow(ctx,
+		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_tie'",
+	).Scan(&winningCat); err != nil {
+		t.Fatalf("query winning category: %v", err)
+	}
+	if winningCat != catB.ID {
+		t.Errorf("same-priority tie winner: got %v, want catB=%v (catA=%v)", winningCat, catB.ID, catA.ID)
+	}
+}
+
+// TestPreviewRule_DoesNotModify verifies that PreviewRule is pure-read: it
+// returns match counts without touching transactions, annotations, or
+// transaction_tags.
+func TestPreviewRule_DoesNotModify(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	acctID := seedTxnFixture(t, queries)
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_p_1", "Starbucks Coffee", 500, "2025-01-15")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_p_2", "Starbucks Reserve", 700, "2025-01-16")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_p_3", "Shell Gas", 3000, "2025-01-17")
+
+	// Snapshot baseline counts.
+	var txnsBefore, annsBefore, tagsBefore int
+	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM transactions WHERE category_id IS NOT NULL").Scan(&txnsBefore); err != nil {
+		t.Fatalf("count categorized txns before: %v", err)
+	}
+	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM annotations").Scan(&annsBefore); err != nil {
+		t.Fatalf("count annotations before: %v", err)
+	}
+	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM transaction_tags").Scan(&tagsBefore); err != nil {
+		t.Fatalf("count transaction_tags before: %v", err)
+	}
+
+	result, err := svc.PreviewRule(ctx,
+		service.Condition{Field: "name", Op: "contains", Value: "Starbucks"}, 10,
+	)
+	if err != nil {
+		t.Fatalf("PreviewRule: %v", err)
+	}
+	if result.MatchCount != 2 {
+		t.Errorf("match count: got %d, want 2", result.MatchCount)
+	}
+
+	// Nothing should have changed.
+	var txnsAfter, annsAfter, tagsAfter int
+	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM transactions WHERE category_id IS NOT NULL").Scan(&txnsAfter); err != nil {
+		t.Fatalf("count categorized txns after: %v", err)
+	}
+	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM annotations").Scan(&annsAfter); err != nil {
+		t.Fatalf("count annotations after: %v", err)
+	}
+	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM transaction_tags").Scan(&tagsAfter); err != nil {
+		t.Fatalf("count transaction_tags after: %v", err)
+	}
+	if txnsAfter != txnsBefore {
+		t.Errorf("PreviewRule modified transactions: categorized rows before=%d after=%d", txnsBefore, txnsAfter)
+	}
+	if annsAfter != annsBefore {
+		t.Errorf("PreviewRule wrote annotations: before=%d after=%d", annsBefore, annsAfter)
+	}
+	if tagsAfter != tagsBefore {
+		t.Errorf("PreviewRule wrote transaction_tags: before=%d after=%d", tagsBefore, tagsAfter)
+	}
+}
+
+// TestPreviewRuleForDetail_ExcludesAlreadyApplied verifies that after a rule
+// has been applied retroactively, calling PreviewRuleForDetail with that
+// rule's id excludes the already-applied transactions from the match count.
+func TestPreviewRuleForDetail_ExcludesAlreadyApplied(t *testing.T) {
+	svc, queries, _ := newService(t)
+	ctx := context.Background()
+
+	_ = mustCreateCategory(t, queries, "coffee", "Coffee")
+
+	acctID := seedTxnFixture(t, queries)
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_d_1", "Starbucks Coffee", 500, "2025-01-15")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_d_2", "Starbucks Reserve", 700, "2025-01-16")
+	testutil.MustCreateTransaction(t, queries, acctID, "txn_d_3", "Starbucks Drive", 450, "2025-01-17")
+
+	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:         "Starbucks → coffee",
+		CategorySlug: "coffee",
+		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "Starbucks"},
+		Priority:     10,
+		Actor:        service.Actor{Type: "system", Name: "test"},
+	})
+	if err != nil {
+		t.Fatalf("CreateTransactionRule: %v", err)
+	}
+
+	// Baseline: preview-for-detail matches all three (none applied yet).
+	initial, err := svc.PreviewRuleForDetail(ctx, rule.ID, rule.Conditions, 10)
+	if err != nil {
+		t.Fatalf("PreviewRuleForDetail (baseline): %v", err)
+	}
+	if initial.MatchCount != 3 {
+		t.Fatalf("baseline match count: got %d, want 3", initial.MatchCount)
+	}
+
+	matched, err := svc.ApplyRuleRetroactively(ctx, rule.ID)
+	if err != nil {
+		t.Fatalf("ApplyRuleRetroactively: %v", err)
+	}
+	if matched != 3 {
+		t.Fatalf("retroactive match count: got %d, want 3", matched)
+	}
+
+	// All three now have a rule_applied annotation for this rule, so
+	// PreviewRuleForDetail excludes them — the preview now matches zero.
+	after, err := svc.PreviewRuleForDetail(ctx, rule.ID, rule.Conditions, 10)
+	if err != nil {
+		t.Fatalf("PreviewRuleForDetail (after apply): %v", err)
+	}
+	if after.MatchCount != 0 {
+		t.Errorf("after-apply match count: got %d, want 0 (already-applied txns should be excluded)", after.MatchCount)
+	}
+
+	// Sanity: regular PreviewRule (no rule context) still sees all three.
+	plain, err := svc.PreviewRule(ctx, rule.Conditions, 10)
+	if err != nil {
+		t.Fatalf("PreviewRule (plain): %v", err)
+	}
+	if plain.MatchCount != 3 {
+		t.Errorf("plain preview after apply: got %d, want 3 (should not filter)", plain.MatchCount)
+	}
+}
