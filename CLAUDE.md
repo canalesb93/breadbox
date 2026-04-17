@@ -68,9 +68,12 @@ These bite in every session regardless of what you're touching.
 Prereqs: Go 1.24+, PostgreSQL.
 
 ```
-make db       # start Postgres via Docker (skip if local Postgres)
-make dev      # installs sqlc/tailwind, generates code, migrates, starts server
+make db         # start Postgres via Docker (skip if local Postgres)
+make dev        # starts server with embedded assets (prod-like; restart on any UI edit)
+make dev-watch  # hot-reload: air rebuilds Go on *.go changes; HTML/CSS served from disk — no restart for UI edits
 ```
+
+Prefer `make dev-watch` for UI work. See `.claude/rules/ui.md` for the hot-reload loop and when to fall back to `make dev`.
 
 - Dev DB: `postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable`
 - Test DB: `postgres://breadbox:breadbox@localhost:5432/breadbox_test?sslmode=disable`
