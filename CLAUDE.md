@@ -81,6 +81,10 @@ Prefer `make dev-watch` for UI work. See `.claude/rules/ui.md` for the hot-reloa
 - Worktrees (`claude -w`): `.worktreeinclude` copies build artifacts; `.claude/hooks/session-start.sh` assigns a port from 8081–8099 and injects env via `CLAUDE_ENV_FILE`. Main repo uses 8080.
 - Stop all dev servers: `make dev-stop`.
 
+## Browser automation
+
+For validating UI on `localhost`, use the **Chrome DevTools MCP** (`mcp__plugin_chrome-devtools-mcp_chrome-devtools__*`) — pre-allowed, no prompts. Prefer it over `claude-in-chrome`, which is slower and requires permission approvals.
+
 ## Releases
 
 - `main` is branch-protected — PR-only, CI must pass.
