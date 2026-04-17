@@ -14,6 +14,78 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// TransactionSummary is a compact DTO for "preview" surfaces that render a
+// transaction as a card: command-palette results, rule preview modals,
+// similar future contexts. One shape, one formatter — adding a new preview
+// surface is a matter of calling a shared renderer instead of defining
+// another ad-hoc struct. See service.ToTransactionSummary.
+type TransactionSummary struct {
+	ID                  string  `json:"id"`
+	Name                string  `json:"name"`
+	Amount              float64 `json:"amount"`
+	AmountLabel         string  `json:"amount_label"`
+	IsoCurrencyCode     *string `json:"iso_currency_code,omitempty"`
+	Date                string  `json:"date"`
+	DateLabel           string  `json:"date_label"`
+	AccountName         string  `json:"account"`
+	UserName            string  `json:"user_name,omitempty"`
+	Pending             bool    `json:"pending,omitempty"`
+	CategoryIcon        *string `json:"category_icon,omitempty"`
+	CategoryColor       *string `json:"category_color,omitempty"`
+	CategoryDisplayName *string `json:"category_display_name,omitempty"`
+}
+
+// ToTransactionSummary converts an AdminTransactionRow into the shared
+// TransactionSummary DTO. Centralises amount/date label formatting so all
+// preview surfaces render identically.
+func ToTransactionSummary(row AdminTransactionRow) TransactionSummary {
+	amountAbs := math.Abs(row.Amount)
+	amountLabel := FormatCurrency(amountAbs)
+	if row.Amount < 0 {
+		amountLabel = "-" + amountLabel
+	}
+	dateLabel := row.Date
+	if t, err := time.Parse("2006-01-02", row.Date); err == nil {
+		dateLabel = t.Format("Jan 2")
+	}
+	return TransactionSummary{
+		ID:                  row.ID,
+		Name:                row.Name,
+		Amount:              row.Amount,
+		AmountLabel:         amountLabel,
+		IsoCurrencyCode:     row.IsoCurrencyCode,
+		Date:                row.Date,
+		DateLabel:           dateLabel,
+		AccountName:         row.AccountName,
+		UserName:            row.UserName,
+		Pending:             row.Pending,
+		CategoryIcon:        row.CategoryIcon,
+		CategoryColor:       row.CategoryColor,
+		CategoryDisplayName: row.CategoryDisplayName,
+	}
+}
+
+// FormatCurrency formats a non-negative float as "$X,XXX.XX". Exported so
+// preview-facing helpers and handlers can share one format with the admin
+// templates.
+func FormatCurrency(abs float64) string {
+	whole := int(abs)
+	cents := int(math.Round((abs - float64(whole)) * 100))
+	s := strconv.Itoa(whole)
+	if len(s) > 3 {
+		var b strings.Builder
+		b.Grow(len(s) + len(s)/3)
+		for i, c := range s {
+			if i > 0 && (len(s)-i)%3 == 0 {
+				b.WriteByte(',')
+			}
+			b.WriteRune(c)
+		}
+		s = b.String()
+	}
+	return fmt.Sprintf("$%s.%02d", s, cents)
+}
+
 func (s *Service) ListTransactions(ctx context.Context, params TransactionListParams) (*TransactionListResult, error) {
 	// Build dynamic SQL query using strings.Builder to reduce allocations.
 	var buf strings.Builder
