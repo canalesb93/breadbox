@@ -1,0 +1,21 @@
+{{define "condition-row"}}
+{{- $c := .Cond -}}
+{{- $isFirst := eq .Idx 0 -}}
+{{- $conj := .Conj -}}
+<div class="flex items-center gap-2 p-2.5 bg-base-200/50 border border-base-content/10 rounded-xl">
+  <!-- Conjunction / IF prefix -->
+  <div class="w-10 shrink-0 text-center">
+    {{if $isFirst}}
+    <span class="text-[0.65rem] font-semibold tracking-wider text-base-content/30">IF</span>
+    {{else}}
+    <span class="text-[0.65rem] font-semibold tracking-wider {{if eq $conj "OR"}}text-warning{{else}}text-base-content/30{{end}}">{{$conj}}</span>
+    {{end}}
+  </div>
+  <!-- Field -->
+  <span class="text-sm font-medium text-base-content/80 truncate">{{ruleFieldLabel $c.Field}}</span>
+  <!-- Operator pill -->
+  <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-100 border border-base-content/10 text-xs text-base-content/55 font-mono">{{ruleOpLabel $c.Op $c.Field}}</span>
+  <!-- Value -->
+  <span class="text-sm font-semibold text-base-content truncate" title="{{ruleValueFormat $c.Value}}">{{ruleValueFormat $c.Value}}</span>
+</div>
+{{end}}

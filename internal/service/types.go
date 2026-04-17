@@ -473,8 +473,14 @@ type TransactionRuleListParams struct {
 	Enabled      *bool
 	Search       *string
 	SearchMode   *string
-	Limit        int
-	Cursor       string
+	// SortBy drives the ORDER BY clause for the offset-paginated path (admin UI).
+	// Accepted values: "created_at" (default), "hit_count", "last_hit_at", "priority", "name".
+	// Ignored by the cursor-paginated path (API), which must stay stable on (date, id).
+	SortBy string
+	// SortDir is "asc" or "desc". Empty → per-column default (desc for most, asc for name/priority).
+	SortDir string
+	Limit   int
+	Cursor  string
 	// Offset-based pagination (used by admin UI). When Page > 0, cursor is ignored.
 	Page     int
 	PageSize int

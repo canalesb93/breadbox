@@ -440,11 +440,11 @@ func TestActionsSummary(t *testing.T) {
 
 func TestTriggerLabel(t *testing.T) {
 	tests := map[string]string{
-		"":          "On create",
-		"on_create": "On create",
-		"on_change": "On change",
-		"on_update": "On change", // legacy alias
-		"always":    "Always",
+		"":          "On sync create",
+		"on_create": "On sync create",
+		"on_change": "On sync change",
+		"on_update": "On sync change", // legacy alias
+		"always":    "Every sync",
 		"weird":     "weird",
 	}
 	for in, want := range tests {

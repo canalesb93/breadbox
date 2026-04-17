@@ -51,6 +51,11 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 			}
 		}
 
+		// Sort key — whitelisted in ruleOrderByClause so unknown values fall
+		// back to created_at DESC instead of injecting arbitrary SQL.
+		sortBy := r.URL.Query().Get("sort_by")
+		params.SortBy = sortBy
+
 		result, err := svc.ListTransactionRules(ctx, params)
 		if err != nil {
 			tr.Render(w, r, "500.html", map[string]any{"PageTitle": "Error", "CurrentPage": "rules"})
@@ -99,6 +104,7 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 		data["SearchFilter"] = r.URL.Query().Get("search")
 		data["CategoryFilter"] = r.URL.Query().Get("category_slug")
 		data["EnabledFilter"] = r.URL.Query().Get("enabled")
+		data["SortBy"] = sortBy
 		data["Categories"] = categories
 		data["FlatCategories"] = flattenCategories(categories)
 		data["Version"] = version
@@ -191,7 +197,7 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 
 // buildRulesPaginationBase returns the pagination base URL for the rules page.
 func buildRulesPaginationBase(r *http.Request) string {
-	params := []string{"search", "category_slug", "enabled", "per_page"}
+	params := []string{"search", "category_slug", "enabled", "per_page", "sort_by"}
 	q := r.URL.Query()
 	var qs []string
 	for _, key := range params {

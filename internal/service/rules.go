@@ -726,6 +726,40 @@ func (s *Service) GetTransactionRule(ctx context.Context, id string) (*Transacti
 	return s.ruleRowToResponse(ctx, &row), nil
 }
 
+// ruleOrderByClause maps a requested sort to the actual ORDER BY fragment.
+// Unknown values fall back to created_at DESC so the admin UI can't inject
+// arbitrary SQL via the query string.
+func ruleOrderByClause(sortBy, sortDir string) string {
+	dir := "DESC"
+	if sortDir == "asc" {
+		dir = "ASC"
+	}
+	switch sortBy {
+	case "hit_count":
+		return " ORDER BY tr.hit_count " + dir + ", tr.id DESC"
+	case "last_hit_at":
+		// NULLs sort last regardless of direction — rules that have never
+		// fired should stay at the bottom.
+		nullsOrder := "NULLS LAST"
+		if dir == "ASC" {
+			nullsOrder = "NULLS LAST"
+		}
+		return " ORDER BY tr.last_hit_at " + dir + " " + nullsOrder + ", tr.id DESC"
+	case "priority":
+		if sortDir == "" {
+			dir = "ASC" // pipeline stages read left-to-right
+		}
+		return " ORDER BY tr.priority " + dir + ", tr.created_at DESC, tr.id DESC"
+	case "name":
+		if sortDir == "" {
+			dir = "ASC"
+		}
+		return " ORDER BY LOWER(tr.name) " + dir + ", tr.id DESC"
+	default:
+		return " ORDER BY tr.created_at DESC, tr.id DESC"
+	}
+}
+
 // ListTransactionRules returns a filtered, paginated list of transaction rules.
 //
 // Category filtering matches against the set_category action inside the
@@ -794,7 +828,7 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 		tr.priority, tr.enabled, tr.expires_at, tr.created_by_type, tr.created_by_id, tr.created_by_name,
 		tr.hit_count, tr.last_hit_at, tr.created_at, tr.updated_at `
 
-	orderBy := " ORDER BY tr.created_at DESC, tr.id DESC"
+	orderBy := ruleOrderByClause(params.SortBy, params.SortDir)
 	whereSQL := filterWhereSQL
 
 	// Offset-based pagination (admin UI)
@@ -2278,16 +2312,18 @@ func ActionsSummary(actions []RuleAction, categoryName string) string {
 }
 
 // TriggerLabel returns the human-readable label for a rule trigger value.
-// Falls back to the raw value (or "On create" when empty) for unknown values.
-// "on_update" is accepted as a back-compat alias for "on_change".
+// The "On sync …" phrasing makes it explicit that rules fire during provider
+// sync, not on arbitrary admin edits. "on_update" is accepted as a back-compat
+// alias for "on_change". Falls back to the raw value for unknown triggers and
+// "On sync create" when the value is empty.
 func TriggerLabel(trigger string) string {
 	switch trigger {
 	case "", "on_create":
-		return "On create"
+		return "On sync create"
 	case "on_change", "on_update":
-		return "On change"
+		return "On sync change"
 	case "always":
-		return "Always"
+		return "Every sync"
 	default:
 		return trigger
 	}
