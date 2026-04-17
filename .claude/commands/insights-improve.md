@@ -86,7 +86,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/health/ready
 
 ## Phase 4: Screenshot
 
-Take a screenshot showing the improvement. Use the `app-screenshot` skill — navigate to `/insights` first.
+Take a screenshot showing the improvement. Use the `validate-ui` skill — navigate to `/insights` first.
 
 ## Phase 5: Submit PR
 

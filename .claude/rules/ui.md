@@ -80,3 +80,30 @@ Admin list pages (reviews, rules, reports) use AJAX actions with card fade-out a
 ## Icons
 
 Lucide names only. Nav-level icons are stable; don't rename on a whim (users build muscle memory). Current nav: `home`, `credit-card`, `receipt`, `folder`, `link-2` (account links), `users`, `key`, `bot` (MCP), `list-filter` (rules), `inbox` (reviews), `flag` (reports), `scroll` (sync logs), `settings`.
+
+## Validation / PR evidence
+
+UI changes must be validated in a real browser before the task is reported done, and the PR must include a screenshot. Use the `validate-ui` skill — it drives Chrome DevTools MCP end-to-end. **Never** fall back to `screencapture` / AppleScript.
+
+**Default flow**:
+
+1. `list_pages` → `select_page`/`new_page` at the target URL.
+2. `wait_for` on expected text so the capture doesn't race render.
+3. `resize_page` to a controlled breakpoint before every capture:
+   - Desktop: `1280x800` (default) or `1440x900` for wide layouts.
+   - Mobile: `390x844`. Required whenever the change is responsive or touches mobile-specific styles.
+   - Tablet: `768x1024` when the change crosses the `md` breakpoint.
+4. `take_screenshot(filePath, format: "jpeg", quality: 85, fullPage: false)` — viewport-only by default. Use `fullPage: true` only when the change is genuinely below the fold and scrolling wouldn't convey it (wrap those in `<details>` in the PR body).
+5. Upload via the `github-image-hosting` skill (img402).
+
+**Embedding in the PR** — always inline HTML so the rendered width is bounded:
+
+```html
+<img src="https://i.img402.dev/<id>.jpg" width="800" alt="<page> — after">
+```
+
+Before/after diffs: use the side-by-side table pattern documented in the `validate-ui` skill. Responsive changes: include both desktop and mobile.
+
+Do NOT use `![alt](url)` — GitHub renders the full native size and tall captures become painful to review. `{width=...}` kramdown syntax and `style="..."` attributes are silently stripped by GitHub's sanitizer.
+
+**Restart `make dev`** after template / CSS / Alpine edits before capturing — the binary serves embedded CSS and reloading the browser alone won't pick up the change (see "CSS build" above).

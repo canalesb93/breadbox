@@ -27,7 +27,7 @@ Browse the current templates, handlers, and service layer to understand the code
 ls internal/templates/pages/ internal/templates/partials/ internal/api/ internal/service/
 ```
 
-**Critical: Look at the actual app.** Use Chrome MCP tools (`navigate`, `read_page`, `javascript_tool`, `get_page_text`, `read_console_messages`, `read_network_requests`, etc.) to browse `http://localhost:8080` and test things. The app root is at `/` (not `/admin`). This is how you find bugs. Do NOT use the `app-screenshot` skill during discovery — just use regular Chrome MCP tools.
+**Critical: Look at the actual app.** Use Chrome MCP tools (`navigate`, `read_page`, `javascript_tool`, `get_page_text`, `read_console_messages`, `read_network_requests`, etc.) to browse `http://localhost:8080` and test things. The app root is at `/` (not `/admin`). This is how you find bugs. Do NOT use the `validate-ui` skill during discovery — just use regular Chrome MCP tools.
 
 **Known issues to investigate** (pick one if nothing else jumps out):
 - Global search (Cmd+K modal) has icon rendering issues and may not match the app's design language
