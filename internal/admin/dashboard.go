@@ -379,17 +379,11 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		if err != nil {
 			a.Logger.Error("list unread agent reports", "error", err)
 		}
-		totalUnreadCount, err := svc.CountUnreadAgentReports(ctx)
-		if err != nil {
-			a.Logger.Error("count unread agent reports", "error", err)
-		}
-		totalUnread := int(totalUnreadCount)
+		// Reuse the unread count already fetched by NavBadgesMiddleware —
+		// avoids a second COUNT(*) round-trip on every dashboard load.
+		totalUnread := int(getNavBadges(ctx).UnreadReports)
 		for _, r := range rawReports {
 			t, _ := time.Parse(time.RFC3339, r.CreatedAt)
-			displayAuthor := r.CreatedByName
-			if r.Author != nil && *r.Author != "" {
-				displayAuthor = *r.Author
-			}
 			agentReports = append(agentReports, DashboardReport{
 				ID:            r.ID,
 				Title:         r.Title,
@@ -397,11 +391,10 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				CreatedByName: r.CreatedByName,
 				Priority:      r.Priority,
 				Tags:          r.Tags,
-				DisplayAuthor: displayAuthor,
+				DisplayAuthor: reportDisplayAuthor(r.CreatedByName, r.Author),
 				CreatedAt:     relativeTime(t),
 			})
 		}
-		hasMoreReports := totalUnread > len(agentReports)
 		moreReportsCount := totalUnread - len(agentReports)
 
 		// Quick stats for the status bar.
@@ -464,7 +457,6 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"AttentionCount":    attentionCount,
 			"HasAttentionItems": attentionCount > 0,
 			"AgentReports":       agentReports,
-			"HasMoreReports":     hasMoreReports,
 			"MoreReportsCount":   moreReportsCount,
 			"TotalUnreadReports": totalUnread,
 		}

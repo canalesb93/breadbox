@@ -112,9 +112,7 @@ function reportDetail(id, initialRead) {
   };
 }
 
-// Styling handled in input.css via .bb-report-body rules. Script only handles
-// external-link targeting and secure noopener. No separator lines under headings,
-// no heavy custom styling — keeps standard markdown rendering clean.
+// External-link targeting only — styling lives in .bb-report-body (input.css).
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.bb-report-body').forEach(function(el) {
     var md = el.getAttribute('data-markdown');

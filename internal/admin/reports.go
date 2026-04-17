@@ -3,8 +3,6 @@ package admin
 import (
 	"encoding/json"
 	"net/http"
-	"regexp"
-	"strings"
 	"time"
 
 	"breadbox/internal/app"
@@ -14,41 +12,13 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// markdown-preview scrubbing: replace links [text](url) with their text, drop bold/italic/code markers.
-var (
-	previewLinkRe   = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`)
-	previewItalicRe = regexp.MustCompile(`\*([^*\n]+)\*`)
-)
-
-// bodyPreview returns a short, plain-text preview of a markdown report body:
-// strips common markdown markers, collapses whitespace, and trims to ~160 chars.
-func bodyPreview(body string) string {
-	var sb strings.Builder
-	for _, line := range strings.Split(body, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "|") || strings.HasPrefix(trimmed, "```") {
-			continue
-		}
-		trimmed = strings.TrimPrefix(trimmed, "- ")
-		trimmed = strings.TrimPrefix(trimmed, "* ")
-		trimmed = strings.ReplaceAll(trimmed, "**", "")
-		trimmed = strings.ReplaceAll(trimmed, "`", "")
-		// Convert markdown links and italics to plain text.
-		trimmed = previewLinkRe.ReplaceAllString(trimmed, "$1")
-		trimmed = previewItalicRe.ReplaceAllString(trimmed, "$1")
-		if sb.Len() > 0 {
-			sb.WriteString(" · ")
-		}
-		sb.WriteString(trimmed)
-		if sb.Len() >= 200 {
-			break
-		}
+// reportDisplayAuthor returns the preferred display name for a report,
+// falling back to the creator's actor name when the agent didn't set a custom author.
+func reportDisplayAuthor(createdByName string, author *string) string {
+	if author != nil && *author != "" {
+		return *author
 	}
-	out := sb.String()
-	if len(out) > 160 {
-		out = strings.TrimSpace(out[:160]) + "…"
-	}
-	return out
+	return createdByName
 }
 
 // ReportsPageHandler handles GET /reports.
@@ -58,7 +28,6 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 
 		statusFilter := r.URL.Query().Get("status") // "", "unread", "read"
 
-		// Fetch reports based on filter.
 		var rawReports []service.AgentReportResponse
 		var err error
 		switch statusFilter {
@@ -73,7 +42,7 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 			return
 		}
 
-		// Filter "read" in Go since we don't have a dedicated query for it.
+		// "read" has no dedicated query; filter in Go.
 		if statusFilter == "read" {
 			var filtered []service.AgentReportResponse
 			for _, r := range rawReports {
@@ -84,12 +53,10 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 			rawReports = filtered
 		}
 
-		// Build template-friendly structs.
 		type ReportItem struct {
 			ID            string
 			Title         string
 			Body          string
-			Preview       string
 			Priority      string
 			Tags          []string
 			DisplayAuthor string
@@ -99,18 +66,13 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 		var reports []ReportItem
 		for _, r := range rawReports {
 			t, _ := time.Parse(time.RFC3339, r.CreatedAt)
-			displayAuthor := r.CreatedByName
-			if r.Author != nil && *r.Author != "" {
-				displayAuthor = *r.Author
-			}
 			reports = append(reports, ReportItem{
 				ID:            r.ID,
 				Title:         r.Title,
 				Body:          r.Body,
-				Preview:       bodyPreview(r.Body),
 				Priority:      r.Priority,
 				Tags:          r.Tags,
-				DisplayAuthor: displayAuthor,
+				DisplayAuthor: reportDisplayAuthor(r.CreatedByName, r.Author),
 				CreatedAt:     relativeTime(t),
 				IsRead:        r.ReadAt != nil,
 			})
@@ -142,10 +104,6 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 		}
 
 		t, _ := time.Parse(time.RFC3339, report.CreatedAt)
-		displayAuthor := report.CreatedByName
-		if report.Author != nil && *report.Author != "" {
-			displayAuthor = *report.Author
-		}
 
 		type ReportDetail struct {
 			ID            string
@@ -165,7 +123,7 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 			Body:          report.Body,
 			Priority:      report.Priority,
 			Tags:          report.Tags,
-			DisplayAuthor: displayAuthor,
+			DisplayAuthor: reportDisplayAuthor(report.CreatedByName, report.Author),
 			CreatedAt:     t.Format("Jan 2, 2006 at 3:04 PM"),
 			CreatedAtRel:  relativeTime(t),
 			IsRead:        report.ReadAt != nil,
