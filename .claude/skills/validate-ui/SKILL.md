@@ -14,7 +14,7 @@ description: >
 
 Validate a Breadbox admin UI change in the running app, then attach a screenshot to the PR as evidence. Uses Chrome DevTools MCP end-to-end.
 
-This replaces the old `screencapture` / AppleScript / `sips` pipeline. No OS permissions, no focus stealing, no browser chrome in the image, and full-page capture works out of the box.
+This replaces the old `screencapture` / AppleScript / `sips` pipeline. No OS permissions, no focus stealing, no browser chrome in the image. Defaults to a viewport capture at a controlled breakpoint so PR reviewers aren't scrolling through a 4,000-pixel-tall image.
 
 ## Prerequisites
 
@@ -53,13 +53,16 @@ If `/login` shows up, fill the form via `evaluate_script` and submit, then `navi
 
 Use `wait_for({ text: [...] })` with a string you expect on the target page (e.g., "Dashboard", "Transactions") so the capture doesn't race the render.
 
-### 4. Resize the viewport (optional, for consistent captures)
+### 4. Resize the viewport — pick the form factor
 
-```
-resize_page(width: 1440, height: 900)
-```
+Always resize before capturing so the image renders at a predictable breakpoint. Use one of:
 
-Use a consistent size for before/after comparisons. Skip if viewport width doesn't matter for this capture.
+- **Desktop (default)**: `resize_page(width: 1280, height: 800)`
+- **Desktop wide**: `resize_page(width: 1440, height: 900)` — use when the change involves wide-screen layouts (multi-column dashboards, tables).
+- **Mobile**: `resize_page(width: 390, height: 844)` — iPhone 14-class viewport. Use for any responsive / mobile-first change, or when validating that a desktop change hasn't regressed mobile.
+- **Tablet**: `resize_page(width: 768, height: 1024)` — use when the change touches the `md` Tailwind breakpoint.
+
+For before/after pairs, resize once and reuse the same dimensions for both captures.
 
 ### 5. Capture
 
@@ -68,13 +71,14 @@ take_screenshot(
   filePath: "/tmp/app-<PAGE>.jpg",
   format: "jpeg",
   quality: 85,
-  fullPage: true,
+  fullPage: false,
 )
 ```
 
-- Use a descriptive `<PAGE>` slug (e.g., `dashboard`, `transactions-before`, `transactions-after`).
-- `fullPage: true` grabs everything below the fold in one image — preferred for PR evidence.
-- JPEG at quality 85 keeps most captures under 1MB. Drop to 70 if you hit the limit.
+- `fullPage: false` (default) captures only the visible viewport — this is what you want in almost every case, since very tall full-page images are hard to review in a PR.
+- `fullPage: true` is for rare cases where the change is *below the fold* and scrolling wouldn't convey it (e.g., a new footer, a long settings form that's entirely below the fold). Prefer scrolling to the relevant section and capturing the viewport instead.
+- Use a descriptive `<PAGE>` slug (e.g., `dashboard`, `transactions-before`, `transactions-after`, `dashboard-mobile`).
+- JPEG at quality 85 keeps most captures well under 1MB. Drop to 70 only if you hit the limit.
 
 ### 6. Verify size (rare safeguard)
 
@@ -83,9 +87,9 @@ FILE_SIZE=$(stat -f%z /tmp/app-<PAGE>.jpg)
 echo "$FILE_SIZE bytes"
 ```
 
-If over 1MB: retake at `quality: 70`, or drop `fullPage` and capture the viewport only.
+If over 1MB: retake at `quality: 70` or drop `fullPage`.
 
-### 7. Upload and embed in the PR
+### 7. Upload
 
 Hand off to the `github-image-hosting` skill, or do it inline:
 
@@ -95,16 +99,58 @@ URL=$(curl -s -X POST https://img402.dev/api/free -F image=@/tmp/app-<PAGE>.jpg 
 echo "$URL"
 ```
 
-Embed in the PR body or as a comment:
+### 8. Embed in the PR
 
-```bash
-gh pr comment <PR_NUMBER> --body "![<PAGE>]($URL)"
+Use inline HTML (not `![alt](url)`) so you control the displayed width. GitHub Markdown accepts `<img>` tags — the full-res image stays one click away, and the rendered size stays readable.
+
+**Single screenshot:**
+
+```html
+<img src="https://i.img402.dev/<ID>.jpg" width="800" alt="<page> — after">
 ```
 
-For before/after diffs, name the files `<PAGE>-before` and `<PAGE>-after` and post them in a single comment.
+**Before/after — side-by-side table** (preferred for visual diffs):
+
+```html
+<table>
+  <tr>
+    <th>Before</th>
+    <th>After</th>
+  </tr>
+  <tr>
+    <td><img src="https://i.img402.dev/<BEFORE_ID>.jpg" width="400" alt="before"></td>
+    <td><img src="https://i.img402.dev/<AFTER_ID>.jpg" width="400" alt="after"></td>
+  </tr>
+</table>
+```
+
+**Mobile screenshot** (narrow — embed smaller):
+
+```html
+<img src="https://i.img402.dev/<ID>.jpg" width="320" alt="<page> — mobile">
+```
+
+**Tall capture you still want to include** (`fullPage: true`) — collapse it:
+
+```html
+<details><summary><page> — full page</summary>
+<img src="https://i.img402.dev/<ID>.jpg" width="800" alt="<page> — full page">
+</details>
+```
+
+Post via `gh`:
+
+```bash
+gh pr comment <PR_NUMBER> --body-file evidence.md   # multi-line HTML
+# or for a single image:
+gh pr comment <PR_NUMBER> --body '<img src="'"$URL"'" width="800" alt="<page>">'
+```
 
 ## Tips
 
+- **Responsive changes always get at least two captures**: desktop (1280 or 1440) + mobile (390). Tablet (768) only when the change crosses the `md` breakpoint.
+- For before/after diffs, name the files `<PAGE>-before` and `<PAGE>-after` and embed them in the table above.
 - After template / CSS / Alpine changes, restart `make dev` before capturing so Tailwind / partials rebuild.
 - `img402.dev` free URLs expire in 7 days — fine for active PR review, not for archived evidence. Re-upload if the PR sits beyond that.
 - For quick visual checks (not PR evidence), skip the upload step — the local JPEG is enough.
+- What does NOT work on GitHub Markdown: `![alt](url){width=600}` (ignored), `style="..."` attributes (stripped). Stick to `<img width="...">`.
