@@ -203,82 +203,98 @@ Admin-only tag CRUD. Agents typically don't need these — `add_transaction_tag`
 
 ## Transaction Rules Tools
 
+> **Full DSL specification**: see **[`docs/rule-dsl.md`](rule-dsl.md)** for the complete condition grammar, action semantics, trigger matrix, pipeline-stage (priority) ordering, sync-vs-retroactive differences, and the chaining model that lets later-stage rules observe earlier-stage rules' tag/category mutations.
+
+The tools below are thin API skins over the DSL — the DSL doc is the source of truth for what a rule *means*.
+
 ### create_transaction_rule (Write)
 
-Create a rule that auto-categorizes future transactions during sync.
+Create a rule that fires during sync. Actions compose (`set_category` + `add_tag` + `add_comment` in a single rule are all valid).
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `name` | string | Rule name |
-| `conditions` | object | Recursive condition tree (see below) |
-| `category_slug` | string | Category to assign when matched |
-| `priority` | int | Higher priority wins (default 0) |
+| `name` | string | Human-readable rule name |
+| `conditions` | object | Condition tree. Omit or `{}` for match-all. Supports `and` / `or` / `not` nesting up to depth 10. |
+| `actions` | array | Typed actions: `set_category`, `add_tag`, `remove_tag`, `add_comment`. Either this or `category_slug` is required. |
+| `category_slug` | string | Shorthand for `actions=[{type:set_category,category_slug:...}]` |
+| `trigger` | string | `on_create` (default) / `on_change` / `always`. `on_update` accepted as legacy alias. |
+| `priority` | int | Pipeline stage, 0–1000. Lower runs first. Typical: 0 (baseline), 10 (standard), 50 (refinement), 100 (override). |
 | `enabled` | bool | Default true |
 | `expires_in` | string | Optional duration (e.g., `24h`, `30d`, `1w`) |
-| `apply_retroactively` | bool | Apply to existing transactions |
+| `apply_retroactively` | bool | Also back-fill matching existing transactions (materializes `set_category` / `add_tag` / `remove_tag`; `add_comment` is sync-only) |
 
 ### list_transaction_rules (Read)
 
-List all rules with optional search filter.
+List rules with optional filters. Returns actions, priority, hit_count, last_hit_at.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `search` | string | Search rule names |
+| `search` | string | Substring / words / fuzzy search on rule name |
 | `category_slug` | string | Filter by target category |
 | `enabled` | bool | Filter by enabled status |
 
 ### update_transaction_rule (Write)
 
-Update an existing rule's conditions, category, priority, or enabled status.
+Every field is optional; omit to leave unchanged. Pass `conditions={}` to explicitly switch to match-all; pass `actions=[...]` to replace the entire action set; pass `expires_at=""` to clear expiry.
 
 ### delete_transaction_rule (Write)
 
-Delete a rule by ID.
+Delete a rule by ID. System-seeded rules can't be deleted — disable them via update instead.
 
 ### apply_rules (Write)
 
-Apply rules retroactively to existing transactions. Optionally specify a single rule ID, or apply all active rules.
+Retroactive apply. Pass `rule_id` for a single rule (no chaining — that rule evaluates in isolation), or omit to run the full active-rule pipeline in priority-ASC order with the same chaining semantics as sync. Materializes `set_category` / `add_tag` / `remove_tag`; skips `add_comment`. Ignores `rule.trigger` (retroactive is a bulk op).
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `rule_id` | string | Optional — apply a specific rule. Omit for all active rules. |
+| `rule_id` | string | Optional — single-rule apply (no chaining). Omit for full pipeline. |
 
 ### preview_rule (Read)
 
-Dry-run a condition against existing transactions. Returns match count and sample matches without making changes.
+Dry-run a condition tree against existing transactions. **Isolation semantics** — evaluates only the supplied condition against stored data; does NOT simulate the full rule pipeline. Use to answer "what does this condition match today" before creating a rule.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `conditions` | object | Condition tree to test |
-| `limit` | int | Max sample matches to return |
+| `conditions` | object | Condition tree to test (same grammar as `create_transaction_rule`) |
+| `sample_size` | int | Max sample matches to return (default 10, max 50). `match_count` always reflects the full match set. |
 
 ### batch_create_rules (Write)
 
-Create multiple rules at once.
+Create multiple rules in one call. Ideal for composable pipelines — use the priority field to order rules so earlier-stage rules set up tags/categories that later-stage rules react to. Returns per-item success + errors.
 
-### Condition Structure
-
-Rules use a recursive JSON condition tree:
+Example pipeline (3 rules that chain):
 
 ```json
 {
-  "type": "and",
-  "conditions": [
-    { "field": "name", "operator": "contains", "value": "AMAZON" },
-    { "field": "amount", "operator": "gt", "value": 50 }
+  "rules": [
+    {
+      "name": "Tag coffee shops",
+      "priority": 0,
+      "conditions": { "field": "merchant_name", "op": "contains", "value": "starbucks" },
+      "actions": [ { "type": "add_tag", "tag_slug": "coffee" } ]
+    },
+    {
+      "name": "Categorize coffee-tagged transactions",
+      "priority": 10,
+      "conditions": { "field": "tags", "op": "contains", "value": "coffee" },
+      "actions": [ { "type": "set_category", "category_slug": "food_and_drink_coffee" } ]
+    },
+    {
+      "name": "Flag expensive coffee",
+      "priority": 50,
+      "conditions": {
+        "and": [
+          { "field": "tags", "op": "contains", "value": "coffee" },
+          { "field": "amount", "op": "gt", "value": 15 }
+        ]
+      },
+      "actions": [ { "type": "add_tag", "tag_slug": "expensive" } ]
+    }
   ]
 }
 ```
 
-**Logical operators:** `and`, `or`, `not` (wraps a single condition)
-
-**Available fields:** `name`, `merchant_name`, `amount`, `category_primary`, `category_detailed`, `pending`, `provider`, `account_id`, `user_id`, `user_name`
-
-**String operators:** `eq`, `neq`, `contains`, `not_contains`, `matches` (regex), `in`
-
-**Numeric operators:** `eq`, `neq`, `gt`, `gte`, `lt`, `lte`
-
-**Boolean operators:** `eq`, `neq`
+Rule 2 sees rule 1's `coffee` tag mid-sync; rule 3 sees both the tag and (if we'd conditioned on it) the category rule 2 set. This is the chaining model — see `docs/rule-dsl.md` for the full story.
 
 ---
 

@@ -628,13 +628,13 @@ func (s *MCPServer) handleImportCategories(ctx context.Context, _ *mcpsdk.CallTo
 type createTransactionRuleInput struct {
 	WriteSessionContext
 	Name               string              `json:"name" jsonschema:"required,Name for this rule (human-readable description)"`
-	Conditions         map[string]any      `json:"conditions,omitempty" jsonschema:"JSON condition object. Omit or pass {} to match every transaction. Simple: {\"field\":\"name\",\"op\":\"contains\",\"value\":\"uber\"}. AND/OR/NOT. Fields: name merchant_name amount category_primary category_detailed category(assigned slug) pending provider account_id account_name user_id user_name tags. Ops: eq neq contains not_contains matches(regex) gt gte lt lte in. See docs/rule-dsl.md for the complete DSL."`
-	Actions            []map[string]string `json:"actions,omitempty" jsonschema:"Array of typed actions. {\"type\":\"set_category\",\"category_slug\":\"...\"}, {\"type\":\"add_tag\",\"tag_slug\":\"...\"}, {\"type\":\"remove_tag\",\"tag_slug\":\"...\"}, or {\"type\":\"add_comment\",\"content\":\"...\"}. If omitted, use category_slug instead."`
+	Conditions         map[string]any      `json:"conditions,omitempty" jsonschema:"JSON condition tree. Omit or pass {} to match every transaction. Leaf: {\"field\":\"...\",\"op\":\"...\",\"value\":...}. Combinators: {\"and\":[...]}, {\"or\":[...]}, {\"not\":{...}} (nest freely, max depth 10). Fields: name merchant_name amount category_primary category_detailed category(assigned slug, live-updated by earlier-stage rules) pending provider account_id account_name user_id user_name tags. Ops: string/category=eq|neq|contains|not_contains|matches(RE2)|in; numeric=eq|neq|gt|gte|lt|lte; bool=eq|neq; tags=contains|not_contains|in. Nested example: {\"or\":[{\"and\":[{\"field\":\"merchant_name\",\"op\":\"contains\",\"value\":\"starbucks\"},{\"field\":\"amount\",\"op\":\"gte\",\"value\":5}]},{\"field\":\"tags\",\"op\":\"contains\",\"value\":\"coffee\"}]}. Full spec: docs/rule-dsl.md."`
+	Actions            []map[string]string `json:"actions,omitempty" jsonschema:"Array of typed actions. {\"type\":\"set_category\",\"category_slug\":\"...\"} | {\"type\":\"add_tag\",\"tag_slug\":\"...\"} | {\"type\":\"remove_tag\",\"tag_slug\":\"...\"} | {\"type\":\"add_comment\",\"content\":\"...\"}. Actions compose: a rule can set a category AND add a tag AND add a comment in the same match. add_comment fires only at sync time (not on retroactive apply). remove_tag net-diffs against add_tag within the same sync pass. If omitted, use category_slug instead."`
 	CategorySlug       string              `json:"category_slug,omitempty" jsonschema:"Shorthand for actions: [{\"type\":\"set_category\",\"category_slug\":\"<slug>\"}]. Either actions or category_slug is required."`
-	Trigger            string              `json:"trigger,omitempty" jsonschema:"When the rule fires: 'on_create' (default — new transactions), 'on_change' (only on re-sync changes), 'always' (both). 'on_update' is accepted as a legacy alias for 'on_change'."`
-	Priority           int                 `json:"priority,omitempty" jsonschema:"Priority (higher wins when multiple rules set the same field). Default 10."`
+	Trigger            string              `json:"trigger,omitempty" jsonschema:"When the rule fires during sync: 'on_create' (default — first-synced transactions) | 'on_change' (existing transactions that changed on re-sync) | 'always' (both). 'on_update' is accepted as a legacy alias for 'on_change'. Retroactive apply ignores trigger."`
+	Priority           int                 `json:"priority,omitempty" jsonschema:"Pipeline-stage integer, 0..1000. Lower runs first. Typical: 0=baseline, 10=standard (default), 50=refinement, 100=override. Higher-priority rules observe earlier-stage rules' tag/category mutations via conditions, and win set_category under last-writer semantics."`
 	ExpiresIn          string              `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
-	ApplyRetroactively bool                `json:"apply_retroactively,omitempty" jsonschema:"If true, immediately apply this rule to all existing non-overridden transactions after creation."`
+	ApplyRetroactively bool                `json:"apply_retroactively,omitempty" jsonschema:"If true, immediately apply this rule to existing transactions after creation. Materializes set_category / add_tag / remove_tag; skips add_comment (sync-only). Hit count reflects every condition match, matching sync-time semantics."`
 }
 
 type listTransactionRulesInput struct {
@@ -650,14 +650,14 @@ type listTransactionRulesInput struct {
 type updateTransactionRuleInput struct {
 	WriteSessionContext
 	ID           string               `json:"id" jsonschema:"required,UUID of the rule to update"`
-	Name         *string              `json:"name,omitempty" jsonschema:"New name for the rule"`
-	Conditions   map[string]any       `json:"conditions,omitempty" jsonschema:"New condition tree (same format as create). Pass {} to change to match-all."`
-	Actions      *[]map[string]string `json:"actions,omitempty" jsonschema:"Replace actions array with typed actions. Each: {\"type\":\"set_category\",\"category_slug\":\"...\"}, {\"type\":\"add_tag\",\"tag_slug\":\"...\"}, {\"type\":\"remove_tag\",\"tag_slug\":\"...\"}, or {\"type\":\"add_comment\",\"content\":\"...\"}."`
-	CategorySlug *string              `json:"category_slug,omitempty" jsonschema:"Shorthand: replace the set_category action. Other actions are kept."`
-	Trigger      *string              `json:"trigger,omitempty" jsonschema:"New trigger: on_create, on_change, or always. 'on_update' accepted as alias for on_change."`
-	Priority     *int                 `json:"priority,omitempty" jsonschema:"New priority"`
-	Enabled      *bool                `json:"enabled,omitempty" jsonschema:"Enable or disable the rule"`
-	ExpiresAt    *string              `json:"expires_at,omitempty" jsonschema:"New expiry timestamp (RFC3339) or empty string to clear"`
+	Name         *string              `json:"name,omitempty" jsonschema:"New name for the rule. Omit to leave unchanged."`
+	Conditions   map[string]any       `json:"conditions,omitempty" jsonschema:"New condition tree (same format as create). Pass {} to explicitly change to match-all. Omit entirely to leave conditions unchanged."`
+	Actions      *[]map[string]string `json:"actions,omitempty" jsonschema:"Replace the entire actions array with typed actions: {\"type\":\"set_category|add_tag|remove_tag|add_comment\", ...}. Pass an empty array to reject (rules must have at least one action). Omit to leave actions unchanged."`
+	CategorySlug *string              `json:"category_slug,omitempty" jsonschema:"Shorthand: replace only the set_category action. Other action types on the rule are preserved. Omit to leave unchanged."`
+	Trigger      *string              `json:"trigger,omitempty" jsonschema:"New trigger: on_create, on_change, or always. 'on_update' accepted as alias for on_change. Omit to leave unchanged."`
+	Priority     *int                 `json:"priority,omitempty" jsonschema:"New priority (pipeline stage). Omit to leave unchanged."`
+	Enabled      *bool                `json:"enabled,omitempty" jsonschema:"Enable or disable the rule. Disabled rules are excluded from sync + retroactive apply."`
+	ExpiresAt    *string              `json:"expires_at,omitempty" jsonschema:"New expiry timestamp (RFC3339) or empty string to clear expiry entirely. Omit to leave unchanged."`
 }
 
 type deleteTransactionRuleInput struct {
@@ -667,7 +667,7 @@ type deleteTransactionRuleInput struct {
 
 type batchCreateRulesInput struct {
 	WriteSessionContext
-	Rules []batchRuleItem `json:"rules" jsonschema:"required,Array of rules to create"`
+	Rules []batchRuleItem `json:"rules" jsonschema:"required,Array of rules to create. Ideal for composable pipelines. Example — tagging then categorizing then flagging: [{\"name\":\"Tag coffee shops\",\"priority\":0,\"conditions\":{\"field\":\"merchant_name\",\"op\":\"contains\",\"value\":\"starbucks\"},\"actions\":[{\"type\":\"add_tag\",\"tag_slug\":\"coffee\"}]},{\"name\":\"Categorize coffee-tagged\",\"priority\":10,\"conditions\":{\"field\":\"tags\",\"op\":\"contains\",\"value\":\"coffee\"},\"actions\":[{\"type\":\"set_category\",\"category_slug\":\"food_and_drink_coffee\"}]},{\"name\":\"Flag expensive coffee\",\"priority\":50,\"conditions\":{\"and\":[{\"field\":\"tags\",\"op\":\"contains\",\"value\":\"coffee\"},{\"field\":\"amount\",\"op\":\"gt\",\"value\":15}]},\"actions\":[{\"type\":\"add_tag\",\"tag_slug\":\"expensive\"}]}]"`
 }
 
 type batchRuleItem struct {
@@ -682,13 +682,13 @@ type batchRuleItem struct {
 
 type applyRulesInput struct {
 	WriteSessionContext
-	RuleID string `json:"rule_id,omitempty" jsonschema:"Optional UUID of a specific rule to apply. If omitted, applies all active rules (first match wins by priority)."`
+	RuleID string `json:"rule_id,omitempty" jsonschema:"Optional ID (UUID or short_id) of a specific rule to apply. When supplied, only that rule runs — no chaining. Omit to apply all active rules in pipeline-stage order (priority ASC); earlier rules' tag/category mutations feed later rules' conditions, exactly like sync-time. Materializes set_category / add_tag / remove_tag; add_comment stays sync-only. Ignores rule.trigger (retroactive is a bulk op)."`
 }
 
 type previewRuleInput struct {
 	ReadSessionContext
-	Conditions map[string]any `json:"conditions" jsonschema:"required,Condition tree to evaluate against existing transactions (same format as create_transaction_rule conditions)."`
-	SampleSize int            `json:"sample_size,omitempty" jsonschema:"Number of sample matching transactions to return (default 10, max 50)."`
+	Conditions map[string]any `json:"conditions" jsonschema:"required,Condition tree to evaluate against existing transactions. Same grammar as create_transaction_rule.conditions. Preview evaluates this single condition in isolation against stored data — it does NOT simulate the full rule pipeline, so tags or categories that other rules would have added don't influence the result. Use this to answer 'what does this condition match today' before creating the rule."`
+	SampleSize int            `json:"sample_size,omitempty" jsonschema:"Number of sample matching transactions to return (default 10, max 50). The match_count in the response reflects the full match set, not just the sample."`
 }
 
 func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.CallToolRequest, input createTransactionRuleInput) (*mcpsdk.CallToolResult, any, error) {
