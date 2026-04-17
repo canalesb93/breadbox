@@ -15,10 +15,10 @@
       <a href="?days=90" class="px-2.5 py-1 text-xs rounded-md transition-colors {{if eq .SpendingDays 90}}bg-base-100 shadow-sm font-medium text-base-content{{else}}text-base-content/50 hover:text-base-content/70{{end}}">90d</a>
       <a href="?days=365" class="px-2.5 py-1 text-xs rounded-md transition-colors {{if eq .SpendingDays 365}}bg-base-100 shadow-sm font-medium text-base-content{{else}}text-base-content/50 hover:text-base-content/70{{end}}">1y</a>
     </div>
-    <button class="btn btn-sm btn-primary rounded-xl gap-2" onclick="document.getElementById('create-modal').showModal()">
+    <a href="/categories/new" class="btn btn-sm btn-primary rounded-xl gap-2">
       <i data-lucide="plus" class="w-4 h-4"></i>
       Add Category
-    </button>
+    </a>
   </div>
 </div>
 
@@ -214,9 +214,9 @@
         </div>
         <h2 class="text-lg font-semibold mb-1">No categories yet</h2>
         <p class="text-base-content/50 text-sm mb-6 max-w-sm">Create your first category to start organizing transactions into a clean taxonomy.</p>
-        <button class="btn btn-primary btn-sm rounded-xl gap-2" onclick="document.getElementById('create-modal').showModal()">
+        <a href="/categories/new" class="btn btn-primary btn-sm rounded-xl gap-2">
           <i data-lucide="plus" class="w-4 h-4"></i> Add Category
-        </button>
+        </a>
       </div>
     </div>
     {{end}}

@@ -115,6 +115,49 @@ func CategoriesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 	}
 }
 
+// CategoryNewPageHandler serves GET /categories/new — renders the empty create form.
+func CategoryNewPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		categories, err := svc.ListCategoryTree(r.Context())
+		if err != nil {
+			tr.RenderError(w, r)
+			return
+		}
+		data := BaseTemplateData(r, sm, "categories", "Add Category")
+		data["IsEdit"] = false
+		data["Categories"] = categories
+		data["Breadcrumbs"] = []Breadcrumb{
+			{Label: "Rules & Categories", Href: "/rules?tab=categories"},
+			{Label: "Add Category"},
+		}
+		tr.Render(w, r, "category_form.html", data)
+	}
+}
+
+// CategoryEditPageHandler serves GET /categories/{id}/edit — renders the form populated from DB.
+func CategoryEditPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		category, err := svc.GetCategory(r.Context(), id)
+		if err != nil {
+			if errors.Is(err, service.ErrCategoryNotFound) || errors.Is(err, service.ErrNotFound) {
+				tr.RenderNotFound(w, r)
+				return
+			}
+			tr.RenderError(w, r)
+			return
+		}
+		data := BaseTemplateData(r, sm, "categories", "Edit "+category.DisplayName)
+		data["IsEdit"] = true
+		data["Category"] = category
+		data["Breadcrumbs"] = []Breadcrumb{
+			{Label: "Rules & Categories", Href: "/rules?tab=categories"},
+			{Label: category.DisplayName},
+		}
+		tr.Render(w, r, "category_form.html", data)
+	}
+}
+
 // CreateCategoryAdminHandler handles POST /admin/api/categories.
 func CreateCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
