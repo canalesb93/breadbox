@@ -155,6 +155,17 @@ Rules use a recursive JSON condition tree supporting AND/OR/NOT logic:
 
 **Boolean operators:** `eq`, `neq`
 
+### Pipeline stage (priority)
+
+`POST /rules` and `PUT /rules/{id}` accept either `stage` (semantic) or `priority` (raw integer) on the request body:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `stage` | string | `baseline` / `standard` / `refinement` / `override`. Resolves to priority `0 / 10 / 50 / 100`. |
+| `priority` | int | Raw pipeline-stage integer, `0..1000`. Lower runs first. |
+
+If both are supplied, `priority` wins. If neither is supplied on create, the rule defaults to `standard` (priority `10`). Stage names are case-insensitive; unknown stage strings return `400 VALIDATION_ERROR`. See [`docs/rule-dsl.md`](rule-dsl.md) for the full priority-as-pipeline-stage model.
+
 ## Account Links
 
 Account links connect dependent (authorized user) accounts to primary (cardholder) accounts for cross-connection transaction deduplication.

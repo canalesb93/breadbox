@@ -576,6 +576,46 @@ var validTriggers = map[string]bool{
 	"always":    true,
 }
 
+// DefaultRulePriority is the priority assigned when neither priority nor stage
+// is supplied. It corresponds to the "standard" pipeline stage.
+const DefaultRulePriority = 10
+
+// stagePriorities maps semantic pipeline-stage names to integer priorities.
+// Values mirror the admin UI presets and are considered canonical.
+var stagePriorities = map[string]int{
+	"baseline":   0,
+	"standard":   10,
+	"refinement": 50,
+	"override":   100,
+}
+
+// ResolveRulePriority returns the effective integer priority for a rule,
+// accepting either an explicit priority, a semantic stage name, or both.
+//
+// Precedence (matches REST/MCP semantics):
+//   - priority non-nil                    -> use priority as-is
+//   - stage set and priority nil          -> map stage name to int
+//   - both nil/empty                      -> DefaultRulePriority ("standard")
+//   - stage set but unrecognized          -> validation error
+//
+// The stage string is case-insensitive and trimmed. Passing both is
+// intentionally allowed — agents may echo the stage back alongside a raw
+// priority for observability.
+func ResolveRulePriority(stage string, priority *int) (int, error) {
+	if priority != nil {
+		return *priority, nil
+	}
+	stage = strings.ToLower(strings.TrimSpace(stage))
+	if stage == "" {
+		return DefaultRulePriority, nil
+	}
+	p, ok := stagePriorities[stage]
+	if !ok {
+		return 0, fmt.Errorf("%w: invalid stage %q (expected baseline|standard|refinement|override)", ErrInvalidParameter, stage)
+	}
+	return p, nil
+}
+
 // normalizeTrigger returns the canonical trigger string, defaulting to
 // "on_create" on empty input. "on_update" is accepted and rewritten to
 // "on_change". Returns an error for unknown values.
@@ -653,9 +693,18 @@ func (s *Service) CreateTransactionRule(ctx context.Context, params CreateTransa
 		return nil, fmt.Errorf("marshal actions: %w", err)
 	}
 
-	priority := params.Priority
-	if priority == 0 {
-		priority = 10
+	// Resolve priority from either the raw int or the semantic stage name.
+	// Priority > 0 wins. Otherwise stage (if set) maps to its canonical int,
+	// else DefaultRulePriority ("standard") applies.
+	var priority int
+	if params.Priority != 0 {
+		priority = params.Priority
+	} else {
+		p, err := ResolveRulePriority(params.Stage, nil)
+		if err != nil {
+			return nil, err
+		}
+		priority = p
 	}
 
 	var expiresAt pgtype.Timestamptz
@@ -1004,6 +1053,12 @@ func (s *Service) UpdateTransactionRule(ctx context.Context, id string, params U
 	priority := int32(existing.Priority)
 	if params.Priority != nil {
 		priority = int32(*params.Priority)
+	} else if params.Stage != nil && *params.Stage != "" {
+		p, err := ResolveRulePriority(*params.Stage, nil)
+		if err != nil {
+			return nil, err
+		}
+		priority = int32(p)
 	}
 
 	enabled := existing.Enabled

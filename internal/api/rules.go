@@ -59,8 +59,12 @@ func CreateRuleHandler(svc *service.Service) http.HandlerFunc {
 			Actions      []service.RuleAction  `json:"actions"`
 			CategorySlug string                `json:"category_slug"`
 			Trigger      string                `json:"trigger"`
-			Priority     int                   `json:"priority"`
-			ExpiresIn    string                `json:"expires_in"`
+			// Stage is the semantic alias for priority:
+			//   baseline=0, standard=10, refinement=50, override=100.
+			// If both stage and priority are supplied, priority wins.
+			Stage     string `json:"stage"`
+			Priority  int    `json:"priority"`
+			ExpiresIn string `json:"expires_in"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
@@ -84,6 +88,7 @@ func CreateRuleHandler(svc *service.Service) http.HandlerFunc {
 			CategorySlug: input.CategorySlug,
 			Trigger:      input.Trigger,
 			Priority:     input.Priority,
+			Stage:        input.Stage,
 			ExpiresIn:    input.ExpiresIn,
 			Actor:        actor,
 		}
@@ -139,9 +144,11 @@ func UpdateRuleHandler(svc *service.Service) http.HandlerFunc {
 			Actions      *[]service.RuleAction  `json:"actions,omitempty"`
 			CategorySlug *string                `json:"category_slug,omitempty"`
 			Trigger      *string                `json:"trigger,omitempty"`
-			Priority     *int                   `json:"priority,omitempty"`
-			Enabled      *bool                  `json:"enabled,omitempty"`
-			ExpiresAt    *string                `json:"expires_at,omitempty"`
+			// Stage is the semantic alias for priority. If both are supplied, priority wins.
+			Stage     *string `json:"stage,omitempty"`
+			Priority  *int    `json:"priority,omitempty"`
+			Enabled   *bool   `json:"enabled,omitempty"`
+			ExpiresAt *string `json:"expires_at,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
@@ -155,6 +162,7 @@ func UpdateRuleHandler(svc *service.Service) http.HandlerFunc {
 			CategorySlug: input.CategorySlug,
 			Trigger:      input.Trigger,
 			Priority:     input.Priority,
+			Stage:        input.Stage,
 			Enabled:      input.Enabled,
 			ExpiresAt:    input.ExpiresAt,
 		})

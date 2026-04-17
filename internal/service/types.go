@@ -505,8 +505,12 @@ type CreateTransactionRuleParams struct {
 	CategorySlug string       // sugar for actions: [{"type":"set_category","category_slug":slug}]
 	Trigger      string       // "on_create" (default), "on_change", or "always" ("on_update" accepted as alias)
 	Priority     int
-	ExpiresIn    string // e.g., "30d", "24h"
-	Actor        Actor
+	// Stage is a semantic alias for Priority: "baseline" (0), "standard" (10),
+	// "refinement" (50), or "override" (100). If both Stage and Priority are
+	// supplied, Priority wins. Unknown values return a validation error.
+	Stage     string
+	ExpiresIn string // e.g., "30d", "24h"
+	Actor     Actor
 }
 
 type UpdateTransactionRuleParams struct {
@@ -517,8 +521,11 @@ type UpdateTransactionRuleParams struct {
 	CategorySlug *string       // sugar: replaces set_category action, keeps others
 	Trigger      *string       // optional trigger change
 	Priority     *int
-	Enabled      *bool
-	ExpiresAt    *string // ISO timestamp or empty to clear
+	// Stage is the semantic alias for Priority. When Priority is also supplied,
+	// Priority wins. An empty string means "don't change".
+	Stage     *string
+	Enabled   *bool
+	ExpiresAt *string // ISO timestamp or empty to clear
 }
 
 // Batch categorize types
