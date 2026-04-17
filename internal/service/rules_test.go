@@ -453,6 +453,111 @@ func TestTriggerLabel(t *testing.T) {
 	}
 }
 
+// --- Baseline regression tests (audit §D) ---
+//
+// These lock down current validation and evaluation semantics so upcoming
+// resolver-chaining / priority-inversion work can't silently regress them.
+
+func TestValidateCondition_DepthLimit(t *testing.T) {
+	// Build a linear chain of NOT-wrapped conditions. Depth 10 = accepted,
+	// depth 11 = rejected (ValidateCondition enforces depth > 10 → error).
+	build := func(n int) Condition {
+		leaf := Condition{Field: "name", Op: "eq", Value: "x"}
+		cur := leaf
+		for i := 0; i < n; i++ {
+			next := cur
+			cur = Condition{Not: &next}
+		}
+		return cur
+	}
+
+	if err := ValidateCondition(build(10)); err != nil {
+		t.Errorf("depth 10 should be accepted, got %v", err)
+	}
+	if err := ValidateCondition(build(11)); err == nil {
+		t.Error("depth 11 should be rejected")
+	}
+}
+
+func TestValidateCondition_TagsField(t *testing.T) {
+	cases := []struct {
+		name    string
+		cond    Condition
+		wantErr bool
+	}{
+		{"contains with string", Condition{Field: "tags", Op: "contains", Value: "needs-review"}, false},
+		{"not_contains with string", Condition{Field: "tags", Op: "not_contains", Value: "needs-review"}, false},
+		{"in with array", Condition{Field: "tags", Op: "in", Value: []interface{}{"a", "b"}}, false},
+		{"eq rejected", Condition{Field: "tags", Op: "eq", Value: "x"}, true},
+		{"matches rejected", Condition{Field: "tags", Op: "matches", Value: ".*"}, true},
+		{"contains with non-string rejected", Condition{Field: "tags", Op: "contains", Value: 123}, true},
+		{"in with empty array rejected", Condition{Field: "tags", Op: "in", Value: []interface{}{}}, true},
+		{"in with non-array rejected", Condition{Field: "tags", Op: "in", Value: "notanarray"}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateCondition(tc.cond)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("ValidateCondition() err=%v wantErr=%v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestEvaluateCondition_TagsField(t *testing.T) {
+	tctx := TransactionContext{Tags: []string{"coffee", "needs-review"}}
+
+	cases := []struct {
+		name     string
+		cond     Condition
+		expected bool
+	}{
+		{"contains present", Condition{Field: "tags", Op: "contains", Value: "coffee"}, true},
+		{"contains absent", Condition{Field: "tags", Op: "contains", Value: "travel"}, false},
+		{"contains case-insensitive", Condition{Field: "tags", Op: "contains", Value: "COFFEE"}, true},
+		{"not_contains absent", Condition{Field: "tags", Op: "not_contains", Value: "travel"}, true},
+		{"not_contains present", Condition{Field: "tags", Op: "not_contains", Value: "coffee"}, false},
+		{"in any present", Condition{Field: "tags", Op: "in", Value: []interface{}{"travel", "coffee"}}, true},
+		{"in none present", Condition{Field: "tags", Op: "in", Value: []interface{}{"travel", "flagged"}}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cc, err := CompileCondition(tc.cond)
+			if err != nil {
+				t.Fatalf("CompileCondition err: %v", err)
+			}
+			if got := EvaluateCondition(cc, tctx); got != tc.expected {
+				t.Errorf("EvaluateCondition() = %v want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestEvaluateCondition_TagsField_EmptyTransactionTags(t *testing.T) {
+	tctx := TransactionContext{Tags: nil}
+
+	// contains false on nil tags.
+	cc := mustCompileSvc(t, Condition{Field: "tags", Op: "contains", Value: "x"})
+	if EvaluateCondition(cc, tctx) {
+		t.Error("expected contains on empty tags to be false")
+	}
+
+	// not_contains true on nil tags.
+	cc = mustCompileSvc(t, Condition{Field: "tags", Op: "not_contains", Value: "x"})
+	if !EvaluateCondition(cc, tctx) {
+		t.Error("expected not_contains on empty tags to be true")
+	}
+}
+
+func mustCompileSvc(t *testing.T, c Condition) *CompiledCondition {
+	t.Helper()
+	cc, err := CompileCondition(c)
+	if err != nil {
+		t.Fatalf("CompileCondition err: %v", err)
+	}
+	return cc
+}
+
 func TestParseDuration(t *testing.T) {
 	tests := []struct {
 		input   string
