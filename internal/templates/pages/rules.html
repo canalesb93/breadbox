@@ -102,9 +102,23 @@
   </div>
 </div>
 
-<!-- Rules count -->
-<div class="text-sm text-base-content/40 mb-4 px-1">
-  {{if gt .TotalPages 1}}Showing {{.ShowingStart}}&ndash;{{.ShowingEnd}} of {{end}}{{.Total}} rule{{if ne .Total 1}}s{{end}} found
+<!-- Rules count + sort -->
+<div class="flex items-center justify-between flex-wrap gap-3 mb-4 px-1">
+  <div class="text-sm text-base-content/40">
+    {{if gt .TotalPages 1}}Showing {{.ShowingStart}}&ndash;{{.ShowingEnd}} of {{end}}{{.Total}} rule{{if ne .Total 1}}s{{end}} found
+  </div>
+  {{if .Rules}}
+  <label class="flex items-center gap-2 text-xs text-base-content/40">
+    <span class="hidden sm:inline">Sort by</span>
+    <select onchange="bbSetRulesSort(this.value)" class="select select-bordered select-xs rounded-lg bg-base-100 min-w-32 tabular-nums">
+      <option value=""            {{if eq .SortBy ""}}selected{{end}}>Newest first</option>
+      <option value="hit_count"   {{if eq .SortBy "hit_count"}}selected{{end}}>Most hits</option>
+      <option value="last_hit_at" {{if eq .SortBy "last_hit_at"}}selected{{end}}>Recently active</option>
+      <option value="priority"    {{if eq .SortBy "priority"}}selected{{end}}>Pipeline stage</option>
+      <option value="name"        {{if eq .SortBy "name"}}selected{{end}}>Name (A–Z)</option>
+    </select>
+  </label>
+  {{end}}
 </div>
 
 <!-- Rules as cards instead of table for Mercury feel -->
@@ -315,6 +329,13 @@
 function bbSetRulesPerPage(val) {
   const u = new URL(window.location.href);
   u.searchParams.set('per_page', val);
+  u.searchParams.delete('page');
+  window.location.href = u.toString();
+}
+function bbSetRulesSort(val) {
+  const u = new URL(window.location.href);
+  if (val) u.searchParams.set('sort_by', val);
+  else u.searchParams.delete('sort_by');
   u.searchParams.delete('page');
   window.location.href = u.toString();
 }

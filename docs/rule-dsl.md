@@ -172,6 +172,29 @@ A rule can carry multiple actions of different types. Override (`category_overri
 }
 ```
 
+#### Which combinations make sense
+
+A single rule is limited to **one action per type** (at most one `set_category`, one `add_tag`, one `remove_tag`, one `add_comment`). The admin UI enforces this by disabling already-picked types in the action dropdown. To apply more than one tag, create additional rules — their outputs accumulate at the tag layer.
+
+Useful combinations:
+
+| Actions | Use case |
+| --- | --- |
+| `set_category` alone | Straightforward reclassification (e.g. `Uber` → `Transportation > Rideshare`). |
+| `set_category` + `add_tag` | Reclassify and annotate simultaneously (e.g. `Uber` → `Transportation > Rideshare` + `recurring`). |
+| `add_tag` alone | Add a tag without touching category. Safe pairing with override-protected transactions. |
+| `remove_tag` alone | Clean up a tag a prior rule or agent added (e.g. remove `needs-review` once a condition proves the transaction is benign). |
+| `add_tag` + `remove_tag` (different slugs) | Transition a transaction between tags (e.g. add `reviewed`, remove `needs-review`). |
+| `set_category` + `add_comment` | Reclassify and explain why — useful for audit trails. |
+
+Combinations to avoid:
+
+- **Same-slug `add_tag` + `remove_tag`** — cancels out under net-diff semantics. The admin UI flags this with an inline warning.
+- **`set_category` with no conditions** — match-all + reclassify will stomp every transaction on every sync. The form shows an "All transactions" banner for any match-all rule; double-check before saving.
+- **`add_comment` on `always` trigger** — fires on every sync, accumulating duplicate comment annotations. Prefer `on_create` or a narrower condition.
+
+See `docs/data-model.md` §annotations for how each action materializes into the timeline, and `internal/sync/engine.go applyRulesToTransaction` for the sync-side ordering guarantees.
+
 ## Triggers
 
 The `trigger` field controls when the rule runs during sync.
