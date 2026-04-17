@@ -93,25 +93,14 @@
               <option value="provider">Provider</option>
             </optgroup>
           </select>
-          <!-- Operator -->
+          <!-- Operator — options are driven by fieldType so string / numeric /
+               bool / tags each have their own label set with no duplicate
+               <option value="..."> across groups (duplicates break <select>
+               display in Chrome/Safari). -->
           <select x-model="cond.op" @change="syncToJson()" class="select select-bordered select-xs rounded-lg bg-base-100 w-28 shrink-0">
-            <option value="contains" x-show="fieldType(cond.field) === 'string'">contains</option>
-            <option value="eq" x-show="fieldType(cond.field) === 'string'">equals</option>
-            <option value="neq" x-show="fieldType(cond.field) === 'string'">not equals</option>
-            <option value="not_contains" x-show="fieldType(cond.field) === 'string'">not contains</option>
-            <option value="matches" x-show="fieldType(cond.field) === 'string'">regex</option>
-            <option value="in" x-show="fieldType(cond.field) === 'string'">in list</option>
-            <option value="gte" x-show="fieldType(cond.field) === 'numeric'">&ge;</option>
-            <option value="lte" x-show="fieldType(cond.field) === 'numeric'">&le;</option>
-            <option value="eq" x-show="fieldType(cond.field) === 'numeric'">=</option>
-            <option value="gt" x-show="fieldType(cond.field) === 'numeric'">&gt;</option>
-            <option value="lt" x-show="fieldType(cond.field) === 'numeric'">&lt;</option>
-            <option value="neq" x-show="fieldType(cond.field) === 'numeric'">&ne;</option>
-            <option value="eq" x-show="fieldType(cond.field) === 'bool'">is</option>
-            <option value="neq" x-show="fieldType(cond.field) === 'bool'">is not</option>
-            <option value="contains" x-show="fieldType(cond.field) === 'tags'">has</option>
-            <option value="not_contains" x-show="fieldType(cond.field) === 'tags'">does not have</option>
-            <option value="in" x-show="fieldType(cond.field) === 'tags'">has any of</option>
+            <template x-for="opt in operatorOptions(cond.field)" :key="opt.value">
+              <option :value="opt.value" x-text="opt.label"></option>
+            </template>
           </select>
           <!-- Value -->
           <select x-model="cond.value" x-show="fieldType(cond.field) === 'bool'" @change="syncToJson()" class="select select-bordered select-xs rounded-lg bg-base-100 w-20 shrink-0">
@@ -295,7 +284,39 @@ function ruleForm() {
     tags: 'tags',
   };
   const defaultOps = { string: 'contains', numeric: 'gte', bool: 'eq', tags: 'contains' };
-  const emptyCondition = () => ({ field: 'name', op: 'contains', value: '' });
+  // Operator option sets keyed by fieldType. Kept as labels (not HTML glyphs)
+  // because the visual builder renders via x-text now.
+  const operatorOptionsByType = {
+    string: [
+      { value: 'contains',     label: 'contains' },
+      { value: 'eq',           label: 'equals' },
+      { value: 'neq',          label: 'not equals' },
+      { value: 'not_contains', label: 'not contains' },
+      { value: 'matches',      label: 'regex' },
+      { value: 'in',           label: 'in list' },
+    ],
+    numeric: [
+      { value: 'gte', label: '\u2265' },
+      { value: 'lte', label: '\u2264' },
+      { value: 'eq',  label: '=' },
+      { value: 'gt',  label: '>' },
+      { value: 'lt',  label: '<' },
+      { value: 'neq', label: '\u2260' },
+    ],
+    bool: [
+      { value: 'eq',  label: 'is' },
+      { value: 'neq', label: 'is not' },
+    ],
+    tags: [
+      { value: 'contains',     label: 'has' },
+      { value: 'not_contains', label: 'does not have' },
+      { value: 'in',           label: 'has any of' },
+    ],
+  };
+  // The initial condition row renders empty so the user must pick a field
+  // explicitly — the operator + value inputs then snap to sensible defaults
+  // via onFieldChange().
+  const emptyCondition = () => ({ field: '', op: '', value: '' });
 
   // Action type registry — first-class typed actions match the API's
   // supported action.type values (set_category | add_tag | remove_tag |
@@ -416,6 +437,12 @@ function ruleForm() {
     form: initForm(),
 
     fieldType(field) { return fieldTypes[field] || 'string'; },
+    operatorOptions(field) {
+      // Empty field → show an empty options set so the operator select is
+      // visually blank until a field is picked.
+      if (!field) return [];
+      return operatorOptionsByType[this.fieldType(field)] || operatorOptionsByType.string;
+    },
     priorityLabel(p) { return priorityLabelFor(p); },
 
     restorePageState() {
