@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"breadbox/internal/slugs"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -986,6 +988,9 @@ func (s *Service) UpdateTransactionRule(ctx context.Context, id string, params U
 		actions = newActions
 	}
 
+	// existing.Trigger is sourced from a NOT NULL DEFAULT column, and
+	// normalizeTrigger guarantees a non-empty value on update — no fallback
+	// needed here.
 	trigger := existing.Trigger
 	if params.Trigger != nil {
 		t, err := normalizeTrigger(*params.Trigger)
@@ -993,9 +998,6 @@ func (s *Service) UpdateTransactionRule(ctx context.Context, id string, params U
 			return nil, err
 		}
 		trigger = t
-	}
-	if trigger == "" {
-		trigger = "on_create"
 	}
 
 	priority := int32(existing.Priority)
@@ -2064,7 +2066,7 @@ func (s *Service) materializeRuleTagAdd(ctx context.Context, tx pgx.Tx, txnID pg
 			INSERT INTO tags (slug, display_name, lifecycle)
 			VALUES ($1, $2, 'persistent')
 			ON CONFLICT (slug) DO UPDATE SET updated_at = tags.updated_at
-			RETURNING id`, slug, titleCaseSlug(slug)).Scan(&tagID); err2 != nil {
+			RETURNING id`, slug, slugs.TitleCase(slug)).Scan(&tagID); err2 != nil {
 			return false, fmt.Errorf("get or create tag %q: %w", slug, err2)
 		}
 	}
@@ -2148,35 +2150,6 @@ func (s *Service) materializeRuleTagRemove(ctx context.Context, tx pgx.Tx, txnID
 		return true, fmt.Errorf("annotate tag_removed: %w", err)
 	}
 	return true, nil
-}
-
-// buildActionSetClause converts rule actions into SQL SET clause components.
-// Returns setClauses (e.g., ["category_id = $1"]), args, and error. Only
-// set_category materializes here — add_tag / remove_tag / add_comment are
-// persisted via separate helpers (materializeRuleTagAdd / Remove) since they
-// don't fit a single UPDATE row. add_comment stays sync-only by design.
-func (s *Service) buildActionSetClause(ctx context.Context, actions []RuleAction) ([]string, []any, error) {
-	var setClauses []string
-	var args []any
-	argN := 1
-
-	for _, a := range actions {
-		switch a.Type {
-		case "set_category":
-			catID, err := s.categorySlugToUUID(ctx, a.CategorySlug)
-			if err != nil {
-				return nil, nil, err
-			}
-			if catID.Valid {
-				setClauses = append(setClauses, fmt.Sprintf("category_id = $%d", argN))
-				args = append(args, catID)
-				argN++
-			}
-			// "add_tag" / "add_comment" are sync-only; skip for retroactive apply.
-		}
-	}
-
-	return setClauses, args, nil
 }
 
 // categorySlugToUUID resolves a category slug to its UUID via the service-layer

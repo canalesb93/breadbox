@@ -13,6 +13,7 @@ import (
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/provider"
+	"breadbox/internal/slugs"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -631,6 +632,12 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 	if !isNew {
 		if slugs, err := e.loadTagSlugsInTx(ctx, tx, dbTxn.ID); err == nil {
 			tctx.Tags = slugs
+		} else {
+			// Don't fail the whole sync over a tag-read glitch; rules that
+			// depend on tag conditions simply won't match this pass. Surfacing
+			// the error lets operators notice repeated failures.
+			e.logger.Warn("load tag slugs for rule evaluation failed; continuing without tag context",
+				"transaction_id", pgconv.FormatUUID(dbTxn.ID), "err", err)
 		}
 	}
 
@@ -642,6 +649,14 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 	// Build quick lookup of Source rule-metadata by (field, value) so the tag /
 	// comment / category persistence below can attach the right rule_id, name,
 	// and short_id to each annotation.
+	//
+	// First-wins on duplicate (field, value) keys: when multiple rules emit
+	// the same action (e.g., two rules both add_tag "needs-review"), the
+	// annotation is credited to the highest-priority rule that fired — because
+	// ResolveWithContext orders Sources by pipeline stage then priority, the
+	// first occurrence here is that rule. Lower-priority duplicates are
+	// dropped rather than overwriting, which matches the "winner takes the
+	// annotation" story the admin UI surfaces.
 	type ruleRef struct {
 		ruleID      pgtype.UUID
 		ruleShortID string
@@ -778,7 +793,7 @@ func (e *Engine) applyTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.U
 			INSERT INTO tags (slug, display_name, lifecycle)
 			VALUES ($1, $2, 'persistent')
 			ON CONFLICT (slug) DO UPDATE SET updated_at = tags.updated_at
-			RETURNING id`, slug, titleCaseSlugForRule(slug)).Scan(&tagID)
+			RETURNING id`, slug, slugs.TitleCase(slug)).Scan(&tagID)
 		if err2 != nil {
 			return fmt.Errorf("get or create tag %q: %w", slug, err2)
 		}
@@ -895,31 +910,6 @@ func (e *Engine) applyCommentFromRule(ctx context.Context, tx pgx.Tx, txnID pgty
 		return fmt.Errorf("annotate rule comment: %w", err)
 	}
 	return nil
-}
-
-// titleCaseSlugForRule converts a slug ("needs-review") to a display name
-// ("Needs Review") for auto-created tags during sync. Mirrors
-// service.titleCaseSlug; duplicated here to keep sync → service dependency
-// direction one-way.
-func titleCaseSlugForRule(slug string) string {
-	out := make([]byte, 0, len(slug))
-	capitalize := true
-	for i := 0; i < len(slug); i++ {
-		c := slug[i]
-		if c == '-' || c == ':' || c == '_' {
-			out = append(out, ' ')
-			capitalize = true
-			continue
-		}
-		if capitalize && c >= 'a' && c <= 'z' {
-			out = append(out, c-32)
-			capitalize = false
-			continue
-		}
-		out = append(out, c)
-		capitalize = false
-	}
-	return string(out)
 }
 
 // writeSyncAnnotationParams is the sync-package-local mirror of

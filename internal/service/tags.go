@@ -10,6 +10,7 @@ import (
 
 	"breadbox/internal/db"
 	"breadbox/internal/shortid"
+	"breadbox/internal/slugs"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -67,21 +68,6 @@ func validateLifecycle(lifecycle string) error {
 		return fmt.Errorf("%w: lifecycle must be 'persistent' or 'ephemeral'", ErrInvalidParameter)
 	}
 	return nil
-}
-
-// titleCaseSlug converts a slug ("needs-review") to a title-cased display name
-// ("Needs Review"). Used as the default display_name for auto-created tags.
-func titleCaseSlug(slug string) string {
-	parts := strings.FieldsFunc(slug, func(r rune) bool {
-		return r == '-' || r == ':' || r == '_'
-	})
-	for i, p := range parts {
-		if p == "" {
-			continue
-		}
-		parts[i] = strings.ToUpper(p[:1]) + p[1:]
-	}
-	return strings.Join(parts, " ")
 }
 
 // CreateTag validates and inserts a new tag record. Slug regex:
@@ -288,7 +274,7 @@ func (s *Service) getOrCreateTagBySlug(ctx context.Context, q *db.Queries, slug 
 	// Auto-create
 	created, err := q.InsertTag(ctx, db.InsertTagParams{
 		Slug:        slug,
-		DisplayName: titleCaseSlug(slug),
+		DisplayName: slugs.TitleCase(slug),
 		Lifecycle:   "persistent",
 	})
 	if err != nil {
