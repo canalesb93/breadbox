@@ -444,7 +444,7 @@ func TestTriggerLabel(t *testing.T) {
 		"on_create": "On sync create",
 		"on_change": "On sync change",
 		"on_update": "On sync change", // legacy alias
-		"always":    "Every sync",
+		"always":    "On sync create or change",
 		"weird":     "weird",
 	}
 	for in, want := range tests {

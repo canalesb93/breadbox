@@ -283,6 +283,31 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return false
 				}
 			},
+			"conditionCount": func(c any) int {
+				count := func(v service.Condition) int {
+					if len(v.And) > 0 {
+						return len(v.And)
+					}
+					if len(v.Or) > 0 {
+						return len(v.Or)
+					}
+					if v.Field != "" {
+						return 1
+					}
+					return 0
+				}
+				switch v := c.(type) {
+				case service.Condition:
+					return count(v)
+				case *service.Condition:
+					if v == nil {
+						return 0
+					}
+					return count(*v)
+				default:
+					return 0
+				}
+			},
 			"actionsSummary": func(rule any) string {
 				if r, ok := rule.(*service.TransactionRuleResponse); ok && r != nil {
 					name := ""

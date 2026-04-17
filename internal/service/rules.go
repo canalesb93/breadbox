@@ -797,18 +797,20 @@ func ruleOrderByClause(sortBy, sortDir string) string {
 			nullsOrder = "NULLS LAST"
 		}
 		return " ORDER BY tr.last_hit_at " + dir + " " + nullsOrder + ", tr.id DESC"
-	case "priority":
-		if sortDir == "" {
-			dir = "ASC" // pipeline stages read left-to-right
-		}
-		return " ORDER BY tr.priority " + dir + ", tr.created_at DESC, tr.id DESC"
+	case "created_at":
+		return " ORDER BY tr.created_at " + dir + ", tr.id DESC"
 	case "name":
 		if sortDir == "" {
 			dir = "ASC"
 		}
 		return " ORDER BY LOWER(tr.name) " + dir + ", tr.id DESC"
 	default:
-		return " ORDER BY tr.created_at DESC, tr.id DESC"
+		// Default: pipeline stage ASC — rules execute in priority order,
+		// so that's the most useful reading order for the list.
+		if sortDir == "" {
+			dir = "ASC"
+		}
+		return " ORDER BY tr.priority " + dir + ", tr.created_at DESC, tr.id DESC"
 	}
 }
 
@@ -2278,7 +2280,7 @@ func TriggerLabel(trigger string) string {
 	case "on_change", "on_update":
 		return "On sync change"
 	case "always":
-		return "Every sync"
+		return "On sync create or change"
 	default:
 		return trigger
 	}
