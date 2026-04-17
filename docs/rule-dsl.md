@@ -212,16 +212,19 @@ For `set_category`, the **last rule to match wins** (higher-priority stage has f
 
 The rule engine has two entry points. They share condition evaluation and priority ordering, but materialize actions differently:
 
-| Aspect                   | Sync (`on_create`/`on_update`/`always`) | Retroactive (`apply_rules`)           |
-| ------------------------ | --------------------------------------- | ------------------------------------- |
-| Trigger honored?         | Yes                                     | No — runs regardless of trigger       |
-| `set_category`           | Applied (respects override)             | Applied (respects override)           |
-| `add_tag`                | Applied                                 | Applied                               |
-| `add_comment`            | Applied                                 | **Not applied** (by design)           |
-| `hit_count`              | +1 per condition match                  | +1 per condition match                |
-| `rule_applied` annotation | Written                                | Written (with `applied_by = "retroactive"`) |
+| Aspect                    | Sync (`on_create`/`on_change`/`always`) | Retroactive (`apply_rules`)                 |
+| ------------------------- | --------------------------------------- | ------------------------------------------- |
+| Trigger honored?          | Yes                                     | No — runs regardless of trigger             |
+| `set_category`            | Applied (respects override)             | Applied (respects override)                 |
+| `add_tag`                 | Applied                                 | Applied                                     |
+| `remove_tag`              | Applied                                 | Applied                                     |
+| `add_comment`             | Applied                                 | **Not applied** (by design)                 |
+| `hit_count`               | +1 per condition match                  | +1 per condition match                      |
+| `rule_applied` annotation | Written                                 | Written (with `applied_by = "retroactive"`) |
 
-> *Historical note:* earlier versions of the engine skipped `add_tag` in the retroactive path as well. This was unified in Phase 2 of the rules polish project (2026-Q2).
+**Why `add_comment` is sync-only.** Comments narrate a specific sync event ("auto-categorized during 2026-04-15 sync"). Materializing them retroactively would either date-warp ("auto-categorized during retroactive back-fill on <today>") or duplicate boilerplate across every matched row. Neither is useful; sync-time remains the only place where a rule adds comments.
+
+**Chaining in retroactive.** `apply_rules` (all-rules bulk path) applies the same pipeline-stage chaining as sync: earlier-stage rules' tags and category assignments feed later-stage rules' conditions for each matched transaction. Single-rule retroactive (`apply_rules` with `rule_id`) evaluates just that one rule in isolation — no other rules contribute.
 
 ## Preview
 
@@ -229,9 +232,9 @@ The rule engine has two entry points. They share condition evaluation and priori
 
 ## Roadmap
 
-All Phase 1 items have shipped. Upcoming work:
+Phases 1 and 2 have shipped. Upcoming work:
 
-- **Sync / retroactive parity.** Retroactive `apply_rules` currently materializes `set_category` only; `add_tag` / `remove_tag` will be wired in the next phase so bulk back-fills match sync-time behavior.
-- **Admin UI polish.** Live preview in the rule form, priority-stage presets ("Baseline / Standard / Refinement / Override"), retroactive-apply confirmation modal.
+- **Admin UI polish.** Live preview in the rule form, priority-stage presets ("Baseline / Standard / Refinement / Override"), retroactive-apply confirmation modal, first-class `remove_tag` UI (currently reuses the add-tag input).
+- **Correctness sweep.** `rule_applied` annotation fires only on persistence side-effects; deleted-category warnings; belt-and-suspenders slug validation at sync time.
 
 Tag-based chaining is already live in the resolver. The remaining roadmap items polish the surface.
