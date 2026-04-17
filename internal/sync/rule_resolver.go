@@ -35,12 +35,13 @@ type TransactionContext struct {
 	// CategoryPrimary's raw provider value). It updates mid-resolver as
 	// earlier-stage rules' set_category actions fire, so later-stage rules
 	// can condition on the current category via field="category".
-	Category  string
-	Pending   bool
-	Provider  string // "plaid", "teller", "csv"
-	AccountID string // UUID string
-	UserID    string // UUID string
-	UserName  string // family member name
+	Category    string
+	Pending     bool
+	Provider    string // "plaid", "teller", "csv"
+	AccountID   string // UUID string
+	AccountName string // account display name (for field="account_name" conditions)
+	UserID      string // UUID string
+	UserName    string // family member name
 	// Tags is populated from transaction_tags so tag-based conditions
 	// (field: "tags") can match against the transaction's current tags.
 	// Updated mid-resolver as earlier-stage add_tag actions apply.
@@ -603,12 +604,16 @@ func evaluateLeaf(c *compiledCondition, tctx TransactionContext) bool {
 		return evaluateString(c, tctx.CategoryPrimary)
 	case "category_detailed":
 		return evaluateString(c, tctx.CategoryDetailed)
+	case "category":
+		return evaluateString(c, tctx.Category)
 	case "pending":
 		return evaluateBool(c, tctx.Pending)
 	case "provider":
 		return evaluateString(c, tctx.Provider)
 	case "account_id":
 		return evaluateString(c, tctx.AccountID)
+	case "account_name":
+		return evaluateString(c, tctx.AccountName)
 	case "user_id":
 		return evaluateString(c, tctx.UserID)
 	case "user_name":

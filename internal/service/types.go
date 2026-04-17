@@ -422,13 +422,17 @@ type TransactionContext struct {
 	Name             string
 	MerchantName     string
 	Amount           float64
-	CategoryPrimary  string
-	CategoryDetailed string
-	Pending          bool
-	Provider         string
-	AccountID        string
-	UserID           string
-	UserName         string
+	CategoryPrimary  string // raw provider primary category
+	CategoryDetailed string // raw provider detailed category
+	// Category is the transaction's assigned category slug (distinct from
+	// CategoryPrimary's raw provider value).
+	Category    string
+	Pending     bool
+	Provider    string
+	AccountID   string
+	AccountName string
+	UserID      string
+	UserName    string
 	// Tags is populated from transaction_tags so tag-based conditions
 	// (field: "tags") can match against the transaction's current tags.
 	Tags []string
