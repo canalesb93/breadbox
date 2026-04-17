@@ -13,6 +13,7 @@ import (
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/provider"
+	"breadbox/internal/ruleapply"
 	"breadbox/internal/slugs"
 
 	"github.com/jackc/pgx/v5"
@@ -370,22 +371,10 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		// user|agent|system — rule_id in the dedicated column carries the rule
 		// back-reference).
 		for _, app := range ruleApplications {
-			payload := map[string]any{
-				"rule_id":      app.ruleShortID,
-				"rule_name":    app.ruleName,
-				"action_field": app.actionField,
-				"action_value": app.actionValue,
-				"applied_by":   "sync",
-			}
-			if err := writeSyncAnnotation(ctx, tx, writeSyncAnnotationParams{
-				TransactionID: app.txnID,
-				Kind:          "rule_applied",
-				ActorType:     "system",
-				ActorID:       app.ruleShortID,
-				ActorName:     app.ruleName,
-				Payload:       payload,
-				RuleID:        app.ruleID,
-			}); err != nil {
+			if err := ruleapply.WriteRuleApplied(ctx, tx, app.txnID,
+				ruleapply.Rule{ID: app.ruleID, ShortID: app.ruleShortID, Name: app.ruleName},
+				app.actionField, app.actionValue, ruleapply.AppliedBySync,
+			); err != nil {
 				logger.Error("insert rule_applied annotation", "transaction_id", app.txnID, "rule_id", app.ruleID, "error", err)
 			}
 		}
@@ -690,18 +679,10 @@ func (e *Engine) applyRulesToTransaction(ctx context.Context, tx pgx.Tx, txn *pr
 			}
 
 			src := sourceByKey["category|"+result.CategorySlug]
-			if err := writeSyncAnnotation(ctx, tx, writeSyncAnnotationParams{
-				TransactionID: dbTxn.ID,
-				Kind:          "category_set",
-				ActorType:     "system",
-				ActorID:       src.ruleShortID,
-				ActorName:     src.ruleName,
-				Payload: map[string]any{
-					"category_slug": result.CategorySlug,
-					"source":        "rule",
-				},
-				RuleID: src.ruleID,
-			}); err != nil {
+			if err := ruleapply.WriteCategorySet(ctx, tx, dbTxn.ID,
+				ruleapply.Rule{ID: src.ruleID, ShortID: src.ruleShortID, Name: src.ruleName},
+				result.CategorySlug, ruleapply.AppliedBySync,
+			); err != nil {
 				return result.Sources, fmt.Errorf("annotate category_set: %w", err)
 			}
 		}

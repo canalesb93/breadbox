@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"breadbox/internal/ruleapply"
 	"breadbox/internal/slugs"
 
 	"github.com/jackc/pgx/v5"
@@ -1280,7 +1281,6 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 		if err != nil {
 			return totalMatched, fmt.Errorf("begin retroactive apply tx: %w", err)
 		}
-		qtx := s.Queries.WithTx(tx)
 
 		// set_category: bulk UPDATE for matching non-overridden rows.
 		if categorySetCatID.Valid {
@@ -1293,23 +1293,9 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 				return totalMatched, fmt.Errorf("update transactions: %w", err)
 			}
 			// Annotation per touched row.
+			rule := ruleapply.Rule{ID: ruleUUID, ShortID: ruleShortID, Name: ruleName}
 			for _, txnID := range matchIDs {
-				payload := map[string]any{
-					"category_slug": categorySetSlug,
-					"source":        "rule",
-					"applied_by":    "retroactive",
-					"rule_id":       ruleShortID,
-					"rule_name":     ruleName,
-				}
-				if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
-					TransactionID: txnID,
-					Kind:          "category_set",
-					ActorType:     "system",
-					ActorID:       ruleShortID,
-					ActorName:     ruleName,
-					Payload:       payload,
-					RuleID:        ruleUUID,
-				}); err != nil {
+				if err := ruleapply.WriteCategorySet(ctx, tx, txnID, rule, categorySetSlug, ruleapply.AppliedByRetroactive); err != nil {
 					tx.Rollback(ctx)
 					return totalMatched, fmt.Errorf("annotate category_set: %w", err)
 				}
@@ -1333,28 +1319,14 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 		}
 
 		// rule_applied audit trail — one per action intent per matched txn.
+		appliedRule := ruleapply.Rule{ID: ruleUUID, ShortID: ruleShortID, Name: ruleName}
 		for _, action := range rule.Actions {
 			field, value := actionAuditFields(action)
 			if field == "" || field == "comment" {
 				continue
 			}
 			for _, txnID := range matchIDs {
-				payload := map[string]any{
-					"rule_id":      ruleShortID,
-					"rule_name":    ruleName,
-					"action_field": field,
-					"action_value": value,
-					"applied_by":   "retroactive",
-				}
-				if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
-					TransactionID: txnID,
-					Kind:          "rule_applied",
-					ActorType:     "system",
-					ActorID:       ruleShortID,
-					ActorName:     ruleName,
-					Payload:       payload,
-					RuleID:        ruleUUID,
-				}); err != nil {
+				if err := ruleapply.WriteRuleApplied(ctx, tx, txnID, appliedRule, field, value, ruleapply.AppliedByRetroactive); err != nil {
 					tx.Rollback(ctx)
 					return totalMatched, fmt.Errorf("annotate rule_applied: %w", err)
 				}
@@ -1570,7 +1542,6 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		if err != nil {
 			return hitCounts, fmt.Errorf("begin apply-all tx: %w", err)
 		}
-		qtx := s.Queries.WithTx(tx)
 		aborted := false
 
 		// Group category updates by (catID) for batched UPDATEs.
@@ -1593,22 +1564,10 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		for _, it := range intents {
 			// category_set annotation (one per touched row, owned by the winning rule).
 			if it.catRule != nil {
-				payload := map[string]any{
-					"category_slug": it.catSlug,
-					"source":        "rule",
-					"applied_by":    "retroactive",
-					"rule_id":       it.catRule.shortID,
-					"rule_name":     it.catRule.name,
-				}
-				if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
-					TransactionID: it.txnID,
-					Kind:          "category_set",
-					ActorType:     "system",
-					ActorID:       it.catRule.shortID,
-					ActorName:     it.catRule.name,
-					Payload:       payload,
-					RuleID:        it.catRule.uuid,
-				}); err != nil {
+				if err := ruleapply.WriteCategorySet(ctx, tx, it.txnID,
+					ruleapply.Rule{ID: it.catRule.uuid, ShortID: it.catRule.shortID, Name: it.catRule.name},
+					it.catSlug, ruleapply.AppliedByRetroactive,
+				); err != nil {
 					aborted = true
 					break
 				}
@@ -1633,21 +1592,16 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 			}
 
 			// rule_applied audit: one per matching rule per txn.
+			//
+			// Unlike ApplyRuleRetroactively, this path emits one annotation per
+			// (matching rule, txn) without per-action specialization — callers
+			// get a rule-level audit, so action_field / action_value are left
+			// empty. Shape still matches the canonical 5-key payload.
 			for _, cr := range it.matchingRules {
-				payload := map[string]any{
-					"rule_id":    cr.shortID,
-					"rule_name":  cr.name,
-					"applied_by": "retroactive",
-				}
-				if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
-					TransactionID: it.txnID,
-					Kind:          "rule_applied",
-					ActorType:     "system",
-					ActorID:       cr.shortID,
-					ActorName:     cr.name,
-					Payload:       payload,
-					RuleID:        cr.uuid,
-				}); err != nil {
+				if err := ruleapply.WriteRuleApplied(ctx, tx, it.txnID,
+					ruleapply.Rule{ID: cr.uuid, ShortID: cr.shortID, Name: cr.name},
+					"", "", ruleapply.AppliedByRetroactive,
+				); err != nil {
 					aborted = true
 					break
 				}
@@ -2019,33 +1973,6 @@ func (s *Service) convertRuleRows(ctx context.Context, scanned []ruleRow) []Tran
 		rules[i] = resp
 	}
 	return rules
-}
-
-// recordRuleApplications writes a rule_applied annotation per transaction —
-// the canonical record of which rules touched which transactions.
-func (s *Service) recordRuleApplications(ctx context.Context, ruleID pgtype.UUID, txnIDs []pgtype.UUID, actionField, actionValue, appliedBy string) {
-	// Look up rule metadata for annotation actor fields.
-	var ruleShortID, ruleName string
-	_ = s.Pool.QueryRow(ctx, `SELECT short_id, name FROM transaction_rules WHERE id = $1`, ruleID).Scan(&ruleShortID, &ruleName)
-
-	for _, txnID := range txnIDs {
-		payload := map[string]interface{}{
-			"rule_id":      ruleShortID,
-			"rule_name":    ruleName,
-			"action_field": actionField,
-			"action_value": actionValue,
-			"applied_by":   appliedBy,
-		}
-		_ = writeAnnotation(ctx, s.Queries, writeAnnotationParams{
-			TransactionID: txnID,
-			Kind:          "rule_applied",
-			ActorType:     "system",
-			ActorID:       ruleShortID,
-			ActorName:     ruleName,
-			Payload:       payload,
-			RuleID:        ruleID,
-		})
-	}
 }
 
 // materializeRuleTagAdd applies an add_tag action retroactively: auto-creates
