@@ -20,7 +20,25 @@ paths:
 - `make css` compiles `input.css` → `static/css/styles.css`.
 - `make css-watch` for dev (rebuilds on change).
 - Dockerfile runs `make css` in the build stage. Don't commit `styles.css` changes — it's a build artifact.
-- **CSS is embedded into the binary** via `static/embed.go` (`//go:embed all:css favicon.svg`). After `make css` you must **restart the server** for changes to take effect — a browser hard-reload alone won't help because the running binary still serves the stale embedded copy.
+- **CSS is embedded into the binary** via `static/embed.go` (`//go:embed all:css favicon.svg`). In a plain `make dev` server you must **restart** after `make css` for changes to take effect — a browser hard-reload alone won't help because the running binary serves the stale embedded copy. `make dev-watch` avoids this (see below).
+
+## Hot-reload dev loop — prefer this for UI work
+
+`make dev-watch` runs three things together so UI edits apply without restarting the server:
+
+1. **`tailwindcss-extra --watch`** — rebuilds `static/css/styles.css` on every `input.css` or template change.
+2. **`air`** — rebuilds and restarts the Go binary on `*.go` changes only (config: `.air.toml`). HTML/CSS edits do **not** trigger a Go rebuild.
+3. **`BREADBOX_DEV_RELOAD=1`** — makes the running binary serve templates and static files from disk (`internal/templates/` and `static/`) instead of the embedded FS. Templates are re-parsed on every request so `.html` edits apply on reload.
+
+Typical agent loop becomes: edit `.html` or `input.css` → reload browser. No restart, no `make css`, no rebuild.
+
+Caveats:
+- Run `make dev-watch` from the **repo root**. The dev-reload paths are relative (`internal/templates`, `static`). Override with `BREADBOX_TEMPLATES_DIR` / `BREADBOX_STATIC_DIR` if needed.
+- `BREADBOX_DEV_RELOAD=1` is dev-only. Never set it in prod — it disables the embedded FS and re-parses templates per request (slow, and broken if the source tree isn't present).
+- Go code changes still trigger a ~1–2s restart via air. If you edited only HTML/CSS and see a restart, check whether a template change touched `*.go` (unlikely) or something else in the Go build graph.
+- For CI / production builds, `make dev-watch` is irrelevant — embedded FS is always used, and the server behaves exactly as before.
+
+Use `make dev` (no watch) when you specifically want the production embedded-FS behavior — e.g. validating an embed regression.
 
 ## Footguns
 
@@ -106,4 +124,6 @@ Before/after diffs: use the side-by-side table pattern documented in the `valida
 
 Do NOT use `![alt](url)` — GitHub renders the full native size and tall captures become painful to review. `{width=...}` kramdown syntax and `style="..."` attributes are silently stripped by GitHub's sanitizer.
 
-**Restart `make dev`** after template / CSS / Alpine edits before capturing — the binary serves embedded CSS and reloading the browser alone won't pick up the change (see "CSS build" above).
+**Picking up your edits before capture**:
+- If the server is running under `make dev-watch`, template/CSS/Alpine edits are already live — just reload the browser.
+- If it's running under `make dev`, restart it first — the binary serves embedded CSS and reloading the browser alone won't pick up the change (see "CSS build" above).

@@ -55,6 +55,7 @@ type Breadcrumb struct {
 type TemplateRenderer struct {
 	mu             sync.RWMutex
 	templates      map[string]*template.Template
+	specs          map[string][]string // name → file list, used to re-parse in dev mode
 	funcMap        template.FuncMap
 	sm             *scs.SessionManager
 	version        string
@@ -66,6 +67,7 @@ type TemplateRenderer struct {
 func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 	tr := &TemplateRenderer{
 		templates: make(map[string]*template.Template),
+		specs:     make(map[string][]string),
 		sm:        sm,
 		funcMap: template.FuncMap{
 			"sub": func(a, b int) int { return a - b },
@@ -350,8 +352,8 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return buf.String()
 			},
-			"lower": strings.ToLower,
-			"eqFold": strings.EqualFold,
+			"lower":     strings.ToLower,
+			"eqFold":    strings.EqualFold,
 			"titleCase": titleCaseMerchant,
 			"syncLogFilterQuery": func(status, connID, trigger, dateFrom, dateTo string) template.URL {
 				params := url.Values{}
@@ -551,22 +553,22 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"accountTypeLabel": func(acctType, subtype string) string {
 				if subtype != "" {
 					labels := map[string]string{
-						"checking":         "Checking",
-						"savings":          "Savings",
-						"credit card":      "Credit Card",
-						"credit_card":      "Credit Card",
-						"money market":     "Money Market",
-						"money_market":     "Money Market",
-						"cd":               "CD",
-						"paypal":           "PayPal",
-						"student":          "Student Loan",
-						"mortgage":         "Mortgage",
-						"auto":             "Auto Loan",
-						"401k":             "401(k)",
-						"ira":              "IRA",
-						"brokerage":        "Brokerage",
-						"prepaid":          "Prepaid",
-						"hsa":              "HSA",
+						"checking":     "Checking",
+						"savings":      "Savings",
+						"credit card":  "Credit Card",
+						"credit_card":  "Credit Card",
+						"money market": "Money Market",
+						"money_market": "Money Market",
+						"cd":           "CD",
+						"paypal":       "PayPal",
+						"student":      "Student Loan",
+						"mortgage":     "Mortgage",
+						"auto":         "Auto Loan",
+						"401k":         "401(k)",
+						"ira":          "IRA",
+						"brokerage":    "Brokerage",
+						"prepaid":      "Prepaid",
+						"hsa":          "HSA",
 					}
 					if label, ok := labels[subtype]; ok {
 						return label
@@ -574,7 +576,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return subtype
 				}
 				labels := map[string]string{
-					"depository":  "Bank Account",
+					"depository": "Bank Account",
 					"credit":     "Credit Card",
 					"loan":       "Loan",
 					"investment": "Investment",
@@ -854,7 +856,9 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		if err != nil {
 			return fmt.Errorf("parse composite page %s: %w", page, err)
 		}
-		tr.templates[path.Base(page)] = t
+		name := path.Base(page)
+		tr.templates[name] = t
+		tr.specs[name] = files
 	}
 
 	for _, page := range wizardPages {
@@ -867,7 +871,9 @@ func (tr *TemplateRenderer) parseTemplates() error {
 			return fmt.Errorf("parse wizard page %s: %w", page, err)
 		}
 		// Store using just the filename (e.g., "login.html").
-		tr.templates[path.Base(page)] = t
+		name := path.Base(page)
+		tr.templates[name] = t
+		tr.specs[name] = files
 	}
 
 	return nil
@@ -882,7 +888,9 @@ func (tr *TemplateRenderer) parseBasePage(pagePath string) error {
 	if err != nil {
 		return fmt.Errorf("parse base page %s: %w", pagePath, err)
 	}
-	tr.templates[path.Base(pagePath)] = t
+	name := path.Base(pagePath)
+	tr.templates[name] = t
+	tr.specs[name] = files
 	return nil
 }
 
@@ -899,8 +907,10 @@ func (tr *TemplateRenderer) RegisterBasePage(pagePath string) error {
 		return err
 	}
 
+	name := path.Base(pagePath)
 	tr.mu.Lock()
-	tr.templates[path.Base(pagePath)] = t
+	tr.templates[name] = t
+	tr.specs[name] = files
 	tr.mu.Unlock()
 	return nil
 }
@@ -912,10 +922,23 @@ func (tr *TemplateRenderer) RegisterBasePage(pagePath string) error {
 func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name string, data interface{}) {
 	tr.mu.RLock()
 	t, ok := tr.templates[name]
+	files := tr.specs[name]
 	tr.mu.RUnlock()
 	if !ok {
 		http.Error(w, "template not found: "+name, http.StatusInternalServerError)
 		return
+	}
+
+	// Dev-reload: re-parse the template from disk on every render so template
+	// edits apply without rebuilding the binary. Requires BREADBOX_DEV_RELOAD=1
+	// and templates.FS pointing at the source directory (see internal/templates/embed.go).
+	if templates.DevReload && len(files) > 0 {
+		fresh, err := template.New("").Funcs(tr.funcMap).ParseFS(templates.FS, files...)
+		if err != nil {
+			http.Error(w, "dev-reload parse failed: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		t = fresh
 	}
 
 	// Auto-inject common fields into map data if not already present.

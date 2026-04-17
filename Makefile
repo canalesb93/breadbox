@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc sqlc-install seed db db-stop docker-up docker-down css css-watch css-install
+.PHONY: dev dev-watch dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc sqlc-install seed db db-stop docker-up docker-down css css-watch css-install air-install
 
 PORT ?= 8080
 
@@ -29,6 +29,35 @@ dev: generate
 	fi
 	@echo $(PORT) > .breadbox-port
 	SERVER_PORT=$(PORT) go run ./cmd/breadbox serve; rm -f .breadbox-port
+
+# dev-watch: hot-reload everything — Go rebuilds via air, CSS rebuilds via
+# tailwind --watch, and BREADBOX_DEV_RELOAD=1 makes the running binary read
+# templates + static files from disk so HTML/CSS edits apply without a restart.
+# Only Go changes trigger a rebuild.
+dev-watch: generate air-install
+	@if [ -z "$$DATABASE_URL" ]; then \
+		echo "Error: DATABASE_URL is not set."; \
+		echo "  Set it for local dev:  export DATABASE_URL=postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable"; \
+		echo "  Or add it to .local.env (auto-loaded by Make)"; \
+		exit 1; \
+	fi
+	@if lsof -ti:$(PORT) >/dev/null 2>&1; then \
+		echo "Error: port $(PORT) is already in use."; \
+		echo "  - Run on another port:  make dev-watch PORT=8081"; \
+		echo "  - Or kill the existing process:  kill $$(lsof -ti:$(PORT))"; \
+		exit 1; \
+	fi
+	@echo $(PORT) > .breadbox-port
+	@trap 'rm -f .breadbox-port; kill 0' EXIT INT TERM; \
+		$(TAILWIND_BIN) -i input.css -o static/css/styles.css --watch & \
+		BREADBOX_DEV_RELOAD=1 SERVER_PORT=$(PORT) air -c .air.toml; \
+		wait
+
+air-install:
+	@if ! command -v air &>/dev/null; then \
+		echo "Installing air..."; \
+		go install github.com/air-verse/air@latest; \
+	fi
 
 dev-stop:
 	@pids=$$(lsof -ti:8080-8099 2>/dev/null | sort -u || true); \
@@ -67,6 +96,7 @@ sqlc-install:
 	fi
 
 sqlc: sqlc-install
+	@rm -f internal/db/*.sql.go internal/db/models.go internal/db/db.go
 	sqlc generate
 
 seed:
