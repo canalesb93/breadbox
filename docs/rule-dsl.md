@@ -137,6 +137,17 @@ Adds a tag. The tag is auto-created with `lifecycle = persistent` if the slug do
 - Slug format: `^[a-z0-9][a-z0-9\-:]*[a-z0-9]$` (lowercase, digits, hyphens, colons; no leading/trailing punctuation).
 - Writes a `tag_added` annotation; deduped against prior annotations of the same tag on the same transaction.
 
+### `remove_tag`
+
+```json
+{ "type": "remove_tag", "tag_slug": "needs-review" }
+```
+
+Removes a tag from the transaction. No-op if the tag isn't attached. Slug validation matches `add_tag`.
+
+- Writes a `tag_removed` annotation. The rule's name is captured in the annotation payload as the removal note, so ephemeral-tag removal has a source attribution on the activity timeline.
+- **Net-diff semantics in a pipeline.** If an earlier-stage rule's `add_tag` and a later-stage rule's `remove_tag` target the same slug in a single sync pass, they cancel — neither the INSERT nor the DELETE hits the DB, and no annotations are emitted. This keeps the timeline clean when rules compose.
+
 ### `add_comment`
 
 ```json
@@ -216,8 +227,11 @@ The rule engine has two entry points. They share condition evaluation and priori
 
 `preview_rule` evaluates a *single* rule's condition against stored transactions and returns the match count plus a sample. It does **not** simulate the full rule pipeline — higher-priority-stage rules that would normally fire first are not considered. Preview is for answering "what would this rule match right now?" — not "what would the sync outcome be?".
 
-## Roadmap (not yet shipped)
+## Roadmap
 
-- **New action.** `remove_tag`, symmetric with `add_tag`; useful for clearing transient tags like `needs-review` once a higher-priority-stage rule has pre-categorized the transaction.
+All Phase 1 items have shipped. Upcoming work:
+
+- **Sync / retroactive parity.** Retroactive `apply_rules` currently materializes `set_category` only; `add_tag` / `remove_tag` will be wired in the next phase so bulk back-fills match sync-time behavior.
+- **Admin UI polish.** Live preview in the rule form, priority-stage presets ("Baseline / Standard / Refinement / Override"), retroactive-apply confirmation modal.
 
 Tag-based chaining is already live in the resolver. The remaining roadmap items polish the surface.

@@ -499,6 +499,7 @@ func toStringSlice(v interface{}) ([]string, bool) {
 var validActionTypes = map[string]bool{
 	"set_category": true,
 	"add_tag":      true,
+	"remove_tag":   true,
 	"add_comment":  true,
 }
 
@@ -518,7 +519,7 @@ func (s *Service) ValidateActions(ctx context.Context, actions []RuleAction) err
 	seenCategory := false
 	for _, a := range actions {
 		if !validActionTypes[a.Type] {
-			return fmt.Errorf("%w: unknown action type %q (expected set_category|add_tag|add_comment)", ErrInvalidParameter, a.Type)
+			return fmt.Errorf("%w: unknown action type %q (expected set_category|add_tag|remove_tag|add_comment)", ErrInvalidParameter, a.Type)
 		}
 		switch a.Type {
 		case "set_category":
@@ -532,9 +533,9 @@ func (s *Service) ValidateActions(ctx context.Context, actions []RuleAction) err
 			if _, err := s.GetCategoryBySlug(ctx, a.CategorySlug); err != nil {
 				return fmt.Errorf("%w: category slug %q not found", ErrInvalidParameter, a.CategorySlug)
 			}
-		case "add_tag":
+		case "add_tag", "remove_tag":
 			if a.TagSlug == "" {
-				return fmt.Errorf("%w: add_tag action requires tag_slug", ErrInvalidParameter)
+				return fmt.Errorf("%w: %s action requires tag_slug", ErrInvalidParameter, a.Type)
 			}
 			if !tagSlugPattern.MatchString(a.TagSlug) {
 				return fmt.Errorf("%w: tag_slug %q must match ^[a-z0-9][a-z0-9\\-:]*[a-z0-9]$", ErrInvalidParameter, a.TagSlug)
@@ -1894,6 +1895,8 @@ func ActionsSummary(actions []RuleAction, categoryName string) string {
 		return "Set category: " + label
 	case "add_tag":
 		return "Add tag " + a.TagSlug
+	case "remove_tag":
+		return "Remove tag " + a.TagSlug
 	case "add_comment":
 		return "Add comment"
 	default:

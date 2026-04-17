@@ -66,22 +66,31 @@ type RuleActionSource struct {
 //   - set_category: last-writer-wins. Lower-priority rules run first (baseline),
 //     higher-priority rules run later and may overwrite the category.
 //   - add_tag: accumulates unique slugs across matching rules.
+//   - remove_tag: accumulates slugs to delete. If an earlier-stage rule added
+//     a slug that a later-stage rule removes in the same pass, both cancel
+//     and neither appears in the DB-write set.
 //   - add_comment: accumulates all content strings across matching rules.
 //
 // Rules evaluate against a live-mutating TransactionContext, so later-priority
 // rules can react to earlier rules' tag and category changes via the `tags`
-// and `category_primary` / `category` condition fields.
+// and `category` condition fields.
 type RuleActions struct {
 	// CategorySlug is the slug chosen by the last rule whose set_category
 	// action matched. Empty when no rule set a category.
 	CategorySlug string
-	// TagsToAdd is the accumulated list of unique tag slugs from add_tag actions.
+	// TagsToAdd is the net list of unique tag slugs to insert into
+	// transaction_tags. Cancelled by a later-stage remove_tag in the same pass.
 	TagsToAdd []string
+	// TagsToRemove is the net list of tag slugs to delete from transaction_tags.
+	// Only slugs that were present in the transaction's initial tag set and
+	// were not re-added by an earlier-stage rule appear here.
+	TagsToRemove []string
 	// Comments is the accumulated list of comment content strings from
 	// add_comment actions.
 	Comments []string
 	// Sources records per-action provenance for the audit trail. For
 	// set_category, only the winning (last) rule's source is retained.
+	// For tag actions, only net-surviving adds/removes have sources.
 	Sources []RuleActionSource
 }
 
@@ -268,7 +277,7 @@ func parseTypedActions(raw []byte, ruleID pgtype.UUID, logger *slog.Logger) []ty
 		case "set_category":
 			slug, _ := m["category_slug"].(string)
 			out = append(out, typedAction{Type: t, CategorySlug: slug})
-		case "add_tag":
+		case "add_tag", "remove_tag":
 			slug, _ := m["tag_slug"].(string)
 			out = append(out, typedAction{Type: t, TagSlug: slug})
 		case "add_comment":
@@ -449,6 +458,13 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 				if a.TagSlug == "" {
 					continue
 				}
+				// If a prior-stage rule's remove_tag had queued this slug,
+				// the later add cancels it — strip from TagsToRemove and
+				// drop the prior remove source.
+				if i := stringSliceIndex(result.TagsToRemove, a.TagSlug); i >= 0 {
+					result.TagsToRemove = append(result.TagsToRemove[:i], result.TagsToRemove[i+1:]...)
+					result.Sources = dropTagSource(result.Sources, "tag_remove", a.TagSlug)
+				}
 				if !stringSliceContains(result.TagsToAdd, a.TagSlug) {
 					result.TagsToAdd = append(result.TagsToAdd, a.TagSlug)
 					result.Sources = append(result.Sources, RuleActionSource{
@@ -463,6 +479,35 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 				// can observe the addition.
 				if !stringSliceContains(tctx.Tags, a.TagSlug) {
 					tctx.Tags = append(tctx.Tags, a.TagSlug)
+				}
+			case "remove_tag":
+				if a.TagSlug == "" {
+					continue
+				}
+				// If a same-pass earlier-stage rule added this slug, cancel
+				// that add rather than queueing a delete. The net effect is
+				// no DB write for this slug.
+				if i := stringSliceIndex(result.TagsToAdd, a.TagSlug); i >= 0 {
+					result.TagsToAdd = append(result.TagsToAdd[:i], result.TagsToAdd[i+1:]...)
+					result.Sources = dropTagSource(result.Sources, "tag", a.TagSlug)
+				} else if stringSliceContains(tctx.Tags, a.TagSlug) {
+					// Only queue a delete if the slug is actually present on
+					// the transaction (loaded initial tags). Otherwise the
+					// remove is a no-op.
+					if !stringSliceContains(result.TagsToRemove, a.TagSlug) {
+						result.TagsToRemove = append(result.TagsToRemove, a.TagSlug)
+						result.Sources = append(result.Sources, RuleActionSource{
+							RuleID:      rule.id,
+							RuleShortID: rule.shortID,
+							RuleName:    rule.name,
+							ActionField: "tag_remove",
+							ActionValue: a.TagSlug,
+						})
+					}
+				}
+				// Mirror into live context so later rules see the slug gone.
+				if i := stringSliceIndex(tctx.Tags, a.TagSlug); i >= 0 {
+					tctx.Tags = append(tctx.Tags[:i], tctx.Tags[i+1:]...)
 				}
 			case "add_comment":
 				if a.Content == "" {
@@ -497,6 +542,35 @@ func dropCategorySource(src []RuleActionSource) []RuleActionSource {
 		kept = append(kept, s)
 	}
 	return kept
+}
+
+// dropTagSource removes a specific (field, value) source entry — used when a
+// later-stage rule cancels an earlier-stage rule's add/remove_tag intent
+// (the cancelled intent produces no DB write, so its source doesn't belong
+// in the audit trail).
+func dropTagSource(src []RuleActionSource, field, value string) []RuleActionSource {
+	if len(src) == 0 {
+		return src
+	}
+	kept := src[:0]
+	for _, s := range src {
+		if s.ActionField == field && s.ActionValue == value {
+			continue
+		}
+		kept = append(kept, s)
+	}
+	return kept
+}
+
+// stringSliceIndex returns the index of s in slice (case-insensitive),
+// or -1 if not present.
+func stringSliceIndex(slice []string, s string) int {
+	for i, v := range slice {
+		if strings.EqualFold(v, s) {
+			return i
+		}
+	}
+	return -1
 }
 
 // triggerMatches reports whether a rule with the given trigger should fire
