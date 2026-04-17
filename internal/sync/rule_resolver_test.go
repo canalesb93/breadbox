@@ -414,6 +414,288 @@ func TestEvaluateCondition_CategoryDetailed(t *testing.T) {
 	}
 }
 
+// --- Baseline regression tests (audit §D) ---
+//
+// These lock down current semantics so upcoming resolver-chaining / priority-
+// inversion work can't silently regress them.
+
+func TestEvaluateCondition_Tags_Contains(t *testing.T) {
+	cc := mustCompile(t, &Condition{Field: "tags", Op: "contains", Value: "needs-review"})
+
+	tctx := TransactionContext{Tags: []string{"coffee", "needs-review"}}
+	if !evaluateCondition(cc, tctx) {
+		t.Error("expected tags contains to match when slug present")
+	}
+
+	tctx.Tags = []string{"coffee"}
+	if evaluateCondition(cc, tctx) {
+		t.Error("expected tags contains to not match when slug absent")
+	}
+
+	// Case-insensitive.
+	tctx.Tags = []string{"NEEDS-REVIEW"}
+	if !evaluateCondition(cc, tctx) {
+		t.Error("expected tags contains to be case-insensitive")
+	}
+}
+
+func TestEvaluateCondition_Tags_NotContains(t *testing.T) {
+	cc := mustCompile(t, &Condition{Field: "tags", Op: "not_contains", Value: "needs-review"})
+
+	tctx := TransactionContext{Tags: []string{"coffee"}}
+	if !evaluateCondition(cc, tctx) {
+		t.Error("expected tags not_contains to match when slug absent")
+	}
+
+	tctx.Tags = []string{"coffee", "needs-review"}
+	if evaluateCondition(cc, tctx) {
+		t.Error("expected tags not_contains to not match when slug present")
+	}
+
+	// Nil tags slice treated as no tags.
+	tctx.Tags = nil
+	if !evaluateCondition(cc, tctx) {
+		t.Error("expected tags not_contains to match on nil tag slice")
+	}
+}
+
+func TestEvaluateCondition_Tags_In(t *testing.T) {
+	cc := mustCompile(t, &Condition{
+		Field: "tags",
+		Op:    "in",
+		Value: []interface{}{"needs-review", "flagged"},
+	})
+
+	tctx := TransactionContext{Tags: []string{"flagged"}}
+	if !evaluateCondition(cc, tctx) {
+		t.Error("expected tags in to match when any slug is present")
+	}
+
+	tctx.Tags = []string{"coffee"}
+	if evaluateCondition(cc, tctx) {
+		t.Error("expected tags in to not match when no slug is present")
+	}
+}
+
+func TestEvaluateCondition_SingleConditionAnd(t *testing.T) {
+	// {and: [one]} should behave like one.
+	cc := mustCompile(t, &Condition{
+		And: []Condition{
+			{Field: "name", Op: "eq", Value: "Starbucks"},
+		},
+	})
+
+	if !evaluateCondition(cc, TransactionContext{Name: "Starbucks"}) {
+		t.Error("expected single-child AND to match")
+	}
+	if evaluateCondition(cc, TransactionContext{Name: "Target"}) {
+		t.Error("expected single-child AND to not match")
+	}
+}
+
+func TestEvaluateCondition_DeeplyNestedAndOfOrOfNot(t *testing.T) {
+	// AND( OR( NOT(pending eq true), name eq "X" ), amount gt 0 )
+	cc := mustCompile(t, &Condition{
+		And: []Condition{
+			{
+				Or: []Condition{
+					{Not: &Condition{Field: "pending", Op: "eq", Value: true}},
+					{Field: "name", Op: "eq", Value: "X"},
+				},
+			},
+			{Field: "amount", Op: "gt", Value: float64(0)},
+		},
+	})
+
+	// Matches: pending=false (NOT true) + amount > 0
+	if !evaluateCondition(cc, TransactionContext{Pending: false, Amount: 10}) {
+		t.Error("expected deeply nested condition to match")
+	}
+	// Fails: pending=true + name≠X + amount > 0 → OR branch false
+	if evaluateCondition(cc, TransactionContext{Pending: true, Name: "Y", Amount: 10}) {
+		t.Error("expected deeply nested condition to fail when OR has no true branch")
+	}
+	// Fails: pending=false + amount <= 0 → AND fails on second clause
+	if evaluateCondition(cc, TransactionContext{Pending: false, Amount: 0}) {
+		t.Error("expected deeply nested condition to fail when outer AND fails")
+	}
+}
+
+func TestResolveWithContext_MultipleActionsOneRule(t *testing.T) {
+	ruleID := testUUID(10)
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:      ruleID,
+				shortID: "rule001x",
+				name:    "combo",
+				actions: []typedAction{
+					{Type: "set_category", CategorySlug: "catA"},
+					{Type: "add_tag", TagSlug: "tagA"},
+					{Type: "add_comment", Content: "hello"},
+				},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	result := r.ResolveWithContext("plaid", TransactionContext{Name: "Coffee Shop"}, true)
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if result.CategorySlug != "catA" {
+		t.Errorf("expected category catA, got %q", result.CategorySlug)
+	}
+	if len(result.TagsToAdd) != 1 || result.TagsToAdd[0] != "tagA" {
+		t.Errorf("expected tags [tagA], got %v", result.TagsToAdd)
+	}
+	if len(result.Comments) != 1 || result.Comments[0] != "hello" {
+		t.Errorf("expected comments [hello], got %v", result.Comments)
+	}
+	// Single rule produces three sources (one per action).
+	if len(result.Sources) != 3 {
+		t.Errorf("expected 3 sources, got %d (%+v)", len(result.Sources), result.Sources)
+	}
+	if r.hitCounts[ruleID.Bytes] != 1 {
+		t.Errorf("expected hit count 1, got %d", r.hitCounts[ruleID.Bytes])
+	}
+}
+
+func TestResolveWithContext_AddTagDedupAcrossRules(t *testing.T) {
+	// Two rules both add the same tag slug — TagsToAdd should dedup.
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        testUUID(10),
+				actions:   []typedAction{{Type: "add_tag", TagSlug: "shared"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "x"}),
+			},
+			{
+				id:        testUUID(11),
+				actions:   []typedAction{{Type: "add_tag", TagSlug: "shared"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "provider", Op: "eq", Value: "plaid"}),
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	result := r.ResolveWithContext("plaid", TransactionContext{Name: "x thing", Provider: "plaid"}, true)
+	if result == nil {
+		t.Fatal("expected result")
+	}
+	if len(result.TagsToAdd) != 1 {
+		t.Errorf("expected 1 tag (deduped), got %v", result.TagsToAdd)
+	}
+}
+
+func TestResolveWithContext_AddTagAccumulationAcrossRules(t *testing.T) {
+	// Two rules adding different tags — both should land.
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        testUUID(10),
+				actions:   []typedAction{{Type: "add_tag", TagSlug: "one"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "x"}),
+			},
+			{
+				id:        testUUID(11),
+				actions:   []typedAction{{Type: "add_tag", TagSlug: "two"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "provider", Op: "eq", Value: "plaid"}),
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	result := r.ResolveWithContext("plaid", TransactionContext{Name: "x thing", Provider: "plaid"}, true)
+	if result == nil {
+		t.Fatal("expected result")
+	}
+	if len(result.TagsToAdd) != 2 {
+		t.Errorf("expected 2 tags accumulated, got %v", result.TagsToAdd)
+	}
+}
+
+func TestResolveWithContext_AddCommentAccumulation(t *testing.T) {
+	r := &RuleResolver{
+		hitCounts: make(map[[16]byte]int),
+		rules: []compiledRule{
+			{
+				id:        testUUID(10),
+				actions:   []typedAction{{Type: "add_comment", Content: "first"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "x"}),
+			},
+			{
+				id:        testUUID(11),
+				actions:   []typedAction{{Type: "add_comment", Content: "second"}},
+				trigger:   "always",
+				condition: mustCompile(t, &Condition{Field: "provider", Op: "eq", Value: "plaid"}),
+			},
+		},
+		uncategorizedID: testUUID(99),
+	}
+
+	result := r.ResolveWithContext("plaid", TransactionContext{Name: "x thing", Provider: "plaid"}, true)
+	if result == nil {
+		t.Fatal("expected result")
+	}
+	if len(result.Comments) != 2 || result.Comments[0] != "first" || result.Comments[1] != "second" {
+		t.Errorf("expected both comments in order, got %v", result.Comments)
+	}
+}
+
+func TestResolveWithContext_TriggerMatrix(t *testing.T) {
+	// Matrix: trigger × isNew. Each cell checks whether the rule fires.
+	cases := []struct {
+		trigger     string
+		isNew       bool
+		shouldMatch bool
+	}{
+		{"on_create", true, true},
+		{"on_create", false, false},
+		{"on_update", true, false},
+		{"on_update", false, true},
+		{"always", true, true},
+		{"always", false, true},
+		{"", true, true},   // default → on_create
+		{"", false, false}, // default → on_create
+	}
+
+	for _, tc := range cases {
+		trigger := tc.trigger
+		if trigger == "" {
+			trigger = "on_create" // loadRules normalizes this; mirror it here
+		}
+		r := &RuleResolver{
+			hitCounts: make(map[[16]byte]int),
+			rules: []compiledRule{
+				{
+					id:        testUUID(10),
+					actions:   []typedAction{{Type: "set_category", CategorySlug: "c"}},
+					trigger:   trigger,
+					condition: nil, // match-all
+				},
+			},
+			uncategorizedID: testUUID(99),
+		}
+
+		result := r.ResolveWithContext("plaid", TransactionContext{}, tc.isNew)
+		matched := result != nil
+		if matched != tc.shouldMatch {
+			t.Errorf("trigger=%q isNew=%v: matched=%v want=%v", tc.trigger, tc.isNew, matched, tc.shouldMatch)
+		}
+	}
+}
+
 func TestResolveWithContext_PriorityOrdering(t *testing.T) {
 	r := &RuleResolver{
 		hitCounts: make(map[[16]byte]int),
