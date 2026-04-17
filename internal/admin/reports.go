@@ -171,12 +171,6 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 			IsRead:        report.ReadAt != nil,
 		}
 
-		// Auto-mark as read when viewing.
-		if report.ReadAt == nil {
-			_ = svc.MarkAgentReportRead(ctx, reportID)
-			detail.IsRead = true
-		}
-
 		data := BaseTemplateData(r, sm, "reports", report.Title)
 		data["Report"] = detail
 		data["Breadcrumbs"] = []Breadcrumb{
