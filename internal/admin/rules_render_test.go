@@ -97,9 +97,20 @@ func TestRulesTemplateWithCategories(t *testing.T) {
 		t.Error("Alpine tab state should initialize to 'categories' for this test")
 	}
 
-	// Verify create-cat-modal exists for the categories tab
-	if !strings.Contains(html, `id="create-cat-modal"`) {
-		t.Error("create-cat-modal dialog not found")
+	// Verify the categories tab links to the new form page rather than the
+	// old modal (the create/edit modals were removed in favor of /categories/new
+	// and /categories/{id}/edit).
+	if !strings.Contains(html, `href="/categories/new"`) {
+		t.Error(`"Add Category" link to /categories/new not found`)
+	}
+	if !strings.Contains(html, `href="/categories/1/edit"`) {
+		t.Error(`edit link to /categories/{id}/edit not found`)
+	}
+	if strings.Contains(html, `id="create-cat-modal"`) {
+		t.Error("legacy create-cat-modal should have been removed")
+	}
+	if strings.Contains(html, `id="edit-cat-modal"`) {
+		t.Error("legacy edit-cat-modal should have been removed")
 	}
 
 	t.Logf("Rendered %d bytes", buf.Len())
