@@ -239,6 +239,16 @@ func loadRules(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) ([]
 		// Parse typed actions JSONB. Unknown types are skipped with a warning
 		// (read-time tolerance — so unknown future types don't brick sync).
 		actions := parseTypedActions(rr.actionsJSON, rr.id, logger)
+		// Skip rules whose action list is empty after parsing — either the
+		// JSONB stored an empty array (shouldn't happen post-validation) or
+		// every action was an unknown type that read-time tolerance dropped.
+		// Loading such a rule would bump hit_count for every matching txn
+		// without producing any DB effect — misleading metric noise.
+		if len(actions) == 0 {
+			logger.Warn("skipping rule with no effective actions",
+				"rule_id", pgconv.FormatUUID(rr.id), "name", rr.name)
+			continue
+		}
 
 		trigger := rr.trigger
 		if trigger == "" {

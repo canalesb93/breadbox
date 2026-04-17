@@ -2015,8 +2015,13 @@ func (s *Service) recordRuleApplications(ctx context.Context, ruleID pgtype.UUID
 // materializeRuleTagAdd applies an add_tag action retroactively: auto-creates
 // the tag if needed, upserts transaction_tags with rule provenance, and writes
 // a tag_added annotation. Runs inside the caller's pgx.Tx. Idempotent — returns
-// (wasAdded=false, nil) when the tag was already attached.
+// (wasAdded=false, nil) when the tag was already attached. Malformed slugs are
+// dropped silently (write-time validation is authoritative; this is belt-and-
+// suspenders defense against direct-DB tampering).
 func (s *Service) materializeRuleTagAdd(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, slug string, ruleID pgtype.UUID, ruleShortID, ruleName string) (bool, error) {
+	if !tagSlugPattern.MatchString(slug) {
+		return false, nil
+	}
 	var tagID pgtype.UUID
 	if err := tx.QueryRow(ctx, `SELECT id FROM tags WHERE slug = $1`, slug).Scan(&tagID); err != nil {
 		// Auto-create on miss. ON CONFLICT DO UPDATE SET updated_at=... is a
@@ -2068,7 +2073,11 @@ func (s *Service) materializeRuleTagAdd(ctx context.Context, tx pgx.Tx, txnID pg
 // materializeRuleTagRemove applies a remove_tag action retroactively: deletes
 // the (transaction, tag) row and writes a tag_removed annotation with the rule
 // as actor. No-op if the tag isn't attached. Runs inside the caller's pgx.Tx.
+// Malformed slugs are dropped silently.
 func (s *Service) materializeRuleTagRemove(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, slug string, ruleID pgtype.UUID, ruleShortID, ruleName string) (bool, error) {
+	if !tagSlugPattern.MatchString(slug) {
+		return false, nil
+	}
 	var tagID pgtype.UUID
 	if err := tx.QueryRow(ctx, `SELECT id FROM tags WHERE slug = $1`, slug).Scan(&tagID); err != nil {
 		// Tag doesn't exist — nothing to remove.
