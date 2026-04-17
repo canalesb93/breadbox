@@ -27,7 +27,7 @@ Browse the current templates and CSS to see the state of the UI:
 ls internal/templates/pages/ internal/templates/partials/ internal/templates/layouts/
 ```
 
-Also **look at the actual app** — use Chrome MCP tools (`navigate`, `read_page`, `javascript_tool`, etc.) to browse `http://localhost:8080` and see the current state. This is critical for choosing what to work on. Do NOT use the `app-screenshot` skill during discovery or implementation — just use the regular Chrome MCP tools to navigate and inspect pages visually. Save the screenshot skill for the final PR submission only.
+Also **look at the actual app** — use Chrome MCP tools (`navigate`, `read_page`, `javascript_tool`, etc.) to browse `http://localhost:8080` and see the current state. This is critical for choosing what to work on. Do NOT use the `validate-ui` skill during discovery or implementation — just use the regular Chrome MCP tools to navigate and inspect pages visually. Save the screenshot skill for the final PR submission only.
 
 ## Phase 2: Choose Your Focus
 

@@ -41,7 +41,7 @@ ls internal/templates/pages/ internal/templates/partials/ internal/templates/lay
 - Modals/dropdowns that go offscreen
 - Filter bars that stack poorly on narrow screens
 
-Do NOT use the `app-screenshot` skill during discovery — just use regular Chrome MCP tools. Save screenshots for the final PR.
+Do NOT use the `validate-ui` skill during discovery — just use regular Chrome MCP tools. Save screenshots for the final PR.
 
 ## Phase 2: Choose Your Focus
 
