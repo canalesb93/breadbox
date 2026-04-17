@@ -31,17 +31,6 @@ One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), M
 - `-p 1` required; never `t.Parallel()` — tests share one DB.
 - Details in `.claude/rules/testing.md`.
 
-## UI Validation
-
-Admin UI / template / CSS / Alpine changes must be validated in a real browser before the task is reported done, and PRs for those changes must include a screenshot as evidence.
-
-- Capture via Chrome DevTools MCP (`mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_screenshot`) — never `screencapture` / AppleScript. See the `validate-ui` skill for the full recipe.
-- Default flow: `list_pages` → `select_page`/`new_page` at the target URL → `wait_for` on expected text → `resize_page` to a controlled breakpoint (desktop `1280x800`, mobile `390x844`) → `take_screenshot(filePath, format: "jpeg", quality: 85, fullPage: false)` → upload via `github-image-hosting`.
-- Embed with inline HTML so the rendered size is bounded: `<img src="..." width="800" alt="...">`. Do NOT use `![alt](url)` — GitHub will render the full native size and tall captures become painful to review.
-- Responsive changes: always capture both desktop and mobile. Use the side-by-side table pattern from the skill for before/after diffs.
-- Restart `make dev` after template / CSS edits so Tailwind and partials rebuild before capture.
-- Skip only when the change is genuinely non-visual (Go-only logic, migrations, MCP tool internals).
-
 ## Gotchas
 
 These bite in every session regardless of what you're touching.
