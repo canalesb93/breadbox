@@ -632,7 +632,8 @@ type createTransactionRuleInput struct {
 	Actions            []map[string]string `json:"actions,omitempty" jsonschema:"Array of typed actions. {\"type\":\"set_category\",\"category_slug\":\"...\"} | {\"type\":\"add_tag\",\"tag_slug\":\"...\"} | {\"type\":\"remove_tag\",\"tag_slug\":\"...\"} | {\"type\":\"add_comment\",\"content\":\"...\"}. Actions compose: a rule can set a category AND add a tag AND add a comment in the same match. add_comment fires only at sync time (not on retroactive apply). remove_tag net-diffs against add_tag within the same sync pass. If omitted, use category_slug instead."`
 	CategorySlug       string              `json:"category_slug,omitempty" jsonschema:"Shorthand for actions: [{\"type\":\"set_category\",\"category_slug\":\"<slug>\"}]. Either actions or category_slug is required."`
 	Trigger            string              `json:"trigger,omitempty" jsonschema:"When the rule fires during sync: 'on_create' (default — first-synced transactions) | 'on_change' (existing transactions that changed on re-sync) | 'always' (both). 'on_update' is accepted as a legacy alias for 'on_change'. Retroactive apply ignores trigger."`
-	Priority           int                 `json:"priority,omitempty" jsonschema:"Pipeline-stage integer, 0..1000. Lower runs first. Typical: 0=baseline, 10=standard (default), 50=refinement, 100=override. Higher-priority rules observe earlier-stage rules' tag/category mutations via conditions, and win set_category under last-writer semantics."`
+	Stage              string              `json:"stage,omitempty" jsonschema:"Semantic pipeline stage — preferred over raw priority for agent-authored rules. One of: 'baseline' (runs first, broad defaults), 'standard' (default), 'refinement' (reacts to earlier stages), 'override' (runs last, wins set_category). Resolves to priority 0/10/50/100. If both stage and priority are supplied, priority wins. Leave both unset for 'standard'."`
+	Priority           int                 `json:"priority,omitempty" jsonschema:"Raw pipeline-stage integer, 0..1000. Lower runs first. Prefer 'stage' for shared vocabulary. Canonical values: 0=baseline, 10=standard (default), 50=refinement, 100=override. Higher-priority rules observe earlier-stage rules' tag/category mutations via conditions, and win set_category under last-writer semantics."`
 	ExpiresIn          string              `json:"expires_in,omitempty" jsonschema:"Optional expiry duration: 24h, 30d, 1w. Rule auto-disables after this period."`
 	ApplyRetroactively bool                `json:"apply_retroactively,omitempty" jsonschema:"If true, immediately apply this rule to existing transactions after creation. Materializes set_category / add_tag / remove_tag; skips add_comment (sync-only). Hit count reflects every condition match, matching sync-time semantics."`
 }
@@ -655,7 +656,8 @@ type updateTransactionRuleInput struct {
 	Actions      *[]map[string]string `json:"actions,omitempty" jsonschema:"Replace the entire actions array with typed actions: {\"type\":\"set_category|add_tag|remove_tag|add_comment\", ...}. Pass an empty array to reject (rules must have at least one action). Omit to leave actions unchanged."`
 	CategorySlug *string              `json:"category_slug,omitempty" jsonschema:"Shorthand: replace only the set_category action. Other action types on the rule are preserved. Omit to leave unchanged."`
 	Trigger      *string              `json:"trigger,omitempty" jsonschema:"New trigger: on_create, on_change, or always. 'on_update' accepted as alias for on_change. Omit to leave unchanged."`
-	Priority     *int                 `json:"priority,omitempty" jsonschema:"New priority (pipeline stage). Omit to leave unchanged."`
+	Stage        *string              `json:"stage,omitempty" jsonschema:"New semantic pipeline stage: baseline | standard | refinement | override (resolves to priority 0/10/50/100). Preferred alias for agent-authored updates. If both stage and priority are supplied, priority wins. Omit to leave unchanged."`
+	Priority     *int                 `json:"priority,omitempty" jsonschema:"New raw priority (pipeline stage). Prefer 'stage' for shared vocabulary. Omit to leave unchanged."`
 	Enabled      *bool                `json:"enabled,omitempty" jsonschema:"Enable or disable the rule. Disabled rules are excluded from sync + retroactive apply."`
 	ExpiresAt    *string              `json:"expires_at,omitempty" jsonschema:"New expiry timestamp (RFC3339) or empty string to clear expiry entirely. Omit to leave unchanged."`
 }
@@ -676,7 +678,8 @@ type batchRuleItem struct {
 	CategorySlug string              `json:"category_slug,omitempty" jsonschema:"Shorthand for set_category action. Either actions or category_slug required."`
 	Conditions   map[string]any      `json:"conditions,omitempty" jsonschema:"Condition tree as JSON object. Omit or {} for match-all."`
 	Trigger      string              `json:"trigger,omitempty" jsonschema:"on_create (default), on_change, or always. 'on_update' accepted as alias for on_change."`
-	Priority     int                 `json:"priority,omitempty" jsonschema:"Priority (default 10)"`
+	Stage        string              `json:"stage,omitempty" jsonschema:"Semantic pipeline stage: baseline | standard (default) | refinement | override — resolves to priority 0/10/50/100. Prefer over raw priority for cross-agent consistency. If both are supplied, priority wins."`
+	Priority     int                 `json:"priority,omitempty" jsonschema:"Raw priority integer. Prefer 'stage' for shared vocabulary. Defaults to 10 (standard)."`
 	ExpiresIn    string              `json:"expires_in,omitempty" jsonschema:"Optional expiry duration"`
 }
 
@@ -708,10 +711,6 @@ func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.C
 	}
 
 	actor := service.ActorFromContext(ctx)
-	priority := input.Priority
-	if priority == 0 {
-		priority = 10
-	}
 
 	rule, err := s.svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name:         input.Name,
@@ -719,7 +718,8 @@ func (s *MCPServer) handleCreateTransactionRule(ctx context.Context, _ *mcpsdk.C
 		Actions:      convertMCPActions(input.Actions),
 		CategorySlug: input.CategorySlug,
 		Trigger:      input.Trigger,
-		Priority:     priority,
+		Priority:     input.Priority,
+		Stage:        input.Stage,
 		ExpiresIn:    input.ExpiresIn,
 		Actor:        actor,
 	})
@@ -799,6 +799,7 @@ func (s *MCPServer) handleUpdateTransactionRule(ctx context.Context, _ *mcpsdk.C
 		CategorySlug: input.CategorySlug,
 		Trigger:      input.Trigger,
 		Priority:     input.Priority,
+		Stage:        input.Stage,
 		Enabled:      input.Enabled,
 		ExpiresAt:    input.ExpiresAt,
 	})
@@ -909,18 +910,14 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 			continue
 		}
 
-		priority := r.Priority
-		if priority == 0 {
-			priority = 10
-		}
-
 		rule, err := s.svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 			Name:         r.Name,
 			Conditions:   conditions,
 			Actions:      convertMCPActions(r.Actions),
 			CategorySlug: r.CategorySlug,
 			Trigger:      r.Trigger,
-			Priority:     priority,
+			Priority:     r.Priority,
+			Stage:        r.Stage,
 			ExpiresIn:    r.ExpiresIn,
 			Actor:        actor,
 		})

@@ -215,14 +215,28 @@ Retroactive apply (`apply_rules`) ignores trigger — it's a bulk operation inte
 
 `priority` is an integer pipeline stage (default `10`, range `0..1000`). Rules load and evaluate in `priority ASC, created_at ASC` order — **lower priority runs first**. Think of priority as the stage number in a pipeline:
 
-- **0** — baseline / foundation (system defaults, broad classifications)
-- **10** — standard rules
-- **50** — refinements
-- **100** — overrides (have the final say)
+| Stage name   | Priority | Meaning                                                       |
+| ------------ | -------- | ------------------------------------------------------------- |
+| `baseline`   | `0`      | Foundation — system defaults, broad classifications           |
+| `standard`   | `10`     | Default rule stage                                            |
+| `refinement` | `50`     | Reacts to baseline/standard output                            |
+| `override`   | `100`    | Has the final say for `set_category`                          |
 
 For `set_category`, the **last rule to match wins** (higher-priority stage has final say). For accumulator actions (`add_tag`, `add_comment`), every matching rule contributes.
 
 `hit_count` increments on every condition match, regardless of whether the rule's action was ultimately superseded by a later stage.
+
+### Stage vs priority in API inputs
+
+`create_transaction_rule`, `update_transaction_rule`, and `batch_create_rules` (both MCP and REST) accept a semantic `stage` string alongside the raw `priority` integer. Agents should prefer `stage` so rules from different sources compose predictably on the same shared values.
+
+- Supply `stage` (`"baseline"` | `"standard"` | `"refinement"` | `"override"`) — resolves to `0 / 10 / 50 / 100`.
+- Supply raw `priority` — used as-is. Useful for fine-grained ordering inside a stage.
+- Supply both — **`priority` wins**. `stage` is effectively a hint in that case.
+- Supply neither — defaults to `standard` (`10`).
+- Unknown stage values return a `VALIDATION_ERROR` (`invalid stage "foo" (expected baseline|standard|refinement|override)`).
+
+Stage names are case-insensitive and whitespace-trimmed on input.
 
 > *Historical note:* before April 2026, rules evaluated in `priority DESC` order with first-writer-wins `set_category`. The inversion to pipeline-stage semantics preserves "higher priority wins set_category" in meaning, but the mechanism changes from "speaks first" to "speaks last." Outcomes for pre-flip rules are unchanged (the winner of a conflict is the same rule either way) — only the mental model shifts.
 
