@@ -279,24 +279,65 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		// Recent applications
 		applications, hasMoreApps, _ := svc.ListRuleApplications(ctx, id, 10, "")
 
+		// Category tree powers (a) the inline category picker on tx-row, and
+		// (b) slug → display-name resolution for the action meta line shown
+		// above each Recent Applications row.
+		categories, _ := svc.ListCategoryTree(ctx)
+		type catMeta struct {
+			DisplayName string
+			Color       *string
+			Icon        *string
+		}
+		catBySlug := make(map[string]catMeta)
+		for _, p := range categories {
+			catBySlug[p.Slug] = catMeta{DisplayName: p.DisplayName, Color: p.Color, Icon: p.Icon}
+			for _, c := range p.Children {
+				catBySlug[c.Slug] = catMeta{DisplayName: c.DisplayName, Color: c.Color, Icon: c.Icon}
+			}
+		}
+
 		// Hydrate application rows with AdminTransactionRow data so the shared
-		// tx-row-compact partial can render them (category avatar, account, user,
-		// agent-reviewed flag, pending state). Preserves order.
+		// tx-row partial can render them (category avatar, account, user,
+		// agent-reviewed flag, pending state). Preserves order. ApplicationMeta
+		// carries the per-application action so the rule_detail template can
+		// prefix each row with a prominent "what happened" pill.
 		applicationTxns := make([]service.AdminTransactionRow, 0, len(applications))
 		applicationMeta := make(map[string]struct {
-			ActionField string
-			ActionValue string
-			AppliedBy   string
+			ActionField        string
+			ActionValue        string
+			ActionDisplay      string
+			ActionCategoryColor *string
+			ActionCategoryIcon  *string
+			AppliedBy          string
 		}, len(applications))
 		if len(applications) > 0 {
 			txnIDs := make([]string, 0, len(applications))
 			for _, a := range applications {
 				txnIDs = append(txnIDs, a.TransactionID)
+				display := a.ActionValue
+				var cColor, cIcon *string
+				if a.ActionField == "category" {
+					if m, ok := catBySlug[a.ActionValue]; ok {
+						display = m.DisplayName
+						cColor = m.Color
+						cIcon = m.Icon
+					}
+				}
 				applicationMeta[a.TransactionID] = struct {
-					ActionField string
-					ActionValue string
-					AppliedBy   string
-				}{ActionField: a.ActionField, ActionValue: a.ActionValue, AppliedBy: a.AppliedBy}
+					ActionField        string
+					ActionValue        string
+					ActionDisplay      string
+					ActionCategoryColor *string
+					ActionCategoryIcon  *string
+					AppliedBy          string
+				}{
+					ActionField:        a.ActionField,
+					ActionValue:        a.ActionValue,
+					ActionDisplay:      display,
+					ActionCategoryColor: cColor,
+					ActionCategoryIcon:  cIcon,
+					AppliedBy:          a.AppliedBy,
+				}
 			}
 			if rows, err := svc.GetAdminTransactionRowsByIDs(ctx, txnIDs); err == nil {
 				applicationTxns = rows
@@ -339,6 +380,9 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		data["HasMoreApplications"] = hasMoreApps
 		data["SyncHistory"] = syncHistory
 		data["ActionCategoryName"] = actionCategoryName
+		// Categories feed window.__bbCategories for the inline category picker
+		// on tx-row partials used in Recent Applications and Matching sections.
+		data["Categories"] = categories
 
 		// Parse last_hit_at for relative time display
 		if rule.LastHitAt != nil {
