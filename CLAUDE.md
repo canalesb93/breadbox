@@ -78,7 +78,7 @@ Prefer `make dev-watch` for UI work. See `.claude/rules/ui.md` for the hot-reloa
 - Dev DB: `postgres://breadbox:breadbox@localhost:5432/breadbox?sslmode=disable`
 - Test DB: `postgres://breadbox:breadbox@localhost:5432/breadbox_test?sslmode=disable`
 - Required env when any provider configured: `DATABASE_URL` (set explicitly — pgx's Unix-socket fallback often breaks in worktrees), `ENCRYPTION_KEY` (recover from a running process via `ps eww -p $(pgrep -f 'breadbox serve' | head -1) | tr ' ' '\n' | grep ENCRYPTION_KEY`).
-- Worktrees (`claude -w`): `.worktreeinclude` copies build artifacts; `.claude/hooks/session-start.sh` assigns a port from 8081–8099 and injects env via `CLAUDE_ENV_FILE`. Main repo uses 8080.
+- Worktrees (`claude -w`): `.worktreeinclude` copies build artifacts; `.claude/hooks/session-start.sh` assigns a port from 8081–8099 and injects env via `CLAUDE_ENV_FILE`, exporting both `PORT` (read by the Makefile) and `SERVER_PORT` (read by the binary) so `make dev` *and* direct `go run ./cmd/breadbox serve` both land on the assigned port. Main repo uses 8080.
 - Stop all dev servers: `make dev-stop`.
 
 ## Browser automation
