@@ -5,12 +5,15 @@ package service_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/testutil"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // mustCreateCategoryForRule creates a category for use in rule tests.
@@ -1083,6 +1086,274 @@ func TestListTransactionRules_IncludesActions(t *testing.T) {
 	}
 	if !found {
 		t.Error("created rule not found in list")
+	}
+}
+
+// --- Retroactive tag materialization (Phase 2) ---
+
+// TestApplyRuleRetroactively_AddTagMaterialized verifies that a rule with an
+// add_tag action materializes transaction_tags rows and writes tag_added
+// annotations for every matched, pre-existing transaction. Also verifies
+// hit-count parity with sync-time semantics (count matches, not UPDATE rows).
+func TestApplyRuleRetroactively_AddTagMaterialized(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	// Dummy category for rule creation (add_tag rules still create fine without
+	// a set_category action, but we need a base set of categories around).
+	_ = mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+
+	// Fixture: user → connection → account + 3 transactions, 2 matching.
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_tag_add")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_tag_add", "Checking")
+
+	txn1 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_rest_1", "Restaurant Alpha", 1500, "2025-06-01")
+	txn2 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_rest_2", "Restaurant Beta", 2200, "2025-06-02")
+	txn3 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_other", "Grocery Mart", 5000, "2025-06-03")
+
+	// Pre-seed the dining tag so materializeRuleTagAdd resolves it directly
+	// rather than auto-creating.
+	tag := testutil.MustCreateTag(t, queries, "dining", "Dining", "persistent")
+
+	// Rule: name contains "Restaurant" → add_tag "dining".
+	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:       "Dining Tagger",
+		Actions:    []service.RuleAction{{Type: "add_tag", TagSlug: "dining"}},
+		Conditions: service.Condition{Field: "name", Op: "contains", Value: "Restaurant"},
+		Priority:   100,
+		Actor:      service.Actor{Type: "system", Name: "test"},
+	})
+	if err != nil {
+		t.Fatalf("CreateTransactionRule: %v", err)
+	}
+
+	matched, err := svc.ApplyRuleRetroactively(ctx, rule.ID)
+	if err != nil {
+		t.Fatalf("ApplyRuleRetroactively: %v", err)
+	}
+	if matched != 2 {
+		t.Errorf("match count: got %d, want 2", matched)
+	}
+
+	// Both matching transactions should have a transaction_tags row with
+	// added_by_type='rule'.
+	for _, txn := range []db.Transaction{txn1, txn2} {
+		var addedByType string
+		err := pool.QueryRow(ctx, `
+			SELECT added_by_type FROM transaction_tags
+			WHERE transaction_id = $1 AND tag_id = $2`, txn.ID, tag.ID).Scan(&addedByType)
+		if err != nil {
+			t.Fatalf("query transaction_tags for %s: %v", txn.ExternalTransactionID, err)
+		}
+		if addedByType != "rule" {
+			t.Errorf("%s: added_by_type got %q, want 'rule'", txn.ExternalTransactionID, addedByType)
+		}
+
+		// tag_added annotation with rule_id set and tag_id matching.
+		var annCount int
+		err = pool.QueryRow(ctx, `
+			SELECT COUNT(*) FROM annotations
+			WHERE transaction_id = $1 AND kind = 'tag_added'
+			  AND tag_id = $2 AND rule_id = $3`,
+			txn.ID, tag.ID, rule.ID).Scan(&annCount)
+		if err != nil {
+			t.Fatalf("count tag_added annotations for %s: %v", txn.ExternalTransactionID, err)
+		}
+		if annCount != 1 {
+			t.Errorf("%s: tag_added annotations with rule_id: got %d, want 1", txn.ExternalTransactionID, annCount)
+		}
+	}
+
+	// Non-matching transaction should have neither a transaction_tags row nor
+	// a tag_added annotation.
+	var ttCount, annCount int
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM transaction_tags WHERE transaction_id = $1 AND tag_id = $2`,
+		txn3.ID, tag.ID).Scan(&ttCount); err != nil {
+		t.Fatalf("count transaction_tags for txn3: %v", err)
+	}
+	if ttCount != 0 {
+		t.Errorf("non-matching transaction has %d transaction_tags rows, want 0", ttCount)
+	}
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM annotations WHERE transaction_id = $1 AND kind = 'tag_added'`,
+		txn3.ID).Scan(&annCount); err != nil {
+		t.Fatalf("count tag_added for txn3: %v", err)
+	}
+	if annCount != 0 {
+		t.Errorf("non-matching transaction has %d tag_added annotations, want 0", annCount)
+	}
+
+	// Rule hit_count should match the matched count (sync-time parity).
+	got, err := svc.GetTransactionRule(ctx, rule.ID)
+	if err != nil {
+		t.Fatalf("GetTransactionRule: %v", err)
+	}
+	if got.HitCount != 2 {
+		t.Errorf("hit_count: got %d, want 2", got.HitCount)
+	}
+}
+
+// TestApplyRuleRetroactively_RemoveTagMaterialized verifies that a rule with a
+// remove_tag action deletes transaction_tags rows for matched transactions and
+// writes tag_removed annotations whose payload carries the rule's name.
+func TestApplyRuleRetroactively_RemoveTagMaterialized(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	_ = mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_tag_rem")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_tag_rem", "Checking")
+
+	txn1 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_sbx_1", "Starbucks Coffee", 500, "2025-06-01")
+	txn2 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_sbx_2", "Starbucks Reserve", 750, "2025-06-02")
+
+	// Pre-seed ephemeral needs-review tag and attach it to both transactions
+	// directly (simulating user-applied review state).
+	tag := testutil.MustCreateTag(t, queries, "needs-review", "Needs Review", "ephemeral")
+	for _, txn := range []db.Transaction{txn1, txn2} {
+		_, err := pool.Exec(ctx, `
+			INSERT INTO transaction_tags (transaction_id, tag_id, added_by_type, added_by_name)
+			VALUES ($1, $2, 'user', 'test')`, txn.ID, tag.ID)
+		if err != nil {
+			t.Fatalf("seed transaction_tags for %s: %v", txn.ExternalTransactionID, err)
+		}
+	}
+
+	// Rule: name contains "Starbucks" → remove_tag "needs-review".
+	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:       "Clear review on Starbucks",
+		Actions:    []service.RuleAction{{Type: "remove_tag", TagSlug: "needs-review"}},
+		Conditions: service.Condition{Field: "name", Op: "contains", Value: "Starbucks"},
+		Priority:   100,
+		Actor:      service.Actor{Type: "system", Name: "test"},
+	})
+	if err != nil {
+		t.Fatalf("CreateTransactionRule: %v", err)
+	}
+
+	matched, err := svc.ApplyRuleRetroactively(ctx, rule.ID)
+	if err != nil {
+		t.Fatalf("ApplyRuleRetroactively: %v", err)
+	}
+	if matched != 2 {
+		t.Errorf("match count: got %d, want 2", matched)
+	}
+
+	// transaction_tags rows gone, tag_removed annotations recorded with the
+	// rule name referenced in the payload note.
+	for _, txn := range []db.Transaction{txn1, txn2} {
+		var ttCount int
+		if err := pool.QueryRow(ctx,
+			`SELECT COUNT(*) FROM transaction_tags WHERE transaction_id = $1 AND tag_id = $2`,
+			txn.ID, tag.ID).Scan(&ttCount); err != nil {
+			t.Fatalf("count transaction_tags for %s: %v", txn.ExternalTransactionID, err)
+		}
+		if ttCount != 0 {
+			t.Errorf("%s: transaction_tags should be empty, got %d rows", txn.ExternalTransactionID, ttCount)
+		}
+
+		var note string
+		err := pool.QueryRow(ctx, `
+			SELECT COALESCE(payload->>'note', '')
+			FROM annotations
+			WHERE transaction_id = $1 AND kind = 'tag_removed'
+			  AND tag_id = $2 AND rule_id = $3`,
+			txn.ID, tag.ID, rule.ID).Scan(&note)
+		if err != nil {
+			t.Fatalf("query tag_removed annotation for %s: %v", txn.ExternalTransactionID, err)
+		}
+		if !strings.Contains(note, rule.Name) {
+			t.Errorf("%s: tag_removed payload note %q does not reference rule name %q",
+				txn.ExternalTransactionID, note, rule.Name)
+		}
+	}
+
+	got, err := svc.GetTransactionRule(ctx, rule.ID)
+	if err != nil {
+		t.Fatalf("GetTransactionRule: %v", err)
+	}
+	if got.HitCount != 2 {
+		t.Errorf("hit_count: got %d, want 2", got.HitCount)
+	}
+}
+
+// TestApplyRuleRetroactively_HitCountMatchesSync verifies Q12: hit_count counts
+// condition matches (sync parity), not UPDATE-touched rows. One matched
+// transaction has category_override=TRUE and is skipped by the set_category
+// UPDATE, but still counts toward the rule's hit count.
+func TestApplyRuleRetroactively_HitCountMatchesSync(t *testing.T) {
+	svc, queries, pool := newService(t)
+	ctx := context.Background()
+
+	targetCat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+
+	user := testutil.MustCreateUser(t, queries, "Alice")
+	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_hit")
+	acct := testutil.MustCreateAccount(t, queries, conn.ID, "ext_hit", "Checking")
+
+	txn1 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_mat_1", "Cafe Match A", 1000, "2025-06-01")
+	txn2 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_mat_2", "Cafe Match B", 1200, "2025-06-02")
+	_ = testutil.MustCreateTransaction(t, queries, acct.ID, "txn_no_match", "Gas Station", 4500, "2025-06-03")
+
+	// Mark one of the two matching txns as category_override=TRUE. Still a
+	// match for the rule's conditions, but the set_category UPDATE will skip
+	// it — hit_count should still include it.
+	if _, err := pool.Exec(ctx,
+		`UPDATE transactions SET category_override = TRUE WHERE id = $1`, txn1.ID); err != nil {
+		t.Fatalf("set category_override: %v", err)
+	}
+
+	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
+		Name:         "Cafe Categorizer",
+		CategorySlug: targetCat.Slug,
+		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "Cafe"},
+		Priority:     100,
+		Actor:        service.Actor{Type: "system", Name: "test"},
+	})
+	if err != nil {
+		t.Fatalf("CreateTransactionRule: %v", err)
+	}
+
+	matched, err := svc.ApplyRuleRetroactively(ctx, rule.ID)
+	if err != nil {
+		t.Fatalf("ApplyRuleRetroactively: %v", err)
+	}
+	if matched != 2 {
+		t.Errorf("match count: got %d, want 2 (every condition match, even if overridden)", matched)
+	}
+
+	// Exactly one transaction's category was actually updated to the target
+	// (txn2); txn1 was skipped due to category_override=TRUE.
+	var updatedCount int
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM transactions WHERE category_id = $1`,
+		targetCat.ID).Scan(&updatedCount); err != nil {
+		t.Fatalf("count updated transactions: %v", err)
+	}
+	if updatedCount != 1 {
+		t.Errorf("updated category rows: got %d, want 1 (override-protected row skipped)", updatedCount)
+	}
+
+	// Confirm the specific row that actually got set.
+	var updatedCatID pgtype.UUID
+	if err := pool.QueryRow(ctx,
+		`SELECT category_id FROM transactions WHERE id = $1`, txn2.ID).Scan(&updatedCatID); err != nil {
+		t.Fatalf("query txn2 category_id: %v", err)
+	}
+	if updatedCatID != targetCat.ID {
+		t.Errorf("txn2 category_id: got %v, want %v", updatedCatID, targetCat.ID)
+	}
+
+	got, err := svc.GetTransactionRule(ctx, rule.ID)
+	if err != nil {
+		t.Fatalf("GetTransactionRule: %v", err)
+	}
+	if got.HitCount != 2 {
+		t.Errorf("hit_count: got %d, want 2 (sync parity — count matches, not UPDATE rows)", got.HitCount)
 	}
 }
 

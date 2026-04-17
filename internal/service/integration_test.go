@@ -1185,9 +1185,13 @@ func TestApplyRuleRetroactively_MatchesAndSkipsOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ApplyRuleRetroactively: %v", err)
 	}
-	// Should match 2 (txn_sb_1 and txn_sb_2), txn_sb_3 has override
-	if count != 2 {
-		t.Errorf("expected count=2, got %d", count)
+	// Under sync-parity hit-count semantics (Q12) every condition match
+	// counts, regardless of whether the rule's action actually updated the
+	// row. All three Starbucks transactions satisfy the condition, so
+	// count=3; the override on txn_sb_3 is honored by the set_category
+	// UPDATE below, not by excluding it from the match count.
+	if count != 3 {
+		t.Errorf("expected count=3 (condition matches), got %d", count)
 	}
 
 	// Verify txn_sb_1 and txn_sb_2 have coffee category

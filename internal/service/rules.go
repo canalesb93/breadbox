@@ -1043,11 +1043,14 @@ func (s *Service) DeleteTransactionRule(ctx context.Context, id string) error {
 	return nil
 }
 
-// ListActiveRulesForSync returns all enabled, non-expired rules ordered by priority.
+// ListActiveRulesForSync returns all enabled, non-expired rules ordered by
+// pipeline stage (priority ASC, created_at ASC) — matches the sync-path
+// loadRules ordering. Lower priority runs first (baseline), higher priority
+// runs last and wins set_category under last-writer-wins merge.
 func (s *Service) ListActiveRulesForSync(ctx context.Context) ([]TransactionRuleResponse, error) {
 	query := ruleSelectQuery + ` WHERE tr.enabled = TRUE
 		AND (tr.expires_at IS NULL OR tr.expires_at > NOW())
-		ORDER BY tr.priority DESC, tr.created_at DESC`
+		ORDER BY tr.priority ASC, tr.created_at ASC`
 
 	rows, err := s.Pool.Query(ctx, query)
 	if err != nil {
@@ -1075,6 +1078,13 @@ func (s *Service) ListActiveRulesForSync(ctx context.Context) ([]TransactionRule
 // evaluation. Aggregates tag slugs from transaction_tags so tag-based
 // conditions work during retroactive apply. GROUP BY t.id is required because
 // of the LEFT JOIN onto the tag pivot.
+//
+// NOTE: `category_override=TRUE` rows are intentionally *not* filtered here.
+// Hit counts must reflect every condition match (sync-time parity, Q12), and
+// non-category actions (add_tag, remove_tag) legitimately fire on overridden
+// rows. The `set_category` UPDATE below enforces its own
+// `category_override = FALSE` guard so overridden rows keep their user-pinned
+// category.
 const transactionContextQuery = `SELECT t.id, t.name, COALESCE(t.merchant_name, ''), t.amount,
 	COALESCE(t.category_primary, ''), COALESCE(t.category_detailed, ''),
 	t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
@@ -1085,7 +1095,7 @@ const transactionContextQuery = `SELECT t.id, t.name, COALESCE(t.merchant_name, 
 	LEFT JOIN users u ON bc.user_id = u.id
 	LEFT JOIN transaction_tags tt ON tt.transaction_id = t.id
 	LEFT JOIN tags tag ON tag.id = tt.tag_id
-	WHERE t.deleted_at IS NULL AND t.category_override = FALSE
+	WHERE t.deleted_at IS NULL
 	AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
 // transactionContextGroupBy is the GROUP BY clause matching transactionContextQuery.
@@ -1115,10 +1125,16 @@ func scanTransactionContextRow(dest []any) *transactionContextRow {
 	return r
 }
 
-// ApplyRuleRetroactively applies a single rule to all existing non-deleted,
-// non-overridden transactions. Returns count of affected rows. Only
-// set_category actions translate to UPDATE SQL — add_tag and add_comment are
-// skipped retroactively (they only fire during sync).
+// ApplyRuleRetroactively applies a single rule to all existing non-deleted
+// transactions matching its condition. Materializes set_category (SQL UPDATE,
+// skipped on category_override=TRUE rows), add_tag (upsert transaction_tags),
+// and remove_tag (delete transaction_tags). add_comment stays sync-only by
+// design — retroactive apply is bulk historical data, not narration.
+//
+// Returns the number of transactions that matched the condition (hit count —
+// not the number of rows physically modified). This matches sync-time
+// hit-count semantics so the counter tells you "how often does this rule
+// match," not "how often did it produce a DB write."
 func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (int64, error) {
 	rule, err := s.GetTransactionRule(ctx, ruleID)
 	if err != nil {
@@ -1142,23 +1158,44 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 		return 0, fmt.Errorf("compile rule conditions: %w", err)
 	}
 
-	// Build SET clause from actions
-	setClauses, setArgs, err := s.buildActionSetClause(ctx, rule.Actions)
-	if err != nil {
-		return 0, fmt.Errorf("build action set clause: %w", err)
+	// Extract action intents once up-front.
+	var categorySetCatID pgtype.UUID
+	var categorySetSlug string
+	var tagAdds []string
+	var tagRemoves []string
+	for _, a := range rule.Actions {
+		switch a.Type {
+		case "set_category":
+			catID, err := s.categorySlugToUUID(ctx, a.CategorySlug)
+			if err != nil || !catID.Valid {
+				// Skip unresolvable slug; a warning log lives in the sync path.
+				continue
+			}
+			categorySetCatID = catID
+			categorySetSlug = a.CategorySlug
+		case "add_tag":
+			tagAdds = append(tagAdds, a.TagSlug)
+		case "remove_tag":
+			tagRemoves = append(tagRemoves, a.TagSlug)
+		case "add_comment":
+			// sync-only; skip retroactively.
+		}
 	}
-	if len(setClauses) == 0 {
+	hasWriteAction := categorySetCatID.Valid || len(tagAdds) > 0 || len(tagRemoves) > 0
+	if !hasWriteAction {
 		return 0, fmt.Errorf("%w: rule has no applicable actions", ErrInvalidParameter)
 	}
 
-	var totalAffected int64
+	ruleUUID, _ := parseUUID(ruleID)
+	ruleShortID, ruleName := s.ruleIdentityForAudit(ctx, ruleUUID)
+
+	var totalMatched int64
 	var lastID pgtype.UUID
 
 	for {
 		query := transactionContextQuery
 		var args []any
 		argN := 1
-
 		if lastID.Valid {
 			query += fmt.Sprintf(" AND t.id > $%d", argN)
 			args = append(args, lastID)
@@ -1171,59 +1208,125 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 
 		rows, err := s.Pool.Query(ctx, query, args...)
 		if err != nil {
-			return totalAffected, fmt.Errorf("query transactions: %w", err)
+			return totalMatched, fmt.Errorf("query transactions: %w", err)
 		}
-
 		var matchIDs []pgtype.UUID
 		rowCount := 0
-
 		for rows.Next() {
 			rowCount++
 			dest := make([]any, 12)
 			r := scanTransactionContextRow(dest)
 			if err := rows.Scan(dest...); err != nil {
 				rows.Close()
-				return totalAffected, fmt.Errorf("scan transaction: %w", err)
+				return totalMatched, fmt.Errorf("scan transaction: %w", err)
 			}
 			lastID = r.id
-
 			if EvaluateCondition(compiled, r.tctx) {
 				matchIDs = append(matchIDs, r.id)
 			}
 		}
 		rows.Close()
 		if err := rows.Err(); err != nil {
-			return totalAffected, fmt.Errorf("iterate transactions: %w", err)
+			return totalMatched, fmt.Errorf("iterate transactions: %w", err)
 		}
 
-		// Bulk update matching transactions
-		if len(matchIDs) > 0 {
-			// Build: UPDATE transactions SET <actions>, updated_at = NOW() WHERE id = ANY($N) AND ...
-			updateArgs := make([]any, len(setArgs))
-			copy(updateArgs, setArgs)
-			idsArgN := len(updateArgs) + 1
-			updateArgs = append(updateArgs, matchIDs)
+		totalMatched += int64(len(matchIDs))
+		if len(matchIDs) == 0 {
+			if rowCount < 1000 {
+				break
+			}
+			continue
+		}
 
-			updateSQL := fmt.Sprintf(`UPDATE transactions SET %s, updated_at = NOW()
-				WHERE id = ANY($%d) AND category_override = FALSE AND deleted_at IS NULL`,
-				strings.Join(setClauses, ", "), idsArgN)
+		// Persist in a per-batch tx so set_category + tag writes + annotations
+		// are atomic against failure.
+		tx, err := s.Pool.Begin(ctx)
+		if err != nil {
+			return totalMatched, fmt.Errorf("begin retroactive apply tx: %w", err)
+		}
+		qtx := s.Queries.WithTx(tx)
 
-			tag, err := s.Pool.Exec(ctx, updateSQL, updateArgs...)
+		// set_category: bulk UPDATE for matching non-overridden rows.
+		if categorySetCatID.Valid {
+			_, err := tx.Exec(ctx,
+				`UPDATE transactions SET category_id = $1, updated_at = NOW()
+				WHERE id = ANY($2) AND category_override = FALSE AND deleted_at IS NULL`,
+				categorySetCatID, matchIDs)
 			if err != nil {
-				return totalAffected, fmt.Errorf("update transactions: %w", err)
+				tx.Rollback(ctx)
+				return totalMatched, fmt.Errorf("update transactions: %w", err)
 			}
-			totalAffected += tag.RowsAffected()
-
-			// Record rule applications (only set_category actually updates rows;
-			// we still record the action for the audit trail).
-			ruleUUID, _ := parseUUID(ruleID)
-			for _, action := range rule.Actions {
-				field, value := actionAuditFields(action)
-				if field == "" {
-					continue
+			// Annotation per touched row.
+			for _, txnID := range matchIDs {
+				payload := map[string]any{
+					"category_slug": categorySetSlug,
+					"source":        "rule",
+					"applied_by":    "retroactive",
+					"rule_id":       ruleShortID,
+					"rule_name":     ruleName,
 				}
-				s.recordRuleApplications(ctx, ruleUUID, matchIDs, field, value, "retroactive")
+				if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
+					TransactionID: txnID,
+					Kind:          "category_set",
+					ActorType:     "system",
+					ActorID:       ruleShortID,
+					ActorName:     ruleName,
+					Payload:       payload,
+					RuleID:        ruleUUID,
+				}); err != nil {
+					tx.Rollback(ctx)
+					return totalMatched, fmt.Errorf("annotate category_set: %w", err)
+				}
 			}
+		}
+
+		// add_tag: materialize per tag per matching txn.
+		for _, txnID := range matchIDs {
+			for _, slug := range tagAdds {
+				if _, err := s.materializeRuleTagAdd(ctx, tx, txnID, slug, ruleUUID, ruleShortID, ruleName); err != nil {
+					tx.Rollback(ctx)
+					return totalMatched, err
+				}
+			}
+			for _, slug := range tagRemoves {
+				if _, err := s.materializeRuleTagRemove(ctx, tx, txnID, slug, ruleUUID, ruleShortID, ruleName); err != nil {
+					tx.Rollback(ctx)
+					return totalMatched, err
+				}
+			}
+		}
+
+		// rule_applied audit trail — one per action intent per matched txn.
+		for _, action := range rule.Actions {
+			field, value := actionAuditFields(action)
+			if field == "" || field == "comment" {
+				continue
+			}
+			for _, txnID := range matchIDs {
+				payload := map[string]any{
+					"rule_id":      ruleShortID,
+					"rule_name":    ruleName,
+					"action_field": field,
+					"action_value": value,
+					"applied_by":   "retroactive",
+				}
+				if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
+					TransactionID: txnID,
+					Kind:          "rule_applied",
+					ActorType:     "system",
+					ActorID:       ruleShortID,
+					ActorName:     ruleName,
+					Payload:       payload,
+					RuleID:        ruleUUID,
+				}); err != nil {
+					tx.Rollback(ctx)
+					return totalMatched, fmt.Errorf("annotate rule_applied: %w", err)
+				}
+			}
+		}
+
+		if err := tx.Commit(ctx); err != nil {
+			return totalMatched, fmt.Errorf("commit retroactive apply batch: %w", err)
 		}
 
 		if rowCount < 1000 {
@@ -1231,13 +1334,21 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 		}
 	}
 
-	// Update hit count
-	if totalAffected > 0 {
-		ruleUUID, _ := parseUUID(ruleID)
-		_, _ = s.Pool.Exec(ctx, "UPDATE transaction_rules SET hit_count = hit_count + $2, last_hit_at = NOW() WHERE id = $1", ruleUUID, totalAffected)
+	// Update hit count on the rule row (sync-parity: count matches, not
+	// UPDATE-touched rows).
+	if totalMatched > 0 {
+		_, _ = s.Pool.Exec(ctx, "UPDATE transaction_rules SET hit_count = hit_count + $2, last_hit_at = NOW() WHERE id = $1", ruleUUID, totalMatched)
 	}
 
-	return totalAffected, nil
+	return totalMatched, nil
+}
+
+// ruleIdentityForAudit looks up the (short_id, name) pair for a rule UUID so
+// annotation actor fields match the rule's public identity. Returns empty
+// strings if the rule isn't found (caller writes without a back-reference).
+func (s *Service) ruleIdentityForAudit(ctx context.Context, ruleID pgtype.UUID) (shortID, name string) {
+	_ = s.Pool.QueryRow(ctx, `SELECT short_id, name FROM transaction_rules WHERE id = $1`, ruleID).Scan(&shortID, &name)
+	return shortID, name
 }
 
 // actionAuditFields returns (action_field, action_value) for the audit trail,
@@ -1254,9 +1365,13 @@ func actionAuditFields(a RuleAction) (string, string) {
 	return "", ""
 }
 
-// ApplyAllRulesRetroactively applies all active rules (priority DESC) to existing transactions.
-// Multiple rules can match — actions are merged (first rule to set a field wins).
-// Returns a map of rule_id → match_count.
+// ApplyAllRulesRetroactively applies all active rules to existing transactions
+// in pipeline-stage order (priority ASC, created_at ASC). Materializes
+// set_category (last-writer-wins), add_tag, and remove_tag. add_comment stays
+// sync-only.
+//
+// Returns a map of rule_id → match_count. Hit counts include every condition
+// match, not just actions that caused a DB write (sync-time parity).
 func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]int64, error) {
 	rules, err := s.ListActiveRulesForSync(ctx)
 	if err != nil {
@@ -1266,9 +1381,11 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		return map[string]int64{}, nil
 	}
 
-	// Compile all rules
 	type compiledRule struct {
 		id       string
+		uuid     pgtype.UUID
+		shortID  string
+		name     string
 		actions  []RuleAction
 		compiled *CompiledCondition
 	}
@@ -1281,7 +1398,15 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		if err != nil {
 			continue
 		}
-		compiled = append(compiled, compiledRule{id: r.ID, actions: r.Actions, compiled: cc})
+		uuid, _ := parseUUID(r.ID)
+		compiled = append(compiled, compiledRule{
+			id:       r.ID,
+			uuid:     uuid,
+			shortID:  r.ShortID,
+			name:     r.Name,
+			actions:  r.Actions,
+			compiled: cc,
+		})
 	}
 	if len(compiled) == 0 {
 		return map[string]int64{}, nil
@@ -1294,7 +1419,6 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		query := transactionContextQuery
 		var args []any
 		argN := 1
-
 		if lastID.Valid {
 			query += fmt.Sprintf(" AND t.id > $%d", argN)
 			args = append(args, lastID)
@@ -1310,17 +1434,19 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 			return hitCounts, fmt.Errorf("query transactions: %w", err)
 		}
 
-		// Per transaction: merge actions from all matching rules, keyed by category_id for batching
-		type txnRuleApp struct {
-			txnID       pgtype.UUID
-			ruleID      string
-			actionField string
-			actionValue string
+		// Per transaction: fold rules to determine net action intents, mirroring
+		// the sync resolver. Category: last-writer-wins. Tags: net-diff.
+		type txnIntent struct {
+			txnID          pgtype.UUID
+			catID          pgtype.UUID
+			catSlug        string
+			catRule        *compiledRule
+			tagAdds        map[string]*compiledRule // slug → first rule that added it
+			tagRemoves     map[string]*compiledRule
+			matchingRules  []*compiledRule // every rule whose condition matched (for rule_applied)
 		}
-		updates := make(map[pgtype.UUID][]pgtype.UUID) // category_id → transaction IDs
-		var applications []txnRuleApp
+		var intents []txnIntent
 		rowCount := 0
-
 		for rows.Next() {
 			rowCount++
 			dest := make([]any, 12)
@@ -1330,34 +1456,66 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 				return hitCounts, fmt.Errorf("scan transaction: %w", err)
 			}
 			lastID = r.id
-
-			// Merge actions from all matching rules (first to set a field wins).
-			// Only set_category is materialized to the transactions table here;
-			// add_tag/add_comment are counted as hits but skipped retroactively.
-			var mergedCatID pgtype.UUID
-			var winningRuleID string
-			var winningSlug string
-			for _, cr := range compiled {
-				if EvaluateCondition(cr.compiled, r.tctx) {
-					hitCounts[cr.id]++
-					// Merge category action (first wins)
-					if !mergedCatID.Valid {
-						if slug := categoryActionSlug(cr.actions); slug != "" {
-							if catID, err := s.categorySlugToUUID(ctx, slug); err == nil && catID.Valid {
-								mergedCatID = catID
-								winningRuleID = cr.id
-								winningSlug = slug
+			tctx := r.tctx
+			if len(tctx.Tags) > 0 {
+				cp := make([]string, len(tctx.Tags))
+				copy(cp, tctx.Tags)
+				tctx.Tags = cp
+			}
+			intent := txnIntent{
+				txnID:      r.id,
+				tagAdds:    make(map[string]*compiledRule),
+				tagRemoves: make(map[string]*compiledRule),
+			}
+			for i := range compiled {
+				cr := &compiled[i]
+				if !EvaluateCondition(cr.compiled, tctx) {
+					continue
+				}
+				hitCounts[cr.id]++
+				intent.matchingRules = append(intent.matchingRules, cr)
+				for _, a := range cr.actions {
+					switch a.Type {
+					case "set_category":
+						if catID, err := s.categorySlugToUUID(ctx, a.CategorySlug); err == nil && catID.Valid {
+							intent.catID = catID
+							intent.catSlug = a.CategorySlug
+							intent.catRule = cr
+							tctx.Category = a.CategorySlug
+						}
+					case "add_tag":
+						if a.TagSlug == "" {
+							continue
+						}
+						// If a prior-stage remove queued this slug, the later
+						// add cancels the remove.
+						if _, was := intent.tagRemoves[a.TagSlug]; was {
+							delete(intent.tagRemoves, a.TagSlug)
+						}
+						if _, exists := intent.tagAdds[a.TagSlug]; !exists {
+							intent.tagAdds[a.TagSlug] = cr
+						}
+						if !stringSliceHasFold(tctx.Tags, a.TagSlug) {
+							tctx.Tags = append(tctx.Tags, a.TagSlug)
+						}
+					case "remove_tag":
+						if a.TagSlug == "" {
+							continue
+						}
+						// If a prior-stage add queued this slug, cancel it.
+						if _, was := intent.tagAdds[a.TagSlug]; was {
+							delete(intent.tagAdds, a.TagSlug)
+						} else if stringSliceHasFold(tctx.Tags, a.TagSlug) {
+							if _, exists := intent.tagRemoves[a.TagSlug]; !exists {
+								intent.tagRemoves[a.TagSlug] = cr
 							}
 						}
+						tctx.Tags = stringSliceDropFold(tctx.Tags, a.TagSlug)
 					}
 				}
 			}
-
-			if mergedCatID.Valid {
-				updates[mergedCatID] = append(updates[mergedCatID], r.id)
-				applications = append(applications, txnRuleApp{
-					txnID: r.id, ruleID: winningRuleID, actionField: "category", actionValue: winningSlug,
-				})
+			if intent.catRule != nil || len(intent.tagAdds) > 0 || len(intent.tagRemoves) > 0 {
+				intents = append(intents, intent)
 			}
 		}
 		rows.Close()
@@ -1365,21 +1523,110 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 			return hitCounts, fmt.Errorf("iterate transactions: %w", err)
 		}
 
-		// Bulk update per category
-		for catID, txnIDs := range updates {
-			_, err := s.Pool.Exec(ctx,
+		if len(intents) == 0 {
+			if rowCount < 1000 {
+				break
+			}
+			continue
+		}
+
+		tx, err := s.Pool.Begin(ctx)
+		if err != nil {
+			return hitCounts, fmt.Errorf("begin apply-all tx: %w", err)
+		}
+		qtx := s.Queries.WithTx(tx)
+		aborted := false
+
+		// Group category updates by (catID) for batched UPDATEs.
+		catBatches := make(map[pgtype.UUID][]pgtype.UUID)
+		for _, it := range intents {
+			if it.catRule != nil {
+				catBatches[it.catID] = append(catBatches[it.catID], it.txnID)
+			}
+		}
+		for catID, txnIDs := range catBatches {
+			if _, err := tx.Exec(ctx,
 				`UPDATE transactions SET category_id = $1, updated_at = NOW()
 				WHERE id = ANY($2) AND category_override = FALSE AND deleted_at IS NULL`,
-				catID, txnIDs)
-			if err != nil {
+				catID, txnIDs); err != nil {
+				tx.Rollback(ctx)
 				return hitCounts, fmt.Errorf("update transactions: %w", err)
 			}
 		}
 
-		// Record rule applications
-		for _, app := range applications {
-			ruleUUID, _ := parseUUID(app.ruleID)
-			s.recordRuleApplications(ctx, ruleUUID, []pgtype.UUID{app.txnID}, app.actionField, app.actionValue, "retroactive")
+		for _, it := range intents {
+			// category_set annotation (one per touched row, owned by the winning rule).
+			if it.catRule != nil {
+				payload := map[string]any{
+					"category_slug": it.catSlug,
+					"source":        "rule",
+					"applied_by":    "retroactive",
+					"rule_id":       it.catRule.shortID,
+					"rule_name":     it.catRule.name,
+				}
+				if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
+					TransactionID: it.txnID,
+					Kind:          "category_set",
+					ActorType:     "system",
+					ActorID:       it.catRule.shortID,
+					ActorName:     it.catRule.name,
+					Payload:       payload,
+					RuleID:        it.catRule.uuid,
+				}); err != nil {
+					aborted = true
+					break
+				}
+			}
+			for slug, cr := range it.tagAdds {
+				if _, err := s.materializeRuleTagAdd(ctx, tx, it.txnID, slug, cr.uuid, cr.shortID, cr.name); err != nil {
+					aborted = true
+					break
+				}
+			}
+			if aborted {
+				break
+			}
+			for slug, cr := range it.tagRemoves {
+				if _, err := s.materializeRuleTagRemove(ctx, tx, it.txnID, slug, cr.uuid, cr.shortID, cr.name); err != nil {
+					aborted = true
+					break
+				}
+			}
+			if aborted {
+				break
+			}
+
+			// rule_applied audit: one per matching rule per txn.
+			for _, cr := range it.matchingRules {
+				payload := map[string]any{
+					"rule_id":    cr.shortID,
+					"rule_name":  cr.name,
+					"applied_by": "retroactive",
+				}
+				if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
+					TransactionID: it.txnID,
+					Kind:          "rule_applied",
+					ActorType:     "system",
+					ActorID:       cr.shortID,
+					ActorName:     cr.name,
+					Payload:       payload,
+					RuleID:        cr.uuid,
+				}); err != nil {
+					aborted = true
+					break
+				}
+			}
+			if aborted {
+				break
+			}
+		}
+
+		if aborted {
+			tx.Rollback(ctx)
+			return hitCounts, fmt.Errorf("apply-all retroactive batch aborted")
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return hitCounts, fmt.Errorf("commit apply-all batch: %w", err)
 		}
 
 		if rowCount < 1000 {
@@ -1387,7 +1634,7 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		}
 	}
 
-	// Update hit counts for all matched rules
+	// Update hit counts for all matched rules.
 	for ruleID, count := range hitCounts {
 		id, err := parseUUID(ruleID)
 		if err != nil {
@@ -1397,6 +1644,27 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 	}
 
 	return hitCounts, nil
+}
+
+// stringSliceHasFold returns true if slice contains s (case-insensitive).
+func stringSliceHasFold(slice []string, s string) bool {
+	for _, v := range slice {
+		if strings.EqualFold(v, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// stringSliceDropFold returns slice with all case-insensitive matches of s removed.
+func stringSliceDropFold(slice []string, s string) []string {
+	out := slice[:0]
+	for _, v := range slice {
+		if !strings.EqualFold(v, s) {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // RulePreviewMatch contains a sample transaction that matched a rule preview.
@@ -1744,10 +2012,106 @@ func (s *Service) recordRuleApplications(ctx context.Context, ruleID pgtype.UUID
 	}
 }
 
+// materializeRuleTagAdd applies an add_tag action retroactively: auto-creates
+// the tag if needed, upserts transaction_tags with rule provenance, and writes
+// a tag_added annotation. Runs inside the caller's pgx.Tx. Idempotent — returns
+// (wasAdded=false, nil) when the tag was already attached.
+func (s *Service) materializeRuleTagAdd(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, slug string, ruleID pgtype.UUID, ruleShortID, ruleName string) (bool, error) {
+	var tagID pgtype.UUID
+	if err := tx.QueryRow(ctx, `SELECT id FROM tags WHERE slug = $1`, slug).Scan(&tagID); err != nil {
+		// Auto-create on miss. ON CONFLICT DO UPDATE SET updated_at=... is a
+		// harmless no-op-returning-id dance so we always get the tag id back.
+		if err2 := tx.QueryRow(ctx, `
+			INSERT INTO tags (slug, display_name, lifecycle)
+			VALUES ($1, $2, 'persistent')
+			ON CONFLICT (slug) DO UPDATE SET updated_at = tags.updated_at
+			RETURNING id`, slug, titleCaseSlug(slug)).Scan(&tagID); err2 != nil {
+			return false, fmt.Errorf("get or create tag %q: %w", slug, err2)
+		}
+	}
+
+	cmd, err := tx.Exec(ctx,
+		`INSERT INTO transaction_tags (transaction_id, tag_id, added_by_type, added_by_id, added_by_name)
+		VALUES ($1, $2, 'rule', $3, $4)
+		ON CONFLICT (transaction_id, tag_id) DO NOTHING`,
+		txnID, tagID, ruleShortID, ruleName)
+	if err != nil {
+		return false, fmt.Errorf("upsert transaction_tag: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		// Already attached — no annotation written (idempotent).
+		return false, nil
+	}
+
+	payload := map[string]any{
+		"slug":       slug,
+		"source":     "rule",
+		"applied_by": "retroactive",
+		"rule_id":    ruleShortID,
+		"rule_name":  ruleName,
+	}
+	if err := writeAnnotation(ctx, s.Queries.WithTx(tx), writeAnnotationParams{
+		TransactionID: txnID,
+		Kind:          "tag_added",
+		ActorType:     "system",
+		ActorID:       ruleShortID,
+		ActorName:     ruleName,
+		Payload:       payload,
+		TagID:         tagID,
+		RuleID:        ruleID,
+	}); err != nil {
+		return true, fmt.Errorf("annotate tag_added: %w", err)
+	}
+	return true, nil
+}
+
+// materializeRuleTagRemove applies a remove_tag action retroactively: deletes
+// the (transaction, tag) row and writes a tag_removed annotation with the rule
+// as actor. No-op if the tag isn't attached. Runs inside the caller's pgx.Tx.
+func (s *Service) materializeRuleTagRemove(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, slug string, ruleID pgtype.UUID, ruleShortID, ruleName string) (bool, error) {
+	var tagID pgtype.UUID
+	if err := tx.QueryRow(ctx, `SELECT id FROM tags WHERE slug = $1`, slug).Scan(&tagID); err != nil {
+		// Tag doesn't exist — nothing to remove.
+		return false, nil
+	}
+	cmd, err := tx.Exec(ctx,
+		`DELETE FROM transaction_tags WHERE transaction_id = $1 AND tag_id = $2`,
+		txnID, tagID)
+	if err != nil {
+		return false, fmt.Errorf("delete transaction_tag: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return false, nil
+	}
+
+	payload := map[string]any{
+		"slug":       slug,
+		"source":     "rule",
+		"applied_by": "retroactive",
+		"rule_id":    ruleShortID,
+		"rule_name":  ruleName,
+		"note":       fmt.Sprintf("Removed by rule: %s", ruleName),
+	}
+	if err := writeAnnotation(ctx, s.Queries.WithTx(tx), writeAnnotationParams{
+		TransactionID: txnID,
+		Kind:          "tag_removed",
+		ActorType:     "system",
+		ActorID:       ruleShortID,
+		ActorName:     ruleName,
+		Payload:       payload,
+		TagID:         tagID,
+		RuleID:        ruleID,
+	}); err != nil {
+		return true, fmt.Errorf("annotate tag_removed: %w", err)
+	}
+	return true, nil
+}
+
 // buildActionSetClause converts rule actions into SQL SET clause components.
 // Returns setClauses (e.g., ["category_id = $1"]), args, and error. Only
-// set_category materializes here — add_tag and add_comment are skipped for
-// retroactive apply.
+// set_category materializes here — add_tag / remove_tag / add_comment are
+// persisted via separate helpers (materializeRuleTagAdd / Remove) since they
+// don't fit a single UPDATE row. add_comment stays sync-only by design.
 func (s *Service) buildActionSetClause(ctx context.Context, actions []RuleAction) ([]string, []any, error) {
 	var setClauses []string
 	var args []any
