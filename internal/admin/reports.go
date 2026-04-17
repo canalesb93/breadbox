@@ -12,6 +12,15 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// reportDisplayAuthor returns the preferred display name for a report,
+// falling back to the creator's actor name when the agent didn't set a custom author.
+func reportDisplayAuthor(createdByName string, author *string) string {
+	if author != nil && *author != "" {
+		return *author
+	}
+	return createdByName
+}
+
 // ReportsPageHandler handles GET /reports.
 func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -19,7 +28,6 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 
 		statusFilter := r.URL.Query().Get("status") // "", "unread", "read"
 
-		// Fetch reports based on filter.
 		var rawReports []service.AgentReportResponse
 		var err error
 		switch statusFilter {
@@ -34,7 +42,7 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 			return
 		}
 
-		// Filter "read" in Go since we don't have a dedicated query for it.
+		// "read" has no dedicated query; filter in Go.
 		if statusFilter == "read" {
 			var filtered []service.AgentReportResponse
 			for _, r := range rawReports {
@@ -45,7 +53,6 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 			rawReports = filtered
 		}
 
-		// Build template-friendly structs.
 		type ReportItem struct {
 			ID            string
 			Title         string
@@ -59,17 +66,13 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 		var reports []ReportItem
 		for _, r := range rawReports {
 			t, _ := time.Parse(time.RFC3339, r.CreatedAt)
-			displayAuthor := r.CreatedByName
-			if r.Author != nil && *r.Author != "" {
-				displayAuthor = *r.Author
-			}
 			reports = append(reports, ReportItem{
 				ID:            r.ID,
 				Title:         r.Title,
 				Body:          r.Body,
 				Priority:      r.Priority,
 				Tags:          r.Tags,
-				DisplayAuthor: displayAuthor,
+				DisplayAuthor: reportDisplayAuthor(r.CreatedByName, r.Author),
 				CreatedAt:     relativeTime(t),
 				IsRead:        r.ReadAt != nil,
 			})
@@ -101,10 +104,6 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 		}
 
 		t, _ := time.Parse(time.RFC3339, report.CreatedAt)
-		displayAuthor := report.CreatedByName
-		if report.Author != nil && *report.Author != "" {
-			displayAuthor = *report.Author
-		}
 
 		type ReportDetail struct {
 			ID            string
@@ -124,16 +123,10 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 			Body:          report.Body,
 			Priority:      report.Priority,
 			Tags:          report.Tags,
-			DisplayAuthor: displayAuthor,
+			DisplayAuthor: reportDisplayAuthor(report.CreatedByName, report.Author),
 			CreatedAt:     t.Format("Jan 2, 2006 at 3:04 PM"),
 			CreatedAtRel:  relativeTime(t),
 			IsRead:        report.ReadAt != nil,
-		}
-
-		// Auto-mark as read when viewing.
-		if report.ReadAt == nil {
-			_ = svc.MarkAgentReportRead(ctx, reportID)
-			detail.IsRead = true
 		}
 
 		data := BaseTemplateData(r, sm, "reports", report.Title)
@@ -151,6 +144,20 @@ func MarkReportReadAdminHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		if err := svc.MarkAgentReportRead(r.Context(), id); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	}
+}
+
+// MarkReportUnreadAdminHandler handles POST /-/reports/{id}/unread.
+func MarkReportUnreadAdminHandler(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		if err := svc.MarkAgentReportUnread(r.Context(), id); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return

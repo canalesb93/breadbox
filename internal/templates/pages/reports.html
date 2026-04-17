@@ -2,7 +2,13 @@
 <div class="bb-page-header">
   <div>
     <h1 class="bb-page-title">Agent Reports</h1>
-    <p class="text-sm text-base-content/50 mt-0.5 hidden sm:block">Summaries and findings from AI agents</p>
+    <p class="text-sm text-base-content/50 mt-0.5 hidden sm:block">Messages from your AI agents — their work, flagged items, and findings</p>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="/agents?tab=settings#report-format" class="btn btn-ghost btn-sm rounded-xl text-xs no-underline" title="Customize how agents write reports">
+      <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+      <span class="hidden sm:inline">Manage format</span>
+    </a>
   </div>
 </div>
 
@@ -19,52 +25,71 @@
   </button>
 </div>
 
-<!-- Reports List -->
+<!-- Reports Inbox -->
 {{if .Reports}}
-<div class="space-y-3 bb-stagger" x-data="reportsPage()">
-  {{range .Reports}}
-  <a href="/reports/{{.ID}}" class="bb-card block no-underline transition-all duration-300 hover:shadow-md {{if not .IsRead}}border-l-2 border-l-primary/40{{end}}"
-    :class="dismissed['{{.ID}}'] ? 'opacity-0 h-0 overflow-hidden !p-0 !m-0 !border-0' : ''"
-    id="report-{{.ID}}">
-    <div class="px-5 py-3.5 flex items-start gap-3">
-      <!-- Priority dot -->
-      <span class="w-2.5 h-2.5 rounded-full shrink-0 mt-1.5 {{if eq .Priority "critical"}}bg-error{{else if eq .Priority "warning"}}bg-warning{{else}}bg-base-content/20{{end}}"></span>
-      <!-- Message content -->
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center flex-wrap gap-2 text-xs mb-1">
-          <span class="font-semibold text-base-content/70">{{.DisplayAuthor}}</span>
-          <span class="text-base-content/30">&middot;</span>
-          <span class="text-base-content/30">{{.CreatedAt}}</span>
-          {{if not .IsRead}}<span class="w-1.5 h-1.5 rounded-full bg-primary shrink-0"></span>{{end}}
-          {{if eq .Priority "critical"}}
-          <span class="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full bg-error/10 text-error/80">critical</span>
-          {{else if eq .Priority "warning"}}
-          <span class="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full bg-warning/10 text-warning">warning</span>
-          {{end}}
-          {{range .Tags}}
-          <span class="text-[0.6rem] px-1.5 py-0.5 rounded-full bg-base-200/80 text-base-content/40">{{.}}</span>
-          {{end}}
+<div class="bb-card" x-data="reportsPage()">
+  <div class="divide-y divide-base-200/60 bb-stagger">
+    {{range .Reports}}
+    <a href="/reports/{{.ID}}"
+      class="group relative block px-4 sm:px-5 py-4 hover:bg-base-200/30 transition-all duration-300 no-underline"
+      :class="dismissed['{{.ID}}'] ? 'opacity-0 h-0 overflow-hidden !p-0' : ''"
+      id="report-{{.ID}}">
+      <div class="flex items-start gap-3">
+
+        <!-- Avatar -->
+        <div class="w-9 h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-primary/10 text-primary">
+          <i data-lucide="bot" class="w-4 h-4"></i>
         </div>
-        <p class="text-sm font-medium text-base-content/80 leading-relaxed">{{.Title}}</p>
+
+        <!-- Message content -->
+        <div class="flex-1 min-w-0">
+          <!-- Meta row -->
+          <div class="flex items-center flex-wrap gap-2 text-xs mb-1.5">
+            <span class="font-semibold text-base-content/80">{{.DisplayAuthor}}</span>
+            <span class="text-base-content/30">{{.CreatedAt}}</span>
+            {{if eq .Priority "critical"}}
+            <span class="relative inline-flex w-2 h-2 shrink-0">
+              <span class="animate-ping absolute inline-flex w-full h-full rounded-full bg-error/60"></span>
+              <span class="relative inline-flex w-2 h-2 rounded-full bg-error"></span>
+            </span>
+            <span class="text-[0.6rem] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-error/10 text-error/90">Critical</span>
+            {{else if eq .Priority "warning"}}
+            <span class="w-2 h-2 rounded-full bg-warning shrink-0"></span>
+            <span class="text-[0.6rem] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-warning/15 text-warning">Warning</span>
+            {{end}}
+            {{range .Tags}}
+            <span class="text-[0.6rem] px-1.5 py-0.5 rounded-full bg-base-200/80 text-base-content/50">{{.}}</span>
+            {{end}}
+          </div>
+
+          <!-- Title as message bubble -->
+          <div class="inline-block max-w-full rounded-2xl rounded-tl-sm shadow-sm px-3.5 py-2.5 bg-base-200/70 group-hover:bg-base-200/90 transition-colors">
+            <p class="text-sm leading-relaxed {{if .IsRead}}text-base-content/70{{else}}text-base-content{{end}} group-hover:text-base-content transition-colors">{{.Title}}</p>
+            <span class="text-xs text-base-content/30 group-hover:text-primary/60 transition-colors">View report &rarr;</span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-1 shrink-0 self-center">
+          {{if not .IsRead}}
+          <button @click.prevent.stop="markRead('{{.ID}}')" class="btn btn-ghost btn-xs rounded-lg cursor-pointer text-base-content/40 hover:text-success hover:bg-success/10" title="Mark as read">
+            <i data-lucide="check" class="w-4 h-4"></i>
+          </button>
+          {{end}}
+          <i data-lucide="chevron-right" class="w-4 h-4 text-base-content/25 group-hover:text-base-content/50 transition-colors"></i>
+        </div>
       </div>
-      <!-- Actions -->
-      <div class="flex items-center gap-1 shrink-0">
-        {{if not .IsRead}}
-        <button @click.prevent.stop="markRead('{{.ID}}')" class="btn btn-success btn-ghost btn-xs rounded-lg cursor-pointer" title="Mark as read">
-          <i data-lucide="check" class="w-4 h-4"></i>
-        </button>
-        {{end}}
-        <i data-lucide="chevron-right" class="w-4 h-4 text-base-content/25"></i>
-      </div>
-    </div>
-  </a>
-  {{end}}
+    </a>
+    {{end}}
+  </div>
 </div>
 {{else}}
-<div class="flex flex-col items-center justify-center py-16 text-base-content/40">
-  <i data-lucide="file-text" class="w-12 h-12 mb-3 opacity-30"></i>
-  <p class="text-sm font-medium">No reports{{if eq .FilterStatus "unread"}} unread{{else if eq .FilterStatus "read"}} read{{end}}</p>
-  <p class="text-xs mt-1 text-base-content/30">Reports submitted by AI agents will appear here</p>
+<div class="bb-card px-5 py-16 text-center">
+  <div class="w-14 h-14 rounded-2xl bg-base-200/50 mx-auto mb-4 flex items-center justify-center">
+    <i data-lucide="inbox" class="w-6 h-6 text-base-content/25"></i>
+  </div>
+  <p class="text-base font-medium text-base-content/70 mb-1">No{{if eq .FilterStatus "unread"}} unread{{else if eq .FilterStatus "read"}} read{{end}} reports</p>
+  <p class="text-sm text-base-content/40 max-w-md mx-auto">{{if eq .FilterStatus "unread"}}You're all caught up. New agent messages will appear here.{{else}}Reports submitted by AI agents will appear here as messages.{{end}}</p>
 </div>
 {{end}}
 

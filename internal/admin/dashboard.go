@@ -373,24 +373,17 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			DisplayAuthor string
 			CreatedAt     string // relative time
 		}
+		const dashboardReportsVisible = 8
 		var agentReports []DashboardReport
-		var totalUnread int
-		rawReports, err := svc.ListUnreadAgentReports(ctx, 50)
+		rawReports, err := svc.ListUnreadAgentReports(ctx, dashboardReportsVisible)
 		if err != nil {
 			a.Logger.Error("list unread agent reports", "error", err)
 		}
-		totalUnread = len(rawReports)
-		now := time.Now()
-		for i, r := range rawReports {
+		// Reuse the unread count already fetched by NavBadgesMiddleware —
+		// avoids a second COUNT(*) round-trip on every dashboard load.
+		totalUnread := int(getNavBadges(ctx).UnreadReports)
+		for _, r := range rawReports {
 			t, _ := time.Parse(time.RFC3339, r.CreatedAt)
-			// Show first 5, plus any additional within 24 hours
-			if i >= 5 && now.Sub(t) > 24*time.Hour {
-				continue
-			}
-			displayAuthor := r.CreatedByName
-			if r.Author != nil && *r.Author != "" {
-				displayAuthor = *r.Author
-			}
 			agentReports = append(agentReports, DashboardReport{
 				ID:            r.ID,
 				Title:         r.Title,
@@ -398,11 +391,11 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				CreatedByName: r.CreatedByName,
 				Priority:      r.Priority,
 				Tags:          r.Tags,
-				DisplayAuthor: displayAuthor,
+				DisplayAuthor: reportDisplayAuthor(r.CreatedByName, r.Author),
 				CreatedAt:     relativeTime(t),
 			})
 		}
-		hasMoreReports := totalUnread > len(agentReports)
+		moreReportsCount := totalUnread - len(agentReports)
 
 		// Quick stats for the status bar.
 		accountCount, err := a.Queries.CountAccounts(ctx)
@@ -464,7 +457,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			"AttentionCount":    attentionCount,
 			"HasAttentionItems": attentionCount > 0,
 			"AgentReports":       agentReports,
-			"HasMoreReports":     hasMoreReports,
+			"MoreReportsCount":   moreReportsCount,
 			"TotalUnreadReports": totalUnread,
 		}
 		tr.Render(w, r, "dashboard.html", data)
