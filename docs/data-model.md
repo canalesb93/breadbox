@@ -599,7 +599,7 @@ The primary key on `key` is itself unique.
 
 #### Known Configuration Keys
 
-The following keys are seeded during initial migration and used by the application. Additional keys may be added by future features.
+The following keys are seeded during initial migration and used by the application. This list is illustrative; additional keys (MCP mode, Teller settings, review guidelines, etc.) are added by features and documented in their own docs.
 
 | Key | Example Value | Description |
 |---|---|---|
@@ -654,6 +654,8 @@ CHECK (lifecycle IN ('persistent', 'ephemeral'))
 |---|---|---|---|
 | `needs-review` | Needs Review | `ephemeral` | Marks transactions awaiting initial categorization review. The seeded `on_create` system rule auto-attaches this tag during sync. |
 
+A companion seeded system rule on `transaction_rules` fires on every `on_create` event and attaches `needs-review` to newly-synced transactions. To opt out of the default review queue, disable that rule from `/rules` — this is the supported opt-out. System-seeded rules can't be deleted, only disabled.
+
 #### Indexes
 
 | Index | Columns | Type | Rationale |
@@ -666,7 +668,7 @@ CHECK (lifecycle IN ('persistent', 'ephemeral'))
 
 ### 2.10 `transaction_tags`
 
-**Purpose:** Many-to-many join between transactions and tags, with attribution metadata. One row means "this tag is currently on this transaction." Phase 3 backfill populated rows from pending `review_queue` entries using the seeded `needs-review` tag.
+**Purpose:** Many-to-many join between transactions and tags, with attribution metadata. One row means "this tag is currently on this transaction."
 
 #### Columns
 
@@ -712,7 +714,7 @@ CHECK (added_by_type IN ('user', 'agent', 'rule', 'system'))
 
 ### 2.11 `annotations`
 
-**Purpose:** Canonical activity timeline for every transaction. Replaces the retired `transaction_comments` and `transaction_rule_applications` tables (both dropped in the Phase 3 cutover migration `20260415083233_cutover_review_queue.sql`). Each row is one event: a free-form comment, a rule firing, a tag add/remove, or a category being set. `list_annotations(transaction_id)` returns the full ordered history.
+**Purpose:** Canonical activity timeline for every transaction. Each row is one event: a free-form comment, a rule firing, a tag add/remove, or a category being set. `list_annotations(transaction_id)` returns the full ordered history.
 
 #### Columns
 
@@ -726,7 +728,7 @@ CHECK (added_by_type IN ('user', 'agent', 'rule', 'system'))
 | `actor_id` | `TEXT` | Yes | `NULL` | Attribution ID (admin user ID, API key prefix, etc.). |
 | `actor_name` | `TEXT` | No | — | Display name of the actor. |
 | `session_id` | `UUID` | Yes | `NULL` | FK → `mcp_sessions(id)`. Links the event back to the originating MCP session when applicable. |
-| `payload` | `JSONB` | No | `'{}'` | Event-specific payload. For `comment`: `{content}`. For `tag_added`/`tag_removed`: `{note, tag_slug}`. For `rule_applied`: `{action_field, action_value, rule_id, rule_name}`. For `category_set`: `{category_slug, previous_category_slug}`. |
+| `payload` | `JSONB` | No | `'{}'` | Event-specific payload. For `comment`: `{content}`. For `tag_added`/`tag_removed`: `{note, tag_slug}`. For `rule_applied`: `{action_field, action_value, rule_id, rule_name}`. For `category_set`: `{category_slug, previous_category_slug}` (slug references the `categories` table — not detailed here; see `internal/db/migrations/`). |
 | `tag_id` | `UUID` | Yes | `NULL` | FK → `tags(id)`. SET NULL on delete. Populated for `tag_added`/`tag_removed` events. |
 | `rule_id` | `UUID` | Yes | `NULL` | FK → `transaction_rules(id)`. SET NULL on delete. Populated for `rule_applied` events. |
 | `created_at` | `TIMESTAMPTZ` | No | `NOW()` | When the event occurred. Timeline is ordered by this column. |
@@ -740,9 +742,9 @@ CHECK (added_by_type IN ('user', 'agent', 'rule', 'system'))
 | Column | References | On Delete |
 |---|---|---|
 | `transaction_id` | `transactions(id)` | `CASCADE` |
-| `session_id` | `mcp_sessions(id)` | (FK only, no cascade specified) |
+| `session_id` | `mcp_sessions(id)` — table not detailed here; see `internal/db/migrations/` for schema. | (FK only, no cascade specified) |
 | `tag_id` | `tags(id)` | `SET NULL` |
-| `rule_id` | `transaction_rules(id)` | `SET NULL` |
+| `rule_id` | `transaction_rules(id)` — table not detailed here; see `internal/db/migrations/` for schema. | `SET NULL` |
 
 #### Unique Constraints
 
@@ -1024,10 +1026,10 @@ Breadbox uses [goose](https://github.com/pressly/goose) for SQL migrations. Migr
 
 ### 6.2 File Organization
 
-Migration files live in `db/migrations/`. Each file is named with a sequential timestamp prefix and a descriptive slug:
+Migration files live in `internal/db/migrations/`. Each file is named with a sequential numeric prefix (older) or timestamp prefix (recent) and a descriptive slug:
 
 ```
-db/migrations/
+internal/db/migrations/
   00001_extensions.sql
   00002_enums.sql
   00003_users.sql
@@ -1086,6 +1088,8 @@ Every migration file must include both `Up` and `Down` sections. The `Down` sect
 Use `-- +goose StatementBegin` / `-- +goose StatementEnd` wrappers whenever the migration contains `DO $$ ... $$` blocks, function definitions, or any statement that itself contains semicolons (to prevent goose from splitting on internal semicolons).
 
 ### 6.6 Example Migration Files
+
+These examples illustrate the goose file format and the earliest migrations — they may drift from the latest files in `internal/db/migrations/`. Always treat the on-disk migrations as the source of truth.
 
 #### `00001_extensions.sql`
 
@@ -1160,13 +1164,13 @@ DELETE FROM app_config WHERE key IN (
 
 ```bash
 # Apply all pending migrations
-goose -dir db/migrations postgres "$DATABASE_URL" up
+goose -dir internal/db/migrations postgres "$DATABASE_URL" up
 
 # Roll back the most recent migration
-goose -dir db/migrations postgres "$DATABASE_URL" down
+goose -dir internal/db/migrations postgres "$DATABASE_URL" down
 
 # Check migration status
-goose -dir db/migrations postgres "$DATABASE_URL" status
+goose -dir internal/db/migrations postgres "$DATABASE_URL" status
 ```
 
 In the Docker Compose deployment, the Breadbox binary runs `goose up` automatically at startup before starting the HTTP server. This ensures the schema is always up to date when the container starts, with no separate migration step required.
