@@ -49,3 +49,32 @@ func TestFormatUUID_MaxBytes(t *testing.T) {
 		t.Errorf("FormatUUID(max) = %q, want %q", got, want)
 	}
 }
+
+func TestParseUUID_Canonical(t *testing.T) {
+	got, err := ParseUUID("550e8400-e29b-41d4-a716-446655440000")
+	if err != nil {
+		t.Fatalf("ParseUUID: unexpected error: %v", err)
+	}
+	if !got.Valid {
+		t.Fatal("ParseUUID: expected Valid=true")
+	}
+	if FormatUUID(got) != "550e8400-e29b-41d4-a716-446655440000" {
+		t.Errorf("ParseUUID roundtrip mismatch: got %q", FormatUUID(got))
+	}
+}
+
+func TestParseUUID_NoDashes(t *testing.T) {
+	got, err := ParseUUID("550e8400e29b41d4a716446655440000")
+	if err != nil {
+		t.Fatalf("ParseUUID: unexpected error: %v", err)
+	}
+	if FormatUUID(got) != "550e8400-e29b-41d4-a716-446655440000" {
+		t.Errorf("ParseUUID roundtrip mismatch: got %q", FormatUUID(got))
+	}
+}
+
+func TestParseUUID_Invalid(t *testing.T) {
+	if _, err := ParseUUID("not-a-uuid"); err == nil {
+		t.Error("ParseUUID: expected error for invalid input")
+	}
+}

@@ -124,7 +124,7 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 		if err := userRows.Scan(&id, &u.Name); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
-		u.ID = fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", id.Bytes[0:4], id.Bytes[4:6], id.Bytes[6:8], id.Bytes[8:10], id.Bytes[10:16])
+		u.ID = formatUUID(id)
 		stats.Users = append(stats.Users, u)
 	}
 	if err := userRows.Err(); err != nil {
@@ -170,7 +170,7 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 		if err := connRows.Scan(&id, &c.Provider, &instName, &c.Status, &lastSynced, &c.AccountCount); err != nil {
 			return nil, fmt.Errorf("scan connection: %w", err)
 		}
-		c.ID = fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", id.Bytes[0:4], id.Bytes[4:6], id.Bytes[6:8], id.Bytes[8:10], id.Bytes[10:16])
+		c.ID = formatUUID(id)
 		c.InstitutionName = instName
 		if lastSynced != nil {
 			s := lastSynced.UTC().Format(time.RFC3339)

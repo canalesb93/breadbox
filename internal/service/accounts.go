@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -165,7 +166,5 @@ func accountFromGetRow(r db.GetAccountRow) AccountResponse {
 }
 
 func parseUUID(s string) (pgtype.UUID, error) {
-	var u pgtype.UUID
-	err := u.Scan(s)
-	return u, err
+	return pgconv.ParseUUID(s)
 }
