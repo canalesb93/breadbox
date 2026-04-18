@@ -1160,7 +1160,7 @@ function updateRowTags(txId, changes) {
   var remove = (changes && changes.remove) || [];
 
   // Remove existing chips by slug (title attribute is the stable slug identifier
-  // set by the tag-chip-sm partial).
+  // set by the TagChipSm templ component).
   remove.forEach(function(slug) {
     var chip = container.querySelector('.bb-tag[title="' + CSS.escape(slug) + '"]');
     if (chip) chip.remove();

@@ -1,0 +1,35 @@
+package components
+
+// TagChipData is the canonical shape consumed by the tag-chip templ components.
+// It mirrors the fields the html/template version read off any struct with
+// matching field names (service.TagResponse, service.AdminTransactionTag, ...).
+// The admin funcMap bridges these callers to the component via reflection.
+type TagChipData struct {
+	Slug        string
+	DisplayName string
+	Color       *string
+	Icon        *string
+}
+
+templ tagChipBody(t TagChipData, class string) {
+	<span
+		class={ class }
+		if t.Color != nil && *t.Color != "" {
+			style={ "--tag-color: " + *t.Color }
+		}
+		title={ t.Slug }
+	>
+		if t.Icon != nil && *t.Icon != "" {
+			<i data-lucide={ *t.Icon }></i>
+		}
+		<span class="truncate">{ t.DisplayName }</span>
+	</span>
+}
+
+templ TagChip(t TagChipData) {
+	@tagChipBody(t, "bb-tag")
+}
+
+templ TagChipSm(t TagChipData) {
+	@tagChipBody(t, "bb-tag bb-tag-sm")
+}

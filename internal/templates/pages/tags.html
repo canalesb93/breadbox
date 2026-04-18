@@ -39,7 +39,7 @@
         x-show="!filter || '{{.Slug}} {{.DisplayName}} {{.Description}}'.toLowerCase().includes(filter.toLowerCase())">
         <!-- Chip preview -->
         <div class="w-32 shrink-0">
-          {{template "tag-chip" .}}
+          {{tagChip .}}
         </div>
         <!-- Details -->
         <div class="min-w-0">

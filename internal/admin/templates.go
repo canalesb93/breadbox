@@ -781,6 +781,12 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"formatBytes": func(bytes int64) string {
 				return service.FormatBytes(bytes)
 			},
+			// templ bridges: render components directly from html/template.
+			// tagChip / tagChipSm replace the former {{template "tag-chip"}}
+			// partial — see internal/templates/components/tag_chip.templ.
+			"renderComponent": renderComponent,
+			"tagChip":         tagChipFunc,
+			"tagChipSm":       tagChipSmFunc,
 		},
 	}
 	if err := tr.parseTemplates(); err != nil {
@@ -798,7 +804,8 @@ var templatePartials = []string{
 	"partials/tx_row.html",
 	"partials/tx_row_compact.html",
 	"partials/tx_results.html",
-	"partials/tag_chip.html",
+	// tag_chip partial migrated to internal/templates/components/tag_chip.templ;
+	// callers use the {{tagChip}} / {{tagChipSm}} funcMap bridges.
 	"partials/condition_row.html",
 }
 
