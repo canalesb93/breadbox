@@ -1,0 +1,125 @@
+package components
+
+import (
+	"fmt"
+
+	"breadbox/internal/service"
+)
+
+// TxResults renders the transactions-list fragment used both by the initial
+// /transactions page and the AJAX search endpoint.
+templ TxResults(d TxResultsData) {
+	<!-- GROUPED VIEW -->
+	<template x-if="$store.txView.mode === 'grouped'">
+		<div class="space-y-1 bb-stagger">
+			for _, g := range d.DateGroups {
+				@dateGroup(g, d.RenderTxRow)
+			}
+		</div>
+	</template>
+	<!-- LIST VIEW -->
+	<template x-if="$store.txView.mode === 'list'">
+		<div>
+			<div class="bb-card overflow-hidden">
+				<div class="bb-table-header">
+					<div class="w-5"></div>
+					<div class="w-9"></div>
+					<div class="flex-1 min-w-0">Name</div>
+					<div class="hidden xl:block shrink-0">Category</div>
+					<div class="w-24 text-right hidden sm:block">Date</div>
+					<div class="w-24 text-right pl-3">Amount</div>
+					<div class="w-4 hidden sm:block"></div>
+				</div>
+				<div class="divide-y divide-base-300/50">
+					for _, tx := range d.Transactions {
+						@d.RenderTxRow(tx)
+					}
+				</div>
+			</div>
+		</div>
+	</template>
+	if d.TotalPages > 1 {
+		@paginator(d)
+	}
+	@templ.Raw(txMetaScript(d.Transactions))
+}
+
+templ dateGroup(g DateGroup, renderRow func(service.AdminTransactionRow) templ.Component) {
+	<div class="bb-date-group" data-date-group={ g.Date }>
+		<div class="flex items-center justify-between px-2 pt-4 pb-2">
+			<div class="flex items-center gap-3">
+				<h3 class="text-xs font-semibold text-base-content/50 tracking-wide">{ g.Label }</h3>
+				<span class="text-xs text-base-content/30 tabular-nums" data-txn-count={ fmt.Sprintf("%d", len(g.Transactions)) }>
+					{ fmt.Sprintf("%d %s", len(g.Transactions), txnCountSuffix(len(g.Transactions))) }
+				</span>
+			</div>
+			<div class="flex items-center gap-3 text-xs tabular-nums">
+				if g.DaySpending > 0 {
+					<span class="text-base-content/50" data-day-spending={ fmt.Sprintf("%.2f", g.DaySpending) }>{ formatAmount(g.DaySpending) }</span>
+				} else {
+					<span class="text-base-content/50" data-day-spending={ fmt.Sprintf("%.2f", g.DaySpending) } style="display:none">{ formatAmount(g.DaySpending) }</span>
+				}
+				if g.DayIncome > 0 {
+					<span class="text-success/70" data-day-income={ fmt.Sprintf("%.2f", g.DayIncome) }>-{ formatAmount(g.DayIncome) }</span>
+				} else {
+					<span class="text-success/70" data-day-income={ fmt.Sprintf("%.2f", g.DayIncome) } style="display:none">-{ formatAmount(g.DayIncome) }</span>
+				}
+			</div>
+		</div>
+		<div class="bb-card overflow-hidden divide-y divide-base-300/50">
+			for _, tx := range g.Transactions {
+				@renderRow(tx)
+			}
+		</div>
+	</div>
+}
+
+templ paginator(d TxResultsData) {
+	<div class="bb-paginator" id="bb-tx-paginator">
+		<div class="bb-paginator__info">
+			<span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
+				Showing { fmt.Sprintf("%d", d.ShowingStart) }&ndash;{ fmt.Sprintf("%d", d.ShowingEnd) } of { fmt.Sprintf("%d", d.Total) }
+			</span>
+			<div class="bb-paginator__per-page">
+				<label class="text-xs text-base-content/40 whitespace-nowrap">Per page</label>
+				<select class="select select-xs select-bordered rounded-lg tabular-nums" onchange="bbSetPerPage(this.value)">
+					<option value="25" selected?={ d.PageSize == 25 }>25</option>
+					<option value="50" selected?={ d.PageSize == 50 }>50</option>
+					<option value="100" selected?={ d.PageSize == 100 }>100</option>
+				</select>
+			</div>
+		</div>
+		<div class="bb-paginator__nav">
+			if d.Page > 2 {
+				<a href={ templ.URL(pageHref(d.PaginationBase, 1)) } class="bb-paginator__btn" title="First page">
+					<i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
+				</a>
+			}
+			if d.Page > 1 {
+				<a href={ templ.URL(pageHref(d.PaginationBase, d.Page-1)) } class="bb-paginator__btn" title="Previous page">
+					<i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+				</a>
+			}
+			for _, p := range pageRange(d.Page, d.TotalPages) {
+				if p == 0 {
+					<span class="bb-paginator__ellipsis">&hellip;</span>
+				} else if p == d.Page {
+					<span class="bb-paginator__btn bb-paginator__btn--active">{ fmt.Sprintf("%d", p) }</span>
+				} else {
+					<a href={ templ.URL(pageHref(d.PaginationBase, p)) } class="bb-paginator__btn">{ fmt.Sprintf("%d", p) }</a>
+				}
+			}
+			if d.Page < d.TotalPages {
+				<a href={ templ.URL(pageHref(d.PaginationBase, d.Page+1)) } class="bb-paginator__btn" title="Next page">
+					<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+				</a>
+			}
+			if d.Page < d.TotalPages-1 {
+				<a href={ templ.URL(pageHref(d.PaginationBase, d.TotalPages)) } class="bb-paginator__btn" title="Last page">
+					<i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
+				</a>
+			}
+		</div>
+	</div>
+}
+

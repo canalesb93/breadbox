@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-watch dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc sqlc-install seed db db-stop docker-up docker-down css css-watch css-install air-install
+.PHONY: dev dev-watch dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc sqlc-install seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install
 
 PORT ?= 8080
 
@@ -13,6 +13,7 @@ PORT ?= 8080
 generate:
 	@if [ ! -f internal/db/models.go ]; then $(MAKE) sqlc; fi
 	@if [ ! -f static/css/styles.css ]; then $(MAKE) css; fi
+	@$(MAKE) templ
 
 dev: generate
 	@if [ -z "$$DATABASE_URL" ]; then \
@@ -98,6 +99,15 @@ sqlc-install:
 sqlc: sqlc-install
 	@rm -f internal/db/*.sql.go internal/db/models.go internal/db/db.go
 	sqlc generate
+
+templ-install:
+	@if ! command -v templ &>/dev/null; then \
+		echo "Installing templ..."; \
+		go install github.com/a-h/templ/cmd/templ@latest; \
+	fi
+
+templ: templ-install
+	templ generate
 
 seed:
 	go run ./cmd/breadbox seed

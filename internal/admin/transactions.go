@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"breadbox/internal/admin/components"
 	"breadbox/internal/app"
 	"breadbox/internal/db"
 	"breadbox/internal/service"
@@ -21,15 +22,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// DateGroup holds transactions grouped by a single date.
-type DateGroup struct {
-	Date         string // raw date string, e.g. "2026-03-24"
-	Label        string // human-friendly: "Today", "Yesterday", "Mon, Mar 22"
-	Transactions []service.AdminTransactionRow
-	DayTotal     float64 // net spending for the day (positive = outflow)
-	DayIncome    float64 // total income (credits) for the day
-	DaySpending  float64 // total spending (debits) for the day
-}
+// DateGroup is re-exported for template-data compatibility; lives in the
+// components package so templ TxResults can consume it directly.
+type DateGroup = components.DateGroup
 
 // groupTransactionsByDate groups a flat list of transactions into date groups
 // with smart labels (Today, Yesterday, or weekday + date).
@@ -246,21 +241,31 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 		allTags, _ := svc.ListTags(ctx)
 
 		data := map[string]any{
-			"PageTitle":         "Transactions",
-			"CurrentPage":      "transactions",
-			"CSRFToken":        GetCSRFToken(r),
-			"Flash":            GetFlash(ctx, sm),
-			"Transactions":     result.Transactions,
-			"DateGroups":       dateGroups,
-			"Accounts":         accounts,
-			"Users":            users,
-			"Categories":       categoryTree,
-			"Connections":      connections,
-			"AllTags":          allTags,
-			"Page":             result.Page,
-			"PageSize":         result.PageSize,
-			"TotalPages":       result.TotalPages,
-			"Total":            result.Total,
+			"PageTitle":    "Transactions",
+			"CurrentPage":  "transactions",
+			"CSRFToken":    GetCSRFToken(r),
+			"Flash":        GetFlash(ctx, sm),
+			"Transactions": result.Transactions,
+			"TxResults": components.TxResultsData{
+				Transactions:   result.Transactions,
+				DateGroups:     dateGroups,
+				Page:           result.Page,
+				PageSize:       result.PageSize,
+				TotalPages:     result.TotalPages,
+				Total:          result.Total,
+				PaginationBase: paginationBase,
+				ShowingStart:   (result.Page-1)*result.PageSize + 1,
+				ShowingEnd:     min(int64(result.Page*result.PageSize), result.Total),
+			},
+			"Accounts":          accounts,
+			"Users":             users,
+			"Categories":        categoryTree,
+			"Connections":       connections,
+			"AllTags":           allTags,
+			"Page":              result.Page,
+			"PageSize":          result.PageSize,
+			"TotalPages":        result.TotalPages,
+			"Total":             result.Total,
 			"ExportURL":         exportURL,
 			"PaginationBase":    paginationBase,
 			"ShowingStart":      (result.Page-1)*result.PageSize + 1,
@@ -380,32 +385,26 @@ func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			return
 		}
 
-		// Load category tree for category pickers in the partial.
-		categoryTree, err := svc.ListCategoryTree(ctx)
-		if err != nil {
-			a.Logger.Error("list categories for transaction search", "error", err)
-		}
-
 		paginationBase := buildPaginationBase(r)
 		dateGroups := groupTransactionsByDate(result.Transactions)
 
-		data := map[string]any{
-			"Transactions":    result.Transactions,
-			"DateGroups":      dateGroups,
-			"Categories":      categoryTree,
-			"Page":            result.Page,
-			"PageSize":        result.PageSize,
-			"TotalPages":      result.TotalPages,
-			"Total":           result.Total,
-			"PaginationBase":  paginationBase,
-			"ShowingStart":    (result.Page-1)*result.PageSize + 1,
-			"ShowingEnd":      min(int64(result.Page*result.PageSize), result.Total),
-			"CSRFToken":       GetCSRFToken(r),
-			"FilterSearch":    r.URL.Query().Get("search"),
-			"FilterSearchMode": r.URL.Query().Get("search_mode"),
+		data := components.TxResultsData{
+			Transactions:   result.Transactions,
+			DateGroups:     dateGroups,
+			Page:           result.Page,
+			PageSize:       result.PageSize,
+			TotalPages:     result.TotalPages,
+			Total:          result.Total,
+			PaginationBase: paginationBase,
+			ShowingStart:   (result.Page-1)*result.PageSize + 1,
+			ShowingEnd:     min(int64(result.Page*result.PageSize), result.Total),
+			RenderTxRow:    tr.txRowRenderer(),
 		}
 
-		tr.RenderPartial(w, r, "transactions.html", "tx-results-partial", data)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := components.TxResults(data).Render(r.Context(), w); err != nil {
+			a.Logger.Error("render tx_results", "error", err)
+		}
 	}
 }
 

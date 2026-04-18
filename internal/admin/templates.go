@@ -2,6 +2,7 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -14,12 +15,14 @@ import (
 	"sync"
 	"time"
 
+	"breadbox/internal/admin/components"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	bsync "breadbox/internal/sync"
 	"breadbox/internal/templates"
 	"breadbox/internal/version"
 
+	"github.com/a-h/templ"
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -783,10 +786,50 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			},
 		},
 	}
+	tr.funcMap["renderComponent"] = tr.renderComponent
 	if err := tr.parseTemplates(); err != nil {
 		return nil, err
 	}
 	return tr, nil
+}
+
+// renderComponent executes a templ component by name and returns its output
+// as safe HTML, so an html/template page can embed a migrated-to-templ fragment
+// via {{renderComponent "tx_results" .TxResults}}.
+func (tr *TemplateRenderer) renderComponent(name string, data any) template.HTML {
+	var c templ.Component
+	switch name {
+	case "tx_results":
+		d, _ := data.(components.TxResultsData)
+		if d.RenderTxRow == nil {
+			d.RenderTxRow = tr.txRowRenderer()
+		}
+		c = components.TxResults(d)
+	default:
+		return template.HTML(fmt.Sprintf("<!-- renderComponent: unknown component %q -->", name))
+	}
+	var buf bytes.Buffer
+	if err := c.Render(context.Background(), &buf); err != nil {
+		return template.HTML("<!-- renderComponent error: " + template.HTMLEscapeString(err.Error()) + " -->")
+	}
+	return template.HTML(buf.String())
+}
+
+// txRowRenderer returns a closure that renders the tx-row html/template
+// partial as a templ.Component, so TxResults can delegate row markup to the
+// existing partial until tx_row.html is itself migrated.
+func (tr *TemplateRenderer) txRowRenderer() func(service.AdminTransactionRow) templ.Component {
+	return func(row service.AdminTransactionRow) templ.Component {
+		return templ.ComponentFunc(func(_ context.Context, w io.Writer) error {
+			tr.mu.RLock()
+			t := tr.templates["transactions.html"]
+			tr.mu.RUnlock()
+			if t == nil {
+				return fmt.Errorf("transactions.html template not registered")
+			}
+			return t.ExecuteTemplate(w, "tx-row", row)
+		})
+	}
 }
 
 var templatePartials = []string{
@@ -797,7 +840,6 @@ var templatePartials = []string{
 	"partials/breadcrumb.html",
 	"partials/tx_row.html",
 	"partials/tx_row_compact.html",
-	"partials/tx_results.html",
 	"partials/tag_chip.html",
 	"partials/condition_row.html",
 }
