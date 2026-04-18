@@ -42,7 +42,13 @@
       "mcp__claude-in-chrome__tabs_context_mcp",
       "Bash(staticcheck *)",
       "Bash(gh pr:*)",
-      "Bash(gh issue:*)"
+      "Bash(gh issue:*)",
+      "Bash(gh api:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh release:*)",
+      "Bash(gh run:*)",
+      "Bash(gh workflow list)",
+      "Bash(gh search:*)"
     ]
   },
   "sandbox": {
@@ -73,7 +79,8 @@
       "make dev*",
       "make test*",
       "go run *",
-      "go test *"
+      "go test *",
+      "gh *"
     ]
   }
 }
