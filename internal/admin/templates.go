@@ -346,26 +346,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"formatUUID": func(u pgtype.UUID) string {
 				return pgconv.FormatUUID(u)
 			},
-			"formatIntervalMinutes": func(minutes int) string {
-				// Render a sync interval in human-readable form (e.g., "12h", "4h", "30m", "1d").
-				if minutes <= 0 {
-					return "N/A"
-				}
-				if minutes >= 1440 && minutes%1440 == 0 {
-					d := minutes / 1440
-					if d == 1 {
-						return "24h"
-					}
-					return fmt.Sprintf("%dd", d)
-				}
-				if minutes >= 60 && minutes%60 == 0 {
-					return fmt.Sprintf("%dh", minutes/60)
-				}
-				if minutes >= 60 {
-					return fmt.Sprintf("%dh %dm", minutes/60, minutes%60)
-				}
-				return fmt.Sprintf("%dm", minutes)
-			},
+			"formatIntervalMinutes": components.FormatIntervalMinutes,
 			"accountLabel": func(name string, mask interface{}) string {
 				// Format an account name with optional last-4 digits for disambiguation.
 				// mask can be *string, string, or pgtype.Text.
@@ -730,28 +711,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				return formatted
 			},
 			"formatBalance": func(amount float64) string {
-				abs := math.Abs(amount)
-				if abs >= 1_000_000 {
-					return fmt.Sprintf("$%.1fM", abs/1_000_000)
-				}
-				if abs >= 1_000 {
-					whole := int(abs)
-					cents := int((abs - float64(whole)) * 100)
-					// Format with comma separators
-					s := fmt.Sprintf("%d", whole)
-					if len(s) > 3 {
-						result := ""
-						for i, c := range s {
-							if i > 0 && (len(s)-i)%3 == 0 {
-								result += ","
-							}
-							result += string(c)
-						}
-						s = result
-					}
-					return fmt.Sprintf("$%s.%02d", s, cents)
-				}
-				return fmt.Sprintf("$%.2f", abs)
+				return components.FormatBalance(amount)
 			},
 			"accountTypeIcon": func(acctType string) string {
 				switch acctType {

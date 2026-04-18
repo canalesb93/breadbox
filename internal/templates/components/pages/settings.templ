@@ -1,27 +1,10 @@
 package pages
 
-import "fmt"
+import (
+	"fmt"
 
-// SettingsProps mirrors the field set the old `settings.html` read off
-// the layout data map. Kept flat so the bridge in admin/settings.go can
-// copy fields across one-to-one.
-type SettingsProps struct {
-	CSRFToken            string
-	SyncIntervalMinutes  int
-	SyncLogRetentionDays int
-	SyncLogCount         int64
-	Version              string
-	GoVersion            string
-	PostgresVersion      string
-	Uptime               string
-	ProviderCount        int
-	HasEncryptionKey     bool
-	OnboardingDismissed  bool
-	NextSyncTime         string
-	// ConfigSources is the env/db/default source map keyed by config
-	// key (mirrors app.Config.ConfigSources).
-	ConfigSources map[string]string
-}
+	"breadbox/internal/templates/components"
+)
 
 // Settings renders the admin settings page body. Hosts inside the base
 // layout via TemplateRenderer.RenderWithTempl — the handler passes the
@@ -56,7 +39,7 @@ templ settingsSyncCard(p SettingsProps) {
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Sync</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">
-					Every { formatIntervalMinutes(p.SyncIntervalMinutes) }
+					Every { components.FormatIntervalMinutes(p.SyncIntervalMinutes) }
 					if p.NextSyncTime != "" {
 						· Next: { p.NextSyncTime }
 					}
@@ -271,22 +254,3 @@ func encryptionStatus(has bool) string {
 	return "not set"
 }
 
-func formatIntervalMinutes(minutes int) string {
-	if minutes <= 0 {
-		return "N/A"
-	}
-	if minutes >= 1440 && minutes%1440 == 0 {
-		d := minutes / 1440
-		if d == 1 {
-			return "24h"
-		}
-		return fmt.Sprintf("%dd", d)
-	}
-	if minutes >= 60 && minutes%60 == 0 {
-		return fmt.Sprintf("%dh", minutes/60)
-	}
-	if minutes >= 60 {
-		return fmt.Sprintf("%dh %dm", minutes/60, minutes%60)
-	}
-	return fmt.Sprintf("%dm", minutes)
-}
