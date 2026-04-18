@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -39,8 +38,7 @@ func CreateCommentHandler(svc *service.Service) http.HandlerFunc {
 		var input struct {
 			Content string `json:"content"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+		if !decodeJSON(w, r, &input) {
 			return
 		}
 
@@ -76,8 +74,7 @@ func UpdateCommentHandler(svc *service.Service) http.HandlerFunc {
 		var input struct {
 			Content string `json:"content"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+		if !decodeJSON(w, r, &input) {
 			return
 		}
 
