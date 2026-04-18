@@ -1,0 +1,72 @@
+{{/*
+  tx-card partial — shared "transaction as a compact card" markup used by:
+    - command palette results (cmdk)
+    - rule form live preview modal / panel
+    - any future preview surface that has a list of TransactionSummary rows
+
+  The partial expects an Alpine scope variable named `card` with the shape:
+    {
+      name:            string,
+      amountLabel:     string,   // pre-formatted, signed
+      amount:          number,   // raw, for sign detection
+      dateLabel:       string,
+      account:         string,
+      userName:        string,
+      pending:         bool,
+      categoryIcon:    string|null,
+      categoryColor:   string|null,
+      categoryName:    string|null,
+    }
+
+  The usage site is responsible for seeding `card` from whatever upstream
+  source it has (palette item, RulePreviewResult.sample_transactions, etc.)
+  — see cmdk and rule_form.html for live examples.
+
+  Changes here ripple through every preview surface, so keep the markup
+  typography-driven and avoid usage-specific concerns. Styling lives in
+  input.css under .bb-tx-card* classes.
+*/}}
+{{define "tx-card"}}
+<div class="bb-tx-card">
+  <div class="bb-tx-card-avatar"
+       :style="card.categoryColor ? '--avatar-color: ' + card.categoryColor : ''">
+    <i :data-lucide="card.categoryIcon || 'receipt'"></i>
+  </div>
+  <div class="bb-tx-card-main">
+    <div class="bb-tx-card-title-row">
+      <span class="bb-tx-card-title" x-text="card.name"></span>
+      <template x-if="card.pending">
+        <span class="badge badge-soft badge-xs badge-warning rounded-md shrink-0">Pending</span>
+      </template>
+    </div>
+    <div class="bb-tx-card-meta">
+      <template x-if="card.userName">
+        <span class="bb-tx-card-user" x-text="card.userName.split(' ')[0]"></span>
+      </template>
+      <template x-if="card.userName && card.account">
+        <span class="bb-tx-card-sep">&middot;</span>
+      </template>
+      <template x-if="card.account">
+        <span class="truncate" x-text="card.account"></span>
+      </template>
+      <template x-if="card.categoryName">
+        <span class="bb-tx-card-sep">&middot;</span>
+      </template>
+      <template x-if="card.categoryName">
+        <span class="bb-tx-card-cat">
+          <template x-if="card.categoryColor">
+            <span class="bb-cat-dot" :style="'background-color:' + card.categoryColor"></span>
+          </template>
+          <span class="truncate" x-text="card.categoryName"></span>
+        </span>
+      </template>
+    </div>
+  </div>
+  <div class="bb-tx-card-right">
+    <div class="bb-tx-card-date" x-text="card.dateLabel"></div>
+    <div class="bb-tx-amount tabular-nums"
+         :class="card.amount < 0 ? 'bb-tx-amount--income' : ''"
+         x-text="card.amountLabel"></div>
+  </div>
+</div>
+{{end}}

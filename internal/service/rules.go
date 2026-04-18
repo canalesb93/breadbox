@@ -1723,10 +1723,17 @@ type RulePreviewMatch struct {
 }
 
 // RulePreviewResult contains the results of a rule preview/dry-run.
+//
+// SampleMatches is the legacy shape kept for backward compatibility with the
+// public REST API (/api/v1/rules/preview) and MCP tool consumers. Admin UI
+// surfaces should prefer SampleTransactions, which hydrates each sample
+// through service.ToTransactionSummary so the shared .bb-tx-card markup can
+// render it identically to the command palette.
 type RulePreviewResult struct {
-	MatchCount   int64              `json:"match_count"`
-	TotalScanned int64              `json:"total_scanned"`
-	SampleMatches []RulePreviewMatch `json:"sample_matches"`
+	MatchCount         int64                `json:"match_count"`
+	TotalScanned       int64                `json:"total_scanned"`
+	SampleMatches      []RulePreviewMatch   `json:"sample_matches"`
+	SampleTransactions []TransactionSummary `json:"sample_transactions"`
 }
 
 // PreviewRuleForDetail evaluates conditions and excludes transactions already applied by this rule.
@@ -1861,6 +1868,24 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 
 	if result.SampleMatches == nil {
 		result.SampleMatches = []RulePreviewMatch{}
+	}
+
+	// Hydrate SampleTransactions so admin surfaces (rule form live preview,
+	// rule detail pending-matches card) can render the shared .bb-tx-card
+	// markup with avatar, user, account, and category pill. Best-effort: if
+	// hydration fails we leave the slice empty and fall back to the skeletal
+	// SampleMatches on the caller side.
+	result.SampleTransactions = []TransactionSummary{}
+	if len(result.SampleMatches) > 0 {
+		ids := make([]string, 0, len(result.SampleMatches))
+		for _, m := range result.SampleMatches {
+			ids = append(ids, m.TransactionID)
+		}
+		if rows, err := s.GetAdminTransactionRowsByIDs(ctx, ids); err == nil {
+			for _, row := range rows {
+				result.SampleTransactions = append(result.SampleTransactions, ToTransactionSummary(row))
+			}
+		}
 	}
 
 	return result, nil

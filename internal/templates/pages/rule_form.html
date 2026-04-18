@@ -272,6 +272,116 @@
       </div>
     </div>
 
+    <!-- Live preview section -->
+    <div class="border-t border-base-300 p-5 sm:p-6">
+      <div class="flex items-center justify-between mb-2">
+        <div>
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/60">Matches</h3>
+          <p class="text-xs text-base-content/40 mt-1">
+            <span x-show="!preview.ran && !preview.loading">Add a condition above to preview matching transactions.</span>
+            <span x-show="preview.loading" class="inline-flex items-center gap-1.5">
+              <span class="loading loading-spinner loading-xs"></span>
+              <span>Scanning&hellip;</span>
+            </span>
+            <span x-show="preview.ran && !preview.loading && !preview.error">
+              <strong x-text="formatMatchCount(preview.matchCount)"></strong>
+              <span>match<span x-show="preview.matchCount !== 1">es</span> in the last scan.</span>
+            </span>
+            <span x-show="preview.error" class="text-error" x-text="preview.error"></span>
+          </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button type="button" class="btn btn-ghost btn-xs rounded-lg gap-1.5"
+                  @click="runPreview()" :disabled="preview.loading">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"
+               :class="preview.loading ? 'animate-spin' : ''"></i>
+            Refresh
+          </button>
+          <button type="button" class="btn btn-primary btn-xs rounded-lg gap-1.5"
+                  @click="openPreviewModal()"
+                  :disabled="!preview.ran || preview.matchCount === 0">
+            <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+            See matches
+          </button>
+        </div>
+      </div>
+
+      <!-- Inline sample preview: up to 3 shared tx-cards so the user gets an
+           instant visual confirmation without opening the modal. -->
+      <template x-if="preview.ran && !preview.loading && preview.samples.length > 0">
+        <div class="bb-card overflow-hidden mt-3">
+          <div class="divide-y divide-base-300/50">
+            <template x-for="(match, idx) in preview.samples.slice(0, 3)" :key="match.id || idx">
+              <div class="px-2">
+                <div x-data="{ card: txCardFromSummary(match) }">
+                  {{template "tx-card"}}
+                </div>
+              </div>
+            </template>
+          </div>
+          <template x-if="preview.matchCount > 3">
+            <div class="px-4 py-2 text-xs text-base-content/45 bg-base-200/30 border-t border-base-300/50">
+              +<span x-text="preview.matchCount - 3"></span> more &mdash; click <strong>See matches</strong> to view all
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <template x-if="preview.ran && !preview.loading && preview.matchCount === 0 && !preview.error">
+        <div class="mt-3 flex items-center gap-3 p-3 bg-base-200/40 border border-base-300/60 rounded-xl">
+          <div class="w-8 h-8 rounded-lg bg-base-300/40 flex items-center justify-center shrink-0">
+            <i data-lucide="search-x" class="w-4 h-4 text-base-content/50"></i>
+          </div>
+          <p class="text-xs text-base-content/60">No existing transactions match these conditions. The rule will still fire on future syncs.</p>
+        </div>
+      </template>
+    </div>
+
+    <!-- Preview modal — teleported to body so the SPA progress bar's filter
+         on <main> doesn't break fixed positioning. Uses the same shared
+         tx-card markup as the cmdk palette. -->
+    <template x-teleport="body">
+    <div x-show="preview.modal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+         @click.self="closePreviewModal()" @keydown.escape.window="closePreviewModal()">
+      <div class="bb-card max-w-2xl w-full bg-base-100 shadow-xl rounded-2xl overflow-hidden flex flex-col max-h-[80vh]" role="dialog" aria-modal="true">
+        <div class="flex items-start justify-between p-5 border-b border-base-300">
+          <div>
+            <h3 class="text-base font-semibold">Matching transactions</h3>
+            <p class="text-xs text-base-content/50 mt-0.5">
+              <span x-text="formatMatchCount(preview.matchCount)"></span>
+              <span>transaction<span x-show="preview.matchCount !== 1">s</span> match this rule right now.</span>
+              <span x-show="preview.samples.length < preview.matchCount">
+                Showing the first <span x-text="preview.samples.length"></span>.
+              </span>
+            </p>
+          </div>
+          <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg" @click="closePreviewModal()" title="Close">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-2">
+          <template x-if="preview.samples.length === 0">
+            <p class="text-sm text-base-content/50 text-center py-10">No matches.</p>
+          </template>
+          <template x-if="preview.samples.length > 0">
+            <div class="divide-y divide-base-300/40">
+              <template x-for="(match, idx) in preview.samples" :key="match.id || idx">
+                <div class="px-2">
+                  <div x-data="{ card: txCardFromSummary(match) }">
+                    {{template "tx-card"}}
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+        <div class="flex justify-end gap-2 p-4 border-t border-base-300">
+          <button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="closePreviewModal()">Close</button>
+        </div>
+      </div>
+    </div>
+    </template>
+
     <!-- Settings section -->
     <div class="border-t border-base-300 p-5 sm:p-6">
       <h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-3">Settings</h3>
@@ -506,6 +616,19 @@ function ruleForm() {
     actionTypes,
     priorityPresets,
     form: initForm(),
+    // Live preview state. ran=true means the last scan returned (used to
+    // distinguish "no matches yet" from "0 matches"). samples are
+    // TransactionSummary records hydrated by the service.
+    preview: {
+      ran: false,
+      loading: false,
+      error: '',
+      matchCount: 0,
+      samples: [],
+      modal: false,
+    },
+    _previewAbort: null,
+    _previewDebounce: null,
 
     fieldType(field) { return fieldTypes[field] || 'string'; },
     operatorOptions(field) {
@@ -602,10 +725,18 @@ function ruleForm() {
       return warnings;
     },
 
+    // Lifecycle hook. Triggers a preview on load so the user sees matches
+    // for an existing rule immediately (edit mode) or the "add a condition"
+    // placeholder (create mode).
+    init() {
+      this.schedulePreview(400);
+    },
+
     // JSON sync
     syncToJson() {
       const json = this.buildConditionsJSON();
       this.form.conditions_json = JSON.stringify(json, null, 2);
+      this.schedulePreview();
     },
     syncFromJson() {
       try {
@@ -620,6 +751,86 @@ function ruleForm() {
           this.form.conditions = [{ field: parsed.field, op: parsed.op || 'contains', value: String(parsed.value ?? '') }];
         }
       } catch (e) { /* let them type freely */ }
+    },
+
+    // Preview helpers. Debounced so rapid typing doesn't hammer the server.
+    schedulePreview(delay) {
+      if (this._previewDebounce) clearTimeout(this._previewDebounce);
+      const wait = typeof delay === 'number' ? delay : 600;
+      this._previewDebounce = setTimeout(() => this.runPreview(), wait);
+    },
+    async runPreview() {
+      // Cancel the previous in-flight scan — the newest request wins.
+      if (this._previewAbort) this._previewAbort.abort();
+      const controller = new AbortController();
+      this._previewAbort = controller;
+
+      const conditions = this.buildConditionsJSON();
+      if (conditions === null) {
+        // No conditions = match-all. We could preview, but it'd scan every
+        // row and not tell the user anything useful. Show a friendly note.
+        this.preview.loading = false;
+        this.preview.ran = false;
+        this.preview.matchCount = 0;
+        this.preview.samples = [];
+        this.preview.error = '';
+        return;
+      }
+
+      this.preview.loading = true;
+      this.preview.error = '';
+      try {
+        const resp = await fetch('/-/rules/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conditions, sample_size: 25 }),
+          signal: controller.signal,
+        });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          this.preview.error = data.error?.message || data.error || 'Failed to preview';
+          this.preview.loading = false;
+          return;
+        }
+        const data = await resp.json();
+        this.preview.matchCount = data.match_count || 0;
+        this.preview.samples = data.sample_transactions || [];
+        this.preview.ran = true;
+        this.preview.loading = false;
+        // Lucide icons inside the cards need re-rendering after x-for inserts.
+        this.$nextTick(() => lucide.createIcons());
+      } catch (e) {
+        if (e.name === 'AbortError') return; // superseded by newer request
+        this.preview.error = 'Network error: ' + e.message;
+        this.preview.loading = false;
+      }
+    },
+    openPreviewModal() {
+      this.preview.modal = true;
+      this.$nextTick(() => lucide.createIcons());
+    },
+    closePreviewModal() {
+      this.preview.modal = false;
+    },
+    formatMatchCount(n) {
+      return (n || 0).toLocaleString();
+    },
+    // Map a TransactionSummary (API shape, snake_case) onto the normalized
+    // `card` object the shared tx-card partial expects. Kept alongside the
+    // cmdk palette's mapper so both feed the same partial.
+    txCardFromSummary(t) {
+      return {
+        name: t.name || '',
+        amount: t.amount || 0,
+        amountLabel: t.amount_label || '',
+        dateLabel: t.date_label || t.date || '',
+        account: t.account || '',
+        userName: t.user_name || '',
+        pending: !!t.pending,
+        categoryIcon: t.category_icon || 'receipt',
+        categoryColor: t.category_color || null,
+        categoryName: t.category_display_name || '',
+      };
     },
 
     // Build the JSON shape the API expects from the visual condition rows.
