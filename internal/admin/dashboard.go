@@ -415,7 +415,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			ConnectionHealth:      exportedHealth,
 			SyncHealth:            syncHealth,
 		})
-		tr.RenderWithTempl(w, r, "dashboard.html", data, body)
+		tr.RenderWithTempl(w, r, data, body)
 	}
 }
 
