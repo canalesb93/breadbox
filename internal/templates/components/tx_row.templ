@@ -93,7 +93,7 @@ templ TxRow(tx service.AdminTransactionRow) {
 						if len(tx.Tags) > 0 {
 							<span class="text-base-content/20 hidden xl:inline" data-tx-tag-sep>&middot;</span>
 							for _, tag := range tx.Tags {
-								@TagChipSm(tag)
+								@TagChipSm(TagChipDataFromTx(tag))
 							}
 						}
 					</span>

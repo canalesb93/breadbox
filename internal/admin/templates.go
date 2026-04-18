@@ -72,6 +72,28 @@ func renderTemplComponent(name string, data any) template.HTML {
 			}
 		}
 		c = components.TxRowCompact(tx)
+	case "TagChip", "TagChipSm":
+		var td components.TagChipData
+		switch v := data.(type) {
+		case service.TagResponse:
+			td = components.TagChipDataFromResponse(v)
+		case *service.TagResponse:
+			if v == nil {
+				return ""
+			}
+			td = components.TagChipDataFromResponse(*v)
+		case service.AdminTransactionTag:
+			td = components.TagChipDataFromTx(v)
+		case components.TagChipData:
+			td = v
+		default:
+			return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): unsupported type %T -->", name, data))
+		}
+		if name == "TagChipSm" {
+			c = components.TagChipSm(td)
+		} else {
+			c = components.TagChip(td)
+		}
 	default:
 		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): unknown -->", name))
 	}
