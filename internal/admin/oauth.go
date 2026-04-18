@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
@@ -518,10 +519,7 @@ func isForwardedHTTPS(r *http.Request) bool {
 }
 
 func parseUUID(s string) (pgtype.UUID, error) {
-	// Re-use existing parse logic. This is a local version to avoid import cycle.
-	var uuid pgtype.UUID
-	err := uuid.Scan(s)
-	return uuid, err
+	return pgconv.ParseUUID(s)
 }
 
 func generateState() string {
