@@ -81,7 +81,12 @@
       <!-- Page content -->
       <main class="p-4 sm:p-6 max-w-6xl min-h-screen bb-page-enter">
         {{template "flash" .}}
-        {{block "content" .}}{{end}}
+        {{- /* TemplContent slot — set by TemplateRenderer.RenderWithTempl to
+              render a templ-generated body inside the base layout without
+              migrating base.html wholesale. Pages migrated to templ drop
+              their old {{define "content"}} block and pass a templ.Component
+              instead. See issue #462. */ -}}
+        {{if .TemplContent}}{{.TemplContent}}{{else}}{{block "content" .}}{{end}}{{end}}
       </main>
     </div>
 
