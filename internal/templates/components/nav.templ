@@ -1,0 +1,188 @@
+package components
+
+import "fmt"
+
+// NavProps carries everything the sidebar needs. The bridge in
+// internal/admin/templates.go assembles this from the layout data map.
+// The admin.Flash/admin.NavBadges types stay in admin; the bridge copies
+// fields across so components has no import back into admin.
+type NavProps struct {
+	CurrentPage string
+
+	IsAdmin  bool
+	IsEditor bool
+
+	// Nav badges
+	ShowGettingStarted   bool
+	UnreadReports        int64
+	ConnectionsAttention int64
+	PendingReviews       int64
+
+	// Profile footer
+	HasLinkedUser        bool
+	SessionUserID        string
+	SessionAvatarVersion string
+	AdminUsername        string
+	RoleDisplay          string
+	CSRFToken            string
+
+	// Version + update callouts
+	AppVersion         string
+	NavUpdateAvailable bool
+	NavLatestVersion   string
+	NavLatestURL       string
+}
+
+// Nav renders the sidebar drawer used inside layout/base.html.
+templ Nav(p NavProps) {
+	<nav class="bb-sidebar-nav">
+		if p.ShowGettingStarted {
+			<div class="bb-sidebar-section">Setup</div>
+			<a href="/getting-started" class={ "bb-sidebar-link", navActive(p.CurrentPage, "getting-started") }>
+				<i data-lucide="compass"></i>
+				<span class="flex-1">Getting Started</span>
+			</a>
+		}
+		<div class="bb-sidebar-section">Overview</div>
+		<a href="/" class={ "bb-sidebar-link", navActive(p.CurrentPage, "home") }>
+			<i data-lucide="house"></i>
+			<span class="flex-1">Home</span>
+		</a>
+		<a href="/transactions" class={ "bb-sidebar-link", navActive(p.CurrentPage, "transactions") }>
+			<i data-lucide="receipt"></i> Transactions
+		</a>
+		if p.IsAdmin {
+			<a href="/reports" class={ "bb-sidebar-link", navActive(p.CurrentPage, "reports") }>
+				<i data-lucide="file-text"></i>
+				<span class="flex-1">Reports</span>
+				if p.UnreadReports > 0 {
+					<span class="bb-nav-badge" title={ fmt.Sprintf("%d unread reports", p.UnreadReports) }>{ badgeCount(p.UnreadReports) }</span>
+				}
+			</a>
+		}
+		<div class="bb-sidebar-section">Manage</div>
+		<a href="/connections" class={ "bb-sidebar-link", navActive(p.CurrentPage, "connections") }>
+			<i data-lucide="link"></i>
+			<span class="flex-1">Connections</span>
+			if p.ConnectionsAttention > 0 {
+				<span class="bb-nav-badge bb-nav-badge--warn" title={ fmt.Sprintf("%d connections need attention", p.ConnectionsAttention) }>{ badgeCount(p.ConnectionsAttention) }</span>
+			}
+		</a>
+		if p.IsEditor {
+			<a href="/agents" class={ "bb-sidebar-link", navActive(p.CurrentPage, "agents") }>
+				<i data-lucide="bot"></i> Agents
+			</a>
+		}
+		if p.IsAdmin {
+			<a href="/rules" class={ "bb-sidebar-link", navActive(p.CurrentPage, "rules") }>
+				<i data-lucide="list-filter"></i> Rules
+			</a>
+			<a href="/categories" class={ "bb-sidebar-link", navActive(p.CurrentPage, "categories") }>
+				<i data-lucide="folder"></i> Categories
+			</a>
+		}
+		if p.IsEditor {
+			<a href="/tags" class={ "bb-sidebar-link", navActive(p.CurrentPage, "tags") }>
+				<i data-lucide="tags"></i>
+				<span class="flex-1">Tags</span>
+				if p.PendingReviews > 0 {
+					<span class="bb-nav-badge" title={ fmt.Sprintf("%d transactions tagged needs-review", p.PendingReviews) }>{ badgeCount(p.PendingReviews) }</span>
+				}
+			</a>
+		}
+		if p.IsAdmin {
+			<a href="/users" class={ "bb-sidebar-link", navActive(p.CurrentPage, "users") }>
+				<i data-lucide="users"></i> Household
+			</a>
+		}
+		if p.IsEditor {
+			<div class="bb-sidebar-section">System</div>
+			<a href="/access" class={ "bb-sidebar-link", navActive(p.CurrentPage, "access") }>
+				<i data-lucide="shield-check"></i> Access
+			</a>
+		}
+		if p.IsAdmin {
+			<a href="/providers" class={ "bb-sidebar-link", navActive(p.CurrentPage, "providers") }>
+				<i data-lucide="plug"></i> Providers
+			</a>
+			<a href="/logs" class={ "bb-sidebar-link", navActive(p.CurrentPage, "logs") }>
+				<i data-lucide="scroll-text"></i> Logs
+			</a>
+			<a href="/backups" class={ "bb-sidebar-link", navActive(p.CurrentPage, "backups") }>
+				<i data-lucide="hard-drive"></i> Backups
+			</a>
+			<a href="/settings" class={ "bb-sidebar-link", navActive(p.CurrentPage, "settings") }>
+				<i data-lucide="settings"></i> Settings
+			</a>
+		}
+	</nav>
+	<!-- User profile + Sign out -->
+	<div class="mt-auto pt-3 border-t border-base-300 px-2">
+		<div class="flex items-center gap-2.5 py-2">
+			if p.HasLinkedUser {
+				<a href="/my-account" class="shrink-0" title="My Account">
+					<img src={ navAvatar(p.SessionUserID, p.SessionAvatarVersion) } alt="" class="bb-sidebar-profile-avatar"/>
+				</a>
+			}
+			<a href="/my-account" class="flex-1 min-w-0 no-underline" title="My Account">
+				<div class="bb-sidebar-profile-name">{ navDisplayName(p.AdminUsername) }</div>
+				<div class="bb-sidebar-profile-role">{ p.RoleDisplay }</div>
+			</a>
+			<form method="POST" action="/logout" class="shrink-0">
+				if p.CSRFToken != "" {
+					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				}
+				<button type="submit" class="btn btn-ghost btn-sm btn-square opacity-40 hover:opacity-100" title="Sign out">
+					<i data-lucide="log-out" class="w-4 h-4"></i>
+				</button>
+			</form>
+		</div>
+		<div class="bb-sidebar-version">
+			<a href="https://github.com/canalesb93/breadbox" target="_blank" rel="noopener" class="bb-sidebar-version-link" title="View on GitHub">
+				<i data-lucide="github" class="w-3 h-3"></i>
+				<span>Breadbox</span>
+			</a>
+			if p.NavUpdateAvailable {
+				<a href={ templ.SafeURL(p.NavLatestURL) } target="_blank" rel="noopener" class="badge badge-warning badge-xs gap-0.5" title={ "Update available: v" + p.NavLatestVersion }>
+					v{ p.AppVersion } &rarr; v{ p.NavLatestVersion }
+				</a>
+			} else if p.AppVersion != "" {
+				<a href="https://github.com/canalesb93/breadbox/releases" target="_blank" rel="noopener" class="badge badge-ghost badge-xs" title={ "Version " + p.AppVersion }>v{ p.AppVersion }</a>
+			} else {
+				<span class="badge badge-ghost badge-xs">dev</span>
+			}
+			<span class="ml-auto hidden lg:inline" style="cursor:pointer;opacity:0.5" @click="$dispatch('open-shortcuts')" title="Keyboard shortcuts">
+				<kbd class="bb-shortcuts-kbd" style="font-size:0.5rem;min-width:1rem;height:1rem;padding:0 0.25rem">?</kbd>
+			</span>
+		</div>
+	</div>
+}
+
+func navActive(current, page string) string {
+	if current == page {
+		return "bb-sidebar-link--active"
+	}
+	return ""
+}
+
+func navAvatar(id, version string) string {
+	base := avatarURL(id)
+	if version != "" {
+		return base + "?v=" + version
+	}
+	return base
+}
+
+func navDisplayName(n string) string {
+	if n == "" {
+		return "Admin"
+	}
+	return n
+}
+
+func badgeCount(n int64) string {
+	if n > 99 {
+		return "99+"
+	}
+	return fmt.Sprintf("%d", n)
+}
