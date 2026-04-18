@@ -8,17 +8,17 @@
 
 <!-- OAuth Clients Section -->
 <div id="oauth-clients" class="mb-8">
-  <div class="flex items-center justify-between mb-3">
-    <div class="flex items-center gap-2">
-      <i data-lucide="fingerprint" class="w-4 h-4 text-primary"></i>
-      <h2 class="text-sm font-semibold">OAuth Clients</h2>
+  <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-3">
+    <div class="flex items-center gap-2 min-w-0 flex-1">
+      <i data-lucide="fingerprint" class="w-4 h-4 text-primary shrink-0"></i>
+      <h2 class="text-sm font-semibold shrink-0">OAuth Clients</h2>
       {{if .Clients}}
-      <span class="text-xs text-base-content/40">{{len .ActiveClients}} active{{if .RevokedClients}}, {{len .RevokedClients}} revoked{{end}}</span>
+      <span class="text-xs text-base-content/40 truncate">{{len .ActiveClients}} active{{if .RevokedClients}}, {{len .RevokedClients}} revoked{{end}}</span>
       {{else}}
-      <span class="text-xs text-base-content/40">External connector access (e.g., Claude)</span>
+      <span class="text-xs text-base-content/40 truncate">External connector access (e.g., Claude)</span>
       {{end}}
     </div>
-    <a href="/oauth-clients/new" class="btn btn-primary btn-sm btn-soft rounded-xl">
+    <a href="/oauth-clients/new" class="btn btn-primary btn-sm btn-soft rounded-xl shrink-0">
       <i data-lucide="plus" class="w-4 h-4"></i>
       Create Client
     </a>
@@ -114,17 +114,17 @@
 
 <!-- API Keys Section -->
 <div id="api-keys">
-  <div class="flex items-center justify-between mb-3">
-    <div class="flex items-center gap-2">
-      <i data-lucide="key" class="w-4 h-4 text-primary"></i>
-      <h2 class="text-sm font-semibold">API Keys</h2>
+  <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-3">
+    <div class="flex items-center gap-2 min-w-0 flex-1">
+      <i data-lucide="key" class="w-4 h-4 text-primary shrink-0"></i>
+      <h2 class="text-sm font-semibold shrink-0">API Keys</h2>
       {{if .Keys}}
-      <span class="text-xs text-base-content/40">{{len .ActiveKeys}} active{{if .RevokedKeys}}, {{len .RevokedKeys}} revoked{{end}}</span>
+      <span class="text-xs text-base-content/40 truncate">{{len .ActiveKeys}} active{{if .RevokedKeys}}, {{len .RevokedKeys}} revoked{{end}}</span>
       {{else}}
-      <span class="text-xs text-base-content/40">Direct REST API and MCP access</span>
+      <span class="text-xs text-base-content/40 truncate">Direct REST API and MCP access</span>
       {{end}}
     </div>
-    <a href="/api-keys/new" class="btn btn-primary btn-sm btn-soft rounded-xl">
+    <a href="/api-keys/new" class="btn btn-primary btn-sm btn-soft rounded-xl shrink-0">
       <i data-lucide="plus" class="w-4 h-4"></i>
       Create Key
     </a>
