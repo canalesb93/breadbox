@@ -117,6 +117,12 @@ func renderTemplComponent(name string, data any) template.HTML {
 			return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): want map[string]any, got %T -->", name, data))
 		}
 		c = components.Nav(navPropsFromData(m))
+	case "TxResults":
+		m, ok := data.(map[string]any)
+		if !ok {
+			return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): want map[string]any, got %T -->", name, data))
+		}
+		c = components.TxResults(txResultsPropsFromData(m))
 	default:
 		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): unknown -->", name))
 	}
@@ -162,6 +168,49 @@ func navPropsFromData(m map[string]any) components.NavProps {
 		p.PendingReviews = badges.PendingReviews
 	}
 	return p
+}
+
+// txResultsPropsFromData copies the AJAX transaction-list fields out of
+// the render-time data map into a typed struct the TxResults templ
+// component consumes. Called by the "TxResults" bridge entry and by
+// the TransactionSearchHandler (which renders the fragment directly).
+func txResultsPropsFromData(m map[string]any) components.TxResultsProps {
+	getInt := func(key string) int {
+		switch v := m[key].(type) {
+		case int:
+			return v
+		case int32:
+			return int(v)
+		case int64:
+			return int(v)
+		}
+		return 0
+	}
+	props := components.TxResultsProps{
+		Page:           getInt("Page"),
+		TotalPages:     getInt("TotalPages"),
+		PageSize:       getInt("PageSize"),
+		Total:          getInt("Total"),
+		ShowingStart:   getInt("ShowingStart"),
+		ShowingEnd:     getInt("ShowingEnd"),
+		PaginationBase: fmt.Sprintf("%v", m["PaginationBase"]),
+	}
+	if txns, ok := m["Transactions"].([]service.AdminTransactionRow); ok {
+		props.Transactions = txns
+	}
+	if groups, ok := m["DateGroups"].([]DateGroup); ok {
+		props.DateGroups = make([]components.TxResultsDateGroup, len(groups))
+		for i, g := range groups {
+			props.DateGroups[i] = components.TxResultsDateGroup{
+				Date:         g.Date,
+				Label:        g.Label,
+				Transactions: g.Transactions,
+				DaySpending:  g.DaySpending,
+				DayIncome:    g.DayIncome,
+			}
+		}
+	}
+	return props
 }
 
 // Flash represents a one-time message shown to the user after a redirect.

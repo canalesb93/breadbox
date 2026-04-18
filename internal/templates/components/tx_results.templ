@@ -1,0 +1,230 @@
+package components
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+
+	"breadbox/internal/service"
+)
+
+// TxResultsDateGroup mirrors admin.DateGroup — kept here so the component
+// has no back-import into admin. The bridge copies fields across.
+type TxResultsDateGroup struct {
+	Date         string
+	Label        string
+	Transactions []service.AdminTransactionRow
+	DaySpending  float64
+	DayIncome    float64
+}
+
+// TxResultsProps is the full view model the AJAX tx-results fragment needs.
+type TxResultsProps struct {
+	DateGroups     []TxResultsDateGroup
+	Transactions   []service.AdminTransactionRow
+	Page           int
+	TotalPages     int
+	PageSize       int
+	Total          int
+	ShowingStart   int
+	ShowingEnd     int
+	PaginationBase string
+}
+
+// TxResults renders the AJAX "tx-results-partial" fragment: grouped + list
+// views, pagination, and the meta <script>. Callers embed the returned
+// HTML inside #bb-tx-results so the existing Alpine store keeps working.
+templ TxResults(p TxResultsProps) {
+	<!-- ═══ GROUPED VIEW ═══ -->
+	<template x-if="$store.txView.mode === 'grouped'">
+		<div class="space-y-1 bb-stagger">
+			for _, g := range p.DateGroups {
+				<div class="bb-date-group" data-date-group={ g.Date }>
+					<!-- Date Header -->
+					<div class="flex items-center justify-between px-2 pt-4 pb-2">
+						<div class="flex items-center gap-3">
+							<h3 class="text-xs font-semibold text-base-content/50 tracking-wide">{ g.Label }</h3>
+							<span class="text-xs text-base-content/30 tabular-nums" data-txn-count={ fmt.Sprintf("%d", len(g.Transactions)) }>
+								{ fmt.Sprintf("%d txn%s", len(g.Transactions), pluralS(len(g.Transactions))) }
+							</span>
+						</div>
+						<div class="flex items-center gap-3 text-xs tabular-nums">
+							@dayTotalBadge("text-base-content/50", "data-day-spending", g.DaySpending, false)
+							@dayTotalBadge("text-success/70", "data-day-income", g.DayIncome, true)
+						</div>
+					</div>
+					<!-- Transaction Rows -->
+					<div class="bb-card overflow-hidden divide-y divide-base-300/50">
+						for _, tx := range g.Transactions {
+							@TxRow(tx)
+						}
+					</div>
+				</div>
+			}
+		</div>
+	</template>
+	<!-- ═══ LIST VIEW ═══ -->
+	<template x-if="$store.txView.mode === 'list'">
+		<div>
+			<div class="bb-card overflow-hidden">
+				<!-- Table Header -->
+				<div class="bb-table-header">
+					<div class="w-5"></div>
+					<div class="w-9"></div>
+					<div class="flex-1 min-w-0">Name</div>
+					<div class="hidden xl:block shrink-0">Category</div>
+					<div class="w-24 text-right hidden sm:block">Date</div>
+					<div class="w-24 text-right pl-3">Amount</div>
+					<div class="w-4 hidden sm:block"></div>
+				</div>
+				<!-- Table Body -->
+				<div class="divide-y divide-base-300/50">
+					for _, tx := range p.Transactions {
+						@TxRow(tx)
+					}
+				</div>
+			</div>
+		</div>
+	</template>
+	<!-- ═══ PAGINATION ═══ -->
+	if p.TotalPages > 1 {
+		<div class="bb-paginator" id="bb-tx-paginator">
+			<div class="bb-paginator__info">
+				<span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
+					Showing { fmt.Sprintf("%d&ndash;%d", p.ShowingStart, p.ShowingEnd) } of { fmt.Sprintf("%d", p.Total) }
+				</span>
+				<div class="bb-paginator__per-page">
+					<label class="text-xs text-base-content/40 whitespace-nowrap">Per page</label>
+					<select class="select select-xs select-bordered rounded-lg tabular-nums" onchange="bbSetPerPage(this.value)">
+						@perPageOption(25, p.PageSize)
+						@perPageOption(50, p.PageSize)
+						@perPageOption(100, p.PageSize)
+					</select>
+				</div>
+			</div>
+			<div class="bb-paginator__nav">
+				<!-- First -->
+				if p.Page > 2 {
+					<a href={ paginatorURL(p.PaginationBase, 1) } class="bb-paginator__btn" title="First page">
+						<i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
+					</a>
+				}
+				<!-- Previous -->
+				if p.Page > 1 {
+					<a href={ paginatorURL(p.PaginationBase, p.Page-1) } class="bb-paginator__btn" title="Previous page">
+						<i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+					</a>
+				}
+				<!-- Page numbers -->
+				for _, n := range pageRange(p.Page, p.TotalPages) {
+					if n == 0 {
+						<span class="bb-paginator__ellipsis">&hellip;</span>
+					} else if n == p.Page {
+						<span class="bb-paginator__btn bb-paginator__btn--active">{ fmt.Sprintf("%d", n) }</span>
+					} else {
+						<a href={ paginatorURL(p.PaginationBase, n) } class="bb-paginator__btn">{ fmt.Sprintf("%d", n) }</a>
+					}
+				}
+				<!-- Next -->
+				if p.Page < p.TotalPages {
+					<a href={ paginatorURL(p.PaginationBase, p.Page+1) } class="bb-paginator__btn" title="Next page">
+						<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+					</a>
+				}
+				<!-- Last -->
+				if p.Page < p.TotalPages-1 {
+					<a href={ paginatorURL(p.PaginationBase, p.TotalPages) } class="bb-paginator__btn" title="Last page">
+						<i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
+					</a>
+				}
+			</div>
+		</div>
+	}
+	@txMetaScript(p.Transactions)
+}
+
+templ dayTotalBadge(class, attr string, value float64, income bool) {
+	if value > 0 {
+		<span class={ class } data-attr={ attr } data-value={ fmt.Sprintf("%.2f", value) }>
+			if income {
+				-{ formatAmount(value) }
+			} else {
+				{ formatAmount(value) }
+			}
+		</span>
+	} else {
+		<span class={ class } data-attr={ attr } data-value={ fmt.Sprintf("%.2f", value) } style="display:none">
+			if income {
+				-{ formatAmount(value) }
+			} else {
+				{ formatAmount(value) }
+			}
+		</span>
+	}
+}
+
+templ perPageOption(size, current int) {
+	if size == current {
+		<option value={ fmt.Sprintf("%d", size) } selected>{ fmt.Sprintf("%d", size) }</option>
+	} else {
+		<option value={ fmt.Sprintf("%d", size) }>{ fmt.Sprintf("%d", size) }</option>
+	}
+}
+
+templ txMetaScript(txns []service.AdminTransactionRow) {
+	<script>
+		window.__bbTxMeta = [@txMetaEntries(txns)];
+		if (window.Alpine && Alpine.store('bulk')) Alpine.store('bulk').clear();
+	</script>
+}
+
+// txMetaEntries renders the inline { id: '...', hasCat: true/false }
+// entries for `window.__bbTxMeta`. Emitted as raw text (no HTML escape)
+// inside the parent <script> — the IDs are server-generated and safe.
+func txMetaEntries(txns []service.AdminTransactionRow) templ.Component {
+	var sb strings.Builder
+	for _, tx := range txns {
+		sb.WriteString(fmt.Sprintf("{ id: %q, hasCat: %t },", tx.ID, tx.CategoryID != nil))
+	}
+	return templ.Raw(sb.String())
+}
+
+func paginatorURL(base string, page int) templ.SafeURL {
+	return templ.SafeURL(fmt.Sprintf("%s%d", base, page))
+}
+
+// pageRange mirrors the admin funcMap helper of the same name. Returns
+// page numbers to display with 0 as an ellipsis sentinel.
+func pageRange(current, total int) []int {
+	if total <= 7 {
+		pages := make([]int, total)
+		for i := range pages {
+			pages[i] = i + 1
+		}
+		return pages
+	}
+	seen := map[int]bool{}
+	add := func(p int) {
+		if p >= 1 && p <= total {
+			seen[p] = true
+		}
+	}
+	add(1)
+	add(total)
+	for d := -1; d <= 1; d++ {
+		add(current + d)
+	}
+	sorted := make([]int, 0, len(seen))
+	for p := range seen {
+		sorted = append(sorted, p)
+	}
+	sort.Ints(sorted)
+	result := make([]int, 0, len(sorted)*2)
+	for i, p := range sorted {
+		if i > 0 && p > sorted[i-1]+1 {
+			result = append(result, 0) // ellipsis
+		}
+		result = append(result, p)
+	}
+	return result
+}
