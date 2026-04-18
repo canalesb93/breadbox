@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log"
 	"math"
 	"net/http"
 	"net/url"
@@ -27,117 +28,169 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// renderTemplComponent renders a named templ component to template.HTML so
-// html/template partials (e.g. partials/tx_row.html) can forward to the
-// Go-generated component while we migrate pages over to templ. Returning an
-// empty string on an unknown name keeps rendering non-fatal — callers see a
-// blank slot and the server log picks up the error, matching how unknown
-// funcMap keys behaved before.
-//
-// Component adapters live in one place so we know every bridge entry up
-// front; add a new adapter here when you port a partial to templ.
-func renderTemplComponent(name string, data any) template.HTML {
-	var c templ.Component
-	switch name {
-	case "TxRow":
-		tx, ok := data.(service.AdminTransactionRow)
-		if !ok {
-			if p, ok := data.(*service.AdminTransactionRow); ok && p != nil {
-				tx = *p
-			} else {
-				return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): want service.AdminTransactionRow, got %T -->", name, data))
-			}
+// componentAdapter converts untyped bridge data to a typed templ.Component.
+// Each adapter is responsible for type-asserting data and returning an error
+// if the type is wrong — the bridge logs these and emits an HTML comment.
+type componentAdapter func(data any) (templ.Component, error)
+
+// componentRegistry maps the bridge name used in html/template partials
+// (e.g. {{renderComponent "TxRow" .}}) to its typed adapter. Add an entry
+// here when porting a new partial to templ.
+var componentRegistry = map[string]componentAdapter{
+	"TxRow": func(data any) (templ.Component, error) {
+		tx, err := assertAdminTxRow(data)
+		if err != nil {
+			return nil, err
 		}
-		c = components.TxRow(tx)
-	case "Flash":
+		return components.TxRow(tx), nil
+	},
+	"TxRowCompact": func(data any) (templ.Component, error) {
+		tx, err := assertAdminTxRow(data)
+		if err != nil {
+			return nil, err
+		}
+		return components.TxRowCompact(tx), nil
+	},
+	"Flash": func(data any) (templ.Component, error) {
 		f, ok := data.(*Flash)
 		if !ok {
-			if v, ok := data.(Flash); ok {
+			if v, ok2 := data.(Flash); ok2 {
 				f = &v
 			} else {
-				return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): want *admin.Flash, got %T -->", name, data))
+				return nil, fmt.Errorf("want *admin.Flash, got %T", data)
 			}
 		}
 		if f == nil {
-			return ""
+			return templ.NopComponent, nil
 		}
-		c = components.Flash(f.Type, f.Message)
-	case "TxRowCompact":
-		tx, ok := data.(service.AdminTransactionRow)
-		if !ok {
-			if p, ok := data.(*service.AdminTransactionRow); ok && p != nil {
-				tx = *p
-			} else {
-				return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): want service.AdminTransactionRow, got %T -->", name, data))
-			}
+		return components.Flash(f.Type, f.Message), nil
+	},
+	"TagChip": func(data any) (templ.Component, error) {
+		td, err := assertTagChipData(data)
+		if err != nil {
+			return nil, err
 		}
-		c = components.TxRowCompact(tx)
-	case "TagChip", "TagChipSm":
-		var td components.TagChipData
-		switch v := data.(type) {
-		case service.TagResponse:
-			td = components.TagChipDataFromResponse(v)
-		case *service.TagResponse:
-			if v == nil {
-				return ""
-			}
-			td = components.TagChipDataFromResponse(*v)
-		case service.AdminTransactionTag:
-			td = components.TagChipDataFromTx(v)
-		case components.TagChipData:
-			td = v
-		default:
-			return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): unsupported type %T -->", name, data))
+		return components.TagChip(td), nil
+	},
+	"TagChipSm": func(data any) (templ.Component, error) {
+		td, err := assertTagChipData(data)
+		if err != nil {
+			return nil, err
 		}
-		if name == "TagChipSm" {
-			c = components.TagChipSm(td)
-		} else {
-			c = components.TagChip(td)
-		}
-	case "Breadcrumb":
+		return components.TagChipSm(td), nil
+	},
+	"Breadcrumb": func(data any) (templ.Component, error) {
 		crumbs, ok := data.([]Breadcrumb)
 		if !ok {
-			return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): want []admin.Breadcrumb, got %T -->", name, data))
+			return nil, fmt.Errorf("want []admin.Breadcrumb, got %T", data)
 		}
 		if len(crumbs) == 0 {
-			return ""
+			return templ.NopComponent, nil
 		}
 		items := make([]components.Breadcrumb, len(crumbs))
 		for i, b := range crumbs {
 			items[i] = components.Breadcrumb{Label: b.Label, Href: b.Href}
 		}
-		c = components.BreadcrumbNav(items)
-	case "CategoryPickerScript":
-		c = components.CategoryPickerScript()
-	case "CategoryPickerStyles":
-		c = components.CategoryPickerStyles()
-	case "Nav":
+		return components.BreadcrumbNav(items), nil
+	},
+	"CategoryPickerScript": func(_ any) (templ.Component, error) {
+		return components.CategoryPickerScript(), nil
+	},
+	"CategoryPickerStyles": func(_ any) (templ.Component, error) {
+		return components.CategoryPickerStyles(), nil
+	},
+	"Nav": func(data any) (templ.Component, error) {
 		m, ok := data.(map[string]any)
 		if !ok {
-			return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): want map[string]any, got %T -->", name, data))
+			return nil, fmt.Errorf("want map[string]any, got %T", data)
 		}
-		c = components.Nav(navPropsFromData(m))
-	case "TxResults":
+		return components.Nav(navPropsFromData(m)), nil
+	},
+	"TxResults": func(data any) (templ.Component, error) {
 		m, ok := data.(map[string]any)
 		if !ok {
-			return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): want map[string]any, got %T -->", name, data))
+			return nil, fmt.Errorf("want map[string]any, got %T", data)
 		}
-		c = components.TxResults(txResultsPropsFromData(m))
+		return components.TxResults(txResultsPropsFromData(m)), nil
+	},
+}
+
+// assertAdminTxRow extracts a service.AdminTransactionRow from data,
+// accepting both value and pointer forms.
+func assertAdminTxRow(data any) (service.AdminTransactionRow, error) {
+	if tx, ok := data.(service.AdminTransactionRow); ok {
+		return tx, nil
+	}
+	if p, ok := data.(*service.AdminTransactionRow); ok && p != nil {
+		return *p, nil
+	}
+	return service.AdminTransactionRow{}, fmt.Errorf("want service.AdminTransactionRow, got %T", data)
+}
+
+// assertTagChipData extracts a components.TagChipData from the several types
+// that the tag-chip bridge accepts.
+func assertTagChipData(data any) (components.TagChipData, error) {
+	switch v := data.(type) {
+	case service.TagResponse:
+		return components.TagChipDataFromResponse(v), nil
+	case *service.TagResponse:
+		if v == nil {
+			return components.TagChipData{}, nil
+		}
+		return components.TagChipDataFromResponse(*v), nil
+	case service.AdminTransactionTag:
+		return components.TagChipDataFromTx(v), nil
+	case components.TagChipData:
+		return v, nil
 	default:
+		return components.TagChipData{}, fmt.Errorf("unsupported tag chip type %T", data)
+	}
+}
+
+// renderTemplComponent renders a named templ component to template.HTML so
+// html/template partials can forward to Go-generated components during the
+// incremental #462 migration. Errors are logged and emitted as HTML comments
+// so the page degrades gracefully rather than panicking.
+func renderTemplComponent(name string, data any) template.HTML {
+	adapter, ok := componentRegistry[name]
+	if !ok {
+		log.Printf("renderTemplComponent: unknown component %q", name)
 		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): unknown -->", name))
+	}
+	c, err := adapter(data)
+	if err != nil {
+		log.Printf("renderTemplComponent: %q adapter error: %v", name, err)
+		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): %s -->", name, template.HTMLEscapeString(err.Error())))
 	}
 	var buf bytes.Buffer
 	if err := c.Render(context.Background(), &buf); err != nil {
-		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q) error: %s -->", name, template.HTMLEscapeString(err.Error())))
+		log.Printf("renderTemplComponent: %q render error: %v", name, err)
+		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q) render error: %s -->", name, template.HTMLEscapeString(err.Error())))
 	}
 	return template.HTML(buf.String())
+}
+
+// buildNavProps assembles a NavProps from the already-injected layout data
+// map. Called once in Render() so navPropsFromData doesn't have to re-extract
+// each key from scratch.
+func buildNavProps(m map[string]any) components.NavProps {
+	return navPropsFromData(m)
 }
 
 // navPropsFromData copies the sidebar fields out of the render-time data
 // map into a typed struct the nav templ component consumes. Centralising
 // the mapping here keeps the component decoupled from html/template
 // conventions (string keys, untyped values).
+//
+// At runtime this always hits the fast path: Render() caches a _NavProps
+// entry before the template executes, so the type assertion succeeds and
+// the string-key extraction below is never reached.
 func navPropsFromData(m map[string]any) components.NavProps {
+	if p, ok := m["_NavProps"].(components.NavProps); ok {
+		return p
+	}
+	// Fallback: extract fields from the map (used when called before
+	// _NavProps is cached, e.g. during initial Render injection).
 	str := func(key string) string {
 		s, _ := m[key].(string)
 		return s
@@ -958,7 +1011,9 @@ func (tr *TemplateRenderer) parseTemplates() error {
 	basePages := []string{
 		"pages/404.html",
 		"pages/500.html",
-		"pages/dashboard.html",
+		"pages/_templ_shell.html",
+		// dashboard.html and settings.html removed — those pages render via
+		// RenderWithTempl which uses the _templ_shell template key.
 		"pages/connections.html",
 		"pages/connection_new.html",
 		"pages/connection_detail.html",
@@ -971,7 +1026,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/api_key_created.html",
 		"pages/sync_logs.html",
 		"pages/sync_log_detail.html",
-		"pages/settings.html",
 		"pages/providers.html",
 		"pages/csv_import.html",
 		"pages/transactions.html",
@@ -1169,6 +1223,9 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 				m["SessionAvatarVersion"] = tr.sm.GetString(r.Context(), sessionKeyAvatarVersion)
 			}
 		}
+		// Cache assembled NavProps so navPropsFromData can type-assert it
+		// directly rather than re-extracting each string key.
+		m["_NavProps"] = buildNavProps(m)
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1184,18 +1241,16 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 // layout/base.html. Pages migrated to templ call this instead of
 // Render — no base.html rewrite needed. See issue #462.
 //
-// templateKey selects which parsed template wraps the component. Pass
-// any base-layout page key that has no per-page content of its own
-// (e.g. "settings.html" keeps working even after its {{define "content"}}
-// is deleted, because the body flows through TemplContent instead).
-func (tr *TemplateRenderer) RenderWithTempl(w http.ResponseWriter, r *http.Request, templateKey string, data map[string]any, body templ.Component) {
+// The template key is always _templ_shell.html — migrated pages don't need
+// their own registered html/template; the body flows through TemplContent.
+func (tr *TemplateRenderer) RenderWithTempl(w http.ResponseWriter, r *http.Request, data map[string]any, body templ.Component) {
 	var buf bytes.Buffer
 	if err := body.Render(r.Context(), &buf); err != nil {
 		http.Error(w, "templ render error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	data["TemplContent"] = template.HTML(buf.String())
-	tr.Render(w, r, templateKey, data)
+	tr.Render(w, r, "_templ_shell.html", data)
 }
 
 // RenderPartial renders a named block from a template without the layout wrapper.

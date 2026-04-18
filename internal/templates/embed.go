@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-//go:embed layout/*.html pages/*.html partials/*.html
+//go:embed layout/*.html pages/*.html pages/_templ_shell.html partials/*.html
 var embedded embed.FS
 
 // FS serves template files. Defaults to the embedded FS baked into the binary.

@@ -75,7 +75,7 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 			NextSyncTime:         nextSyncTime,
 			ConfigSources:        a.Config.ConfigSources,
 		})
-		tr.RenderWithTempl(w, r, "settings.html", data, body)
+		tr.RenderWithTempl(w, r, data, body)
 	}
 }
 
