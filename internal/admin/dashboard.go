@@ -3,7 +3,6 @@ package admin
 import (
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"math"
 	"net/http"
 	"sort"
@@ -12,6 +11,8 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
+	dashpage "breadbox/internal/templates/components/pages"
 )
 
 // DashboardHandler serves GET /admin/ — the dashboard home page.
@@ -68,10 +69,30 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			}
 		}
 
-		// Build recent transactions data for template.
-		var recentTransactions []service.AdminTransactionRow
+		// Build recent transactions data for template. Copy into the
+		// dashboard-local view type so the template package doesn't import
+		// service (and so the dedicated tx-row worker can later swap this
+		// panel for the shared components.TxRow without touching the
+		// handler).
+		var recentTransactions []components.RecentTxRow
 		if recentTx != nil {
-			recentTransactions = recentTx.Transactions
+			recentTransactions = make([]components.RecentTxRow, 0, len(recentTx.Transactions))
+			for _, tx := range recentTx.Transactions {
+				recentTransactions = append(recentTransactions, components.RecentTxRow{
+					ID:                  tx.ID,
+					Name:                tx.Name,
+					AccountName:         tx.AccountName,
+					UserName:            tx.UserName,
+					EffectiveUserID:     tx.EffectiveUserID,
+					Date:                tx.Date,
+					Amount:              tx.Amount,
+					Pending:             tx.Pending,
+					AgentReviewed:       tx.AgentReviewed,
+					CategoryIcon:        tx.CategoryIcon,
+					CategoryColor:       tx.CategoryColor,
+					CategoryDisplayName: tx.CategoryDisplayName,
+				})
+			}
 		}
 
 		// Accounts with balances for the overview section.
@@ -80,22 +101,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			a.Logger.Error("list accounts for dashboard", "error", err)
 		}
 
-		// Group accounts by type for display.
-		type DashboardAccount struct {
-			ID              string
-			Name            string
-			InstitutionName string
-			Type            string
-			Subtype         string
-			Mask            string
-			BalanceCurrent  float64
-			IsoCurrencyCode string
-			IsLiability     bool
-			SparklineData   template.JS // JSON array of daily balance values (30 days)
-			SpendingTotal   float64     // Total spending in last 30 days for this account
-			ConnectionStatus string     // active, error, pending_reauth, disconnected
-		}
-		var dashAccounts []DashboardAccount
+		var dashAccounts []components.DashboardAccount
 		for _, acct := range accounts {
 			if acct.BalanceCurrent == nil {
 				continue
@@ -127,7 +133,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				AccountID:    &acctID,
 				SpendingOnly: true,
 			})
-			var sparklineJSON template.JS
+			var sparklineJSON string
 			var acctSpendTotal float64
 			if err == nil && acctDailySummary != nil && len(acctDailySummary.Summary) > 0 {
 				// Build a map of date->amount, then fill in 30 days.
@@ -146,7 +152,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 					sparkData[29-i] = dayMap[day]
 				}
 				if sb, err := json.Marshal(sparkData); err == nil {
-					sparklineJSON = template.JS(sb)
+					sparklineJSON = string(sb)
 				}
 			}
 
@@ -154,7 +160,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			if acct.ConnectionStatus != nil {
 				connStatus = *acct.ConnectionStatus
 			}
-			dashAccounts = append(dashAccounts, DashboardAccount{
+			dashAccounts = append(dashAccounts, components.DashboardAccount{
 				ID:               acct.ID,
 				Name:             acct.Name,
 				InstitutionName:  institution,
@@ -218,19 +224,13 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		}
 
 		// Allocation bar: proportion of total assets in each asset type.
-		type AllocationSlice struct {
-			Label   string
-			Amount  float64
-			Percent float64
-			Color   string // OKLCH color for the bar segment
-		}
 		allocationColors := map[string]string{
 			"depository": "oklch(0.55 0.14 155)", // green
 			"investment": "oklch(0.55 0.12 250)", // blue
 			"credit":     "oklch(0.58 0.12 35)",  // amber
 			"loan":       "oklch(0.55 0.15 25)",  // red-ish
 		}
-		var allocationSlices []AllocationSlice
+		var allocationSlices []components.AllocationSlice
 		grossTotal := totalAssets + totalLiabilities
 		if grossTotal > 0 {
 			for _, key := range accountGroupOrder {
@@ -247,7 +247,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 					color = "oklch(0.45 0 0)"
 				}
 				label := accountGroupLabels[key]
-				allocationSlices = append(allocationSlices, AllocationSlice{
+				allocationSlices = append(allocationSlices, components.AllocationSlice{
 					Label:   label,
 					Amount:  total,
 					Percent: pct,
@@ -256,20 +256,14 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			}
 		}
 
-		// ── Connection Health: per-connection status for dashboard panel ──
-		type ConnectionHealthRow struct {
-			ID            string
-			Name          string // Institution name
-			Provider      string
-			Status        string // active, error, pending_reauth, disconnected
-			ErrorMessage  string
-			LastSyncedAt  string // relative time string
-			AccountCount  int64
-			Paused        bool
-			IsStale       bool // hasn't synced in 24+ hours
+		// Connection Health: per-connection status for dashboard panel. We
+		// keep a parallel slice of raw sync times so we can sort by most
+		// recent before handing off to the view type.
+		type connHealthInternal struct {
+			row           components.ConnectionHealthRow
 			lastSyncedRaw time.Time
 		}
-		var connectionHealth []ConnectionHealthRow
+		var connectionHealthRaw []connHealthInternal
 		var healthyCount, errorCount, staleCount int
 
 		bankConnections, err := a.Queries.ListBankConnections(ctx)
@@ -319,24 +313,30 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			if conn.LastSyncedAt.Valid {
 				rawTime = conn.LastSyncedAt.Time
 			}
-			connectionHealth = append(connectionHealth, ConnectionHealthRow{
-				ID:            connID,
-				Name:          name,
-				Provider:      string(conn.Provider),
-				Status:        status,
-				ErrorMessage:  errMsg,
-				LastSyncedAt:  lastSync,
-				AccountCount:  conn.AccountCount,
-				Paused:        conn.Paused,
-				IsStale:       isStale,
+			connectionHealthRaw = append(connectionHealthRaw, connHealthInternal{
+				row: components.ConnectionHealthRow{
+					ID:           connID,
+					Name:         name,
+					Provider:     string(conn.Provider),
+					Status:       status,
+					ErrorMessage: errMsg,
+					LastSyncedAt: lastSync,
+					AccountCount: conn.AccountCount,
+					Paused:       conn.Paused,
+					IsStale:      isStale,
+				},
 				lastSyncedRaw: rawTime,
 			})
 		}
 
 		// Sort connections by last sync time (most recent first)
-		sort.Slice(connectionHealth, func(i, j int) bool {
-			return connectionHealth[i].lastSyncedRaw.After(connectionHealth[j].lastSyncedRaw)
+		sort.Slice(connectionHealthRaw, func(i, j int) bool {
+			return connectionHealthRaw[i].lastSyncedRaw.After(connectionHealthRaw[j].lastSyncedRaw)
 		})
+		connectionHealth := make([]components.ConnectionHealthRow, len(connectionHealthRaw))
+		for i, e := range connectionHealthRaw {
+			connectionHealth[i] = e.row
+		}
 
 		// ── Sync Health Summary ──────────────────────────────────────
 		syncHealth, err := svc.GetSyncHealthSummary(ctx)
@@ -355,7 +355,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			}
 		}
 
-		// Pending reviews count for badge.
+		// Uncategorized transactions count (rendered in the Attention panel).
 		var uncatCount int64
 		err = a.DB.QueryRow(ctx, "SELECT COUNT(*) FROM transactions WHERE deleted_at IS NULL AND category_id IS NULL AND pending = false").Scan(&uncatCount)
 		if err != nil {
@@ -363,18 +363,8 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		}
 
 		// Agent reports: load recent unread reports for the dashboard widget.
-		type DashboardReport struct {
-			ID            string
-			Title         string
-			Body          string
-			CreatedByName string
-			Priority      string
-			Tags          []string
-			DisplayAuthor string
-			CreatedAt     string // relative time
-		}
 		const dashboardReportsVisible = 8
-		var agentReports []DashboardReport
+		var agentReports []components.DashboardReport
 		rawReports, err := svc.ListUnreadAgentReports(ctx, dashboardReportsVisible)
 		if err != nil {
 			a.Logger.Error("list unread agent reports", "error", err)
@@ -384,7 +374,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		totalUnread := int(getNavBadges(ctx).UnreadReports)
 		for _, r := range rawReports {
 			t, _ := time.Parse(time.RFC3339, r.CreatedAt)
-			agentReports = append(agentReports, DashboardReport{
+			agentReports = append(agentReports, components.DashboardReport{
 				ID:            r.ID,
 				Title:         r.Title,
 				Body:          r.Body,
@@ -396,19 +386,6 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			})
 		}
 		moreReportsCount := totalUnread - len(agentReports)
-
-		// Quick stats for the status bar.
-		accountCount, err := a.Queries.CountAccounts(ctx)
-		if err != nil {
-			a.Logger.Error("count accounts", "error", err)
-			accountCount = 0
-		}
-
-		txCount, err := a.Queries.CountTransactions(ctx)
-		if err != nil {
-			a.Logger.Error("count transactions", "error", err)
-			txCount = 0
-		}
 
 		// Compute attention items count for the dashboard card.
 		attentionCount := 0
@@ -422,45 +399,56 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			attentionCount++
 		}
 
-		data := map[string]any{
-			"PageTitle":             "Home",
-			"CurrentPage":          "home",
-			"NeedsAttention":       needsAttention,
-			"CSRFToken":            GetCSRFToken(r),
-			"ShowUpdateBanner":     showUpdateBanner,
-			"LatestVersion":        latestVersion,
-			"LatestURL":            latestURL,
-			"CurrentVersion":       currentVersion,
-			"DockerSocketAvailable": a.DockerSocketAvailable,
-			"ReviewPending":        reviewPending,
-			"ReviewsEnabled":      reviewsEnabled,
-			"RecentTransactions":   recentTransactions,
-			"Accounts":             dashAccounts,
-			// Account totals & allocation bar.
-			"TotalAssets":       totalAssets,
-			"TotalLiabilities":  totalLiabilities,
-			"NetWorth":          totalAssets - totalLiabilities,
-			"AllocationSlices":  allocationSlices,
-			// Connection health.
-			"ConnectionHealth":  connectionHealth,
-			"HealthyCount":     healthyCount,
-			"ErrorCount":       errorCount,
-			"StaleCount":       staleCount,
-			// Sync health summary.
-			"SyncHealth":        syncHealth,
-			// Quick stats.
-			"AccountCount":     accountCount,
-			"TxCount":          txCount,
-			"UncategorizedCount": uncatCount,
-			// Agent reports.
-			// Attention items.
-			"AttentionCount":    attentionCount,
-			"HasAttentionItems": attentionCount > 0,
-			"AgentReports":       agentReports,
-			"MoreReportsCount":   moreReportsCount,
-			"TotalUnreadReports": totalUnread,
+		// Convert the service-level sync health summary into the
+		// template-package view type so the templ component doesn't need to
+		// import service.
+		var syncHealthView *components.SyncHealthView
+		if syncHealth != nil {
+			syncHealthView = &components.SyncHealthView{
+				LastSyncTime:      syncHealth.LastSyncTime,
+				RecentSyncCount:   syncHealth.RecentSyncCount,
+				RecentSuccessRate: syncHealth.RecentSuccessRate,
+				NextSyncTime:      syncHealth.NextSyncTime,
+			}
 		}
-		tr.Render(w, r, "dashboard.html", data)
+
+		pageData := components.DashboardData{
+			PageTitle:             "Home",
+			CurrentPage:           "home",
+			CSRFToken:             GetCSRFToken(r),
+			ShowUpdateBanner:      showUpdateBanner,
+			LatestVersion:         latestVersion,
+			LatestURL:             latestURL,
+			CurrentVersion:        currentVersion,
+			DockerSocketAvailable: a.DockerSocketAvailable,
+			NeedsAttention:        needsAttention,
+			Accounts:              dashAccounts,
+			AllocationSlices:      allocationSlices,
+			TotalAssets:           totalAssets,
+			TotalLiabilities:      totalLiabilities,
+			NetWorth:              totalAssets - totalLiabilities,
+			AgentReports:          agentReports,
+			MoreReportsCount:      moreReportsCount,
+			TotalUnreadReports:    totalUnread,
+			RecentTransactions:    recentTransactions,
+			AttentionCount:        attentionCount,
+			HasAttentionItems:     attentionCount > 0,
+			UncategorizedCount:    uncatCount,
+			ReviewsEnabled:        reviewsEnabled,
+			ReviewPending:         reviewPending,
+			ErrorCount:            errorCount,
+			ConnectionHealth:      connectionHealth,
+			SyncHealth:            syncHealthView,
+		}
+
+		// Data the legacy base layout still needs (nav state, flash, etc.).
+		// Auto-injected fields are filled in by TemplateRenderer.Render.
+		layoutData := map[string]any{
+			"PageTitle":   pageData.PageTitle,
+			"CurrentPage": pageData.CurrentPage,
+			"CSRFToken":   pageData.CSRFToken,
+		}
+		tr.RenderWithTempl(w, r, layoutData, dashpage.DashboardPage(pageData))
 	}
 }
 

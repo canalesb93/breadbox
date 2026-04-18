@@ -20,9 +20,15 @@ import (
 	"breadbox/internal/templates"
 	"breadbox/internal/version"
 
+	"github.com/a-h/templ"
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// templBaseKey is the template key for the bare base layout used when wrapping
+// templ-rendered pages. It isn't a real filename so it can't collide with any
+// page template.
+const templBaseKey = "__templ_base__"
 
 // Flash represents a one-time message shown to the user after a redirect.
 type Flash struct {
@@ -807,7 +813,8 @@ func (tr *TemplateRenderer) parseTemplates() error {
 	basePages := []string{
 		"pages/404.html",
 		"pages/500.html",
-		"pages/dashboard.html",
+		// pages/dashboard.html migrated to templ — see
+		// internal/templates/components/pages/dashboard.templ (issue #462).
 		"pages/connections.html",
 		"pages/connection_new.html",
 		"pages/connection_detail.html",
@@ -876,6 +883,17 @@ func (tr *TemplateRenderer) parseTemplates() error {
 			return err
 		}
 	}
+
+	// Register a bare base template with no page content — used by
+	// RenderWithTempl to wrap templ-rendered pages in the legacy layout. The
+	// layout's content block falls through to `.TemplContent` when set.
+	bareFiles := append([]string{"layout/base.html"}, templatePartials...)
+	bareT, err := template.New("").Funcs(tr.funcMap).ParseFS(templates.FS, bareFiles...)
+	if err != nil {
+		return fmt.Errorf("parse bare base: %w", err)
+	}
+	tr.templates[templBaseKey] = bareT
+	tr.specs[templBaseKey] = bareFiles
 
 	// Composite pages: parsed with extra page files so sub-templates are available.
 	for page, extras := range compositePages {
@@ -1024,6 +1042,26 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
 		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// RenderWithTempl wraps a templ component in the legacy base layout. The
+// component is rendered to a buffer and injected into the layout via
+// `.TemplContent` (html/template escapes it as template.HTML since we pass it
+// that way). This is the bridge used during the incremental html/template →
+// templ migration tracked in GitHub issue #462 — pages in components/pages/
+// can render through here until the base layout itself is ported.
+func (tr *TemplateRenderer) RenderWithTempl(w http.ResponseWriter, r *http.Request, data map[string]any, component templ.Component) {
+	// Render the templ component to a buffer so we can inject it as HTML.
+	var buf bytes.Buffer
+	if err := component.Render(r.Context(), &buf); err != nil {
+		http.Error(w, "templ render error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if data == nil {
+		data = map[string]any{}
+	}
+	data["TemplContent"] = template.HTML(buf.String())
+	tr.Render(w, r, templBaseKey, data)
 }
 
 // RenderPartial renders a named block from a template without the layout wrapper.

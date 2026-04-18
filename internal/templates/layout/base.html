@@ -81,7 +81,7 @@
       <!-- Page content -->
       <main class="p-4 sm:p-6 max-w-6xl min-h-screen bb-page-enter">
         {{template "flash" .}}
-        {{block "content" .}}{{end}}
+        {{if .TemplContent}}{{.TemplContent}}{{else}}{{block "content" .}}{{end}}{{end}}
       </main>
     </div>
 

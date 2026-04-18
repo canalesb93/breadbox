@@ -3,7 +3,7 @@ export
 
 TAILWIND_BIN := ./tailwindcss-extra
 
-.PHONY: dev dev-watch dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc sqlc-install seed db db-stop docker-up docker-down css css-watch css-install air-install
+.PHONY: dev dev-watch dev-stop build test test-integration lint generate migrate-up migrate-down migrate-create sqlc sqlc-install seed db db-stop docker-up docker-down css css-watch css-install air-install templ templ-install templ-check
 
 PORT ?= 8080
 
@@ -13,6 +13,23 @@ PORT ?= 8080
 generate:
 	@if [ ! -f internal/db/models.go ]; then $(MAKE) sqlc; fi
 	@if [ ! -f static/css/styles.css ]; then $(MAKE) css; fi
+	@if find internal/templates -name '*.templ' -print -quit 2>/dev/null | grep -q .; then $(MAKE) templ; fi
+
+# templ regenerates Go source for every *.templ file in the tree. Runs
+# automatically from `generate`, but can be invoked directly after editing
+# a templ file.
+templ: templ-install
+	templ generate
+
+templ-check: templ-install
+	templ generate
+	@git diff --exit-code -- '*_templ.go' || (echo "templ generate produced diffs — commit the regenerated files" && exit 1)
+
+templ-install:
+	@if ! command -v templ >/dev/null 2>&1; then \
+		echo "Installing templ..."; \
+		go install github.com/a-h/templ/cmd/templ@latest; \
+	fi
 
 dev: generate
 	@if [ -z "$$DATABASE_URL" ]; then \

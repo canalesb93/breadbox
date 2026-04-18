@@ -1,0 +1,642 @@
+package pages
+
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
+
+// DashboardPage renders the admin home page. It emits the same HTML that
+// `pages/dashboard.html` used to produce inside the base layout's `content`
+// block. The admin handler renders this component through the bridge
+// (`TemplateRenderer.RenderWithTempl`) so the legacy html/template base
+// layout still wraps it.
+templ DashboardPage(data components.DashboardData) {
+	if data.ShowUpdateBanner {
+		@updateBanner(data)
+	}
+	if data.NeedsAttention > 0 {
+		<div role="alert" class="alert alert-warning rounded-xl mb-6">
+			<i data-lucide="alert-triangle" class="w-5 h-5"></i>
+			<div>
+				<strong>{ fmt.Sprintf("%d connection(s) need attention.", data.NeedsAttention) }</strong>
+				<a href="/connections" class="link ml-1">View connections &rarr;</a>
+			</div>
+		</div>
+	}
+	@netWorthHero(data)
+	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+		@agentReportsPanel(data)
+		@recentTransactionsPanel(data)
+	</div>
+	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+		@attentionPanel(data)
+		@connectionHealthPanel(data)
+	</div>
+	@agentReportsScript()
+	@sparklineScript()
+}
+
+templ updateBanner(data components.DashboardData) {
+	<div role="alert" class="alert alert-info rounded-xl mb-6" x-data="{ pulling: false, pulled: false, error: '' }">
+		<i data-lucide="download" class="w-5 h-5"></i>
+		<div class="flex-1">
+			<h3 class="font-bold">Update Available</h3>
+			<p class="text-sm">
+				Version <strong>{ "v" + data.LatestVersion }</strong> is available (current: { "v" + data.CurrentVersion }).
+				if data.LatestURL != "" {
+					<a href={ templ.URL(data.LatestURL) } target="_blank" rel="noopener" class="link">Release notes</a>
+				}
+			</p>
+			<template x-if="pulled">
+				<p class="text-sm mt-1 text-success font-semibold">Image pulled! Run <code>docker compose up -d</code> to apply.</p>
+			</template>
+			<template x-if="error !== ''">
+				<p class="text-sm mt-1 text-error" x-text="error"></p>
+			</template>
+		</div>
+		<div class="flex gap-2 items-center">
+			if data.DockerSocketAvailable {
+				<button
+					class="btn btn-sm btn-primary rounded-xl"
+					x-show="!pulled"
+					:disabled="pulling"
+					@click="pulling = true; error = '';
+                fetch('/-/update', {method: 'POST', headers: {'Content-Type': 'application/json'}})
+                  .then(r => r.json())
+                  .then(d => { if (d.ok) { pulled = true; } else { error = d.error || 'Update failed'; } })
+                  .catch(() => { error = 'Network error'; })
+                  .finally(() => { pulling = false; })"
+				>
+					<span x-show="!pulling">Pull Update</span>
+					<span x-show="pulling" class="loading loading-spinner loading-xs"></span>
+				</button>
+			}
+			<div class="dropdown dropdown-end">
+				<div tabindex="0" role="button" class="btn btn-sm btn-ghost rounded-xl">Update Command</div>
+				<div tabindex="0" class="dropdown-content card card-compact bg-base-200 shadow-sm p-3 w-80 z-10">
+					<code class="text-xs select-all">cd /opt/breadbox &amp;&amp; docker compose pull &amp;&amp; docker compose up -d</code>
+				</div>
+			</div>
+			<button
+				class="btn btn-sm btn-ghost"
+				@click={ fmt.Sprintf("fetch('/-/update/dismiss', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({version: %q}) }).then(() => $el.closest('.alert').remove())", data.LatestVersion) }
+			>
+				Dismiss
+			</button>
+		</div>
+	</div>
+}
+
+templ netWorthHero(data components.DashboardData) {
+	if len(data.Accounts) > 0 {
+		<div class="bb-card mb-6">
+			if len(data.AllocationSlices) > 0 {
+				<div class="p-5 sm:p-6">
+					<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+						<div>
+							<div class="text-xs text-base-content/40 mb-0.5">Net Worth</div>
+							<div class="text-3xl sm:text-4xl font-bold tabular-nums tracking-tight">{ components.FormatBalance(data.NetWorth) }</div>
+						</div>
+						<div class="flex items-center gap-5 sm:text-right">
+							<div>
+								<div class="text-[0.65rem] text-base-content/35 uppercase tracking-wider">Assets</div>
+								<div class="text-sm font-semibold tabular-nums text-success/80">{ components.FormatBalance(data.TotalAssets) }</div>
+							</div>
+							<div>
+								<div class="text-[0.65rem] text-base-content/35 uppercase tracking-wider">Liabilities</div>
+								<div class="text-sm font-semibold tabular-nums text-error/70">{ components.FormatBalance(data.TotalLiabilities) }</div>
+							</div>
+						</div>
+					</div>
+					<div class="flex h-2.5 rounded-full overflow-hidden gap-0.5">
+						for _, slice := range data.AllocationSlices {
+							<div
+								class="h-full rounded-full transition-all duration-700 ease-out"
+								style={ components.AllocationBarStyle(slice) }
+								title={ fmt.Sprintf("%s: %s", slice.Label, components.FormatBalance(slice.Amount)) }
+							></div>
+						}
+					</div>
+					<div class="flex items-center gap-4 flex-wrap mt-2.5">
+						for _, slice := range data.AllocationSlices {
+							<span class="flex items-center gap-1.5 text-xs text-base-content/50">
+								<span class="w-2 h-2 rounded-full shrink-0" style={ components.AllocationDotStyle(slice) }></span>
+								{ slice.Label }
+								<span class="tabular-nums font-medium text-base-content/70">{ components.FormatBalance(slice.Amount) }</span>
+							</span>
+						}
+					</div>
+				</div>
+			}
+			<div class="border-t border-base-200/60" x-data="{ showAccounts: false }">
+				<button
+					@click="showAccounts = !showAccounts"
+					class="w-full px-4 sm:px-5 py-3 flex items-center justify-between cursor-pointer hover:bg-base-200/30 transition-colors"
+				>
+					<span class="flex items-center gap-2">
+						<span class="text-sm font-semibold text-base-content/70">{ fmt.Sprintf("%d Accounts", len(data.Accounts)) }</span>
+						<i data-lucide="chevron-down" class="w-3.5 h-3.5 text-base-content/30 transition-transform duration-200" :class="showAccounts ? 'rotate-180' : ''"></i>
+					</span>
+					<a href="/connections" @click.stop class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">Manage</a>
+				</button>
+				<div x-show="showAccounts" x-cloak x-collapse>
+					<div class="px-4 sm:px-5 pb-4 sm:pb-5">
+						<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+							for _, acct := range data.Accounts {
+								@accountCard(acct)
+							}
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	} else {
+		<div class="bb-card mb-6 p-8 text-center">
+			<i data-lucide="wallet" class="w-10 h-10 mx-auto mb-3 text-base-content/20"></i>
+			<h2 class="text-lg font-semibold mb-1">No accounts yet</h2>
+			<p class="text-sm text-base-content/50 mb-4">Connect your first bank to see your balances and transactions here.</p>
+			<a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">
+				<i data-lucide="plus" class="w-4 h-4"></i>
+				Connect a Bank
+			</a>
+		</div>
+	}
+}
+
+templ accountCard(acct components.DashboardAccount) {
+	<a href={ templ.URL("/accounts/" + acct.ID) } class="bb-card bb-card--interactive p-4 no-underline group block">
+		<div class="flex items-start justify-between mb-2">
+			<div class="min-w-0 flex-1">
+				<div class="flex items-center gap-1.5">
+					switch acct.ConnectionStatus {
+						case "active":
+							<span class="w-1.5 h-1.5 rounded-full bg-success/60 shrink-0" title="Connected"></span>
+						case "error":
+							<span class="w-1.5 h-1.5 rounded-full bg-error/70 shrink-0" title="Error"></span>
+						case "pending_reauth":
+							<span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0" title="Needs reauth"></span>
+						case "disconnected":
+							<span class="w-1.5 h-1.5 rounded-full bg-base-300 shrink-0" title="Disconnected"></span>
+					}
+					<span class="text-sm font-medium truncate group-hover:text-primary transition-colors">{ acct.Name }</span>
+				</div>
+				<div class="text-[0.65rem] text-base-content/40 mt-0.5 truncate">
+					{ acct.InstitutionName }
+					if acct.Mask != "" {
+						{ " · ····" + acct.Mask }
+					}
+				</div>
+			</div>
+			<div class="w-7 h-7 rounded-lg bg-base-200/50 flex items-center justify-center shrink-0 ml-2">
+				<i data-lucide={ components.AccountTypeIcon(acct.Type) } class="w-3.5 h-3.5 text-base-content/35"></i>
+			</div>
+		</div>
+		if acct.SparklineData != "" {
+			<div
+				class="bb-sparkline w-full h-8 my-1.5"
+				data-values={ acct.SparklineData }
+				data-liability={ fmt.Sprintf("%t", acct.IsLiability) }
+			></div>
+		} else {
+			<div class="h-8 my-1.5"></div>
+		}
+		<div class="flex items-end justify-between mt-1">
+			<div class={ components.AccountBalanceClass(acct.IsLiability) }>
+				if acct.IsLiability {
+					{ "-" + components.FormatBalance(acct.BalanceCurrent) }
+				} else {
+					{ components.FormatBalance(acct.BalanceCurrent) }
+				}
+			</div>
+			<div class="text-right">
+				if acct.SpendingTotal > 0 {
+					<div class="text-[0.65rem] text-base-content/40 tabular-nums">{ components.FormatBalance(acct.SpendingTotal) } spent</div>
+				} else {
+					<div class="text-[0.65rem] text-base-content/35">{ components.AccountTypeLabel(acct.Type, acct.Subtype) }</div>
+				}
+			</div>
+		</div>
+	</a>
+}
+
+templ agentReportsPanel(data components.DashboardData) {
+	<div class="bb-card" x-data="{ ...agentReports() }">
+		<div class="px-5 py-4 flex items-center justify-between border-b border-base-200/60">
+			<div class="flex items-center gap-2">
+				<i data-lucide="bot" class="w-4 h-4 text-primary/70"></i>
+				<h2 class="text-sm font-semibold text-base-content/80">Agent Reports</h2>
+				if len(data.AgentReports) > 0 {
+					<span class="text-[0.65rem] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">{ fmt.Sprintf("%d unread", data.TotalUnreadReports) }</span>
+				}
+			</div>
+			<div class="flex items-center gap-3">
+				if len(data.AgentReports) > 0 {
+					<button
+						type="button"
+						class="flex items-center gap-1 text-xs text-base-content/40 hover:text-base-content/60 transition-colors cursor-pointer"
+						@click="markAllRead()"
+						title="Mark all reports as read"
+					>
+						<i data-lucide="check-check" class="w-3.5 h-3.5"></i>
+						<span>Mark all read</span>
+					</button>
+				}
+				<a href="/reports" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
+			</div>
+		</div>
+		if len(data.AgentReports) > 0 {
+			<div class="px-4 sm:px-5 py-4 space-y-4">
+				for _, r := range data.AgentReports {
+					@agentReportItem(r)
+				}
+				if data.MoreReportsCount > 0 {
+					<div class="pt-3 border-t border-base-200/60 text-center">
+						<a href="/reports?status=unread" class="text-xs text-primary/70 hover:text-primary transition-colors">{ fmt.Sprintf("%d more unread →", data.MoreReportsCount) }</a>
+					</div>
+				}
+			</div>
+		} else {
+			<div class="px-5 py-8 text-center">
+				<i data-lucide="bot" class="w-8 h-8 mx-auto mb-2 text-base-content/15"></i>
+				<p class="text-sm text-base-content/40 mb-1">No unread reports</p>
+				<p class="text-xs text-base-content/30">Agent reports appear here when AI agents submit findings about your finances.</p>
+				<a href="/agents" class="text-xs text-primary/60 hover:text-primary transition-colors mt-2 inline-block">Set up an agent &rarr;</a>
+			</div>
+		}
+	</div>
+}
+
+templ agentReportItem(r components.DashboardReport) {
+	<div
+		class="transition-all duration-300"
+		:class={ fmt.Sprintf("dismissed['%s'] ? 'opacity-0 h-0 overflow-hidden !my-0' : ''", r.ID) }
+		id={ "report-" + r.ID }
+	>
+		<div class="flex items-start gap-2.5">
+			<div class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-primary/10 text-primary">
+				<i data-lucide="bot" class="w-3.5 h-3.5"></i>
+			</div>
+			<div class="flex-1 min-w-0">
+				<div class="flex items-center gap-2 mb-1">
+					<span class="text-xs font-semibold text-base-content/70">{ r.DisplayAuthor }</span>
+					<span class="text-[0.65rem] text-base-content/30">{ r.CreatedAt }</span>
+					if r.Priority == "critical" {
+						<span class="relative inline-flex w-2 h-2 shrink-0">
+							<span class="animate-ping absolute inline-flex w-full h-full rounded-full bg-error/60"></span>
+							<span class="relative inline-flex w-2 h-2 rounded-full bg-error"></span>
+						</span>
+					} else if r.Priority == "warning" {
+						<span class="w-2 h-2 rounded-full bg-warning shrink-0"></span>
+					}
+					<button
+						@click.stop={ fmt.Sprintf("markRead(%q)", r.ID) }
+						title="Mark as read"
+						class="ml-auto shrink-0 w-5 h-5 rounded-md flex items-center justify-center text-base-content/30 hover:text-success hover:bg-success/10 transition-colors cursor-pointer"
+					>
+						<i data-lucide="check" class="w-3.5 h-3.5"></i>
+					</button>
+				</div>
+				<a href={ templ.URL("/reports/" + r.ID) } class="rounded-2xl rounded-tl-sm shadow-sm px-3.5 py-2.5 inline-block max-w-full no-underline group bg-base-200/70 hover:bg-base-200/90 transition-colors">
+					<p class="text-sm leading-relaxed text-base-content/80 group-hover:text-base-content transition-colors">{ r.Title }</p>
+					<span class="text-xs text-base-content/30 group-hover:text-primary/60 transition-colors">View report &rarr;</span>
+				</a>
+			</div>
+		</div>
+	</div>
+}
+
+templ recentTransactionsPanel(data components.DashboardData) {
+	<div class="bb-card">
+		<div class="px-5 py-4 flex items-center justify-between border-b border-base-200/60">
+			<h2 class="text-sm font-semibold text-base-content/80">Recent Transactions</h2>
+			<a href="/transactions" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
+		</div>
+		if len(data.RecentTransactions) > 0 {
+			<div class="px-3 sm:px-4 py-2">
+				for _, tx := range data.RecentTransactions {
+					@txRowCompact(tx)
+				}
+			</div>
+		} else {
+			<div class="flex items-center justify-center py-8 text-base-content/40">
+				<div class="text-center">
+					<i data-lucide="receipt" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+					<p class="text-sm">No transactions yet</p>
+					<a href="/connections/new" class="btn btn-primary btn-sm mt-3 rounded-xl">Connect a bank</a>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+// txRowCompact mirrors partials/tx_row_compact.html. Kept local to this page
+// until the dedicated tx_row worker lands — callers in other pages can then
+// swap to `components.TxRow` without disturbing this file.
+templ txRowCompact(tx components.RecentTxRow) {
+	<a href={ templ.URL("/transactions/" + tx.ID) } class="bb-tx-row-compact flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline">
+		<div class="relative shrink-0">
+			if tx.CategoryIcon != nil {
+				<div class="bb-tx-avatar bb-tx-avatar--sm" style={ components.CategoryAvatarStyle(tx.CategoryColor) }>
+					<i data-lucide={ components.Deref(tx.CategoryIcon) } class="w-3.5 h-3.5"></i>
+				</div>
+			} else {
+				<div class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--letter">
+					<span>{ components.FirstChar(tx.Name) }</span>
+				</div>
+			}
+		</div>
+		<div class="min-w-0 flex-1">
+			<div class="flex items-center gap-1.5 min-w-0">
+				<span class="text-sm font-medium truncate">{ tx.Name }</span>
+				if tx.Pending {
+					<span class="badge badge-soft badge-xs badge-warning rounded-md shrink-0">Pending</span>
+				}
+			</div>
+			<div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40 overflow-hidden">
+				if tx.UserName != "" {
+					if tx.EffectiveUserID != nil {
+						<img src={ components.AvatarURL(tx.EffectiveUserID) } alt="" class="w-4 h-4 rounded-full object-cover shrink-0" title={ tx.UserName }/>
+					} else {
+						<span class="w-4 h-4 rounded-full bg-primary/10 inline-flex items-center justify-center shrink-0" title={ tx.UserName }>
+							<span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{ components.FirstChar(tx.UserName) }</span>
+						</span>
+					}
+				}
+				<span class="truncate shrink min-w-0">{ tx.AccountName }</span>
+				if tx.CategoryDisplayName != nil {
+					<span class="text-base-content/20 shrink-0 hidden sm:inline">·</span>
+					<span class="items-center gap-1 shrink-0 hidden sm:inline-flex">
+						<span class="w-1.5 h-1.5 rounded-full shrink-0" style={ components.CategoryDotStyle(tx.CategoryColor) }></span>
+						<span class="text-base-content/50 truncate max-w-24">{ components.Deref(tx.CategoryDisplayName) }</span>
+					</span>
+				}
+				if tx.AgentReviewed {
+					<span class="text-base-content/20 shrink-0">·</span>
+					<span class="inline-flex items-center gap-0.5 text-primary/60 shrink-0" title="Categorized by AI agent">
+						<i data-lucide="bot" class="w-3 h-3"></i>
+					</span>
+				}
+			</div>
+		</div>
+		<div class="shrink-0 text-right flex flex-col items-end gap-0.5">
+			<span class={ components.TxAmountClass(tx.Amount) }>
+				{ components.FormatAmount(tx.Amount) }
+			</span>
+			<span class="text-[0.65rem] text-base-content/40 tabular-nums">{ components.RelativeDate(tx.Date) }</span>
+		</div>
+	</a>
+}
+
+templ attentionPanel(data components.DashboardData) {
+	<div class="bb-card">
+		<div class="px-5 py-4 flex items-center justify-between border-b border-base-200/60">
+			<div class="flex items-center gap-2">
+				<i data-lucide="bell" class="w-4 h-4 text-base-content/40"></i>
+				<h2 class="text-sm font-semibold text-base-content/80">Attention</h2>
+				if data.HasAttentionItems {
+					<span class="text-[0.65rem] font-semibold px-2 py-0.5 rounded-full bg-warning/15 text-warning">
+						if data.AttentionCount == 1 {
+							{ "1 item" }
+						} else {
+							{ fmt.Sprintf("%d items", data.AttentionCount) }
+						}
+					</span>
+				}
+			</div>
+		</div>
+		if data.HasAttentionItems {
+			<div class="px-3 sm:px-4 py-2">
+				if data.UncategorizedCount > 0 {
+					<a href="/transactions?filter=uncategorized" class="flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline group">
+						<div class="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+							<i data-lucide="tag" class="w-4 h-4 text-warning"></i>
+						</div>
+						<div class="flex-1 min-w-0">
+							<div class="text-sm font-medium group-hover:text-primary transition-colors">{ fmt.Sprintf("%s uncategorized", components.CommaInt(data.UncategorizedCount)) }</div>
+							<div class="text-[0.65rem] text-base-content/40 mt-0.5">Review and assign categories</div>
+						</div>
+						<i data-lucide="chevron-right" class="w-4 h-4 text-base-content/20 group-hover:text-base-content/40 transition-colors shrink-0"></i>
+					</a>
+				}
+				if data.ReviewsEnabled && data.ReviewPending > 0 {
+					<a href="/reviews" class="flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline group">
+						<div class="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
+							<i data-lucide="clipboard-check" class="w-4 h-4 text-info"></i>
+						</div>
+						<div class="flex-1 min-w-0">
+							<div class="text-sm font-medium group-hover:text-primary transition-colors">{ fmt.Sprintf("%s pending reviews", components.CommaInt(data.ReviewPending)) }</div>
+							<div class="text-[0.65rem] text-base-content/40 mt-0.5">Awaiting your approval</div>
+						</div>
+						<i data-lucide="chevron-right" class="w-4 h-4 text-base-content/20 group-hover:text-base-content/40 transition-colors shrink-0"></i>
+					</a>
+				}
+				if data.ErrorCount > 0 {
+					<a href="/connections" class="flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline group">
+						<div class="w-8 h-8 rounded-lg bg-error/10 flex items-center justify-center shrink-0">
+							<i data-lucide="alert-circle" class="w-4 h-4 text-error/70"></i>
+						</div>
+						<div class="flex-1 min-w-0">
+							<div class="text-sm font-medium group-hover:text-primary transition-colors">
+								if data.ErrorCount == 1 {
+									{ "1 connection needs attention" }
+								} else {
+									{ fmt.Sprintf("%d connections need attention", data.ErrorCount) }
+								}
+							</div>
+							<div class="text-[0.65rem] text-base-content/40 mt-0.5">Authentication or sync errors</div>
+						</div>
+						<i data-lucide="chevron-right" class="w-4 h-4 text-base-content/20 group-hover:text-base-content/40 transition-colors shrink-0"></i>
+					</a>
+				}
+			</div>
+		} else {
+			<div class="px-5 py-8 text-center">
+				<i data-lucide="check-circle-2" class="w-8 h-8 mx-auto mb-2 text-success/30"></i>
+				<p class="text-sm text-base-content/40">All caught up</p>
+				<p class="text-xs text-base-content/30 mt-0.5">No items need your attention right now.</p>
+			</div>
+		}
+	</div>
+}
+
+templ connectionHealthPanel(data components.DashboardData) {
+	if len(data.ConnectionHealth) > 0 {
+		<div class="bb-card">
+			<div class="px-5 py-4 flex items-center justify-between border-b border-base-200/60">
+				<div class="flex items-center gap-2">
+					<i data-lucide="link-2" class="w-4 h-4 text-base-content/40"></i>
+					<h2 class="text-sm font-semibold text-base-content/80">Connections</h2>
+				</div>
+				<a href="/connections" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">Manage</a>
+			</div>
+			if data.SyncHealth != nil {
+				@syncHealthRow(data.SyncHealth)
+			}
+			<div class="px-3 sm:px-4 py-2">
+				for _, conn := range data.ConnectionHealth {
+					@connectionHealthRow(conn)
+				}
+			</div>
+		</div>
+	} else {
+		<div class="bb-card">
+			<div class="px-5 py-4 flex items-center justify-between border-b border-base-200/60">
+				<div class="flex items-center gap-2">
+					<i data-lucide="link-2" class="w-4 h-4 text-base-content/40"></i>
+					<h2 class="text-sm font-semibold text-base-content/80">Connections</h2>
+				</div>
+			</div>
+			<div class="px-5 py-8 text-center">
+				<i data-lucide="link-2" class="w-8 h-8 mx-auto mb-2 text-base-content/15"></i>
+				<p class="text-sm text-base-content/40">No connections yet</p>
+				<a href="/connections/new" class="btn btn-primary btn-sm mt-3 rounded-xl">Connect a bank</a>
+			</div>
+		</div>
+	}
+}
+
+templ syncHealthRow(sh *components.SyncHealthView) {
+	<div class="flex items-center gap-5 flex-wrap px-5 py-3 text-xs text-base-content/50 border-b border-base-200/60">
+		if sh.LastSyncTime != nil {
+			<span class="flex items-center gap-1.5">
+				<i data-lucide="clock" class="w-3 h-3 text-base-content/30"></i>
+				{ "Synced " + components.Deref(sh.LastSyncTime) }
+			</span>
+		}
+		if sh.RecentSyncCount > 0 {
+			<span class={ components.SyncRateClass(sh.RecentSuccessRate) }>
+				<i data-lucide="bar-chart-3" class="w-3 h-3"></i>
+				{ fmt.Sprintf("%.0f%% success", sh.RecentSuccessRate) }
+			</span>
+		}
+		if sh.NextSyncTime != "" {
+			<span class="flex items-center gap-1.5 text-base-content/40">
+				<i data-lucide="timer" class="w-3 h-3"></i>
+				{ "Next: " + sh.NextSyncTime }
+			</span>
+		}
+	</div>
+}
+
+templ connectionHealthRow(conn components.ConnectionHealthRow) {
+	<a href={ templ.URL("/connections/" + conn.ID) } class="flex items-center gap-2.5 py-2.5 px-2 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline group">
+		<div class="relative shrink-0">
+			<div class={ components.ConnectionIconWrapperClass(conn) }>
+				switch {
+					case conn.Status == "error":
+						<i data-lucide="alert-circle" class="w-3.5 h-3.5 text-error/70"></i>
+					case conn.Status == "pending_reauth":
+						<i data-lucide="key" class="w-3.5 h-3.5 text-warning"></i>
+					case conn.IsStale:
+						<i data-lucide="clock" class="w-3.5 h-3.5 text-warning/70"></i>
+					default:
+						<i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-success/70"></i>
+				}
+			</div>
+			if conn.Paused {
+				<div class="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-base-100 flex items-center justify-center">
+					<i data-lucide="pause" class="w-2 h-2 text-base-content/40"></i>
+				</div>
+			}
+		</div>
+		<div class="flex-1 min-w-0">
+			<div class="flex items-center gap-1.5">
+				<span class="text-xs font-medium truncate group-hover:text-primary transition-colors">{ conn.Name }</span>
+				<span class="text-[0.6rem] text-base-content/25 shrink-0">{ conn.Provider }</span>
+			</div>
+			if conn.Status != "active" && conn.ErrorMessage != "" {
+				<div class="text-[0.6rem] text-error/60 truncate mt-0.5 font-mono max-w-full" title={ conn.ErrorMessage }>{ conn.ErrorMessage }</div>
+			} else {
+				<div class="text-[0.6rem] text-base-content/30 mt-0.5">
+					{ components.ConnectionAccountsLine(conn) }
+				</div>
+			}
+		</div>
+		<div class="shrink-0">
+			switch {
+				case conn.Status == "active" && conn.IsStale:
+					<span class="text-[0.6rem] font-medium text-warning/70 bg-warning/8 px-1.5 py-0.5 rounded-full">stale</span>
+				case conn.Status == "active":
+					<span class="w-1.5 h-1.5 rounded-full bg-success/50"></span>
+				case conn.Status == "error":
+					<span class="text-[0.6rem] font-medium text-error/70 bg-error/8 px-1.5 py-0.5 rounded-full">error</span>
+				case conn.Status == "pending_reauth":
+					<span class="text-[0.6rem] font-medium text-warning bg-warning/8 px-1.5 py-0.5 rounded-full">reauth</span>
+			}
+		</div>
+	</a>
+}
+
+// The agent reports dismiss/mark-read helpers and the sparkline renderer are
+// ported verbatim from the legacy dashboard.html. Keeping them inline (vs. a
+// shared static asset) keeps the diff small and the migration reviewable.
+templ agentReportsScript() {
+	<script>
+function agentReports() {
+  return {
+    dismissed: {},
+    markRead(id) {
+      this.dismissed[id] = true;
+      fetch('/-/reports/' + id + '/read', { method: 'POST' });
+    },
+    markAllRead() {
+      var self = this;
+      document.querySelectorAll('[id^="report-"]').forEach(function(el) {
+        var id = el.id.replace('report-', '');
+        self.dismissed[id] = true;
+      });
+      fetch('/-/reports/read-all', { method: 'POST' });
+    }
+  };
+}
+  </script>
+}
+
+templ sparklineScript() {
+	<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+  document.querySelectorAll('.bb-sparkline').forEach(function(el) {
+    try {
+      var values = JSON.parse(el.dataset.values);
+      var isLiability = el.dataset.liability === 'true';
+      if (!values || values.length === 0) return;
+
+      var max = Math.max.apply(null, values);
+      var hasData = max > 0;
+      if (!hasData) return;
+
+      var w = 200, h = 40, padding = 2;
+      var points = values.map(function(v, i) {
+        var x = padding + (i / (values.length - 1)) * (w - padding * 2);
+        var y = h - padding - ((v / max) * (h - padding * 2));
+        return x + ',' + y;
+      });
+
+      var pathD = 'M' + points.join(' L');
+      var fillD = pathD + ' L' + (w - padding) + ',' + h + ' L' + padding + ',' + h + ' Z';
+
+      var strokeColor, fillColor;
+      if (isLiability) {
+        strokeColor = isDark ? 'oklch(0.65 0.15 25)' : 'oklch(0.55 0.15 25)';
+        fillColor = isDark ? 'oklch(0.65 0.15 25 / 0.15)' : 'oklch(0.55 0.15 25 / 0.1)';
+      } else {
+        strokeColor = isDark ? 'oklch(0.65 0.02 250)' : 'oklch(0.45 0.02 250)';
+        fillColor = isDark ? 'oklch(0.65 0.02 250 / 0.15)' : 'oklch(0.45 0.02 250 / 0.1)';
+      }
+
+      var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" class="w-full h-full">' +
+        '<path d="' + fillD + '" fill="' + fillColor + '" />' +
+        '<polyline points="' + points.join(' ') + '" fill="none" stroke="' + strokeColor + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />' +
+        '</svg>';
+
+      el.innerHTML = svg;
+    } catch(e) {
+      // Silently ignore malformed data.
+    }
+  });
+});
+  </script>
+}
