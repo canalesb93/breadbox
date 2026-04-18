@@ -107,6 +107,10 @@ func renderTemplComponent(name string, data any) template.HTML {
 			items[i] = components.Breadcrumb{Label: b.Label, Href: b.Href}
 		}
 		c = components.BreadcrumbNav(items)
+	case "CategoryPickerScript":
+		c = components.CategoryPickerScript()
+	case "CategoryPickerStyles":
+		c = components.CategoryPickerStyles()
 	default:
 		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): unknown -->", name))
 	}
