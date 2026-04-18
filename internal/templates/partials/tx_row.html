@@ -54,8 +54,8 @@
         {{end}}
         <span class="truncate min-w-0">{{.AccountName}}</span>
         {{if and .MerchantName (not (eqFold .Name (deref .MerchantName)))}}
-        <span class="text-base-content/20 hidden sm:inline">&middot;</span>
-        <span class="text-base-content/40 truncate hidden sm:inline">{{titleCase (deref .MerchantName)}}</span>
+        <span class="text-base-content/20 hidden xl:inline">&middot;</span>
+        <span class="text-base-content/40 truncate hidden xl:inline">{{titleCase (deref .MerchantName)}}</span>
         {{end}}
         {{if .AgentReviewed}}
         <span class="text-base-content/20">&middot;</span>
@@ -70,17 +70,18 @@
              the mobile-only count pill below takes their place. -->
         <span class="bb-tx-tag-container contents" data-tx-tag-container>
           {{if .Tags}}
-          <span class="text-base-content/20 hidden sm:inline" data-tx-tag-sep>&middot;</span>
+          <span class="text-base-content/20 hidden xl:inline" data-tx-tag-sep>&middot;</span>
           {{range .Tags}}
           {{template "tag-chip-sm" .}}
           {{end}}
           {{end}}
         </span>
-        <!-- Mobile tag indicator: single pill with tag icon + count. Kept in
-             sync by updateRowTags(). Rendered only when tags exist so the
-             leading middot doesn't orphan. -->
+        <!-- Compact tag indicator: single pill with tag icon + count. Shown
+             below xl where the inline chips would crowd the meta line and
+             overflow into the Category column (fits roughly: phones, tablets,
+             and small desktops with the sidebar open). -->
         {{if .Tags}}
-        <span class="sm:hidden inline-flex items-center gap-0.5 text-base-content/40 shrink-0"
+        <span class="xl:hidden inline-flex items-center gap-0.5 text-base-content/40 shrink-0"
               data-tx-tag-mobile
               title="{{len .Tags}} tag{{if ne (len .Tags) 1}}s{{end}}">
           <span class="text-base-content/20 mr-0.5">&middot;</span>
@@ -88,24 +89,26 @@
           <span class="text-[0.65rem] tabular-nums font-medium" data-tx-tag-count>{{len .Tags}}</span>
         </span>
         {{end}}
-        <!-- Mobile category label (hidden on desktop where the picker column shows).
-             Separator lives inside the conditional so it never orphans when the
-             meta line is empty. -->
+        <!-- Compact category label (shown below xl where the inline picker
+             column is hidden). Separator lives inside the conditional so it
+             never orphans when the meta line is empty. -->
         {{if .CategoryDisplayName}}
-        <span class="sm:hidden text-base-content/20 shrink-0">&middot;</span>
-        <span class="sm:hidden inline-flex items-center gap-1 shrink min-w-0">
+        <span class="xl:hidden text-base-content/20 shrink-0">&middot;</span>
+        <span class="xl:hidden inline-flex items-center gap-1 shrink min-w-0">
           {{if .CategoryColor}}<span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {{safeCSS (deref .CategoryColor)}}"></span>{{end}}
           <span class="text-base-content/50 truncate">{{deref .CategoryDisplayName}}</span>
         </span>
         {{else}}
-        <span class="sm:hidden text-base-content/20 shrink-0">&middot;</span>
-        <span class="sm:hidden text-base-content/25 truncate shrink-0">Uncategorized</span>
+        <span class="xl:hidden text-base-content/20 shrink-0">&middot;</span>
+        <span class="xl:hidden text-base-content/25 truncate shrink-0">Uncategorized</span>
         {{end}}
       </div>
     </div>
 
-    <!-- Category Picker (inline column) -->
-    <div class="shrink-0 hidden sm:block" @click.stop>
+    <!-- Category Picker (inline column) — shown at xl+ where there's room
+         for chips + picker without overflow. Below xl the compact category
+         label appears in the meta line above. -->
+    <div class="shrink-0 hidden xl:block" @click.stop>
       <div class="bb-cat-picker" data-picker-source="tx-cat-{{.ID}}" x-data="categoryPicker({categories: window.__bbCategories, mode: 'assign', initial: '{{if .CategoryID}}{{.CategoryID}}{{end}}', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', sourceId: 'tx-cat-{{.ID}}'})" x-init="$watch('selectedId', (v, old) => { if (old !== undefined && v !== old && !($store.bulk && $store.bulk.processing)) { quickSetCategory('{{.ID}}', v) } })">
         <button type="button" class="btn btn-ghost btn-xs gap-1.5 rounded-lg" @click="openPicker()">
           <template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
