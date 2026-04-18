@@ -168,8 +168,7 @@ func CreateCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
 			Color       *string `json:"color"`
 			SortOrder   int32   `json:"sort_order"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 		req.DisplayName = strings.TrimSpace(req.DisplayName)
@@ -204,8 +203,7 @@ func UpdateCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
 			SortOrder   int32   `json:"sort_order"`
 			Hidden      bool    `json:"hidden"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 		req.DisplayName = strings.TrimSpace(req.DisplayName)
@@ -249,8 +247,7 @@ func MergeCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
 		var req struct {
 			TargetID string `json:"target_id"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 		if req.TargetID == "" {
@@ -289,8 +286,7 @@ func SetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
 		var req struct {
 			CategoryID string `json:"category_id"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 		if req.CategoryID == "" {
@@ -339,8 +335,7 @@ func BatchSetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerF
 				CategoryID    string `json:"category_id"`
 			} `json:"items"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 		if len(req.Items) == 0 {
