@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 
-	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -21,7 +20,7 @@ func ListConnectionsHandler(svc *service.Service) http.HandlerFunc {
 
 		connections, err := svc.ListConnections(r.Context(), userIDPtr)
 		if err != nil {
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list connections")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list connections")
 			return
 		}
 
@@ -37,10 +36,10 @@ func GetConnectionStatusHandler(svc *service.Service) http.HandlerFunc {
 		status, err := svc.GetConnectionStatus(r.Context(), id)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Connection not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Connection not found")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get connection status")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get connection status")
 			return
 		}
 

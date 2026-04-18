@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -30,18 +29,18 @@ func parseTransactionFilters(w http.ResponseWriter, r *http.Request) (
 
 	startDate, err = parseDateParam(q, "start_date")
 	if err != nil {
-		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
 	}
 
 	endDate, err = parseDateParam(q, "end_date")
 	if err != nil {
-		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
 	}
 
 	if startDate != nil && endDate != nil && !startDate.Before(*endDate) {
-		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be before end_date")
+		writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", "start_date must be before end_date")
 		return
 	}
 
@@ -51,36 +50,36 @@ func parseTransactionFilters(w http.ResponseWriter, r *http.Request) (
 
 	minAmount, err = parseFloatParam(q, "min_amount")
 	if err != nil {
-		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
 	}
 
 	maxAmount, err = parseFloatParam(q, "max_amount")
 	if err != nil {
-		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
 	}
 
 	if minAmount != nil && maxAmount != nil && *minAmount > *maxAmount {
-		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "min_amount must be less than or equal to max_amount")
+		writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", "min_amount must be less than or equal to max_amount")
 		return
 	}
 
 	pending, err = parseBoolParam(q, "pending")
 	if err != nil {
-		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
 	}
 
 	search, err = parseMinLengthStringParam(q, "search", 2)
 	if err != nil {
-		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
 	}
 
 	if v := q.Get("search_mode"); v != "" {
 		if !service.ValidateSearchMode(v) {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "search_mode must be one of: contains, words, fuzzy")
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", "search_mode must be one of: contains, words, fuzzy")
 			return
 		}
 		searchMode = &v
@@ -88,7 +87,7 @@ func parseTransactionFilters(w http.ResponseWriter, r *http.Request) (
 
 	excludeSearch, err = parseMinLengthStringParam(q, "exclude_search", 2)
 	if err != nil {
-		mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+		writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 		return
 	}
 
@@ -103,7 +102,7 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 
 		limit, err := parseIntParam(q, "limit", 100, 1, 500)
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 
@@ -115,7 +114,7 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 		// Parse sort_by.
 		sortBy, err := parseEnumParam(q, "sort_by", []string{"date", "amount", "name"})
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 
@@ -126,7 +125,7 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			case "asc", "desc":
 				sortOrder = &v
 			default:
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "sort_order must be asc or desc")
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", "sort_order must be asc or desc")
 				return
 			}
 		}
@@ -152,17 +151,17 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 		// Parse fields for field selection.
 		fieldSet, err := service.ParseFields(q.Get("fields"))
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_FIELDS", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_FIELDS", err.Error())
 			return
 		}
 
 		result, err := svc.ListTransactions(r.Context(), params)
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidCursor) {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_CURSOR", "The provided cursor is not valid")
+				writeError(w, http.StatusBadRequest, "INVALID_CURSOR", "The provided cursor is not valid")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list transactions")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list transactions")
 			return
 		}
 
@@ -208,7 +207,7 @@ func CountTransactionsHandler(svc *service.Service) http.HandlerFunc {
 
 		count, err := svc.CountTransactionsFiltered(r.Context(), params)
 		if err != nil {
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to count transactions")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to count transactions")
 			return
 		}
 
@@ -223,17 +222,17 @@ func GetTransactionHandler(svc *service.Service) http.HandlerFunc {
 
 		fieldSet, err := service.ParseFields(r.URL.Query().Get("fields"))
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_FIELDS", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_FIELDS", err.Error())
 			return
 		}
 
 		txn, err := svc.GetTransaction(r.Context(), id)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get transaction")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get transaction")
 			return
 		}
 
@@ -253,7 +252,7 @@ func TransactionSummaryHandler(svc *service.Service) http.HandlerFunc {
 
 		groupBy := q.Get("group_by")
 		if groupBy == "" {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "group_by is required (category, month, week, day, category_month)")
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", "group_by is required (category, month, week, day, category_month)")
 			return
 		}
 
@@ -264,13 +263,13 @@ func TransactionSummaryHandler(svc *service.Service) http.HandlerFunc {
 		var err error
 		params.StartDate, err = parseDateParam(q, "start_date")
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 
 		params.EndDate, err = parseDateParam(q, "end_date")
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 
@@ -287,10 +286,10 @@ func TransactionSummaryHandler(svc *service.Service) http.HandlerFunc {
 		result, err := svc.GetTransactionSummary(r.Context(), params)
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidParameter) {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get transaction summary")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get transaction summary")
 			return
 		}
 
@@ -309,13 +308,13 @@ func MerchantSummaryHandler(svc *service.Service) http.HandlerFunc {
 
 		params.StartDate, err = parseDateParam(q, "start_date")
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 
 		params.EndDate, err = parseDateParam(q, "end_date")
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 
@@ -325,24 +324,24 @@ func MerchantSummaryHandler(svc *service.Service) http.HandlerFunc {
 
 		params.MinAmount, err = parseFloatParam(q, "min_amount")
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 
 		params.MaxAmount, err = parseFloatParam(q, "max_amount")
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 
 		params.Search, err = parseMinLengthStringParam(q, "search", 2)
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 		if v := q.Get("search_mode"); v != "" {
 			if !service.ValidateSearchMode(v) {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "search_mode must be one of: contains, words, fuzzy")
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", "search_mode must be one of: contains, words, fuzzy")
 				return
 			}
 			params.SearchMode = &v
@@ -350,14 +349,14 @@ func MerchantSummaryHandler(svc *service.Service) http.HandlerFunc {
 
 		params.ExcludeSearch, err = parseMinLengthStringParam(q, "exclude_search", 2)
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 
 		if v := q.Get("min_count"); v != "" {
 			n, parseErr := strconv.Atoi(v)
 			if parseErr != nil || n < 1 {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "min_count must be a positive integer")
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", "min_count must be a positive integer")
 				return
 			}
 			params.MinCount = n
@@ -370,10 +369,10 @@ func MerchantSummaryHandler(svc *service.Service) http.HandlerFunc {
 		result, err := svc.GetMerchantSummary(r.Context(), params)
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidParameter) {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get merchant summary")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get merchant summary")
 			return
 		}
 
@@ -390,23 +389,23 @@ func SetTransactionCategoryHandler(svc *service.Service) http.HandlerFunc {
 			CategoryID string `json:"category_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+			writeError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
 			return
 		}
 		if input.CategoryID == "" {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "category_id is required")
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", "category_id is required")
 			return
 		}
 		if err := svc.SetTransactionCategory(r.Context(), id, input.CategoryID); err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
 				return
 			}
 			if errors.Is(err, service.ErrCategoryNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "CATEGORY_NOT_FOUND", "Category not found")
+				writeError(w, http.StatusNotFound, "CATEGORY_NOT_FOUND", "Category not found")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to set transaction category")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to set transaction category")
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -420,10 +419,10 @@ func ResetTransactionCategoryHandler(svc *service.Service) http.HandlerFunc {
 		id := chi.URLParam(r, "id")
 		if err := svc.ResetTransactionCategory(r.Context(), id); err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to reset transaction category")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to reset transaction category")
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -437,17 +436,17 @@ func BatchCategorizeHandler(svc *service.Service) http.HandlerFunc {
 			Items []service.BatchCategorizeItem `json:"items"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+			writeError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
 			return
 		}
 
 		result, err := svc.BatchSetTransactionCategory(r.Context(), input.Items)
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidParameter) {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to batch categorize transactions")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to batch categorize transactions")
 			return
 		}
 
@@ -472,12 +471,12 @@ func BulkRecategorizeHandler(svc *service.Service) http.HandlerFunc {
 			NameContains       string   `json:"name_contains"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+			writeError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
 			return
 		}
 
 		if input.TargetCategorySlug == "" {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "target_category_slug is required")
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", "target_category_slug is required")
 			return
 		}
 
@@ -491,7 +490,7 @@ func BulkRecategorizeHandler(svc *service.Service) http.HandlerFunc {
 		if input.StartDate != "" {
 			t, err := time.Parse("2006-01-02", input.StartDate)
 			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "invalid start_date format")
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", "invalid start_date format")
 				return
 			}
 			params.StartDate = &t
@@ -499,7 +498,7 @@ func BulkRecategorizeHandler(svc *service.Service) http.HandlerFunc {
 		if input.EndDate != "" {
 			t, err := time.Parse("2006-01-02", input.EndDate)
 			if err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "invalid end_date format")
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", "invalid end_date format")
 				return
 			}
 			params.EndDate = &t
@@ -523,14 +522,14 @@ func BulkRecategorizeHandler(svc *service.Service) http.HandlerFunc {
 		result, err := svc.BulkRecategorizeByFilter(r.Context(), params)
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidParameter) {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 				return
 			}
 			if errors.Is(err, service.ErrCategoryNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "CATEGORY_NOT_FOUND", err.Error())
+				writeError(w, http.StatusNotFound, "CATEGORY_NOT_FOUND", err.Error())
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to bulk recategorize transactions")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to bulk recategorize transactions")
 			return
 		}
 

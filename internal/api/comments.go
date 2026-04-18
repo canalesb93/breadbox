@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -20,10 +19,10 @@ func ListCommentsHandler(svc *service.Service) http.HandlerFunc {
 		comments, err := svc.ListComments(r.Context(), txnID)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list comments")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list comments")
 			return
 		}
 
@@ -40,7 +39,7 @@ func CreateCommentHandler(svc *service.Service) http.HandlerFunc {
 			Content string `json:"content"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+			writeError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
 			return
 		}
 
@@ -53,14 +52,14 @@ func CreateCommentHandler(svc *service.Service) http.HandlerFunc {
 		})
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
 				return
 			}
 			if strings.Contains(err.Error(), "content must be") {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create comment")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create comment")
 			return
 		}
 
@@ -77,7 +76,7 @@ func UpdateCommentHandler(svc *service.Service) http.HandlerFunc {
 			Content string `json:"content"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+			writeError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
 			return
 		}
 
@@ -89,18 +88,18 @@ func UpdateCommentHandler(svc *service.Service) http.HandlerFunc {
 		})
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Comment not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Comment not found")
 				return
 			}
 			if errors.Is(err, service.ErrForbidden) {
-				mw.WriteError(w, http.StatusForbidden, "FORBIDDEN", "You can only edit your own comments")
+				writeError(w, http.StatusForbidden, "FORBIDDEN", "You can only edit your own comments")
 				return
 			}
 			if strings.Contains(err.Error(), "content must be") {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update comment")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update comment")
 			return
 		}
 
@@ -116,14 +115,14 @@ func DeleteCommentHandler(svc *service.Service) http.HandlerFunc {
 
 		if err := svc.DeleteComment(r.Context(), commentID, actor); err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Comment not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Comment not found")
 				return
 			}
 			if errors.Is(err, service.ErrForbidden) {
-				mw.WriteError(w, http.StatusForbidden, "FORBIDDEN", "You can only delete your own comments")
+				writeError(w, http.StatusForbidden, "FORBIDDEN", "You can only delete your own comments")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete comment")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete comment")
 			return
 		}
 

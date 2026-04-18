@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 )
 
@@ -19,7 +18,7 @@ func TriggerSyncHandler(svc *service.Service) http.HandlerFunc {
 				ConnectionID *string `json:"connection_id"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+				writeError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
 				return
 			}
 			connectionID = body.ConnectionID
@@ -27,10 +26,10 @@ func TriggerSyncHandler(svc *service.Service) http.HandlerFunc {
 
 		if err := svc.TriggerSync(r.Context(), connectionID); err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Connection not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Connection not found")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to trigger sync")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to trigger sync")
 			return
 		}
 

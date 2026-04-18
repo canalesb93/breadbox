@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -18,13 +17,13 @@ func ListRulesHandler(svc *service.Service) http.HandlerFunc {
 
 		limit, err := parseIntParam(q, "limit", 50, 1, 500)
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 
 		enabled, err := parseBoolParam(q, "enabled")
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 
@@ -39,10 +38,10 @@ func ListRulesHandler(svc *service.Service) http.HandlerFunc {
 		result, err := svc.ListTransactionRules(r.Context(), params)
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidCursor) {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "Invalid cursor")
+				writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", "Invalid cursor")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list rules")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list rules")
 			return
 		}
 
@@ -67,16 +66,16 @@ func CreateRuleHandler(svc *service.Service) http.HandlerFunc {
 			ExpiresIn string `json:"expires_in"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+			writeError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
 			return
 		}
 
 		if input.Name == "" {
-			mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "name is required")
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "name is required")
 			return
 		}
 		if len(input.Actions) == 0 && input.CategorySlug == "" {
-			mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "either actions or category_slug is required")
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "either actions or category_slug is required")
 			return
 		}
 
@@ -99,14 +98,14 @@ func CreateRuleHandler(svc *service.Service) http.HandlerFunc {
 		rule, err := svc.CreateTransactionRule(r.Context(), params)
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidParameter) {
-				mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+				writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 				return
 			}
 			if errors.Is(err, service.ErrCategoryNotFound) {
-				mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Category not found")
+				writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Category not found")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create rule")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create rule")
 			return
 		}
 
@@ -122,10 +121,10 @@ func GetRuleHandler(svc *service.Service) http.HandlerFunc {
 		rule, err := svc.GetTransactionRule(r.Context(), id)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Rule not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Rule not found")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get rule")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get rule")
 			return
 		}
 
@@ -151,7 +150,7 @@ func UpdateRuleHandler(svc *service.Service) http.HandlerFunc {
 			ExpiresAt *string `json:"expires_at,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+			writeError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
 			return
 		}
 
@@ -168,14 +167,14 @@ func UpdateRuleHandler(svc *service.Service) http.HandlerFunc {
 		})
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Rule not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Rule not found")
 				return
 			}
 			if errors.Is(err, service.ErrInvalidParameter) {
-				mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+				writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update rule")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update rule")
 			return
 		}
 
@@ -190,10 +189,10 @@ func DeleteRuleHandler(svc *service.Service) http.HandlerFunc {
 
 		if err := svc.DeleteTransactionRule(r.Context(), id); err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Rule not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Rule not found")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete rule")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete rule")
 			return
 		}
 
@@ -209,14 +208,14 @@ func ApplyRuleHandler(svc *service.Service) http.HandlerFunc {
 		count, err := svc.ApplyRuleRetroactively(r.Context(), id)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Rule not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Rule not found")
 				return
 			}
 			if errors.Is(err, service.ErrInvalidParameter) {
-				mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+				writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to apply rule")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to apply rule")
 			return
 		}
 
@@ -232,7 +231,7 @@ func ApplyAllRulesHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		results, err := svc.ApplyAllRulesRetroactively(r.Context())
 		if err != nil {
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to apply rules")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to apply rules")
 			return
 		}
 
@@ -256,17 +255,17 @@ func PreviewRuleHandler(svc *service.Service) http.HandlerFunc {
 			SampleSize int               `json:"sample_size"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+			writeError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
 			return
 		}
 
 		result, err := svc.PreviewRule(r.Context(), input.Conditions, input.SampleSize)
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidParameter) {
-				mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+				writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to preview rule")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to preview rule")
 			return
 		}
 

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -15,7 +14,7 @@ func ListReportsHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reports, err := svc.ListAgentReports(r.Context(), 50)
 		if err != nil {
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list reports")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list reports")
 			return
 		}
 		writeData(w, reports)
@@ -27,7 +26,7 @@ func UnreadReportCountHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		count, err := svc.CountUnreadAgentReports(r.Context())
 		if err != nil {
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to count unread reports")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to count unread reports")
 			return
 		}
 		writeData(w, map[string]int64{"unread_count": count})
@@ -45,14 +44,14 @@ func CreateReportHandler(svc *service.Service) http.HandlerFunc {
 			Author   string   `json:"author"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid JSON body")
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid JSON body")
 			return
 		}
 
 		actor := service.ActorFromContext(r.Context())
 		report, err := svc.CreateAgentReport(r.Context(), req.Title, req.Body, actor, req.Priority, req.Tags, req.Author, "")
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
@@ -65,7 +64,7 @@ func MarkReportReadHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		if err := svc.MarkAgentReportRead(r.Context(), id); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
+			writeError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return
 		}
 		writeData(w, map[string]bool{"ok": true})

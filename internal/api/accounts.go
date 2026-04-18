@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 
-	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -21,7 +20,7 @@ func ListAccountsHandler(svc *service.Service) http.HandlerFunc {
 
 		accounts, err := svc.ListAccounts(r.Context(), userIDPtr)
 		if err != nil {
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list accounts")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list accounts")
 			return
 		}
 
@@ -37,10 +36,10 @@ func GetAccountHandler(svc *service.Service) http.HandlerFunc {
 		account, err := svc.GetAccount(r.Context(), id)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Account not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Account not found")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get account")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get account")
 			return
 		}
 

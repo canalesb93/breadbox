@@ -4,7 +4,6 @@ import (
 	"io"
 	"net/http"
 
-	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 )
 
@@ -13,7 +12,7 @@ func ExportCategoriesTSVHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tsv, err := svc.ExportCategoriesTSV(r.Context())
 		if err != nil {
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to export categories")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to export categories")
 			return
 		}
 		w.Header().Set("Content-Type", "text/tab-separated-values")
@@ -27,11 +26,11 @@ func ImportCategoriesTSVHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Failed to read request body")
+			writeError(w, http.StatusBadRequest, "INVALID_BODY", "Failed to read request body")
 			return
 		}
 		if len(body) == 0 {
-			mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Request body is empty")
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Request body is empty")
 			return
 		}
 
@@ -39,7 +38,7 @@ func ImportCategoriesTSVHandler(svc *service.Service) http.HandlerFunc {
 
 		result, err := svc.ImportCategoriesTSV(r.Context(), string(body), replaceMode)
 		if err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "IMPORT_ERROR", err.Error())
+			writeError(w, http.StatusBadRequest, "IMPORT_ERROR", err.Error())
 			return
 		}
 		writeData(w, result)

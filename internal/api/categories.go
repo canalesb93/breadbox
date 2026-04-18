@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -16,7 +15,7 @@ func ListCategoriesHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		categories, err := svc.ListCategoryTree(r.Context())
 		if err != nil {
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list categories")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list categories")
 			return
 		}
 		writeData(w, categories)
@@ -31,10 +30,10 @@ func GetCategoryHandler(svc *service.Service) http.HandlerFunc {
 		category, err := svc.GetCategory(r.Context(), id)
 		if err != nil {
 			if errors.Is(err, service.ErrCategoryNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Category not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Category not found")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get category")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get category")
 			return
 		}
 
@@ -56,12 +55,12 @@ func CreateCategoryHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var input createCategoryRequest
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Invalid JSON body")
+			writeError(w, http.StatusBadRequest, "INVALID_JSON", "Invalid JSON body")
 			return
 		}
 
 		if input.DisplayName == "" {
-			mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "display_name is required")
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "display_name is required")
 			return
 		}
 
@@ -75,10 +74,10 @@ func CreateCategoryHandler(svc *service.Service) http.HandlerFunc {
 		})
 		if err != nil {
 			if errors.Is(err, service.ErrSlugConflict) {
-				mw.WriteError(w, http.StatusConflict, "SLUG_CONFLICT", "A category with this slug already exists")
+				writeError(w, http.StatusConflict, "SLUG_CONFLICT", "A category with this slug already exists")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create category")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create category")
 			return
 		}
 
@@ -101,12 +100,12 @@ func UpdateCategoryHandler(svc *service.Service) http.HandlerFunc {
 
 		var input updateCategoryRequest
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Invalid JSON body")
+			writeError(w, http.StatusBadRequest, "INVALID_JSON", "Invalid JSON body")
 			return
 		}
 
 		if input.DisplayName == "" {
-			mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "display_name is required")
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "display_name is required")
 			return
 		}
 
@@ -119,10 +118,10 @@ func UpdateCategoryHandler(svc *service.Service) http.HandlerFunc {
 		})
 		if err != nil {
 			if errors.Is(err, service.ErrCategoryNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Category not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Category not found")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update category")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update category")
 			return
 		}
 
@@ -138,14 +137,14 @@ func DeleteCategoryHandler(svc *service.Service) http.HandlerFunc {
 		affected, err := svc.DeleteCategory(r.Context(), id)
 		if err != nil {
 			if errors.Is(err, service.ErrCategoryNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Category not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Category not found")
 				return
 			}
 			if errors.Is(err, service.ErrCategoryUndeletable) {
-				mw.WriteError(w, http.StatusConflict, "CATEGORY_UNDELETABLE", "This category cannot be deleted")
+				writeError(w, http.StatusConflict, "CATEGORY_UNDELETABLE", "This category cannot be deleted")
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete category")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete category")
 			return
 		}
 
@@ -164,26 +163,26 @@ func MergeCategoriesHandler(svc *service.Service) http.HandlerFunc {
 
 		var input mergeCategoriesRequest
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Invalid JSON body")
+			writeError(w, http.StatusBadRequest, "INVALID_JSON", "Invalid JSON body")
 			return
 		}
 
 		if input.TargetID == "" {
-			mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "target_id is required")
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "target_id is required")
 			return
 		}
 
 		err := svc.MergeCategories(r.Context(), id, input.TargetID)
 		if err != nil {
 			if errors.Is(err, service.ErrCategoryNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Category not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Category not found")
 				return
 			}
 			if errors.Is(err, service.ErrInvalidParameter) {
-				mw.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+				writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 				return
 			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to merge categories")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to merge categories")
 			return
 		}
 
