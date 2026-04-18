@@ -8,6 +8,10 @@ Go 1.24+ single binary. PostgreSQL, chi/v5, pgx/v5 + sqlc, goose migrations, rob
 
 One HTTP server (`breadbox serve`) hosts everything: REST API (`/api/v1/...`), MCP, admin dashboard, webhooks (`/webhooks/:provider`). Bank providers are abstracted behind the `internal/provider.Provider` interface.
 
+### Templ components
+
+New admin UI pieces are authored as [`a-h/templ`](https://templ.guide) components under `internal/templates/components/*.templ` — type-safe Go that compiles to generated `*_templ.go` siblings (commit both). Existing `html/template` pages continue to work during the migration (#462) and can embed templ components via the `renderComponent` funcMap bridge. Run `templ generate` after editing a `.templ` file; `make generate` and `make dev-watch` do it automatically once the #462 infrastructure lands. Run `templ fmt .` before committing. Details in `docs/design-system.md`.
+
 ## Codebase Map
 
 - `internal/service/` — shared service layer. REST handlers and MCP tools call into here (no HTTP round-trip for MCP). Converts `pgtype.*` → Go primitives. See `.claude/rules/service.md`.
