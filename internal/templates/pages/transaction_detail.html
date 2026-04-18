@@ -1,7 +1,7 @@
 {{define "content"}}
 {{template "category-picker-styles" .}}
 
-{{template "breadcrumb" .}}
+{{renderComponent "breadcrumb" .Breadcrumbs}}
 
 <!-- Hero: Transaction name + amount -->
 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">

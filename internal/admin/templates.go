@@ -2,6 +2,7 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -18,8 +19,10 @@ import (
 	"breadbox/internal/service"
 	bsync "breadbox/internal/sync"
 	"breadbox/internal/templates"
+	"breadbox/internal/templates/components"
 	"breadbox/internal/version"
 
+	"github.com/a-h/templ"
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -44,12 +47,10 @@ type WizardData struct {
 	StepNumber int
 }
 
-// Breadcrumb represents one item in a navigation breadcrumb trail.
-// If Href is empty, it's rendered as the current page (no link).
-type Breadcrumb struct {
-	Label string
-	Href  string
-}
+// Breadcrumb is the item type used by handlers when populating
+// data["Breadcrumbs"]. Aliased to the templ component's type so both
+// sides share one definition.
+type Breadcrumb = components.Breadcrumb
 
 // TemplateRenderer parses and renders HTML templates.
 type TemplateRenderer struct {
@@ -781,6 +782,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"formatBytes": func(bytes int64) string {
 				return service.FormatBytes(bytes)
 			},
+			"renderComponent": renderComponent,
 		},
 	}
 	if err := tr.parseTemplates(); err != nil {
@@ -789,12 +791,15 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 	return tr, nil
 }
 
+// templatePartials lists html/template partials that still ship as .html
+// files. Components migrated to templ (see internal/templates/components/)
+// are not listed here and are rendered via the "renderComponent" funcMap
+// bridge.
 var templatePartials = []string{
 	"partials/flash.html",
 	"partials/nav.html",
 	"partials/category_picker.html",
 	"partials/skeletons.html",
-	"partials/breadcrumb.html",
 	"partials/tx_row.html",
 	"partials/tx_row_compact.html",
 	"partials/tx_results.html",
@@ -1273,4 +1278,24 @@ func (tr *TemplateRenderer) RenderTo(w io.Writer, name string, data interface{})
 		return fmt.Errorf("template not found: %s", name)
 	}
 	return t.ExecuteTemplate(w, "layout", data)
+}
+
+// renderComponent is the html/template → templ bridge so pages mid-migration
+// can embed templ components via {{renderComponent "name" .Data}}. The
+// second argument is the component's input; each case type-asserts to its
+// expected prop type.
+func renderComponent(name string, data any) (template.HTML, error) {
+	var comp templ.Component
+	switch name {
+	case "breadcrumb":
+		items, _ := data.([]components.Breadcrumb)
+		comp = components.BreadcrumbNav(items)
+	default:
+		return "", fmt.Errorf("renderComponent: unknown component %q", name)
+	}
+	var buf bytes.Buffer
+	if err := comp.Render(context.Background(), &buf); err != nil {
+		return "", fmt.Errorf("renderComponent %q: %w", name, err)
+	}
+	return template.HTML(buf.String()), nil
 }

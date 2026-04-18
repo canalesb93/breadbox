@@ -1,0 +1,34 @@
+// Package components holds templ components migrated from html/template
+// partials. Components here are rendered from Go handlers or bridged into
+// the existing html/template renderer via the "renderComponent" funcMap
+// (see internal/admin/templates.go).
+package components
+
+// Breadcrumb represents one item in a navigation breadcrumb trail.
+// If Href is empty, the item is rendered as the current page (no link).
+type Breadcrumb struct {
+	Label string
+	Href  string
+}
+
+// BreadcrumbNav renders a clean navigation trail. The last item is shown as
+// the current page (bolder, no link). A chevron-right SVG separator sits
+// between items. When items is empty, the component renders nothing.
+templ BreadcrumbNav(items []Breadcrumb) {
+	if len(items) > 0 {
+		<nav aria-label="Breadcrumb" class="bb-breadcrumb">
+			for i, crumb := range items {
+				if i > 0 {
+					<span class="bb-breadcrumb-sep" aria-hidden="true">
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+					</span>
+				}
+				if crumb.Href != "" {
+					<span class="bb-breadcrumb-item"><a href={ templ.SafeURL(crumb.Href) }>{ crumb.Label }</a></span>
+				} else {
+					<span class="bb-breadcrumb-current">{ crumb.Label }</span>
+				}
+			}
+		</nav>
+	}
+}

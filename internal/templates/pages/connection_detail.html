@@ -1,6 +1,6 @@
 {{define "content"}}
 <div class="max-w-full overflow-x-hidden">
-{{template "breadcrumb" .}}
+{{renderComponent "breadcrumb" .Breadcrumbs}}
 
 {{if or (eq (printf "%s" .Connection.Status) "error") (eq (printf "%s" .Connection.Status) "pending_reauth")}}
 <div class="bb-card border-error/30 bg-error/5 px-5 py-4 mb-6 flex items-center gap-4 flex-wrap">

@@ -1,5 +1,5 @@
 {{define "content"}}
-{{template "breadcrumb" .}}
+{{renderComponent "breadcrumb" .Breadcrumbs}}
 
 <div x-data="reportDetail('{{.Report.ID}}', {{.Report.IsRead}})" class="max-w-4xl">
   <!-- Toast for copy + mark-unread feedback -->
