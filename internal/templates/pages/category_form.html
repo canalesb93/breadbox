@@ -1,6 +1,6 @@
 {{define "content"}}
 {{template "breadcrumb" .}}
-{{template "category-picker-styles" .}}
+{{renderComponent "CategoryPickerStyles"}}
 
 <div class="bb-page-header">
   <div>
@@ -159,7 +159,7 @@
   </form>
 </div>
 
-{{template "category-picker-script" .}}
+{{renderComponent "CategoryPickerScript"}}
 
 <script>
 function categoryForm() {

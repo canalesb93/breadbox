@@ -1,5 +1,5 @@
 {{define "content"}}
-{{template "category-picker-styles" .}}
+{{renderComponent "CategoryPickerStyles"}}
 
 <!-- Page Header -->
 <div class="bb-page-header">
@@ -236,7 +236,7 @@
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 
-{{template "category-picker-script" .}}
+{{renderComponent "CategoryPickerScript"}}
 <script>
 
 document.addEventListener('DOMContentLoaded', function() {

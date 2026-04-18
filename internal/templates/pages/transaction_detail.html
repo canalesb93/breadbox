@@ -1,5 +1,5 @@
 {{define "content"}}
-{{template "category-picker-styles" .}}
+{{renderComponent "CategoryPickerStyles"}}
 
 {{template "breadcrumb" .}}
 
@@ -299,7 +299,7 @@
   {{end}}
 </div>
 
-{{template "category-picker-script" .}}
+{{renderComponent "CategoryPickerScript"}}
 <script>
 // Populate global tag cache so the picker works without a re-fetch.
 window.__bbAllTags = {{toJSON .AvailableTags}} || [];

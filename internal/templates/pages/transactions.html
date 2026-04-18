@@ -1,5 +1,5 @@
 {{define "content"}}
-{{template "category-picker-styles" .}}
+{{renderComponent "CategoryPickerStyles"}}
 
 <!-- Page Header -->
 <div class="bb-page-header">
@@ -286,7 +286,7 @@
 
 <!-- Floating bulk action bar is created via JS in <body> to avoid parent transform breaking position:fixed -->
 
-{{template "category-picker-script" .}}
+{{renderComponent "CategoryPickerScript"}}
 <script>
 window.__bbCategories = {{toJSON .Categories}};
 window.__bbAllTags = {{toJSON .AllTags}};

@@ -2,6 +2,7 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -18,11 +19,54 @@ import (
 	"breadbox/internal/service"
 	bsync "breadbox/internal/sync"
 	"breadbox/internal/templates"
+	"breadbox/internal/templates/components"
 	"breadbox/internal/version"
 
+	"github.com/a-h/templ"
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// templComponents maps template-accessible names to zero-arg templ components.
+// Pages invoke these via `{{renderComponent "Name"}}`. Keep keys stable; they
+// are a narrow API surface referenced from .html files. Components here must
+// be stateless — rendered output is cached on first use per process.
+var templComponents = map[string]func() templ.Component{
+	"CategoryPickerScript": components.CategoryPickerScript,
+	"CategoryPickerStyles": components.CategoryPickerStyles,
+}
+
+// templComponentCache memoizes rendered output of zero-arg stateless
+// components. Each component renders identical HTML for the life of the
+// process, so there's no reason to re-execute the templ template per request.
+var (
+	templComponentCacheMu sync.RWMutex
+	templComponentCache   = map[string]template.HTML{}
+)
+
+func renderCachedComponent(name string) template.HTML {
+	templComponentCacheMu.RLock()
+	if cached, ok := templComponentCache[name]; ok {
+		templComponentCacheMu.RUnlock()
+		return cached
+	}
+	templComponentCacheMu.RUnlock()
+
+	factory, ok := templComponents[name]
+	if !ok {
+		return template.HTML("<!-- unknown templ component: " + template.HTMLEscapeString(name) + " -->")
+	}
+	var buf bytes.Buffer
+	if err := factory().Render(context.Background(), &buf); err != nil {
+		return template.HTML("<!-- templ render error: " + template.HTMLEscapeString(err.Error()) + " -->")
+	}
+	out := template.HTML(buf.String())
+
+	templComponentCacheMu.Lock()
+	templComponentCache[name] = out
+	templComponentCacheMu.Unlock()
+	return out
+}
 
 // Flash represents a one-time message shown to the user after a redirect.
 type Flash struct {
@@ -781,6 +825,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"formatBytes": func(bytes int64) string {
 				return service.FormatBytes(bytes)
 			},
+			"renderComponent": renderCachedComponent,
 		},
 	}
 	if err := tr.parseTemplates(); err != nil {
@@ -792,7 +837,6 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 var templatePartials = []string{
 	"partials/flash.html",
 	"partials/nav.html",
-	"partials/category_picker.html",
 	"partials/skeletons.html",
 	"partials/breadcrumb.html",
 	"partials/tx_row.html",

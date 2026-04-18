@@ -1,5 +1,14 @@
-{{define "category-picker-script"}}
-<script>
+// Package components holds templ components migrated from html/template
+// partials. Components here are rendered from Go handlers or bridged into
+// the existing html/template renderer via the "renderComponent" funcMap
+// (see internal/admin/templates.go).
+package components
+
+// CategoryPickerScript renders the Alpine.js factory that powers the
+// `x-data="categoryPicker(...)"` component used across admin pages.
+// Pages embed this once near the bottom of their template.
+templ CategoryPickerScript() {
+	<script>
 function categoryPicker(config) {
   return {
     open: false,
@@ -154,11 +163,13 @@ function categoryPicker(config) {
     }
   };
 }
-</script>
-{{end}}
+	</script>
+}
 
-{{define "category-picker-styles"}}
-<style>
+// CategoryPickerStyles renders the CSS used by the category picker wrapper.
+// Safe to include on every page that uses the picker (idempotent rules).
+templ CategoryPickerStyles() {
+	<style>
   /* Legacy inline picker styles removed — using global overlay via base.html */
   .bb-cat-picker { position: relative; }
   .bb-cat-dot { width: 0.625rem; height: 0.625rem; border-radius: 9999px; flex-shrink: 0; }
@@ -173,5 +184,5 @@ function categoryPicker(config) {
     outline: 2px solid var(--color-error);
     outline-offset: -1px;
   }
-</style>
-{{end}}
+	</style>
+}
