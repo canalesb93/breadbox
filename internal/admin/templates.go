@@ -781,6 +781,9 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"formatBytes": func(bytes int64) string {
 				return service.FormatBytes(bytes)
 			},
+			// Bridges templ-based components into the html/template layouts.
+			// Used during the issue #462 migration while layouts still live in html/template.
+			"flashBanner": renderFlashComponent,
 		},
 	}
 	if err := tr.parseTemplates(); err != nil {
@@ -790,7 +793,6 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 }
 
 var templatePartials = []string{
-	"partials/flash.html",
 	"partials/nav.html",
 	"partials/category_picker.html",
 	"partials/skeletons.html",

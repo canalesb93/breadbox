@@ -24,6 +24,9 @@ internal/db/db.go
 internal/db/models.go
 internal/db/*.sql.go
 
+# templ generated files (run `templ generate` to regenerate)
+internal/templates/components/*_templ.go
+
 # IDE
 .idea/
 .vscode/

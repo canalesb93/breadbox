@@ -1,0 +1,27 @@
+package components
+
+// Flash is a one-time banner shown after a redirect.
+// Type is "success", "error", or "info" (anything else renders as info).
+type Flash struct {
+	Type    string
+	Message string
+}
+
+func flashClass(t string) string {
+	switch t {
+	case "success":
+		return "alert-success"
+	case "error":
+		return "alert-error"
+	default:
+		return "alert-info"
+	}
+}
+
+templ FlashBanner(f *Flash) {
+	if f != nil {
+		<div role="alert" class={ "alert", flashClass(f.Type), "rounded-xl", "mb-6" }>
+			<span>{ f.Message }</span>
+		</div>
+	}
+}

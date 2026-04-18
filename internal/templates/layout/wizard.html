@@ -31,7 +31,7 @@
         <p class="text-xs font-medium text-base-content/40">Setup — Step {{.StepNumber}} of 6</p>
       </div>
       {{end}}
-      {{template "flash" .}}
+      {{flashBanner .Flash}}
       {{block "content" .}}{{end}}
     </div>
 
