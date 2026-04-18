@@ -37,7 +37,7 @@ If not 200, start it: `make dev`.
 - `select_page(pageId)` — reuse a Breadbox tab if one exists.
 - `new_page(url)` — otherwise open one pointed at the target path.
 
-Common paths (admin UI is served at the root, not under `/admin/`): `/`, `/transactions`, `/connections`, `/reviews`, `/rules`, `/categories`, `/insights`, `/reports`, `/agents`, `/settings`.
+Common paths (admin UI is served at the root, not under `/admin/`): `/`, `/transactions`, `/connections`, `/reviews`, `/rules`, `/categories`, `/reports`, `/agents`, `/settings`.
 
 ### 3. Handle login if redirected
 

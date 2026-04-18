@@ -65,7 +65,6 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/getting-started", GettingStartedHandler(a, sm, tr))
 		r.Post("/getting-started/dismiss", DismissGettingStartedHandler(a, sm))
 		r.Post("/getting-started/reopen", ReopenGettingStartedHandler(a, sm))
-		r.Get("/insights", InsightsHandler(a, svc, tr))
 
 		r.Route("/connections", func(r chi.Router) {
 			r.Get("/", ConnectionsListHandler(a, svc, sm, tr))
