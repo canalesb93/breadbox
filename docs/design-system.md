@@ -4,6 +4,8 @@
 
 The Breadbox admin dashboard uses **DaisyUI 5 + Tailwind CSS v4** with **Alpine.js v3** for interactivity. DaisyUI provides semantic component classes (drawer, table, badge, menu, modal) with built-in dark mode.
 
+**Component authoring:** new UI pieces are written as [`a-h/templ`](https://templ.guide) components in `internal/templates/components/*.templ` — this is the target pattern going forward (issue #462). Existing `html/template` pages and partials continue to work during the migration and can call templ components via the `renderComponent` funcMap bridge. See §13 below for the workflow.
+
 **Constraints:**
 - No Node.js, no npm, no bundler — uses `tailwindcss-extra` standalone binary
 - Single `make css` build step (like `sqlc generate` or `go generate`)
@@ -724,3 +726,48 @@ Flash messages (`partials/flash.html`) and inline alerts follow the same pattern
 ```
 
 Always pair with an `alert-circle` icon so the error reads at a glance. This is the canonical pattern for inline Alpine-driven form validation errors.
+
+## 13. Templ Components
+
+Admin UI is migrating from `html/template` to [`a-h/templ`](https://templ.guide) (issue #462). Both coexist during the migration — don't rewrite a whole page to templ unless the migration plan calls for it.
+
+### Where components live
+
+`internal/templates/components/*.templ` — one component per file, named in `PascalCase`. Each `.templ` file produces a generated `*_templ.go` sibling; commit both.
+
+### Generating Go from `.templ`
+
+```
+templ generate      # regenerates all *_templ.go in the repo
+```
+
+`make generate` and `make dev-watch` invoke `templ generate` automatically (once the #462 infrastructure lands). If you edit a `.templ` file by hand, re-run generation before `go build` — the Go compiler only sees the generated files.
+
+Install the CLI with `go install github.com/a-h/templ/cmd/templ@latest` if it's missing from `$PATH`.
+
+### Dev-reload interaction
+
+`make dev-watch` rebuilds the Go binary on `.templ` changes via **air** — the generated `*_templ.go` files are part of the Go build graph, so a save triggers a ~1–2s restart, not the HTML-from-disk fast path used for `.html` edits. `BREADBOX_DEV_RELOAD=1` does **not** re-read templ components from disk; they're compiled in.
+
+If you're iterating rapidly on a templ component, expect a Go restart per save. Prefer `.html` for pure markup tweaks during the migration if restart latency matters.
+
+### Calling templ components from `.html` pages
+
+`.html` templates bridge to templ via the `renderComponent` funcMap helper. Register a component once in the bridge (see `internal/templates/components/bridge.go`) and call it from any `.html` block:
+
+```html
+{{renderComponent "StatusBadge" .Connection.Status}}
+```
+
+The helper invokes the component's `Render(ctx, w)` and returns `template.HTML` so the output isn't re-escaped. Pass simple Go values — the bridge signature is fixed per component.
+
+### Adding a new component
+
+1. Copy an existing component (e.g. `status_badge.templ`) — mirrors package, imports, and signature conventions.
+2. Edit the markup and params, then run `templ generate`.
+3. If the component will be called from a `.html` page, add an entry to the `renderComponent` bridge. Pure templ-to-templ calls don't need a bridge entry.
+4. `go build ./...` to confirm the generated code compiles.
+
+### `templ fmt`
+
+Run `templ fmt .` before committing — it normalizes whitespace and attribute order in `.templ` files. CI may enforce this. Many editors have a templ LSP that formats on save.
