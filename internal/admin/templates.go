@@ -111,6 +111,12 @@ func renderTemplComponent(name string, data any) template.HTML {
 		c = components.CategoryPickerScript()
 	case "CategoryPickerStyles":
 		c = components.CategoryPickerStyles()
+	case "Nav":
+		m, ok := data.(map[string]any)
+		if !ok {
+			return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): want map[string]any, got %T -->", name, data))
+		}
+		c = components.Nav(navPropsFromData(m))
 	default:
 		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): unknown -->", name))
 	}
@@ -119,6 +125,43 @@ func renderTemplComponent(name string, data any) template.HTML {
 		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q) error: %s -->", name, template.HTMLEscapeString(err.Error())))
 	}
 	return template.HTML(buf.String())
+}
+
+// navPropsFromData copies the sidebar fields out of the render-time data
+// map into a typed struct the nav templ component consumes. Centralising
+// the mapping here keeps the component decoupled from html/template
+// conventions (string keys, untyped values).
+func navPropsFromData(m map[string]any) components.NavProps {
+	str := func(key string) string {
+		s, _ := m[key].(string)
+		return s
+	}
+	boolv := func(key string) bool {
+		b, _ := m[key].(bool)
+		return b
+	}
+	p := components.NavProps{
+		CurrentPage:          str("CurrentPage"),
+		IsAdmin:              boolv("IsAdmin"),
+		IsEditor:             boolv("IsEditor"),
+		HasLinkedUser:        boolv("HasLinkedUser"),
+		SessionUserID:        str("SessionUserID"),
+		SessionAvatarVersion: str("SessionAvatarVersion"),
+		AdminUsername:        str("AdminUsername"),
+		RoleDisplay:          str("RoleDisplay"),
+		CSRFToken:            str("CSRFToken"),
+		AppVersion:           str("AppVersion"),
+		NavUpdateAvailable:   boolv("NavUpdateAvailable"),
+		NavLatestVersion:     str("NavLatestVersion"),
+		NavLatestURL:         str("NavLatestURL"),
+	}
+	if badges, ok := m["NavBadges"].(NavBadges); ok {
+		p.ShowGettingStarted = badges.ShowGettingStarted
+		p.UnreadReports = badges.UnreadReports
+		p.ConnectionsAttention = badges.ConnectionsAttention
+		p.PendingReviews = badges.PendingReviews
+	}
+	return p
 }
 
 // Flash represents a one-time message shown to the user after a redirect.
