@@ -1120,6 +1120,27 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 	}
 }
 
+// RenderWithTempl hosts a templ-rendered page body inside the existing
+// html/template base layout (nav, drawer, cmd-K palette, progress bar,
+// CSRF shim, Alpine/chart.js scripts). The component is rendered to a
+// buffer and passed to the layout via the TemplContent slot added in
+// layout/base.html. Pages migrated to templ call this instead of
+// Render — no base.html rewrite needed. See issue #462.
+//
+// templateKey selects which parsed template wraps the component. Pass
+// any base-layout page key that has no per-page content of its own
+// (e.g. "settings.html" keeps working even after its {{define "content"}}
+// is deleted, because the body flows through TemplContent instead).
+func (tr *TemplateRenderer) RenderWithTempl(w http.ResponseWriter, r *http.Request, templateKey string, data map[string]any, body templ.Component) {
+	var buf bytes.Buffer
+	if err := body.Render(r.Context(), &buf); err != nil {
+		http.Error(w, "templ render error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	data["TemplContent"] = template.HTML(buf.String())
+	tr.Render(w, r, templateKey, data)
+}
+
 // RenderPartial renders a named block from a template without the layout wrapper.
 // name is the template key (e.g. "transactions.html"), block is the define name
 // (e.g. "tx-results-partial"). Used for HTML fragment responses (AJAX swap).

@@ -10,6 +10,7 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -49,36 +50,32 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		// Check onboarding dismissed state for help section.
 		onboardingDismissed := GetConfigBool(ctx, a.Queries, "onboarding_dismissed")
 
-		data := map[string]any{
-			"PageTitle":           "Settings",
-			"CurrentPage":         "settings",
-			"CSRFToken":           GetCSRFToken(r),
-			"Flash":               GetFlash(ctx, sm),
-			"SyncIntervalMinutes": a.Config.SyncIntervalMinutes,
-			// Sync log retention
-			"SyncLogRetentionDays": retentionDays,
-			"SyncLogCount":         syncLogCount,
-			// System info
-			"Version":         a.Config.Version,
-			"GoVersion":       runtime.Version(),
-			"PostgresVersion": pgVersion,
-			"Uptime":          formatUptime(time.Since(a.Config.StartTime)),
-			"ProviderCount":   len(a.Providers),
-			// Config sources
-			"ConfigSources":   a.Config.ConfigSources,
-			// Safety indicators
-			"HasEncryptionKey": len(a.Config.EncryptionKey) > 0,
-			// Help section
-			"OnboardingDismissed": onboardingDismissed,
-			// Next sync time
-			"NextSyncTime": func() string {
-				if a.Scheduler != nil {
-					return formatNextSync(a.Scheduler.NextRun())
-				}
-				return ""
-			}(),
+		nextSyncTime := ""
+		if a.Scheduler != nil {
+			nextSyncTime = formatNextSync(a.Scheduler.NextRun())
 		}
-		tr.Render(w, r, "settings.html", data)
+		data := map[string]any{
+			"PageTitle":   "Settings",
+			"CurrentPage": "settings",
+			"CSRFToken":   GetCSRFToken(r),
+			"Flash":       GetFlash(ctx, sm),
+		}
+		body := pages.Settings(pages.SettingsProps{
+			CSRFToken:            GetCSRFToken(r),
+			SyncIntervalMinutes:  a.Config.SyncIntervalMinutes,
+			SyncLogRetentionDays: retentionDays,
+			SyncLogCount:         syncLogCount,
+			Version:              a.Config.Version,
+			GoVersion:            runtime.Version(),
+			PostgresVersion:      pgVersion,
+			Uptime:               formatUptime(time.Since(a.Config.StartTime)),
+			ProviderCount:        len(a.Providers),
+			HasEncryptionKey:     len(a.Config.EncryptionKey) > 0,
+			OnboardingDismissed:  onboardingDismissed,
+			NextSyncTime:         nextSyncTime,
+			ConfigSources:        a.Config.ConfigSources,
+		})
+		tr.RenderWithTempl(w, r, "settings.html", data, body)
 	}
 }
 
