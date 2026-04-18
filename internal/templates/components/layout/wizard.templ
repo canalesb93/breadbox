@@ -1,0 +1,94 @@
+package layout
+
+import "breadbox/internal/templates/components"
+
+// WizardProps mirrors the wizard layout data: a page title, an optional
+// setup step number, an optional flash banner, and a slot that holds the
+// page body. Keeping props minimal means the same layout can host every
+// wizard-class page (login, setup, oauth consent) as they migrate.
+type WizardProps struct {
+	PageTitle  string
+	StepNumber int
+	FlashType  string
+	FlashMsg   string
+}
+
+// Wizard wraps a wizard-class page body in the shared full-document shell
+// (doctype, head, gradient bg, brand mark, card, footer, lucide script).
+// Mirrors layout/wizard.html. Pages call it as:
+//
+//	@layout.Wizard(layout.WizardProps{...}) {
+//	  … body templ content …
+//	}
+templ Wizard(p WizardProps) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ wizardTitle(p.PageTitle) }</title>
+			<link rel="icon" type="image/svg+xml" href="/static/favicon.svg"/>
+			<link rel="stylesheet" href="/static/css/styles.css"/>
+			<link rel="preconnect" href="https://fonts.googleapis.com"/>
+			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+			<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+			<style>body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }</style>
+		</head>
+		<body class="bb-wizard-bg">
+			<!-- Subtle decorative gradient orb -->
+			<div class="bb-wizard-orb"></div>
+			<div class="bb-wizard-container">
+				<!-- Brand mark -->
+				<div class="bb-wizard-brand">
+					<div class="bb-wizard-brand-icon">
+						<i data-lucide="package" class="w-6 h-6"></i>
+					</div>
+				</div>
+				<!-- Card -->
+				<div class="bb-wizard-card">
+					if p.StepNumber > 0 {
+						<div class="text-center mb-6">
+							<p class="text-xs font-medium text-base-content/40">Setup — Step { stepText(p.StepNumber) } of 6</p>
+						</div>
+					}
+					if p.FlashMsg != "" {
+						@components.Flash(p.FlashType, p.FlashMsg)
+					}
+					{ children... }
+				</div>
+				<!-- Footer -->
+				<p class="text-center text-xs text-base-content/30 mt-8">
+					Breadbox &mdash; Financial data for households
+				</p>
+			</div>
+			<script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+			<script>lucide.createIcons();</script>
+		</body>
+	</html>
+}
+
+func wizardTitle(page string) string {
+	if page == "" {
+		return "Breadbox Setup"
+	}
+	return page + " — Breadbox"
+}
+
+func stepText(n int) string {
+	switch n {
+	case 1:
+		return "1"
+	case 2:
+		return "2"
+	case 3:
+		return "3"
+	case 4:
+		return "4"
+	case 5:
+		return "5"
+	case 6:
+		return "6"
+	default:
+		return ""
+	}
+}

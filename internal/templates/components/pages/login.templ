@@ -1,0 +1,73 @@
+package pages
+
+import "breadbox/internal/templates/components/layout"
+
+// LoginProps carries what the login form needs. Username is preserved on
+// failure so the user doesn't have to retype it. Error is an inline
+// message specific to the login attempt (distinct from session flashes).
+type LoginProps struct {
+	PageTitle string
+	CSRFToken string
+	Username  string
+	Error     string
+	FlashType string
+	FlashMsg  string
+}
+
+// Login renders the full login page (wizard layout + form body).
+templ Login(p LoginProps) {
+	@layout.Wizard(layout.WizardProps{
+		PageTitle: p.PageTitle,
+		FlashType: p.FlashType,
+		FlashMsg:  p.FlashMsg,
+	}) {
+		<div class="text-center mb-8">
+			<h1 class="text-xl font-semibold tracking-tight">Welcome back</h1>
+			<p class="text-sm text-base-content/50 mt-1.5">Sign in to your Breadbox dashboard</p>
+		</div>
+		if p.Error != "" {
+			<div role="alert" class="flex items-center gap-3 rounded-xl bg-error/10 text-error px-4 py-3 text-sm mb-6">
+				<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+				<span>{ p.Error }</span>
+			</div>
+		}
+		<form method="POST" action="/login" class="space-y-5">
+			if p.CSRFToken != "" {
+				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			}
+			<div>
+				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="username">Email</label>
+				<input
+					type="email"
+					id="username"
+					name="username"
+					value={ p.Username }
+					required
+					autocomplete="email"
+					placeholder="Enter your email"
+					class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200"
+				/>
+			</div>
+			<div>
+				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="password">Password</label>
+				<input
+					type="password"
+					id="password"
+					name="password"
+					required
+					autocomplete="current-password"
+					placeholder="Enter your password"
+					class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200"
+				/>
+			</div>
+			<label class="flex items-center gap-2 cursor-pointer select-none text-sm text-base-content/70">
+				<input type="checkbox" name="remember_me" value="1" checked class="checkbox checkbox-sm checkbox-primary"/>
+				Keep me signed in for 30 days
+			</label>
+			<button type="submit" class="btn btn-primary w-full h-12 rounded-xl text-base font-semibold transition-colors duration-150 mt-1">
+				Sign In
+				<i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
+			</button>
+		</form>
+	}
+}
