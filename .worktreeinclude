@@ -12,6 +12,9 @@ internal/db/db.go
 internal/db/models.go
 internal/db/*.sql.go
 
+# templ generated files
+internal/templates/components/**/*_templ.go
+
 # Teller mTLS certificates
 teller/
 

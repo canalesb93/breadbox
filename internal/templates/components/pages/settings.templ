@@ -1,0 +1,290 @@
+package pages
+
+import (
+	"fmt"
+	"strconv"
+)
+
+// SettingsPageData carries the dynamic values the settings page renders.
+// Handlers populate this struct and pass it to SettingsPage.
+type SettingsPageData struct {
+	CSRFToken            string
+	SyncIntervalMinutes  int
+	SyncLogRetentionDays int
+	SyncLogCount         int64
+	NextSyncTime         string
+	HasEncryptionKey     bool
+	OnboardingDismissed  bool
+	Version              string
+	GoVersion            string
+	PostgresVersion      string
+	Uptime               string
+	ProviderCount        int
+	ConfigSources        map[string]string
+}
+
+// formatIntervalMinutes renders a sync interval in human-readable form
+// (e.g., "12h", "4h", "30m", "1d"). Mirrors the html/template funcMap entry
+// in internal/admin/templates.go.
+func formatIntervalMinutes(minutes int) string {
+	switch {
+	case minutes <= 0:
+		return "N/A"
+	case minutes >= 1440 && minutes%1440 == 0:
+		d := minutes / 1440
+		if d == 1 {
+			return "24h"
+		}
+		return fmt.Sprintf("%dd", d)
+	case minutes >= 60 && minutes%60 == 0:
+		return fmt.Sprintf("%dh", minutes/60)
+	case minutes >= 60:
+		return fmt.Sprintf("%dh %dm", minutes/60, minutes%60)
+	default:
+		return fmt.Sprintf("%dm", minutes)
+	}
+}
+
+// configSourceBadge returns the human-readable label for where a config value
+// was sourced from (env var, database, or built-in default).
+func configSourceBadge(sources map[string]string, key string) string {
+	switch sources[key] {
+	case "env":
+		return "from env"
+	case "db":
+		return "from database"
+	default:
+		return "default"
+	}
+}
+
+templ SettingsPage(d SettingsPageData) {
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">Settings</h1>
+			<p class="text-sm text-base-content/50 mt-1">Manage sync schedule, security, and system info</p>
+		</div>
+	</div>
+	<div class="grid gap-6 bb-stagger">
+		@syncCard(d)
+		@securityCard(d)
+		@systemCard(d)
+		@helpCard(d)
+	</div>
+	<script>
+		(function() {
+			if (!location.hash) return;
+			var el = document.querySelector(location.hash);
+			if (el) setTimeout(function() { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+		})();
+	</script>
+}
+
+templ syncCard(d SettingsPageData) {
+	<div id="sync" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#sync' || location.hash === '#retention' }">
+		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+			<i data-lucide="refresh-cw" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+			<div class="min-w-0 flex-1">
+				<h2 class="font-semibold">Sync</h2>
+				<p class="text-xs text-base-content/40" x-show="!expanded">
+					Every { formatIntervalMinutes(d.SyncIntervalMinutes) }
+					if d.NextSyncTime != "" {
+						{ " · Next: " + d.NextSyncTime }
+					}
+					{ " · " }
+					{ strconv.FormatInt(d.SyncLogCount, 10) } logs stored
+				</p>
+				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Schedule and log retention</p>
+			</div>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+		</div>
+		<div x-show="expanded" x-collapse x-cloak>
+			<div class="px-4 sm:px-5 py-4">
+				<form method="POST" action="/settings/sync">
+					<input type="hidden" name="_csrf" value={ d.CSRFToken }/>
+					<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="sync_interval_minutes">
+						Sync Interval
+						<span class="badge badge-ghost badge-sm">{ configSourceBadge(d.ConfigSources, "sync_interval_minutes") }</span>
+					</label>
+					<select id="sync_interval_minutes" name="sync_interval_minutes" class="select select-sm select-bordered w-full max-w-sm rounded-xl bg-base-200">
+						@syncIntervalOption(15, "Every 15 minutes", d.SyncIntervalMinutes)
+						@syncIntervalOption(30, "Every 30 minutes", d.SyncIntervalMinutes)
+						@syncIntervalOption(60, "Every hour", d.SyncIntervalMinutes)
+						@syncIntervalOption(240, "Every 4 hours", d.SyncIntervalMinutes)
+						@syncIntervalOption(480, "Every 8 hours", d.SyncIntervalMinutes)
+						@syncIntervalOption(720, "Every 12 hours", d.SyncIntervalMinutes)
+						@syncIntervalOption(1440, "Every 24 hours", d.SyncIntervalMinutes)
+					</select>
+					if d.NextSyncTime != "" {
+						<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
+							<i data-lucide="clock" class="w-3.5 h-3.5"></i>
+							Next sync: { d.NextSyncTime }
+						</p>
+					}
+					<div class="mt-4">
+						<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Schedule</button>
+					</div>
+				</form>
+				<div class="border-t border-base-300 mt-5 pt-5">
+					<form method="POST" action="/settings/retention">
+						<input type="hidden" name="_csrf" value={ d.CSRFToken }/>
+						<div class="flex items-center justify-between mb-3">
+							<label class="text-sm font-medium text-base-content/70" for="sync_log_retention_days">
+								Log Retention
+							</label>
+							<span class="text-xs text-base-content/40 tabular-nums">{ strconv.FormatInt(d.SyncLogCount, 10) } logs stored</span>
+						</div>
+						<select id="sync_log_retention_days" name="sync_log_retention_days" class="select select-sm select-bordered w-full max-w-sm rounded-xl bg-base-200">
+							@retentionOption(7, "7 days", d.SyncLogRetentionDays)
+							@retentionOption(14, "14 days", d.SyncLogRetentionDays)
+							@retentionOption(30, "30 days", d.SyncLogRetentionDays)
+							@retentionOption(60, "60 days", d.SyncLogRetentionDays)
+							@retentionOption(90, "90 days (default)", d.SyncLogRetentionDays)
+							@retentionOption(180, "180 days", d.SyncLogRetentionDays)
+							@retentionOption(365, "1 year", d.SyncLogRetentionDays)
+							@retentionOption(0, "Keep forever", d.SyncLogRetentionDays)
+						</select>
+						<p class="text-xs text-base-content/40 mt-3 flex items-center gap-1.5">
+							<i data-lucide="clock" class="w-3.5 h-3.5"></i>
+							Cleanup runs daily at 3:00 AM
+						</p>
+						<div class="mt-4">
+							<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Retention</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ syncIntervalOption(value int, label string, selected int) {
+	if value == selected {
+		<option value={ strconv.Itoa(value) } selected>{ label }</option>
+	} else {
+		<option value={ strconv.Itoa(value) }>{ label }</option>
+	}
+}
+
+templ retentionOption(value int, label string, selected int) {
+	if value == selected {
+		<option value={ strconv.Itoa(value) } selected>{ label }</option>
+	} else {
+		<option value={ strconv.Itoa(value) }>{ label }</option>
+	}
+}
+
+templ securityCard(d SettingsPageData) {
+	<div id="security" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#security' }">
+		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+			<i data-lucide="shield" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+			<div class="min-w-0 flex-1">
+				<h2 class="font-semibold">Security</h2>
+				<p class="text-xs text-base-content/40" x-show="!expanded">
+					Encryption
+					if d.HasEncryptionKey {
+						active
+					} else {
+						not set
+					}
+					· Password management
+				</p>
+				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Encryption and authentication</p>
+			</div>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+		</div>
+		<div x-show="expanded" x-collapse x-cloak>
+			<div class="px-4 sm:px-5 py-4">
+				<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 mb-5">
+					<div class="flex items-center gap-2.5">
+						<i data-lucide="key-round" class="w-4 h-4 text-base-content/50"></i>
+						<span class="text-sm font-medium">Encryption Key</span>
+					</div>
+					if d.HasEncryptionKey {
+						<span class="badge badge-success badge-sm">Active</span>
+					} else {
+						<span class="badge badge-error badge-sm">Not Set</span>
+					}
+				</div>
+				if !d.HasEncryptionKey {
+					<div class="text-xs text-error/80 bg-error/5 rounded-lg p-3 mb-5">
+						<i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-1"></i>
+						Access tokens cannot be stored without an encryption key. Set the ENCRYPTION_KEY environment variable.
+					</div>
+				}
+				<h3 class="text-sm font-semibold text-base-content/70 mb-3">Change Password</h3>
+				<form method="POST" action="/settings/password" class="space-y-3 max-w-sm">
+					<input type="hidden" name="_csrf" value={ d.CSRFToken }/>
+					<div>
+						<label class="text-xs font-medium text-base-content/50 mb-1 block" for="current_password">Current Password</label>
+						<input type="password" id="current_password" name="current_password" required class="input input-sm input-bordered w-full rounded-xl"/>
+					</div>
+					<div>
+						<label class="text-xs font-medium text-base-content/50 mb-1 block" for="new_password">New Password</label>
+						<input type="password" id="new_password" name="new_password" required minlength="8" class="input input-sm input-bordered w-full rounded-xl"/>
+					</div>
+					<div>
+						<label class="text-xs font-medium text-base-content/50 mb-1 block" for="confirm_password">Confirm New Password</label>
+						<input type="password" id="confirm_password" name="confirm_password" required class="input input-sm input-bordered w-full rounded-xl"/>
+					</div>
+					<div class="pt-2">
+						<button type="submit" class="btn btn-primary btn-sm rounded-xl">Update Password</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+}
+
+templ systemCard(d SettingsPageData) {
+	<div id="system" class="bb-card p-5">
+		<div class="flex items-center gap-3 mb-4">
+			<i data-lucide="cpu" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+			<h2 class="font-semibold">System</h2>
+		</div>
+		<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+			<div><span class="text-base-content/40">Version</span> <span class="font-medium tabular-nums">{ d.Version }</span></div>
+			<div><span class="text-base-content/40">Go</span> <span class="font-medium">{ d.GoVersion }</span></div>
+			<div><span class="text-base-content/40">PostgreSQL</span> <span class="font-medium">{ d.PostgresVersion }</span></div>
+			<div><span class="text-base-content/40">Uptime</span> <span class="font-medium">{ d.Uptime }</span></div>
+			<div><span class="text-base-content/40">Providers</span> <span class="font-medium">{ strconv.Itoa(d.ProviderCount) } configured</span></div>
+		</div>
+	</div>
+}
+
+templ helpCard(d SettingsPageData) {
+	<div id="help" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#help' }">
+		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+			<i data-lucide="life-buoy" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
+			<div class="min-w-0 flex-1">
+				<h2 class="font-semibold">Help</h2>
+				<p class="text-xs text-base-content/40" x-show="!expanded">Setup guide and documentation</p>
+				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Resources and guides</p>
+			</div>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+		</div>
+		<div x-show="expanded" x-collapse x-cloak>
+			<div class="px-4 sm:px-5 py-4">
+				<div class="flex flex-col gap-3">
+					<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
+						<div class="flex items-center gap-2.5">
+							<i data-lucide="compass" class="w-4 h-4 text-base-content/50"></i>
+							<div>
+								<span class="text-sm font-medium">Getting Started Guide</span>
+								<p class="text-xs text-base-content/40">Step-by-step setup walkthrough</p>
+							</div>
+						</div>
+						if d.OnboardingDismissed {
+							<form method="POST" action="/getting-started/reopen">
+								<input type="hidden" name="_csrf" value={ d.CSRFToken }/>
+								<button type="submit" class="btn btn-ghost btn-sm rounded-xl">Re-open</button>
+							</form>
+						} else {
+							<a href="/getting-started" class="btn btn-ghost btn-sm rounded-xl">Open</a>
+						}
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+}

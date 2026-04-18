@@ -820,7 +820,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/api_key_created.html",
 		"pages/sync_logs.html",
 		"pages/sync_log_detail.html",
-		"pages/settings.html",
 		"pages/providers.html",
 		"pages/csv_import.html",
 		"pages/transactions.html",
@@ -851,6 +850,10 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/my_account.html",
 		"pages/getting_started.html",
 		"pages/create_login.html",
+		// _templ_host.html is a tiny shim that lets templ-rendered pages
+		// reuse the base layout. Its "content" block just writes the
+		// pre-rendered TemplBody HTML straight through.
+		"pages/_templ_host.html",
 	}
 
 	// Pages that need multiple page files parsed together (for sub-template sharing).

@@ -10,6 +10,7 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
+	pages "breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -49,36 +50,36 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		// Check onboarding dismissed state for help section.
 		onboardingDismissed := GetConfigBool(ctx, a.Queries, "onboarding_dismissed")
 
-		data := map[string]any{
-			"PageTitle":           "Settings",
-			"CurrentPage":         "settings",
-			"CSRFToken":           GetCSRFToken(r),
-			"Flash":               GetFlash(ctx, sm),
-			"SyncIntervalMinutes": a.Config.SyncIntervalMinutes,
-			// Sync log retention
-			"SyncLogRetentionDays": retentionDays,
-			"SyncLogCount":         syncLogCount,
-			// System info
-			"Version":         a.Config.Version,
-			"GoVersion":       runtime.Version(),
-			"PostgresVersion": pgVersion,
-			"Uptime":          formatUptime(time.Since(a.Config.StartTime)),
-			"ProviderCount":   len(a.Providers),
-			// Config sources
-			"ConfigSources":   a.Config.ConfigSources,
-			// Safety indicators
-			"HasEncryptionKey": len(a.Config.EncryptionKey) > 0,
-			// Help section
-			"OnboardingDismissed": onboardingDismissed,
-			// Next sync time
-			"NextSyncTime": func() string {
-				if a.Scheduler != nil {
-					return formatNextSync(a.Scheduler.NextRun())
-				}
-				return ""
-			}(),
+		nextSync := ""
+		if a.Scheduler != nil {
+			nextSync = formatNextSync(a.Scheduler.NextRun())
 		}
-		tr.Render(w, r, "settings.html", data)
+
+		pageData := pages.SettingsPageData{
+			CSRFToken:            GetCSRFToken(r),
+			SyncIntervalMinutes:  a.Config.SyncIntervalMinutes,
+			SyncLogRetentionDays: retentionDays,
+			SyncLogCount:         syncLogCount,
+			NextSyncTime:         nextSync,
+			HasEncryptionKey:     len(a.Config.EncryptionKey) > 0,
+			OnboardingDismissed:  onboardingDismissed,
+			Version:              a.Config.Version,
+			GoVersion:            runtime.Version(),
+			PostgresVersion:      pgVersion,
+			Uptime:               formatUptime(time.Since(a.Config.StartTime)),
+			ProviderCount:        len(a.Providers),
+			ConfigSources:        a.Config.ConfigSources,
+		}
+
+		// Layout data — auto-injected fields (AdminUsername, nav badges, …)
+		// are filled in by TemplateRenderer.Render.
+		layoutData := map[string]any{
+			"PageTitle":   "Settings",
+			"CurrentPage": "settings",
+			"CSRFToken":   pageData.CSRFToken,
+			"Flash":       GetFlash(ctx, sm),
+		}
+		tr.RenderTempl(w, r, pages.SettingsPage(pageData), layoutData)
 	}
 }
 
