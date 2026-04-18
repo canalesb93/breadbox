@@ -493,15 +493,12 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 		}
 		dayMap := make(map[string]*DaySync)
 		now := time.Now()
-		var daySyncs []DaySync
 		for i := 13; i >= 0; i-- {
 			day := now.AddDate(0, 0, -i)
 			key := day.Format("2006-01-02")
 			label := day.Format("Jan 2")
 			shortLabel := day.Format("2")
-			ds := &DaySync{Date: key, Label: label, ShortLabel: shortLabel}
-			dayMap[key] = ds
-			daySyncs = append(daySyncs, *ds)
+			dayMap[key] = &DaySync{Date: key, Label: label, ShortLabel: shortLabel}
 		}
 
 		for _, log := range allSyncLogs {
@@ -558,8 +555,8 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 			successRate = float64(successSyncs) / float64(totalSyncs) * 100
 		}
 
-		// Rebuild daySyncs from the map (map was modified in-place).
-		daySyncs = nil
+		// Flatten the day map into a chronologically ordered slice.
+		var daySyncs []DaySync
 		for i := 13; i >= 0; i-- {
 			day := now.AddDate(0, 0, -i)
 			key := day.Format("2006-01-02")

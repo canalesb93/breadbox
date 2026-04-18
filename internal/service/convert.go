@@ -67,28 +67,12 @@ func timestampStr(ts pgtype.Timestamptz) *string {
 	return &s
 }
 
-func timestampPtr(ts pgtype.Timestamptz) *time.Time {
-	if !ts.Valid {
-		return nil
-	}
-	t := ts.Time.UTC()
-	return &t
-}
-
 func dateStr(d pgtype.Date) *string {
 	if !d.Valid {
 		return nil
 	}
 	s := d.Time.Format("2006-01-02")
 	return &s
-}
-
-func datePtr(d pgtype.Date) *time.Time {
-	if !d.Valid {
-		return nil
-	}
-	t := d.Time
-	return &t
 }
 
 func nullConnStatusPtr(s db.NullConnectionStatus) *string {
