@@ -85,18 +85,18 @@
       {{else if .Rule.Conditions.And}}
       <div class="space-y-1.5">
         {{range $i, $c := .Rule.Conditions.And}}
-        {{template "condition-row" dict "Cond" $c "Idx" $i "Conj" "AND"}}
+        {{renderComponent (renderConditionRow $c $i "AND")}}
         {{end}}
       </div>
       {{else if .Rule.Conditions.Or}}
       <div class="space-y-1.5">
         {{range $i, $c := .Rule.Conditions.Or}}
-        {{template "condition-row" dict "Cond" $c "Idx" $i "Conj" "OR"}}
+        {{renderComponent (renderConditionRow $c $i "OR")}}
         {{end}}
       </div>
       {{else if .Rule.Conditions.Field}}
       <div class="space-y-1.5">
-        {{template "condition-row" dict "Cond" .Rule.Conditions "Idx" 0 "Conj" ""}}
+        {{renderComponent (renderConditionRow .Rule.Conditions 0 "")}}
       </div>
       {{else}}
       <div class="p-3 bg-base-200/50 border border-base-content/10 rounded-xl">

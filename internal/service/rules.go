@@ -1497,13 +1497,13 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		// Per transaction: fold rules to determine net action intents, mirroring
 		// the sync resolver. Category: last-writer-wins. Tags: net-diff.
 		type txnIntent struct {
-			txnID          pgtype.UUID
-			catID          pgtype.UUID
-			catSlug        string
-			catRule        *compiledRule
-			tagAdds        map[string]*compiledRule // slug → first rule that added it
-			tagRemoves     map[string]*compiledRule
-			matchingRules  []*compiledRule // every rule whose condition matched (for rule_applied)
+			txnID         pgtype.UUID
+			catID         pgtype.UUID
+			catSlug       string
+			catRule       *compiledRule
+			tagAdds       map[string]*compiledRule // slug → first rule that added it
+			tagRemoves    map[string]*compiledRule
+			matchingRules []*compiledRule // every rule whose condition matched (for rule_applied)
 		}
 		var intents []txnIntent
 		rowCount := 0
@@ -1709,18 +1709,18 @@ func stringSliceDropFold(slice []string, s string) []string {
 
 // RulePreviewMatch contains a sample transaction that matched a rule preview.
 type RulePreviewMatch struct {
-	TransactionID      string  `json:"transaction_id"`
-	Name               string  `json:"name"`
-	Amount             float64 `json:"amount"`
-	Date               string  `json:"date"`
-	CategoryPrimaryRaw string  `json:"category_primary_raw"`
-	CurrentCategorySlug string `json:"current_category_slug,omitempty"`
+	TransactionID       string  `json:"transaction_id"`
+	Name                string  `json:"name"`
+	Amount              float64 `json:"amount"`
+	Date                string  `json:"date"`
+	CategoryPrimaryRaw  string  `json:"category_primary_raw"`
+	CurrentCategorySlug string  `json:"current_category_slug,omitempty"`
 }
 
 // RulePreviewResult contains the results of a rule preview/dry-run.
 type RulePreviewResult struct {
-	MatchCount   int64              `json:"match_count"`
-	TotalScanned int64              `json:"total_scanned"`
+	MatchCount    int64              `json:"match_count"`
+	TotalScanned  int64              `json:"total_scanned"`
 	SampleMatches []RulePreviewMatch `json:"sample_matches"`
 }
 
@@ -1810,10 +1810,10 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 		for rows.Next() {
 			rowCount++
 			var (
-				id           pgtype.UUID
-				tctx         TransactionContext
-				date         pgtype.Date
-				catSlug      string
+				id      pgtype.UUID
+				tctx    TransactionContext
+				date    pgtype.Date
+				catSlug string
 			)
 			if err := rows.Scan(&id, &tctx.Name, &tctx.MerchantName, &tctx.Amount,
 				&tctx.CategoryPrimary, &tctx.CategoryDetailed,
@@ -1882,22 +1882,22 @@ func (s *Service) BatchIncrementHitCounts(ctx context.Context, hits map[string]i
 // is populated at response time by looking up the set_category action's slug
 // (no JOINed category columns).
 type ruleRow struct {
-	id             pgtype.UUID
-	shortID        string
-	name           string
-	conditions     []byte // NULL -> nil -> match-all
-	actions        []byte
-	trigger        string
-	priority       int32
-	enabled        bool
-	expiresAt      pgtype.Timestamptz
-	createdByType  string
-	createdByID    pgtype.Text
-	createdByName  string
-	hitCount       int32
-	lastHitAt      pgtype.Timestamptz
-	createdAt      pgtype.Timestamptz
-	updatedAt      pgtype.Timestamptz
+	id            pgtype.UUID
+	shortID       string
+	name          string
+	conditions    []byte // NULL -> nil -> match-all
+	actions       []byte
+	trigger       string
+	priority      int32
+	enabled       bool
+	expiresAt     pgtype.Timestamptz
+	createdByType string
+	createdByID   pgtype.Text
+	createdByName string
+	hitCount      int32
+	lastHitAt     pgtype.Timestamptz
+	createdAt     pgtype.Timestamptz
+	updatedAt     pgtype.Timestamptz
 }
 
 // scanDest returns a slice of pointers for use with rows.Scan.
@@ -2279,6 +2279,123 @@ func TriggerLabel(trigger string) string {
 	}
 }
 
+// RuleFieldLabel maps a rule-condition field name to its human-readable
+// label. Falls back to title-casing the raw identifier so unknown fields
+// still read reasonably.
+func RuleFieldLabel(field string) string {
+	switch field {
+	case "name":
+		return "Name"
+	case "merchant_name":
+		return "Merchant"
+	case "amount":
+		return "Amount"
+	case "pending":
+		return "Pending"
+	case "category":
+		return "Category"
+	case "category_primary":
+		return "Category (primary)"
+	case "category_detailed":
+		return "Category (detail)"
+	case "tags":
+		return "Tag"
+	case "account_name":
+		return "Account"
+	case "user_name":
+		return "Family member"
+	case "provider":
+		return "Provider"
+	default:
+		if field == "" {
+			return "—"
+		}
+		return slugs.TitleCase(field)
+	}
+}
+
+// RuleOpLabel maps an operator code to a short display symbol/phrase. The
+// field argument lets us pick type-appropriate wording (e.g. "contains" for
+// strings vs "has" for tag-list fields, "=" for numerics vs "is" for bools).
+func RuleOpLabel(op, field string) string {
+	numericFields := map[string]bool{"amount": true}
+	boolFields := map[string]bool{"pending": true}
+	tagField := field == "tags"
+	switch op {
+	case "contains":
+		if tagField {
+			return "has"
+		}
+		return "contains"
+	case "not_contains":
+		if tagField {
+			return "does not have"
+		}
+		return "does not contain"
+	case "in":
+		if tagField {
+			return "has any of"
+		}
+		return "in"
+	case "matches":
+		return "matches /regex/"
+	case "eq":
+		if numericFields[field] {
+			return "="
+		}
+		if boolFields[field] {
+			return "is"
+		}
+		return "is"
+	case "neq":
+		if numericFields[field] {
+			return "≠"
+		}
+		if boolFields[field] {
+			return "is not"
+		}
+		return "is not"
+	case "gt":
+		return ">"
+	case "gte":
+		return "≥"
+	case "lt":
+		return "<"
+	case "lte":
+		return "≤"
+	default:
+		if op == "" {
+			return "—"
+		}
+		return op
+	}
+}
+
+// RuleValueFormat renders a condition's value for display. Arrays come back
+// comma-separated; booleans as "true"/"false"; everything else via fmt.Sprint.
+func RuleValueFormat(v any) string {
+	if v == nil {
+		return ""
+	}
+	switch vv := v.(type) {
+	case []any:
+		parts := make([]string, 0, len(vv))
+		for _, x := range vv {
+			parts = append(parts, fmt.Sprint(x))
+		}
+		return strings.Join(parts, ", ")
+	case string:
+		return vv
+	case bool:
+		if vv {
+			return "true"
+		}
+		return "false"
+	default:
+		return fmt.Sprint(v)
+	}
+}
+
 // --- Rule application tracking ---
 
 // RuleApplicationRow represents a transaction affected by a rule.
@@ -2296,12 +2413,12 @@ type RuleApplicationRow struct {
 
 // RuleStats contains aggregate stats about a rule's impact.
 type RuleStats struct {
-	TotalApplications    int64  `json:"total_applications"`
-	UniqueTransactions   int64  `json:"unique_transactions"`
-	FirstAppliedAt       string `json:"first_applied_at,omitempty"`
-	LastAppliedAt        string `json:"last_applied_at,omitempty"`
-	SyncApplications     int64  `json:"sync_applications"`
-	RetroApplications    int64  `json:"retro_applications"`
+	TotalApplications  int64  `json:"total_applications"`
+	UniqueTransactions int64  `json:"unique_transactions"`
+	FirstAppliedAt     string `json:"first_applied_at,omitempty"`
+	LastAppliedAt      string `json:"last_applied_at,omitempty"`
+	SyncApplications   int64  `json:"sync_applications"`
+	RetroApplications  int64  `json:"retro_applications"`
 }
 
 // GetRuleStats returns aggregate stats about a rule's applications, sourced

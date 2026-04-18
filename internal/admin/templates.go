@@ -2,6 +2,7 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -18,8 +19,10 @@ import (
 	"breadbox/internal/service"
 	bsync "breadbox/internal/sync"
 	"breadbox/internal/templates"
+	"breadbox/internal/templates/components"
 	"breadbox/internal/version"
 
+	"github.com/a-h/templ"
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -325,10 +328,12 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return ""
 			},
-			"triggerLabel":    service.TriggerLabel,
-			"ruleFieldLabel":  ruleFieldLabel,
-			"ruleOpLabel":     ruleOpLabel,
-			"ruleValueFormat": ruleValueFormat,
+			"triggerLabel":       service.TriggerLabel,
+			"ruleFieldLabel":     service.RuleFieldLabel,
+			"ruleOpLabel":        service.RuleOpLabel,
+			"ruleValueFormat":    service.RuleValueFormat,
+			"renderComponent":    renderTemplComponent,
+			"renderConditionRow": renderConditionRow,
 			"ruleHasRetroactiveAction": func(actions []service.RuleAction) bool {
 				// Retroactive apply materializes set_category / add_tag / remove_tag.
 				// add_comment is sync-only. A rule with only comments isn't
@@ -799,7 +804,6 @@ var templatePartials = []string{
 	"partials/tx_row_compact.html",
 	"partials/tx_results.html",
 	"partials/tag_chip.html",
-	"partials/condition_row.html",
 }
 
 func (tr *TemplateRenderer) parseTemplates() error {
@@ -1148,121 +1152,39 @@ func AdminUsername(r *http.Request, sm *scs.SessionManager) string {
 	return sm.GetString(r.Context(), sessionKeyAccountUsername)
 }
 
-// ruleFieldLabel maps a rule-condition field name to its human-readable
-// label. Falls back to title-casing the raw identifier so unknown fields
-// still read reasonably.
-func ruleFieldLabel(field string) string {
-	switch field {
-	case "name":
-		return "Name"
-	case "merchant_name":
-		return "Merchant"
-	case "amount":
-		return "Amount"
-	case "pending":
-		return "Pending"
-	case "category":
-		return "Category"
-	case "category_primary":
-		return "Category (primary)"
-	case "category_detailed":
-		return "Category (detail)"
-	case "tags":
-		return "Tag"
-	case "account_name":
-		return "Account"
-	case "user_name":
-		return "Family member"
-	case "provider":
-		return "Provider"
-	default:
-		if field == "" {
-			return "—"
-		}
-		return titleCaseMerchant(strings.ReplaceAll(field, "_", " "))
-	}
-}
-
-// ruleOpLabel maps an operator code to a short display symbol/phrase. The
-// field argument lets us pick type-appropriate wording (e.g. "contains" for
-// strings vs "has" for tag-list fields, "=" for numerics vs "is" for bools).
-func ruleOpLabel(op, field string) string {
-	numericFields := map[string]bool{"amount": true}
-	boolFields := map[string]bool{"pending": true}
-	tagField := field == "tags"
-	switch op {
-	case "contains":
-		if tagField {
-			return "has"
-		}
-		return "contains"
-	case "not_contains":
-		if tagField {
-			return "does not have"
-		}
-		return "does not contain"
-	case "in":
-		if tagField {
-			return "has any of"
-		}
-		return "in"
-	case "matches":
-		return "matches /regex/"
-	case "eq":
-		if numericFields[field] {
-			return "="
-		}
-		if boolFields[field] {
-			return "is"
-		}
-		return "is"
-	case "neq":
-		if numericFields[field] {
-			return "≠"
-		}
-		if boolFields[field] {
-			return "is not"
-		}
-		return "is not"
-	case "gt":
-		return ">"
-	case "gte":
-		return "≥"
-	case "lt":
-		return "<"
-	case "lte":
-		return "≤"
-	default:
-		if op == "" {
-			return "—"
-		}
-		return op
-	}
-}
-
-// ruleValueFormat renders a condition's value for display. Arrays come back
-// comma-separated; booleans as "true"/"false"; everything else via fmt.Sprint.
-func ruleValueFormat(v any) string {
-	if v == nil {
+// renderTemplComponent is the generic bridge that lets html/template pages
+// embed any a-h/templ component. Usage in an html/template:
+//
+//	{{renderComponent (renderConditionRow ...)}}
+//
+// Individual component factories (e.g. renderConditionRow) produce a
+// templ.Component; this helper renders it to safe HTML so the outer template
+// can interpolate it.
+func renderTemplComponent(c templ.Component) template.HTML {
+	if c == nil {
 		return ""
 	}
-	switch vv := v.(type) {
-	case []any:
-		parts := make([]string, 0, len(vv))
-		for _, x := range vv {
-			parts = append(parts, fmt.Sprint(x))
-		}
-		return strings.Join(parts, ", ")
-	case string:
-		return vv
-	case bool:
-		if vv {
-			return "true"
-		}
-		return "false"
-	default:
-		return fmt.Sprint(v)
+	var buf bytes.Buffer
+	if err := c.Render(context.Background(), &buf); err != nil {
+		return template.HTML("<!-- templ render error: " + template.HTMLEscapeString(err.Error()) + " -->")
 	}
+	return template.HTML(buf.String())
+}
+
+// renderConditionRow constructs a ConditionRow templ component from its
+// template inputs. Exposed via the funcMap so html/template callers can invoke
+// it directly: {{renderComponent (renderConditionRow .Cond $i "AND")}}.
+func renderConditionRow(cond any, idx int, conj string) templ.Component {
+	var c service.Condition
+	switch v := cond.(type) {
+	case service.Condition:
+		c = v
+	case *service.Condition:
+		if v != nil {
+			c = *v
+		}
+	}
+	return components.ConditionRow(components.ConditionRowProps{Cond: c, Idx: idx, Conj: conj})
 }
 
 // RenderTo writes the named template to any io.Writer.

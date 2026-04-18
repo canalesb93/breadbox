@@ -1,0 +1,36 @@
+package components
+
+import "breadbox/internal/service"
+
+// ConditionRowProps carries the data rendered by ConditionRow.
+// Idx indicates the row's position inside the surrounding AND/OR group: the
+// first row shows "IF" instead of the conjunction label.
+type ConditionRowProps struct {
+	Cond service.Condition
+	Idx  int
+	Conj string // "AND" | "OR" | "" (single condition)
+}
+
+// ConditionRow renders a read-only rule condition row used by the rule detail page.
+// Layout: [IF|AND|OR prefix] [field label] [operator pill] [value].
+templ ConditionRow(p ConditionRowProps) {
+	<div class="flex items-center gap-2 p-2.5 bg-base-200/50 border border-base-content/10 rounded-xl">
+		<div class="w-10 shrink-0 text-center">
+			if p.Idx == 0 {
+				<span class="text-[0.65rem] font-semibold tracking-wider text-base-content/30">IF</span>
+			} else {
+				<span class={ conjClasses(p.Conj) }>{ p.Conj }</span>
+			}
+		</div>
+		<span class="text-sm font-medium text-base-content/80 truncate">{ service.RuleFieldLabel(p.Cond.Field) }</span>
+		<span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-100 border border-base-content/10 text-xs text-base-content/55 font-mono">{ service.RuleOpLabel(p.Cond.Op, p.Cond.Field) }</span>
+		<span class="text-sm font-semibold text-base-content truncate" title={ service.RuleValueFormat(p.Cond.Value) }>{ service.RuleValueFormat(p.Cond.Value) }</span>
+	</div>
+}
+
+func conjClasses(conj string) string {
+	if conj == "OR" {
+		return "text-[0.65rem] font-semibold tracking-wider text-warning"
+	}
+	return "text-[0.65rem] font-semibold tracking-wider text-base-content/30"
+}

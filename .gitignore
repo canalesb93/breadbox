@@ -16,6 +16,9 @@ static/css/styles.css
 # air (hot-reload) build output — used by `make dev-watch`
 tmp/
 
+# templ generated code (regenerated via `templ generate`)
+*_templ.go
+
 # Go
 vendor/
 
