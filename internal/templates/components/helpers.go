@@ -44,6 +44,33 @@ func formatDate(s string) string {
 	return s
 }
 
+// relativeDate returns "Today", "Yesterday", "N days ago" (2–6), "1 week ago"
+// (7–13), or an absolute "Jan 2, 2006" date otherwise. Mirrors the admin
+// funcMap of the same name so components and html/template stay aligned.
+func relativeDate(s string) string {
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return s
+	}
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	d := t.In(now.Location())
+	dateOnly := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, now.Location())
+	days := int(today.Sub(dateOnly).Hours() / 24)
+	switch {
+	case days == 0:
+		return "Today"
+	case days == 1:
+		return "Yesterday"
+	case days >= 2 && days <= 6:
+		return fmt.Sprintf("%d days ago", days)
+	case days >= 7 && days <= 13:
+		return "1 week ago"
+	default:
+		return t.Format("Jan 2, 2006")
+	}
+}
+
 func formatAmount(amount float64) string {
 	formatted := service.FormatCurrency(math.Abs(amount))
 	if amount < 0 {
