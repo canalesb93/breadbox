@@ -1,0 +1,85 @@
+package components
+
+import (
+	"fmt"
+
+	"breadbox/internal/service"
+)
+
+// TxRowCompact renders the dense transaction row used in dashboard "Recent
+// Transactions" and rule detail previews. Lightweight sibling of TxRow — no
+// selection checkbox, no inline category picker, no expand panel.
+templ TxRowCompact(tx service.AdminTransactionRow) {
+	<a
+		href={ templ.SafeURL(fmt.Sprintf("/transactions/%s", tx.ID)) }
+		class="bb-tx-row-compact flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-base-200/40 transition-colors duration-150 -mx-1 no-underline"
+	>
+		<!-- Category avatar (same style as tx-row, smaller size) -->
+		<div class="relative shrink-0">
+			if tx.CategoryIcon != nil {
+				<div class="bb-tx-avatar bb-tx-avatar--sm" style={ "--avatar-color: " + colorOrDefault(tx.CategoryColor) }>
+					<i data-lucide={ deref(tx.CategoryIcon) } class="w-3.5 h-3.5"></i>
+				</div>
+			} else {
+				<div class="bb-tx-avatar bb-tx-avatar--sm bb-tx-avatar--letter">
+					<span>{ firstChar(tx.Name) }</span>
+				</div>
+			}
+		</div>
+		<!-- Name + meta line -->
+		<div class="min-w-0 flex-1">
+			<div class="flex items-center gap-1.5 min-w-0">
+				<span class="text-sm font-medium truncate">{ tx.Name }</span>
+				if tx.Pending {
+					<span class="badge badge-soft badge-xs badge-warning rounded-md shrink-0">Pending</span>
+				}
+			</div>
+			<div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40 overflow-hidden">
+				if tx.UserName != "" {
+					if tx.EffectiveUserID != nil {
+						<img
+							src={ avatarURL(tx.EffectiveUserID) }
+							alt=""
+							class="w-4 h-4 rounded-full object-cover shrink-0"
+							title={ tx.UserName }
+						/>
+					} else {
+						<span
+							class="w-4 h-4 rounded-full bg-primary/10 inline-flex items-center justify-center shrink-0"
+							title={ tx.UserName }
+						>
+							<span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{ firstChar(tx.UserName) }</span>
+						</span>
+					}
+				}
+				<span class="truncate shrink min-w-0">{ tx.AccountName }</span>
+				if tx.CategoryDisplayName != nil {
+					<span class="text-base-content/20 shrink-0 hidden sm:inline">&middot;</span>
+					<span class="items-center gap-1 shrink-0 hidden sm:inline-flex">
+						<span
+							class="w-1.5 h-1.5 rounded-full shrink-0"
+							style={ "background-color: " + colorOrDefault(tx.CategoryColor) }
+						></span>
+						<span class="text-base-content/50 truncate max-w-24">{ deref(tx.CategoryDisplayName) }</span>
+					</span>
+				}
+				if tx.AgentReviewed {
+					<span class="text-base-content/20 shrink-0">&middot;</span>
+					<span
+						class="inline-flex items-center gap-0.5 text-primary/60 shrink-0"
+						title="Categorized by AI agent"
+					>
+						<i data-lucide="bot" class="w-3 h-3"></i>
+					</span>
+				}
+			</div>
+		</div>
+		<!-- Date + Amount (right-aligned stack) -->
+		<div class="shrink-0 text-right flex flex-col items-end gap-0.5">
+			<span class={ amountClass(tx.Amount) }>
+				{ formatAmount(tx.Amount) }
+			</span>
+			<span class="text-[0.65rem] text-base-content/40 tabular-nums">{ relativeDate(tx.Date) }</span>
+		</div>
+	</a>
+}

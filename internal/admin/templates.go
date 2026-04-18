@@ -2,6 +2,7 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -18,11 +19,23 @@ import (
 	"breadbox/internal/service"
 	bsync "breadbox/internal/sync"
 	"breadbox/internal/templates"
+	"breadbox/internal/templates/components"
 	"breadbox/internal/version"
 
+	"github.com/a-h/templ"
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// renderComponent renders a templ component into template.HTML. templ output
+// is pre-escaped, so wrapping in template.HTML is safe.
+func renderComponent(c templ.Component) (template.HTML, error) {
+	var buf bytes.Buffer
+	if err := c.Render(context.Background(), &buf); err != nil {
+		return "", fmt.Errorf("render templ component: %w", err)
+	}
+	return template.HTML(buf.String()), nil
+}
 
 // Flash represents a one-time message shown to the user after a redirect.
 type Flash struct {
@@ -781,6 +794,14 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"formatBytes": func(bytes int64) string {
 				return service.FormatBytes(bytes)
 			},
+			// Bridge for invoking templ components from html/template pages.
+			// Generic entry used by page-data that already carries a
+			// templ.Component; per-component wrappers below avoid exposing the
+			// component type to callers that just want to render by name.
+			"renderComponent": renderComponent,
+			"txRowCompact": func(tx service.AdminTransactionRow) (template.HTML, error) {
+				return renderComponent(components.TxRowCompact(tx))
+			},
 		},
 	}
 	if err := tr.parseTemplates(); err != nil {
@@ -796,7 +817,8 @@ var templatePartials = []string{
 	"partials/skeletons.html",
 	"partials/breadcrumb.html",
 	"partials/tx_row.html",
-	"partials/tx_row_compact.html",
+	// tx_row_compact migrated to templ (internal/templates/components/tx_row_compact.templ).
+	// Callers invoke it via the renderComponent funcMap bridge.
 	"partials/tx_results.html",
 	"partials/tag_chip.html",
 	"partials/condition_row.html",

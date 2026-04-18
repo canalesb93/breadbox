@@ -4,12 +4,15 @@ tmp_dir = "tmp"
 [build]
   # Only Go changes trigger a rebuild. HTML/CSS are served from disk at runtime
   # (BREADBOX_DEV_RELOAD=1), so including them here would cause spurious restarts.
-  cmd = "go build -o ./tmp/breadbox ./cmd/breadbox"
+  # *.templ files regenerate into *_templ.go via `make templ` (or templ --watch);
+  # the resulting Go file edits are what trigger the rebuild here, so .templ
+  # sources themselves don't need to be watched by air.
+  cmd = "templ generate && go build -o ./tmp/breadbox ./cmd/breadbox"
   bin = "./tmp/breadbox"
   full_bin = "./tmp/breadbox serve"
-  include_ext = ["go"]
-  exclude_dir = ["tmp", "static", "internal/templates", "internal/db/migrations", "docs", "node_modules", ".git", ".claude"]
-  exclude_regex = ["_test\\.go$", "\\.sql\\.go$"]
+  include_ext = ["go", "templ"]
+  exclude_dir = ["tmp", "static", "internal/templates/layout", "internal/templates/pages", "internal/templates/partials", "internal/db/migrations", "docs", "node_modules", ".git", ".claude"]
+  exclude_regex = ["_test\\.go$", "\\.sql\\.go$", "_templ\\.go$"]
   delay = 300
   stop_on_error = true
   send_interrupt = true

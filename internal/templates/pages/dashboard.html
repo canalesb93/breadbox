@@ -260,7 +260,7 @@
     {{if .RecentTransactions}}
     <div class="px-3 sm:px-4 py-2">
       {{range .RecentTransactions}}
-      {{template "tx-row-compact" .}}
+      {{txRowCompact .}}
       {{end}}
     </div>
     {{else}}
