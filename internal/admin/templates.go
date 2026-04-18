@@ -62,6 +62,25 @@ func renderTemplComponent(name string, data any) template.HTML {
 			return ""
 		}
 		c = components.Flash(f.Type, f.Message)
+	case "ConditionRow":
+		m, ok := data.(map[string]any)
+		if !ok {
+			return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): want map[string]any{Cond, Idx, Conj}, got %T -->", name, data))
+		}
+		cond, ok := m["Cond"].(service.Condition)
+		if !ok {
+			return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): Cond not service.Condition, got %T -->", name, m["Cond"]))
+		}
+		idx, _ := m["Idx"].(int)
+		conj, _ := m["Conj"].(string)
+		props := components.ConditionRowProps{
+			IsFirst:     idx == 0,
+			Conj:        conj,
+			FieldLabel:  ruleFieldLabel(cond.Field),
+			OpLabel:     ruleOpLabel(cond.Op, cond.Field),
+			ValueFormat: ruleValueFormat(cond.Value),
+		}
+		c = components.ConditionRow(props)
 	default:
 		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): unknown -->", name))
 	}

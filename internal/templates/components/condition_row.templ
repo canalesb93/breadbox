@@ -1,0 +1,44 @@
+package components
+
+// ConditionRowProps carries the pre-formatted strings the bridge
+// computes from a service.Condition. The component stays oblivious to
+// the underlying condition shape so no admin↔components import cycle.
+type ConditionRowProps struct {
+	// IsFirst controls the "IF" prefix vs the AND/OR conjunction.
+	IsFirst bool
+	// Conj is "AND" or "OR" (ignored when IsFirst).
+	Conj string
+	// FieldLabel, OpLabel, ValueFormat are the pre-rendered strings from
+	// admin's ruleFieldLabel / ruleOpLabel / ruleValueFormat helpers.
+	FieldLabel  string
+	OpLabel     string
+	ValueFormat string
+}
+
+// ConditionRow renders one row in the rule-conditions list on the rule
+// detail page. Mirrors the "condition-row" html/template partial.
+templ ConditionRow(p ConditionRowProps) {
+	<div class="flex items-center gap-2 p-2.5 bg-base-200/50 border border-base-content/10 rounded-xl">
+		<!-- Conjunction / IF prefix -->
+		<div class="w-10 shrink-0 text-center">
+			if p.IsFirst {
+				<span class="text-[0.65rem] font-semibold tracking-wider text-base-content/30">IF</span>
+			} else {
+				<span class={ "text-[0.65rem]", "font-semibold", "tracking-wider", conjClass(p.Conj) }>{ p.Conj }</span>
+			}
+		</div>
+		<!-- Field -->
+		<span class="text-sm font-medium text-base-content/80 truncate">{ p.FieldLabel }</span>
+		<!-- Operator pill -->
+		<span class="inline-flex items-center px-2 py-0.5 rounded-md bg-base-100 border border-base-content/10 text-xs text-base-content/55 font-mono">{ p.OpLabel }</span>
+		<!-- Value -->
+		<span class="text-sm font-semibold text-base-content truncate" title={ p.ValueFormat }>{ p.ValueFormat }</span>
+	</div>
+}
+
+func conjClass(c string) string {
+	if c == "OR" {
+		return "text-warning"
+	}
+	return "text-base-content/30"
+}
