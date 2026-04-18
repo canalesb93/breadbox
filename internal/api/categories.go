@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -55,8 +54,7 @@ type createCategoryRequest struct {
 func CreateCategoryHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var input createCategoryRequest
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Invalid JSON body")
+		if !decodeJSON(w, r, &input) {
 			return
 		}
 
@@ -100,8 +98,7 @@ func UpdateCategoryHandler(svc *service.Service) http.HandlerFunc {
 		id := chi.URLParam(r, "id")
 
 		var input updateCategoryRequest
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Invalid JSON body")
+		if !decodeJSON(w, r, &input) {
 			return
 		}
 
@@ -163,8 +160,7 @@ func MergeCategoriesHandler(svc *service.Service) http.HandlerFunc {
 		id := chi.URLParam(r, "id")
 
 		var input mergeCategoriesRequest
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_JSON", "Invalid JSON body")
+		if !decodeJSON(w, r, &input) {
 			return
 		}
 

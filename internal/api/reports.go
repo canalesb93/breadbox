@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	mw "breadbox/internal/middleware"
@@ -44,8 +43,7 @@ func CreateReportHandler(svc *service.Service) http.HandlerFunc {
 			Tags     []string `json:"tags"`
 			Author   string   `json:"author"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid JSON body")
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 

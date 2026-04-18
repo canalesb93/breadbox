@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -18,8 +17,7 @@ func TriggerSyncHandler(svc *service.Service) http.HandlerFunc {
 			var body struct {
 				ConnectionID *string `json:"connection_id"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+			if !decodeJSON(w, r, &body) {
 				return
 			}
 			connectionID = body.ConnectionID

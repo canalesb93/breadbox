@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -389,8 +388,7 @@ func SetTransactionCategoryHandler(svc *service.Service) http.HandlerFunc {
 		var input struct {
 			CategoryID string `json:"category_id"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+		if !decodeJSON(w, r, &input) {
 			return
 		}
 		if input.CategoryID == "" {
@@ -436,8 +434,7 @@ func BatchCategorizeHandler(svc *service.Service) http.HandlerFunc {
 		var input struct {
 			Items []service.BatchCategorizeItem `json:"items"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+		if !decodeJSON(w, r, &input) {
 			return
 		}
 
@@ -471,8 +468,7 @@ func BulkRecategorizeHandler(svc *service.Service) http.HandlerFunc {
 			Search             string   `json:"search"`
 			NameContains       string   `json:"name_contains"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+		if !decodeJSON(w, r, &input) {
 			return
 		}
 

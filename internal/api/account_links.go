@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -32,8 +31,7 @@ func CreateAccountLinkHandler(svc *service.Service) http.HandlerFunc {
 			MatchStrategy      string `json:"match_strategy"`
 			MatchToleranceDays int    `json:"match_tolerance_days"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+		if !decodeJSON(w, r, &input) {
 			return
 		}
 
@@ -92,8 +90,7 @@ func UpdateAccountLinkHandler(svc *service.Service) http.HandlerFunc {
 			MatchToleranceDays *int    `json:"match_tolerance_days"`
 			Enabled            *bool   `json:"enabled"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+		if !decodeJSON(w, r, &input) {
 			return
 		}
 
@@ -206,8 +203,7 @@ func ManualMatchHandler(svc *service.Service) http.HandlerFunc {
 			PrimaryTransactionID   string `json:"primary_transaction_id"`
 			DependentTransactionID string `json:"dependent_transaction_id"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			mw.WriteError(w, http.StatusBadRequest, "INVALID_BODY", "Invalid JSON body")
+		if !decodeJSON(w, r, &input) {
 			return
 		}
 
