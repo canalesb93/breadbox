@@ -642,10 +642,6 @@ const ruleSelectQuery = `SELECT tr.id, tr.short_id, tr.name, tr.conditions, tr.a
 	tr.hit_count, tr.last_hit_at, tr.created_at, tr.updated_at
 	FROM transaction_rules tr`
 
-// ruleSelectColumnCount is the number of columns in ruleSelectQuery (excluding
-// JOINs). Used to bound scanDest() for INSERT/UPDATE RETURNING.
-const ruleSelectColumnCount = 16
-
 // CreateTransactionRule creates a new transaction rule.
 //
 // Category info is derived from actions[{type:"set_category"}] at response
@@ -1197,9 +1193,8 @@ const transactionContextGroupBy = ` GROUP BY t.id, t.name, t.merchant_name, t.am
 
 // transactionContextRow holds a scanned transaction row for rule evaluation.
 type transactionContextRow struct {
-	id        pgtype.UUID
-	tctx      TransactionContext
-	accountID pgtype.UUID
+	id   pgtype.UUID
+	tctx TransactionContext
 }
 
 func scanTransactionContextRow(dest []any) *transactionContextRow {
@@ -1554,9 +1549,7 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 						}
 						// If a prior-stage remove queued this slug, the later
 						// add cancels the remove.
-						if _, was := intent.tagRemoves[a.TagSlug]; was {
-							delete(intent.tagRemoves, a.TagSlug)
-						}
+						delete(intent.tagRemoves, a.TagSlug)
 						if _, exists := intent.tagAdds[a.TagSlug]; !exists {
 							intent.tagAdds[a.TagSlug] = cr
 						}

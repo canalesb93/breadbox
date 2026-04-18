@@ -1,13 +1,14 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"testing"
 )
 
 func TestGetTransactionSummary_InvalidGroupBy(t *testing.T) {
 	svc := &Service{} // no pool needed for validation check
-	_, err := svc.GetTransactionSummary(nil, TransactionSummaryParams{GroupBy: "invalid"})
+	_, err := svc.GetTransactionSummary(context.Background(), TransactionSummaryParams{GroupBy: "invalid"})
 	if err == nil {
 		t.Fatal("expected error for invalid group_by")
 	}

@@ -390,9 +390,7 @@ func flattenCategories(tree []service.CategoryResponse) []service.CategoryRespon
 	var flat []service.CategoryResponse
 	for _, parent := range tree {
 		flat = append(flat, parent)
-		for _, child := range parent.Children {
-			flat = append(flat, child)
-		}
+		flat = append(flat, parent.Children...)
 	}
 	return flat
 }
