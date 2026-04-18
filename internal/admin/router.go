@@ -80,6 +80,11 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/transactions/{id}", TransactionDetailHandler(a, sm, tr, svc))
 		r.Get("/accounts/{id}", AccountDetailHandler(a, sm, tr, svc))
 
+		// The review queue is tag-backed — "needs-review" transactions. The
+		// `/reviews` alias exists so dashboard CTAs and the `gr` keyboard
+		// shortcut point at a stable, meaningful URL.
+		r.Get("/reviews", ReviewsAliasHandler)
+
 		// Member account self-service pages.
 		r.Get("/my-account", MyAccountHandler(a, sm, tr, svc))
 		r.Post("/my-account/password", MyAccountChangePasswordHandler(a, sm))
