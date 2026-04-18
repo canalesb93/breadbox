@@ -49,6 +49,19 @@ func renderTemplComponent(name string, data any) template.HTML {
 			}
 		}
 		c = components.TxRow(tx)
+	case "Flash":
+		f, ok := data.(*Flash)
+		if !ok {
+			if v, ok := data.(Flash); ok {
+				f = &v
+			} else {
+				return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): want *admin.Flash, got %T -->", name, data))
+			}
+		}
+		if f == nil {
+			return ""
+		}
+		c = components.Flash(f.Type, f.Message)
 	default:
 		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): unknown -->", name))
 	}

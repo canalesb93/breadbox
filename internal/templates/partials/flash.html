@@ -1,7 +1,8 @@
-{{define "flash"}}
-{{if .Flash}}
-<div role="alert" class="alert {{if eq .Flash.Type "success"}}alert-success{{else if eq .Flash.Type "error"}}alert-error{{else}}alert-info{{end}} rounded-xl mb-6">
-  <span>{{.Flash.Message}}</span>
-</div>
-{{end}}
-{{end}}
+{{/*
+  Thin html/template facade around the templ component in
+  internal/templates/components/flash.templ. base.html + wizard.html call
+  {{template "flash" .}} with the full layout data; we short-circuit when
+  .Flash is nil so the component can accept a non-nil value directly.
+  See issue #462 for migration context.
+*/}}
+{{define "flash"}}{{if .Flash}}{{renderComponent "Flash" .Flash}}{{end}}{{end}}

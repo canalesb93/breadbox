@@ -1,0 +1,22 @@
+package components
+
+// Flash renders a one-time banner shown after a redirect.
+// Callers pass the type ("success", "error", anything else → "info") and
+// the human-readable message. The caller is responsible for the nil check
+// (the html/template facade short-circuits when .Flash is nil).
+templ Flash(flashType, message string) {
+	<div role="alert" class={ "alert", flashClass(flashType), "rounded-xl", "mb-6" }>
+		<span>{ message }</span>
+	</div>
+}
+
+func flashClass(t string) string {
+	switch t {
+	case "success":
+		return "alert-success"
+	case "error":
+		return "alert-error"
+	default:
+		return "alert-info"
+	}
+}
