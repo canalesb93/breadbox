@@ -96,13 +96,13 @@ func CreateTagAdminHandler(svc *service.Service) http.HandlerFunc {
 			Lifecycle   string  `json:"lifecycle"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]any{"code": "INVALID_REQUEST", "message": "Invalid request body"}})
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
 			return
 		}
 		req.Slug = strings.TrimSpace(req.Slug)
 		req.DisplayName = strings.TrimSpace(req.DisplayName)
 		if req.Slug == "" || req.DisplayName == "" {
-			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": map[string]any{"code": "VALIDATION_ERROR", "message": "slug and display_name are required"}})
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "slug and display_name are required")
 			return
 		}
 
@@ -134,7 +134,7 @@ func UpdateTagAdminHandler(svc *service.Service) http.HandlerFunc {
 			Lifecycle   *string `json:"lifecycle"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]any{"code": "INVALID_REQUEST", "message": "Invalid request body"}})
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
 			return
 		}
 		result, err := svc.UpdateTag(r.Context(), id, service.UpdateTagParams{
@@ -248,11 +248,11 @@ func RemoveTransactionTagAdminHandler(a *app.App, sm *scs.SessionManager, svc *s
 func handleTagError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrNotFound):
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": map[string]any{"code": "NOT_FOUND", "message": "Tag not found"}})
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "Tag not found")
 	case errors.Is(err, service.ErrInvalidParameter):
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": map[string]any{"code": "VALIDATION_ERROR", "message": err.Error()}})
+		writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 	default:
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": map[string]any{"code": "INTERNAL_ERROR", "message": err.Error()}})
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
 	}
 }
 

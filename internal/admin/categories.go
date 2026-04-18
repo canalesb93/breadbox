@@ -169,12 +169,12 @@ func CreateCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
 			SortOrder   int32   `json:"sort_order"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeCategoryError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
 			return
 		}
 		req.DisplayName = strings.TrimSpace(req.DisplayName)
 		if req.DisplayName == "" {
-			writeCategoryError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Display name is required")
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Display name is required")
 			return
 		}
 
@@ -205,12 +205,12 @@ func UpdateCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
 			Hidden      bool    `json:"hidden"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeCategoryError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
 			return
 		}
 		req.DisplayName = strings.TrimSpace(req.DisplayName)
 		if req.DisplayName == "" {
-			writeCategoryError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Display name is required")
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Display name is required")
 			return
 		}
 
@@ -250,11 +250,11 @@ func MergeCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
 			TargetID string `json:"target_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeCategoryError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
 			return
 		}
 		if req.TargetID == "" {
-			writeCategoryError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "target_id is required")
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "target_id is required")
 			return
 		}
 
@@ -270,26 +270,16 @@ func MergeCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
 func handleCategoryError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrCategoryNotFound):
-		writeCategoryError(w, http.StatusNotFound, "NOT_FOUND", "Category not found")
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "Category not found")
 	case errors.Is(err, service.ErrCategoryUndeletable):
-		writeCategoryError(w, http.StatusConflict, "UNDELETABLE", "This category cannot be deleted")
+		writeError(w, http.StatusConflict, "UNDELETABLE", "This category cannot be deleted")
 	case errors.Is(err, service.ErrSlugConflict):
-		writeCategoryError(w, http.StatusConflict, "SLUG_CONFLICT", "A category with this name already exists")
+		writeError(w, http.StatusConflict, "SLUG_CONFLICT", "A category with this name already exists")
 	case errors.Is(err, service.ErrInvalidParameter):
-		writeCategoryError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 	default:
-		writeCategoryError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "An unexpected error occurred")
 	}
-}
-
-// writeCategoryError writes a JSON error envelope.
-func writeCategoryError(w http.ResponseWriter, status int, code, message string) {
-	writeJSON(w, status, map[string]any{
-		"error": map[string]string{
-			"code":    code,
-			"message": message,
-		},
-	})
 }
 
 // SetTransactionCategoryAdminHandler handles POST /admin/api/transactions/{id}/category.
@@ -300,23 +290,23 @@ func SetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
 			CategoryID string `json:"category_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeCategoryError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
 			return
 		}
 		if req.CategoryID == "" {
-			writeCategoryError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "category_id is required")
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "category_id is required")
 			return
 		}
 		if err := svc.SetTransactionCategory(r.Context(), id, req.CategoryID); err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				writeCategoryError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
 				return
 			}
 			if errors.Is(err, service.ErrCategoryNotFound) {
-				writeCategoryError(w, http.StatusNotFound, "CATEGORY_NOT_FOUND", "Category not found")
+				writeError(w, http.StatusNotFound, "CATEGORY_NOT_FOUND", "Category not found")
 				return
 			}
-			writeCategoryError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to set category")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to set category")
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -329,10 +319,10 @@ func ResetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerFunc
 		id := chi.URLParam(r, "id")
 		if err := svc.ResetTransactionCategory(r.Context(), id); err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				writeCategoryError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
 				return
 			}
-			writeCategoryError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to reset category")
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to reset category")
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -350,15 +340,15 @@ func BatchSetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerF
 			} `json:"items"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeCategoryError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
 			return
 		}
 		if len(req.Items) == 0 {
-			writeCategoryError(w, http.StatusBadRequest, "VALIDATION_ERROR", "items array is required")
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "items array is required")
 			return
 		}
 		if len(req.Items) > 500 {
-			writeCategoryError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Maximum 500 items per batch")
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Maximum 500 items per batch")
 			return
 		}
 
