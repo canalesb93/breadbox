@@ -1,6 +1,12 @@
 package avatar
 
 import (
+	"bytes"
+	"image"
+	"image/color"
+	"image/gif"
+	"image/jpeg"
+	"image/png"
 	"math"
 	"strings"
 	"testing"
@@ -153,4 +159,118 @@ func TestProcessUpload_CorruptImage(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for corrupt image data")
 	}
+}
+
+func TestProcessUpload_Success(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		encode      func(*bytes.Buffer, image.Image) error
+		width       int
+		height      int
+	}{
+		{
+			name:        "square png",
+			contentType: "image/png",
+			encode:      func(b *bytes.Buffer, img image.Image) error { return png.Encode(b, img) },
+			width:       300,
+			height:      300,
+		},
+		{
+			name:        "landscape jpeg",
+			contentType: "image/jpeg",
+			encode:      func(b *bytes.Buffer, img image.Image) error { return jpeg.Encode(b, img, nil) },
+			width:       400,
+			height:      200,
+		},
+		{
+			name:        "portrait gif",
+			contentType: "image/gif",
+			encode:      func(b *bytes.Buffer, img image.Image) error { return gif.Encode(b, img, nil) },
+			width:       200,
+			height:      400,
+		},
+		{
+			name:        "small upscale png",
+			contentType: "image/png",
+			encode:      func(b *bytes.Buffer, img image.Image) error { return png.Encode(b, img) },
+			width:       64,
+			height:      64,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			src := makeSolidImage(tt.width, tt.height, color.RGBA{R: 200, G: 100, B: 50, A: 255})
+			var buf bytes.Buffer
+			if err := tt.encode(&buf, src); err != nil {
+				t.Fatalf("encode source: %v", err)
+			}
+
+			out, outType, err := ProcessUpload(buf.Bytes(), tt.contentType)
+			if err != nil {
+				t.Fatalf("ProcessUpload: %v", err)
+			}
+			if outType != "image/png" {
+				t.Errorf("output content-type = %q, want image/png", outType)
+			}
+			decoded, err := png.Decode(bytes.NewReader(out))
+			if err != nil {
+				t.Fatalf("decode output: %v", err)
+			}
+			b := decoded.Bounds()
+			if b.Dx() != targetSize || b.Dy() != targetSize {
+				t.Errorf("output size = %dx%d, want %dx%d", b.Dx(), b.Dy(), targetSize, targetSize)
+			}
+		})
+	}
+}
+
+func TestCenterCrop(t *testing.T) {
+	tests := []struct {
+		name          string
+		width, height int
+		wantSize      int
+	}{
+		{"already square", 100, 100, 100},
+		{"landscape crops to height", 300, 150, 150},
+		{"portrait crops to width", 150, 300, 150},
+		{"tall strip", 50, 500, 50},
+		{"wide strip", 500, 50, 50},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			src := makeSolidImage(tt.width, tt.height, color.RGBA{A: 255})
+			got := centerCrop(src)
+			b := got.Bounds()
+			if b.Dx() != tt.wantSize || b.Dy() != tt.wantSize {
+				t.Errorf("cropped size = %dx%d, want %dx%d", b.Dx(), b.Dy(), tt.wantSize, tt.wantSize)
+			}
+		})
+	}
+}
+
+func TestCenterCrop_FallbackNonSubImager(t *testing.T) {
+	// nonSubImager wraps an image.Image but does not implement SubImage,
+	// forcing centerCrop's manual-copy fallback path.
+	src := nonSubImager{makeSolidImage(200, 100, color.RGBA{R: 255, A: 255})}
+	got := centerCrop(src)
+	b := got.Bounds()
+	if b.Dx() != 100 || b.Dy() != 100 {
+		t.Errorf("fallback cropped size = %dx%d, want 100x100", b.Dx(), b.Dy())
+	}
+}
+
+// makeSolidImage returns an opaque image of the given dimensions filled with c.
+func makeSolidImage(w, h int, c color.RGBA) *image.RGBA {
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			img.Set(x, y, c)
+		}
+	}
+	return img
+}
+
+type nonSubImager struct {
+	image.Image
 }
