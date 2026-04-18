@@ -28,7 +28,7 @@ func ValidateCredentials(ctx context.Context, clientID, secret, env string) erro
 			}
 		}
 		if plaidErr != nil {
-			return fmt.Errorf("Plaid error: %s", plaidErr.GetErrorMessage())
+			return fmt.Errorf("plaid error: %s", plaidErr.GetErrorMessage())
 		}
 		return fmt.Errorf("could not connect to Plaid: %v", err)
 	}
