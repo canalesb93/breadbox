@@ -95,22 +95,22 @@ templ dashNetWorthCard(p DashboardProps) {
 				<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
 					<div>
 						<div class="text-xs text-base-content/40 mb-0.5">Net Worth</div>
-						<div class="text-3xl sm:text-4xl font-bold tabular-nums tracking-tight">{ formatBalance(p.NetWorth) }</div>
+						<div class="text-3xl sm:text-4xl font-bold tabular-nums tracking-tight">{ components.FormatBalance(p.NetWorth) }</div>
 					</div>
 					<div class="flex items-center gap-5 sm:text-right">
 						<div>
 							<div class="text-[0.65rem] text-base-content/35 uppercase tracking-wider">Assets</div>
-							<div class="text-sm font-semibold tabular-nums text-success/80">{ formatBalance(p.TotalAssets) }</div>
+							<div class="text-sm font-semibold tabular-nums text-success/80">{ components.FormatBalance(p.TotalAssets) }</div>
 						</div>
 						<div>
 							<div class="text-[0.65rem] text-base-content/35 uppercase tracking-wider">Liabilities</div>
-							<div class="text-sm font-semibold tabular-nums text-error/70">{ formatBalance(p.TotalLiabilities) }</div>
+							<div class="text-sm font-semibold tabular-nums text-error/70">{ components.FormatBalance(p.TotalLiabilities) }</div>
 						</div>
 					</div>
 				</div>
 				<div class="flex h-2.5 rounded-full overflow-hidden gap-0.5">
 					for _, s := range p.AllocationSlices {
-						<div class="h-full rounded-full transition-all duration-700 ease-out" style={ dashAllocSegStyle(s) } title={ fmt.Sprintf("%s: %s", s.Label, formatBalance(s.Amount)) }></div>
+						<div class="h-full rounded-full transition-all duration-700 ease-out" style={ dashAllocSegStyle(s) } title={ fmt.Sprintf("%s: %s", s.Label, components.FormatBalance(s.Amount)) }></div>
 					}
 				</div>
 				<div class="flex items-center gap-4 flex-wrap mt-2.5">
@@ -118,7 +118,7 @@ templ dashNetWorthCard(p DashboardProps) {
 						<span class="flex items-center gap-1.5 text-xs text-base-content/50">
 							<span class="w-2 h-2 rounded-full shrink-0" style={ dashAllocDotStyle(s) }></span>
 							{ s.Label }
-							<span class="tabular-nums font-medium text-base-content/70">{ formatBalance(s.Amount) }</span>
+							<span class="tabular-nums font-medium text-base-content/70">{ components.FormatBalance(s.Amount) }</span>
 						</span>
 					}
 				</div>
@@ -178,11 +178,11 @@ templ dashAccountCard(a DashboardAccount) {
 				if a.IsLiability {
 					-
 				}
-				{ formatBalance(a.BalanceCurrent) }
+				{ components.FormatBalance(a.BalanceCurrent) }
 			</div>
 			<div class="text-right">
 				if a.SpendingTotal > 0 {
-					<div class="text-[0.65rem] text-base-content/40 tabular-nums">{ formatBalance(a.SpendingTotal) } spent</div>
+					<div class="text-[0.65rem] text-base-content/40 tabular-nums">{ components.FormatBalance(a.SpendingTotal) } spent</div>
 				} else {
 					<div class="text-[0.65rem] text-base-content/35">{ dashAccountLabel(a.Type, a.Subtype) }</div>
 				}
@@ -317,12 +317,12 @@ templ dashAttentionCard(p DashboardProps) {
 			<div class="px-3 sm:px-4 py-2">
 				if p.UncategorizedCount > 0 {
 					@dashAttentionLink("/transactions?filter=uncategorized", "tag", "text-warning", "bg-warning/10",
-						fmt.Sprintf("%s uncategorized", commaInt(p.UncategorizedCount)),
+						fmt.Sprintf("%s uncategorized", components.CommaInt(p.UncategorizedCount)),
 						"Review and assign categories")
 				}
 				if p.ReviewsEnabled && p.ReviewPending > 0 {
 					@dashAttentionLink("/reviews", "clipboard-check", "text-info", "bg-info/10",
-						fmt.Sprintf("%s pending reviews", commaInt(p.ReviewPending)),
+						fmt.Sprintf("%s pending reviews", components.CommaInt(p.ReviewPending)),
 						"Awaiting your approval")
 				}
 				if p.ErrorCount > 0 {
@@ -532,57 +532,6 @@ templ dashScripts() {
 }
 
 // ── Helpers ──────────────────────────────────────────────────
-
-func formatBalance(amount float64) string {
-	abs := amount
-	if abs < 0 {
-		abs = -abs
-	}
-	if abs >= 1_000_000 {
-		return fmt.Sprintf("$%.1fM", amount/1_000_000)
-	}
-	if abs >= 1_000 {
-		return fmt.Sprintf("$%s", withCommas(amount))
-	}
-	return fmt.Sprintf("$%.2f", amount)
-}
-
-func withCommas(f float64) string {
-	sign := ""
-	if f < 0 {
-		sign = "-"
-		f = -f
-	}
-	whole := int64(f)
-	cents := int((f - float64(whole)) * 100)
-	if cents < 0 {
-		cents = -cents
-	}
-	s := fmt.Sprintf("%d", whole)
-	out := ""
-	for i, c := range s {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			out += ","
-		}
-		out += string(c)
-	}
-	return fmt.Sprintf("%s%s.%02d", sign, out, cents)
-}
-
-func commaInt(n int64) string {
-	s := fmt.Sprintf("%d", n)
-	if len(s) <= 3 {
-		return s
-	}
-	out := ""
-	for i, c := range s {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			out += ","
-		}
-		out += string(c)
-	}
-	return out
-}
 
 func pluralS(n int) string {
 	if n == 1 {

@@ -143,3 +143,78 @@ func pluralS(n int) string {
 func amount2f(f float64) string {
 	return fmt.Sprintf("%.2f", f)
 }
+
+// FormatBalance formats an amount for balance display. Values >= $1M are
+// abbreviated ($1.2M); values >= $1K use comma-thousands ($1,234.56); all
+// others use two-decimal notation ($123.45). Sign is ignored — always absolute.
+// Mirrors the "formatBalance" admin funcMap entry; keep them in sync.
+func FormatBalance(amount float64) string {
+	abs := math.Abs(amount)
+	if abs >= 1_000_000 {
+		return fmt.Sprintf("$%.1fM", abs/1_000_000)
+	}
+	if abs >= 1_000 {
+		return fmt.Sprintf("$%s", commaAmount(abs))
+	}
+	return fmt.Sprintf("$%.2f", abs)
+}
+
+// commaAmount formats a non-negative float as "1,234.56" (no $ prefix).
+func commaAmount(f float64) string {
+	whole := int64(f)
+	cents := int(math.Round((f - float64(whole)) * 100))
+	s := CommaInt(whole)
+	return fmt.Sprintf("%s.%02d", s, cents)
+}
+
+// CommaInt formats a non-negative integer with thousands-separator commas:
+// 1234567 → "1,234,567". Used by FormatBalance and templates that need
+// a plain integer count formatted with commas.
+func CommaInt(n int64) string {
+	s := fmt.Sprintf("%d", n)
+	if len(s) <= 3 {
+		return s
+	}
+	out := ""
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			out += ","
+		}
+		out += string(c)
+	}
+	return out
+}
+
+// FormatIntervalMinutes renders a sync interval in minutes as a short human
+// label: "24h", "4h", "30m", "1d". Mirrors the "formatIntervalMinutes" admin
+// funcMap entry; keep them in sync.
+func FormatIntervalMinutes(minutes int) string {
+	if minutes <= 0 {
+		return "N/A"
+	}
+	if minutes >= 1440 && minutes%1440 == 0 {
+		d := minutes / 1440
+		if d == 1 {
+			return "24h"
+		}
+		return fmt.Sprintf("%dd", d)
+	}
+	if minutes >= 60 && minutes%60 == 0 {
+		return fmt.Sprintf("%dh", minutes/60)
+	}
+	if minutes >= 60 {
+		return fmt.Sprintf("%dh %dm", minutes/60, minutes%60)
+	}
+	return fmt.Sprintf("%dm", minutes)
+}
+
+// AvatarURLVersioned returns an avatar path with an optional cache-busting
+// version suffix. Pass an empty version for no suffix. Extends avatarURL
+// to match the admin funcMap's two-argument form.
+func AvatarURLVersioned(id, version string) string {
+	base := avatarURL(id)
+	if version == "" {
+		return base
+	}
+	return base + "?v=" + version
+}
