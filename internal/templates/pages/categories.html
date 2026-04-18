@@ -15,10 +15,10 @@
       <a href="?days=90" class="px-2.5 py-1 text-xs rounded-md transition-colors {{if eq .SpendingDays 90}}bg-base-100 shadow-sm font-medium text-base-content{{else}}text-base-content/50 hover:text-base-content/70{{end}}">90d</a>
       <a href="?days=365" class="px-2.5 py-1 text-xs rounded-md transition-colors {{if eq .SpendingDays 365}}bg-base-100 shadow-sm font-medium text-base-content{{else}}text-base-content/50 hover:text-base-content/70{{end}}">1y</a>
     </div>
-    <button class="btn btn-sm btn-primary rounded-xl gap-2" onclick="document.getElementById('create-modal').showModal()">
+    <a href="/categories/new" class="btn btn-sm btn-primary rounded-xl gap-2">
       <i data-lucide="plus" class="w-4 h-4"></i>
       Add Category
-    </button>
+    </a>
   </div>
 </div>
 
@@ -92,10 +92,7 @@
               <!-- Desktop: inline buttons -->
               <div class="hidden sm:flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 {{if gt $spending.TransactionCount 0}}<a href="/transactions?category={{.Slug}}" class="btn btn-ghost btn-xs rounded-lg" title="View transactions"><i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i></a>{{end}}
-                <button class="btn btn-ghost btn-xs rounded-lg"
-                  data-id="{{.ID}}" data-display-name="{{.DisplayName}}" data-icon="{{if .Icon}}{{.Icon}}{{end}}" data-color="{{if .Color}}{{.Color}}{{end}}" data-sort-order="{{.SortOrder}}" data-hidden="{{.Hidden}}"
-                  @click.prevent="$dispatch('edit-category', {id: $el.dataset.id, displayName: $el.dataset.displayName, icon: $el.dataset.icon, color: $el.dataset.color, sortOrder: parseInt($el.dataset.sortOrder) || 0, hidden: $el.dataset.hidden === 'true'})"
-                  title="Edit"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                <a href="/categories/{{.ID}}/edit" class="btn btn-ghost btn-xs rounded-lg" title="Edit"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></a>
                 {{if not .IsSystem}}<button class="btn btn-ghost btn-xs rounded-lg text-error"
                   data-id="{{.ID}}" data-name="{{.DisplayName}}"
                   @click.prevent="$dispatch('delete-category', {id: $el.dataset.id, name: $el.dataset.name})"
@@ -108,10 +105,7 @@
                 </div>
                 <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-40 p-1">
                   {{if gt $spending.TransactionCount 0}}<li><a href="/transactions?category={{.Slug}}"><i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i> View txns</a></li>{{end}}
-                  <li><button
-                    data-id="{{.ID}}" data-display-name="{{.DisplayName}}" data-icon="{{if .Icon}}{{.Icon}}{{end}}" data-color="{{if .Color}}{{.Color}}{{end}}" data-sort-order="{{.SortOrder}}" data-hidden="{{.Hidden}}"
-                    @click="$dispatch('edit-category', {id: $el.dataset.id, displayName: $el.dataset.displayName, icon: $el.dataset.icon, color: $el.dataset.color, sortOrder: parseInt($el.dataset.sortOrder) || 0, hidden: $el.dataset.hidden === 'true'})"
-                    ><i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit</button></li>
+                  <li><a href="/categories/{{.ID}}/edit"><i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit</a></li>
                   {{if not .IsSystem}}<li><button class="text-error"
                     data-id="{{.ID}}" data-name="{{.DisplayName}}"
                     @click="$dispatch('delete-category', {id: $el.dataset.id, name: $el.dataset.name})"
@@ -163,10 +157,7 @@
                   <!-- Desktop: inline buttons -->
                   <div class="hidden sm:flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     {{if gt $childSpending.TransactionCount 0}}<a href="/transactions?category={{.Slug}}" class="btn btn-ghost btn-xs rounded-lg" title="View transactions"><i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i></a>{{end}}
-                    <button class="btn btn-ghost btn-xs rounded-lg"
-                      data-id="{{.ID}}" data-display-name="{{.DisplayName}}" data-icon="{{if .Icon}}{{.Icon}}{{end}}" data-color="{{if .Color}}{{.Color}}{{end}}" data-sort-order="{{.SortOrder}}" data-hidden="{{.Hidden}}"
-                      @click="$dispatch('edit-category', {id: $el.dataset.id, displayName: $el.dataset.displayName, icon: $el.dataset.icon, color: $el.dataset.color, sortOrder: parseInt($el.dataset.sortOrder) || 0, hidden: $el.dataset.hidden === 'true'})"
-                      title="Edit"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                    <a href="/categories/{{.ID}}/edit" class="btn btn-ghost btn-xs rounded-lg" title="Edit"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></a>
                     {{if not .IsSystem}}<button class="btn btn-ghost btn-xs rounded-lg text-error"
                       data-id="{{.ID}}" data-name="{{.DisplayName}}"
                       @click="$dispatch('delete-category', {id: $el.dataset.id, name: $el.dataset.name})"
@@ -179,10 +170,7 @@
                     </div>
                     <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-40 p-1">
                       {{if gt $childSpending.TransactionCount 0}}<li><a href="/transactions?category={{.Slug}}"><i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i> View txns</a></li>{{end}}
-                      <li><button
-                        data-id="{{.ID}}" data-display-name="{{.DisplayName}}" data-icon="{{if .Icon}}{{.Icon}}{{end}}" data-color="{{if .Color}}{{.Color}}{{end}}" data-sort-order="{{.SortOrder}}" data-hidden="{{.Hidden}}"
-                        @click="$dispatch('edit-category', {id: $el.dataset.id, displayName: $el.dataset.displayName, icon: $el.dataset.icon, color: $el.dataset.color, sortOrder: parseInt($el.dataset.sortOrder) || 0, hidden: $el.dataset.hidden === 'true'})"
-                        ><i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit</button></li>
+                      <li><a href="/categories/{{.ID}}/edit"><i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit</a></li>
                       {{if not .IsSystem}}<li><button class="text-error"
                         data-id="{{.ID}}" data-name="{{.DisplayName}}"
                         @click="$dispatch('delete-category', {id: $el.dataset.id, name: $el.dataset.name})"
@@ -214,184 +202,13 @@
         </div>
         <h2 class="text-lg font-semibold mb-1">No categories yet</h2>
         <p class="text-base-content/50 text-sm mb-6 max-w-sm">Create your first category to start organizing transactions into a clean taxonomy.</p>
-        <button class="btn btn-primary btn-sm rounded-xl gap-2" onclick="document.getElementById('create-modal').showModal()">
+        <a href="/categories/new" class="btn btn-primary btn-sm rounded-xl gap-2">
           <i data-lucide="plus" class="w-4 h-4"></i> Add Category
-        </button>
+        </a>
       </div>
     </div>
     {{end}}
   </div>
-
-
-<!-- ═══════════ Create Modal ═══════════ -->
-<dialog id="create-modal" class="modal modal-bottom sm:modal-middle">
-  <form class="modal-box rounded-xl max-w-lg" x-data="{displayName: '', parentId: '', icon: '', color: '#6366f1', sortOrder: 0, submitting: false, showIconPicker: false,
-    commonIcons: ['shopping-cart','utensils','car','home','briefcase','heart','zap','book','plane','music','gift','coffee','scissors','shirt','gamepad-2','graduation-cap','building-2','fuel','bus','train'],
-    presetColors: ['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#64748b','#78716c']
-  }" @submit.prevent="
-    submitting = true;
-    fetch('/-/categories', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({display_name: displayName, parent_id: parentId || undefined, icon: icon || undefined, color: color || undefined, sort_order: sortOrder})})
-    .then(r => { if(r.ok) location.reload(); else r.json().then(d => { window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error?.message || 'Error', type:'error'}})); submitting = false; }); })
-    .catch(() => { submitting = false; })
-  ">
-    <h3 class="text-lg font-bold">Add Category</h3>
-    <p class="text-sm text-base-content/50 mt-1">Create a new category in your taxonomy</p>
-    <div class="space-y-4 mt-6">
-      <!-- Live preview -->
-      <div class="flex items-center gap-3 p-4 bg-base-200/40 rounded-xl">
-        <div class="w-9 h-9 rounded-xl flex items-center justify-center" :style="'background-color:' + (color || '#6366f1') + '15'">
-          <template x-if="icon"><i :data-lucide="icon" class="w-5 h-5" :style="'color:' + (color || '#6366f1')"></i></template>
-          <template x-if="!icon"><span class="w-2.5 h-2.5 rounded-full" :style="'background-color:' + (color || '#6366f1')"></span></template>
-        </div>
-        <span class="font-semibold text-sm" x-text="displayName || 'Category Name'"></span>
-      </div>
-
-      <label class="form-control w-full">
-        <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Display Name</span></div>
-        <input type="text" x-model="displayName" class="input input-bordered w-full rounded-xl" required placeholder="e.g. Food & Drink">
-      </label>
-
-      <label class="form-control w-full">
-        <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Parent Category</span></div>
-        <div class="bb-cat-picker" data-picker-source="cat-create-parent" x-data="categoryPicker({categories: {{toJSON .Categories}}, mode: 'assign', placeholder: 'None (top-level)', allowEmpty: true, emptyLabel: 'None (top-level)', sourceId: 'cat-create-parent'})" @category-change="parentId = $event.detail.id">
-          <button type="button" class="select select-bordered w-full text-left flex items-center gap-2 rounded-xl" @click="openPicker()">
-            <span x-text="displayLabel" class="flex-1 text-sm"></span>
-            <i data-lucide="chevron-down" class="w-4 h-4 opacity-40"></i>
-          </button>
-        </div>
-      </label>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="form-control">
-          <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Icon</span></div>
-          <div class="flex gap-2 items-center">
-            <input type="text" x-model="icon" class="input input-bordered flex-1 rounded-xl" placeholder="e.g. shopping-cart">
-            <button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="showIconPicker = !showIconPicker" title="Browse icons">
-              <i data-lucide="grid-3x3" class="w-4 h-4"></i>
-            </button>
-          </div>
-          <div x-show="showIconPicker" x-cloak class="mt-2 p-2.5 bg-base-200/40 rounded-xl">
-            <div class="grid grid-cols-5 gap-1">
-              <template x-for="ic in commonIcons">
-                <button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="icon = ic; showIconPicker = false; $nextTick(() => lucide.createIcons())">
-                  <i :data-lucide="ic" class="w-4 h-4"></i>
-                </button>
-              </template>
-            </div>
-          </div>
-        </div>
-        <div class="form-control">
-          <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Color</span></div>
-          <div class="flex flex-wrap gap-1.5">
-            <template x-for="c in presetColors">
-              <button type="button" class="w-7 h-7 rounded-full border-2 transition-all duration-150 hover:scale-110" :style="'background-color:' + c" :class="color === c ? 'border-base-content scale-110 shadow-sm' : 'border-transparent'" @click="color = c"></button>
-            </template>
-            <label class="w-7 h-7 rounded-full border-2 border-dashed border-base-content/20 cursor-pointer overflow-hidden flex items-center justify-center hover:border-base-content/40 transition-colors" title="Custom color">
-              <input type="color" x-model="color" class="opacity-0 absolute w-0 h-0">
-              <i data-lucide="palette" class="w-3.5 h-3.5 opacity-40"></i>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <label class="form-control w-full">
-        <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Sort Order</span></div>
-        <input type="number" x-model.number="sortOrder" class="input input-bordered w-full rounded-xl" value="0">
-      </label>
-    </div>
-    <div class="modal-action">
-      <button type="button" class="btn btn-ghost btn-sm rounded-xl" onclick="document.getElementById('create-modal').close()">Cancel</button>
-      <button type="submit" class="btn btn-primary btn-sm rounded-xl" :disabled="submitting || !displayName">
-        <span x-show="!submitting">Create</span>
-        <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-      </button>
-    </div>
-  </form>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
-</dialog>
-
-<!-- ═══════════ Edit Modal ═══════════ -->
-<dialog id="edit-modal" class="modal modal-bottom sm:modal-middle" x-data="{editId: '', editDisplayName: '', editIcon: '', editColor: '', editSortOrder: 0, editHidden: false, submitting: false, showIconPicker: false,
-  commonIcons: ['shopping-cart','utensils','car','home','briefcase','heart','zap','book','plane','music','gift','coffee','scissors','shirt','gamepad-2','graduation-cap','building-2','fuel','bus','train'],
-  presetColors: ['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#64748b','#78716c']
-}" @edit-category.window="editId = $event.detail.id; editDisplayName = $event.detail.displayName; editIcon = $event.detail.icon; editColor = $event.detail.color || '#6366f1'; editSortOrder = $event.detail.sortOrder; editHidden = $event.detail.hidden; showIconPicker = false; document.getElementById('edit-modal').showModal(); $nextTick(() => lucide.createIcons())">
-  <div class="modal-box rounded-xl max-w-lg">
-    <h3 class="text-lg font-bold">Edit Category</h3>
-    <p class="text-sm text-base-content/50 mt-1">Update category appearance and settings</p>
-    <div class="space-y-4 mt-6">
-      <!-- Live preview -->
-      <div class="flex items-center gap-3 p-4 bg-base-200/40 rounded-xl">
-        <div class="w-9 h-9 rounded-xl flex items-center justify-center" :style="'background-color:' + (editColor || '#6366f1') + '15'">
-          <template x-if="editIcon"><i :data-lucide="editIcon" class="w-5 h-5" :style="'color:' + (editColor || '#6366f1')"></i></template>
-          <template x-if="!editIcon"><span class="w-2.5 h-2.5 rounded-full" :style="'background-color:' + (editColor || '#6366f1')"></span></template>
-        </div>
-        <span class="font-semibold text-sm" x-text="editDisplayName || 'Category Name'"></span>
-        <span x-show="editHidden" class="badge badge-ghost badge-xs">Hidden</span>
-      </div>
-
-      <label class="form-control w-full">
-        <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Display Name</span></div>
-        <input type="text" x-model="editDisplayName" class="input input-bordered w-full rounded-xl" required>
-      </label>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="form-control">
-          <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Icon</span></div>
-          <div class="flex gap-2 items-center">
-            <input type="text" x-model="editIcon" class="input input-bordered flex-1 rounded-xl" placeholder="e.g. shopping-cart">
-            <button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="showIconPicker = !showIconPicker">
-              <i data-lucide="grid-3x3" class="w-4 h-4"></i>
-            </button>
-          </div>
-          <div x-show="showIconPicker" x-cloak class="mt-2 p-2.5 bg-base-200/40 rounded-xl">
-            <div class="grid grid-cols-5 gap-1">
-              <template x-for="ic in commonIcons">
-                <button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="editIcon = ic; showIconPicker = false; $nextTick(() => lucide.createIcons())">
-                  <i :data-lucide="ic" class="w-4 h-4"></i>
-                </button>
-              </template>
-            </div>
-          </div>
-        </div>
-        <div class="form-control">
-          <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Color</span></div>
-          <div class="flex flex-wrap gap-1.5">
-            <template x-for="c in presetColors">
-              <button type="button" class="w-7 h-7 rounded-full border-2 transition-all duration-150 hover:scale-110" :style="'background-color:' + c" :class="editColor === c ? 'border-base-content scale-110 shadow-sm' : 'border-transparent'" @click="editColor = c"></button>
-            </template>
-            <label class="w-7 h-7 rounded-full border-2 border-dashed border-base-content/20 cursor-pointer overflow-hidden flex items-center justify-center hover:border-base-content/40 transition-colors" title="Custom color">
-              <input type="color" x-model="editColor" class="opacity-0 absolute w-0 h-0">
-              <i data-lucide="palette" class="w-3.5 h-3.5 opacity-40"></i>
-            </label>
-          </div>
-        </div>
-      </div>
-      <label class="form-control w-full">
-        <div class="label"><span class="label-text text-xs font-medium text-base-content/60">Sort Order</span></div>
-        <input type="number" x-model.number="editSortOrder" class="input input-bordered w-full rounded-xl">
-      </label>
-      <label class="label cursor-pointer justify-start gap-3">
-        <input type="checkbox" x-model="editHidden" class="toggle toggle-sm">
-        <div>
-          <span class="label-text text-sm">Hidden</span>
-          <span class="text-xs text-base-content/40 block">Hidden categories still work for mapping but don't appear in dropdowns</span>
-        </div>
-      </label>
-    </div>
-    <div class="modal-action">
-      <button type="button" class="btn btn-ghost btn-sm rounded-xl" onclick="document.getElementById('edit-modal').close()">Cancel</button>
-      <button type="button" class="btn btn-primary btn-sm rounded-xl" :disabled="submitting || !editDisplayName" @click="
-        submitting = true;
-        fetch('/-/categories/' + editId, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({display_name: editDisplayName, icon: editIcon || undefined, color: editColor || undefined, sort_order: editSortOrder, hidden: editHidden})})
-        .then(r => { if(r.ok) location.reload(); else r.json().then(d => { window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error?.message || 'Error', type:'error'}})); submitting = false; }); })
-        .catch(() => { submitting = false; })
-      ">
-        <span x-show="!submitting">Save</span>
-        <span x-show="submitting" class="loading loading-spinner loading-xs"></span>
-      </button>
-    </div>
-  </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
-</dialog>
 
 <!-- ═══════════ Delete Modal ═══════════ -->
 <dialog id="delete-modal" class="modal modal-bottom sm:modal-middle" x-data="{deleteId: '', deleteName: '', submitting: false}" @delete-category.window="deleteId = $event.detail.id; deleteName = $event.detail.name; document.getElementById('delete-modal').showModal()">

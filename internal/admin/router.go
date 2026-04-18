@@ -194,6 +194,8 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 		r.Get("/tags/{id}/edit", TagEditPageHandler(svc, sm, tr))
 
 		r.Get("/categories", CategoriesPageHandler(svc, sm, tr))
+		r.Get("/categories/new", CategoryNewPageHandler(svc, sm, tr))
+		r.Get("/categories/{id}/edit", CategoryEditPageHandler(svc, sm, tr))
 
 		r.Route("/mcp-settings", func(r chi.Router) {
 			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
