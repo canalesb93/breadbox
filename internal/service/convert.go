@@ -88,9 +88,9 @@ func connStatusPtr(s db.ConnectionStatus) *string {
 	return &str
 }
 
-// formatDurationMs converts milliseconds to a human-readable duration string.
+// FormatDurationMs converts milliseconds to a human-readable duration string.
 // Examples: 42ms, 1.2s, 2m 15s
-func formatDurationMs(ms int64) string {
+func FormatDurationMs(ms int64) string {
 	if ms < 1000 {
 		return fmt.Sprintf("%dms", ms)
 	}

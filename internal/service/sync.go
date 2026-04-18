@@ -193,11 +193,11 @@ func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListP
 
 		var duration *string
 		if durationMs.Valid {
-			d := formatDurationMs(int64(durationMs.Int32))
+			d := FormatDurationMs(int64(durationMs.Int32))
 			duration = &d
 		} else if startedAt.Valid && completedAt.Valid {
 			// Fallback for logs before the duration_ms column was backfilled.
-			d := formatDurationMs(completedAt.Time.Sub(startedAt.Time).Milliseconds())
+			d := FormatDurationMs(completedAt.Time.Sub(startedAt.Time).Milliseconds())
 			duration = &d
 		}
 

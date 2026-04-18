@@ -186,9 +186,9 @@ func TestFormatDurationMs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
-			got := formatDurationMs(tt.ms)
+			got := FormatDurationMs(tt.ms)
 			if got != tt.want {
-				t.Errorf("formatDurationMs(%d) = %q, want %q", tt.ms, got, tt.want)
+				t.Errorf("FormatDurationMs(%d) = %q, want %q", tt.ms, got, tt.want)
 			}
 		})
 	}

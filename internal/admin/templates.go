@@ -162,7 +162,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return fmt.Sprintf("%.0fm", d.Minutes())
 			},
-			"formatDurationMs": formatSyncStatusDuration,
+			"formatDurationMs": func(ms int32) string { return service.FormatDurationMs(int64(ms)) },
 			"relativeTime": func(t interface{}) string {
 				switch v := t.(type) {
 				case time.Time:
