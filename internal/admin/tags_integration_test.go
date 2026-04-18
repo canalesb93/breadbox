@@ -132,6 +132,41 @@ func TestDeleteTagAdmin(t *testing.T) {
 	}
 }
 
+// TestCreateTagAdmin_ErrorEnvelope verifies the error response matches the
+// canonical envelope shape documented in .claude/rules/api.md:
+// { "error": { "code": "...", "message": "..." } }.
+func TestCreateTagAdmin_ErrorEnvelope(t *testing.T) {
+	svc := newTestSvc(t)
+	r := chi.NewRouter()
+	r.Post("/-/tags", CreateTagAdminHandler(svc))
+
+	// Missing display_name triggers VALIDATION_ERROR.
+	body := []byte(`{"slug":"incomplete"}`)
+	req := httptest.NewRequest(http.MethodPost, "/-/tags", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", w.Code, w.Body.String())
+	}
+	var env struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
+		t.Fatalf("decode: %v (body=%s)", err, w.Body.String())
+	}
+	if env.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected code=VALIDATION_ERROR, got %q", env.Error.Code)
+	}
+	if env.Error.Message == "" {
+		t.Errorf("expected non-empty message, got empty")
+	}
+}
+
 // TestTagsPageRenders is a smoke test that the page handler renders the tag list.
 func TestTagsPageRenders(t *testing.T) {
 	svc := newTestSvc(t)

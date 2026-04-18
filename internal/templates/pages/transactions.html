@@ -1136,7 +1136,7 @@ function removeTag(el, txnId, slug, displayName) {
       setTimeout(function() { el.remove(); }, 160);
       window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: displayName + ' removed', type:'success'}}));
     } else {
-      window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error || 'Failed to remove tag', type:'error'}}));
+      window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: (d.error && d.error.message) || 'Failed to remove tag', type:'error'}}));
     }
   });
 }

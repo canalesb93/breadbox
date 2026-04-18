@@ -470,7 +470,7 @@ function tagManager() {
           showToast('Tag removed.', 'success');
           location.reload();
         } else {
-          showToast(r.body.error || 'Failed to remove tag.');
+          showToast((r.body.error && r.body.error.message) || 'Failed to remove tag.');
         }
       })
       .catch(function() { showToast('Network error.'); });
