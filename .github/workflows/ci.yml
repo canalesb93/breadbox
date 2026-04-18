@@ -46,6 +46,18 @@ jobs:
           curl -sL https://github.com/sqlc-dev/sqlc/releases/download/v1.30.0/sqlc_1.30.0_linux_amd64.tar.gz | tar xz -C /usr/local/bin sqlc
           sqlc generate
 
+      - name: Install templ and generate
+        run: |
+          go install github.com/a-h/templ/cmd/templ@latest
+          templ generate
+          # Fail fast if the committed *.templ files don't regenerate to the
+          # *_templ.go already in the tree (they shouldn't exist in git, but
+          # if someone lands a manual edit this surfaces it).
+          if ! git diff --exit-code --name-only -- '*_templ.go'; then
+            echo "::error::templ generated files drifted — run 'make templ' locally and commit"
+            exit 1
+          fi
+
       - name: Build CSS
         run: make css
 
@@ -156,6 +168,11 @@ jobs:
         run: |
           curl -sL https://github.com/sqlc-dev/sqlc/releases/download/v1.30.0/sqlc_1.30.0_linux_amd64.tar.gz | tar xz -C /usr/local/bin sqlc
           sqlc generate
+
+      - name: Install templ and generate
+        run: |
+          go install github.com/a-h/templ/cmd/templ@latest
+          templ generate
 
       - name: Build binary
         env:

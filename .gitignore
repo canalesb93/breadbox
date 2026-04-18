@@ -24,6 +24,12 @@ internal/db/db.go
 internal/db/models.go
 internal/db/*.sql.go
 
+# templ generated files — *.templ files are source, *_templ.go are artifacts
+# produced by `make templ` (or `templ generate`). Keep generated Go out of
+# git so diffs stay readable; CI regenerates and `templ-check` enforces
+# freshness.
+*_templ.go
+
 # IDE
 .idea/
 .vscode/

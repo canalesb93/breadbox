@@ -1,0 +1,113 @@
+// Package components hosts templ-generated admin UI components.
+//
+// Helpers here mirror the admin funcMap (internal/admin/templates.go) so a
+// component produces the same HTML whether it's rendered standalone, via
+// another templ component, or through the renderComponent bridge. Keep the
+// two in lock-step — drift shows up as different rows between pages.
+package components
+
+import (
+	"fmt"
+	"math"
+	"strings"
+	"time"
+
+	"breadbox/internal/service"
+)
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+// firstChar returns the first A–Z/0–9 rune of s uppercased, or "?" when s
+// has none. Used for avatar letter fallbacks.
+func firstChar(s string) string {
+	if s == "" {
+		return "?"
+	}
+	for _, r := range s {
+		c := strings.ToUpper(string(r))
+		if (c >= "A" && c <= "Z") || (c >= "0" && c <= "9") {
+			return c
+		}
+	}
+	return strings.ToUpper(string([]rune(s)[0]))
+}
+
+func formatDate(s string) string {
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		return t.Format("Jan 2, 2006")
+	}
+	return s
+}
+
+func formatAmount(amount float64) string {
+	formatted := service.FormatCurrency(math.Abs(amount))
+	if amount < 0 {
+		return "-" + formatted
+	}
+	return formatted
+}
+
+func avatarURL(id string) string {
+	if id == "" {
+		return "/avatars/unknown"
+	}
+	return "/avatars/" + id
+}
+
+// titleCase mirrors admin.titleCaseMerchant: ALL-CAPS or all-lowercase input
+// is rewritten to Title Case; mixed-case input is returned unchanged so
+// already-styled names like "McDonald's" aren't mangled.
+func titleCase(s string) string {
+	if s == "" {
+		return s
+	}
+	upper := strings.ToUpper(s)
+	lower := strings.ToLower(s)
+	if s != upper && s != lower {
+		return s
+	}
+	smallWords := map[string]bool{
+		"a": true, "an": true, "and": true, "as": true, "at": true,
+		"by": true, "for": true, "in": true, "of": true, "on": true,
+		"or": true, "the": true, "to": true, "vs": true, "via": true,
+	}
+	words := strings.Fields(lower)
+	for i, w := range words {
+		// Abbreviations with periods ("h.e." → "H.E.") uppercase every segment.
+		if strings.Contains(w, ".") {
+			parts := strings.Split(w, ".")
+			for j, p := range parts {
+				if len(p) > 0 {
+					parts[j] = strings.ToUpper(p)
+				}
+			}
+			words[i] = strings.Join(parts, ".")
+			continue
+		}
+		// Short non-article words are likely acronyms (ATM, US, AB).
+		if len(w) <= 2 && !smallWords[w] {
+			words[i] = strings.ToUpper(w)
+			continue
+		}
+		if i == 0 || !smallWords[w] {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	return strings.Join(words, " ")
+}
+
+func pluralS(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
+func amount2f(f float64) string {
+	return fmt.Sprintf("%.2f", f)
+}

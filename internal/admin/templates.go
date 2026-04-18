@@ -2,6 +2,7 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -18,11 +19,45 @@ import (
 	"breadbox/internal/service"
 	bsync "breadbox/internal/sync"
 	"breadbox/internal/templates"
+	"breadbox/internal/templates/components"
 	"breadbox/internal/version"
 
+	"github.com/a-h/templ"
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// renderTemplComponent renders a named templ component to template.HTML so
+// html/template partials (e.g. partials/tx_row.html) can forward to the
+// Go-generated component while we migrate pages over to templ. Returning an
+// empty string on an unknown name keeps rendering non-fatal — callers see a
+// blank slot and the server log picks up the error, matching how unknown
+// funcMap keys behaved before.
+//
+// Component adapters live in one place so we know every bridge entry up
+// front; add a new adapter here when you port a partial to templ.
+func renderTemplComponent(name string, data any) template.HTML {
+	var c templ.Component
+	switch name {
+	case "TxRow":
+		tx, ok := data.(service.AdminTransactionRow)
+		if !ok {
+			if p, ok := data.(*service.AdminTransactionRow); ok && p != nil {
+				tx = *p
+			} else {
+				return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): want service.AdminTransactionRow, got %T -->", name, data))
+			}
+		}
+		c = components.TxRow(tx)
+	default:
+		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): unknown -->", name))
+	}
+	var buf bytes.Buffer
+	if err := c.Render(context.Background(), &buf); err != nil {
+		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q) error: %s -->", name, template.HTMLEscapeString(err.Error())))
+	}
+	return template.HTML(buf.String())
+}
 
 // Flash represents a one-time message shown to the user after a redirect.
 type Flash struct {
@@ -781,6 +816,9 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"formatBytes": func(bytes int64) string {
 				return service.FormatBytes(bytes)
 			},
+			// renderComponent bridges html/template partials to templ-generated
+			// components during the incremental UI migration (issue #462).
+			"renderComponent": renderTemplComponent,
 		},
 	}
 	if err := tr.parseTemplates(); err != nil {
