@@ -1,0 +1,190 @@
+package components
+
+import (
+	"testing"
+	"time"
+)
+
+func TestDeref(t *testing.T) {
+	if got := deref(nil); got != "" {
+		t.Errorf("deref(nil) = %q, want \"\"", got)
+	}
+	s := "hello"
+	if got := deref(&s); got != "hello" {
+		t.Errorf("deref(&\"hello\") = %q, want \"hello\"", got)
+	}
+	empty := ""
+	if got := deref(&empty); got != "" {
+		t.Errorf("deref(&\"\") = %q, want \"\"", got)
+	}
+}
+
+func TestFirstChar(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"", "?"},
+		{"apple", "A"},
+		{"APPLE", "A"},
+		{"2024 sales", "2"},
+		{"  leading space", "L"},
+		{"!@#hello", "H"},
+		{"!!!", "!"}, // no ASCII letter/digit — first rune, uppercased
+		{"émilie", "M"}, // non-ASCII leader skipped; first A–Z wins
+		{"é", "É"},     // no A–Z/0–9 at all — first rune uppercased
+	}
+	for _, tc := range tests {
+		t.Run(tc.in, func(t *testing.T) {
+			if got := firstChar(tc.in); got != tc.want {
+				t.Errorf("firstChar(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFormatDate(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"2024-03-15", "Mar 15, 2024"},
+		{"2024-12-31", "Dec 31, 2024"},
+		{"not-a-date", "not-a-date"},
+		{"", ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.in, func(t *testing.T) {
+			if got := formatDate(tc.in); got != tc.want {
+				t.Errorf("formatDate(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRelativeDateAt(t *testing.T) {
+	// Fix "now" to a known moment so assertions are deterministic.
+	now := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name string
+		date string
+		want string
+	}{
+		{"today", "2026-04-18", "Today"},
+		{"yesterday", "2026-04-17", "Yesterday"},
+		{"2 days ago", "2026-04-16", "2 days ago"},
+		{"6 days ago", "2026-04-12", "6 days ago"},
+		{"7 days ago → 1 week", "2026-04-11", "1 week ago"},
+		{"13 days ago → 1 week", "2026-04-05", "1 week ago"},
+		{"14 days ago → absolute", "2026-04-04", "Apr 4, 2026"},
+		{"far past", "2020-01-15", "Jan 15, 2020"},
+		{"future dates fall through to absolute", "2026-05-01", "May 1, 2026"},
+		{"invalid input returned as-is", "not-a-date", "not-a-date"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := relativeDateAt(tc.date, now); got != tc.want {
+				t.Errorf("relativeDateAt(%q) = %q, want %q", tc.date, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFormatAmount(t *testing.T) {
+	tests := []struct {
+		in   float64
+		want string
+	}{
+		{0, "$0.00"},
+		{1.5, "$1.50"},
+		{-1.5, "-$1.50"},
+		{1234.56, "$1,234.56"},
+		{-1234.56, "-$1,234.56"},
+		{1000000, "$1,000,000.00"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.want, func(t *testing.T) {
+			if got := formatAmount(tc.in); got != tc.want {
+				t.Errorf("formatAmount(%v) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestAvatarURL(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"", "/avatars/unknown"},
+		{"abc123", "/avatars/abc123"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.in, func(t *testing.T) {
+			if got := avatarURL(tc.in); got != tc.want {
+				t.Errorf("avatarURL(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTitleCase(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"empty string", "", ""},
+		{"all caps becomes title case", "STARBUCKS COFFEE", "Starbucks Coffee"},
+		{"all lowercase becomes title case", "starbucks coffee", "Starbucks Coffee"},
+		{"mixed case left untouched", "McDonald's", "McDonald's"},
+		{"short non-article words uppercased", "us bank", "US Bank"},
+		{"small words stay lowercase in middle", "BANK OF AMERICA", "Bank of America"},
+		{"first small word capitalized", "the coffee shop", "The Coffee Shop"},
+		{"abbreviations with periods uppercased", "h.e.b grocery", "H.E.B Grocery"},
+		{"single word all caps", "WALMART", "Walmart"},
+		{"two-letter acronym uppercased", "ab pharmacy", "AB Pharmacy"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := titleCase(tc.in); got != tc.want {
+				t.Errorf("titleCase(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPluralS(t *testing.T) {
+	tests := []struct {
+		n    int
+		want string
+	}{
+		{0, "s"},
+		{1, ""},
+		{2, "s"},
+		{-1, "s"}, // only n==1 is singular
+	}
+	for _, tc := range tests {
+		if got := pluralS(tc.n); got != tc.want {
+			t.Errorf("pluralS(%d) = %q, want %q", tc.n, got, tc.want)
+		}
+	}
+}
+
+func TestAmount2f(t *testing.T) {
+	tests := []struct {
+		in   float64
+		want string
+	}{
+		{0, "0.00"},
+		{1.5, "1.50"},
+		{-1.2, "-1.20"},
+		{1234.5678, "1234.57"}, // %.2f rounds half-away-from-zero
+	}
+	for _, tc := range tests {
+		if got := amount2f(tc.in); got != tc.want {
+			t.Errorf("amount2f(%v) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}

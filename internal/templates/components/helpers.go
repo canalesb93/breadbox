@@ -48,11 +48,16 @@ func formatDate(s string) string {
 // (7–13), or an absolute "Jan 2, 2006" date otherwise. Mirrors the admin
 // funcMap of the same name so components and html/template stay aligned.
 func relativeDate(s string) string {
+	return relativeDateAt(s, time.Now())
+}
+
+// relativeDateAt is the testable core of relativeDate — takes an explicit
+// "now" so tests don't depend on wall-clock time.
+func relativeDateAt(s string, now time.Time) string {
 	t, err := time.Parse("2006-01-02", s)
 	if err != nil {
 		return s
 	}
-	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	d := t.In(now.Location())
 	dateOnly := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, now.Location())
