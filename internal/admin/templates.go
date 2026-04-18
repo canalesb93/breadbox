@@ -94,6 +94,19 @@ func renderTemplComponent(name string, data any) template.HTML {
 		} else {
 			c = components.TagChip(td)
 		}
+	case "Breadcrumb":
+		crumbs, ok := data.([]Breadcrumb)
+		if !ok {
+			return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): want []admin.Breadcrumb, got %T -->", name, data))
+		}
+		if len(crumbs) == 0 {
+			return ""
+		}
+		items := make([]components.Breadcrumb, len(crumbs))
+		for i, b := range crumbs {
+			items[i] = components.Breadcrumb{Label: b.Label, Href: b.Href}
+		}
+		c = components.BreadcrumbNav(items)
 	default:
 		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q): unknown -->", name))
 	}
