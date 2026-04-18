@@ -781,6 +781,9 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"formatBytes": func(bytes int64) string {
 				return service.FormatBytes(bytes)
 			},
+			// renderComponent bridges templ components into html/template
+			// pages during the #462 migration. See templ_bridge.go.
+			"renderComponent": renderComponent,
 		},
 	}
 	if err := tr.parseTemplates(); err != nil {
@@ -793,7 +796,6 @@ var templatePartials = []string{
 	"partials/flash.html",
 	"partials/nav.html",
 	"partials/category_picker.html",
-	"partials/skeletons.html",
 	"partials/breadcrumb.html",
 	"partials/tx_row.html",
 	"partials/tx_row_compact.html",
