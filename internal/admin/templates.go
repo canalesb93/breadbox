@@ -844,7 +844,6 @@ var templatePartials = []string{
 	"partials/flash.html",
 	"partials/nav.html",
 	"partials/category_picker.html",
-	"partials/skeletons.html",
 	"partials/breadcrumb.html",
 	"partials/tx_row.html",
 	"partials/tx_row_compact.html",
