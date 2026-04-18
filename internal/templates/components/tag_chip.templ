@@ -2,13 +2,38 @@ package components
 
 import "breadbox/internal/service"
 
-// TagChipSm renders the compact tag chip used inside transaction rows.
-//
-// Mirrors the "tag-chip-sm" html/template partial. Styling lives in
-// input.css under .bb-tag / .bb-tag-sm.
-templ TagChipSm(tag service.AdminTransactionTag) {
+// TagChipData is the minimal shape both tag-chip variants need. Both
+// service.AdminTransactionTag (transaction rows) and service.TagResponse
+// (tags admin page) collapse to this via the two helpers below so the
+// component stays independent of the service layer's naming.
+type TagChipData struct {
+	Slug        string
+	DisplayName string
+	Color       *string
+	Icon        *string
+}
+
+func TagChipDataFromTx(t service.AdminTransactionTag) TagChipData {
+	return TagChipData{Slug: t.Slug, DisplayName: t.DisplayName, Color: t.Color, Icon: t.Icon}
+}
+
+func TagChipDataFromResponse(t service.TagResponse) TagChipData {
+	return TagChipData{Slug: t.Slug, DisplayName: t.DisplayName, Color: t.Color, Icon: t.Icon}
+}
+
+// TagChip renders the default-sized pill. Mirrors the "tag-chip" partial.
+templ TagChip(tag TagChipData) {
+	@tagChipBody("bb-tag", tag)
+}
+
+// TagChipSm renders the compact variant used inside transaction rows.
+templ TagChipSm(tag TagChipData) {
+	@tagChipBody("bb-tag bb-tag-sm", tag)
+}
+
+templ tagChipBody(class string, tag TagChipData) {
 	<span
-		class="bb-tag bb-tag-sm"
+		class={ class }
 		if tag.Color != nil {
 			style={ "--tag-color: " + deref(tag.Color) }
 		}
