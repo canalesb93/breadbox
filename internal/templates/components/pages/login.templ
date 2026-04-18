@@ -1,0 +1,105 @@
+package pages
+
+import (
+	"breadbox/internal/templates/components/layout"
+)
+
+// LoginProps carries the fields previously passed via map[string]any to
+// pages/login.html.
+type LoginProps struct {
+	PageTitle string
+	CSRFToken string
+	Username  string
+	Error     string
+	// Flash is an optional one-time message (info/success/error) carried
+	// across redirects. nil when there's nothing to show.
+	Flash *LoginFlash
+}
+
+// LoginFlash mirrors admin.Flash so this package doesn't depend on the
+// admin package (avoiding an import cycle).
+type LoginFlash struct {
+	Type    string
+	Message string
+}
+
+// Login renders the /login page inside the wizard layout.
+templ Login(props LoginProps) {
+	@layout.Wizard(layout.WizardProps{PageTitle: props.PageTitle, CSRFToken: props.CSRFToken}) {
+		if props.Flash != nil {
+			@flashAlert(*props.Flash)
+		}
+		<div class="text-center mb-8">
+			<h1 class="text-xl font-semibold tracking-tight">Welcome back</h1>
+			<p class="text-sm text-base-content/50 mt-1.5">Sign in to your Breadbox dashboard</p>
+		</div>
+		if props.Error != "" {
+			<div role="alert" class="flex items-center gap-3 rounded-xl bg-error/10 text-error px-4 py-3 text-sm mb-6">
+				<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+				<span>{ props.Error }</span>
+			</div>
+		}
+		<form method="POST" action="/login" class="space-y-5">
+			if props.CSRFToken != "" {
+				<input type="hidden" name="_csrf" value={ props.CSRFToken }/>
+			}
+			<div>
+				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="username">Email</label>
+				<input
+					type="email"
+					id="username"
+					name="username"
+					value={ props.Username }
+					required
+					autocomplete="email"
+					placeholder="Enter your email"
+					class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200"
+				/>
+			</div>
+			<div>
+				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="password">Password</label>
+				<input
+					type="password"
+					id="password"
+					name="password"
+					required
+					autocomplete="current-password"
+					placeholder="Enter your password"
+					class="input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200"
+				/>
+			</div>
+			<label class="flex items-center gap-2 cursor-pointer select-none text-sm text-base-content/70">
+				<input type="checkbox" name="remember_me" value="1" checked class="checkbox checkbox-sm checkbox-primary"/>
+				Keep me signed in for 30 days
+			</label>
+			<button type="submit" class="btn btn-primary w-full h-12 rounded-xl text-base font-semibold transition-colors duration-150 mt-1">
+				Sign In
+				<i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
+			</button>
+		</form>
+	}
+}
+
+// flashAlert mirrors `internal/templates/partials/flash.html` so the templ
+// login page can render the same one-time message the legacy page rendered
+// via `{{template "flash" .}}`. When more pages migrate, this is a candidate
+// for extraction into its own component package.
+templ flashAlert(f LoginFlash) {
+	<div
+		role="alert"
+		class={ "alert rounded-xl mb-6", flashClass(f.Type) }
+	>
+		<span>{ f.Message }</span>
+	</div>
+}
+
+func flashClass(t string) string {
+	switch t {
+	case "success":
+		return "alert-success"
+	case "error":
+		return "alert-error"
+	default:
+		return "alert-info"
+	}
+}

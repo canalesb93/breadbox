@@ -863,9 +863,10 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		},
 	}
 
-	// Pages using the wizard layout (login + first-run admin creation + OAuth consent + account setup).
+	// Pages using the wizard layout (first-run admin creation + OAuth consent + account setup).
+	// Note: login.html has been migrated to a templ component at
+	// internal/templates/components/pages/login.templ.
 	wizardPages := []string{
-		"pages/login.html",
 		"pages/setup_create_admin.html",
 		"pages/setup_account.html",
 		"pages/oauth_authorize.html",

@@ -7,6 +7,7 @@ import (
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
+	loginpage "breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -44,17 +45,32 @@ var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("dummy-password-for-timing
 
 // LoginHandler returns an http.HandlerFunc that handles GET and POST /login.
 // Single table lookup against auth_accounts.
-func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
+//
+// The `tr` parameter is kept for signature compatibility with other wizard-page
+// handlers; the login page itself is rendered by a templ component and doesn't
+// need the html/template renderer.
+func LoginHandler(sm *scs.SessionManager, queries *db.Queries, _ *TemplateRenderer) http.HandlerFunc {
+	renderLogin := func(w http.ResponseWriter, r *http.Request, username, errMsg string, includeFlash bool) {
+		props := loginpage.LoginProps{
+			PageTitle: "Sign In",
+			CSRFToken: GenerateCSRFToken(r.Context(), sm),
+			Username:  username,
+			Error:     errMsg,
+		}
+		if includeFlash {
+			if f := GetFlash(r.Context(), sm); f != nil {
+				props.Flash = &loginpage.LoginFlash{Type: f.Type, Message: f.Message}
+			}
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := loginpage.Login(props).Render(r.Context(), w); err != nil {
+			http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
+		}
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
-			data := map[string]any{
-				"PageTitle": "Sign In",
-				"CSRFToken": GenerateCSRFToken(r.Context(), sm),
-				"Flash":     GetFlash(r.Context(), sm),
-				"Username":  "",
-				"Error":     "",
-			}
-			tr.Render(w, r, "login.html", data)
+			renderLogin(w, r, "", "", true)
 			return
 		}
 
@@ -63,24 +79,8 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRende
 		password := r.FormValue("password")
 
 		if username == "" || password == "" {
-			data := map[string]any{
-				"PageTitle": "Sign In",
-				"CSRFToken": GenerateCSRFToken(r.Context(), sm),
-				"Username":  username,
-				"Error":     "Invalid username or password",
-			}
-			tr.Render(w, r, "login.html", data)
+			renderLogin(w, r, username, "Invalid username or password", false)
 			return
-		}
-
-		renderLoginError := func() {
-			data := map[string]any{
-				"PageTitle": "Sign In",
-				"CSRFToken": GenerateCSRFToken(r.Context(), sm),
-				"Username":  username,
-				"Error":     "Invalid username or password",
-			}
-			tr.Render(w, r, "login.html", data)
 		}
 
 		// Single table lookup.
@@ -88,25 +88,19 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRende
 		if err != nil {
 			// Not found — run dummy bcrypt to prevent timing enumeration.
 			bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
-			renderLoginError()
+			renderLogin(w, r, username, "Invalid username or password", false)
 			return
 		}
 
 		// Account exists but no password set yet — tell user to use setup link.
 		if account.HashedPassword == nil {
 			bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
-			data := map[string]any{
-				"PageTitle": "Sign In",
-				"CSRFToken": GenerateCSRFToken(r.Context(), sm),
-				"Username":  username,
-				"Error":     "Your account hasn't been set up yet. Ask your administrator for a setup link.",
-			}
-			tr.Render(w, r, "login.html", data)
+			renderLogin(w, r, username, "Your account hasn't been set up yet. Ask your administrator for a setup link.", false)
 			return
 		}
 
 		if err := bcrypt.CompareHashAndPassword(account.HashedPassword, []byte(password)); err != nil {
-			renderLoginError()
+			renderLogin(w, r, username, "Invalid username or password", false)
 			return
 		}
 
