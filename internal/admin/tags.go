@@ -95,8 +95,7 @@ func CreateTagAdminHandler(svc *service.Service) http.HandlerFunc {
 			Icon        *string `json:"icon"`
 			Lifecycle   string  `json:"lifecycle"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 		req.Slug = strings.TrimSpace(req.Slug)
@@ -133,8 +132,7 @@ func UpdateTagAdminHandler(svc *service.Service) http.HandlerFunc {
 			Icon        *string `json:"icon"`
 			Lifecycle   *string `json:"lifecycle"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 		result, err := svc.UpdateTag(r.Context(), id, service.UpdateTagParams{
