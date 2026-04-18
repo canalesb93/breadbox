@@ -119,12 +119,12 @@ func (s *Service) GetConnectionStatus(ctx context.Context, id string) (*Connecti
 		}
 		if syncLog.DurationMs.Valid {
 			slResp.DurationMs = &syncLog.DurationMs.Int32
-			d := formatDurationMs(int64(syncLog.DurationMs.Int32))
+			d := FormatDurationMs(int64(syncLog.DurationMs.Int32))
 			slResp.Duration = &d
 		} else if syncLog.StartedAt.Valid && syncLog.CompletedAt.Valid {
 			ms := int32(syncLog.CompletedAt.Time.Sub(syncLog.StartedAt.Time).Milliseconds())
 			slResp.DurationMs = &ms
-			d := formatDurationMs(int64(ms))
+			d := FormatDurationMs(int64(ms))
 			slResp.Duration = &d
 		}
 		resp.LastSyncLog = &slResp

@@ -894,7 +894,7 @@ func SyncConnectionStatusHandler(a *app.App) http.HandlerFunc {
 		}
 		if hasDuration {
 			resp["duration_ms"] = durationMs
-			resp["duration_label"] = formatSyncStatusDuration(durationMs)
+			resp["duration_label"] = service.FormatDurationMs(int64(durationMs))
 		}
 		if log.ErrorMessage.Valid {
 			resp["error_message"] = log.ErrorMessage.String
@@ -1165,23 +1165,4 @@ func relativeTimeUntil(target, now time.Time) string {
 		return "in <1m"
 	}
 }
-
-// formatSyncStatusDuration mirrors the "formatDurationMs" template helper so
-// the sync-status JSON payload carries a preformatted label the client can
-// render without duplicating the formatting logic.
-func formatSyncStatusDuration(ms int32) string {
-	if ms < 1000 {
-		return fmt.Sprintf("%dms", ms)
-	}
-	if ms < 60000 {
-		return fmt.Sprintf("%.1fs", float64(ms)/1000)
-	}
-	mins := ms / 60000
-	secs := (ms % 60000) / 1000
-	if secs == 0 {
-		return fmt.Sprintf("%dm", mins)
-	}
-	return fmt.Sprintf("%dm %ds", mins, secs)
-}
-
 
