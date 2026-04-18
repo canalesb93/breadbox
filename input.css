@@ -504,11 +504,13 @@
     height: 0.65rem;
   }
 
-  /* On mobile (<sm), transaction-row tag chips collapse into a single icon +
-     count pill rendered beside the container (see data-tx-tag-mobile in
-     tx_row.html). Chips stay in the DOM so the bulk picker's
+  /* Below xl, transaction-row tag chips collapse into a single icon + count
+     pill rendered beside the container (see data-tx-tag-mobile in tx_row.html).
+     The pill renders cleanly on phones, tablets, and small desktops where the
+     full chip list would otherwise crowd the meta line and overflow into the
+     adjacent Category column. Chips stay in the DOM so the bulk picker's
      computeAppliedCounts() can still read them; they're just visually hidden. */
-  @media (max-width: 639.98px) {
+  @media (max-width: 1279.98px) {
     .bb-tx-tag-container .bb-tag {
       display: none;
     }
