@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"breadbox/internal/admin/navdata"
 	"breadbox/internal/db"
 
 	"github.com/alexedwards/scs/v2"
@@ -14,14 +15,9 @@ import (
 const navBadgesKey contextKey = "navBadges"
 
 // NavBadges holds notification counts displayed in the sidebar navigation.
-type NavBadges struct {
-	// PendingReviews is the count of transactions currently tagged
-	// "needs-review". Displayed next to the Tags nav link.
-	PendingReviews       int64
-	ConnectionsAttention int64
-	UnreadReports        int64
-	ShowGettingStarted   bool
-}
+// Aliased to navdata.Badges so the templ Nav component and handler code
+// share a single definition without an admin ↔ components import cycle.
+type NavBadges = navdata.Badges
 
 // NavBadgesMiddleware fetches sidebar notification badge counts and stores them
 // in the request context. The Render method auto-injects these into template data.

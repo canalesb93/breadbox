@@ -2,6 +2,7 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -14,12 +15,15 @@ import (
 	"sync"
 	"time"
 
+	"breadbox/internal/admin/navdata"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	bsync "breadbox/internal/sync"
 	"breadbox/internal/templates"
+	"breadbox/internal/templates/components"
 	"breadbox/internal/version"
 
+	"github.com/a-h/templ"
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -781,6 +785,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"formatBytes": func(bytes int64) string {
 				return service.FormatBytes(bytes)
 			},
+			"renderComponent": renderComponent,
 		},
 	}
 	if err := tr.parseTemplates(); err != nil {
@@ -1274,4 +1279,71 @@ func (tr *TemplateRenderer) RenderTo(w io.Writer, name string, data interface{})
 		return fmt.Errorf("template not found: %s", name)
 	}
 	return t.ExecuteTemplate(w, "layout", data)
+}
+
+// renderComponent is the html/template → templ bridge. Pages using
+// {{renderComponent "name" .}} receive the rendered templ output as safe
+// HTML so we can migrate partials one at a time without rewriting every
+// caller. `data` is typically the template's dot context (a map[string]any
+// produced by BaseTemplateData + handler-specific fields).
+func renderComponent(name string, data any) (template.HTML, error) {
+	var comp templ.Component
+	switch name {
+	case "nav":
+		comp = components.Nav(navPropsFromData(data))
+	default:
+		return "", fmt.Errorf("renderComponent: unknown component %q", name)
+	}
+	var buf bytes.Buffer
+	if err := comp.Render(context.Background(), &buf); err != nil {
+		return "", fmt.Errorf("renderComponent %q: %w", name, err)
+	}
+	return template.HTML(buf.String()), nil
+}
+
+// navPropsFromData extracts the nav component's props from a template data
+// map. Nav-required fields are auto-injected by Render, so handlers that
+// pass BaseTemplateData-style maps get everything they need for free.
+func navPropsFromData(data any) navdata.Props {
+	m, _ := data.(map[string]any)
+	if m == nil {
+		return navdata.Props{}
+	}
+	p := navdata.Props{
+		CurrentPage:          mapString(m, "CurrentPage"),
+		NavUpdateAvailable:   mapBool(m, "NavUpdateAvailable"),
+		NavLatestVersion:     mapString(m, "NavLatestVersion"),
+		NavLatestURL:         mapString(m, "NavLatestURL"),
+		AppVersion:           mapString(m, "AppVersion"),
+		IsAdmin:              mapBool(m, "IsAdmin"),
+		IsEditor:             mapBool(m, "IsEditor"),
+		AdminUsername:        mapString(m, "AdminUsername"),
+		SessionUserID:        mapString(m, "SessionUserID"),
+		SessionAvatarVersion: mapString(m, "SessionAvatarVersion"),
+		RoleDisplay:          mapString(m, "RoleDisplay"),
+		HasLinkedUser:        mapBool(m, "HasLinkedUser"),
+		CSRFToken:            mapString(m, "CSRFToken"),
+	}
+	// NavBadges is injected as a value type; we pass a pointer to the
+	// component so it can cheaply nil-check before dereferencing.
+	if b, ok := m["NavBadges"].(navdata.Badges); ok {
+		p.NavBadges = &b
+	} else if bp, ok := m["NavBadges"].(*navdata.Badges); ok {
+		p.NavBadges = bp
+	}
+	return p
+}
+
+func mapString(m map[string]any, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+func mapBool(m map[string]any, key string) bool {
+	if v, ok := m[key].(bool); ok {
+		return v
+	}
+	return false
 }

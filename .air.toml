@@ -7,9 +7,14 @@ tmp_dir = "tmp"
   cmd = "go build -o ./tmp/breadbox ./cmd/breadbox"
   bin = "./tmp/breadbox"
   full_bin = "./tmp/breadbox serve"
-  include_ext = ["go"]
-  exclude_dir = ["tmp", "static", "internal/templates", "internal/db/migrations", "docs", "node_modules", ".git", ".claude"]
+  include_ext = ["go", "templ"]
+  # internal/templates/components holds *.templ sources + generated *_templ.go.
+  # Both need to trigger rebuilds: .templ so a change re-runs templ generate via
+  # pre_cmd, *_templ.go so the refreshed Go source picks up.
+  include_dir = ["cmd", "internal"]
+  exclude_dir = ["tmp", "static", "internal/templates/layout", "internal/templates/pages", "internal/templates/partials", "internal/db/migrations", "docs", "node_modules", ".git", ".claude"]
   exclude_regex = ["_test\\.go$", "\\.sql\\.go$"]
+  pre_cmd = ["templ generate"]
   delay = 300
   stop_on_error = true
   send_interrupt = true
