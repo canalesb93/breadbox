@@ -1,0 +1,33 @@
+package components
+
+// Breadcrumb is one entry in a breadcrumb trail. An empty Href marks the
+// current page (rendered without a link). Kept in sync with
+// admin.Breadcrumb via the bridge in admin/templates.go.
+type Breadcrumb struct {
+	Label string
+	Href  string
+}
+
+// BreadcrumbNav renders a navigation breadcrumb trail. The last entry is
+// the current page (no link, bolder text). Separators are inline SVG
+// chevrons so we don't have to wait for lucide.createIcons() to run.
+templ BreadcrumbNav(items []Breadcrumb) {
+	if len(items) > 0 {
+		<nav aria-label="Breadcrumb" class="bb-breadcrumb">
+			for i, crumb := range items {
+				if i > 0 {
+					<span class="bb-breadcrumb-sep" aria-hidden="true">
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+					</span>
+				}
+				if crumb.Href != "" {
+					<span class="bb-breadcrumb-item">
+						<a href={ templ.SafeURL(crumb.Href) }>{ crumb.Label }</a>
+					</span>
+				} else {
+					<span class="bb-breadcrumb-current">{ crumb.Label }</span>
+				}
+			}
+		</nav>
+	}
+}
