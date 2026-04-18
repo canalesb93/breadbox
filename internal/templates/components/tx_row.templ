@@ -1,0 +1,241 @@
+package components
+
+import (
+	"fmt"
+	"strings"
+
+	"breadbox/internal/service"
+)
+
+// TxRow renders a single transaction row (Alpine-managed expand/collapse,
+// inline category picker, bulk-select checkbox, detail panel).
+//
+// Behavior mirrors the original {{define "tx-row"}} partial exactly:
+//   - data-* attributes feed JS-driven filtering, selection, and sort.
+//   - All funcMap helpers (deref, firstChar, formatDate, formatAmount,
+//     titleCase, avatarURL, safeCSS) are resolved at compile time here.
+//   - Alpine attributes (@click, x-data, x-init, x-text, :class, :style)
+//     pass through as literal HTML attribute names; templ does not touch
+//     them, which is exactly what we need for Alpine to see them.
+//
+// The inline category picker still reads window.__bbCategories from the
+// page; pages that render tx rows must continue to populate that global.
+templ TxRow(tx service.AdminTransactionRow) {
+	<div
+		class="bb-tx-row group"
+		x-data="{ expanded: false }"
+		data-tx-id={ tx.ID }
+		data-tx-name={ strings.ToLower(tx.Name) }
+		data-tx-merchant={ txMerchantAttr(tx.MerchantName) }
+		data-tx-account={ strings.ToLower(tx.AccountName) }
+		data-tx-amount={ amount2f(tx.Amount) }
+	>
+		<!-- Main Row -->
+		<div class="flex items-center gap-3 px-4 py-3 cursor-pointer" @click="expanded = !expanded">
+			<!-- Checkbox (bulk-select). Visibility + checked state set imperatively
+			     by the Alpine bulk store to avoid per-row reactivity on 50+ rows. -->
+			<label class="bb-tx-checkbox" @click.stop>
+				<input
+					type="checkbox"
+					class="checkbox checkbox-sm checkbox-primary"
+					data-tx-checkbox
+					@change={ fmt.Sprintf("$store.bulk.toggle('%s')", tx.ID) }
+				/>
+			</label>
+			<!-- Category icon / merchant-initial avatar -->
+			<div class="relative shrink-0">
+				if tx.CategoryIcon != nil {
+					<div class="bb-tx-avatar" style={ txAvatarColorStyle(tx.CategoryColor) }>
+						<i data-lucide={ deref(tx.CategoryIcon) } class="w-4 h-4"></i>
+					</div>
+				} else {
+					<div class="bb-tx-avatar bb-tx-avatar--letter">
+						<span>{ firstChar(tx.Name) }</span>
+					</div>
+				}
+			</div>
+			<!-- Description + meta line -->
+			<div class="flex-1 min-w-0">
+				<div class="flex items-center gap-2">
+					<a href={ templ.URL("/transactions/" + tx.ID) } @click.stop class="font-medium text-sm hover:text-primary transition-colors truncate">{ tx.Name }</a>
+					if tx.Pending {
+						<span class="badge badge-soft badge-xs badge-warning rounded-md shrink-0">Pending</span>
+					}
+				</div>
+				<div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40 min-w-0">
+					if tx.UserName != "" {
+						<!-- Avatar renders at every breakpoint so owner identity survives
+						     on mobile without eating space with a truncated first word. -->
+						if tx.EffectiveUserID != nil {
+							<img src={ avatarURL(deref(tx.EffectiveUserID)) } alt="" class="w-4 h-4 rounded-full object-cover shrink-0" title={ tx.UserName }/>
+						} else {
+							<span class="inline-flex w-4 h-4 rounded-full bg-primary/10 items-center justify-center shrink-0" title={ tx.UserName }>
+								<span class="text-[0.5rem] font-semibold text-primary/70 leading-none">{ firstChar(tx.UserName) }</span>
+							</span>
+						}
+					}
+					<span class="truncate min-w-0">{ tx.AccountName }</span>
+					if tx.MerchantName != nil && !strings.EqualFold(tx.Name, deref(tx.MerchantName)) {
+						<span class="text-base-content/20 hidden xl:inline">&middot;</span>
+						<span class="text-base-content/40 truncate hidden xl:inline">{ titleCase(deref(tx.MerchantName)) }</span>
+					}
+					if tx.AgentReviewed {
+						<span class="text-base-content/20">&middot;</span>
+						<span class="inline-flex items-center gap-0.5 text-primary/60" title="Categorized by AI agent">
+							<i data-lucide="bot" class="w-3 h-3"></i>
+						</span>
+					}
+					<!-- Tag container — updated in place by JS on add/remove. Leading
+					     middot separator is inside the container so it vanishes once
+					     the last tag is removed. Chips hidden on mobile via CSS;
+					     the mobile pill below takes their place. -->
+					<span class="bb-tx-tag-container contents" data-tx-tag-container>
+						if len(tx.Tags) > 0 {
+							<span class="text-base-content/20 hidden xl:inline" data-tx-tag-sep>&middot;</span>
+							for _, tag := range tx.Tags {
+								@TagChipSm(tag)
+							}
+						}
+					</span>
+					<!-- Compact tag indicator (below xl): tag icon + count pill. -->
+					if len(tx.Tags) > 0 {
+						<span
+							class="xl:hidden inline-flex items-center gap-0.5 text-base-content/40 shrink-0"
+							data-tx-tag-mobile
+							title={ fmt.Sprintf("%d tag%s", len(tx.Tags), pluralS(len(tx.Tags))) }
+						>
+							<span class="text-base-content/20 mr-0.5">&middot;</span>
+							<i data-lucide="tag" class="w-3 h-3"></i>
+							<span class="text-[0.65rem] tabular-nums font-medium" data-tx-tag-count>{ fmt.Sprintf("%d", len(tx.Tags)) }</span>
+						</span>
+					}
+					<!-- Compact category label (below xl). Separator stays inside the
+					     conditional so it never orphans when the meta line is empty. -->
+					if tx.CategoryDisplayName != nil {
+						<span class="xl:hidden text-base-content/20 shrink-0">&middot;</span>
+						<span class="xl:hidden inline-flex items-center gap-1 shrink min-w-0">
+							if tx.CategoryColor != nil {
+								<span class="w-1.5 h-1.5 rounded-full shrink-0" style={ "background-color: " + deref(tx.CategoryColor) }></span>
+							}
+							<span class="text-base-content/50 truncate">{ deref(tx.CategoryDisplayName) }</span>
+						</span>
+					} else {
+						<span class="xl:hidden text-base-content/20 shrink-0">&middot;</span>
+						<span class="xl:hidden text-base-content/25 truncate shrink-0">Uncategorized</span>
+					}
+				</div>
+			</div>
+			<!-- Inline category picker (xl+). Below xl the compact label above
+			     stands in for it. -->
+			<div class="shrink-0 hidden xl:block" @click.stop>
+				<div
+					class="bb-cat-picker"
+					data-picker-source={ "tx-cat-" + tx.ID }
+					x-data={ txCategoryPickerInit(tx.ID, tx.CategoryID) }
+					x-init={ fmt.Sprintf("$watch('selectedId', (v, old) => { if (old !== undefined && v !== old && !($store.bulk && $store.bulk.processing)) { quickSetCategory('%s', v) } })", tx.ID) }
+				>
+					<button type="button" class="btn btn-ghost btn-xs gap-1.5 rounded-lg" @click="openPicker()">
+						<template x-if="displayColor"><span class="bb-cat-dot" :style="'background-color:' + displayColor"></span></template>
+						<span x-text="displayLabel" class="text-xs" :class="!selectedId && 'text-base-content/30'">
+							if tx.CategoryDisplayName != nil {
+								{ deref(tx.CategoryDisplayName) }
+							} else {
+								Uncategorized
+							}
+						</span>
+					</button>
+				</div>
+			</div>
+			<!-- Date (list mode only; hidden in grouped view where the date header
+			     already shows it) -->
+			<div class="text-xs text-base-content/40 tabular-nums shrink-0 hidden sm:block w-24 text-right bb-tx-date">
+				{ formatDate(tx.Date) }
+			</div>
+			<!-- Amount -->
+			<div class="w-20 sm:w-24 text-right shrink-0 pl-2 sm:pl-3">
+				<span class={ "bb-tx-amount tabular-nums", templ.KV("bb-tx-amount--income", tx.Amount < 0) }>
+					{ formatAmount(tx.Amount) }
+				</span>
+			</div>
+			<!-- Expand chevron. Rotation lives on the wrapper because Lucide
+			     replaces the <i> with an <svg> at runtime. -->
+			<span
+				class="inline-flex text-base-content/20 shrink-0 transition-transform duration-200 hidden sm:block"
+				:class="expanded ? 'rotate-90' : ''"
+			>
+				<i data-lucide="chevron-right" class="w-4 h-4"></i>
+			</span>
+		</div>
+		<!-- Expanded detail panel. max-height is cheaper to composite at scale
+		     than a grid-rows transition; 16rem cap is well above the ~4rem of
+		     actual content. -->
+		<div
+			class="overflow-hidden transition-[max-height] duration-200 ease-out"
+			:class="expanded ? 'max-h-64' : 'max-h-0'"
+			aria-hidden="!expanded"
+		>
+			<div class="transition-opacity duration-150" :class="expanded ? 'opacity-100' : 'opacity-0'">
+				<div class="border-t border-base-300/50 bg-base-200/20 px-4 py-3">
+					<div class="flex flex-col sm:flex-row sm:items-start gap-4">
+						<div class="flex flex-wrap gap-x-6 gap-y-2 text-xs">
+							if tx.MerchantName != nil {
+								<div>
+									<span class="text-base-content/30">Merchant</span>
+									<span class="text-base-content/60 ml-1.5">{ titleCase(deref(tx.MerchantName)) }</span>
+								</div>
+							}
+							<div>
+								<span class="text-base-content/30">Account</span>
+								<span class="text-base-content/60 ml-1.5">{ tx.AccountName } ({ tx.InstitutionName })</span>
+							</div>
+							<div>
+								<span class="text-base-content/30">Member</span>
+								if tx.UserName != "" {
+									<span class="text-base-content/60 ml-1.5">{ tx.UserName }</span>
+								} else {
+									<span class="text-base-content/60 ml-1.5">&mdash;</span>
+								}
+							</div>
+							<div>
+								<span class="text-base-content/30">ID</span>
+								<code class="font-mono text-[0.65rem] bg-base-200 px-1.5 py-0.5 rounded ml-1.5">{ tx.ID }</code>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// txMerchantAttr lowercases merchant for the data-tx-merchant filter attr;
+// empty when the transaction has no merchant.
+func txMerchantAttr(m *string) string {
+	if m == nil {
+		return ""
+	}
+	return strings.ToLower(*m)
+}
+
+// txAvatarColorStyle falls back to the neutral oklch used by the original
+// partial when a category has no color.
+func txAvatarColorStyle(color *string) string {
+	if color != nil {
+		return "--avatar-color: " + *color
+	}
+	return "--avatar-color: oklch(0.65 0 0)"
+}
+
+// txCategoryPickerInit builds the x-data payload for the inline picker. Short
+// IDs are base62 and category IDs are UUIDs, so single-quote interpolation is
+// safe — anything else is rejected upstream at parseID.
+func txCategoryPickerInit(txID string, categoryID *string) string {
+	initial := ""
+	if categoryID != nil {
+		initial = *categoryID
+	}
+	return fmt.Sprintf(
+		"categoryPicker({categories: window.__bbCategories, mode: 'assign', initial: '%s', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', sourceId: 'tx-cat-%s'})",
+		initial, txID,
+	)
+}

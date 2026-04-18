@@ -1,0 +1,22 @@
+package components
+
+import "breadbox/internal/service"
+
+// TagChipSm renders the compact tag chip used inside transaction rows.
+//
+// Mirrors the "tag-chip-sm" html/template partial. Styling lives in
+// input.css under .bb-tag / .bb-tag-sm.
+templ TagChipSm(tag service.AdminTransactionTag) {
+	<span
+		class="bb-tag bb-tag-sm"
+		if tag.Color != nil {
+			style={ "--tag-color: " + deref(tag.Color) }
+		}
+		title={ tag.Slug }
+	>
+		if tag.Icon != nil {
+			<i data-lucide={ deref(tag.Icon) }></i>
+		}
+		<span class="truncate">{ tag.DisplayName }</span>
+	</span>
+}

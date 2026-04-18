@@ -16,6 +16,11 @@ RUN ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') \
     && wget -qO- "https://github.com/sqlc-dev/sqlc/releases/download/v1.30.0/sqlc_1.30.0_linux_${ARCH}.tar.gz" | tar xz -C /usr/local/bin sqlc \
     && sqlc generate
 
+# Generate templ components (*.templ → *_templ.go, also gitignored).
+# templ's own binary is small and the go install is fast on the build host.
+RUN go install github.com/a-h/templ/cmd/templ@latest \
+    && /go/bin/templ generate
+
 # Build CSS: download tailwindcss-extra (musl variant for Alpine) and compile input.css
 RUN apk add --no-cache libstdc++ libgcc \
     && ARCH=$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/') \
