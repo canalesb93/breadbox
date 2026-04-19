@@ -100,10 +100,10 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 
 		q := r.URL.Query()
 		params := service.AdminTransactionListParams{
-			Page:         queryPage(r, "page"),
-			PageSize:     queryPageSize(r, 50, 25, 50, 100),
-			StartDate:    optDateQuery(q, "start_date"),
-			EndDate:      optEndDateQuery(q, "end_date"),
+			Page:         parsePage(r),
+			PageSize:     parsePerPage(r, 50, 25, 50, 100),
+			StartDate:    parseDateParam(r, "start_date"),
+			EndDate:      parseInclusiveDateParam(r, "end_date"),
 			AccountID:    optStrQuery(q, "account_id"),
 			UserID:       optStrQuery(q, "user_id"),
 			ConnectionID: optStrQuery(q, "connection_id"),
@@ -252,10 +252,10 @@ func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 
 		q := r.URL.Query()
 		params := service.AdminTransactionListParams{
-			Page:         queryPage(r, "page"),
-			PageSize:     queryPageSize(r, 50, 25, 50, 100),
-			StartDate:    optDateQuery(q, "start_date"),
-			EndDate:      optEndDateQuery(q, "end_date"),
+			Page:         parsePage(r),
+			PageSize:     parsePerPage(r, 50, 25, 50, 100),
+			StartDate:    parseDateParam(r, "start_date"),
+			EndDate:      parseInclusiveDateParam(r, "end_date"),
 			AccountID:    optStrQuery(q, "account_id"),
 			UserID:       optStrQuery(q, "user_id"),
 			ConnectionID: optStrQuery(q, "connection_id"),
@@ -359,9 +359,11 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 
 		// Fetch transactions for this account.
 		txParams := service.AdminTransactionListParams{
-			Page:      queryPage(r, "page"),
+			Page:      parsePage(r),
 			PageSize:  50,
 			AccountID: &idStr,
+			StartDate: parseDateParam(r, "start_date"),
+			EndDate:   parseInclusiveDateParam(r, "end_date"),
 		}
 
 		// Scope transaction query to viewer's user. Editors+ see all.
@@ -370,8 +372,6 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 		}
 
 		q := r.URL.Query()
-		txParams.StartDate = optDateQuery(q, "start_date")
-		txParams.EndDate = optEndDateQuery(q, "end_date")
 		txParams.Search = optStrQuery(q, "search")
 		txParams.CategorySlug = optStrQuery(q, "category")
 		if v := q.Get("pending"); v != "" {

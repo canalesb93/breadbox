@@ -21,8 +21,8 @@ func ExportTransactionsCSVHandler(a *app.App, svc *service.Service) http.Handler
 		params := service.AdminTransactionListParams{
 			Page:         1,
 			PageSize:     -1, // Export all matching rows (no pagination).
-			StartDate:    optDateQuery(q, "start_date"),
-			EndDate:      optEndDateQuery(q, "end_date"),
+			StartDate:    parseDateParam(r, "start_date"),
+			EndDate:      parseInclusiveDateParam(r, "end_date"),
 			AccountID:    optStrQuery(q, "account_id"),
 			UserID:       optStrQuery(q, "user_id"),
 			ConnectionID: optStrQuery(q, "connection_id"),

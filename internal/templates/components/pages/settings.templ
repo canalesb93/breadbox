@@ -163,16 +163,16 @@ templ settingsSecurityCard(p SettingsProps) {
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Security</h2>
 				<p class="text-xs text-base-content/40" x-show="!expanded">
-					Encryption { encryptionStatus(p.HasEncryptionKey) } · Password management
+					Encryption { encryptionStatus(p.HasEncryptionKey) }
 				</p>
-				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Encryption and authentication</p>
+				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Encryption key status · Change password in <a href="/my-account" class="link link-hover">My Account</a></p>
 			</div>
 			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
 		<div id="security-panel" x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4">
 				<!-- Encryption Key Status -->
-				<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 mb-5">
+				<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
 					<div class="flex items-center gap-2.5">
 						<i data-lucide="key-round" class="w-4 h-4 text-base-content/50"></i>
 						<span class="text-sm font-medium">Encryption Key</span>
@@ -184,31 +184,15 @@ templ settingsSecurityCard(p SettingsProps) {
 					}
 				</div>
 				if !p.HasEncryptionKey {
-					<div class="text-xs text-error/80 bg-error/5 rounded-lg p-3 mb-5">
+					<div class="text-xs text-error/80 bg-error/5 rounded-lg p-3 mt-3">
 						<i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-1"></i>
 						Access tokens cannot be stored without an encryption key. Set the ENCRYPTION_KEY environment variable.
 					</div>
 				}
-				<!-- Change Password -->
-				<h3 class="text-sm font-semibold text-base-content/70 mb-3">Change Password</h3>
-				<form method="POST" action="/settings/password" class="space-y-3 max-w-sm">
-					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
-					<div>
-						<label class="text-xs font-medium text-base-content/50 mb-1 block" for="current_password">Current Password</label>
-						<input type="password" id="current_password" name="current_password" required class="input input-sm input-bordered w-full rounded-xl"/>
-					</div>
-					<div>
-						<label class="text-xs font-medium text-base-content/50 mb-1 block" for="new_password">New Password</label>
-						<input type="password" id="new_password" name="new_password" required minlength="8" class="input input-sm input-bordered w-full rounded-xl"/>
-					</div>
-					<div>
-						<label class="text-xs font-medium text-base-content/50 mb-1 block" for="confirm_password">Confirm New Password</label>
-						<input type="password" id="confirm_password" name="confirm_password" required class="input input-sm input-bordered w-full rounded-xl"/>
-					</div>
-					<div class="pt-2">
-						<button type="submit" class="btn btn-primary btn-sm rounded-xl">Update Password</button>
-					</div>
-				</form>
+				<p class="text-xs text-base-content/40 mt-4">
+					Looking to change your password? Manage it in
+					<a href="/my-account" class="link link-hover font-medium">My Account</a>.
+				</p>
 			</div>
 		</div>
 	</div>

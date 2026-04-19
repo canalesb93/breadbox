@@ -78,12 +78,12 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, _ *TemplateRender
 		password := r.FormValue("password")
 
 		if username == "" || password == "" {
-			renderLogin(w, r, sm, username, "Invalid username or password")
+			renderLogin(w, r, sm, username, "Invalid email or password")
 			return
 		}
 
 		renderLoginError := func() {
-			renderLogin(w, r, sm, username, "Invalid username or password")
+			renderLogin(w, r, sm, username, "Invalid email or password")
 		}
 
 		// Single table lookup.

@@ -19,13 +19,13 @@ func SyncLogsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, s
 		// Parse query params.
 		q := r.URL.Query()
 		params := service.SyncLogListParams{
-			Page:         queryPage(r, "page"),
+			Page:         parsePage(r),
 			PageSize:     25,
 			ConnectionID: optStrQuery(q, "connection_id"),
 			Status:       optStrQuery(q, "status"),
 			Trigger:      optStrQuery(q, "trigger"),
-			DateFrom:     optDateQuery(q, "date_from"),
-			DateTo:       optEndDateQuery(q, "date_to"),
+			DateFrom:     parseDateParam(r, "date_from"),
+			DateTo:       parseInclusiveDateParam(r, "date_to"),
 		}
 
 		// Fetch paginated sync logs.

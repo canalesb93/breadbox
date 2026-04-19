@@ -30,13 +30,13 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 		{
 			q := r.URL.Query()
 			params := service.SyncLogListParams{
-				Page:         queryPage(r, "page"),
+				Page:         parsePage(r),
 				PageSize:     25,
 				ConnectionID: optStrQuery(q, "connection_id"),
 				Status:       optStrQuery(q, "status"),
 				Trigger:      optStrQuery(q, "trigger"),
-				DateFrom:     optDateQuery(q, "date_from"),
-				DateTo:       optEndDateQuery(q, "date_to"),
+				DateFrom:     parseDateParam(r, "date_from"),
+				DateTo:       parseInclusiveDateParam(r, "date_to"),
 			}
 
 			result, err := svc.ListSyncLogsPaginated(ctx, params)
@@ -126,7 +126,7 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 		// Always fetch webhook events data.
 		{
 			params := service.WebhookEventListParams{
-				Page:     queryPage(r, "wh_page"),
+				Page:     parsePageKey(r, "wh_page"),
 				PageSize: 25,
 			}
 

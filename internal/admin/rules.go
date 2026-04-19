@@ -21,8 +21,8 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 
 		q := r.URL.Query()
 		params := service.TransactionRuleListParams{
-			Page:         queryPage(r, "page"),
-			PageSize:     queryPageSize(r, 50, 25, 50, 100),
+			Page:         parsePage(r),
+			PageSize:     parsePerPage(r, 50, 25, 50, 100),
 			Search:       optStrQuery(q, "search"),
 			CategorySlug: optStrQuery(q, "category_slug"),
 		}
