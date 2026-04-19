@@ -114,6 +114,40 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.TxResults(txResultsPropsFromData(m)), nil
 	},
+	"ConditionRow": func(data any) (templ.Component, error) {
+		m, ok := data.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("want map[string]any, got %T", data)
+		}
+		var cond service.Condition
+		switch c := m["Cond"].(type) {
+		case service.Condition:
+			cond = c
+		case *service.Condition:
+			if c != nil {
+				cond = *c
+			}
+		default:
+			return nil, fmt.Errorf("ConditionRow: want service.Condition in Cond, got %T", m["Cond"])
+		}
+		idx := 0
+		switch v := m["Idx"].(type) {
+		case int:
+			idx = v
+		case int32:
+			idx = int(v)
+		case int64:
+			idx = int(v)
+		}
+		conj, _ := m["Conj"].(string)
+		return components.ConditionRow(components.ConditionRowProps{
+			IsFirst:     idx == 0,
+			Conj:        conj,
+			FieldLabel:  ruleFieldLabel(cond.Field),
+			OpLabel:     ruleOpLabel(cond.Op, cond.Field),
+			ValueFormat: ruleValueFormat(cond.Value),
+		}), nil
+	},
 }
 
 // assertAdminTxRow extracts a service.AdminTransactionRow from data,
