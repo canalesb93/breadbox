@@ -160,9 +160,17 @@ templ TxRow(tx service.AdminTransactionRow) {
 				</span>
 			</div>
 			<!-- Expand chevron. Rotation lives on the wrapper because Lucide
-			     replaces the <i> with an <svg> at runtime. -->
+			     replaces the <i> with an <svg> at runtime. Below the `sm`
+			     breakpoint the chevron is hidden to reclaim ~20px of horizontal
+			     room on narrow phones — critical in selection mode and for
+			     long merchant names. Use `hidden sm:inline-flex` (one display
+			     utility at a time) rather than `inline-flex ... hidden sm:block`
+			     because Tailwind v4 emits `.inline-flex` *after* `.hidden` in
+			     the utilities layer, so combining both on one element resolves
+			     to `display: inline-flex` at every breakpoint and the chevron
+			     leaks onto mobile. -->
 			<span
-				class="inline-flex text-base-content/20 shrink-0 transition-transform duration-200 hidden sm:block"
+				class="hidden sm:inline-flex text-base-content/20 shrink-0 transition-transform duration-200"
 				:class="expanded ? 'rotate-90' : ''"
 			>
 				<i data-lucide="chevron-right" class="w-4 h-4"></i>
