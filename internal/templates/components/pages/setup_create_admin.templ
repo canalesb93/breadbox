@@ -4,7 +4,7 @@ import "breadbox/internal/templates/components/layout"
 
 // CreateAdminProps carries the data the first-run admin setup page needs.
 // Rendered at GET/POST /setup when no auth accounts exist yet. Error is the
-// top-level banner; FieldErrors keys "Name", "Username", "Password" drive
+// top-level banner; FieldErrors keys "Name", "Email", "Password" drive
 // per-field styling and messages.
 type CreateAdminProps struct {
 	PageTitle   string
@@ -65,10 +65,10 @@ templ CreateAdmin(p CreateAdminProps) {
 					required
 					autocomplete="email"
 					placeholder="you@example.com"
-					class={ "input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["Username"] != "") }
+					class={ "input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["Email"] != "") }
 				/>
-				if p.FieldErrors["Username"] != "" {
-					<p class="text-xs text-error mt-1.5">{ p.FieldErrors["Username"] }</p>
+				if p.FieldErrors["Email"] != "" {
+					<p class="text-xs text-error mt-1.5">{ p.FieldErrors["Email"] }</p>
 				}
 			</div>
 			<div>
