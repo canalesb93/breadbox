@@ -184,6 +184,13 @@
   /* ── Breadcrumbs: shadcn-style navigation trail ── */
   .bb-breadcrumb {
     @apply flex items-center gap-1.5 text-sm mb-6 overflow-x-auto whitespace-nowrap;
+    /* With overflow-x:auto the CSS spec forces overflow-y to also compute
+       as auto (visible can't coexist with a scroll container). That means
+       any sub-pixel row-height mismatch between the SVG chevrons and the
+       text baseline produces a spurious vertical scroll region. Pin Y to
+       clip so a long trail still scrolls horizontally, but vertical
+       overflow never becomes scrollable. */
+    overflow-y: clip;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;        /* Firefox */
     -ms-overflow-style: none;     /* IE/Edge */

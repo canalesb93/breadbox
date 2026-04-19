@@ -7,12 +7,18 @@ TAILWIND_BIN := ./tailwindcss-extra
 
 PORT ?= 8080
 
-# generate ensures gitignored build artifacts exist.
-# Skips if artifacts are already present (e.g., copied by .worktreeinclude).
+# generate ensures gitignored build artifacts exist and are up to date.
+# - sqlc: only rebuilds if the generated models file is missing (queries are
+#   regenerated out-of-band via `make sqlc` when queries change).
+# - css: rebuilds whenever styles.css is missing OR older than input.css, so
+#   editing input.css and running `make dev` picks up the change without a
+#   manual `make css`. Previously this used `-f` existence only, which caused
+#   plain `make dev` to serve stale embedded CSS whenever input.css had been
+#   edited since the last full build.
 # Run 'make sqlc', 'make templ', or 'make css' directly to force regeneration.
 generate: templ
 	@if [ ! -f internal/db/models.go ]; then $(MAKE) sqlc; fi
-	@if [ ! -f static/css/styles.css ]; then $(MAKE) css; fi
+	@if [ ! -f static/css/styles.css ] || [ input.css -nt static/css/styles.css ]; then $(MAKE) css; fi
 
 # templ-install pulls the templ CLI if it's missing. Pinned via go.mod so the
 # version the CLI understands always matches the runtime lib the binary

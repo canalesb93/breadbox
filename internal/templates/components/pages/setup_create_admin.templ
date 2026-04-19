@@ -1,0 +1,98 @@
+package pages
+
+import "breadbox/internal/templates/components/layout"
+
+// CreateAdminProps carries the data the first-run admin setup page needs.
+// Rendered at GET/POST /setup when no auth accounts exist yet. Error is the
+// top-level banner; FieldErrors keys "Name", "Username", "Password" drive
+// per-field styling and messages.
+type CreateAdminProps struct {
+	PageTitle   string
+	CSRFToken   string
+	Name        string
+	Username    string
+	Error       string
+	FieldErrors map[string]string
+	FlashType   string
+	FlashMsg    string
+}
+
+// CreateAdmin renders the /setup page ("Welcome to Breadbox" — first-run
+// admin account creation) inside the shared wizard layout.
+templ CreateAdmin(p CreateAdminProps) {
+	@layout.Wizard(layout.WizardProps{
+		PageTitle: p.PageTitle,
+		FlashType: p.FlashType,
+		FlashMsg:  p.FlashMsg,
+	}) {
+		<div class="text-center mb-8">
+			<h1 class="text-xl font-semibold tracking-tight">Welcome to Breadbox</h1>
+			<p class="text-sm text-base-content/50 mt-1.5">Create your account to start managing your household's finances</p>
+		</div>
+		if p.Error != "" {
+			<div role="alert" class="flex items-center gap-3 rounded-xl bg-error/10 text-error px-4 py-3 text-sm mb-6">
+				<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+				<span>{ p.Error }</span>
+			</div>
+		}
+		<form method="POST" action="/setup" class="space-y-5">
+			if p.CSRFToken != "" {
+				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			}
+			<div>
+				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="name">Your Name</label>
+				<input
+					type="text"
+					id="name"
+					name="name"
+					value={ p.Name }
+					required
+					autocomplete="name"
+					placeholder="e.g. Alex"
+					class={ "input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["Name"] != "") }
+				/>
+				if p.FieldErrors["Name"] != "" {
+					<p class="text-xs text-error mt-1.5">{ p.FieldErrors["Name"] }</p>
+				}
+			</div>
+			<div>
+				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="username">Email</label>
+				<input
+					type="email"
+					id="username"
+					name="username"
+					value={ p.Username }
+					required
+					autocomplete="email"
+					placeholder="you@example.com"
+					class={ "input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["Username"] != "") }
+				/>
+				if p.FieldErrors["Username"] != "" {
+					<p class="text-xs text-error mt-1.5">{ p.FieldErrors["Username"] }</p>
+				}
+			</div>
+			<div>
+				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="password">Password</label>
+				<input
+					type="password"
+					id="password"
+					name="password"
+					required
+					autocomplete="new-password"
+					minlength="8"
+					placeholder="Create a password"
+					class={ "input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["Password"] != "") }
+				/>
+				<p class="text-xs text-base-content/40 mt-1.5">At least 8 characters</p>
+				if p.FieldErrors["Password"] != "" {
+					<p class="text-xs text-error mt-1">{ p.FieldErrors["Password"] }</p>
+				}
+			</div>
+			<p class="text-xs text-base-content/40 text-center">You'll be able to add other family members after setup.</p>
+			<button type="submit" class="btn btn-primary w-full h-12 rounded-xl text-base font-semibold transition-colors duration-150 mt-1">
+				Get Started
+				<i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
+			</button>
+		</form>
+	}
+}

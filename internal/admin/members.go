@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -27,8 +26,7 @@ type createLoginAccountRequest struct {
 func CreateLoginAccountHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req createLoginAccountRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 
@@ -112,8 +110,7 @@ func UpdateLoginAccountRoleHandler(svc *service.Service, sm *scs.SessionManager)
 		var req struct {
 			Role string `json:"role"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 

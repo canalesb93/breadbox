@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"encoding/json"
 	"errors"
 	"math"
 	"net/http"
@@ -234,8 +233,7 @@ type createUserRequest struct {
 func CreateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req createUserRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 
@@ -305,8 +303,7 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		}
 
 		var req updateUserRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 

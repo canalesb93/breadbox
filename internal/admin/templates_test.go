@@ -4,36 +4,9 @@ import (
 	"testing"
 )
 
-func TestTitleCaseMerchant(t *testing.T) {
-	tests := []struct {
-		name string
-		in   string
-		want string
-	}{
-		{"empty", "", ""},
-		{"all caps single word", "WALMART", "Walmart"},
-		{"all caps multi word", "WHOLE FOODS MARKET", "Whole Foods Market"},
-		{"all lower", "amazon prime", "Amazon Prime"},
-		{"mixed case left alone", "McDonald's", "McDonald's"},
-		{"mixed case name left alone", "iTunes", "iTunes"},
-		{"small words stay lowercase", "BANK OF AMERICA", "Bank of America"},
-		{"small word at start stays capitalized", "THE HOME DEPOT", "The Home Depot"},
-		{"two-letter abbreviations uppercased", "US ATM FEE", "US Atm Fee"},
-		{"two-letter small word stays lowercase mid-phrase", "UP AND AT EM", "UP and at EM"},
-		{"abbreviation with periods", "h.e.b.", "H.E.B."},
-		{"abbreviation with periods caps", "H.E.B.", "H.E.B."},
-		{"single small word capitalized as first", "the", "The"},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := titleCaseMerchant(tc.in)
-			if got != tc.want {
-				t.Errorf("titleCaseMerchant(%q) = %q, want %q", tc.in, got, tc.want)
-			}
-		})
-	}
-}
+// titleCaseMerchant coverage moved to internal/templates/components.TestTitleCase
+// after PR #513 consolidated the helper. Don't reintroduce a wrapper test here
+// — extend TestTitleCase in the components package instead.
 
 func TestRuleFieldLabel(t *testing.T) {
 	tests := []struct {

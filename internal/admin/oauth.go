@@ -11,6 +11,7 @@ import (
 
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -112,7 +113,7 @@ func OAuthRegisterHandler(svc *service.Service) http.HandlerFunc {
 
 // OAuthAuthorizeHandler handles GET /oauth/authorize.
 // If the admin is logged in, shows consent screen. Otherwise redirects to login.
-func OAuthAuthorizeHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+func OAuthAuthorizeHandler(svc *service.Service, sm *scs.SessionManager, _ *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse required OAuth params.
 		clientID := r.URL.Query().Get("client_id")
@@ -160,18 +161,32 @@ func OAuthAuthorizeHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		}
 
 		// Admin is logged in — show consent screen.
-		data := map[string]any{
-			"PageTitle":           "Authorize Application",
-			"ClientName":          client.Name,
-			"Scope":               scope,
-			"ClientID":            clientID,
-			"RedirectURI":         redirectURI,
-			"State":               state,
-			"CodeChallenge":       codeChallenge,
-			"CodeChallengeMethod": codeChallengeMethod,
-			"CSRFToken":           GenerateCSRFToken(r.Context(), sm),
-		}
-		tr.Render(w, r, "oauth_authorize.html", data)
+		renderOAuthAuthorize(w, r, sm, client.Name, scope, clientID, redirectURI, state, codeChallenge, codeChallengeMethod)
+	}
+}
+
+// renderOAuthAuthorize renders the OAuth consent page via the templ
+// component. Mirrors renderLogin / renderSetupAccount / renderCreateAdmin:
+// handler is decoupled from the html/template renderer.
+func renderOAuthAuthorize(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, clientName, scope, clientID, redirectURI, state, codeChallenge, codeChallengeMethod string) {
+	props := pages.OAuthAuthorizeProps{
+		PageTitle:           "Authorize Application",
+		CSRFToken:           GenerateCSRFToken(r.Context(), sm),
+		ClientName:          clientName,
+		ClientID:            clientID,
+		Scope:               scope,
+		RedirectURI:         redirectURI,
+		State:               state,
+		CodeChallenge:       codeChallenge,
+		CodeChallengeMethod: codeChallengeMethod,
+	}
+	if f := GetFlash(r.Context(), sm); f != nil {
+		props.FlashType = f.Type
+		props.FlashMsg = f.Message
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := pages.OAuthAuthorize(props).Render(r.Context(), w); err != nil {
+		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
 	}
 }
 

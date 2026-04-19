@@ -177,6 +177,24 @@ if ! make css 2>&1; then
   echo "WARN: make css failed"
 fi
 
+# --- Graphite CLI (for stacked PRs) ---
+# Installed eagerly so /stack is ready without a second round-trip. Skip
+# silently if npm isn't available — single-PR work doesn't need gt.
+if command -v npm &>/dev/null; then
+  echo "==> Installing Graphite CLI..."
+  if ! command -v gt &>/dev/null; then
+    npm install -g @withgraphite/graphite-cli@stable >/dev/null 2>&1 \
+      && echo "    gt installed" \
+      || echo "WARN: gt install failed — /stack will not work until fixed"
+  else
+    echo "    gt already installed"
+  fi
+  # Initialize repo metadata (idempotent).
+  if command -v gt &>/dev/null && [ ! -f .graphite_repo_config ]; then
+    gt repo init --trunk main >/dev/null 2>&1 || true
+  fi
+fi
+
 # --- Test database ---
 echo "==> Setting up test database..."
 if command -v pg_isready &>/dev/null; then

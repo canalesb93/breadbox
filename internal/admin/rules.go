@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -325,8 +324,7 @@ func CreateRuleAdminHandler(svc *service.Service, sm *scs.SessionManager) http.H
 			Priority     int                   `json:"priority"`
 			ExpiresIn    string                `json:"expires_in"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		if !decodeJSON(w, r, &body) {
 			return
 		}
 
@@ -381,8 +379,7 @@ func UpdateRuleAdminHandler(svc *service.Service, sm *scs.SessionManager) http.H
 			Enabled      *bool                  `json:"enabled,omitempty"`
 			ExpiresAt    *string                `json:"expires_at,omitempty"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		if !decodeJSON(w, r, &body) {
 			return
 		}
 
@@ -468,8 +465,7 @@ func PreviewRuleAdminHandler(svc *service.Service) http.HandlerFunc {
 			Conditions service.Condition `json:"conditions"`
 			SampleSize int               `json:"sample_size"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		if !decodeJSON(w, r, &input) {
 			return
 		}
 

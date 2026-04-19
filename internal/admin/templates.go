@@ -21,6 +21,7 @@ import (
 	bsync "breadbox/internal/sync"
 	"breadbox/internal/templates"
 	"breadbox/internal/templates/components"
+	"breadbox/internal/templates/components/pages"
 	"breadbox/internal/version"
 
 	"github.com/a-h/templ"
@@ -862,7 +863,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				if err != nil || !f.Valid {
 					return ""
 				}
-				return formatCurrency(math.Abs(f.Float64))
+				return service.FormatCurrency(math.Abs(f.Float64))
 			},
 			"fmtBalance": func(v interface{}) string {
 				var f float64
@@ -960,11 +961,10 @@ var templatePartials = []string{
 func (tr *TemplateRenderer) parseTemplates() error {
 	// Pages using the base layout (authenticated dashboard pages).
 	basePages := []string{
-		"pages/404.html",
-		"pages/500.html",
 		"pages/_templ_shell.html",
-		// dashboard.html and settings.html removed — those pages render via
-		// RenderWithTempl which uses the _templ_shell template key.
+		// dashboard.html, settings.html, 404.html, and 500.html removed —
+		// those pages render via RenderWithTempl which uses the
+		// _templ_shell template key.
 		"pages/connections.html",
 		"pages/connection_new.html",
 		"pages/connection_detail.html",
@@ -1018,15 +1018,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		},
 	}
 
-	// Pages using the wizard layout (first-run admin creation + OAuth consent + account setup).
-	// login.html was migrated to a templ component in #462 — see
-	// internal/templates/components/pages/login.templ.
-	wizardPages := []string{
-		"pages/setup_create_admin.html",
-		"pages/setup_account.html",
-		"pages/oauth_authorize.html",
-	}
-
 	for _, page := range basePages {
 		if err := tr.parseBasePage(page); err != nil {
 			return err
@@ -1043,21 +1034,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		if err != nil {
 			return fmt.Errorf("parse composite page %s: %w", page, err)
 		}
-		name := path.Base(page)
-		tr.templates[name] = t
-		tr.specs[name] = files
-	}
-
-	for _, page := range wizardPages {
-		files := []string{"layout/wizard.html"}
-		files = append(files, templatePartials...)
-		files = append(files, page)
-
-		t, err := template.New("").Funcs(tr.funcMap).ParseFS(templates.FS, files...)
-		if err != nil {
-			return fmt.Errorf("parse wizard page %s: %w", page, err)
-		}
-		// Store using just the filename (e.g., "login.html").
 		name := path.Base(page)
 		tr.templates[name] = t
 		tr.specs[name] = files
@@ -1245,14 +1221,14 @@ func BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage, page
 func (tr *TemplateRenderer) RenderNotFound(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 	data := BaseTemplateData(r, tr.sm, "", "Page Not Found")
-	tr.Render(w, r, "404.html", data)
+	tr.RenderWithTempl(w, r, data, pages.NotFound())
 }
 
 // RenderError renders the styled 500 page within the app layout.
 func (tr *TemplateRenderer) RenderError(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusInternalServerError)
 	data := BaseTemplateData(r, tr.sm, "", "Error")
-	tr.Render(w, r, "500.html", data)
+	tr.RenderWithTempl(w, r, data, pages.InternalError())
 }
 
 // SetVersion sets the application version for auto-injection into template data.
@@ -1263,13 +1239,6 @@ func (tr *TemplateRenderer) SetVersion(v string) {
 // SetVersionChecker sets the version checker for auto-injecting update status into template data.
 func (tr *TemplateRenderer) SetVersionChecker(vc *version.Checker) {
 	tr.versionChecker = vc
-}
-
-// formatCurrency formats a non-negative float as "$X,XXX.XX". Delegates to
-// service.FormatCurrency so preview DTOs and template rendering share one
-// format.
-func formatCurrency(abs float64) string {
-	return service.FormatCurrency(abs)
 }
 
 // AdminUsername returns the username from the session for use in template data maps.
