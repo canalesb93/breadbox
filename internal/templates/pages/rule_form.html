@@ -258,12 +258,16 @@
         </button>
       </div>
 
+      <!-- Action row: stacks on mobile (Action select + remove button on row 1,
+           value input full-width on row 2) and sits inline at sm+. Mirrors the
+           condition-row pattern above (#512). -->
       <div class="space-y-2">
         <template x-for="(action, idx) in form.actions" :key="idx">
-          <div class="flex items-start gap-2 p-2.5 rounded-xl bg-base-200/50 border border-base-content/10">
-            <!-- Action type selector -->
+          <div class="flex flex-wrap sm:flex-nowrap items-start gap-2 p-2.5 rounded-xl bg-base-200/50 border border-base-content/10">
+            <!-- Action type selector — full width minus remove button on mobile,
+                 fixed-width on sm+ so the value input can take the remainder. -->
             <select x-model="action.field" @change="onActionTypeChange(idx)"
-                    class="select select-bordered select-xs rounded-lg bg-base-100 w-36 shrink-0 mt-px">
+                    class="select select-bordered select-xs rounded-lg bg-base-100 flex-1 min-w-0 sm:flex-none sm:w-36 sm:shrink-0 mt-px">
               <option value="">Action...</option>
               <option value="category"   :disabled="action.field !== 'category'   && isActionUsed('category')">Set category</option>
               <option value="tag"        :disabled="action.field !== 'tag'        && isActionUsed('tag')">Add tag</option>
@@ -271,16 +275,32 @@
               <option value="comment"    :disabled="action.field !== 'comment'    && isActionUsed('comment')">Add comment</option>
             </select>
 
+            <!-- Remove — pinned to the right of the Action select on mobile,
+                 moves to the far right of the row on sm+. Rendered here (not at
+                 the end) so flex-wrap places it on row 1 at mobile. Ordered last
+                 on sm+ via order-last so the inline layout matches the original. -->
+            <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg shrink-0 mt-px order-2 sm:order-last"
+                    @click="removeAction(idx)"
+                    :disabled="form.actions.length === 1"
+                    :title="form.actions.length === 1 ? 'A rule needs at least one action' : 'Remove this action'">
+              <i data-lucide="x" class="w-3.5 h-3.5 text-base-content/40"></i>
+            </button>
+
+            <!-- Flex-wrap break: forces the value input onto its own row at
+                 mobile so the input/textarea gets the full width. Hidden on sm+
+                 so the row stays single-line. -->
+            <div class="w-full basis-full h-0 sm:hidden order-3" aria-hidden="true"></div>
+
             <!-- Value: disabled placeholder when no type picked -->
             <template x-if="!action.field">
               <input type="text" disabled
-                     class="input input-bordered input-xs rounded-lg bg-base-200 opacity-70 flex-1 min-w-0 mt-px"
+                     class="input input-bordered input-xs rounded-lg bg-base-200 opacity-70 w-full sm:w-auto sm:flex-1 min-w-0 mt-px order-4 sm:order-none"
                      placeholder="pick an action above..." />
             </template>
 
             <!-- Value: category picker -->
             <template x-if="action.field === 'category'">
-              <select x-model="action.value" class="select select-bordered select-xs rounded-lg bg-base-100 flex-1 min-w-0 mt-px">
+              <select x-model="action.value" class="select select-bordered select-xs rounded-lg bg-base-100 w-full sm:w-auto sm:flex-1 min-w-0 mt-px order-4 sm:order-none">
                 <option value="">Select category...</option>
                 {{range .FlatCategories}}
                 <option value="{{.Slug}}">{{if .ParentDisplayName}}{{.ParentDisplayName}} &gt; {{end}}{{.DisplayName}}</option>
@@ -290,7 +310,7 @@
 
             <!-- Value: tag slug input (add_tag or remove_tag) -->
             <template x-if="action.field === 'tag' || action.field === 'tag_remove'">
-              <div class="flex-1 min-w-0">
+              <div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none">
                 <input type="text" x-model="action.value" @input="validateTagSlug(idx)" list="bb-tag-slugs"
                   class="input input-bordered input-xs rounded-lg w-full mt-px bg-base-100"
                   placeholder="needs-review, subscription:monthly, ..."
@@ -303,21 +323,13 @@
 
             <!-- Value: comment textarea -->
             <template x-if="action.field === 'comment'">
-              <div class="flex-1 min-w-0">
+              <div class="w-full sm:w-auto sm:flex-1 min-w-0 order-4 sm:order-none">
                 <textarea x-model="action.value" rows="2"
                   class="textarea textarea-bordered textarea-xs rounded-lg bg-base-100 w-full text-xs"
                   placeholder="Comment to attach to matching transactions..."></textarea>
                 <p class="text-[0.65rem] text-base-content/40 mt-1">Plain text. The comment is attributed to this rule.</p>
               </div>
             </template>
-
-            <!-- Remove -->
-            <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg shrink-0 mt-px"
-                    @click="removeAction(idx)"
-                    :disabled="form.actions.length === 1"
-                    :title="form.actions.length === 1 ? 'A rule needs at least one action' : 'Remove this action'">
-              <i data-lucide="x" class="w-3.5 h-3.5 text-base-content/40"></i>
-            </button>
           </div>
         </template>
       </div>
