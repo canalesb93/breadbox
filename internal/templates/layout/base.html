@@ -356,6 +356,7 @@
 
       <!-- Results list -->
       <div class="bb-catpicker-list" x-ref="catPickerList"
+           :data-searching="search ? 'true' : 'false'"
            x-effect="filteredList; $nextTick(() => { if (typeof lucide !== 'undefined' && $refs.catPickerList) lucide.createIcons({ nodes: [$refs.catPickerList] }); })">
         <div class="py-1">
           <template x-for="(item, idx) in filteredList" :key="item.slug + '-' + idx">
@@ -373,7 +374,7 @@
               </template>
               <span x-text="item.label" class="truncate"></span>
               <template x-if="item.indent && item.parentLabel">
-                <span class="text-xs text-base-content/30 ml-auto truncate" x-text="item.parentLabel"></span>
+                <span class="bb-catpicker-item__parent-label text-xs text-base-content/30 ml-auto truncate" x-text="item.parentLabel"></span>
               </template>
             </div>
           </template>
