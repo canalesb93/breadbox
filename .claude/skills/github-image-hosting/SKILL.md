@@ -36,8 +36,8 @@ gh release view screenshots-cdn 2>/dev/null || \
 
 # Upload (use a timestamped name to avoid collisions between concurrent PRs)
 FNAME="$(date +%Y%m%d-%H%M%S)-$(basename "$FILE")"
-cp "$FILE" "/tmp/$FNAME"
-gh release upload screenshots-cdn "/tmp/$FNAME" --clobber
+cp "$FILE" "$TMPDIR/$FNAME"
+gh release upload screenshots-cdn "$TMPDIR/$FNAME" --clobber  # use dangerouslyDisableSandbox: true
 
 # Resulting URL
 IMG_URL="https://github.com/$REPO/releases/download/screenshots-cdn/$FNAME"
@@ -64,7 +64,7 @@ echo "$IMG_URL"
    ```bash
    FNAME="$(date +%Y%m%d-%H%M%S)-$(basename /tmp/app-<page>.jpg)"
    cp /tmp/app-<page>.jpg "/tmp/$FNAME"
-   gh release upload screenshots-cdn "/tmp/$FNAME" --clobber
+   gh release upload screenshots-cdn "$TMPDIR/$FNAME" --clobber  # use dangerouslyDisableSandbox: true
    IMG_URL="https://github.com/$REPO/releases/download/screenshots-cdn/$FNAME"
    echo "$IMG_URL"
    ```

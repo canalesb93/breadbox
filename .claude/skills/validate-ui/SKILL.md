@@ -106,8 +106,8 @@ gh release view screenshots-cdn 2>/dev/null || \
 
 # Upload with a timestamped filename to avoid collisions
 FNAME="$(date +%Y%m%d-%H%M%S)-app-<PAGE>.jpg"
-cp /tmp/app-<PAGE>.jpg "/tmp/$FNAME"
-gh release upload screenshots-cdn "/tmp/$FNAME" --clobber
+cp /tmp/app-<PAGE>.jpg "$TMPDIR/$FNAME"
+gh release upload screenshots-cdn "$TMPDIR/$FNAME" --clobber  # use dangerouslyDisableSandbox: true for this Bash call
 
 URL="https://github.com/$REPO/releases/download/screenshots-cdn/$FNAME"
 echo "$URL"
