@@ -39,3 +39,13 @@ func NumericToFloat(n pgtype.Numeric) (float64, bool) {
 	}
 	return f.Float64, true
 }
+
+// TextPtr converts a pgtype.Text to *string for JSON serialization. Returns
+// nil when the text is NULL; otherwise returns a pointer to the underlying
+// string value.
+func TextPtr(t pgtype.Text) *string {
+	if !t.Valid {
+		return nil
+	}
+	return &t.String
+}
