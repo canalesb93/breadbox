@@ -42,8 +42,10 @@ templ TxRow(tx service.AdminTransactionRow) {
 					@change={ fmt.Sprintf("$store.bulk.toggle('%s')", tx.ID) }
 				/>
 			</label>
-			<!-- Category icon / merchant-initial avatar -->
-			<div class="relative shrink-0">
+			<!-- Category icon / merchant-initial avatar. The `bb-tx-avatar-slot`
+			     class lets CSS hide the slot on mobile while selection mode is on
+			     so the bulk-select checkbox doesn't squeeze the name column. -->
+			<div class="relative shrink-0 bb-tx-avatar-slot">
 				if tx.CategoryIcon != nil {
 					<div class="bb-tx-avatar" style={ txAvatarColorStyle(tx.CategoryColor) }>
 						<i data-lucide={ deref(tx.CategoryIcon) } class="w-4 h-4"></i>
