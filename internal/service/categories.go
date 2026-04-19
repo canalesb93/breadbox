@@ -7,9 +7,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -63,8 +63,8 @@ func (s *Service) ListCategories(ctx context.Context) ([]CategoryResponse, error
 			SortOrder:         r.SortOrder,
 			IsSystem:          r.IsSystem,
 			Hidden:            r.Hidden,
-			CreatedAt:         r.CreatedAt.Time.UTC().Format(time.RFC3339),
-			UpdatedAt:         r.UpdatedAt.Time.UTC().Format(time.RFC3339),
+			CreatedAt:         pgconv.TimestampStr(r.CreatedAt),
+			UpdatedAt:         pgconv.TimestampStr(r.UpdatedAt),
 		})
 	}
 	return result, nil
@@ -124,8 +124,8 @@ func (s *Service) GetCategory(ctx context.Context, id string) (*CategoryResponse
 		SortOrder:   cat.SortOrder,
 		IsSystem:    cat.IsSystem,
 		Hidden:      cat.Hidden,
-		CreatedAt:   cat.CreatedAt.Time.UTC().Format(time.RFC3339),
-		UpdatedAt:   cat.UpdatedAt.Time.UTC().Format(time.RFC3339),
+		CreatedAt:   pgconv.TimestampStr(cat.CreatedAt),
+		UpdatedAt:   pgconv.TimestampStr(cat.UpdatedAt),
 	}, nil
 }
 
@@ -201,8 +201,8 @@ func (s *Service) CreateCategory(ctx context.Context, params CreateCategoryParam
 		SortOrder:   cat.SortOrder,
 		IsSystem:    cat.IsSystem,
 		Hidden:      cat.Hidden,
-		CreatedAt:   cat.CreatedAt.Time.UTC().Format(time.RFC3339),
-		UpdatedAt:   cat.UpdatedAt.Time.UTC().Format(time.RFC3339),
+		CreatedAt:   pgconv.TimestampStr(cat.CreatedAt),
+		UpdatedAt:   pgconv.TimestampStr(cat.UpdatedAt),
 	}, nil
 }
 
@@ -248,8 +248,8 @@ func (s *Service) UpdateCategory(ctx context.Context, id string, params UpdateCa
 		SortOrder:   cat.SortOrder,
 		IsSystem:    cat.IsSystem,
 		Hidden:      cat.Hidden,
-		CreatedAt:   cat.CreatedAt.Time.UTC().Format(time.RFC3339),
-		UpdatedAt:   cat.UpdatedAt.Time.UTC().Format(time.RFC3339),
+		CreatedAt:   pgconv.TimestampStr(cat.CreatedAt),
+		UpdatedAt:   pgconv.TimestampStr(cat.UpdatedAt),
 	}, nil
 }
 

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/shortid"
 	"breadbox/internal/slugs"
 
@@ -301,7 +301,7 @@ func tagFromRow(t db.Tag) TagResponse {
 		Color:       textPtr(t.Color),
 		Icon:        textPtr(t.Icon),
 		Lifecycle:   t.Lifecycle,
-		CreatedAt:   t.CreatedAt.Time.UTC().Format(time.RFC3339),
-		UpdatedAt:   t.UpdatedAt.Time.UTC().Format(time.RFC3339),
+		CreatedAt:   pgconv.TimestampStr(t.CreatedAt),
+		UpdatedAt:   pgconv.TimestampStr(t.UpdatedAt),
 	}
 }

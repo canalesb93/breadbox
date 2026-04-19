@@ -2,6 +2,7 @@ package pgconv
 
 import (
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -158,5 +159,80 @@ func TestTextPtr_Invalid(t *testing.T) {
 	got := TextPtr(pgtype.Text{Valid: false})
 	if got != nil {
 		t.Errorf("TextPtr(invalid) = %v, want nil", got)
+	}
+}
+
+func TestTimestampStr_Valid(t *testing.T) {
+	ts := pgtype.Timestamptz{
+		Time:  time.Date(2024, 3, 15, 14, 30, 0, 0, time.UTC),
+		Valid: true,
+	}
+	got := TimestampStr(ts)
+	want := "2024-03-15T14:30:00Z"
+	if got != want {
+		t.Errorf("TimestampStr = %q, want %q", got, want)
+	}
+}
+
+func TestTimestampStr_NonUTC(t *testing.T) {
+	loc, _ := time.LoadLocation("America/Los_Angeles")
+	ts := pgtype.Timestamptz{
+		Time:  time.Date(2024, 3, 15, 7, 30, 0, 0, loc),
+		Valid: true,
+	}
+	got := TimestampStr(ts)
+	want := "2024-03-15T14:30:00Z"
+	if got != want {
+		t.Errorf("TimestampStr(non-UTC) = %q, want %q (should be normalized to UTC)", got, want)
+	}
+}
+
+func TestTimestampStr_Invalid(t *testing.T) {
+	got := TimestampStr(pgtype.Timestamptz{Valid: false})
+	if got != "" {
+		t.Errorf("TimestampStr(invalid) = %q, want empty", got)
+	}
+}
+
+func TestTimestampStrPtr_Valid(t *testing.T) {
+	ts := pgtype.Timestamptz{
+		Time:  time.Date(2024, 3, 15, 14, 30, 0, 0, time.UTC),
+		Valid: true,
+	}
+	got := TimestampStrPtr(ts)
+	if got == nil {
+		t.Fatal("TimestampStrPtr: expected non-nil")
+	}
+	want := "2024-03-15T14:30:00Z"
+	if *got != want {
+		t.Errorf("TimestampStrPtr = %q, want %q", *got, want)
+	}
+}
+
+func TestTimestampStrPtr_Invalid(t *testing.T) {
+	got := TimestampStrPtr(pgtype.Timestamptz{Valid: false})
+	if got != nil {
+		t.Errorf("TimestampStrPtr(invalid) = %v, want nil", got)
+	}
+}
+
+func TestDateStrPtr_Valid(t *testing.T) {
+	d := pgtype.Date{
+		Time:  time.Date(2024, 3, 15, 0, 0, 0, 0, time.UTC),
+		Valid: true,
+	}
+	got := DateStrPtr(d)
+	if got == nil {
+		t.Fatal("DateStrPtr: expected non-nil")
+	}
+	if *got != "2024-03-15" {
+		t.Errorf("DateStrPtr = %q, want 2024-03-15", *got)
+	}
+}
+
+func TestDateStrPtr_Invalid(t *testing.T) {
+	got := DateStrPtr(pgtype.Date{Valid: false})
+	if got != nil {
+		t.Errorf("DateStrPtr(invalid) = %v, want nil", got)
 	}
 }

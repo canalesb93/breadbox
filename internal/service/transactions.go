@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"breadbox/internal/pgconv"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -419,8 +421,8 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			CategoryConfidence:  textPtr(categoryConfidence),
 			PaymentChannel:      textPtr(paymentChannel),
 			Pending:             pending,
-			CreatedAt:           createdAt.Time.UTC().Format(time.RFC3339),
-			UpdatedAt:           updatedAt.Time.UTC().Format(time.RFC3339),
+			CreatedAt:           pgconv.TimestampStr(createdAt),
+			UpdatedAt:           pgconv.TimestampStr(updatedAt),
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -965,8 +967,8 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 			Pending:             pending,
 			AgentReviewed:       agentReviewed,
 			HasPendingReview:    hasPendingReview,
-			CreatedAt:           createdAt.Time.UTC().Format(time.RFC3339),
-			UpdatedAt:           updatedAt.Time.UTC().Format(time.RFC3339),
+			CreatedAt:           pgconv.TimestampStr(createdAt),
+			UpdatedAt:           pgconv.TimestampStr(updatedAt),
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -1151,8 +1153,8 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 			Pending:             pending,
 			AgentReviewed:       agentReviewed,
 			HasPendingReview:    hasPendingReview,
-			CreatedAt:           createdAt.Time.UTC().Format(time.RFC3339),
-			UpdatedAt:           updatedAt.Time.UTC().Format(time.RFC3339),
+			CreatedAt:           pgconv.TimestampStr(createdAt),
+			UpdatedAt:           pgconv.TimestampStr(updatedAt),
 		}
 		byID[row.ID] = row
 	}
@@ -1246,8 +1248,8 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		CategoryOverride:    txn.CategoryOverride,
 		PaymentChannel:      textPtr(txn.PaymentChannel),
 		Pending:             txn.Pending,
-		CreatedAt:           txn.CreatedAt.Time.UTC().Format(time.RFC3339),
-		UpdatedAt:           txn.UpdatedAt.Time.UTC().Format(time.RFC3339),
+		CreatedAt:           pgconv.TimestampStr(txn.CreatedAt),
+		UpdatedAt:           pgconv.TimestampStr(txn.UpdatedAt),
 	}
 
 	// Load structured category info if category_id is set
@@ -1296,7 +1298,7 @@ func (s *Service) GetCategoryBySlug(ctx context.Context, slug string) (*Category
 		SortOrder:   cat.SortOrder,
 		IsSystem:    cat.IsSystem,
 		Hidden:      cat.Hidden,
-		CreatedAt:   cat.CreatedAt.Time.UTC().Format(time.RFC3339),
-		UpdatedAt:   cat.UpdatedAt.Time.UTC().Format(time.RFC3339),
+		CreatedAt:   pgconv.TimestampStr(cat.CreatedAt),
+		UpdatedAt:   pgconv.TimestampStr(cat.UpdatedAt),
 	}, nil
 }
