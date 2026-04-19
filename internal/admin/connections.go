@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
@@ -284,8 +283,7 @@ type linkTokenResponse struct {
 func LinkTokenHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req linkTokenRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 
@@ -348,8 +346,7 @@ type exchangeTokenResponse struct {
 func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req exchangeTokenRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 
@@ -941,8 +938,7 @@ func UpdateAccountExcludedHandler(a *app.App, sm *scs.SessionManager) http.Handl
 		var req struct {
 			Excluded bool `json:"excluded"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 
@@ -974,8 +970,7 @@ func UpdateAccountDisplayNameHandler(a *app.App, sm *scs.SessionManager) http.Ha
 		var req struct {
 			DisplayName *string `json:"display_name"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 
@@ -1012,8 +1007,7 @@ func UpdateConnectionPausedHandler(a *app.App, sm *scs.SessionManager) http.Hand
 		var req struct {
 			Paused bool `json:"paused"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 
@@ -1045,8 +1039,7 @@ func UpdateConnectionSyncIntervalHandler(a *app.App, sm *scs.SessionManager) htt
 		var req struct {
 			Minutes *int32 `json:"minutes"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 

@@ -173,8 +173,7 @@ func AddTransactionTagAdminHandler(a *app.App, sm *scs.SessionManager, svc *serv
 			Slug string `json:"slug"`
 			Note string `json:"note,omitempty"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid body"})
+		if !decodeJSON(w, r, &body) {
 			return
 		}
 		body.Slug = strings.TrimSpace(body.Slug)
