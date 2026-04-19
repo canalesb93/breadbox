@@ -31,3 +31,9 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 	}
 	return true
 }
+
+// writeOK writes a 200 OK response with the canonical `{"ok": true}` body used
+// by fire-and-forget admin mutation endpoints.
+func writeOK(w http.ResponseWriter) {
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}

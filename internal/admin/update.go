@@ -23,9 +23,7 @@ func DismissUpdateHandler(a *app.App) http.HandlerFunc {
 			Version string `json:"version"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Version == "" {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]any{"error": "version is required"})
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "version is required")
 			return
 		}
 
@@ -34,8 +32,7 @@ func DismissUpdateHandler(a *app.App) http.HandlerFunc {
 			Value: pgtype.Text{String: body.Version, Valid: true},
 		})
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"ok": true})
+		writeOK(w)
 	}
 }
 
@@ -45,22 +42,17 @@ func DismissUpdateHandler(a *app.App) http.HandlerFunc {
 func TriggerUpdateHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !a.DockerSocketAvailable {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]any{"error": "Docker socket not available"})
+			writeError(w, http.StatusBadRequest, "DOCKER_UNAVAILABLE", "Docker socket not available")
 			return
 		}
 
 		if err := pullImage(r.Context(), "ghcr.io/canalesb93/breadbox", "latest"); err != nil {
 			a.Logger.Error("docker image pull failed", "error", err)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]any{"error": fmt.Sprintf("Failed to pull image: %v", err)})
+			writeError(w, http.StatusInternalServerError, "UPDATE_FAILED", fmt.Sprintf("Failed to pull image: %v", err))
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"ok":      true,
 			"message": "Image pulled. Run 'docker compose up -d' to complete the update.",
 			"pulled":  true,
