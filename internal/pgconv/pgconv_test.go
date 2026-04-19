@@ -139,3 +139,24 @@ func TestNumericToFloat_NaN(t *testing.T) {
 		t.Error("NumericToFloat: expected ok=false for NaN")
 	}
 }
+
+func TestTextPtr_Valid(t *testing.T) {
+	got := TextPtr(pgtype.Text{String: "hello", Valid: true})
+	if got == nil || *got != "hello" {
+		t.Errorf("TextPtr = %v, want &\"hello\"", got)
+	}
+}
+
+func TestTextPtr_Empty(t *testing.T) {
+	got := TextPtr(pgtype.Text{String: "", Valid: true})
+	if got == nil || *got != "" {
+		t.Errorf("TextPtr(empty valid) = %v, want &\"\"", got)
+	}
+}
+
+func TestTextPtr_Invalid(t *testing.T) {
+	got := TextPtr(pgtype.Text{Valid: false})
+	if got != nil {
+		t.Errorf("TextPtr(invalid) = %v, want nil", got)
+	}
+}

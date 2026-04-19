@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"breadbox/internal/db"
@@ -24,39 +23,18 @@ func uuidPtr(u pgtype.UUID) *string {
 }
 
 func textPtr(t pgtype.Text) *string {
-	if !t.Valid {
-		return nil
-	}
-	return &t.String
+	return pgconv.TextPtr(t)
 }
 
 func numericFloat(n pgtype.Numeric) *float64 {
-	if !n.Valid {
-		return nil
-	}
-	// Construct the float from Int * 10^Exp
 	if n.Int == nil {
 		return nil
 	}
-	f := new(big.Float).SetInt(n.Int)
-	if n.Exp != 0 {
-		exp := new(big.Float).SetFloat64(1)
-		base := new(big.Float).SetFloat64(10)
-		e := int(n.Exp)
-		if e > 0 {
-			for i := 0; i < e; i++ {
-				exp.Mul(exp, base)
-			}
-		} else {
-			for i := 0; i < -e; i++ {
-				exp.Mul(exp, base)
-			}
-			exp = new(big.Float).Quo(new(big.Float).SetFloat64(1), exp)
-		}
-		f.Mul(f, exp)
+	f, ok := pgconv.NumericToFloat(n)
+	if !ok {
+		return nil
 	}
-	result, _ := f.Float64()
-	return &result
+	return &f
 }
 
 func timestampStr(ts pgtype.Timestamptz) *string {

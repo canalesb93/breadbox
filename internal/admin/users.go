@@ -277,7 +277,7 @@ func CreateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"id":         userID,
 			"name":       user.Name,
-			"email":      nullTextToPtr(user.Email),
+			"email":      pgconv.TextPtr(user.Email),
 			"created_at": user.CreatedAt.Time,
 			"updated_at": user.UpdatedAt.Time,
 		})
@@ -364,7 +364,7 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"id":         pgconv.FormatUUID(user.ID),
 			"name":       user.Name,
-			"email":      nullTextToPtr(user.Email),
+			"email":      pgconv.TextPtr(user.Email),
 			"created_at": user.CreatedAt.Time,
 			"updated_at": user.UpdatedAt.Time,
 		})
@@ -438,10 +438,3 @@ func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 	}
 }
 
-// nullTextToPtr converts a pgtype.Text to a *string for JSON serialization.
-func nullTextToPtr(t pgtype.Text) *string {
-	if !t.Valid {
-		return nil
-	}
-	return &t.String
-}
