@@ -1017,7 +1017,8 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/sync_log_detail.html",
 		"pages/providers.html",
 		"pages/csv_import.html",
-		"pages/transactions.html",
+		// pages/transactions.html removed — renders via RenderWithTempl
+		// using the _templ_shell template key (see pages.Transactions).
 		"pages/account_detail.html",
 		"pages/categories.html",
 		"pages/category_form.html",
