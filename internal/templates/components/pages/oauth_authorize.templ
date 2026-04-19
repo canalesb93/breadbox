@@ -1,0 +1,85 @@
+package pages
+
+import "breadbox/internal/templates/components/layout"
+
+// OAuthAuthorizeProps carries the data the OAuth consent page needs.
+// Rendered at GET /oauth/authorize when an admin session is active. Scope
+// "read_only" hides the two write-mode permission rows; any other value
+// (e.g. "full_access") shows them.
+type OAuthAuthorizeProps struct {
+	PageTitle           string
+	CSRFToken           string
+	ClientName          string
+	ClientID            string
+	Scope               string
+	RedirectURI         string
+	State               string
+	CodeChallenge       string
+	CodeChallengeMethod string
+	FlashType           string
+	FlashMsg            string
+}
+
+// OAuthAuthorize renders the OAuth consent screen (client name, permission
+// list, authorize/deny buttons) inside the shared wizard layout.
+templ OAuthAuthorize(p OAuthAuthorizeProps) {
+	@layout.Wizard(layout.WizardProps{
+		PageTitle: p.PageTitle,
+		FlashType: p.FlashType,
+		FlashMsg:  p.FlashMsg,
+	}) {
+		<div class="flex flex-col items-center justify-center min-h-[60vh] px-4">
+			<div class="bb-card p-8 max-w-md w-full">
+				<div class="flex flex-col items-center text-center mb-6">
+					<div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+						<i data-lucide="shield-check" class="w-8 h-8 text-primary"></i>
+					</div>
+					<h2 class="text-lg font-semibold mb-1">Authorize Access</h2>
+					<p class="text-sm text-base-content/50">
+						<strong>{ p.ClientName }</strong> wants to connect to your Breadbox instance.
+					</p>
+				</div>
+				<div class="rounded-xl bg-base-200/50 p-4 mb-6">
+					<div class="text-xs font-medium text-base-content/50 mb-2">This will allow the application to:</div>
+					<ul class="space-y-2">
+						<li class="flex items-center gap-2 text-sm">
+							<i data-lucide="check" class="w-4 h-4 text-success shrink-0"></i>
+							Read your transactions, accounts, and categories
+						</li>
+						if p.Scope != "read_only" {
+							<li class="flex items-center gap-2 text-sm">
+								<i data-lucide="check" class="w-4 h-4 text-success shrink-0"></i>
+								Categorize transactions and manage rules
+							</li>
+							<li class="flex items-center gap-2 text-sm">
+								<i data-lucide="check" class="w-4 h-4 text-success shrink-0"></i>
+								Use MCP tools in read/write mode
+							</li>
+						}
+					</ul>
+				</div>
+				<form method="POST" action="/oauth/authorize">
+					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+					<input type="hidden" name="client_id" value={ p.ClientID }/>
+					<input type="hidden" name="redirect_uri" value={ p.RedirectURI }/>
+					<input type="hidden" name="state" value={ p.State }/>
+					<input type="hidden" name="scope" value={ p.Scope }/>
+					<input type="hidden" name="code_challenge" value={ p.CodeChallenge }/>
+					<input type="hidden" name="code_challenge_method" value={ p.CodeChallengeMethod }/>
+					<div class="flex gap-3">
+						<button type="submit" name="action" value="approve" class="btn btn-primary flex-1 rounded-xl">
+							<i data-lucide="check" class="w-4 h-4"></i>
+							Authorize
+						</button>
+						<button type="submit" name="action" value="deny" class="btn btn-ghost flex-1 rounded-xl">
+							Deny
+						</button>
+					</div>
+				</form>
+				<p class="text-xs text-base-content/30 text-center mt-4">
+					You can revoke this access anytime from OAuth Clients settings.
+				</p>
+			</div>
+		</div>
+	}
+}
