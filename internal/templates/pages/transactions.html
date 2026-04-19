@@ -86,9 +86,9 @@
       </div>
     </div>
 
-    <!-- Filter toggle button (always pinned right) -->
-    <button type="button" class="btn rounded-xl gap-2 shrink-0 ml-auto h-10 min-h-0 px-4"
-      :class="filtersOpen ? 'btn-primary' : 'btn-ghost'"
+    <!-- Filter toggle button (pinned right when collapsed; full-width header when open) -->
+    <button type="button" class="btn rounded-xl gap-2 h-10 min-h-0 px-4"
+      :class="filtersOpen ? 'btn-primary w-full justify-between' : 'btn-ghost shrink-0 ml-auto'"
       @click="filtersOpen = !filtersOpen">
       <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
       <span>Filters</span>
