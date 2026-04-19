@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"breadbox/internal/service"
 
@@ -186,12 +185,7 @@ func (s *MCPServer) handleCreateSession(reqCtx context.Context, _ *mcpsdk.CallTo
 
 func (s *MCPServer) handleListAccounts(_ context.Context, _ *mcpsdk.CallToolRequest, input listAccountsInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
-	var userID *string
-	if input.UserID != "" {
-		userID = &input.UserID
-	}
-
-	accounts, err := s.svc.ListAccounts(ctx, userID)
+	accounts, err := s.svc.ListAccounts(ctx, optStr(input.UserID))
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
@@ -202,65 +196,34 @@ func (s *MCPServer) handleListAccounts(_ context.Context, _ *mcpsdk.CallToolRequ
 func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToolRequest, input queryTransactionsInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
 	params := service.TransactionListParams{
-		Cursor: input.Cursor,
-		Limit:  input.Limit,
+		Cursor:        input.Cursor,
+		Limit:         input.Limit,
+		AccountID:     optStr(input.AccountID),
+		UserID:        optStr(input.UserID),
+		CategorySlug:  optStr(input.CategorySlug),
+		MinAmount:     input.MinAmount,
+		MaxAmount:     input.MaxAmount,
+		Pending:       input.Pending,
+		Search:        optStr(input.Search),
+		ExcludeSearch: optStr(input.ExcludeSearch),
+		Tags:          input.Tags,
+		AnyTag:        input.AnyTag,
+		SortBy:        optStr(input.SortBy),
+		SortOrder:     optStr(input.SortOrder),
 	}
 
-	if input.StartDate != "" {
-		t, err := time.Parse("2006-01-02", input.StartDate)
-		if err != nil {
-			return errorResult(fmt.Errorf("invalid start_date: %w", err)), nil, nil
-		}
-		params.StartDate = &t
+	var err error
+	if params.StartDate, err = parseOptionalDate("start_date", input.StartDate); err != nil {
+		return errorResult(err), nil, nil
 	}
-	if input.EndDate != "" {
-		t, err := time.Parse("2006-01-02", input.EndDate)
-		if err != nil {
-			return errorResult(fmt.Errorf("invalid end_date: %w", err)), nil, nil
-		}
-		params.EndDate = &t
-	}
-	if input.AccountID != "" {
-		params.AccountID = &input.AccountID
-	}
-	if input.UserID != "" {
-		params.UserID = &input.UserID
-	}
-	if input.CategorySlug != "" {
-		params.CategorySlug = &input.CategorySlug
-	}
-	if input.MinAmount != nil {
-		params.MinAmount = input.MinAmount
-	}
-	if input.MaxAmount != nil {
-		params.MaxAmount = input.MaxAmount
-	}
-	if input.Pending != nil {
-		params.Pending = input.Pending
-	}
-	if input.Search != "" {
-		params.Search = &input.Search
+	if params.EndDate, err = parseOptionalDate("end_date", input.EndDate); err != nil {
+		return errorResult(err), nil, nil
 	}
 	if input.SearchMode != "" {
 		if !service.ValidateSearchMode(input.SearchMode) {
 			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
 		}
 		params.SearchMode = &input.SearchMode
-	}
-	if input.ExcludeSearch != "" {
-		params.ExcludeSearch = &input.ExcludeSearch
-	}
-	if len(input.Tags) > 0 {
-		params.Tags = input.Tags
-	}
-	if len(input.AnyTag) > 0 {
-		params.AnyTag = input.AnyTag
-	}
-	if input.SortBy != "" {
-		params.SortBy = &input.SortBy
-	}
-	if input.SortOrder != "" {
-		params.SortOrder = &input.SortOrder
 	}
 
 	fieldSet, err := service.ParseFields(input.Fields)
@@ -298,57 +261,31 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 
 func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToolRequest, input countTransactionsInput) (*mcpsdk.CallToolResult, any, error) {
 	ctx := context.Background()
-	params := service.TransactionCountParams{}
+	params := service.TransactionCountParams{
+		AccountID:     optStr(input.AccountID),
+		UserID:        optStr(input.UserID),
+		CategorySlug:  optStr(input.CategorySlug),
+		MinAmount:     input.MinAmount,
+		MaxAmount:     input.MaxAmount,
+		Pending:       input.Pending,
+		Search:        optStr(input.Search),
+		ExcludeSearch: optStr(input.ExcludeSearch),
+		Tags:          input.Tags,
+		AnyTag:        input.AnyTag,
+	}
 
-	if input.StartDate != "" {
-		t, err := time.Parse("2006-01-02", input.StartDate)
-		if err != nil {
-			return errorResult(fmt.Errorf("invalid start_date: %w", err)), nil, nil
-		}
-		params.StartDate = &t
+	var err error
+	if params.StartDate, err = parseOptionalDate("start_date", input.StartDate); err != nil {
+		return errorResult(err), nil, nil
 	}
-	if input.EndDate != "" {
-		t, err := time.Parse("2006-01-02", input.EndDate)
-		if err != nil {
-			return errorResult(fmt.Errorf("invalid end_date: %w", err)), nil, nil
-		}
-		params.EndDate = &t
-	}
-	if input.AccountID != "" {
-		params.AccountID = &input.AccountID
-	}
-	if input.UserID != "" {
-		params.UserID = &input.UserID
-	}
-	if input.CategorySlug != "" {
-		params.CategorySlug = &input.CategorySlug
-	}
-	if input.MinAmount != nil {
-		params.MinAmount = input.MinAmount
-	}
-	if input.MaxAmount != nil {
-		params.MaxAmount = input.MaxAmount
-	}
-	if input.Pending != nil {
-		params.Pending = input.Pending
-	}
-	if input.Search != "" {
-		params.Search = &input.Search
+	if params.EndDate, err = parseOptionalDate("end_date", input.EndDate); err != nil {
+		return errorResult(err), nil, nil
 	}
 	if input.SearchMode != "" {
 		if !service.ValidateSearchMode(input.SearchMode) {
 			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
 		}
 		params.SearchMode = &input.SearchMode
-	}
-	if input.ExcludeSearch != "" {
-		params.ExcludeSearch = &input.ExcludeSearch
-	}
-	if len(input.Tags) > 0 {
-		params.Tags = input.Tags
-	}
-	if len(input.AnyTag) > 0 {
-		params.AnyTag = input.AnyTag
 	}
 
 	count, err := s.svc.CountTransactionsFiltered(ctx, params)
@@ -393,10 +330,7 @@ func (s *MCPServer) handleTriggerSync(ctx context.Context, _ *mcpsdk.CallToolReq
 		return errorResult(err), nil, nil
 	}
 	ctx = context.Background()
-	var connectionID *string
-	if input.ConnectionID != "" {
-		connectionID = &input.ConnectionID
-	}
+	connectionID := optStr(input.ConnectionID)
 
 	if err := s.svc.TriggerSync(ctx, connectionID); err != nil {
 		return errorResult(err), nil, nil
@@ -498,31 +432,18 @@ func (s *MCPServer) handleTransactionSummary(_ context.Context, _ *mcpsdk.CallTo
 	ctx := context.Background()
 
 	params := service.TransactionSummaryParams{
-		GroupBy: input.GroupBy,
+		GroupBy:   input.GroupBy,
+		AccountID: optStr(input.AccountID),
+		UserID:    optStr(input.UserID),
+		Category:  optStr(input.Category),
 	}
 
-	if input.StartDate != "" {
-		t, err := time.Parse("2006-01-02", input.StartDate)
-		if err != nil {
-			return errorResult(fmt.Errorf("invalid start_date: %w", err)), nil, nil
-		}
-		params.StartDate = &t
+	var err error
+	if params.StartDate, err = parseOptionalDate("start_date", input.StartDate); err != nil {
+		return errorResult(err), nil, nil
 	}
-	if input.EndDate != "" {
-		t, err := time.Parse("2006-01-02", input.EndDate)
-		if err != nil {
-			return errorResult(fmt.Errorf("invalid end_date: %w", err)), nil, nil
-		}
-		params.EndDate = &t
-	}
-	if input.AccountID != "" {
-		params.AccountID = &input.AccountID
-	}
-	if input.UserID != "" {
-		params.UserID = &input.UserID
-	}
-	if input.Category != "" {
-		params.Category = &input.Category
+	if params.EndDate, err = parseOptionalDate("end_date", input.EndDate); err != nil {
+		return errorResult(err), nil, nil
 	}
 	if input.IncludePending != nil && *input.IncludePending {
 		params.IncludePending = true
@@ -540,49 +461,28 @@ func (s *MCPServer) handleMerchantSummary(_ context.Context, _ *mcpsdk.CallToolR
 	ctx := context.Background()
 
 	params := service.MerchantSummaryParams{
-		MinCount: input.MinCount,
+		MinCount:      input.MinCount,
+		AccountID:     optStr(input.AccountID),
+		UserID:        optStr(input.UserID),
+		CategorySlug:  optStr(input.CategorySlug),
+		MinAmount:     input.MinAmount,
+		MaxAmount:     input.MaxAmount,
+		Search:        optStr(input.Search),
+		ExcludeSearch: optStr(input.ExcludeSearch),
 	}
 
-	if input.StartDate != "" {
-		t, err := time.Parse("2006-01-02", input.StartDate)
-		if err != nil {
-			return errorResult(fmt.Errorf("invalid start_date: %w", err)), nil, nil
-		}
-		params.StartDate = &t
+	var err error
+	if params.StartDate, err = parseOptionalDate("start_date", input.StartDate); err != nil {
+		return errorResult(err), nil, nil
 	}
-	if input.EndDate != "" {
-		t, err := time.Parse("2006-01-02", input.EndDate)
-		if err != nil {
-			return errorResult(fmt.Errorf("invalid end_date: %w", err)), nil, nil
-		}
-		params.EndDate = &t
-	}
-	if input.AccountID != "" {
-		params.AccountID = &input.AccountID
-	}
-	if input.UserID != "" {
-		params.UserID = &input.UserID
-	}
-	if input.CategorySlug != "" {
-		params.CategorySlug = &input.CategorySlug
-	}
-	if input.MinAmount != nil {
-		params.MinAmount = input.MinAmount
-	}
-	if input.MaxAmount != nil {
-		params.MaxAmount = input.MaxAmount
-	}
-	if input.Search != "" {
-		params.Search = &input.Search
+	if params.EndDate, err = parseOptionalDate("end_date", input.EndDate); err != nil {
+		return errorResult(err), nil, nil
 	}
 	if input.SearchMode != "" {
 		if !service.ValidateSearchMode(input.SearchMode) {
 			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
 		}
 		params.SearchMode = &input.SearchMode
-	}
-	if input.ExcludeSearch != "" {
-		params.ExcludeSearch = &input.ExcludeSearch
 	}
 	if input.SpendingOnly != nil && *input.SpendingOnly {
 		params.SpendingOnly = true
@@ -743,17 +643,11 @@ func (s *MCPServer) handleListTransactionRules(_ context.Context, _ *mcpsdk.Call
 	ctx := context.Background()
 
 	params := service.TransactionRuleListParams{
-		Limit:  input.Limit,
-		Cursor: input.Cursor,
-	}
-	if input.CategorySlug != "" {
-		params.CategorySlug = &input.CategorySlug
-	}
-	if input.Enabled != nil {
-		params.Enabled = input.Enabled
-	}
-	if input.Search != "" {
-		params.Search = &input.Search
+		Limit:        input.Limit,
+		Cursor:       input.Cursor,
+		CategorySlug: optStr(input.CategorySlug),
+		Enabled:      input.Enabled,
+		Search:       optStr(input.Search),
 	}
 	if input.SearchMode != "" {
 		if !service.ValidateSearchMode(input.SearchMode) {
@@ -1014,45 +908,22 @@ func (s *MCPServer) handleBulkRecategorize(ctx context.Context, _ *mcpsdk.CallTo
 
 	params := service.BulkRecategorizeParams{
 		TargetCategorySlug: toCategory,
+		AccountID:          optStr(input.AccountID),
+		UserID:             optStr(input.UserID),
+		CategorySlug:       optStr(fromCategory),
+		MinAmount:          input.MinAmount,
+		MaxAmount:          input.MaxAmount,
+		Pending:            input.Pending,
+		Search:             optStr(input.Search),
+		NameContains:       optStr(input.NameContains),
 	}
 
-	if input.StartDate != "" {
-		t, err := time.Parse("2006-01-02", input.StartDate)
-		if err != nil {
-			return errorResult(fmt.Errorf("invalid start_date: %w", err)), nil, nil
-		}
-		params.StartDate = &t
+	var err error
+	if params.StartDate, err = parseOptionalDate("start_date", input.StartDate); err != nil {
+		return errorResult(err), nil, nil
 	}
-	if input.EndDate != "" {
-		t, err := time.Parse("2006-01-02", input.EndDate)
-		if err != nil {
-			return errorResult(fmt.Errorf("invalid end_date: %w", err)), nil, nil
-		}
-		params.EndDate = &t
-	}
-	if input.AccountID != "" {
-		params.AccountID = &input.AccountID
-	}
-	if input.UserID != "" {
-		params.UserID = &input.UserID
-	}
-	if fromCategory != "" {
-		params.CategorySlug = &fromCategory
-	}
-	if input.MinAmount != nil {
-		params.MinAmount = input.MinAmount
-	}
-	if input.MaxAmount != nil {
-		params.MaxAmount = input.MaxAmount
-	}
-	if input.Pending != nil {
-		params.Pending = input.Pending
-	}
-	if input.Search != "" {
-		params.Search = &input.Search
-	}
-	if input.NameContains != "" {
-		params.NameContains = &input.NameContains
+	if params.EndDate, err = parseOptionalDate("end_date", input.EndDate); err != nil {
+		return errorResult(err), nil, nil
 	}
 
 	result, err := s.svc.BulkRecategorizeByFilter(ctx, params)
