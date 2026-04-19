@@ -17,6 +17,9 @@ static/css/styles.css
 # air (hot-reload) build output — used by `make dev-watch`
 tmp/
 
+# mkdocs build output — produced fresh by .github/workflows/docs.yml
+site/
+
 # Go
 vendor/
 
