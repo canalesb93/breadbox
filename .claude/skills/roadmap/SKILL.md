@@ -84,6 +84,8 @@ Write the new phase following the format in [format-reference.md](format-referen
 - Tasks should be self-contained: one package, one endpoint group, one page, etc.
 - Break large features into sub-phases (e.g., 18A, 18B) if they exceed 10 tasks
 
+**Flag stacked-PR candidates:** When a phase touches multiple layers (migration + service + handler + UI) or is likely to exceed ~400 LOC, note in the phase description that it's a good candidate for a stacked PR split and reference `docs/stacked-prs.md`. This lets the implementing agent invoke `/stack plan <topic>` up front instead of discovering mid-implementation that the diff has outgrown a single PR.
+
 ### Spec Files for New Phases
 
 For non-trivial features, create a **spec document** in `docs/` alongside the roadmap entry. This serves two purposes: it gives the implementing agent detailed context without bloating the roadmap, and it becomes permanent documentation for the feature.

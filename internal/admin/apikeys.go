@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -20,8 +19,7 @@ func CreateAPIKeyHandler(svc *service.Service) http.HandlerFunc {
 			Name  string `json:"name"`
 			Scope string `json:"scope"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 		req.Name = strings.TrimSpace(req.Name)

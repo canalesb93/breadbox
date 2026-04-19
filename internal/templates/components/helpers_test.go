@@ -139,12 +139,20 @@ func TestTitleCase(t *testing.T) {
 		{"all caps becomes title case", "STARBUCKS COFFEE", "Starbucks Coffee"},
 		{"all lowercase becomes title case", "starbucks coffee", "Starbucks Coffee"},
 		{"mixed case left untouched", "McDonald's", "McDonald's"},
+		{"mixed case name like iTunes left untouched", "iTunes", "iTunes"},
 		{"short non-article words uppercased", "us bank", "US Bank"},
 		{"small words stay lowercase in middle", "BANK OF AMERICA", "Bank of America"},
 		{"first small word capitalized", "the coffee shop", "The Coffee Shop"},
+		{"first small word capitalized from all caps", "THE HOME DEPOT", "The Home Depot"},
 		{"abbreviations with periods uppercased", "h.e.b grocery", "H.E.B Grocery"},
+		{"abbreviation with trailing period", "h.e.b.", "H.E.B."},
+		{"abbreviation already capitalized stays", "H.E.B.", "H.E.B."},
 		{"single word all caps", "WALMART", "Walmart"},
+		{"all caps multi word", "WHOLE FOODS MARKET", "Whole Foods Market"},
 		{"two-letter acronym uppercased", "ab pharmacy", "AB Pharmacy"},
+		{"three-letter acronym title-cased not all-uppered", "US ATM FEE", "US Atm Fee"},
+		{"two-letter small words stay lowercase mid-phrase", "UP AND AT EM", "UP and at EM"},
+		{"single small word at start gets capitalized", "the", "The"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -169,6 +177,31 @@ func TestPluralS(t *testing.T) {
 		if got := pluralS(tc.n); got != tc.want {
 			t.Errorf("pluralS(%d) = %q, want %q", tc.n, got, tc.want)
 		}
+	}
+}
+
+func TestExportedWrappersDelegate(t *testing.T) {
+	// Each exported wrapper must return the same value as its lowercase
+	// counterpart so the admin funcMap and .templ files stay in lock-step.
+	if got, want := FirstChar("apple"), firstChar("apple"); got != want {
+		t.Errorf("FirstChar = %q, want %q", got, want)
+	}
+	if got, want := FormatDate("2024-03-15"), formatDate("2024-03-15"); got != want {
+		t.Errorf("FormatDate = %q, want %q", got, want)
+	}
+	if got, want := FormatAmount(-1.5), formatAmount(-1.5); got != want {
+		t.Errorf("FormatAmount = %q, want %q", got, want)
+	}
+	if got, want := TitleCase("STARBUCKS"), titleCase("STARBUCKS"); got != want {
+		t.Errorf("TitleCase = %q, want %q", got, want)
+	}
+	if got, want := PluralS(2), pluralS(2); got != want {
+		t.Errorf("PluralS = %q, want %q", got, want)
+	}
+	// RelativeDate goes through time.Now() — just assert it returns non-empty
+	// for a valid date.
+	if got := RelativeDate("2024-01-01"); got == "" {
+		t.Error("RelativeDate returned empty string for valid input")
 	}
 }
 

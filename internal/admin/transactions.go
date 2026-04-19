@@ -932,8 +932,7 @@ func CreateTransactionCommentHandler(a *app.App, sm *scs.SessionManager, svc *se
 		var input struct {
 			Content string `json:"content"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		if !decodeJSON(w, r, &input) {
 			return
 		}
 
@@ -1070,8 +1069,7 @@ func BulkUpdateTransactionsAdminHandler(a *app.App, sm *scs.SessionManager, svc 
 			} `json:"operations"`
 			OnError string `json:"on_error,omitempty"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid body"})
+		if !decodeJSON(w, r, &body) {
 			return
 		}
 		if len(body.Operations) == 0 {

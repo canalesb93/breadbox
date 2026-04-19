@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"breadbox/internal/pgconv"
+	"breadbox/internal/sliceutil"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -471,11 +472,11 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 				// If a prior-stage rule's remove_tag had queued this slug,
 				// the later add cancels it — strip from TagsToRemove and
 				// drop the prior remove source.
-				if i := stringSliceIndex(result.TagsToRemove, a.TagSlug); i >= 0 {
+				if i := sliceutil.IndexFold(result.TagsToRemove, a.TagSlug); i >= 0 {
 					result.TagsToRemove = append(result.TagsToRemove[:i], result.TagsToRemove[i+1:]...)
 					result.Sources = dropTagSource(result.Sources, "tag_remove", a.TagSlug)
 				}
-				if !stringSliceContains(result.TagsToAdd, a.TagSlug) {
+				if !sliceutil.Contains(result.TagsToAdd, a.TagSlug) {
 					result.TagsToAdd = append(result.TagsToAdd, a.TagSlug)
 					result.Sources = append(result.Sources, RuleActionSource{
 						RuleID:      rule.id,
@@ -487,7 +488,7 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 				}
 				// Mirror into live context so later rules' tags conditions
 				// can observe the addition.
-				if !stringSliceContains(tctx.Tags, a.TagSlug) {
+				if !sliceutil.Contains(tctx.Tags, a.TagSlug) {
 					tctx.Tags = append(tctx.Tags, a.TagSlug)
 				}
 			case "remove_tag":
@@ -497,14 +498,14 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 				// If a same-pass earlier-stage rule added this slug, cancel
 				// that add rather than queueing a delete. The net effect is
 				// no DB write for this slug.
-				if i := stringSliceIndex(result.TagsToAdd, a.TagSlug); i >= 0 {
+				if i := sliceutil.IndexFold(result.TagsToAdd, a.TagSlug); i >= 0 {
 					result.TagsToAdd = append(result.TagsToAdd[:i], result.TagsToAdd[i+1:]...)
 					result.Sources = dropTagSource(result.Sources, "tag", a.TagSlug)
-				} else if stringSliceContains(tctx.Tags, a.TagSlug) {
+				} else if sliceutil.Contains(tctx.Tags, a.TagSlug) {
 					// Only queue a delete if the slug is actually present on
 					// the transaction (loaded initial tags). Otherwise the
 					// remove is a no-op.
-					if !stringSliceContains(result.TagsToRemove, a.TagSlug) {
+					if !sliceutil.Contains(result.TagsToRemove, a.TagSlug) {
 						result.TagsToRemove = append(result.TagsToRemove, a.TagSlug)
 						result.Sources = append(result.Sources, RuleActionSource{
 							RuleID:      rule.id,
@@ -516,7 +517,7 @@ func (r *RuleResolver) ResolveWithContext(providerName string, txn TransactionCo
 					}
 				}
 				// Mirror into live context so later rules see the slug gone.
-				if i := stringSliceIndex(tctx.Tags, a.TagSlug); i >= 0 {
+				if i := sliceutil.IndexFold(tctx.Tags, a.TagSlug); i >= 0 {
 					tctx.Tags = append(tctx.Tags[:i], tctx.Tags[i+1:]...)
 				}
 			case "add_comment":
@@ -570,17 +571,6 @@ func dropTagSource(src []RuleActionSource, field, value string) []RuleActionSour
 		kept = append(kept, s)
 	}
 	return kept
-}
-
-// stringSliceIndex returns the index of s in slice (case-insensitive),
-// or -1 if not present.
-func stringSliceIndex(slice []string, s string) int {
-	for i, v := range slice {
-		if strings.EqualFold(v, s) {
-			return i
-		}
-	}
-	return -1
 }
 
 // triggerMatches reports whether a rule with the given trigger should fire
@@ -773,16 +763,16 @@ func evaluateBool(c *compiledCondition, fieldVal bool) bool {
 func evaluateTags(c *compiledCondition, tags []string) bool {
 	switch c.op {
 	case "contains":
-		return stringSliceContainsFold(tags, toString(c.value))
+		return sliceutil.ContainsFold(tags, toString(c.value))
 	case "not_contains":
-		return !stringSliceContainsFold(tags, toString(c.value))
+		return !sliceutil.ContainsFold(tags, toString(c.value))
 	case "in":
 		list, ok := c.value.([]interface{})
 		if !ok {
 			return false
 		}
 		for _, item := range list {
-			if stringSliceContainsFold(tags, toString(item)) {
+			if sliceutil.ContainsFold(tags, toString(item)) {
 				return true
 			}
 		}
@@ -869,25 +859,3 @@ func stringInList(fieldVal string, v interface{}) bool {
 	}
 }
 
-// stringSliceContains reports whether slice contains target (case-sensitive).
-func stringSliceContains(slice []string, target string) bool {
-	for _, s := range slice {
-		if s == target {
-			return true
-		}
-	}
-	return false
-}
-
-// stringSliceContainsFold reports whether slice contains target (case-insensitive).
-func stringSliceContainsFold(slice []string, target string) bool {
-	if target == "" {
-		return false
-	}
-	for _, s := range slice {
-		if strings.EqualFold(s, target) {
-			return true
-		}
-	}
-	return false
-}

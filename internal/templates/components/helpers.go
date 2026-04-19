@@ -218,3 +218,31 @@ func AvatarURLVersioned(id, version string) string {
 	}
 	return base + "?v=" + version
 }
+
+// Exported wrappers for the shared formatting helpers. Used by the admin
+// funcMap (internal/admin/templates.go) and other packages so there's one
+// canonical implementation. Keep these in lock-step with their lowercase
+// counterparts above — drift surfaces as different rows between pages.
+
+// FirstChar returns the first A–Z/0–9 rune of s uppercased, or "?" when s has
+// none. See firstChar.
+func FirstChar(s string) string { return firstChar(s) }
+
+// FormatDate formats a "2006-01-02" date string as "Jan 2, 2006". Returns the
+// input unchanged if it doesn't parse. See formatDate.
+func FormatDate(s string) string { return formatDate(s) }
+
+// RelativeDate renders a "2006-01-02" date as "Today", "Yesterday", etc.
+// See relativeDate.
+func RelativeDate(s string) string { return relativeDate(s) }
+
+// FormatAmount renders a signed amount with currency prefix (e.g. "-$1.50").
+// See formatAmount.
+func FormatAmount(amount float64) string { return formatAmount(amount) }
+
+// TitleCase rewrites ALL-CAPS or all-lowercase input to Title Case, leaving
+// mixed-case input untouched. See titleCase.
+func TitleCase(s string) string { return titleCase(s) }
+
+// PluralS returns "" for n == 1, else "s". See pluralS.
+func PluralS(n int) string { return pluralS(n) }

@@ -21,6 +21,7 @@ import (
 	bsync "breadbox/internal/sync"
 	"breadbox/internal/templates"
 	"breadbox/internal/templates/components"
+	"breadbox/internal/templates/components/pages"
 	"breadbox/internal/version"
 
 	"github.com/a-h/templ"
@@ -605,7 +606,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			},
 			"lower":     strings.ToLower,
 			"eqFold":    strings.EqualFold,
-			"titleCase": titleCaseMerchant,
+			"titleCase": components.TitleCase,
 			"syncLogFilterQuery": func(status, connID, trigger, dateFrom, dateTo string) template.URL {
 				params := url.Values{}
 				if status != "" {
@@ -716,21 +717,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return base
 			},
-			"firstChar": func(s string) string {
-				if s == "" {
-					return "?"
-				}
-				for _, r := range s {
-					c := strings.ToUpper(string(r))
-					if c >= "A" && c <= "Z" {
-						return c
-					}
-					if c >= "0" && c <= "9" {
-						return c
-					}
-				}
-				return strings.ToUpper(string([]rune(s)[0]))
-			},
+			"firstChar": components.FirstChar,
 			"firstWord": func(s string) string {
 				if s == "" {
 					return ""
@@ -754,15 +741,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return (value / max) * 100
 			},
-			"formatAmount": func(amount float64) string {
-				neg := amount < 0
-				abs := math.Abs(amount)
-				formatted := formatCurrency(abs)
-				if neg {
-					return "-" + formatted
-				}
-				return formatted
-			},
+			"formatAmount": components.FormatAmount,
 			"formatBalance": func(amount float64) string {
 				return components.FormatBalance(amount)
 			},
@@ -874,35 +853,8 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return ""
 				}
 			},
-			"formatDate": func(s string) string {
-				if t, err := time.Parse("2006-01-02", s); err == nil {
-					return t.Format("Jan 2, 2006")
-				}
-				return s
-			},
-			"relativeDate": func(s string) string {
-				t, err := time.Parse("2006-01-02", s)
-				if err != nil {
-					return s
-				}
-				now := time.Now()
-				today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-				d := t.In(now.Location())
-				dateOnly := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, now.Location())
-				days := int(today.Sub(dateOnly).Hours() / 24)
-				switch {
-				case days == 0:
-					return "Today"
-				case days == 1:
-					return "Yesterday"
-				case days >= 2 && days <= 6:
-					return fmt.Sprintf("%d days ago", days)
-				case days >= 7 && days <= 13:
-					return "1 week ago"
-				default:
-					return t.Format("Jan 2, 2006")
-				}
-			},
+			"formatDate":   components.FormatDate,
+			"relativeDate": components.RelativeDate,
 			"formatNumeric": func(n pgtype.Numeric) string {
 				if !n.Valid {
 					return ""
@@ -911,7 +863,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				if err != nil || !f.Valid {
 					return ""
 				}
-				return formatCurrency(math.Abs(f.Float64))
+				return service.FormatCurrency(math.Abs(f.Float64))
 			},
 			"fmtBalance": func(v interface{}) string {
 				var f float64
@@ -1009,11 +961,10 @@ var templatePartials = []string{
 func (tr *TemplateRenderer) parseTemplates() error {
 	// Pages using the base layout (authenticated dashboard pages).
 	basePages := []string{
-		"pages/404.html",
-		"pages/500.html",
 		"pages/_templ_shell.html",
-		// dashboard.html and settings.html removed — those pages render via
-		// RenderWithTempl which uses the _templ_shell template key.
+		// dashboard.html, settings.html, 404.html, and 500.html removed —
+		// those pages render via RenderWithTempl which uses the
+		// _templ_shell template key.
 		"pages/connections.html",
 		"pages/connection_new.html",
 		"pages/connection_detail.html",
@@ -1067,15 +1018,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		},
 	}
 
-	// Pages using the wizard layout (first-run admin creation + OAuth consent + account setup).
-	// login.html was migrated to a templ component in #462 — see
-	// internal/templates/components/pages/login.templ.
-	wizardPages := []string{
-		"pages/setup_create_admin.html",
-		"pages/setup_account.html",
-		"pages/oauth_authorize.html",
-	}
-
 	for _, page := range basePages {
 		if err := tr.parseBasePage(page); err != nil {
 			return err
@@ -1092,21 +1034,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		if err != nil {
 			return fmt.Errorf("parse composite page %s: %w", page, err)
 		}
-		name := path.Base(page)
-		tr.templates[name] = t
-		tr.specs[name] = files
-	}
-
-	for _, page := range wizardPages {
-		files := []string{"layout/wizard.html"}
-		files = append(files, templatePartials...)
-		files = append(files, page)
-
-		t, err := template.New("").Funcs(tr.funcMap).ParseFS(templates.FS, files...)
-		if err != nil {
-			return fmt.Errorf("parse wizard page %s: %w", page, err)
-		}
-		// Store using just the filename (e.g., "login.html").
 		name := path.Base(page)
 		tr.templates[name] = t
 		tr.specs[name] = files
@@ -1294,14 +1221,14 @@ func BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage, page
 func (tr *TemplateRenderer) RenderNotFound(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 	data := BaseTemplateData(r, tr.sm, "", "Page Not Found")
-	tr.Render(w, r, "404.html", data)
+	tr.RenderWithTempl(w, r, data, pages.NotFound())
 }
 
 // RenderError renders the styled 500 page within the app layout.
 func (tr *TemplateRenderer) RenderError(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusInternalServerError)
 	data := BaseTemplateData(r, tr.sm, "", "Error")
-	tr.Render(w, r, "500.html", data)
+	tr.RenderWithTempl(w, r, data, pages.InternalError())
 }
 
 // SetVersion sets the application version for auto-injection into template data.
@@ -1312,62 +1239,6 @@ func (tr *TemplateRenderer) SetVersion(v string) {
 // SetVersionChecker sets the version checker for auto-injecting update status into template data.
 func (tr *TemplateRenderer) SetVersionChecker(vc *version.Checker) {
 	tr.versionChecker = vc
-}
-
-// formatCurrency formats a non-negative float as "$X,XXX.XX". Delegates to
-// service.FormatCurrency so preview DTOs and template rendering share one
-// format.
-func formatCurrency(abs float64) string {
-	return service.FormatCurrency(abs)
-}
-
-// titleCaseMerchant converts ALL-CAPS merchant names from bank feeds into
-// readable Title Case. Mixed-case input is returned as-is to avoid mangling
-// names that are already properly cased.
-func titleCaseMerchant(s string) string {
-	if s == "" {
-		return s
-	}
-	// Only transform if the string appears to be ALL CAPS or all lowercase.
-	// Mixed-case strings like "McDonald's" are left alone.
-	upper := strings.ToUpper(s)
-	lower := strings.ToLower(s)
-	if s != upper && s != lower {
-		return s // already mixed case — leave it alone
-	}
-
-	// Small words that should stay lowercase (unless first word).
-	smallWords := map[string]bool{
-		"a": true, "an": true, "and": true, "as": true, "at": true,
-		"by": true, "for": true, "in": true, "of": true, "on": true,
-		"or": true, "the": true, "to": true, "vs": true, "via": true,
-	}
-
-	words := strings.Fields(lower)
-	for i, w := range words {
-		// Abbreviations with periods (e.g., "h.e." → "H.E."): uppercase all parts.
-		if strings.Contains(w, ".") {
-			parts := strings.Split(w, ".")
-			for j, p := range parts {
-				if len(p) > 0 {
-					parts[j] = strings.ToUpper(p)
-				}
-			}
-			words[i] = strings.Join(parts, ".")
-			continue
-		}
-		// Short words (2 letters or less) that aren't articles: keep uppercase
-		// (likely abbreviations like "AB", "US", "ATM").
-		if len(w) <= 2 && !smallWords[w] {
-			words[i] = strings.ToUpper(w)
-			continue
-		}
-		// Always capitalize the first word; small words stay lowercase otherwise.
-		if i == 0 || !smallWords[w] {
-			words[i] = strings.ToUpper(w[:1]) + w[1:]
-		}
-	}
-	return strings.Join(words, " ")
 }
 
 // AdminUsername returns the username from the session for use in template data maps.
@@ -1406,7 +1277,7 @@ func ruleFieldLabel(field string) string {
 		if field == "" {
 			return "—"
 		}
-		return titleCaseMerchant(strings.ReplaceAll(field, "_", " "))
+		return components.TitleCase(strings.ReplaceAll(field, "_", " "))
 	}
 }
 

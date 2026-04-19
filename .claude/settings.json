@@ -58,6 +58,8 @@
       "allowWrite": [
         "~/go",
         "~/Library/Caches/go-build",
+        "~/.local/share/graphite",
+        "~/.config/graphite",
         "/tmp",
         "/var/folders"
       ]
@@ -71,7 +73,9 @@
         "storage.googleapis.com",
         "github.com",
         "api.github.com",
-        "objects.githubusercontent.com"
+        "objects.githubusercontent.com",
+        "img402.dev",
+        "i.img402.dev"
       ],
       "allowLocalBinding": true
     },
