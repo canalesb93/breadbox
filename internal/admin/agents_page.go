@@ -22,18 +22,7 @@ func AgentsPageHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer, s
 		data["Tab"] = tab
 
 		// === Getting Started data ===
-		scheme := "http"
-		if r.TLS != nil {
-			scheme = "https"
-		}
-		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
-			scheme = proto
-		}
-		host := r.Host
-		if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
-			host = fwdHost
-		}
-		data["MCPServerURL"] = scheme + "://" + host + "/mcp"
+		data["MCPServerURL"] = mcpServerURL(r)
 
 		var hasAPIKeys, hasOAuthClients bool
 		if keys, err := svc.ListAPIKeys(ctx); err == nil {

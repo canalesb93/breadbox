@@ -425,6 +425,7 @@ func OAuthClientCreatedPageHandler(sm *scs.SessionManager, tr *TemplateRenderer)
 			"ClientID":     clientID,
 			"ClientSecret": clientSecret,
 			"ClientName":   name,
+			"MCPServerURL": mcpServerURL(r),
 			"CSRFToken":    GetCSRFToken(r),
 			"Breadcrumbs": []Breadcrumb{
 				{Label: "Access", Href: "/access"},

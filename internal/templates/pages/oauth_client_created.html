@@ -8,7 +8,7 @@
   </div>
 </div>
 
-<div class="bb-card p-6 max-w-lg" x-data="{ copiedId: false, copiedSecret: false }">
+<div class="bb-card p-6 max-w-lg" x-data="{ copiedId: false, copiedSecret: false, copiedUrl: false }">
   <div class="flex items-center gap-3 mb-5">
     <div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center">
       <i data-lucide="check" class="w-5 h-5 text-success"></i>
@@ -55,8 +55,16 @@
       <a href="/access" class="btn btn-ghost btn-sm rounded-xl shrink-0">Done</a>
     </div>
     <div class="rounded-xl bg-base-200/50 p-3">
-      <div class="text-xs font-medium text-base-content/50 mb-1">MCP Server URL</div>
-      <code class="text-xs font-mono text-primary/70">https://your-breadbox-host/mcp</code>
+      <div class="text-xs font-medium text-base-content/50 mb-1.5">MCP Server URL</div>
+      <div class="flex gap-2">
+        <input type="text" value="{{.MCPServerURL}}" readonly id="oauth-mcp-url"
+               class="input input-sm font-mono flex-1 bg-base-100 border-base-300 rounded-xl text-xs text-primary/80">
+        <button class="btn btn-sm btn-ghost rounded-xl shrink-0 gap-1.5" :class="copiedUrl && '!text-success'" @click="navigator.clipboard.writeText(document.getElementById('oauth-mcp-url').value).then(function(){ $data.copiedUrl = true; setTimeout(function(){ $data.copiedUrl = false; }, 2000); })">
+          <i data-lucide="clipboard" class="w-3.5 h-3.5" x-show="!copiedUrl"></i>
+          <i data-lucide="check" class="w-3.5 h-3.5" x-show="copiedUrl" x-cloak></i>
+          <span x-text="copiedUrl ? 'Copied!' : 'Copy'"></span>
+        </button>
+      </div>
     </div>
   </div>
 </div>

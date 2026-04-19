@@ -8,25 +8,31 @@ import (
 	"github.com/alexedwards/scs/v2"
 )
 
+// mcpServerURL derives the public MCP endpoint from the incoming request,
+// honoring X-Forwarded-Proto / X-Forwarded-Host when set by a reverse proxy.
+// Shared across admin pages that surface the URL to users.
+func mcpServerURL(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		scheme = proto
+	}
+	host := r.Host
+	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
+		host = fwdHost
+	}
+	return scheme + "://" + host + "/mcp"
+}
+
 // MCPGuideHandler serves GET /admin/mcp-getting-started.
 func MCPGuideHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		data := BaseTemplateData(r, sm, "mcp-getting-started", "Getting Started")
 
-		// Build MCP server URL from request.
-		scheme := "http"
-		if r.TLS != nil {
-			scheme = "https"
-		}
-		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
-			scheme = proto
-		}
-		host := r.Host
-		if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
-			host = fwdHost
-		}
-		data["MCPServerURL"] = scheme + "://" + host + "/mcp"
+		data["MCPServerURL"] = mcpServerURL(r)
 
 		// Check for existing credentials.
 		var hasAPIKeys, hasOAuthClients bool
