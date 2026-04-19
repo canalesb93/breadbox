@@ -127,7 +127,7 @@ func CategoryNewPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Te
 		data["IsEdit"] = false
 		data["Categories"] = categories
 		data["Breadcrumbs"] = []Breadcrumb{
-			{Label: "Rules & Categories", Href: "/rules?tab=categories"},
+			{Label: "Categories", Href: "/categories"},
 			{Label: "Add Category"},
 		}
 		tr.Render(w, r, "category_form.html", data)
@@ -151,7 +151,7 @@ func CategoryEditPageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 		data["IsEdit"] = true
 		data["Category"] = category
 		data["Breadcrumbs"] = []Breadcrumb{
-			{Label: "Rules & Categories", Href: "/rules?tab=categories"},
+			{Label: "Categories", Href: "/categories"},
 			{Label: category.DisplayName},
 		}
 		tr.Render(w, r, "category_form.html", data)

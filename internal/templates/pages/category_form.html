@@ -147,7 +147,7 @@
 
     <!-- Sticky action row -->
     <div class="bb-action-row">
-      <a href="/rules?tab=categories" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
+      <a href="/categories" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
       <button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32" :disabled="submitting || !displayName">
         <span x-show="!submitting" class="inline-flex items-center gap-1.5">
           <i data-lucide="save" class="w-3.5 h-3.5"></i>
@@ -237,7 +237,7 @@ function categoryForm() {
       })
       .then(function(res) {
         if (res.ok) {
-          window.location.href = '/rules?tab=categories';
+          window.location.href = '/categories';
           return;
         }
         return res.json().then(function(data) {
