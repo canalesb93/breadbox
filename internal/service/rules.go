@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"breadbox/internal/ruleapply"
+	"breadbox/internal/sliceutil"
 	"breadbox/internal/slugs"
 
 	"github.com/jackc/pgx/v5"
@@ -1553,7 +1554,7 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 						if _, exists := intent.tagAdds[a.TagSlug]; !exists {
 							intent.tagAdds[a.TagSlug] = cr
 						}
-						if !stringSliceHasFold(tctx.Tags, a.TagSlug) {
+						if !sliceutil.ContainsFold(tctx.Tags, a.TagSlug) {
 							tctx.Tags = append(tctx.Tags, a.TagSlug)
 						}
 					case "remove_tag":
@@ -1563,12 +1564,12 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 						// If a prior-stage add queued this slug, cancel it.
 						if _, was := intent.tagAdds[a.TagSlug]; was {
 							delete(intent.tagAdds, a.TagSlug)
-						} else if stringSliceHasFold(tctx.Tags, a.TagSlug) {
+						} else if sliceutil.ContainsFold(tctx.Tags, a.TagSlug) {
 							if _, exists := intent.tagRemoves[a.TagSlug]; !exists {
 								intent.tagRemoves[a.TagSlug] = cr
 							}
 						}
-						tctx.Tags = stringSliceDropFold(tctx.Tags, a.TagSlug)
+						tctx.Tags = sliceutil.DropFold(tctx.Tags, a.TagSlug)
 					}
 				}
 			}
@@ -1684,27 +1685,6 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 	}
 
 	return hitCounts, nil
-}
-
-// stringSliceHasFold returns true if slice contains s (case-insensitive).
-func stringSliceHasFold(slice []string, s string) bool {
-	for _, v := range slice {
-		if strings.EqualFold(v, s) {
-			return true
-		}
-	}
-	return false
-}
-
-// stringSliceDropFold returns slice with all case-insensitive matches of s removed.
-func stringSliceDropFold(slice []string, s string) []string {
-	out := slice[:0]
-	for _, v := range slice {
-		if !strings.EqualFold(v, s) {
-			out = append(out, v)
-		}
-	}
-	return out
 }
 
 // RulePreviewMatch contains a sample transaction that matched a rule preview.

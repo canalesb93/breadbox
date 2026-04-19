@@ -190,23 +190,23 @@ func RoleDisplayName(role string) string {
 
 // SetupAccountHandler handles GET/POST /setup-account/{token} — token-based password setup.
 // This is an unauthenticated route. Members receive a setup URL from their admin.
-func SetupAccountHandler(sm *scs.SessionManager, queries *db.Queries, tr *TemplateRenderer) http.HandlerFunc {
+func SetupAccountHandler(sm *scs.SessionManager, queries *db.Queries, _ *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := chi.URLParam(r, "token")
 		if token == "" {
-			renderSetupError(w, r, sm, tr, "This setup link is invalid.")
+			renderSetupError(w, r, sm, "This setup link is invalid.")
 			return
 		}
 
 		account, err := queries.GetAuthAccountBySetupToken(r.Context(), pgtype.Text{String: token, Valid: true})
 		if err != nil {
-			renderSetupError(w, r, sm, tr, "This setup link is invalid or has expired.")
+			renderSetupError(w, r, sm, "This setup link is invalid or has expired.")
 			return
 		}
 
 		// Check expiry.
 		if account.SetupTokenExpiresAt.Valid && account.SetupTokenExpiresAt.Time.Before(time.Now()) {
-			renderSetupError(w, r, sm, tr, "This setup link has expired. Ask your administrator for a new one.")
+			renderSetupError(w, r, sm, "This setup link has expired. Ask your administrator for a new one.")
 			return
 		}
 
@@ -218,15 +218,7 @@ func SetupAccountHandler(sm *scs.SessionManager, queries *db.Queries, tr *Templa
 		}
 
 		if r.Method == http.MethodGet {
-			data := map[string]any{
-				"PageTitle": "Set Your Password",
-				"CSRFToken": GenerateCSRFToken(r.Context(), sm),
-				"Username":  account.Username,
-				"Token":     token,
-				"Error":     "",
-				"Errors":    map[string]string{},
-			}
-			tr.Render(w, r, "setup_account.html", data)
+			renderSetupAccount(w, r, sm, account.Username, token, "", nil)
 			return
 		}
 
@@ -243,15 +235,7 @@ func SetupAccountHandler(sm *scs.SessionManager, queries *db.Queries, tr *Templa
 		}
 
 		if len(fieldErrors) > 0 {
-			data := map[string]any{
-				"PageTitle": "Set Your Password",
-				"CSRFToken": GenerateCSRFToken(r.Context(), sm),
-				"Username":  account.Username,
-				"Token":     token,
-				"Error":     "",
-				"Errors":    fieldErrors,
-			}
-			tr.Render(w, r, "setup_account.html", data)
+			renderSetupAccount(w, r, sm, account.Username, token, "", fieldErrors)
 			return
 		}
 
@@ -277,13 +261,45 @@ func SetupAccountHandler(sm *scs.SessionManager, queries *db.Queries, tr *Templa
 	}
 }
 
-// renderSetupError renders the setup account page with an error message (no form).
-func renderSetupError(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, tr *TemplateRenderer, message string) {
-	data := map[string]any{
-		"PageTitle":  "Account Setup",
-		"SetupError": message,
+// renderSetupAccount renders the token-based setup-account page via the
+// templ component. Mirrors renderLogin: handler is decoupled from the
+// html/template renderer. When fieldErrors is nil an empty map is used.
+func renderSetupAccount(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, username, token, errMsg string, fieldErrors map[string]string) {
+	if fieldErrors == nil {
+		fieldErrors = map[string]string{}
 	}
-	tr.Render(w, r, "setup_account.html", data)
+	props := pages.SetupAccountProps{
+		PageTitle:   "Set Your Password",
+		CSRFToken:   GenerateCSRFToken(r.Context(), sm),
+		Username:    username,
+		Token:       token,
+		Error:       errMsg,
+		FieldErrors: fieldErrors,
+	}
+	if f := GetFlash(r.Context(), sm); f != nil {
+		props.FlashType = f.Type
+		props.FlashMsg = f.Message
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := pages.SetupAccount(props).Render(r.Context(), w); err != nil {
+		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// renderSetupError renders the setup account page with an error message (no form).
+func renderSetupError(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, message string) {
+	props := pages.SetupAccountProps{
+		PageTitle:  "Account Setup",
+		SetupError: message,
+	}
+	if f := GetFlash(r.Context(), sm); f != nil {
+		props.FlashType = f.Type
+		props.FlashMsg = f.Message
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := pages.SetupAccount(props).Render(r.Context(), w); err != nil {
+		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // LogoutHandler returns an http.HandlerFunc that handles POST /logout.

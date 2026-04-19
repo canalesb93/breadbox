@@ -1,0 +1,98 @@
+package pages
+
+import "breadbox/internal/templates/components/layout"
+
+// SetupAccountProps carries what the token-based account setup page needs.
+// SetupError non-empty renders the error view (no form); otherwise the form
+// renders with an optional top-level Error banner plus per-field errors.
+type SetupAccountProps struct {
+	PageTitle   string
+	CSRFToken   string
+	Username    string
+	Token       string
+	Error       string
+	SetupError  string
+	FieldErrors map[string]string
+	FlashType   string
+	FlashMsg    string
+}
+
+// SetupAccount renders the /setup-account/{token} page (wizard layout +
+// either the error card or the password form).
+templ SetupAccount(p SetupAccountProps) {
+	@layout.Wizard(layout.WizardProps{
+		PageTitle: p.PageTitle,
+		FlashType: p.FlashType,
+		FlashMsg:  p.FlashMsg,
+	}) {
+		if p.SetupError != "" {
+			<div class="text-center mb-8">
+				<h1 class="text-xl font-semibold tracking-tight">Account Setup</h1>
+			</div>
+			<div role="alert" class="flex items-center gap-3 rounded-xl bg-error/10 text-error px-4 py-3 text-sm mb-6">
+				<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+				<span>{ p.SetupError }</span>
+			</div>
+			<div class="text-center">
+				<a href="/login" class="btn btn-ghost btn-sm rounded-xl">
+					<i data-lucide="arrow-left" class="w-4 h-4"></i>
+					Go to Sign In
+				</a>
+			</div>
+		} else {
+			<div class="text-center mb-8">
+				<h1 class="text-xl font-semibold tracking-tight">Set your password</h1>
+				<p class="text-sm text-base-content/50 mt-1.5">
+					Welcome, <strong>{ p.Username }</strong>. Create a password to complete your account setup.
+				</p>
+			</div>
+			if p.Error != "" {
+				<div role="alert" class="flex items-center gap-3 rounded-xl bg-error/10 text-error px-4 py-3 text-sm mb-6">
+					<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+					<span>{ p.Error }</span>
+				</div>
+			}
+			<form method="POST" action={ templ.SafeURL("/setup-account/" + p.Token) } class="space-y-5">
+				if p.CSRFToken != "" {
+					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				}
+				<div>
+					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="password">Password</label>
+					<input
+						type="password"
+						id="password"
+						name="password"
+						required
+						autocomplete="new-password"
+						minlength="8"
+						placeholder="Create a password"
+						class={ "input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["Password"] != "") }
+					/>
+					<p class="text-xs text-base-content/40 mt-1.5">Minimum 8 characters</p>
+					if p.FieldErrors["Password"] != "" {
+						<p class="text-xs text-error mt-1">{ p.FieldErrors["Password"] }</p>
+					}
+				</div>
+				<div>
+					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="confirm_password">Confirm Password</label>
+					<input
+						type="password"
+						id="confirm_password"
+						name="confirm_password"
+						required
+						autocomplete="new-password"
+						placeholder="Confirm your password"
+						class={ "input w-full h-12 rounded-xl text-base bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40 transition-all duration-200", templ.KV("input-error", p.FieldErrors["ConfirmPassword"] != "") }
+					/>
+					if p.FieldErrors["ConfirmPassword"] != "" {
+						<p class="text-xs text-error mt-1.5">{ p.FieldErrors["ConfirmPassword"] }</p>
+					}
+				</div>
+				<button type="submit" class="btn btn-primary w-full h-12 rounded-xl text-base font-semibold transition-colors duration-150 mt-1">
+					Set Password
+					<i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
+				</button>
+			</form>
+		}
+	}
+}

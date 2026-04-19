@@ -1,5 +1,6 @@
 # Binary
 /breadbox
+/breadbox-server
 breadbox.exe
 
 # Tailwind CSS standalone binary and generated CSS

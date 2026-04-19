@@ -15,7 +15,7 @@ type WizardProps struct {
 
 // Wizard wraps a wizard-class page body in the shared full-document shell
 // (doctype, head, gradient bg, brand mark, card, footer, lucide script).
-// Mirrors layout/wizard.html. Pages call it as:
+// Pages call it as:
 //
 //	@layout.Wizard(layout.WizardProps{...}) {
 //	  … body templ content …
@@ -61,7 +61,7 @@ templ Wizard(p WizardProps) {
 					Breadbox &mdash; Financial data for households
 				</p>
 			</div>
-			<script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+			<script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js" integrity="sha384-uTYyvsSSUZeaPhb5RbKlQa0zY/WpX/QHfvg2mczXyBQOpkWPEDy9lczyp+w7SKXu" crossorigin="anonymous"></script>
 			<script>lucide.createIcons();</script>
 		</body>
 	</html>

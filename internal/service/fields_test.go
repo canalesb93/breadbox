@@ -288,3 +288,97 @@ func TestFilterTransactionFields_UserNameUsesAttribution(t *testing.T) {
 		t.Errorf("expected user_name to be 'Ricardo' after normalization, got %v", result["user_name"])
 	}
 }
+
+// When normalization hasn't run yet (e.g. REST path that skips it),
+// FilterTransactionFields must still prefer AttributedUserName over UserName.
+func TestFilterTransactionFields_UserNameAttributionWithoutNormalization(t *testing.T) {
+	owner := "Alice"
+	attributed := "Ricardo"
+	txn := TransactionResponse{
+		ID:                 "txn-1",
+		UserName:           &owner,
+		AttributedUserName: &attributed,
+	}
+
+	fields := map[string]bool{"id": true, "user_name": true}
+	result := FilterTransactionFields(txn, fields)
+
+	name, ok := result["user_name"].(*string)
+	if !ok || *name != "Ricardo" {
+		t.Errorf("expected user_name to be 'Ricardo', got %v", result["user_name"])
+	}
+}
+
+// When AttributedUserName is unset, the owner's UserName must pass through.
+func TestFilterTransactionFields_UserNameFallsBackToOwner(t *testing.T) {
+	owner := "Alice"
+	txn := TransactionResponse{
+		ID:       "txn-1",
+		UserName: &owner,
+	}
+
+	fields := map[string]bool{"id": true, "user_name": true}
+	result := FilterTransactionFields(txn, fields)
+
+	name, ok := result["user_name"].(*string)
+	if !ok || *name != "Alice" {
+		t.Errorf("expected user_name to be 'Alice', got %v", result["user_name"])
+	}
+}
+
+// When AccountShortID is set, filtering account_id must also emit account_short_id.
+func TestFilterTransactionFields_AccountShortIDIncluded(t *testing.T) {
+	accountID := "acct-uuid-123"
+	accountShort := "Ab12CdEf"
+	txn := TransactionResponse{
+		ID:             "txn-1",
+		AccountID:      &accountID,
+		AccountShortID: &accountShort,
+	}
+
+	fields := map[string]bool{"id": true, "account_id": true}
+	result := FilterTransactionFields(txn, fields)
+
+	if gotID, _ := result["account_id"].(*string); gotID == nil || *gotID != accountID {
+		t.Errorf("expected account_id %q, got %v", accountID, result["account_id"])
+	}
+	gotShort, ok := result["account_short_id"].(*string)
+	if !ok || *gotShort != accountShort {
+		t.Errorf("expected account_short_id %q, got %v", accountShort, result["account_short_id"])
+	}
+}
+
+// When AccountShortID is nil, account_short_id must be absent from the result
+// (the key is omitted entirely, not set to a nil pointer).
+func TestFilterTransactionFields_AccountShortIDOmittedWhenNil(t *testing.T) {
+	accountID := "acct-uuid-123"
+	txn := TransactionResponse{
+		ID:        "txn-1",
+		AccountID: &accountID,
+	}
+
+	fields := map[string]bool{"id": true, "account_id": true}
+	result := FilterTransactionFields(txn, fields)
+
+	if _, present := result["account_short_id"]; present {
+		t.Error("account_short_id should be omitted when AccountShortID is nil")
+	}
+}
+
+// Normalizing a transaction with only AttributedUserName set (no owner UserName)
+// must promote it to UserName rather than leaving it nil.
+func TestNormalizeTransactionAttribution_NilOwner(t *testing.T) {
+	attributed := "Ricardo"
+	txn := TransactionResponse{
+		ID:                 "txn-1",
+		AttributedUserName: &attributed,
+	}
+	NormalizeTransactionAttribution(&txn)
+
+	if txn.UserName == nil || *txn.UserName != "Ricardo" {
+		t.Errorf("expected user_name to be 'Ricardo', got %v", txn.UserName)
+	}
+	if txn.AttributedUserName != nil {
+		t.Error("expected attributed_user_name to be cleared")
+	}
+}

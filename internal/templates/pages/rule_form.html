@@ -135,16 +135,20 @@
         </button>
       </div>
 
-      <!-- Condition rows -->
+      <!-- Condition rows. Mobile: stacks as IF + Field on row 1, then
+           Operator + value + remove on row 2 so the Field select can show
+           its full label (e.g. "Category (raw primary)") without truncation.
+           On sm+ everything sits on a single line as before. -->
       <div class="space-y-2" x-show="form.conditions.length > 0">
         <template x-for="(cond, idx) in form.conditions" :key="idx">
-          <div class="flex items-center gap-2 p-2.5 bg-base-200/50 border border-base-content/10 rounded-xl">
+          <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 p-2.5 bg-base-200/50 border border-base-content/10 rounded-xl">
             <!-- Conjunction label -->
             <div class="w-10 shrink-0 text-center">
               <span x-show="idx === 0" class="text-xs text-base-content/30 font-medium">IF</span>
               <span x-show="idx > 0" class="text-xs font-medium" :class="form.logic === 'or' ? 'text-warning' : 'text-base-content/30'" x-text="form.logic.toUpperCase()"></span>
             </div>
-            <!-- Field -->
+            <!-- Field — row 1 on mobile (takes all remaining space after IF);
+                 flex-1 alongside the rest on sm+ -->
             <select x-model="cond.field" @change="onFieldChange(idx)" class="select select-bordered select-xs rounded-lg bg-base-100 flex-1 min-w-0">
               <option value="">Field...</option>
               <optgroup label="Transaction">
@@ -167,6 +171,12 @@
                 <option value="provider">Provider</option>
               </optgroup>
             </select>
+            <!-- Flex-wrap break: on mobile, forces Operator + value + remove
+                 onto a second row so Field can use the full width. Hidden on
+                 sm+ so the row stays single-line at larger widths.
+                 w-full + basis-full together ensure the spacer claims a full
+                 row even when the preceding Field select is narrower. -->
+            <div class="w-full basis-full h-0 sm:hidden" aria-hidden="true"></div>
             <!-- Operator — disabled until a field is picked. Options are
                  rendered inline (not x-for) so x-model syncs correctly on
                  first paint when editing an existing rule. Each option value

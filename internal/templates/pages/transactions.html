@@ -170,24 +170,24 @@
 
     <!-- Search within filters -->
     <div class="border-t border-base-200 pt-4 mb-4" x-data="{ mode: '{{if .FilterSearchMode}}{{.FilterSearchMode}}{{else}}contains{{end}}' }">
-      <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1">
+      <div class="grid grid-cols-2 sm:grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1">
         <div class="text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2 hidden sm:flex">
           <i data-lucide="search" class="w-3.5 h-3.5 text-base-content/40"></i>
           Search
         </div>
         <div class="text-[0.65rem] text-base-content/40 hidden sm:block">Search in</div>
         <div class="text-[0.65rem] text-base-content/40 hidden sm:block">Match type</div>
-        <div class="text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2 sm:hidden mb-1">
+        <div class="col-span-2 sm:hidden text-xs font-medium text-base-content/50 uppercase tracking-wider flex items-center gap-2 mb-1">
           <i data-lucide="search" class="w-3.5 h-3.5 text-base-content/40"></i>
           Search
         </div>
-        <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Search transactions..." class="input input-sm input-bordered w-full">
-        <select name="search_field" class="select select-sm select-bordered">
+        <input type="text" name="search" value="{{.FilterSearch}}" placeholder="Search transactions..." class="input input-sm input-bordered w-full col-span-2 sm:col-span-1">
+        <select name="search_field" class="select select-sm select-bordered w-full">
           <option value="all"{{if or (eq .FilterSearchField "all") (not .FilterSearchField)}} selected{{end}}>Name &amp; Merchant</option>
           <option value="name"{{if eq .FilterSearchField "name"}} selected{{end}}>Name only</option>
           <option value="merchant"{{if eq .FilterSearchField "merchant"}} selected{{end}}>Merchant only</option>
         </select>
-        <select name="search_mode" class="select select-sm select-bordered" x-model="mode">
+        <select name="search_mode" class="select select-sm select-bordered w-full" x-model="mode">
           <option value="contains">Contains</option>
           <option value="words">All words</option>
           <option value="fuzzy">Fuzzy match</option>

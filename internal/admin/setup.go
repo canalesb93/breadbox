@@ -12,6 +12,7 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/db"
 	plaidprovider "breadbox/internal/provider/plaid"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5"
@@ -22,7 +23,7 @@ import (
 // CreateAdminHandler handles GET/POST /admin/setup — Create Admin Account.
 // This is the minimal first-run page that replaces the multi-step wizard.
 // Creates both a household user and an admin auth account in a single transaction.
-func CreateAdminHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+func CreateAdminHandler(a *app.App, sm *scs.SessionManager, _ *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -34,15 +35,7 @@ func CreateAdminHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		}
 
 		if r.Method == http.MethodGet {
-			data := map[string]any{
-				"PageTitle": "Welcome",
-				"CSRFToken": "",
-				"Name":      "",
-				"Username":  "",
-				"Error":     "",
-				"Errors":    map[string]string{},
-			}
-			tr.Render(w, r, "setup_create_admin.html", data)
+			renderCreateAdmin(w, r, sm, "", "", "", nil)
 			return
 		}
 
@@ -72,49 +65,52 @@ func CreateAdminHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		}
 
 		if len(errors) > 0 {
-			data := map[string]any{
-				"PageTitle": "Welcome",
-				"CSRFToken": "",
-				"Name":      name,
-				"Username":  username,
-				"Error":     "",
-				"Errors":    errors,
-			}
-			tr.Render(w, r, "setup_create_admin.html", data)
+			renderCreateAdmin(w, r, sm, name, username, "", errors)
 			return
 		}
 
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 		if err != nil {
-			data := map[string]any{
-				"PageTitle": "Welcome",
-				"CSRFToken": "",
-				"Name":      name,
-				"Username":  username,
-				"Error":     "Failed to hash password",
-				"Errors":    map[string]string{},
-			}
-			tr.Render(w, r, "setup_create_admin.html", data)
+			renderCreateAdmin(w, r, sm, name, username, "Failed to hash password", nil)
 			return
 		}
 
 		// Create household user + admin account in a single transaction.
 		if err := createLinkedAdmin(ctx, a, name, username, hashedPassword); err != nil {
-			data := map[string]any{
-				"PageTitle": "Welcome",
-				"CSRFToken": "",
-				"Name":      name,
-				"Username":  username,
-				"Error":     "Failed to create admin account",
-				"Errors":    map[string]string{},
-			}
-			tr.Render(w, r, "setup_create_admin.html", data)
+			renderCreateAdmin(w, r, sm, name, username, "Failed to create admin account", nil)
 			return
 		}
 
 		// Set flash and redirect to login.
 		SetFlash(ctx, sm, "success", "Admin account created. Sign in to get started.")
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	}
+}
+
+// renderCreateAdmin renders the first-run admin setup page via the templ
+// component. Mirrors renderSetupAccount: handler is decoupled from the
+// html/template renderer. When fieldErrors is nil an empty map is used.
+// CSRF token is intentionally empty to preserve existing handler behavior
+// (see handler — not in scope for this migration).
+func renderCreateAdmin(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, name, username, errMsg string, fieldErrors map[string]string) {
+	if fieldErrors == nil {
+		fieldErrors = map[string]string{}
+	}
+	props := pages.CreateAdminProps{
+		PageTitle:   "Welcome",
+		CSRFToken:   "",
+		Name:        name,
+		Username:    username,
+		Error:       errMsg,
+		FieldErrors: fieldErrors,
+	}
+	if f := GetFlash(r.Context(), sm); f != nil {
+		props.FlashType = f.Type
+		props.FlashMsg = f.Message
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := pages.CreateAdmin(props).Render(r.Context(), w); err != nil {
+		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
 	}
 }
 
