@@ -220,6 +220,102 @@ func TestExportedWrappersDelegate(t *testing.T) {
 	}
 }
 
+func TestCommaInt(t *testing.T) {
+	tests := []struct {
+		in   int64
+		want string
+	}{
+		{0, "0"},
+		{5, "5"},
+		{123, "123"},
+		{1000, "1,000"},
+		{1234, "1,234"},
+		{12345, "12,345"},
+		{123456, "123,456"},
+		{1234567, "1,234,567"},
+		{1000000000, "1,000,000,000"},
+	}
+	for _, tc := range tests {
+		if got := CommaInt(tc.in); got != tc.want {
+			t.Errorf("CommaInt(%d) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestCommaAmount(t *testing.T) {
+	tests := []struct {
+		in   float64
+		want string
+	}{
+		{0, "0.00"},
+		{1.5, "1.50"},
+		{12.34, "12.34"},
+		{1234.56, "1,234.56"},
+		{1000000, "1,000,000.00"},
+		{1234567.89, "1,234,567.89"},
+	}
+	for _, tc := range tests {
+		if got := commaAmount(tc.in); got != tc.want {
+			t.Errorf("commaAmount(%v) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestFormatBalance(t *testing.T) {
+	tests := []struct {
+		name string
+		in   float64
+		want string
+	}{
+		{"zero", 0, "$0.00"},
+		{"small", 12.34, "$12.34"},
+		{"under 1K rounds cents", 999.995, "$1000.00"}, // edge: cents round up to 1.00, not yet ≥1K branch
+		{"exactly 1K uses commas", 1000, "$1,000.00"},
+		{"mid thousands", 12345.67, "$12,345.67"},
+		{"just under 1M", 999999.99, "$999,999.99"},
+		{"exactly 1M abbreviates", 1_000_000, "$1.0M"},
+		{"1.25M abbreviates with one decimal", 1_250_000, "$1.2M"},
+		{"10M abbreviates", 10_500_000, "$10.5M"},
+		{"negative treated as absolute", -1234.56, "$1,234.56"},
+		{"negative over 1M abbreviates", -2_500_000, "$2.5M"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := FormatBalance(tc.in); got != tc.want {
+				t.Errorf("FormatBalance(%v) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFormatIntervalMinutes(t *testing.T) {
+	tests := []struct {
+		name    string
+		minutes int
+		want    string
+	}{
+		{"zero → N/A", 0, "N/A"},
+		{"negative → N/A", -5, "N/A"},
+		{"sub-hour minutes", 15, "15m"},
+		{"59 minutes", 59, "59m"},
+		{"exactly one hour", 60, "1h"},
+		{"two hours", 120, "2h"},
+		{"four hours", 240, "4h"},
+		{"hours plus leftover minutes", 90, "1h 30m"},
+		{"hours plus leftover minutes (2h 5m)", 125, "2h 5m"},
+		{"exactly 24 hours", 1440, "24h"},
+		{"exactly 2 days", 2880, "2d"},
+		{"7 days", 10080, "7d"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := FormatIntervalMinutes(tc.minutes); got != tc.want {
+				t.Errorf("FormatIntervalMinutes(%d) = %q, want %q", tc.minutes, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestAmount2f(t *testing.T) {
 	tests := []struct {
 		in   float64
