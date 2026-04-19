@@ -16,7 +16,7 @@ All error responses use:
 ```
 
 - Codes are **stable contracts** — treat them as API surface. Don't rename on a whim.
-- Use `internal/api/response.go` helpers (`writeError`, `writeJSON`) — don't hand-roll.
+- REST handlers use `internal/api/response.go` helpers (`writeError`, `writeJSON`). Admin handlers use `internal/admin/response.go` equivalents. Don't hand-roll either.
 - 4xx for client errors, 5xx only for actual server bugs. Validation errors are 400 with a specific code like `INVALID_DATE_RANGE`.
 
 ## Auth
@@ -81,7 +81,7 @@ Split for orchestrators:
 
 ## Admin-only endpoints
 
-Prefixed `/-/` to disambiguate from user-facing routes. Examples: `POST /-/reports/{id}/read`, `POST /-/reports/read-all`. CSRF + session required.
+Prefixed `/-/` to disambiguate from user-facing routes. Examples: `POST /-/reports/{id}/read`, `POST /-/reports/{id}/unread`, `POST /-/reports/read-all`. CSRF + session required.
 
 ## Webhooks
 
