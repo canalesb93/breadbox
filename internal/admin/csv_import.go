@@ -187,8 +187,7 @@ func CSVPreviewHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 			DateFormat      string         `json:"date_format"`
 			HasDebitCredit  bool           `json:"has_debit_credit"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 
@@ -320,8 +319,7 @@ func CSVImportHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) 
 			ConnectionID    string         `json:"connection_id"`
 			HasDebitCredit  bool           `json:"has_debit_credit"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		if !decodeJSON(w, r, &req) {
 			return
 		}
 
