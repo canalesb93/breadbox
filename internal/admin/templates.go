@@ -21,6 +21,7 @@ import (
 	bsync "breadbox/internal/sync"
 	"breadbox/internal/templates"
 	"breadbox/internal/templates/components"
+	"breadbox/internal/templates/components/pages"
 	"breadbox/internal/version"
 
 	"github.com/a-h/templ"
@@ -960,11 +961,10 @@ var templatePartials = []string{
 func (tr *TemplateRenderer) parseTemplates() error {
 	// Pages using the base layout (authenticated dashboard pages).
 	basePages := []string{
-		"pages/404.html",
-		"pages/500.html",
 		"pages/_templ_shell.html",
-		// dashboard.html and settings.html removed — those pages render via
-		// RenderWithTempl which uses the _templ_shell template key.
+		// dashboard.html, settings.html, 404.html, and 500.html removed —
+		// those pages render via RenderWithTempl which uses the
+		// _templ_shell template key.
 		"pages/connections.html",
 		"pages/connection_new.html",
 		"pages/connection_detail.html",
@@ -1245,14 +1245,14 @@ func BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage, page
 func (tr *TemplateRenderer) RenderNotFound(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 	data := BaseTemplateData(r, tr.sm, "", "Page Not Found")
-	tr.Render(w, r, "404.html", data)
+	tr.RenderWithTempl(w, r, data, pages.NotFound())
 }
 
 // RenderError renders the styled 500 page within the app layout.
 func (tr *TemplateRenderer) RenderError(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusInternalServerError)
 	data := BaseTemplateData(r, tr.sm, "", "Error")
-	tr.Render(w, r, "500.html", data)
+	tr.RenderWithTempl(w, r, data, pages.InternalError())
 }
 
 // SetVersion sets the application version for auto-injection into template data.
