@@ -213,10 +213,7 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 	}
 
 	var err error
-	if params.StartDate, err = parseOptionalDate("start_date", input.StartDate); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if params.EndDate, err = parseOptionalDate("end_date", input.EndDate); err != nil {
+	if params.StartDate, params.EndDate, err = parseDateRange(input.StartDate, input.EndDate); err != nil {
 		return errorResult(err), nil, nil
 	}
 	if input.SearchMode != "" {
@@ -275,10 +272,7 @@ func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToo
 	}
 
 	var err error
-	if params.StartDate, err = parseOptionalDate("start_date", input.StartDate); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if params.EndDate, err = parseOptionalDate("end_date", input.EndDate); err != nil {
+	if params.StartDate, params.EndDate, err = parseDateRange(input.StartDate, input.EndDate); err != nil {
 		return errorResult(err), nil, nil
 	}
 	if input.SearchMode != "" {
@@ -439,10 +433,7 @@ func (s *MCPServer) handleTransactionSummary(_ context.Context, _ *mcpsdk.CallTo
 	}
 
 	var err error
-	if params.StartDate, err = parseOptionalDate("start_date", input.StartDate); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if params.EndDate, err = parseOptionalDate("end_date", input.EndDate); err != nil {
+	if params.StartDate, params.EndDate, err = parseDateRange(input.StartDate, input.EndDate); err != nil {
 		return errorResult(err), nil, nil
 	}
 	if input.IncludePending != nil && *input.IncludePending {
@@ -472,10 +463,7 @@ func (s *MCPServer) handleMerchantSummary(_ context.Context, _ *mcpsdk.CallToolR
 	}
 
 	var err error
-	if params.StartDate, err = parseOptionalDate("start_date", input.StartDate); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if params.EndDate, err = parseOptionalDate("end_date", input.EndDate); err != nil {
+	if params.StartDate, params.EndDate, err = parseDateRange(input.StartDate, input.EndDate); err != nil {
 		return errorResult(err), nil, nil
 	}
 	if input.SearchMode != "" {
@@ -919,10 +907,7 @@ func (s *MCPServer) handleBulkRecategorize(ctx context.Context, _ *mcpsdk.CallTo
 	}
 
 	var err error
-	if params.StartDate, err = parseOptionalDate("start_date", input.StartDate); err != nil {
-		return errorResult(err), nil, nil
-	}
-	if params.EndDate, err = parseOptionalDate("end_date", input.EndDate); err != nil {
+	if params.StartDate, params.EndDate, err = parseDateRange(input.StartDate, input.EndDate); err != nil {
 		return errorResult(err), nil, nil
 	}
 

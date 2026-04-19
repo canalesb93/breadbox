@@ -28,3 +28,19 @@ func parseOptionalDate(field, value string) (*time.Time, error) {
 	}
 	return &t, nil
 }
+
+// parseDateRange parses a paired start_date/end_date YYYY-MM-DD input into
+// time pointers. Either or both may be empty. Tool handlers accept these as
+// a bounded window filter and nearly always parse them together, so bundling
+// the two calls keeps handler bodies focused on the filter being built.
+func parseDateRange(start, end string) (*time.Time, *time.Time, error) {
+	startT, err := parseOptionalDate("start_date", start)
+	if err != nil {
+		return nil, nil, err
+	}
+	endT, err := parseOptionalDate("end_date", end)
+	if err != nil {
+		return nil, nil, err
+	}
+	return startT, endT, nil
+}

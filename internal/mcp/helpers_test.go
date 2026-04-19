@@ -60,3 +60,59 @@ func TestParseOptionalDate(t *testing.T) {
 		}
 	})
 }
+
+func TestParseDateRange(t *testing.T) {
+	t.Run("both empty returns nil pair", func(t *testing.T) {
+		start, end, err := parseDateRange("", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if start != nil || end != nil {
+			t.Errorf("expected nil pair, got start=%v end=%v", start, end)
+		}
+	})
+
+	t.Run("only start parses", func(t *testing.T) {
+		start, end, err := parseDateRange("2024-03-15", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if start == nil || end != nil {
+			t.Fatalf("expected start set, end nil; got start=%v end=%v", start, end)
+		}
+		want := time.Date(2024, 3, 15, 0, 0, 0, 0, time.UTC)
+		if !start.Equal(want) {
+			t.Errorf("expected %v, got %v", want, *start)
+		}
+	})
+
+	t.Run("both set parse", func(t *testing.T) {
+		start, end, err := parseDateRange("2024-01-01", "2024-12-31")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if start == nil || end == nil {
+			t.Fatal("expected both non-nil")
+		}
+	})
+
+	t.Run("invalid start surfaces field name", func(t *testing.T) {
+		_, _, err := parseDateRange("nope", "2024-12-31")
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if !strings.Contains(err.Error(), "start_date") {
+			t.Errorf("expected start_date in error, got: %q", err.Error())
+		}
+	})
+
+	t.Run("invalid end surfaces field name", func(t *testing.T) {
+		_, _, err := parseDateRange("2024-01-01", "nope")
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if !strings.Contains(err.Error(), "end_date") {
+			t.Errorf("expected end_date in error, got: %q", err.Error())
+		}
+	})
+}
