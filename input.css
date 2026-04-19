@@ -887,6 +887,20 @@
   }
 
   /*
+   * While bulk-selection mode is active, the per-row checkbox is injected at
+   * the start of the row. On mobile there isn't enough horizontal room to
+   * also keep the decorative category avatar — the name column would lose
+   * ~40px and merchant names truncate (#593). Hide the avatar slot below the
+   * `sm` breakpoint so the checkbox effectively reuses that space. Tablet and
+   * desktop keep both.
+   */
+  @media (max-width: 639px) {
+    body.bb-tx-selecting .bb-tx-avatar-slot {
+      display: none;
+    }
+  }
+
+  /*
    * DaisyUI 5's `.checkbox` ships with `transition: all`, which animated every
    * property change (including nearby paint invalidations from unrelated CSS).
    * Clamp the transition to the properties that actually drive the check draw.

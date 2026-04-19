@@ -467,11 +467,15 @@ document.addEventListener('alpine:init', function() {
     // Show/hide the per-row checkbox labels when selection mode toggles.
     // Done once globally instead of 50 reactive x-show bindings.
     // Set display explicitly (not '') so inline style wins over Tailwind `.flex`.
+    // Also toggles a body-level class so CSS can hide the per-row avatar slot
+    // at mobile breakpoints (the checkbox reuses that slot's width instead of
+    // appending to it, which was truncating merchant names — see #593).
     _updateRowVisibility() {
       var on = this.selecting;
       document.querySelectorAll('.bb-tx-checkbox').forEach(function(el) {
         el.style.display = on ? 'flex' : 'none';
       });
+      document.body.classList.toggle('bb-tx-selecting', on);
     },
 
     // Update a single row's checkbox + selected attribute without touching others.

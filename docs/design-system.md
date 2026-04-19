@@ -52,7 +52,7 @@ Also available via Homebrew: `brew tap dobicinaitis/tailwind-cli-extra && brew i
   .bb-amount { ... }         /* Tabular-nums right-aligned amounts */
   .bb-info-grid { ... }      /* Detail page key-value grids */
   .bb-paginator { ... }      /* Numbered pagination with page range */
-  .bb-page-header { ... }    /* Page title + action row */
+  .bb-page-header { ... }    /* Page title + primary action (see §5 Page Header) */
   /* ... see input.css for full list */
 }
 ```
@@ -352,6 +352,28 @@ For filtered "no results" states (e.g., transactions with active filters), a com
 </div>
 ```
 
+### Page Header (`.bb-page-header`)
+
+Every top-level admin page opens with a `.bb-page-header` row: the `<h1 class="bb-page-title">` (plus optional subtitle) on the left, and an optional **primary action** on the right (Save, Create, Sync All, Reconcile, Add Member, etc.).
+
+**Single-back-affordance rule.** The shared breadcrumb (`{{template "breadcrumb" .}}` / the `Breadcrumb` templ component, rendered at the top of the `content` block **above** `.bb-page-header`) is the **sole** back affordance on a page. Do **not** place a `← Back to <Parent>` link inside `.bb-page-header`, above the title, or anywhere else on the page — it duplicates the breadcrumb and on mobile the extra full-width link stretches the header awkwardly (see #579, #582, #605).
+
+**What lives where:**
+
+| Slot                              | Contents                                                                                      |
+| --------------------------------- | --------------------------------------------------------------------------------------------- |
+| Above `.bb-page-header`           | `{{template "breadcrumb" .}}` — the single back affordance.                                    |
+| `.bb-page-header` left            | `<h1 class="bb-page-title">` + optional subtitle / summary counts.                             |
+| `.bb-page-header` trailing slot   | **Primary action only** (Save, Create, Sync All, Reconcile, Add Member, etc.). No back links. |
+
+**Separate patterns that are fine** (not governed by this rule):
+
+- **Wizard / stepper step-back buttons** inside a multi-step flow (e.g. `connection_new.html`, `csv_import.html`) — these live inside the step card/footer, not in `.bb-page-header`.
+- **Post-success CTAs** inside a success card (e.g. "Back to Users" after creating a login in `create_login.html`, `user_form.html`) — these live inside a card body, not in `.bb-page-header`.
+- **404 / error pages** whose entire content is a "Back to Dashboard" card.
+
+Pages that need to pass breadcrumbs should set `data["Breadcrumbs"] = []Breadcrumb{…}` in the handler (see `internal/admin/categories.go` for an example).
+
 ### Form Card Pattern
 
 The canonical pattern for create/edit/settings forms. A sectioned card with a colored icon header on top, form fields in the middle, and a subtle action row (Cancel + Save/Create) at the bottom. Use `max-w-lg` for the container.
@@ -417,6 +439,7 @@ The canonical pattern for create/edit/settings forms. A sectioned card with a co
 - Field groups use `space-y-4`. Labels use `text-xs font-medium text-base-content/50 mb-1.5 block`.
 - Primary submit button gets `min-w-32` so it doesn't jitter between its label and the loading spinner.
 - Icons inside the primary button are `w-3.5 h-3.5` (not `w-4 h-4`) to match the compact `btn-sm` weight.
+- **No back link inside `.bb-page-header`.** The breadcrumb above the header is the sole back affordance — see the [Page Header](#page-header-bb-page-header) section above. The Cancel button in the bottom action row is the only secondary navigation the form needs.
 - For destructive operations, add a **separate** `bb-card bb-danger-card` below — never mix the save action with the delete action in one card.
 
 ## 6. Table Guidelines

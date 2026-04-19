@@ -17,52 +17,26 @@ func ExportTransactionsCSVHandler(a *app.App, svc *service.Service) http.Handler
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
+		q := r.URL.Query()
 		params := service.AdminTransactionListParams{
-			Page:     1,
-			PageSize: -1, // Export all matching rows (no pagination).
+			Page:         1,
+			PageSize:     -1, // Export all matching rows (no pagination).
+			StartDate:    parseDateParam(r, "start_date"),
+			EndDate:      parseInclusiveDateParam(r, "end_date"),
+			AccountID:    optStrQuery(q, "account_id"),
+			UserID:       optStrQuery(q, "user_id"),
+			ConnectionID: optStrQuery(q, "connection_id"),
+			CategorySlug: optStrQuery(q, "category"),
+			MinAmount:    optFloatQuery(q, "min_amount"),
+			MaxAmount:    optFloatQuery(q, "max_amount"),
+			Search:       optStrQuery(q, "search"),
 		}
 
-		if v := r.URL.Query().Get("start_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				params.StartDate = &t
-			}
-		}
-		if v := r.URL.Query().Get("end_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				t = t.AddDate(0, 0, 1)
-				params.EndDate = &t
-			}
-		}
-		if v := r.URL.Query().Get("account_id"); v != "" {
-			params.AccountID = &v
-		}
-		if v := r.URL.Query().Get("user_id"); v != "" {
-			params.UserID = &v
-		}
-		if v := r.URL.Query().Get("connection_id"); v != "" {
-			params.ConnectionID = &v
-		}
-		if v := r.URL.Query().Get("category"); v != "" {
-			params.CategorySlug = &v
-		}
-		if v := r.URL.Query().Get("min_amount"); v != "" {
-			if f, err := strconv.ParseFloat(v, 64); err == nil {
-				params.MinAmount = &f
-			}
-		}
-		if v := r.URL.Query().Get("max_amount"); v != "" {
-			if f, err := strconv.ParseFloat(v, 64); err == nil {
-				params.MaxAmount = &f
-			}
-		}
-		if v := r.URL.Query().Get("pending"); v != "" {
+		if v := q.Get("pending"); v != "" {
 			b := v == "true"
 			params.Pending = &b
 		}
-		if v := r.URL.Query().Get("search"); v != "" {
-			params.Search = &v
-		}
-		if v := r.URL.Query().Get("sort"); v == "asc" {
+		if q.Get("sort") == "asc" {
 			params.SortOrder = "asc"
 		}
 

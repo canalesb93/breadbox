@@ -472,6 +472,15 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 			syncLogs = syncLogs[:10]
 		}
 
+		// Latest sync status + error message — mirror the list query so the
+		// header badge on the detail page matches the list (issue #578).
+		var lastSyncStatus string
+		var lastSyncErrorMessage pgtype.Text
+		if len(allSyncLogs) > 0 {
+			lastSyncStatus = string(allSyncLogs[0].Status)
+			lastSyncErrorMessage = allSyncLogs[0].ErrorMessage
+		}
+
 		// Compute sync health stats from all logs.
 		var totalSyncs, successSyncs, errorSyncs int
 		var totalAdded, totalModified, totalRemoved int
@@ -613,6 +622,9 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 			"HasBalance":          hasBalance,
 			// Next sync schedule
 			"NextSync":            nextSync,
+			// Latest sync log status (for header badge — matches list page).
+			"LastSyncStatus":       lastSyncStatus,
+			"LastSyncErrorMessage": lastSyncErrorMessage,
 		}
 		tr.Render(w, r, "connection_detail.html", data)
 	}

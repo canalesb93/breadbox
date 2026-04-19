@@ -20,7 +20,7 @@
 <div class="grid gap-6 bb-stagger">
 
   <!-- Encryption Key Warning -->
-  <div class="alert alert-warning shadow-sm">
+  <div class="alert alert-warning rounded-xl">
     <i data-lucide="shield-alert" class="w-5 h-5 flex-shrink-0"></i>
     <div>
       <h3 class="font-semibold text-sm">Back up your ENCRYPTION_KEY separately</h3>
@@ -40,14 +40,14 @@
   </div>
 
   {{if .Error}}
-  <div class="alert alert-error shadow-sm">
+  <div class="alert alert-error rounded-xl">
     <i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0"></i>
     <span class="text-sm">{{.Error}}</span>
   </div>
   {{else}}
 
   {{if not .PreflightOK}}
-  <div class="alert alert-error shadow-sm">
+  <div class="alert alert-error rounded-xl">
     <i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0"></i>
     <div>
       <h3 class="font-semibold text-sm">Backups unavailable</h3>
@@ -57,22 +57,22 @@
   {{end}}
 
   <!-- Stats -->
-  <div class="flex flex-wrap gap-4">
-    <div class="bb-card p-4 flex-1 min-w-[140px]">
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="bb-card p-4">
       <div class="text-xs text-base-content/40 mb-1">Backups</div>
       <div class="text-2xl font-bold tabular-nums">{{.BackupCount}}</div>
     </div>
-    <div class="bb-card p-4 flex-1 min-w-[140px]">
+    <div class="bb-card p-4">
       <div class="text-xs text-base-content/40 mb-1">Total Size</div>
       <div class="text-2xl font-bold tabular-nums">{{.TotalSize}}</div>
     </div>
-    <div class="bb-card p-4 flex-1 min-w-[140px]">
+    <div class="bb-card p-4">
       <div class="text-xs text-base-content/40 mb-1">Schedule</div>
       <div class="text-2xl font-bold">
         {{if eq .Schedule ""}}Off{{else if eq .Schedule "daily_2am"}}Daily 2am{{else if eq .Schedule "daily_3am"}}Daily 3am{{else if eq .Schedule "daily_4am"}}Daily 4am{{else if eq .Schedule "weekly"}}Weekly{{else}}{{.Schedule}}{{end}}
       </div>
     </div>
-    <div class="bb-card p-4 flex-1 min-w-[140px]">
+    <div class="bb-card p-4">
       <div class="text-xs text-base-content/40 mb-1">Retention</div>
       <div class="text-2xl font-bold tabular-nums">{{.RetentionDays}}d</div>
     </div>
