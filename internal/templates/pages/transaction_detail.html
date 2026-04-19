@@ -173,7 +173,8 @@
             <a :href="'/transactions?tags=' + t.slug" class="hover:underline" x-text="t.displayName || t.slug"></a>
             <button type="button" class="bb-tag-remove"
               @click.prevent.stop="t.lifecycle === 'ephemeral' ? (showRemoveNote = !showRemoveNote) : removeTag(t, '')"
-              title="Remove tag">
+              :aria-label="'Remove tag ' + (t.displayName || t.slug)"
+              :title="'Remove tag ' + (t.displayName || t.slug)">
               <i data-lucide="x" ></i>
             </button>
             <div x-show="showRemoveNote && t.lifecycle === 'ephemeral'" x-cloak

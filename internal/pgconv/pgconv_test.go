@@ -78,3 +78,64 @@ func TestParseUUID_Invalid(t *testing.T) {
 		t.Error("ParseUUID: expected error for invalid input")
 	}
 }
+
+func TestNumericToFloat_Valid(t *testing.T) {
+	var n pgtype.Numeric
+	if err := n.Scan("123.45"); err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	got, ok := NumericToFloat(n)
+	if !ok {
+		t.Fatal("NumericToFloat: expected ok=true")
+	}
+	if got != 123.45 {
+		t.Errorf("NumericToFloat = %v, want 123.45", got)
+	}
+}
+
+func TestNumericToFloat_Negative(t *testing.T) {
+	var n pgtype.Numeric
+	if err := n.Scan("-42.5"); err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	got, ok := NumericToFloat(n)
+	if !ok {
+		t.Fatal("NumericToFloat: expected ok=true")
+	}
+	if got != -42.5 {
+		t.Errorf("NumericToFloat = %v, want -42.5", got)
+	}
+}
+
+func TestNumericToFloat_Zero(t *testing.T) {
+	var n pgtype.Numeric
+	if err := n.Scan("0"); err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	got, ok := NumericToFloat(n)
+	if !ok {
+		t.Fatal("NumericToFloat: expected ok=true for zero")
+	}
+	if got != 0 {
+		t.Errorf("NumericToFloat = %v, want 0", got)
+	}
+}
+
+func TestNumericToFloat_Null(t *testing.T) {
+	n := pgtype.Numeric{Valid: false}
+	got, ok := NumericToFloat(n)
+	if ok {
+		t.Error("NumericToFloat: expected ok=false for NULL")
+	}
+	if got != 0 {
+		t.Errorf("NumericToFloat = %v, want 0", got)
+	}
+}
+
+func TestNumericToFloat_NaN(t *testing.T) {
+	n := pgtype.Numeric{NaN: true, Valid: true}
+	_, ok := NumericToFloat(n)
+	if ok {
+		t.Error("NumericToFloat: expected ok=false for NaN")
+	}
+}
