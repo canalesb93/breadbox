@@ -206,19 +206,19 @@ templ dashConnDot(status string) {
 
 templ dashAgentReportsCard(p DashboardProps) {
 	<div class="bb-card" x-data="{ ...agentReports() }">
-		<div class="px-5 py-4 flex items-center justify-between border-b border-base-200/60">
-			<div class="flex items-center gap-2">
-				<i data-lucide="bot" class="w-4 h-4 text-primary/70"></i>
+		<div class="px-5 py-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-base-200/60">
+			<div class="flex items-center gap-2 min-w-0">
+				<i data-lucide="bot" class="w-4 h-4 text-primary/70 shrink-0"></i>
 				<h2 class="text-sm font-semibold text-base-content/80">Agent Reports</h2>
 				if len(p.AgentReports) > 0 {
-					<span class="text-[0.65rem] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">{ fmt.Sprintf("%d unread", p.TotalUnreadReports) }</span>
+					<span class="text-[0.65rem] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary shrink-0">{ fmt.Sprintf("%d unread", p.TotalUnreadReports) }</span>
 				}
 			</div>
-			<div class="flex items-center gap-3">
+			<div class="flex items-center gap-3 ml-auto">
 				if len(p.AgentReports) > 0 {
 					<button type="button" class="flex items-center gap-1 text-xs text-base-content/40 hover:text-base-content/60 transition-colors cursor-pointer" @click="markAllRead()" title="Mark all reports as read">
 						<i data-lucide="check-check" class="w-3.5 h-3.5"></i>
-						<span>Mark all read</span>
+						<span class="hidden sm:inline">Mark all read</span>
 					</button>
 				}
 				<a href="/reports" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
