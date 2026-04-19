@@ -77,8 +77,7 @@ func UsersListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) 
 				}
 				eu.ConnectionCount = int64(len(connSet))
 				for _, acct := range accounts {
-					bal, err := numericToFloat(acct.BalanceCurrent)
-					hasBal := err == nil
+					bal, hasBal := pgconv.NumericToFloat(acct.BalanceCurrent)
 					subtype := ""
 					if acct.Subtype.Valid {
 						// Clean up subtype for display (e.g. "credit_card" -> "Credit Card")
