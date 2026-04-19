@@ -813,6 +813,13 @@ func buildActivityTimeline(annotations []service.Annotation) []service.ActivityE
 			})
 
 		case "tag_added":
+			source, _ := a.Payload["source"].(string)
+			if source == "rule" {
+				// Represented separately via the rule_applied annotation
+				// written alongside tag_added during sync. Skip to avoid
+				// double-rendering. Mirrors the category_set dedup below.
+				continue
+			}
 			slug, _ := a.Payload["slug"].(string)
 			note, _ := a.Payload["note"].(string)
 			summary := "Added tag " + slug
@@ -832,6 +839,13 @@ func buildActivityTimeline(annotations []service.Annotation) []service.ActivityE
 			entries = append(entries, entry)
 
 		case "tag_removed":
+			source, _ := a.Payload["source"].(string)
+			if source == "rule" {
+				// Future-proof: if a rule ever emits a rule-sourced tag_removed
+				// alongside a rule_applied annotation, dedup the same way as
+				// tag_added / category_set so the timeline stays symmetric.
+				continue
+			}
 			slug, _ := a.Payload["slug"].(string)
 			note, _ := a.Payload["note"].(string)
 			summary := "Removed tag " + slug
