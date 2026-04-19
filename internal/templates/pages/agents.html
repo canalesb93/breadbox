@@ -9,29 +9,29 @@
   </div>
 </div>
 
-<!-- Tab Switcher -->
-<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 mb-6 w-fit">
+<!-- Tab Switcher: horizontally scrollable on mobile so labels stay on one line -->
+<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 mb-6 w-fit max-w-full overflow-x-auto">
   <button @click="tab = 'guide'"
     :class="tab === 'guide' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
-    class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2">
+    class="px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 whitespace-nowrap shrink-0">
     <i data-lucide="rocket" class="w-3.5 h-3.5"></i>
     Getting Started
   </button>
   <button @click="tab = 'wizard'"
     :class="tab === 'wizard' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
-    class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2">
+    class="px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 whitespace-nowrap shrink-0">
     <i data-lucide="wand-sparkles" class="w-3.5 h-3.5"></i>
     Prompt Library
   </button>
   <button @click="tab = 'settings'"
     :class="tab === 'settings' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
-    class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2">
+    class="px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 whitespace-nowrap shrink-0">
     <i data-lucide="settings" class="w-3.5 h-3.5"></i>
     MCP Settings
   </button>
   <a href="/agents?tab=activity"
     :class="tab === 'activity' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
-    class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 no-underline">
+    class="px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 no-underline whitespace-nowrap shrink-0">
     <i data-lucide="scroll-text" class="w-3.5 h-3.5"></i>
     Activity
   </a>
