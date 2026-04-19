@@ -89,6 +89,12 @@ Prefer `make dev-watch` for UI work. See `.claude/rules/ui.md` for the hot-reloa
 
 For validating UI on `localhost`, use the **Chrome DevTools MCP** (`mcp__plugin_chrome-devtools-mcp_chrome-devtools__*`) — pre-allowed, no prompts. Prefer it over `claude-in-chrome`, which is slower and requires permission approvals.
 
+## Stacked PRs
+
+Default to a single PR. Stack **only when reasonable** — i.e., the change is large (touches >1 layer or ~400+ LOC) and splits cleanly into independently reviewable pieces. Don't stack a single bug fix or UI tweak.
+
+When stacking, use [Graphite](https://graphite.dev) (`gt`) — never raw `git push`, `git checkout -b`, or `git commit --amend` on a stacked branch. Invoke `/stack plan <topic>` before writing code to propose the split; use `/stack next`, `/stack submit`, and `/stack land` to execute. Full spec in `docs/stacked-prs.md`; guardrails in `.claude/rules/stacked-prs.md`.
+
 ## Releases
 
 - `main` is branch-protected — PR-only, CI must pass.
@@ -108,6 +114,7 @@ Canonical specs in `docs/`:
 - `design-system.md` — CSS framework, components, icons
 - `plaid-integration.md`, `teller-integration.md`, `csv-import.md` — provider specifics
 - `admin-dashboard.md`, `mcp-server.md`, `rest-api.md`, `backup.md` — subsystem details
+- `stacked-prs.md` — when and how to split work across stacked PRs using `gt`
 
 Scoped rules in `.claude/rules/` load when you touch matching files:
 
@@ -119,3 +126,4 @@ Scoped rules in `.claude/rules/` load when you touch matching files:
 - `providers.md` — provider integrations
 - `sync.md` — sync engine patterns
 - `ui.md` — admin UI, CSS, Alpine, icons
+- `stacked-prs.md` — `gt` workflow and stack conventions (read before creating a stack)
