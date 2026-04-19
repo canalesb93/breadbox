@@ -19,20 +19,16 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
+		q := r.URL.Query()
 		params := service.TransactionRuleListParams{
-			Page:     parsePage(r),
-			PageSize: parsePerPage(r, 50, 25, 50, 100),
+			Page:         parsePage(r),
+			PageSize:     parsePerPage(r, 50, 25, 50, 100),
+			Search:       optStrQuery(q, "search"),
+			CategorySlug: optStrQuery(q, "category_slug"),
 		}
 
-		if v := r.URL.Query().Get("search"); v != "" {
-			params.Search = &v
-		}
-		if v := r.URL.Query().Get("category_slug"); v != "" {
-			params.CategorySlug = &v
-		}
-		if v := r.URL.Query().Get("enabled"); v != "" {
-			b, err := strconv.ParseBool(v)
-			if err == nil {
+		if v := q.Get("enabled"); v != "" {
+			if b, err := strconv.ParseBool(v); err == nil {
 				params.Enabled = &b
 			}
 		}

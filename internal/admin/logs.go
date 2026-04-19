@@ -28,21 +28,15 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 
 		// Always fetch sync logs data.
 		{
+			q := r.URL.Query()
 			params := service.SyncLogListParams{
-				Page:     parsePage(r),
-				PageSize: 25,
-				DateFrom: parseDateParam(r, "date_from"),
-				DateTo:   parseInclusiveDateParam(r, "date_to"),
-			}
-
-			if connID := r.URL.Query().Get("connection_id"); connID != "" {
-				params.ConnectionID = &connID
-			}
-			if status := r.URL.Query().Get("status"); status != "" {
-				params.Status = &status
-			}
-			if trigger := r.URL.Query().Get("trigger"); trigger != "" {
-				params.Trigger = &trigger
+				Page:         parsePage(r),
+				PageSize:     25,
+				ConnectionID: optStrQuery(q, "connection_id"),
+				Status:       optStrQuery(q, "status"),
+				Trigger:      optStrQuery(q, "trigger"),
+				DateFrom:     parseDateParam(r, "date_from"),
+				DateTo:       parseInclusiveDateParam(r, "date_to"),
 			}
 
 			result, err := svc.ListSyncLogsPaginated(ctx, params)
