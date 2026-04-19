@@ -433,7 +433,7 @@ templ dashConnectionRow(c ConnectionHealthRow) {
 			if c.Status != "active" && c.ErrorMessage != "" {
 				<div class="text-[0.6rem] text-error/60 truncate mt-0.5 font-mono max-w-full" title={ c.ErrorMessage }>{ c.ErrorMessage }</div>
 			} else {
-				<div class="text-[0.6rem] text-base-content/30 mt-0.5">{ fmt.Sprintf("%d account%s · synced %s", c.AccountCount, components.PluralS(int(c.AccountCount)), c.LastSyncedAt) }</div>
+				<div class="text-[0.6rem] text-base-content/30 mt-0.5">{ fmt.Sprintf("%d account%s · synced %s", c.AccountCount, components.PluralS(c.AccountCount), c.LastSyncedAt) }</div>
 			}
 		</div>
 		<div class="shrink-0">

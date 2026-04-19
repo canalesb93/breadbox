@@ -45,7 +45,7 @@ templ txPageHeader(p TransactionsProps) {
 			<h1 class="bb-page-title">Transactions</h1>
 			if p.Total > 0 {
 				<span class="text-sm text-base-content/40 tabular-nums">
-					{ fmt.Sprintf("%d transaction%s", p.Total, pluralSuffix(p.Total)) }
+					{ fmt.Sprintf("%d transaction%s", p.Total, components.PluralS(p.Total)) }
 				</span>
 			}
 		</div>
@@ -376,13 +376,6 @@ templ txPageScripts(p TransactionsProps) {
 }
 
 // ── Helpers ──────────────────────────────────────────────────
-
-func pluralSuffix(n int64) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
-}
 
 // accountSelectLabel mirrors the admin funcMap "accountLabel" helper: combine
 // a name with an optional last-4 mask so ambiguous accounts stay addressable.
