@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"breadbox/internal/app"
+	"breadbox/internal/appconfig"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
@@ -21,7 +22,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 		ctx := r.Context()
 
 		// Redirect to getting-started page if onboarding is not dismissed.
-		if !GetConfigBool(ctx, a.Queries, "onboarding_dismissed") {
+		if !appconfig.Bool(ctx, a.Queries, "onboarding_dismissed", false) {
 			http.Redirect(w, r, "/getting-started", http.StatusSeeOther)
 			return
 		}
@@ -60,7 +61,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 				a.Logger.Debug("version check failed", "error", err)
 			}
 			if updateAvailable != nil && *updateAvailable && latest != nil {
-				if GetConfigString(ctx, a.Queries, "update_dismissed_version") != latest.Version {
+				if appconfig.String(ctx, a.Queries, "update_dismissed_version", "") != latest.Version {
 					showUpdateBanner = true
 					latestVersion = latest.Version
 					latestURL = latest.URL
