@@ -328,6 +328,10 @@ func renderTransactions(w http.ResponseWriter, r *http.Request, tr *TemplateRend
 		ExportURL:         in.exportURL,
 		Results:           results,
 	}
+	// Chip summary renders above the results when the filter panel is
+	// collapsed. Built after the rest of props so all lookup lists (names
+	// for connections/accounts/users/categories/tags) are already populated.
+	props.FilterChips = buildTransactionFilterChips(r, props)
 
 	data := map[string]any{
 		"PageTitle":   "Transactions",

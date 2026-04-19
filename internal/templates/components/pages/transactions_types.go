@@ -24,6 +24,16 @@ type TransactionsUserOption struct {
 	Name string
 }
 
+// TransactionsFilterChip describes one active-filter chip rendered above the
+// transaction list when the filter panel is collapsed. Each chip shows a
+// human-readable label and links to the current URL with just that one
+// filter dropped so the user can clear filters individually without having
+// to open the panel.
+type TransactionsFilterChip struct {
+	Label     string
+	RemoveURL string
+}
+
 // TransactionsProps is the full view model the transactions page renders.
 // Hosted inside base.html via TemplateRenderer.RenderWithTempl. The AJAX
 // tx-results fragment (TxResultsProps) is embedded so the same templ
@@ -58,6 +68,10 @@ type TransactionsProps struct {
 	FilterSort        string
 	FilterTags        []string
 	FilterAnyTag      []string
+
+	// Active-filter chip summary. Populated by the admin handler so the view
+	// can render one chip per applied filter when the panel is collapsed.
+	FilterChips []TransactionsFilterChip
 
 	// Export + pagination base URLs.
 	ExportURL string
