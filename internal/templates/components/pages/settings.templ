@@ -34,7 +34,17 @@ templ Settings(p SettingsProps) {
 
 templ settingsSyncCard(p SettingsProps) {
 	<div id="sync" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#sync' || location.hash === '#retention' }">
-		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+		<div
+			class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer"
+			:class="expanded && 'border-b border-base-300'"
+			role="button"
+			tabindex="0"
+			:aria-expanded="expanded ? 'true' : 'false'"
+			aria-controls="sync-panel"
+			@click="expanded = !expanded"
+			@keydown.enter.prevent="expanded = !expanded"
+			@keydown.space.prevent="expanded = !expanded"
+		>
 			<i data-lucide="refresh-cw" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Sync</h2>
@@ -49,7 +59,7 @@ templ settingsSyncCard(p SettingsProps) {
 			</div>
 			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
-		<div x-show="expanded" x-collapse x-cloak>
+		<div id="sync-panel" x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4">
 				<!-- Schedule section -->
 				<form method="POST" action="/settings/sync">
@@ -138,7 +148,17 @@ templ configSourceBadge(sources map[string]string, key string) {
 
 templ settingsSecurityCard(p SettingsProps) {
 	<div id="security" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#security' }">
-		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+		<div
+			class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer"
+			:class="expanded && 'border-b border-base-300'"
+			role="button"
+			tabindex="0"
+			:aria-expanded="expanded ? 'true' : 'false'"
+			aria-controls="security-panel"
+			@click="expanded = !expanded"
+			@keydown.enter.prevent="expanded = !expanded"
+			@keydown.space.prevent="expanded = !expanded"
+		>
 			<i data-lucide="shield" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Security</h2>
@@ -149,7 +169,7 @@ templ settingsSecurityCard(p SettingsProps) {
 			</div>
 			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
-		<div x-show="expanded" x-collapse x-cloak>
+		<div id="security-panel" x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4">
 				<!-- Encryption Key Status -->
 				<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40 mb-5">
@@ -212,7 +232,17 @@ templ settingsSystemCard(p SettingsProps) {
 
 templ settingsHelpCard(p SettingsProps) {
 	<div id="help" class="bb-card p-0 overflow-hidden" x-data="{ expanded: location.hash === '#help' }">
-		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+		<div
+			class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer"
+			:class="expanded && 'border-b border-base-300'"
+			role="button"
+			tabindex="0"
+			:aria-expanded="expanded ? 'true' : 'false'"
+			aria-controls="help-panel"
+			@click="expanded = !expanded"
+			@keydown.enter.prevent="expanded = !expanded"
+			@keydown.space.prevent="expanded = !expanded"
+		>
 			<i data-lucide="life-buoy" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Help</h2>
@@ -221,7 +251,7 @@ templ settingsHelpCard(p SettingsProps) {
 			</div>
 			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
 		</div>
-		<div x-show="expanded" x-collapse x-cloak>
+		<div id="help-panel" x-show="expanded" x-collapse x-cloak>
 			<div class="px-4 sm:px-5 py-4">
 				<div class="flex flex-col gap-3">
 					<div class="flex items-center justify-between p-3 rounded-xl bg-base-200/40">
@@ -253,4 +283,3 @@ func encryptionStatus(has bool) string {
 	}
 	return "not set"
 }
-
