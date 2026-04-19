@@ -28,7 +28,7 @@ Always use `gt` for branch/PR operations when in a stack:
 - **First submit:** `gt submit --stack --publish --ai --no-interactive`. `--ai` populates title + body from the commit; `--publish` opens as ready-for-review (not draft); `--no-interactive` keeps it harness-safe.
 - **Subsequent pushes:** `gt submit --stack --publish --no-interactive` — no `--ai` (it only fires on initial PR creation).
 - `gt modify -u` for mid-stack edits — amends the current branch's commit (the default behavior; `-u` stages all tracked updates) and auto-restacks descendants. Never `git commit --amend` + force-push.
-- `gt land` to merge the bottom PR and auto-restack the rest.
+- Landing: `gt land` is not in the installed CLI. Either pass `--merge-when-ready` on the submit (queues GitHub auto-merge for every PR in the stack) or run `gh pr merge <bottom-pr> --auto --squash`. After each merge: `gt sync` + re-submit to restack the tail.
 
 Never `git push` or `git checkout -b` directly once you're on a stack — it desynchronizes `gt`'s metadata.
 
