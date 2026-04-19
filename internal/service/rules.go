@@ -352,29 +352,16 @@ func evaluateLeaf(c *CompiledCondition, tctx TransactionContext) bool {
 func evalTags(c *CompiledCondition, tags []string) bool {
 	switch c.Op {
 	case "contains":
-		return tagSliceContains(tags, c.lowerValue)
+		return sliceutil.ContainsFold(tags, c.lowerValue)
 	case "not_contains":
-		return !tagSliceContains(tags, c.lowerValue)
+		return !sliceutil.ContainsFold(tags, c.lowerValue)
 	case "in":
 		for _, v := range c.lowerInSet {
-			if tagSliceContains(tags, v) {
+			if sliceutil.ContainsFold(tags, v) {
 				return true
 			}
 		}
 		return false
-	}
-	return false
-}
-
-// tagSliceContains reports whether tags contains target (case-insensitive).
-func tagSliceContains(tags []string, target string) bool {
-	if target == "" {
-		return false
-	}
-	for _, t := range tags {
-		if strings.EqualFold(t, target) {
-			return true
-		}
 	}
 	return false
 }
