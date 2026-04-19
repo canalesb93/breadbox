@@ -102,7 +102,7 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 				for _, acct := range accounts {
 					ca := ConnectionAccount{Account: acct}
 					if acct.BalanceCurrent.Valid {
-						if f, err := numericToFloat(acct.BalanceCurrent); err == nil {
+						if f, ok := pgconv.NumericToFloat(acct.BalanceCurrent); ok {
 							ca.HasBalance = true
 							cwa.HasBalance = true
 							hasAnyBalance = true
@@ -567,8 +567,7 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 		var hasBalance bool
 		for _, acct := range accounts {
 			if acct.BalanceCurrent.Valid {
-				n, err := numericToFloat(acct.BalanceCurrent)
-				if err == nil {
+				if n, ok := pgconv.NumericToFloat(acct.BalanceCurrent); ok {
 					totalBalance += n
 					hasBalance = true
 				}
@@ -617,18 +616,6 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 		}
 		tr.Render(w, r, "connection_detail.html", data)
 	}
-}
-
-// numericToFloat converts a pgtype.Numeric to float64.
-func numericToFloat(n pgtype.Numeric) (float64, error) {
-	if !n.Valid {
-		return 0, fmt.Errorf("null numeric")
-	}
-	f, err := n.Float64Value()
-	if err != nil {
-		return 0, err
-	}
-	return f.Float64, nil
 }
 
 // ConnectionReauthHandler serves GET /admin/connections/{id}/reauth.

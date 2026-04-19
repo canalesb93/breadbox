@@ -2,7 +2,6 @@ package admin
 
 import (
 	"net/http"
-	"strconv"
 
 	breadboxmcp "breadbox/internal/mcp"
 	"breadbox/internal/service"
@@ -223,10 +222,7 @@ func AgentsPageHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer, s
 
 		// === Activity tab data ===
 		if tab == "activity" {
-			page := 1
-			if p, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && p > 0 {
-				page = p
-			}
+			page := queryPage(r, "page")
 			sessions, total, _ := svc.ListMCPSessions(ctx, page, 25)
 			data["Sessions"] = sessions
 			data["SessionsTotal"] = int(total)

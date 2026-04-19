@@ -31,15 +31,17 @@ func parseOptionalDate(field, value string) (*time.Time, error) {
 	return &t, nil
 }
 
-// optSearchMode validates an MCP search_mode input and returns a pointer to
-// the value, or nil when the input is empty. Callers surface the error back
-// to the MCP client unchanged.
-func optSearchMode(value string) (*string, error) {
-	if value == "" {
+// parseSearchMode validates an MCP search_mode input and returns a pointer
+// suitable for service-layer params. Empty input returns (nil, nil) —
+// service layer falls back to its own default. Unknown modes return an
+// error whose message mirrors the one previously duplicated across tool
+// handlers so agents see a consistent hint.
+func parseSearchMode(mode string) (*string, error) {
+	if mode == "" {
 		return nil, nil
 	}
-	if !service.ValidateSearchMode(value) {
-		return nil, fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", value)
+	if !service.ValidateSearchMode(mode) {
+		return nil, fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", mode)
 	}
-	return &value, nil
+	return &mode, nil
 }

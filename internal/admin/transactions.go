@@ -99,22 +99,9 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-		if page < 1 {
-			page = 1
-		}
-
-		pageSize := 50
-		if v, err := strconv.Atoi(r.URL.Query().Get("per_page")); err == nil {
-			switch v {
-			case 25, 50, 100:
-				pageSize = v
-			}
-		}
-
 		params := service.AdminTransactionListParams{
-			Page:     page,
-			PageSize: pageSize,
+			Page:     queryPage(r, "page"),
+			PageSize: queryPageSize(r, 50, 25, 50, 100),
 		}
 
 		if v := r.URL.Query().Get("start_date"); v != "" {
@@ -291,22 +278,9 @@ func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-		if page < 1 {
-			page = 1
-		}
-
-		pageSize := 50
-		if v, err := strconv.Atoi(r.URL.Query().Get("per_page")); err == nil {
-			switch v {
-			case 25, 50, 100:
-				pageSize = v
-			}
-		}
-
 		params := service.AdminTransactionListParams{
-			Page:     page,
-			PageSize: pageSize,
+			Page:     queryPage(r, "page"),
+			PageSize: queryPageSize(r, 50, 25, 50, 100),
 		}
 
 		if v := r.URL.Query().Get("start_date"); v != "" {
@@ -438,13 +412,8 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 		}
 
 		// Fetch transactions for this account.
-		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-		if page < 1 {
-			page = 1
-		}
-
 		txParams := service.AdminTransactionListParams{
-			Page:      page,
+			Page:      queryPage(r, "page"),
 			PageSize:  50,
 			AccountID: &idStr,
 		}
@@ -844,6 +813,13 @@ func buildActivityTimeline(annotations []service.Annotation) []service.ActivityE
 			})
 
 		case "tag_added":
+			source, _ := a.Payload["source"].(string)
+			if source == "rule" {
+				// Represented separately via the rule_applied annotation
+				// written alongside tag_added during sync. Skip to avoid
+				// double-rendering. Mirrors the category_set dedup below.
+				continue
+			}
 			slug, _ := a.Payload["slug"].(string)
 			note, _ := a.Payload["note"].(string)
 			summary := "Added tag " + slug
@@ -863,6 +839,13 @@ func buildActivityTimeline(annotations []service.Annotation) []service.ActivityE
 			entries = append(entries, entry)
 
 		case "tag_removed":
+			source, _ := a.Payload["source"].(string)
+			if source == "rule" {
+				// Future-proof: if a rule ever emits a rule-sourced tag_removed
+				// alongside a rule_applied annotation, dedup the same way as
+				// tag_added / category_set so the timeline stays symmetric.
+				continue
+			}
 			slug, _ := a.Payload["slug"].(string)
 			note, _ := a.Payload["note"].(string)
 			summary := "Removed tag " + slug

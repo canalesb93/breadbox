@@ -1,11 +1,41 @@
 package admin
 
 import (
+	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// queryPage reads a 1-based page number from a named query-string key.
+// Missing, non-numeric, or sub-1 values collapse to 1 so handlers never
+// issue a paginated query with page=0.
+func queryPage(r *http.Request, key string) int {
+	page, _ := strconv.Atoi(r.URL.Query().Get(key))
+	if page < 1 {
+		page = 1
+	}
+	return page
+}
+
+// queryPageSize reads ?per_page and rejects any value not in allowed,
+// returning defaultSize on missing, malformed, or disallowed input.
+// Whitelisting is mandatory — page size drives SQL LIMIT and must not be
+// attacker-controlled.
+func queryPageSize(r *http.Request, defaultSize int, allowed ...int) int {
+	v, err := strconv.Atoi(r.URL.Query().Get("per_page"))
+	if err != nil {
+		return defaultSize
+	}
+	for _, a := range allowed {
+		if v == a {
+			return v
+		}
+	}
+	return defaultSize
+}
 
 // splitCSV splits a comma-separated string into trimmed non-empty entries.
 // Used by URL params that accept multi-value lists (e.g. ?tags=a,b,c).

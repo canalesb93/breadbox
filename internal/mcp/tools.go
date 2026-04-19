@@ -219,7 +219,7 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 	if params.EndDate, err = parseOptionalDate("end_date", input.EndDate); err != nil {
 		return errorResult(err), nil, nil
 	}
-	if params.SearchMode, err = optSearchMode(input.SearchMode); err != nil {
+	if params.SearchMode, err = parseSearchMode(input.SearchMode); err != nil {
 		return errorResult(err), nil, nil
 	}
 
@@ -278,7 +278,7 @@ func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToo
 	if params.EndDate, err = parseOptionalDate("end_date", input.EndDate); err != nil {
 		return errorResult(err), nil, nil
 	}
-	if params.SearchMode, err = optSearchMode(input.SearchMode); err != nil {
+	if params.SearchMode, err = parseSearchMode(input.SearchMode); err != nil {
 		return errorResult(err), nil, nil
 	}
 
@@ -472,7 +472,7 @@ func (s *MCPServer) handleMerchantSummary(_ context.Context, _ *mcpsdk.CallToolR
 	if params.EndDate, err = parseOptionalDate("end_date", input.EndDate); err != nil {
 		return errorResult(err), nil, nil
 	}
-	if params.SearchMode, err = optSearchMode(input.SearchMode); err != nil {
+	if params.SearchMode, err = parseSearchMode(input.SearchMode); err != nil {
 		return errorResult(err), nil, nil
 	}
 	if input.SpendingOnly != nil && *input.SpendingOnly {
@@ -641,7 +641,7 @@ func (s *MCPServer) handleListTransactionRules(_ context.Context, _ *mcpsdk.Call
 		Search:       optStr(input.Search),
 	}
 	var err error
-	if params.SearchMode, err = optSearchMode(input.SearchMode); err != nil {
+	if params.SearchMode, err = parseSearchMode(input.SearchMode); err != nil {
 		return errorResult(err), nil, nil
 	}
 
