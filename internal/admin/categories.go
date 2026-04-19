@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -361,8 +360,7 @@ func BatchSetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerF
 			succeeded++
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"succeeded": succeeded,
 			"failed":    failed,
 			"total":     len(req.Items),

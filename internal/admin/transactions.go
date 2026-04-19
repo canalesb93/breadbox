@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"encoding/json"
 	"errors"
 	"math"
 	"net/http"
@@ -1176,8 +1175,7 @@ func QuickSearchTransactionsHandler(svc *service.Service) http.HandlerFunc {
 
 		result, err := svc.ListTransactionsAdmin(r.Context(), params)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte("[]"))
+			writeJSON(w, http.StatusOK, []service.TransactionSummary{})
 			return
 		}
 
@@ -1186,7 +1184,6 @@ func QuickSearchTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			items = append(items, service.ToTransactionSummary(tx))
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(items)
+		writeJSON(w, http.StatusOK, items)
 	}
 }
