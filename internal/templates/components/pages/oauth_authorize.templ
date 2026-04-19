@@ -1,6 +1,36 @@
 package pages
 
-import "breadbox/internal/templates/components/layout"
+import (
+	"net/url"
+
+	"breadbox/internal/templates/components/layout"
+)
+
+// redirectHost returns the host of a redirect URI for display on the OAuth
+// consent card. Falls back to the raw URI if parsing fails or the host is
+// empty (e.g. malformed or opaque URI) so the user can still eyeball where
+// the authorization code is headed.
+func redirectHost(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return raw
+	}
+	return u.Host
+}
+
+// scopeLabel maps the raw OAuth scope string to a short human-readable label
+// shown on the consent card. Keeps the word "scope" on-screen for users
+// comparing against the permission bullets below.
+func scopeLabel(scope string) string {
+	switch scope {
+	case "read_only":
+		return "Read only"
+	case "full_access", "":
+		return "Full access"
+	default:
+		return scope
+	}
+}
 
 // OAuthAuthorizeProps carries the data the OAuth consent page needs.
 // Rendered at GET /oauth/authorize when an admin session is active. Scope
@@ -38,9 +68,19 @@ templ OAuthAuthorize(p OAuthAuthorizeProps) {
 					<p class="text-sm text-base-content/50">
 						<strong>{ p.ClientName }</strong> wants to connect to your Breadbox instance.
 					</p>
+					if p.RedirectURI != "" {
+						<p class="text-xs text-base-content/40 mt-2 break-all">
+							Redirecting to <span class="font-mono text-base-content/60">{ redirectHost(p.RedirectURI) }</span>
+						</p>
+					}
 				</div>
 				<div class="rounded-xl bg-base-200/50 p-4 mb-6">
-					<div class="text-xs font-medium text-base-content/50 mb-2">This will allow the application to:</div>
+					<div class="flex items-center justify-between gap-2 mb-2">
+						<div class="text-xs font-medium text-base-content/50">This will allow the application to:</div>
+						<span class="badge badge-sm bg-base-100 border-base-300 text-base-content/70 font-medium shrink-0">
+							{ scopeLabel(p.Scope) }
+						</span>
+					</div>
 					<ul class="space-y-2">
 						<li class="flex items-center gap-2 text-sm">
 							<i data-lucide="check" class="w-4 h-4 text-success shrink-0"></i>
