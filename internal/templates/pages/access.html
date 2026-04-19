@@ -13,9 +13,9 @@
       <i data-lucide="fingerprint" class="w-4 h-4 text-primary shrink-0"></i>
       <h2 class="text-sm font-semibold shrink-0">OAuth Clients</h2>
       {{if .Clients}}
-      <span class="text-xs text-base-content/40 truncate">{{len .ActiveClients}} active{{if .RevokedClients}}, {{len .RevokedClients}} revoked{{end}}</span>
+      <span class="hidden sm:inline text-xs text-base-content/40 truncate">{{len .ActiveClients}} active{{if .RevokedClients}}, {{len .RevokedClients}} revoked{{end}}</span>
       {{else}}
-      <span class="text-xs text-base-content/40 truncate">External connector access (e.g., Claude)</span>
+      <span class="hidden sm:inline text-xs text-base-content/40 truncate">External connector access (e.g., Claude)</span>
       {{end}}
     </div>
     <a href="/oauth-clients/new" class="btn btn-primary btn-sm btn-soft rounded-xl shrink-0">
@@ -119,9 +119,9 @@
       <i data-lucide="key" class="w-4 h-4 text-primary shrink-0"></i>
       <h2 class="text-sm font-semibold shrink-0">API Keys</h2>
       {{if .Keys}}
-      <span class="text-xs text-base-content/40 truncate">{{len .ActiveKeys}} active{{if .RevokedKeys}}, {{len .RevokedKeys}} revoked{{end}}</span>
+      <span class="hidden sm:inline text-xs text-base-content/40 truncate">{{len .ActiveKeys}} active{{if .RevokedKeys}}, {{len .RevokedKeys}} revoked{{end}}</span>
       {{else}}
-      <span class="text-xs text-base-content/40 truncate">Direct REST API and MCP access</span>
+      <span class="hidden sm:inline text-xs text-base-content/40 truncate">Direct REST API and MCP access</span>
       {{end}}
     </div>
     <a href="/api-keys/new" class="btn btn-primary btn-sm btn-soft rounded-xl shrink-0">
