@@ -1018,13 +1018,11 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		},
 	}
 
-	// Pages using the wizard layout (OAuth consent only — everything else
-	// migrated to templ). login.html, setup_account.html, and
-	// setup_create_admin.html were migrated — see
-	// internal/templates/components/pages/{login,setup_account,setup_create_admin}.templ.
-	wizardPages := []string{
-		"pages/oauth_authorize.html",
-	}
+	// Pages using the wizard layout — all migrated to templ. See
+	// internal/templates/components/pages/{login,setup_account,setup_create_admin,oauth_authorize}.templ.
+	// The slice and loop below are left in place intentionally; a follow-up
+	// PR deletes them along with layout/wizard.html.
+	wizardPages := []string{}
 
 	for _, page := range basePages {
 		if err := tr.parseBasePage(page); err != nil {
