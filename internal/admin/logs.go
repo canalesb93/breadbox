@@ -2,7 +2,6 @@ package admin
 
 import (
 	"net/http"
-	"time"
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
@@ -30,8 +29,10 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 		// Always fetch sync logs data.
 		{
 			params := service.SyncLogListParams{
-				Page:     queryPage(r, "page"),
+				Page:     parsePage(r),
 				PageSize: 25,
+				DateFrom: parseDateParam(r, "date_from"),
+				DateTo:   parseInclusiveDateParam(r, "date_to"),
 			}
 
 			if connID := r.URL.Query().Get("connection_id"); connID != "" {
@@ -42,17 +43,6 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 			}
 			if trigger := r.URL.Query().Get("trigger"); trigger != "" {
 				params.Trigger = &trigger
-			}
-			if v := r.URL.Query().Get("date_from"); v != "" {
-				if t, err := time.Parse("2006-01-02", v); err == nil {
-					params.DateFrom = &t
-				}
-			}
-			if v := r.URL.Query().Get("date_to"); v != "" {
-				if t, err := time.Parse("2006-01-02", v); err == nil {
-					t = t.AddDate(0, 0, 1)
-					params.DateTo = &t
-				}
 			}
 
 			result, err := svc.ListSyncLogsPaginated(ctx, params)
@@ -142,7 +132,7 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 		// Always fetch webhook events data.
 		{
 			params := service.WebhookEventListParams{
-				Page:     queryPage(r, "wh_page"),
+				Page:     parsePageKey(r, "wh_page"),
 				PageSize: 25,
 			}
 

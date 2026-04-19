@@ -222,7 +222,7 @@ func AgentsPageHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer, s
 
 		// === Activity tab data ===
 		if tab == "activity" {
-			page := queryPage(r, "page")
+			page := parsePage(r)
 			sessions, total, _ := svc.ListMCPSessions(ctx, page, 25)
 			data["Sessions"] = sessions
 			data["SessionsTotal"] = int(total)

@@ -15,7 +15,7 @@ func WebhookEventsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 		ctx := r.Context()
 
 		params := service.WebhookEventListParams{
-			Page:     queryPage(r, "page"),
+			Page:     parsePage(r),
 			PageSize: 25,
 		}
 

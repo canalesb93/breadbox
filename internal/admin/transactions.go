@@ -100,22 +100,12 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 		ctx := r.Context()
 
 		params := service.AdminTransactionListParams{
-			Page:     queryPage(r, "page"),
-			PageSize: queryPageSize(r, 50, 25, 50, 100),
+			Page:      parsePage(r),
+			PageSize:  parsePerPage(r, 50, 25, 50, 100),
+			StartDate: parseDateParam(r, "start_date"),
+			EndDate:   parseInclusiveDateParam(r, "end_date"),
 		}
 
-		if v := r.URL.Query().Get("start_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				params.StartDate = &t
-			}
-		}
-		if v := r.URL.Query().Get("end_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				// Add one day so the end date is inclusive.
-				t = t.AddDate(0, 0, 1)
-				params.EndDate = &t
-			}
-		}
 		if v := r.URL.Query().Get("account_id"); v != "" {
 			params.AccountID = &v
 		}
@@ -279,21 +269,12 @@ func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 		ctx := r.Context()
 
 		params := service.AdminTransactionListParams{
-			Page:     queryPage(r, "page"),
-			PageSize: queryPageSize(r, 50, 25, 50, 100),
+			Page:      parsePage(r),
+			PageSize:  parsePerPage(r, 50, 25, 50, 100),
+			StartDate: parseDateParam(r, "start_date"),
+			EndDate:   parseInclusiveDateParam(r, "end_date"),
 		}
 
-		if v := r.URL.Query().Get("start_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				params.StartDate = &t
-			}
-		}
-		if v := r.URL.Query().Get("end_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				t = t.AddDate(0, 0, 1)
-				params.EndDate = &t
-			}
-		}
 		if v := r.URL.Query().Get("account_id"); v != "" {
 			params.AccountID = &v
 		}
@@ -413,9 +394,11 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 
 		// Fetch transactions for this account.
 		txParams := service.AdminTransactionListParams{
-			Page:      queryPage(r, "page"),
+			Page:      parsePage(r),
 			PageSize:  50,
 			AccountID: &idStr,
+			StartDate: parseDateParam(r, "start_date"),
+			EndDate:   parseInclusiveDateParam(r, "end_date"),
 		}
 
 		// Scope transaction query to viewer's user. Editors+ see all.
@@ -423,17 +406,6 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			txParams.UserID = &memberUID
 		}
 
-		if v := r.URL.Query().Get("start_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				txParams.StartDate = &t
-			}
-		}
-		if v := r.URL.Query().Get("end_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				t = t.AddDate(0, 0, 1)
-				txParams.EndDate = &t
-			}
-		}
 		if v := r.URL.Query().Get("search"); v != "" {
 			txParams.Search = &v
 		}

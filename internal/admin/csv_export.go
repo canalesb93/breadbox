@@ -18,21 +18,12 @@ func ExportTransactionsCSVHandler(a *app.App, svc *service.Service) http.Handler
 		ctx := r.Context()
 
 		params := service.AdminTransactionListParams{
-			Page:     1,
-			PageSize: -1, // Export all matching rows (no pagination).
+			Page:      1,
+			PageSize:  -1, // Export all matching rows (no pagination).
+			StartDate: parseDateParam(r, "start_date"),
+			EndDate:   parseInclusiveDateParam(r, "end_date"),
 		}
 
-		if v := r.URL.Query().Get("start_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				params.StartDate = &t
-			}
-		}
-		if v := r.URL.Query().Get("end_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				t = t.AddDate(0, 0, 1)
-				params.EndDate = &t
-			}
-		}
 		if v := r.URL.Query().Get("account_id"); v != "" {
 			params.AccountID = &v
 		}

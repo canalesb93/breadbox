@@ -8,53 +8,106 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-func TestQueryPage(t *testing.T) {
-	cases := []struct {
-		name string
-		url  string
-		key  string
-		want int
+func TestParsePage(t *testing.T) {
+	tests := []struct {
+		query string
+		want  int
 	}{
-		{"missing collapses to 1", "/?", "page", 1},
-		{"empty collapses to 1", "/?page=", "page", 1},
-		{"zero collapses to 1", "/?page=0", "page", 1},
-		{"negative collapses to 1", "/?page=-4", "page", 1},
-		{"non-numeric collapses to 1", "/?page=abc", "page", 1},
-		{"positive preserved", "/?page=3", "page", 3},
-		{"custom key honored", "/?wh_page=5&page=1", "wh_page", 5},
+		{"", 1},
+		{"page=", 1},
+		{"page=abc", 1},
+		{"page=0", 1},
+		{"page=-5", 1},
+		{"page=1", 1},
+		{"page=7", 7},
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			r := httptest.NewRequest("GET", tc.url, nil)
-			if got := queryPage(r, tc.key); got != tc.want {
-				t.Errorf("queryPage(%q, %q) = %d, want %d", tc.url, tc.key, got, tc.want)
+	for _, tc := range tests {
+		t.Run(tc.query, func(t *testing.T) {
+			r := httptest.NewRequest("GET", "/?"+tc.query, nil)
+			if got := parsePage(r); got != tc.want {
+				t.Errorf("parsePage(%q) = %d, want %d", tc.query, got, tc.want)
 			}
 		})
 	}
 }
 
-func TestQueryPageSize(t *testing.T) {
-	cases := []struct {
+func TestParsePageKey(t *testing.T) {
+	r := httptest.NewRequest("GET", "/?page=2&wh_page=9", nil)
+	if got := parsePageKey(r, "wh_page"); got != 9 {
+		t.Errorf("parsePageKey(wh_page) = %d, want 9", got)
+	}
+	if got := parsePageKey(r, "missing"); got != 1 {
+		t.Errorf("parsePageKey(missing) = %d, want 1", got)
+	}
+}
+
+func TestParsePerPage(t *testing.T) {
+	tests := []struct {
 		name    string
-		url     string
+		query   string
 		def     int
 		allowed []int
 		want    int
 	}{
-		{"missing → default", "/?", 50, []int{25, 50, 100}, 50},
-		{"non-numeric → default", "/?per_page=abc", 50, []int{25, 50, 100}, 50},
-		{"not in allowlist → default", "/?per_page=7", 50, []int{25, 50, 100}, 50},
-		{"hostile large value → default", "/?per_page=99999", 50, []int{25, 50, 100}, 50},
-		{"allowed value preserved", "/?per_page=25", 50, []int{25, 50, 100}, 25},
-		{"allowed top-of-range preserved", "/?per_page=100", 50, []int{25, 50, 100}, 100},
+		{"missing returns default", "", 25, []int{25, 50}, 25},
+		{"non-numeric returns default", "per_page=abc", 25, []int{25, 50}, 25},
+		{"in allowed", "per_page=50", 25, []int{25, 50, 100}, 50},
+		{"not in allowed returns default", "per_page=33", 25, []int{25, 50}, 25},
+		{"no allowlist accepts positive", "per_page=200", 25, nil, 200},
+		{"no allowlist rejects zero", "per_page=0", 25, nil, 25},
+		{"no allowlist rejects negative", "per_page=-1", 25, nil, 25},
 	}
-	for _, tc := range cases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			r := httptest.NewRequest("GET", tc.url, nil)
-			if got := queryPageSize(r, tc.def, tc.allowed...); got != tc.want {
-				t.Errorf("queryPageSize(%q) = %d, want %d", tc.url, got, tc.want)
+			r := httptest.NewRequest("GET", "/?"+tc.query, nil)
+			if got := parsePerPage(r, tc.def, tc.allowed...); got != tc.want {
+				t.Errorf("parsePerPage = %d, want %d", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestParseDateParam(t *testing.T) {
+	r := httptest.NewRequest("GET", "/?d=2026-04-19&bad=2026/04/19", nil)
+
+	got := parseDateParam(r, "d")
+	if got == nil {
+		t.Fatal("parseDateParam(d) = nil, want 2026-04-19")
+	}
+	want := time.Date(2026, 4, 19, 0, 0, 0, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Errorf("parseDateParam(d) = %v, want %v", got, want)
+	}
+
+	if parseDateParam(r, "bad") != nil {
+		t.Error("parseDateParam(bad) should return nil for malformed input")
+	}
+	if parseDateParam(r, "missing") != nil {
+		t.Error("parseDateParam(missing) should return nil")
+	}
+}
+
+func TestParseInclusiveDateParam(t *testing.T) {
+	r := httptest.NewRequest("GET", "/?d=2026-04-19", nil)
+
+	got := parseInclusiveDateParam(r, "d")
+	if got == nil {
+		t.Fatal("parseInclusiveDateParam = nil")
+	}
+	want := time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Errorf("parseInclusiveDateParam = %v, want %v (end-date shifted by +1 day)", got, want)
+	}
+
+	// Verify the original param isn't mutated: re-parsing returns the
+	// un-shifted date.
+	orig := parseDateParam(r, "d")
+	if orig == nil || !orig.Equal(time.Date(2026, 4, 19, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("parseDateParam(d) after inclusive parse = %v, want 2026-04-19", orig)
+	}
+
+	if parseInclusiveDateParam(r, "missing") != nil {
+		t.Error("parseInclusiveDateParam(missing) should return nil")
 	}
 }
 
