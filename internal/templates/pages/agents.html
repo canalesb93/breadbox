@@ -9,8 +9,8 @@
   </div>
 </div>
 
-<!-- Tab Switcher: horizontally scrollable on mobile so labels stay on one line -->
-<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 mb-6 w-fit max-w-full overflow-x-auto">
+<!-- Tab Switcher: wraps to a second row on mobile so all labels stay visible; stays single-line from sm and up. -->
+<div class="flex flex-wrap sm:flex-nowrap items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 mb-6 w-full sm:w-fit max-w-full sm:overflow-x-auto">
   <button @click="tab = 'guide'"
     :class="tab === 'guide' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
     class="px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 whitespace-nowrap shrink-0">
