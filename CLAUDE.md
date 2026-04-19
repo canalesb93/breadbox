@@ -102,6 +102,10 @@ When stacking, use [Graphite](https://graphite.dev) (`gt`) — never raw `git pu
 - Merge to `main` auto-deploys to `breadbox.exe.xyz` via SSH.
 - See `CHANGELOG.md` and `CONTRIBUTING.md`.
 
+## Landing site
+
+The public marketing site at [breadbox.sh](https://breadbox.sh) lives in a separate private repo at `~/dev/breadbox-site` (canalesb93/breadbox-site). Astro 5 static site, deployed to Cloudflare Workers Static Assets via auto-build on push to `main`. Anything visitor-facing (hero copy, install instructions, screenshots, OG/social, footer links) belongs there — not in this repo. The README here links to breadbox.sh once mkdocs is torn down (#583).
+
 ## References
 
 Canonical specs in `docs/`:
