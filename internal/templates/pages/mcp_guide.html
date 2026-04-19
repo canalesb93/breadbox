@@ -91,9 +91,10 @@
                     :class="tab === t.id ? 'btn-primary' : 'btn-ghost'"
                     @click="switchTab(t.id)"
                     role="tab"
-                    :aria-selected="tab === t.id">
+                    :aria-selected="tab === t.id"
+                    :aria-label="t.label">
               <i :data-lucide="t.icon" class="w-3.5 h-3.5"></i>
-              <span x-text="t.label" class="hidden sm:inline"></span>
+              <span x-text="t.label"></span>
             </button>
           </template>
         </div>
