@@ -60,3 +60,43 @@ func TestParseOptionalDate(t *testing.T) {
 		}
 	})
 }
+
+func TestOptSearchMode(t *testing.T) {
+	t.Run("empty returns nil without error", func(t *testing.T) {
+		got, err := optSearchMode("")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != nil {
+			t.Errorf("expected nil, got %q", *got)
+		}
+	})
+
+	t.Run("valid modes return pointer to value", func(t *testing.T) {
+		for _, mode := range []string{"contains", "words", "fuzzy"} {
+			got, err := optSearchMode(mode)
+			if err != nil {
+				t.Fatalf("unexpected error for %q: %v", mode, err)
+			}
+			if got == nil {
+				t.Fatalf("expected non-nil pointer for %q", mode)
+			}
+			if *got != mode {
+				t.Errorf("expected %q, got %q", mode, *got)
+			}
+		}
+	})
+
+	t.Run("invalid mode returns error mentioning the value", func(t *testing.T) {
+		got, err := optSearchMode("bogus")
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if got != nil {
+			t.Errorf("expected nil pointer on error, got %q", *got)
+		}
+		if msg := err.Error(); !strings.Contains(msg, "bogus") {
+			t.Errorf("expected error to mention invalid value, got: %q", msg)
+		}
+	})
+}

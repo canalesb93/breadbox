@@ -3,6 +3,8 @@ package mcp
 import (
 	"fmt"
 	"time"
+
+	"breadbox/internal/service"
 )
 
 // optStr returns a pointer to s when non-empty, else nil. Used to forward
@@ -27,4 +29,17 @@ func parseOptionalDate(field, value string) (*time.Time, error) {
 		return nil, fmt.Errorf("invalid %s: %w", field, err)
 	}
 	return &t, nil
+}
+
+// optSearchMode validates an MCP search_mode input and returns a pointer to
+// the value, or nil when the input is empty. Callers surface the error back
+// to the MCP client unchanged.
+func optSearchMode(value string) (*string, error) {
+	if value == "" {
+		return nil, nil
+	}
+	if !service.ValidateSearchMode(value) {
+		return nil, fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", value)
+	}
+	return &value, nil
 }
