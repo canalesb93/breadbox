@@ -111,6 +111,24 @@ make css        # Compile input.css -> static/css/styles.css
 make css-watch  # Watch mode for development
 ```
 
+## Pull Requests
+
+Default to a single PR per change. Use stacked PRs (via [Graphite](https://graphite.dev)) **only when the change is large and splits cleanly** — e.g., touches >1 layer, exceeds ~400 LOC, or has pieces that can merge in stages. Don't stack a single bug fix or UI tweak.
+
+When stacking:
+
+```bash
+npm install -g @withgraphite/graphite-cli@stable
+gt repo init --trunk main           # one-time, per clone
+gt sync                             # before starting
+gt create -b stack/<topic>/01-<slug> -am "..."
+# ...repeat gt create for each subsequent PR...
+gt submit --stack --no-interactive  # push and open/update PRs
+gt land                             # merge bottom PR, auto-restacks the rest
+```
+
+Never `git push`, `git checkout -b`, or `git commit --amend` on a stacked branch — it desyncs `gt`'s metadata. See `docs/stacked-prs.md` for the full policy.
+
 ## Code Style
 
 - Error codes: `UPPER_SNAKE_CASE` in JSON envelope `{ "error": { "code": "...", "message": "..." } }`
