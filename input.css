@@ -1709,6 +1709,25 @@
            text-[0.6rem] font-medium text-base-content/40 bg-base-200 border border-base-300 rounded mx-0.5;
   }
 
+  /* Mobile list polish: meet the 44px tap target, tighten the indent gutter,
+     and drop the echoed parent label while browsing (the hierarchy is already
+     obvious from the indentation). Parent labels still show while searching,
+     where results appear out of hierarchy context. */
+  @media (max-width: 640px) {
+    .bb-catpicker-item {
+      @apply py-2.5;
+      min-height: 2.75rem;
+    }
+
+    .bb-catpicker-item--indent {
+      @apply pl-7;
+    }
+
+    .bb-catpicker-list[data-searching="false"] .bb-catpicker-item__parent-label {
+      display: none;
+    }
+  }
+
   /* ─── Global Tag Picker Overlay ─── */
   /*
    * Mirrors the category picker shell (backdrop, dialog, input, footer) but the body is a
