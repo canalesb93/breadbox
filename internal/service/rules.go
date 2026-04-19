@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"breadbox/internal/pgconv"
 	"breadbox/internal/ruleapply"
 	"breadbox/internal/sliceutil"
 	"breadbox/internal/slugs"
@@ -1908,8 +1909,8 @@ func (r *ruleRow) toResponseBase() TransactionRuleResponse {
 		CreatedByName: r.createdByName,
 		HitCount:      int(r.hitCount),
 		LastHitAt:     timestampStr(r.lastHitAt),
-		CreatedAt:     r.createdAt.Time.UTC().Format(time.RFC3339),
-		UpdatedAt:     r.updatedAt.Time.UTC().Format(time.RFC3339),
+		CreatedAt:     pgconv.TimestampStr(r.createdAt),
+		UpdatedAt:     pgconv.TimestampStr(r.updatedAt),
 	}
 }
 
@@ -2370,9 +2371,7 @@ func (s *Service) ListRuleApplications(ctx context.Context, ruleID string, limit
 		if date.Valid {
 			r.Date = date.Time.Format("2006-01-02")
 		}
-		if appliedAt.Valid {
-			r.AppliedAt = appliedAt.Time.UTC().Format(time.RFC3339)
-		}
+		r.AppliedAt = pgconv.TimestampStr(appliedAt)
 		results = append(results, r)
 	}
 
@@ -2429,7 +2428,7 @@ func (s *Service) GetRuleSyncHistory(ctx context.Context, ruleID string, limit i
 
 		entry := map[string]any{
 			"sync_id":     formatUUID(id),
-			"started_at":  startedAt.Time.UTC().Format(time.RFC3339),
+			"started_at":  pgconv.TimestampStr(startedAt),
 			"status":      status,
 			"hit_count":   hits[ruleID],
 			"institution": textPtr(instName),
@@ -2485,9 +2484,7 @@ func (s *Service) ListRuleApplicationsByTransactionID(ctx context.Context, trans
 			return nil, fmt.Errorf("scan rule application: %w", err)
 		}
 		d.RuleID = formatUUID(ruleID)
-		if appliedAt.Valid {
-			d.AppliedAt = appliedAt.Time.UTC().Format(time.RFC3339)
-		}
+		d.AppliedAt = pgconv.TimestampStr(appliedAt)
 		results = append(results, d)
 	}
 

@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -243,8 +243,8 @@ func commentFromAnnotation(a db.Annotation, content, reviewID string) CommentRes
 		AuthorID:      textPtr(a.ActorID),
 		AuthorName:    a.ActorName,
 		Content:       content,
-		CreatedAt:     a.CreatedAt.Time.UTC().Format(time.RFC3339),
-		UpdatedAt:     a.CreatedAt.Time.UTC().Format(time.RFC3339),
+		CreatedAt:     pgconv.TimestampStr(a.CreatedAt),
+		UpdatedAt:     pgconv.TimestampStr(a.CreatedAt),
 	}
 	if reviewID != "" {
 		rid := reviewID

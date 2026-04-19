@@ -3,6 +3,7 @@ package pgconv
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -48,4 +49,36 @@ func TextPtr(t pgtype.Text) *string {
 		return nil
 	}
 	return &t.String
+}
+
+// TimestampStr renders a pgtype.Timestamptz as an RFC3339 UTC string. Returns
+// an empty string when the timestamp is NULL. Use for NOT NULL columns where
+// an empty response field is acceptable for the rare invalid case.
+func TimestampStr(ts pgtype.Timestamptz) string {
+	if !ts.Valid {
+		return ""
+	}
+	return ts.Time.UTC().Format(time.RFC3339)
+}
+
+// TimestampStrPtr renders a pgtype.Timestamptz as an RFC3339 UTC string wrapped
+// in *string. Returns nil when the timestamp is NULL. Use for nullable columns
+// where JSON should serialize absent timestamps as null (and be omitted via
+// omitempty).
+func TimestampStrPtr(ts pgtype.Timestamptz) *string {
+	if !ts.Valid {
+		return nil
+	}
+	s := ts.Time.UTC().Format(time.RFC3339)
+	return &s
+}
+
+// DateStrPtr renders a pgtype.Date as a "2006-01-02" string wrapped in
+// *string. Returns nil when the date is NULL.
+func DateStrPtr(d pgtype.Date) *string {
+	if !d.Valid {
+		return nil
+	}
+	s := d.Time.Format("2006-01-02")
+	return &s
 }

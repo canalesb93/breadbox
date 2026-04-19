@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -227,7 +227,7 @@ func (s *Service) ListTransactionTags(ctx context.Context, txnID string) ([]Tran
 			Color:       textPtr(color),
 			Icon:        textPtr(icon),
 			Lifecycle:   lifecycle,
-			AddedAt:     addedAt.Time.UTC().Format(time.RFC3339),
+			AddedAt:     pgconv.TimestampStr(addedAt),
 			AddedByType: addedByType,
 			AddedByName: addedByName,
 		})

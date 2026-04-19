@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -110,7 +110,7 @@ func annotationFromRow(a db.Annotation) Annotation {
 		ActorType:     a.ActorType,
 		ActorID:       textPtr(a.ActorID),
 		ActorName:     a.ActorName,
-		CreatedAt:     a.CreatedAt.Time.UTC().Format(time.RFC3339),
+		CreatedAt:     pgconv.TimestampStr(a.CreatedAt),
 	}
 
 	if a.SessionID.Valid {

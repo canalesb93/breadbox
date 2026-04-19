@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"time"
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
@@ -38,19 +37,11 @@ func numericFloat(n pgtype.Numeric) *float64 {
 }
 
 func timestampStr(ts pgtype.Timestamptz) *string {
-	if !ts.Valid {
-		return nil
-	}
-	s := ts.Time.UTC().Format(time.RFC3339)
-	return &s
+	return pgconv.TimestampStrPtr(ts)
 }
 
 func dateStr(d pgtype.Date) *string {
-	if !d.Valid {
-		return nil
-	}
-	s := d.Time.Format("2006-01-02")
-	return &s
+	return pgconv.DateStrPtr(d)
 }
 
 func nullConnStatusPtr(s db.NullConnectionStatus) *string {
