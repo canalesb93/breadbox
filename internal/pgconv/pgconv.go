@@ -25,3 +25,17 @@ func ParseUUID(s string) (pgtype.UUID, error) {
 	err := u.Scan(s)
 	return u, err
 }
+
+// NumericToFloat returns the float64 value of a pgtype.Numeric. Returns
+// (0, false) when the numeric is NULL, NaN, or fails to convert (e.g. overflow).
+// Callers that need to distinguish those cases should use Float64Value directly.
+func NumericToFloat(n pgtype.Numeric) (float64, bool) {
+	if !n.Valid || n.NaN {
+		return 0, false
+	}
+	f, err := n.Float64Value()
+	if err != nil || !f.Valid {
+		return 0, false
+	}
+	return f.Float64, true
+}

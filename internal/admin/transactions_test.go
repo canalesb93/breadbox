@@ -117,6 +117,82 @@ func TestBuildActivityTimeline_FreeStandingCommentStillEmitted(t *testing.T) {
 	}
 }
 
+// Rule-sourced tag_added annotations are represented by the paired
+// rule_applied annotation that sync writes alongside them. The timeline
+// must dedup the tag_added so rule-driven tag applications do not render
+// twice (once as "Added tag X" and once as "Rule '…' added tag X").
+// Mirrors the existing category_set dedup.
+func TestBuildActivityTimeline_RuleSourcedTagAddedDeduped(t *testing.T) {
+	ruleID := "rule-1"
+	annotations := []service.Annotation{
+		{
+			ID:        "ann-tag",
+			Kind:      "tag_added",
+			ActorName: "Auto-tag new transactions for review",
+			ActorType: "system",
+			ActorID:   &ruleID,
+			Payload: map[string]interface{}{
+				"slug":      "needs-review",
+				"source":    "rule",
+				"rule_id":   ruleID,
+				"rule_name": "Auto-tag new transactions for review",
+			},
+			CreatedAt: "2026-04-04T12:00:00Z",
+		},
+		{
+			ID:        "ann-rule",
+			Kind:      "rule_applied",
+			ActorName: "Auto-tag new transactions for review",
+			ActorType: "system",
+			ActorID:   &ruleID,
+			Payload: map[string]interface{}{
+				"rule_name": "Auto-tag new transactions for review",
+				"how":       "tag_added",
+				"slug":      "needs-review",
+			},
+			CreatedAt: "2026-04-04T12:00:00Z",
+		},
+	}
+
+	entries := buildActivityTimeline(annotations)
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry (rule_applied only), got %d", len(entries))
+	}
+	if entries[0].Type != "rule" {
+		t.Errorf("expected the surviving entry to be a rule entry, got type=%q", entries[0].Type)
+	}
+}
+
+// User-authored tag additions must still render as regular "Added tag …" entries.
+func TestBuildActivityTimeline_UserTagAddedStillEmitted(t *testing.T) {
+	userID := "user-1"
+	annotations := []service.Annotation{{
+		ID:        "ann-user-tag",
+		Kind:      "tag_added",
+		ActorName: "Alice",
+		ActorType: "user",
+		ActorID:   &userID,
+		Payload: map[string]interface{}{
+			"slug": "vacation",
+			// no "source" field — user-authored
+		},
+		CreatedAt: "2026-04-05T09:00:00Z",
+	}}
+
+	entries := buildActivityTimeline(annotations)
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 tag entry, got %d", len(entries))
+	}
+	if entries[0].Type != "tag" {
+		t.Errorf("expected tag entry, got type=%q", entries[0].Type)
+	}
+	if entries[0].TagSlug != "vacation" {
+		t.Errorf("expected TagSlug=vacation, got %q", entries[0].TagSlug)
+	}
+}
+
 func TestBuildActivityTimeline_LegacyPrefixCommentSuppressed(t *testing.T) {
 	annotations := []service.Annotation{{
 		ID:        "ann-legacy",

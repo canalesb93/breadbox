@@ -216,11 +216,8 @@ func (s *MCPServer) handleQueryTransactions(_ context.Context, _ *mcpsdk.CallToo
 	if params.StartDate, params.EndDate, err = parseDateRange(input.StartDate, input.EndDate); err != nil {
 		return errorResult(err), nil, nil
 	}
-	if input.SearchMode != "" {
-		if !service.ValidateSearchMode(input.SearchMode) {
-			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
-		}
-		params.SearchMode = &input.SearchMode
+	if params.SearchMode, err = parseSearchMode(input.SearchMode); err != nil {
+		return errorResult(err), nil, nil
 	}
 
 	fieldSet, err := service.ParseFields(input.Fields)
@@ -275,11 +272,8 @@ func (s *MCPServer) handleCountTransactions(_ context.Context, _ *mcpsdk.CallToo
 	if params.StartDate, params.EndDate, err = parseDateRange(input.StartDate, input.EndDate); err != nil {
 		return errorResult(err), nil, nil
 	}
-	if input.SearchMode != "" {
-		if !service.ValidateSearchMode(input.SearchMode) {
-			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
-		}
-		params.SearchMode = &input.SearchMode
+	if params.SearchMode, err = parseSearchMode(input.SearchMode); err != nil {
+		return errorResult(err), nil, nil
 	}
 
 	count, err := s.svc.CountTransactionsFiltered(ctx, params)
@@ -466,11 +460,8 @@ func (s *MCPServer) handleMerchantSummary(_ context.Context, _ *mcpsdk.CallToolR
 	if params.StartDate, params.EndDate, err = parseDateRange(input.StartDate, input.EndDate); err != nil {
 		return errorResult(err), nil, nil
 	}
-	if input.SearchMode != "" {
-		if !service.ValidateSearchMode(input.SearchMode) {
-			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
-		}
-		params.SearchMode = &input.SearchMode
+	if params.SearchMode, err = parseSearchMode(input.SearchMode); err != nil {
+		return errorResult(err), nil, nil
 	}
 	if input.SpendingOnly != nil && *input.SpendingOnly {
 		params.SpendingOnly = true
@@ -637,11 +628,9 @@ func (s *MCPServer) handleListTransactionRules(_ context.Context, _ *mcpsdk.Call
 		Enabled:      input.Enabled,
 		Search:       optStr(input.Search),
 	}
-	if input.SearchMode != "" {
-		if !service.ValidateSearchMode(input.SearchMode) {
-			return errorResult(fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", input.SearchMode)), nil, nil
-		}
-		params.SearchMode = &input.SearchMode
+	var err error
+	if params.SearchMode, err = parseSearchMode(input.SearchMode); err != nil {
+		return errorResult(err), nil, nil
 	}
 
 	result, err := s.svc.ListTransactionRules(ctx, params)

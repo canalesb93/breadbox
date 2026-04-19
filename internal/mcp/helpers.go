@@ -3,6 +3,8 @@ package mcp
 import (
 	"fmt"
 	"time"
+
+	"breadbox/internal/service"
 )
 
 // optStr returns a pointer to s when non-empty, else nil. Used to forward
@@ -43,4 +45,19 @@ func parseDateRange(start, end string) (*time.Time, *time.Time, error) {
 		return nil, nil, err
 	}
 	return startT, endT, nil
+}
+
+// parseSearchMode validates an MCP search_mode input and returns a pointer
+// suitable for service-layer params. Empty input returns (nil, nil) —
+// service layer falls back to its own default. Unknown modes return an
+// error whose message mirrors the one previously duplicated across tool
+// handlers so agents see a consistent hint.
+func parseSearchMode(mode string) (*string, error) {
+	if mode == "" {
+		return nil, nil
+	}
+	if !service.ValidateSearchMode(mode) {
+		return nil, fmt.Errorf("invalid search_mode: %s. Must be one of: contains, words, fuzzy", mode)
+	}
+	return &mode, nil
 }
