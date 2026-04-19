@@ -4,8 +4,8 @@ description: >
   Validate a Breadbox admin UI change in a real browser and produce a screenshot as PR
   evidence. Uses Chrome DevTools MCP to navigate the running app and capture the rendered
   page directly (no OS screen recording, no AppleScript, no focus hacks). Saves a JPEG
-  under 1MB, ready for img402 upload via the github-image-hosting skill. Triggers:
-  "validate the UI change", "screenshot this page", "capture the transactions page",
+  under 1MB, uploads to GitHub's native CDN via `gh release upload`, ready to embed in a PR.
+  Triggers: "validate the UI change", "screenshot this page", "capture the transactions page",
   "attach a screenshot to the PR", "show me how it looks", or any task needing a visual
   of the running app before a PR can be marked done.
 ---
@@ -91,11 +91,25 @@ If over 1MB: retake at `quality: 70` or drop `fullPage`.
 
 ### 7. Upload
 
-Hand off to the `github-image-hosting` skill, or do it inline:
+Use `gh` (already sandbox-exempt — no network allowlist required) to upload to a dedicated
+GitHub prerelease. This gives a permanent, GitHub-native URL.
 
 ```bash
-URL=$(curl -s -X POST https://img402.dev/api/free -F image=@/tmp/app-<PAGE>.jpg \
-  | grep -o '"url":"[^"]*"' | cut -d'"' -f4)
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+
+# Ensure screenshots-cdn prerelease exists (idempotent)
+gh release view screenshots-cdn 2>/dev/null || \
+  gh release create screenshots-cdn \
+    --prerelease \
+    --title "Screenshots CDN" \
+    --notes "Auto-uploaded PR validation screenshots. Assets may be overwritten between runs."
+
+# Upload with a timestamped filename to avoid collisions
+FNAME="$(date +%Y%m%d-%H%M%S)-app-<PAGE>.jpg"
+cp /tmp/app-<PAGE>.jpg "/tmp/$FNAME"
+gh release upload screenshots-cdn "/tmp/$FNAME" --clobber
+
+URL="https://github.com/$REPO/releases/download/screenshots-cdn/$FNAME"
 echo "$URL"
 ```
 
@@ -106,7 +120,7 @@ Use inline HTML (not `![alt](url)`) so you control the displayed width. GitHub M
 **Single screenshot:**
 
 ```html
-<img src="https://i.img402.dev/<ID>.jpg" width="800" alt="<page> — after">
+<img src="https://github.com/OWNER/REPO/releases/download/screenshots-cdn/FNAME.jpg" width="800" alt="<page> — after">
 ```
 
 **Before/after — side-by-side table** (preferred for visual diffs):
@@ -118,8 +132,8 @@ Use inline HTML (not `![alt](url)`) so you control the displayed width. GitHub M
     <th>After</th>
   </tr>
   <tr>
-    <td><img src="https://i.img402.dev/<BEFORE_ID>.jpg" width="400" alt="before"></td>
-    <td><img src="https://i.img402.dev/<AFTER_ID>.jpg" width="400" alt="after"></td>
+    <td><img src="https://github.com/OWNER/REPO/releases/download/screenshots-cdn/before.jpg" width="400" alt="before"></td>
+    <td><img src="https://github.com/OWNER/REPO/releases/download/screenshots-cdn/after.jpg" width="400" alt="after"></td>
   </tr>
 </table>
 ```
@@ -127,14 +141,14 @@ Use inline HTML (not `![alt](url)`) so you control the displayed width. GitHub M
 **Mobile screenshot** (narrow — embed smaller):
 
 ```html
-<img src="https://i.img402.dev/<ID>.jpg" width="320" alt="<page> — mobile">
+<img src="https://github.com/OWNER/REPO/releases/download/screenshots-cdn/mobile.jpg" width="320" alt="<page> — mobile">
 ```
 
 **Tall capture you still want to include** (`fullPage: true`) — collapse it:
 
 ```html
 <details><summary><page> — full page</summary>
-<img src="https://i.img402.dev/<ID>.jpg" width="800" alt="<page> — full page">
+<img src="https://github.com/OWNER/REPO/releases/download/screenshots-cdn/fullpage.jpg" width="800" alt="<page> — full page">
 </details>
 ```
 
@@ -143,7 +157,7 @@ Post via `gh`:
 ```bash
 gh pr comment <PR_NUMBER> --body-file evidence.md   # multi-line HTML
 # or for a single image:
-gh pr comment <PR_NUMBER> --body '<img src="'"$URL"'" width="800" alt="<page>">'
+gh pr comment <PR_NUMBER> --body "<img src=\"$URL\" width=\"800\" alt=\"<page>\">"
 ```
 
 ## Tips
@@ -151,6 +165,6 @@ gh pr comment <PR_NUMBER> --body '<img src="'"$URL"'" width="800" alt="<page>">'
 - **Responsive changes always get at least two captures**: desktop (1280 or 1440) + mobile (390). Tablet (768) only when the change crosses the `md` breakpoint.
 - For before/after diffs, name the files `<PAGE>-before` and `<PAGE>-after` and embed them in the table above.
 - After template / CSS / Alpine changes, restart `make dev` before capturing so Tailwind / partials rebuild.
-- `img402.dev` free URLs expire in 7 days — fine for active PR review, not for archived evidence. Re-upload if the PR sits beyond that.
+- The `screenshots-cdn` prerelease is permanent — URLs stay valid indefinitely. Each new upload uses a timestamped filename so old URLs remain accessible.
 - For quick visual checks (not PR evidence), skip the upload step — the local JPEG is enough.
 - What does NOT work on GitHub Markdown: `![alt](url){width=600}` (ignored), `style="..."` attributes (stripped). Stick to `<img width="...">`.

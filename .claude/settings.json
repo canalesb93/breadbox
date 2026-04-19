@@ -71,7 +71,9 @@
         "storage.googleapis.com",
         "github.com",
         "api.github.com",
-        "objects.githubusercontent.com"
+        "objects.githubusercontent.com",
+        "img402.dev",
+        "i.img402.dev"
       ],
       "allowLocalBinding": true
     },

@@ -1,84 +1,128 @@
 ---
 name: github-image-hosting
 description: >
-  Upload images to img402.dev for embedding in GitHub PRs, issues, and comments.
-  Images under 1MB are uploaded free (no payment, no auth) and persist for 7 days.
-  Use when the agent needs to share an image in a GitHub context — screenshots, mockups,
-  diagrams, or any visual. Triggers: "screenshot this", "attach an image", "add a screenshot
-  to the PR", "upload this mockup", or any task producing an image for GitHub.
+  Upload images to GitHub's native CDN for embedding in PRs, issues, and comments.
+  Uses `gh release upload` to a dedicated screenshots prerelease, giving permanent
+  github.com-hosted URLs with no third-party dependency. Falls back to img402.dev
+  if the gh approach isn't available.
+  Triggers: "screenshot this", "attach an image", "add a screenshot to the PR",
+  "upload this mockup", or any task producing an image for GitHub.
 metadata:
   openclaw:
     requires:
       bins:
-        - curl
         - gh
 ---
 
 # Image Upload for GitHub
 
-Upload an image to img402.dev's free tier and embed the returned URL in GitHub markdown.
+Upload a screenshot or image to GitHub's native CDN and embed the URL in a PR or issue.
 
-## Quick reference
+## Primary approach: GitHub Release Assets (preferred)
+
+Uses `gh` (already sandbox-exempt via `excludedCommands`) — no network allowlist changes
+needed, no third-party dependency, URLs are permanent GitHub-hosted links.
+
+### Quick reference
+
+```bash
+# One-time setup: ensure the screenshots-cdn prerelease exists in this repo
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+gh release view screenshots-cdn 2>/dev/null || \
+  gh release create screenshots-cdn \
+    --prerelease \
+    --title "Screenshots CDN" \
+    --notes "Auto-uploaded PR validation screenshots. Assets may be overwritten between runs."
+
+# Upload (use a timestamped name to avoid collisions between concurrent PRs)
+FNAME="$(date +%Y%m%d-%H%M%S)-$(basename "$FILE")"
+cp "$FILE" "/tmp/$FNAME"
+gh release upload screenshots-cdn "/tmp/$FNAME" --clobber
+
+# Resulting URL
+IMG_URL="https://github.com/$REPO/releases/download/screenshots-cdn/$FNAME"
+echo "$IMG_URL"
+```
+
+### Full workflow
+
+1. **Capture** the screenshot (via Chrome DevTools MCP `take_screenshot`, saving to `/tmp/app-<page>.jpg`).
+
+2. **Verify size**: must be under 100MB for GitHub releases (practically never an issue).
+
+3. **Ensure the release exists** (idempotent — safe to run every time):
+   ```bash
+   REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+   gh release view screenshots-cdn 2>/dev/null || \
+     gh release create screenshots-cdn \
+       --prerelease \
+       --title "Screenshots CDN" \
+       --notes "Auto-uploaded PR validation screenshots."
+   ```
+
+4. **Upload**:
+   ```bash
+   FNAME="$(date +%Y%m%d-%H%M%S)-$(basename /tmp/app-<page>.jpg)"
+   cp /tmp/app-<page>.jpg "/tmp/$FNAME"
+   gh release upload screenshots-cdn "/tmp/$FNAME" --clobber
+   IMG_URL="https://github.com/$REPO/releases/download/screenshots-cdn/$FNAME"
+   echo "$IMG_URL"
+   ```
+
+5. **Embed** in PR description or comment:
+   ```bash
+   # Inline HTML (preferred — controls display width)
+   gh pr comment <PR_NUMBER> --body "<img src=\"$IMG_URL\" width=\"800\" alt=\"<page>\">"
+
+   # Or in a PR body via --body-file with the full markdown
+   ```
+
+### Embed formats
+
+**Single screenshot:**
+```html
+<img src="https://github.com/OWNER/REPO/releases/download/screenshots-cdn/FNAME.jpg" width="800" alt="<page> — after">
+```
+
+**Before/after table:**
+```html
+<table>
+  <tr><th>Before</th><th>After</th></tr>
+  <tr>
+    <td><img src="https://github.com/OWNER/REPO/releases/download/screenshots-cdn/before.jpg" width="400" alt="before"></td>
+    <td><img src="https://github.com/OWNER/REPO/releases/download/screenshots-cdn/after.jpg" width="400" alt="after"></td>
+  </tr>
+</table>
+```
+
+**Mobile screenshot** (narrow — embed smaller):
+```html
+<img src="https://github.com/OWNER/REPO/releases/download/screenshots-cdn/mobile.jpg" width="320" alt="<page> — mobile">
+```
+
+---
+
+## Fallback: img402.dev free tier
+
+Use this only if `gh` is unavailable or the release approach fails. Requires `img402.dev`
+to be in the sandbox network allowlist — check `settings.json` before using.
 
 ```bash
 # Upload (multipart)
 curl -s -X POST https://img402.dev/api/free -F image=@/tmp/screenshot.png
 
 # Response
-# {"url":"https://i.img402.dev/aBcDeFgHiJ.png","id":"aBcDeFgHiJ","contentType":"image/png","sizeBytes":182400,"expiresAt":"2026-02-17T..."}
+# {"url":"https://i.img402.dev/aBcDeFgHiJ.png","id":"aBcDeFgHiJ",...,"expiresAt":"..."}
 ```
 
-## Workflow
+**Constraints**: 1MB max, 7-day expiry, 1,000 uploads/day global limit, requires network
+allowlist entry for `img402.dev`.
 
-1. **Get image**: Use an existing file, or capture a screenshot:
-   ```bash
-   screencapture -x /tmp/screenshot.png        # macOS — full screen
-   screencapture -xw /tmp/screenshot.png       # macOS — frontmost window
-   ```
-2. **Verify size**: Must be under 1MB. If larger, resize:
-   ```bash
-   sips -Z 1600 /tmp/screenshot.png  # macOS — scale longest edge to 1600px
-   ```
-3. **Upload**:
-   ```bash
-   curl -s -X POST https://img402.dev/api/free -F image=@/tmp/screenshot.png
-   ```
-4. **Embed** the returned `url` in GitHub markdown:
-   ```markdown
-   ![Screenshot description](https://i.img402.dev/aBcDeFgHiJ.png)
-   ```
-
-## GitHub integration
-
-Use `gh` CLI to embed images in PRs and issues:
-
-```bash
-# Add to PR description
-gh pr edit --body "$(gh pr view --json body -q .body)
-
-![Screenshot](https://i.img402.dev/aBcDeFgHiJ.png)"
-
-# Add as PR comment
-gh pr comment --body "![Screenshot](https://i.img402.dev/aBcDeFgHiJ.png)"
-
-# Add to issue
-gh issue comment 123 --body "![Screenshot](https://i.img402.dev/aBcDeFgHiJ.png)"
-```
-
-## Constraints
-
-- **Max size**: 1MB
-- **Retention**: 7 days — suitable for PR reviews, not permanent docs
-- **Formats**: PNG, JPEG, GIF, WebP
-- **Rate limit**: 1,000 free uploads/day (global)
-- **No auth required**
+---
 
 ## Tips
 
-- Prefer PNG for UI screenshots (sharp text). Use JPEG for photos.
-- If a screenshot is too large, reduce dimensions with `sips -Z 1600` before uploading.
-- When adding to a PR body or comment, use `gh pr comment` or `gh pr edit` with the image markdown.
-
-## Paid tier
-
-For permanent images (1 year, 5MB max), use the paid endpoint at $0.01 USDC via x402. See https://img402.dev/blog/paying-x402-apis for details.
+- Use a descriptive, timestamped filename to avoid asset collisions between parallel PR runs.
+- The `screenshots-cdn` release is a prerelease — it won't appear on the repo's main releases
+  page. Assets persist indefinitely (or until manually deleted).
+- For quick local checks (not PR evidence), skip the upload step entirely.
