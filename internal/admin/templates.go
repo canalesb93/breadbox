@@ -897,14 +897,11 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"formatDate":   components.FormatDate,
 			"relativeDate": components.RelativeDate,
 			"formatNumeric": func(n pgtype.Numeric) string {
-				if !n.Valid {
+				f, ok := pgconv.NumericToFloat(n)
+				if !ok {
 					return ""
 				}
-				f, err := n.Float64Value()
-				if err != nil || !f.Valid {
-					return ""
-				}
-				return service.FormatCurrency(math.Abs(f.Float64))
+				return service.FormatCurrency(math.Abs(f))
 			},
 			"fmtBalance": func(v interface{}) string {
 				var f float64
