@@ -139,12 +139,20 @@ func TestTitleCase(t *testing.T) {
 		{"all caps becomes title case", "STARBUCKS COFFEE", "Starbucks Coffee"},
 		{"all lowercase becomes title case", "starbucks coffee", "Starbucks Coffee"},
 		{"mixed case left untouched", "McDonald's", "McDonald's"},
+		{"mixed case name like iTunes left untouched", "iTunes", "iTunes"},
 		{"short non-article words uppercased", "us bank", "US Bank"},
 		{"small words stay lowercase in middle", "BANK OF AMERICA", "Bank of America"},
 		{"first small word capitalized", "the coffee shop", "The Coffee Shop"},
+		{"first small word capitalized from all caps", "THE HOME DEPOT", "The Home Depot"},
 		{"abbreviations with periods uppercased", "h.e.b grocery", "H.E.B Grocery"},
+		{"abbreviation with trailing period", "h.e.b.", "H.E.B."},
+		{"abbreviation already capitalized stays", "H.E.B.", "H.E.B."},
 		{"single word all caps", "WALMART", "Walmart"},
+		{"all caps multi word", "WHOLE FOODS MARKET", "Whole Foods Market"},
 		{"two-letter acronym uppercased", "ab pharmacy", "AB Pharmacy"},
+		{"three-letter acronym title-cased not all-uppered", "US ATM FEE", "US Atm Fee"},
+		{"two-letter small words stay lowercase mid-phrase", "UP AND AT EM", "UP and at EM"},
+		{"single small word at start gets capitalized", "the", "The"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
