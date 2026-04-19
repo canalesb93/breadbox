@@ -172,21 +172,25 @@ templ perPageOption(size, current int) {
 }
 
 templ txMetaScript(txns []service.AdminTransactionRow) {
-	<script>
-		window.__bbTxMeta = [@txMetaEntries(txns)];
-		if (window.Alpine && Alpine.store('bulk')) Alpine.store('bulk').clear();
-	</script>
+	@templ.Raw(txMetaScriptHTML(txns))
 }
 
-// txMetaEntries renders the inline { id: '...', hasCat: true/false }
-// entries for `window.__bbTxMeta`. Emitted as raw text (no HTML escape)
-// inside the parent <script> — the IDs are server-generated and safe.
-func txMetaEntries(txns []service.AdminTransactionRow) templ.Component {
+// txMetaScriptHTML renders the inline meta <script> that seeds
+// window.__bbTxMeta with `{ id, hasCat }` entries for every visible row
+// and resets the bulk-selection store. Emitted via @templ.Raw because
+// templ's {children} / @component syntax is not recognized inside a
+// <script> literal — the @... reference otherwise lands in the output
+// as literal text and the surrounding expression is a syntax error.
+// IDs are server-generated base62, so they're safe to interpolate
+// without escaping.
+func txMetaScriptHTML(txns []service.AdminTransactionRow) string {
 	var sb strings.Builder
+	sb.WriteString("<script>\nwindow.__bbTxMeta = [")
 	for _, tx := range txns {
 		sb.WriteString(fmt.Sprintf("{ id: %q, hasCat: %t },", tx.ID, tx.CategoryID != nil))
 	}
-	return templ.Raw(sb.String())
+	sb.WriteString("];\nif (window.Alpine && Alpine.store('bulk')) Alpine.store('bulk').clear();\n</script>")
+	return sb.String()
 }
 
 func paginatorURL(base string, page int) templ.SafeURL {

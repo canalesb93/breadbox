@@ -14,7 +14,10 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -232,44 +235,136 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 		// Pull the registered tag list for the multi-select filter UI.
 		allTags, _ := svc.ListTags(ctx)
 
-		data := map[string]any{
-			"PageTitle":         "Transactions",
-			"CurrentPage":      "transactions",
-			"CSRFToken":        GetCSRFToken(r),
-			"Flash":            GetFlash(ctx, sm),
-			"Transactions":     result.Transactions,
-			"DateGroups":       dateGroups,
-			"Accounts":         accounts,
-			"Users":            users,
-			"Categories":       categoryTree,
-			"Connections":      connections,
-			"AllTags":          allTags,
-			"Page":             result.Page,
-			"PageSize":         result.PageSize,
-			"TotalPages":       result.TotalPages,
-			"Total":            result.Total,
-			"ExportURL":         exportURL,
-			"PaginationBase":    paginationBase,
-			"ShowingStart":      (result.Page-1)*result.PageSize + 1,
-			"ShowingEnd":        min(int64(result.Page*result.PageSize), result.Total),
-			"FilterStartDate":  stringOrEmpty(dateParamPtr(r, "start_date")),
-			"FilterEndDate":    stringOrEmpty(dateParamPtr(r, "end_date")),
-			"FilterAccountID":  stringOrEmpty(params.AccountID),
-			"FilterUserID":     stringOrEmpty(params.UserID),
-			"FilterConnID":     stringOrEmpty(params.ConnectionID),
-			"FilterCategory":   stringOrEmpty(params.CategorySlug),
-			"FilterMinAmount":  stringOrEmpty(floatParamPtr(r, "min_amount")),
-			"FilterMaxAmount":  stringOrEmpty(floatParamPtr(r, "max_amount")),
-			"FilterPending":    r.URL.Query().Get("pending"),
-			"FilterSearch":      r.URL.Query().Get("search"),
-			"FilterSearchMode":  r.URL.Query().Get("search_mode"),
-			"FilterSearchField": r.URL.Query().Get("search_field"),
-			"FilterSort":        r.URL.Query().Get("sort"),
-			"FilterTags":        params.Tags,
-			"FilterAnyTag":      params.AnyTag,
-		}
-		tr.Render(w, r, "transactions.html", data)
+		renderTransactions(w, r, tr, transactionsRenderInput{
+			sm:             sm,
+			params:         params,
+			result:         result,
+			dateGroups:     dateGroups,
+			accounts:       accounts,
+			users:          users,
+			categories:     categoryTree,
+			connections:    connections,
+			allTags:        allTags,
+			exportURL:      exportURL,
+			paginationBase: paginationBase,
+		})
 	}
+}
+
+// transactionsRenderInput gathers the handler-side inputs that feed
+// renderTransactions. Kept as a struct so the call site stays readable and
+// future fields can be added without a long positional argument list.
+type transactionsRenderInput struct {
+	sm             *scs.SessionManager
+	params         service.AdminTransactionListParams
+	result         *service.AdminTransactionListResult
+	dateGroups     []DateGroup
+	accounts       []service.AccountResponse
+	users          []db.User
+	categories     []service.CategoryResponse
+	connections    []db.ListBankConnectionsRow
+	allTags        []service.TagResponse
+	exportURL      string
+	paginationBase string
+}
+
+// renderTransactions builds the TransactionsProps view model and hands it to
+// the templ component via RenderWithTempl. Mirrors the renderDashboard pattern
+// in internal/admin/dashboard.go — the handler only has to collect raw inputs;
+// the conversion to the typed props lives here so the templ component stays
+// decoupled from the handler's map[string]any layout data.
+func renderTransactions(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, in transactionsRenderInput) {
+	q := r.URL.Query()
+
+	connOpts := make([]pages.TransactionsConnectionOption, 0, len(in.connections))
+	for _, c := range in.connections {
+		connOpts = append(connOpts, pages.TransactionsConnectionOption{
+			ID:              pgconv.FormatUUID(c.ID),
+			InstitutionName: c.InstitutionName.String,
+		})
+	}
+
+	acctOpts := make([]pages.TransactionsAccountOption, 0, len(in.accounts))
+	for _, a := range in.accounts {
+		mask := ""
+		if a.Mask != nil {
+			mask = *a.Mask
+		}
+		acctOpts = append(acctOpts, pages.TransactionsAccountOption{
+			ID:   a.ID,
+			Name: a.Name,
+			Mask: mask,
+		})
+	}
+
+	userOpts := make([]pages.TransactionsUserOption, 0, len(in.users))
+	for _, u := range in.users {
+		userOpts = append(userOpts, pages.TransactionsUserOption{
+			ID:   pgconv.FormatUUID(u.ID),
+			Name: u.Name,
+		})
+	}
+
+	// Convert internal admin.DateGroup slice into components.TxResultsDateGroup
+	// (same field set, just a different package home).
+	groups := make([]components.TxResultsDateGroup, len(in.dateGroups))
+	for i, g := range in.dateGroups {
+		groups[i] = components.TxResultsDateGroup{
+			Date:         g.Date,
+			Label:        g.Label,
+			Transactions: g.Transactions,
+			DaySpending:  g.DaySpending,
+			DayIncome:    g.DayIncome,
+		}
+	}
+
+	results := components.TxResultsProps{
+		DateGroups:     groups,
+		Transactions:   in.result.Transactions,
+		Page:           in.result.Page,
+		TotalPages:     in.result.TotalPages,
+		PageSize:       in.result.PageSize,
+		Total:          int(in.result.Total),
+		ShowingStart:   (in.result.Page-1)*in.result.PageSize + 1,
+		ShowingEnd:     int(min(int64(in.result.Page*in.result.PageSize), in.result.Total)),
+		PaginationBase: in.paginationBase,
+	}
+
+	props := pages.TransactionsProps{
+		CSRFToken:         GetCSRFToken(r),
+		Total:             in.result.Total,
+		Transactions:      in.result.Transactions,
+		Connections:       connOpts,
+		Accounts:          acctOpts,
+		Users:             userOpts,
+		Categories:        in.categories,
+		AllTags:           in.allTags,
+		FilterStartDate:   stringOrEmpty(dateParamPtr(r, "start_date")),
+		FilterEndDate:     stringOrEmpty(dateParamPtr(r, "end_date")),
+		FilterAccountID:   stringOrEmpty(in.params.AccountID),
+		FilterUserID:      stringOrEmpty(in.params.UserID),
+		FilterConnID:      stringOrEmpty(in.params.ConnectionID),
+		FilterCategory:    stringOrEmpty(in.params.CategorySlug),
+		FilterMinAmount:   stringOrEmpty(floatParamPtr(r, "min_amount")),
+		FilterMaxAmount:   stringOrEmpty(floatParamPtr(r, "max_amount")),
+		FilterPending:     q.Get("pending"),
+		FilterSearch:      q.Get("search"),
+		FilterSearchMode:  q.Get("search_mode"),
+		FilterSearchField: q.Get("search_field"),
+		FilterSort:        q.Get("sort"),
+		FilterTags:        in.params.Tags,
+		FilterAnyTag:      in.params.AnyTag,
+		ExportURL:         in.exportURL,
+		Results:           results,
+	}
+
+	data := map[string]any{
+		"PageTitle":   "Transactions",
+		"CurrentPage": "transactions",
+		"CSRFToken":   GetCSRFToken(r),
+		"Flash":       GetFlash(r.Context(), in.sm),
+	}
+	tr.RenderWithTempl(w, r, data, pages.Transactions(props))
 }
 
 // TransactionSearchHandler serves GET /admin/transactions/search.
@@ -362,24 +457,38 @@ func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 
 		paginationBase := buildPaginationBase(r)
 		dateGroups := groupTransactionsByDate(result.Transactions)
+		_ = categoryTree // categories are no longer needed — rows render tags/labels from DOM-cached data
 
-		data := map[string]any{
-			"Transactions":    result.Transactions,
-			"DateGroups":      dateGroups,
-			"Categories":      categoryTree,
-			"Page":            result.Page,
-			"PageSize":        result.PageSize,
-			"TotalPages":      result.TotalPages,
-			"Total":           result.Total,
-			"PaginationBase":  paginationBase,
-			"ShowingStart":    (result.Page-1)*result.PageSize + 1,
-			"ShowingEnd":      min(int64(result.Page*result.PageSize), result.Total),
-			"CSRFToken":       GetCSRFToken(r),
-			"FilterSearch":    r.URL.Query().Get("search"),
-			"FilterSearchMode": r.URL.Query().Get("search_mode"),
+		// Convert to the templ component's typed props and render the
+		// fragment directly (no shell). This replaces the old
+		// tr.RenderPartial("transactions.html", "tx-results-partial") call
+		// — the TxResults templ component is the canonical source for
+		// both the inline and AJAX render paths.
+		groups := make([]components.TxResultsDateGroup, len(dateGroups))
+		for i, g := range dateGroups {
+			groups[i] = components.TxResultsDateGroup{
+				Date:         g.Date,
+				Label:        g.Label,
+				Transactions: g.Transactions,
+				DaySpending:  g.DaySpending,
+				DayIncome:    g.DayIncome,
+			}
 		}
-
-		tr.RenderPartial(w, r, "transactions.html", "tx-results-partial", data)
+		props := components.TxResultsProps{
+			DateGroups:     groups,
+			Transactions:   result.Transactions,
+			Page:           result.Page,
+			TotalPages:     result.TotalPages,
+			PageSize:       result.PageSize,
+			Total:          int(result.Total),
+			ShowingStart:   (result.Page-1)*result.PageSize + 1,
+			ShowingEnd:     int(min(int64(result.Page*result.PageSize), result.Total)),
+			PaginationBase: paginationBase,
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := pages.TransactionsResults(props).Render(r.Context(), w); err != nil {
+			a.Logger.Error("render transactions results partial", "error", err)
+		}
 	}
 }
 
