@@ -116,9 +116,38 @@
           </div>
 
           {{if .Children}}
+          {{/* Determine whether the parent and every child have zero activity in the selected period.
+               When true we render a single "No activity" hint with subcategory chips instead of
+               a wall of em-dashes for each subcategory. */}}
+          {{$allZero := eq $spending.TransactionCount 0}}
+          {{if $allZero}}
+            {{range .Children}}
+              {{$cs := index $.SpendingByCategory .DisplayName}}
+              {{if gt $cs.TransactionCount 0}}{{$allZero = false}}{{end}}
+            {{end}}
+          {{end}}
           <!-- Children -->
           <div x-show="open" x-cloak x-collapse>
             <div class="border-t border-base-300/30 bg-base-200/20">
+              {{if $allZero}}
+              <!-- Zero-activity compact hint: chips instead of a wall of em-dashes -->
+              <div class="pl-10 sm:pl-14 pr-4 sm:pr-5 py-3">
+                <p class="text-xs text-base-content/50 mb-2">
+                  <i data-lucide="info" class="inline-block w-3 h-3 mr-1 -mt-0.5 align-middle"></i>
+                  No activity in last {{$.SpendingDays}}d &middot; {{len .Children}} subcategories available
+                </p>
+                <div class="flex flex-wrap gap-1.5">
+                  {{range .Children}}
+                  <a href="/categories/{{.ID}}/edit"
+                    class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-base-100 border border-base-300/60 text-base-content/60 hover:text-base-content hover:border-base-content/30 transition-colors {{if .Hidden}}italic text-base-content/40{{end}}"
+                    title="Edit {{.DisplayName}}">
+                    {{if .Icon}}<i data-lucide="{{.Icon}}" class="w-3 h-3"{{if .Color}} style="color: {{safeCSS .Color}}"{{end}}></i>{{end}}
+                    <span>{{.DisplayName}}</span>
+                  </a>
+                  {{end}}
+                </div>
+              </div>
+              {{else}}
               {{range .Children}}
               {{$childSpending := index $.SpendingByCategory .DisplayName}}
               <div class="group grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1fr_auto_auto_auto_auto] items-center gap-3 sm:gap-4 pl-10 sm:pl-14 pr-4 sm:pr-5 py-2.5 hover:bg-base-200/30 transition-colors duration-150">
@@ -179,6 +208,7 @@
                   </div>
                 </div>
               </div>
+              {{end}}
               {{end}}
             </div>
           </div>
