@@ -96,6 +96,10 @@ func AccountLinkDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionM
 		data := BaseTemplateData(r, sm, "connections", "Transaction Matches")
 		data["Link"] = link
 		data["Matches"] = matches
+		data["Breadcrumbs"] = []Breadcrumb{
+			{Label: "Account Links", Href: "/connections?tab=links"},
+			{Label: link.PrimaryAccountName + " → " + link.DependentAccountName},
+		}
 
 		tr.Render(w, r, "account_link_detail.html", data)
 	}
