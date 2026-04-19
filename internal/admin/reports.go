@@ -131,9 +131,13 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 
 		data := BaseTemplateData(r, sm, "reports", report.Title)
 		data["Report"] = detail
+		// Use a short, fixed label for the current-page crumb. Agent report
+		// titles can be full sentences; interpolating them into the breadcrumb
+		// overflows on mobile/tablet and visually competes with the header
+		// card below, which already shows the full title.
 		data["Breadcrumbs"] = []Breadcrumb{
 			{Label: "Reports", Href: "/reports"},
-			{Label: report.Title},
+			{Label: "Report"},
 		}
 		tr.Render(w, r, "report_detail.html", data)
 	}

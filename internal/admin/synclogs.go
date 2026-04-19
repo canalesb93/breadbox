@@ -3,7 +3,6 @@ package admin
 import (
 	"net/http"
 	"net/url"
-	"strconv"
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
@@ -19,13 +18,8 @@ func SyncLogsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, s
 
 		// Parse query params.
 		q := r.URL.Query()
-		page, _ := strconv.Atoi(q.Get("page"))
-		if page < 1 {
-			page = 1
-		}
-
 		params := service.SyncLogListParams{
-			Page:         page,
+			Page:         queryPage(r, "page"),
 			PageSize:     25,
 			ConnectionID: optStrQuery(q, "connection_id"),
 			Status:       optStrQuery(q, "status"),

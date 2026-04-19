@@ -2,7 +2,6 @@ package admin
 
 import (
 	"net/http"
-	"strconv"
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
@@ -30,13 +29,8 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 		// Always fetch sync logs data.
 		{
 			q := r.URL.Query()
-			page, _ := strconv.Atoi(q.Get("page"))
-			if page < 1 {
-				page = 1
-			}
-
 			params := service.SyncLogListParams{
-				Page:         page,
+				Page:         queryPage(r, "page"),
 				PageSize:     25,
 				ConnectionID: optStrQuery(q, "connection_id"),
 				Status:       optStrQuery(q, "status"),
@@ -131,13 +125,8 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 
 		// Always fetch webhook events data.
 		{
-			page, _ := strconv.Atoi(r.URL.Query().Get("wh_page"))
-			if page < 1 {
-				page = 1
-			}
-
 			params := service.WebhookEventListParams{
-				Page:     page,
+				Page:     queryPage(r, "wh_page"),
 				PageSize: 25,
 			}
 
