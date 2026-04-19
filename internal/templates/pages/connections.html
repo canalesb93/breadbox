@@ -122,15 +122,7 @@
               {{if .IsStale}}
               <span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-warning/10 text-warning">Stale</span>
               {{else if and (eq .LastSyncStatus "error") (eq (printf "%s" .Status) "active")}}
-              <span class="relative group/err">
-                <span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-error/10 text-error cursor-help">Sync Error</span>
-                {{if .LastSyncErrorMessage.Valid}}
-                <span class="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/err:block w-64 sm:w-80 px-3 py-2.5 rounded-lg bg-base-300 text-xs shadow-lg border border-error/20 leading-relaxed">
-                  <span class="flex items-center gap-1.5 text-error font-medium mb-1"><i data-lucide="alert-circle" class="w-3 h-3"></i>Last sync failed</span>
-                  <span class="text-base-content/70">{{.LastSyncErrorMessage.String}}</span>
-                </span>
-                {{end}}
-              </span>
+              <span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-error/10 text-error">Sync Error</span>
               {{else}}
               {{statusBadge (printf "%s" .Status)}}
               {{end}}
@@ -191,9 +183,16 @@
       <a href="/connections/{{formatUUID .ID}}" class="btn btn-ghost btn-xs rounded-lg shrink-0" @click.stop>View Details</a>
       {{end}}
     </div>
+    {{else if and (eq .LastSyncStatus "error") (eq (printf "%s" .Status) "active")}}
+    <!-- Inline sync error message — touch/keyboard accessible (#576) -->
+    <div class="mx-4 sm:mx-6 mb-4 flex items-start justify-between gap-2 text-xs text-error bg-error/10 rounded-lg px-3 py-2">
+      <div class="flex items-start gap-2 min-w-0">
+        <i data-lucide="alert-circle" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
+        <span class="min-w-0 break-words">{{if .LastSyncErrorMessage.Valid}}{{.LastSyncErrorMessage.String}}{{else}}Last sync failed.{{end}}</span>
+      </div>
+      <a href="/connections/{{formatUUID .ID}}" class="btn btn-ghost btn-xs rounded-lg shrink-0" @click.stop>View Details</a>
+    </div>
     {{end}}
-
-    {{/* Error message communicated via badge tooltip on hover */}}
 
     {{if .NewAccountsAvailable}}
     <div class="mx-6 mb-4 flex items-center gap-2 text-xs text-info bg-info/10 rounded-lg px-3 py-2">
