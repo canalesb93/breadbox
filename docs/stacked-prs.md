@@ -39,8 +39,20 @@ stack/review-ui/04-templates
 Pass the name explicitly to `gt`:
 
 ```bash
-gt create -b stack/review-ui/01-add-migration -am "review-ui: add reviews table"
+gt create stack/review-ui/01-add-migration -am "review-ui: add reviews table"
 ```
+
+### PR titles and bodies
+
+`gt submit` picks up PR metadata one of three ways. Pick one; don't mix:
+
+**Option 1 — `--ai` (default in this repo).** Graphite generates the title and body from the commit subject, body, and diff. This is the lowest-friction path for agent-driven stacks and is what the command line above uses. Re-running `gt submit --ai` on an already-open PR does **not** regenerate — `--ai` only populates the first time.
+
+**Option 2 — Commit-driven (no `--ai`, no `--no-interactive`).** In an interactive TTY, `gt submit` prompts inline and seeds the prompts with the commit subject + body. This is the humans-at-keyboards default and is what the Graphite docs assume.
+
+**Option 3 — Pre-written body files (any mode).** Drop a `.github/pull_request_template/stack-<topic>-<NN>.md` (or any convenient file) per PR and apply them after submit with `gh pr edit <num> --body-file …`. Use this when the body needs to be richer than what `--ai` produces (e.g., screenshots, cross-PR checklists, hand-curated test plans).
+
+**What NOT to use:** `gt submit --no-interactive` by itself leaves the PR body as the repo's `.github/pull_request_template.md` placeholder — empty from a reviewer's perspective. Always pair `--no-interactive` with either `--ai` or a follow-up `gh pr edit --body-file`.
 
 ### Stack metadata in PR bodies
 
@@ -58,11 +70,11 @@ The first PR in a stack targets `main`. Subsequent PRs target their parent branc
 
 ```bash
 gt sync                                          # pull main, restack, prune merged branches
-gt create -b stack/<topic>/01-<slug> -am "..."   # create branch + commit as one step
+gt create stack/<topic>/01-<slug> -am "..."   # create branch + commit as one step
 # implement, test
-gt create -b stack/<topic>/02-<slug> -am "..."   # stack next branch on top
+gt create stack/<topic>/02-<slug> -am "..."   # stack next branch on top
 # implement, test
-gt submit --stack --no-interactive               # push all, open/update PRs
+gt submit --stack --publish --ai --no-interactive  # push all, open/update PRs
 ```
 
 ### Amending a branch mid-stack
@@ -70,8 +82,8 @@ gt submit --stack --no-interactive               # push all, open/update PRs
 Check out the branch, edit, then:
 
 ```bash
-gt modify --amend                                # amend current branch's commit and restack dependents
-gt submit --stack --no-interactive               # update all affected PRs
+gt modify -u                                       # amend current branch's commit (default) + restack dependents; -u stages tracked updates
+gt submit --stack --publish --no-interactive       # update already-open PRs (no --ai needed; bodies already set)
 ```
 
 Never `git commit --amend` + `git push --force` on a stacked branch — `gt modify` is what preserves the stack state.
@@ -81,8 +93,8 @@ Never `git commit --amend` + `git push --force` on a stacked branch — `gt modi
 Other PRs will land on `main` while your stack is open:
 
 ```bash
-gt sync                                          # pulls main, restacks your entire stack onto the new tip
-gt submit --stack --no-interactive               # force-with-lease the restacked branches
+gt sync                                            # pulls main, restacks your entire stack onto the new tip
+gt submit --stack --publish --no-interactive       # force-with-lease the restacked branches
 ```
 
 ### Landing (merging)
@@ -121,9 +133,10 @@ Each PR in a stack runs CI independently against its own tip. There's no merge-q
 | Task | Command |
 |---|---|
 | Start fresh from main | `gt sync && gt trunk` |
-| New branch stacked on current | `gt create -b <name> -am "<msg>"` |
-| Push + open/update all PRs | `gt submit --stack --no-interactive` |
-| Amend current branch | `gt modify --amend` |
+| New branch stacked on current | `gt create <name> -am "<msg>"` |
+| Push + open all PRs (first submit) | `gt submit --stack --publish --ai --no-interactive` |
+| Push updates to already-open PRs | `gt submit --stack --publish --no-interactive` |
+| Amend current branch | `gt modify -u` |
 | Pull main and restack | `gt sync` |
 | See the stack | `gt log short` |
 | Merge the bottom PR | `gt land` |
