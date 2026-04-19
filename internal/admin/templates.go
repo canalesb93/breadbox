@@ -1018,12 +1018,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		},
 	}
 
-	// Pages using the wizard layout — all migrated to templ. See
-	// internal/templates/components/pages/{login,setup_account,setup_create_admin,oauth_authorize}.templ.
-	// The slice and loop below are left in place intentionally; a follow-up
-	// PR deletes them along with layout/wizard.html.
-	wizardPages := []string{}
-
 	for _, page := range basePages {
 		if err := tr.parseBasePage(page); err != nil {
 			return err
@@ -1040,21 +1034,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		if err != nil {
 			return fmt.Errorf("parse composite page %s: %w", page, err)
 		}
-		name := path.Base(page)
-		tr.templates[name] = t
-		tr.specs[name] = files
-	}
-
-	for _, page := range wizardPages {
-		files := []string{"layout/wizard.html"}
-		files = append(files, templatePartials...)
-		files = append(files, page)
-
-		t, err := template.New("").Funcs(tr.funcMap).ParseFS(templates.FS, files...)
-		if err != nil {
-			return fmt.Errorf("parse wizard page %s: %w", page, err)
-		}
-		// Store using just the filename (e.g., "login.html").
 		name := path.Base(page)
 		tr.templates[name] = t
 		tr.specs[name] = files
