@@ -2,7 +2,6 @@ package admin
 
 import (
 	"net/http"
-	"strconv"
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
@@ -15,13 +14,8 @@ func WebhookEventsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-		if page < 1 {
-			page = 1
-		}
-
 		params := service.WebhookEventListParams{
-			Page:     page,
+			Page:     queryPage(r, "page"),
 			PageSize: 25,
 		}
 
