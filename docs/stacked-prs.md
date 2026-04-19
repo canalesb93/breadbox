@@ -44,15 +44,44 @@ gt create stack/review-ui/01-add-migration -am "review-ui: add reviews table"
 
 ### PR titles and bodies
 
-`gt submit` picks up PR metadata one of three ways. Pick one; don't mix:
+**Write them yourself.** `gt submit --no-interactive` on its own leaves the PR body as the repo's `.github/pull_request_template.md` placeholder, which reads as empty in review. Close the gap with pre-written body files and a post-submit fixup pass:
 
-**Option 1 — `--ai` (default in this repo).** Graphite generates the title and body from the commit subject, body, and diff. This is the lowest-friction path for agent-driven stacks and is what the command line above uses. Re-running `gt submit --ai` on an already-open PR does **not** regenerate — `--ai` only populates the first time.
+```bash
+gt submit --stack --publish --no-interactive
+# For each new PR the submit produced (bottom to top):
+gh pr edit <pr> --title "<topic>: <clear title>" --body-file /tmp/body-<pr>.md
+```
 
-**Option 2 — Commit-driven (no `--ai`, no `--no-interactive`).** In an interactive TTY, `gt submit` prompts inline and seeds the prompts with the commit subject + body. This is the humans-at-keyboards default and is what the Graphite docs assume.
+The body files are drafted during the implementation phase (one per PR) and kept in `/tmp/` or another scratch location — they're throwaway artifacts of the submit step.
 
-**Option 3 — Pre-written body files (any mode).** Drop a `.github/pull_request_template/stack-<topic>-<NN>.md` (or any convenient file) per PR and apply them after submit with `gh pr edit <num> --body-file …`. Use this when the body needs to be richer than what `--ai` produces (e.g., screenshots, cross-PR checklists, hand-curated test plans).
+**Do not use `--ai`.** Graphite's `--ai` flag ships each commit's code + related codebase context to their AI subprocessors (Anthropic, OpenAI) and returns a generated title and body. Two reasons this is off for Breadbox:
 
-**What NOT to use:** `gt submit --no-interactive` by itself leaves the PR body as the repo's `.github/pull_request_template.md` placeholder — empty from a reviewer's perspective. Always pair `--no-interactive` with either `--ai` or a follow-up `gh pr edit --body-file`.
+1. **Accuracy.** The AI summarizes what it sees in the diff, which in practice means latching onto a salient detail and inflating it. [#546](https://github.com/canalesb93/breadbox/pull/546) landed with an AI title that picked the PR's secondary recommendation and omitted the primary — technically sourced from the diff, functionally misleading. Human-written titles don't have that failure mode.
+2. **Privacy.** Breadbox is self-hosted financial-data infrastructure. There's no reason to ship source to Graphite → an LLM provider. Their [AI privacy doc](https://graphite.com/docs/ai-privacy-and-security) confirms this is opt-in per-command for exactly this kind of concern.
+
+**Interactive alternative (not used in this harness).** In a real TTY, `gt submit` without `--no-interactive` prompts inline and seeds each prompt with the commit subject + body. Humans-at-keyboards default; doesn't work in the agent harness because there's no stdin.
+
+### Labeling stacked PRs
+
+Every PR that's part of a stack gets two GitHub labels so they're easy to filter from the PR dashboard:
+
+1. **`stacked`** — catches every stacked PR across all topics. Filter link: [`label:stacked`](https://github.com/canalesb93/breadbox/pulls?q=is%3Apr+label%3Astacked).
+2. **`stack/<topic>`** — per-topic grouping (e.g. `stack/templ-wizard`). Matches the branch prefix. If the label doesn't exist yet, create it during submit:
+
+```bash
+gh label create "stack/<topic>" --repo canalesb93/breadbox --color "B866F8" \
+  --description "PRs in the <topic> stack" 2>/dev/null || true
+```
+
+Apply both to every new PR in the stack, in the same loop as the body-file fixup:
+
+```bash
+for pr in <n1> <n2> <n3>; do
+  gh pr edit "$pr" --add-label stacked --add-label "stack/<topic>"
+done
+```
+
+Single-PR submits (not multi-PR stacks) do **not** get the `stacked` label — it's reserved for actual stacks of 2+ PRs where the dashboard view benefits from the filter.
 
 ### Stack metadata in PR bodies
 
@@ -74,7 +103,7 @@ gt create stack/<topic>/01-<slug> -am "..."   # create branch + commit as one st
 # implement, test
 gt create stack/<topic>/02-<slug> -am "..."   # stack next branch on top
 # implement, test
-gt submit --stack --publish --ai --no-interactive  # push all, open/update PRs
+gt submit --stack --publish --no-interactive       # push all, open/update PRs; follow up with gh pr edit per PR (title + body + labels)
 ```
 
 ### Amending a branch mid-stack
@@ -83,7 +112,7 @@ Check out the branch, edit, then:
 
 ```bash
 gt modify -u                                       # amend current branch's commit (default) + restack dependents; -u stages tracked updates
-gt submit --stack --publish --no-interactive       # update already-open PRs (no --ai needed; bodies already set)
+gt submit --stack --publish --no-interactive       # update already-open PRs; title, body, and labels persist
 ```
 
 Never `git commit --amend` + `git push --force` on a stacked branch — `gt modify` is what preserves the stack state.
@@ -151,7 +180,7 @@ GitHub's auto-merge (via `--merge-when-ready` or `gh pr merge --auto`) waits on 
 |---|---|
 | Start fresh from main | `gt sync && gt trunk` |
 | New branch stacked on current | `gt create <name> -am "<msg>"` |
-| Push + open all PRs (first submit) | `gt submit --stack --publish --ai --no-interactive` |
+| Push + open all PRs (first submit) | `gt submit --stack --publish --no-interactive` then per-PR `gh pr edit <num> --title "..." --body-file body-<num>.md --add-label stacked --add-label "stack/<topic>"` |
 | Push updates to already-open PRs | `gt submit --stack --publish --no-interactive` |
 | Amend current branch | `gt modify -u` |
 | Pull main and restack | `gt sync` |

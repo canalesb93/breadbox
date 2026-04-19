@@ -81,37 +81,53 @@ Note: pass the branch name positionally. The `-b` flag shown in some Graphite do
 
 ## Submit Mode
 
-Push everything and open/update PRs. The flag combination depends on whether PRs already exist.
-
-**First submit (PRs don't exist yet):**
-
-```bash
-gt submit --stack --publish --ai --no-interactive
-```
-
-- `--ai` populates title + description from each commit + diff. Only works on initial PR creation — it's a no-op on already-open PRs.
-- `--publish` opens as ready-for-review instead of draft (the default when `--no-interactive` is set).
-- `--no-interactive` keeps it harness-safe (no inline prompts, no stalled stdin).
-
-**Subsequent pushes (PRs already exist):**
+Push everything and open/update PRs. Same flag combination whether PRs are new or already open:
 
 ```bash
 gt submit --stack --publish --no-interactive
 ```
 
-Drop `--ai` — title and body are already set; AI won't re-generate them, and including the flag just burns time.
+- `--publish` opens as ready-for-review (not draft — the default when `--no-interactive` is set).
+- `--no-interactive` keeps it harness-safe (no inline prompts, no stalled stdin).
 
-**What NOT to use:** `gt submit --stack --no-interactive` on its own. That leaves the PR body as the repo's `.github/pull_request_template.md` placeholder, which reads as empty in review.
+**Do NOT pass `--ai`.** Graphite's `--ai` flag ships each commit's code + "related or similar parts of your codebase" to their AI subprocessors (Anthropic, OpenAI). Two problems for Breadbox: (1) observed inaccuracy — see [#546](https://github.com/canalesb93/breadbox/pull/546), where `--ai` produced a title that emphasized the PR's secondary recommendation and omitted the primary; (2) privacy — we don't ship source for a self-hosted financial app. Write titles and bodies yourself.
 
-After submit:
+### After submit — metadata + labels per PR
 
-1. Capture the PR URLs from the command output.
-2. Print them in order (bottom to top) so the user can start review from the base.
-3. Spot-check the bodies: if `--ai` produced something thin (no "why this PR exists" line, no test plan, no screenshots for a UI PR), either:
-   - Pre-write a `body-NN.md` file and apply via `gh pr edit <num> --body-file body-NN.md`, or
-   - Use `mcp__github__update_pull_request` to fill in the sections that matter.
+Bare `gt submit --no-interactive` leaves each PR body as the repo's PR template placeholder. Close the gap in a single loop:
 
-Leave the `<!-- Graphite stack -->` block alone — `gt` owns it and will overwrite hand edits on the next submit.
+```bash
+# Ensure the topic label exists (idempotent; create once per topic)
+gh label create "stack/<topic>" --repo canalesb93/breadbox --color B866F8 \
+  --description "PRs in the <topic> stack" 2>/dev/null || true
+
+# For each PR the submit just opened (bottom to top):
+for pr in <n1> <n2> <n3>; do
+  gh pr edit "$pr" \
+    --title "<topic>: <clear human-written title>" \
+    --body-file "/tmp/body-$pr.md" \
+    --add-label stacked \
+    --add-label "stack/<topic>"
+done
+```
+
+Author the `body-<pr>.md` files during the implementation phase, not after — the context is fresher. Keep them in `/tmp` (throwaway per session).
+
+**Single-PR submits** (one branch, not a stack) skip the `stacked` + `stack/<topic>` labels — they're reserved for actual multi-PR stacks so the dashboard filter stays meaningful.
+
+**On subsequent submits** (re-pushing amended branches), skip the title/body/label step — they persist across `gt submit`.
+
+### Print the stack state
+
+Capture the PR numbers from the submit output and print URLs bottom-to-top so the user can start review from the base:
+
+```
+#<n1>  (stack/<topic>/01-<slug>)  — bottom
+#<n2>  (stack/<topic>/02-<slug>)
+#<n3>  (stack/<topic>/03-<slug>)  — top
+```
+
+**Leave the `<!-- Graphite stack -->` block alone** — `gt` owns it and will overwrite hand edits on the next submit.
 
 ---
 

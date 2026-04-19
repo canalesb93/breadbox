@@ -25,8 +25,9 @@ Always use `gt` for branch/PR operations when in a stack:
 
 - `gt sync` before starting — pulls `main`, restacks open stacks, prunes merged branches.
 - `gt create stack/<topic>/<NN>-<slug> -am "..."` for each new branch in the stack. Positional branch name; `-am` stages all and commits in one step (if nothing is staged, creates an empty branch to fill in later).
-- **First submit:** `gt submit --stack --publish --ai --no-interactive`. `--ai` populates title + body from the commit; `--publish` opens as ready-for-review (not draft); `--no-interactive` keeps it harness-safe.
-- **Subsequent pushes:** `gt submit --stack --publish --no-interactive` — no `--ai` (it only fires on initial PR creation).
+- **First submit:** `gt submit --stack --publish --no-interactive`. `--publish` opens as ready-for-review (not draft); `--no-interactive` keeps it harness-safe. Follow up **per PR** with `gh pr edit <num> --title "..." --body-file /tmp/body-<num>.md --add-label stacked --add-label "stack/<topic>"` to set metadata + labels yourself.
+- **Subsequent pushes:** `gt submit --stack --publish --no-interactive`. Title, body, and labels persist from the initial submit.
+- **Do not use `--ai`.** It ships diffs + related codebase context to Graphite's AI subprocessors (Anthropic, OpenAI) and has produced inaccurate titles in practice (see #546). Both reasons — privacy and accuracy — are spelled out in `docs/stacked-prs.md`.
 - `gt modify -u` for mid-stack edits — amends the current branch's commit (the default behavior; `-u` stages all tracked updates) and auto-restacks descendants. Never `git commit --amend` + force-push.
 - Landing: `gt land` is not in the installed CLI. Either pass `--merge-when-ready` on the submit (queues GitHub auto-merge for every PR in the stack) or run `gh pr merge <bottom-pr> --auto --squash`. After each merge: `gt sync` + re-submit to restack the tail.
 
@@ -36,7 +37,20 @@ Never `git push` or `git checkout -b` directly once you're on a stack — it des
 
 `gt submit` inserts and maintains a `<!-- Graphite stack -->` block at the top of each PR body. Do not hand-edit it. Write the rest of the description as usual; the first line should be a one-sentence standalone justification for this PR.
 
-**If `--ai`-generated output isn't rich enough** (needs screenshots, cross-PR checklists, hand-curated test plan), pre-write `body-NN.md` files during the implementation phase and after submit run `gh pr edit <pr-number> --body-file body-NN.md`. Never call `gt submit --no-interactive` without either `--ai` or a follow-up `gh pr edit` — the bare non-interactive form leaves the repo's PR template as the body, which reads as empty in review.
+**Bare `gt submit --no-interactive` leaves the body as the repo's PR template** (empty from a reviewer's perspective). Always pair it with a follow-up `gh pr edit <pr> --body-file /tmp/body-<pr>.md` per PR. Author the body files during the implementation phase.
+
+## Labeling
+
+Every PR in a real stack (2+ PRs) gets two labels in the GitHub dashboard, applied right after submit:
+
+1. **`stacked`** — catches every stacked PR across topics. Already exists in the repo.
+2. **`stack/<topic>`** — per-topic grouping (mirrors the branch prefix, e.g. `stack/templ-wizard`). If missing, create it:
+   ```bash
+   gh label create "stack/<topic>" --repo canalesb93/breadbox --color B866F8 \
+     --description "PRs in the <topic> stack" 2>/dev/null || true
+   ```
+
+Apply via `gh pr edit <pr> --add-label stacked --add-label "stack/<topic>"` in the same loop as the body-file fixup. Single-PR submits don't get `stacked` — it's reserved for actual multi-PR stacks.
 
 ## Review iteration
 
