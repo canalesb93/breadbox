@@ -70,8 +70,10 @@ Create the next branch in the current stack. Requires `<slug>` as an argument.
 4. Run:
 
 ```bash
-gt create -b stack/<topic>/<NN>-<slug> -am "<topic>: <one-line commit msg>"
+gt create stack/<topic>/<NN>-<slug> -am "<topic>: <one-line commit msg>"
 ```
+
+Note: pass the branch name positionally. The `-b` flag shown in some Graphite docs isn't accepted by the current CLI — it errors with `Unknown argument: b`.
 
 5. Confirm the new branch is the tip of the stack via `gt log short`.
 
@@ -79,17 +81,37 @@ gt create -b stack/<topic>/<NN>-<slug> -am "<topic>: <one-line commit msg>"
 
 ## Submit Mode
 
-Push everything and open/update PRs.
+Push everything and open/update PRs. The flag combination depends on whether PRs already exist.
+
+**First submit (PRs don't exist yet):**
 
 ```bash
-gt submit --stack --no-interactive --no-edit
+gt submit --stack --publish --ai --no-interactive
 ```
+
+- `--ai` populates title + description from each commit + diff. Only works on initial PR creation — it's a no-op on already-open PRs.
+- `--publish` opens as ready-for-review instead of draft (the default when `--no-interactive` is set).
+- `--no-interactive` keeps it harness-safe (no inline prompts, no stalled stdin).
+
+**Subsequent pushes (PRs already exist):**
+
+```bash
+gt submit --stack --publish --no-interactive
+```
+
+Drop `--ai` — title and body are already set; AI won't re-generate them, and including the flag just burns time.
+
+**What NOT to use:** `gt submit --stack --no-interactive` on its own. That leaves the PR body as the repo's `.github/pull_request_template.md` placeholder, which reads as empty in review.
 
 After submit:
 
 1. Capture the PR URLs from the command output.
 2. Print them in order (bottom to top) so the user can start review from the base.
-3. If any PR body lacks a "why this PR exists" line under the `<!-- Graphite stack -->` block, offer to fill it in via `mcp__github__update_pull_request`.
+3. Spot-check the bodies: if `--ai` produced something thin (no "why this PR exists" line, no test plan, no screenshots for a UI PR), either:
+   - Pre-write a `body-NN.md` file and apply via `gh pr edit <num> --body-file body-NN.md`, or
+   - Use `mcp__github__update_pull_request` to fill in the sections that matter.
+
+Leave the `<!-- Graphite stack -->` block alone — `gt` owns it and will overwrite hand edits on the next submit.
 
 ---
 
@@ -127,6 +149,7 @@ Before calling `gt land`:
 ```bash
 gt checkout <bottom-branch>
 gt land --no-interactive
+gt submit --stack --publish --no-interactive  # after land, restack + force-push the remainder
 ```
 
 After a successful land, run `gt log short` and report which PR is next in line.
