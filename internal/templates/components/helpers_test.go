@@ -172,6 +172,31 @@ func TestPluralS(t *testing.T) {
 	}
 }
 
+func TestExportedWrappersDelegate(t *testing.T) {
+	// Each exported wrapper must return the same value as its lowercase
+	// counterpart so the admin funcMap and .templ files stay in lock-step.
+	if got, want := FirstChar("apple"), firstChar("apple"); got != want {
+		t.Errorf("FirstChar = %q, want %q", got, want)
+	}
+	if got, want := FormatDate("2024-03-15"), formatDate("2024-03-15"); got != want {
+		t.Errorf("FormatDate = %q, want %q", got, want)
+	}
+	if got, want := FormatAmount(-1.5), formatAmount(-1.5); got != want {
+		t.Errorf("FormatAmount = %q, want %q", got, want)
+	}
+	if got, want := TitleCase("STARBUCKS"), titleCase("STARBUCKS"); got != want {
+		t.Errorf("TitleCase = %q, want %q", got, want)
+	}
+	if got, want := PluralS(2), pluralS(2); got != want {
+		t.Errorf("PluralS = %q, want %q", got, want)
+	}
+	// RelativeDate goes through time.Now() — just assert it returns non-empty
+	// for a valid date.
+	if got := RelativeDate("2024-01-01"); got == "" {
+		t.Error("RelativeDate returned empty string for valid input")
+	}
+}
+
 func TestAmount2f(t *testing.T) {
 	tests := []struct {
 		in   float64
