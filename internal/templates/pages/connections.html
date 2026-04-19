@@ -3,7 +3,7 @@
      x-init="$watch('tab', function(v) { var u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); })">
 
 <!-- Page Header -->
-<div class="flex flex-col items-start sm:flex-row sm:items-center justify-between gap-3 mb-6">
+<div class="bb-page-header">
   <div class="flex items-baseline gap-3 flex-wrap">
     <h1 class="bb-page-title">Connections</h1>
     {{if .Connections}}
@@ -196,7 +196,7 @@
     {{/* Error message communicated via badge tooltip on hover */}}
 
     {{if .NewAccountsAvailable}}
-    <div class="mx-6 mb-4 flex items-center gap-2 text-xs text-info bg-info/10 rounded-lg px-3 py-2">
+    <div class="mx-4 sm:mx-6 mb-4 flex items-center gap-2 text-xs text-info bg-info/10 rounded-lg px-3 py-2">
       <i data-lucide="plus-circle" class="w-3.5 h-3.5 shrink-0"></i>
       <span>New accounts available to link</span>
     </div>
@@ -255,7 +255,7 @@
     </div>
     <h3 class="text-lg font-semibold mb-1">No bank connections yet</h3>
     <p class="text-sm text-base-content/60 max-w-sm mb-4">Connect your first bank to start syncing transactions and tracking your finances.</p>
-    <a href="/connections/new" class="btn btn-primary rounded-xl">
+    <a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">
       <i data-lucide="plus" class="w-4 h-4"></i>
       Connect Your First Bank
     </a>
