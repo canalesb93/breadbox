@@ -19,22 +19,9 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-		if page < 1 {
-			page = 1
-		}
-
-		pageSize := 50
-		if v, err := strconv.Atoi(r.URL.Query().Get("per_page")); err == nil {
-			switch v {
-			case 25, 50, 100:
-				pageSize = v
-			}
-		}
-
 		params := service.TransactionRuleListParams{
-			Page:     page,
-			PageSize: pageSize,
+			Page:     parsePage(r),
+			PageSize: parsePerPage(r, 50, 25, 50, 100),
 		}
 
 		if v := r.URL.Query().Get("search"); v != "" {

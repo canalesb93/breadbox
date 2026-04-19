@@ -1,11 +1,78 @@
 package admin
 
 import (
+	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// parsePage returns the 1-indexed page from ?page=, flooring at 1 when the
+// param is missing, non-numeric, or less than 1.
+func parsePage(r *http.Request) int {
+	return parsePageKey(r, "page")
+}
+
+// parsePageKey is like parsePage but reads from an arbitrary query-param name.
+// Useful on pages that host multiple independent lists (e.g. ?page=1&wh_page=2).
+func parsePageKey(r *http.Request, key string) int {
+	page, _ := strconv.Atoi(r.URL.Query().Get(key))
+	if page < 1 {
+		page = 1
+	}
+	return page
+}
+
+// parsePerPage returns the validated ?per_page= value. It falls back to
+// defaultSize when the param is missing, non-numeric, or not in allowed.
+// An empty allowed list means any positive integer is accepted.
+func parsePerPage(r *http.Request, defaultSize int, allowed ...int) int {
+	v, err := strconv.Atoi(r.URL.Query().Get("per_page"))
+	if err != nil {
+		return defaultSize
+	}
+	if len(allowed) == 0 {
+		if v > 0 {
+			return v
+		}
+		return defaultSize
+	}
+	for _, a := range allowed {
+		if v == a {
+			return v
+		}
+	}
+	return defaultSize
+}
+
+// parseDateParam parses the YYYY-MM-DD value of r.URL.Query().Get(key) into a
+// *time.Time. Returns nil when the param is missing or malformed, matching the
+// "silently drop invalid filters" convention used across admin handlers.
+func parseDateParam(r *http.Request, key string) *time.Time {
+	v := r.URL.Query().Get(key)
+	if v == "" {
+		return nil
+	}
+	t, err := time.Parse("2006-01-02", v)
+	if err != nil {
+		return nil
+	}
+	return &t
+}
+
+// parseInclusiveDateParam behaves like parseDateParam but adds one day so the
+// parsed value can be used as an exclusive upper bound that still includes the
+// entire given calendar date (e.g. `date < end+1 day`).
+func parseInclusiveDateParam(r *http.Request, key string) *time.Time {
+	t := parseDateParam(r, key)
+	if t == nil {
+		return nil
+	}
+	next := t.AddDate(0, 0, 1)
+	return &next
+}
 
 // splitCSV splits a comma-separated string into trimmed non-empty entries.
 // Used by URL params that accept multi-value lists (e.g. ?tags=a,b,c).

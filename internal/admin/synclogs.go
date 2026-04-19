@@ -3,8 +3,6 @@ package admin
 import (
 	"net/http"
 	"net/url"
-	"strconv"
-	"time"
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
@@ -19,14 +17,11 @@ func SyncLogsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, s
 		ctx := r.Context()
 
 		// Parse query params.
-		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-		if page < 1 {
-			page = 1
-		}
-
 		params := service.SyncLogListParams{
-			Page:     page,
+			Page:     parsePage(r),
 			PageSize: 25,
+			DateFrom: parseDateParam(r, "date_from"),
+			DateTo:   parseInclusiveDateParam(r, "date_to"),
 		}
 
 		if connID := r.URL.Query().Get("connection_id"); connID != "" {
@@ -37,18 +32,6 @@ func SyncLogsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, s
 		}
 		if trigger := r.URL.Query().Get("trigger"); trigger != "" {
 			params.Trigger = &trigger
-		}
-		if v := r.URL.Query().Get("date_from"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				params.DateFrom = &t
-			}
-		}
-		if v := r.URL.Query().Get("date_to"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				// Add one day so the end date is inclusive.
-				t = t.AddDate(0, 0, 1)
-				params.DateTo = &t
-			}
 		}
 
 		// Fetch paginated sync logs.
