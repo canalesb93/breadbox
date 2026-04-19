@@ -173,6 +173,13 @@ func assertTagChipData(data any) (components.TagChipData, error) {
 			return components.TagChipData{}, nil
 		}
 		return components.TagChipDataFromResponse(*v), nil
+	case TagRow:
+		return components.TagChipDataFromResponse(v.TagResponse), nil
+	case *TagRow:
+		if v == nil {
+			return components.TagChipData{}, nil
+		}
+		return components.TagChipDataFromResponse(v.TagResponse), nil
 	case service.AdminTransactionTag:
 		return components.TagChipDataFromTx(v), nil
 	case components.TagChipData:
