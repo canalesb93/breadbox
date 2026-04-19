@@ -384,9 +384,9 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 		bankConn, err := a.Queries.CreateBankConnection(r.Context(), db.CreateBankConnectionParams{
 			UserID:           userID,
 			Provider:         db.ProviderType(providerName),
-			InstitutionID:    pgtype.Text{String: req.InstitutionID, Valid: true},
-			InstitutionName:  pgtype.Text{String: req.InstitutionName, Valid: true},
-			ExternalID:           pgtype.Text{String: conn.ExternalID, Valid: true},
+			InstitutionID:    pgconv.Text(req.InstitutionID),
+			InstitutionName:  pgconv.Text(req.InstitutionName),
+			ExternalID:           pgconv.Text(conn.ExternalID),
 			EncryptedCredentials: conn.EncryptedCredentials,
 			Status:           db.ConnectionStatusActive,
 		})

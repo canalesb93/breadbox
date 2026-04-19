@@ -6,8 +6,7 @@ import (
 	"fmt"
 
 	"breadbox/internal/db"
-
-	"github.com/jackc/pgx/v5/pgtype"
+	"breadbox/internal/pgconv"
 )
 
 // MCPConfig represents the MCP permission and instruction settings.
@@ -68,7 +67,7 @@ func (s *Service) SaveMCPMode(ctx context.Context, mode string) error {
 	}
 	return s.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 		Key:   "mcp_mode",
-		Value: pgtype.Text{String: mode, Valid: true},
+		Value: pgconv.Text(mode),
 	})
 }
 
@@ -83,7 +82,7 @@ func (s *Service) SaveMCPDisabledTools(ctx context.Context, tools []string) erro
 	}
 	return s.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 		Key:   "mcp_disabled_tools",
-		Value: pgtype.Text{String: string(data), Valid: true},
+		Value: pgconv.Text(string(data)),
 	})
 }
 
@@ -94,7 +93,7 @@ func (s *Service) SaveMCPInstructions(ctx context.Context, instructions string) 
 	}
 	return s.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 		Key:   "mcp_instructions",
-		Value: pgtype.Text{String: instructions, Valid: true},
+		Value: pgconv.Text(instructions),
 	})
 }
 
@@ -105,7 +104,7 @@ func (s *Service) SaveMCPReviewGuidelines(ctx context.Context, guidelines string
 	}
 	return s.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 		Key:   "mcp_review_guidelines",
-		Value: pgtype.Text{String: guidelines, Valid: true},
+		Value: pgconv.Text(guidelines),
 	})
 }
 
@@ -116,6 +115,6 @@ func (s *Service) SaveMCPReportFormat(ctx context.Context, format string) error 
 	}
 	return s.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 		Key:   "mcp_report_format",
-		Value: pgtype.Text{String: format, Valid: true},
+		Value: pgconv.Text(format),
 	})
 }

@@ -6,9 +6,9 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/appconfig"
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/alexedwards/scs/v2"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // GettingStartedHandler serves GET /getting-started — the setup walkthrough page.
@@ -104,7 +104,7 @@ func DismissGettingStartedHandler(a *app.App, sm *scs.SessionManager) http.Handl
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := a.Queries.SetAppConfig(r.Context(), db.SetAppConfigParams{
 			Key:   "onboarding_dismissed",
-			Value: pgtype.Text{String: "true", Valid: true},
+			Value: pgconv.Text("true"),
 		}); err != nil {
 			a.Logger.Error("dismiss getting started: set app config", "error", err)
 			SetFlash(r.Context(), sm, "error", "Failed to dismiss guide. Please try again.")
@@ -122,7 +122,7 @@ func ReopenGettingStartedHandler(a *app.App, sm *scs.SessionManager) http.Handle
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := a.Queries.SetAppConfig(r.Context(), db.SetAppConfigParams{
 			Key:   "onboarding_dismissed",
-			Value: pgtype.Text{String: "false", Valid: true},
+			Value: pgconv.Text("false"),
 		}); err != nil {
 			a.Logger.Error("reopen getting started: set app config", "error", err)
 			SetFlash(r.Context(), sm, "error", "Failed to re-open guide. Please try again.")

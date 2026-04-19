@@ -11,6 +11,7 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/crypto"
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	plaidprovider "breadbox/internal/provider/plaid"
 	tellerprovider "breadbox/internal/provider/teller"
 	"breadbox/internal/service"
@@ -132,9 +133,9 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 		}
 
 		entries := []db.SetAppConfigParams{
-			{Key: "plaid_client_id", Value: pgtype.Text{String: plaidClientID, Valid: true}},
-			{Key: "plaid_secret", Value: pgtype.Text{String: plaidSecret, Valid: true}},
-			{Key: "plaid_env", Value: pgtype.Text{String: plaidEnv, Valid: true}},
+			{Key: "plaid_client_id", Value: pgconv.Text(plaidClientID)},
+			{Key: "plaid_secret", Value: pgconv.Text(plaidSecret)},
+			{Key: "plaid_env", Value: pgconv.Text(plaidEnv)},
 			{Key: "webhook_url", Value: pgtype.Text{String: webhookURL, Valid: webhookURL != ""}},
 		}
 		for _, entry := range entries {
@@ -214,12 +215,12 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 
 		// Save app ID, env, webhook secret.
 		configEntries := []db.SetAppConfigParams{
-			{Key: "teller_app_id", Value: pgtype.Text{String: tellerAppID, Valid: true}},
-			{Key: "teller_env", Value: pgtype.Text{String: tellerEnv, Valid: true}},
+			{Key: "teller_app_id", Value: pgconv.Text(tellerAppID)},
+			{Key: "teller_env", Value: pgconv.Text(tellerEnv)},
 		}
 		if tellerWebhookSecret != "" {
 			configEntries = append(configEntries, db.SetAppConfigParams{
-				Key: "teller_webhook_secret", Value: pgtype.Text{String: tellerWebhookSecret, Valid: true},
+				Key: "teller_webhook_secret", Value: pgconv.Text(tellerWebhookSecret),
 			})
 		}
 		for _, entry := range configEntries {
@@ -280,14 +281,14 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 				keyB64 := base64.StdEncoding.EncodeToString(encKey)
 
 				if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
-					Key: "teller_cert_pem", Value: pgtype.Text{String: certB64, Valid: true},
+					Key: "teller_cert_pem", Value: pgconv.Text(certB64),
 				}); err != nil {
 					SetFlash(ctx, sm, "error", "Failed to save certificate.")
 					http.Redirect(w, r, "/providers", http.StatusSeeOther)
 					return
 				}
 				if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
-					Key: "teller_key_pem", Value: pgtype.Text{String: keyB64, Valid: true},
+					Key: "teller_key_pem", Value: pgconv.Text(keyB64),
 				}); err != nil {
 					SetFlash(ctx, sm, "error", "Failed to save private key.")
 					http.Redirect(w, r, "/providers", http.StatusSeeOther)

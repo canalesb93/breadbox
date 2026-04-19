@@ -14,6 +14,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"breadbox/internal/pgconv"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -115,7 +117,7 @@ func writeAnnotation(ctx context.Context, tx pgx.Tx, r annotationRow) error {
 
 	actorID := pgtype.Text{}
 	if r.ActorID != "" {
-		actorID = pgtype.Text{String: r.ActorID, Valid: true}
+		actorID = pgconv.Text(r.ActorID)
 	}
 
 	if _, err := tx.Exec(ctx,

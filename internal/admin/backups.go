@@ -8,6 +8,7 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 
 	"github.com/alexedwards/scs/v2"
@@ -222,7 +223,7 @@ func BackupScheduleHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 		// Save schedule.
 		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 			Key:   "backup_schedule",
-			Value: pgtype.Text{String: schedule, Valid: true},
+			Value: pgconv.Text(schedule),
 		}); err != nil {
 			a.Logger.Error("save backup schedule", "error", err)
 			SetFlash(ctx, sm, "error", "Failed to save backup schedule.")

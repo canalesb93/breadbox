@@ -106,12 +106,12 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 	var errMsg pgtype.Text
 	if syncErr != nil {
 		status = db.SyncStatusError
-		errMsg = pgtype.Text{String: syncErr.Error(), Valid: true}
+		errMsg = pgconv.Text(syncErr.Error())
 	}
 
 	var warnMsg pgtype.Text
 	if warningMsg != "" {
-		warnMsg = pgtype.Text{String: warningMsg, Valid: true}
+		warnMsg = pgconv.Text(warningMsg)
 	}
 
 	// Compute duration in milliseconds from started_at.
@@ -260,8 +260,8 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 				_ = e.db.UpdateBankConnectionStatus(ctx, db.UpdateBankConnectionStatusParams{
 					ID:           connectionID,
 					Status:       db.ConnectionStatusPendingReauth,
-					ErrorCode:    pgtype.Text{String: "ITEM_LOGIN_REQUIRED", Valid: true},
-					ErrorMessage: pgtype.Text{String: "Re-authentication required by institution", Valid: true},
+					ErrorCode:    pgconv.Text("ITEM_LOGIN_REQUIRED"),
+					ErrorMessage: pgconv.Text("Re-authentication required by institution"),
 				})
 				return 0, 0, 0, 0, nil, nil, "", syncErr
 			}
@@ -392,7 +392,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 		// Commit cursor.
 		if err := txQueries.UpdateBankConnectionCursor(ctx, db.UpdateBankConnectionCursorParams{
 			ID:         connectionID,
-			SyncCursor: pgtype.Text{String: result.Cursor, Valid: true},
+			SyncCursor: pgconv.Text(result.Cursor),
 		}); err != nil {
 			return added, modified, removed, unchanged, perAccount, nil, "", fmt.Errorf("update cursor: %w", err)
 		}
@@ -923,7 +923,7 @@ func writeSyncAnnotation(ctx context.Context, tx pgx.Tx, params writeSyncAnnotat
 
 	actorID := pgtype.Text{}
 	if params.ActorID != "" {
-		actorID = pgtype.Text{String: params.ActorID, Valid: true}
+		actorID = pgconv.Text(params.ActorID)
 	}
 
 	_, err := tx.Exec(ctx,

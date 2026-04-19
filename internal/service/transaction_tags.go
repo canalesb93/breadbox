@@ -65,7 +65,7 @@ func (s *Service) AddTransactionTag(ctx context.Context, txnID, slug string, act
 	}
 	var addedByID pgtype.Text
 	if actor.ID != "" {
-		addedByID = pgtype.Text{String: actor.ID, Valid: true}
+		addedByID = pgconv.Text(actor.ID)
 	}
 
 	rows, err := qtx.AddTransactionTag(ctx, db.AddTransactionTagParams{
