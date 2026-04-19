@@ -53,11 +53,11 @@ func CreateAdminHandler(a *app.App, sm *scs.SessionManager, _ *TemplateRenderer)
 		}
 
 		if username == "" {
-			errors["Username"] = "Email is required"
+			errors["Email"] = "Email is required"
 		} else if _, err := mail.ParseAddress(username); err != nil {
-			errors["Username"] = "Please enter a valid email address"
+			errors["Email"] = "Please enter a valid email address"
 		} else if len(username) > 64 {
-			errors["Username"] = "Email must be 64 characters or fewer"
+			errors["Email"] = "Email must be 64 characters or fewer"
 		}
 
 		if len(password) < 8 {
