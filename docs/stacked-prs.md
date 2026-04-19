@@ -99,13 +99,30 @@ gt submit --stack --publish --no-interactive       # force-with-lease the restac
 
 ### Landing (merging)
 
-Once the bottom PR is approved and CI is green:
+The installed Graphite CLI doesn't ship `gt land`. Use one of these instead:
+
+**Option 1 — queue at submit time:**
 
 ```bash
-gt land                                          # merges bottom PR, auto-restacks rest
+gt submit --stack --publish --merge-when-ready --no-interactive
 ```
 
-Repeat from the bottom upward. Don't squash-merge out of order.
+`--merge-when-ready` marks every PR in the stack as auto-merge; GitHub squash-merges them in order as approvals come in and CI clears. Respects branch protection.
+
+**Option 2 — queue the bottom PR directly:**
+
+```bash
+gh pr merge <bottom-PR-number> --auto --squash
+```
+
+Then after it lands:
+
+```bash
+gt sync                                            # pulls main, prunes the merged bottom, restacks the rest
+gt submit --stack --publish --no-interactive       # force-with-lease the restacked tail
+```
+
+Repeat from the bottom upward. Never squash-merge a mid-stack PR manually — the GitHub merge squashes the diff from `main`, which includes all lower PRs' changes, which breaks later PRs' diffs. Always land the bottom first.
 
 ### Navigating
 
@@ -126,7 +143,7 @@ gt checkout <branch>                             # jump to any branch
 
 Each PR in a stack runs CI independently against its own tip. There's no merge-queue coordination — if you need the bottom PR's changes to make the middle PR's CI green, that's the correct behavior; merge the bottom first.
 
-`gt land` waits on CI for the branch being landed, not the rest of the stack.
+GitHub's auto-merge (via `--merge-when-ready` or `gh pr merge --auto`) waits on CI for the branch being landed, not the rest of the stack.
 
 ## Cheat sheet
 
@@ -139,6 +156,7 @@ Each PR in a stack runs CI independently against its own tip. There's no merge-q
 | Amend current branch | `gt modify -u` |
 | Pull main and restack | `gt sync` |
 | See the stack | `gt log short` |
-| Merge the bottom PR | `gt land` |
+| Queue auto-merge for the whole stack | `gt submit --stack --publish --merge-when-ready --no-interactive` |
+| Queue auto-merge for a single PR | `gh pr merge <pr> --auto --squash` |
 
 See the [Graphite docs](https://graphite.dev/docs) for everything else.

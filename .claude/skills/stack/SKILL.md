@@ -134,32 +134,43 @@ Then, for each branch in the stack, fetch its PR state via `mcp__github__pull_re
 
 ## Land Mode
 
-Merge the bottom PR and auto-restack the remainder.
+Merge the bottom PR and auto-restack the remainder. The installed Graphite CLI doesn't ship `gt land`; use GitHub's auto-merge instead.
 
 ### Pre-flight checks
 
-Before calling `gt land`:
+Before queuing the merge:
 
-1. Confirm the bottom PR has approving review and green CI (via `mcp__github__pull_request_read`).
+1. Confirm the bottom PR has approving review and green (or in-progress) CI (via `mcp__github__pull_request_read`).
 2. Confirm no unresolved review threads on the bottom PR.
 3. Refuse to proceed if any of the above fail; surface the blocker to the user.
 
 ### Execute
 
+**Option A — queue auto-merge for the whole stack at submit time:**
+
 ```bash
-gt checkout <bottom-branch>
-gt land --no-interactive
-gt submit --stack --publish --no-interactive  # after land, restack + force-push the remainder
+gt submit --stack --publish --merge-when-ready --no-interactive
 ```
 
-After a successful land, run `gt log short` and report which PR is next in line.
+This marks every PR in the stack for auto-merge. GitHub squashes them in order as approvals/CI clear.
+
+**Option B — queue the bottom PR alone, then re-sync:**
+
+```bash
+gh pr merge <bottom-pr-number> --auto --squash
+# wait for it to land
+gt sync                                        # pulls main, prunes the merged branch, restacks the tail
+gt submit --stack --publish --no-interactive   # force-with-lease the restacked tail
+```
+
+After a successful land, run `gt log short` and report which PR is next in line. Never merge a mid-stack PR manually via `mcp__github__merge_pull_request` — the squash drops the lower-stack diff into `main`, which breaks later branches' diffs.
 
 ---
 
 ## Guardrails
 
 - **Never** run `git push`, `git commit --amend`, `git checkout -b`, or `git rebase` manually while on a stacked branch. Always go through `gt`.
-- **Never** squash-merge a mid-stack PR directly via `mcp__github__merge_pull_request` — use `gt land` so the rest of the stack restacks correctly.
+- **Never** squash-merge a mid-stack PR out of order (via `mcp__github__merge_pull_request`, `gh pr merge` without waiting, or the GitHub UI) — the squash drops the lower-stack diff into `main`, which breaks later branches' diffs. Land the bottom first, then `gt sync` + re-submit.
 - If `gt` reports a merge conflict during `gt sync` or `gt modify`, stop and surface the conflict files to the user; don't try to resolve autonomously unless the conflict is trivial (whitespace-only, a single line in a single file).
 - The `<!-- Graphite stack -->` block in each PR body is owned by `gt`. Don't edit it via `mcp__github__update_pull_request`.
 
