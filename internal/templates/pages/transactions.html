@@ -103,14 +103,17 @@
   <form method="GET" action="/transactions" x-show="filtersOpen" x-cloak x-collapse
     class="bb-card mt-3 p-4" x-data>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
-      <label class="bb-filter-label">
-        Start Date
-        <input type="date" name="start_date" value="{{.FilterStartDate}}" class="input input-sm input-bordered w-full">
-      </label>
-      <label class="bb-filter-label">
-        End Date
-        <input type="date" name="end_date" value="{{.FilterEndDate}}" class="input input-sm input-bordered w-full">
-      </label>
+      <!-- Date range: paired together at every breakpoint so Start/End stay adjacent -->
+      <div class="grid grid-cols-2 gap-3 lg:col-span-2">
+        <label class="bb-filter-label">
+          Start Date
+          <input type="date" name="start_date" value="{{.FilterStartDate}}" class="input input-sm input-bordered w-full">
+        </label>
+        <label class="bb-filter-label">
+          End Date
+          <input type="date" name="end_date" value="{{.FilterEndDate}}" class="input input-sm input-bordered w-full">
+        </label>
+      </div>
       <label class="bb-filter-label">
         Connection
         <select name="connection_id" class="select select-sm select-bordered w-full">
@@ -150,14 +153,17 @@
           </button>
         </div>
       </label>
-      <label class="bb-filter-label">
-        Min Amount
-        <input type="number" name="min_amount" step="0.01" value="{{.FilterMinAmount}}" placeholder="0.00" class="input input-sm input-bordered w-full">
-      </label>
-      <label class="bb-filter-label">
-        Max Amount
-        <input type="number" name="max_amount" step="0.01" value="{{.FilterMaxAmount}}" placeholder="0.00" class="input input-sm input-bordered w-full">
-      </label>
+      <!-- Amount range: paired together at every breakpoint so Min/Max stay adjacent -->
+      <div class="grid grid-cols-2 gap-3 lg:col-span-2">
+        <label class="bb-filter-label">
+          Min Amount
+          <input type="number" name="min_amount" step="0.01" value="{{.FilterMinAmount}}" placeholder="0.00" class="input input-sm input-bordered w-full">
+        </label>
+        <label class="bb-filter-label">
+          Max Amount
+          <input type="number" name="max_amount" step="0.01" value="{{.FilterMaxAmount}}" placeholder="0.00" class="input input-sm input-bordered w-full">
+        </label>
+      </div>
       <label class="bb-filter-label">
         Pending
         <select name="pending" class="select select-sm select-bordered w-full">
