@@ -107,3 +107,18 @@ func TestEncryptInvalidKeySize(t *testing.T) {
 		}
 	}
 }
+
+func TestDecryptInvalidKeySize(t *testing.T) {
+	// Produce a valid ciphertext first so the input is otherwise well-formed —
+	// this ensures the error comes from the key, not the ciphertext shape.
+	ciphertext, err := Encrypt([]byte("test"), validKey(t))
+	if err != nil {
+		t.Fatalf("setup Encrypt: %v", err)
+	}
+	for _, size := range []int{0, 15, 31, 33, 64} {
+		key := make([]byte, size)
+		if _, err := Decrypt(ciphertext, key); err == nil {
+			t.Errorf("expected error for key size %d", size)
+		}
+	}
+}
