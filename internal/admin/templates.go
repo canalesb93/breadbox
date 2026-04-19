@@ -757,7 +757,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"formatAmount": func(amount float64) string {
 				neg := amount < 0
 				abs := math.Abs(amount)
-				formatted := formatCurrency(abs)
+				formatted := service.FormatCurrency(abs)
 				if neg {
 					return "-" + formatted
 				}
@@ -911,7 +911,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				if err != nil || !f.Valid {
 					return ""
 				}
-				return formatCurrency(math.Abs(f.Float64))
+				return service.FormatCurrency(math.Abs(f.Float64))
 			},
 			"fmtBalance": func(v interface{}) string {
 				var f float64
@@ -1312,13 +1312,6 @@ func (tr *TemplateRenderer) SetVersion(v string) {
 // SetVersionChecker sets the version checker for auto-injecting update status into template data.
 func (tr *TemplateRenderer) SetVersionChecker(vc *version.Checker) {
 	tr.versionChecker = vc
-}
-
-// formatCurrency formats a non-negative float as "$X,XXX.XX". Delegates to
-// service.FormatCurrency so preview DTOs and template rendering share one
-// format.
-func formatCurrency(abs float64) string {
-	return service.FormatCurrency(abs)
 }
 
 // titleCaseMerchant converts ALL-CAPS merchant names from bank feeds into

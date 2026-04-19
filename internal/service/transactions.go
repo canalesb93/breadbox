@@ -71,6 +71,10 @@ func ToTransactionSummary(row AdminTransactionRow) TransactionSummary {
 func FormatCurrency(abs float64) string {
 	whole := int(abs)
 	cents := int(math.Round((abs - float64(whole)) * 100))
+	if cents >= 100 {
+		whole += cents / 100
+		cents = cents % 100
+	}
 	s := strconv.Itoa(whole)
 	if len(s) > 3 {
 		var b strings.Builder
