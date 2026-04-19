@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"time"
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
@@ -19,36 +18,20 @@ func SyncLogsHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, s
 		ctx := r.Context()
 
 		// Parse query params.
-		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		q := r.URL.Query()
+		page, _ := strconv.Atoi(q.Get("page"))
 		if page < 1 {
 			page = 1
 		}
 
 		params := service.SyncLogListParams{
-			Page:     page,
-			PageSize: 25,
-		}
-
-		if connID := r.URL.Query().Get("connection_id"); connID != "" {
-			params.ConnectionID = &connID
-		}
-		if status := r.URL.Query().Get("status"); status != "" {
-			params.Status = &status
-		}
-		if trigger := r.URL.Query().Get("trigger"); trigger != "" {
-			params.Trigger = &trigger
-		}
-		if v := r.URL.Query().Get("date_from"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				params.DateFrom = &t
-			}
-		}
-		if v := r.URL.Query().Get("date_to"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				// Add one day so the end date is inclusive.
-				t = t.AddDate(0, 0, 1)
-				params.DateTo = &t
-			}
+			Page:         page,
+			PageSize:     25,
+			ConnectionID: optStrQuery(q, "connection_id"),
+			Status:       optStrQuery(q, "status"),
+			Trigger:      optStrQuery(q, "trigger"),
+			DateFrom:     optDateQuery(q, "date_from"),
+			DateTo:       optEndDateQuery(q, "date_to"),
 		}
 
 		// Fetch paginated sync logs.

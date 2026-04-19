@@ -112,67 +112,40 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 			}
 		}
 
+		q := r.URL.Query()
 		params := service.AdminTransactionListParams{
-			Page:     page,
-			PageSize: pageSize,
+			Page:         page,
+			PageSize:     pageSize,
+			StartDate:    optDateQuery(q, "start_date"),
+			EndDate:      optEndDateQuery(q, "end_date"),
+			AccountID:    optStrQuery(q, "account_id"),
+			UserID:       optStrQuery(q, "user_id"),
+			ConnectionID: optStrQuery(q, "connection_id"),
+			CategorySlug: optStrQuery(q, "category"),
+			MinAmount:    optFloatQuery(q, "min_amount"),
+			MaxAmount:    optFloatQuery(q, "max_amount"),
+			Search:       optStrQuery(q, "search"),
 		}
 
-		if v := r.URL.Query().Get("start_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				params.StartDate = &t
-			}
-		}
-		if v := r.URL.Query().Get("end_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				// Add one day so the end date is inclusive.
-				t = t.AddDate(0, 0, 1)
-				params.EndDate = &t
-			}
-		}
-		if v := r.URL.Query().Get("account_id"); v != "" {
-			params.AccountID = &v
-		}
-		if v := r.URL.Query().Get("user_id"); v != "" {
-			params.UserID = &v
-		}
-		if v := r.URL.Query().Get("connection_id"); v != "" {
-			params.ConnectionID = &v
-		}
-		if v := r.URL.Query().Get("category"); v != "" {
-			params.CategorySlug = &v
-		}
-		if v := r.URL.Query().Get("min_amount"); v != "" {
-			if f, err := strconv.ParseFloat(v, 64); err == nil {
-				params.MinAmount = &f
-			}
-		}
-		if v := r.URL.Query().Get("max_amount"); v != "" {
-			if f, err := strconv.ParseFloat(v, 64); err == nil {
-				params.MaxAmount = &f
-			}
-		}
-		if v := r.URL.Query().Get("pending"); v != "" {
+		if v := q.Get("pending"); v != "" {
 			b := v == "true"
 			params.Pending = &b
 		}
-		if v := r.URL.Query().Get("search"); v != "" {
-			params.Search = &v
-		}
-		if v := r.URL.Query().Get("search_mode"); v != "" && service.ValidateSearchMode(v) {
+		if v := q.Get("search_mode"); v != "" && service.ValidateSearchMode(v) {
 			params.SearchMode = &v
 		}
-		if v := r.URL.Query().Get("search_field"); v != "" && service.ValidateSearchField(v) {
+		if v := q.Get("search_field"); v != "" && service.ValidateSearchField(v) {
 			params.SearchField = &v
 		}
-		if v := r.URL.Query().Get("sort"); v == "asc" {
+		if q.Get("sort") == "asc" {
 			params.SortOrder = "asc"
 		}
 
 		// Tag filters. ?tags=needs-review,foo (AND) and ?any_tag=a,b (OR).
-		if v := r.URL.Query().Get("tags"); v != "" {
+		if v := q.Get("tags"); v != "" {
 			params.Tags = splitCSV(v)
 		}
-		if v := r.URL.Query().Get("any_tag"); v != "" {
+		if v := q.Get("any_tag"); v != "" {
 			params.AnyTag = splitCSV(v)
 		}
 
@@ -296,8 +269,9 @@ func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			page = 1
 		}
 
+		q := r.URL.Query()
 		pageSize := 50
-		if v, err := strconv.Atoi(r.URL.Query().Get("per_page")); err == nil {
+		if v, err := strconv.Atoi(q.Get("per_page")); err == nil {
 			switch v {
 			case 25, 50, 100:
 				pageSize = v
@@ -305,64 +279,37 @@ func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 		}
 
 		params := service.AdminTransactionListParams{
-			Page:     page,
-			PageSize: pageSize,
+			Page:         page,
+			PageSize:     pageSize,
+			StartDate:    optDateQuery(q, "start_date"),
+			EndDate:      optEndDateQuery(q, "end_date"),
+			AccountID:    optStrQuery(q, "account_id"),
+			UserID:       optStrQuery(q, "user_id"),
+			ConnectionID: optStrQuery(q, "connection_id"),
+			CategorySlug: optStrQuery(q, "category"),
+			MinAmount:    optFloatQuery(q, "min_amount"),
+			MaxAmount:    optFloatQuery(q, "max_amount"),
+			Search:       optStrQuery(q, "search"),
 		}
 
-		if v := r.URL.Query().Get("start_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				params.StartDate = &t
-			}
-		}
-		if v := r.URL.Query().Get("end_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				t = t.AddDate(0, 0, 1)
-				params.EndDate = &t
-			}
-		}
-		if v := r.URL.Query().Get("account_id"); v != "" {
-			params.AccountID = &v
-		}
-		if v := r.URL.Query().Get("user_id"); v != "" {
-			params.UserID = &v
-		}
-		if v := r.URL.Query().Get("connection_id"); v != "" {
-			params.ConnectionID = &v
-		}
-		if v := r.URL.Query().Get("category"); v != "" {
-			params.CategorySlug = &v
-		}
-		if v := r.URL.Query().Get("min_amount"); v != "" {
-			if f, err := strconv.ParseFloat(v, 64); err == nil {
-				params.MinAmount = &f
-			}
-		}
-		if v := r.URL.Query().Get("max_amount"); v != "" {
-			if f, err := strconv.ParseFloat(v, 64); err == nil {
-				params.MaxAmount = &f
-			}
-		}
-		if v := r.URL.Query().Get("pending"); v != "" {
+		if v := q.Get("pending"); v != "" {
 			b := v == "true"
 			params.Pending = &b
 		}
-		if v := r.URL.Query().Get("search"); v != "" {
-			params.Search = &v
-		}
-		if v := r.URL.Query().Get("search_mode"); v != "" && service.ValidateSearchMode(v) {
+		if v := q.Get("search_mode"); v != "" && service.ValidateSearchMode(v) {
 			params.SearchMode = &v
 		}
-		if v := r.URL.Query().Get("search_field"); v != "" && service.ValidateSearchField(v) {
+		if v := q.Get("search_field"); v != "" && service.ValidateSearchField(v) {
 			params.SearchField = &v
 		}
-		if v := r.URL.Query().Get("sort"); v == "asc" {
+		if q.Get("sort") == "asc" {
 			params.SortOrder = "asc"
 		}
 
-		if v := r.URL.Query().Get("tags"); v != "" {
+		if v := q.Get("tags"); v != "" {
 			params.Tags = splitCSV(v)
 		}
-		if v := r.URL.Query().Get("any_tag"); v != "" {
+		if v := q.Get("any_tag"); v != "" {
 			params.AnyTag = splitCSV(v)
 		}
 
@@ -454,24 +401,12 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			txParams.UserID = &memberUID
 		}
 
-		if v := r.URL.Query().Get("start_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				txParams.StartDate = &t
-			}
-		}
-		if v := r.URL.Query().Get("end_date"); v != "" {
-			if t, err := time.Parse("2006-01-02", v); err == nil {
-				t = t.AddDate(0, 0, 1)
-				txParams.EndDate = &t
-			}
-		}
-		if v := r.URL.Query().Get("search"); v != "" {
-			txParams.Search = &v
-		}
-		if v := r.URL.Query().Get("category"); v != "" {
-			txParams.CategorySlug = &v
-		}
-		if v := r.URL.Query().Get("pending"); v != "" {
+		q := r.URL.Query()
+		txParams.StartDate = optDateQuery(q, "start_date")
+		txParams.EndDate = optEndDateQuery(q, "end_date")
+		txParams.Search = optStrQuery(q, "search")
+		txParams.CategorySlug = optStrQuery(q, "category")
+		if v := q.Get("pending"); v != "" {
 			b := v == "true"
 			txParams.Pending = &b
 		}
@@ -488,16 +423,16 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 
 		// Build export URL for this account's transactions.
 		acctExportURL := "/-/transactions/export-csv?account_id=" + idStr
-		if sd := r.URL.Query().Get("start_date"); sd != "" {
+		if sd := q.Get("start_date"); sd != "" {
 			acctExportURL += "&start_date=" + sd
 		}
-		if ed := r.URL.Query().Get("end_date"); ed != "" {
+		if ed := q.Get("end_date"); ed != "" {
 			acctExportURL += "&end_date=" + ed
 		}
-		if cat := r.URL.Query().Get("category"); cat != "" {
+		if cat := q.Get("category"); cat != "" {
 			acctExportURL += "&category=" + cat
 		}
-		if search := r.URL.Query().Get("search"); search != "" {
+		if search := q.Get("search"); search != "" {
 			acctExportURL += "&search=" + search
 		}
 
