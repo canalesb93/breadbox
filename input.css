@@ -618,8 +618,10 @@
   }
 
   /* ── Page header pattern ── */
+  /* items-start on mobile so single-child buttons keep their intrinsic width
+     instead of stretching edge-to-edge when the header wraps to a column. */
   .bb-page-header {
-    @apply flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6;
+    @apply flex flex-col items-start sm:flex-row sm:items-center justify-between gap-3 mb-6;
   }
 
   .bb-page-title {
