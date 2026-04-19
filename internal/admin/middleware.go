@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"breadbox/internal/appconfig"
 	"breadbox/internal/db"
 
 	"github.com/alexedwards/scs/v2"
@@ -52,7 +53,7 @@ func NavBadgesMiddleware(queries *db.Queries, logger *slog.Logger) func(http.Han
 			}
 
 			// Check if getting started guide should show in nav.
-			badges.ShowGettingStarted = !GetConfigBool(ctx, queries, "onboarding_dismissed")
+			badges.ShowGettingStarted = !appconfig.Bool(ctx, queries, "onboarding_dismissed", false)
 
 			ctx = context.WithValue(ctx, navBadgesKey, badges)
 			next.ServeHTTP(w, r.WithContext(ctx))

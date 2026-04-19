@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"breadbox/internal/app"
+	"breadbox/internal/appconfig"
 	"breadbox/internal/db"
 
 	"github.com/alexedwards/scs/v2"
@@ -77,7 +78,7 @@ func GettingStartedHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRende
 		}
 
 		// Check if onboarding is dismissed (for the nav badge display).
-		dismissed := GetConfigBool(ctx, a.Queries, "onboarding_dismissed")
+		dismissed := appconfig.Bool(ctx, a.Queries, "onboarding_dismissed", false)
 
 		data := BaseTemplateData(r, sm, "getting-started", "Getting Started")
 		data["HasMember"] = hasMember

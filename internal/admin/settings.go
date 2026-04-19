@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"breadbox/internal/app"
+	"breadbox/internal/appconfig"
 	"breadbox/internal/db"
 	"breadbox/internal/templates/components/pages"
 
@@ -48,7 +49,7 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		syncLogCount, _ := a.Service.CountSyncLogs(ctx)
 
 		// Check onboarding dismissed state for help section.
-		onboardingDismissed := GetConfigBool(ctx, a.Queries, "onboarding_dismissed")
+		onboardingDismissed := appconfig.Bool(ctx, a.Queries, "onboarding_dismissed", false)
 
 		nextSyncTime := ""
 		if a.Scheduler != nil {

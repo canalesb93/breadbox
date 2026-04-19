@@ -3,9 +3,9 @@ package sync
 import (
 	"context"
 	"log/slog"
-	"strconv"
 	"time"
 
+	"breadbox/internal/appconfig"
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 
@@ -218,13 +218,9 @@ const defaultRetentionDays = 90
 // Reads sync_log_retention_days from app_config (default: 90 days).
 // A value of 0 disables cleanup.
 func (s *Scheduler) cleanupSyncLogs(ctx context.Context) {
-	retentionDays := defaultRetentionDays
-
-	row, err := s.queries.GetAppConfig(ctx, "sync_log_retention_days")
-	if err == nil && row.Value.Valid && row.Value.String != "" {
-		if days, parseErr := strconv.Atoi(row.Value.String); parseErr == nil && days >= 0 {
-			retentionDays = days
-		}
+	retentionDays := appconfig.Int(ctx, s.queries, "sync_log_retention_days", defaultRetentionDays)
+	if retentionDays < 0 {
+		retentionDays = defaultRetentionDays
 	}
 
 	if retentionDays == 0 {

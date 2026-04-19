@@ -9,13 +9,13 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"breadbox/internal/api"
 	"breadbox/internal/app"
+	"breadbox/internal/appconfig"
 	"breadbox/internal/config"
 	"breadbox/internal/db"
 	breadboxmcp "breadbox/internal/mcp"
@@ -566,11 +566,10 @@ func runSeed() error {
 func runScheduledBackup(bs *service.BackupService, queries *db.Queries, logger *slog.Logger) {
 	ctx := context.Background()
 
-	row, err := queries.GetAppConfig(ctx, "backup_schedule")
-	if err != nil || !row.Value.Valid || row.Value.String == "" {
+	schedule := appconfig.String(ctx, queries, "backup_schedule", "")
+	if schedule == "" {
 		return // Backups not scheduled
 	}
-	schedule := row.Value.String
 
 	now := time.Now()
 	hour := now.Hour()
@@ -604,12 +603,9 @@ func runScheduledBackup(bs *service.BackupService, queries *db.Queries, logger *
 	logger.Info("scheduled backup completed", "filename", filename)
 
 	// Clean up old backups based on retention setting.
-	retentionDays := 7 // default
-	retRow, err := queries.GetAppConfig(ctx, "backup_retention_days")
-	if err == nil && retRow.Value.Valid && retRow.Value.String != "" {
-		if d, parseErr := strconv.Atoi(retRow.Value.String); parseErr == nil && d > 0 {
-			retentionDays = d
-		}
+	retentionDays := appconfig.Int(ctx, queries, "backup_retention_days", 7)
+	if retentionDays <= 0 {
+		retentionDays = 7
 	}
 
 	deleted, err := bs.CleanupOldBackups(retentionDays)

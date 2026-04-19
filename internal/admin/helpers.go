@@ -1,11 +1,8 @@
 package admin
 
 import (
-	"context"
 	"strings"
 	"time"
-
-	"breadbox/internal/db"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -22,26 +19,6 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
-}
-
-// GetConfigBool reads a boolean config key from app_config.
-// Returns false if the key doesn't exist, has a null value, or can't be parsed.
-func GetConfigBool(ctx context.Context, queries *db.Queries, key string) bool {
-	cfg, err := queries.GetAppConfig(ctx, key)
-	if err != nil {
-		return false
-	}
-	return cfg.Value.Valid && cfg.Value.String == "true"
-}
-
-// GetConfigString reads a string config key from app_config.
-// Returns empty string if the key doesn't exist or has a null value.
-func GetConfigString(ctx context.Context, queries *db.Queries, key string) string {
-	cfg, err := queries.GetAppConfig(ctx, key)
-	if err != nil || !cfg.Value.Valid {
-		return ""
-	}
-	return cfg.Value.String
 }
 
 // BalanceTotals holds aggregated asset/liability/net-worth values.

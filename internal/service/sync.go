@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"strconv"
 	"time"
 
+	"breadbox/internal/appconfig"
 	"breadbox/internal/db"
 	bsync "breadbox/internal/sync"
 
@@ -362,18 +362,10 @@ func (s *Service) CleanupSyncLogs(ctx context.Context, retentionDays int) (int64
 }
 
 // GetSyncLogRetentionDays reads the sync_log_retention_days setting from app_config.
-// Returns 90 (default) if not set.
+// Returns 90 (default) if not set or not a positive value.
 func (s *Service) GetSyncLogRetentionDays(ctx context.Context) (int, error) {
-	row, err := s.Queries.GetAppConfig(ctx, "sync_log_retention_days")
-	if err != nil {
-		return 90, nil // default if not found
-	}
-	if !row.Value.Valid || row.Value.String == "" {
-		return 90, nil
-	}
-
-	days, err := strconv.Atoi(row.Value.String)
-	if err != nil || days <= 0 {
+	days := appconfig.Int(ctx, s.Queries, "sync_log_retention_days", 90)
+	if days <= 0 {
 		return 90, nil
 	}
 	return days, nil

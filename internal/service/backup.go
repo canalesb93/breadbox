@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"breadbox/internal/appconfig"
 )
 
 // BackupInfo describes a backup file on disk.
@@ -482,28 +484,14 @@ func FormatBytes(bytes int64) string {
 // GetBackupSchedule returns the backup schedule from app_config.
 // Returns empty string if not configured (disabled).
 func (s *Service) GetBackupSchedule(ctx context.Context) string {
-	row, err := s.Queries.GetAppConfig(ctx, "backup_schedule")
-	if err != nil {
-		return ""
-	}
-	if !row.Value.Valid || row.Value.String == "" {
-		return ""
-	}
-	return row.Value.String
+	return appconfig.String(ctx, s.Queries, "backup_schedule", "")
 }
 
 // GetBackupRetentionDays returns the backup retention days from app_config.
-// Returns default of 7 if not configured.
+// Returns default of 7 if not configured or negative.
 func (s *Service) GetBackupRetentionDays(ctx context.Context) int {
-	row, err := s.Queries.GetAppConfig(ctx, "backup_retention_days")
-	if err != nil {
-		return 7
-	}
-	if !row.Value.Valid || row.Value.String == "" {
-		return 7
-	}
-	days, err := strconv.Atoi(row.Value.String)
-	if err != nil || days < 0 {
+	days := appconfig.Int(ctx, s.Queries, "backup_retention_days", 7)
+	if days < 0 {
 		return 7
 	}
 	return days
