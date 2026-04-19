@@ -1,11 +1,62 @@
 package admin
 
 import (
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+func TestQueryPage(t *testing.T) {
+	cases := []struct {
+		name string
+		url  string
+		key  string
+		want int
+	}{
+		{"missing collapses to 1", "/?", "page", 1},
+		{"empty collapses to 1", "/?page=", "page", 1},
+		{"zero collapses to 1", "/?page=0", "page", 1},
+		{"negative collapses to 1", "/?page=-4", "page", 1},
+		{"non-numeric collapses to 1", "/?page=abc", "page", 1},
+		{"positive preserved", "/?page=3", "page", 3},
+		{"custom key honored", "/?wh_page=5&page=1", "wh_page", 5},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := httptest.NewRequest("GET", tc.url, nil)
+			if got := queryPage(r, tc.key); got != tc.want {
+				t.Errorf("queryPage(%q, %q) = %d, want %d", tc.url, tc.key, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestQueryPageSize(t *testing.T) {
+	cases := []struct {
+		name    string
+		url     string
+		def     int
+		allowed []int
+		want    int
+	}{
+		{"missing → default", "/?", 50, []int{25, 50, 100}, 50},
+		{"non-numeric → default", "/?per_page=abc", 50, []int{25, 50, 100}, 50},
+		{"not in allowlist → default", "/?per_page=7", 50, []int{25, 50, 100}, 50},
+		{"hostile large value → default", "/?per_page=99999", 50, []int{25, 50, 100}, 50},
+		{"allowed value preserved", "/?per_page=25", 50, []int{25, 50, 100}, 25},
+		{"allowed top-of-range preserved", "/?per_page=100", 50, []int{25, 50, 100}, 100},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := httptest.NewRequest("GET", tc.url, nil)
+			if got := queryPageSize(r, tc.def, tc.allowed...); got != tc.want {
+				t.Errorf("queryPageSize(%q) = %d, want %d", tc.url, got, tc.want)
+			}
+		})
+	}
+}
 
 func TestSplitCSV(t *testing.T) {
 	tests := []struct {

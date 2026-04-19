@@ -99,22 +99,9 @@ func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRend
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-		if page < 1 {
-			page = 1
-		}
-
-		pageSize := 50
-		if v, err := strconv.Atoi(r.URL.Query().Get("per_page")); err == nil {
-			switch v {
-			case 25, 50, 100:
-				pageSize = v
-			}
-		}
-
 		params := service.AdminTransactionListParams{
-			Page:     page,
-			PageSize: pageSize,
+			Page:     queryPage(r, "page"),
+			PageSize: queryPageSize(r, 50, 25, 50, 100),
 		}
 
 		if v := r.URL.Query().Get("start_date"); v != "" {
@@ -291,22 +278,9 @@ func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-		if page < 1 {
-			page = 1
-		}
-
-		pageSize := 50
-		if v, err := strconv.Atoi(r.URL.Query().Get("per_page")); err == nil {
-			switch v {
-			case 25, 50, 100:
-				pageSize = v
-			}
-		}
-
 		params := service.AdminTransactionListParams{
-			Page:     page,
-			PageSize: pageSize,
+			Page:     queryPage(r, "page"),
+			PageSize: queryPageSize(r, 50, 25, 50, 100),
 		}
 
 		if v := r.URL.Query().Get("start_date"); v != "" {
@@ -438,13 +412,8 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 		}
 
 		// Fetch transactions for this account.
-		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-		if page < 1 {
-			page = 1
-		}
-
 		txParams := service.AdminTransactionListParams{
-			Page:      page,
+			Page:      queryPage(r, "page"),
 			PageSize:  50,
 			AccountID: &idStr,
 		}
