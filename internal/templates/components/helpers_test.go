@@ -178,6 +178,21 @@ func TestPluralS(t *testing.T) {
 			t.Errorf("pluralS(%d) = %q, want %q", tc.n, got, tc.want)
 		}
 	}
+	// int64 path — sqlc-derived counts (e.g. transaction totals) hit this
+	// branch of the generic and must produce the same output as int.
+	int64Cases := []struct {
+		n    int64
+		want string
+	}{
+		{0, "s"},
+		{1, ""},
+		{2, "s"},
+	}
+	for _, tc := range int64Cases {
+		if got := pluralS(tc.n); got != tc.want {
+			t.Errorf("pluralS(int64=%d) = %q, want %q", tc.n, got, tc.want)
+		}
+	}
 }
 
 func TestExportedWrappersDelegate(t *testing.T) {

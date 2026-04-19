@@ -133,7 +133,13 @@ func titleCase(s string) string {
 	return strings.Join(words, " ")
 }
 
-func pluralS(n int) string {
+// pluralInt constrains pluralS to signed int types so the same helper works
+// for `len(slice)` (int) and sqlc-derived counts (int64) without casting.
+type pluralInt interface {
+	~int | ~int32 | ~int64
+}
+
+func pluralS[T pluralInt](n T) string {
 	if n == 1 {
 		return ""
 	}
@@ -245,4 +251,4 @@ func FormatAmount(amount float64) string { return formatAmount(amount) }
 func TitleCase(s string) string { return titleCase(s) }
 
 // PluralS returns "" for n == 1, else "s". See pluralS.
-func PluralS(n int) string { return pluralS(n) }
+func PluralS[T pluralInt](n T) string { return pluralS(n) }
