@@ -11,23 +11,22 @@
   <!-- ─── Plaid ─── -->
   {{$plaidHealth := index .ProviderHealth "plaid"}}
   <div class="bb-card p-0 overflow-hidden" x-data="providerCard('plaid')">
-    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between gap-3 min-w-0">
+    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 min-w-0">
       <div class="flex items-center gap-3 min-w-0">
         <div class="w-10 h-10 rounded-xl bg-info/8 flex items-center justify-center flex-shrink-0">
           <i data-lucide="building-2" class="w-5 h-5 text-info"></i>
         </div>
         <div class="min-w-0">
           <h2 class="font-semibold">Plaid</h2>
-          <p class="text-xs text-base-content/40 truncate">Thousands of financial institutions</p>
+          <p class="text-xs text-base-content/40 sm:truncate">Thousands of financial institutions</p>
         </div>
       </div>
-      <div class="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+      <div class="flex items-center gap-2 flex-shrink-0 flex-wrap justify-start sm:justify-end">
         {{if and $plaidHealth.LastSyncTime (eq $plaidHealth.LastSyncStatus "error")}}
           <span class="badge badge-soft badge-error badge-sm">Sync Error</span>
         {{else if and $plaidHealth.LastSyncTime (eq $plaidHealth.LastSyncStatus "success")}}
           <span class="badge badge-soft badge-success badge-sm">Healthy</span>
-        {{end}}
-        {{if .PlaidConfigured}}
+        {{else if .PlaidConfigured}}
           <span class="badge badge-soft badge-success badge-sm">Configured</span>
         {{else}}
           <span class="badge badge-ghost badge-sm">Not Configured</span>
@@ -137,23 +136,22 @@
   <!-- ─── Teller ─── -->
   {{$tellerHealth := index .ProviderHealth "teller"}}
   <div class="bb-card p-0 overflow-hidden" x-data="providerCard('teller')">
-    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between gap-3 min-w-0">
+    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 min-w-0">
       <div class="flex items-center gap-3 min-w-0">
         <div class="w-10 h-10 rounded-xl bg-success/8 flex items-center justify-center flex-shrink-0">
           <i data-lucide="landmark" class="w-5 h-5 text-success"></i>
         </div>
         <div class="min-w-0">
           <h2 class="font-semibold">Teller</h2>
-          <p class="text-xs text-base-content/40 truncate">mTLS certificate authentication</p>
+          <p class="text-xs text-base-content/40 sm:truncate">mTLS certificate authentication</p>
         </div>
       </div>
-      <div class="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+      <div class="flex items-center gap-2 flex-shrink-0 flex-wrap justify-start sm:justify-end">
         {{if and $tellerHealth.LastSyncTime (eq $tellerHealth.LastSyncStatus "error")}}
           <span class="badge badge-soft badge-error badge-sm">Sync Error</span>
         {{else if and $tellerHealth.LastSyncTime (eq $tellerHealth.LastSyncStatus "success")}}
           <span class="badge badge-soft badge-success badge-sm">Healthy</span>
-        {{end}}
-        {{if .TellerConfigured}}
+        {{else if .TellerConfigured}}
           <span class="badge badge-soft badge-success badge-sm">Configured</span>
         {{else}}
           <span class="badge badge-ghost badge-sm">Not Configured</span>
@@ -288,17 +286,17 @@
   <!-- ─── CSV Import ─── -->
   {{$csvHealth := index .ProviderHealth "csv"}}
   <div class="bb-card p-0 overflow-hidden">
-    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex items-center justify-between gap-3">
+    <div class="px-4 sm:px-5 py-4 border-b border-base-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
       <div class="flex items-center gap-3 min-w-0">
         <div class="w-10 h-10 rounded-xl bg-warning/8 flex items-center justify-center flex-shrink-0">
           <i data-lucide="file-spreadsheet" class="w-5 h-5 text-warning"></i>
         </div>
         <div class="min-w-0">
           <h2 class="font-semibold">CSV Import</h2>
-          <p class="text-xs text-base-content/40 truncate">Import transactions from bank-exported files</p>
+          <p class="text-xs text-base-content/40 sm:truncate">Import transactions from bank-exported files</p>
         </div>
       </div>
-      <span class="badge badge-soft badge-success badge-sm flex-shrink-0">Always Available</span>
+      <span class="badge badge-soft badge-success badge-sm flex-shrink-0 self-start sm:self-auto">Always Available</span>
     </div>
 
     <div class="px-4 sm:px-5 py-4 space-y-4">
