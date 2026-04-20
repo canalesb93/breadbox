@@ -1186,7 +1186,7 @@
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
               slug: slug, display_name: displayName, description: '',
-              color: color, icon: null, lifecycle: 'persistent'
+              color: color, icon: null
             })
           })
           .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, body: d}; }); })
@@ -1200,7 +1200,7 @@
             var tag = {
               id: t.id, slug: t.slug, display_name: t.display_name,
               description: t.description || '', color: t.color || color,
-              icon: t.icon || null, lifecycle: t.lifecycle || 'persistent'
+              icon: t.icon || null
             };
             if (window.__bbAllTags && !window.__bbAllTags.some(function(x) { return x.slug === tag.slug; })) {
               window.__bbAllTags.push(tag);

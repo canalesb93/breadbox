@@ -14,13 +14,12 @@ import (
 )
 
 // TransactionTagResponse is the enriched per-transaction tag entry returned to
-// API/MCP consumers. Includes the tag's slug + lifecycle plus provenance info.
+// API/MCP consumers. Includes the tag's slug plus provenance info.
 type TransactionTagResponse struct {
 	Slug        string  `json:"slug"`
 	DisplayName string  `json:"display_name"`
 	Color       *string `json:"color,omitempty"`
 	Icon        *string `json:"icon,omitempty"`
-	Lifecycle   string  `json:"lifecycle"`
 	AddedAt     string  `json:"added_at"`
 	AddedByType string  `json:"added_by_type"`
 	AddedByName string  `json:"added_by_name"`
@@ -202,7 +201,7 @@ func (s *Service) ListTransactionTags(ctx context.Context, txnID string) ([]Tran
 	// We also need the added_by_* provenance from transaction_tags; a small
 	// dynamic query covers both in a single round-trip.
 	rows, err := s.Pool.Query(ctx, `
-		SELECT t.slug, t.display_name, t.color, t.icon, t.lifecycle,
+		SELECT t.slug, t.display_name, t.color, t.icon,
 		       tt.added_at, tt.added_by_type, tt.added_by_name
 		FROM tags t
 		JOIN transaction_tags tt ON tt.tag_id = t.id
@@ -215,10 +214,10 @@ func (s *Service) ListTransactionTags(ctx context.Context, txnID string) ([]Tran
 
 	var result []TransactionTagResponse
 	for rows.Next() {
-		var slug, displayName, lifecycle, addedByType, addedByName string
+		var slug, displayName, addedByType, addedByName string
 		var color, icon pgtype.Text
 		var addedAt pgtype.Timestamptz
-		if err := rows.Scan(&slug, &displayName, &color, &icon, &lifecycle, &addedAt, &addedByType, &addedByName); err != nil {
+		if err := rows.Scan(&slug, &displayName, &color, &icon, &addedAt, &addedByType, &addedByName); err != nil {
 			return nil, fmt.Errorf("scan transaction tag: %w", err)
 		}
 		result = append(result, TransactionTagResponse{
@@ -226,7 +225,6 @@ func (s *Service) ListTransactionTags(ctx context.Context, txnID string) ([]Tran
 			DisplayName: displayName,
 			Color:       textPtr(color),
 			Icon:        textPtr(icon),
-			Lifecycle:   lifecycle,
 			AddedAt:     pgconv.TimestampStr(addedAt),
 			AddedByType: addedByType,
 			AddedByName: addedByName,

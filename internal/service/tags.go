@@ -25,7 +25,6 @@ type TagResponse struct {
 	Description string  `json:"description"`
 	Color       *string `json:"color,omitempty"`
 	Icon        *string `json:"icon,omitempty"`
-	Lifecycle   string  `json:"lifecycle"`
 	CreatedAt   string  `json:"created_at"`
 	UpdatedAt   string  `json:"updated_at"`
 }
@@ -37,7 +36,6 @@ type CreateTagParams struct {
 	Description string
 	Color       *string
 	Icon        *string
-	Lifecycle   string // "persistent" (default) | "ephemeral"
 }
 
 // UpdateTagParams holds parameters for updating an existing tag.
@@ -46,7 +44,6 @@ type UpdateTagParams struct {
 	Description *string
 	Color       *string
 	Icon        *string
-	Lifecycle   *string
 }
 
 // tagSlugRegex enforces the tag slug format: lowercase alphanumerics with
@@ -62,17 +59,8 @@ func validateTagSlug(slug string) error {
 	return nil
 }
 
-// validateLifecycle accepts "persistent" and "ephemeral".
-func validateLifecycle(lifecycle string) error {
-	if lifecycle != "persistent" && lifecycle != "ephemeral" {
-		return fmt.Errorf("%w: lifecycle must be 'persistent' or 'ephemeral'", ErrInvalidParameter)
-	}
-	return nil
-}
-
 // CreateTag validates and inserts a new tag record. Slug regex:
-// ^[a-z0-9][a-z0-9\-:]*[a-z0-9]$. display_name must be non-empty. Lifecycle
-// defaults to "persistent".
+// ^[a-z0-9][a-z0-9\-:]*[a-z0-9]$. display_name must be non-empty.
 func (s *Service) CreateTag(ctx context.Context, params CreateTagParams) (*TagResponse, error) {
 	if err := validateTagSlug(params.Slug); err != nil {
 		return nil, err
@@ -80,13 +68,6 @@ func (s *Service) CreateTag(ctx context.Context, params CreateTagParams) (*TagRe
 	displayName := strings.TrimSpace(params.DisplayName)
 	if displayName == "" {
 		return nil, fmt.Errorf("%w: display_name is required", ErrInvalidParameter)
-	}
-	lifecycle := params.Lifecycle
-	if lifecycle == "" {
-		lifecycle = "persistent"
-	}
-	if err := validateLifecycle(lifecycle); err != nil {
-		return nil, err
 	}
 
 	color := pgtype.Text{}
@@ -104,7 +85,6 @@ func (s *Service) CreateTag(ctx context.Context, params CreateTagParams) (*TagRe
 		Description: params.Description,
 		Color:       color,
 		Icon:        icon,
-		Lifecycle:   lifecycle,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("insert tag: %w", err)
@@ -208,14 +188,6 @@ func (s *Service) UpdateTag(ctx context.Context, id string, params UpdateTagPara
 		icon = pgtype.Text{String: *params.Icon, Valid: *params.Icon != ""}
 	}
 
-	lifecycle := existing.Lifecycle
-	if params.Lifecycle != nil {
-		if err := validateLifecycle(*params.Lifecycle); err != nil {
-			return nil, err
-		}
-		lifecycle = *params.Lifecycle
-	}
-
 	existingUID, _ := parseUUID(existing.ID)
 	tag, err := s.Queries.UpdateTag(ctx, db.UpdateTagParams{
 		ID:          existingUID,
@@ -223,7 +195,6 @@ func (s *Service) UpdateTag(ctx context.Context, id string, params UpdateTagPara
 		Description: description,
 		Color:       color,
 		Icon:        icon,
-		Lifecycle:   lifecycle,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -257,9 +228,9 @@ func (s *Service) DeleteTag(ctx context.Context, id string) error {
 }
 
 // getOrCreateTagBySlug returns the UUID+row of the tag with the given slug.
-// If the tag doesn't exist, it's auto-created with lifecycle=persistent and
-// display_name=title-cased slug. Safe to call from inside a DB tx — the passed
-// db.Queries handle is used for lookup + insert.
+// If the tag doesn't exist, it's auto-created with display_name=title-cased
+// slug. Safe to call from inside a DB tx — the passed db.Queries handle is
+// used for lookup + insert.
 func (s *Service) getOrCreateTagBySlug(ctx context.Context, q *db.Queries, slug string) (db.Tag, error) {
 	if err := validateTagSlug(slug); err != nil {
 		return db.Tag{}, err
@@ -275,7 +246,6 @@ func (s *Service) getOrCreateTagBySlug(ctx context.Context, q *db.Queries, slug 
 	created, err := q.InsertTag(ctx, db.InsertTagParams{
 		Slug:        slug,
 		DisplayName: slugs.TitleCase(slug),
-		Lifecycle:   "persistent",
 	})
 	if err != nil {
 		return db.Tag{}, fmt.Errorf("auto-create tag %q: %w", slug, err)
@@ -300,7 +270,6 @@ func tagFromRow(t db.Tag) TagResponse {
 		Description: t.Description,
 		Color:       textPtr(t.Color),
 		Icon:        textPtr(t.Icon),
-		Lifecycle:   t.Lifecycle,
 		CreatedAt:   pgconv.TimestampStr(t.CreatedAt),
 		UpdatedAt:   pgconv.TimestampStr(t.UpdatedAt),
 	}

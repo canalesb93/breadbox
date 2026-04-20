@@ -2008,8 +2008,8 @@ func (s *Service) materializeRuleTagAdd(ctx context.Context, tx pgx.Tx, txnID pg
 		// Auto-create on miss. ON CONFLICT DO UPDATE SET updated_at=... is a
 		// harmless no-op-returning-id dance so we always get the tag id back.
 		if err2 := tx.QueryRow(ctx, `
-			INSERT INTO tags (slug, display_name, lifecycle)
-			VALUES ($1, $2, 'persistent')
+			INSERT INTO tags (slug, display_name)
+			VALUES ($1, $2)
 			ON CONFLICT (slug) DO UPDATE SET updated_at = tags.updated_at
 			RETURNING id`, slug, slugs.TitleCase(slug)).Scan(&tagID); err2 != nil {
 			return false, fmt.Errorf("get or create tag %q: %w", slug, err2)

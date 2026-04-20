@@ -162,13 +162,13 @@ Attach a tag to a transaction. Auto-creates a persistent tag if the slug is unkn
 
 ### remove_transaction_tag (Write)
 
-Remove a tag from a transaction. A `note` is strongly recommended for ephemeral tags (`needs-review`) — it lands on the `tag_removed` annotation. Idempotent.
+Remove a tag from a transaction. An optional `note` lands on the `tag_removed` annotation. Idempotent.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `transaction_id` | string | UUID or short ID |
 | `tag_slug` | string | Tag slug |
-| `note` | string | Optional. Recommended for ephemeral tags so the rationale lands on the audit trail. |
+| `note` | string | Optional rationale for removal — recorded on the audit trail. |
 
 ### update_transactions (Write)
 
@@ -185,8 +185,8 @@ Each operation:
 |-------|------|-------------|
 | `transaction_id` | string | UUID or short ID. Required. |
 | `category_slug` | string | Optional category to set. Sets `category_override=true`. |
-| `tags_to_add` | array | `[{slug, note?}, ...]`. Auto-creates persistent tags. |
-| `tags_to_remove` | array | `[{slug, note?}, ...]`. `note` is optional but strongly recommended for ephemeral tags — lands on the `tag_removed` annotation. |
+| `tags_to_add` | array | `[{slug, note?}, ...]`. Auto-creates tags if the slug is new. |
+| `tags_to_remove` | array | `[{slug, note?}, ...]`. `note` is optional — if provided, lands on the `tag_removed` annotation. |
 | `comment` | string | Optional comment annotation. |
 
 Use this to close a review entry: `set category + remove needs-review (with note) + comment` in one call.
@@ -197,7 +197,7 @@ Return the activity timeline for a transaction. Each row is one of: `comment`, `
 
 ### create_tag / update_tag / delete_tag (Write)
 
-Admin-only tag CRUD. Agents typically don't need these — `add_transaction_tag` auto-creates persistent tags. Use these to set display name, color, lifecycle, or cascade-delete a tag.
+Admin-only tag CRUD. Agents typically don't need these — `add_transaction_tag` auto-creates tags on demand. Use these to set display name, color, or cascade-delete a tag.
 
 ---
 

@@ -771,8 +771,8 @@ func (e *Engine) applyTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.U
 	if err != nil {
 		// Either no row (auto-create) or some other error.
 		err2 := tx.QueryRow(ctx, `
-			INSERT INTO tags (slug, display_name, lifecycle)
-			VALUES ($1, $2, 'persistent')
+			INSERT INTO tags (slug, display_name)
+			VALUES ($1, $2)
 			ON CONFLICT (slug) DO UPDATE SET updated_at = tags.updated_at
 			RETURNING id`, slug, slugs.TitleCase(slug)).Scan(&tagID)
 		if err2 != nil {
@@ -827,8 +827,8 @@ func (e *Engine) applyTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.U
 
 // removeTagFromRule deletes a (transaction, tag) row and writes the matching
 // tag_removed annotation. No-op if the tag slug doesn't exist. The rule's
-// name is used as the removal note so ephemeral-tag removal has a source
-// attribution visible in the activity timeline.
+// name is used as the removal note so the activity timeline carries a source
+// attribution.
 func (e *Engine) removeTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, slug string, ruleID pgtype.UUID, ruleShortID, ruleName string) error {
 	var tagID pgtype.UUID
 	err := tx.QueryRow(ctx, `SELECT id FROM tags WHERE slug = $1`, slug).Scan(&tagID)

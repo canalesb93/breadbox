@@ -1,6 +1,6 @@
 -- name: InsertTag :one
-INSERT INTO tags (slug, display_name, description, color, icon, lifecycle)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO tags (slug, display_name, description, color, icon)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: GetTagByID :one
@@ -21,7 +21,6 @@ SET display_name = $2,
     description = $3,
     color = $4,
     icon = $5,
-    lifecycle = $6,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;

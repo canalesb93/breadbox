@@ -35,7 +35,7 @@ func TestCreateTagAdmin_Success(t *testing.T) {
 	r := chi.NewRouter()
 	r.Post("/-/tags", CreateTagAdminHandler(svc))
 
-	body := []byte(`{"slug":"watchlist","display_name":"Watchlist","color":"#ff0000","lifecycle":"persistent"}`)
+	body := []byte(`{"slug":"watchlist","display_name":"Watchlist","color":"#ff0000"}`)
 	req := httptest.NewRequest(http.MethodPost, "/-/tags", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -136,7 +136,7 @@ func TestDeleteTagAdmin(t *testing.T) {
 func TestTagsPageRenders(t *testing.T) {
 	svc := newTestSvc(t)
 	ctx := context.Background()
-	if _, err := svc.CreateTag(ctx, service.CreateTagParams{Slug: "needs-review", DisplayName: "Needs Review", Lifecycle: "ephemeral"}); err != nil {
+	if _, err := svc.CreateTag(ctx, service.CreateTagParams{Slug: "needs-review", DisplayName: "Needs Review"}); err != nil {
 		t.Fatalf("CreateTag: %v", err)
 	}
 

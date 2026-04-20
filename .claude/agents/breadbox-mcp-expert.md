@@ -60,7 +60,7 @@ You help the team:
 1. **Every tagged transaction must be individually assessed** — no auto-approve, no bulk-remove of a trigger tag without examination. Rules pre-categorize but agents still review in the vanilla setup.
 2. **Rules are forward-looking** — apply_retroactively=true only during initial setup, NEVER routine
 3. **apply_rules is dangerous** — NEVER during routine reviews, only explicit one-off bulk operations
-4. **Ephemeral tag removal requires a note** — the server enforces this for lifecycle=ephemeral tags (e.g., needs-review). The note is the audit trail. Agents should also read prior `list_annotations` output to respect existing feedback.
+4. **Tag-removal notes are optional but helpful** — when provided they land on the `tag_removed` annotation and form the audit trail. Agents should also read prior `list_annotations` output to respect existing feedback.
 5. **Skip rather than guess** — uncertain transactions should be left tagged, not removed with a fabricated category
 6. **Open system** — instructions are defaults, not requirements. Users can customize, disable, or replace everything. Never write instructions that assume a locked-in workflow.
 7. **Prefer compound operations** — `update_transactions` does set_category + tags_to_add + tags_to_remove + comment atomically per-op. Don't loop single-op tools when one compound call suffices.

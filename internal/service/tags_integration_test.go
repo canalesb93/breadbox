@@ -38,24 +38,8 @@ func TestCreateTag_SlugValidation(t *testing.T) {
 	}
 }
 
-// TestCreateTag_DefaultsLifecycle verifies lifecycle defaults to "persistent".
-func TestCreateTag_DefaultsLifecycle(t *testing.T) {
-	svc, _, _ := newService(t)
-	ctx := context.Background()
-	tag, err := svc.CreateTag(ctx, service.CreateTagParams{
-		Slug:        "work",
-		DisplayName: "Work",
-	})
-	if err != nil {
-		t.Fatalf("CreateTag: %v", err)
-	}
-	if tag.Lifecycle != "persistent" {
-		t.Errorf("expected lifecycle=persistent, got %q", tag.Lifecycle)
-	}
-}
-
 // TestAddTransactionTag_AutoCreatesTag verifies that adding a tag whose slug
-// doesn't exist creates it as persistent with a title-cased display name.
+// doesn't exist creates it with a title-cased display name.
 func TestAddTransactionTag_AutoCreatesTag(t *testing.T) {
 	svc, queries, _ := newService(t)
 	ctx := context.Background()
@@ -78,9 +62,6 @@ func TestAddTransactionTag_AutoCreatesTag(t *testing.T) {
 	tag, err := queries.GetTagBySlug(ctx, "vacation-2026")
 	if err != nil {
 		t.Fatalf("tag was not created: %v", err)
-	}
-	if tag.Lifecycle != "persistent" {
-		t.Errorf("expected persistent lifecycle, got %q", tag.Lifecycle)
 	}
 	if tag.DisplayName != "Vacation 2026" {
 		t.Errorf("expected display name 'Vacation 2026', got %q", tag.DisplayName)
@@ -118,15 +99,15 @@ func TestAddTransactionTag_WritesAnnotation(t *testing.T) {
 	}
 }
 
-// TestRemoveTransactionTag_EphemeralNoNote verifies that ephemeral tags
-// can be removed without a note (note is optional, not required).
-func TestRemoveTransactionTag_EphemeralNoNote(t *testing.T) {
+// TestRemoveTransactionTag_NoNote verifies that a tag can be removed without
+// a note — note is optional for all tags.
+func TestRemoveTransactionTag_NoNote(t *testing.T) {
 	svc, queries, _ := newService(t)
 	ctx := context.Background()
 	acctID := seedTxnFixture(t, queries)
 	txn := testutil.MustCreateTransaction(t, queries, acctID, "txn3", "Coffee", 500, "2026-03-01")
 
-	testutil.MustCreateTag(t, queries, "needs-review", "Needs Review", "ephemeral")
+	testutil.MustCreateTag(t, queries, "needs-review", "Needs Review")
 
 	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", Name: "A"}, ""); err != nil {
 		t.Fatalf("AddTransactionTag: %v", err)
@@ -146,15 +127,15 @@ func TestRemoveTransactionTag_EphemeralNoNote(t *testing.T) {
 	}
 }
 
-// TestRemoveTransactionTag_NonEphemeralAcceptsEmptyNote verifies that
-// persistent tags can be removed without a note.
-func TestRemoveTransactionTag_NonEphemeralAcceptsEmptyNote(t *testing.T) {
+// TestRemoveTransactionTag_EmptyNoteSucceeds verifies tag removal works with
+// an empty note across regular tags.
+func TestRemoveTransactionTag_EmptyNoteSucceeds(t *testing.T) {
 	svc, queries, _ := newService(t)
 	ctx := context.Background()
 	acctID := seedTxnFixture(t, queries)
 	txn := testutil.MustCreateTransaction(t, queries, acctID, "txn4", "Coffee", 500, "2026-03-01")
 
-	testutil.MustCreateTag(t, queries, "watchlist", "Watch", "persistent")
+	testutil.MustCreateTag(t, queries, "watchlist", "Watch")
 
 	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "watchlist", service.Actor{Type: "user", Name: "A"}, ""); err != nil {
 		t.Fatalf("AddTransactionTag: %v", err)
@@ -176,7 +157,7 @@ func TestRemoveTransactionTag_AlreadyAbsent_NoError(t *testing.T) {
 	acctID := seedTxnFixture(t, queries)
 	txn := testutil.MustCreateTransaction(t, queries, acctID, "txn5", "Coffee", 500, "2026-03-01")
 
-	testutil.MustCreateTag(t, queries, "unused", "Unused", "persistent")
+	testutil.MustCreateTag(t, queries, "unused", "Unused")
 
 	removed, alreadyAbsent, err := svc.RemoveTransactionTag(ctx, txn.ShortID, "unused", service.Actor{Type: "user", Name: "A"}, "")
 	if err != nil {

@@ -93,7 +93,6 @@ func CreateTagAdminHandler(svc *service.Service) http.HandlerFunc {
 			Description string  `json:"description"`
 			Color       *string `json:"color"`
 			Icon        *string `json:"icon"`
-			Lifecycle   string  `json:"lifecycle"`
 		}
 		if !decodeJSON(w, r, &req) {
 			return
@@ -111,7 +110,6 @@ func CreateTagAdminHandler(svc *service.Service) http.HandlerFunc {
 			Description: req.Description,
 			Color:       req.Color,
 			Icon:        req.Icon,
-			Lifecycle:   req.Lifecycle,
 		})
 		if err != nil {
 			handleTagError(w, err)
@@ -130,7 +128,6 @@ func UpdateTagAdminHandler(svc *service.Service) http.HandlerFunc {
 			Description *string `json:"description"`
 			Color       *string `json:"color"`
 			Icon        *string `json:"icon"`
-			Lifecycle   *string `json:"lifecycle"`
 		}
 		if !decodeJSON(w, r, &req) {
 			return
@@ -140,7 +137,6 @@ func UpdateTagAdminHandler(svc *service.Service) http.HandlerFunc {
 			Description: req.Description,
 			Color:       req.Color,
 			Icon:        req.Icon,
-			Lifecycle:   req.Lifecycle,
 		})
 		if err != nil {
 			handleTagError(w, err)
@@ -204,7 +200,8 @@ func AddTransactionTagAdminHandler(a *app.App, sm *scs.SessionManager, svc *serv
 }
 
 // RemoveTransactionTagAdminHandler handles DELETE /-/transactions/{id}/tags/{slug}.
-// Query/body: note (REQUIRED for ephemeral tags). Accepts either form-encoded or JSON.
+// Query/body: optional note recorded on the tag_removed annotation. Accepts
+// either form-encoded or JSON.
 func RemoveTransactionTagAdminHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		txnID := chi.URLParam(r, "id")
