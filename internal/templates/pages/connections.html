@@ -221,8 +221,13 @@
             {{end}}
           </div>
           <div class="min-w-0">
-            <div class="text-sm font-medium truncate group-hover/acct:text-primary transition-colors">
-              {{if .DisplayName.Valid}}{{.DisplayName.String}}{{else}}{{.Name}}{{end}}
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-sm font-medium truncate group-hover/acct:text-primary transition-colors">
+                {{if .DisplayName.Valid}}{{.DisplayName.String}}{{else}}{{.Name}}{{end}}
+              </span>
+              {{if .IsDependentLinked}}
+              <span class="badge badge-soft badge-info badge-xs" title="Dependent-linked: balance and transactions are attributed to a linked user and excluded from this user's totals">Linked</span>
+              {{end}}
             </div>
             <div class="text-xs text-base-content/40">
               {{if .Subtype.Valid}}<span class="capitalize">{{humanize .Subtype.String}}</span>{{end}}
