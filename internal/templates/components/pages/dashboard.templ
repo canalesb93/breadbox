@@ -216,7 +216,7 @@ templ dashAgentReportsCard(p DashboardProps) {
 			</div>
 			<div class="flex items-center gap-3 ml-auto">
 				if len(p.AgentReports) > 0 {
-					<button type="button" class="flex items-center gap-1 text-xs text-base-content/40 hover:text-base-content/60 transition-colors cursor-pointer" @click="markAllRead()" title="Mark all reports as read">
+					<button type="button" class="inline-flex items-center justify-center gap-1 text-xs text-base-content/40 hover:text-base-content/60 transition-colors cursor-pointer px-2 h-8 min-w-8 -mx-1 rounded-md" @click="markAllRead()" aria-label="Mark all reports as read" title="Mark all reports as read">
 						<i data-lucide="check-check" class="w-3.5 h-3.5"></i>
 						<span class="hidden sm:inline">Mark all read</span>
 					</button>
@@ -265,8 +265,8 @@ templ dashReportItem(r DashboardReport) {
 						case "warning":
 							<span class="w-2 h-2 rounded-full bg-warning shrink-0"></span>
 					}
-					<button @click.stop={ fmt.Sprintf("markRead(%q)", r.ID) } title="Mark as read" class="ml-auto shrink-0 w-5 h-5 rounded-md flex items-center justify-center text-base-content/30 hover:text-success hover:bg-success/10 transition-colors cursor-pointer">
-						<i data-lucide="check" class="w-3.5 h-3.5"></i>
+					<button @click.stop={ fmt.Sprintf("markRead(%q)", r.ID) } aria-label={ fmt.Sprintf("Mark %s report as read", r.DisplayAuthor) } title="Mark as read" class="ml-auto shrink-0 w-9 h-9 rounded-md flex items-center justify-center text-base-content/30 hover:text-success hover:bg-success/10 transition-colors cursor-pointer">
+						<i data-lucide="check" class="w-4 h-4"></i>
 					</button>
 				</div>
 				<a href={ templ.SafeURL("/reports/" + r.ID) } class="rounded-2xl rounded-tl-sm shadow-sm px-3.5 py-2.5 inline-block max-w-full no-underline group bg-base-200/70 hover:bg-base-200/90 transition-colors">
