@@ -17,6 +17,7 @@
         <span class="text-xs text-base-content/40">{{$typeLabel}}{{if $subtype}} &middot; {{$subtype}}{{end}}</span>
         {{if .Account.Mask}}<span class="text-xs text-base-content/30">&bull;&bull;&bull;&bull;{{.Account.Mask}}</span>{{end}}
         {{if .Account.Excluded}}<span class="badge badge-ghost badge-xs">Excluded</span>{{end}}
+        {{if .Account.IsDependentLinked}}<span class="badge badge-soft badge-info badge-xs" title="Dependent-linked: balance and transactions are attributed to a linked user and excluded from this user's totals">Linked</span>{{end}}
         {{if and .Account.ConnectionStatus (ne (deref .Account.ConnectionStatus) "active")}}
         {{if eq (deref .Account.ConnectionStatus) "error"}}<span class="badge badge-soft badge-error badge-xs">Error</span>
         {{else if eq (deref .Account.ConnectionStatus) "pending_reauth"}}<span class="badge badge-soft badge-warning badge-xs">Reauth</span>
@@ -109,6 +110,15 @@
         <div>
           <p class="text-xs text-base-content/40 mb-1">Family Member</p>
           <p class="text-sm font-medium">{{.Account.UserName}}</p>
+        </div>
+        {{end}}
+        {{if .Account.IsDependentLinked}}
+        <div class="sm:col-span-2 lg:col-span-4">
+          <p class="text-xs text-base-content/40 mb-1">Attribution</p>
+          <div class="flex items-start gap-2 text-sm">
+            <span class="badge badge-soft badge-info badge-sm shrink-0">Linked</span>
+            <p class="text-base-content/70 leading-relaxed">This account is linked to a primary cardholder. Its balance and transactions are attributed to the linked user, so they are excluded from this user's totals. Manage links on the <a href="/connections?tab=links" class="link link-primary">Account Links</a> tab.</p>
+          </div>
         </div>
         {{end}}
       </div>

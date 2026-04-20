@@ -116,6 +116,7 @@ func accountFromAllRow(r db.ListAccountsRow) AccountResponse {
 		CreatedAt:         r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:         r.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
 		ConnectionStatus:  nullConnStatusPtr(r.ConnectionStatus),
+		IsDependentLinked: r.IsDependentLinked,
 	}
 }
 
@@ -139,6 +140,7 @@ func accountFromUserRow(r db.ListAccountsByUserRow) AccountResponse {
 		CreatedAt:         r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:         r.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
 		ConnectionStatus:  connStatusPtr(r.ConnectionStatus),
+		IsDependentLinked: r.IsDependentLinked,
 	}
 }
 
@@ -162,6 +164,7 @@ func accountFromGetRow(r db.GetAccountRow) AccountResponse {
 		CreatedAt:         r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:         r.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
 		ConnectionStatus:  nullConnStatusPtr(r.ConnectionStatus),
+		IsDependentLinked: r.IsDependentLinked,
 	}
 }
 

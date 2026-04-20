@@ -21,6 +21,7 @@ type AccountResponse struct {
 	CreatedAt         string   `json:"created_at"`
 	UpdatedAt         string   `json:"updated_at"`
 	ConnectionStatus  *string  `json:"connection_status,omitempty"`
+	IsDependentLinked bool     `json:"is_dependent_linked"`
 }
 
 type TransactionCategoryInfo struct {
