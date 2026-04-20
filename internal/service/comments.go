@@ -54,7 +54,7 @@ func (s *Service) CreateComment(ctx context.Context, params CreateCommentParams)
 
 	actorID := pgtype.Text{}
 	if params.Actor.ID != "" {
-		actorID = pgtype.Text{String: params.Actor.ID, Valid: true}
+		actorID = pgconv.Text(params.Actor.ID)
 	}
 
 	payloadBytes, err := json.Marshal(payload)

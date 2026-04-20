@@ -60,7 +60,7 @@ func writeAnnotation(ctx context.Context, q *db.Queries, params writeAnnotationP
 
 	actorID := pgtype.Text{}
 	if params.ActorID != "" {
-		actorID = pgtype.Text{String: params.ActorID, Valid: true}
+		actorID = pgconv.Text(params.ActorID)
 	}
 
 	_, err := q.InsertAnnotation(ctx, db.InsertAnnotationParams{

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	csvpkg "breadbox/internal/provider/csv"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -85,8 +86,8 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 			UserID:               userID,
 			Provider:             db.ProviderTypeCsv,
 			InstitutionID:        pgtype.Text{},
-			InstitutionName:      pgtype.Text{String: params.AccountName, Valid: true},
-			ExternalID:           pgtype.Text{String: externalID, Valid: true},
+			InstitutionName:      pgconv.Text(params.AccountName),
+			ExternalID:           pgconv.Text(externalID),
 			EncryptedCredentials: nil,
 			Status:               db.ConnectionStatusActive,
 		})
@@ -100,8 +101,8 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 			ExternalAccountID: externalID,
 			Name:              params.AccountName,
 			Type:              "depository",
-			Subtype:           pgtype.Text{String: "checking", Valid: true},
-			IsoCurrencyCode:   pgtype.Text{String: "USD", Valid: true},
+			Subtype:           pgconv.Text("checking"),
+			IsoCurrencyCode:   pgconv.Text("USD"),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("create account: %w", err)
@@ -227,12 +228,12 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 			AccountID:             accountID,
 			ExternalTransactionID: externalTxnID,
 			Amount:                amountNumeric,
-			IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
+			IsoCurrencyCode:       pgconv.Text("USD"),
 			Date:                  pgtype.Date{Time: dateVal, Valid: true},
 			Name:                  desc,
 			MerchantName:          pgtype.Text{String: merchant, Valid: merchant != ""},
 			CategoryPrimary:       pgtype.Text{String: category, Valid: category != ""},
-			PaymentChannel:        pgtype.Text{String: "other", Valid: true},
+			PaymentChannel:        pgconv.Text("other"),
 			Pending:               false,
 			CategoryID:            categoryID,
 		})

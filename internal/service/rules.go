@@ -711,7 +711,7 @@ func (s *Service) CreateTransactionRule(ctx context.Context, params CreateTransa
 	}
 	var createdByID pgtype.Text
 	if params.Actor.ID != "" {
-		createdByID = pgtype.Text{String: params.Actor.ID, Valid: true}
+		createdByID = pgconv.Text(params.Actor.ID)
 	}
 
 	query := `INSERT INTO transaction_rules (name, conditions, actions, trigger, priority, enabled, expires_at, created_by_type, created_by_id, created_by_name)

@@ -11,12 +11,12 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	plaidprovider "breadbox/internal/provider/plaid"
 	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -126,7 +126,7 @@ func createLinkedAdmin(ctx context.Context, a *app.App, name, username string, h
 
 	user, err := qtx.CreateUser(ctx, db.CreateUserParams{
 		Name:  name,
-		Email: pgtype.Text{String: username, Valid: true},
+		Email: pgconv.Text(username),
 	})
 	if err != nil {
 		return fmt.Errorf("create user: %w", err)
@@ -264,8 +264,8 @@ func ProgrammaticSetupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFu
 
 		// Store all config values.
 		configEntries := []db.SetAppConfigParams{
-			{Key: "sync_interval_minutes", Value: pgtype.Text{String: req.SyncIntervalMinutes, Valid: true}},
-			{Key: "webhook_url", Value: pgtype.Text{String: req.WebhookURL, Valid: true}},
+			{Key: "sync_interval_minutes", Value: pgconv.Text(req.SyncIntervalMinutes)},
+			{Key: "webhook_url", Value: pgconv.Text(req.WebhookURL)},
 		}
 		if req.PlaidClientID != "" {
 			plaidEnv := req.PlaidEnv
@@ -273,9 +273,9 @@ func ProgrammaticSetupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFu
 				plaidEnv = "sandbox"
 			}
 			configEntries = append(configEntries,
-				db.SetAppConfigParams{Key: "plaid_client_id", Value: pgtype.Text{String: req.PlaidClientID, Valid: true}},
-				db.SetAppConfigParams{Key: "plaid_secret", Value: pgtype.Text{String: req.PlaidSecret, Valid: true}},
-				db.SetAppConfigParams{Key: "plaid_env", Value: pgtype.Text{String: plaidEnv, Valid: true}},
+				db.SetAppConfigParams{Key: "plaid_client_id", Value: pgconv.Text(req.PlaidClientID)},
+				db.SetAppConfigParams{Key: "plaid_secret", Value: pgconv.Text(req.PlaidSecret)},
+				db.SetAppConfigParams{Key: "plaid_env", Value: pgconv.Text(plaidEnv)},
 			)
 		}
 

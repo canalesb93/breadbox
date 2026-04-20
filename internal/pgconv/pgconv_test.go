@@ -162,6 +162,43 @@ func TestTextPtr_Invalid(t *testing.T) {
 	}
 }
 
+func TestText(t *testing.T) {
+	got := Text("hello")
+	if !got.Valid || got.String != "hello" {
+		t.Errorf("Text(hello) = %+v, want {hello true}", got)
+	}
+}
+
+func TestText_Empty(t *testing.T) {
+	got := Text("")
+	if !got.Valid || got.String != "" {
+		t.Errorf("Text(\"\") = %+v, want {\"\" true} — empty strings stay valid", got)
+	}
+}
+
+func TestTextFromPtr_Nil(t *testing.T) {
+	got := TextFromPtr(nil)
+	if got.Valid {
+		t.Errorf("TextFromPtr(nil) = %+v, want invalid", got)
+	}
+}
+
+func TestTextFromPtr_Valid(t *testing.T) {
+	s := "hello"
+	got := TextFromPtr(&s)
+	if !got.Valid || got.String != "hello" {
+		t.Errorf("TextFromPtr(&hello) = %+v, want {hello true}", got)
+	}
+}
+
+func TestTextFromPtr_EmptyPointer(t *testing.T) {
+	s := ""
+	got := TextFromPtr(&s)
+	if !got.Valid || got.String != "" {
+		t.Errorf("TextFromPtr(&\"\") = %+v, want {\"\" true}", got)
+	}
+}
+
 func TestTimestampStr_Valid(t *testing.T) {
 	ts := pgtype.Timestamptz{
 		Time:  time.Date(2024, 3, 15, 14, 30, 0, 0, time.UTC),

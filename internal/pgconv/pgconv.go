@@ -51,6 +51,22 @@ func TextPtr(t pgtype.Text) *string {
 	return &t.String
 }
 
+// Text wraps a string as a non-NULL pgtype.Text. Empty strings are preserved
+// as valid (non-NULL) empty values — use TextFromPtr when an empty/missing
+// input should map to NULL.
+func Text(s string) pgtype.Text {
+	return pgtype.Text{String: s, Valid: true}
+}
+
+// TextFromPtr wraps *string as pgtype.Text: nil → NULL, non-nil → valid
+// (including the empty string). Mirrors TextPtr in reverse.
+func TextFromPtr(s *string) pgtype.Text {
+	if s == nil {
+		return pgtype.Text{}
+	}
+	return pgtype.Text{String: *s, Valid: true}
+}
+
 // TimestampStr renders a pgtype.Timestamptz as an RFC3339 UTC string. Returns
 // an empty string when the timestamp is NULL. Use for NOT NULL columns where
 // an empty response field is acceptable for the rare invalid case.

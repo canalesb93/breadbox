@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/provider"
 	"breadbox/internal/sync"
 
@@ -67,7 +68,7 @@ func NewHandler(providers map[string]provider.Provider, engine *sync.Engine, que
 		// Look up the internal connection by provider + external ID.
 		conn, err := queries.GetBankConnectionByExternalID(r.Context(), db.GetBankConnectionByExternalIDParams{
 			Provider:   db.ProviderType(providerName),
-			ExternalID: pgtype.Text{String: event.ConnectionID, Valid: true},
+			ExternalID: pgconv.Text(event.ConnectionID),
 		})
 		if err != nil {
 			logger.Error("failed to look up connection", "error", err)

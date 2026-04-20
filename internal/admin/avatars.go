@@ -143,7 +143,7 @@ func RegenerateUserAvatarHandler(a *app.App) http.HandlerFunc {
 			return
 		}
 		if err := a.Queries.SetUserAvatarSeed(r.Context(), db.SetUserAvatarSeedParams{
-			ID: userID, AvatarSeed: pgtype.Text{String: seed, Valid: true},
+			ID: userID, AvatarSeed: pgconv.Text(seed),
 		}); err != nil {
 			a.Logger.Error("set avatar seed", "error", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to regenerate"})
@@ -198,7 +198,7 @@ func RegenerateMyAvatarHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 			return
 		}
 		if err := a.Queries.SetUserAvatarSeed(r.Context(), db.SetUserAvatarSeedParams{
-			ID: userID, AvatarSeed: pgtype.Text{String: seed, Valid: true},
+			ID: userID, AvatarSeed: pgconv.Text(seed),
 		}); err != nil {
 			a.Logger.Error("set avatar seed", "error", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to regenerate"})
@@ -248,7 +248,7 @@ func processAndStoreAvatar(a *app.App, w http.ResponseWriter, r *http.Request, u
 	if err := a.Queries.SetUserAvatar(r.Context(), db.SetUserAvatarParams{
 		ID:                userID,
 		AvatarData:        processed,
-		AvatarContentType: pgtype.Text{String: ct, Valid: true},
+		AvatarContentType: pgconv.Text(ct),
 	}); err != nil {
 		a.Logger.Error("store avatar", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to save avatar"})

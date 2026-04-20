@@ -10,8 +10,7 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/db"
-
-	"github.com/jackc/pgx/v5/pgtype"
+	"breadbox/internal/pgconv"
 )
 
 // DismissUpdateHandler handles POST /admin/api/update/dismiss.
@@ -29,7 +28,7 @@ func DismissUpdateHandler(a *app.App) http.HandlerFunc {
 
 		_ = a.Queries.SetAppConfig(r.Context(), db.SetAppConfigParams{
 			Key:   "update_dismissed_version",
-			Value: pgtype.Text{String: body.Version, Valid: true},
+			Value: pgconv.Text(body.Version),
 		})
 
 		writeOK(w)

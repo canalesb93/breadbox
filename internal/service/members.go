@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -171,7 +172,7 @@ func (s *Service) generateSetupToken(ctx context.Context, accountID pgtype.UUID)
 
 	err := s.Queries.SetAuthAccountSetupToken(ctx, db.SetAuthAccountSetupTokenParams{
 		ID:                  accountID,
-		SetupToken:          pgtype.Text{String: token, Valid: true},
+		SetupToken:          pgconv.Text(token),
 		SetupTokenExpiresAt: pgtype.Timestamptz{Time: expiresAt, Valid: true},
 	})
 	if err != nil {

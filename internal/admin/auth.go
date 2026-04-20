@@ -11,7 +11,6 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -198,7 +197,7 @@ func SetupAccountHandler(sm *scs.SessionManager, queries *db.Queries, _ *Templat
 			return
 		}
 
-		account, err := queries.GetAuthAccountBySetupToken(r.Context(), pgtype.Text{String: token, Valid: true})
+		account, err := queries.GetAuthAccountBySetupToken(r.Context(), pgconv.Text(token))
 		if err != nil {
 			renderSetupError(w, r, sm, "This setup link is invalid or has expired.")
 			return

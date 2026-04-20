@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -224,7 +225,7 @@ func (s *Service) runUpdateOpInTx(ctx context.Context, tx pgx.Tx, op UpdateTrans
 		}
 		actorID := pgtype.Text{}
 		if actor.ID != "" {
-			actorID = pgtype.Text{String: actor.ID, Valid: true}
+			actorID = pgconv.Text(actor.ID)
 		}
 		rows, err := qtx.AddTransactionTag(ctx, db.AddTransactionTagParams{
 			TransactionID: txnUID,
