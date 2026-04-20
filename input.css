@@ -2414,16 +2414,16 @@
     @apply text-sm text-base-content/85 leading-relaxed;
   }
   .bb-report-body > :first-child { @apply mt-0; }
-  .bb-report-body h1 { @apply text-lg font-semibold text-base-content mt-6 mb-2; }
-  .bb-report-body h2 { @apply text-base font-semibold text-base-content mt-5 mb-2; }
-  .bb-report-body h3 {
-    @apply text-[0.7rem] font-semibold uppercase tracking-wider text-base-content/50 mt-5 mb-1.5;
+  .bb-report-body h1 { @apply text-xl font-semibold text-base-content mt-6 mb-2; }
+  .bb-report-body h2 { @apply text-lg font-semibold text-base-content mt-5 mb-2; }
+  .bb-report-body h3 { @apply text-base font-semibold text-base-content mt-5 mb-1.5; }
+  .bb-report-body h4 {
+    @apply text-sm font-semibold uppercase tracking-wider text-base-content/60 mt-4 mb-1;
   }
-  .bb-report-body h4 { @apply text-sm font-semibold text-base-content/80 mt-4 mb-1; }
   .bb-report-body p  { @apply mb-3; }
   .bb-report-body ul { @apply list-disc pl-5 space-y-1 my-2; }
   .bb-report-body ol { @apply list-decimal pl-5 space-y-1 my-2; }
-  .bb-report-body li { @apply marker:text-base-content/30; }
+  .bb-report-body li { @apply marker:text-base-content/60; }
   .bb-report-body strong { @apply font-semibold text-base-content; }
   .bb-report-body em { @apply italic; }
   .bb-report-body a  { @apply text-primary underline decoration-primary/30 hover:decoration-primary underline-offset-2; }
