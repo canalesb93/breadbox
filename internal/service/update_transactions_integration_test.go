@@ -22,9 +22,9 @@ func TestUpdateTransactions_CompoundOp(t *testing.T) {
 	acctID := seedTxnFixture(t, queries)
 	txn := testutil.MustCreateTransaction(t, queries, acctID, "extu1", "Costco", 8732, "2026-04-01")
 
-	// Seed required category + ephemeral tag.
+	// Seed required category + needs-review tag.
 	mustCreateCategory(t, queries, "food_and_drink_groceries", "Groceries")
-	testutil.MustCreateTag(t, queries, "needs-review", "Needs Review", "ephemeral")
+	testutil.MustCreateTag(t, queries, "needs-review", "Needs Review")
 
 	// Pre-attach needs-review to mimic the seeded auto-rule.
 	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", ID: "u1", Name: "Tester"}, ""); err != nil {
@@ -175,15 +175,15 @@ func TestUpdateTransactions_AbortMode_RollsBack(t *testing.T) {
 	}
 }
 
-// TestUpdateTransactions_EphemeralRemovalWithoutNote verifies that removing
-// an ephemeral tag without a note succeeds (note is optional).
-func TestUpdateTransactions_EphemeralRemovalWithoutNote(t *testing.T) {
+// TestUpdateTransactions_TagRemovalWithoutNote verifies that tag removal
+// without a note succeeds — note is optional.
+func TestUpdateTransactions_TagRemovalWithoutNote(t *testing.T) {
 	svc, queries, _ := newService(t)
 	ctx := context.Background()
 	acctID := seedTxnFixture(t, queries)
 	txn := testutil.MustCreateTransaction(t, queries, acctID, "tx_c", "Subscription", 999, "2026-04-03")
 
-	testutil.MustCreateTag(t, queries, "needs-review", "Needs Review", "ephemeral")
+	testutil.MustCreateTag(t, queries, "needs-review", "Needs Review")
 	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", ID: "u1", Name: "Tester"}, ""); err != nil {
 		t.Fatalf("seed: %v", err)
 	}

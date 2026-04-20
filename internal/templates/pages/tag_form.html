@@ -93,27 +93,6 @@
           </div>
         </div>
 
-        <!-- Lifecycle -->
-        <div>
-          <label class="block text-xs font-medium text-base-content/50 mb-1.5">Lifecycle</label>
-          <div class="flex gap-2">
-            <label class="flex-1 cursor-pointer">
-              <input type="radio" x-model="lifecycle" value="persistent" class="peer sr-only">
-              <div class="border-2 border-base-300 peer-checked:border-primary peer-checked:bg-primary/5 rounded-xl p-3 transition-colors">
-                <div class="font-medium text-sm">Persistent</div>
-                <div class="text-xs text-base-content/50 mt-0.5">Long-lived label (subscription, shared)</div>
-              </div>
-            </label>
-            <label class="flex-1 cursor-pointer">
-              <input type="radio" x-model="lifecycle" value="ephemeral" class="peer sr-only">
-              <div class="border-2 border-base-300 peer-checked:border-warning peer-checked:bg-warning/5 rounded-xl p-3 transition-colors">
-                <div class="font-medium text-sm">Ephemeral</div>
-                <div class="text-xs text-base-content/50 mt-0.5">Workflow trigger, removal requires note</div>
-              </div>
-            </label>
-          </div>
-        </div>
-
         <template x-if="error">
           <div role="alert" class="bb-form-error">
             <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
@@ -146,8 +125,7 @@ function tagForm() {
     displayName: {{if .IsEdit}}{{toJSON .Tag.DisplayName}}{{else}}''{{end}},
     description: {{if .IsEdit}}{{toJSON .Tag.Description}}{{else}}''{{end}},
     color: {{if .IsEdit}}{{if .Tag.Color}}'{{deref .Tag.Color}}'{{else}}'#6366f1'{{end}}{{else}}'#6366f1'{{end}},
-    icon: {{if .IsEdit}}{{if .Tag.Icon}}'{{deref .Tag.Icon}}'{{else}}''{{end}}{{else}}''{{end}},
-    lifecycle: {{if .IsEdit}}'{{.Tag.Lifecycle}}'{{else}}'persistent'{{end}}
+    icon: {{if .IsEdit}}{{if .Tag.Icon}}'{{deref .Tag.Icon}}'{{else}}''{{end}}{{else}}''{{end}}
   };
   return {
     isEdit: isEdit,
@@ -157,7 +135,6 @@ function tagForm() {
     description: initial.description,
     color: initial.color,
     icon: initial.icon,
-    lifecycle: initial.lifecycle,
     submitting: false,
     error: '',
     presetColors: ['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#64748b','#78716c'],
@@ -191,8 +168,7 @@ function tagForm() {
           display_name: displayName,
           description: this.description || '',
           color: this.color || null,
-          icon: this.icon || null,
-          lifecycle: this.lifecycle
+          icon: this.icon || null
         };
       } else {
         url = '/-/tags';
@@ -202,8 +178,7 @@ function tagForm() {
           display_name: displayName,
           description: this.description || '',
           color: this.color || null,
-          icon: this.icon || null,
-          lifecycle: this.lifecycle
+          icon: this.icon || null
         };
       }
 

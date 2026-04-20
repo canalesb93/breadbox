@@ -132,7 +132,7 @@ Sets the transaction's assigned category. At most one `set_category` per rule.
 { "type": "add_tag", "tag_slug": "needs-review" }
 ```
 
-Adds a tag. The tag is auto-created with `lifecycle = persistent` if the slug doesn't exist yet. Idempotent — re-adding an existing tag is a no-op.
+Adds a tag. The tag is auto-created if the slug doesn't exist yet. Idempotent — re-adding an existing tag is a no-op.
 
 - Slug format: `^[a-z0-9][a-z0-9\-:]*[a-z0-9]$` (lowercase, digits, hyphens, colons; no leading/trailing punctuation).
 - Writes a `tag_added` annotation; deduped against prior annotations of the same tag on the same transaction.
@@ -145,7 +145,7 @@ Adds a tag. The tag is auto-created with `lifecycle = persistent` if the slug do
 
 Removes a tag from the transaction. No-op if the tag isn't attached. Slug validation matches `add_tag`.
 
-- Writes a `tag_removed` annotation. The rule's name is captured in the annotation payload as the removal note, so ephemeral-tag removal has a source attribution on the activity timeline.
+- Writes a `tag_removed` annotation. The rule's name is captured in the annotation payload as the removal note so the activity timeline carries a source attribution.
 - **Net-diff semantics in a pipeline.** If an earlier-stage rule's `add_tag` and a later-stage rule's `remove_tag` target the same slug in a single sync pass, they cancel — neither the INSERT nor the DELETE hits the DB, and no annotations are emitted. This keeps the timeline clean when rules compose.
 
 ### `add_comment`

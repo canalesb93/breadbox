@@ -24,7 +24,7 @@ DATA MODEL:
 - Transactions: individual financial transactions belonging to an account
 - Categories: 2-level hierarchy (primary → subcategory), identified by slug (e.g., food_and_drink_groceries)
 - Transaction Rules: pattern-matching conditions that pre-categorize new transactions during sync
-- Tags: open-ended labels attached to transactions. Each tag has a slug (stable identifier), display_name, and lifecycle ("persistent" or "ephemeral"). Tags coordinate work between agents and humans.
+- Tags: open-ended labels attached to transactions. Each tag has a slug (stable identifier) and a display_name. Tags coordinate work between agents and humans.
 - Annotations: the activity timeline for a transaction. Every tag change, category set, rule application, and comment is an annotation.
 
 AMOUNT CONVENTION (critical):
@@ -401,7 +401,7 @@ func (s *MCPServer) buildToolRegistry() {
 			s.handleSubmitReport, svc),
 		// --- Tags + annotations ---
 		makeToolDefLogged("list_tags", ToolRead,
-			"List all tags registered in the system. Each tag has a slug (stable identifier), display_name, and lifecycle ('persistent' or 'ephemeral'). Tags attached to transactions can be queried via the tags / any_tag filters on query_transactions.",
+			"List all tags registered in the system. Each tag has a slug (stable identifier) and a display_name. Tags attached to transactions can be queried via the tags / any_tag filters on query_transactions.",
 			s.handleListTags, svc),
 		makeToolDefLogged("list_annotations", ToolRead,
 			"List the activity timeline for a transaction. Each annotation is a single event: comment, tag_added, tag_removed, rule_applied, or category_set. Ordered by created_at ASC. Payload carries kind-specific fields (content for comments, slug for tags, rule_name for rule applications).",
@@ -413,13 +413,13 @@ func (s *MCPServer) buildToolRegistry() {
 			"Remove a tag from a transaction. A note is recommended (it's recorded on the tag_removed annotation for auditability) but not required. Idempotent: returns already_absent=true if the tag wasn't attached.",
 			s.handleRemoveTransactionTag, svc),
 		makeToolDefLogged("update_transactions", ToolWrite,
-			"Compound write for up to 50 transactions at once. Each operation can: set a category (category_slug), add tags (tags_to_add), remove tags (tags_to_remove), and attach a comment — all atomically per transaction, with annotations written for every change. The preferred tool for closing review work (set category + remove needs-review + explain) in one call. Example operation: {\"transaction_id\":\"k7Xm9pQ2\",\"category_slug\":\"food_and_drink_groceries\",\"tags_to_remove\":[{\"slug\":\"needs-review\",\"note\":\"clearly groceries\"}],\"comment\":\"Costco run\"}. on_error: 'continue' (default — each op in its own DB tx, partial failures OK) or 'abort' (one DB tx, rolls back on first error). Ephemeral tags (needs-review) REQUIRE a non-empty note on removal.",
+			"Compound write for up to 50 transactions at once. Each operation can: set a category (category_slug), add tags (tags_to_add), remove tags (tags_to_remove), and attach a comment — all atomically per transaction, with annotations written for every change. The preferred tool for closing review work (set category + remove needs-review + explain) in one call. Example operation: {\"transaction_id\":\"k7Xm9pQ2\",\"category_slug\":\"food_and_drink_groceries\",\"tags_to_remove\":[{\"slug\":\"needs-review\",\"note\":\"clearly groceries\"}],\"comment\":\"Costco run\"}. on_error: 'continue' (default — each op in its own DB tx, partial failures OK) or 'abort' (one DB tx, rolls back on first error). Notes on tag removal are optional but recommended for workflow tags like needs-review.",
 			s.handleUpdateTransactions, svc),
 		makeToolDefLogged("create_tag", ToolWrite,
-			"Register a new tag in the system. Admin-only write — agents can auto-create persistent tags implicitly via add_transaction_tag (pass a new slug), so use create_tag only when users need to set display_name/color/lifecycle up front. Slug regex: ^[a-z0-9][a-z0-9\\-:]*[a-z0-9]$. Lifecycle defaults to 'persistent' (user-defined, long-lived). Use 'ephemeral' for workflow trigger tags like needs-review.",
+			"Register a new tag in the system. Admin-only write — agents can auto-create tags implicitly via add_transaction_tag (pass a new slug), so use create_tag only when users need to set display_name/color/icon up front. Slug regex: ^[a-z0-9][a-z0-9\\-:]*[a-z0-9]$.",
 			s.handleCreateTag, svc),
 		makeToolDefLogged("update_tag", ToolWrite,
-			"Update a tag's mutable fields (display_name, description, color, icon, lifecycle). Slug is immutable — to rename, create a new tag + bulk re-tag + delete old. Identify the tag by UUID, short ID, or slug.",
+			"Update a tag's mutable fields (display_name, description, color, icon). Slug is immutable — to rename, create a new tag + bulk re-tag + delete old. Identify the tag by UUID, short ID, or slug.",
 			s.handleUpdateTag, svc),
 		makeToolDefLogged("delete_tag", ToolWrite,
 			"Delete a tag. Cascades to transaction_tags (removes the tag from every transaction). Annotations that reference the tag keep their rows with tag_id=NULL (preserves audit trail). Identify the tag by UUID, short ID, or slug.",

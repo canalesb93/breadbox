@@ -277,17 +277,12 @@ func MustCreateAPIKey(t *testing.T, q *db.Queries, name string) db.ApiKey {
 	return key
 }
 
-// MustCreateTag inserts a tag row and fatals on error. lifecycle defaults to
-// "persistent" if empty.
-func MustCreateTag(t *testing.T, q *db.Queries, slug, displayName, lifecycle string) db.Tag {
+// MustCreateTag inserts a tag row and fatals on error.
+func MustCreateTag(t *testing.T, q *db.Queries, slug, displayName string) db.Tag {
 	t.Helper()
-	if lifecycle == "" {
-		lifecycle = "persistent"
-	}
 	tag, err := q.InsertTag(context.Background(), db.InsertTagParams{
 		Slug:        slug,
 		DisplayName: displayName,
-		Lifecycle:   lifecycle,
 	})
 	if err != nil {
 		t.Fatalf("MustCreateTag(%q): %v", slug, err)

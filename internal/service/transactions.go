@@ -988,7 +988,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 		}
 		if len(ids) > 0 {
 			tagRows, err := s.Pool.Query(ctx, `
-				SELECT tt.transaction_id, t.slug, t.display_name, t.color, t.icon, t.lifecycle
+				SELECT tt.transaction_id, t.slug, t.display_name, t.color, t.icon
 				FROM transaction_tags tt
 				JOIN tags t ON t.id = tt.tag_id
 				WHERE tt.transaction_id = ANY($1)
@@ -997,9 +997,9 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 				defer tagRows.Close()
 				for tagRows.Next() {
 					var txnID pgtype.UUID
-					var slug, displayName, lifecycle string
+					var slug, displayName string
 					var color, icon pgtype.Text
-					if scanErr := tagRows.Scan(&txnID, &slug, &displayName, &color, &icon, &lifecycle); scanErr != nil {
+					if scanErr := tagRows.Scan(&txnID, &slug, &displayName, &color, &icon); scanErr != nil {
 						continue
 					}
 					tag := AdminTransactionTag{
@@ -1007,7 +1007,6 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 						DisplayName: displayName,
 						Color:       textPtr(color),
 						Icon:        textPtr(icon),
-						Lifecycle:   lifecycle,
 					}
 					if idx, ok := idIdx[formatUUID(txnID)]; ok {
 						transactions[idx].Tags = append(transactions[idx].Tags, tag)

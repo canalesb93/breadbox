@@ -25,17 +25,16 @@
   {{if .Tags}}
   <div class="bb-card overflow-hidden">
     <!-- Table header -->
-    <div class="hidden sm:grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 px-5 py-2.5 border-b border-base-300/50 text-xs font-medium text-base-content/40 uppercase tracking-wider">
+    <div class="hidden sm:grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-5 py-2.5 border-b border-base-300/50 text-xs font-medium text-base-content/40 uppercase tracking-wider">
       <div class="w-32">Chip</div>
       <div>Details</div>
       <div class="w-24 text-right">Transactions</div>
-      <div class="w-20">Lifecycle</div>
       <div class="w-20"></div>
     </div>
 
     <div class="divide-y divide-base-300/40">
       {{range .Tags}}
-      <div class="group grid grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3"
+      <div class="group grid grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_auto_auto] items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3"
         x-show="!filter || '{{.Slug}} {{.DisplayName}} {{.Description}}'.toLowerCase().includes(filter.toLowerCase())">
         <!-- Chip preview -->
         <div class="w-32 shrink-0">
@@ -56,14 +55,6 @@
           <a href="/transactions?tags={{.Slug}}" class="link link-hover">{{commaInt .TransactionCount}}</a>
           {{else}}
           <span class="text-base-content/25">&mdash;</span>
-          {{end}}
-        </div>
-        <!-- Lifecycle -->
-        <div class="w-20 hidden sm:block">
-          {{if eq .Lifecycle "ephemeral"}}
-          <span class="badge badge-soft badge-warning badge-xs">ephemeral</span>
-          {{else}}
-          <span class="badge badge-ghost badge-xs">persistent</span>
           {{end}}
         </div>
         <!-- Actions -->

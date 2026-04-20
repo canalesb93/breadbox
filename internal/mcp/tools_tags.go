@@ -32,7 +32,7 @@ type removeTransactionTagInput struct {
 	WriteSessionContext
 	TransactionID string `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
 	TagSlug       string `json:"tag_slug" jsonschema:"required,Tag slug to remove"`
-	Note          string `json:"note,omitempty" jsonschema:"Required when the tag's lifecycle is 'ephemeral'. Short rationale for removal."`
+	Note          string `json:"note,omitempty" jsonschema:"Optional rationale recorded on the tag_removed annotation."`
 }
 
 type createTagInput struct {
@@ -42,7 +42,6 @@ type createTagInput struct {
 	Description string  `json:"description,omitempty" jsonschema:"Optional description."`
 	Color       *string `json:"color,omitempty" jsonschema:"Optional CSS color (e.g. '#4f46e5') used for chip rendering."`
 	Icon        *string `json:"icon,omitempty" jsonschema:"Optional Lucide icon name (e.g. 'inbox')."`
-	Lifecycle   string  `json:"lifecycle,omitempty" jsonschema:"'persistent' (default) or 'ephemeral'. Ephemeral tags require a note on removal."`
 }
 
 type updateTagInput struct {
@@ -52,7 +51,6 @@ type updateTagInput struct {
 	Description *string `json:"description,omitempty" jsonschema:"New description."`
 	Color       *string `json:"color,omitempty" jsonschema:"New color (pass empty string to clear)."`
 	Icon        *string `json:"icon,omitempty" jsonschema:"New icon (pass empty string to clear)."`
-	Lifecycle   *string `json:"lifecycle,omitempty" jsonschema:"'persistent' or 'ephemeral'."`
 }
 
 type deleteTagInput struct {
@@ -139,7 +137,6 @@ func (s *MCPServer) handleCreateTag(ctx context.Context, _ *mcpsdk.CallToolReque
 		Description: input.Description,
 		Color:       input.Color,
 		Icon:        input.Icon,
-		Lifecycle:   input.Lifecycle,
 	}
 	tag, err := s.svc.CreateTag(context.Background(), params)
 	if err != nil {
@@ -160,7 +157,6 @@ func (s *MCPServer) handleUpdateTag(ctx context.Context, _ *mcpsdk.CallToolReque
 		Description: input.Description,
 		Color:       input.Color,
 		Icon:        input.Icon,
-		Lifecycle:   input.Lifecycle,
 	}
 	tag, err := s.svc.UpdateTag(context.Background(), input.ID, params)
 	if err != nil {

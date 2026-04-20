@@ -324,7 +324,6 @@ type AdminTransactionTag struct {
 	DisplayName string
 	Color       *string
 	Icon        *string
-	Lifecycle   string
 }
 
 type AdminTransactionListResult struct {

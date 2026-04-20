@@ -2,14 +2,14 @@
 > Annotate transactions with reasoning and context
 
 THREE WRITE PATHS — pick the right one:
-- Compound review decision: call update_transactions with an operation that sets the category, removes the needs-review tag (with a required note), and optionally attaches a `comment`. Everything lands in one audit-atomic batch.
+- Compound review decision: call update_transactions with an operation that sets the category, removes the needs-review tag (with an optional note), and optionally attaches a `comment`. Everything lands in one audit-atomic batch.
 - Stand-alone note during review: include `comment` inside an update_transactions operation. It is written as an annotation with kind=comment attributed to you.
 - Free-standing narrative: call add_transaction_comment for context that isn't tied to a specific review or tag change — flagging a suspicious charge, cross-referencing related transactions, long-lived household notes.
 
 Don't double-write: if you have an update_transactions op with `tags_to_remove: [{slug: "needs-review", note: "..."}]`, the note you pass there captures "why I closed this review". Do NOT also call add_transaction_comment for the same narrative — you'll produce two annotations saying the same thing.
 
 WHEN TO ADD NARRATIVE:
-- Removing an ephemeral tag (needs-review): strongly recommended — the note lands on the audit trail explaining why the tag came off.
+- Removing a workflow tag (e.g. needs-review): recommended — the note lands on the audit trail explaining why the tag came off.
 - Confirming a non-obvious category — explain your reasoning
 - Flagging a transaction for human attention — explain what looks suspicious
 - An ambiguous transaction where you're making a judgment call

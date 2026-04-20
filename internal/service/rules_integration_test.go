@@ -1114,7 +1114,7 @@ func TestApplyRuleRetroactively_AddTagMaterialized(t *testing.T) {
 
 	// Pre-seed the dining tag so materializeRuleTagAdd resolves it directly
 	// rather than auto-creating.
-	tag := testutil.MustCreateTag(t, queries, "dining", "Dining", "persistent")
+	tag := testutil.MustCreateTag(t, queries, "dining", "Dining")
 
 	// Rule: name contains "Restaurant" → add_tag "dining".
 	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
@@ -1211,9 +1211,9 @@ func TestApplyRuleRetroactively_RemoveTagMaterialized(t *testing.T) {
 	txn1 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_sbx_1", "Starbucks Coffee", 500, "2025-06-01")
 	txn2 := testutil.MustCreateTransaction(t, queries, acct.ID, "txn_sbx_2", "Starbucks Reserve", 750, "2025-06-02")
 
-	// Pre-seed ephemeral needs-review tag and attach it to both transactions
+	// Pre-seed needs-review tag and attach it to both transactions
 	// directly (simulating user-applied review state).
-	tag := testutil.MustCreateTag(t, queries, "needs-review", "Needs Review", "ephemeral")
+	tag := testutil.MustCreateTag(t, queries, "needs-review", "Needs Review")
 	for _, txn := range []db.Transaction{txn1, txn2} {
 		_, err := pool.Exec(ctx, `
 			INSERT INTO transaction_tags (transaction_id, tag_id, added_by_type, added_by_name)

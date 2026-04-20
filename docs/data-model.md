@@ -44,7 +44,7 @@ This document defines the complete PostgreSQL database schema for the Breadbox M
 | `sync_logs` | Immutable audit trail of every sync operation attempt. |
 | `api_keys` | Hashed API keys for REST API and MCP access. |
 | `app_config` | Key-value store for runtime configuration set during the first-run setup wizard. |
-| `tags` | Reusable labels attached to transactions (e.g. `needs-review`). Ephemeral tags require a note on removal. |
+| `tags` | Reusable labels attached to transactions (e.g. `needs-review`). |
 | `transaction_tags` | Many-to-many join between transactions and tags with attribution metadata. |
 | `annotations` | Unified activity timeline per transaction (comments, tag events, rule applications, category sets). |
 
@@ -627,7 +627,7 @@ The following keys are seeded during initial migration and used by the applicati
 | `description` | `TEXT` | No | `''` | Operator-facing description. |
 | `color` | `TEXT` | Yes | `NULL` | CSS color used when rendering the tag chip. |
 | `icon` | `TEXT` | Yes | `NULL` | Lucide icon name for chip rendering. |
-| `lifecycle` | `TEXT` | No | `'persistent'` | `persistent` or `ephemeral`. Ephemeral tags require a non-empty note on removal (enforced by service layer, recorded on the `tag_removed` annotation payload). |
+| `lifecycle` | `TEXT` | No | `'persistent'` | **Deprecated.** Legacy persistent/ephemeral distinction — no longer read or written by the app. Column remains in the schema for backwards compatibility; all new rows default to `persistent`. Notes on tag removal are optional and recorded on the `tag_removed` annotation payload regardless. |
 | `created_at` | `TIMESTAMPTZ` | No | `NOW()` | Record creation timestamp. |
 | `updated_at` | `TIMESTAMPTZ` | No | `NOW()` | Last modification timestamp. |
 
@@ -645,14 +645,14 @@ UNIQUE (short_id)
 #### Check Constraints
 
 ```sql
-CHECK (lifecycle IN ('persistent', 'ephemeral'))
+CHECK (lifecycle IN ('persistent', 'ephemeral')) -- deprecated, column no longer used
 ```
 
 #### Seeds
 
-| Slug | Display Name | Lifecycle | Purpose |
-|---|---|---|---|
-| `needs-review` | Needs Review | `ephemeral` | Marks transactions awaiting initial categorization review. The seeded `on_create` system rule auto-attaches this tag during sync. |
+| Slug | Display Name | Purpose |
+|---|---|---|
+| `needs-review` | Needs Review | Marks transactions awaiting initial categorization review. The seeded `on_create` system rule auto-attaches this tag during sync. |
 
 A companion seeded system rule on `transaction_rules` fires on every `on_create` event and attaches `needs-review` to newly-synced transactions. To opt out of the default review queue, disable that rule from `/rules` — this is the supported opt-out. System-seeded rules can't be deleted, only disabled.
 

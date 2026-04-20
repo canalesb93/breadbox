@@ -25,7 +25,7 @@ func TestSync_AddTagAction_PersistsTag(t *testing.T) {
 
 	// Seed a persistent "dining" tag so we don't rely on auto-create in this
 	// test — the auto-create path is covered by the seeded-rule test below.
-	tag := testutil.MustCreateTag(t, queries, "dining", "Dining", "persistent")
+	tag := testutil.MustCreateTag(t, queries, "dining", "Dining")
 
 	// Rule: name contains "Restaurant" → add_tag "dining".
 	testutil.MustCreateTransactionRule(
@@ -116,7 +116,7 @@ func TestSync_RemoveTagAction_DeletesTagAndAnnotates(t *testing.T) {
 	seedCategories(t, queries)
 
 	// Pre-seed tag and rule.
-	tag := testutil.MustCreateTag(t, queries, "needs-review", "Needs Review", "ephemeral")
+	tag := testutil.MustCreateTag(t, queries, "needs-review", "Needs Review")
 	testutil.MustCreateTransactionRule(
 		t, queries, "Clear review flag for coffee",
 		[]byte(`{"field":"name","op":"contains","value":"Starbucks"}`),
@@ -217,7 +217,7 @@ func TestSync_RemoveTagAction_DeletesTagAndAnnotates(t *testing.T) {
 //
 // Testutil truncates all tables between tests, so the migration's seeded
 // rows are wiped. We re-seed the tag + rule here mirroring the migration
-// exactly (same slug, same lifecycle, same action shape) to prove the
+// exactly (same slug, same action shape) to prove the
 // seeded behavior works end-to-end.
 func TestSync_SeededRule_TagsAllNewTransactions(t *testing.T) {
 	pool, queries := testutil.ServicePool(t)
@@ -226,7 +226,7 @@ func TestSync_SeededRule_TagsAllNewTransactions(t *testing.T) {
 	seedCategories(t, queries)
 
 	// Re-seed the needs-review tag + rule just like the migration.
-	testutil.MustCreateTag(t, queries, "needs-review", "Needs Review", "ephemeral")
+	testutil.MustCreateTag(t, queries, "needs-review", "Needs Review")
 	testutil.MustCreateTransactionRule(
 		t, queries, "Auto-tag new transactions for review",
 		nil, // match-all conditions

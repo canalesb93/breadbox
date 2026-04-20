@@ -166,27 +166,16 @@
       </div>
       <div class="flex flex-wrap gap-1.5 min-h-[1.5rem] items-center">
         <template x-for="t in tags" :key="t.slug">
-          <span class="bb-tag relative"
-            :style="t.color ? ('--tag-color:' + t.color) : ''"
-            x-data="{showRemoveNote: false, note: ''}">
+          <span class="bb-tag"
+            :style="t.color ? ('--tag-color:' + t.color) : ''">
             <template x-if="t.icon"><i :data-lucide="t.icon" ></i></template>
             <a :href="'/transactions?tags=' + t.slug" class="hover:underline" x-text="t.displayName || t.slug"></a>
             <button type="button" class="bb-tag-remove"
-              @click.prevent.stop="t.lifecycle === 'ephemeral' ? (showRemoveNote = !showRemoveNote) : removeTag(t, '')"
+              @click.prevent.stop="removeTag(t, '')"
               :aria-label="'Remove tag ' + (t.displayName || t.slug)"
               :title="'Remove tag ' + (t.displayName || t.slug)">
               <i data-lucide="x" ></i>
             </button>
-            <div x-show="showRemoveNote && t.lifecycle === 'ephemeral'" x-cloak
-              class="absolute left-0 top-full mt-1 bg-base-100 border border-base-300 rounded-xl p-2 shadow-lg z-10 w-64"
-              @click.outside="showRemoveNote = false">
-              <p class="text-xs text-warning mb-1.5">Removing ephemeral tag — note required:</p>
-              <input type="text" x-model="note" class="input input-bordered input-xs rounded-lg w-full mb-1.5" placeholder="Why removing?" @keydown.enter="if(note.trim()) { removeTag(t, note); showRemoveNote = false; }">
-              <div class="flex gap-1 justify-end">
-                <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="showRemoveNote = false">Cancel</button>
-                <button type="button" class="btn btn-error btn-xs rounded-lg" :disabled="!note.trim()" @click="if(note.trim()) { removeTag(t, note); showRemoveNote = false; }">Remove</button>
-              </div>
-            </div>
           </span>
         </template>
         <!-- Edit-tags chip sits in the same wrapping row as its siblings. Opens the
@@ -409,7 +398,6 @@ function tagManager() {
       displayName: t.display_name,
       color: t.color,
       icon: t.icon,
-      lifecycle: t.lifecycle,
     }; }),
     availableTags: {{toJSON .AvailableTags}} || [],
 
@@ -457,8 +445,7 @@ function tagManager() {
     },
 
     removeTag(tag, note) {
-      // Inline × on a tag chip — direct DELETE (keeps the note path for
-      // ephemeral tags, which the picker doesn't surface).
+      // Inline × on a tag chip — direct DELETE. Note is optional.
       var url = '/-/transactions/{{.TransactionID}}/tags/' + encodeURIComponent(tag.slug);
       fetch(url, {
         method: 'DELETE',
