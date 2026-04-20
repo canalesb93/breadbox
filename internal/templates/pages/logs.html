@@ -376,31 +376,31 @@
 <!-- Status Filter Tabs + Provider Dropdown -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
   <!-- Status pill tabs -->
-  <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5">
+  <div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 overflow-x-auto">
     <a href="/logs?tab=webhooks{{if .WHFilterProvider}}&wh_provider={{.WHFilterProvider}}{{end}}"
-       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5 whitespace-nowrap
               {{if not .WHFilterStatus}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
       All
       <span class="text-[0.6rem] tabular-nums opacity-60">{{.WHStats.TotalEvents}}</span>
     </a>
     <a href="/logs?tab=webhooks&wh_status=processed{{if .WHFilterProvider}}&wh_provider={{.WHFilterProvider}}{{end}}"
-       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5 whitespace-nowrap
               {{if eq .WHFilterStatus "processed"}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
-      <span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+      <span class="w-1.5 h-1.5 rounded-full bg-success shrink-0"></span>
       Processed
       <span class="text-[0.6rem] tabular-nums opacity-60">{{.WHStats.ProcessedCount}}</span>
     </a>
     <a href="/logs?tab=webhooks&wh_status=received{{if .WHFilterProvider}}&wh_provider={{.WHFilterProvider}}{{end}}"
-       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5 whitespace-nowrap
               {{if eq .WHFilterStatus "received"}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
-      <span class="w-1.5 h-1.5 rounded-full bg-warning"></span>
+      <span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0"></span>
       In-flight
       <span class="text-[0.6rem] tabular-nums opacity-60">{{.WHStats.ReceivedCount}}</span>
     </a>
     <a href="/logs?tab=webhooks&wh_status=error{{if .WHFilterProvider}}&wh_provider={{.WHFilterProvider}}{{end}}"
-       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5
+       class="px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5 whitespace-nowrap
               {{if eq .WHFilterStatus "error"}}bg-base-100 text-base-content shadow-sm{{else}}text-base-content/40 hover:text-base-content/60{{end}}">
-      <span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+      <span class="w-1.5 h-1.5 rounded-full bg-error shrink-0"></span>
       Errors
       <span class="text-[0.6rem] tabular-nums opacity-60">{{.WHStats.ErrorCount}}</span>
     </a>
