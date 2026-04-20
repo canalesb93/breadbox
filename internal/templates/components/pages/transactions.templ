@@ -305,6 +305,31 @@ templ txFilters(p TransactionsProps) {
 				</button>
 			</div>
 		</form>
+		if len(p.FilterChips) > 0 {
+			@txFilterChips(p.FilterChips)
+		}
+	</div>
+}
+
+// txFilterChips renders a row of removable chips summarising each active
+// filter. Shown only when the filter panel is collapsed (x-show="!filtersOpen")
+// so the chips and the expanded panel never duplicate each other. Each chip's
+// × link drops just that one param from the current URL.
+templ txFilterChips(chips []TransactionsFilterChip) {
+	<div x-show="!filtersOpen" x-cloak class="flex flex-wrap items-center gap-1.5 mt-3" aria-label="Active filters">
+		for _, chip := range chips {
+			<span class="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+				<span>{ chip.Label }</span>
+				<a
+					href={ templ.SafeURL(chip.RemoveURL) }
+					class="inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-primary/20 transition-colors"
+					aria-label={ "Remove filter " + chip.Label }
+					title={ "Remove " + chip.Label }
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+				</a>
+			</span>
+		}
 	</div>
 }
 
