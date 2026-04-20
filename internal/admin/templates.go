@@ -676,6 +676,26 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"humanize": func(s string) string {
 				return strings.ReplaceAll(s, "_", " ")
 			},
+			// subtypeSuffix returns the humanized subtype for use after a type label
+			// (e.g. "savings" in "Bank Account · savings"), or "" when the subtype
+			// is an echo of the type label (e.g. "credit_card" under "Credit Card").
+			// Comparison strips spaces and underscores and is case-insensitive, so
+			// "Credit Card" vs "credit_card" collapses to the same token.
+			"subtypeSuffix": func(typeLabel, subtype string) string {
+				if subtype == "" {
+					return ""
+				}
+				normalize := func(s string) string {
+					s = strings.ToLower(s)
+					s = strings.ReplaceAll(s, "_", "")
+					s = strings.ReplaceAll(s, " ", "")
+					return s
+				}
+				if normalize(typeLabel) == normalize(subtype) {
+					return ""
+				}
+				return strings.ReplaceAll(subtype, "_", " ")
+			},
 			"pageRange": func(current, total int) []int {
 				// Returns page numbers to display: always include first, last,
 				// current, and neighbors. Use 0 as ellipsis sentinel.
