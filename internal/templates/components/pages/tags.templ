@@ -1,0 +1,175 @@
+package pages
+
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
+
+// Tags renders the tags configuration page. Hosts inside the base layout
+// via TemplateRenderer.RenderWithTempl — tags are purely configuration,
+// no per-tag analytics beyond a usage count linking to the filtered
+// transactions view.
+templ Tags(p TagsProps) {
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">Tags</h1>
+			<p class="text-sm text-base-content/50 mt-1 hidden sm:block">Open-ended labels for coordinating work on transactions</p>
+		</div>
+		<a href="/tags/new" class="btn btn-sm btn-primary rounded-xl gap-2">
+			<i data-lucide="plus" class="w-4 h-4"></i>
+			Add Tag
+		</a>
+	</div>
+	<div x-data="{filter: ''}" class="space-y-4">
+		<div class="relative">
+			<i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/30 pointer-events-none"></i>
+			<input
+				type="text"
+				placeholder="Filter tags..."
+				x-model="filter"
+				class="input input-bordered w-full pl-9 rounded-xl h-10 text-sm"
+			/>
+		</div>
+		if len(p.Tags) > 0 {
+			<div class="text-xs text-base-content/40 px-1">
+				{ fmt.Sprintf("%d tags", len(p.Tags)) }
+			</div>
+			<div class="bb-card overflow-hidden">
+				<div class="divide-y divide-base-300/40 bb-stagger">
+					for _, t := range p.Tags {
+						@tagListRow(t)
+					}
+				</div>
+			</div>
+		} else {
+			@tagsEmpty()
+		}
+	</div>
+	<script>
+		window.addEventListener('bb-delete-tag', function(e) {
+			var detail = e.detail;
+			var msg = 'Delete tag "' + detail.slug + '"?';
+			if (detail.count > 0) {
+				msg += '\n\nThis will remove the tag from ' + detail.count + ' transaction' + (detail.count === 1 ? '' : 's') + '. Activity annotations are preserved.';
+			}
+			bbConfirm({title: 'Delete tag?', message: msg, confirmLabel: 'Delete', variant: 'danger'}).then(function(ok) {
+				if (!ok) return;
+				fetch('/-/tags/' + detail.id, {method: 'DELETE'})
+					.then(function(r) {
+						if (r.ok) {
+							window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Tag deleted', type:'success'}}));
+							setTimeout(function() { location.reload(); }, 400);
+						} else {
+							r.json().then(function(d) {
+								window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error?.message || 'Delete failed', type:'error'}}));
+							});
+						}
+					});
+			});
+		});
+	</script>
+}
+
+// tagListRow renders one tag as a horizontal row: chip preview (natural
+// width), slug + optional description, usage count, then an
+// actions slot. No fixed column widths — the chip sizes to its content so
+// longer names like "Needs Enrichment" don't get truncated the way they
+// did in the old w-32 column.
+templ tagListRow(t TagRow) {
+	<div
+		data-search={ tagSearchIndex(t) }
+		x-show="!filter || ($el.dataset.search || '').includes(filter.toLowerCase())"
+		class="group flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3"
+	>
+		<!-- Chip preview — natural width, capped so it can't monopolize the row -->
+		<div class="shrink-0 min-w-0 max-w-[10rem] sm:max-w-[14rem]">
+			@components.TagChip(components.TagChipData{
+				Slug:        t.Slug,
+				DisplayName: t.DisplayName,
+				Color:       t.Color,
+				Icon:        t.Icon,
+			})
+		</div>
+		<!-- Slug + optional description -->
+		<div class="flex-1 min-w-0">
+			<code class="font-mono text-xs text-base-content/60 bg-base-200/50 px-1.5 py-0.5 rounded">{ t.Slug }</code>
+			if t.Description != "" {
+				<p class="text-xs text-base-content/50 mt-1 line-clamp-1">{ t.Description }</p>
+			}
+		</div>
+		<!-- Transaction count (always visible; desktop gets the "txns" label) -->
+		<div class="shrink-0 text-right tabular-nums">
+			if t.TransactionCount > 0 {
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/transactions?tags=%s", t.Slug)) }
+					class="inline-flex items-baseline gap-1 text-xs text-base-content/70 hover:text-base-content"
+					title="View transactions"
+				>
+					<span class="font-medium">{ fmt.Sprintf("%d", t.TransactionCount) }</span>
+					<span class="text-base-content/40 hidden sm:inline">{ tagCountLabel(t.TransactionCount) }</span>
+				</a>
+			} else {
+				<span class="text-xs text-base-content/25">&mdash;</span>
+			}
+		</div>
+		<!-- Actions -->
+		<div class="shrink-0 flex items-center">
+			<div class="hidden sm:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+				<a href={ templ.SafeURL(fmt.Sprintf("/tags/%s/edit", t.ID)) } class="btn btn-ghost btn-xs rounded-lg" title="Edit">
+					<i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+				</a>
+				<button
+					type="button"
+					class="btn btn-ghost btn-xs rounded-lg text-error"
+					data-id={ t.ID }
+					data-slug={ t.Slug }
+					data-count={ fmt.Sprintf("%d", t.TransactionCount) }
+					@click="window.dispatchEvent(new CustomEvent('bb-delete-tag', {detail: {id: $el.dataset.id, slug: $el.dataset.slug, count: parseInt($el.dataset.count) || 0}}))"
+					title="Delete"
+				>
+					<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+				</button>
+			</div>
+			<div class="dropdown dropdown-end sm:hidden">
+				<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square rounded-lg">
+					<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
+				</div>
+				<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-40 p-1">
+					<li>
+						<a href={ templ.SafeURL(fmt.Sprintf("/tags/%s/edit", t.ID)) }>
+							<i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
+						</a>
+					</li>
+					<li>
+						<button
+							type="button"
+							class="text-error"
+							data-id={ t.ID }
+							data-slug={ t.Slug }
+							data-count={ fmt.Sprintf("%d", t.TransactionCount) }
+							@click="window.dispatchEvent(new CustomEvent('bb-delete-tag', {detail: {id: $el.dataset.id, slug: $el.dataset.slug, count: parseInt($el.dataset.count) || 0}}))"
+						>
+							<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
+						</button>
+					</li>
+				</ul>
+			</div>
+		</div>
+	</div>
+}
+
+templ tagsEmpty() {
+	<div class="bb-card">
+		<div class="flex flex-col items-center text-center py-16 px-6">
+			<div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+				<i data-lucide="tags" class="w-8 h-8 text-primary"></i>
+			</div>
+			<h2 class="text-lg font-semibold mb-1">No tags yet</h2>
+			<p class="text-base-content/50 text-sm mb-6 max-w-sm">Tags coordinate work on transactions — add "needs-review" to flag items for follow-up, or custom tags to group related charges.</p>
+			<a href="/tags/new" class="btn btn-primary btn-sm rounded-xl gap-2">
+				<i data-lucide="plus" class="w-4 h-4"></i> Add Tag
+			</a>
+		</div>
+	</div>
+}

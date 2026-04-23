@@ -173,13 +173,6 @@ func assertTagChipData(data any) (components.TagChipData, error) {
 			return components.TagChipData{}, nil
 		}
 		return components.TagChipDataFromResponse(*v), nil
-	case TagRow:
-		return components.TagChipDataFromResponse(v.TagResponse), nil
-	case *TagRow:
-		if v == nil {
-			return components.TagChipData{}, nil
-		}
-		return components.TagChipDataFromResponse(v.TagResponse), nil
 	case service.AdminTransactionTag:
 		return components.TagChipDataFromTx(v), nil
 	case components.TagChipData:
@@ -1046,7 +1039,8 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/transaction_detail.html",
 		"pages/mcp_settings.html",
 		"pages/rules.html",
-		"pages/tags.html",
+		// pages/tags.html removed — renders via RenderWithTempl
+		// using the _templ_shell template key (see pages.Tags).
 		"pages/tag_form.html",
 		"pages/rule_form.html",
 		"pages/rule_detail.html",
