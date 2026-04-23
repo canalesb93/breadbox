@@ -50,6 +50,31 @@
       };
     })();
   </script>
+
+  <script>
+    // Alpine store: $store.device
+    //
+    // Exposes `isTouch` and `isMobile` for downstream UI code (keyboard-hint
+    // components, shortcut dispatchers) to branch on input capability without
+    // each call site re-running matchMedia. Evaluated once on Alpine init —
+    // breakpoint changes on resize are not currently observed because nothing
+    // in the UI depends on transitional values, and keeping the store static
+    // avoids forcing every consumer to use reactive getters.
+    //
+    // Detection:
+    //   isTouch — `(hover: none) and (pointer: coarse)` (true on phones, false
+    //             on most laptops/desktops even with touchscreens).
+    //   isMobile — viewport width < 1024px (matches the existing `lg:` breakpoint
+    //              used by the drawer + mobile navbar).
+    document.addEventListener('alpine:init', function() {
+      var mqTouch = window.matchMedia('(hover: none) and (pointer: coarse)');
+      var mqMobile = window.matchMedia('(max-width: 1023.98px)');
+      Alpine.store('device', {
+        isTouch: mqTouch.matches,
+        isMobile: mqMobile.matches,
+      });
+    });
+  </script>
 </head>
 <body>
   <!-- Navigation progress bar -->
