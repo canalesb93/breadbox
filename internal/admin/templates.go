@@ -114,6 +114,20 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.TxResults(txResultsPropsFromData(m)), nil
 	},
+	"Kbd": func(data any) (templ.Component, error) {
+		key, ok := data.(string)
+		if !ok {
+			return nil, fmt.Errorf("Kbd: want string, got %T", data)
+		}
+		return components.Kbd(key), nil
+	},
+	"KbdChord": func(data any) (templ.Component, error) {
+		keys, ok := data.([]string)
+		if !ok {
+			return nil, fmt.Errorf("KbdChord: want []string, got %T", data)
+		}
+		return components.KbdChord(keys...), nil
+	},
 	"ConditionRow": func(data any) (templ.Component, error) {
 		m, ok := data.(map[string]any)
 		if !ok {
