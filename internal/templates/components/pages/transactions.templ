@@ -27,6 +27,22 @@ templ Transactions(p TransactionsProps) {
 	<!-- Floating bulk action bar is created via JS in <body> to avoid parent transform breaking position:fixed -->
 	@components.CategoryPickerScript()
 	@txPageScripts(p)
+	if p.IsReviewQueue() {
+		@txReviewQueueShortcuts()
+	}
+}
+
+// txReviewQueueShortcuts registers M3 review-queue keyboard shortcuts
+// (`a` approve, `r` reject, `s` skip) at `scope: 'reviews'` whenever the
+// transactions page is filtered to `tags=needs-review` — the review queue
+// view. The x-data wrapper flips the shortcut-registry scope on init so
+// the `?` help modal (M0.3) surfaces these under "This page", and resets
+// back to 'global' on teardown. j/k/Enter/c continue to fire via the
+// existing inline keydown handler in transactions_scripts.js.html; M3
+// only layers the review-specific actions on top.
+templ txReviewQueueShortcuts() {
+	<div x-data x-init="$store.shortcuts.setScope('reviews')" x-destroy="$store.shortcuts.setScope('global')"></div>
+	@templ.Raw("<script>" + reviewQueueScriptBody + "</script>")
 }
 
 // TransactionsResults renders only the AJAX tx-results-partial fragment —
