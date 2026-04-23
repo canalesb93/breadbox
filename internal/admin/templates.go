@@ -1040,9 +1040,9 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// pages/transactions.html removed — renders via RenderWithTempl
 		// using the _templ_shell template key (see pages.Transactions).
 		"pages/account_detail.html",
-		// pages/categories.html removed — renders via RenderWithTempl
-		// using the _templ_shell template key (see pages.Categories).
-		"pages/category_form.html",
+		// pages/categories.html and pages/category_form.html removed —
+		// both render via RenderWithTempl using the _templ_shell template
+		// key (see pages.Categories and pages.CategoryForm).
 		"pages/transaction_detail.html",
 		"pages/mcp_settings.html",
 		"pages/rules.html",
