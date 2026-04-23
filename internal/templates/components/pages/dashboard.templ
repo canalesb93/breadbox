@@ -7,7 +7,7 @@ import (
 )
 
 templ dashOverviewStats(p DashboardProps) {
-	<div class="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+	<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
 		<div class="bb-card p-4 col-span-2 lg:col-span-1">
 			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Net Worth</div>
 			<div class="text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.FormatBalance(p.NetWorth) }</div>
@@ -16,6 +16,11 @@ templ dashOverviewStats(p DashboardProps) {
 				<span>Liabilities <span class="tabular-nums text-error/70 font-medium">{ components.FormatBalance(p.TotalLiabilities) }</span></span>
 			</div>
 		</div>
+		<a href="/transactions" class="bb-card bb-card--interactive p-4 no-underline group block">
+			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Total Transactions</div>
+			<div class="text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.CommaInt(p.TotalTransactions) }</div>
+			<div class="text-[0.65rem] text-base-content/40 mt-1 group-hover:text-primary/70 transition-colors">Browse &rarr;</div>
+		</a>
 		<a href="/transactions?filter=uncategorized" class="bb-card bb-card--interactive p-4 no-underline group block">
 			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Uncategorized</div>
 			<div class="text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.CommaInt(p.UncategorizedCount) }</div>

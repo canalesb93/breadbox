@@ -75,6 +75,12 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			recentTransactions = recentTx.Transactions
 		}
 
+		// Total transaction count for the overview stats.
+		totalTransactions, err := svc.CountTransactions(ctx)
+		if err != nil {
+			a.Logger.Error("count transactions for dashboard", "error", err)
+		}
+
 		// Accounts with balances for the overview section.
 		accounts, err := svc.ListAccounts(ctx, nil)
 		if err != nil {
@@ -407,6 +413,7 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			TotalUnreadReports:    totalUnread,
 			MoreReportsCount:      moreReportsCount,
 			RecentTransactions:    recentTransactions,
+			TotalTransactions:     totalTransactions,
 			HasAttentionItems:     attentionCount > 0,
 			AttentionCount:        attentionCount,
 			UncategorizedCount:    uncatCount,
