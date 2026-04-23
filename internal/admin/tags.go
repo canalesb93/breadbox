@@ -8,16 +8,11 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 )
-
-// TagRow is a tag entry enriched with usage counts for the admin list page.
-type TagRow struct {
-	service.TagResponse
-	TransactionCount int64
-}
 
 // TagsPageHandler serves GET /tags.
 func TagsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
@@ -31,18 +26,25 @@ func TagsPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateR
 		}
 
 		// Fetch usage counts for each tag.
-		rows := make([]TagRow, 0, len(tags))
+		rows := make([]pages.TagRow, 0, len(tags))
 		for _, t := range tags {
 			count, err := svc.CountTransactionsTag(ctx, t.Slug)
 			if err != nil {
 				count = 0
 			}
-			rows = append(rows, TagRow{TagResponse: t, TransactionCount: count})
+			rows = append(rows, pages.TagRow{
+				ID:               t.ID,
+				Slug:             t.Slug,
+				DisplayName:      t.DisplayName,
+				Description:      t.Description,
+				Color:            t.Color,
+				Icon:             t.Icon,
+				TransactionCount: count,
+			})
 		}
 
 		data := BaseTemplateData(r, sm, "tags", "Tags")
-		data["Tags"] = rows
-		tr.Render(w, r, "tags.html", data)
+		tr.RenderWithTempl(w, r, data, pages.Tags(pages.TagsProps{Tags: rows}))
 	}
 }
 
