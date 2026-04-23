@@ -267,7 +267,10 @@
     </template>
   </div>
 
-  <!-- Keyboard Shortcuts Help (?-key) -->
+  <!-- Keyboard Shortcuts Help (?-key) — registry-driven.
+       Body is rendered from $store.shortcuts grouped by scope (Global vs Page)
+       and, within each scope, by the spec's `group` field. See seedRegistry()
+       below for the current bindings. -->
   <div x-data="shortcutsHelp()" x-show="open" x-cloak
        @open-shortcuts.window="openHelp()"
        @keydown.window.escape="if (open) { open = false; $event.stopPropagation(); }">
@@ -280,141 +283,46 @@
         </button>
       </div>
       <div class="bb-shortcuts-body">
-        <!-- General -->
-        <div class="bb-shortcuts-group">
-          <div class="bb-shortcuts-group-label">General</div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Open command palette</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">&#8984;</kbd>
-              <kbd class="bb-shortcuts-kbd">K</kbd>
-            </span>
+        <!-- Global section: shortcuts available on every page. -->
+        <template x-for="group in sections.global" :key="'global-' + group.label">
+          <div class="bb-shortcuts-group">
+            <div class="bb-shortcuts-group-label" x-text="group.label"></div>
+            <template x-for="item in group.items" :key="item.id">
+              <div class="bb-shortcuts-row">
+                <span class="bb-shortcuts-label" x-text="item.description"></span>
+                <span class="bb-shortcuts-keys" x-html="renderTokens(item.tokens)"></span>
+              </div>
+            </template>
           </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Show keyboard shortcuts</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">?</kbd>
-            </span>
+        </template>
+        <!-- Page section: shortcuts scoped to the current page (populated by
+             pages that call $store.shortcuts.register with a page scope + set
+             $store.shortcuts.currentScope). Hidden when empty. -->
+        <template x-if="sections.page.length > 0">
+          <div>
+            <div class="bb-shortcuts-group" x-show="sections.page.length > 0" style="padding-top:0.25rem;">
+              <div class="bb-shortcuts-group-label" style="opacity:0.65;">This page</div>
+            </div>
+            <template x-for="group in sections.page" :key="'page-' + group.label">
+              <div class="bb-shortcuts-group">
+                <div class="bb-shortcuts-group-label" x-text="group.label"></div>
+                <template x-for="item in group.items" :key="'page-' + item.id">
+                  <div class="bb-shortcuts-row">
+                    <span class="bb-shortcuts-label" x-text="item.description"></span>
+                    <span class="bb-shortcuts-keys" x-html="renderTokens(item.tokens)"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
           </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Close dialog / cancel</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">Esc</kbd>
-            </span>
+        </template>
+        <template x-if="sections.global.length === 0 && sections.page.length === 0">
+          <div class="bb-shortcuts-group">
+            <div class="bb-shortcuts-row">
+              <span class="bb-shortcuts-label" style="opacity:0.6;">No shortcuts registered.</span>
+            </div>
           </div>
-        </div>
-        <!-- Go to navigation -->
-        <div class="bb-shortcuts-group">
-          <div class="bb-shortcuts-group-label">Go to</div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Dashboard</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">d</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Transactions</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">t</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Connections</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">c</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Reviews</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">r</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Rules</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">u</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Categories</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">a</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Sync Logs</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">l</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Backups</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">b</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Settings</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">s</kbd>
-            </span>
-          </div>
-        </div>
-        <!-- Actions -->
-        <div class="bb-shortcuts-group">
-          <div class="bb-shortcuts-group-label">Actions</div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Connect a bank</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">n</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">c</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Import CSV</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">n</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">i</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Create API key</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">n</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">k</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Add family member</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">n</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">u</kbd>
-            </span>
-          </div>
-        </div>
+        </template>
       </div>
       <div class="bb-shortcuts-footer">
         Press <kbd class="bb-shortcuts-kbd" style="display:inline-flex;vertical-align:middle;">?</kbd> anytime to toggle this panel
@@ -1673,16 +1581,129 @@
       };
     }
 
-    // Shortcuts Help Panel
+    // Shortcuts Help Panel — registry-driven.
+    //
+    // Reads from $store.shortcuts every time the panel opens, groups entries
+    // by scope ('global' vs current page scope) and then by the spec's
+    // `group` field. Entries with visible === false are skipped. Keys are
+    // formatted into lightweight tokens ({ label } for a keycap, { then: true }
+    // for the "then" separator) so the template can render them with a single
+    // x-html pass.
     function shortcutsHelp() {
+      // Preferred ordering for group labels within each section. Unknown
+      // groups fall to the end alphabetically.
+      var GROUP_ORDER = ['Actions', 'Go to', 'New', 'Navigation', 'Selection'];
+
+      function orderGroups(a, b) {
+        var ia = GROUP_ORDER.indexOf(a);
+        var ib = GROUP_ORDER.indexOf(b);
+        if (ia === -1 && ib === -1) return a.localeCompare(b);
+        if (ia === -1) return 1;
+        if (ib === -1) return -1;
+        return ia - ib;
+      }
+
+      // Escape text before it goes through x-html. Keep it minimal — we only
+      // emit user-authored descriptions/labels from the registry.
+      function esc(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      // Turn a spec's `keys` into a flat list of render tokens:
+      //   [{ label: 'g' }, { then: true }, { label: 'd' }]
+      // Supports: single string ('?', '/', 'c'), modifier combo ('cmd+k',
+      // 'ctrl+shift+p'), array-of-one (['c']), and chord ({ chord: ['g','d'] }).
+      function toTokens(keys) {
+        if (!keys) return [];
+        // Chord: sequential keys joined by "then".
+        if (keys.chord && Array.isArray(keys.chord)) {
+          var out = [];
+          keys.chord.forEach(function(k, i) {
+            if (i > 0) out.push({ then: true });
+            out.push({ label: esc(k) });
+          });
+          return out;
+        }
+        // Array form — treat as simultaneous chord (no "then" separator).
+        if (Array.isArray(keys)) {
+          return keys.map(function(k) { return { label: esc(k) }; });
+        }
+        if (typeof keys === 'string') {
+          // Modifier combo like 'cmd+k' or 'ctrl+shift+p'. Plus as a shortcut
+          // for itself (a lone '+') is not something we register today.
+          if (keys.indexOf('+') !== -1 && keys.length > 1) {
+            return keys.split('+').map(function(part) {
+              var p = part.toLowerCase();
+              if (p === 'cmd' || p === 'meta') return { label: '&#8984;' };
+              if (p === 'ctrl')                return { label: 'Ctrl' };
+              if (p === 'shift')               return { label: '&#8679;' };
+              if (p === 'alt' || p === 'opt')  return { label: '&#8997;' };
+              // Render a single-letter key uppercase so it reads like a key cap.
+              return { label: esc(part.length === 1 ? part.toUpperCase() : part) };
+            });
+          }
+          return [{ label: esc(keys) }];
+        }
+        return [];
+      }
+
+      function renderTokens(tokens) {
+        if (!tokens || !tokens.length) return '';
+        return tokens.map(function(t) {
+          if (t.then) return '<span class="bb-shortcuts-then">then</span>';
+          return '<kbd class="bb-shortcuts-kbd">' + t.label + '</kbd>';
+        }).join('');
+      }
+
+      // Build the section data structure consumed by the template.
+      // Returns { global: [{label, items: [{id, description, tokens}]}, ...],
+      //           page:   [...] } where `page` excludes entries whose scope
+      // is 'global'.
+      function buildSections() {
+        var store = (window.Alpine && Alpine.store('shortcuts')) || null;
+        var empty = { global: [], page: [] };
+        if (!store) return empty;
+        var scope = store.currentScope || 'global';
+        var all = store.forScope(scope) || [];
+        var byScope = { global: {}, page: {} };
+
+        all.forEach(function(spec) {
+          if (!spec || spec.visible === false) return;
+          var bucket = spec.scope === 'global' ? 'global' : 'page';
+          var group = spec.group || 'Other';
+          if (!byScope[bucket][group]) byScope[bucket][group] = [];
+          byScope[bucket][group].push({
+            id: spec.id,
+            description: spec.description || spec.id,
+            tokens: toTokens(spec.keys)
+          });
+        });
+
+        function flatten(buckets) {
+          return Object.keys(buckets)
+            .sort(orderGroups)
+            .map(function(label) { return { label: label, items: buckets[label] }; });
+        }
+
+        return { global: flatten(byScope.global), page: flatten(byScope.page) };
+      }
+
       return {
         open: false,
+        sections: { global: [], page: [] },
+        renderTokens: renderTokens,
         openHelp: function() {
+          // Rebuild on open so newly registered shortcuts (late-init pages,
+          // dynamic scope changes) surface immediately.
+          this.sections = buildSections();
           this.open = true;
-          var self = this;
           setTimeout(function() {
             var dialog = document.querySelector('.bb-shortcuts-dialog');
-            if (dialog) lucide.createIcons({ nodes: [dialog] });
+            if (dialog && typeof lucide !== 'undefined') {
+              lucide.createIcons({ nodes: [dialog] });
+            }
           }, 50);
         }
       };
@@ -1939,6 +1960,18 @@
           // Actual toggle is wired in commandPalette()'s @keydown.window handler
           // so it can close the palette when already open. Listed here only
           // so the help modal / palette can show the binding.
+          visible: true
+        });
+
+        // Esc is handled by per-overlay Alpine `@keydown.window.escape` rather
+        // than this dispatcher, but the help modal should still advertise it.
+        // visible:true + no action keeps it display-only.
+        reg.register({
+          id: 'global.esc',
+          keys: 'Esc',
+          description: 'Close dialog / cancel',
+          group: 'Actions',
+          scope: 'global',
           visible: true
         });
 
