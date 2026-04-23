@@ -395,7 +395,7 @@
         <div class="flex items-center gap-3">
           <span><kbd>&uarr;</kbd> <kbd>&darr;</kbd> navigate</span>
           <span><kbd>&crarr;</kbd> select</span>
-          <span><kbd>esc</kbd> close</span>
+          <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "Esc"}} close</span>
         </div>
       </div>
     </div>
@@ -529,7 +529,7 @@
           <template x-if="!canCreate">
             <span><kbd>&crarr;</kbd> apply</span>
           </template>
-          <span><kbd>esc</kbd> cancel</span>
+          <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "Esc"}} cancel</span>
         </div>
         <div class="flex items-center gap-2">
           <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="closePicker()">Cancel</button>
