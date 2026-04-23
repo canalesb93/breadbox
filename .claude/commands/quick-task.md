@@ -27,7 +27,7 @@ Respect scoped `.claude/rules/*.md` for the files you're touching. Run `go build
 
 ## 4. AFTER state
 
-Reload the browser, snapshot + screenshot to `/tmp/quick-task-<slug>-after.jpg`. If you can't see the change, it didn't land — say so and debug. Upload both screenshots via the `github-image-hosting` skill for permanent URLs.
+Reload the browser, snapshot + screenshot to `/tmp/quick-task-<slug>-after.jpg`. If you can't see the change, it didn't land — say so and debug. Upload both screenshots via the `github-image-hosting` skill (defaults to img402.dev) and embed the resulting URLs inline in the PR body.
 
 ## 5. Ship
 
