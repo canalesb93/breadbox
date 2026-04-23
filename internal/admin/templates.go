@@ -1039,9 +1039,9 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/transaction_detail.html",
 		"pages/mcp_settings.html",
 		"pages/rules.html",
-		// pages/tags.html removed — renders via RenderWithTempl
-		// using the _templ_shell template key (see pages.Tags).
-		"pages/tag_form.html",
+		// pages/tags.html and pages/tag_form.html removed — both render
+		// via RenderWithTempl using the _templ_shell template key
+		// (see pages.Tags and pages.TagForm).
 		"pages/rule_form.html",
 		"pages/rule_detail.html",
 		"pages/backups.html",
