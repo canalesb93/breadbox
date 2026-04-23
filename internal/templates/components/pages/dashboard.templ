@@ -6,6 +6,38 @@ import (
 	"breadbox/internal/templates/components"
 )
 
+templ dashOverviewStats(p DashboardProps) {
+	<div class="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+		<div class="bb-card p-4 col-span-2 lg:col-span-1">
+			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Net Worth</div>
+			<div class="text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.FormatBalance(p.NetWorth) }</div>
+			<div class="text-[0.65rem] text-base-content/40 mt-1 flex flex-wrap gap-x-2">
+				<span>Assets <span class="tabular-nums text-success/80 font-medium">{ components.FormatBalance(p.TotalAssets) }</span></span>
+				<span>Liabilities <span class="tabular-nums text-error/70 font-medium">{ components.FormatBalance(p.TotalLiabilities) }</span></span>
+			</div>
+		</div>
+		<a href="/transactions?filter=uncategorized" class="bb-card bb-card--interactive p-4 no-underline group block">
+			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Uncategorized</div>
+			<div class="text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.CommaInt(p.UncategorizedCount) }</div>
+			<div class="text-[0.65rem] text-base-content/40 mt-1 group-hover:text-primary/70 transition-colors">Review &rarr;</div>
+		</a>
+		if p.ReviewsEnabled {
+			<a href="/reviews" class="bb-card bb-card--interactive p-4 no-underline group block">
+				<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Pending Reviews</div>
+				<div class="text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.CommaInt(p.ReviewPending) }</div>
+				<div class="text-[0.65rem] text-base-content/40 mt-1 group-hover:text-primary/70 transition-colors">Approve &rarr;</div>
+			</a>
+		}
+		if p.ErrorCount > 0 {
+			<a href="/connections" class="bb-card bb-card--interactive p-4 no-underline group block">
+				<div class="text-[0.65rem] uppercase tracking-wider text-warning">Connection Errors</div>
+				<div class="text-2xl font-bold tabular-nums tracking-tight mt-1 text-error/80">{ fmt.Sprintf("%d", p.ErrorCount) }</div>
+				<div class="text-[0.65rem] text-base-content/40 mt-1 group-hover:text-primary/70 transition-colors">Fix &rarr;</div>
+			</a>
+		}
+	</div>
+}
+
 // Dashboard renders the admin home page: agent reports and recent transactions.
 // Hosted inside base.html via TemplateRenderer.RenderWithTempl.
 templ Dashboard(p DashboardProps) {
@@ -22,6 +54,8 @@ templ Dashboard(p DashboardProps) {
 				Connect a Bank
 			</a>
 		</div>
+	} else {
+		@dashOverviewStats(p)
 	}
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 		@dashAgentReportsCard(p)
