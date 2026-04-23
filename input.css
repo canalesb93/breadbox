@@ -1354,6 +1354,13 @@
            text-[0.6rem] font-medium text-base-content/40 bg-base-200 border border-base-300 rounded;
   }
 
+  /* Chord separator used between kbd hints in a palette row ("g" then "d").
+     Matches the help modal's `.bb-shortcuts-then` weight so the same chord
+     reads consistently across both surfaces. */
+  .bb-cmdk-then {
+    @apply text-[0.6rem] text-base-content/30 mx-0.5;
+  }
+
   .bb-cmdk-footer {
     @apply flex items-center justify-between px-4 py-2.5 border-t border-base-300 text-[0.65rem] text-base-content/40;
   }

@@ -663,10 +663,19 @@
                         <div class="bb-cmdk-item-desc" x-text="item.desc"></div>
                       </template>
                     </div>
-                    <template x-if="item.shortcut">
-                      <div class="bb-cmdk-item-shortcut">
-                        <template x-for="k in item.shortcut" :key="k">
-                          <span class="bb-cmdk-kbd" x-text="k"></span>
+                    <!-- Kbd hint: rendered from $store.shortcuts when the
+                         item declares a shortcutId that matches a registered
+                         spec. Hidden on touch ($store.device.isTouch) so
+                         phones/tablets don't display a key hint that can
+                         never fire. Chord tokens carry a `then` flag so the
+                         separator interleaves correctly ('g' then 'd'). -->
+                    <template x-if="shortcutTokensFor(item).length > 0">
+                      <div class="bb-cmdk-item-shortcut" x-show="!$store.device.isTouch">
+                        <template x-for="(tok, ti) in shortcutTokensFor(item)" :key="ti">
+                          <span>
+                            <span x-show="tok.then" class="bb-cmdk-then">then</span>
+                            <span x-show="!tok.then" class="bb-cmdk-kbd" x-text="tok.label"></span>
+                          </span>
                         </template>
                       </div>
                     </template>
@@ -1359,30 +1368,71 @@
 
     // Command Palette Alpine component
     function commandPalette() {
+      // NB: `shortcutId` points into $store.shortcuts. When an entry matches,
+      // the palette row renders a trailing kbd hint (see shortcutTokensFor()
+      // below). Matching by id (not inventing new chords) keeps the registry
+      // the single source of truth — change a chord in seedRegistry and every
+      // palette hint updates automatically.
       var allItems = [
         // Overview
-        { id: 'nav-home', group: 'Overview', title: 'Home', desc: 'Overview and stats', icon: 'house', href: '/', keywords: 'home dashboard overview net worth' },
-        { id: 'nav-transactions', group: 'Overview', title: 'Transactions', desc: 'View all transactions', icon: 'receipt', href: '/transactions', keywords: 'payments expenses spending' },
+        { id: 'nav-home', shortcutId: 'global.go.d', group: 'Overview', title: 'Home', desc: 'Overview and stats', icon: 'house', href: '/', keywords: 'home dashboard overview net worth' },
+        { id: 'nav-transactions', shortcutId: 'global.go.t', group: 'Overview', title: 'Transactions', desc: 'View all transactions', icon: 'receipt', href: '/transactions', keywords: 'payments expenses spending' },
         { id: 'nav-reports', group: 'Overview', title: 'Reports', desc: 'Agent reports and findings', icon: 'file-text', href: '/reports', keywords: 'agent summaries notifications' },
         // Manage
-        { id: 'nav-connections', group: 'Manage', title: 'Connections', desc: 'Bank connections and account links', icon: 'link', href: '/connections', keywords: 'banks accounts linked dedup matching' },
+        { id: 'nav-connections', shortcutId: 'global.go.c', group: 'Manage', title: 'Connections', desc: 'Bank connections and account links', icon: 'link', href: '/connections', keywords: 'banks accounts linked dedup matching' },
         { id: 'nav-agents', group: 'Manage', title: 'Agents', desc: 'Agent setup, prompts, and MCP settings', icon: 'bot', href: '/agents', keywords: 'getting started mcp connect agent setup guide wizard prompt tools permissions instructions' },
-        { id: 'nav-rules', group: 'Manage', title: 'Rules', desc: 'Auto-categorization rules', icon: 'list-filter', href: '/rules', keywords: 'automation patterns categorize labels organize' },
-        { id: 'nav-categories', group: 'Manage', title: 'Categories', desc: 'Category taxonomy', icon: 'folder', href: '/categories', keywords: 'taxonomy labels organize spending' },
+        { id: 'nav-rules', shortcutId: 'global.go.u', group: 'Manage', title: 'Rules', desc: 'Auto-categorization rules', icon: 'list-filter', href: '/rules', keywords: 'automation patterns categorize labels organize' },
+        { id: 'nav-categories', shortcutId: 'global.go.a', group: 'Manage', title: 'Categories', desc: 'Category taxonomy', icon: 'folder', href: '/categories', keywords: 'taxonomy labels organize spending' },
         { id: 'nav-tags', group: 'Manage', title: 'Tags', desc: 'Tag transactions and triage review queue', icon: 'tags', href: '/tags', keywords: 'labels needs-review triage annotations' },
-        { id: 'nav-users', group: 'Manage', title: 'Household', desc: 'Manage household members', icon: 'users', href: '/users', keywords: 'people family members' },
+        { id: 'nav-users', shortcutId: 'global.go.f', group: 'Manage', title: 'Household', desc: 'Manage household members', icon: 'users', href: '/users', keywords: 'people family members' },
         // System
-        { id: 'sys-access', group: 'System', title: 'Access', desc: 'API keys and OAuth clients', icon: 'shield-check', href: '/access', keywords: 'tokens authentication api keys oauth connector claude' },
-        { id: 'sys-providers', group: 'System', title: 'Providers', desc: 'Configure Plaid, Teller, CSV', icon: 'plug', href: '/providers', keywords: 'plaid teller csv bank setup' },
-        { id: 'sys-logs', group: 'System', title: 'Logs', desc: 'Sync logs and webhook events', icon: 'scroll-text', href: '/logs', keywords: 'sync history errors status webhooks events' },
-        { id: 'sys-backups', group: 'System', title: 'Backups', desc: 'Database backup and restore', icon: 'hard-drive', href: '/backups', keywords: 'backup restore database dump export' },
-        { id: 'sys-settings', group: 'System', title: 'Settings', desc: 'Sync schedule, security, system', icon: 'settings', href: '/settings', keywords: 'schedule password encryption' },
+        { id: 'sys-access', shortcutId: 'global.go.k', group: 'System', title: 'Access', desc: 'API keys and OAuth clients', icon: 'shield-check', href: '/access', keywords: 'tokens authentication api keys oauth connector claude' },
+        { id: 'sys-providers', shortcutId: 'global.go.p', group: 'System', title: 'Providers', desc: 'Configure Plaid, Teller, CSV', icon: 'plug', href: '/providers', keywords: 'plaid teller csv bank setup' },
+        { id: 'sys-logs', shortcutId: 'global.go.l', group: 'System', title: 'Logs', desc: 'Sync logs and webhook events', icon: 'scroll-text', href: '/logs', keywords: 'sync history errors status webhooks events' },
+        { id: 'sys-backups', shortcutId: 'global.go.b', group: 'System', title: 'Backups', desc: 'Database backup and restore', icon: 'hard-drive', href: '/backups', keywords: 'backup restore database dump export' },
+        { id: 'sys-settings', shortcutId: 'global.go.s', group: 'System', title: 'Settings', desc: 'Sync schedule, security, system', icon: 'settings', href: '/settings', keywords: 'schedule password encryption' },
         // Quick Actions
-        { id: 'act-connect', group: 'Quick Actions', title: 'Connect a Bank', desc: 'Add a new bank connection', icon: 'plus-circle', href: '/connections/new', keywords: 'add new link' },
-        { id: 'act-import', group: 'Quick Actions', title: 'Import CSV', desc: 'Import transactions from CSV', icon: 'upload', href: '/connections/import-csv', keywords: 'upload file' },
-        { id: 'act-api-key', group: 'Quick Actions', title: 'Create API Key', desc: 'Generate a new API key', icon: 'key-round', href: '/api-keys/new', keywords: 'new token' },
-        { id: 'act-user', group: 'Quick Actions', title: 'Add Member', desc: 'Add a new household member', icon: 'user-plus', href: '/users/new', keywords: 'new person family' },
+        { id: 'act-connect', shortcutId: 'global.new.c', group: 'Quick Actions', title: 'Connect a Bank', desc: 'Add a new bank connection', icon: 'plus-circle', href: '/connections/new', keywords: 'add new link' },
+        { id: 'act-import', shortcutId: 'global.new.i', group: 'Quick Actions', title: 'Import CSV', desc: 'Import transactions from CSV', icon: 'upload', href: '/connections/import-csv', keywords: 'upload file' },
+        { id: 'act-api-key', shortcutId: 'global.new.k', group: 'Quick Actions', title: 'Create API Key', desc: 'Generate a new API key', icon: 'key-round', href: '/api-keys/new', keywords: 'new token' },
+        { id: 'act-user', shortcutId: 'global.new.u', group: 'Quick Actions', title: 'Add Member', desc: 'Add a new household member', icon: 'user-plus', href: '/users/new', keywords: 'new person family' },
       ];
+
+      // Turn a spec's `keys` into flat tokens for rendering:
+      //   'cmd+k'               → [{label:'⌘'}, {label:'K'}]
+      //   '?'                   → [{label:'?'}]
+      //   { chord: ['g','d'] }  → [{label:'g'}, {then:true}, {label:'d'}]
+      // Mirrors shortcutsHelp.toTokens() (M0.3). Duplicated on purpose —
+      // keeping the two renderers independent means a palette tweak can't
+      // break the help modal and vice versa.
+      function shortcutKeyTokens(keys) {
+        if (!keys) return [];
+        if (keys.chord && Array.isArray(keys.chord)) {
+          var out = [];
+          keys.chord.forEach(function(k, i) {
+            if (i > 0) out.push({ then: true });
+            out.push({ label: String(k) });
+          });
+          return out;
+        }
+        if (Array.isArray(keys)) {
+          return keys.map(function(k) { return { label: String(k) }; });
+        }
+        if (typeof keys === 'string') {
+          if (keys.indexOf('+') !== -1 && keys.length > 1) {
+            return keys.split('+').map(function(part) {
+              var p = part.toLowerCase();
+              if (p === 'cmd' || p === 'meta') return { label: '⌘' };
+              if (p === 'ctrl')                return { label: 'Ctrl' };
+              if (p === 'shift')               return { label: '⇧' };
+              if (p === 'alt' || p === 'opt')  return { label: '⌥' };
+              return { label: part.length === 1 ? part.toUpperCase() : part };
+            });
+          }
+          return [{ label: keys }];
+        }
+        return [];
+      }
 
       return {
         open: false,
@@ -1393,6 +1443,20 @@
         _txLoading: false,
         _txTimer: null,
         _txAbort: null,
+
+        // Lookup the key tokens for a palette item's registered shortcut.
+        // Returns [] when the item has no `shortcutId`, the shortcuts store
+        // hasn't loaded yet, or the id doesn't match. The template renders
+        // nothing when the array is empty, so missing bindings silently fall
+        // through.
+        shortcutTokensFor: function(item) {
+          if (!item || !item.shortcutId) return [];
+          var store = (window.Alpine && Alpine.store('shortcuts')) || null;
+          if (!store || !store.items) return [];
+          var spec = store.items.find(function(s) { return s.id === item.shortcutId; });
+          if (!spec) return [];
+          return shortcutKeyTokens(spec.keys);
+        },
 
         get filteredItems() {
           var commandItems;
