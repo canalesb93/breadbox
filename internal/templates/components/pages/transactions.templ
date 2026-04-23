@@ -16,6 +16,18 @@ import (
 // shared components.TxResults component so the AJAX swap path renders
 // byte-for-byte the same HTML when fetched standalone.
 templ Transactions(p TransactionsProps) {
+	<!--
+		Set the shortcut-registry scope so the base.html global dispatcher routes
+		keys like j/k/c/t/e/x/Enter/J/K/// (registered in transactions_scripts.js)
+		to this page's handlers, and so the ?-help modal shows them under "This page".
+		Reset to 'global' on destroy (Alpine's htmx-style teardowns) so other pages
+		don't inherit the scope.
+	-->
+	<div
+		x-data
+		x-init="$store.shortcuts.setScope('transactions')"
+		x-destroy="$store.shortcuts.setScope('global')"
+	></div>
 	@components.CategoryPickerStyles()
 	@txPageHeader(p)
 	@txFilters(p)
