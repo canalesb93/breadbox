@@ -83,11 +83,7 @@ templ Nav(p NavProps) {
 		}
 		if p.IsEditor {
 			<a href="/tags" class={ "bb-sidebar-link", navActive(p.CurrentPage, "tags") }>
-				<i data-lucide="tags"></i>
-				<span class="flex-1">Tags</span>
-				if p.PendingReviews > 0 {
-					<span class="bb-nav-badge" title={ fmt.Sprintf("%d transactions tagged needs-review", p.PendingReviews) }>{ badgeCount(p.PendingReviews) }</span>
-				}
+				<i data-lucide="tags"></i> Tags
 			</a>
 		}
 		if p.IsAdmin {
