@@ -11,24 +11,28 @@
 <!-- Step indicator -->
 <div x-data="{step: {{if .ConnectionID}}1{{else}}1{{end}}}" x-init="window._csvWizard = {setStep: (s) => { step = s; }}">
 
-  <div class="flex items-center gap-0 mb-6 sm:mb-8 max-w-xl" id="step-indicator">
-    <template x-for="(s, i) in [{n:1, label:'Upload'}, {n:2, label:'Map Columns'}, {n:3, label:'Confirm'}, {n:4, label:'Done'}]" :key="i">
-      <div class="flex items-center" :class="i < 3 ? 'flex-1' : ''">
-        <div class="flex items-center gap-2">
-          <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-200"
-               :class="step > s.n ? 'bg-success text-success-content' : step === s.n ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/40'">
-            <template x-if="step > s.n"><i data-lucide="check" class="w-4 h-4"></i></template>
-            <template x-if="step <= s.n"><span x-text="s.n"></span></template>
+  <div x-data="{steps: [{n:1, label:'Upload'}, {n:2, label:'Map Columns'}, {n:3, label:'Confirm'}, {n:4, label:'Done'}]}">
+    <div class="flex items-center gap-0 mb-2 sm:mb-8 max-w-xl" id="step-indicator">
+      <template x-for="(s, i) in steps" :key="i">
+        <div class="flex items-center" :class="i < 3 ? 'flex-1' : ''">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-200 shrink-0"
+                 :class="step > s.n ? 'bg-success text-success-content' : step === s.n ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/40'">
+              <template x-if="step > s.n"><i data-lucide="check" class="w-4 h-4"></i></template>
+              <template x-if="step <= s.n"><span x-text="s.n"></span></template>
+            </div>
+            <span class="text-xs font-medium whitespace-nowrap transition-colors duration-200 hidden sm:inline"
+                  :class="step >= s.n ? 'text-base-content' : 'text-base-content/40'" x-text="s.label"></span>
           </div>
-          <span class="text-xs font-medium whitespace-nowrap transition-colors duration-200"
-                :class="step >= s.n ? 'text-base-content' : 'text-base-content/40'" x-text="s.label"></span>
+          <template x-if="i < 3">
+            <div class="flex-1 h-px mx-2 sm:mx-3 transition-colors duration-200"
+                 :class="step > s.n ? 'bg-success/40' : 'bg-base-200'"></div>
+          </template>
         </div>
-        <template x-if="i < 3">
-          <div class="flex-1 h-px mx-3 transition-colors duration-200"
-               :class="step > s.n ? 'bg-success/40' : 'bg-base-200'"></div>
-        </template>
-      </div>
-    </template>
+      </template>
+    </div>
+    <p class="text-xs font-medium text-base-content/70 sm:hidden mb-6"
+       x-text="'Step ' + step + ' of ' + steps.length + ': ' + steps[step-1].label"></p>
   </div>
 
   <!-- Step 1: Upload -->
