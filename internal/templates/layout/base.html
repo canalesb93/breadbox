@@ -75,6 +75,66 @@
       });
     });
   </script>
+
+  <script>
+    // Alpine store: $store.shortcuts
+    //
+    // Central registry for all keyboard shortcuts. Pages declare their bindings
+    // via $store.shortcuts.register() on init; the global dispatcher (see the
+    // keydown listener near the bottom of this file) reads from this registry
+    // to route events. Upcoming PRs will also feed the help modal (M0.3) and
+    // command-palette kbd hints (M0.5) from the same source.
+    //
+    // Spec shape (see planned-features/keyboard-nav-sprint.md):
+    //   {
+    //     id:          string (unique),
+    //     keys:        'c' | ['c'] | { chord: ['g','d'] } | 'cmd+k',
+    //     description: short user-facing string,
+    //     group:       'Navigation' | 'Go to' | 'New' | 'Actions' | 'Selection',
+    //     scope:       'global' | route id (e.g. 'transactions'),
+    //     when:        optional () => bool,
+    //     action:      () => void | { cmdk: { label, icon, href } } palette-only,
+    //     visible:     default true (hide from help modal; action still wired),
+    //     allowInInput: optional bool (shortcut still fires while typing),
+    //   }
+    //
+    // M0.2 scope: register + dispatch only. The help modal and command palette
+    // remain hardcoded in this PR; they will be rewired to read from this
+    // registry in M0.3 and M0.5.
+    document.addEventListener('alpine:init', function() {
+      Alpine.store('shortcuts', {
+        items: [],
+        currentScope: 'global',
+
+        register(spec) {
+          if (!spec || !spec.id) return;
+          // Idempotent by id — re-registering replaces the previous spec so
+          // Alpine re-init (htmx boosts, drawer re-render) doesn't double-bind.
+          var idx = this.items.findIndex(function(s) { return s.id === spec.id; });
+          if (idx >= 0) this.items.splice(idx, 1, spec);
+          else this.items.push(spec);
+        },
+
+        unregister(id) {
+          var idx = this.items.findIndex(function(s) { return s.id === id; });
+          if (idx >= 0) this.items.splice(idx, 1);
+        },
+
+        setScope(s) {
+          this.currentScope = s || 'global';
+        },
+
+        forScope(scope) {
+          // Returns all shortcuts whose scope matches `scope` OR 'global'.
+          // Used by the help modal (M0.3) and command palette (M0.5).
+          var target = scope || this.currentScope;
+          return this.items.filter(function(s) {
+            return s.scope === 'global' || s.scope === target;
+          });
+        },
+      });
+    });
+  </script>
 </head>
 <body>
   <!-- Navigation progress bar -->
@@ -1759,35 +1819,57 @@
       });
     })();
 
-    // Global Keyboard Shortcuts (vim-style g+key navigation, ?-key help)
+    // Global Keyboard Shortcuts — registry-driven dispatcher.
+    //
+    // Reads `$store.shortcuts` (see head) and routes keydown events against
+    // registered specs. This PR (M0.2) keeps the observable behavior identical
+    // to the previous hardcoded switch: `?` opens help, `/` opens cmdk, `Cmd+K`
+    // toggles cmdk, `g+<x>` navigates, `n+<x>` opens new-entity pages. The
+    // help modal and command palette continue to render from their hardcoded
+    // lists; they will be swapped to read from the registry in M0.3 and M0.5.
     (function() {
+      var COMBO_WINDOW = 800; // ms to type second key in a chord
       var pendingPrefix = null;
       var prefixTimeout = null;
-      var COMBO_WINDOW = 800; // ms to type second key
 
-      // Route maps for two-key combos
+      // "Go to" navigation — source of truth for `g+<x>` chords. Still exported
+      // as plain maps so M0.5 can reuse them to seed palette entries.
       var goRoutes = {
-        d: '/',
-        t: '/transactions',
-        c: '/connections',
-        r: '/reviews',
-        u: '/rules',
-        a: '/categories',
-        l: '/sync-logs',
-        b: '/backups',
-        s: '/settings',
-        p: '/providers',
-        m: '/mcp-settings',
-        k: '/access',
-        f: '/users'
+        d: { path: '/',             label: 'Go to Dashboard' },
+        t: { path: '/transactions', label: 'Go to Transactions' },
+        c: { path: '/connections',  label: 'Go to Connections' },
+        r: { path: '/reviews',      label: 'Go to Reviews' },
+        u: { path: '/rules',        label: 'Go to Rules' },
+        a: { path: '/categories',   label: 'Go to Categories' },
+        l: { path: '/sync-logs',    label: 'Go to Sync Logs' },
+        b: { path: '/backups',      label: 'Go to Backups' },
+        s: { path: '/settings',     label: 'Go to Settings' },
+        p: { path: '/providers',    label: 'Go to Providers' },
+        m: { path: '/mcp-settings', label: 'Go to MCP Settings' },
+        k: { path: '/access',       label: 'Go to Access' },
+        f: { path: '/users',        label: 'Go to Users' }
       };
 
       var newRoutes = {
-        c: '/connections/new',
-        i: '/connections/import-csv',
-        k: '/api-keys/new',
-        u: '/users/new'
+        c: { path: '/connections/new',        label: 'New Connection' },
+        i: { path: '/connections/import-csv', label: 'Import CSV' },
+        k: { path: '/api-keys/new',           label: 'New API Key' },
+        u: { path: '/users/new',              label: 'New User' }
       };
+
+      // Soft page-out before a chord-triggered full-page nav. Matches the
+      // previous behavior in the hardcoded dispatcher byte-for-byte.
+      function navigateTo(path) {
+        if (window.bbProgress) window.bbProgress.start();
+        var main = document.querySelector('main');
+        if (main) {
+          main.style.transition = 'opacity 0.15s ease, filter 0.15s ease';
+          main.style.opacity = '0.6';
+          main.style.filter = 'blur(1px)';
+          main.style.pointerEvents = 'none';
+        }
+        window.location.href = path;
+      }
 
       function isInputFocused() {
         var el = document.activeElement;
@@ -1799,12 +1881,12 @@
       }
 
       function isOverlayOpen() {
-        // Check if command palette or shortcuts help is open
+        // Check if command palette or shortcuts help is open.
         var cmdkEl = document.querySelector('[x-data="commandPalette()"]');
         var shortcutsEl = document.querySelector('[x-data="shortcutsHelp()"]');
         if (cmdkEl && cmdkEl.style.display !== 'none' && cmdkEl.__x && cmdkEl.__x.$data && cmdkEl.__x.$data.open) return true;
         if (shortcutsEl && shortcutsEl.style.display !== 'none' && shortcutsEl.__x && shortcutsEl.__x.$data && shortcutsEl.__x.$data.open) return true;
-        // Also check by visibility of backdrop
+        // Also check by visibility of backdrop.
         var backdrops = document.querySelectorAll('.bb-cmdk-backdrop, .bb-shortcuts-backdrop');
         for (var i = 0; i < backdrops.length; i++) {
           if (backdrops[i].offsetParent !== null) return true;
@@ -1820,64 +1902,167 @@
         }
       }
 
+      // ----- Registry seed -----
+      //
+      // Populated once on alpine:init (deferred via setTimeout so the keydown
+      // listener below doesn't depend on Alpine being ready — any unregistered
+      // keys simply fall through to the legacy-less no-op path).
+      function seedRegistry() {
+        if (!window.Alpine || !Alpine.store('shortcuts')) return;
+        var reg = Alpine.store('shortcuts');
+
+        reg.register({
+          id: 'global.help',
+          keys: '?',
+          description: 'Show keyboard shortcuts',
+          group: 'Actions',
+          scope: 'global',
+          action: function() { window.dispatchEvent(new CustomEvent('open-shortcuts')); }
+        });
+
+        reg.register({
+          id: 'global.cmdk.slash',
+          keys: '/',
+          description: 'Open command palette',
+          group: 'Actions',
+          scope: 'global',
+          visible: false, // `cmd+k` is the canonical binding shown in help
+          action: function() { window.dispatchEvent(new CustomEvent('open-cmdk')); }
+        });
+
+        reg.register({
+          id: 'global.cmdk',
+          keys: 'cmd+k',
+          description: 'Open command palette',
+          group: 'Actions',
+          scope: 'global',
+          // Actual toggle is wired in commandPalette()'s @keydown.window handler
+          // so it can close the palette when already open. Listed here only
+          // so the help modal / palette can show the binding.
+          visible: true
+        });
+
+        Object.keys(goRoutes).forEach(function(k) {
+          var r = goRoutes[k];
+          reg.register({
+            id: 'global.go.' + k,
+            keys: { chord: ['g', k] },
+            description: r.label,
+            group: 'Go to',
+            scope: 'global',
+            action: (function(path) { return function() { navigateTo(path); }; })(r.path)
+          });
+        });
+
+        Object.keys(newRoutes).forEach(function(k) {
+          var r = newRoutes[k];
+          reg.register({
+            id: 'global.new.' + k,
+            keys: { chord: ['n', k] },
+            description: r.label,
+            group: 'New',
+            scope: 'global',
+            action: (function(path) { return function() { navigateTo(path); }; })(r.path)
+          });
+        });
+      }
+
+      document.addEventListener('alpine:init', function() {
+        // Wait for the shortcuts store from head to register before seeding.
+        setTimeout(seedRegistry, 0);
+      });
+
+      // ----- Match helpers -----
+      //
+      // Returns the first spec whose `keys` matches the given single key within
+      // the active scope set (current scope + global). Chord specs are skipped
+      // here — chord resolution happens once we have a pending prefix.
+      function matchSingle(reg, key) {
+        var scope = reg.currentScope;
+        for (var i = 0; i < reg.items.length; i++) {
+          var s = reg.items[i];
+          if (s.scope !== 'global' && s.scope !== scope) continue;
+          var k = s.keys;
+          if (typeof k === 'string' && k === key) return s;
+          if (Array.isArray(k) && k.length === 1 && k[0] === key) return s;
+        }
+        return null;
+      }
+
+      function matchChord(reg, prefix, key) {
+        var scope = reg.currentScope;
+        for (var i = 0; i < reg.items.length; i++) {
+          var s = reg.items[i];
+          if (s.scope !== 'global' && s.scope !== scope) continue;
+          var k = s.keys;
+          if (k && k.chord && k.chord.length === 2 && k.chord[0] === prefix && k.chord[1] === key) return s;
+        }
+        return null;
+      }
+
+      function hasChordStartingWith(reg, prefix) {
+        var scope = reg.currentScope;
+        for (var i = 0; i < reg.items.length; i++) {
+          var s = reg.items[i];
+          if (s.scope !== 'global' && s.scope !== scope) continue;
+          var k = s.keys;
+          if (k && k.chord && k.chord.length >= 1 && k.chord[0] === prefix) return true;
+        }
+        return false;
+      }
+
       document.addEventListener('keydown', function(e) {
-        // Skip if modifier keys are held (except shift for ?)
+        // Cmd+K / Ctrl+K is handled by the command-palette Alpine component so
+        // it can toggle the palette when already open. Everything else in this
+        // dispatcher is modifier-free.
         if (e.ctrlKey || e.metaKey || e.altKey) return;
-        // Skip if typing in an input
         if (isInputFocused()) return;
-        // Skip if an overlay is open
         if (isOverlayOpen()) return;
+
+        var reg = (window.Alpine && Alpine.store('shortcuts')) || null;
+        if (!reg) return;
 
         var key = e.key;
 
-        // ? opens shortcuts help (shift + / on most keyboards)
-        if (key === '?') {
-          e.preventDefault();
-          window.dispatchEvent(new CustomEvent('open-shortcuts'));
-          clearPrefix();
-          return;
+        // Touch device guard — page-level specs don't fire on touch.
+        // Globals (`?`, `/`, `g+_`, `n+_`) still run; the per-spec filter
+        // happens when we resolve the match below.
+        var isTouch = (Alpine.store('device') || {}).isTouch === true;
+
+        function shouldFire(spec) {
+          if (!spec) return false;
+          if (spec.when && !spec.when()) return false;
+          if (isTouch && spec.scope !== 'global') return false;
+          return true;
         }
 
-        // / focuses the command palette (like GitHub)
-        if (key === '/') {
-          e.preventDefault();
-          window.dispatchEvent(new CustomEvent('open-cmdk'));
-          clearPrefix();
-          return;
-        }
-
-        // Two-key combos: g+key, n+key
+        // Chord resolution: if we have a pending prefix, match second key now.
         if (pendingPrefix) {
           var prefix = pendingPrefix;
           clearPrefix();
-
-          var routes = null;
-          if (prefix === 'g') routes = goRoutes;
-          else if (prefix === 'n') routes = newRoutes;
-
-          if (routes && routes[key]) {
+          var chordSpec = matchChord(reg, prefix, key);
+          if (shouldFire(chordSpec) && typeof chordSpec.action === 'function') {
             e.preventDefault();
-            if (window.bbProgress) window.bbProgress.start();
-            var main = document.querySelector('main');
-            if (main) {
-              main.style.transition = 'opacity 0.15s ease, filter 0.15s ease';
-              main.style.opacity = '0.6';
-              main.style.filter = 'blur(1px)';
-              main.style.pointerEvents = 'none';
-            }
-            window.location.href = routes[key];
+            chordSpec.action();
           }
           return;
         }
 
-        // Start a prefix sequence
-        if (key === 'g' || key === 'n') {
+        // Start a chord sequence if any registered spec begins with this key.
+        if (hasChordStartingWith(reg, key)) {
           pendingPrefix = key;
           prefixTimeout = setTimeout(function() {
             pendingPrefix = null;
             prefixTimeout = null;
           }, COMBO_WINDOW);
           return;
+        }
+
+        // Single-key match.
+        var spec = matchSingle(reg, key);
+        if (shouldFire(spec) && typeof spec.action === 'function') {
+          e.preventDefault();
+          spec.action();
         }
       });
     })();
