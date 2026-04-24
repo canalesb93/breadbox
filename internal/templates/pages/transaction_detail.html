@@ -203,10 +203,10 @@
 </div>
 
 <!-- Activity Timeline -->
-<div class="bb-card p-0 overflow-hidden" x-data="commentManager()">
+<section id="activity" aria-labelledby="activity-heading" class="bb-card p-0 overflow-hidden" x-data="commentManager()">
   <div class="px-4 sm:px-5 pt-5 pb-3 flex items-center gap-2">
-    <i data-lucide="activity" class="w-4 h-4 text-base-content/40"></i>
-    <h2 class="text-sm font-semibold text-base-content/50">Activity</h2>
+    <i data-lucide="activity" class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>
+    <h2 id="activity-heading" class="text-sm font-semibold text-base-content/50">Activity</h2>
     {{if .Activity}}
     <span class="text-xs text-base-content/30">{{len .Activity}} events</span>
     {{end}}
@@ -215,9 +215,10 @@
   <!-- Add Note -->
   <div class="px-4 sm:px-5 pb-4">
     <div class="flex gap-2 items-center">
+      <label for="bb-txd-comment" class="sr-only">Add a note</label>
       <input id="bb-txd-comment" type="text" x-model="newComment" placeholder="Add a note..." class="input input-bordered input-sm h-9 flex-1 bg-base-200/50 rounded-xl" @keydown.enter.prevent="newComment.trim() && addComment()" />
-      <button @click="addComment()" class="btn btn-sm h-9 rounded-xl btn-primary btn-square" :disabled="!newComment.trim()">
-        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+      <button @click="addComment()" class="btn btn-sm h-9 rounded-xl btn-primary btn-square" :disabled="!newComment.trim()" aria-label="Post note">
+        <i data-lucide="send" class="w-3.5 h-3.5" aria-hidden="true"></i>
       </button>
     </div>
   </div>
@@ -228,28 +229,28 @@
     <div class="flex items-start gap-3 py-3 border-b border-base-200/50 last:border-b-0 group">
       <!-- Icon -->
       {{if eq .Type "rule"}}
-      <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center shrink-0 mt-0.5">
-        <i data-lucide="zap" class="w-4 h-4 text-info"></i>
+      <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
+        <i data-lucide="zap" class="w-4 h-4 text-info" aria-hidden="true"></i>
       </div>
       {{else if eq .Type "review"}}
       <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5
         {{if eq .ReviewStatus "approved"}}bg-success/10
         {{else if eq .ReviewStatus "rejected"}}bg-error/10
         {{else if eq .ReviewStatus "skipped"}}bg-warning/10
-        {{else}}bg-base-200{{end}}">
-        {{if eq .ReviewStatus "approved"}}<i data-lucide="check-circle" class="w-4 h-4 text-success"></i>
-        {{else if eq .ReviewStatus "rejected"}}<i data-lucide="x-circle" class="w-4 h-4 text-error"></i>
-        {{else if eq .ReviewStatus "skipped"}}<i data-lucide="skip-forward" class="w-4 h-4 text-warning"></i>
-        {{else}}<i data-lucide="scan-search" class="w-4 h-4 text-base-content/40"></i>{{end}}
+        {{else}}bg-base-200{{end}}" aria-hidden="true">
+        {{if eq .ReviewStatus "approved"}}<i data-lucide="check-circle" class="w-4 h-4 text-success" aria-hidden="true"></i>
+        {{else if eq .ReviewStatus "rejected"}}<i data-lucide="x-circle" class="w-4 h-4 text-error" aria-hidden="true"></i>
+        {{else if eq .ReviewStatus "skipped"}}<i data-lucide="skip-forward" class="w-4 h-4 text-warning" aria-hidden="true"></i>
+        {{else}}<i data-lucide="scan-search" class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>{{end}}
       </div>
       {{else if eq .ActorType "agent"}}
-      <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-        <i data-lucide="bot" class="w-4 h-4 text-primary"></i>
+      <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
+        <i data-lucide="bot" class="w-4 h-4 text-primary" aria-hidden="true"></i>
       </div>
       {{else if and (eq .ActorType "user") .ActorID}}
-      <img src="{{avatarURL (deref .ActorID)}}" alt="" class="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5" title="{{.ActorName}}">
+      <img src="{{avatarURL (deref .ActorID)}}" alt="{{.ActorName}} avatar" class="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5" title="{{.ActorName}}">
       {{else}}
-      <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+      <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
         <span class="text-xs font-semibold text-primary leading-none">{{firstChar .ActorName}}</span>
       </div>
       {{end}}
@@ -279,23 +280,23 @@
           <span class="text-xs text-info font-medium">{{.Detail}}</span>
           {{end}}
           {{if .Timestamp}}
-          <span class="text-xs text-base-content/30">&middot;</span>
-          <span class="text-xs text-base-content/30">{{relativeTime .Timestamp}}</span>
+          <span class="text-xs text-base-content/30" aria-hidden="true">&middot;</span>
+          <time datetime="{{.Timestamp}}" class="text-xs text-base-content/30" title="{{formatDateTime .Timestamp}}">{{relativeTime .Timestamp}}</time>
           {{end}}
         </div>
       </div>
 
       <!-- Delete button (comments only) -->
       {{if .CommentID}}
-      <button class="btn btn-ghost btn-xs rounded-lg sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-error/50 hover:text-error" @click="deleteComment('{{.CommentID}}')" title="Delete">
-        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+      <button class="btn btn-ghost btn-xs rounded-lg sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-error/50 hover:text-error" @click="deleteComment('{{.CommentID}}')" aria-label="Delete comment by {{.ActorName}} from {{relativeTime .Timestamp}}" title="Delete">
+        <i data-lucide="trash-2" class="w-3.5 h-3.5" aria-hidden="true"></i>
       </button>
       {{end}}
     </div>
     {{end}}
   </div>
   {{end}}
-</div>
+</section>
 
 {{template "category-picker-script" .}}
 <script>
