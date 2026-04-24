@@ -29,17 +29,17 @@ func TestParseFields_SingleField(t *testing.T) {
 }
 
 func TestParseFields_MultipleFields(t *testing.T) {
-	fields, err := ParseFields("amount,date,name")
+	fields, err := ParseFields("amount,date,provider_name")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, f := range []string{"id", "amount", "date", "name"} {
+	for _, f := range []string{"id", "amount", "date", "provider_name"} {
 		if !fields[f] {
 			t.Errorf("expected %s to be selected", f)
 		}
 	}
-	if fields["merchant_name"] {
-		t.Error("merchant_name should not be selected")
+	if fields["provider_merchant_name"] {
+		t.Error("provider_merchant_name should not be selected")
 	}
 }
 
@@ -48,7 +48,7 @@ func TestParseFields_CoreAlias(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, f := range []string{"id", "date", "amount", "name", "iso_currency_code"} {
+	for _, f := range []string{"id", "date", "amount", "provider_name", "iso_currency_code"} {
 		if !fields[f] {
 			t.Errorf("core alias should include %s", f)
 		}
@@ -60,7 +60,7 @@ func TestParseFields_CategoryAlias(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, f := range []string{"id", "category", "category_primary_raw", "category_detailed_raw"} {
+	for _, f := range []string{"id", "category", "provider_category_primary", "provider_category_detailed"} {
 		if !fields[f] {
 			t.Errorf("category alias should include %s", f)
 		}
@@ -80,14 +80,14 @@ func TestParseFields_TimestampsAlias(t *testing.T) {
 }
 
 func TestParseFields_MixedAliasAndField(t *testing.T) {
-	fields, err := ParseFields("core,merchant_name")
+	fields, err := ParseFields("core,provider_merchant_name")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !fields["amount"] {
 		t.Error("core alias should expand")
 	}
-	if !fields["merchant_name"] {
+	if !fields["provider_merchant_name"] {
 		t.Error("explicit field should be included")
 	}
 }
@@ -124,11 +124,11 @@ func TestParseFields_UnknownFieldSortedList(t *testing.T) {
 }
 
 func TestParseFields_WhitespaceHandling(t *testing.T) {
-	fields, err := ParseFields(" amount , date , name ")
+	fields, err := ParseFields(" amount , date , provider_name ")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, f := range []string{"amount", "date", "name"} {
+	for _, f := range []string{"amount", "date", "provider_name"} {
 		if !fields[f] {
 			t.Errorf("expected %s to be selected after trimming", f)
 		}
@@ -165,12 +165,12 @@ func TestFilterTransactionFields_Nil(t *testing.T) {
 
 func TestFilterTransactionFields_SelectsCorrectly(t *testing.T) {
 	txn := TransactionResponse{
-		ID:     "txn-1",
-		Amount: 42.50,
-		Name:   "Test Store",
-		Date:   "2024-01-15",
+		ID:           "txn-1",
+		Amount:       42.50,
+		ProviderName: "Test Store",
+		Date:         "2024-01-15",
 	}
-	fields := map[string]bool{"id": true, "amount": true, "name": true}
+	fields := map[string]bool{"id": true, "amount": true, "provider_name": true}
 	result := FilterTransactionFields(txn, fields)
 
 	if result["id"] != "txn-1" {
@@ -179,8 +179,8 @@ func TestFilterTransactionFields_SelectsCorrectly(t *testing.T) {
 	if result["amount"] != 42.50 {
 		t.Error("expected amount")
 	}
-	if result["name"] != "Test Store" {
-		t.Error("expected name")
+	if result["provider_name"] != "Test Store" {
+		t.Error("expected provider_name")
 	}
 	if _, ok := result["date"]; ok {
 		t.Error("date should not be in filtered result")
@@ -191,7 +191,7 @@ func strPtr(s string) *string { return &s }
 
 func TestFilterTransactionFields_AllFields(t *testing.T) {
 	// Build a fieldSet with all valid fields
-	fields, err := ParseFields("id,account_id,account_name,user_name,amount,iso_currency_code,date,authorized_date,datetime,authorized_datetime,name,merchant_name,category,category_override,category_primary_raw,category_detailed_raw,category_confidence,payment_channel,pending,created_at,updated_at")
+	fields, err := ParseFields("id,account_id,account_name,user_name,amount,iso_currency_code,date,authorized_date,datetime,authorized_datetime,provider_name,provider_merchant_name,category,category_override,provider_category_primary,provider_category_detailed,provider_category_confidence,provider_payment_channel,pending,created_at,updated_at")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -221,13 +221,13 @@ func TestParseFields_MinimalAlias(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, f := range []string{"id", "name", "amount", "date"} {
+	for _, f := range []string{"id", "provider_name", "amount", "date"} {
 		if !fields[f] {
 			t.Errorf("minimal alias should include %s", f)
 		}
 	}
 	// Should NOT include other core fields
-	for _, f := range []string{"iso_currency_code", "account_id", "merchant_name"} {
+	for _, f := range []string{"iso_currency_code", "account_id", "provider_merchant_name"} {
 		if fields[f] {
 			t.Errorf("minimal alias should not include %s", f)
 		}

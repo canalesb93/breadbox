@@ -263,14 +263,14 @@ func TestListTransactions_WithData(t *testing.T) {
 		t.Fatalf("expected 2 transactions, got %d", len(result.Transactions))
 	}
 	// Default sort is date DESC — newest first
-	if result.Transactions[0].Name != "Starbucks" {
-		t.Errorf("expected first transaction Starbucks (newer), got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Starbucks" {
+		t.Errorf("expected first transaction Starbucks (newer), got %s", result.Transactions[0].ProviderName)
 	}
 	if result.Transactions[0].Amount != 4.50 {
 		t.Errorf("expected amount 4.50, got %f", result.Transactions[0].Amount)
 	}
-	if result.Transactions[1].Name != "Shell Gas" {
-		t.Errorf("expected second transaction Shell Gas, got %s", result.Transactions[1].Name)
+	if result.Transactions[1].ProviderName != "Shell Gas" {
+		t.Errorf("expected second transaction Shell Gas, got %s", result.Transactions[1].ProviderName)
 	}
 	if result.Transactions[1].Amount != 42.15 {
 		t.Errorf("expected amount 42.15, got %f", result.Transactions[1].Amount)
@@ -344,8 +344,8 @@ func TestListTransactions_SearchFilter(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 result for 'starbucks', got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Starbucks Coffee" {
-		t.Errorf("expected Starbucks Coffee, got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Starbucks Coffee" {
+		t.Errorf("expected Starbucks Coffee, got %s", result.Transactions[0].ProviderName)
 	}
 }
 
@@ -365,8 +365,8 @@ func TestListTransactions_AmountFilter(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 result with min=50, got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Big" {
-		t.Errorf("expected Big, got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Big" {
+		t.Errorf("expected Big, got %s", result.Transactions[0].ProviderName)
 	}
 }
 
@@ -418,8 +418,8 @@ func TestSoftDeletedTransactions_NotReturned(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 visible transaction, got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Visible" {
-		t.Errorf("expected Visible, got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Visible" {
+		t.Errorf("expected Visible, got %s", result.Transactions[0].ProviderName)
 	}
 }
 
@@ -917,8 +917,8 @@ func TestSoftDeleteTransactionsByConnectionID(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 visible transaction, got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Groceries" {
-		t.Errorf("expected Groceries, got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Groceries" {
+		t.Errorf("expected Groceries, got %s", result.Transactions[0].ProviderName)
 	}
 }
 
@@ -1169,7 +1169,7 @@ func TestApplyRuleRetroactively_MatchesAndSkipsOverrides(t *testing.T) {
 	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name: "Starbucks Rule",
 		Conditions: service.Condition{
-			Field: "name",
+			Field: "provider_name",
 			Op:    "contains",
 			Value: "Starbucks",
 		},
@@ -1262,7 +1262,7 @@ func TestApplyAllRulesRetroactively_PriorityWins(t *testing.T) {
 	_, err = svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name: "Coffee Rule",
 		Conditions: service.Condition{
-			Field: "name",
+			Field: "provider_name",
 			Op:    "contains",
 			Value: "Coffee",
 		},
@@ -1278,7 +1278,7 @@ func TestApplyAllRulesRetroactively_PriorityWins(t *testing.T) {
 	_, err = svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name: "Gas Rule",
 		Conditions: service.Condition{
-			Field: "name",
+			Field: "provider_name",
 			Op:    "contains",
 			Value: "Gas",
 		},
@@ -1352,7 +1352,7 @@ func TestPreviewRule_MatchCount(t *testing.T) {
 	testutil.MustCreateTransaction(t, queries, acctID, "txn_other_2", "Amazon", 7500, "2025-01-19")
 
 	result, err := svc.PreviewRule(ctx, service.Condition{
-		Field: "name",
+		Field: "provider_name",
 		Op:    "contains",
 		Value: "Starbucks",
 	}, 10)
@@ -1384,7 +1384,7 @@ func TestPreviewRule_SampleSizeLimit(t *testing.T) {
 	}
 
 	result, err := svc.PreviewRule(ctx, service.Condition{
-		Field: "name",
+		Field: "provider_name",
 		Op:    "contains",
 		Value: "Starbucks",
 	}, 2) // limit to 2 samples

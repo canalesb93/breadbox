@@ -1412,9 +1412,9 @@ func AdminUsername(r *http.Request, sm *scs.SessionManager) string {
 // still read reasonably.
 func ruleFieldLabel(field string) string {
 	switch field {
-	case "name":
+	case "provider_name":
 		return "Name"
-	case "merchant_name":
+	case "provider_merchant_name":
 		return "Merchant"
 	case "amount":
 		return "Amount"
@@ -1422,9 +1422,9 @@ func ruleFieldLabel(field string) string {
 		return "Pending"
 	case "category":
 		return "Category"
-	case "category_primary":
+	case "provider_category_primary":
 		return "Category (primary)"
-	case "category_detailed":
+	case "provider_category_detailed":
 		return "Category (detail)"
 	case "tags":
 		return "Tag"

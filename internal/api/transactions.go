@@ -116,7 +116,7 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		// Parse sort_by.
-		sortBy, err := parseEnumParam(q, "sort_by", []string{"date", "amount", "name"})
+		sortBy, err := parseEnumParam(q, "sort_by", []string{"date", "amount", "provider_name"})
 		if err != nil {
 			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
 			return

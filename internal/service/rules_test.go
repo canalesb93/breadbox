@@ -12,12 +12,12 @@ func TestValidateCondition_Simple(t *testing.T) {
 	}{
 		{
 			name:    "valid string contains",
-			cond:    Condition{Field: "name", Op: "contains", Value: "uber"},
+			cond:    Condition{Field: "provider_name", Op: "contains", Value: "uber"},
 			wantErr: false,
 		},
 		{
 			name:    "valid string eq",
-			cond:    Condition{Field: "merchant_name", Op: "eq", Value: "Starbucks"},
+			cond:    Condition{Field: "provider_merchant_name", Op: "eq", Value: "Starbucks"},
 			wantErr: false,
 		},
 		{
@@ -32,7 +32,7 @@ func TestValidateCondition_Simple(t *testing.T) {
 		},
 		{
 			name:    "valid regex",
-			cond:    Condition{Field: "name", Op: "matches", Value: "(?i)uber.*eats"},
+			cond:    Condition{Field: "provider_name", Op: "matches", Value: "(?i)uber.*eats"},
 			wantErr: false,
 		},
 		{
@@ -47,7 +47,7 @@ func TestValidateCondition_Simple(t *testing.T) {
 		},
 		{
 			name:    "invalid operator for string",
-			cond:    Condition{Field: "name", Op: "gt", Value: "test"},
+			cond:    Condition{Field: "provider_name", Op: "gt", Value: "test"},
 			wantErr: true,
 		},
 		{
@@ -62,7 +62,7 @@ func TestValidateCondition_Simple(t *testing.T) {
 		},
 		{
 			name:    "invalid regex",
-			cond:    Condition{Field: "name", Op: "matches", Value: "[invalid"},
+			cond:    Condition{Field: "provider_name", Op: "matches", Value: "[invalid"},
 			wantErr: true,
 		},
 		{
@@ -80,12 +80,12 @@ func TestValidateCondition_Simple(t *testing.T) {
 		},
 		{
 			name:    "missing operator",
-			cond:    Condition{Field: "name", Value: "test"},
+			cond:    Condition{Field: "provider_name", Value: "test"},
 			wantErr: true,
 		},
 		{
 			name:    "in operator with empty array",
-			cond:    Condition{Field: "name", Op: "in", Value: []interface{}{}},
+			cond:    Condition{Field: "provider_name", Op: "in", Value: []interface{}{}},
 			wantErr: true,
 		},
 		{
@@ -109,7 +109,7 @@ func TestValidateCondition_Logical(t *testing.T) {
 	t.Run("valid AND", func(t *testing.T) {
 		cond := Condition{
 			And: []Condition{
-				{Field: "name", Op: "contains", Value: "uber"},
+				{Field: "provider_name", Op: "contains", Value: "uber"},
 				{Field: "amount", Op: "gte", Value: float64(20)},
 			},
 		}
@@ -121,8 +121,8 @@ func TestValidateCondition_Logical(t *testing.T) {
 	t.Run("valid OR", func(t *testing.T) {
 		cond := Condition{
 			Or: []Condition{
-				{Field: "name", Op: "contains", Value: "uber"},
-				{Field: "name", Op: "contains", Value: "lyft"},
+				{Field: "provider_name", Op: "contains", Value: "uber"},
+				{Field: "provider_name", Op: "contains", Value: "lyft"},
 			},
 		}
 		if err := ValidateCondition(cond); err != nil {
@@ -141,7 +141,7 @@ func TestValidateCondition_Logical(t *testing.T) {
 
 	t.Run("mixed field and logical rejected", func(t *testing.T) {
 		cond := Condition{
-			Field: "name",
+			Field: "provider_name",
 			Op:    "eq",
 			Value: "test",
 			And: []Condition{
@@ -156,7 +156,7 @@ func TestValidateCondition_Logical(t *testing.T) {
 	t.Run("invalid child in AND", func(t *testing.T) {
 		cond := Condition{
 			And: []Condition{
-				{Field: "name", Op: "contains", Value: "uber"},
+				{Field: "provider_name", Op: "contains", Value: "uber"},
 				{Field: "unknown", Op: "eq", Value: "test"},
 			},
 		}
@@ -186,17 +186,17 @@ func TestEvaluateCondition(t *testing.T) {
 	}{
 		{
 			name:     "string contains match",
-			cond:     Condition{Field: "name", Op: "contains", Value: "uber eats"},
+			cond:     Condition{Field: "provider_name", Op: "contains", Value: "uber eats"},
 			expected: true,
 		},
 		{
 			name:     "string contains no match",
-			cond:     Condition{Field: "name", Op: "contains", Value: "doordash"},
+			cond:     Condition{Field: "provider_name", Op: "contains", Value: "doordash"},
 			expected: false,
 		},
 		{
 			name:     "string eq case insensitive",
-			cond:     Condition{Field: "merchant_name", Op: "eq", Value: "uber eats"},
+			cond:     Condition{Field: "provider_merchant_name", Op: "eq", Value: "uber eats"},
 			expected: true,
 		},
 		{
@@ -206,7 +206,7 @@ func TestEvaluateCondition(t *testing.T) {
 		},
 		{
 			name:     "string not_contains",
-			cond:     Condition{Field: "name", Op: "not_contains", Value: "doordash"},
+			cond:     Condition{Field: "provider_name", Op: "not_contains", Value: "doordash"},
 			expected: true,
 		},
 		{
@@ -238,7 +238,7 @@ func TestEvaluateCondition(t *testing.T) {
 			name: "AND all match",
 			cond: Condition{
 				And: []Condition{
-					{Field: "name", Op: "contains", Value: "uber"},
+					{Field: "provider_name", Op: "contains", Value: "uber"},
 					{Field: "amount", Op: "gte", Value: float64(20)},
 				},
 			},
@@ -248,7 +248,7 @@ func TestEvaluateCondition(t *testing.T) {
 			name: "AND partial match",
 			cond: Condition{
 				And: []Condition{
-					{Field: "name", Op: "contains", Value: "uber"},
+					{Field: "provider_name", Op: "contains", Value: "uber"},
 					{Field: "amount", Op: "gt", Value: float64(100)},
 				},
 			},
@@ -258,8 +258,8 @@ func TestEvaluateCondition(t *testing.T) {
 			name: "OR any match",
 			cond: Condition{
 				Or: []Condition{
-					{Field: "name", Op: "contains", Value: "doordash"},
-					{Field: "name", Op: "contains", Value: "uber"},
+					{Field: "provider_name", Op: "contains", Value: "doordash"},
+					{Field: "provider_name", Op: "contains", Value: "uber"},
 				},
 			},
 			expected: true,
@@ -268,8 +268,8 @@ func TestEvaluateCondition(t *testing.T) {
 			name: "OR no match",
 			cond: Condition{
 				Or: []Condition{
-					{Field: "name", Op: "contains", Value: "doordash"},
-					{Field: "name", Op: "contains", Value: "grubhub"},
+					{Field: "provider_name", Op: "contains", Value: "doordash"},
+					{Field: "provider_name", Op: "contains", Value: "grubhub"},
 				},
 			},
 			expected: false,
@@ -312,7 +312,7 @@ func TestEvaluateCondition_Regex(t *testing.T) {
 		Name: "UBER EATS - ORDER #1234",
 	}
 
-	cond := Condition{Field: "name", Op: "matches", Value: "(?i)uber.*eats"}
+	cond := Condition{Field: "provider_name", Op: "matches", Value: "(?i)uber.*eats"}
 	cc, err := CompileCondition(cond)
 	if err != nil {
 		t.Fatalf("CompileCondition() error = %v", err)
@@ -322,7 +322,7 @@ func TestEvaluateCondition_Regex(t *testing.T) {
 		t.Error("expected regex to match")
 	}
 
-	cond2 := Condition{Field: "name", Op: "matches", Value: "doordash.*"}
+	cond2 := Condition{Field: "provider_name", Op: "matches", Value: "doordash.*"}
 	cc2, err := CompileCondition(cond2)
 	if err != nil {
 		t.Fatalf("CompileCondition() error = %v", err)
@@ -351,28 +351,28 @@ func TestConditionSummary(t *testing.T) {
 		},
 		{
 			name:     "simple contains",
-			cond:     Condition{Field: "name", Op: "contains", Value: "uber"},
-			expected: `name contains "uber"`,
+			cond:     Condition{Field: "provider_name", Op: "contains", Value: "uber"},
+			expected: `provider_name contains "uber"`,
 		},
 		{
 			name: "AND",
 			cond: Condition{
 				And: []Condition{
-					{Field: "name", Op: "contains", Value: "uber"},
+					{Field: "provider_name", Op: "contains", Value: "uber"},
 					{Field: "amount", Op: "gte", Value: float64(20)},
 				},
 			},
-			expected: `name contains "uber" AND amount >= 20`,
+			expected: `provider_name contains "uber" AND amount >= 20`,
 		},
 		{
 			name: "OR",
 			cond: Condition{
 				Or: []Condition{
-					{Field: "name", Op: "contains", Value: "uber"},
-					{Field: "name", Op: "contains", Value: "lyft"},
+					{Field: "provider_name", Op: "contains", Value: "uber"},
+					{Field: "provider_name", Op: "contains", Value: "lyft"},
 				},
 			},
-			expected: `(name contains "uber" OR name contains "lyft")`,
+			expected: `(provider_name contains "uber" OR provider_name contains "lyft")`,
 		},
 	}
 
@@ -493,7 +493,7 @@ func TestValidateCondition_DepthLimit(t *testing.T) {
 	// Build a linear chain of NOT-wrapped conditions. Depth 10 = accepted,
 	// depth 11 = rejected (ValidateCondition enforces depth > 10 → error).
 	build := func(n int) Condition {
-		leaf := Condition{Field: "name", Op: "eq", Value: "x"}
+		leaf := Condition{Field: "provider_name", Op: "eq", Value: "x"}
 		cur := leaf
 		for i := 0; i < n; i++ {
 			next := cur

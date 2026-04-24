@@ -50,14 +50,14 @@ type TransactionResponse struct {
 	AuthorizedDate      *string                  `json:"authorized_date"`
 	Datetime            *string                  `json:"datetime"`
 	AuthorizedDatetime  *string                  `json:"authorized_datetime"`
-	Name                string                   `json:"name"`
-	MerchantName        *string                  `json:"merchant_name"`
-	Category            *TransactionCategoryInfo `json:"category"`
-	CategoryOverride    bool                     `json:"category_override"`
-	CategoryPrimaryRaw  *string                  `json:"category_primary_raw"`
-	CategoryDetailedRaw *string                  `json:"category_detailed_raw"`
-	CategoryConfidence  *string                  `json:"category_confidence"`
-	PaymentChannel      *string                  `json:"payment_channel"`
+	ProviderName               string                   `json:"provider_name"`
+	ProviderMerchantName       *string                  `json:"provider_merchant_name"`
+	Category                   *TransactionCategoryInfo `json:"category"`
+	CategoryOverride           bool                     `json:"category_override"`
+	ProviderCategoryPrimary    *string                  `json:"provider_category_primary"`
+	ProviderCategoryDetailed   *string                  `json:"provider_category_detailed"`
+	ProviderCategoryConfidence *string                  `json:"provider_category_confidence"`
+	ProviderPaymentChannel     *string                  `json:"provider_payment_channel"`
 	Pending             bool                     `json:"pending"`
 	CreatedAt           string                   `json:"created_at"`
 	UpdatedAt           string                   `json:"updated_at"`

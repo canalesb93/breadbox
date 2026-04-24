@@ -33,7 +33,7 @@ func mustCompile(b *testing.B, c Condition) *CompiledCondition {
 
 // BenchmarkEvaluateSimpleContains benchmarks a single "contains" condition on merchant_name.
 func BenchmarkEvaluateSimpleContains(b *testing.B) {
-	cc := mustCompile(b, Condition{Field: "merchant_name", Op: "contains", Value: "uber"})
+	cc := mustCompile(b, Condition{Field: "provider_merchant_name", Op: "contains", Value: "uber"})
 	tctx := benchTransactionContext()
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -47,8 +47,8 @@ func BenchmarkEvaluateSimpleContains(b *testing.B) {
 func BenchmarkEvaluateMediumAND(b *testing.B) {
 	cc := mustCompile(b, Condition{
 		And: []Condition{
-			{Field: "name", Op: "contains", Value: "uber eats"},
-			{Field: "category_primary", Op: "eq", Value: "dining"},
+			{Field: "provider_name", Op: "contains", Value: "uber eats"},
+			{Field: "provider_category_primary", Op: "eq", Value: "dining"},
 			{Field: "amount", Op: "gte", Value: float64(20)},
 		},
 	})
@@ -67,9 +67,9 @@ func BenchmarkEvaluateComplexTree(b *testing.B) {
 		And: []Condition{
 			{
 				Or: []Condition{
-					{Field: "name", Op: "contains", Value: "uber"},
-					{Field: "name", Op: "contains", Value: "lyft"},
-					{Field: "merchant_name", Op: "matches", Value: "(?i)doordash|grubhub"},
+					{Field: "provider_name", Op: "contains", Value: "uber"},
+					{Field: "provider_name", Op: "contains", Value: "lyft"},
+					{Field: "provider_merchant_name", Op: "matches", Value: "(?i)doordash|grubhub"},
 				},
 			},
 			{Field: "provider", Op: "in", Value: []interface{}{"plaid", "teller", "csv"}},
@@ -77,7 +77,7 @@ func BenchmarkEvaluateComplexTree(b *testing.B) {
 			{
 				Not: &Condition{Field: "pending", Op: "eq", Value: true},
 			},
-			{Field: "category_primary", Op: "neq", Value: "transfer"},
+			{Field: "provider_category_primary", Op: "neq", Value: "transfer"},
 		},
 	})
 	tctx := benchTransactionContext()
@@ -93,7 +93,7 @@ func BenchmarkEvaluateComplexTree(b *testing.B) {
 func BenchmarkEvaluateBatch1000(b *testing.B) {
 	cc := mustCompile(b, Condition{
 		And: []Condition{
-			{Field: "name", Op: "contains", Value: "uber"},
+			{Field: "provider_name", Op: "contains", Value: "uber"},
 			{Field: "amount", Op: "gte", Value: float64(10)},
 			{Field: "provider", Op: "in", Value: []interface{}{"plaid", "teller"}},
 		},
@@ -136,7 +136,7 @@ func BenchmarkEvaluateBatch1000(b *testing.B) {
 
 // BenchmarkEvaluateStringEq benchmarks the "eq" string operator in isolation.
 func BenchmarkEvaluateStringEq(b *testing.B) {
-	cc := mustCompile(b, Condition{Field: "merchant_name", Op: "eq", Value: "Uber Eats"})
+	cc := mustCompile(b, Condition{Field: "provider_merchant_name", Op: "eq", Value: "Uber Eats"})
 	tctx := benchTransactionContext()
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -166,9 +166,9 @@ func BenchmarkCompileCondition(b *testing.B) {
 		And: []Condition{
 			{
 				Or: []Condition{
-					{Field: "name", Op: "contains", Value: "uber"},
-					{Field: "name", Op: "contains", Value: "lyft"},
-					{Field: "merchant_name", Op: "matches", Value: "(?i)doordash|grubhub"},
+					{Field: "provider_name", Op: "contains", Value: "uber"},
+					{Field: "provider_name", Op: "contains", Value: "lyft"},
+					{Field: "provider_merchant_name", Op: "matches", Value: "(?i)doordash|grubhub"},
 				},
 			},
 			{Field: "provider", Op: "in", Value: []interface{}{"plaid", "teller", "csv"}},

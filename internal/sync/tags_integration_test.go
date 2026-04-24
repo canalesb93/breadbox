@@ -30,7 +30,7 @@ func TestSync_AddTagAction_PersistsTag(t *testing.T) {
 	// Rule: name contains "Restaurant" → add_tag "dining".
 	testutil.MustCreateTransactionRule(
 		t, queries, "Dining Tag",
-		[]byte(`{"field":"name","op":"contains","value":"Restaurant"}`),
+		[]byte(`{"field": "provider_name","op":"contains","value":"Restaurant"}`),
 		[]byte(`[{"type":"add_tag","tag_slug":"dining"}]`),
 		"on_create",
 	)
@@ -119,7 +119,7 @@ func TestSync_RemoveTagAction_DeletesTagAndAnnotates(t *testing.T) {
 	tag := testutil.MustCreateTag(t, queries, "needs-review", "Needs Review")
 	testutil.MustCreateTransactionRule(
 		t, queries, "Clear review flag for coffee",
-		[]byte(`{"field":"name","op":"contains","value":"Starbucks"}`),
+		[]byte(`{"field": "provider_name","op":"contains","value":"Starbucks"}`),
 		[]byte(`[{"type":"remove_tag","tag_slug":"needs-review"}]`),
 		"always",
 	)

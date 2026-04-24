@@ -26,19 +26,19 @@ import (
 // transaction_tags at evaluation time. It supports contains, not_contains,
 // and "in" (any-of).
 var validConditionFields = map[string]string{
-	"name":              "string",
-	"merchant_name":     "string",
-	"amount":            "numeric",
-	"category_primary":  "string", // raw provider primary category
-	"category_detailed": "string", // raw provider detailed category
-	"category":          "string", // assigned category slug (distinct from provider raw)
-	"pending":           "bool",
-	"provider":          "string",
-	"account_id":        "string",
-	"account_name":      "string",
-	"user_id":           "string",
-	"user_name":         "string",
-	"tags":              "tags",
+	"provider_name":              "string",
+	"provider_merchant_name":     "string",
+	"amount":                     "numeric",
+	"provider_category_primary":  "string", // raw provider primary category
+	"provider_category_detailed": "string", // raw provider detailed category
+	"category":                   "string", // assigned category slug (distinct from provider raw)
+	"pending":                    "bool",
+	"provider":                   "string",
+	"account_id":                 "string",
+	"account_name":               "string",
+	"user_id":                    "string",
+	"user_name":                  "string",
+	"tags":                       "tags",
 }
 
 // stringOps are operators valid for string fields.
@@ -319,15 +319,15 @@ func EvaluateCondition(c *CompiledCondition, tctx TransactionContext) bool {
 
 func evaluateLeaf(c *CompiledCondition, tctx TransactionContext) bool {
 	switch c.Field {
-	case "name":
+	case "provider_name":
 		return evalString(c, tctx.Name)
-	case "merchant_name":
+	case "provider_merchant_name":
 		return evalString(c, tctx.MerchantName)
 	case "amount":
 		return evalNumeric(c, tctx.Amount)
-	case "category_primary":
+	case "provider_category_primary":
 		return evalString(c, tctx.CategoryPrimary)
-	case "category_detailed":
+	case "provider_category_detailed":
 		return evalString(c, tctx.CategoryDetailed)
 	case "category":
 		return evalString(c, tctx.Category)
@@ -1677,12 +1677,12 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 
 // RulePreviewMatch contains a sample transaction that matched a rule preview.
 type RulePreviewMatch struct {
-	TransactionID      string  `json:"transaction_id"`
-	Name               string  `json:"name"`
-	Amount             float64 `json:"amount"`
-	Date               string  `json:"date"`
-	CategoryPrimaryRaw string  `json:"category_primary_raw"`
-	CurrentCategorySlug string `json:"current_category_slug,omitempty"`
+	TransactionID           string  `json:"transaction_id"`
+	ProviderName            string  `json:"provider_name"`
+	Amount                  float64 `json:"amount"`
+	Date                    string  `json:"date"`
+	ProviderCategoryPrimary string  `json:"provider_category_primary"`
+	CurrentCategorySlug     string  `json:"current_category_slug,omitempty"`
 }
 
 // RulePreviewResult contains the results of a rule preview/dry-run.
@@ -1797,10 +1797,10 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 				result.MatchCount++
 				if len(result.SampleMatches) < sampleSize {
 					match := RulePreviewMatch{
-						TransactionID:      formatUUID(id),
-						Name:               tctx.Name,
-						Amount:             tctx.Amount,
-						CategoryPrimaryRaw: tctx.CategoryPrimary,
+						TransactionID:           formatUUID(id),
+						ProviderName:            tctx.Name,
+						Amount:                  tctx.Amount,
+						ProviderCategoryPrimary: tctx.CategoryPrimary,
 					}
 					if date.Valid {
 						match.Date = date.Time.Format("2006-01-02")

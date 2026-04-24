@@ -29,7 +29,7 @@ func TestCreateTransactionRule_Success(t *testing.T) {
 		Name:         "Coffee shops",
 		CategorySlug: cat.Slug,
 		Conditions: service.Condition{
-			Field: "name",
+			Field: "provider_name",
 			Op:    "contains",
 			Value: "coffee",
 		},
@@ -76,7 +76,7 @@ func TestCreateTransactionRule_DefaultPriority(t *testing.T) {
 	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Default priority rule",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 		// No priority — should default to 10.
 	})
 	if err != nil {
@@ -94,7 +94,7 @@ func TestCreateTransactionRule_WithExpiry(t *testing.T) {
 	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Temporary rule",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 		ExpiresIn:    "24h",
 		Actor:        service.Actor{Type: "agent", Name: "AI Agent"},
 	})
@@ -116,7 +116,7 @@ func TestCreateTransactionRule_InvalidExpiresIn(t *testing.T) {
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Bad expiry",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 		ExpiresIn:    "invalid",
 	})
 	if err == nil {
@@ -133,7 +133,7 @@ func TestCreateTransactionRule_InvalidCategorySlug(t *testing.T) {
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Bad category",
 		CategorySlug: "nonexistent_category",
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err == nil {
 		t.Fatal("expected error for invalid category slug")
@@ -166,7 +166,7 @@ func TestCreateTransactionRule_ANDCondition(t *testing.T) {
 		CategorySlug: cat.Slug,
 		Conditions: service.Condition{
 			And: []service.Condition{
-				{Field: "name", Op: "contains", Value: "coffee"},
+				{Field: "provider_name", Op: "contains", Value: "coffee"},
 				{Field: "amount", Op: "gte", Value: float64(5)},
 			},
 		},
@@ -188,7 +188,7 @@ func TestGetTransactionRule_Success(t *testing.T) {
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Test rule",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 		Priority:     5,
 	})
 	if err != nil {
@@ -260,7 +260,7 @@ func TestListTransactionRules_WithData(t *testing.T) {
 		_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 			Name:         "Rule " + string(rune('A'+i)),
 			CategorySlug: cat.Slug,
-			Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+			Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 		})
 		if err != nil {
 			t.Fatalf("CreateTransactionRule %d: %v", i, err)
@@ -286,7 +286,7 @@ func TestListTransactionRules_FilterByEnabled(t *testing.T) {
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Enabled rule",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -305,7 +305,7 @@ func TestListTransactionRules_FilterByEnabled(t *testing.T) {
 	_, err = svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Still enabled",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test2"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test2"},
 	})
 	if err != nil {
 		t.Fatalf("create 2: %v", err)
@@ -331,7 +331,7 @@ func TestListTransactionRules_FilterByCategory(t *testing.T) {
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Food rule",
 		CategorySlug: cat1.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "pizza"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "pizza"},
 	})
 	if err != nil {
 		t.Fatalf("create 1: %v", err)
@@ -340,7 +340,7 @@ func TestListTransactionRules_FilterByCategory(t *testing.T) {
 	_, err = svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Transport rule",
 		CategorySlug: cat2.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "uber"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "uber"},
 	})
 	if err != nil {
 		t.Fatalf("create 2: %v", err)
@@ -368,7 +368,7 @@ func TestListTransactionRules_FilterBySearch(t *testing.T) {
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Coffee shops",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "coffee"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "contains", Value: "coffee"},
 	})
 	if err != nil {
 		t.Fatalf("create 1: %v", err)
@@ -377,7 +377,7 @@ func TestListTransactionRules_FilterBySearch(t *testing.T) {
 	_, err = svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Grocery stores",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "grocery"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "contains", Value: "grocery"},
 	})
 	if err != nil {
 		t.Fatalf("create 2: %v", err)
@@ -404,7 +404,7 @@ func TestListTransactionRules_Pagination(t *testing.T) {
 		_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 			Name:         "Rule " + string(rune('A'+i)),
 			CategorySlug: cat.Slug,
-			Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+			Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 		})
 		if err != nil {
 			t.Fatalf("create %d: %v", i, err)
@@ -466,7 +466,7 @@ func TestUpdateTransactionRule_Success(t *testing.T) {
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Original name",
 		CategorySlug: cat1.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 		Priority:     5,
 	})
 	if err != nil {
@@ -502,7 +502,7 @@ func TestUpdateTransactionRule_PartialUpdate(t *testing.T) {
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Original",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 		Priority:     5,
 	})
 	if err != nil {
@@ -535,7 +535,7 @@ func TestUpdateTransactionRule_Disable(t *testing.T) {
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Rule",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -572,7 +572,7 @@ func TestUpdateTransactionRule_InvalidCategorySlug(t *testing.T) {
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Rule",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -599,7 +599,7 @@ func TestDeleteTransactionRule_Success(t *testing.T) {
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "To be deleted",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -644,7 +644,7 @@ func TestListActiveRulesForSync_FiltersExpiredAndDisabled(t *testing.T) {
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Active rule",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "active"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "active"},
 	})
 	if err != nil {
 		t.Fatalf("create active: %v", err)
@@ -654,7 +654,7 @@ func TestListActiveRulesForSync_FiltersExpiredAndDisabled(t *testing.T) {
 	created2, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Disabled rule",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "disabled"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "disabled"},
 	})
 	if err != nil {
 		t.Fatalf("create disabled: %v", err)
@@ -688,7 +688,7 @@ func TestBatchIncrementHitCounts_Success(t *testing.T) {
 	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Hit counter test",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -818,7 +818,7 @@ func TestPreviewRule_ExcludesCategoryOverride(t *testing.T) {
 
 	// Preview a rule that matches "Amazon" in name.
 	result, err := svc.PreviewRule(ctx, service.Condition{
-		Field: "name",
+		Field: "provider_name",
 		Op:    "contains",
 		Value: "Amazon",
 	}, 10)
@@ -851,7 +851,7 @@ func TestCreateTransactionRule_WithActions(t *testing.T) {
 		Actions: []service.RuleAction{
 			{Type: "set_category", CategorySlug: cat.Slug},
 		},
-		Conditions: service.Condition{Field: "name", Op: "contains", Value: "coffee"},
+		Conditions: service.Condition{Field: "provider_name", Op: "contains", Value: "coffee"},
 		Priority:   10,
 		Actor:      service.Actor{Type: "user", Name: "Test"},
 	})
@@ -882,7 +882,7 @@ func TestCreateTransactionRule_CategorySlugBackfillsActions(t *testing.T) {
 	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Legacy create",
 		CategorySlug: cat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -907,7 +907,7 @@ func TestCreateTransactionRule_ActionsOverCategorySlug(t *testing.T) {
 		Name:         "Precedence test",
 		Actions:      []service.RuleAction{{Type: "set_category", CategorySlug: cat1.Slug}},
 		CategorySlug: cat2.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -923,7 +923,7 @@ func TestCreateTransactionRule_NoActionsNoCategorySlug(t *testing.T) {
 
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:       "No actions",
-		Conditions: service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions: service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err == nil {
 		t.Fatal("expected error when neither actions nor category_slug provided")
@@ -939,7 +939,7 @@ func TestCreateTransactionRule_InvalidActionField(t *testing.T) {
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:       "Bad field",
 		Actions:    []service.RuleAction{{Type: "nonexistent", CategorySlug: "test"}},
-		Conditions: service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions: service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err == nil {
 		t.Fatal("expected error for invalid action field")
@@ -959,7 +959,7 @@ func TestCreateTransactionRule_DuplicateActionField(t *testing.T) {
 			{Type: "set_category", CategorySlug: cat.Slug},
 			{Type: "set_category", CategorySlug: cat.Slug},
 		},
-		Conditions: service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions: service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err == nil {
 		t.Fatal("expected error for duplicate set_category action")
@@ -977,7 +977,7 @@ func TestUpdateTransactionRule_ChangeActions(t *testing.T) {
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:       "Original",
 		Actions:    []service.RuleAction{{Type: "set_category", CategorySlug: cat1.Slug}},
-		Conditions: service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions: service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -1008,7 +1008,7 @@ func TestUpdateTransactionRule_CategorySlugUpdatesSynthesizedActions(t *testing.
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:       "Original",
 		Actions:    []service.RuleAction{{Type: "set_category", CategorySlug: cat1.Slug}},
-		Conditions: service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions: service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -1035,7 +1035,7 @@ func TestGetTransactionRule_IncludesActions(t *testing.T) {
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:       "Test",
 		Actions:    []service.RuleAction{{Type: "set_category", CategorySlug: cat.Slug}},
-		Conditions: service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions: service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -1061,7 +1061,7 @@ func TestListTransactionRules_IncludesActions(t *testing.T) {
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:       "List test",
 		Actions:    []service.RuleAction{{Type: "set_category", CategorySlug: cat.Slug}},
-		Conditions: service.Condition{Field: "name", Op: "eq", Value: "test"},
+		Conditions: service.Condition{Field: "provider_name", Op: "eq", Value: "test"},
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -1120,7 +1120,7 @@ func TestApplyRuleRetroactively_AddTagMaterialized(t *testing.T) {
 	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name:       "Dining Tagger",
 		Actions:    []service.RuleAction{{Type: "add_tag", TagSlug: "dining"}},
-		Conditions: service.Condition{Field: "name", Op: "contains", Value: "Restaurant"},
+		Conditions: service.Condition{Field: "provider_name", Op: "contains", Value: "Restaurant"},
 		Priority:   100,
 		Actor:      service.Actor{Type: "system", Name: "test"},
 	})
@@ -1227,7 +1227,7 @@ func TestApplyRuleRetroactively_RemoveTagMaterialized(t *testing.T) {
 	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name:       "Clear review on Starbucks",
 		Actions:    []service.RuleAction{{Type: "remove_tag", TagSlug: "needs-review"}},
-		Conditions: service.Condition{Field: "name", Op: "contains", Value: "Starbucks"},
+		Conditions: service.Condition{Field: "provider_name", Op: "contains", Value: "Starbucks"},
 		Priority:   100,
 		Actor:      service.Actor{Type: "system", Name: "test"},
 	})
@@ -1310,7 +1310,7 @@ func TestApplyRuleRetroactively_HitCountMatchesSync(t *testing.T) {
 	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name:         "Cafe Categorizer",
 		CategorySlug: targetCat.Slug,
-		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "Cafe"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "contains", Value: "Cafe"},
 		Priority:     100,
 		Actor:        service.Actor{Type: "system", Name: "test"},
 	})
@@ -1379,7 +1379,7 @@ func TestApplyRuleRetroactively_Expired_Rejected(t *testing.T) {
 	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name:         "Expired Coffee Rule",
 		CategorySlug: "food_and_drink",
-		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "Starbucks"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "contains", Value: "Starbucks"},
 		Priority:     10,
 		Actor:        service.Actor{Type: "system", Name: "test"},
 	})
@@ -1432,7 +1432,7 @@ func TestApplyRuleRetroactively_Disabled_Rejected(t *testing.T) {
 	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name:         "Disabled Coffee Rule",
 		CategorySlug: "food_and_drink",
-		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "Starbucks"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "contains", Value: "Starbucks"},
 		Priority:     10,
 		Actor:        service.Actor{Type: "system", Name: "test"},
 	})
@@ -1489,7 +1489,7 @@ func TestApplyAllRulesRetroactively_SamePriorityTie(t *testing.T) {
 	ruleA, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name:         "Rule A (first)",
 		CategorySlug: "cat_a",
-		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "Starbucks"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "contains", Value: "Starbucks"},
 		Priority:     50,
 		Actor:        service.Actor{Type: "system", Name: "test"},
 	})
@@ -1503,7 +1503,7 @@ func TestApplyAllRulesRetroactively_SamePriorityTie(t *testing.T) {
 	ruleB, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name:         "Rule B (second)",
 		CategorySlug: "cat_b",
-		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "Starbucks"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "contains", Value: "Starbucks"},
 		Priority:     50,
 		Actor:        service.Actor{Type: "system", Name: "test"},
 	})
@@ -1562,7 +1562,7 @@ func TestPreviewRule_DoesNotModify(t *testing.T) {
 	}
 
 	result, err := svc.PreviewRule(ctx,
-		service.Condition{Field: "name", Op: "contains", Value: "Starbucks"}, 10,
+		service.Condition{Field: "provider_name", Op: "contains", Value: "Starbucks"}, 10,
 	)
 	if err != nil {
 		t.Fatalf("PreviewRule: %v", err)
@@ -1610,7 +1610,7 @@ func TestPreviewRuleForDetail_ExcludesAlreadyApplied(t *testing.T) {
 	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name:         "Starbucks → coffee",
 		CategorySlug: "coffee",
-		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "Starbucks"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "contains", Value: "Starbucks"},
 		Priority:     10,
 		Actor:        service.Actor{Type: "system", Name: "test"},
 	})

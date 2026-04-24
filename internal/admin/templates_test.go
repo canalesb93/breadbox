@@ -13,13 +13,13 @@ func TestRuleFieldLabel(t *testing.T) {
 		in   string
 		want string
 	}{
-		{"name", "Name"},
-		{"merchant_name", "Merchant"},
+		{"provider_name", "Name"},
+		{"provider_merchant_name", "Merchant"},
 		{"amount", "Amount"},
 		{"pending", "Pending"},
 		{"category", "Category"},
-		{"category_primary", "Category (primary)"},
-		{"category_detailed", "Category (detail)"},
+		{"provider_category_primary", "Category (primary)"},
+		{"provider_category_detailed", "Category (detail)"},
 		{"tags", "Tag"},
 		{"account_name", "Account"},
 		{"user_name", "Family member"},
