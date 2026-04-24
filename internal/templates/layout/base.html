@@ -2107,6 +2107,20 @@
 
       function hasChordStartingWith(reg, prefix) {
         var scope = reg.currentScope;
+        // If the active page scope has a single-key binding for this exact
+        // key, the page wins — don't start a chord sequence. This lets a
+        // page rebind a key that's otherwise a global chord prefix (e.g.
+        // the rules list using `n` for "New rule" instead of `n+_`).
+        if (scope && scope !== 'global') {
+          for (var j = 0; j < reg.items.length; j++) {
+            var ps = reg.items[j];
+            if (ps.scope !== scope) continue;
+            var pk = ps.keys;
+            var pageMatch = (typeof pk === 'string' && pk === prefix) ||
+              (Array.isArray(pk) && pk.length === 1 && pk[0] === prefix);
+            if (pageMatch) return false;
+          }
+        }
         for (var i = 0; i < reg.items.length; i++) {
           var s = reg.items[i];
           if (s.scope !== 'global' && s.scope !== scope) continue;
