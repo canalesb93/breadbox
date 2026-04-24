@@ -28,7 +28,7 @@ func mustCompile(t *testing.T, c *Condition) *compiledCondition {
 }
 
 func TestEvaluateCondition_SimpleEq(t *testing.T) {
-	cc := mustCompile(t, &Condition{Field: "name", Op: "eq", Value: "Starbucks"})
+	cc := mustCompile(t, &Condition{Field: "provider_name", Op: "eq", Value: "Starbucks"})
 	tctx := TransactionContext{Name: "Starbucks"}
 	if !evaluateCondition(cc, tctx) {
 		t.Error("expected eq to match")
@@ -36,7 +36,7 @@ func TestEvaluateCondition_SimpleEq(t *testing.T) {
 }
 
 func TestEvaluateCondition_EqCaseInsensitive(t *testing.T) {
-	cc := mustCompile(t, &Condition{Field: "name", Op: "eq", Value: "STARBUCKS"})
+	cc := mustCompile(t, &Condition{Field: "provider_name", Op: "eq", Value: "STARBUCKS"})
 	tctx := TransactionContext{Name: "starbucks"}
 	if !evaluateCondition(cc, tctx) {
 		t.Error("expected case-insensitive eq to match")
@@ -44,7 +44,7 @@ func TestEvaluateCondition_EqCaseInsensitive(t *testing.T) {
 }
 
 func TestEvaluateCondition_Neq(t *testing.T) {
-	cc := mustCompile(t, &Condition{Field: "name", Op: "neq", Value: "Starbucks"})
+	cc := mustCompile(t, &Condition{Field: "provider_name", Op: "neq", Value: "Starbucks"})
 	tctx := TransactionContext{Name: "Target"}
 	if !evaluateCondition(cc, tctx) {
 		t.Error("expected neq to match for different values")
@@ -57,7 +57,7 @@ func TestEvaluateCondition_Neq(t *testing.T) {
 }
 
 func TestEvaluateCondition_Contains(t *testing.T) {
-	cc := mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "star"})
+	cc := mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "star"})
 	tctx := TransactionContext{Name: "Starbucks Coffee"}
 	if !evaluateCondition(cc, tctx) {
 		t.Error("expected contains to match (case-insensitive)")
@@ -70,7 +70,7 @@ func TestEvaluateCondition_Contains(t *testing.T) {
 }
 
 func TestEvaluateCondition_NotContains(t *testing.T) {
-	cc := mustCompile(t, &Condition{Field: "name", Op: "not_contains", Value: "star"})
+	cc := mustCompile(t, &Condition{Field: "provider_name", Op: "not_contains", Value: "star"})
 	tctx := TransactionContext{Name: "Target"}
 	if !evaluateCondition(cc, tctx) {
 		t.Error("expected not_contains to match")
@@ -83,7 +83,7 @@ func TestEvaluateCondition_NotContains(t *testing.T) {
 }
 
 func TestEvaluateCondition_Matches(t *testing.T) {
-	cc := mustCompile(t, &Condition{Field: "name", Op: "matches", Value: "^Star.*ks$"})
+	cc := mustCompile(t, &Condition{Field: "provider_name", Op: "matches", Value: "^Star.*ks$"})
 	tctx := TransactionContext{Name: "Starbucks"}
 	if !evaluateCondition(cc, tctx) {
 		t.Error("expected matches to match")
@@ -96,7 +96,7 @@ func TestEvaluateCondition_Matches(t *testing.T) {
 }
 
 func TestEvaluateCondition_MatchesInvalidRegex(t *testing.T) {
-	_, err := compileCondition(&Condition{Field: "name", Op: "matches", Value: "[invalid"})
+	_, err := compileCondition(&Condition{Field: "provider_name", Op: "matches", Value: "[invalid"})
 	if err == nil {
 		t.Error("expected error for invalid regex")
 	}
@@ -104,7 +104,7 @@ func TestEvaluateCondition_MatchesInvalidRegex(t *testing.T) {
 
 func TestEvaluateCondition_In(t *testing.T) {
 	cc := mustCompile(t, &Condition{
-		Field: "name",
+		Field: "provider_name",
 		Op:    "in",
 		Value: []interface{}{"Starbucks", "Target", "Walmart"},
 	})
@@ -122,7 +122,7 @@ func TestEvaluateCondition_In(t *testing.T) {
 func TestEvaluateCondition_And(t *testing.T) {
 	cc := mustCompile(t, &Condition{
 		And: []Condition{
-			{Field: "name", Op: "contains", Value: "coffee"},
+			{Field: "provider_name", Op: "contains", Value: "coffee"},
 			{Field: "amount", Op: "gt", Value: float64(5)},
 		},
 	})
@@ -141,8 +141,8 @@ func TestEvaluateCondition_And(t *testing.T) {
 func TestEvaluateCondition_Or(t *testing.T) {
 	cc := mustCompile(t, &Condition{
 		Or: []Condition{
-			{Field: "name", Op: "eq", Value: "Starbucks"},
-			{Field: "name", Op: "eq", Value: "Dunkin"},
+			{Field: "provider_name", Op: "eq", Value: "Starbucks"},
+			{Field: "provider_name", Op: "eq", Value: "Dunkin"},
 		},
 	})
 
@@ -159,7 +159,7 @@ func TestEvaluateCondition_Or(t *testing.T) {
 
 func TestEvaluateCondition_Not(t *testing.T) {
 	cc := mustCompile(t, &Condition{
-		Not: &Condition{Field: "name", Op: "eq", Value: "Starbucks"},
+		Not: &Condition{Field: "provider_name", Op: "eq", Value: "Starbucks"},
 	})
 
 	tctx := TransactionContext{Name: "Target"}
@@ -179,11 +179,11 @@ func TestEvaluateCondition_NestedAndInsideOr(t *testing.T) {
 		Or: []Condition{
 			{
 				And: []Condition{
-					{Field: "name", Op: "contains", Value: "coffee"},
+					{Field: "provider_name", Op: "contains", Value: "coffee"},
 					{Field: "amount", Op: "gt", Value: float64(5)},
 				},
 			},
-			{Field: "name", Op: "eq", Value: "Starbucks"},
+			{Field: "provider_name", Op: "eq", Value: "Starbucks"},
 		},
 	})
 
@@ -339,7 +339,7 @@ func TestEvaluateCondition_BoolNeq(t *testing.T) {
 }
 
 func TestEvaluateCondition_MerchantName(t *testing.T) {
-	cc := mustCompile(t, &Condition{Field: "merchant_name", Op: "contains", Value: "amazon"})
+	cc := mustCompile(t, &Condition{Field: "provider_merchant_name", Op: "contains", Value: "amazon"})
 
 	tctx := TransactionContext{MerchantName: "Amazon.com"}
 	if !evaluateCondition(cc, tctx) {
@@ -394,7 +394,7 @@ func TestEvaluateCondition_UnknownField(t *testing.T) {
 }
 
 func TestEvaluateCondition_UnknownOp(t *testing.T) {
-	cc := mustCompile(t, &Condition{Field: "name", Op: "regex_match", Value: "test"})
+	cc := mustCompile(t, &Condition{Field: "provider_name", Op: "regex_match", Value: "test"})
 
 	tctx := TransactionContext{Name: "test"}
 	if evaluateCondition(cc, tctx) {
@@ -403,7 +403,7 @@ func TestEvaluateCondition_UnknownOp(t *testing.T) {
 }
 
 func TestEvaluateCondition_EmptyFieldValue(t *testing.T) {
-	cc := mustCompile(t, &Condition{Field: "merchant_name", Op: "contains", Value: "coffee"})
+	cc := mustCompile(t, &Condition{Field: "provider_merchant_name", Op: "contains", Value: "coffee"})
 
 	// Empty merchant_name should not match "contains coffee"
 	tctx := TransactionContext{MerchantName: ""}
@@ -426,7 +426,7 @@ func TestEvaluateCondition_EmptyCondition(t *testing.T) {
 }
 
 func TestEvaluateCondition_CategoryPrimary(t *testing.T) {
-	cc := mustCompile(t, &Condition{Field: "category_primary", Op: "eq", Value: "FOOD_AND_DRINK"})
+	cc := mustCompile(t, &Condition{Field: "provider_category_primary", Op: "eq", Value: "FOOD_AND_DRINK"})
 
 	tctx := TransactionContext{CategoryPrimary: "food_and_drink"}
 	if !evaluateCondition(cc, tctx) {
@@ -435,7 +435,7 @@ func TestEvaluateCondition_CategoryPrimary(t *testing.T) {
 }
 
 func TestEvaluateCondition_CategoryDetailed(t *testing.T) {
-	cc := mustCompile(t, &Condition{Field: "category_detailed", Op: "contains", Value: "groceries"})
+	cc := mustCompile(t, &Condition{Field: "provider_category_detailed", Op: "contains", Value: "groceries"})
 
 	tctx := TransactionContext{CategoryDetailed: "FOOD_AND_DRINK_GROCERIES"}
 	if !evaluateCondition(cc, tctx) {
@@ -510,7 +510,7 @@ func TestEvaluateCondition_SingleConditionAnd(t *testing.T) {
 	// {and: [one]} should behave like one.
 	cc := mustCompile(t, &Condition{
 		And: []Condition{
-			{Field: "name", Op: "eq", Value: "Starbucks"},
+			{Field: "provider_name", Op: "eq", Value: "Starbucks"},
 		},
 	})
 
@@ -529,7 +529,7 @@ func TestEvaluateCondition_DeeplyNestedAndOfOrOfNot(t *testing.T) {
 			{
 				Or: []Condition{
 					{Not: &Condition{Field: "pending", Op: "eq", Value: true}},
-					{Field: "name", Op: "eq", Value: "X"},
+					{Field: "provider_name", Op: "eq", Value: "X"},
 				},
 			},
 			{Field: "amount", Op: "gt", Value: float64(0)},
@@ -565,7 +565,7 @@ func TestResolveWithContext_MultipleActionsOneRule(t *testing.T) {
 					{Type: "add_comment", Content: "hello"},
 				},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "coffee"}),
 			},
 		},
 		uncategorizedID: testUUID(99),
@@ -602,7 +602,7 @@ func TestResolveWithContext_AddTagDedupAcrossRules(t *testing.T) {
 				id:        testUUID(10),
 				actions:   []typedAction{{Type: "add_tag", TagSlug: "shared"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "x"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "x"}),
 			},
 			{
 				id:        testUUID(11),
@@ -632,7 +632,7 @@ func TestResolveWithContext_AddTagAccumulationAcrossRules(t *testing.T) {
 				id:        testUUID(10),
 				actions:   []typedAction{{Type: "add_tag", TagSlug: "one"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "x"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "x"}),
 			},
 			{
 				id:        testUUID(11),
@@ -661,7 +661,7 @@ func TestResolveWithContext_AddCommentAccumulation(t *testing.T) {
 				id:        testUUID(10),
 				actions:   []typedAction{{Type: "add_comment", Content: "first"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "x"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "x"}),
 			},
 			{
 				id:        testUUID(11),
@@ -716,7 +716,7 @@ func TestResolveWithContext_ChainingCategoryVisibleToLaterRule(t *testing.T) {
 				id:        testUUID(10),
 				actions:   []typedAction{{Type: "set_category", CategorySlug: "food_and_drink_coffee"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "starbucks"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "starbucks"}),
 			},
 			{
 				id:        testUUID(11),
@@ -752,7 +752,7 @@ func TestResolveWithContext_ChainingTagsVisibleToLaterRule(t *testing.T) {
 				id:        testUUID(10), // earlier
 				actions:   []typedAction{{Type: "add_tag", TagSlug: "coffee"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "starbucks"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "starbucks"}),
 			},
 			{
 				id:      testUUID(11), // later
@@ -873,7 +873,7 @@ func TestResolveWithContext_AddThenRemoveCancelsOut(t *testing.T) {
 				id:        testUUID(10),
 				actions:   []typedAction{{Type: "add_tag", TagSlug: "coffee"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "starbucks"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "starbucks"}),
 			},
 			{
 				id:        testUUID(11),
@@ -1062,13 +1062,13 @@ func TestResolveWithContext_PriorityOrdering_LastWins(t *testing.T) {
 				id:        testUUID(10), // lower priority — runs first
 				actions:   []typedAction{{Type: "set_category", CategorySlug: "catA"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "coffee"}),
 			},
 			{
 				id:        testUUID(11), // higher priority — runs last, wins
 				actions:   []typedAction{{Type: "set_category", CategorySlug: "catB"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "coffee"}),
 			},
 		},
 		uncategorizedID: testUUID(99),
@@ -1102,7 +1102,7 @@ func TestResolveWithContext_NoRuleMatchFallsBackToUncategorized(t *testing.T) {
 				id:        testUUID(10),
 				actions:   []typedAction{{Type: "set_category", CategorySlug: "catX"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "eq", Value: "Starbucks"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "eq", Value: "Starbucks"}),
 			},
 		},
 		uncategorizedID: testUUID(99),
@@ -1149,7 +1149,7 @@ func TestResolveWithContext_HitCountTracking(t *testing.T) {
 				id:        ruleID,
 				actions:   []typedAction{{Type: "set_category", CategorySlug: "catA"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "coffee"}),
 			},
 		},
 		uncategorizedID: testUUID(99),
@@ -1177,7 +1177,7 @@ func TestResolveWithContext_MergeNonConflictingActions(t *testing.T) {
 				id:        ruleAID,
 				actions:   []typedAction{{Type: "set_category", CategorySlug: "catA"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "coffee"}),
 			},
 			{
 				// Later-stage (higher priority) rule — runs last and wins
@@ -1221,7 +1221,7 @@ func TestResolveWithContext_NoShortCircuit(t *testing.T) {
 				id:        ruleAID,
 				actions:   []typedAction{{Type: "set_category", CategorySlug: "catA"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "coffee"}),
 			},
 			{
 				// Rule B matches but has no actions (future: could set another field)
@@ -1254,7 +1254,7 @@ func TestResolveWithContext_NoShortCircuit(t *testing.T) {
 
 func TestCompileCondition_InvalidRegex(t *testing.T) {
 	_, err := compileCondition(&Condition{
-		Field: "name",
+		Field: "provider_name",
 		Op:    "matches",
 		Value: "[unclosed",
 	})
@@ -1265,7 +1265,7 @@ func TestCompileCondition_InvalidRegex(t *testing.T) {
 
 func TestCompileCondition_MatchesNonString(t *testing.T) {
 	_, err := compileCondition(&Condition{
-		Field: "name",
+		Field: "provider_name",
 		Op:    "matches",
 		Value: 123,
 	})
@@ -1278,7 +1278,7 @@ func TestEvaluateCondition_AndShortCircuit(t *testing.T) {
 	// First condition fails, second should not be reached.
 	cc := mustCompile(t, &Condition{
 		And: []Condition{
-			{Field: "name", Op: "eq", Value: "nope"},
+			{Field: "provider_name", Op: "eq", Value: "nope"},
 			{Field: "amount", Op: "gt", Value: float64(0)},
 		},
 	})
@@ -1293,7 +1293,7 @@ func TestEvaluateCondition_OrShortCircuit(t *testing.T) {
 	// First condition passes, second should not need evaluation.
 	cc := mustCompile(t, &Condition{
 		Or: []Condition{
-			{Field: "name", Op: "eq", Value: "match"},
+			{Field: "provider_name", Op: "eq", Value: "match"},
 			{Field: "amount", Op: "gt", Value: float64(1000)},
 		},
 	})
@@ -1448,7 +1448,7 @@ func TestHitCountsJSON_IntegrationWithResolveWithContext(t *testing.T) {
 				id:        ruleID,
 				actions:   []typedAction{{Type: "set_category", CategorySlug: "catA"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "coffee"}),
 			},
 		},
 		uncategorizedID: testUUID(99),
@@ -1492,7 +1492,7 @@ func TestResolveWithContext_AddCommentAccumulation_Dedup(t *testing.T) {
 				name:      "rule-A",
 				actions:   []typedAction{{Type: "add_comment", Content: "same-text"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "x"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "x"}),
 			},
 			{
 				id:        testUUID(11),
@@ -1550,7 +1550,7 @@ func TestResolveWithContext_RuleWithOnlyTagAction_NoCategoryWrite(t *testing.T) 
 				name:      "tag-only",
 				actions:   []typedAction{{Type: "add_tag", TagSlug: "review"}},
 				trigger:   "always",
-				condition: mustCompile(t, &Condition{Field: "name", Op: "contains", Value: "coffee"}),
+				condition: mustCompile(t, &Condition{Field: "provider_name", Op: "contains", Value: "coffee"}),
 			},
 		},
 		uncategorizedID: testUUID(99),

@@ -668,15 +668,15 @@ func evaluateCondition(c *compiledCondition, tctx TransactionContext) bool {
 // evaluateLeaf evaluates a single field/op/value comparison.
 func evaluateLeaf(c *compiledCondition, tctx TransactionContext) bool {
 	switch c.field {
-	case "name":
+	case "provider_name":
 		return evaluateString(c, tctx.Name)
-	case "merchant_name":
+	case "provider_merchant_name":
 		return evaluateString(c, tctx.MerchantName)
 	case "amount":
 		return evaluateNumeric(c, tctx.Amount)
-	case "category_primary":
+	case "provider_category_primary":
 		return evaluateString(c, tctx.CategoryPrimary)
-	case "category_detailed":
+	case "provider_category_detailed":
 		return evaluateString(c, tctx.CategoryDetailed)
 	case "category":
 		return evaluateString(c, tctx.Category)

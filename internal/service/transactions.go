@@ -281,7 +281,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		switch *params.SortBy {
 		case "amount":
 			sortCol = "t.amount"
-		case "name":
+		case "provider_name":
 			sortCol = "t.provider_name"
 		case "date":
 			sortCol = "t.date"
@@ -412,14 +412,14 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 			AuthorizedDate:      dateStr(authorizedDate),
 			Datetime:            timestampStr(datetime),
 			AuthorizedDatetime:  timestampStr(authorizedDatetime),
-			Name:                name,
-			MerchantName:        textPtr(merchantName),
-			Category:            catInfo,
-			CategoryOverride:    categoryOverride,
-			CategoryPrimaryRaw:  textPtr(categoryPrimary),
-			CategoryDetailedRaw: textPtr(categoryDetailed),
-			CategoryConfidence:  textPtr(categoryConfidence),
-			PaymentChannel:      textPtr(paymentChannel),
+			ProviderName:               name,
+			ProviderMerchantName:       textPtr(merchantName),
+			Category:                   catInfo,
+			CategoryOverride:           categoryOverride,
+			ProviderCategoryPrimary:    textPtr(categoryPrimary),
+			ProviderCategoryDetailed:   textPtr(categoryDetailed),
+			ProviderCategoryConfidence: textPtr(categoryConfidence),
+			ProviderPaymentChannel:     textPtr(paymentChannel),
 			Pending:             pending,
 			CreatedAt:           pgconv.TimestampStr(createdAt),
 			UpdatedAt:           pgconv.TimestampStr(updatedAt),
@@ -1239,13 +1239,13 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		AuthorizedDate:      dateStr(txn.AuthorizedDate),
 		Datetime:            timestampStr(txn.Datetime),
 		AuthorizedDatetime:  timestampStr(txn.AuthorizedDatetime),
-		Name:                txn.ProviderName,
-		MerchantName:        textPtr(txn.ProviderMerchantName),
-		CategoryPrimaryRaw:  textPtr(txn.ProviderCategoryPrimary),
-		CategoryDetailedRaw: textPtr(txn.ProviderCategoryDetailed),
-		CategoryConfidence:  textPtr(txn.ProviderCategoryConfidence),
-		CategoryOverride:    txn.CategoryOverride,
-		PaymentChannel:      textPtr(txn.ProviderPaymentChannel),
+		ProviderName:               txn.ProviderName,
+		ProviderMerchantName:       textPtr(txn.ProviderMerchantName),
+		ProviderCategoryPrimary:    textPtr(txn.ProviderCategoryPrimary),
+		ProviderCategoryDetailed:   textPtr(txn.ProviderCategoryDetailed),
+		ProviderCategoryConfidence: textPtr(txn.ProviderCategoryConfidence),
+		CategoryOverride:           txn.CategoryOverride,
+		ProviderPaymentChannel:     textPtr(txn.ProviderPaymentChannel),
 		Pending:             txn.Pending,
 		CreatedAt:           pgconv.TimestampStr(txn.CreatedAt),
 		UpdatedAt:           pgconv.TimestampStr(txn.UpdatedAt),

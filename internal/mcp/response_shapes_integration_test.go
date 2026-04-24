@@ -109,7 +109,7 @@ func seedFixtures(t *testing.T) *fixtures {
 	}
 
 	actions := []byte(`[{"type":"set_category","category_slug":"food_and_drink_groceries"}]`)
-	conditions := []byte(`{"field":"name","op":"contains","value":"Whole Foods"}`)
+	conditions := []byte(`{"field":"provider_name","op":"contains","value":"Whole Foods"}`)
 	rule := testutil.MustCreateTransactionRule(t, q, "Whole Foods → Groceries", conditions, actions, "on_create")
 
 	link := testutil.MustCreateAccountLink(t, q, primaryAcct.ID, dependentAcct.ID)
@@ -470,7 +470,7 @@ func TestQueryTransactionsResponseShape(t *testing.T) {
 	}
 	txn := asObject(t, "query_transactions.transactions[0]", txns[0])
 	requireKeys(t, "query_transactions.transactions[0]", txn,
-		"id", "account_id", "amount", "date", "name", "category",
+		"id", "account_id", "amount", "date", "provider_name", "category",
 	)
 	switch v := txn["category"].(type) {
 	case map[string]any:
@@ -501,7 +501,7 @@ func TestPreviewRuleResponseShape(t *testing.T) {
 	f := seedFixtures(t)
 	res, _, err := f.svc.handlePreviewRule(f.ctx, nil, previewRuleInput{
 		Conditions: map[string]any{
-			"field": "name",
+			"field": "provider_name",
 			"op":    "contains",
 			"value": "Whole Foods",
 		},
@@ -519,9 +519,9 @@ func TestPreviewRuleResponseShape(t *testing.T) {
 	}
 	sample := asObject(t, "preview_rule.sample_matches[0]", samples[0])
 	requireKeys(t, "preview_rule.sample_matches[0]", sample,
-		"transaction_id", "name", "amount", "date", "category_primary_raw",
+		"transaction_id", "provider_name", "amount", "date", "provider_category_primary",
 	)
-	requireAbsent(t, "preview_rule.sample_matches[0]", sample, "id", "merchant_name")
+	requireAbsent(t, "preview_rule.sample_matches[0]", sample, "id", "provider_merchant_name")
 }
 
 // TestListTagsResponseShape pins required tag fields, including updated_at

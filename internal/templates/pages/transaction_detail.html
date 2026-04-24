@@ -18,12 +18,12 @@
       <i data-lucide="{{if lt .Transaction.Amount 0.0}}arrow-down-left{{else}}arrow-up-right{{end}}" class="w-6 h-6 {{if lt .Transaction.Amount 0.0}}text-success{{else}}text-error{{end}}"></i>
     </div>
     <div>
-      <h1 class="bb-page-title">{{.Transaction.Name}}</h1>
+      <h1 class="bb-page-title">{{.Transaction.ProviderName}}</h1>
       <div class="flex items-center gap-2 mt-0.5 flex-wrap">
         <span class="text-xs text-base-content/40">{{formatDate .Transaction.Date}}</span>
-        {{if .Transaction.MerchantName}}
+        {{if .Transaction.ProviderMerchantName}}
         <span class="text-xs text-base-content/30">&middot;</span>
-        <span class="text-xs text-base-content/40">{{titleCase (deref .Transaction.MerchantName)}}</span>
+        <span class="text-xs text-base-content/40">{{titleCase (deref .Transaction.ProviderMerchantName)}}</span>
         {{end}}
         {{if .Transaction.Pending}}
         <span class="text-xs text-base-content/30">&middot;</span>
@@ -91,16 +91,16 @@
         <p class="text-xs text-base-content/40 mb-1">Date</p>
         <p class="text-sm font-medium">{{formatDate .Transaction.Date}}</p>
       </div>
-      {{if .Transaction.MerchantName}}
+      {{if .Transaction.ProviderMerchantName}}
       <div>
         <p class="text-xs text-base-content/40 mb-1">Merchant</p>
-        <p class="text-sm font-medium">{{titleCase (deref .Transaction.MerchantName)}}</p>
+        <p class="text-sm font-medium">{{titleCase (deref .Transaction.ProviderMerchantName)}}</p>
       </div>
       {{end}}
-      {{if .Transaction.PaymentChannel}}
+      {{if .Transaction.ProviderPaymentChannel}}
       <div>
         <p class="text-xs text-base-content/40 mb-1">Payment Channel</p>
-        <p class="text-sm font-medium capitalize">{{deref .Transaction.PaymentChannel}}</p>
+        <p class="text-sm font-medium capitalize">{{deref .Transaction.ProviderPaymentChannel}}</p>
       </div>
       {{end}}
       <div>
@@ -115,10 +115,10 @@
           {{end}}
         </div>
       </div>
-      {{if .Transaction.CategoryPrimaryRaw}}
+      {{if .Transaction.ProviderCategoryPrimary}}
       <div>
         <p class="text-xs text-base-content/40 mb-1">Provider Category</p>
-        <p class="text-xs font-mono text-base-content/50">{{deref .Transaction.CategoryPrimaryRaw}}{{if .Transaction.CategoryDetailedRaw}} / {{deref .Transaction.CategoryDetailedRaw}}{{end}}</p>
+        <p class="text-xs font-mono text-base-content/50">{{deref .Transaction.ProviderCategoryPrimary}}{{if .Transaction.ProviderCategoryDetailed}} / {{deref .Transaction.ProviderCategoryDetailed}}{{end}}</p>
       </div>
       {{end}}
     </div>

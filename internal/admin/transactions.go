@@ -783,10 +783,10 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 		if accountName != "" && accountID != "" {
 			breadcrumbs = append(breadcrumbs, Breadcrumb{Label: accountName, Href: "/accounts/" + accountID})
 		}
-		breadcrumbs = append(breadcrumbs, Breadcrumb{Label: txn.Name})
+		breadcrumbs = append(breadcrumbs, Breadcrumb{Label: txn.ProviderName})
 
 		data := map[string]any{
-			"PageTitle":       txn.Name,
+			"PageTitle":       txn.ProviderName,
 			"CurrentPage":     "transactions",
 			"CSRFToken":       GetCSRFToken(r),
 			"Flash":           GetFlash(ctx, sm),
