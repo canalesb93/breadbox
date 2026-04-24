@@ -32,16 +32,16 @@ breadbox serve           Start HTTP server with all components
 breadbox mcp-stdio       Start MCP server on stdio (local agent dev only)
 breadbox migrate         Run pending database migrations
 breadbox seed            Insert sandbox test data (development only)
-breadbox api-keys        List or create API keys (list | create <name>)
 breadbox create-admin    Create an admin account (interactive or --username/--password flags)
 breadbox reset-password  Reset the admin account password
 breadbox version         Print build version and exit
 ```
 
 > **Note:** There is no separate CLI client binary. All subcommands above are
-> part of the server binary (`cmd/breadbox/main.go`). The `api-keys`,
-> `create-admin`, and `reset-password` commands connect directly to the database
-> — they are administrative utilities, not API clients.
+> part of the server binary (`cmd/breadbox/main.go`). The `create-admin` and
+> `reset-password` commands connect directly to the database — they are
+> administrative utilities, not API clients. API keys are managed exclusively
+> via the admin dashboard at `/admin/api-keys`.
 
 `breadbox serve` is the production entry point. It initializes every component
 — HTTP router, sync engine, cron scheduler, webhook handler — and runs them
