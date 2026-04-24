@@ -23,9 +23,6 @@ templ TxRowCompact(tx service.AdminTransactionRow) {
 		<div class="min-w-0 flex-1">
 			<div class="flex items-center gap-1.5 min-w-0">
 				<span class="text-sm font-medium truncate">{ tx.Name }</span>
-				if tx.Pending {
-					<span class="badge badge-soft badge-xs badge-warning rounded-md shrink-0">Pending</span>
-				}
 			</div>
 			<div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40 overflow-hidden">
 				if tx.UserName != "" {
@@ -53,11 +50,24 @@ templ TxRowCompact(tx service.AdminTransactionRow) {
 				}
 			</div>
 		</div>
-		<!-- Date + Amount -->
+		<!-- Date + Amount. Pending rows get a small clock icon left of the
+		     amount plus a softer glyph color; row height stays stable. -->
 		<div class="shrink-0 text-right flex flex-col items-end gap-0.5">
-			<span class={ "bb-tx-amount tabular-nums", templ.KV("bb-tx-amount--income", tx.Amount < 0) }>
-				{ formatAmount(tx.Amount) }
-			</span>
+			<div class="flex items-center justify-end gap-1">
+				if tx.Pending {
+					<i
+						data-lucide="clock"
+						class="w-3 h-3 shrink-0 text-warning/70"
+						title="Pending — not yet posted"
+					></i>
+					<span class="sr-only">(pending)</span>
+				}
+				<span class={ "bb-tx-amount tabular-nums",
+					templ.KV("bb-tx-amount--income", tx.Amount < 0),
+					templ.KV("bb-tx-amount--pending", tx.Pending) }>
+					{ formatAmount(tx.Amount) }
+				</span>
+			</div>
 			<span class="text-[0.65rem] text-base-content/40 tabular-nums">{ relativeDate(tx.Date) }</span>
 		</div>
 	</a>

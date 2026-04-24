@@ -25,13 +25,15 @@
         <span class="text-xs text-base-content/30">&middot;</span>
         <span class="text-xs text-base-content/40">{{titleCase (deref .Transaction.MerchantName)}}</span>
         {{end}}
-        {{if .Transaction.Pending}}<span class="badge badge-soft badge-warning badge-xs ml-1">Pending</span>{{end}}
+        {{if .Transaction.Pending}}<span class="inline-flex items-center gap-1 px-1.5 py-0 text-[0.65rem] border border-dashed border-warning/60 text-warning rounded-md ml-1" title="Not yet posted"><i data-lucide="clock" class="w-2.5 h-2.5"></i>pending</span>{{end}}
       </div>
     </div>
   </div>
   <div class="sm:text-right">
-    <p class="text-3xl font-semibold tabular-nums{{if lt .Transaction.Amount 0.0}} text-success{{end}}">
-      {{formatAmount .Transaction.Amount}}
+    <p class="text-3xl font-semibold tabular-nums inline-flex items-center gap-2 justify-end{{if lt .Transaction.Amount 0.0}} text-success{{end}}"
+       {{if .Transaction.Pending}}title="Pending — not yet posted"{{end}}>
+      {{if .Transaction.Pending}}<i data-lucide="clock" class="w-5 h-5 shrink-0 text-warning/70"></i>{{end}}
+      <span class="{{if .Transaction.Pending}}bb-tx-amount--pending{{end}}">{{formatAmount .Transaction.Amount}}</span>
     </p>
     {{if .Transaction.IsoCurrencyCode}}<p class="text-xs text-base-content/30 mt-0.5">{{deref .Transaction.IsoCurrencyCode}}</p>{{end}}
   </div>

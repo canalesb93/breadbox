@@ -979,6 +979,20 @@
     }
   }
 
+  /* Pending transactions: the amount is provisional, so we soften it (dimmed
+     glyph + leading clock icon via the row template) instead of tacking a
+     warning chip onto the name line where it competes with tag pills.
+     No italic / no underline — just a quieter number. */
+  .bb-tx-amount--pending {
+    opacity: 0.55;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-tx-amount--pending {
+      opacity: 0.65;
+    }
+  }
+
   /* ── Rule category badge ── */
   .bb-rule-cat-badge {
     @apply inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full;

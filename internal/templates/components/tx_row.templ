@@ -60,9 +60,6 @@ templ TxRow(tx service.AdminTransactionRow) {
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center gap-2">
 					<a href={ templ.URL("/transactions/" + tx.ID) } @click.stop class="font-medium text-sm hover:text-primary transition-colors truncate">{ tx.Name }</a>
-					if tx.Pending {
-						<span class="badge badge-soft badge-xs badge-warning rounded-md shrink-0">Pending</span>
-					}
 				</div>
 				<div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40 min-w-0">
 					if tx.UserName != "" {
@@ -153,9 +150,22 @@ templ TxRow(tx service.AdminTransactionRow) {
 			<div class="text-xs text-base-content/40 tabular-nums shrink-0 hidden sm:block w-24 text-right bb-tx-date">
 				{ formatDate(tx.Date) }
 			</div>
-			<!-- Amount -->
-			<div class="w-20 sm:w-24 text-right shrink-0 pl-2 sm:pl-3">
-				<span class={ "bb-tx-amount tabular-nums", templ.KV("bb-tx-amount--income", tx.Amount < 0) }>
+			<!-- Amount. Pending transactions render a small clock icon flush
+			     against the amount and soften the glyph (bb-tx-amount pending
+			     modifier). The flex+justify-end layout keeps the right edge
+			     locked and the row height stable across pending and settled. -->
+			<div class="w-20 sm:w-24 shrink-0 pl-2 sm:pl-3 flex items-center justify-end gap-1">
+				if tx.Pending {
+					<i
+						data-lucide="clock"
+						class="w-3 h-3 shrink-0 text-warning/70"
+						title="Pending — not yet posted"
+					></i>
+					<span class="sr-only">(pending)</span>
+				}
+				<span class={ "bb-tx-amount tabular-nums",
+					templ.KV("bb-tx-amount--income", tx.Amount < 0),
+					templ.KV("bb-tx-amount--pending", tx.Pending) }>
 					{ formatAmount(tx.Amount) }
 				</span>
 			</div>
