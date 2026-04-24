@@ -42,9 +42,16 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Caddy is gated behind the `caddy` compose profile. It is only started when
+  # a public domain is configured. Localhost-only installs do not start Caddy,
+  # so ports 80/443 are not bound on the host.
+  #
+  # Enable with: docker compose --profile caddy up -d
+  # (install.sh toggles this automatically when DOMAIN is set.)
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    profiles: ["caddy"]
     ports:
       - "80:80"
       - "443:443"
