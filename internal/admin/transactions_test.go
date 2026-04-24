@@ -104,7 +104,7 @@ func TestBuildActivityTimeline_FreeStandingCommentStillEmitted(t *testing.T) {
 		CreatedAt: "2026-04-04T12:00:00Z",
 	}}
 
-	entries := buildActivityTimeline(annotations)
+	entries := buildActivityTimeline(annotations, nil)
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
@@ -154,7 +154,7 @@ func TestBuildActivityTimeline_RuleSourcedTagAddedDeduped(t *testing.T) {
 		},
 	}
 
-	entries := buildActivityTimeline(annotations)
+	entries := buildActivityTimeline(annotations, nil)
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry (rule_applied only), got %d", len(entries))
@@ -180,7 +180,7 @@ func TestBuildActivityTimeline_UserTagAddedStillEmitted(t *testing.T) {
 		CreatedAt: "2026-04-05T09:00:00Z",
 	}}
 
-	entries := buildActivityTimeline(annotations)
+	entries := buildActivityTimeline(annotations, nil)
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 tag entry, got %d", len(entries))
@@ -190,6 +190,88 @@ func TestBuildActivityTimeline_UserTagAddedStillEmitted(t *testing.T) {
 	}
 	if entries[0].TagSlug != "vacation" {
 		t.Errorf("expected TagSlug=vacation, got %q", entries[0].TagSlug)
+	}
+}
+
+// Older rule_applied rows can have empty rule_name/rule_id (pre-ruleapply
+// helper retroactive runs). Render a generic subject instead of the raw
+// `Rule "" set category to food_and_drink_groceries` copy that #704 reported.
+func TestBuildActivityTimeline_RuleAppliedEmptyNameFallsBack(t *testing.T) {
+	annotations := []service.Annotation{{
+		ID:        "ann-rule-empty",
+		Kind:      "rule_applied",
+		ActorName: "",
+		ActorType: "system",
+		Payload: map[string]interface{}{
+			"rule_id":       "",
+			"rule_name":     "",
+			"applied_by":    "retroactive",
+			"action_field":  "category",
+			"action_value":  "food_and_drink_groceries",
+		},
+		CreatedAt: "2026-04-04T12:00:00Z",
+	}}
+
+	categoryDisplay := func(slug string) string {
+		if slug == "food_and_drink_groceries" {
+			return "Food & Drink › Groceries"
+		}
+		return slug
+	}
+
+	entries := buildActivityTimeline(annotations, categoryDisplay)
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	want := `A rule set category to Food & Drink › Groceries`
+	if entries[0].Summary != want {
+		t.Errorf("summary = %q, want %q", entries[0].Summary, want)
+	}
+	if entries[0].RuleID != "" {
+		t.Errorf("expected empty RuleID so template skips /rules/<id> link, got %q", entries[0].RuleID)
+	}
+}
+
+// Named rule rows must keep their quoted-name subject and the link-eligible
+// RuleID — the fallback is only for the empty-name edge case.
+func TestBuildActivityTimeline_RuleAppliedNamedStillQuoted(t *testing.T) {
+	ruleID := "rule-1"
+	annotations := []service.Annotation{{
+		ID:        "ann-rule-named",
+		Kind:      "rule_applied",
+		ActorName: "Walgreens auto-categorize",
+		ActorType: "system",
+		ActorID:   &ruleID,
+		RuleID:    &ruleID,
+		Payload: map[string]interface{}{
+			"rule_id":      ruleID,
+			"rule_name":    "Walgreens auto-categorize",
+			"applied_by":   "sync",
+			"action_field": "category",
+			"action_value": "shopping",
+		},
+		CreatedAt: "2026-04-04T12:00:00Z",
+	}}
+
+	categoryDisplay := func(slug string) string {
+		if slug == "shopping" {
+			return "Shopping"
+		}
+		return slug
+	}
+
+	entries := buildActivityTimeline(annotations, categoryDisplay)
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	want := `Rule "Walgreens auto-categorize" set category to Shopping`
+	if entries[0].Summary != want {
+		t.Errorf("summary = %q, want %q", entries[0].Summary, want)
+	}
+	if entries[0].RuleID != ruleID {
+		t.Errorf("expected RuleID=%q, got %q", ruleID, entries[0].RuleID)
 	}
 }
 
@@ -206,7 +288,7 @@ func TestBuildActivityTimeline_LegacyPrefixCommentSuppressed(t *testing.T) {
 		CreatedAt: "2026-03-01T00:00:00Z",
 	}}
 
-	entries := buildActivityTimeline(annotations)
+	entries := buildActivityTimeline(annotations, nil)
 
 	if len(entries) != 0 {
 		t.Fatalf("expected legacy [Review: ...] comment to be suppressed, got %d entries", len(entries))

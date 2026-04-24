@@ -690,8 +690,15 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			a.Logger.Error("list transaction annotations", "error", err)
 		}
 
+		// Load category tree early so the activity timeline can humanize
+		// category slugs (rule_applied + category_set rows).
+		categoryTree, err := svc.ListCategoryTree(ctx)
+		if err != nil {
+			a.Logger.Error("list categories for transaction detail", "error", err)
+		}
+
 		// Build unified activity timeline from annotations.
-		activity := buildActivityTimeline(annotations)
+		activity := buildActivityTimeline(annotations, categoryDisplayLookup(categoryTree))
 
 		// Load tags currently attached + the registered-tag list (for the inline
 		// add-tag suggestion datalist). Also derive HasPendingReview from the
@@ -757,11 +764,8 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			userName = *txn.UserName
 		}
 
-		// Load category tree for inline category picker.
-		categoryTree, err := svc.ListCategoryTree(ctx)
-		if err != nil {
-			a.Logger.Error("list categories for transaction detail", "error", err)
-		}
+		// categoryTree already loaded above for the activity timeline; reused
+		// for the inline category picker.
 
 		// Build breadcrumbs: Transactions > Account Name > Transaction Name
 		breadcrumbs := []Breadcrumb{
@@ -798,11 +802,40 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 	}
 }
 
+// categoryDisplayLookup returns a slug→"Parent › Child" formatter for the
+// given category tree. Falls back to the raw slug when a match can't be
+// found (e.g. the category was deleted after the annotation was written).
+func categoryDisplayLookup(tree []service.CategoryResponse) func(string) string {
+	names := make(map[string]string, 64)
+	for _, parent := range tree {
+		names[parent.Slug] = parent.DisplayName
+		for _, child := range parent.Children {
+			names[child.Slug] = parent.DisplayName + " › " + child.DisplayName
+		}
+	}
+	return func(slug string) string {
+		if slug == "" {
+			return ""
+		}
+		if name, ok := names[slug]; ok {
+			return name
+		}
+		return slug
+	}
+}
+
 // buildActivityTimeline produces a sorted activity list from annotations.
 // Review lifecycle events surface as tag_added/tag_removed on the
 // needs-review tag. Comment annotations originally authored as review notes
 // (identified by payload.review_id) render inline on their resolution event.
-func buildActivityTimeline(annotations []service.Annotation) []service.ActivityEntry {
+//
+// categoryDisplay maps a category slug to a human-readable name
+// ("Food & Drink › Groceries"). Pass a no-op (returning slug unchanged) in
+// tests that don't need humanization.
+func buildActivityTimeline(annotations []service.Annotation, categoryDisplay func(string) string) []service.ActivityEntry {
+	if categoryDisplay == nil {
+		categoryDisplay = func(s string) string { return s }
+	}
 	var entries []service.ActivityEntry
 
 	// Annotations.
@@ -835,14 +868,29 @@ func buildActivityTimeline(annotations []service.Annotation) []service.ActivityE
 			field, _ := a.Payload["action_field"].(string)
 			value, _ := a.Payload["action_value"].(string)
 			appliedBy, _ := a.Payload["applied_by"].(string)
-			summary := "Rule \"" + ruleName + "\" applied"
+			// Older rows (and any future bug) can land here with rule_name
+			// empty and rule_id empty — render a generic subject instead of
+			// `Rule "" set category to food_and_drink_groceries`. The
+			// template already skips the /rules/<id> link when RuleID is
+			// empty, so the fallback text renders as plain copy.
+			subject := `Rule "` + ruleName + `"`
+			if ruleName == "" {
+				subject = "A rule"
+			}
+			// Humanize the action value for category actions so we render
+			// "Food & Drink › Groceries" rather than the raw slug.
+			displayValue := value
+			if field == "category" {
+				displayValue = categoryDisplay(value)
+			}
+			summary := subject + " applied"
 			switch field {
 			case "category":
-				summary = "Rule \"" + ruleName + "\" set category to " + value
+				summary = subject + " set category to " + displayValue
 			case "tag":
-				summary = "Rule \"" + ruleName + "\" added tag " + value
+				summary = subject + " added tag " + value
 			case "comment":
-				summary = "Rule \"" + ruleName + "\" added a comment"
+				summary = subject + " added a comment"
 			}
 			how := "during sync"
 			if appliedBy == "retroactive" {
@@ -913,20 +961,21 @@ func buildActivityTimeline(annotations []service.Annotation) []service.ActivityE
 		case "category_set":
 			slug, _ := a.Payload["category_slug"].(string)
 			source, _ := a.Payload["source"].(string)
-			summary := "Category set to " + slug
 			if source == "rule" {
 				// Represented separately via the rule_applied annotation
 				// written alongside category_set during sync. Skip to avoid
 				// double-rendering.
 				continue
 			}
+			displaySlug := categoryDisplay(slug)
+			summary := "Category set to " + displaySlug
 			entry := service.ActivityEntry{
-				Type:      "category",
-				Timestamp: a.CreatedAt,
-				ActorName: a.ActorName,
-				ActorType: a.ActorType,
-				Summary:   summary,
-				CategoryName: slug,
+				Type:         "category",
+				Timestamp:    a.CreatedAt,
+				ActorName:    a.ActorName,
+				ActorType:    a.ActorType,
+				Summary:      summary,
+				CategoryName: displaySlug,
 			}
 			if a.ActorID != nil && *a.ActorID != "" {
 				id := *a.ActorID
