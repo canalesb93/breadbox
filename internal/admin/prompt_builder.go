@@ -50,7 +50,7 @@ func PromptBuilderHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.Han
 
 		cfg, ok := prompts.GetAgentConfig(agentType)
 		if !ok {
-			tr.Render(w, r, "404.html", BaseTemplateData(r, sm, "", "Not Found"))
+			tr.RenderNotFound(w, r)
 			return
 		}
 

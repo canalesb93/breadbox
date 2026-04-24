@@ -40,7 +40,7 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 
 		result, err := svc.ListTransactionRules(ctx, params)
 		if err != nil {
-			tr.Render(w, r, "500.html", map[string]any{"PageTitle": "Error", "CurrentPage": "rules"})
+			tr.RenderError(w, r)
 			return
 		}
 
@@ -128,10 +128,10 @@ func RuleFormPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 			rule, err := svc.GetTransactionRule(ctx, id)
 			if err != nil {
 				if errors.Is(err, service.ErrNotFound) {
-					tr.Render(w, r, "404.html", map[string]any{"PageTitle": "Not Found", "CurrentPage": "rules"})
+					tr.RenderNotFound(w, r)
 					return
 				}
-				tr.Render(w, r, "500.html", map[string]any{"PageTitle": "Error", "CurrentPage": "rules"})
+				tr.RenderError(w, r)
 				return
 			}
 			data["Rule"] = rule
@@ -156,10 +156,10 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		rule, err := svc.GetTransactionRule(ctx, id)
 		if err != nil {
 			if errors.Is(err, service.ErrNotFound) {
-				tr.Render(w, r, "404.html", map[string]any{"PageTitle": "Not Found", "CurrentPage": "rules"})
+				tr.RenderNotFound(w, r)
 				return
 			}
-			tr.Render(w, r, "500.html", map[string]any{"PageTitle": "Error", "CurrentPage": "rules"})
+			tr.RenderError(w, r)
 			return
 		}
 
