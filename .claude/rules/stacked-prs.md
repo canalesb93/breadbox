@@ -15,6 +15,18 @@ Stack if any of these apply; otherwise ship a single PR:
 
 Do not stack a single bug fix, single UI tweak, or any change whose pieces only make sense together.
 
+## Every PR must independently pass CI — non-negotiable
+
+The point of stacking is **smaller, easier-to-review units** — not splitting an atomic change into intermediate states that don't compile. At every branch tip in the stack, `go build ./...`, `go vet ./...`, and `go test ./...` must all pass.
+
+CI runs per-PR. There is no merge-queue coordination, no cross-PR CI. A PR whose tip fails `go vet` because "the next PR fixes it" will be red and blocked, and "merge the bottom first" does not rescue a broken bottom either.
+
+**Canonical trap — a schema-only PR.** Renaming a DB column without the matching Go rename in the same PR looks clean but fails `go vet` at the tip. Don't do this split. Schema + the Go references that read it belong in one PR.
+
+**If you've already split it wrong**, fold the next branch back in with `gt fold` so the combined branch is self-contained, then `gt submit --stack` to update the rest.
+
+Before pushing a stack: checkout each branch top-to-bottom, run `go build ./... && go vet ./... && go test ./...`, and only `gt submit` once every tip is green.
+
 ## Branch naming
 
 `stack/<topic>/<NN>-<slug>` — topic is kebab-case, `NN` is a two-digit position, `slug` describes this PR. Pass the name positionally: `gt create <name>`. The `-b` flag is not accepted by this version of the CLI.
