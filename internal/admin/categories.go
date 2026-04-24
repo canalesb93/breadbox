@@ -185,9 +185,9 @@ func MergeCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
 func handleCategoryError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrCategoryNotFound):
-		writeError(w, http.StatusNotFound, "NOT_FOUND", "Category not found")
+		writeError(w, http.StatusNotFound, "CATEGORY_NOT_FOUND", "Category not found")
 	case errors.Is(err, service.ErrCategoryUndeletable):
-		writeError(w, http.StatusConflict, "UNDELETABLE", "This category cannot be deleted")
+		writeError(w, http.StatusConflict, "CATEGORY_UNDELETABLE", "This category cannot be deleted")
 	case errors.Is(err, service.ErrSlugConflict):
 		writeError(w, http.StatusConflict, "SLUG_CONFLICT", "A category with this name already exists")
 	case errors.Is(err, service.ErrInvalidParameter):
