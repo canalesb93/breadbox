@@ -2165,9 +2165,11 @@
 
         var key = e.key;
 
-        // Touch device guard — page-level specs don't fire on touch.
-        // Globals (`?`, `/`, `g+_`, `n+_`) still run; the per-spec filter
-        // happens when we resolve the match below.
+        // Touch device guard — page-level specs don't fire on touch, and
+        // two-key chord prefixes (`g+_`, `n+_`) are suppressed entirely since
+        // users can't reasonably type chords on a soft keyboard. Single-key
+        // globals (`?`, `/`, Cmd+K, Esc) still run — they're non-destructive
+        // and occasionally reachable from mobile hardware keyboards.
         var isTouch = (Alpine.store('device') || {}).isTouch === true;
 
         function shouldFire(spec) {
@@ -2178,7 +2180,13 @@
         }
 
         // Chord resolution: if we have a pending prefix, match second key now.
+        // On touch the prefix shouldn't have been acquired (see below), but
+        // bail defensively if it somehow was.
         if (pendingPrefix) {
+          if (isTouch) {
+            clearPrefix();
+            return;
+          }
           var prefix = pendingPrefix;
           clearPrefix();
           var chordSpec = matchChord(reg, prefix, key);
@@ -2190,7 +2198,10 @@
         }
 
         // Start a chord sequence if any registered spec begins with this key.
-        if (hasChordStartingWith(reg, key)) {
+        // Skipped on touch so `g`/`n` don't swallow a keystroke waiting for a
+        // second key that will never come — and the chord itself is unusable
+        // on mobile anyway.
+        if (!isTouch && hasChordStartingWith(reg, key)) {
           pendingPrefix = key;
           prefixTimeout = setTimeout(function() {
             pendingPrefix = null;
