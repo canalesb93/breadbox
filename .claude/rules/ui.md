@@ -118,7 +118,7 @@ document.addEventListener('alpine:init', function () {
 
 Never add a fresh `addEventListener('keydown', ...)` for a UI shortcut — the global dispatcher in `base.html` already handles input-field short-circuiting, overlay suppression, touch-device gating, and chord state. Raw listeners bypass all of it.
 
-Visible `kbd` hints must use the `Kbd` / `KbdChord` components in `internal/templates/components/kbd.templ` (or guard with `x-show="!$store.device.isTouch"`) so they disappear on touch devices. Don't hand-roll new `<kbd>` spans in new code.
+Visible `kbd` hints must use the `Kbd` (single key), `KbdChord` (sequential "g then d"), or `KbdCombo` (blended modifier pill like `⌘K`) components in `internal/templates/components/kbd.templ` (or guard with `x-show="!$store.device.isTouch"`) so they disappear on touch devices. Don't hand-roll new `<kbd>` spans in new code. Symbol mapping (`cmd` → ⌘, `shift` → ⇧, `enter` → ↵, `up`/`down`/`left`/`right` → arrows, etc.) is handled by the shared `kbdGlyph` Go helper and its JS twin `bbKbdGlyph` — keep those in lock-step when adding new glyphs.
 
 Full reference, including the canonical global + per-page shortcut tables and architecture notes, lives in `docs/keyboard-shortcuts.md`.
 

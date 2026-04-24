@@ -1,5 +1,7 @@
 package components
 
+import "strings"
+
 // Kbd renders a single keyboard-shortcut badge.
 //
 // The badge is hidden on touch devices two ways:
@@ -12,7 +14,7 @@ package components
 // Both guards are needed: `sm:` catches the common case, `$store.device`
 // catches touch-capable desktops/tablets on a wide viewport.
 templ Kbd(key string) {
-	<kbd class="bb-kbd hidden sm:inline-flex" x-show="!$store.device.isTouch">{ key }</kbd>
+	<kbd class="bb-kbd hidden sm:inline-flex" x-show="!$store.device.isTouch">{ kbdGlyph(key) }</kbd>
 }
 
 // KbdChord renders a sequence of keys separated by a faint "then" label,
@@ -26,8 +28,71 @@ templ KbdChord(keys ...string) {
 				if i > 0 {
 					<span class="bb-shortcuts-then">then</span>
 				}
-				<kbd class="bb-kbd">{ k }</kbd>
+				<kbd class="bb-kbd">{ kbdGlyph(k) }</kbd>
 			}
 		</span>
 	}
+}
+
+// KbdCombo renders a modifier-style combo as a single blended pill.
+// Each key becomes an inner cell with a hairline divider between siblings
+// and only the OUTER corners rounded. Example: `KbdCombo("cmd","k")`
+// renders one pill with ⌘│K fused together.
+//
+// Hides on touch via the same two-layer guard as `Kbd`.
+//
+// With zero keys the component renders nothing; with one key it degrades
+// to a single inner cell — callers can pass variable-length slices without
+// a pre-check.
+templ KbdCombo(keys ...string) {
+	if len(keys) > 0 {
+		<span class="bb-kbd-combo hidden sm:inline-flex" x-show="!$store.device.isTouch">
+			for _, k := range keys {
+				<span class="bb-kbd-combo__key">{ kbdGlyph(k) }</span>
+			}
+		</span>
+	}
+}
+
+// kbdGlyph maps a key-name string to its on-screen glyph. Shared by
+// `Kbd`, `KbdChord`, and `KbdCombo` so a "cmd" token always renders the
+// same whether it appears alone, inside a chord, or fused in a combo.
+//
+// The JS counterpart in `base.html` (`bbKbdGlyph()`) must mirror this
+// map so dynamic renderers (help modal, cmdk palette) produce identical
+// HTML to the server-rendered components.
+func kbdGlyph(s string) string {
+	switch strings.ToLower(s) {
+	case "cmd", "meta":
+		return "⌘" // ⌘
+	case "shift":
+		return "⇧" // ⇧
+	case "ctrl":
+		return "⌃" // ⌃
+	case "alt", "option", "opt":
+		return "⌥" // ⌥
+	case "enter", "return":
+		return "↵" // ↵
+	case "esc":
+		return "esc"
+	case "tab":
+		return "⇥" // ⇥
+	case "space":
+		return "␣" // ␣
+	case "up":
+		return "↑" // ↑
+	case "down":
+		return "↓" // ↓
+	case "left":
+		return "←" // ←
+	case "right":
+		return "→" // →
+	}
+	// Single-letter alphanumerics render uppercase so they read like a
+	// key cap (`k` → `K`). Multi-char labels like "F2" or "?" pass
+	// through unchanged.
+	if len(s) == 1 {
+		return strings.ToUpper(s)
+	}
+	return s
 }

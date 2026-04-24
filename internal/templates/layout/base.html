@@ -77,6 +77,41 @@
   </script>
 
   <script>
+    // bbKbdGlyph(key) → display string for a keyboard-shortcut token.
+    //
+    // Mirrors the Go-side `kbdGlyph` in internal/templates/components/kbd.templ.
+    // Both must stay in lock-step so a help-modal entry, a cmdk hint, and a
+    // server-rendered Kbd/KbdCombo component all render the exact same glyph
+    // for a given registered key (e.g. 'cmd' → '⌘'). Shared by
+    // `toTokens()` (help modal) and `shortcutKeyTokens()` (palette).
+    window.bbKbdGlyph = function(key) {
+      if (key == null) return '';
+      var s = String(key);
+      switch (s.toLowerCase()) {
+        case 'cmd':
+        case 'meta':    return '⌘';         // ⌘
+        case 'shift':   return '⇧';         // ⇧
+        case 'ctrl':    return '⌃';         // ⌃
+        case 'alt':
+        case 'option':
+        case 'opt':     return '⌥';         // ⌥
+        case 'enter':
+        case 'return':  return '↵';         // ↵
+        case 'esc':     return 'esc';
+        case 'tab':     return '⇥';         // ⇥
+        case 'space':   return '␣';         // ␣
+        case 'up':      return '↑';         // ↑
+        case 'down':    return '↓';         // ↓
+        case 'left':    return '←';         // ←
+        case 'right':   return '→';         // →
+      }
+      // Single-letter alphanumerics render uppercase so they read like a
+      // key cap (`k` → `K`). Longer labels (`F2`, `?`) pass through.
+      return s.length === 1 ? s.toUpperCase() : s;
+    };
+  </script>
+
+  <script>
     // Alpine store: $store.shortcuts
     //
     // Central registry for all keyboard shortcuts. Pages declare their bindings
@@ -226,7 +261,7 @@
           <i data-lucide="search"></i>
           <span>Search...</span>
           <span class="bb-sidebar-search-hint">
-            <kbd>&#8984;</kbd><kbd>K</kbd>
+            {{renderComponent "KbdCombo" (strs "cmd" "k")}}
           </span>
         </div>
         {{template "nav" .}}
@@ -355,7 +390,7 @@
         </template>
       </div>
       <div class="bb-shortcuts-footer">
-        Press <kbd class="bb-shortcuts-kbd" style="display:inline-flex;vertical-align:middle;">?</kbd> anytime to toggle this panel
+        Press {{renderComponent "Kbd" "?"}} anytime to toggle this panel
       </div>
     </div>
   </div>
@@ -423,9 +458,9 @@
       <!-- Footer -->
       <div class="bb-catpicker-footer">
         <div class="flex items-center gap-3">
-          <span><kbd>&uarr;</kbd> <kbd>&darr;</kbd> navigate</span>
-          <span><kbd>&crarr;</kbd> select</span>
-          <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "Esc"}} close</span>
+          <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "up"}} {{renderComponent "Kbd" "down"}} navigate</span>
+          <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "enter"}} select</span>
+          <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "esc"}} close</span>
         </div>
       </div>
     </div>
@@ -510,7 +545,7 @@
             <span>Create</span>
             <code class="font-mono bg-base-100/60 px-1.5 py-0.5 rounded text-[0.7rem]" x-text="normalizedQuery"></code>
             <span x-show="!creating" class="ml-auto text-[0.65rem] text-base-content/40">
-              <kbd>&crarr;</kbd>
+              <kbd class="bb-kbd">&crarr;</kbd>
             </span>
             <span x-show="creating" class="ml-auto loading loading-spinner loading-xs"></span>
           </button>
@@ -554,12 +589,12 @@
       <div class="bb-catpicker-footer">
         <div class="flex items-center gap-3 flex-wrap">
           <template x-if="canCreate">
-            <span><kbd>&crarr;</kbd> create</span>
+            <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "enter"}} create</span>
           </template>
           <template x-if="!canCreate">
-            <span><kbd>&crarr;</kbd> apply</span>
+            <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "enter"}} apply</span>
           </template>
-          <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "Esc"}} cancel</span>
+          <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "esc"}} cancel</span>
         </div>
         <div class="flex items-center gap-2">
           <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="closePicker()">Cancel</button>
@@ -704,7 +739,17 @@
                         <template x-for="(tok, ti) in shortcutTokensFor(item)" :key="ti">
                           <span>
                             <span x-show="tok.then" class="bb-cmdk-then">then</span>
-                            <span x-show="!tok.then" class="bb-cmdk-kbd" x-text="tok.label"></span>
+                            <!-- Blended combo pill: renders ⌘│K as one tight
+                                 badge so modifier combos don't read as two
+                                 disconnected keycaps (see .bb-kbd-combo). -->
+                            <template x-if="tok.combo">
+                              <span class="bb-kbd-combo">
+                                <template x-for="(k, ki) in tok.combo" :key="ki">
+                                  <span class="bb-kbd-combo__key" x-text="k"></span>
+                                </template>
+                              </span>
+                            </template>
+                            <span x-show="!tok.then && !tok.combo" class="bb-cmdk-kbd" x-text="tok.label"></span>
                           </span>
                         </template>
                       </div>
@@ -720,10 +765,10 @@
       <!-- Footer hints -->
       <div class="bb-cmdk-footer">
         <div class="flex items-center gap-3">
-          <span><kbd>&uarr;</kbd> <kbd>&darr;</kbd> navigate</span>
-          <span><kbd>&crarr;</kbd> open</span>
-          <span><kbd>esc</kbd> close</span>
-          <span><kbd>?</kbd> shortcuts</span>
+          <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "up"}} {{renderComponent "Kbd" "down"}} navigate</span>
+          <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "enter"}} open</span>
+          <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "esc"}} close</span>
+          <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "?"}} shortcuts</span>
         </div>
       </div>
     </div>
@@ -1429,37 +1474,36 @@
       ];
 
       // Turn a spec's `keys` into flat tokens for rendering:
-      //   'cmd+k'               → [{label:'⌘'}, {label:'K'}]
+      //   'cmd+k'               → [{combo:['⌘','K']}]
       //   '?'                   → [{label:'?'}]
       //   { chord: ['g','d'] }  → [{label:'g'}, {then:true}, {label:'d'}]
-      // Mirrors shortcutsHelp.toTokens() (M0.3). Duplicated on purpose —
-      // keeping the two renderers independent means a palette tweak can't
-      // break the help modal and vice versa.
+      // Symbol mapping goes through the shared `bbKbdGlyph` helper defined
+      // at the top of this file so the palette, help modal, and server-
+      // rendered Kbd/KbdCombo components all speak the same glyph vocabulary.
       function shortcutKeyTokens(keys) {
         if (!keys) return [];
         if (keys.chord && Array.isArray(keys.chord)) {
           var out = [];
           keys.chord.forEach(function(k, i) {
             if (i > 0) out.push({ then: true });
-            out.push({ label: String(k) });
+            out.push({ label: bbKbdGlyph(k) });
           });
           return out;
         }
+        // Array form collapses into a blended pill — the keys are meant to
+        // be pressed simultaneously so visually they belong in one badge.
         if (Array.isArray(keys)) {
-          return keys.map(function(k) { return { label: String(k) }; });
+          return [{ combo: keys.map(function(k) { return bbKbdGlyph(k); }) }];
         }
         if (typeof keys === 'string') {
           if (keys.indexOf('+') !== -1 && keys.length > 1) {
-            return keys.split('+').map(function(part) {
-              var p = part.toLowerCase();
-              if (p === 'cmd' || p === 'meta') return { label: '⌘' };
-              if (p === 'ctrl')                return { label: 'Ctrl' };
-              if (p === 'shift')               return { label: '⇧' };
-              if (p === 'alt' || p === 'opt')  return { label: '⌥' };
-              return { label: part.length === 1 ? part.toUpperCase() : part };
-            });
+            return [{
+              combo: keys.split('+').map(function(part) {
+                return bbKbdGlyph(part);
+              }),
+            }];
           }
-          return [{ label: keys }];
+          return [{ label: bbKbdGlyph(keys) }];
         }
         return [];
       }
@@ -1707,8 +1751,11 @@
 
       // Turn a spec's `keys` into a flat list of render tokens:
       //   [{ label: 'g' }, { then: true }, { label: 'd' }]
+      //   [{ combo: ['⌘', 'K'] }]                         ← modifier combo
       // Supports: single string ('?', '/', 'c'), modifier combo ('cmd+k',
       // 'ctrl+shift+p'), array-of-one (['c']), and chord ({ chord: ['g','d'] }).
+      // Combos become a single `combo` token so the renderer can emit one
+      // blended pill (.bb-kbd-combo) instead of adjacent standalone kbds.
       function toTokens(keys) {
         if (!keys) return [];
         // Chord: sequential keys joined by "then".
@@ -1716,29 +1763,27 @@
           var out = [];
           keys.chord.forEach(function(k, i) {
             if (i > 0) out.push({ then: true });
-            out.push({ label: esc(k) });
+            out.push({ label: esc(bbKbdGlyph(k)) });
           });
           return out;
         }
-        // Array form — treat as simultaneous chord (no "then" separator).
+        // Array form — treat as simultaneous chord rendered as a single
+        // blended pill so the keys read as a unit rather than two
+        // standalone keycaps side-by-side.
         if (Array.isArray(keys)) {
-          return keys.map(function(k) { return { label: esc(k) }; });
+          return [{ combo: keys.map(function(k) { return esc(bbKbdGlyph(k)); }) }];
         }
         if (typeof keys === 'string') {
           // Modifier combo like 'cmd+k' or 'ctrl+shift+p'. Plus as a shortcut
           // for itself (a lone '+') is not something we register today.
           if (keys.indexOf('+') !== -1 && keys.length > 1) {
-            return keys.split('+').map(function(part) {
-              var p = part.toLowerCase();
-              if (p === 'cmd' || p === 'meta') return { label: '&#8984;' };
-              if (p === 'ctrl')                return { label: 'Ctrl' };
-              if (p === 'shift')               return { label: '&#8679;' };
-              if (p === 'alt' || p === 'opt')  return { label: '&#8997;' };
-              // Render a single-letter key uppercase so it reads like a key cap.
-              return { label: esc(part.length === 1 ? part.toUpperCase() : part) };
-            });
+            return [{
+              combo: keys.split('+').map(function(part) {
+                return esc(bbKbdGlyph(part));
+              }),
+            }];
           }
-          return [{ label: esc(keys) }];
+          return [{ label: esc(bbKbdGlyph(keys)) }];
         }
         return [];
       }
@@ -1747,6 +1792,13 @@
         if (!tokens || !tokens.length) return '';
         return tokens.map(function(t) {
           if (t.then) return '<span class="bb-shortcuts-then">then</span>';
+          if (t.combo) {
+            return '<span class="bb-kbd-combo">' +
+              t.combo.map(function(k) {
+                return '<span class="bb-kbd-combo__key">' + k + '</span>';
+              }).join('') +
+              '</span>';
+          }
           return '<kbd class="bb-shortcuts-kbd">' + t.label + '</kbd>';
         }).join('');
       }

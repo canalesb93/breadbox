@@ -2173,6 +2173,39 @@
     }
   }
 
+  /* Blended modifier pill: ⌘│K rendered as one tight badge with a hairline
+     divider between cells and only the outer corners rounded. Inherits the
+     background / border palette from .bb-kbd so light/dark mode stays in
+     sync — only the shape is different (no per-cell rounding). */
+  .bb-kbd-combo {
+    @apply inline-flex items-center h-[1.25rem] rounded overflow-hidden
+           font-mono font-medium text-[0.6rem] leading-none;
+    background: oklch(0.97 0 0);
+    color: oklch(0.4 0 0);
+    border: 1px solid oklch(0.9 0 0);
+    box-shadow: 0 1px 0 oklch(0.88 0 0);
+  }
+
+  .bb-kbd-combo__key {
+    @apply inline-flex items-center justify-center min-w-[1.25rem] px-1 h-full;
+  }
+
+  .bb-kbd-combo__key + .bb-kbd-combo__key {
+    border-left: 1px solid oklch(0.9 0 0);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-kbd-combo {
+      background: oklch(0.25 0 0);
+      color: oklch(0.7 0 0);
+      border-color: oklch(0.35 0 0);
+      box-shadow: 0 1px 0 oklch(0.15 0 0);
+    }
+    .bb-kbd-combo__key + .bb-kbd-combo__key {
+      border-left-color: oklch(0.35 0 0);
+    }
+  }
+
   /* ── Triage mode: compact review rows ── */
   .bb-triage-row {
     @apply relative;
