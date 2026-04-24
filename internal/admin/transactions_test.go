@@ -92,14 +92,17 @@ func searchString(s, sub string) bool {
 // not a distinct timeline event type.
 
 func TestBuildActivityTimeline_FreeStandingCommentStillEmitted(t *testing.T) {
+	// CommentID must be populated from the annotation's own short_id — the
+	// write path never sets payload.comment_id, so the template-gated delete
+	// button only renders when we surface ShortID here. See #703.
 	annotations := []service.Annotation{{
 		ID:        "ann-free",
+		ShortID:   "ax9Ku7Qp",
 		Kind:      "comment",
 		ActorName: "Alice",
 		ActorType: "user",
 		Payload: map[string]interface{}{
-			"content":    "split with Bob",
-			"comment_id": "comment-free",
+			"content": "split with Bob",
 		},
 		CreatedAt: "2026-04-04T12:00:00Z",
 	}}
@@ -112,8 +115,8 @@ func TestBuildActivityTimeline_FreeStandingCommentStillEmitted(t *testing.T) {
 	if entries[0].Type != "comment" {
 		t.Errorf("expected comment entry, got type=%q", entries[0].Type)
 	}
-	if entries[0].CommentID != "comment-free" {
-		t.Errorf("expected CommentID=comment-free, got %q", entries[0].CommentID)
+	if entries[0].CommentID != "ax9Ku7Qp" {
+		t.Errorf("expected CommentID to come from annotation ShortID (ax9Ku7Qp), got %q", entries[0].CommentID)
 	}
 }
 
