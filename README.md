@@ -178,8 +178,15 @@ breadbox serve           Start the server (API, MCP, dashboard, webhooks, cron)
 breadbox create-admin    Create an admin user
 breadbox mcp-stdio       Start MCP server on stdin/stdout
 breadbox migrate         Run pending database migrations
+breadbox doctor          Validate config and connectivity without booting the server
 breadbox version         Print version
 ```
+
+Run `breadbox doctor` if the server fails to start or something feels off — it
+surfaces bad `DATABASE_URL`/`ENCRYPTION_KEY`, missing migrations, unreadable
+Teller certs, a missing admin account, and unreachable `PUBLIC_URL` in a single
+pass. See [Doctor](docs/doctor.md) for the full check list and `--json` /
+`--skip-external` flags.
 
 ## Documentation
 
@@ -193,6 +200,7 @@ breadbox version         Print version
 - [Admin Dashboard](docs/admin-dashboard.md) -- dashboard pages and features
 - [Design System](docs/design-system.md) -- UI framework and component reference
 - [Backup & Restore](docs/backup.md) -- database backup strategies
+- [Doctor](docs/doctor.md) -- `breadbox doctor` pre-flight / readiness check
 
 ## Contributing
 
