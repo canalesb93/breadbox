@@ -305,26 +305,45 @@
        bulk action bar), which dispatching bb-toast from a DOMContentLoaded
        handler is too early to deliver reliably. -->
   <div class="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none"
-       x-data="{ toasts: [] }"
-       @bb-toast.window="
-         toasts.push({ message: $event.detail.message, type: $event.detail.type || 'success', id: Date.now() });
-         setTimeout(() => { toasts = toasts.filter(t2 => t2.id !== toasts[0]?.id); }, 3500)
-       ">
+       role="region"
+       aria-live="polite"
+       aria-label="Notifications"
+       x-data="{
+         toasts: [],
+         nextId: 0,
+         add(detail) {
+           const id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+             ? crypto.randomUUID()
+             : ('t-' + (++this.nextId) + '-' + Math.random().toString(36).slice(2));
+           const toast = { message: detail.message, type: detail.type || 'success', id: id };
+           this.toasts.push(toast);
+           setTimeout(() => { this.toasts = this.toasts.filter(t2 => t2.id !== id); }, 3500);
+         },
+         dismiss(id) { this.toasts = this.toasts.filter(t2 => t2.id !== id); },
+       }"
+       @bb-toast.window="add($event.detail)">
     <template x-for="t in toasts" :key="t.id">
       <div x-data="{ show: false }" x-init="$nextTick(() => { show = true; lucide.createIcons({nodes:[$el]}); setTimeout(() => show = false, 3000) })"
            x-show="show"
+           :role="t.type === 'error' ? 'alert' : 'status'"
            x-transition:enter="transition ease-out duration-200"
            x-transition:enter-start="opacity-0 translate-y-2 scale-95"
            x-transition:enter-end="opacity-100 translate-y-0 scale-100"
            x-transition:leave="transition ease-in duration-150"
            x-transition:leave-start="opacity-100 translate-y-0"
            x-transition:leave-end="opacity-0 translate-y-2"
-           class="bg-base-100 border border-base-300 rounded-xl shadow-lg px-4 py-2.5 flex items-center gap-2 pointer-events-auto">
+           class="bg-base-100 border border-base-300 rounded-xl shadow-lg px-4 py-2.5 flex items-center gap-2 pointer-events-auto max-w-[calc(100vw-2rem)]">
         <template x-if="t.type === 'success'"><i data-lucide="check" class="w-4 h-4 text-success shrink-0"></i></template>
         <template x-if="t.type === 'error'"><i data-lucide="x-circle" class="w-4 h-4 text-error shrink-0"></i></template>
         <template x-if="t.type === 'warning'"><i data-lucide="alert-triangle" class="w-4 h-4 text-warning shrink-0"></i></template>
         <template x-if="t.type === 'info'"><i data-lucide="info" class="w-4 h-4 text-info shrink-0"></i></template>
         <span class="text-sm font-medium" x-text="t.message"></span>
+        <button type="button"
+                class="ml-1 -mr-1 p-1 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-200 transition-colors shrink-0"
+                aria-label="Dismiss notification"
+                @click="dismiss(t.id)">
+          <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        </button>
       </div>
     </template>
   </div>
