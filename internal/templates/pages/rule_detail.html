@@ -368,7 +368,10 @@
       </div>
       <div class="flex items-center justify-end gap-2 mt-5">
         <button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="closeApplyModal()">Cancel</button>
-        <button type="button" class="btn btn-sm btn-warning rounded-xl" :disabled="!confirmApply || applying" @click="applyRetroactively()">
+        <button type="button"
+                class="btn btn-sm rounded-xl btn-warning disabled:bg-warning/40 disabled:text-warning disabled:border-transparent disabled:!opacity-100"
+                :disabled="!confirmApply || applying"
+                @click="applyRetroactively()">
           <span x-show="applying" class="loading loading-spinner loading-xs"></span>
           <i data-lucide="play" class="w-3.5 h-3.5" x-show="!applying"></i>
           Apply to {{commaInt .Preview.MatchCount}}
