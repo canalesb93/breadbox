@@ -892,6 +892,42 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return ""
 				}
 			},
+			// clockTime renders the local clock portion of a timestamp
+			// ("2:03 AM"). Paired with a same-day day separator on the
+			// activity timeline it disambiguates 10 events that would all
+			// otherwise read "8 days ago" (#707).
+			"clockTime": func(t interface{}) string {
+				format := func(tm time.Time) string {
+					return tm.Local().Format("3:04 PM")
+				}
+				switch v := t.(type) {
+				case time.Time:
+					return format(v)
+				case *time.Time:
+					if v == nil {
+						return ""
+					}
+					return format(*v)
+				case string:
+					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
+						return format(parsed)
+					}
+					if parsed, err := time.Parse(time.RFC3339Nano, v); err == nil {
+						return format(parsed)
+					}
+					return v
+				case *string:
+					if v == nil {
+						return ""
+					}
+					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
+						return format(parsed)
+					}
+					return *v
+				default:
+					return ""
+				}
+			},
 			"formatDateShort": func(t interface{}) string {
 				format := func(tm time.Time) string {
 					return tm.Local().Format("Jan 2, 3:04 PM")

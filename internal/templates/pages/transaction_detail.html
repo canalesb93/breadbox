@@ -249,7 +249,7 @@
           {{end}}
           {{if .Timestamp}}
           <span class="text-xs text-base-content/30" aria-hidden="true">&middot;</span>
-          <time datetime="{{.Timestamp}}" class="text-xs text-base-content/30" title="{{formatDateTime .Timestamp}}">{{relativeTime .Timestamp}}</time>
+          <time datetime="{{.Timestamp}}" class="text-xs text-base-content/30" title="{{formatDateTime .Timestamp}}">{{clockTime .Timestamp}}</time>
           {{end}}
         </div>
       </div>
@@ -328,7 +328,7 @@
           {{end}}
           {{if .Timestamp}}
           <span class="text-xs text-base-content/30" aria-hidden="true">&middot;</span>
-          <time datetime="{{.Timestamp}}" class="text-xs text-base-content/30" title="{{formatDateTime .Timestamp}}">{{relativeTime .Timestamp}}</time>
+          <time datetime="{{.Timestamp}}" class="text-xs text-base-content/30" title="{{formatDateTime .Timestamp}}">{{clockTime .Timestamp}}</time>
           {{end}}
         </div>
       </div>
