@@ -20,11 +20,18 @@ templ Categories(p CategoriesProps) {
 			<h1 class="bb-page-title">Categories</h1>
 			<p class="text-sm text-base-content/50 mt-1 hidden sm:block">Organize transactions with a two-level taxonomy</p>
 		</div>
-		<a href="/categories/new" class="btn btn-sm btn-primary rounded-xl gap-2">
+		<a href="/categories/new" data-new-category class="btn btn-sm btn-primary rounded-xl gap-2">
 			<i data-lucide="plus" class="w-4 h-4"></i>
 			Add Category
 		</a>
 	</div>
+	<!--
+		Set the shortcut-registry scope so base.html's global dispatcher routes
+		j/k/n (registered in bbCategoryNavScript) to this page's handlers, and
+		so the ? help modal surfaces them under "This page". Reset to 'global'
+		on Alpine teardown so other pages don't inherit the scope.
+	-->
+	<div x-data x-init="$store.shortcuts.setScope('categories')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	<div
 		x-data="{
 			filter: '',
@@ -66,6 +73,102 @@ templ Categories(p CategoriesProps) {
 	<script>
 		document.addEventListener('DOMContentLoaded', function() { lucide.createIcons(); });
 	</script>
+	@categoriesKeyboardScript()
+}
+
+// categoriesKeyboardScript wires j/k tree nav and n (new category) into the
+// shared $store.shortcuts registry at scope 'categories'. Enter/Space for
+// expand/collapse are already bound inline on each parent button via
+// Alpine's @keydown.enter / @keydown.space.prevent (see categoryRow) — those
+// fire on the *focused* DOM element, so we deliberately do NOT register
+// Enter/Space at page scope here. Doing so would double-fire expansion when
+// the button also has browser focus. The nav helper only applies a focus
+// *class* (.bb-tx-row--focused) and never calls .focus(), so the two
+// mechanisms stay independent: j/k moves a visual cursor, tab/click gives
+// real DOM focus which then accepts Enter/Space inline.
+templ categoriesKeyboardScript() {
+	<script>
+		// Keyboard navigation for the categories tree. Reads the DOM for visible
+		// rows (two levels: primary row + subcategory rows inside each expanded
+		// x-collapse). offsetParent !== null respects both the filter (x-show
+		// on parent/child wrappers) and the collapsed state (x-collapse toggles
+		// display) — collapsed children simply won't appear in visibleRows().
+		var bbCategoryNav = {
+			focusedIdx: -1,
+			FOCUSED_CLASS: 'bb-tx-row--focused', // reuse the tx-list focus styling
+			visibleRows: function() {
+				var all = document.querySelectorAll('[data-category-row]');
+				var out = [];
+				for (var i = 0; i < all.length; i++) {
+					if (all[i].offsetParent !== null) out.push(all[i]);
+				}
+				return out;
+			},
+			clearFocus: function() {
+				var rows = document.querySelectorAll('[data-category-row].' + this.FOCUSED_CLASS);
+				for (var i = 0; i < rows.length; i++) rows[i].classList.remove(this.FOCUSED_CLASS);
+			},
+			setFocus: function(idx) {
+				var rows = this.visibleRows();
+				if (!rows.length) { this.focusedIdx = -1; return; }
+				if (idx < 0) idx = 0;
+				if (idx >= rows.length) idx = rows.length - 1;
+				this.clearFocus();
+				rows[idx].classList.add(this.FOCUSED_CLASS);
+				this.focusedIdx = idx;
+				rows[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			},
+			next: function() {
+				var rows = this.visibleRows();
+				if (!rows.length) return;
+				this.setFocus(this.focusedIdx < 0 ? 0 : this.focusedIdx + 1);
+			},
+			prev: function() {
+				var rows = this.visibleRows();
+				if (!rows.length) return;
+				this.setFocus(this.focusedIdx < 0 ? 0 : this.focusedIdx - 1);
+			},
+		};
+
+		document.addEventListener('alpine:init', function() {
+			var reg = Alpine.store('shortcuts');
+			if (!reg) return;
+
+			reg.register({
+				id: 'categories.next',
+				keys: 'j',
+				description: 'Move down',
+				group: 'Navigation',
+				scope: 'categories',
+				action: function() { bbCategoryNav.next(); },
+			});
+
+			reg.register({
+				id: 'categories.prev',
+				keys: 'k',
+				description: 'Move up',
+				group: 'Navigation',
+				scope: 'categories',
+				action: function() { bbCategoryNav.prev(); },
+			});
+
+			reg.register({
+				id: 'categories.new',
+				keys: 'n',
+				description: 'New category',
+				group: 'Actions',
+				scope: 'categories',
+				// Shadows the global `n+_` chord while on /categories via the
+				// page-scope-wins guard in base.html's hasChordStartingWith
+				// (added in M4.2). Clicks the Add Category link so middle-click
+				// / cmd-click semantics aren't silently bypassed.
+				action: function() {
+					var btn = document.querySelector('[data-new-category]');
+					if (btn) btn.click();
+				},
+			});
+		});
+	</script>
 }
 
 // categoryRow renders one top-level category with its expandable child list.
@@ -74,6 +177,8 @@ templ categoryRow(c service.CategoryResponse) {
 		<div
 			role="button"
 			tabindex="0"
+			data-category-row
+			data-category-id={ c.ID }
 			class="group flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 hover:bg-base-200/30 transition-colors duration-150 cursor-pointer select-none"
 			@click={ fmt.Sprintf("toggle('%s')", c.ID) }
 			@keydown.enter={ fmt.Sprintf("toggle('%s')", c.ID) }
@@ -127,6 +232,8 @@ templ categoryRow(c service.CategoryResponse) {
 templ categoryChildRow(c service.CategoryResponse) {
 	<div
 		data-search={ categoryChildSearchIndex(c) }
+		data-category-row
+		data-category-id={ c.ID }
 		x-show="matches($el)"
 		class="group flex items-center gap-3 sm:gap-4 pl-10 sm:pl-14 pr-4 sm:pr-5 py-2.5 hover:bg-base-200/30 transition-colors duration-150"
 	>
