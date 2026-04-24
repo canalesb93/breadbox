@@ -244,6 +244,9 @@
         {{end}}
         <div class="flex items-center gap-1.5 mt-1 flex-wrap">
           {{if .ActorName}}<span class="text-xs text-base-content/40">{{.ActorName}}</span>{{end}}
+          {{if .Origin}}
+          <span class="text-xs text-base-content/40 italic">Applied {{.Origin}}</span>
+          {{end}}
           {{if .Timestamp}}
           <span class="text-xs text-base-content/30" aria-hidden="true">&middot;</span>
           <time datetime="{{.Timestamp}}" class="text-xs text-base-content/30" title="{{formatDateTime .Timestamp}}">{{relativeTime .Timestamp}}</time>
@@ -271,6 +274,10 @@
       </div>
       {{else if and (eq .ActorType "user") .ActorID}}
       <img src="{{avatarURL (deref .ActorID)}}" alt="{{.ActorName}} avatar" class="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5" title="{{.ActorName}}">
+      {{else if eq .Type "rule"}}
+      <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
+        <i data-lucide="zap" class="w-4 h-4 text-info" aria-hidden="true"></i>
+      </div>
       {{else}}
       <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
         <span class="text-xs font-semibold text-primary leading-none">{{firstChar .ActorName}}</span>
@@ -293,6 +300,9 @@
         {{end}}
         <div class="flex items-center gap-1.5 mt-1 flex-wrap">
           {{if .ActorName}}<span class="text-xs text-base-content/40">{{.ActorName}}</span>{{end}}
+          {{if .Origin}}
+          <span class="text-xs text-base-content/40 italic">Applied {{.Origin}}</span>
+          {{end}}
           {{if and (eq .Type "review") (eq .ReviewStatus "pending") .Detail}}
           <span class="text-xs text-base-content/30">&middot;</span>
           <span class="text-xs text-info font-medium">{{.Detail}}</span>

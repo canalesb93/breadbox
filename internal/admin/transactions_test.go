@@ -234,6 +234,14 @@ func TestBuildActivityTimeline_RuleAppliedEmptyNameFallsBack(t *testing.T) {
 	if entries[0].RuleID != "" {
 		t.Errorf("expected empty RuleID so template skips /rules/<id> link, got %q", entries[0].RuleID)
 	}
+	// Rule rows must not overload ActorName with a verb phrase.
+	if entries[0].ActorName != "" {
+		t.Errorf("rule row ActorName should be empty, got %q", entries[0].ActorName)
+	}
+	// Origin carries the retroactively/during-sync qualifier instead.
+	if entries[0].Origin != "retroactively" {
+		t.Errorf("Origin = %q, want %q", entries[0].Origin, "retroactively")
+	}
 }
 
 // Named rule rows must keep their quoted-name subject and the link-eligible
@@ -275,6 +283,12 @@ func TestBuildActivityTimeline_RuleAppliedNamedStillQuoted(t *testing.T) {
 	}
 	if entries[0].RuleID != ruleID {
 		t.Errorf("expected RuleID=%q, got %q", ruleID, entries[0].RuleID)
+	}
+	if entries[0].ActorName != "" {
+		t.Errorf("rule row ActorName should be empty, got %q", entries[0].ActorName)
+	}
+	if entries[0].Origin != "during sync" {
+		t.Errorf("Origin = %q, want %q", entries[0].Origin, "during sync")
 	}
 }
 

@@ -899,11 +899,16 @@ func buildActivityTimeline(annotations []service.Annotation, categoryDisplay fun
 			entries = append(entries, service.ActivityEntry{
 				Type:      "rule",
 				Timestamp: a.CreatedAt,
-				ActorName: how,
+				// Rules aren't actors — keep the actor slot empty so the
+				// template's actor-meta span is skipped. Origin carries the
+				// "during sync" / "retroactively" qualifier as a subordinate
+				// meta pill next to the timestamp.
+				ActorName: "",
 				ActorType: "system",
 				Summary:   summary,
 				RuleName:  ruleName,
 				RuleID:    derefOr(a.RuleID, ""),
+				Origin:    how,
 			})
 
 		case "tag_added":
