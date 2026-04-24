@@ -1,5 +1,7 @@
 package pages
 
+import "breadbox/internal/templates/components/layout"
+
 // NotFound renders the 404 page body hosted inside the base layout via
 // TemplateRenderer.RenderWithTempl. The handler passes no props.
 templ NotFound() {
@@ -37,4 +39,50 @@ templ InternalError() {
 			</a>
 		</div>
 	</div>
+}
+
+// NotFoundPublic renders the 404 page for unauthenticated visitors — no admin
+// shell, wizard-style standalone layout with a 'Back to sign in' CTA. Used
+// when someone hits an unknown path without a session (OSS visitors, stale
+// links, typos).
+templ NotFoundPublic() {
+	@layout.Wizard(layout.WizardProps{PageTitle: "Page Not Found"}) {
+		<div class="bb-error-page">
+			<p class="bb-error-code">404</p>
+			<div class="bb-error-icon bg-base-200/80">
+				<i data-lucide="compass" class="w-7 h-7 text-base-content/40"></i>
+			</div>
+			<h1 class="bb-error-title">Page not found</h1>
+			<p class="bb-error-message">The page you're looking for doesn't exist or has been moved.</p>
+			<a href="/login" class="btn btn-primary rounded-xl px-6">
+				<i data-lucide="arrow-left" class="w-4 h-4"></i>
+				Back to sign in
+			</a>
+		</div>
+	}
+}
+
+// InternalErrorPublic renders the 500 page for unauthenticated visitors — no
+// admin shell, wizard-style standalone layout. Keeps anonymous error pages
+// from leaking the admin sidebar and role labels.
+templ InternalErrorPublic() {
+	@layout.Wizard(layout.WizardProps{PageTitle: "Error"}) {
+		<div class="bb-error-page">
+			<p class="bb-error-code">500</p>
+			<div class="bb-error-icon bg-error/10">
+				<i data-lucide="alert-triangle" class="w-7 h-7 text-error/60"></i>
+			</div>
+			<h1 class="bb-error-title">Something went wrong</h1>
+			<p class="bb-error-message">An unexpected error occurred. Please try again.</p>
+			<div class="flex items-center gap-3">
+				<a href="javascript:location.reload()" class="btn btn-primary rounded-xl px-6">
+					<i data-lucide="refresh-cw" class="w-4 h-4"></i>
+					Try Again
+				</a>
+				<a href="/login" class="btn btn-ghost rounded-xl px-6">
+					Back to sign in
+				</a>
+			</div>
+		</div>
+	}
 }
