@@ -69,6 +69,7 @@ type DashboardProps struct {
 	TotalUnreadReports    int
 	MoreReportsCount      int
 	RecentTransactions    []service.AdminTransactionRow
+	TotalTransactions     int64
 	HasAttentionItems     bool
 	AttentionCount        int
 	UncategorizedCount    int64
