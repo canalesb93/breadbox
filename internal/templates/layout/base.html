@@ -283,25 +283,16 @@
         </button>
       </div>
       <div class="bb-shortcuts-body">
-        <!-- Global section: shortcuts available on every page. -->
-        <template x-for="group in sections.global" :key="'global-' + group.label">
-          <div class="bb-shortcuts-group">
-            <div class="bb-shortcuts-group-label" x-text="group.label"></div>
-            <template x-for="item in group.items" :key="item.id">
-              <div class="bb-shortcuts-row">
-                <span class="bb-shortcuts-label" x-text="item.description"></span>
-                <span class="bb-shortcuts-keys" x-html="renderTokens(item.tokens)"></span>
-              </div>
-            </template>
-          </div>
-        </template>
         <!-- Page section: shortcuts scoped to the current page (populated by
              pages that call $store.shortcuts.register with a page scope + set
-             $store.shortcuts.currentScope). Hidden when empty. -->
+             $store.shortcuts.currentScope). Rendered ABOVE Global so the
+             page-specific actions are the first thing users see. Hidden
+             entirely when the current scope is 'global' or no page-scoped
+             shortcuts are registered. -->
         <template x-if="sections.page.length > 0">
           <div>
-            <div class="bb-shortcuts-group" x-show="sections.page.length > 0" style="padding-top:0.25rem;">
-              <div class="bb-shortcuts-group-label" style="opacity:0.65;">This page</div>
+            <div class="bb-shortcuts-group" style="padding-top:0.25rem;">
+              <div class="bb-shortcuts-group-label" style="opacity:0.65;" x-text="sections.pageLabel"></div>
             </div>
             <template x-for="group in sections.page" :key="'page-' + group.label">
               <div class="bb-shortcuts-group">
@@ -312,6 +303,18 @@
                     <span class="bb-shortcuts-keys" x-html="renderTokens(item.tokens)"></span>
                   </div>
                 </template>
+              </div>
+            </template>
+          </div>
+        </template>
+        <!-- Global section: shortcuts available on every page. -->
+        <template x-for="group in sections.global" :key="'global-' + group.label">
+          <div class="bb-shortcuts-group">
+            <div class="bb-shortcuts-group-label" x-text="group.label"></div>
+            <template x-for="item in group.items" :key="item.id">
+              <div class="bb-shortcuts-row">
+                <span class="bb-shortcuts-label" x-text="item.description"></span>
+                <span class="bb-shortcuts-keys" x-html="renderTokens(item.tokens)"></span>
               </div>
             </template>
           </div>
@@ -1721,13 +1724,28 @@
         }).join('');
       }
 
+      // Derive a display label for a scope id. We don't maintain an explicit
+      // scope→name map — treat the id as kebab-case and titlecase the first
+      // word so 'transactions' → 'Transactions', 'transaction-detail' →
+      // 'Transaction detail'. Falls back to 'This page' if the scope is empty
+      // or equals 'global'.
+      function scopeLabel(scope) {
+        if (!scope || scope === 'global') return 'This page';
+        var parts = String(scope).split('-');
+        if (!parts.length) return 'This page';
+        parts[0] = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+        return parts.join(' ');
+      }
+
       // Build the section data structure consumed by the template.
       // Returns { global: [{label, items: [{id, description, tokens}]}, ...],
-      //           page:   [...] } where `page` excludes entries whose scope
-      // is 'global'.
+      //           page:   [...], pageLabel: '...' } where `page` excludes
+      // entries whose scope is 'global'. When the current scope is 'global'
+      // or there are no page-scoped shortcuts, `page` is empty and the
+      // template hides the whole page section.
       function buildSections() {
         var store = (window.Alpine && Alpine.store('shortcuts')) || null;
-        var empty = { global: [], page: [] };
+        var empty = { global: [], page: [], pageLabel: 'This page' };
         if (!store) return empty;
         var scope = store.currentScope || 'global';
         var all = store.forScope(scope) || [];
@@ -1751,12 +1769,16 @@
             .map(function(label) { return { label: label, items: buckets[label] }; });
         }
 
-        return { global: flatten(byScope.global), page: flatten(byScope.page) };
+        return {
+          global: flatten(byScope.global),
+          page: flatten(byScope.page),
+          pageLabel: scopeLabel(scope)
+        };
       }
 
       return {
         open: false,
-        sections: { global: [], page: [] },
+        sections: { global: [], page: [], pageLabel: 'This page' },
         renderTokens: renderTokens,
         openHelp: function() {
           // Rebuild on open so newly registered shortcuts (late-init pages,
