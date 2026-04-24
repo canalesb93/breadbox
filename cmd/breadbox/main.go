@@ -39,7 +39,7 @@ var version = "dev"
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: breadbox <command>")
-		fmt.Fprintln(os.Stderr, "commands: serve, migrate, seed, mcp-stdio, api-keys, create-admin, reset-password, version")
+		fmt.Fprintln(os.Stderr, "commands: serve, migrate, seed, mcp-stdio, create-admin, reset-password, version")
 		os.Exit(1)
 	}
 
@@ -61,11 +61,6 @@ func main() {
 		}
 	case "mcp-stdio":
 		if err := runMCPStdio(); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
-		}
-	case "api-keys":
-		if err := runAPIKeys(); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
@@ -402,71 +397,6 @@ func runMCPStdio() error {
 
 	logger.Info("starting MCP stdio server", "version", version)
 	return server.Run(ctx, &mcpsdk.StdioTransport{})
-}
-
-func runAPIKeys() error {
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
-
-	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		return fmt.Errorf("connect to database: %w", err)
-	}
-	defer pool.Close()
-
-	queries := db.New(pool)
-	svc := service.New(queries, pool, nil, slog.New(slog.NewTextHandler(os.Stderr, nil)))
-
-	// Sub-action: "create <name>" or default to "list"
-	action := "list"
-	if len(os.Args) > 2 {
-		action = os.Args[2]
-	}
-
-	switch action {
-	case "list":
-		keys, err := svc.ListAPIKeys(ctx)
-		if err != nil {
-			return fmt.Errorf("list api keys: %w", err)
-		}
-		if len(keys) == 0 {
-			fmt.Println("No API keys found. Create one with: breadbox api-keys create <name>")
-			return nil
-		}
-		fmt.Printf("%-38s  %-20s  %-12s  %-10s  %s\n", "ID", "NAME", "PREFIX", "STATUS", "LAST USED")
-		for _, k := range keys {
-			status := "active"
-			if k.RevokedAt != nil {
-				status = "revoked"
-			}
-			lastUsed := "never"
-			if k.LastUsedAt != nil {
-				lastUsed = *k.LastUsedAt
-			}
-			fmt.Printf("%-38s  %-20s  %-12s  %-10s  %s\n", k.ID, k.Name, k.KeyPrefix+"...", status, lastUsed)
-		}
-
-	case "create":
-		name := "cli"
-		if len(os.Args) > 3 {
-			name = os.Args[3]
-		}
-		result, err := svc.CreateAPIKey(ctx, name, "full_access")
-		if err != nil {
-			return fmt.Errorf("create api key: %w", err)
-		}
-		fmt.Printf("Created API key: %s\n", result.Name)
-		fmt.Printf("Key: %s\n", result.PlaintextKey)
-		fmt.Println("\nSave this key now — it cannot be retrieved again.")
-
-	default:
-		return fmt.Errorf("unknown api-keys action: %s (use 'list' or 'create <name>')", action)
-	}
-
-	return nil
 }
 
 func runResetPassword() error {
