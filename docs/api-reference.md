@@ -189,10 +189,31 @@ AI agents can submit summaries and flag transactions for human review.
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/reports` | Read | List all reports |
+| GET | `/reports` | Read | List all reports (bare array, bounded) |
 | GET | `/reports/unread-count` | Read | Count of unread reports |
-| POST | `/reports` | Write | Submit a report (title + markdown body) |
+| POST | `/reports` | Write | Submit a report |
 | PATCH | `/reports/{id}/read` | Write | Mark a report as read |
+
+### `POST /reports` body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | string | Yes | Short headline shown in the reports list. |
+| `body` | string | Yes | Markdown body. May include transaction references, tables, etc. |
+| `priority` | string | No | `low`, `normal` (default), `high`. Surfaced in the admin list view. |
+| `tags` | string[] | No | Free-form labels for filtering (e.g., `["monthly-summary", "groceries"]`). |
+| `author` | string | No | Override display name for the report author. Defaults to the authenticated actor (API key name). |
+
+### `POST /rules/apply-all` response
+
+```json
+{
+  "rules_applied": { "<rule_id>": 17, "<rule_id>": 4 },
+  "total_affected": 21
+}
+```
+
+`rules_applied` is an object keyed by rule ID, mapping to the number of transactions updated by that rule in this retroactive pass. Order is not guaranteed. `total_affected` is the sum across all rules.
 
 ## OAuth / MCP Auth
 
@@ -205,21 +226,27 @@ OAuth 2.1 endpoints for MCP client authentication:
 | POST | `/oauth/token` | No | Token exchange |
 | POST | `/oauth/register` | No | Dynamic client registration |
 
-## Pagination
+## List Response Envelopes
 
-List endpoints use cursor-based pagination:
+Two shapes, picked per-resource:
 
-```json
-{
-  "data": [...],
-  "pagination": {
-    "next_cursor": "eyJ...",
-    "has_more": true
-  }
-}
-```
+- **Bounded resources** (small by design: accounts, users, connections, categories, reports) return a **bare JSON array**:
 
-Pass the `next_cursor` value as the `cursor` query parameter to get the next page. Cursor pagination only works with the default date sort.
+  ```json
+  [ { "id": "...", ... }, { "id": "...", ... } ]
+  ```
+
+- **Paginated resources** (transactions, rules) return a **resource-keyed envelope** with cursor pagination:
+
+  ```json
+  { "transactions": [...], "next_cursor": "eyJ...", "has_more": true, "limit": 50 }
+  ```
+
+  ```json
+  { "rules": [...], "next_cursor": "eyJ...", "has_more": true, "total": 248 }
+  ```
+
+The list key matches the resource name. Pass the `next_cursor` value as the `cursor` query parameter to fetch the next page. Cursor pagination only works with the default date sort on transactions.
 
 ## Error Format
 

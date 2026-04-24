@@ -152,21 +152,32 @@ Cursors are not guaranteed to be stable across schema changes or server restarts
 
 ### Response Shape
 
-All paginated list responses share this envelope:
+Paginated list responses use a **resource-keyed** envelope. The list key matches the resource name:
 
 ```json
 {
-  "data": [ ... ],
+  "transactions": [ ... ],
   "next_cursor": "eyJkYXRlIjoiMjAyNS0xMi0xNSIsImlkIjoiYWJjZGVmIn0",
-  "has_more": true
+  "has_more": true,
+  "limit": 50
 }
+```
+
+Rules use `"rules"`:
+
+```json
+{ "rules": [ ... ], "next_cursor": "...", "has_more": true, "total": 248 }
 ```
 
 | Field | Type | Description |
 |---|---|---|
-| `data` | array | The page of results. May be empty. |
-| `next_cursor` | string \| null | Cursor to pass as `cursor` in the next request. `null` when there are no more results. |
+| `<resource>` | array | The page of results. May be empty. Key name matches the resource (`transactions`, `rules`, etc.). |
+| `next_cursor` | string \| null | Cursor to pass as `cursor` in the next request. `null` or omitted when there are no more results. |
 | `has_more` | boolean | `true` if additional pages exist. Equivalent to `next_cursor != null`. |
+| `limit` | integer | Echoed back so clients can detect when their requested limit was clamped (transactions only). |
+| `total` | integer | Total count across all pages (rules only). Not populated for high-cardinality resources where counting is expensive. |
+
+**Bounded resources** — `GET /api/v1/accounts`, `/users`, `/connections`, `/categories`, `/reports` — are not paginated and return a **bare JSON array** rather than an envelope. See each endpoint's example in [Section 5](#5-endpoint-specifications).
 
 ### Fetching All Pages
 
@@ -206,15 +217,19 @@ All errors return a consistent JSON body with an HTTP status code in the 4xx or 
 | HTTP Status | Code | Description |
 |---|---|---|
 | `400 Bad Request` | `INVALID_PARAMETER` | A query parameter or request body field has an invalid value (wrong type, out of range, bad format). The `message` field identifies which parameter. |
+| `400 Bad Request` | `INVALID_BODY` | The request body is not valid JSON. |
 | `400 Bad Request` | `INVALID_CURSOR` | The provided `cursor` value is malformed or no longer valid. |
+| `400 Bad Request` | `VALIDATION_ERROR` | A required field is missing, empty, or fails semantic validation (e.g., unknown category slug, missing rule name). The `message` field describes the issue. |
 | `401 Unauthorized` | `MISSING_API_KEY` | `X-API-Key` header was not provided. |
 | `401 Unauthorized` | `INVALID_API_KEY` | The provided key is malformed or does not match any active key. |
 | `401 Unauthorized` | `REVOKED_API_KEY` | The key exists but has been revoked. |
+| `403 Forbidden` | `INSUFFICIENT_SCOPE` | Read-only API key attempted a write endpoint. |
 | `404 Not Found` | `NOT_FOUND` | The requested resource does not exist. |
 | `409 Conflict` | `SYNC_IN_PROGRESS` | A sync is already running for the requested connection. |
-| `422 Unprocessable Entity` | `VALIDATION_ERROR` | The request body failed validation. The `message` field describes the issue. |
 | `500 Internal Server Error` | `INTERNAL_ERROR` | An unexpected server-side error. Check server logs. |
 | `503 Service Unavailable` | `DATABASE_UNAVAILABLE` | The database connection is not healthy. |
+
+> **Note:** Validation failures on the public `/api/v1/*` API return `400`, not `422`. Admin form submissions under `/admin/api/*` return `422` for form-validation failures (classic browser-form convention) — see [Section 8](#8-admin-api).
 
 ### Example Error Response
 
@@ -307,48 +322,46 @@ This endpoint returns **all accounts** without pagination — the total number o
 
 **Response — 200 OK**
 
-```json
-{
-  "data": [
-    {
-      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-      "connection_id": "c9d8e7f6-a5b4-3210-fedc-ba0987654321",
-      "user_id": "u1a2b3c4-d5e6-f789-0abc-def123456789",
-      "name": "Platinum Checking",
-      "official_name": "Chase Total Checking®",
-      "type": "depository",
-      "subtype": "checking",
-      "mask": "4821",
-      "iso_currency_code": "USD",
-      "balance_current": 3241.87,
-      "balance_available": 3191.87,
-      "balance_limit": null,
-      "institution_name": "Chase",
-      "created_at": "2025-11-01T09:00:00Z",
-      "updated_at": "2026-02-28T14:30:00Z"
-    },
-    {
-      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-      "connection_id": "c9d8e7f6-a5b4-3210-fedc-ba0987654321",
-      "user_id": "u1a2b3c4-d5e6-f789-0abc-def123456789",
-      "name": "Sapphire Reserve",
-      "official_name": "Chase Sapphire Reserve®",
-      "type": "credit",
-      "subtype": "credit card",
-      "mask": "7743",
-      "iso_currency_code": "USD",
-      "balance_current": 1842.50,
-      "balance_available": 18157.50,
-      "balance_limit": 20000.00,
-      "institution_name": "Chase",
-      "created_at": "2025-11-01T09:00:00Z",
-      "updated_at": "2026-02-28T14:30:00Z"
-    }
-  ]
-}
-```
+Returns a bare JSON array — this endpoint does not paginate.
 
-The response is not wrapped in a pagination envelope because this endpoint does not paginate.
+```json
+[
+  {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "connection_id": "c9d8e7f6-a5b4-3210-fedc-ba0987654321",
+    "user_id": "u1a2b3c4-d5e6-f789-0abc-def123456789",
+    "name": "Platinum Checking",
+    "official_name": "Chase Total Checking®",
+    "type": "depository",
+    "subtype": "checking",
+    "mask": "4821",
+    "iso_currency_code": "USD",
+    "balance_current": 3241.87,
+    "balance_available": 3191.87,
+    "balance_limit": null,
+    "institution_name": "Chase",
+    "created_at": "2025-11-01T09:00:00Z",
+    "updated_at": "2026-02-28T14:30:00Z"
+  },
+  {
+    "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "connection_id": "c9d8e7f6-a5b4-3210-fedc-ba0987654321",
+    "user_id": "u1a2b3c4-d5e6-f789-0abc-def123456789",
+    "name": "Sapphire Reserve",
+    "official_name": "Chase Sapphire Reserve®",
+    "type": "credit",
+    "subtype": "credit card",
+    "mask": "7743",
+    "iso_currency_code": "USD",
+    "balance_current": 1842.50,
+    "balance_available": 18157.50,
+    "balance_limit": 20000.00,
+    "institution_name": "Chase",
+    "created_at": "2025-11-01T09:00:00Z",
+    "updated_at": "2026-02-28T14:30:00Z"
+  }
+]
+```
 
 **Error Cases**
 
@@ -449,7 +462,7 @@ All filters are combined with `AND` logic. See [Section 6](#6-filtering-and-sear
 
 ```json
 {
-  "data": [
+  "transactions": [
     {
       "id": "t1a2b3c4-d5e6-f789-0abc-def123456789",
       "account_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
@@ -515,7 +528,8 @@ All filters are combined with `AND` logic. See [Section 6](#6-filtering-and-sear
     }
   ],
   "next_cursor": "eyJkYXRlIjoiMjAyNi0wMi0yNSIsImlkIjoidDNjNGQ1ZTYtZjdhOC05MDFiLWNkZWYtMTIzNDU2Nzg5MDEyIn0",
-  "has_more": true
+  "has_more": true,
+  "limit": 50
 }
 ```
 
@@ -661,28 +675,26 @@ None.
 
 **Response — 200 OK**
 
-```json
-{
-  "data": [
-    {
-      "id": "u1a2b3c4-d5e6-f789-0abc-def123456789",
-      "name": "Alex Canales",
-      "email": "alex@example.com",
-      "created_at": "2025-11-01T09:00:00Z",
-      "updated_at": "2025-11-01T09:00:00Z"
-    },
-    {
-      "id": "u2b3c4d5-e6f7-890a-bcde-f12345678901",
-      "name": "Jordan Canales",
-      "email": null,
-      "created_at": "2025-11-15T12:00:00Z",
-      "updated_at": "2025-11-15T12:00:00Z"
-    }
-  ]
-}
-```
+Returns a bare JSON array — this endpoint does not paginate.
 
-The response is not wrapped in a pagination envelope.
+```json
+[
+  {
+    "id": "u1a2b3c4-d5e6-f789-0abc-def123456789",
+    "name": "Alex Canales",
+    "email": "alex@example.com",
+    "created_at": "2025-11-01T09:00:00Z",
+    "updated_at": "2025-11-01T09:00:00Z"
+  },
+  {
+    "id": "u2b3c4d5-e6f7-890a-bcde-f12345678901",
+    "name": "Jordan Canales",
+    "email": null,
+    "created_at": "2025-11-15T12:00:00Z",
+    "updated_at": "2025-11-15T12:00:00Z"
+  }
+]
+```
 
 **Error Cases**
 
@@ -709,41 +721,41 @@ Returns a list of all bank connections (Plaid Items), including their current st
 
 **Response — 200 OK**
 
+Returns a bare JSON array — this endpoint does not paginate.
+
 ```json
-{
-  "data": [
-    {
-      "id": "c9d8e7f6-a5b4-3210-fedc-ba0987654321",
-      "institution_id": "ins_3",
-      "institution_name": "Chase",
-      "provider": "plaid",
-      "status": "active",
-      "error_code": null,
-      "error_message": null,
-      "last_synced_at": "2026-02-28T14:30:00Z",
-      "last_attempted_sync_at": "2026-02-28T14:30:00Z",
-      "user_id": "u1a2b3c4-d5e6-f789-0abc-def123456789",
-      "user_name": "Alex Canales",
-      "created_at": "2025-11-01T09:00:00Z",
-      "updated_at": "2026-02-28T14:30:00Z"
-    },
-    {
-      "id": "d8e9f0a1-b2c3-4567-efab-cd9012345678",
-      "institution_id": "ins_11",
-      "institution_name": "Bank of America",
-      "provider": "plaid",
-      "status": "error",
-      "error_code": "ITEM_LOGIN_REQUIRED",
-      "error_message": "the login details of this item have changed",
-      "last_synced_at": "2026-01-15T08:00:00Z",
-      "last_attempted_sync_at": "2026-02-28T14:31:00Z",
-      "user_id": "u2b3c4d5-e6f7-890a-bcde-f12345678901",
-      "user_name": "Jordan Canales",
-      "created_at": "2025-12-01T11:00:00Z",
-      "updated_at": "2026-02-28T14:31:00Z"
-    }
-  ]
-}
+[
+  {
+    "id": "c9d8e7f6-a5b4-3210-fedc-ba0987654321",
+    "institution_id": "ins_3",
+    "institution_name": "Chase",
+    "provider": "plaid",
+    "status": "active",
+    "error_code": null,
+    "error_message": null,
+    "last_synced_at": "2026-02-28T14:30:00Z",
+    "last_attempted_sync_at": "2026-02-28T14:30:00Z",
+    "user_id": "u1a2b3c4-d5e6-f789-0abc-def123456789",
+    "user_name": "Alex Canales",
+    "created_at": "2025-11-01T09:00:00Z",
+    "updated_at": "2026-02-28T14:30:00Z"
+  },
+  {
+    "id": "d8e9f0a1-b2c3-4567-efab-cd9012345678",
+    "institution_id": "ins_11",
+    "institution_name": "Bank of America",
+    "provider": "plaid",
+    "status": "error",
+    "error_code": "ITEM_LOGIN_REQUIRED",
+    "error_message": "the login details of this item have changed",
+    "last_synced_at": "2026-01-15T08:00:00Z",
+    "last_attempted_sync_at": "2026-02-28T14:31:00Z",
+    "user_id": "u2b3c4d5-e6f7-890a-bcde-f12345678901",
+    "user_name": "Jordan Canales",
+    "created_at": "2025-12-01T11:00:00Z",
+    "updated_at": "2026-02-28T14:31:00Z"
+  }
+]
 ```
 
 **Connection Status Values**
@@ -924,23 +936,23 @@ No parameters.
 
 **Response — 200 OK**
 
+Returns a bare JSON array — this endpoint does not paginate.
+
 ```json
-{
-  "data": [
-    {
-      "primary": "FOOD_AND_DRINK",
-      "detailed": "FOOD_AND_DRINK_GROCERIES"
-    },
-    {
-      "primary": "FOOD_AND_DRINK",
-      "detailed": "FOOD_AND_DRINK_RESTAURANTS"
-    },
-    {
-      "primary": "TRANSPORTATION",
-      "detailed": "TRANSPORTATION_GAS"
-    }
-  ]
-}
+[
+  {
+    "primary": "FOOD_AND_DRINK",
+    "detailed": "FOOD_AND_DRINK_GROCERIES"
+  },
+  {
+    "primary": "FOOD_AND_DRINK",
+    "detailed": "FOOD_AND_DRINK_RESTAURANTS"
+  },
+  {
+    "primary": "TRANSPORTATION",
+    "detailed": "TRANSPORTATION_GAS"
+  }
+]
 ```
 
 | Field | Type | Description |
