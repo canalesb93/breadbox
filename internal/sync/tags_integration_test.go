@@ -66,7 +66,7 @@ func TestSync_AddTagAction_PersistsTag(t *testing.T) {
 	err := pool.QueryRow(ctx, `
 		SELECT COUNT(*) FROM transaction_tags tt
 		JOIN transactions t ON tt.transaction_id = t.id
-		WHERE t.external_transaction_id = 'txn_tagged' AND tt.tag_id = $1`, tag.ID).Scan(&count)
+		WHERE t.provider_transaction_id = 'txn_tagged' AND tt.tag_id = $1`, tag.ID).Scan(&count)
 	if err != nil {
 		t.Fatalf("count transaction_tags: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestSync_AddTagAction_PersistsTag(t *testing.T) {
 	err = pool.QueryRow(ctx, `
 		SELECT COUNT(*) FROM annotations a
 		JOIN transactions t ON a.transaction_id = t.id
-		WHERE t.external_transaction_id = 'txn_tagged'
+		WHERE t.provider_transaction_id = 'txn_tagged'
 		  AND a.kind = 'tag_added'
 		  AND a.tag_id = $1
 		  AND a.rule_id IS NOT NULL`, tag.ID).Scan(&annCount)
@@ -95,7 +95,7 @@ func TestSync_AddTagAction_PersistsTag(t *testing.T) {
 	err = pool.QueryRow(ctx, `
 		SELECT added_by_type FROM transaction_tags tt
 		JOIN transactions t ON tt.transaction_id = t.id
-		WHERE t.external_transaction_id = 'txn_tagged' AND tt.tag_id = $1`, tag.ID).Scan(&addedByType)
+		WHERE t.provider_transaction_id = 'txn_tagged' AND tt.tag_id = $1`, tag.ID).Scan(&addedByType)
 	if err != nil {
 		t.Fatalf("query added_by_type: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestSync_RemoveTagAction_DeletesTagAndAnnotates(t *testing.T) {
 	_, err := pool.Exec(ctx, `
 		INSERT INTO transaction_tags (transaction_id, tag_id, added_by_type, added_by_name)
 		SELECT t.id, $1, 'user', 'Alice'
-		FROM transactions t WHERE t.external_transaction_id = 'txn_sbx'`, tag.ID)
+		FROM transactions t WHERE t.provider_transaction_id = 'txn_sbx'`, tag.ID)
 	if err != nil {
 		t.Fatalf("attach needs-review: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestSync_RemoveTagAction_DeletesTagAndAnnotates(t *testing.T) {
 	err = pool.QueryRow(ctx, `
 		SELECT COUNT(*) FROM transaction_tags tt
 		JOIN transactions t ON tt.transaction_id = t.id
-		WHERE t.external_transaction_id = 'txn_sbx' AND tt.tag_id = $1`, tag.ID).Scan(&ttCount)
+		WHERE t.provider_transaction_id = 'txn_sbx' AND tt.tag_id = $1`, tag.ID).Scan(&ttCount)
 	if err != nil {
 		t.Fatalf("count transaction_tags: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestSync_RemoveTagAction_DeletesTagAndAnnotates(t *testing.T) {
 	err = pool.QueryRow(ctx, `
 		SELECT COUNT(*) FROM annotations a
 		JOIN transactions t ON a.transaction_id = t.id
-		WHERE t.external_transaction_id = 'txn_sbx'
+		WHERE t.provider_transaction_id = 'txn_sbx'
 		  AND a.kind = 'tag_removed'
 		  AND a.tag_id = $1
 		  AND a.rule_id IS NOT NULL`, tag.ID).Scan(&annCount)
@@ -276,7 +276,7 @@ func TestSync_SeededRule_TagsAllNewTransactions(t *testing.T) {
 		JOIN transaction_tags tt ON tt.transaction_id = t.id
 		JOIN tags tag ON tag.id = tt.tag_id
 		WHERE tag.slug = 'needs-review'
-		  AND t.external_transaction_id IN ('txn_seeded_1', 'txn_seeded_2')`).Scan(&taggedCount)
+		  AND t.provider_transaction_id IN ('txn_seeded_1', 'txn_seeded_2')`).Scan(&taggedCount)
 	if err != nil {
 		t.Fatalf("count tagged transactions: %v", err)
 	}
