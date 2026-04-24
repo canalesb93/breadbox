@@ -78,8 +78,8 @@ templ dashUpdateBanner(p DashboardProps) {
 }
 
 templ dashAgentReportsCard(p DashboardProps) {
-	<div class="bb-card" x-data="{ ...agentReports() }">
-		<div class="px-5 py-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-base-200/60">
+	<div class="bb-card flex flex-col h-full" x-data="{ ...agentReports() }">
+		<div class="px-5 py-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-base-200/60 shrink-0">
 			<div class="flex items-center gap-2 min-w-0">
 				<i data-lucide="bot" class="w-4 h-4 text-primary/70 shrink-0"></i>
 				<h2 class="text-sm font-semibold text-base-content/80">Agent Reports</h2>
@@ -98,7 +98,7 @@ templ dashAgentReportsCard(p DashboardProps) {
 			</div>
 		</div>
 		if len(p.AgentReports) > 0 {
-			<div class="px-4 sm:px-5 py-4 space-y-4">
+			<div class="px-4 sm:px-5 py-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
 				for _, r := range p.AgentReports {
 					@dashReportItem(r)
 				}
@@ -109,7 +109,7 @@ templ dashAgentReportsCard(p DashboardProps) {
 				}
 			</div>
 		} else {
-			<div class="px-5 py-8 text-center">
+			<div class="px-5 py-8 text-center flex-1 flex flex-col items-center justify-center">
 				<i data-lucide="bot" class="w-8 h-8 mx-auto mb-2 text-base-content/15"></i>
 				<p class="text-sm text-base-content/40 mb-1">No unread reports</p>
 				<p class="text-xs text-base-content/30">Agent reports appear here when AI agents submit findings about your finances.</p>
@@ -152,19 +152,19 @@ templ dashReportItem(r DashboardReport) {
 }
 
 templ dashRecentTransactionsCard(p DashboardProps) {
-	<div class="bb-card">
-		<div class="px-5 py-4 flex items-center justify-between border-b border-base-200/60">
+	<div class="bb-card flex flex-col h-full">
+		<div class="px-5 py-4 flex items-center justify-between border-b border-base-200/60 shrink-0">
 			<h2 class="text-sm font-semibold text-base-content/80">Recent Transactions</h2>
 			<a href="/transactions" class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">View all</a>
 		</div>
 		if len(p.RecentTransactions) > 0 {
-			<div class="px-3 sm:px-4 py-2">
+			<div class="px-3 sm:px-4 py-2 flex-1 min-h-0 overflow-y-auto">
 				for _, tx := range p.RecentTransactions {
 					@components.TxRowCompact(tx)
 				}
 			</div>
 		} else {
-			<div class="flex items-center justify-center py-8 text-base-content/40">
+			<div class="flex-1 flex items-center justify-center py-8 text-base-content/40">
 				<div class="text-center">
 					<i data-lucide="receipt" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
 					<p class="text-sm">No transactions yet</p>
