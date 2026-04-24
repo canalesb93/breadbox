@@ -207,9 +207,7 @@
   <div class="px-4 sm:px-5 pt-5 pb-3 flex items-center gap-2">
     <i data-lucide="activity" class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>
     <h2 id="activity-heading" class="text-sm font-semibold text-base-content/50">Activity</h2>
-    {{if .Activity}}
-    <span class="text-xs text-base-content/30">{{len .Activity}} events</span>
-    {{end}}
+    <span class="text-xs text-base-content/30">{{if .Activity}}{{len .Activity}}{{else}}0{{end}} events</span>
   </div>
 
   <!-- Add Note -->
@@ -316,6 +314,12 @@
     {{end}}
     {{end}}
     {{end}}
+  </div>
+  {{else}}
+  <div class="px-4 sm:px-5 border-t border-base-200 py-8 text-center">
+    <i data-lucide="clock" class="w-6 h-6 text-base-content/20 mx-auto" aria-hidden="true"></i>
+    <p class="text-sm text-base-content/40 mt-2">No activity yet.</p>
+    <p class="text-xs text-base-content/30 mt-1">Comments, tag changes, and rule hits will appear here.</p>
   </div>
   {{end}}
 </section>
