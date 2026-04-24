@@ -23,7 +23,7 @@ func TestUpdateTransactions_CompoundOp(t *testing.T) {
 	txn := testutil.MustCreateTransaction(t, queries, acctID, "extu1", "Costco", 8732, "2026-04-01")
 
 	// Seed required category + needs-review tag.
-	mustCreateCategory(t, queries, "food_and_drink_groceries", "Groceries")
+	testutil.MustCreateCategory(t, queries, "food_and_drink_groceries", "Groceries")
 	testutil.MustCreateTag(t, queries, "needs-review", "Needs Review")
 
 	// Pre-attach needs-review to mimic the seeded auto-rule.
@@ -109,7 +109,7 @@ func TestUpdateTransactions_ContinueMode_PartialFailure(t *testing.T) {
 	acctID := seedTxnFixture(t, queries)
 	tx1 := testutil.MustCreateTransaction(t, queries, acctID, "tx_a", "Coffee", 500, "2026-04-01")
 
-	mustCreateCategory(t, queries, "food_and_drink_coffee", "Coffee")
+	testutil.MustCreateCategory(t, queries, "food_and_drink_coffee", "Coffee")
 
 	results, err := svc.UpdateTransactions(ctx, service.UpdateTransactionsParams{
 		Operations: []service.UpdateTransactionsOp{
@@ -153,7 +153,7 @@ func TestUpdateTransactions_AbortMode_RollsBack(t *testing.T) {
 	acctID := seedTxnFixture(t, queries)
 	tx1 := testutil.MustCreateTransaction(t, queries, acctID, "tx_b", "Latte", 600, "2026-04-02")
 
-	mustCreateCategory(t, queries, "food_and_drink_coffee", "Coffee")
+	testutil.MustCreateCategory(t, queries, "food_and_drink_coffee", "Coffee")
 
 	_, err := svc.UpdateTransactions(ctx, service.UpdateTransactionsParams{
 		Operations: []service.UpdateTransactionsOp{

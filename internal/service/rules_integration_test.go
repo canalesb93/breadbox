@@ -16,14 +16,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// mustCreateCategoryForRule creates a category for use in rule tests.
-// Re-uses the mustCreateCategory helper from review_integration_test.go (same package).
-
 // --- CreateTransactionRule ---
 
 func TestCreateTransactionRule_Success(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Coffee shops",
@@ -71,7 +68,7 @@ func TestCreateTransactionRule_Success(t *testing.T) {
 
 func TestCreateTransactionRule_DefaultPriority(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Default priority rule",
@@ -89,7 +86,7 @@ func TestCreateTransactionRule_DefaultPriority(t *testing.T) {
 
 func TestCreateTransactionRule_WithExpiry(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Temporary rule",
@@ -111,7 +108,7 @@ func TestCreateTransactionRule_WithExpiry(t *testing.T) {
 
 func TestCreateTransactionRule_InvalidExpiresIn(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Bad expiry",
@@ -145,7 +142,7 @@ func TestCreateTransactionRule_InvalidCategorySlug(t *testing.T) {
 
 func TestCreateTransactionRule_InvalidCondition(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Bad condition",
@@ -159,7 +156,7 @@ func TestCreateTransactionRule_InvalidCondition(t *testing.T) {
 
 func TestCreateTransactionRule_ANDCondition(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "AND condition",
@@ -183,7 +180,7 @@ func TestCreateTransactionRule_ANDCondition(t *testing.T) {
 
 func TestGetTransactionRule_Success(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Test rule",
@@ -254,7 +251,7 @@ func TestListTransactionRules_Empty(t *testing.T) {
 
 func TestListTransactionRules_WithData(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	for i := 0; i < 3; i++ {
 		_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
@@ -281,7 +278,7 @@ func TestListTransactionRules_WithData(t *testing.T) {
 
 func TestListTransactionRules_FilterByEnabled(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Enabled rule",
@@ -325,8 +322,8 @@ func TestListTransactionRules_FilterByEnabled(t *testing.T) {
 
 func TestListTransactionRules_FilterByCategory(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat1 := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
-	cat2 := mustCreateCategory(t, queries, "transportation", "Transportation")
+	cat1 := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat2 := testutil.MustCreateCategory(t, queries, "transportation", "Transportation")
 
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Food rule",
@@ -363,7 +360,7 @@ func TestListTransactionRules_FilterByCategory(t *testing.T) {
 
 func TestListTransactionRules_FilterBySearch(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Coffee shops",
@@ -397,7 +394,7 @@ func TestListTransactionRules_FilterBySearch(t *testing.T) {
 
 func TestListTransactionRules_Pagination(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	// Create 5 rules.
 	for i := 0; i < 5; i++ {
@@ -460,8 +457,8 @@ func TestListTransactionRules_Pagination(t *testing.T) {
 
 func TestUpdateTransactionRule_Success(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat1 := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
-	cat2 := mustCreateCategory(t, queries, "transportation", "Transportation")
+	cat1 := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat2 := testutil.MustCreateCategory(t, queries, "transportation", "Transportation")
 
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Original name",
@@ -497,7 +494,7 @@ func TestUpdateTransactionRule_Success(t *testing.T) {
 
 func TestUpdateTransactionRule_PartialUpdate(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Original",
@@ -530,7 +527,7 @@ func TestUpdateTransactionRule_PartialUpdate(t *testing.T) {
 
 func TestUpdateTransactionRule_Disable(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Rule",
@@ -567,7 +564,7 @@ func TestUpdateTransactionRule_NotFound(t *testing.T) {
 
 func TestUpdateTransactionRule_InvalidCategorySlug(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Rule",
@@ -594,7 +591,7 @@ func TestUpdateTransactionRule_InvalidCategorySlug(t *testing.T) {
 
 func TestDeleteTransactionRule_Success(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "To be deleted",
@@ -638,7 +635,7 @@ func TestDeleteTransactionRule_BadUUID(t *testing.T) {
 
 func TestListActiveRulesForSync_FiltersExpiredAndDisabled(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	// Create an active rule.
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
@@ -683,7 +680,7 @@ func TestListActiveRulesForSync_FiltersExpiredAndDisabled(t *testing.T) {
 
 func TestBatchIncrementHitCounts_Success(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:         "Hit counter test",
@@ -844,7 +841,7 @@ func TestPreviewRule_ExcludesCategoryOverride(t *testing.T) {
 
 func TestCreateTransactionRule_WithActions(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name: "Actions rule",
@@ -876,7 +873,7 @@ func TestCreateTransactionRule_WithActions(t *testing.T) {
 
 func TestCreateTransactionRule_CategorySlugBackfillsActions(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	// Create using legacy category_slug param (no actions)
 	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
@@ -899,8 +896,8 @@ func TestCreateTransactionRule_CategorySlugBackfillsActions(t *testing.T) {
 
 func TestCreateTransactionRule_ActionsOverCategorySlug(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat1 := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
-	cat2 := mustCreateCategory(t, queries, "transportation", "Transportation")
+	cat1 := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat2 := testutil.MustCreateCategory(t, queries, "transportation", "Transportation")
 
 	// Both actions and category_slug provided — actions wins
 	rule, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
@@ -951,7 +948,7 @@ func TestCreateTransactionRule_InvalidActionField(t *testing.T) {
 
 func TestCreateTransactionRule_DuplicateActionField(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name: "Dup field",
@@ -971,8 +968,8 @@ func TestCreateTransactionRule_DuplicateActionField(t *testing.T) {
 
 func TestUpdateTransactionRule_ChangeActions(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat1 := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
-	cat2 := mustCreateCategory(t, queries, "transportation", "Transportation")
+	cat1 := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat2 := testutil.MustCreateCategory(t, queries, "transportation", "Transportation")
 
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:       "Original",
@@ -1002,8 +999,8 @@ func TestUpdateTransactionRule_ChangeActions(t *testing.T) {
 
 func TestUpdateTransactionRule_CategorySlugUpdatesSynthesizedActions(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat1 := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
-	cat2 := mustCreateCategory(t, queries, "transportation", "Transportation")
+	cat1 := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat2 := testutil.MustCreateCategory(t, queries, "transportation", "Transportation")
 
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:       "Original",
@@ -1030,7 +1027,7 @@ func TestUpdateTransactionRule_CategorySlugUpdatesSynthesizedActions(t *testing.
 
 func TestGetTransactionRule_IncludesActions(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	created, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:       "Test",
@@ -1056,7 +1053,7 @@ func TestGetTransactionRule_IncludesActions(t *testing.T) {
 
 func TestListTransactionRules_IncludesActions(t *testing.T) {
 	svc, queries, _ := newService(t)
-	cat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	cat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	_, err := svc.CreateTransactionRule(context.Background(), service.CreateTransactionRuleParams{
 		Name:       "List test",
@@ -1101,7 +1098,7 @@ func TestApplyRuleRetroactively_AddTagMaterialized(t *testing.T) {
 
 	// Dummy category for rule creation (add_tag rules still create fine without
 	// a set_category action, but we need a base set of categories around).
-	_ = mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	_ = testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	// Fixture: user → connection → account + 3 transactions, 2 matching.
 	user := testutil.MustCreateUser(t, queries, "Alice")
@@ -1202,7 +1199,7 @@ func TestApplyRuleRetroactively_RemoveTagMaterialized(t *testing.T) {
 	svc, queries, pool := newService(t)
 	ctx := context.Background()
 
-	_ = mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	_ = testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_tag_rem")
@@ -1289,7 +1286,7 @@ func TestApplyRuleRetroactively_HitCountMatchesSync(t *testing.T) {
 	svc, queries, pool := newService(t)
 	ctx := context.Background()
 
-	targetCat := mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	targetCat := testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	user := testutil.MustCreateUser(t, queries, "Alice")
 	conn := testutil.MustCreateConnection(t, queries, user.ID, "item_hit")
@@ -1371,7 +1368,7 @@ func TestApplyRuleRetroactively_Expired_Rejected(t *testing.T) {
 	svc, queries, pool := newService(t)
 	ctx := context.Background()
 
-	_ = mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	_ = testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	acctID := seedTxnFixture(t, queries)
 	testutil.MustCreateTransaction(t, queries, acctID, "txn_exp_1", "Starbucks Coffee", 500, "2025-01-15")
@@ -1424,7 +1421,7 @@ func TestApplyRuleRetroactively_Disabled_Rejected(t *testing.T) {
 	svc, queries, pool := newService(t)
 	ctx := context.Background()
 
-	_ = mustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
+	_ = testutil.MustCreateCategory(t, queries, "food_and_drink", "Food & Drink")
 
 	acctID := seedTxnFixture(t, queries)
 	testutil.MustCreateTransaction(t, queries, acctID, "txn_dis_1", "Starbucks Coffee", 500, "2025-01-15")
@@ -1477,8 +1474,8 @@ func TestApplyAllRulesRetroactively_SamePriorityTie(t *testing.T) {
 	svc, queries, pool := newService(t)
 	ctx := context.Background()
 
-	catA := mustCreateCategory(t, queries, "cat_a", "Cat A")
-	catB := mustCreateCategory(t, queries, "cat_b", "Cat B")
+	catA := testutil.MustCreateCategory(t, queries, "cat_a", "Cat A")
+	catB := testutil.MustCreateCategory(t, queries, "cat_b", "Cat B")
 
 	acctID := seedTxnFixture(t, queries)
 	testutil.MustCreateTransaction(t, queries, acctID, "txn_tie", "Starbucks Coffee", 500, "2025-01-15")
@@ -1600,7 +1597,7 @@ func TestPreviewRuleForDetail_ExcludesAlreadyApplied(t *testing.T) {
 	svc, queries, _ := newService(t)
 	ctx := context.Background()
 
-	_ = mustCreateCategory(t, queries, "coffee", "Coffee")
+	_ = testutil.MustCreateCategory(t, queries, "coffee", "Coffee")
 
 	acctID := seedTxnFixture(t, queries)
 	testutil.MustCreateTransaction(t, queries, acctID, "txn_d_1", "Starbucks Coffee", 500, "2025-01-15")
