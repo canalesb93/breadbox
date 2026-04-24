@@ -679,6 +679,20 @@ if [ "$healthy" -eq 1 ]; then
         printf "${DIM}  cd ${INSTALL_DIR} && docker compose --profile caddy -f ${COMPOSE_FILE} up -d${NC}\n"
         printf "\n"
     fi
+
+    # --- Post-install: breadbox doctor handoff ---
+    # `breadbox doctor` is a planned pre-flight command (tracked in issue
+    # #687). When it lands, running it against the fresh install catches
+    # misconfiguration before the user hits runtime errors. If the binary
+    # inside the container doesn't support `doctor` yet, tolerate the
+    # failure quietly so the installer doesn't regress on older images.
+    if docker compose -f "$COMPOSE_FILE" exec -T breadbox /app/breadbox doctor 2>/dev/null; then
+        :  # doctor printed its own summary; nothing more to say.
+    else
+        printf "${DIM}Run 'docker compose -f %s exec breadbox /app/breadbox doctor' when available${NC}\n" "$COMPOSE_FILE"
+        printf "${DIM}to verify configuration (see issue #687).${NC}\n"
+        printf "\n"
+    fi
 else
     error "Breadbox did not become healthy within 60 seconds."
     error "Check logs: cd ${INSTALL_DIR} && docker compose -f ${COMPOSE_FILE} logs"

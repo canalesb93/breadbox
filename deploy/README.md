@@ -21,9 +21,23 @@ Caddy handles automatic HTTPS via Let's Encrypt. Breadbox is a single Go binary 
 
 ## Quick Install (One-Liner)
 
+Recommended — the bootstrap at `breadbox.sh` pins to a known-good installer:
+
 ```bash
-curl -sSL https://raw.githubusercontent.com/canalesb93/breadbox/main/deploy/install.sh | bash
+curl -fsSL https://breadbox.sh/install.sh | bash
 ```
+
+Straight-from-GitHub alternative (no CDN layer):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/canalesb93/breadbox/main/deploy/install.sh | bash
+```
+
+The `breadbox.sh/install.sh` endpoint is a tiny shim (source in this repo at
+[`deploy/bootstrap.sh`](./bootstrap.sh)) that fetches the real installer and
+execs it with your arguments. That lets bug fixes to the installer land in
+one place (`deploy/install.sh`) without needing to redeploy the landing
+site. Pin a specific ref with `BB_INSTALL_REF=v0.4.0 curl ... | bash`.
 
 The script will:
 1. Verify Docker / Docker Compose (offer to install Docker on Linux if missing)
