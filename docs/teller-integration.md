@@ -299,20 +299,20 @@ Continue fetching until fewer than `count` transactions are returned.
 
 | Teller Field | Breadbox Field | Notes |
 |---|---|---|
-| `id` | `external_transaction_id` | Stable across most pending→posted transitions |
+| `id` | `provider_transaction_id` | Stable across most pending→posted transitions |
 | `account_id` | `account_external_id` | Resolved to internal account UUID by sync engine |
 | `amount` | `amount` | Parse string to decimal, **negate sign** (see 3.4) |
 | `date` | `date` | ISO 8601 date string `YYYY-MM-DD` |
-| `description` | `name` | Raw bank statement text |
+| `description` | `provider_name` | Raw bank statement text |
 | `status` | `pending` | `"pending"` → `true`, `"posted"` → `false` |
-| `details.category` | `category_primary` | Via category mapping table (Section 7) |
-| `details.counterparty.name` | `merchant_name` | Nullable |
+| `details.category` | `provider_category_primary` | Via category mapping table (Section 7) |
+| `details.counterparty.name` | `provider_merchant_name` | Nullable |
 | (not available) | `authorized_date` | `NULL` |
 | (not available) | `datetime` | `NULL` |
-| (not available) | `category_detailed` | `NULL` |
-| (not available) | `category_confidence` | `NULL` |
-| (not available) | `payment_channel` | `"other"` |
-| (not available) | `pending_transaction_id` | `NULL` (Teller has no explicit linkage) |
+| (not available) | `provider_category_detailed` | `NULL` |
+| (not available) | `provider_category_confidence` | `NULL` |
+| (not available) | `provider_payment_channel` | `"other"` |
+| (not available) | `provider_pending_transaction_id` | `NULL` (Teller has no explicit linkage) |
 | `currency` | `iso_currency_code` | From parent account's `currency` field |
 
 ### 3.4 Amount Sign Convention
@@ -353,7 +353,7 @@ WHERE account_id IN (... accounts for this connection ...)
   AND date >= $from_date
   AND date <= $to_date
   AND pending = true
-  AND external_transaction_id NOT IN (... returned IDs ...)
+  AND provider_transaction_id NOT IN (... returned IDs ...)
   AND deleted_at IS NULL;
 ```
 
@@ -573,7 +573,7 @@ active   →  pending_reauth      (credentials invalid, MFA required)
 Teller provides a single-level category in `details.category`. Breadbox
 normalizes these to primary categories compatible with Plaid's taxonomy.
 
-| Teller Category | Breadbox `category_primary` |
+| Teller Category | Breadbox `provider_category_primary` |
 |---|---|
 | `accommodation` | `TRAVEL` |
 | `advertising` | `GENERAL_SERVICES` |
@@ -607,7 +607,7 @@ normalizes these to primary categories compatible with Plaid's taxonomy.
 ### 7.2 Unmapped Categories
 
 If a Teller category is not in the mapping table (e.g., a new category added
-by Teller), default to `GENERAL_MERCHANDISE`. The `category_detailed` field is
+by Teller), default to `GENERAL_MERCHANDISE`. The `provider_category_detailed` field is
 always `NULL` for Teller transactions since Teller has no sub-categories.
 
 ---
@@ -626,7 +626,7 @@ always `NULL` for Teller transactions since Teller has no sub-categories.
 | **Balances** | All accounts in one call per item | One call per account | Loop over accounts in `GetBalances` |
 | **Webhooks** | JWT/ES256, `Plaid-Verification` header | HMAC-SHA256, `Teller-Signature` header | Provider-specific verification in `HandleWebhook` |
 | **Webhook data** | Notification only (sync separately) | `transactions.processed` includes tx data | Trigger full sync regardless (consistency) |
-| **Categories** | Two-level (primary + detailed) | Single-level (~27 categories) | Map to primary, `category_detailed = NULL` |
+| **Categories** | Two-level (primary + detailed) | Single-level (~27 categories) | Map to primary, `provider_category_detailed = NULL` |
 | **Amount sign** | Positive = debit | Negative = debit | Negate Teller amounts |
 | **Authorized date** | Separate `authorized_date` field | Not provided | `NULL` for Teller |
 | **Account types** | depository, credit, loan, investment | depository, credit only | Subset, no mapping needed |

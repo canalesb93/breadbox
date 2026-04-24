@@ -9,7 +9,7 @@ A rule is a JSON document with four parts:
 ```json
 {
   "name": "Dining out categorization",
-  "conditions": { "field": "merchant_name", "op": "contains", "value": "Starbucks" },
+  "conditions": { "field": "provider_merchant_name", "op": "contains", "value": "Starbucks" },
   "actions": [ { "type": "set_category", "category_slug": "food_and_drink_coffee" } ],
   "trigger": "on_create",
   "priority": 10
@@ -45,11 +45,11 @@ Combinators nest. Max depth: **10**. Empty / zero-value condition (`{}`) means *
   "or": [
     {
       "and": [
-        { "field": "merchant_name", "op": "contains", "value": "Starbucks" },
+        { "field": "provider_merchant_name", "op": "contains", "value": "Starbucks" },
         { "field": "amount", "op": "gte", "value": 5 }
       ]
     },
-    { "field": "name", "op": "matches", "value": "^COFFEE.*" }
+    { "field": "provider_name", "op": "matches", "value": "^COFFEE.*" }
   ]
 }
 ```
@@ -58,11 +58,11 @@ Combinators nest. Max depth: **10**. Empty / zero-value condition (`{}`) means *
 
 | Field               | Type    | Source                                                          |
 | ------------------- | ------- | --------------------------------------------------------------- |
-| `name`              | string  | Transaction name                                                |
-| `merchant_name`     | string  | Merchant display name (may be empty for CSV / no-enrich rows)   |
+| `provider_name`     | string  | Transaction name (raw provider)                                 |
+| `provider_merchant_name` | string | Merchant display name (may be empty for CSV / no-enrich rows)   |
 | `amount`            | numeric | Transaction amount (positive = debit, negative = credit)        |
-| `category_primary`  | string  | **Raw provider** primary category (Plaid/Teller classification) |
-| `category_detailed` | string  | **Raw provider** detailed category                              |
+| `provider_category_primary` | string | **Raw provider** primary category (Plaid/Teller classification) |
+| `provider_category_detailed` | string | **Raw provider** detailed category                              |
 | `category`          | string  | **Assigned** category slug (reflects Breadbox/rule/user writes) |
 | `pending`           | bool    | Provider-reported pending flag                                  |
 | `provider`          | string  | `plaid`, `teller`, or `csv`                                     |
@@ -72,7 +72,7 @@ Combinators nest. Max depth: **10**. Empty / zero-value condition (`{}`) means *
 | `user_name`         | string  | Family member display name                                      |
 | `tags`              | tags    | List of current transaction tag slugs (special, see below)      |
 
-> **Raw vs assigned category.** `category_primary` / `category_detailed` are the provider's classification — they don't change when Breadbox, a rule, or the user reassigns. Use `category` when you want to react to the *current* category, including mid-pass rule updates (see "Rule chaining" below).
+> **Raw vs assigned category.** `provider_category_primary` / `provider_category_detailed` are the provider's classification — they don't change when Breadbox, a rule, or the user reassigns. Use `category` when you want to react to the *current* category, including mid-pass rule updates (see "Rule chaining" below).
 
 ### Operators per field type
 
@@ -101,7 +101,7 @@ Rules evaluate in pipeline order — lower `priority` runs first. As each matchi
 
 This enables composition. For example, a pipeline of three rules:
 
-1. `priority: 0`, `name contains "starbucks"` → `add_tag: coffee`
+1. `priority: 0`, `provider_name contains "starbucks"` → `add_tag: coffee`
 2. `priority: 10`, `tags contains "coffee"` → `set_category: food_and_drink_coffee`
 3. `priority: 50`, `category eq "food_and_drink_coffee"` → `add_tag: dining`
 
@@ -164,7 +164,7 @@ A rule can carry multiple actions of different types. Override (`category_overri
 
 ```json
 {
-  "conditions": { "field": "merchant_name", "op": "contains", "value": "Uber" },
+  "conditions": { "field": "provider_merchant_name", "op": "contains", "value": "Uber" },
   "actions": [
     { "type": "set_category", "category_slug": "transportation_rideshare" },
     { "type": "add_tag", "tag_slug": "recurring" }
