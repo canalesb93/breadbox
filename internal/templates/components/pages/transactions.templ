@@ -47,15 +47,17 @@ templ Transactions(p TransactionsProps) {
 // txReviewQueueShortcuts registers the M3 review-queue keyboard shortcut
 // (`a` approve) at `scope: 'reviews'` whenever the transactions page is
 // filtered to `tags=needs-review` — the review queue view. The x-data
-// wrapper flips the shortcut-registry scope on init so the `?` help modal
-// (M0.3) surfaces approve under "This page", and resets back to 'global'
-// on teardown. j/k/Enter/c continue to fire via the existing inline keydown
-// handler in transactions_scripts.js.html; M3 only layers the approve
-// action on top. Reject and skip were dropped after review feedback —
-// reject had no data-model meaning (the queue is tag-backed, so there is
-// no "rejected" state), and skip was duplicative of `j`.
+// wrapper flips the shortcut-registry scope on init and declares
+// `transactions` as the parent scope so the review queue inherits the
+// transactions list's j/k/Enter/c/t/e/x/Esc bindings without
+// re-registering them. The `?` help modal then surfaces approve under
+// "This page" alongside the inherited transactions bindings. Scope
+// resets to 'global' on teardown. Reject and skip were dropped after
+// review feedback — reject had no data-model meaning (the queue is
+// tag-backed, so there is no "rejected" state), and skip was
+// duplicative of `j`.
 templ txReviewQueueShortcuts() {
-	<div x-data x-init="$store.shortcuts.setScope('reviews')" x-destroy="$store.shortcuts.setScope('global')"></div>
+	<div x-data x-init="$store.shortcuts.setScope('reviews', { parent: 'transactions' })" x-destroy="$store.shortcuts.setScope('global')"></div>
 	@templ.Raw("<script>" + reviewQueueScriptBody + "</script>")
 }
 
@@ -397,12 +399,19 @@ templ txResultsShell(p TransactionsProps) {
 			     also guards on `$store.device.isTouch` to cover touch-capable
 			     large viewports. -->
 			<div class="hidden sm:flex items-center gap-2 text-xs text-base-content/30">
-				<span class="flex items-center gap-1">@components.Kbd("j")@components.Kbd("k") navigate</span>
-				<span class="flex items-center gap-1">@components.Kbd("Enter") open</span>
-				<span class="flex items-center gap-1">@components.Kbd("c") category</span>
-				<span class="flex items-center gap-1">@components.Kbd("t") tag</span>
-				<span class="flex items-center gap-1">@components.Kbd("e") expand</span>
-				<span class="flex items-center gap-1">@components.Kbd("x") select</span>
+				<span class="flex items-center gap-1">@components.Kbd("j")
+@components.Kbd("k")
+navigate</span>
+				<span class="flex items-center gap-1">@components.Kbd("Enter")
+open</span>
+				<span class="flex items-center gap-1">@components.Kbd("c")
+category</span>
+				<span class="flex items-center gap-1">@components.Kbd("t")
+tag</span>
+				<span class="flex items-center gap-1">@components.Kbd("e")
+expand</span>
+				<span class="flex items-center gap-1">@components.Kbd("x")
+select</span>
 			</div>
 		</div>
 		<div id="bb-tx-results">

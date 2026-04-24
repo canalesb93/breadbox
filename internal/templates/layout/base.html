@@ -105,6 +105,12 @@
       Alpine.store('shortcuts', {
         items: [],
         currentScope: 'global',
+        // Optional parent scope for the current scope. When set, the
+        // dispatcher and help modal treat the parent's shortcuts as part
+        // of the active set too — lets a page compose its bindings on top
+        // of a related scope (e.g. the review queue inherits the
+        // transactions list's j/k/Enter/c/t/e/x/Esc without re-registering).
+        parentScope: null,
 
         register(spec) {
           if (!spec || !spec.id) return;
@@ -120,16 +126,37 @@
           if (idx >= 0) this.items.splice(idx, 1);
         },
 
-        setScope(s) {
+        // Sets the active scope and, optionally, a parent scope that the
+        // current scope inherits shortcuts from. Pass `{ parent: null }`
+        // (or omit the second arg) to clear the parent.
+        setScope(s, opts) {
           this.currentScope = s || 'global';
+          this.parentScope = (opts && opts.parent) || null;
+        },
+
+        // True if `specScope` is considered active for the current scope —
+        // i.e. it's 'global', the current scope itself, or the current
+        // scope's declared parent. Exposed so the dispatcher and help
+        // modal share one matching rule.
+        scopeActive(specScope) {
+          if (specScope === 'global') return true;
+          if (specScope === this.currentScope) return true;
+          if (this.parentScope && specScope === this.parentScope) return true;
+          return false;
         },
 
         forScope(scope) {
-          // Returns all shortcuts whose scope matches `scope` OR 'global'.
-          // Used by the help modal (M0.3) and command palette (M0.5).
+          // Returns all shortcuts active for `scope` (or currentScope).
+          // When called with an explicit scope arg, we still honor the
+          // configured parentScope — callers are the help modal and
+          // command palette, which always reason about the live scope.
           var target = scope || this.currentScope;
+          var parent = this.parentScope;
           return this.items.filter(function(s) {
-            return s.scope === 'global' || s.scope === target;
+            if (s.scope === 'global') return true;
+            if (s.scope === target) return true;
+            if (parent && s.scope === parent) return true;
+            return false;
           });
         },
       });
@@ -2072,33 +2099,39 @@
       // ----- Match helpers -----
       //
       // Returns the first spec whose `keys` matches the given single key within
-      // the active scope set (current scope + global). Chord specs are skipped
-      // here — chord resolution happens once we have a pending prefix.
+      // the active scope set (current scope + optional parent scope + global).
+      // Chord specs are skipped here — chord resolution happens once we have a
+      // pending prefix.
       //
-      // Page-scoped specs take precedence over global ones on the same key, so
-      // a page can shadow a global binding (e.g. transactions rebinding `/` to
-      // focus the in-page search input instead of opening the command palette).
+      // Precedence when the same key is bound at multiple scopes:
+      //   currentScope > parentScope > global
+      // This lets a page shadow a global binding (transactions rebinding `/`
+      // to focus the in-page search input) and lets an inheriting scope
+      // shadow one of its parent's bindings (reviews layering `a` approve
+      // on top of the transactions list's j/k/Enter/c).
       function matchSingle(reg, key) {
         var scope = reg.currentScope;
+        var parent = reg.parentScope;
+        var parentMatch = null;
         var globalMatch = null;
         for (var i = 0; i < reg.items.length; i++) {
           var s = reg.items[i];
-          if (s.scope !== 'global' && s.scope !== scope) continue;
+          if (!reg.scopeActive(s.scope)) continue;
           var k = s.keys;
           var matches = (typeof k === 'string' && k === key) ||
             (Array.isArray(k) && k.length === 1 && k[0] === key);
           if (!matches) continue;
           if (s.scope === scope && scope !== 'global') return s;
+          if (parent && s.scope === parent && !parentMatch) parentMatch = s;
           if (s.scope === 'global' && !globalMatch) globalMatch = s;
         }
-        return globalMatch;
+        return parentMatch || globalMatch;
       }
 
       function matchChord(reg, prefix, key) {
-        var scope = reg.currentScope;
         for (var i = 0; i < reg.items.length; i++) {
           var s = reg.items[i];
-          if (s.scope !== 'global' && s.scope !== scope) continue;
+          if (!reg.scopeActive(s.scope)) continue;
           var k = s.keys;
           if (k && k.chord && k.chord.length === 2 && k.chord[0] === prefix && k.chord[1] === key) return s;
         }
@@ -2107,23 +2140,24 @@
 
       function hasChordStartingWith(reg, prefix) {
         var scope = reg.currentScope;
-        // If the active page scope has a single-key binding for this exact
-        // key, the page wins — don't start a chord sequence. This lets a
-        // page rebind a key that's otherwise a global chord prefix (e.g.
-        // the rules list using `n` for "New rule" instead of `n+_`).
-        if (scope && scope !== 'global') {
-          for (var j = 0; j < reg.items.length; j++) {
-            var ps = reg.items[j];
-            if (ps.scope !== scope) continue;
-            var pk = ps.keys;
-            var pageMatch = (typeof pk === 'string' && pk === prefix) ||
-              (Array.isArray(pk) && pk.length === 1 && pk[0] === prefix);
-            if (pageMatch) return false;
-          }
+        var parent = reg.parentScope;
+        // If the active page scope (or its parent) has a single-key binding
+        // for this exact key, the page wins — don't start a chord sequence.
+        // This lets a page rebind a key that's otherwise a global chord
+        // prefix (e.g. the rules list using `n` for "New rule" instead of
+        // `n+_`), and lets an inherited binding do the same.
+        for (var j = 0; j < reg.items.length; j++) {
+          var ps = reg.items[j];
+          if (ps.scope === 'global') continue;
+          if (ps.scope !== scope && (!parent || ps.scope !== parent)) continue;
+          var pk = ps.keys;
+          var pageMatch = (typeof pk === 'string' && pk === prefix) ||
+            (Array.isArray(pk) && pk.length === 1 && pk[0] === prefix);
+          if (pageMatch) return false;
         }
         for (var i = 0; i < reg.items.length; i++) {
           var s = reg.items[i];
-          if (s.scope !== 'global' && s.scope !== scope) continue;
+          if (!reg.scopeActive(s.scope)) continue;
           var k = s.keys;
           if (k && k.chord && k.chord.length >= 1 && k.chord[0] === prefix) return true;
         }
