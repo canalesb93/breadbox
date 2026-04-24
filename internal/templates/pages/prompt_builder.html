@@ -199,12 +199,18 @@
     <div class="flex items-center gap-2 sm:gap-3 bg-base-100 border border-base-300 rounded-2xl shadow-lg px-3 sm:px-5 py-3 justify-center">
       <span class="text-xs text-base-content/40 tabular-nums whitespace-nowrap" x-text="activeBlocks.length + ' blocks · ' + preview.length.toLocaleString() + ' chars'"></span>
       <div class="w-px h-4 bg-base-300"></div>
-      <button class="btn btn-ghost btn-sm rounded-xl gap-2 text-xs" @click="openPreview()">
+      <button class="btn btn-ghost btn-sm rounded-xl gap-2 text-xs"
+              :disabled="activeBlocks.length === 0"
+              :title="activeBlocks.length === 0 ? 'Enable at least one block to preview' : ''"
+              @click="openPreview()">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
         <span class="hidden sm:inline">Preview</span>
         <span class="hidden sm:inline ml-1 text-[10px] opacity-50 border border-current/30 rounded px-1 leading-none py-0.5">P</span>
       </button>
-      <button class="btn btn-primary btn-sm rounded-xl gap-2 text-xs relative overflow-hidden" style="min-width:auto" @click="copyPrompt()">
+      <button class="btn btn-primary btn-sm rounded-xl gap-2 text-xs relative overflow-hidden" style="min-width:auto"
+              :disabled="activeBlocks.length === 0"
+              :title="activeBlocks.length === 0 ? 'Enable at least one block to copy' : ''"
+              @click="copyPrompt()">
         <span class="flex items-center gap-1.5 transition-all duration-200"
               :class="copied ? 'opacity-0 scale-75' : 'opacity-100 scale-100'">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
@@ -270,7 +276,14 @@
       </div>
       <!-- Rendered markdown content -->
       <div class="overflow-auto flex-1 px-6 py-5">
-        <div class="bb-markdown" x-html="renderMarkdown(preview)"></div>
+        <template x-if="preview.length === 0">
+          <div class="px-6 py-12 text-center text-base-content/40">
+            <p class="text-sm">No blocks enabled. Toggle blocks above to start building your prompt.</p>
+          </div>
+        </template>
+        <template x-if="preview.length > 0">
+          <div class="bb-markdown" x-html="renderMarkdown(preview)"></div>
+        </template>
       </div>
       <style>
         .bb-markdown { font-size: 0.875rem; line-height: 1.7; color: var(--color-base-content); }
@@ -589,6 +602,10 @@ function promptBuilder(initialBlocks) {
     },
 
     openPreview: function() {
+      if (this.activeBlocks.length === 0) {
+        this.showToast('Enable at least one block to preview', 'info');
+        return;
+      }
       this.showPreview = true;
       document.body.style.overflow = 'hidden';
     },
@@ -615,11 +632,15 @@ function promptBuilder(initialBlocks) {
       return marked.parse(processed);
     },
 
-    showToast: function(msg) {
-      window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: msg, type: 'success' } }));
+    showToast: function(msg, type) {
+      window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: msg, type: type || 'success' } }));
     },
 
     copyPrompt: function() {
+      if (this.activeBlocks.length === 0) {
+        this.showToast('Enable at least one block to copy', 'info');
+        return;
+      }
       var self = this;
       navigator.clipboard.writeText(this.preview).then(function() {
         self.copied = true;
@@ -637,7 +658,11 @@ function promptBuilder(initialBlocks) {
         this.copyPrompt();
       } else if (e.key === 'p' && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
-        this.showPreview ? this.closePreview() : this.openPreview();
+        if (this.showPreview) {
+          this.closePreview();
+        } else {
+          this.openPreview();
+        }
       }
     }
   };
