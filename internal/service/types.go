@@ -406,6 +406,12 @@ type ActivityEntry struct {
 	RuleID       string `json:"rule_id,omitempty"`
 	CommentID    string `json:"comment_id,omitempty"`
 	TagSlug      string `json:"tag_slug,omitempty"` // for tag_added / tag_removed entries
+
+	// Origin describes how a rule-sourced entry was applied ("during sync",
+	// "retroactively"). Rule-applied rows previously overloaded ActorName
+	// with this phrase; Origin keeps the actor slot empty for system rows
+	// and lets the template render origin as a subordinate meta pill.
+	Origin string `json:"origin,omitempty"`
 }
 
 type Condition struct {
