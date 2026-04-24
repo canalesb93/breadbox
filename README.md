@@ -28,9 +28,45 @@ Breadbox syncs your bank data into a PostgreSQL database you control, then expos
 
 ## Installation
 
-### Docker (recommended)
+### One-liner (recommended)
 
-No need to clone the repo. This pulls the pre-built image from GHCR and starts Breadbox with PostgreSQL:
+```bash
+curl -fsSL https://breadbox.sh/install.sh | bash
+```
+
+This is the primary install path. It detects your OS (Linux or macOS) and arch
+(amd64 or arm64), checks for Docker (and offers to install it on Linux via
+`get.docker.com`), prompts for an optional public domain (leave blank for a
+localhost-only install), writes a version-pinned `docker-compose.prod.yml`,
+generates an `ENCRYPTION_KEY` and database password, and starts the stack.
+
+On success it offers to register a launchd agent (macOS) or systemd unit
+(Linux) so Breadbox restarts on boot, and calls `breadbox doctor` to verify
+configuration.
+
+Common variations:
+
+```bash
+# Non-interactive install with a public domain (enables Caddy + HTTPS)
+curl -fsSL https://breadbox.sh/install.sh | bash -s -- --yes --domain=breadbox.example.com
+
+# Installer without breadbox.sh (straight from GitHub)
+curl -fsSL https://raw.githubusercontent.com/canalesb93/breadbox/main/deploy/install.sh | bash
+```
+
+Install directory:
+
+- Root (`sudo bash ...`) → `/opt/breadbox`
+- Regular user → `$HOME/.breadbox`
+- Override: `INSTALL_DIR=/custom/path bash install.sh`
+
+Updates respect the installed version pin. `./update.sh` in the install
+directory pulls the same tag on every run; `./update.sh --bump=v0.4.0` (or
+`--bump=latest`) explicitly changes it. Full docs in [`deploy/`](deploy/).
+
+### Docker Compose (manual)
+
+No need to clone the repo. This pulls the pre-built image from GHCR and starts Breadbox with PostgreSQL directly — useful if you want full control over the compose file:
 
 ```bash
 mkdir breadbox && cd breadbox
@@ -55,11 +91,14 @@ EOF
 Start the services:
 
 ```bash
+# Localhost-only (no HTTPS, no Caddy, no 80/443 bindings)
 docker compose up -d breadbox db
-# Visit http://localhost:8080 to start the setup wizard
+
+# With public HTTPS via Caddy (requires DOMAIN= in .env)
+docker compose --profile caddy up -d
 ```
 
-> **Note:** This starts Breadbox and PostgreSQL without the Caddy reverse proxy, exposing port 8080 directly. For production with automatic HTTPS, run `docker compose up -d` (all services) and configure your domain in the Caddyfile -- see [Production Deployment](#production-deployment) below.
+Caddy is gated behind the `caddy` compose profile, so localhost-only installs never bind ports 80/443.
 
 To pin a specific version instead of `latest`, edit `docker-compose.yml` and change the image tag:
 
@@ -113,15 +152,7 @@ make dev
 # Visit http://localhost:8080
 ```
 
-### Production deployment
-
-For production, use the one-liner install script:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/canalesb93/breadbox/main/deploy/install.sh | sudo bash
-```
-
-The script checks for Docker (and offers to install it on Linux via `get.docker.com`), downloads the deployment files, prompts for an optional public domain, generates secrets, and starts Breadbox. If you supply a domain it also starts Caddy for automatic TLS; otherwise the install is localhost-only and does not bind ports 80/443. See [`deploy/`](deploy/) for details, including version-pinned updates via `update.sh`.
+For production deployment details (domain setup, Caddy, daemon registration, backups), see the [`deploy/README.md`](deploy/README.md).
 
 ## MCP Integration
 
