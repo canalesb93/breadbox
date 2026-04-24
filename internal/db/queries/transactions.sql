@@ -3,30 +3,31 @@ SELECT COUNT(*) FROM transactions WHERE deleted_at IS NULL;
 
 -- name: UpsertTransaction :one
 INSERT INTO transactions (
-  account_id, external_transaction_id, pending_transaction_id,
+  account_id, provider_transaction_id, provider_pending_transaction_id,
   amount, iso_currency_code, date, authorized_date,
-  datetime, authorized_datetime, name, merchant_name,
-  category_primary, category_detailed, category_confidence,
-  payment_channel, pending, category_id
+  datetime, authorized_datetime, provider_name, provider_merchant_name,
+  provider_category_primary, provider_category_detailed, provider_category_confidence,
+  provider_payment_channel, pending, category_id, provider_raw
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
 )
-ON CONFLICT (external_transaction_id) DO UPDATE SET
+ON CONFLICT (provider_transaction_id) DO UPDATE SET
   account_id = EXCLUDED.account_id,
-  pending_transaction_id = EXCLUDED.pending_transaction_id,
+  provider_pending_transaction_id = EXCLUDED.provider_pending_transaction_id,
   amount = EXCLUDED.amount,
   iso_currency_code = EXCLUDED.iso_currency_code,
   date = EXCLUDED.date,
   authorized_date = EXCLUDED.authorized_date,
   datetime = EXCLUDED.datetime,
   authorized_datetime = EXCLUDED.authorized_datetime,
-  name = EXCLUDED.name,
-  merchant_name = EXCLUDED.merchant_name,
-  category_primary = EXCLUDED.category_primary,
-  category_detailed = EXCLUDED.category_detailed,
-  category_confidence = EXCLUDED.category_confidence,
-  payment_channel = EXCLUDED.payment_channel,
+  provider_name = EXCLUDED.provider_name,
+  provider_merchant_name = EXCLUDED.provider_merchant_name,
+  provider_category_primary = EXCLUDED.provider_category_primary,
+  provider_category_detailed = EXCLUDED.provider_category_detailed,
+  provider_category_confidence = EXCLUDED.provider_category_confidence,
+  provider_payment_channel = EXCLUDED.provider_payment_channel,
   pending = EXCLUDED.pending,
+  provider_raw = COALESCE(EXCLUDED.provider_raw, transactions.provider_raw),
   category_id = CASE
     WHEN transactions.category_override THEN transactions.category_id
     WHEN EXCLUDED.category_id IS NOT NULL THEN EXCLUDED.category_id
@@ -35,11 +36,11 @@ ON CONFLICT (external_transaction_id) DO UPDATE SET
   deleted_at = NULL,
   updated_at = CASE
     WHEN transactions.amount IS DISTINCT FROM EXCLUDED.amount
-      OR transactions.name IS DISTINCT FROM EXCLUDED.name
+      OR transactions.provider_name IS DISTINCT FROM EXCLUDED.provider_name
       OR transactions.pending IS DISTINCT FROM EXCLUDED.pending
-      OR transactions.merchant_name IS DISTINCT FROM EXCLUDED.merchant_name
-      OR transactions.category_primary IS DISTINCT FROM EXCLUDED.category_primary
-      OR transactions.category_detailed IS DISTINCT FROM EXCLUDED.category_detailed
+      OR transactions.provider_merchant_name IS DISTINCT FROM EXCLUDED.provider_merchant_name
+      OR transactions.provider_category_primary IS DISTINCT FROM EXCLUDED.provider_category_primary
+      OR transactions.provider_category_detailed IS DISTINCT FROM EXCLUDED.provider_category_detailed
       OR transactions.deleted_at IS NOT NULL
     THEN NOW()
     ELSE transactions.updated_at
@@ -47,7 +48,7 @@ ON CONFLICT (external_transaction_id) DO UPDATE SET
 RETURNING *;
 
 -- name: SoftDeleteTransactionByExternalID :exec
-UPDATE transactions SET deleted_at = NOW() WHERE external_transaction_id = $1 AND deleted_at IS NULL;
+UPDATE transactions SET deleted_at = NOW() WHERE provider_transaction_id = $1 AND deleted_at IS NULL;
 
 -- name: SoftDeleteTransactionsByConnectionID :execrows
 UPDATE transactions SET deleted_at = NOW()
