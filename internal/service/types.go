@@ -407,6 +407,15 @@ type ActivityEntry struct {
 	CommentID    string `json:"comment_id,omitempty"`
 	TagSlug      string `json:"tag_slug,omitempty"` // for tag_added / tag_removed entries
 
+	// TagDisplayName and TagColor drive the rendered tag-chip on
+	// tag_added / tag_removed timeline rows. Empty/nil when the tag no
+	// longer exists in the registry (deleted tags still show their slug).
+	TagDisplayName string  `json:"tag_display_name,omitempty"`
+	TagColor       *string `json:"tag_color,omitempty"`
+	// TagAction distinguishes "added" vs "removed" so the template can
+	// render a plus / minus overlay on tag rows.
+	TagAction string `json:"tag_action,omitempty"` // "added" | "removed"
+
 	// Origin describes how a rule-sourced entry was applied ("during sync",
 	// "retroactively"). Rule-applied rows previously overloaded ActorName
 	// with this phrase; Origin keeps the actor slot empty for system rows

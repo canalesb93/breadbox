@@ -107,7 +107,7 @@ func TestBuildActivityTimeline_FreeStandingCommentStillEmitted(t *testing.T) {
 		CreatedAt: "2026-04-04T12:00:00Z",
 	}}
 
-	entries := buildActivityTimeline(annotations, nil)
+	entries := buildActivityTimeline(annotations, nil, nil)
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
@@ -157,7 +157,7 @@ func TestBuildActivityTimeline_RuleSourcedTagAddedDeduped(t *testing.T) {
 		},
 	}
 
-	entries := buildActivityTimeline(annotations, nil)
+	entries := buildActivityTimeline(annotations, nil, nil)
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry (rule_applied only), got %d", len(entries))
@@ -183,7 +183,7 @@ func TestBuildActivityTimeline_UserTagAddedStillEmitted(t *testing.T) {
 		CreatedAt: "2026-04-05T09:00:00Z",
 	}}
 
-	entries := buildActivityTimeline(annotations, nil)
+	entries := buildActivityTimeline(annotations, nil, nil)
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 tag entry, got %d", len(entries))
@@ -222,7 +222,7 @@ func TestBuildActivityTimeline_RuleAppliedEmptyNameFallsBack(t *testing.T) {
 		return slug
 	}
 
-	entries := buildActivityTimeline(annotations, categoryDisplay)
+	entries := buildActivityTimeline(annotations, categoryDisplay, nil)
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
@@ -272,7 +272,7 @@ func TestBuildActivityTimeline_RuleAppliedNamedStillQuoted(t *testing.T) {
 		return slug
 	}
 
-	entries := buildActivityTimeline(annotations, categoryDisplay)
+	entries := buildActivityTimeline(annotations, categoryDisplay, nil)
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
@@ -386,7 +386,7 @@ func TestBuildActivityTimeline_TagNoteAndDuplicateCommentDeduped(t *testing.T) {
 		},
 	}
 
-	entries := buildActivityTimeline(annotations, nil)
+	entries := buildActivityTimeline(annotations, nil, nil)
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry (duplicate comment suppressed), got %d", len(entries))
@@ -414,7 +414,7 @@ func TestBuildActivityTimeline_StandaloneCommentNotDeduped(t *testing.T) {
 		CreatedAt: "2026-04-16T03:39:34Z",
 	}}
 
-	entries := buildActivityTimeline(annotations, nil)
+	entries := buildActivityTimeline(annotations, nil, nil)
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
 	}
@@ -454,9 +454,93 @@ func TestBuildActivityTimeline_DistantCommentNotDeduped(t *testing.T) {
 		},
 	}
 
-	entries := buildActivityTimeline(annotations, nil)
+	entries := buildActivityTimeline(annotations, nil, nil)
 	if len(entries) != 2 {
 		t.Fatalf("expected both entries to survive (distant timestamps), got %d", len(entries))
+	}
+}
+
+// Tag timeline rows now carry display name + color for chip rendering and a
+// TagAction discriminator for the plus/minus icon overlay.
+func TestBuildActivityTimeline_TagRowHasChipMetadata(t *testing.T) {
+	color := "#ff9800"
+	lookup := func(slug string) tagDisplay {
+		if slug == "needs-review" {
+			return tagDisplay{DisplayName: "Needs Review", Color: &color}
+		}
+		return tagDisplay{DisplayName: slug}
+	}
+	annotations := []service.Annotation{
+		{
+			ID:        "ann-add",
+			Kind:      "tag_added",
+			ActorName: "admin@example.com",
+			ActorType: "user",
+			Payload: map[string]interface{}{
+				"slug": "needs-review",
+			},
+			CreatedAt: "2026-04-16T03:39:34Z",
+		},
+		{
+			ID:        "ann-rem",
+			Kind:      "tag_removed",
+			ActorName: "admin@example.com",
+			ActorType: "user",
+			Payload: map[string]interface{}{
+				"slug": "needs-review",
+			},
+			CreatedAt: "2026-04-16T04:00:00Z",
+		},
+		{
+			ID:        "ann-unknown",
+			Kind:      "tag_added",
+			ActorName: "admin@example.com",
+			ActorType: "user",
+			Payload: map[string]interface{}{
+				"slug": "deleted-tag-slug",
+			},
+			CreatedAt: "2026-04-16T05:00:00Z",
+		},
+	}
+
+	entries := buildActivityTimeline(annotations, nil, lookup)
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 tag entries, got %d", len(entries))
+	}
+	byKey := map[string]service.ActivityEntry{}
+	for _, e := range entries {
+		if e.Type != "tag" {
+			t.Fatalf("expected type=tag, got %q", e.Type)
+		}
+		byKey[e.TagAction+"/"+e.TagSlug] = e
+	}
+
+	added := byKey["added/needs-review"]
+	if added.TagDisplayName != "Needs Review" {
+		t.Errorf("added.TagDisplayName = %q, want %q", added.TagDisplayName, "Needs Review")
+	}
+	if added.TagColor == nil || *added.TagColor != color {
+		t.Errorf("added.TagColor not propagated, got %v", added.TagColor)
+	}
+	if added.Summary != "Added tag" {
+		t.Errorf("added.Summary = %q, want just \"Added tag\" (chip renders the name)", added.Summary)
+	}
+
+	removed := byKey["removed/needs-review"]
+	if removed.TagAction != "removed" {
+		t.Errorf("removed.TagAction = %q", removed.TagAction)
+	}
+	if removed.TagColor == nil || *removed.TagColor != color {
+		t.Errorf("removed.TagColor not propagated, got %v", removed.TagColor)
+	}
+
+	// Unknown/deleted tag falls back to slug as display name, no color.
+	unknown := byKey["added/deleted-tag-slug"]
+	if unknown.TagDisplayName != "deleted-tag-slug" {
+		t.Errorf("unknown tag fallback DisplayName = %q, want slug", unknown.TagDisplayName)
+	}
+	if unknown.TagColor != nil {
+		t.Errorf("unknown tag should have nil color, got %v", unknown.TagColor)
 	}
 }
 
@@ -473,7 +557,7 @@ func TestBuildActivityTimeline_LegacyPrefixCommentSuppressed(t *testing.T) {
 		CreatedAt: "2026-03-01T00:00:00Z",
 	}}
 
-	entries := buildActivityTimeline(annotations, nil)
+	entries := buildActivityTimeline(annotations, nil, nil)
 
 	if len(entries) != 0 {
 		t.Fatalf("expected legacy [Review: ...] comment to be suppressed, got %d entries", len(entries))

@@ -268,6 +268,20 @@
         {{else if eq .ReviewStatus "skipped"}}<i data-lucide="skip-forward" class="w-4 h-4 text-warning" aria-hidden="true"></i>
         {{else}}<i data-lucide="scan-search" class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>{{end}}
       </div>
+      {{else if eq .Type "tag"}}
+      <div class="relative w-8 h-8 shrink-0 mt-0.5" aria-hidden="true">
+        <div class="w-8 h-8 rounded-full {{if eq .TagAction "removed"}}bg-base-200{{else}}bg-primary/10{{end}} flex items-center justify-center">
+          <i data-lucide="tag" class="w-4 h-4 {{if eq .TagAction "removed"}}text-base-content/50{{else}}text-primary{{end}}"></i>
+        </div>
+        <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border border-base-100 flex items-center justify-center {{if eq .TagAction "removed"}}bg-error/80{{else}}bg-success/80{{end}}">
+          {{if eq .TagAction "removed"}}<i data-lucide="minus" class="w-2 h-2 text-base-100"></i>
+          {{else}}<i data-lucide="plus" class="w-2 h-2 text-base-100"></i>{{end}}
+        </div>
+      </div>
+      {{else if eq .Type "category"}}
+      <div class="w-8 h-8 rounded-full bg-warning/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
+        <i data-lucide="folder" class="w-4 h-4 text-warning" aria-hidden="true"></i>
+      </div>
       {{else if eq .ActorType "agent"}}
       <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
         <i data-lucide="bot" class="w-4 h-4 text-primary" aria-hidden="true"></i>
@@ -289,6 +303,11 @@
         {{if .Summary}}
         <p class="text-sm">
           <span class="font-medium break-words">{{.Summary}}</span>
+          {{if and (eq .Type "tag") .TagSlug}}
+          <span class="bb-tag bb-tag-sm ml-1 align-middle{{if eq .TagAction "removed"}} line-through opacity-70{{end}}"{{if .TagColor}} style="--tag-color: {{deref .TagColor}}"{{end}} title="{{.TagSlug}}">
+            <span class="truncate">{{if .TagDisplayName}}{{.TagDisplayName}}{{else}}{{.TagSlug}}{{end}}</span>
+          </span>
+          {{end}}
         </p>
         {{end}}
         {{if .Detail}}

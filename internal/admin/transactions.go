@@ -698,7 +698,15 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 		}
 
 		// Build unified activity timeline from annotations.
-		activity := buildActivityTimeline(annotations, categoryDisplayLookup(categoryTree))
+		// Load registered-tag list early so tag chip rendering in the
+		// timeline has display names + colors without a per-row query.
+		timelineTags, err := svc.ListTags(ctx)
+		if err != nil {
+			a.Logger.Error("list tags for activity timeline", "error", err)
+			timelineTags = nil
+		}
+
+		activity := buildActivityTimeline(annotations, categoryDisplayLookup(categoryTree), tagDisplayLookup(timelineTags))
 		activityDays := groupActivityByDay(activity)
 
 		// Load tags currently attached + the registered-tag list (for the inline
@@ -875,6 +883,35 @@ func isDuplicateOfAdjacentTagNote(all []service.Annotation, c service.Annotation
 	return false
 }
 
+// tagDisplay carries presentation metadata for rendering a tag chip on a
+// timeline row. See tagDisplayLookup and the tag_added / tag_removed cases
+// in buildActivityTimeline.
+type tagDisplay struct {
+	DisplayName string
+	Color       *string
+}
+
+// tagDisplayLookup returns a slug -> presentation lookup built from the
+// registered-tag list. Slugs without a registered tag fall back to the
+// slug itself with a nil color so the template renders a plain chip.
+func tagDisplayLookup(tags []service.TagResponse) func(string) tagDisplay {
+	by := make(map[string]tagDisplay, len(tags))
+	for _, t := range tags {
+		by[t.Slug] = tagDisplay{DisplayName: t.DisplayName, Color: t.Color}
+	}
+	return func(slug string) tagDisplay {
+		if slug == "" {
+			return tagDisplay{}
+		}
+		if d, ok := by[slug]; ok {
+			return d
+		}
+		// Fall back to the slug as the display name — preserves legibility
+		// for tags that have since been deleted.
+		return tagDisplay{DisplayName: slug}
+	}
+}
+
 // buildActivityTimeline produces a sorted activity list from annotations.
 // Review lifecycle events surface as tag_added/tag_removed on the
 // needs-review tag. Comment annotations originally authored as review notes
@@ -883,9 +920,16 @@ func isDuplicateOfAdjacentTagNote(all []service.Annotation, c service.Annotation
 // categoryDisplay maps a category slug to a human-readable name
 // ("Food & Drink › Groceries"). Pass a no-op (returning slug unchanged) in
 // tests that don't need humanization.
-func buildActivityTimeline(annotations []service.Annotation, categoryDisplay func(string) string) []service.ActivityEntry {
+//
+// tagDisplayFn maps a tag slug to its display name + color for rendering a
+// tag chip on tag_added / tag_removed rows. Pass nil in tests that don't
+// exercise tag presentation.
+func buildActivityTimeline(annotations []service.Annotation, categoryDisplay func(string) string, tagDisplayFn func(string) tagDisplay) []service.ActivityEntry {
 	if categoryDisplay == nil {
 		categoryDisplay = func(s string) string { return s }
+	}
+	if tagDisplayFn == nil {
+		tagDisplayFn = func(slug string) tagDisplay { return tagDisplay{DisplayName: slug} }
 	}
 	var entries []service.ActivityEntry
 
@@ -979,15 +1023,18 @@ func buildActivityTimeline(annotations []service.Annotation, categoryDisplay fun
 			}
 			slug, _ := a.Payload["slug"].(string)
 			note, _ := a.Payload["note"].(string)
-			summary := "Added tag " + slug
+			td := tagDisplayFn(slug)
 			entry := service.ActivityEntry{
-				Type:      "tag",
-				Timestamp: a.CreatedAt,
-				ActorName: a.ActorName,
-				ActorType: a.ActorType,
-				Summary:   summary,
-				Detail:    note,
-				TagSlug:   slug,
+				Type:           "tag",
+				Timestamp:      a.CreatedAt,
+				ActorName:      a.ActorName,
+				ActorType:      a.ActorType,
+				Summary:        "Added tag",
+				Detail:         note,
+				TagSlug:        slug,
+				TagDisplayName: td.DisplayName,
+				TagColor:       td.Color,
+				TagAction:      "added",
 			}
 			if a.ActorID != nil && *a.ActorID != "" {
 				id := *a.ActorID
@@ -1005,15 +1052,18 @@ func buildActivityTimeline(annotations []service.Annotation, categoryDisplay fun
 			}
 			slug, _ := a.Payload["slug"].(string)
 			note, _ := a.Payload["note"].(string)
-			summary := "Removed tag " + slug
+			td := tagDisplayFn(slug)
 			entry := service.ActivityEntry{
-				Type:      "tag",
-				Timestamp: a.CreatedAt,
-				ActorName: a.ActorName,
-				ActorType: a.ActorType,
-				Summary:   summary,
-				Detail:    note,
-				TagSlug:   slug,
+				Type:           "tag",
+				Timestamp:      a.CreatedAt,
+				ActorName:      a.ActorName,
+				ActorType:      a.ActorType,
+				Summary:        "Removed tag",
+				Detail:         note,
+				TagSlug:        slug,
+				TagDisplayName: td.DisplayName,
+				TagColor:       td.Color,
+				TagAction:      "removed",
 			}
 			if a.ActorID != nil && *a.ActorID != "" {
 				id := *a.ActorID
