@@ -65,6 +65,8 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | `exclude_search` | string | Exclude matching name/merchant (min 2 chars) |
 | `search_mode` | string | `contains` (default), `words`, `fuzzy` |
 | `pending` | bool | Filter by pending status |
+| `tags` | string | Comma-separated slugs; result transactions must carry **every** slug (AND) |
+| `any_tag` | string | Comma-separated slugs; result transactions must carry **at least one** slug (OR) |
 | `sort_by` | string | `date` (default), `amount`, `name` |
 | `sort_order` | string | `desc` (default), `asc` |
 | `fields` | string | Field selection. Aliases: `minimal`, `core`, `category`, `timestamps` |
@@ -116,7 +118,15 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 
 The review queue is a tag. Transactions carrying the seeded `needs-review` tag (or any operator-defined trigger tag) are the backlog. A seeded `on_create` system rule auto-attaches `needs-review` to every newly-synced transaction; disable that rule to opt out. When removing a tag, passing a rationale `note` is optional — if provided, it's recorded on the `tag_removed` annotation.
 
-Tag management is exposed via the MCP tools (`list_tags`, `add_transaction_tag`, `remove_transaction_tag`, `create_tag`, `update_tag`, `delete_tag`, `update_transactions`, `list_annotations`) and the admin dashboard (`/tags`, `/transactions/:id/edit`, bulk actions on `/transactions`).
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/tags` | Read | List all registered tags |
+| POST | `/transactions/{id}/tags` | Write | Attach a tag to a transaction (body: `{"slug":"...","note":"..."}`). Auto-creates the tag if the slug is not yet registered. Idempotent — returns `already_present: true` on repeat calls. |
+| DELETE | `/transactions/{id}/tags/{slug}` | Write | Detach a tag from a transaction. Optional `?note=...` or JSON body `{"note":"..."}` recorded on the `tag_removed` annotation. Idempotent — returns `already_absent: true` when the tag isn't attached. |
+
+Tag CRUD (create/update/delete tag records themselves) remains on the admin dashboard and MCP (`create_tag`, `update_tag`, `delete_tag`) for now; REST CRUD is tracked as a follow-up. For filtering, pass `tags=slug1,slug2` (AND) or `any_tag=slug1,slug2` (OR) to `/transactions` and `/transactions/count`.
+
+Additional tag-touching operations exposed via MCP: `list_tags`, `add_transaction_tag`, `remove_transaction_tag`, `create_tag`, `update_tag`, `delete_tag`, `update_transactions`, `list_annotations`. The admin dashboard covers the same ground at `/tags`, `/transactions/:id/edit`, and bulk actions on `/transactions`.
 
 ## Transaction Rules
 

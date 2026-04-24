@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -108,6 +109,32 @@ func parseEnumParam(q url.Values, key string, allowed []string) (*string, error)
 		}
 	}
 	return nil, fmt.Errorf("%s must be one of: %s", key, joinStrings(allowed))
+}
+
+// parseCSVParam collects a repeatable/comma-separated query parameter into a
+// de-duplicated, trimmed slice. Accepts both ?tags=a,b and ?tags=a&tags=b.
+// Returns nil when the parameter is absent or contains only empty tokens.
+func parseCSVParam(q url.Values, key string) []string {
+	raw := q[key]
+	if len(raw) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	var out []string
+	for _, v := range raw {
+		for _, token := range strings.Split(v, ",") {
+			t := strings.TrimSpace(token)
+			if t == "" {
+				continue
+			}
+			if _, ok := seen[t]; ok {
+				continue
+			}
+			seen[t] = struct{}{}
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // joinStrings joins strings with ", " for error messages.
