@@ -91,6 +91,37 @@ DaisyUI `light`/`dark` themes with `prefers-color-scheme` auto-switch. **No hard
 
 Use Alpine inline patterns (modal + `x-data` state). Never blocking browser dialogs — they're hostile in an admin context and ignore dark mode.
 
+## Keyboard shortcuts
+
+New pages must register their scope. In the page's root `x-data`, set the scope on init and reset on destroy:
+
+```html
+<div x-data x-init="$store.shortcuts.setScope('my-page')" x-destroy="$store.shortcuts.setScope('global')"></div>
+```
+
+All shortcut bindings go through the Alpine store, never raw listeners:
+
+```js
+document.addEventListener('alpine:init', function () {
+  var reg = Alpine.store('shortcuts');
+  if (!reg) return;
+  reg.register({
+    id: 'my-page.do-thing',
+    keys: 'd',
+    description: 'Do the thing',
+    group: 'Actions',
+    scope: 'my-page',
+    action: function () { doTheThing(); },
+  });
+});
+```
+
+Never add a fresh `addEventListener('keydown', ...)` for a UI shortcut — the global dispatcher in `base.html` already handles input-field short-circuiting, overlay suppression, touch-device gating, and chord state. Raw listeners bypass all of it.
+
+Visible `kbd` hints must use the `Kbd` / `KbdChord` components in `internal/templates/components/kbd.templ` (or guard with `x-show="!$store.device.isTouch"`) so they disappear on touch devices. Don't hand-roll new `<kbd>` spans in new code.
+
+Full reference, including the canonical global + per-page shortcut tables and architecture notes, lives in `docs/keyboard-shortcuts.md`.
+
 ## Modal & AJAX patterns
 
 Admin list pages (reviews, rules, reports) use AJAX actions with card fade-out animations via Alpine. See `/reviews` (`reviewQueue()` component) for the reference pattern: inline approve/reject/skip/dismiss, optimistic UI, fade transitions, error recovery via `restorePageState()`.
