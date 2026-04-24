@@ -469,8 +469,8 @@ func TestListTransactions_DateRangeFilter(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 transaction in date range, got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Mid" {
-		t.Errorf("expected Mid, got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Mid" {
+		t.Errorf("expected Mid, got %s", result.Transactions[0].ProviderName)
 	}
 }
 
@@ -493,8 +493,8 @@ func TestListTransactions_PendingFilter(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 pending, got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Pending" {
-		t.Errorf("expected Pending, got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Pending" {
+		t.Errorf("expected Pending, got %s", result.Transactions[0].ProviderName)
 	}
 
 	// Filter for pending=false
@@ -506,8 +506,8 @@ func TestListTransactions_PendingFilter(t *testing.T) {
 	if len(result2.Transactions) != 1 {
 		t.Fatalf("expected 1 posted, got %d", len(result2.Transactions))
 	}
-	if result2.Transactions[0].Name != "Posted" {
-		t.Errorf("expected Posted, got %s", result2.Transactions[0].Name)
+	if result2.Transactions[0].ProviderName != "Posted" {
+		t.Errorf("expected Posted, got %s", result2.Transactions[0].ProviderName)
 	}
 }
 
@@ -535,8 +535,8 @@ func TestListTransactions_UserFilter(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 transaction for Alice, got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Alice Purchase" {
-		t.Errorf("expected Alice Purchase, got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Alice Purchase" {
+		t.Errorf("expected Alice Purchase, got %s", result.Transactions[0].ProviderName)
 	}
 }
 
@@ -562,8 +562,8 @@ func TestListTransactions_AccountFilter(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 for checking account, got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Checking Txn" {
-		t.Errorf("expected Checking Txn, got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Checking Txn" {
+		t.Errorf("expected Checking Txn, got %s", result.Transactions[0].ProviderName)
 	}
 }
 
@@ -592,8 +592,8 @@ func TestListTransactions_CategorySlugFilter(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 groceries transaction, got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Whole Foods" {
-		t.Errorf("expected Whole Foods, got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Whole Foods" {
+		t.Errorf("expected Whole Foods, got %s", result.Transactions[0].ProviderName)
 	}
 }
 
@@ -680,11 +680,11 @@ func TestListTransactions_SortByAmount(t *testing.T) {
 	if len(result.Transactions) != 3 {
 		t.Fatalf("expected 3, got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Big" {
-		t.Errorf("expected Big first (highest amount), got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Big" {
+		t.Errorf("expected Big first (highest amount), got %s", result.Transactions[0].ProviderName)
 	}
-	if result.Transactions[2].Name != "Small" {
-		t.Errorf("expected Small last (lowest amount), got %s", result.Transactions[2].Name)
+	if result.Transactions[2].ProviderName != "Small" {
+		t.Errorf("expected Small last (lowest amount), got %s", result.Transactions[2].ProviderName)
 	}
 
 	// No cursor when sorting by non-date
@@ -704,7 +704,7 @@ func TestListTransactions_SortByName(t *testing.T) {
 	testutil.MustCreateTransaction(t, queries, acctID, "txn_a", "Alice", 200, "2025-01-14")
 	testutil.MustCreateTransaction(t, queries, acctID, "txn_b", "Bob", 300, "2025-01-13")
 
-	sortBy := "name"
+	sortBy := "provider_name"
 	sortOrder := "asc"
 	result, err := svc.ListTransactions(ctx, service.TransactionListParams{
 		SortBy:    &sortBy,
@@ -713,14 +713,14 @@ func TestListTransactions_SortByName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Transactions[0].Name != "Alice" {
-		t.Errorf("expected Alice first, got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Alice" {
+		t.Errorf("expected Alice first, got %s", result.Transactions[0].ProviderName)
 	}
-	if result.Transactions[1].Name != "Bob" {
-		t.Errorf("expected Bob second, got %s", result.Transactions[1].Name)
+	if result.Transactions[1].ProviderName != "Bob" {
+		t.Errorf("expected Bob second, got %s", result.Transactions[1].ProviderName)
 	}
-	if result.Transactions[2].Name != "Charlie" {
-		t.Errorf("expected Charlie third, got %s", result.Transactions[2].Name)
+	if result.Transactions[2].ProviderName != "Charlie" {
+		t.Errorf("expected Charlie third, got %s", result.Transactions[2].ProviderName)
 	}
 }
 
@@ -739,8 +739,8 @@ func TestListTransactions_SortDateAsc(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Transactions[0].Name != "Old" {
-		t.Errorf("expected Old first (asc), got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Old" {
+		t.Errorf("expected Old first (asc), got %s", result.Transactions[0].ProviderName)
 	}
 }
 
@@ -762,8 +762,8 @@ func TestListTransactions_MaxAmountFilter(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 (amount <= 10), got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Small" {
-		t.Errorf("expected Small, got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Small" {
+		t.Errorf("expected Small, got %s", result.Transactions[0].ProviderName)
 	}
 }
 
@@ -790,8 +790,8 @@ func TestListTransactions_MinMaxAmountRange(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 (5 <= amount <= 50), got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Mid" {
-		t.Errorf("expected Mid, got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Mid" {
+		t.Errorf("expected Mid, got %s", result.Transactions[0].ProviderName)
 	}
 }
 
@@ -1485,8 +1485,8 @@ func TestListTransactions_SearchMode_Fuzzy(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 transaction matching 'starbuks' in fuzzy mode, got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Starbucks Coffee" {
-		t.Errorf("expected 'Starbucks Coffee', got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Starbucks Coffee" {
+		t.Errorf("expected 'Starbucks Coffee', got %s", result.Transactions[0].ProviderName)
 	}
 }
 
@@ -1540,7 +1540,7 @@ func TestListTransactions_ExcludeSearch_CommaOR(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 transaction after excluding starbucks,amazon, got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "TARGET #123" {
-		t.Errorf("expected TARGET #123, got %s", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "TARGET #123" {
+		t.Errorf("expected TARGET #123, got %s", result.Transactions[0].ProviderName)
 	}
 }

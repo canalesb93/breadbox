@@ -477,7 +477,7 @@ func TestMergeCategories_ReassignsRulesInsteadOfDeleting(t *testing.T) {
 	// Create a rule pointing to the source category.
 	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name:         "Test Rule For Merge",
-		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "coffee"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "contains", Value: "coffee"},
 		CategorySlug: "merge_rule_src",
 		Priority:     10,
 		Actor:        service.Actor{Type: "system", Name: "test"},
@@ -569,7 +569,7 @@ func TestMergeCategories_ParentWithChildren(t *testing.T) {
 	// Create a rule pointing to child2.
 	rule, err := svc.CreateTransactionRule(ctx, service.CreateTransactionRuleParams{
 		Name:         "Child Rule",
-		Conditions:   service.Condition{Field: "name", Op: "contains", Value: "child"},
+		Conditions:   service.Condition{Field: "provider_name", Op: "contains", Value: "child"},
 		CategorySlug: "merge_child2",
 		Priority:     10,
 		Actor:        service.Actor{Type: "system", Name: "test"},

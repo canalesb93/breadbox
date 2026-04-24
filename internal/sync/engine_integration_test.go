@@ -630,7 +630,7 @@ func TestSync_RuleCategoryDuringSync(t *testing.T) {
 	// Create a transaction rule that matches "Restaurant" → food_and_drink.
 	testutil.MustCreateTransactionRule(
 		t, queries, "Food Rule",
-		[]byte(`{"field":"name","op":"contains","value":"Restaurant"}`),
+		[]byte(`{"field": "provider_name","op":"contains","value":"Restaurant"}`),
 		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"}]`),
 		"on_create",
 	)
@@ -1096,7 +1096,7 @@ func TestSync_RuleBasedCategorization(t *testing.T) {
 	// Create a rule that matches "coffee" in name.
 	testutil.MustCreateTransactionRule(
 		t, queries, "Coffee Rule",
-		[]byte(`{"field":"name","op":"contains","value":"coffee"}`),
+		[]byte(`{"field": "provider_name","op":"contains","value":"coffee"}`),
 		[]byte(`[{"type":"set_category","category_slug":"coffee_shops"}]`),
 		"on_create",
 	)
@@ -1220,7 +1220,7 @@ func TestSync_UnchangedTransactions_SkipRuleReapplication(t *testing.T) {
 
 	testutil.MustCreateTransactionRule(
 		t, queries, "Coffee Rule",
-		[]byte(`{"field":"name","op":"contains","value":"coffee"}`),
+		[]byte(`{"field": "provider_name","op":"contains","value":"coffee"}`),
 		[]byte(`[{"type":"set_category","category_slug":"coffee_shops"}]`),
 		"on_create",
 	)
@@ -1422,7 +1422,7 @@ func TestRule_Trigger_OnCreate_SkipsOnUpdate(t *testing.T) {
 	// First rule fires on create only.
 	testutil.MustCreateTransactionRule(
 		t, queries, "On-Create Rule",
-		[]byte(`{"field":"name","op":"contains","value":"Coffee"}`),
+		[]byte(`{"field": "provider_name","op":"contains","value":"Coffee"}`),
 		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"}]`),
 		"on_create",
 	)
@@ -1520,7 +1520,7 @@ func TestRule_Trigger_OnUpdate_SkipsOnCreate(t *testing.T) {
 
 	testutil.MustCreateTransactionRule(
 		t, queries, "On-Update Rule",
-		[]byte(`{"field":"name","op":"contains","value":"Coffee"}`),
+		[]byte(`{"field": "provider_name","op":"contains","value":"Coffee"}`),
 		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"}]`),
 		"on_update",
 	)
@@ -1582,7 +1582,7 @@ func TestRule_TypedActions_SetCategory_RespectsOverride(t *testing.T) {
 
 	testutil.MustCreateTransactionRule(
 		t, queries, "Override Rule",
-		[]byte(`{"field":"name","op":"contains","value":"Coffee"}`),
+		[]byte(`{"field": "provider_name","op":"contains","value":"Coffee"}`),
 		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"}]`),
 		"always",
 	)
@@ -1684,7 +1684,7 @@ func TestRule_ExpiredRule_NotFired(t *testing.T) {
 
 	rule := testutil.MustCreateTransactionRule(
 		t, queries, "Expired Rule",
-		[]byte(`{"field":"name","op":"contains","value":"Coffee"}`),
+		[]byte(`{"field": "provider_name","op":"contains","value":"Coffee"}`),
 		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"}]`),
 		"on_create",
 	)
@@ -1765,7 +1765,7 @@ func TestRule_DisabledRule_NotFired_DuringSync(t *testing.T) {
 
 	rule := testutil.MustCreateTransactionRule(
 		t, queries, "Disabled Rule",
-		[]byte(`{"field":"name","op":"contains","value":"Coffee"}`),
+		[]byte(`{"field": "provider_name","op":"contains","value":"Coffee"}`),
 		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"}]`),
 		"on_create",
 	)
@@ -1841,7 +1841,7 @@ func TestRule_OverrideSuppressesSetCategoryButNotOthers(t *testing.T) {
 
 	rule := testutil.MustCreateTransactionRule(
 		t, queries, "Coffee combo",
-		[]byte(`{"field":"name","op":"contains","value":"Coffee"}`),
+		[]byte(`{"field": "provider_name","op":"contains","value":"Coffee"}`),
 		[]byte(`[{"type":"set_category","category_slug":"food_and_drink"},{"type":"add_tag","tag_slug":"caffeine"}]`),
 		"always",
 	)
@@ -1942,7 +1942,7 @@ func TestRule_HitCountMatchesWrites_TagOnly(t *testing.T) {
 
 	rule := testutil.MustCreateTransactionRule(
 		t, queries, "Tag-only Rule",
-		[]byte(`{"field":"name","op":"contains","value":"Tagged"}`),
+		[]byte(`{"field": "provider_name","op":"contains","value":"Tagged"}`),
 		[]byte(`[{"type":"add_tag","tag_slug":"auto-tagged"}]`),
 		"on_create",
 	)

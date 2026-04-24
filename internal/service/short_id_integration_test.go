@@ -222,8 +222,8 @@ func TestShortID_Resolver_ListTransactions_FilterByUserShortID(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 transaction for Alice, got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Alice Purchase" {
-		t.Fatalf("expected 'Alice Purchase', got %q", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Alice Purchase" {
+		t.Fatalf("expected 'Alice Purchase', got %q", result.Transactions[0].ProviderName)
 	}
 }
 
@@ -249,8 +249,8 @@ func TestShortID_Resolver_ListTransactions_FilterByAccountShortID(t *testing.T) 
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 transaction for Checking, got %d", len(result.Transactions))
 	}
-	if result.Transactions[0].Name != "Check Purchase" {
-		t.Fatalf("expected 'Check Purchase', got %q", result.Transactions[0].Name)
+	if result.Transactions[0].ProviderName != "Check Purchase" {
+		t.Fatalf("expected 'Check Purchase', got %q", result.Transactions[0].ProviderName)
 	}
 }
 
@@ -274,7 +274,7 @@ func TestShortID_Resolver_NotFound(t *testing.T) {
 // --- Field filtering includes short_id ---
 
 func TestShortID_AlwaysIncludedInFieldSelection(t *testing.T) {
-	fields, err := service.ParseFields("name,amount")
+	fields, err := service.ParseFields("provider_name,amount")
 	if err != nil {
 		t.Fatalf("ParseFields: %v", err)
 	}
@@ -288,16 +288,16 @@ func TestShortID_AlwaysIncludedInFieldSelection(t *testing.T) {
 
 func TestShortID_FilterTransactionFields(t *testing.T) {
 	txn := service.TransactionResponse{
-		ID:      "some-uuid",
-		ShortID: "Ab12Cd34",
-		Name:    "Coffee",
-		Amount:  4.50,
+		ID:           "some-uuid",
+		ShortID:      "Ab12Cd34",
+		ProviderName: "Coffee",
+		Amount:       4.50,
 	}
 
 	fields := map[string]bool{
-		"id":       true,
-		"short_id": true,
-		"name":     true,
+		"id":            true,
+		"short_id":      true,
+		"provider_name": true,
 	}
 
 	filtered := service.FilterTransactionFields(txn, fields)

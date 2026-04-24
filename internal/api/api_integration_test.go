@@ -390,8 +390,8 @@ func TestAPI_ListTransactions_WithData(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 transaction, got %d", len(result.Transactions))
 	}
-	if result.Transactions[0]["name"] != "Coffee Shop" {
-		t.Errorf("expected name 'Coffee Shop', got %v", result.Transactions[0]["name"])
+	if result.Transactions[0]["provider_name"] != "Coffee Shop" {
+		t.Errorf("expected name 'Coffee Shop', got %v", result.Transactions[0]["provider_name"])
 	}
 	// Verify denormalized fields exist
 	if result.Transactions[0]["account_name"] == nil {
@@ -521,8 +521,8 @@ func TestAPI_ListTransactions_SearchFilter(t *testing.T) {
 	if len(result.Transactions) != 1 {
 		t.Fatalf("expected 1 transaction matching 'coffee', got %d", len(result.Transactions))
 	}
-	if result.Transactions[0]["name"] != "Starbucks Coffee" {
-		t.Errorf("expected 'Starbucks Coffee', got %v", result.Transactions[0]["name"])
+	if result.Transactions[0]["provider_name"] != "Starbucks Coffee" {
+		t.Errorf("expected 'Starbucks Coffee', got %v", result.Transactions[0]["provider_name"])
 	}
 }
 
@@ -627,8 +627,8 @@ func TestAPI_GetTransaction_Found(t *testing.T) {
 
 	var result map[string]any
 	parseJSON(t, resp, &result)
-	if result["name"] != "Coffee Shop" {
-		t.Errorf("expected name 'Coffee Shop', got %v", result["name"])
+	if result["provider_name"] != "Coffee Shop" {
+		t.Errorf("expected provider_name 'Coffee Shop', got %v", result["provider_name"])
 	}
 }
 
@@ -992,7 +992,7 @@ func TestAPI_CreateRule_Success(t *testing.T) {
 		"category_slug": "groceries",
 		"priority":      10,
 		"conditions": map[string]any{
-			"field": "name",
+			"field": "provider_name",
 			"op":    "contains",
 			"value": "grocery",
 		},
@@ -1015,7 +1015,7 @@ func TestAPI_CreateRule_MissingName(t *testing.T) {
 	resp := env.doPost(t, "/api/v1/rules", map[string]any{
 		"category_slug": "food",
 		"conditions": map[string]any{
-			"field": "name",
+			"field": "provider_name",
 			"op":    "eq",
 			"value": "test",
 		},
@@ -1029,7 +1029,7 @@ func TestAPI_CreateRule_MissingCategorySlug(t *testing.T) {
 	resp := env.doPost(t, "/api/v1/rules", map[string]any{
 		"name": "Test Rule",
 		"conditions": map[string]any{
-			"field": "name",
+			"field": "provider_name",
 			"op":    "eq",
 			"value": "test",
 		},
@@ -1044,7 +1044,7 @@ func TestAPI_CreateRule_InvalidCategory(t *testing.T) {
 		"name":          "Bad Category Rule",
 		"category_slug": "nonexistent_category_slug",
 		"conditions": map[string]any{
-			"field": "name",
+			"field": "provider_name",
 			"op":    "eq",
 			"value": "test",
 		},
@@ -1098,7 +1098,7 @@ func TestAPI_UpdateRule_Success(t *testing.T) {
 		"name":          "Food Rule",
 		"category_slug": "food",
 		"priority":      5,
-		"conditions":    map[string]any{"field": "name", "op": "contains", "value": "food"},
+		"conditions":    map[string]any{"field": "provider_name", "op": "contains", "value": "food"},
 	})
 	assertStatus(t, resp, http.StatusCreated)
 	var rule map[string]any
@@ -1128,7 +1128,7 @@ func TestAPI_UpdateRule_Disable(t *testing.T) {
 	resp := env.doPost(t, "/api/v1/rules", map[string]any{
 		"name":          "Disable Me",
 		"category_slug": "misc",
-		"conditions":    map[string]any{"field": "name", "op": "eq", "value": "x"},
+		"conditions":    map[string]any{"field": "provider_name", "op": "eq", "value": "x"},
 	})
 	var rule map[string]any
 	parseJSON(t, resp, &rule)
@@ -1165,7 +1165,7 @@ func TestAPI_DeleteRule_Success(t *testing.T) {
 		"name":          "Transport Rule",
 		"category_slug": "transport",
 		"priority":      1,
-		"conditions":    map[string]any{"field": "name", "op": "contains", "value": "uber"},
+		"conditions":    map[string]any{"field": "provider_name", "op": "contains", "value": "uber"},
 	})
 	assertStatus(t, resp, http.StatusCreated)
 	var rule map[string]any
@@ -1190,7 +1190,7 @@ func TestAPI_PreviewRule_Success(t *testing.T) {
 
 	resp := env.doPost(t, "/api/v1/rules/preview", map[string]any{
 		"conditions": map[string]any{
-			"field": "name",
+			"field": "provider_name",
 			"op":    "contains",
 			"value": "Coffee",
 		},
@@ -1215,7 +1215,7 @@ func TestAPI_PreviewRule_NoMatches(t *testing.T) {
 
 	resp := env.doPost(t, "/api/v1/rules/preview", map[string]any{
 		"conditions": map[string]any{
-			"field": "name",
+			"field": "provider_name",
 			"op":    "eq",
 			"value": "NONEXISTENT",
 		},
