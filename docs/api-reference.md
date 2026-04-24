@@ -67,7 +67,7 @@ API keys are created from the admin dashboard under **API Keys**. Keys can be sc
 | `pending` | bool | Filter by pending status |
 | `tags` | string | Comma-separated slugs; result transactions must carry **every** slug (AND) |
 | `any_tag` | string | Comma-separated slugs; result transactions must carry **at least one** slug (OR) |
-| `sort_by` | string | `date` (default), `amount`, `name` |
+| `sort_by` | string | `date` (default), `amount`, `provider_name` |
 | `sort_order` | string | `desc` (default), `asc` |
 | `fields` | string | Field selection. Aliases: `minimal`, `core`, `category`, `timestamps` |
 | `cursor` | string | Pagination cursor (only with date sort) |
@@ -151,13 +151,13 @@ Rules use a recursive JSON condition tree supporting AND/OR/NOT logic:
 {
   "type": "and",
   "conditions": [
-    { "field": "name", "operator": "contains", "value": "AMAZON" },
+    { "field": "provider_name", "operator": "contains", "value": "AMAZON" },
     { "field": "amount", "operator": "gt", "value": 50 }
   ]
 }
 ```
 
-**Available fields:** `name`, `merchant_name`, `amount`, `category_primary`, `category_detailed`, `pending`, `provider`, `account_id`, `user_id`, `user_name`
+**Available fields:** `provider_name`, `provider_merchant_name`, `amount`, `provider_category_primary`, `provider_category_detailed`, `pending`, `provider`, `account_id`, `user_id`, `user_name`
 
 **String operators:** `eq`, `neq`, `contains`, `not_contains`, `matches` (regex), `in`
 

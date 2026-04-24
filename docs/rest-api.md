@@ -447,13 +447,13 @@ Soft-deleted transactions (where `deleted_at` is non-null) are excluded from all
 | `end_date` | string (ISO 8601 date) | No | — | Exclusive upper bound on `date`. Format: `YYYY-MM-DD`. A transaction with `date == end_date` is excluded. |
 | `account_id` | UUID | No | — | Filter to a single account. |
 | `user_id` | UUID | No | — | Filter to all accounts belonging to a specific family member. |
-| `category` | string | No | — | Exact match on `category_primary` (e.g., `"FOOD_AND_DRINK"`, `"TRANSPORTATION"`). Case-sensitive. |
-| `category_detailed` | string | No | — | Exact match on `category_detailed` (e.g., `"FOOD_AND_DRINK_GROCERIES"`). Case-sensitive. |
+| `category` | string | No | — | Exact match on `provider_category_primary` (e.g., `"FOOD_AND_DRINK"`, `"TRANSPORTATION"`). Case-sensitive. |
+| `category_detailed` | string | No | — | Exact match on `provider_category_detailed` (e.g., `"FOOD_AND_DRINK_GROCERIES"`). Case-sensitive. |
 | `min_amount` | number | No | — | Inclusive lower bound on `amount`. Uses Plaid sign convention (positive = debit). |
 | `max_amount` | number | No | — | Inclusive upper bound on `amount`. |
 | `pending` | boolean | No | — | If `true`, return only pending transactions. If `false`, return only posted transactions. If omitted, return both. |
-| `search` | string | No | — | Text search applied to `name` and `merchant_name`. Case-insensitive. Uses PostgreSQL `pg_trgm` similarity or `ILIKE`. Min length: 2 characters. |
-| `sort_by` | string | No | `date` | Sort field. Valid values: `date`, `amount`, `name`. |
+| `search` | string | No | — | Text search applied to `provider_name` and `provider_merchant_name`. Case-insensitive. Uses PostgreSQL `pg_trgm` similarity or `ILIKE`. Min length: 2 characters. |
+| `sort_by` | string | No | `date` | Sort field. Valid values: `date`, `amount`, `provider_name`. |
 | `sort_order` | string | No | `desc` | Sort direction. Valid values: `asc`, `desc`. Cursor pagination only works with `date` sort. |
 
 All filters are combined with `AND` logic. See [Section 6](#6-filtering-and-search) for detailed filter semantics.
@@ -466,8 +466,8 @@ All filters are combined with `AND` logic. See [Section 6](#6-filtering-and-sear
     {
       "id": "t1a2b3c4-d5e6-f789-0abc-def123456789",
       "account_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-      "external_transaction_id": "lPNZkR5o3Vh1qWxYuEj2dM7fKtS9gA",
-      "pending_transaction_id": null,
+      "provider_transaction_id": "lPNZkR5o3Vh1qWxYuEj2dM7fKtS9gA",
+      "provider_pending_transaction_id": null,
       "amount": 67.43,
       "iso_currency_code": "USD",
       "unofficial_currency_code": null,
@@ -475,11 +475,11 @@ All filters are combined with `AND` logic. See [Section 6](#6-filtering-and-sear
       "datetime": "2026-02-27T10:23:00Z",
       "authorized_date": "2026-02-26",
       "authorized_datetime": "2026-02-26T19:45:00Z",
-      "name": "WHOLE FOODS MARKET #10452",
-      "merchant_name": "Whole Foods Market",
-      "category_primary": "FOOD_AND_DRINK",
-      "category_detailed": "FOOD_AND_DRINK_GROCERIES",
-      "payment_channel": "in store",
+      "provider_name": "WHOLE FOODS MARKET #10452",
+      "provider_merchant_name": "Whole Foods Market",
+      "provider_category_primary": "FOOD_AND_DRINK",
+      "provider_category_detailed": "FOOD_AND_DRINK_GROCERIES",
+      "provider_payment_channel": "in store",
       "pending": false,
       "created_at": "2026-02-27T08:15:00Z",
       "updated_at": "2026-02-27T08:15:00Z"
@@ -487,8 +487,8 @@ All filters are combined with `AND` logic. See [Section 6](#6-filtering-and-sear
     {
       "id": "t2b3c4d5-e6f7-890a-bcde-f12345678901",
       "account_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-      "external_transaction_id": "mQoZjS4p2Wg0rVyXtFk3eN8hLuT1bB",
-      "pending_transaction_id": null,
+      "provider_transaction_id": "mQoZjS4p2Wg0rVyXtFk3eN8hLuT1bB",
+      "provider_pending_transaction_id": null,
       "amount": 14.00,
       "iso_currency_code": "USD",
       "unofficial_currency_code": null,
@@ -496,11 +496,11 @@ All filters are combined with `AND` logic. See [Section 6](#6-filtering-and-sear
       "datetime": null,
       "authorized_date": "2026-02-26",
       "authorized_datetime": null,
-      "name": "NETFLIX.COM",
-      "merchant_name": "Netflix",
-      "category_primary": "ENTERTAINMENT",
-      "category_detailed": "ENTERTAINMENT_STREAMING_SERVICES",
-      "payment_channel": "online",
+      "provider_name": "NETFLIX.COM",
+      "provider_merchant_name": "Netflix",
+      "provider_category_primary": "ENTERTAINMENT",
+      "provider_category_detailed": "ENTERTAINMENT_STREAMING_SERVICES",
+      "provider_payment_channel": "online",
       "pending": false,
       "created_at": "2026-02-26T22:00:00Z",
       "updated_at": "2026-02-26T22:00:00Z"
@@ -508,8 +508,8 @@ All filters are combined with `AND` logic. See [Section 6](#6-filtering-and-sear
     {
       "id": "t3c4d5e6-f7a8-901b-cdef-123456789012",
       "account_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-      "external_transaction_id": "nRpAkT5q3Xh1sWzYvGl4fO9iMvU2cC",
-      "pending_transaction_id": null,
+      "provider_transaction_id": "nRpAkT5q3Xh1sWzYvGl4fO9iMvU2cC",
+      "provider_pending_transaction_id": null,
       "amount": -2500.00,
       "iso_currency_code": "USD",
       "unofficial_currency_code": null,
@@ -517,11 +517,11 @@ All filters are combined with `AND` logic. See [Section 6](#6-filtering-and-sear
       "datetime": null,
       "authorized_date": null,
       "authorized_datetime": null,
-      "name": "EMPLOYER DIRECT DEPOSIT",
-      "merchant_name": null,
-      "category_primary": "INCOME",
-      "category_detailed": "INCOME_WAGES",
-      "payment_channel": "other",
+      "provider_name": "EMPLOYER DIRECT DEPOSIT",
+      "provider_merchant_name": null,
+      "provider_category_primary": "INCOME",
+      "provider_category_detailed": "INCOME_WAGES",
+      "provider_payment_channel": "other",
       "pending": false,
       "created_at": "2026-02-25T06:00:00Z",
       "updated_at": "2026-02-25T06:00:00Z"
@@ -575,11 +575,11 @@ Returns the total count of transactions matching the given filters. Accepts the 
 | `end_date` | string (ISO 8601 date) | No | — | Exclusive upper bound on `date`. Format: `YYYY-MM-DD`. |
 | `account_id` | UUID | No | — | Filter to a single account. |
 | `user_id` | UUID | No | — | Filter to all accounts belonging to a specific family member. |
-| `category` | string | No | — | Exact match on `category_primary`. Case-sensitive. |
+| `category` | string | No | — | Exact match on `provider_category_primary`. Case-sensitive. |
 | `min_amount` | number | No | — | Inclusive lower bound on `amount`. |
 | `max_amount` | number | No | — | Inclusive upper bound on `amount`. |
 | `pending` | boolean | No | — | If `true`, count only pending transactions. If `false`, count only posted. If omitted, count both. |
-| `search` | string | No | — | Text search applied to `name` and `merchant_name`. Min length: 2 characters. |
+| `search` | string | No | — | Text search applied to `provider_name` and `provider_merchant_name`. Min length: 2 characters. |
 
 All filters are combined with `AND` logic. Soft-deleted transactions are excluded.
 
@@ -628,8 +628,8 @@ Returns a single transaction by its Breadbox UUID.
 {
   "id": "t1a2b3c4-d5e6-f789-0abc-def123456789",
   "account_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "external_transaction_id": "lPNZkR5o3Vh1qWxYuEj2dM7fKtS9gA",
-  "pending_transaction_id": null,
+  "provider_transaction_id": "lPNZkR5o3Vh1qWxYuEj2dM7fKtS9gA",
+  "provider_pending_transaction_id": null,
   "amount": 67.43,
   "iso_currency_code": "USD",
   "unofficial_currency_code": null,
@@ -637,11 +637,11 @@ Returns a single transaction by its Breadbox UUID.
   "datetime": "2026-02-27T10:23:00Z",
   "authorized_date": "2026-02-26",
   "authorized_datetime": "2026-02-26T19:45:00Z",
-  "name": "WHOLE FOODS MARKET #10452",
-  "merchant_name": "Whole Foods Market",
-  "category_primary": "FOOD_AND_DRINK",
-  "category_detailed": "FOOD_AND_DRINK_GROCERIES",
-  "payment_channel": "in store",
+  "provider_name": "WHOLE FOODS MARKET #10452",
+  "provider_merchant_name": "Whole Foods Market",
+  "provider_category_primary": "FOOD_AND_DRINK",
+  "provider_category_detailed": "FOOD_AND_DRINK_GROCERIES",
+  "provider_payment_channel": "in store",
   "pending": false,
   "created_at": "2026-02-27T08:15:00Z",
   "updated_at": "2026-02-27T08:15:00Z"

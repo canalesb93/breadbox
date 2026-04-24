@@ -37,7 +37,7 @@ Query transactions with composable filters and cursor pagination.
 | `pending` | bool | Filter by pending status |
 | `tags` | array | AND filter — must have every slug. Use `["needs-review"]` to fetch the review backlog. |
 | `any_tag` | array | OR filter — must have at least one slug. |
-| `sort_by` | string | `date` (default), `amount`, `name` |
+| `sort_by` | string | `date` (default), `amount`, `provider_name` |
 | `sort_order` | string | `desc` (default), `asc` |
 | `fields` | string | Field selection. Aliases: `minimal`, `core`, `category`, `timestamps` |
 | `cursor` | string | Pagination cursor |
@@ -271,7 +271,7 @@ Example pipeline (3 rules that chain):
     {
       "name": "Tag coffee shops",
       "stage": "baseline",
-      "conditions": { "field": "merchant_name", "op": "contains", "value": "starbucks" },
+      "conditions": { "field": "provider_merchant_name", "op": "contains", "value": "starbucks" },
       "actions": [ { "type": "add_tag", "tag_slug": "coffee" } ]
     },
     {

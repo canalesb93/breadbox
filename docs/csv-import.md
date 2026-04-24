@@ -198,7 +198,7 @@ This avoids the MM/DD vs DD/MM ambiguity problem — if all dates parse as both,
 
 ### Hash Algorithm
 
-Each imported transaction gets a deterministic `external_transaction_id`:
+Each imported transaction gets a deterministic `provider_transaction_id`:
 
 ```
 SHA-256(account_id | date | amount | description)
@@ -213,7 +213,7 @@ Where:
 
 ### Upsert Behavior
 
-The generated `external_transaction_id` is passed to the existing `UpsertTransaction` query, which uses `ON CONFLICT (external_transaction_id) DO UPDATE`. This means:
+The generated `provider_transaction_id` is passed to the existing `UpsertTransaction` query, which uses `ON CONFLICT (provider_transaction_id) DO UPDATE`. This means:
 
 - **First import**: all rows are inserted as new transactions
 - **Re-import same file**: all rows match existing transactions, counts as "updated" (no-op in practice since values are identical)

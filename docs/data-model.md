@@ -133,20 +133,21 @@ This document defines the complete PostgreSQL database schema for the Breadbox M
                             │──────────────────────│
                             │ id (PK)              │
                             │ account_id (FK)      │
-                            │ external_transaction_id│
-                            │ pending_transaction_id│
+                            │ provider_transaction_id│
+                            │ provider_pending_transaction_id│
                             │ amount               │
                             │ iso_currency_code    │
                             │ date                 │
                             │ authorized_date      │
                             │ datetime             │
                             │ authorized_datetime  │
-                            │ name                 │
-                            │ merchant_name        │
-                            │ category_primary     │
-                            │ category_detailed    │
-                            │ category_confidence  │
-                            │ payment_channel      │
+                            │ provider_name        │
+                            │ provider_merchant_name│
+                            │ provider_category_primary│
+                            │ provider_category_detailed│
+                            │ provider_category_confidence│
+                            │ provider_payment_channel│
+                            │ provider_raw (JSONB) │
                             │ pending              │
                             │ deleted_at           │
                             │ created_at           │
@@ -400,8 +401,8 @@ Plaid `account_id` values are globally unique across all items and institutions.
 |---|---|---|---|---|
 | `id` | `UUID` | No | `gen_random_uuid()` | Primary key. Internal Breadbox identifier. |
 | `account_id` | `UUID` | Yes | `NULL` | FK to `accounts.id`. SET NULL on account delete. Nullable so transactions are preserved for historical queries if the parent account is removed. |
-| `external_transaction_id` | `TEXT` | No | — | Provider-assigned transaction identifier. For Plaid: `transaction_id`. Case-sensitive. Stable for posted transactions; pending transactions may receive a new `transaction_id` when they post. Used for upsert during sync. |
-| `pending_transaction_id` | `TEXT` | Yes | `NULL` | For a posted transaction that was previously pending, this is the `transaction_id` of that original pending transaction. Plaid sets this field to link the posted record back to the pending record it replaced. The application uses this to locate and soft-delete the superseded pending row. |
+| `provider_transaction_id` | `TEXT` | No | — | Provider-assigned transaction identifier. For Plaid: `transaction_id`. Case-sensitive. Stable for posted transactions; pending transactions may receive a new `transaction_id` when they post. Used for upsert during sync. |
+| `provider_pending_transaction_id` | `TEXT` | Yes | `NULL` | For a posted transaction that was previously pending, this is the `transaction_id` of that original pending transaction. Plaid sets this field to link the posted record back to the pending record it replaced. The application uses this to locate and soft-delete the superseded pending row. |
 | `amount` | `NUMERIC(12,2)` | No | — | Transaction amount in the account's currency. **Sign convention (Plaid passthrough):** Positive values represent money leaving the account (debits, purchases, payments). Negative values represent money entering the account (credits, refunds, deposits). This matches Plaid's native convention exactly — Breadbox does not invert the sign. See Section 4 for full rationale. |
 | `iso_currency_code` | `TEXT` | Yes | `NULL` | ISO-4217 currency code for this transaction (e.g., `USD`). `NULL` if Plaid returns an unofficial currency code. Never silently aggregate across currencies. |
 | `unofficial_currency_code` | `TEXT` | Yes | `NULL` | Non-standard currency code (e.g., cryptocurrency). Mutually exclusive with `iso_currency_code` — Plaid guarantees at most one is non-null. |
@@ -409,12 +410,13 @@ Plaid `account_id` values are globally unique across all items and institutions.
 | `authorized_date` | `DATE` | Yes | `NULL` | Date the transaction was authorized by the user (e.g., when a card was swiped). Earlier than or equal to `date` for posted transactions. Not always available. |
 | `datetime` | `TIMESTAMPTZ` | Yes | `NULL` | Full timestamp of the posted transaction, if provided by the institution. Only available for select institutions. `NULL` for most transactions. |
 | `authorized_datetime` | `TIMESTAMPTZ` | Yes | `NULL` | Full timestamp of authorization, if provided by the institution. `NULL` for most transactions. |
-| `name` | `TEXT` | No | — | Merchant name or transaction description as returned by Plaid (sourced from the raw financial institution description). This is the primary human-readable description of the transaction. Plaid marks this field as deprecated in favor of `merchant_name` but it remains populated and is the most reliable description field. |
-| `merchant_name` | `TEXT` | Yes | `NULL` | Plaid-enriched merchant name, cleaned and normalized from the `name` field (e.g., "McDonald's" instead of "MCDONALDS 00321 CARD PURCH"). `NULL` when Plaid cannot identify the merchant. |
-| `category_primary` | `TEXT` | Yes | `NULL` | High-level personal finance category from Plaid's `personal_finance_category.primary` (e.g., `FOOD_AND_DRINK`, `TRANSPORTATION`, `INCOME`). Part of Plaid's enriched categorization taxonomy (v2). |
-| `category_detailed` | `TEXT` | Yes | `NULL` | Granular subcategory from Plaid's `personal_finance_category.detailed` (e.g., `FOOD_AND_DRINK_RESTAURANTS`, `TRANSPORTATION_GAS_AND_FUEL`). Can be used as a stable identifier. |
-| `category_confidence` | `TEXT` | Yes | `NULL` | Plaid's confidence in the category assignment. One of: `VERY_HIGH`, `HIGH`, `MEDIUM`, `LOW`, `UNKNOWN`. |
-| `payment_channel` | `TEXT` | Yes | `NULL` | Channel used to make the payment. One of: `online`, `in store`, `other`. `NULL` if Plaid does not provide this field. |
+| `provider_name` | `TEXT` | No | — | Merchant name or transaction description as returned by the provider (sourced from the raw financial institution description). This is the primary human-readable description of the transaction. Plaid marks this field as deprecated in favor of `merchant_name` but it remains populated and is the most reliable description field. |
+| `provider_merchant_name` | `TEXT` | Yes | `NULL` | Provider-enriched merchant name, cleaned and normalized from the provider name field (e.g., "McDonald's" instead of "MCDONALDS 00321 CARD PURCH"). `NULL` when the provider cannot identify the merchant. |
+| `provider_category_primary` | `TEXT` | Yes | `NULL` | High-level personal finance category from the provider's categorization (e.g., `FOOD_AND_DRINK`, `TRANSPORTATION`, `INCOME` for Plaid). Part of the provider's enriched categorization taxonomy. |
+| `provider_category_detailed` | `TEXT` | Yes | `NULL` | Granular subcategory from the provider (e.g., `FOOD_AND_DRINK_RESTAURANTS`, `TRANSPORTATION_GAS_AND_FUEL` for Plaid). Can be used as a stable identifier. |
+| `provider_category_confidence` | `TEXT` | Yes | `NULL` | Provider's confidence in the category assignment. One of: `VERY_HIGH`, `HIGH`, `MEDIUM`, `LOW`, `UNKNOWN`. |
+| `provider_payment_channel` | `TEXT` | Yes | `NULL` | Channel used to make the payment. One of: `online`, `in store`, `other`. `NULL` if the provider does not provide this field. |
+| `provider_raw` | `JSONB` | Yes | `NULL` | Unmodified provider payload for this transaction. Populated by the Plaid, Teller, and CSV adapters during upsert. Useful for debugging, replaying enrichment, and accessing fields that Breadbox does not yet model as typed columns. Large — do not `SELECT *` it on list endpoints. |
 | `pending` | `BOOLEAN` | No | `FALSE` | Whether the transaction has settled. `TRUE` = pending (not yet cleared). `FALSE` = posted. Pending transactions may change details or be replaced entirely when they post. |
 | `deleted_at` | `TIMESTAMPTZ` | Yes | `NULL` | Soft-delete timestamp. `NULL` means the transaction is active. Set to the current time when Plaid includes this `transaction_id` in the `removed` array of a `/transactions/sync` response. Soft-deleted transactions are excluded from API responses by default but are never hard-deleted. |
 | `created_at` | `TIMESTAMPTZ` | No | `NOW()` | Timestamp when this row was first inserted into Breadbox. |
@@ -435,10 +437,10 @@ FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE SET NULL
 #### Unique Constraints
 
 ```sql
-UNIQUE (external_transaction_id)
+UNIQUE (provider_transaction_id)
 ```
 
-Enables `INSERT ... ON CONFLICT (external_transaction_id) DO UPDATE` upsert pattern for all sync operations. Plaid `transaction_id` values are globally unique.
+Enables `INSERT ... ON CONFLICT (provider_transaction_id) DO UPDATE` upsert pattern for all sync operations. Plaid `transaction_id` values are globally unique.
 
 #### Indexes
 
@@ -447,13 +449,13 @@ See Section 5 for full index rationale. Summary:
 | Index | Columns | Type | Rationale |
 |---|---|---|---|
 | `transactions_pkey` | `id` | B-tree (implicit PK) | Primary key lookup. |
-| `transactions_external_transaction_id_idx` | `external_transaction_id` | B-tree | Upsert lookup during sync. Enforces unique constraint. |
+| `transactions_provider_transaction_id_idx` | `provider_transaction_id` | B-tree | Upsert lookup during sync. Enforces unique constraint. |
 | `transactions_account_id_date_idx` | `account_id, date DESC` | B-tree | Primary query pattern: all transactions for an account ordered by date. |
 | `transactions_account_id_date_active_idx` | `account_id, date DESC` WHERE `deleted_at IS NULL` | Partial B-tree | Same as above but excludes soft-deleted rows. Most API queries use this path. |
 | `transactions_date_idx` | `date DESC` | B-tree | Date-range queries spanning multiple accounts (e.g., agent asking "all transactions last 30 days"). |
 | `transactions_pending_idx` | `pending` | B-tree | Filter pending/posted transactions. Low cardinality; effective when combined with other predicates. |
-| `transactions_category_primary_idx` | `category_primary` | B-tree | Filter by spending category (e.g., all `FOOD_AND_DRINK` transactions). |
-| `transactions_name_merchant_gin_idx` | `name, merchant_name` | GIN (pg_trgm) | Full-text trigram search on transaction description and merchant name. Supports `ILIKE '%query%'` efficiently. |
+| `transactions_provider_category_primary_idx` | `provider_category_primary` | B-tree | Filter by spending category (e.g., all `FOOD_AND_DRINK` transactions). |
+| `transactions_provider_name_merchant_gin_idx` | `provider_name, provider_merchant_name` | GIN (pg_trgm) | Full-text trigram search on transaction description and merchant name. Supports `ILIKE '%query%'` efficiently. |
 | `transactions_account_id_idx` | `account_id` | B-tree | Join path from accounts to transactions; supports CASCADE DELETE FK. |
 
 ---

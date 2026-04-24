@@ -296,18 +296,18 @@ Each object in the `added` and `modified` arrays contains:
 
 | Plaid Field | Breadbox Column | Type | Notes |
 |-------------|-----------------|------|-------|
-| `transaction_id` | `external_transaction_id` | string | Stable Plaid ID; used as upsert key |
-| `pending_transaction_id` | `pending_transaction_id` | string | Non-null when this posted tx replaces a pending tx |
+| `transaction_id` | `provider_transaction_id` | string | Stable Plaid ID; used as upsert key |
+| `pending_transaction_id` | `provider_pending_transaction_id` | string | Non-null when this posted tx replaces a pending tx |
 | `account_id` | (join to `accounts.external_account_id`) | string | Link to account |
 | `amount` | `amount` | NUMERIC(12,2) | Positive = debit (money out); negative = credit (money in) |
 | `iso_currency_code` | `iso_currency_code` | string | ISO 4217; may be null if `unofficial_currency_code` is set |
 | `date` | `date` | date | Posted date (or expected posted date for pending) |
 | `authorized_date` | `authorized_date` | date | Date transaction was authorized; may be null |
-| `name` | `name` | string | Plaid-cleaned merchant/payee name |
-| `merchant_name` | `merchant_name` | string | Further-normalized merchant name; may be null |
-| `personal_finance_category.primary` | `category_primary` | string | e.g., `FOOD_AND_DRINK`, `TRANSPORTATION` |
-| `personal_finance_category.detailed` | `category_detailed` | string | e.g., `FOOD_AND_DRINK_RESTAURANTS` |
-| `payment_channel` | `payment_channel` | string | `online`, `in store`, `other` |
+| `name` | `provider_name` | string | Plaid-cleaned merchant/payee name |
+| `merchant_name` | `provider_merchant_name` | string | Further-normalized merchant name; may be null |
+| `personal_finance_category.primary` | `provider_category_primary` | string | e.g., `FOOD_AND_DRINK`, `TRANSPORTATION` |
+| `personal_finance_category.detailed` | `provider_category_detailed` | string | e.g., `FOOD_AND_DRINK_RESTAURANTS` |
+| `payment_channel` | `provider_payment_channel` | string | `online`, `in store`, `other` |
 | `pending` | `pending` | boolean | True if transaction has not posted |
 | `transaction_type` | — | string | Deprecated; use `personal_finance_category` instead |
 
@@ -369,15 +369,15 @@ function syncConnection(connectionID):
 For each object in `response.added`:
 
 1. Look up the `account_id` in `accounts` table by `external_account_id`.
-2. Upsert into `transactions` on conflict `(external_transaction_id)`:
+2. Upsert into `transactions` on conflict `(provider_transaction_id)`:
    - On insert: populate all columns from the transaction object.
    - On conflict: update all mutable fields (name, amount, date, category, pending, etc.).
    - Never update `created_at`; always update `updated_at`.
-3. If `pending_transaction_id` is non-null, check whether the referenced pending transaction exists in the database. If it does and has `deleted_at` set (it will have been soft-deleted by `processRemoved` in this same batch or a prior sync), record the link for historical continuity. The posted transaction carries the lineage via its `pending_transaction_id` column.
+3. If `provider_pending_transaction_id` is non-null, check whether the referenced pending transaction exists in the database. If it does and has `deleted_at` set (it will have been soft-deleted by `processRemoved` in this same batch or a prior sync), record the link for historical continuity. The posted transaction carries the lineage via its `provider_pending_transaction_id` column.
 
 ### 3.5 Processing Modified Transactions
 
-For each object in `response.modified`: update the existing row in `transactions` by `external_transaction_id`. Apply the same field updates as the upsert above. If the row does not exist (possible in edge cases), insert it as in Section 3.4.
+For each object in `response.modified`: update the existing row in `transactions` by `provider_transaction_id`. Apply the same field updates as the upsert above. If the row does not exist (possible in edge cases), insert it as in Section 3.4.
 
 ### 3.6 Processing Removed Transactions
 
@@ -385,7 +385,7 @@ For each object in `response.removed` (each contains only `transaction_id`):
 
 1. Set `deleted_at = NOW()` on the matching `transactions` row (soft delete).
 2. The REST API excludes rows with `deleted_at IS NOT NULL` by default.
-3. Do not hard-delete; the `pending_transaction_id` on posted transactions may reference these removed pending IDs.
+3. Do not hard-delete; the `provider_pending_transaction_id` on posted transactions may reference these removed pending IDs.
 
 ### 3.7 Pending to Posted Transition
 
@@ -395,11 +395,11 @@ When a pending transaction posts at the institution:
 2. Plaid adds a new posted transaction to `response.added` with:
    - A new, different `transaction_id`
    - `pending: false`
-   - `pending_transaction_id` set to the old pending `transaction_id`
+   - `provider_pending_transaction_id` set to the old pending `transaction_id`
 
 Breadbox handling:
 1. `processRemoved` soft-deletes the pending transaction row (sets `deleted_at`).
-2. `processAdded` inserts the new posted transaction with `pending_transaction_id` referencing the old ID.
+2. `processAdded` inserts the new posted transaction with `provider_pending_transaction_id` referencing the old ID.
 3. The old pending row remains queryable with `include_deleted=true` for audit purposes.
 4. The REST API transaction list returns only the posted transaction by default.
 
