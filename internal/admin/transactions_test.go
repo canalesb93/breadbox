@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"breadbox/internal/service"
@@ -48,12 +49,12 @@ func TestBuildPaginationBase_URLEncodesValues(t *testing.T) {
 			result := buildPaginationBase(req)
 
 			if tt.contains != "" {
-				if !containsSubstring(result, tt.contains) {
+				if !strings.Contains(result, tt.contains) {
 					t.Errorf("expected result to contain %q, got %q", tt.contains, result)
 				}
 			}
 			if tt.excludes != "" {
-				if containsSubstring(result, tt.excludes) {
+				if strings.Contains(result, tt.excludes) {
 					t.Errorf("expected result NOT to contain %q, got %q", tt.excludes, result)
 				}
 			}
@@ -65,26 +66,13 @@ func TestBuildExportURL_URLEncodesValues(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/transactions?search=foo%26bar", nil)
 	result := buildExportURL(req)
 
-	if !containsSubstring(result, "search=foo%26bar") {
+	if !strings.Contains(result, "search=foo%26bar") {
 		t.Errorf("expected URL-encoded ampersand in export URL, got %q", result)
 	}
 	// The raw ampersand should not appear as a parameter separator within the value
-	if containsSubstring(result, "search=foo&bar") {
+	if strings.Contains(result, "search=foo&bar") {
 		t.Errorf("raw ampersand should be encoded in export URL, got %q", result)
 	}
-}
-
-func containsSubstring(s, sub string) bool {
-	return len(s) >= len(sub) && searchString(s, sub)
-}
-
-func searchString(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }
 
 // The activity timeline is built purely from annotations — comments,
