@@ -1285,15 +1285,36 @@ func BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage, page
 	}
 }
 
-// RenderNotFound renders the styled 404 page within the app layout.
+// RenderNotFound renders the styled 404 page. For authenticated sessions the
+// page lives inside the admin shell (so the user can navigate away); for
+// anonymous visitors it renders standalone in the wizard layout so the admin
+// sidebar and 'Administrator' footer don't leak to logged-out users.
 func (tr *TemplateRenderer) RenderNotFound(w http.ResponseWriter, r *http.Request) {
+	if !IsViewer(tr.sm, r) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+		if err := pages.NotFoundPublic().Render(r.Context(), w); err != nil {
+			log.Printf("templ render error (NotFoundPublic): %v", err)
+		}
+		return
+	}
 	w.WriteHeader(http.StatusNotFound)
 	data := BaseTemplateData(r, tr.sm, "", "Page Not Found")
 	tr.RenderWithTempl(w, r, data, pages.NotFound())
 }
 
-// RenderError renders the styled 500 page within the app layout.
+// RenderError renders the styled 500 page. Matches RenderNotFound's branching:
+// anonymous visitors get a standalone wizard-layout page; authenticated users
+// get the full admin shell.
 func (tr *TemplateRenderer) RenderError(w http.ResponseWriter, r *http.Request) {
+	if !IsViewer(tr.sm, r) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusInternalServerError)
+		if err := pages.InternalErrorPublic().Render(r.Context(), w); err != nil {
+			log.Printf("templ render error (InternalErrorPublic): %v", err)
+		}
+		return
+	}
 	w.WriteHeader(http.StatusInternalServerError)
 	data := BaseTemplateData(r, tr.sm, "", "Error")
 	tr.RenderWithTempl(w, r, data, pages.InternalError())
