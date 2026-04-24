@@ -699,6 +699,7 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 
 		// Build unified activity timeline from annotations.
 		activity := buildActivityTimeline(annotations, categoryDisplayLookup(categoryTree))
+		activityDays := groupActivityByDay(activity)
 
 		// Load tags currently attached + the registered-tag list (for the inline
 		// add-tag suggestion datalist). Also derive HasPendingReview from the
@@ -792,6 +793,7 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			"ConnectionID":    connectionID,
 			"Account":         account,
 			"Activity":          activity,
+			"ActivityDays":      activityDays,
 			"HasPendingReview":  hasPendingReview,
 			"CurrentTags":       currentTags,
 			"AvailableTags":     availableTags,
@@ -989,6 +991,73 @@ func buildActivityTimeline(annotations []service.Annotation, categoryDisplay fun
 	})
 
 	return entries
+}
+
+// ActivityDayGroup holds activity entries grouped by calendar day (in the
+// server's local timezone) for rendering day separators on the transaction
+// detail timeline.
+type ActivityDayGroup struct {
+	Date   string                  // ISO date, e.g. "2026-04-16"
+	Label  string                  // Human-friendly: "Today", "Yesterday", "Thursday, April 16"
+	Events []service.ActivityEntry // events for this day, newest first (order preserved)
+}
+
+// groupActivityByDay groups a sorted-desc activity list into per-day buckets.
+// Timestamp is an RFC3339 string on ActivityEntry; entries with unparseable
+// timestamps are skipped (they're dropped rather than mis-bucketed). Each
+// returned group preserves the relative ordering of the input slice.
+func groupActivityByDay(entries []service.ActivityEntry) []ActivityDayGroup {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+	today := now.Format("2006-01-02")
+	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
+
+	var groups []ActivityDayGroup
+	groupIdx := map[string]int{}
+
+	for _, e := range entries {
+		t, err := time.Parse(time.RFC3339, e.Timestamp)
+		if err != nil {
+			continue
+		}
+		date := t.Local().Format("2006-01-02")
+
+		idx, ok := groupIdx[date]
+		if !ok {
+			groups = append(groups, ActivityDayGroup{
+				Date:  date,
+				Label: activityDayLabel(date, today, yesterday),
+			})
+			idx = len(groups) - 1
+			groupIdx[date] = idx
+		}
+		groups[idx].Events = append(groups[idx].Events, e)
+	}
+
+	return groups
+}
+
+// activityDayLabel returns "Today", "Yesterday", or "Thursday, April 16" /
+// "Thursday, April 16, 2025" for older dates. The long-form weekday/month
+// mirrors GitHub's timeline convention and reads well at mobile widths.
+func activityDayLabel(dateStr, today, yesterday string) string {
+	if dateStr == today {
+		return "Today"
+	}
+	if dateStr == yesterday {
+		return "Yesterday"
+	}
+	t, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return dateStr
+	}
+	if t.Year() == time.Now().Year() {
+		return t.Format("Monday, January 2")
+	}
+	return t.Format("Monday, January 2, 2006")
 }
 
 // derefOr returns *p if non-nil, else def.
