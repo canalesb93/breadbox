@@ -115,13 +115,13 @@ make dev
 
 ### Production deployment
 
-For production with automatic HTTPS via Caddy, use the one-liner install script:
+For production, use the one-liner install script:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/canalesb93/breadbox/main/deploy/install.sh | sudo bash
 ```
 
-This installs Docker if needed, downloads the deployment files, generates secrets, and starts Breadbox with Caddy for automatic TLS. See [`deploy/`](deploy/) for details.
+The script checks for Docker (and offers to install it on Linux via `get.docker.com`), downloads the deployment files, prompts for an optional public domain, generates secrets, and starts Breadbox. If you supply a domain it also starts Caddy for automatic TLS; otherwise the install is localhost-only and does not bind ports 80/443. See [`deploy/`](deploy/) for details, including version-pinned updates via `update.sh`.
 
 ## MCP Integration
 

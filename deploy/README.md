@@ -11,10 +11,13 @@ Caddy handles automatic HTTPS via Let's Encrypt. Breadbox is a single Go binary 
 
 ## Prerequisites
 
-- A Linux VM (Ubuntu 22.04+ or Debian 12+ recommended)
-- A domain name pointing to your VM's IP address
-- Docker and Docker Compose (installed automatically by the install script if missing)
-- Ports 80, 443 open for HTTPS, port 22 for SSH
+- A Linux VM (Ubuntu 22.04+ or Debian 12+ recommended) or macOS with Docker Desktop
+- Docker and Docker Compose
+  - On Linux the installer can install Docker for you (`--install-docker`, uses `https://get.docker.com`).
+  - On macOS install [Docker Desktop](https://docs.docker.com/desktop/install/mac-install/) manually first.
+- Optional: a domain name pointing to your VM's IP address (for HTTPS via Caddy). If you don't
+  configure a domain the installer performs a localhost-only install and does **not** bind
+  ports 80/443.
 
 ## Quick Install (One-Liner)
 
@@ -23,18 +26,38 @@ curl -sSL https://raw.githubusercontent.com/canalesb93/breadbox/main/deploy/inst
 ```
 
 The script will:
-1. Verify Docker and Docker Compose are installed
+1. Verify Docker / Docker Compose (offer to install Docker on Linux if missing)
 2. Fetch the latest release tag from GitHub
 3. Download `docker-compose.prod.yml` and `Caddyfile`, pinned to that release
-4. Generate an `ENCRYPTION_KEY` and database password
-5. Create a `.env` file (will not overwrite an existing one)
-6. Start all services and wait for a healthy status
+4. Write `.breadbox-version` so `update.sh` preserves the pin
+5. Prompt for an optional public domain (leave blank for localhost-only)
+6. Generate `ENCRYPTION_KEY` and database password
+7. Create a `.env` file (will not overwrite an existing one)
+8. Start Breadbox + Postgres. Caddy is started only if you configured a domain
+   (via the `caddy` compose profile).
 
-After installation, visit `http://localhost:8080/setup` to create your admin account.
+After installation, visit `http://localhost:8080/setup` (or `https://<your-domain>/setup`) to
+create your admin account.
 
-Options:
-- `INSTALL_DIR=./my-dir bash install.sh` -- install to a custom directory (default: `./breadbox`)
-- `bash install.sh --uninstall` -- stop containers and remove installed files (preserves database volume)
+### Options
+
+| Flag | Purpose |
+| --- | --- |
+| `--yes, -y` | Non-interactive mode: accept defaults, no prompts. |
+| `--domain=HOST` | Configure HTTPS via Caddy for `HOST`. Also enables the `caddy` compose profile. |
+| `--install-docker` | Install Docker automatically on Linux via `https://get.docker.com` (no prompt). |
+| `--uninstall` | Stop containers and remove installed files (preserves database volume). |
+
+### `INSTALL_DIR` default
+
+`INSTALL_DIR` follows a consistent convention across install and update:
+
+- **Root / `sudo bash install.sh`** → `/opt/breadbox`
+- **Regular user** → `$HOME/.breadbox`
+- Override: `INSTALL_DIR=/custom/path bash install.sh`
+
+`update.sh` resolves `INSTALL_DIR` with the same rules, so `sudo ./update.sh` and `./update.sh`
+target the same directory as their matching install.
 
 ## Manual Setup
 
@@ -81,9 +104,20 @@ Key variables:
 
 ### 5. Start Services
 
+Localhost-only (no HTTPS, no Caddy, no ports 80/443 bound):
+
 ```bash
 docker compose up -d
 ```
+
+With public HTTPS via Caddy (requires `DOMAIN` in `.env`):
+
+```bash
+docker compose --profile caddy up -d
+```
+
+The `caddy` service is gated behind a compose profile so it **only** starts when you opt in.
+This avoids port 80/443 conflicts on localhost-only installs.
 
 ### 6. Verify
 
@@ -120,11 +154,23 @@ When a new version is published on GitHub, the admin dashboard shows an update b
 ### CLI Update
 
 ```bash
-cd /opt/breadbox
+cd /opt/breadbox    # or $HOME/.breadbox for user installs
 sudo ./update.sh
 ```
 
-Or manually:
+`update.sh` respects the version pin recorded in `.breadbox-version`. If you installed
+`v0.3.1`, the script will pull `v0.3.1` on every run — it will **not** silently roll
+you forward to `main` / `latest`. To explicitly change the pin:
+
+```bash
+./update.sh --bump=v0.4.0    # pin to a specific release
+./update.sh --bump=latest    # opt in to rolling updates
+```
+
+If `.env` has `DOMAIN` set, the script passes `--profile caddy` to `docker compose`
+automatically so the reverse proxy restarts alongside the app.
+
+Manual update (not recommended — skips the pin check):
 
 ```bash
 cd /opt/breadbox
