@@ -114,6 +114,20 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.TxResults(txResultsPropsFromData(m)), nil
 	},
+	"Kbd": func(data any) (templ.Component, error) {
+		key, ok := data.(string)
+		if !ok {
+			return nil, fmt.Errorf("Kbd: want string, got %T", data)
+		}
+		return components.Kbd(key), nil
+	},
+	"KbdChord": func(data any) (templ.Component, error) {
+		keys, ok := data.([]string)
+		if !ok {
+			return nil, fmt.Errorf("KbdChord: want []string, got %T", data)
+		}
+		return components.KbdChord(keys...), nil
+	},
 	"ConditionRow": func(data any) (templ.Component, error) {
 		m, ok := data.(map[string]any)
 		if !ok {
@@ -173,13 +187,6 @@ func assertTagChipData(data any) (components.TagChipData, error) {
 			return components.TagChipData{}, nil
 		}
 		return components.TagChipDataFromResponse(*v), nil
-	case TagRow:
-		return components.TagChipDataFromResponse(v.TagResponse), nil
-	case *TagRow:
-		if v == nil {
-			return components.TagChipData{}, nil
-		}
-		return components.TagChipDataFromResponse(v.TagResponse), nil
 	case service.AdminTransactionTag:
 		return components.TagChipDataFromTx(v), nil
 	case components.TagChipData:
@@ -1040,13 +1047,15 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// pages/transactions.html removed — renders via RenderWithTempl
 		// using the _templ_shell template key (see pages.Transactions).
 		"pages/account_detail.html",
-		"pages/categories.html",
-		"pages/category_form.html",
+		// pages/categories.html and pages/category_form.html removed —
+		// both render via RenderWithTempl using the _templ_shell template
+		// key (see pages.Categories and pages.CategoryForm).
 		"pages/transaction_detail.html",
 		"pages/mcp_settings.html",
 		"pages/rules.html",
-		"pages/tags.html",
-		"pages/tag_form.html",
+		// pages/tags.html and pages/tag_form.html removed — both render
+		// via RenderWithTempl using the _templ_shell template key
+		// (see pages.Tags and pages.TagForm).
 		"pages/rule_form.html",
 		"pages/rule_detail.html",
 		"pages/backups.html",

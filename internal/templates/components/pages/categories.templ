@@ -1,0 +1,416 @@
+package pages
+
+import (
+	"fmt"
+
+	"breadbox/internal/service"
+)
+
+// Categories renders the categories configuration page. Hosts inside the
+// base layout via TemplateRenderer.RenderWithTempl — the handler passes the
+// typed props and the bridge drops the rendered HTML into base.html's
+// TemplContent slot.
+//
+// This is a purely configuration-focused page: no period selector, no
+// spending totals, no per-category amounts. Users manage the two-level
+// taxonomy here; spending analytics live on the Insights page.
+templ Categories(p CategoriesProps) {
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">Categories</h1>
+			<p class="text-sm text-base-content/50 mt-1 hidden sm:block">Organize transactions with a two-level taxonomy</p>
+		</div>
+		<a href="/categories/new" data-new-category class="btn btn-sm btn-primary rounded-xl gap-2">
+			<i data-lucide="plus" class="w-4 h-4"></i>
+			Add Category
+		</a>
+	</div>
+	<!--
+		Set the shortcut-registry scope so base.html's global dispatcher routes
+		j/k/n (registered in bbCategoryNavScript) to this page's handlers, and
+		so the ? help modal surfaces them under "This page". Reset to 'global'
+		on Alpine teardown so other pages don't inherit the scope.
+	-->
+	<div x-data x-init="$store.shortcuts.setScope('categories')" x-destroy="$store.shortcuts.setScope('global')"></div>
+	<div
+		x-data="{
+			filter: '',
+			expanded: {},
+			toggle(id) { this.expanded[id] = !this.expanded[id]; },
+			isOpen(id) { return !!this.expanded[id] || !!this.filter; },
+			matches(el) {
+				if (!this.filter) return true;
+				return (el.dataset.search || '').includes(this.filter.toLowerCase());
+			}
+		}"
+		class="space-y-4"
+	>
+		<div class="relative">
+			<i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/30 pointer-events-none"></i>
+			<input
+				type="text"
+				placeholder="Filter categories..."
+				x-model="filter"
+				class="input input-bordered w-full pl-9 rounded-xl h-10 text-sm"
+			/>
+		</div>
+		if len(p.Categories) > 0 {
+			<div class="text-xs text-base-content/40 px-1">
+				{ fmt.Sprintf("%d top-level categories", len(p.Categories)) }
+			</div>
+			<div class="bb-card overflow-hidden">
+				<div class="divide-y divide-base-300/40 bb-stagger">
+					for _, parent := range p.Categories {
+						@categoryRow(parent)
+					}
+				</div>
+			</div>
+		} else {
+			@categoriesEmpty()
+		}
+	</div>
+	@deleteCategoryModal()
+	<script>
+		document.addEventListener('DOMContentLoaded', function() { lucide.createIcons(); });
+	</script>
+	@categoriesKeyboardScript()
+}
+
+// categoriesKeyboardScript wires j/k tree nav and n (new category) into the
+// shared $store.shortcuts registry at scope 'categories'. Enter/Space for
+// expand/collapse are already bound inline on each parent button via
+// Alpine's @keydown.enter / @keydown.space.prevent (see categoryRow) — those
+// fire on the *focused* DOM element, so we deliberately do NOT register
+// Enter/Space at page scope here. Doing so would double-fire expansion when
+// the button also has browser focus. The nav helper only applies a focus
+// *class* (.bb-tx-row--focused) and never calls .focus(), so the two
+// mechanisms stay independent: j/k moves a visual cursor, tab/click gives
+// real DOM focus which then accepts Enter/Space inline.
+templ categoriesKeyboardScript() {
+	<script>
+		// Keyboard navigation for the categories tree. Reads the DOM for visible
+		// rows (two levels: primary row + subcategory rows inside each expanded
+		// x-collapse). offsetParent !== null respects both the filter (x-show
+		// on parent/child wrappers) and the collapsed state (x-collapse toggles
+		// display) — collapsed children simply won't appear in visibleRows().
+		var bbCategoryNav = {
+			focusedIdx: -1,
+			FOCUSED_CLASS: 'bb-tx-row--focused', // reuse the tx-list focus styling
+			visibleRows: function() {
+				var all = document.querySelectorAll('[data-category-row]');
+				var out = [];
+				for (var i = 0; i < all.length; i++) {
+					if (all[i].offsetParent !== null) out.push(all[i]);
+				}
+				return out;
+			},
+			clearFocus: function() {
+				var rows = document.querySelectorAll('[data-category-row].' + this.FOCUSED_CLASS);
+				for (var i = 0; i < rows.length; i++) rows[i].classList.remove(this.FOCUSED_CLASS);
+			},
+			setFocus: function(idx) {
+				var rows = this.visibleRows();
+				if (!rows.length) { this.focusedIdx = -1; return; }
+				if (idx < 0) idx = 0;
+				if (idx >= rows.length) idx = rows.length - 1;
+				this.clearFocus();
+				rows[idx].classList.add(this.FOCUSED_CLASS);
+				this.focusedIdx = idx;
+				rows[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			},
+			next: function() {
+				var rows = this.visibleRows();
+				if (!rows.length) return;
+				this.setFocus(this.focusedIdx < 0 ? 0 : this.focusedIdx + 1);
+			},
+			prev: function() {
+				var rows = this.visibleRows();
+				if (!rows.length) return;
+				this.setFocus(this.focusedIdx < 0 ? 0 : this.focusedIdx - 1);
+			},
+		};
+
+		document.addEventListener('alpine:init', function() {
+			var reg = Alpine.store('shortcuts');
+			if (!reg) return;
+
+			reg.register({
+				id: 'categories.next',
+				keys: 'j',
+				description: 'Move down',
+				group: 'Navigation',
+				scope: 'categories',
+				action: function() { bbCategoryNav.next(); },
+			});
+
+			reg.register({
+				id: 'categories.prev',
+				keys: 'k',
+				description: 'Move up',
+				group: 'Navigation',
+				scope: 'categories',
+				action: function() { bbCategoryNav.prev(); },
+			});
+
+			reg.register({
+				id: 'categories.new',
+				keys: 'n',
+				description: 'New category',
+				group: 'Actions',
+				scope: 'categories',
+				// Shadows the global `n+_` chord while on /categories via the
+				// page-scope-wins guard in base.html's hasChordStartingWith
+				// (added in M4.2). Clicks the Add Category link so middle-click
+				// / cmd-click semantics aren't silently bypassed.
+				action: function() {
+					var btn = document.querySelector('[data-new-category]');
+					if (btn) btn.click();
+				},
+			});
+		});
+	</script>
+}
+
+// categoryRow renders one top-level category with its expandable child list.
+templ categoryRow(c service.CategoryResponse) {
+	<div data-search={ categorySearchIndex(c) } x-show="matches($el)">
+		<div
+			role="button"
+			tabindex="0"
+			data-category-row
+			data-category-id={ c.ID }
+			class="group flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 hover:bg-base-200/30 transition-colors duration-150 cursor-pointer select-none"
+			@click={ fmt.Sprintf("toggle('%s')", c.ID) }
+			@keydown.enter={ fmt.Sprintf("toggle('%s')", c.ID) }
+			@keydown.space.prevent={ fmt.Sprintf("toggle('%s')", c.ID) }
+		>
+			@categoryIconTile(c, false)
+			<div class="flex items-center gap-2 min-w-0 flex-1">
+				<i
+					data-lucide="chevron-right"
+					class="w-3.5 h-3.5 text-base-content/30 transition-transform duration-200 shrink-0"
+					:class={ fmt.Sprintf("isOpen('%s') ? 'rotate-90' : ''", c.ID) }
+				></i>
+				<span class={ "font-semibold text-sm truncate", templ.KV("text-base-content/40", c.IsSystem), templ.KV("text-base-content/40 italic", c.Hidden && !c.IsSystem) }>
+					{ c.DisplayName }
+				</span>
+				if len(c.Children) > 0 {
+					<span class="text-[0.65rem] font-medium px-1.5 py-0.5 rounded-full bg-base-200/60 text-base-content/40 shrink-0">
+						{ fmt.Sprintf("%d", len(c.Children)) }
+					</span>
+				}
+				if c.IsSystem {
+					<span class="badge badge-ghost badge-xs">System</span>
+				}
+				if c.Hidden {
+					<span class="badge badge-ghost badge-xs">Hidden</span>
+				}
+			</div>
+			<div class="flex items-center justify-end shrink-0" @click.stop>
+				@categoryRowActions(c, false)
+			</div>
+		</div>
+		if len(c.Children) > 0 {
+			<div x-show={ fmt.Sprintf("isOpen('%s')", c.ID) } x-cloak x-collapse>
+				<div class="border-t border-base-300/30 bg-base-200/20">
+					for _, child := range c.Children {
+						@categoryChildRow(child)
+					}
+				</div>
+			</div>
+		} else {
+			<div x-show={ fmt.Sprintf("expanded['%s']", c.ID) } x-cloak x-collapse>
+				<div class="border-t border-base-300/30 bg-base-200/20 py-3 pl-14 sm:pl-20 pr-5">
+					<p class="text-sm text-base-content/30 italic">No subcategories</p>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+// categoryChildRow renders one subcategory beneath its parent.
+templ categoryChildRow(c service.CategoryResponse) {
+	<div
+		data-search={ categoryChildSearchIndex(c) }
+		data-category-row
+		data-category-id={ c.ID }
+		x-show="matches($el)"
+		class="group flex items-center gap-3 sm:gap-4 pl-10 sm:pl-14 pr-4 sm:pr-5 py-2.5 hover:bg-base-200/30 transition-colors duration-150"
+	>
+		@categoryIconTile(c, true)
+		<div class="flex items-center gap-2 min-w-0 flex-1">
+			<span class={ "text-sm truncate", templ.KV("text-base-content/40 italic", c.Hidden) }>
+				{ c.DisplayName }
+			</span>
+			if c.Hidden {
+				<span class="badge badge-ghost badge-xs">Hidden</span>
+			}
+		</div>
+		<div class="flex items-center justify-end shrink-0" @click.stop>
+			@categoryRowActions(c, true)
+		</div>
+	</div>
+}
+
+// categoryIconTile renders the colored square icon tile at the start of
+// each row. Parent rows use the larger 9–10 geometry; child rows use 7–8.
+templ categoryIconTile(c service.CategoryResponse, child bool) {
+	if child {
+		<div class="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg shrink-0" style={ categoryTileBg(c.Color, true) }>
+			@categoryTileInner(c, true)
+		</div>
+	} else {
+		<div class="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl shrink-0" style={ categoryTileBg(c.Color, false) }>
+			@categoryTileInner(c, false)
+		</div>
+	}
+}
+
+templ categoryTileInner(c service.CategoryResponse, child bool) {
+	if c.Icon != nil && *c.Icon != "" {
+		if child {
+			<i data-lucide={ *c.Icon } class="w-3.5 h-3.5" style={ categoryIconColor(c.Color) }></i>
+		} else {
+			<i data-lucide={ *c.Icon } class="w-5 h-5" style={ categoryIconColor(c.Color) }></i>
+		}
+	} else if c.Color != nil && *c.Color != "" {
+		if child {
+			<span class="w-2 h-2 rounded-full" style={ fmt.Sprintf("background-color: %s", *c.Color) }></span>
+		} else {
+			<span class="w-3 h-3 rounded-full" style={ fmt.Sprintf("background-color: %s", *c.Color) }></span>
+		}
+	} else {
+		if child {
+			<span class="w-2 h-2 rounded-full bg-base-content/20"></span>
+		} else {
+			<i data-lucide="tag" class="w-5 h-5 text-primary/60"></i>
+		}
+	}
+}
+
+// categoryRowActions emits the trailing edit/delete controls — desktop
+// uses inline ghost buttons, mobile collapses to an overflow menu.
+templ categoryRowActions(c service.CategoryResponse, child bool) {
+	<div class="hidden sm:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+		<a href={ templ.SafeURL(fmt.Sprintf("/categories/%s/edit", c.ID)) } class="btn btn-ghost btn-xs rounded-lg" title="Edit">
+			<i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+		</a>
+		if !c.IsSystem {
+			<button
+				type="button"
+				class="btn btn-ghost btn-xs rounded-lg text-error"
+				data-id={ c.ID }
+				data-name={ c.DisplayName }
+				@click.prevent="$dispatch('delete-category', {id: $el.dataset.id, name: $el.dataset.name})"
+				title="Delete"
+			>
+				<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+			</button>
+		}
+	</div>
+	<div class="dropdown dropdown-end sm:hidden">
+		<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square rounded-lg">
+			<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
+		</div>
+		<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-40 p-1">
+			<li>
+				<a href={ templ.SafeURL(fmt.Sprintf("/categories/%s/edit", c.ID)) }>
+					<i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
+				</a>
+			</li>
+			if !c.IsSystem {
+				<li>
+					<button
+						type="button"
+						class="text-error"
+						data-id={ c.ID }
+						data-name={ c.DisplayName }
+						@click="$dispatch('delete-category', {id: $el.dataset.id, name: $el.dataset.name})"
+					>
+						<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
+					</button>
+				</li>
+			}
+		</ul>
+	</div>
+}
+
+templ categoriesEmpty() {
+	<div class="bb-card">
+		<div class="flex flex-col items-center text-center py-16 px-6">
+			<div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+				<i data-lucide="tag" class="w-8 h-8 text-primary"></i>
+			</div>
+			<h2 class="text-lg font-semibold mb-1">No categories yet</h2>
+			<p class="text-base-content/50 text-sm mb-6 max-w-sm">Create your first category to start organizing transactions into a clean taxonomy.</p>
+			<a href="/categories/new" class="btn btn-primary btn-sm rounded-xl gap-2">
+				<i data-lucide="plus" class="w-4 h-4"></i> Add Category
+			</a>
+		</div>
+	</div>
+}
+
+// deleteCategoryModal renders the shared confirmation dialog. Listens for
+// the `delete-category` custom event dispatched by row actions, then
+// issues a DELETE to /-/categories/:id and reloads on success.
+templ deleteCategoryModal() {
+	<dialog
+		id="delete-modal"
+		class="modal modal-bottom sm:modal-middle"
+		x-data="{deleteId: '', deleteName: '', submitting: false}"
+		@delete-category.window="deleteId = $event.detail.id; deleteName = $event.detail.name; document.getElementById('delete-modal').showModal()"
+	>
+		<div class="modal-box rounded-xl max-w-md">
+			<div class="flex items-center gap-3 mb-4">
+				<div class="w-10 h-10 rounded-xl bg-error/10 flex items-center justify-center">
+					<i data-lucide="alert-triangle" class="w-5 h-5 text-error"></i>
+				</div>
+				<h3 class="font-bold text-lg">Delete Category</h3>
+			</div>
+			<p class="text-sm text-base-content/70">Are you sure you want to delete <strong x-text="deleteName"></strong>? Affected transactions will be set to Uncategorized.</p>
+			<div class="modal-action">
+				<button type="button" class="btn btn-ghost btn-sm rounded-xl" onclick="document.getElementById('delete-modal').close()">Cancel</button>
+				<button
+					type="button"
+					class="btn btn-error btn-sm rounded-xl"
+					:disabled="submitting"
+					@click="
+						submitting = true;
+						fetch('/-/categories/' + deleteId, {method: 'DELETE'})
+						.then(r => { if(r.ok) location.reload(); else r.json().then(d => { window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error?.message || 'Error', type:'error'}})); submitting = false; }); })
+						.catch(() => { submitting = false; })
+					"
+				>
+					<span x-show="!submitting">Delete</span>
+					<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+				</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop"><button>close</button></form>
+	</dialog>
+}
+
+// categoryTileBg returns a background-color style string for the icon tile.
+// When a category has a color it's used at ~12% alpha; otherwise a neutral
+// default matches the old html/template rendering.
+func categoryTileBg(color *string, child bool) string {
+	if color != nil && *color != "" {
+		if child {
+			return fmt.Sprintf("background-color: %s12", *color)
+		}
+		return fmt.Sprintf("background-color: %s18", *color)
+	}
+	if child {
+		return ""
+	}
+	return "background-color: oklch(48% 0.17 265 / 0.08)"
+}
+
+// categoryIconColor returns a text-color style string for a colored icon,
+// or empty when the category has no color set.
+func categoryIconColor(color *string) string {
+	if color == nil || *color == "" {
+		return ""
+	}
+	return fmt.Sprintf("color: %s", *color)
+}

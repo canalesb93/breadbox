@@ -5,112 +5,29 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 )
 
-// CategoriesPageHandler serves GET /admin/categories.
+// CategoriesPageHandler serves GET /admin/categories. This is a
+// configuration-only page — no spending aggregates, no period selector.
 func CategoriesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		categories, err := svc.ListCategoryTree(ctx)
+		categories, err := svc.ListCategoryTree(r.Context())
 		if err != nil {
 			http.Error(w, "Failed to load categories", http.StatusInternalServerError)
 			return
 		}
 
-		// Parse date range for spending data (default 30 days).
-		spendingDays := 30
-		if d := r.URL.Query().Get("days"); d != "" {
-			switch d {
-			case "7":
-				spendingDays = 7
-			case "30":
-				spendingDays = 30
-			case "90":
-				spendingDays = 90
-			case "365":
-				spendingDays = 365
-			}
-		}
-		spendingStart := time.Now().AddDate(0, 0, -spendingDays)
-
-		// Fetch spending by category for the selected period.
-		type CategorySpending struct {
-			Amount           float64
-			TransactionCount int64
-			Percent          float64 // percentage of total spending
-		}
-		spendingByCategory := make(map[string]CategorySpending) // keyed by display name
-		var totalSpending float64
-		var maxCategorySpend float64
-
-		catSummary, err := svc.GetTransactionSummary(ctx, service.TransactionSummaryParams{
-			GroupBy:      "category",
-			StartDate:    &spendingStart,
-			SpendingOnly: true,
-		})
-		if err == nil && catSummary != nil {
-			for _, row := range catSummary.Summary {
-				name := "Uncategorized"
-				if row.Category != nil && *row.Category != "" {
-					name = *row.Category
-				}
-				spendingByCategory[name] = CategorySpending{
-					Amount:           row.TotalAmount,
-					TransactionCount: row.TransactionCount,
-				}
-				totalSpending += row.TotalAmount
-			}
-
-			// Aggregate child spending into parent totals.
-			for _, parent := range categories {
-				var parentAmount float64
-				var parentCount int64
-				// Add direct parent spending if any.
-				if ps, ok := spendingByCategory[parent.DisplayName]; ok {
-					parentAmount += ps.Amount
-					parentCount += ps.TransactionCount
-				}
-				// Add children spending.
-				for _, child := range parent.Children {
-					if cs, ok := spendingByCategory[child.DisplayName]; ok {
-						parentAmount += cs.Amount
-						parentCount += cs.TransactionCount
-					}
-				}
-				if parentAmount > 0 || parentCount > 0 {
-					spendingByCategory[parent.DisplayName] = CategorySpending{
-						Amount:           parentAmount,
-						TransactionCount: parentCount,
-					}
-				}
-				if parentAmount > maxCategorySpend {
-					maxCategorySpend = parentAmount
-				}
-			}
-
-			// Calculate percentages.
-			if totalSpending > 0 {
-				for name, cs := range spendingByCategory {
-					cs.Percent = (cs.Amount / totalSpending) * 100
-					spendingByCategory[name] = cs
-				}
-			}
-		}
-
 		data := BaseTemplateData(r, sm, "categories", "Categories")
-		data["Categories"] = categories
-		data["SpendingByCategory"] = spendingByCategory
-		data["TotalSpending"] = totalSpending
-		data["MaxCategorySpend"] = maxCategorySpend
-		data["SpendingDays"] = spendingDays
-		tr.Render(w, r, "categories.html", data)
+		tr.RenderWithTempl(w, r, data, pages.Categories(pages.CategoriesProps{
+			Categories: categories,
+		}))
 	}
 }
 
@@ -123,13 +40,14 @@ func CategoryNewPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Te
 			return
 		}
 		data := BaseTemplateData(r, sm, "categories", "Add Category")
-		data["IsEdit"] = false
-		data["Categories"] = categories
-		data["Breadcrumbs"] = []Breadcrumb{
-			{Label: "Categories", Href: "/categories"},
-			{Label: "Add Category"},
-		}
-		tr.Render(w, r, "category_form.html", data)
+		tr.RenderWithTempl(w, r, data, pages.CategoryForm(pages.CategoryFormProps{
+			IsEdit:     false,
+			Categories: categories,
+			Breadcrumbs: []components.Breadcrumb{
+				{Label: "Categories", Href: "/categories"},
+				{Label: "Add Category"},
+			},
+		}))
 	}
 }
 
@@ -147,13 +65,14 @@ func CategoryEditPageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 			return
 		}
 		data := BaseTemplateData(r, sm, "categories", "Edit "+category.DisplayName)
-		data["IsEdit"] = true
-		data["Category"] = category
-		data["Breadcrumbs"] = []Breadcrumb{
-			{Label: "Categories", Href: "/categories"},
-			{Label: category.DisplayName},
-		}
-		tr.Render(w, r, "category_form.html", data)
+		tr.RenderWithTempl(w, r, data, pages.CategoryForm(pages.CategoryFormProps{
+			IsEdit:   true,
+			Category: category,
+			Breadcrumbs: []components.Breadcrumb{
+				{Label: "Categories", Href: "/categories"},
+				{Label: category.DisplayName},
+			},
+		}))
 	}
 }
 

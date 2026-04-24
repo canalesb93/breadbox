@@ -1,0 +1,33 @@
+package components
+
+// Kbd renders a single keyboard-shortcut badge.
+//
+// The badge is hidden on touch devices two ways:
+//  1. CSS fallback: `hidden sm:inline-flex` keeps it invisible on small
+//     viewports even before Alpine initializes.
+//  2. Runtime via Alpine: `x-show="!$store.device.isTouch"` suppresses the
+//     hint on devices reporting `(hover: none) and (pointer: coarse)` —
+//     the same signal the global shortcut dispatcher uses to skip firing.
+//
+// Both guards are needed: `sm:` catches the common case, `$store.device`
+// catches touch-capable desktops/tablets on a wide viewport.
+templ Kbd(key string) {
+	<kbd class="bb-kbd hidden sm:inline-flex" x-show="!$store.device.isTouch">{ key }</kbd>
+}
+
+// KbdChord renders a sequence of keys separated by a faint "then" label,
+// mirroring the `.bb-shortcuts-kbd` + `.bb-shortcuts-then` styling used in
+// the help modal. The whole chord hides on touch via the same guards as
+// `Kbd`. Calling with 0 or 1 keys degrades gracefully.
+templ KbdChord(keys ...string) {
+	if len(keys) > 0 {
+		<span class="inline-flex items-center gap-1 hidden sm:inline-flex" x-show="!$store.device.isTouch">
+			for i, k := range keys {
+				if i > 0 {
+					<span class="bb-shortcuts-then">then</span>
+				}
+				<kbd class="bb-kbd">{ k }</kbd>
+			}
+		</span>
+	}
+}

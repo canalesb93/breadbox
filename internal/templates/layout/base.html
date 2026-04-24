@@ -50,6 +50,91 @@
       };
     })();
   </script>
+
+  <script>
+    // Alpine store: $store.device
+    //
+    // Exposes `isTouch` and `isMobile` for downstream UI code (keyboard-hint
+    // components, shortcut dispatchers) to branch on input capability without
+    // each call site re-running matchMedia. Evaluated once on Alpine init —
+    // breakpoint changes on resize are not currently observed because nothing
+    // in the UI depends on transitional values, and keeping the store static
+    // avoids forcing every consumer to use reactive getters.
+    //
+    // Detection:
+    //   isTouch — `(hover: none) and (pointer: coarse)` (true on phones, false
+    //             on most laptops/desktops even with touchscreens).
+    //   isMobile — viewport width < 1024px (matches the existing `lg:` breakpoint
+    //              used by the drawer + mobile navbar).
+    document.addEventListener('alpine:init', function() {
+      var mqTouch = window.matchMedia('(hover: none) and (pointer: coarse)');
+      var mqMobile = window.matchMedia('(max-width: 1023.98px)');
+      Alpine.store('device', {
+        isTouch: mqTouch.matches,
+        isMobile: mqMobile.matches,
+      });
+    });
+  </script>
+
+  <script>
+    // Alpine store: $store.shortcuts
+    //
+    // Central registry for all keyboard shortcuts. Pages declare their bindings
+    // via $store.shortcuts.register() on init; the global dispatcher (see the
+    // keydown listener near the bottom of this file) reads from this registry
+    // to route events. Upcoming PRs will also feed the help modal (M0.3) and
+    // command-palette kbd hints (M0.5) from the same source.
+    //
+    // Spec shape (see planned-features/keyboard-nav-sprint.md):
+    //   {
+    //     id:          string (unique),
+    //     keys:        'c' | ['c'] | { chord: ['g','d'] } | 'cmd+k',
+    //     description: short user-facing string,
+    //     group:       'Navigation' | 'Go to' | 'New' | 'Actions' | 'Selection',
+    //     scope:       'global' | route id (e.g. 'transactions'),
+    //     when:        optional () => bool,
+    //     action:      () => void | { cmdk: { label, icon, href } } palette-only,
+    //     visible:     default true (hide from help modal; action still wired),
+    //     allowInInput: optional bool (shortcut still fires while typing),
+    //   }
+    //
+    // M0.2 scope: register + dispatch only. The help modal and command palette
+    // remain hardcoded in this PR; they will be rewired to read from this
+    // registry in M0.3 and M0.5.
+    document.addEventListener('alpine:init', function() {
+      Alpine.store('shortcuts', {
+        items: [],
+        currentScope: 'global',
+
+        register(spec) {
+          if (!spec || !spec.id) return;
+          // Idempotent by id — re-registering replaces the previous spec so
+          // Alpine re-init (htmx boosts, drawer re-render) doesn't double-bind.
+          var idx = this.items.findIndex(function(s) { return s.id === spec.id; });
+          if (idx >= 0) this.items.splice(idx, 1, spec);
+          else this.items.push(spec);
+        },
+
+        unregister(id) {
+          var idx = this.items.findIndex(function(s) { return s.id === id; });
+          if (idx >= 0) this.items.splice(idx, 1);
+        },
+
+        setScope(s) {
+          this.currentScope = s || 'global';
+        },
+
+        forScope(scope) {
+          // Returns all shortcuts whose scope matches `scope` OR 'global'.
+          // Used by the help modal (M0.3) and command palette (M0.5).
+          var target = scope || this.currentScope;
+          return this.items.filter(function(s) {
+            return s.scope === 'global' || s.scope === target;
+          });
+        },
+      });
+    });
+  </script>
 </head>
 <body>
   <!-- Navigation progress bar -->
@@ -182,7 +267,10 @@
     </template>
   </div>
 
-  <!-- Keyboard Shortcuts Help (?-key) -->
+  <!-- Keyboard Shortcuts Help (?-key) — registry-driven.
+       Body is rendered from $store.shortcuts grouped by scope (Global vs Page)
+       and, within each scope, by the spec's `group` field. See seedRegistry()
+       below for the current bindings. -->
   <div x-data="shortcutsHelp()" x-show="open" x-cloak
        @open-shortcuts.window="openHelp()"
        @keydown.window.escape="if (open) { open = false; $event.stopPropagation(); }">
@@ -195,141 +283,46 @@
         </button>
       </div>
       <div class="bb-shortcuts-body">
-        <!-- General -->
-        <div class="bb-shortcuts-group">
-          <div class="bb-shortcuts-group-label">General</div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Open command palette</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">&#8984;</kbd>
-              <kbd class="bb-shortcuts-kbd">K</kbd>
-            </span>
+        <!-- Global section: shortcuts available on every page. -->
+        <template x-for="group in sections.global" :key="'global-' + group.label">
+          <div class="bb-shortcuts-group">
+            <div class="bb-shortcuts-group-label" x-text="group.label"></div>
+            <template x-for="item in group.items" :key="item.id">
+              <div class="bb-shortcuts-row">
+                <span class="bb-shortcuts-label" x-text="item.description"></span>
+                <span class="bb-shortcuts-keys" x-html="renderTokens(item.tokens)"></span>
+              </div>
+            </template>
           </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Show keyboard shortcuts</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">?</kbd>
-            </span>
+        </template>
+        <!-- Page section: shortcuts scoped to the current page (populated by
+             pages that call $store.shortcuts.register with a page scope + set
+             $store.shortcuts.currentScope). Hidden when empty. -->
+        <template x-if="sections.page.length > 0">
+          <div>
+            <div class="bb-shortcuts-group" x-show="sections.page.length > 0" style="padding-top:0.25rem;">
+              <div class="bb-shortcuts-group-label" style="opacity:0.65;">This page</div>
+            </div>
+            <template x-for="group in sections.page" :key="'page-' + group.label">
+              <div class="bb-shortcuts-group">
+                <div class="bb-shortcuts-group-label" x-text="group.label"></div>
+                <template x-for="item in group.items" :key="'page-' + item.id">
+                  <div class="bb-shortcuts-row">
+                    <span class="bb-shortcuts-label" x-text="item.description"></span>
+                    <span class="bb-shortcuts-keys" x-html="renderTokens(item.tokens)"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
           </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Close dialog / cancel</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">Esc</kbd>
-            </span>
+        </template>
+        <template x-if="sections.global.length === 0 && sections.page.length === 0">
+          <div class="bb-shortcuts-group">
+            <div class="bb-shortcuts-row">
+              <span class="bb-shortcuts-label" style="opacity:0.6;">No shortcuts registered.</span>
+            </div>
           </div>
-        </div>
-        <!-- Go to navigation -->
-        <div class="bb-shortcuts-group">
-          <div class="bb-shortcuts-group-label">Go to</div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Dashboard</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">d</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Transactions</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">t</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Connections</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">c</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Reviews</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">r</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Rules</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">u</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Categories</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">a</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Sync Logs</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">l</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Backups</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">b</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Settings</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">g</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">s</kbd>
-            </span>
-          </div>
-        </div>
-        <!-- Actions -->
-        <div class="bb-shortcuts-group">
-          <div class="bb-shortcuts-group-label">Actions</div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Connect a bank</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">n</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">c</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Import CSV</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">n</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">i</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Create API key</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">n</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">k</kbd>
-            </span>
-          </div>
-          <div class="bb-shortcuts-row">
-            <span class="bb-shortcuts-label">Add family member</span>
-            <span class="bb-shortcuts-keys">
-              <kbd class="bb-shortcuts-kbd">n</kbd>
-              <span class="bb-shortcuts-then">then</span>
-              <kbd class="bb-shortcuts-kbd">u</kbd>
-            </span>
-          </div>
-        </div>
+        </template>
       </div>
       <div class="bb-shortcuts-footer">
         Press <kbd class="bb-shortcuts-kbd" style="display:inline-flex;vertical-align:middle;">?</kbd> anytime to toggle this panel
@@ -402,7 +395,7 @@
         <div class="flex items-center gap-3">
           <span><kbd>&uarr;</kbd> <kbd>&darr;</kbd> navigate</span>
           <span><kbd>&crarr;</kbd> select</span>
-          <span><kbd>esc</kbd> close</span>
+          <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "Esc"}} close</span>
         </div>
       </div>
     </div>
@@ -536,7 +529,7 @@
           <template x-if="!canCreate">
             <span><kbd>&crarr;</kbd> apply</span>
           </template>
-          <span><kbd>esc</kbd> cancel</span>
+          <span class="inline-flex items-center gap-1">{{renderComponent "Kbd" "Esc"}} cancel</span>
         </div>
         <div class="flex items-center gap-2">
           <button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="closePicker()">Cancel</button>
@@ -670,10 +663,19 @@
                         <div class="bb-cmdk-item-desc" x-text="item.desc"></div>
                       </template>
                     </div>
-                    <template x-if="item.shortcut">
-                      <div class="bb-cmdk-item-shortcut">
-                        <template x-for="k in item.shortcut" :key="k">
-                          <span class="bb-cmdk-kbd" x-text="k"></span>
+                    <!-- Kbd hint: rendered from $store.shortcuts when the
+                         item declares a shortcutId that matches a registered
+                         spec. Hidden on touch ($store.device.isTouch) so
+                         phones/tablets don't display a key hint that can
+                         never fire. Chord tokens carry a `then` flag so the
+                         separator interleaves correctly ('g' then 'd'). -->
+                    <template x-if="shortcutTokensFor(item).length > 0">
+                      <div class="bb-cmdk-item-shortcut" x-show="!$store.device.isTouch">
+                        <template x-for="(tok, ti) in shortcutTokensFor(item)" :key="ti">
+                          <span>
+                            <span x-show="tok.then" class="bb-cmdk-then">then</span>
+                            <span x-show="!tok.then" class="bb-cmdk-kbd" x-text="tok.label"></span>
+                          </span>
                         </template>
                       </div>
                     </template>
@@ -1366,30 +1368,71 @@
 
     // Command Palette Alpine component
     function commandPalette() {
+      // NB: `shortcutId` points into $store.shortcuts. When an entry matches,
+      // the palette row renders a trailing kbd hint (see shortcutTokensFor()
+      // below). Matching by id (not inventing new chords) keeps the registry
+      // the single source of truth — change a chord in seedRegistry and every
+      // palette hint updates automatically.
       var allItems = [
         // Overview
-        { id: 'nav-home', group: 'Overview', title: 'Home', desc: 'Overview and stats', icon: 'house', href: '/', keywords: 'home dashboard overview net worth' },
-        { id: 'nav-transactions', group: 'Overview', title: 'Transactions', desc: 'View all transactions', icon: 'receipt', href: '/transactions', keywords: 'payments expenses spending' },
+        { id: 'nav-home', shortcutId: 'global.go.d', group: 'Overview', title: 'Home', desc: 'Overview and stats', icon: 'house', href: '/', keywords: 'home dashboard overview net worth' },
+        { id: 'nav-transactions', shortcutId: 'global.go.t', group: 'Overview', title: 'Transactions', desc: 'View all transactions', icon: 'receipt', href: '/transactions', keywords: 'payments expenses spending' },
         { id: 'nav-reports', group: 'Overview', title: 'Reports', desc: 'Agent reports and findings', icon: 'file-text', href: '/reports', keywords: 'agent summaries notifications' },
         // Manage
-        { id: 'nav-connections', group: 'Manage', title: 'Connections', desc: 'Bank connections and account links', icon: 'link', href: '/connections', keywords: 'banks accounts linked dedup matching' },
+        { id: 'nav-connections', shortcutId: 'global.go.c', group: 'Manage', title: 'Connections', desc: 'Bank connections and account links', icon: 'link', href: '/connections', keywords: 'banks accounts linked dedup matching' },
         { id: 'nav-agents', group: 'Manage', title: 'Agents', desc: 'Agent setup, prompts, and MCP settings', icon: 'bot', href: '/agents', keywords: 'getting started mcp connect agent setup guide wizard prompt tools permissions instructions' },
-        { id: 'nav-rules', group: 'Manage', title: 'Rules', desc: 'Auto-categorization rules', icon: 'list-filter', href: '/rules', keywords: 'automation patterns categorize labels organize' },
-        { id: 'nav-categories', group: 'Manage', title: 'Categories', desc: 'Category taxonomy', icon: 'folder', href: '/categories', keywords: 'taxonomy labels organize spending' },
+        { id: 'nav-rules', shortcutId: 'global.go.u', group: 'Manage', title: 'Rules', desc: 'Auto-categorization rules', icon: 'list-filter', href: '/rules', keywords: 'automation patterns categorize labels organize' },
+        { id: 'nav-categories', shortcutId: 'global.go.a', group: 'Manage', title: 'Categories', desc: 'Category taxonomy', icon: 'folder', href: '/categories', keywords: 'taxonomy labels organize spending' },
         { id: 'nav-tags', group: 'Manage', title: 'Tags', desc: 'Tag transactions and triage review queue', icon: 'tags', href: '/tags', keywords: 'labels needs-review triage annotations' },
-        { id: 'nav-users', group: 'Manage', title: 'Household', desc: 'Manage household members', icon: 'users', href: '/users', keywords: 'people family members' },
+        { id: 'nav-users', shortcutId: 'global.go.f', group: 'Manage', title: 'Household', desc: 'Manage household members', icon: 'users', href: '/users', keywords: 'people family members' },
         // System
-        { id: 'sys-access', group: 'System', title: 'Access', desc: 'API keys and OAuth clients', icon: 'shield-check', href: '/access', keywords: 'tokens authentication api keys oauth connector claude' },
-        { id: 'sys-providers', group: 'System', title: 'Providers', desc: 'Configure Plaid, Teller, CSV', icon: 'plug', href: '/providers', keywords: 'plaid teller csv bank setup' },
-        { id: 'sys-logs', group: 'System', title: 'Logs', desc: 'Sync logs and webhook events', icon: 'scroll-text', href: '/logs', keywords: 'sync history errors status webhooks events' },
-        { id: 'sys-backups', group: 'System', title: 'Backups', desc: 'Database backup and restore', icon: 'hard-drive', href: '/backups', keywords: 'backup restore database dump export' },
-        { id: 'sys-settings', group: 'System', title: 'Settings', desc: 'Sync schedule, security, system', icon: 'settings', href: '/settings', keywords: 'schedule password encryption' },
+        { id: 'sys-access', shortcutId: 'global.go.k', group: 'System', title: 'Access', desc: 'API keys and OAuth clients', icon: 'shield-check', href: '/access', keywords: 'tokens authentication api keys oauth connector claude' },
+        { id: 'sys-providers', shortcutId: 'global.go.p', group: 'System', title: 'Providers', desc: 'Configure Plaid, Teller, CSV', icon: 'plug', href: '/providers', keywords: 'plaid teller csv bank setup' },
+        { id: 'sys-logs', shortcutId: 'global.go.l', group: 'System', title: 'Logs', desc: 'Sync logs and webhook events', icon: 'scroll-text', href: '/logs', keywords: 'sync history errors status webhooks events' },
+        { id: 'sys-backups', shortcutId: 'global.go.b', group: 'System', title: 'Backups', desc: 'Database backup and restore', icon: 'hard-drive', href: '/backups', keywords: 'backup restore database dump export' },
+        { id: 'sys-settings', shortcutId: 'global.go.s', group: 'System', title: 'Settings', desc: 'Sync schedule, security, system', icon: 'settings', href: '/settings', keywords: 'schedule password encryption' },
         // Quick Actions
-        { id: 'act-connect', group: 'Quick Actions', title: 'Connect a Bank', desc: 'Add a new bank connection', icon: 'plus-circle', href: '/connections/new', keywords: 'add new link' },
-        { id: 'act-import', group: 'Quick Actions', title: 'Import CSV', desc: 'Import transactions from CSV', icon: 'upload', href: '/connections/import-csv', keywords: 'upload file' },
-        { id: 'act-api-key', group: 'Quick Actions', title: 'Create API Key', desc: 'Generate a new API key', icon: 'key-round', href: '/api-keys/new', keywords: 'new token' },
-        { id: 'act-user', group: 'Quick Actions', title: 'Add Member', desc: 'Add a new household member', icon: 'user-plus', href: '/users/new', keywords: 'new person family' },
+        { id: 'act-connect', shortcutId: 'global.new.c', group: 'Quick Actions', title: 'Connect a Bank', desc: 'Add a new bank connection', icon: 'plus-circle', href: '/connections/new', keywords: 'add new link' },
+        { id: 'act-import', shortcutId: 'global.new.i', group: 'Quick Actions', title: 'Import CSV', desc: 'Import transactions from CSV', icon: 'upload', href: '/connections/import-csv', keywords: 'upload file' },
+        { id: 'act-api-key', shortcutId: 'global.new.k', group: 'Quick Actions', title: 'Create API Key', desc: 'Generate a new API key', icon: 'key-round', href: '/api-keys/new', keywords: 'new token' },
+        { id: 'act-user', shortcutId: 'global.new.u', group: 'Quick Actions', title: 'Add Member', desc: 'Add a new household member', icon: 'user-plus', href: '/users/new', keywords: 'new person family' },
       ];
+
+      // Turn a spec's `keys` into flat tokens for rendering:
+      //   'cmd+k'               → [{label:'⌘'}, {label:'K'}]
+      //   '?'                   → [{label:'?'}]
+      //   { chord: ['g','d'] }  → [{label:'g'}, {then:true}, {label:'d'}]
+      // Mirrors shortcutsHelp.toTokens() (M0.3). Duplicated on purpose —
+      // keeping the two renderers independent means a palette tweak can't
+      // break the help modal and vice versa.
+      function shortcutKeyTokens(keys) {
+        if (!keys) return [];
+        if (keys.chord && Array.isArray(keys.chord)) {
+          var out = [];
+          keys.chord.forEach(function(k, i) {
+            if (i > 0) out.push({ then: true });
+            out.push({ label: String(k) });
+          });
+          return out;
+        }
+        if (Array.isArray(keys)) {
+          return keys.map(function(k) { return { label: String(k) }; });
+        }
+        if (typeof keys === 'string') {
+          if (keys.indexOf('+') !== -1 && keys.length > 1) {
+            return keys.split('+').map(function(part) {
+              var p = part.toLowerCase();
+              if (p === 'cmd' || p === 'meta') return { label: '⌘' };
+              if (p === 'ctrl')                return { label: 'Ctrl' };
+              if (p === 'shift')               return { label: '⇧' };
+              if (p === 'alt' || p === 'opt')  return { label: '⌥' };
+              return { label: part.length === 1 ? part.toUpperCase() : part };
+            });
+          }
+          return [{ label: keys }];
+        }
+        return [];
+      }
 
       return {
         open: false,
@@ -1400,6 +1443,20 @@
         _txLoading: false,
         _txTimer: null,
         _txAbort: null,
+
+        // Lookup the key tokens for a palette item's registered shortcut.
+        // Returns [] when the item has no `shortcutId`, the shortcuts store
+        // hasn't loaded yet, or the id doesn't match. The template renders
+        // nothing when the array is empty, so missing bindings silently fall
+        // through.
+        shortcutTokensFor: function(item) {
+          if (!item || !item.shortcutId) return [];
+          var store = (window.Alpine && Alpine.store('shortcuts')) || null;
+          if (!store || !store.items) return [];
+          var spec = store.items.find(function(s) { return s.id === item.shortcutId; });
+          if (!spec) return [];
+          return shortcutKeyTokens(spec.keys);
+        },
 
         get filteredItems() {
           var commandItems;
@@ -1588,16 +1645,129 @@
       };
     }
 
-    // Shortcuts Help Panel
+    // Shortcuts Help Panel — registry-driven.
+    //
+    // Reads from $store.shortcuts every time the panel opens, groups entries
+    // by scope ('global' vs current page scope) and then by the spec's
+    // `group` field. Entries with visible === false are skipped. Keys are
+    // formatted into lightweight tokens ({ label } for a keycap, { then: true }
+    // for the "then" separator) so the template can render them with a single
+    // x-html pass.
     function shortcutsHelp() {
+      // Preferred ordering for group labels within each section. Unknown
+      // groups fall to the end alphabetically.
+      var GROUP_ORDER = ['Actions', 'Go to', 'New', 'Navigation', 'Selection'];
+
+      function orderGroups(a, b) {
+        var ia = GROUP_ORDER.indexOf(a);
+        var ib = GROUP_ORDER.indexOf(b);
+        if (ia === -1 && ib === -1) return a.localeCompare(b);
+        if (ia === -1) return 1;
+        if (ib === -1) return -1;
+        return ia - ib;
+      }
+
+      // Escape text before it goes through x-html. Keep it minimal — we only
+      // emit user-authored descriptions/labels from the registry.
+      function esc(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      // Turn a spec's `keys` into a flat list of render tokens:
+      //   [{ label: 'g' }, { then: true }, { label: 'd' }]
+      // Supports: single string ('?', '/', 'c'), modifier combo ('cmd+k',
+      // 'ctrl+shift+p'), array-of-one (['c']), and chord ({ chord: ['g','d'] }).
+      function toTokens(keys) {
+        if (!keys) return [];
+        // Chord: sequential keys joined by "then".
+        if (keys.chord && Array.isArray(keys.chord)) {
+          var out = [];
+          keys.chord.forEach(function(k, i) {
+            if (i > 0) out.push({ then: true });
+            out.push({ label: esc(k) });
+          });
+          return out;
+        }
+        // Array form — treat as simultaneous chord (no "then" separator).
+        if (Array.isArray(keys)) {
+          return keys.map(function(k) { return { label: esc(k) }; });
+        }
+        if (typeof keys === 'string') {
+          // Modifier combo like 'cmd+k' or 'ctrl+shift+p'. Plus as a shortcut
+          // for itself (a lone '+') is not something we register today.
+          if (keys.indexOf('+') !== -1 && keys.length > 1) {
+            return keys.split('+').map(function(part) {
+              var p = part.toLowerCase();
+              if (p === 'cmd' || p === 'meta') return { label: '&#8984;' };
+              if (p === 'ctrl')                return { label: 'Ctrl' };
+              if (p === 'shift')               return { label: '&#8679;' };
+              if (p === 'alt' || p === 'opt')  return { label: '&#8997;' };
+              // Render a single-letter key uppercase so it reads like a key cap.
+              return { label: esc(part.length === 1 ? part.toUpperCase() : part) };
+            });
+          }
+          return [{ label: esc(keys) }];
+        }
+        return [];
+      }
+
+      function renderTokens(tokens) {
+        if (!tokens || !tokens.length) return '';
+        return tokens.map(function(t) {
+          if (t.then) return '<span class="bb-shortcuts-then">then</span>';
+          return '<kbd class="bb-shortcuts-kbd">' + t.label + '</kbd>';
+        }).join('');
+      }
+
+      // Build the section data structure consumed by the template.
+      // Returns { global: [{label, items: [{id, description, tokens}]}, ...],
+      //           page:   [...] } where `page` excludes entries whose scope
+      // is 'global'.
+      function buildSections() {
+        var store = (window.Alpine && Alpine.store('shortcuts')) || null;
+        var empty = { global: [], page: [] };
+        if (!store) return empty;
+        var scope = store.currentScope || 'global';
+        var all = store.forScope(scope) || [];
+        var byScope = { global: {}, page: {} };
+
+        all.forEach(function(spec) {
+          if (!spec || spec.visible === false) return;
+          var bucket = spec.scope === 'global' ? 'global' : 'page';
+          var group = spec.group || 'Other';
+          if (!byScope[bucket][group]) byScope[bucket][group] = [];
+          byScope[bucket][group].push({
+            id: spec.id,
+            description: spec.description || spec.id,
+            tokens: toTokens(spec.keys)
+          });
+        });
+
+        function flatten(buckets) {
+          return Object.keys(buckets)
+            .sort(orderGroups)
+            .map(function(label) { return { label: label, items: buckets[label] }; });
+        }
+
+        return { global: flatten(byScope.global), page: flatten(byScope.page) };
+      }
+
       return {
         open: false,
+        sections: { global: [], page: [] },
+        renderTokens: renderTokens,
         openHelp: function() {
+          // Rebuild on open so newly registered shortcuts (late-init pages,
+          // dynamic scope changes) surface immediately.
+          this.sections = buildSections();
           this.open = true;
-          var self = this;
           setTimeout(function() {
             var dialog = document.querySelector('.bb-shortcuts-dialog');
-            if (dialog) lucide.createIcons({ nodes: [dialog] });
+            if (dialog && typeof lucide !== 'undefined') {
+              lucide.createIcons({ nodes: [dialog] });
+            }
           }, 50);
         }
       };
@@ -1734,35 +1904,57 @@
       });
     })();
 
-    // Global Keyboard Shortcuts (vim-style g+key navigation, ?-key help)
+    // Global Keyboard Shortcuts — registry-driven dispatcher.
+    //
+    // Reads `$store.shortcuts` (see head) and routes keydown events against
+    // registered specs. This PR (M0.2) keeps the observable behavior identical
+    // to the previous hardcoded switch: `?` opens help, `/` opens cmdk, `Cmd+K`
+    // toggles cmdk, `g+<x>` navigates, `n+<x>` opens new-entity pages. The
+    // help modal and command palette continue to render from their hardcoded
+    // lists; they will be swapped to read from the registry in M0.3 and M0.5.
     (function() {
+      var COMBO_WINDOW = 800; // ms to type second key in a chord
       var pendingPrefix = null;
       var prefixTimeout = null;
-      var COMBO_WINDOW = 800; // ms to type second key
 
-      // Route maps for two-key combos
+      // "Go to" navigation — source of truth for `g+<x>` chords. Still exported
+      // as plain maps so M0.5 can reuse them to seed palette entries.
       var goRoutes = {
-        d: '/',
-        t: '/transactions',
-        c: '/connections',
-        r: '/reviews',
-        u: '/rules',
-        a: '/categories',
-        l: '/sync-logs',
-        b: '/backups',
-        s: '/settings',
-        p: '/providers',
-        m: '/mcp-settings',
-        k: '/access',
-        f: '/users'
+        d: { path: '/',             label: 'Go to Dashboard' },
+        t: { path: '/transactions', label: 'Go to Transactions' },
+        c: { path: '/connections',  label: 'Go to Connections' },
+        r: { path: '/reviews',      label: 'Go to Reviews' },
+        u: { path: '/rules',        label: 'Go to Rules' },
+        a: { path: '/categories',   label: 'Go to Categories' },
+        l: { path: '/sync-logs',    label: 'Go to Sync Logs' },
+        b: { path: '/backups',      label: 'Go to Backups' },
+        s: { path: '/settings',     label: 'Go to Settings' },
+        p: { path: '/providers',    label: 'Go to Providers' },
+        m: { path: '/mcp-settings', label: 'Go to MCP Settings' },
+        k: { path: '/access',       label: 'Go to Access' },
+        f: { path: '/users',        label: 'Go to Users' }
       };
 
       var newRoutes = {
-        c: '/connections/new',
-        i: '/connections/import-csv',
-        k: '/api-keys/new',
-        u: '/users/new'
+        c: { path: '/connections/new',        label: 'New Connection' },
+        i: { path: '/connections/import-csv', label: 'Import CSV' },
+        k: { path: '/api-keys/new',           label: 'New API Key' },
+        u: { path: '/users/new',              label: 'New User' }
       };
+
+      // Soft page-out before a chord-triggered full-page nav. Matches the
+      // previous behavior in the hardcoded dispatcher byte-for-byte.
+      function navigateTo(path) {
+        if (window.bbProgress) window.bbProgress.start();
+        var main = document.querySelector('main');
+        if (main) {
+          main.style.transition = 'opacity 0.15s ease, filter 0.15s ease';
+          main.style.opacity = '0.6';
+          main.style.filter = 'blur(1px)';
+          main.style.pointerEvents = 'none';
+        }
+        window.location.href = path;
+      }
 
       function isInputFocused() {
         var el = document.activeElement;
@@ -1774,12 +1966,12 @@
       }
 
       function isOverlayOpen() {
-        // Check if command palette or shortcuts help is open
+        // Check if command palette or shortcuts help is open.
         var cmdkEl = document.querySelector('[x-data="commandPalette()"]');
         var shortcutsEl = document.querySelector('[x-data="shortcutsHelp()"]');
         if (cmdkEl && cmdkEl.style.display !== 'none' && cmdkEl.__x && cmdkEl.__x.$data && cmdkEl.__x.$data.open) return true;
         if (shortcutsEl && shortcutsEl.style.display !== 'none' && shortcutsEl.__x && shortcutsEl.__x.$data && shortcutsEl.__x.$data.open) return true;
-        // Also check by visibility of backdrop
+        // Also check by visibility of backdrop.
         var backdrops = document.querySelectorAll('.bb-cmdk-backdrop, .bb-shortcuts-backdrop');
         for (var i = 0; i < backdrops.length; i++) {
           if (backdrops[i].offsetParent !== null) return true;
@@ -1795,64 +1987,201 @@
         }
       }
 
+      // ----- Registry seed -----
+      //
+      // Populated once on alpine:init (deferred via setTimeout so the keydown
+      // listener below doesn't depend on Alpine being ready — any unregistered
+      // keys simply fall through to the legacy-less no-op path).
+      function seedRegistry() {
+        if (!window.Alpine || !Alpine.store('shortcuts')) return;
+        var reg = Alpine.store('shortcuts');
+
+        reg.register({
+          id: 'global.help',
+          keys: '?',
+          description: 'Show keyboard shortcuts',
+          group: 'Actions',
+          scope: 'global',
+          action: function() { window.dispatchEvent(new CustomEvent('open-shortcuts')); }
+        });
+
+        reg.register({
+          id: 'global.cmdk.slash',
+          keys: '/',
+          description: 'Open command palette',
+          group: 'Actions',
+          scope: 'global',
+          visible: false, // `cmd+k` is the canonical binding shown in help
+          action: function() { window.dispatchEvent(new CustomEvent('open-cmdk')); }
+        });
+
+        reg.register({
+          id: 'global.cmdk',
+          keys: 'cmd+k',
+          description: 'Open command palette',
+          group: 'Actions',
+          scope: 'global',
+          // Actual toggle is wired in commandPalette()'s @keydown.window handler
+          // so it can close the palette when already open. Listed here only
+          // so the help modal / palette can show the binding.
+          visible: true
+        });
+
+        // Esc is handled by per-overlay Alpine `@keydown.window.escape` rather
+        // than this dispatcher, but the help modal should still advertise it.
+        // visible:true + no action keeps it display-only.
+        reg.register({
+          id: 'global.esc',
+          keys: 'Esc',
+          description: 'Close dialog / cancel',
+          group: 'Actions',
+          scope: 'global',
+          visible: true
+        });
+
+        Object.keys(goRoutes).forEach(function(k) {
+          var r = goRoutes[k];
+          reg.register({
+            id: 'global.go.' + k,
+            keys: { chord: ['g', k] },
+            description: r.label,
+            group: 'Go to',
+            scope: 'global',
+            action: (function(path) { return function() { navigateTo(path); }; })(r.path)
+          });
+        });
+
+        Object.keys(newRoutes).forEach(function(k) {
+          var r = newRoutes[k];
+          reg.register({
+            id: 'global.new.' + k,
+            keys: { chord: ['n', k] },
+            description: r.label,
+            group: 'New',
+            scope: 'global',
+            action: (function(path) { return function() { navigateTo(path); }; })(r.path)
+          });
+        });
+      }
+
+      document.addEventListener('alpine:init', function() {
+        // Wait for the shortcuts store from head to register before seeding.
+        setTimeout(seedRegistry, 0);
+      });
+
+      // ----- Match helpers -----
+      //
+      // Returns the first spec whose `keys` matches the given single key within
+      // the active scope set (current scope + global). Chord specs are skipped
+      // here — chord resolution happens once we have a pending prefix.
+      //
+      // Page-scoped specs take precedence over global ones on the same key, so
+      // a page can shadow a global binding (e.g. transactions rebinding `/` to
+      // focus the in-page search input instead of opening the command palette).
+      function matchSingle(reg, key) {
+        var scope = reg.currentScope;
+        var globalMatch = null;
+        for (var i = 0; i < reg.items.length; i++) {
+          var s = reg.items[i];
+          if (s.scope !== 'global' && s.scope !== scope) continue;
+          var k = s.keys;
+          var matches = (typeof k === 'string' && k === key) ||
+            (Array.isArray(k) && k.length === 1 && k[0] === key);
+          if (!matches) continue;
+          if (s.scope === scope && scope !== 'global') return s;
+          if (s.scope === 'global' && !globalMatch) globalMatch = s;
+        }
+        return globalMatch;
+      }
+
+      function matchChord(reg, prefix, key) {
+        var scope = reg.currentScope;
+        for (var i = 0; i < reg.items.length; i++) {
+          var s = reg.items[i];
+          if (s.scope !== 'global' && s.scope !== scope) continue;
+          var k = s.keys;
+          if (k && k.chord && k.chord.length === 2 && k.chord[0] === prefix && k.chord[1] === key) return s;
+        }
+        return null;
+      }
+
+      function hasChordStartingWith(reg, prefix) {
+        var scope = reg.currentScope;
+        // If the active page scope has a single-key binding for this exact
+        // key, the page wins — don't start a chord sequence. This lets a
+        // page rebind a key that's otherwise a global chord prefix (e.g.
+        // the rules list using `n` for "New rule" instead of `n+_`).
+        if (scope && scope !== 'global') {
+          for (var j = 0; j < reg.items.length; j++) {
+            var ps = reg.items[j];
+            if (ps.scope !== scope) continue;
+            var pk = ps.keys;
+            var pageMatch = (typeof pk === 'string' && pk === prefix) ||
+              (Array.isArray(pk) && pk.length === 1 && pk[0] === prefix);
+            if (pageMatch) return false;
+          }
+        }
+        for (var i = 0; i < reg.items.length; i++) {
+          var s = reg.items[i];
+          if (s.scope !== 'global' && s.scope !== scope) continue;
+          var k = s.keys;
+          if (k && k.chord && k.chord.length >= 1 && k.chord[0] === prefix) return true;
+        }
+        return false;
+      }
+
       document.addEventListener('keydown', function(e) {
-        // Skip if modifier keys are held (except shift for ?)
+        // Cmd+K / Ctrl+K is handled by the command-palette Alpine component so
+        // it can toggle the palette when already open. Everything else in this
+        // dispatcher is modifier-free.
         if (e.ctrlKey || e.metaKey || e.altKey) return;
-        // Skip if typing in an input
         if (isInputFocused()) return;
-        // Skip if an overlay is open
         if (isOverlayOpen()) return;
+
+        var reg = (window.Alpine && Alpine.store('shortcuts')) || null;
+        if (!reg) return;
 
         var key = e.key;
 
-        // ? opens shortcuts help (shift + / on most keyboards)
-        if (key === '?') {
-          e.preventDefault();
-          window.dispatchEvent(new CustomEvent('open-shortcuts'));
-          clearPrefix();
-          return;
+        // Touch device guard — page-level specs don't fire on touch.
+        // Globals (`?`, `/`, `g+_`, `n+_`) still run; the per-spec filter
+        // happens when we resolve the match below.
+        var isTouch = (Alpine.store('device') || {}).isTouch === true;
+
+        function shouldFire(spec) {
+          if (!spec) return false;
+          if (spec.when && !spec.when()) return false;
+          if (isTouch && spec.scope !== 'global') return false;
+          return true;
         }
 
-        // / focuses the command palette (like GitHub)
-        if (key === '/') {
-          e.preventDefault();
-          window.dispatchEvent(new CustomEvent('open-cmdk'));
-          clearPrefix();
-          return;
-        }
-
-        // Two-key combos: g+key, n+key
+        // Chord resolution: if we have a pending prefix, match second key now.
         if (pendingPrefix) {
           var prefix = pendingPrefix;
           clearPrefix();
-
-          var routes = null;
-          if (prefix === 'g') routes = goRoutes;
-          else if (prefix === 'n') routes = newRoutes;
-
-          if (routes && routes[key]) {
+          var chordSpec = matchChord(reg, prefix, key);
+          if (shouldFire(chordSpec) && typeof chordSpec.action === 'function') {
             e.preventDefault();
-            if (window.bbProgress) window.bbProgress.start();
-            var main = document.querySelector('main');
-            if (main) {
-              main.style.transition = 'opacity 0.15s ease, filter 0.15s ease';
-              main.style.opacity = '0.6';
-              main.style.filter = 'blur(1px)';
-              main.style.pointerEvents = 'none';
-            }
-            window.location.href = routes[key];
+            chordSpec.action();
           }
           return;
         }
 
-        // Start a prefix sequence
-        if (key === 'g' || key === 'n') {
+        // Start a chord sequence if any registered spec begins with this key.
+        if (hasChordStartingWith(reg, key)) {
           pendingPrefix = key;
           prefixTimeout = setTimeout(function() {
             pendingPrefix = null;
             prefixTimeout = null;
           }, COMBO_WINDOW);
           return;
+        }
+
+        // Single-key match.
+        var spec = matchSingle(reg, key);
+        if (shouldFire(spec) && typeof spec.action === 'function') {
+          e.preventDefault();
+          spec.action();
         }
       });
     })();

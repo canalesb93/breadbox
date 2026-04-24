@@ -106,3 +106,18 @@ func (p TransactionsProps) HasActiveFilters() bool {
 func (p TransactionsProps) HasAnyFilter() bool {
 	return p.HasActiveFilters() || p.FilterSearch != ""
 }
+
+// IsReviewQueue reports whether the current page view is the review queue —
+// transactions filtered to the needs-review tag. The `/reviews` admin alias
+// redirects to `/transactions?tags=needs-review`, so the reviews queue is
+// just this filtered view of the transactions list. Drives the M3 keyboard
+// shortcut scope (`scope: 'reviews'`) so the page registers approve/reject/
+// skip actions on top of the standard transactions navigation.
+func (p TransactionsProps) IsReviewQueue() bool {
+	for _, slug := range p.FilterTags {
+		if slug == "needs-review" {
+			return true
+		}
+	}
+	return false
+}

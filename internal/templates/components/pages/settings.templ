@@ -11,6 +11,13 @@ import (
 // typed props and the bridge drops the rendered HTML into base.html's
 // TemplContent slot.
 templ Settings(p SettingsProps) {
+	<!--
+		Set the shortcut-registry scope so the ? help modal reflects "This page"
+		accurately. Settings intentionally has no custom shortcuts — it's a
+		settings form and letter-key shortcuts would collide with form inputs.
+		Reset to 'global' on Alpine teardown.
+	-->
+	<div x-data x-init="$store.shortcuts.setScope('settings')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	<div class="bb-page-header">
 		<div>
 			<h1 class="bb-page-title">Settings</h1>

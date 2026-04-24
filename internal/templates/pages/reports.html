@@ -1,4 +1,11 @@
 {{define "content"}}
+{{/*
+  Set the shortcut-registry scope so base.html's global dispatcher routes
+  r (registered below) to a reload, and so the ? help modal surfaces it
+  under "This page". Reset on Alpine teardown.
+*/}}
+<div x-data x-init="$store.shortcuts.setScope('reports')" x-destroy="$store.shortcuts.setScope('global')"></div>
+
 <div class="bb-page-header">
   <div>
     <h1 class="bb-page-title">Agent Reports</h1>
@@ -110,5 +117,23 @@ function reportsPage() {
 }
 </script>
 {{end}}
+
+<script>
+// Register reports-scoped keyboard shortcuts. No dedicated refresh button
+// on this page (it's a server-rendered inbox), so `r` reloads.
+document.addEventListener('alpine:init', function() {
+  var reg = Alpine.store('shortcuts');
+  if (!reg) return;
+
+  reg.register({
+    id: 'reports.refresh',
+    keys: 'r',
+    description: 'Refresh reports',
+    group: 'Actions',
+    scope: 'reports',
+    action: function() { window.location.reload(); },
+  });
+});
+</script>
 
 {{end}}

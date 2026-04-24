@@ -16,6 +16,18 @@ import (
 // shared components.TxResults component so the AJAX swap path renders
 // byte-for-byte the same HTML when fetched standalone.
 templ Transactions(p TransactionsProps) {
+	<!--
+		Set the shortcut-registry scope so the base.html global dispatcher routes
+		keys like j/k/c/t/e/x/Enter/J/K/// (registered in transactions_scripts.js)
+		to this page's handlers, and so the ?-help modal shows them under "This page".
+		Reset to 'global' on destroy (Alpine's htmx-style teardowns) so other pages
+		don't inherit the scope.
+	-->
+	<div
+		x-data
+		x-init="$store.shortcuts.setScope('transactions')"
+		x-destroy="$store.shortcuts.setScope('global')"
+	></div>
 	@components.CategoryPickerStyles()
 	@txPageHeader(p)
 	@txFilters(p)
@@ -27,6 +39,24 @@ templ Transactions(p TransactionsProps) {
 	<!-- Floating bulk action bar is created via JS in <body> to avoid parent transform breaking position:fixed -->
 	@components.CategoryPickerScript()
 	@txPageScripts(p)
+	if p.IsReviewQueue() {
+		@txReviewQueueShortcuts()
+	}
+}
+
+// txReviewQueueShortcuts registers the M3 review-queue keyboard shortcut
+// (`a` approve) at `scope: 'reviews'` whenever the transactions page is
+// filtered to `tags=needs-review` — the review queue view. The x-data
+// wrapper flips the shortcut-registry scope on init so the `?` help modal
+// (M0.3) surfaces approve under "This page", and resets back to 'global'
+// on teardown. j/k/Enter/c continue to fire via the existing inline keydown
+// handler in transactions_scripts.js.html; M3 only layers the approve
+// action on top. Reject and skip were dropped after review feedback —
+// reject had no data-model meaning (the queue is tag-backed, so there is
+// no "rejected" state), and skip was duplicative of `j`.
+templ txReviewQueueShortcuts() {
+	<div x-data x-init="$store.shortcuts.setScope('reviews')" x-destroy="$store.shortcuts.setScope('global')"></div>
+	@templ.Raw("<script>" + reviewQueueScriptBody + "</script>")
 }
 
 // TransactionsResults renders only the AJAX tx-results-partial fragment —
@@ -362,14 +392,17 @@ templ txResultsShell(p TransactionsProps) {
 				</label>
 			</div>
 			<div class="flex-1"></div>
-			<!-- Keyboard shortcuts (desktop only) -->
+			<!-- Keyboard shortcuts (desktop only).
+			     `.hidden sm:flex` gives a pre-Alpine fallback; each @components.Kbd
+			     also guards on `$store.device.isTouch` to cover touch-capable
+			     large viewports. -->
 			<div class="hidden sm:flex items-center gap-2 text-xs text-base-content/30">
-				<span class="flex items-center gap-1"><kbd class="bb-kbd">j</kbd><kbd class="bb-kbd">k</kbd> navigate</span>
-				<span class="flex items-center gap-1"><kbd class="bb-kbd">Enter</kbd> open</span>
-				<span class="flex items-center gap-1"><kbd class="bb-kbd">c</kbd> category</span>
-				<span class="flex items-center gap-1"><kbd class="bb-kbd">t</kbd> tag</span>
-				<span class="flex items-center gap-1"><kbd class="bb-kbd">e</kbd> expand</span>
-				<span class="flex items-center gap-1"><kbd class="bb-kbd">x</kbd> select</span>
+				<span class="flex items-center gap-1">@components.Kbd("j")@components.Kbd("k") navigate</span>
+				<span class="flex items-center gap-1">@components.Kbd("Enter") open</span>
+				<span class="flex items-center gap-1">@components.Kbd("c") category</span>
+				<span class="flex items-center gap-1">@components.Kbd("t") tag</span>
+				<span class="flex items-center gap-1">@components.Kbd("e") expand</span>
+				<span class="flex items-center gap-1">@components.Kbd("x") select</span>
 			</div>
 		</div>
 		<div id="bb-tx-results">

@@ -756,6 +756,25 @@ document.addEventListener('alpine:init', function() {
       Alpine.store('bulk').toggle(id);
     },
 
+    // Shift+J / Shift+K — extend the bulk selection while moving the focus ring.
+    // Mirrors Gmail/Linear: the row the cursor *arrives at* gets (de)selected,
+    // which feels like "drag-select with the keyboard".
+    _extendSelection(dir) {
+      var rows = this._getRows();
+      if (!rows.length) return;
+      // Enter selection mode implicitly — matches the behavior of `x` which
+      // also bootstraps selection mode when a row first gets toggled.
+      if (!Alpine.store('bulk').selecting) Alpine.store('bulk').toggleMode();
+      if (dir > 0) this.next(); else this.prev();
+      var row = rows[this.focusedIdx] || this._getRows()[this.focusedIdx];
+      if (!row) return;
+      var id = row.dataset.txId;
+      if (!id) return;
+      Alpine.store('bulk').toggle(id);
+    },
+    extendSelectionDown() { this._extendSelection(1); },
+    extendSelectionUp() { this._extendSelection(-1); },
+
     // Jump the keyboard focus ring onto the clicked row so j/k continues from there.
     focusRow(row) {
       var rows = this._getRows();
@@ -794,46 +813,81 @@ document.addEventListener('alpine:init', function() {
     if (nav) nav.focusRow(row);
   });
 
-  // Keyboard handler
-  document.addEventListener('keydown', function(e) {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
-    // Skip while any picker overlay is open so their own shortcuts can fire.
-    // Alpine's x-show toggles display:none on the wrapper, not the dialog — and the
-    // dialog itself is position:fixed which makes offsetParent always null. Check
-    // the wrapper's computed display instead.
-    if (document.querySelector('.bb-cat-overlay[style*="block"]')) return;
-    var pickerOpen = function(dialogSel) {
-      var d = document.querySelector(dialogSel);
+  // Register transactions-scoped shortcuts against the global $store.shortcuts
+  // registry. The base.html dispatcher reads from this registry, so no inline
+  // keydown listener is needed here — and the help modal + cmdk can surface
+  // these bindings automatically on this page.
+  //
+  // Scope is activated when the transactions page runs its x-init
+  // ($store.shortcuts.setScope('transactions')); all specs below declare
+  // scope: 'transactions' so they only fire there.
+  function txPickerOpen() {
+    // Category overlay sets inline display:block when open.
+    if (document.querySelector('.bb-cat-overlay[style*="block"]')) return true;
+    function dialogShown(sel) {
+      var d = document.querySelector(sel);
       if (!d || !d.parentElement) return false;
       return window.getComputedStyle(d.parentElement).display !== 'none';
-    };
-    if (pickerOpen('.bb-catpicker-dialog')) return;
-    if (pickerOpen('.bb-tagpicker-dialog')) return;
-
-    var nav = Alpine.store('txNav');
-    switch(e.key) {
-      case 'j': e.preventDefault(); nav.next(); break;
-      case 'k': e.preventDefault(); nav.prev(); break;
-      case 'Enter': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.openDetail(); } break;
-      case 'c': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.openCategorize(); } break;
-      case 't': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.openTagPicker(); } break;
-      case 'e': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.toggleExpand(); } break;
-      case 'x': if (nav.focusedIdx >= 0) { e.preventDefault(); nav.toggleSelect(); } break;
-      case 'Escape':
-        // Escape priority: deselect bulk → exit select mode → clear j/k
-        // focus. Bulk state wins over the focus ring because it's the
-        // heavier piece of state the user is likely to want to back out of
-        // first; clearing focus is quietest and goes last.
-        if (Alpine.store('bulk').selecting && Alpine.store('bulk').sel.length > 0) {
-          Alpine.store('bulk').clear();
-        } else if (Alpine.store('bulk').selecting) {
-          Alpine.store('bulk').toggleMode();
-        } else if (nav.focusedIdx >= 0) {
-          nav.clearFocus();
-        }
-        break;
     }
-  });
+    return dialogShown('.bb-catpicker-dialog') || dialogShown('.bb-tagpicker-dialog');
+  }
+  var txHasFocus = function() { return Alpine.store('txNav').focusedIdx >= 0; };
+  var txNotInPicker = function() { return !txPickerOpen(); };
+  var txFocusedNotInPicker = function() { return txHasFocus() && txNotInPicker(); };
+  var reg = Alpine.store('shortcuts');
+
+  reg.register({ id: 'transactions.next', keys: 'j', description: 'Move focus down',
+    group: 'Navigation', scope: 'transactions', when: txNotInPicker,
+    action: function() { Alpine.store('txNav').next(); } });
+  reg.register({ id: 'transactions.prev', keys: 'k', description: 'Move focus up',
+    group: 'Navigation', scope: 'transactions', when: txNotInPicker,
+    action: function() { Alpine.store('txNav').prev(); } });
+  reg.register({ id: 'transactions.open', keys: 'Enter', description: 'Open focused transaction',
+    group: 'Actions', scope: 'transactions', when: txFocusedNotInPicker,
+    action: function() { Alpine.store('txNav').openDetail(); } });
+  reg.register({ id: 'transactions.categorize', keys: 'c', description: 'Categorize',
+    group: 'Actions', scope: 'transactions', when: txFocusedNotInPicker,
+    action: function() { Alpine.store('txNav').openCategorize(); } });
+  reg.register({ id: 'transactions.tag', keys: 't', description: 'Tag',
+    group: 'Actions', scope: 'transactions', when: txFocusedNotInPicker,
+    action: function() { Alpine.store('txNav').openTagPicker(); } });
+  reg.register({ id: 'transactions.expand', keys: 'e', description: 'Expand / collapse row',
+    group: 'Actions', scope: 'transactions', when: txFocusedNotInPicker,
+    action: function() { Alpine.store('txNav').toggleExpand(); } });
+  reg.register({ id: 'transactions.select', keys: 'x', description: 'Toggle selection',
+    group: 'Selection', scope: 'transactions', when: txFocusedNotInPicker,
+    action: function() { Alpine.store('txNav').toggleSelect(); } });
+  reg.register({ id: 'transactions.select-extend-down', keys: 'J',
+    description: 'Extend selection down',
+    group: 'Selection', scope: 'transactions', when: txNotInPicker,
+    action: function() { Alpine.store('txNav').extendSelectionDown(); } });
+  reg.register({ id: 'transactions.select-extend-up', keys: 'K',
+    description: 'Extend selection up',
+    group: 'Selection', scope: 'transactions', when: txNotInPicker,
+    action: function() { Alpine.store('txNav').extendSelectionUp(); } });
+  reg.register({ id: 'transactions.focus-search', keys: '/',
+    description: 'Focus search',
+    group: 'Actions', scope: 'transactions', when: txNotInPicker,
+    action: function() {
+      var input = document.getElementById('bb-quick-search');
+      if (input) { input.focus(); input.select && input.select(); }
+    } });
+  // Escape priority: deselect bulk → exit select mode → clear j/k focus.
+  // Bulk state wins over the focus ring because it's the heavier piece of
+  // state the user is likely to want to back out of first; clearing focus
+  // is quietest and goes last. Registered page-scoped so it takes precedence
+  // over any future global Esc binding.
+  reg.register({ id: 'transactions.escape', keys: 'Escape',
+    description: 'Clear selection / focus',
+    group: 'Navigation', scope: 'transactions', when: txNotInPicker,
+    visible: false,
+    action: function() {
+      var bulk = Alpine.store('bulk');
+      var nav = Alpine.store('txNav');
+      if (bulk.selecting && bulk.sel.length > 0) bulk.clear();
+      else if (bulk.selecting) bulk.toggleMode();
+      else if (nav.focusedIdx >= 0) nav.clearFocus();
+    } });
 
 });
 
