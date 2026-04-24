@@ -46,7 +46,28 @@ create your admin account.
 | `--yes, -y` | Non-interactive mode: accept defaults, no prompts. |
 | `--domain=HOST` | Configure HTTPS via Caddy for `HOST`. Also enables the `caddy` compose profile. |
 | `--install-docker` | Install Docker automatically on Linux via `https://get.docker.com` (no prompt). |
+| `--register-daemon` | Register a launchd agent (macOS) or systemd unit (Linux) so Breadbox restarts on boot. |
+| `--no-register-daemon` | Skip the daemon registration prompt entirely. |
 | `--uninstall` | Stop containers and remove installed files (preserves database volume). |
+
+### Platform support
+
+The installer detects OS / arch / distro / package manager / init system via
+`deploy/detect.sh` and adapts:
+
+| Platform | Docker install | openssl install | Daemon registration |
+| --- | --- | --- | --- |
+| Linux (Debian/Ubuntu) | `get.docker.com` | `apt-get install -y openssl` | systemd unit at `/etc/systemd/system/breadbox.service` |
+| Linux (Fedora/RHEL) | `get.docker.com` | `dnf install -y openssl` | systemd unit |
+| Linux (Arch) | `get.docker.com` | `pacman -S openssl` | systemd unit |
+| Linux (Alpine) | `get.docker.com` | `apk add openssl` | systemd (when present) |
+| macOS | Manual (Docker Desktop link) | `brew install openssl` | user-level launchd agent at `~/Library/LaunchAgents/sh.breadbox.plist` |
+
+Official Docker images are published for `linux/amd64` and `linux/arm64`. Other
+architectures may work under emulation; the installer warns but proceeds.
+
+You can run `deploy/detect.sh` directly to print what the installer sees, and
+`deploy/detect.sh --test` to run self-tests.
 
 ### `INSTALL_DIR` default
 

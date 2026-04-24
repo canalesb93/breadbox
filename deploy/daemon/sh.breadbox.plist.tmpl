@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>sh.breadbox</string>
+
+    <key>WorkingDirectory</key>
+    <string>__INSTALL_DIR__</string>
+
+    <!--
+        Run the compose command at load time. Docker Desktop must be running
+        on macOS; we do NOT try to launch Docker Desktop ourselves because
+        doing so from launchd without a GUI session is unreliable.
+    -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>__COMPOSE_CMD__ up -d</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Relaunch if the oneshot exits abnormally. -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>__INSTALL_DIR__/breadbox.launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>__INSTALL_DIR__/breadbox.launchd.log</string>
+</dict>
+</plist>
