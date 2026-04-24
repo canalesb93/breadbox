@@ -125,6 +125,13 @@ document.addEventListener('DOMContentLoaded', function() {
         a.setAttribute('rel', 'noopener');
       }
     });
+    el.querySelectorAll('table').forEach(function(t) {
+      if (t.parentNode && t.parentNode.classList && t.parentNode.classList.contains('bb-report-table-wrap')) return;
+      var wrap = document.createElement('div');
+      wrap.className = 'bb-report-table-wrap';
+      t.parentNode.insertBefore(wrap, t);
+      wrap.appendChild(t);
+    });
     var lastChild = el.lastElementChild;
     if (lastChild) lastChild.classList.add('!mb-0');
   });
