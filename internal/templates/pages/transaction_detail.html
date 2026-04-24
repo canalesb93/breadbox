@@ -3,7 +3,7 @@
 
 {{/*
   Set the shortcut-registry scope so base.html's global dispatcher routes
-  c / t / e / Enter (registered below) to this page's handlers, and so the
+  c / t / e (registered below) to this page's handlers, and so the
   ? help modal surfaces them under "This page". Reset to 'global' on
   Alpine teardown so other pages don't inherit the scope.
 */}}
@@ -335,18 +335,6 @@ document.addEventListener('alpine:init', function() {
       // opens the picker with its current tag state (appliedCounts, etc.).
       var btn = document.querySelector('.bb-tag-add');
       if (btn) btn.click();
-    },
-  });
-
-  reg.register({
-    id: 'transaction-detail.focus-comment',
-    keys: 'Enter',
-    description: 'Focus comment',
-    group: 'Actions',
-    scope: 'transaction-detail',
-    action: function() {
-      var el = document.getElementById('bb-txd-comment');
-      if (el) el.focus();
     },
   });
 
