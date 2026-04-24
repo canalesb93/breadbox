@@ -7,7 +7,7 @@ import (
 )
 
 templ dashOverviewStats(p DashboardProps) {
-	<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+	<div class="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
 		<div class="bb-card p-4 col-span-2 lg:col-span-1">
 			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Net Worth</div>
 			<div class="text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.FormatBalance(p.NetWorth) }</div>
@@ -16,16 +16,17 @@ templ dashOverviewStats(p DashboardProps) {
 				<span>Liabilities <span class="tabular-nums text-error/70 font-medium">{ components.FormatBalance(p.TotalLiabilities) }</span></span>
 			</div>
 		</div>
-		<a href="/transactions" class="bb-card bb-card--interactive p-4 no-underline group block">
-			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Total Transactions</div>
+		<div class="bb-card p-4">
+			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">
+				<a href="/transactions" class="hover:text-base-content/60 transition-colors">Transactions</a>
+			</div>
 			<div class="text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.CommaInt(p.TotalTransactions) }</div>
-			<div class="text-[0.65rem] text-base-content/40 mt-1 group-hover:text-primary/70 transition-colors">Browse &rarr;</div>
-		</a>
-		<a href="/transactions?filter=uncategorized" class="bb-card bb-card--interactive p-4 no-underline group block">
-			<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Uncategorized</div>
-			<div class="text-2xl font-bold tabular-nums tracking-tight mt-1">{ components.CommaInt(p.UncategorizedCount) }</div>
-			<div class="text-[0.65rem] text-base-content/40 mt-1 group-hover:text-primary/70 transition-colors">Review &rarr;</div>
-		</a>
+			<div class="text-[0.65rem] text-base-content/40 mt-1 flex flex-wrap gap-x-2">
+				<a href="/transactions?filter=uncategorized" class="hover:text-warning transition-colors">
+					Uncategorized <span class="tabular-nums text-warning/80 font-medium">{ components.CommaInt(p.UncategorizedCount) }</span>
+				</a>
+			</div>
+		</div>
 		if p.ReviewsEnabled {
 			<a href="/reviews" class="bb-card bb-card--interactive p-4 no-underline group block">
 				<div class="text-[0.65rem] uppercase tracking-wider text-base-content/40">Pending Reviews</div>
@@ -34,7 +35,7 @@ templ dashOverviewStats(p DashboardProps) {
 			</a>
 		}
 		if p.ErrorCount > 0 {
-			<a href="/connections" class="bb-card bb-card--interactive p-4 no-underline group block">
+			<a href="/connections" class={ "bb-card bb-card--interactive p-4 no-underline group block", templ.KV("col-span-2 lg:col-span-3", p.ReviewsEnabled) }>
 				<div class="text-[0.65rem] uppercase tracking-wider text-warning">Connection Errors</div>
 				<div class="text-2xl font-bold tabular-nums tracking-tight mt-1 text-error/80">{ fmt.Sprintf("%d", p.ErrorCount) }</div>
 				<div class="text-[0.65rem] text-base-content/40 mt-1 group-hover:text-primary/70 transition-colors">Fix &rarr;</div>
