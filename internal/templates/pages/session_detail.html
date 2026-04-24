@@ -7,7 +7,7 @@
       <span>Session</span>
     </div>
     <h1 class="bb-page-title">{{.Session.Purpose}}</h1>
-    <div class="flex items-center gap-4 text-sm text-base-content/50 mt-1">
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-base-content/50 mt-1">
       {{if .Session.AgentName}}
         <span class="flex items-center gap-1">
           <i data-lucide="bot" class="w-3.5 h-3.5"></i>
@@ -21,6 +21,15 @@
       {{end}}
       <span>{{relativeTime .Session.CreatedAt}}</span>
       <span>{{.Session.ToolCallCount}} tool calls</span>
+      {{if .Session.ErrorCount}}
+        <span class="inline-flex items-center gap-1 badge badge-sm badge-error">
+          <i data-lucide="alert-triangle" class="w-3 h-3"></i>
+          {{.Session.ErrorCount}} error{{if ne .Session.ErrorCount 1}}s{{end}}
+        </span>
+      {{end}}
+      {{if or .Session.WriteCount .Session.ReadCount}}
+        <span class="text-base-content/60">{{.Session.WriteCount}} write · {{.Session.ReadCount}} read</span>
+      {{end}}
     </div>
   </div>
 </div>
