@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +17,46 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// humanizeCSVError converts low-level `encoding/csv` parser errors into
+// plain-English messages suitable for the import wizard UI. Unknown errors
+// fall through with their prefix stripped so we never expose the Go
+// `fmt.Errorf("parse CSV: ...")` wrapper or the word "fields" (the stdlib's
+// term for CSV columns).
+func humanizeCSVError(err error) string {
+	if err == nil {
+		return ""
+	}
+	var parseErr *csv.ParseError
+	if errors.As(err, &parseErr) {
+		line := parseErr.Line
+		if line <= 0 {
+			line = parseErr.StartLine
+		}
+		switch {
+		case errors.Is(parseErr.Err, csv.ErrFieldCount):
+			return fmt.Sprintf(
+				"We couldn't parse this file. Row %d has a different number of columns than the header row. Check that no commas appear inside values without quotes, or re-export from your bank with consistent columns.",
+				line,
+			)
+		case errors.Is(parseErr.Err, csv.ErrBareQuote):
+			return fmt.Sprintf(
+				"We couldn't parse this file. Row %d contains an unescaped quote character. Make sure any values containing quotes are wrapped in double quotes with inner quotes doubled (e.g., \"she said \"\"hi\"\"\").",
+				line,
+			)
+		case errors.Is(parseErr.Err, csv.ErrQuote):
+			return fmt.Sprintf(
+				"We couldn't parse this file. Row %d has a quoted value that is never closed. Make sure every opening \" has a matching closing \".",
+				line,
+			)
+		}
+	}
+	// Strip the "parse CSV: " wrapper added in internal/provider/csv/parser.go
+	// before surfacing anything unexpected to the user.
+	msg := err.Error()
+	msg = strings.TrimPrefix(msg, "parse CSV: ")
+	return msg
+}
 
 const maxCSVUploadSize = 10 << 20 // 10MB
 
@@ -94,7 +136,8 @@ func CSVUploadHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 
 		parsed, err := csvpkg.ParseFile(raw)
 		if err != nil {
-			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+			a.Logger.Debug("csv upload parse failed", "error", err)
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": humanizeCSVError(err)})
 			return
 		}
 
