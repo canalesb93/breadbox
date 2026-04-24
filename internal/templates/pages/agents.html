@@ -107,10 +107,20 @@
   {{end}}
 {{else}}
   <div class="card bg-base-100 shadow-sm">
-    <div class="card-body items-center text-center py-12">
-      <i data-lucide="scroll-text" class="w-12 h-12 text-base-content/20 mb-3"></i>
-      <h3 class="font-medium text-base-content/70">No agent sessions yet</h3>
-      <p class="text-sm text-base-content/50 max-w-md">When AI agents use the MCP tools with sessions enabled, their activity will appear here.</p>
+    <div class="card-body items-center text-center py-12 gap-4">
+      <i data-lucide="scroll-text" class="w-12 h-12 text-base-content/20 mb-1"></i>
+      <div>
+        <h3 class="font-medium text-base-content/70">No agent sessions yet</h3>
+        <p class="text-sm text-base-content/50 max-w-md mt-1">Agent activity appears here once an MCP client connects to Breadbox. Start by configuring your first agent.</p>
+      </div>
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <a href="/agents?tab=guide" class="btn btn-primary btn-sm rounded-xl">
+          <i data-lucide="rocket" class="w-4 h-4"></i> Connect your first agent
+        </a>
+        <a href="/agents?tab=wizard" class="btn btn-ghost btn-sm rounded-xl">
+          <i data-lucide="wand-sparkles" class="w-4 h-4"></i> Browse prompt library
+        </a>
+      </div>
     </div>
   </div>
 {{end}}
