@@ -30,29 +30,28 @@
   {{range .ToolCalls}}
   <div class="card bg-base-100 shadow-sm" x-data="{ expanded: false }">
     <div class="card-body p-3 cursor-pointer" @click="expanded = !expanded">
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2 sm:gap-3 min-w-0">
         <!-- Classification badge -->
         {{if eq .Classification "write"}}
-          <span class="badge badge-sm badge-warning">write</span>
+          <span class="badge badge-sm badge-warning shrink-0">write</span>
         {{else}}
-          <span class="badge badge-sm badge-info">read</span>
+          <span class="badge badge-sm badge-info shrink-0">read</span>
         {{end}}
 
-        <!-- Tool name -->
-        <span class="font-mono text-sm font-medium">{{.ToolName}}</span>
+        <!-- Tool name (truncates before pushing trailing cluster off-screen) -->
+        <span class="font-mono text-sm font-medium truncate min-w-0 flex-1">{{.ToolName}}</span>
 
-        <!-- Error badge -->
+        <!-- Error badge (stays next to tool name, never wraps to right cluster) -->
         {{if .IsError}}
-          <span class="badge badge-sm badge-error">error</span>
+          <span class="badge badge-sm badge-error shrink-0">error</span>
         {{end}}
 
-        <!-- Duration -->
-        {{if .DurationMs}}
-          <span class="text-xs text-base-content/40">{{derefInt32 .DurationMs}}ms</span>
-        {{end}}
-
-        <span class="ml-auto flex items-center gap-2">
-          <span class="text-xs text-base-content/40">{{relativeTime .CreatedAt}}</span>
+        <!-- Trailing cluster: keep duration + caret always visible; hide relative time on mobile -->
+        <span class="flex items-center gap-2 shrink-0 whitespace-nowrap">
+          {{if .DurationMs}}
+            <span class="text-xs text-base-content/40 tabular-nums">{{derefInt32 .DurationMs}}ms</span>
+          {{end}}
+          <span class="text-xs text-base-content/40 hidden sm:inline">{{relativeTime .CreatedAt}}</span>
           <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-base-content/30 transition-transform" :class="expanded && 'rotate-180'"></i>
         </span>
       </div>
@@ -64,6 +63,12 @@
 
     <!-- Expanded detail -->
     <div x-show="expanded" x-cloak class="border-t border-base-200 p-3">
+      <!-- Absolute timestamp (keeps created-at available on mobile where the relative label is hidden) -->
+      <div class="mb-3 text-xs text-base-content/50">
+        <span class="font-medium">Called</span>
+        <time datetime="{{.CreatedAt}}">{{formatDateTime .CreatedAt}}</time>
+        <span class="text-base-content/30">· {{relativeTime .CreatedAt}}</span>
+      </div>
       {{if .RequestJSON}}
       <div class="mb-3">
         <div class="text-xs font-medium text-base-content/50 mb-1">Request</div>
