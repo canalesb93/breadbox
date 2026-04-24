@@ -1363,9 +1363,25 @@
     @apply text-[0.65rem] text-base-content/40 tabular-nums;
   }
 
+  /* Palette key hint. Matches `.bb-kbd` exactly so single keys render
+     identically to combo-pill cells and help-modal hints. */
   .bb-cmdk-kbd {
-    @apply inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1
-           text-[0.6rem] font-medium text-base-content/40 bg-base-200 border border-base-300 rounded;
+    @apply inline-flex items-center justify-center min-w-[1.25rem] h-[1.25rem]
+           text-[0.6rem] font-mono font-medium leading-none
+           rounded px-1;
+    background: oklch(0.97 0 0);
+    color: oklch(0.4 0 0);
+    border: 1px solid oklch(0.9 0 0);
+    box-shadow: 0 1px 0 oklch(0.88 0 0);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-cmdk-kbd {
+      background: oklch(0.25 0 0);
+      color: oklch(0.7 0 0);
+      border-color: oklch(0.35 0 0);
+      box-shadow: 0 1px 0 oklch(0.15 0 0);
+    }
   }
 
   /* Chord separator used between kbd hints in a palette row ("g" then "d").
@@ -1379,9 +1395,25 @@
     @apply flex items-center justify-between px-4 py-2.5 border-t border-base-300 text-[0.65rem] text-base-content/40;
   }
 
+  /* Palette footer inline kbd. Matches `.bb-kbd` / `.bb-cmdk-kbd`; only
+     the outer margin is specific to the footer layout. */
   .bb-cmdk-footer kbd {
-    @apply inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1
-           text-[0.6rem] font-medium text-base-content/40 bg-base-200 border border-base-300 rounded mx-0.5;
+    @apply inline-flex items-center justify-center min-w-[1.25rem] h-[1.25rem]
+           text-[0.6rem] font-mono font-medium leading-none
+           rounded px-1 mx-0.5;
+    background: oklch(0.97 0 0);
+    color: oklch(0.4 0 0);
+    border: 1px solid oklch(0.9 0 0);
+    box-shadow: 0 1px 0 oklch(0.88 0 0);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-cmdk-footer kbd {
+      background: oklch(0.25 0 0);
+      color: oklch(0.7 0 0);
+      border-color: oklch(0.35 0 0);
+      box-shadow: 0 1px 0 oklch(0.15 0 0);
+    }
   }
 
   .bb-cmdk-empty {
@@ -1602,9 +1634,25 @@
     @apply flex items-center gap-1.5;
   }
 
+  /* Help modal key hint. Unified with `.bb-kbd` so palette, inline, and
+     help-modal keys all render at the same size and weight. */
   .bb-shortcuts-kbd {
-    @apply inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5
-           text-[0.65rem] font-medium text-base-content/50 bg-base-200 border border-base-300 rounded;
+    @apply inline-flex items-center justify-center min-w-[1.25rem] h-[1.25rem]
+           text-[0.6rem] font-mono font-medium leading-none
+           rounded px-1;
+    background: oklch(0.97 0 0);
+    color: oklch(0.4 0 0);
+    border: 1px solid oklch(0.9 0 0);
+    box-shadow: 0 1px 0 oklch(0.88 0 0);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-shortcuts-kbd {
+      background: oklch(0.25 0 0);
+      color: oklch(0.7 0 0);
+      border-color: oklch(0.35 0 0);
+      box-shadow: 0 1px 0 oklch(0.15 0 0);
+    }
   }
 
   .bb-shortcuts-then {
