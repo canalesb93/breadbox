@@ -40,8 +40,7 @@ func OAuthMetadataHandler() http.HandlerFunc {
 			"scopes_supported":                      []string{"full_access", "read_only"},
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(metadata)
+		writeJSON(w, http.StatusOK, metadata)
 	}
 }
 
@@ -60,8 +59,7 @@ func OAuthProtectedResourceHandler() http.HandlerFunc {
 			"scopes_supported":     []string{"full_access", "read_only"},
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(metadata)
+		writeJSON(w, http.StatusOK, metadata)
 	}
 }
 
@@ -105,9 +103,7 @@ func OAuthRegisterHandler(svc *service.Service) http.HandlerFunc {
 			"scope":                    result.Scope,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(resp)
+		writeJSON(w, http.StatusCreated, resp)
 	}
 }
 
@@ -292,9 +288,8 @@ func handleAuthCodeGrant(w http.ResponseWriter, r *http.Request, svc *service.Se
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	json.NewEncoder(w).Encode(tokenResp)
+	writeJSON(w, http.StatusOK, tokenResp)
 }
 
 func handleRefreshGrant(w http.ResponseWriter, r *http.Request, svc *service.Service) {
@@ -322,9 +317,8 @@ func handleRefreshGrant(w http.ResponseWriter, r *http.Request, svc *service.Ser
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	json.NewEncoder(w).Encode(tokenResp)
+	writeJSON(w, http.StatusOK, tokenResp)
 }
 
 // OAuthLoginReturnHandler wraps the normal login to handle OAuth return flow.
@@ -502,9 +496,7 @@ func RevokeOAuthClientHandler(svc *service.Service) http.HandlerFunc {
 // --- Helpers ---
 
 func oauthError(w http.ResponseWriter, status int, code, description string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{
+	writeJSON(w, status, map[string]string{
 		"error":             code,
 		"error_description": description,
 	})
