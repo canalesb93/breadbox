@@ -353,6 +353,113 @@ func TestGroupActivityByDay_DropsUnparseableTimestamps(t *testing.T) {
 	}
 }
 
+// update_transactions can write a tag_added with a note AND a standalone
+// comment in the same call. The timeline should collapse the duplicate
+// comment (the note already renders inline on the tag row) so users don't
+// see twin near-identical rows.
+func TestBuildActivityTimeline_TagNoteAndDuplicateCommentDeduped(t *testing.T) {
+	actor := "user-1"
+	note := "Please review this one again"
+	annotations := []service.Annotation{
+		{
+			ID:        "ann-tag",
+			Kind:      "tag_added",
+			ActorID:   &actor,
+			ActorName: "admin@example.com",
+			ActorType: "user",
+			Payload: map[string]interface{}{
+				"slug": "needs-review",
+				"note": note,
+			},
+			CreatedAt: "2026-04-16T03:39:34.502794Z",
+		},
+		{
+			ID:        "ann-comment",
+			Kind:      "comment",
+			ActorID:   &actor,
+			ActorName: "admin@example.com",
+			ActorType: "user",
+			Payload: map[string]interface{}{
+				"content": note,
+			},
+			CreatedAt: "2026-04-16T03:39:34.513524Z",
+		},
+	}
+
+	entries := buildActivityTimeline(annotations, nil)
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry (duplicate comment suppressed), got %d", len(entries))
+	}
+	if entries[0].Type != "tag" {
+		t.Errorf("expected the tag entry to survive, got type=%q", entries[0].Type)
+	}
+	if entries[0].Detail != note {
+		t.Errorf("expected note to render inline as Detail, got %q", entries[0].Detail)
+	}
+}
+
+// A standalone comment with no matching tag note must still be emitted.
+func TestBuildActivityTimeline_StandaloneCommentNotDeduped(t *testing.T) {
+	actor := "user-1"
+	annotations := []service.Annotation{{
+		ID:        "ann-standalone",
+		Kind:      "comment",
+		ActorID:   &actor,
+		ActorName: "admin@example.com",
+		ActorType: "user",
+		Payload: map[string]interface{}{
+			"content": "Just a standalone note",
+		},
+		CreatedAt: "2026-04-16T03:39:34Z",
+	}}
+
+	entries := buildActivityTimeline(annotations, nil)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].Type != "comment" {
+		t.Errorf("expected comment type, got %q", entries[0].Type)
+	}
+}
+
+// A comment far outside the ±2s window of a matching tag_added note must NOT
+// be deduped — users can legitimately comment the same text later.
+func TestBuildActivityTimeline_DistantCommentNotDeduped(t *testing.T) {
+	actor := "user-1"
+	note := "duplicate text"
+	annotations := []service.Annotation{
+		{
+			ID:        "ann-tag",
+			Kind:      "tag_added",
+			ActorID:   &actor,
+			ActorName: "admin@example.com",
+			ActorType: "user",
+			Payload: map[string]interface{}{
+				"slug": "needs-review",
+				"note": note,
+			},
+			CreatedAt: "2026-04-16T03:39:34Z",
+		},
+		{
+			ID:        "ann-comment-later",
+			Kind:      "comment",
+			ActorID:   &actor,
+			ActorName: "admin@example.com",
+			ActorType: "user",
+			Payload: map[string]interface{}{
+				"content": note,
+			},
+			CreatedAt: "2026-04-16T03:40:34Z", // 60s later
+		},
+	}
+
+	entries := buildActivityTimeline(annotations, nil)
+	if len(entries) != 2 {
+		t.Fatalf("expected both entries to survive (distant timestamps), got %d", len(entries))
+	}
+}
+
 func TestBuildActivityTimeline_LegacyPrefixCommentSuppressed(t *testing.T) {
 	annotations := []service.Annotation{{
 		ID:        "ann-legacy",

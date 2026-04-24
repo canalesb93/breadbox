@@ -826,6 +826,55 @@ func categoryDisplayLookup(tree []service.CategoryResponse) func(string) string 
 	}
 }
 
+// isDuplicateOfAdjacentTagNote reports whether a comment annotation exactly
+// duplicates a tag_added.note from the same actor within ±2 seconds — the
+// signature of a single update_transactions call that wrote both a tag with
+// a note and a standalone comment. Timestamps outside RFC3339-parseable
+// range are treated as non-matching (fail open, never over-dedup).
+func isDuplicateOfAdjacentTagNote(all []service.Annotation, c service.Annotation, content string) bool {
+	if content == "" {
+		return false
+	}
+	cT, err := time.Parse(time.RFC3339Nano, c.CreatedAt)
+	if err != nil {
+		return false
+	}
+	const window = 2 * time.Second
+	for _, a := range all {
+		if a.Kind != "tag_added" {
+			continue
+		}
+		note, _ := a.Payload["note"].(string)
+		if note != content {
+			continue
+		}
+		// Match only if both rows share the same actor id (when available);
+		// fall back to actor name for system/agent rows without an id.
+		sameActor := false
+		switch {
+		case a.ActorID != nil && c.ActorID != nil && *a.ActorID != "" && *a.ActorID == *c.ActorID:
+			sameActor = true
+		case (a.ActorID == nil || *a.ActorID == "") && (c.ActorID == nil || *c.ActorID == "") && a.ActorName == c.ActorName:
+			sameActor = true
+		}
+		if !sameActor {
+			continue
+		}
+		aT, err := time.Parse(time.RFC3339Nano, a.CreatedAt)
+		if err != nil {
+			continue
+		}
+		diff := cT.Sub(aT)
+		if diff < 0 {
+			diff = -diff
+		}
+		if diff <= window {
+			return true
+		}
+	}
+	return false
+}
+
 // buildActivityTimeline produces a sorted activity list from annotations.
 // Review lifecycle events surface as tag_added/tag_removed on the
 // needs-review tag. Comment annotations originally authored as review notes
@@ -847,6 +896,15 @@ func buildActivityTimeline(annotations []service.Annotation, categoryDisplay fun
 			content, _ := a.Payload["content"].(string)
 			// Filter legacy [Review: ...] prefix duplicates from pre-consolidation imports.
 			if strings.HasPrefix(content, "[Review: ") {
+				continue
+			}
+			// Dedup: suppress a comment that exactly duplicates a same-actor
+			// tag_added.note written within ±2s. update_transactions (MCP
+			// and REST) can write a tag-with-note AND a standalone comment
+			// in one call; the resulting rows land within a few ms of each
+			// other and render as twin adjacent events. The tag row already
+			// inlines the note via .Detail — the comment is redundant.
+			if isDuplicateOfAdjacentTagNote(annotations, a, content) {
 				continue
 			}
 			entry := service.ActivityEntry{
