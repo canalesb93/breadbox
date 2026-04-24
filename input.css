@@ -2448,14 +2448,17 @@
     @apply border-l-2 border-base-300 pl-3 my-3 text-base-content/60;
   }
   .bb-report-body hr { @apply hidden; } /* discourage HR as decorative separator */
+  .bb-report-body .bb-report-table-wrap {
+    @apply -mx-2 sm:mx-0 my-3 overflow-x-auto rounded-xl;
+  }
   .bb-report-body table {
-    @apply w-full my-3 text-sm border-collapse;
+    @apply w-full text-sm border-collapse;
   }
   .bb-report-body thead th {
-    @apply text-left font-semibold text-[0.7rem] uppercase tracking-wider text-base-content/50 px-3 py-2 border-b border-base-300;
+    @apply text-left font-semibold text-[0.7rem] uppercase tracking-wider text-base-content/50 px-3 py-2 border-b border-base-300 whitespace-nowrap;
   }
   .bb-report-body tbody td {
-    @apply px-3 py-2 border-b border-base-200;
+    @apply px-3 py-2 border-b border-base-200 whitespace-nowrap sm:whitespace-normal;
   }
   .bb-report-body tbody tr:last-child td { @apply border-b-0; }
 
