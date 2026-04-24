@@ -47,6 +47,7 @@ func BackupsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		data["Schedule"] = schedule
 		data["RetentionDays"] = retentionDays
 		data["HasEncryptionKey"] = len(a.Config.EncryptionKey) > 0
+		data["EncryptionKeyFingerprint"] = a.Config.EncryptionKeyFingerprint
 		data["DatabaseName"] = service.ParseDatabaseName(a.Config.DatabaseURL)
 		data["BackupDir"] = a.BackupService.BackupDir()
 		data["PreflightOK"] = preflight.OK

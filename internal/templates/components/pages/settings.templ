@@ -190,6 +190,20 @@ templ settingsSecurityCard(p SettingsProps) {
 						<span class="badge badge-error badge-sm">Not Set</span>
 					}
 				</div>
+				if p.HasEncryptionKey && p.EncryptionKeyFingerprint != "" {
+					<div class="mt-3 p-3 rounded-xl bg-base-200/40">
+						<div class="flex items-center justify-between gap-3">
+							<div class="flex items-center gap-2.5 min-w-0">
+								<i data-lucide="fingerprint" class="w-4 h-4 text-base-content/50 flex-shrink-0"></i>
+								<span class="text-sm font-medium">Key Fingerprint</span>
+							</div>
+							<code class="text-xs font-mono tabular-nums bg-base-300/60 px-2 py-1 rounded select-all" data-encryption-key-fingerprint>{ p.EncryptionKeyFingerprint }</code>
+						</div>
+						<p class="text-xs text-base-content/50 mt-2 leading-relaxed">
+							First 8 hex chars of <code class="text-xs bg-base-300/40 px-1 rounded">sha256(key)</code>. Compare this against the fingerprint you saved at install — if it changes after a host migration or <code class="text-xs bg-base-300/40 px-1 rounded">.env</code> restore, your encrypted bank credentials will fail to decrypt.
+						</p>
+					</div>
+				}
 				if !p.HasEncryptionKey {
 					<div class="text-xs text-error/80 bg-error/5 rounded-lg p-3 mt-3">
 						<i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-1"></i>

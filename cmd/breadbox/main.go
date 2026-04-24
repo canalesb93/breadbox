@@ -17,6 +17,7 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/appconfig"
 	"breadbox/internal/config"
+	cryptopkg "breadbox/internal/crypto"
 	"breadbox/internal/db"
 	breadboxmcp "breadbox/internal/mcp"
 	"breadbox/internal/seed"
@@ -188,6 +189,12 @@ func runServe() error {
 		return fmt.Errorf("ENCRYPTION_KEY is required when Plaid or Teller providers are configured. Generate one with: openssl rand -hex 32")
 	}
 
+	// Record (TOFU) or compare the encryption-key fingerprint. Lets admins
+	// spot a changed key after a host migration or `.env` restore. A future
+	// `breadbox doctor` (#687) will fail loudly on mismatch; today we just
+	// log and surface the observed value in the admin UI.
+	cfg.EncryptionKeyFingerprint = recordKeyFingerprint(ctx, a.Queries, cfg.EncryptionKey, logger)
+
 	// Clean up orphaned sync logs from previous crashes.
 	result, err := a.Queries.CleanupOrphanedSyncLogs(ctx)
 	if err != nil {
@@ -307,6 +314,51 @@ func runServe() error {
 	}
 
 	return nil
+}
+
+// recordKeyFingerprint implements trust-on-first-use for the encryption-key
+// fingerprint stored in app_config. Returns the observed fingerprint so the
+// caller can stash it on cfg for UI rendering.
+//
+//   - No key configured → no-op, returns "".
+//   - No stored fingerprint → write the observed one (first-boot TOFU).
+//   - Stored matches observed → silent success.
+//   - Stored differs from observed → log a warning. Phase 1 does not fail
+//     startup; #687's `breadbox doctor` will upgrade this into a hard stop
+//     once we have a supported key-rotation path.
+func recordKeyFingerprint(ctx context.Context, queries *db.Queries, key []byte, logger *slog.Logger) string {
+	if len(key) == 0 {
+		return ""
+	}
+	observed := cryptopkg.Fingerprint(key)
+
+	row, err := queries.GetAppConfig(ctx, "encryption_key_fingerprint")
+	stored := ""
+	if err == nil && row.Value.Valid {
+		stored = row.Value.String
+	}
+
+	switch {
+	case stored == "":
+		// First boot with this key — record it.
+		if err := queries.SetAppConfig(ctx, db.SetAppConfigParams{
+			Key:   "encryption_key_fingerprint",
+			Value: pgtype.Text{String: observed, Valid: true},
+		}); err != nil {
+			logger.Warn("failed to store encryption-key fingerprint", "error", err)
+		} else {
+			logger.Info("recorded encryption-key fingerprint (first boot)", "fingerprint", observed)
+		}
+	case stored == observed:
+		logger.Debug("encryption-key fingerprint verified", "fingerprint", observed)
+	default:
+		logger.Warn(
+			"encryption-key fingerprint mismatch — existing encrypted data may be undecryptable",
+			"observed", observed,
+			"stored", stored,
+		)
+	}
+	return observed
 }
 
 func runMigrate() error {

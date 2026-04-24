@@ -52,6 +52,13 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 	r.Get("/setup", CreateAdminHandler(a, sm, tr))
 	r.Post("/setup", CreateAdminHandler(a, sm, tr))
 
+	// Encryption-key acknowledgement pre-step. CreateAdminHandler redirects
+	// here on first GET /setup so operators see the fingerprint and confirm
+	// they've saved the key before creating the admin account. CSRF-wrapped
+	// because the POST writes a session flag.
+	r.With(CSRFMiddleware(sm)).Get("/setup/key", SetupKeyConfirmHandler(a, sm))
+	r.With(CSRFMiddleware(sm)).Post("/setup/key", SetupKeyConfirmHandler(a, sm))
+
 	// Programmatic setup API (unauthenticated).
 	r.Post("/-/setup", ProgrammaticSetupHandler(a, sm))
 

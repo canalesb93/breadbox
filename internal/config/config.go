@@ -5,9 +5,10 @@ import "time"
 // Config holds all application configuration.
 type Config struct {
 	// Derived from environment
-	DatabaseURL   string
-	EncryptionKey []byte // 32 bytes, decoded from hex
-	ServerPort    string
+	DatabaseURL              string
+	EncryptionKey            []byte // 32 bytes, decoded from hex
+	EncryptionKeyFingerprint string // first 8 hex chars of sha256(EncryptionKey); "" when unset
+	ServerPort               string
 	Environment   string
 	LogLevel      string // LOG_LEVEL: debug, info, warn, error
 

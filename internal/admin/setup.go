@@ -34,6 +34,15 @@ func CreateAdminHandler(a *app.App, sm *scs.SessionManager, _ *TemplateRenderer)
 			return
 		}
 
+		// Pre-step: require the operator to confirm they've saved the
+		// encryption key (and seen its fingerprint) before surfacing the
+		// admin-creation form. Gated on GET only so programmatic POSTs from
+		// tests and the `/-/setup` headless flow are unaffected.
+		if r.Method == http.MethodGet && !requireEncryptionKeyAck(a, sm, r) {
+			http.Redirect(w, r, "/setup/key", http.StatusSeeOther)
+			return
+		}
+
 		if r.Method == http.MethodGet {
 			renderCreateAdmin(w, r, sm, "", "", "", nil)
 			return

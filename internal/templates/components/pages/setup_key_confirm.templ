@@ -1,0 +1,112 @@
+package pages
+
+import "breadbox/internal/templates/components/layout"
+
+// SetupKeyConfirmProps carries the data the pre-wizard encryption-key
+// confirmation page needs. Shown at GET/POST /setup/key before CreateAdmin
+// so the operator acknowledges they've copied the ENCRYPTION_KEY somewhere
+// durable. The page intentionally does NOT show the raw key — the key is
+// already visible in the `.env` the installer just wrote, and re-rendering
+// it over HTTP would add a second disclosure point for no gain. We show
+// only the fingerprint so the operator can cross-check what they saved.
+type SetupKeyConfirmProps struct {
+	PageTitle   string
+	CSRFToken   string
+	Fingerprint string
+	// MissingKey is true when no ENCRYPTION_KEY is set on the server. The
+	// page still renders (so the operator sees what happened) but the
+	// acknowledgement form is replaced with remediation guidance.
+	MissingKey bool
+	Error      string
+	FlashType  string
+	FlashMsg   string
+}
+
+// SetupKeyConfirm renders the /setup/key pre-step. Reuses the wizard layout
+// so it looks continuous with the admin-creation page that follows.
+templ SetupKeyConfirm(p SetupKeyConfirmProps) {
+	@layout.Wizard(layout.WizardProps{
+		PageTitle: p.PageTitle,
+		FlashType: p.FlashType,
+		FlashMsg:  p.FlashMsg,
+	}) {
+		<div class="text-center mb-8">
+			<h1 class="text-xl font-semibold tracking-tight">Before we continue</h1>
+			<p class="text-sm text-base-content/50 mt-1.5">Your ENCRYPTION_KEY protects every bank credential Breadbox stores</p>
+		</div>
+		if p.Error != "" {
+			<div role="alert" class="flex items-center gap-3 rounded-xl bg-error/10 text-error px-4 py-3 text-sm mb-6">
+				<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+				<span>{ p.Error }</span>
+			</div>
+		}
+		if p.MissingKey {
+			<div class="rounded-xl bg-error/10 border border-error/30 p-4 mb-6 text-sm">
+				<div class="flex items-start gap-2.5">
+					<i data-lucide="alert-triangle" class="w-5 h-5 text-error shrink-0 mt-0.5"></i>
+					<div class="min-w-0">
+						<p class="font-semibold text-error">No ENCRYPTION_KEY is configured.</p>
+						<p class="text-base-content/70 mt-1 leading-relaxed">
+							Set <code class="bg-base-300/50 px-1 py-0.5 rounded text-xs">ENCRYPTION_KEY</code> to a 64-char hex string
+							in your <code class="bg-base-300/50 px-1 py-0.5 rounded text-xs">.env</code> file and restart the server.
+							Generate one with <code class="bg-base-300/50 px-1 py-0.5 rounded text-xs">openssl rand -hex 32</code>.
+						</p>
+					</div>
+				</div>
+			</div>
+			<a href="/setup" class="btn btn-ghost w-full h-12 rounded-xl text-base">
+				<i data-lucide="refresh-cw" class="w-4 h-4 mr-1"></i>
+				Retry
+			</a>
+		} else {
+			<div class="rounded-xl bg-base-200/60 p-4 mb-6">
+				<div class="flex items-center gap-2.5 mb-3">
+					<i data-lucide="fingerprint" class="w-4 h-4 text-base-content/60"></i>
+					<span class="text-sm font-medium">Key fingerprint</span>
+				</div>
+				<code class="block text-lg font-mono tabular-nums text-center bg-base-300/60 px-3 py-3 rounded-lg select-all" data-encryption-key-fingerprint>
+					{ p.Fingerprint }
+				</code>
+				<p class="text-xs text-base-content/50 mt-3 leading-relaxed">
+					This is the first 8 hex characters of <code class="bg-base-300/40 px-1 rounded">sha256</code> over your ENCRYPTION_KEY.
+					Write it down or store it alongside the key in your password manager. You'll see this same fingerprint on the
+					Settings and Backups pages — if it ever changes, your encrypted bank credentials will be undecryptable.
+				</p>
+			</div>
+			<div class="rounded-xl bg-warning/10 border border-warning/30 p-4 mb-6 text-sm">
+				<div class="flex items-start gap-2.5">
+					<i data-lucide="alert-triangle" class="w-5 h-5 text-warning shrink-0 mt-0.5"></i>
+					<div class="min-w-0">
+						<p class="font-semibold">If you lose ENCRYPTION_KEY, every bank connection is unrecoverable.</p>
+						<p class="text-base-content/70 mt-1 leading-relaxed">
+							The installer printed your key once. Copy the full 64-char hex value from
+							<code class="bg-base-300/50 px-1 py-0.5 rounded text-xs">.env</code> into a password manager or secure vault
+							before continuing. Don't commit it to version control.
+						</p>
+					</div>
+				</div>
+			</div>
+			<form method="POST" action="/setup/key" class="space-y-5">
+				if p.CSRFToken != "" {
+					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				}
+				<label class="flex items-start gap-3 p-3 rounded-xl bg-base-200/40 cursor-pointer border border-transparent hover:border-base-300 transition-colors">
+					<input
+						type="checkbox"
+						name="saved"
+						value="yes"
+						required
+						class="checkbox checkbox-primary checkbox-sm mt-0.5 flex-shrink-0"
+					/>
+					<span class="text-sm leading-relaxed">
+						I've saved my encryption key somewhere safe and confirmed the fingerprint above.
+					</span>
+				</label>
+				<button type="submit" class="btn btn-primary w-full h-12 rounded-xl text-base font-semibold transition-colors duration-150">
+					Continue
+					<i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
+				</button>
+			</form>
+		}
+	}
+}

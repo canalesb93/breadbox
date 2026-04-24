@@ -62,19 +62,20 @@ func SettingsGetHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 			"Flash":       GetFlash(ctx, sm),
 		}
 		body := pages.Settings(pages.SettingsProps{
-			CSRFToken:            GetCSRFToken(r),
-			SyncIntervalMinutes:  a.Config.SyncIntervalMinutes,
-			SyncLogRetentionDays: retentionDays,
-			SyncLogCount:         syncLogCount,
-			Version:              a.Config.Version,
-			GoVersion:            runtime.Version(),
-			PostgresVersion:      pgVersion,
-			Uptime:               formatUptime(time.Since(a.Config.StartTime)),
-			ProviderCount:        len(a.Providers),
-			HasEncryptionKey:     len(a.Config.EncryptionKey) > 0,
-			OnboardingDismissed:  onboardingDismissed,
-			NextSyncTime:         nextSyncTime,
-			ConfigSources:        a.Config.ConfigSources,
+			CSRFToken:                GetCSRFToken(r),
+			SyncIntervalMinutes:      a.Config.SyncIntervalMinutes,
+			SyncLogRetentionDays:     retentionDays,
+			SyncLogCount:             syncLogCount,
+			Version:                  a.Config.Version,
+			GoVersion:                runtime.Version(),
+			PostgresVersion:          pgVersion,
+			Uptime:                   formatUptime(time.Since(a.Config.StartTime)),
+			ProviderCount:            len(a.Providers),
+			HasEncryptionKey:         len(a.Config.EncryptionKey) > 0,
+			EncryptionKeyFingerprint: a.Config.EncryptionKeyFingerprint,
+			OnboardingDismissed:      onboardingDismissed,
+			NextSyncTime:             nextSyncTime,
+			ConfigSources:            a.Config.ConfigSources,
 		})
 		tr.RenderWithTempl(w, r, data, body)
 	}

@@ -13,8 +13,13 @@ type SettingsProps struct {
 	Uptime               string
 	ProviderCount        int
 	HasEncryptionKey     bool
-	OnboardingDismissed  bool
-	NextSyncTime         string
+	// EncryptionKeyFingerprint is the first 8 hex chars of sha256(key).
+	// Empty when no key is configured. Shown in the Security card so admins
+	// can sanity-check a host migration or `.env` restore against the value
+	// they stashed during install.
+	EncryptionKeyFingerprint string
+	OnboardingDismissed      bool
+	NextSyncTime             string
 	// ConfigSources maps config keys to their source: "env", "db", or "default".
 	ConfigSources map[string]string
 }

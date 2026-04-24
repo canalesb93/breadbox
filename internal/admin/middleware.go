@@ -184,6 +184,8 @@ func SetupDetection(queries *db.Queries) func(http.Handler) http.Handler {
 }
 
 // isSetupRoute checks whether the path is a setup or setup API route.
+// Includes /setup/key so the encryption-key confirmation pre-step can
+// render before the first admin account exists.
 func isSetupRoute(path string) bool {
-	return path == "/setup" || path == "/-/setup"
+	return path == "/setup" || path == "/setup/key" || path == "/-/setup"
 }
