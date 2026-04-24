@@ -343,10 +343,10 @@ func estimateExcludeSize(numCols, numTerms int, columns []string, nullableColumn
 }
 
 // TransactionSearchColumns are the standard columns searched for transactions.
-var TransactionSearchColumns = []string{"t.name", "t.merchant_name"}
+var TransactionSearchColumns = []string{"t.provider_name", "t.provider_merchant_name"}
 
 // TransactionNullableColumns marks which transaction search columns are nullable.
-var TransactionNullableColumns = map[string]bool{"t.merchant_name": true}
+var TransactionNullableColumns = map[string]bool{"t.provider_merchant_name": true}
 
 // validSearchFields lists recognized search_field values.
 var validSearchFields = map[string]bool{
@@ -367,9 +367,9 @@ func resolveSearchField(field *string) ([]string, map[string]bool) {
 	}
 	switch *field {
 	case "name":
-		return []string{"t.name"}, map[string]bool{}
+		return []string{"t.provider_name"}, map[string]bool{}
 	case "merchant":
-		return []string{"t.merchant_name"}, map[string]bool{"t.merchant_name": true}
+		return []string{"t.provider_merchant_name"}, map[string]bool{"t.provider_merchant_name": true}
 	default:
 		return TransactionSearchColumns, TransactionNullableColumns
 	}

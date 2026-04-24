@@ -105,7 +105,7 @@ ON CONFLICT (id) DO NOTHING;
 `
 
 const transactionsSQL = `
-INSERT INTO transactions (account_id, external_transaction_id, amount, iso_currency_code, date, name, merchant_name, category_primary, category_detailed, payment_channel, pending) VALUES
+INSERT INTO transactions (account_id, provider_transaction_id, amount, iso_currency_code, date, provider_name, provider_merchant_name, provider_category_primary, provider_category_detailed, provider_payment_channel, pending) VALUES
   -- Alice / Chase Checking (seed_acct_1)
   ('00000000-0000-0000-0000-000000000021', 'seed_txn_001', 4.50,    'USD', CURRENT_DATE - INTERVAL '1 day',  'Starbucks Coffee',       'Starbucks',      'FOOD_AND_DRINK',  'COFFEE_SHOPS',     'in_store', false),
   ('00000000-0000-0000-0000-000000000021', 'seed_txn_002', 42.15,   'USD', CURRENT_DATE - INTERVAL '2 days', 'Shell Gas Station',      'Shell',          'TRANSPORTATION',  'GAS_STATIONS',     'in_store', false),
@@ -167,7 +167,7 @@ INSERT INTO transactions (account_id, external_transaction_id, amount, iso_curre
   ('00000000-0000-0000-0000-000000000023', 'seed_txn_048', -2800.00,'USD', CURRENT_DATE - INTERVAL '35 days','Direct Deposit',         NULL,             'INCOME',          'WAGES',            'other',    false),
   ('00000000-0000-0000-0000-000000000023', 'seed_txn_049', 1500.00, 'USD', CURRENT_DATE - INTERVAL '36 days','Rent',                   NULL,             'RENT_AND_UTILITIES', 'RENT',          'other',    false),
   ('00000000-0000-0000-0000-000000000023', 'seed_txn_050', 95.00,   'USD', CURRENT_DATE - INTERVAL '40 days','Kroger',                 'Kroger',         'FOOD_AND_DRINK',  'GROCERIES',        'in_store', false)
-ON CONFLICT (external_transaction_id) DO NOTHING;
+ON CONFLICT (provider_transaction_id) DO NOTHING;
 `
 
 const syncLogsSQL = `
@@ -191,7 +191,7 @@ ON CONFLICT (id) DO NOTHING;
 `
 
 const tellerTransactionsSQL = `
-INSERT INTO transactions (account_id, external_transaction_id, amount, iso_currency_code, date, name, merchant_name, category_primary, category_detailed, payment_channel, pending) VALUES
+INSERT INTO transactions (account_id, provider_transaction_id, amount, iso_currency_code, date, provider_name, provider_merchant_name, provider_category_primary, provider_category_detailed, provider_payment_channel, pending) VALUES
   -- Alice / Wells Fargo Checking (seed_acct_t1)
   ('00000000-0000-0000-0000-000000000025', 'seed_txn_t01', 12.50,   'USD', CURRENT_DATE - INTERVAL '1 day',  'Taco Bell',              'Taco Bell',      'FOOD_AND_DRINK',  NULL, 'other', false),
   ('00000000-0000-0000-0000-000000000025', 'seed_txn_t02', 45.00,   'USD', CURRENT_DATE - INTERVAL '3 days', 'Chevron Gas',            'Chevron',        'TRANSPORTATION',  NULL, 'other', false),
@@ -201,7 +201,7 @@ INSERT INTO transactions (account_id, external_transaction_id, amount, iso_curre
   -- Alice / Wells Fargo Savings (seed_acct_t2)
   ('00000000-0000-0000-0000-000000000026', 'seed_txn_t05', -300.00, 'USD', CURRENT_DATE - INTERVAL '2 days', 'Transfer from Checking', NULL,             'TRANSFER_IN',     NULL, 'other', false),
   ('00000000-0000-0000-0000-000000000026', 'seed_txn_t06', 0.18,    'USD', CURRENT_DATE - INTERVAL '30 days','Interest Payment',       NULL,             'INCOME',          NULL, 'other', false)
-ON CONFLICT (external_transaction_id) DO NOTHING;
+ON CONFLICT (provider_transaction_id) DO NOTHING;
 `
 
 const tellerSyncLogSQL = `

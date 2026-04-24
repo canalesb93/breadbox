@@ -99,11 +99,11 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	args := make([]any, 0, 16)
 	argN := 1
 
-	buf.WriteString("SELECT t.id, t.short_id, t.account_id, t.external_transaction_id, t.pending_transaction_id, " +
+	buf.WriteString("SELECT t.id, t.short_id, t.account_id, t.provider_transaction_id, t.provider_pending_transaction_id, " +
 		"t.amount, t.iso_currency_code, t.unofficial_currency_code, t.date, t.authorized_date, " +
-		"t.datetime, t.authorized_datetime, t.name, t.merchant_name, " +
-		"t.category_primary, t.category_detailed, t.category_confidence, " +
-		"t.payment_channel, t.pending, t.deleted_at, t.created_at, t.updated_at, " +
+		"t.datetime, t.authorized_datetime, t.provider_name, t.provider_merchant_name, " +
+		"t.provider_category_primary, t.provider_category_detailed, t.provider_category_confidence, " +
+		"t.provider_payment_channel, t.pending, t.deleted_at, t.created_at, t.updated_at, " +
 		"COALESCE(a.display_name, a.name) AS account_name, " +
 		"a.short_id AS account_short_id, " +
 		"COALESCE(au.name, u.name) AS user_name, " +
@@ -282,7 +282,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		case "amount":
 			sortCol = "t.amount"
 		case "name":
-			sortCol = "t.name"
+			sortCol = "t.provider_name"
 		case "date":
 			sortCol = "t.date"
 		}
@@ -667,7 +667,7 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 
 	buf.WriteString("SELECT t.id, t.account_id, COALESCE(a.display_name, a.name, ''), " +
 		"COALESCE(bc.institution_name, ''), COALESCE(au.name, u.name, ''), " +
-		"t.date, t.name, t.merchant_name, t.amount, t.iso_currency_code, " +
+		"t.date, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, " +
 		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
 		"t.category_override, t.pending, " +
 		// "Agent reviewed" is inferred from a category_set annotation authored
@@ -1059,7 +1059,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 
 	query := "SELECT t.id, t.account_id, COALESCE(a.display_name, a.name, ''), " +
 		"COALESCE(bc.institution_name, ''), COALESCE(au.name, u.name, ''), " +
-		"t.date, t.name, t.merchant_name, t.amount, t.iso_currency_code, " +
+		"t.date, t.provider_name, t.provider_merchant_name, t.amount, t.iso_currency_code, " +
 		"t.category_id, c.display_name AS cat_display_name, c.slug AS cat_slug, c.icon AS cat_icon, COALESCE(c.color, pc.color) AS cat_color, " +
 		"t.category_override, t.pending, " +
 		"EXISTS(SELECT 1 FROM annotations ann WHERE ann.transaction_id = t.id AND ann.kind = 'category_set' AND ann.actor_type = 'agent') AS agent_reviewed, " +
@@ -1184,7 +1184,7 @@ func (s *Service) GetAdminTransactionRowsByIDs(ctx context.Context, ids []string
 
 func (s *Service) ListDistinctCategories(ctx context.Context) ([]CategoryPair, error) {
 	rows, err := s.Pool.Query(ctx,
-		"SELECT DISTINCT category_primary, category_detailed FROM transactions WHERE deleted_at IS NULL AND category_primary IS NOT NULL ORDER BY category_primary, category_detailed")
+		"SELECT DISTINCT provider_category_primary, provider_category_detailed FROM transactions WHERE deleted_at IS NULL AND provider_category_primary IS NOT NULL ORDER BY provider_category_primary, provider_category_detailed")
 	if err != nil {
 		return nil, fmt.Errorf("list distinct categories: %w", err)
 	}
@@ -1239,13 +1239,13 @@ func (s *Service) GetTransaction(ctx context.Context, id string) (*TransactionRe
 		AuthorizedDate:      dateStr(txn.AuthorizedDate),
 		Datetime:            timestampStr(txn.Datetime),
 		AuthorizedDatetime:  timestampStr(txn.AuthorizedDatetime),
-		Name:                txn.Name,
-		MerchantName:        textPtr(txn.MerchantName),
-		CategoryPrimaryRaw:  textPtr(txn.CategoryPrimary),
-		CategoryDetailedRaw: textPtr(txn.CategoryDetailed),
-		CategoryConfidence:  textPtr(txn.CategoryConfidence),
+		Name:                txn.ProviderName,
+		MerchantName:        textPtr(txn.ProviderMerchantName),
+		CategoryPrimaryRaw:  textPtr(txn.ProviderCategoryPrimary),
+		CategoryDetailedRaw: textPtr(txn.ProviderCategoryDetailed),
+		CategoryConfidence:  textPtr(txn.ProviderCategoryConfidence),
 		CategoryOverride:    txn.CategoryOverride,
-		PaymentChannel:      textPtr(txn.PaymentChannel),
+		PaymentChannel:      textPtr(txn.ProviderPaymentChannel),
 		Pending:             txn.Pending,
 		CreatedAt:           pgconv.TimestampStr(txn.CreatedAt),
 		UpdatedAt:           pgconv.TimestampStr(txn.UpdatedAt),

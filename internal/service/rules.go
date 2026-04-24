@@ -1164,8 +1164,8 @@ func (s *Service) ListActiveRulesForSync(ctx context.Context) ([]TransactionRule
 // rows. The `set_category` UPDATE below enforces its own
 // `category_override = FALSE` guard so overridden rows keep their user-pinned
 // category.
-const transactionContextQuery = `SELECT t.id, t.name, COALESCE(t.merchant_name, ''), t.amount,
-	COALESCE(t.category_primary, ''), COALESCE(t.category_detailed, ''),
+const transactionContextQuery = `SELECT t.id, t.provider_name, COALESCE(t.provider_merchant_name, ''), t.amount,
+	COALESCE(t.provider_category_primary, ''), COALESCE(t.provider_category_detailed, ''),
 	t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
 	COALESCE(array_agg(DISTINCT tag.slug) FILTER (WHERE tag.slug IS NOT NULL), ARRAY[]::text[])
 	FROM transactions t
@@ -1178,7 +1178,7 @@ const transactionContextQuery = `SELECT t.id, t.name, COALESCE(t.merchant_name, 
 	AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))`
 
 // transactionContextGroupBy is the GROUP BY clause matching transactionContextQuery.
-const transactionContextGroupBy = ` GROUP BY t.id, t.name, t.merchant_name, t.amount, t.category_primary, t.category_detailed, t.pending, bc.provider, t.account_id, u.id, u.name`
+const transactionContextGroupBy = ` GROUP BY t.id, t.provider_name, t.provider_merchant_name, t.amount, t.provider_category_primary, t.provider_category_detailed, t.pending, bc.provider, t.account_id, u.id, u.name`
 
 // transactionContextRow holds a scanned transaction row for rule evaluation.
 type transactionContextRow struct {
@@ -1731,8 +1731,8 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 	// Must match the same filters as transactionContextQuery (used by ApplyRuleRetroactively):
 	// - category_override = FALSE (rules don't overwrite manual overrides)
 	// - exclude matched dependent transactions (dedup'd via account links)
-	baseQuery := `SELECT t.id, t.name, COALESCE(t.merchant_name, ''), t.amount,
-		COALESCE(t.category_primary, ''), COALESCE(t.category_detailed, ''),
+	baseQuery := `SELECT t.id, t.provider_name, COALESCE(t.provider_merchant_name, ''), t.amount,
+		COALESCE(t.provider_category_primary, ''), COALESCE(t.provider_category_detailed, ''),
 		t.pending, bc.provider, t.account_id::text, COALESCE(u.id::text, ''), COALESCE(u.name, ''),
 		t.date, COALESCE(c.slug, '')
 		FROM transactions t
@@ -2317,7 +2317,7 @@ func (s *Service) ListRuleApplications(ctx context.Context, ruleID string, limit
 		limit = 100
 	}
 
-	query := `SELECT ann.id, ann.transaction_id, t.name, t.amount, t.date,
+	query := `SELECT ann.id, ann.transaction_id, t.provider_name, t.amount, t.date,
 		COALESCE(ann.payload->>'action_field', ''),
 		COALESCE(ann.payload->>'action_value', ''),
 		COALESCE(ann.payload->>'applied_by', 'sync'),

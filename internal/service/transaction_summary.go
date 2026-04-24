@@ -82,8 +82,8 @@ func (s *Service) GetTransactionSummary(ctx context.Context, params TransactionS
 	joinCategories := false
 	switch params.GroupBy {
 	case "category":
-		selectCols = "COALESCE(cat.display_name, INITCAP(REPLACE(t.category_primary, '_', ' ')), 'Uncategorized') AS category, cat.icon AS category_icon, cat.color AS category_color, t.iso_currency_code"
-		groupCols = "COALESCE(cat.display_name, INITCAP(REPLACE(t.category_primary, '_', ' ')), 'Uncategorized'), cat.icon, cat.color, t.iso_currency_code"
+		selectCols = "COALESCE(cat.display_name, INITCAP(REPLACE(t.provider_category_primary, '_', ' ')), 'Uncategorized') AS category, cat.icon AS category_icon, cat.color AS category_color, t.iso_currency_code"
+		groupCols = "COALESCE(cat.display_name, INITCAP(REPLACE(t.provider_category_primary, '_', ' ')), 'Uncategorized'), cat.icon, cat.color, t.iso_currency_code"
 		orderCols = "SUM(t.amount) DESC"
 		joinCategories = true
 	case "month":
@@ -99,8 +99,8 @@ func (s *Service) GetTransactionSummary(ctx context.Context, params TransactionS
 		groupCols = "t.date, t.iso_currency_code"
 		orderCols = "t.date DESC"
 	case "category_month":
-		selectCols = "COALESCE(cat.display_name, INITCAP(REPLACE(t.category_primary, '_', ' ')), 'Uncategorized') AS category, cat.icon AS category_icon, cat.color AS category_color, to_char(date_trunc('month', t.date), 'YYYY-MM') AS period, t.iso_currency_code"
-		groupCols = "COALESCE(cat.display_name, INITCAP(REPLACE(t.category_primary, '_', ' ')), 'Uncategorized'), cat.icon, cat.color, date_trunc('month', t.date), t.iso_currency_code"
+		selectCols = "COALESCE(cat.display_name, INITCAP(REPLACE(t.provider_category_primary, '_', ' ')), 'Uncategorized') AS category, cat.icon AS category_icon, cat.color AS category_color, to_char(date_trunc('month', t.date), 'YYYY-MM') AS period, t.iso_currency_code"
+		groupCols = "COALESCE(cat.display_name, INITCAP(REPLACE(t.provider_category_primary, '_', ' ')), 'Uncategorized'), cat.icon, cat.color, date_trunc('month', t.date), t.iso_currency_code"
 		orderCols = "date_trunc('month', t.date) DESC, SUM(t.amount) DESC"
 		joinCategories = true
 	}
@@ -160,7 +160,7 @@ func (s *Service) GetTransactionSummary(ctx context.Context, params TransactionS
 	}
 
 	if params.Category != nil {
-		buf.WriteString(" AND t.category_primary = $")
+		buf.WriteString(" AND t.provider_category_primary = $")
 		buf.WriteString(strconv.Itoa(argN))
 		args = append(args, *params.Category)
 		argN++ //nolint:ineffassign // kept for consistency with other filters
@@ -255,7 +255,7 @@ func (s *Service) GetMerchantSummary(ctx context.Context, params MerchantSummary
 	args := make([]any, 0, 12)
 	argN := 1
 
-	buf.WriteString(`SELECT COALESCE(t.merchant_name, t.name) AS merchant,
+	buf.WriteString(`SELECT COALESCE(t.provider_merchant_name, t.provider_name) AS merchant,
 		COUNT(*) AS transaction_count,
 		SUM(t.amount) AS total_amount,
 		AVG(t.amount) AS avg_amount,
@@ -369,7 +369,7 @@ LEFT JOIN bank_connections bc ON a.connection_id = bc.id`)
 		argN = ec.ArgN
 	}
 
-	buf.WriteString(" GROUP BY COALESCE(t.merchant_name, t.name), t.iso_currency_code")
+	buf.WriteString(" GROUP BY COALESCE(t.provider_merchant_name, t.provider_name), t.iso_currency_code")
 	buf.WriteString(" HAVING COUNT(*) >= $")
 	buf.WriteString(strconv.Itoa(argN))
 	args = append(args, params.MinCount)

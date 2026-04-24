@@ -613,7 +613,7 @@ func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecat
 	}
 
 	if params.NameContains != nil {
-		query += fmt.Sprintf(" AND t.name ILIKE '%%' || $%d || '%%'", argN)
+		query += fmt.Sprintf(" AND t.provider_name ILIKE '%%' || $%d || '%%'", argN)
 		args = append(args, *params.NameContains)
 		argN++
 	}

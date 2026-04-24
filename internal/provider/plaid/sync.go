@@ -2,6 +2,7 @@ package plaid
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -183,6 +184,11 @@ func mapTransaction(txn plaidgo.Transaction) provider.Transaction {
 		if conf, ok := pfc.GetConfidenceLevelOk(); ok && conf != nil {
 			t.CategoryConfidence = conf
 		}
+	}
+
+	// Store the raw Plaid transaction as JSON for audit / future use.
+	if raw, err := json.Marshal(txn); err == nil {
+		t.Raw = raw
 	}
 
 	return t
