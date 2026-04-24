@@ -76,16 +76,14 @@ templ Categories(p CategoriesProps) {
 	@categoriesKeyboardScript()
 }
 
-// categoriesKeyboardScript wires j/k tree nav and n (new category) into the
-// shared $store.shortcuts registry at scope 'categories'. Enter/Space for
-// expand/collapse are already bound inline on each parent button via
-// Alpine's @keydown.enter / @keydown.space.prevent (see categoryRow) — those
-// fire on the *focused* DOM element, so we deliberately do NOT register
-// Enter/Space at page scope here. Doing so would double-fire expansion when
-// the button also has browser focus. The nav helper only applies a focus
-// *class* (.bb-tx-row--focused) and never calls .focus(), so the two
-// mechanisms stay independent: j/k moves a visual cursor, tab/click gives
-// real DOM focus which then accepts Enter/Space inline.
+// categoriesKeyboardScript wires j/k/Enter/Space/e/n into the shared
+// $store.shortcuts registry at scope 'categories'. Enter (and Space) act on
+// the j/k-tracked row — primary rows expand/collapse; subcategory rows jump
+// to the filtered transactions list. `e` opens the edit page for the
+// focused category; `n` clicks the Add Category link. The inline @keydown
+// bindings on primary rows were removed so the dispatcher is the single
+// source of truth — otherwise a Tab-focused row would fire both the Alpine
+// handler and the page-scope shortcut and expansion would double-toggle.
 templ categoriesKeyboardScript() {
 	<script>
 		// Keyboard navigation for the categories tree. Reads the DOM for visible
@@ -128,6 +126,39 @@ templ categoriesKeyboardScript() {
 				if (!rows.length) return;
 				this.setFocus(this.focusedIdx < 0 ? 0 : this.focusedIdx - 1);
 			},
+			// Returns the row a keyboard action should target — the j/k-tracked
+			// row when one is set, otherwise any row the user has Tab-focused.
+			// Keeps Enter/Space/e working for users who reach the tree via Tab
+			// instead of j/k.
+			currentRow: function() {
+				var rows = this.visibleRows();
+				if (this.focusedIdx >= 0 && this.focusedIdx < rows.length) return rows[this.focusedIdx];
+				var active = document.activeElement;
+				if (active && active.hasAttribute && active.hasAttribute('data-category-row')) return active;
+				return null;
+			},
+			// Activate the focused row: expand/collapse a primary via click
+			// (reuses the parent Alpine x-data's `toggle(id)`); jump to the
+			// filtered transactions list for a subcategory.
+			activateRow: function() {
+				var row = this.currentRow();
+				if (!row) return;
+				var level = row.getAttribute('data-category-level');
+				if (level === 'primary') {
+					row.click();
+					return;
+				}
+				if (level === 'sub') {
+					var slug = row.getAttribute('data-category-slug');
+					if (slug) window.location.href = '/transactions?category=' + encodeURIComponent(slug);
+				}
+			},
+			editRow: function() {
+				var row = this.currentRow();
+				if (!row) return;
+				var id = row.getAttribute('data-category-id');
+				if (id) window.location.href = '/categories/' + encodeURIComponent(id) + '/edit';
+			},
 		};
 
 		document.addEventListener('alpine:init', function() {
@@ -153,6 +184,34 @@ templ categoriesKeyboardScript() {
 			});
 
 			reg.register({
+				id: 'categories.activate',
+				keys: 'Enter',
+				description: 'Expand primary / open subcategory',
+				group: 'Actions',
+				scope: 'categories',
+				action: function() { bbCategoryNav.activateRow(); },
+			});
+
+			reg.register({
+				id: 'categories.activate.space',
+				keys: ' ', // Space — e.key is a literal space
+				description: 'Expand / open (Space)',
+				group: 'Actions',
+				scope: 'categories',
+				visible: false, // Enter is the canonical binding shown in help
+				action: function() { bbCategoryNav.activateRow(); },
+			});
+
+			reg.register({
+				id: 'categories.edit',
+				keys: 'e',
+				description: 'Edit focused category',
+				group: 'Actions',
+				scope: 'categories',
+				action: function() { bbCategoryNav.editRow(); },
+			});
+
+			reg.register({
 				id: 'categories.new',
 				keys: 'n',
 				description: 'New category',
@@ -168,6 +227,24 @@ templ categoriesKeyboardScript() {
 				},
 			});
 		});
+
+		// When the user clicks a row (to expand/collapse a primary or select
+		// a sub), sync the j/k ring to that row so subsequent keyboard nav
+		// picks up from there — matches the tx-list convention.
+		document.addEventListener('click', function(e) {
+			var row = e.target && e.target.closest && e.target.closest('[data-category-row]');
+			if (!row) return;
+			// Ignore clicks on action buttons/links inside the row; those
+			// stop propagation already, but belt-and-suspenders in case a
+			// future affordance forgets.
+			if (e.target.closest('a, button')) return;
+			var rows = bbCategoryNav.visibleRows();
+			var idx = rows.indexOf(row);
+			if (idx < 0) return;
+			bbCategoryNav.clearFocus();
+			row.classList.add(bbCategoryNav.FOCUSED_CLASS);
+			bbCategoryNav.focusedIdx = idx;
+		});
 	</script>
 }
 
@@ -178,11 +255,11 @@ templ categoryRow(c service.CategoryResponse) {
 			role="button"
 			tabindex="0"
 			data-category-row
+			data-category-level="primary"
 			data-category-id={ c.ID }
+			data-category-slug={ c.Slug }
 			class="group flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 hover:bg-base-200/30 transition-colors duration-150 cursor-pointer select-none"
 			@click={ fmt.Sprintf("toggle('%s')", c.ID) }
-			@keydown.enter={ fmt.Sprintf("toggle('%s')", c.ID) }
-			@keydown.space.prevent={ fmt.Sprintf("toggle('%s')", c.ID) }
 		>
 			@categoryIconTile(c, false)
 			<div class="flex items-center gap-2 min-w-0 flex-1">
@@ -233,7 +310,9 @@ templ categoryChildRow(c service.CategoryResponse) {
 	<div
 		data-search={ categoryChildSearchIndex(c) }
 		data-category-row
+		data-category-level="sub"
 		data-category-id={ c.ID }
+		data-category-slug={ c.Slug }
 		x-show="matches($el)"
 		class="group flex items-center gap-3 sm:gap-4 pl-10 sm:pl-14 pr-4 sm:pr-5 py-2.5 hover:bg-base-200/30 transition-colors duration-150"
 	>
