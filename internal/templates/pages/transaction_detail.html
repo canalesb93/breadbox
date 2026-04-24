@@ -25,7 +25,10 @@
         <span class="text-xs text-base-content/30">&middot;</span>
         <span class="text-xs text-base-content/40">{{titleCase (deref .Transaction.MerchantName)}}</span>
         {{end}}
-        {{if .Transaction.Pending}}<span class="inline-flex items-center gap-1 px-1.5 py-0 text-[0.65rem] border border-dashed border-warning/60 text-warning rounded-md ml-1" title="Not yet posted"><i data-lucide="clock" class="w-2.5 h-2.5"></i>pending</span>{{end}}
+        {{if .Transaction.Pending}}
+        <span class="text-xs text-base-content/30">&middot;</span>
+        <span class="text-xs text-warning/70" title="Not yet posted">Pending</span>
+        {{end}}
       </div>
     </div>
   </div>
