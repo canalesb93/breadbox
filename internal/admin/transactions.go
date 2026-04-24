@@ -820,9 +820,7 @@ func buildActivityTimeline(annotations []service.Annotation) []service.ActivityE
 				ActorName: a.ActorName,
 				ActorType: a.ActorType,
 				Detail:    content,
-			}
-			if cid, _ := a.Payload["comment_id"].(string); cid != "" {
-				entry.CommentID = cid
+				CommentID: a.ShortID,
 			}
 			if a.ActorID != nil && *a.ActorID != "" {
 				id := *a.ActorID
