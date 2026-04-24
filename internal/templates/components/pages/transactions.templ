@@ -32,14 +32,16 @@ templ Transactions(p TransactionsProps) {
 	}
 }
 
-// txReviewQueueShortcuts registers M3 review-queue keyboard shortcuts
-// (`a` approve, `r` reject, `s` skip) at `scope: 'reviews'` whenever the
-// transactions page is filtered to `tags=needs-review` — the review queue
-// view. The x-data wrapper flips the shortcut-registry scope on init so
-// the `?` help modal (M0.3) surfaces these under "This page", and resets
-// back to 'global' on teardown. j/k/Enter/c continue to fire via the
-// existing inline keydown handler in transactions_scripts.js.html; M3
-// only layers the review-specific actions on top.
+// txReviewQueueShortcuts registers the M3 review-queue keyboard shortcut
+// (`a` approve) at `scope: 'reviews'` whenever the transactions page is
+// filtered to `tags=needs-review` — the review queue view. The x-data
+// wrapper flips the shortcut-registry scope on init so the `?` help modal
+// (M0.3) surfaces approve under "This page", and resets back to 'global'
+// on teardown. j/k/Enter/c continue to fire via the existing inline keydown
+// handler in transactions_scripts.js.html; M3 only layers the approve
+// action on top. Reject and skip were dropped after review feedback —
+// reject had no data-model meaning (the queue is tag-backed, so there is
+// no "rejected" state), and skip was duplicative of `j`.
 templ txReviewQueueShortcuts() {
 	<div x-data x-init="$store.shortcuts.setScope('reviews')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	@templ.Raw("<script>" + reviewQueueScriptBody + "</script>")

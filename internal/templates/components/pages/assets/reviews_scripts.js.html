@@ -2,17 +2,18 @@
  * M3 — Reviews queue keyboard shortcuts.
  *
  * Rendered only when the transactions page is filtered to tags=needs-review
- * (see txReviewQueueShortcuts in transactions.templ). Registers the three
- * review-specific actions — approve (a), reject (r), skip (s) — at
- * `scope: 'reviews'` on top of the transactions list's existing j/k/Enter/c
- * handlers (still driven by the inline keydown in transactions_scripts.js.html
- * until M1 lands and ports them to the registry).
+ * (see txReviewQueueShortcuts in transactions.templ). Registers the single
+ * review-specific action — approve (a) — at `scope: 'reviews'` on top of the
+ * transactions list's existing j/k/Enter/c handlers (still driven by the
+ * inline keydown in transactions_scripts.js.html until M1 lands and ports
+ * them to the registry).
  *
- * Approve/reject both resolve the needs-review tag on the focused row: the
- * review system is tag-backed since the review_queue cutover (#... migration
- * 20260415083233_cutover_review_queue.sql) so there is no distinct "rejected"
- * state in the data model — only a different annotation / toast. Skip leaves
- * the tag intact and just advances focus so the reviewer can come back later.
+ * Reject and skip were considered but dropped: the review model is tag-backed
+ * (the needs-review tag is the queue), so there is no distinct "rejected"
+ * state to record — reject would be semantically identical to approve with
+ * different toast copy. Skip, without a tracked snooze-until mechanism, is
+ * just `j` (advance focus). We keep the transactions list free of custom
+ * logic that doesn't pull its weight.
  *
  * Guards (input focus, open overlays, touch devices) are owned by the global
  * dispatcher in base.html, so these handlers only need to care about "what
@@ -88,28 +89,6 @@
       group: 'Actions',
       scope: 'reviews',
       action: function () { resolveReview('approved'); }
-    });
-
-    reg.register({
-      id: 'reviews.reject',
-      keys: 'r',
-      description: 'Reject review',
-      group: 'Actions',
-      scope: 'reviews',
-      action: function () { resolveReview('rejected'); }
-    });
-
-    reg.register({
-      id: 'reviews.skip',
-      keys: 's',
-      description: 'Skip review',
-      group: 'Actions',
-      scope: 'reviews',
-      action: function () {
-        // Leaves the tag in place — the review stays queued. Advances focus
-        // so the reviewer can move on and come back to it later.
-        advanceFocus();
-      }
     });
   }
 
