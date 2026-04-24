@@ -41,10 +41,13 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			reviewPending = 0
 		}
 
-		// Recent transactions (last 8).
+		// Recent transactions (last 12).
+		// Fetched at 12 so the card fills the sibling Agent Reports card's
+		// height on desktop; the card scrolls internally if the list still
+		// runs longer than the Reports column on a given day.
 		recentTx, err := svc.ListTransactionsAdmin(ctx, service.AdminTransactionListParams{
 			Page:     1,
-			PageSize: 8,
+			PageSize: 12,
 		})
 		if err != nil {
 			a.Logger.Error("recent transactions", "error", err)
