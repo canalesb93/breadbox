@@ -52,7 +52,6 @@ Each page calls `$store.shortcuts.setScope('<page>')` in its root `x-init` and r
 | `t` | Tag focused row |
 | `e` | Expand / collapse row |
 | `x` | Toggle selection on focused row |
-| `Shift+J` / `Shift+K` | Extend selection down / up |
 | `/` | Focus the quick-search input |
 | `Esc` | Clear selection, then exit select mode, then clear focus |
 
@@ -62,7 +61,6 @@ Each page calls `$store.shortcuts.setScope('<page>')` in its root `x-init` and r
 | --- | --- |
 | `c` | Categorize transaction (opens inline picker) |
 | `t` | Edit tags (opens tag picker) |
-| `Enter` | Focus the comment input |
 | `e` | Toggle system details |
 
 ### Reviews queue — scope `reviews`
@@ -82,7 +80,6 @@ The review queue reuses the transactions list UI, so `j/k/Enter/c/t/Esc` all wor
 | `j` / `k` | Move focus down / up (skips hidden rows) |
 | `Enter` | Open connection detail |
 | `s` | Sync focused connection (respects 5 s cooldown) |
-| `e` | Edit connection (routes to detail page) |
 
 ### Rules list — scope `rules`
 
@@ -110,18 +107,6 @@ Expand/collapse is handled inline via Alpine `@keydown.enter` / `@keydown.space`
 | --- | --- |
 | `j` / `k` | Move focus down / up through visible rows |
 | `n` | Add a new category (clicks the Add link; shadows global `n+_`) |
-
-### Sync logs — scope `sync-logs`
-
-| Keys | Action |
-| --- | --- |
-| `r` | Reload the page |
-
-### Reports — scope `reports`
-
-| Keys | Action |
-| --- | --- |
-| `r` | Reload the page |
 
 ### Backups — scope `backups`
 

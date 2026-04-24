@@ -447,23 +447,6 @@ document.addEventListener('alpine:init', function() {
     },
   });
 
-  reg.register({
-    id: 'connections.edit',
-    keys: 'e',
-    description: 'Edit connection',
-    group: 'Actions',
-    scope: 'connections',
-    action: function() {
-      var row = bbConnNav.currentRow();
-      if (!row) return;
-      // No inline edit affordance on the list — the connection-detail page
-      // hosts rename, pause, and disconnect. Route 'e' there so the user
-      // lands on the edit surface directly. Same destination as Enter today;
-      // will diverge once an inline edit drawer lands.
-      var url = row.getAttribute('data-edit-url') || row.getAttribute('data-open-url');
-      if (url) window.location.href = url;
-    },
-  });
 });
 </script>
 

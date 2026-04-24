@@ -756,25 +756,6 @@ document.addEventListener('alpine:init', function() {
       Alpine.store('bulk').toggle(id);
     },
 
-    // Shift+J / Shift+K — extend the bulk selection while moving the focus ring.
-    // Mirrors Gmail/Linear: the row the cursor *arrives at* gets (de)selected,
-    // which feels like "drag-select with the keyboard".
-    _extendSelection(dir) {
-      var rows = this._getRows();
-      if (!rows.length) return;
-      // Enter selection mode implicitly — matches the behavior of `x` which
-      // also bootstraps selection mode when a row first gets toggled.
-      if (!Alpine.store('bulk').selecting) Alpine.store('bulk').toggleMode();
-      if (dir > 0) this.next(); else this.prev();
-      var row = rows[this.focusedIdx] || this._getRows()[this.focusedIdx];
-      if (!row) return;
-      var id = row.dataset.txId;
-      if (!id) return;
-      Alpine.store('bulk').toggle(id);
-    },
-    extendSelectionDown() { this._extendSelection(1); },
-    extendSelectionUp() { this._extendSelection(-1); },
-
     // Jump the keyboard focus ring onto the clicked row so j/k continues from there.
     focusRow(row) {
       var rows = this._getRows();
@@ -857,14 +838,6 @@ document.addEventListener('alpine:init', function() {
   reg.register({ id: 'transactions.select', keys: 'x', description: 'Toggle selection',
     group: 'Selection', scope: 'transactions', when: txFocusedNotInPicker,
     action: function() { Alpine.store('txNav').toggleSelect(); } });
-  reg.register({ id: 'transactions.select-extend-down', keys: 'J',
-    description: 'Extend selection down',
-    group: 'Selection', scope: 'transactions', when: txNotInPicker,
-    action: function() { Alpine.store('txNav').extendSelectionDown(); } });
-  reg.register({ id: 'transactions.select-extend-up', keys: 'K',
-    description: 'Extend selection up',
-    group: 'Selection', scope: 'transactions', when: txNotInPicker,
-    action: function() { Alpine.store('txNav').extendSelectionUp(); } });
   reg.register({ id: 'transactions.focus-search', keys: '/',
     description: 'Focus search',
     group: 'Actions', scope: 'transactions', when: txNotInPicker,

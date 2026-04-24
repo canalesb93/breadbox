@@ -118,22 +118,4 @@ function reportsPage() {
 </script>
 {{end}}
 
-<script>
-// Register reports-scoped keyboard shortcuts. No dedicated refresh button
-// on this page (it's a server-rendered inbox), so `r` reloads.
-document.addEventListener('alpine:init', function() {
-  var reg = Alpine.store('shortcuts');
-  if (!reg) return;
-
-  reg.register({
-    id: 'reports.refresh',
-    keys: 'r',
-    description: 'Refresh reports',
-    group: 'Actions',
-    scope: 'reports',
-    action: function() { window.location.reload(); },
-  });
-});
-</script>
-
 {{end}}
