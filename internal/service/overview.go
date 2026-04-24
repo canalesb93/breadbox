@@ -216,11 +216,11 @@ func (s *Service) GetOverviewStats(ctx context.Context) (*OverviewStats, error) 
 		}
 
 		catRows, err := s.Pool.Query(ctx, `
-			SELECT COALESCE(t.category_primary, 'UNCATEGORIZED'), SUM(t.amount), COUNT(*)
+			SELECT COALESCE(t.provider_category_primary, 'UNCATEGORIZED'), SUM(t.amount), COUNT(*)
 			FROM transactions t
 			JOIN accounts a ON t.account_id = a.id
 			WHERE t.deleted_at IS NULL AND t.pending = false AND t.date >= $1 AND t.amount > 0 AND (a.is_dependent_linked = FALSE OR NOT EXISTS (SELECT 1 FROM transaction_matches tm WHERE tm.dependent_transaction_id = t.id))
-			GROUP BY t.category_primary
+			GROUP BY t.provider_category_primary
 			ORDER BY SUM(t.amount) DESC
 			LIMIT 5`, thirtyDaysAgo)
 		if err != nil {

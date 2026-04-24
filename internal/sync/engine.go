@@ -550,22 +550,23 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 	}
 
 	params := db.UpsertTransactionParams{
-		AccountID:             accountID,
-		ExternalTransactionID: txn.ExternalID,
-		PendingTransactionID:  optionalText(txn.PendingExternalID),
-		Amount:                decimalToNumeric(txn.Amount),
-		IsoCurrencyCode:       pgtype.Text{String: txn.ISOCurrencyCode, Valid: txn.ISOCurrencyCode != ""},
-		Date:                  pgtype.Date{Time: txn.Date, Valid: true},
-		AuthorizedDate:        optionalDate(txn.AuthorizedDate),
-		Datetime:              optionalTimestamptz(txn.Datetime),
-		AuthorizedDatetime:    optionalTimestamptz(txn.AuthorizedDatetime),
-		Name:                  txn.Name,
-		MerchantName:          optionalText(txn.MerchantName),
-		CategoryPrimary:       optionalText(txn.CategoryPrimary),
-		CategoryDetailed:      optionalText(txn.CategoryDetailed),
-		CategoryConfidence:    optionalText(txn.CategoryConfidence),
-		PaymentChannel:        pgtype.Text{String: txn.PaymentChannel, Valid: txn.PaymentChannel != ""},
-		Pending:               txn.Pending,
+		AccountID:                    accountID,
+		ProviderTransactionID:        txn.ExternalID,
+		ProviderPendingTransactionID: optionalText(txn.PendingExternalID),
+		Amount:                       decimalToNumeric(txn.Amount),
+		IsoCurrencyCode:              pgtype.Text{String: txn.ISOCurrencyCode, Valid: txn.ISOCurrencyCode != ""},
+		Date:                         pgtype.Date{Time: txn.Date, Valid: true},
+		AuthorizedDate:               optionalDate(txn.AuthorizedDate),
+		Datetime:                     optionalTimestamptz(txn.Datetime),
+		AuthorizedDatetime:           optionalTimestamptz(txn.AuthorizedDatetime),
+		ProviderName:                 txn.Name,
+		ProviderMerchantName:         optionalText(txn.MerchantName),
+		ProviderCategoryPrimary:      optionalText(txn.CategoryPrimary),
+		ProviderCategoryDetailed:     optionalText(txn.CategoryDetailed),
+		ProviderCategoryConfidence:   optionalText(txn.CategoryConfidence),
+		ProviderPaymentChannel:       pgtype.Text{String: txn.PaymentChannel, Valid: txn.PaymentChannel != ""},
+		Pending:                      txn.Pending,
+		ProviderRaw:                  txn.Raw,
 	}
 
 	return q.UpsertTransaction(ctx, params)
@@ -1020,8 +1021,8 @@ func (e *Engine) cleanStalePending(ctx context.Context, tx pgx.Tx, connectionID 
 		  AND date <= $3
 		  AND pending = true
 		  AND deleted_at IS NULL
-		  AND external_transaction_id != ALL($4)
-		RETURNING external_transaction_id`
+		  AND provider_transaction_id != ALL($4)
+		RETURNING provider_transaction_id`
 
 	rows, err := tx.Query(ctx, query, connectionID, fromDate, toDate, returnedIDs)
 	if err != nil {
@@ -1037,7 +1038,7 @@ func (e *Engine) cleanStalePending(ctx context.Context, tx pgx.Tx, connectionID 
 			logger.Error("scan stale pending transaction", "error", err)
 			continue
 		}
-		logger.Info("soft-deleted stale pending transaction", "external_transaction_id", externalID)
+		logger.Info("soft-deleted stale pending transaction", "provider_transaction_id", externalID)
 		count++
 	}
 	if rows.Err() != nil {
