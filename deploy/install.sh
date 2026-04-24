@@ -20,6 +20,47 @@ GITHUB_RAW="https://raw.githubusercontent.com/${REPO}"
 GITHUB_API="https://api.github.com/repos/${REPO}"
 COMPOSE_FILE="docker-compose.prod.yml"
 
+# Load platform detection. When install.sh is piped into `bash`, the local
+# detect.sh file does not exist — fetch it into a temp location and source
+# from there so the one-liner path works too.
+_bb_load_detect() {
+    # Try the local copy first (git checkout / manual install).
+    script_dir=""
+    if [ -n "${BASH_SOURCE:-}" ]; then
+        script_dir=$(cd "$(dirname "${BASH_SOURCE:-$0}")" 2>/dev/null && pwd || echo "")
+    fi
+    if [ -n "$script_dir" ] && [ -r "$script_dir/detect.sh" ]; then
+        # shellcheck disable=SC1090,SC1091
+        . "$script_dir/detect.sh"
+        return
+    fi
+    # Fetch from GitHub. Use a temp file; silently skip if we can't.
+    _detect_tmp="${TMPDIR:-/tmp}/breadbox-detect.$$.sh"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "${GITHUB_RAW}/main/deploy/detect.sh" -o "$_detect_tmp" 2>/dev/null || return 0
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO "$_detect_tmp" "${GITHUB_RAW}/main/deploy/detect.sh" 2>/dev/null || return 0
+    else
+        return 0
+    fi
+    if [ -r "$_detect_tmp" ]; then
+        # shellcheck disable=SC1090
+        . "$_detect_tmp"
+        rm -f "$_detect_tmp"
+    fi
+}
+_bb_load_detect
+# Populate BB_* if detect.sh is available; otherwise tolerate absence.
+if command -v bb_detect_all >/dev/null 2>&1; then
+    bb_detect_all
+fi
+: "${BB_OS:=unknown}"
+: "${BB_ARCH:=unknown}"
+: "${BB_DISTRO:=unknown}"
+: "${BB_DISTRO_VERSION:=unknown}"
+: "${BB_PKG_MANAGER:=none}"
+: "${BB_INIT_SYSTEM:=none}"
+
 # Pick a consistent default INSTALL_DIR based on privilege.
 if [ -z "${INSTALL_DIR:-}" ]; then
     if [ "$(id -u 2>/dev/null || echo 1000)" = "0" ]; then
@@ -209,10 +250,9 @@ download() {
 # Try to install Docker via https://get.docker.com.
 # Only Linux. Best-effort — if it fails, surface the error.
 try_install_docker() {
-    os=$(uname -s 2>/dev/null || echo unknown)
-    case "$os" in
-        Linux)
-            info "Installing Docker via https://get.docker.com ..."
+    case "$BB_OS" in
+        linux)
+            info "Installing Docker via https://get.docker.com (detected: ${BB_DISTRO} ${BB_DISTRO_VERSION}, ${BB_ARCH}) ..."
             if check_command curl; then
                 curl -fsSL https://get.docker.com | sh
             elif check_command wget; then
@@ -228,11 +268,100 @@ try_install_docker() {
                 warn "Added ${SUDO_USER} to the 'docker' group. Log out and back in for this to take effect."
             fi
             ;;
-        Darwin)
+        darwin)
             die "Automatic Docker install is not supported on macOS. Install Docker Desktop from https://docs.docker.com/desktop/install/mac-install/ and re-run this script."
             ;;
         *)
-            die "Automatic Docker install is not supported on ${os}. Install Docker manually from https://docs.docker.com/get-docker/ and re-run this script."
+            die "Automatic Docker install is not supported on ${BB_OS}. Install Docker manually from https://docs.docker.com/get-docker/ and re-run this script."
+            ;;
+    esac
+}
+
+# Install openssl via the detected package manager if available. Skipped on
+# systems where we don't know the package manager — the user can install it
+# manually and re-run.
+try_install_openssl() {
+    case "$BB_PKG_MANAGER" in
+        none)
+            die "openssl is not installed and no supported package manager was detected. Install openssl manually and re-run this script."
+            ;;
+    esac
+    info "Installing openssl via ${BB_PKG_MANAGER}..."
+    if ! bb_pkg_install openssl; then
+        die "Failed to install openssl via ${BB_PKG_MANAGER}. Install it manually and re-run."
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Daemon registration (opt-in)
+# ---------------------------------------------------------------------------
+
+register_daemon_systemd() {
+    unit_template_url="${GITHUB_RAW}/main/deploy/daemon/breadbox.service.tmpl"
+    unit_dest="/etc/systemd/system/breadbox.service"
+
+    if [ "$(id -u)" != "0" ]; then
+        warn "Registering a systemd unit requires root. Re-run with sudo to enable this feature."
+        return 1
+    fi
+
+    tmp_unit="${TMPDIR:-/tmp}/breadbox.service.$$"
+    # Prefer local file if present (git checkout install).
+    if [ -r "$(dirname "$0")/daemon/breadbox.service.tmpl" ]; then
+        cp "$(dirname "$0")/daemon/breadbox.service.tmpl" "$tmp_unit"
+    else
+        download "$unit_template_url" "$tmp_unit" || { warn "Could not fetch systemd unit template"; return 1; }
+    fi
+
+    compose_cmd="docker compose ${CADDY_PROFILE} -f ${INSTALL_DIR}/${COMPOSE_FILE}"
+    sed -e "s|__INSTALL_DIR__|${INSTALL_DIR}|g" \
+        -e "s|__COMPOSE_CMD__|${compose_cmd}|g" \
+        "$tmp_unit" > "$unit_dest"
+    rm -f "$tmp_unit"
+
+    systemctl daemon-reload
+    systemctl enable breadbox.service >/dev/null 2>&1 || true
+    success "Registered systemd unit: ${unit_dest} (enabled at boot)"
+    info "Start: systemctl start breadbox    Stop: systemctl stop breadbox"
+}
+
+register_daemon_launchd() {
+    plist_template_url="${GITHUB_RAW}/main/deploy/daemon/sh.breadbox.plist.tmpl"
+    # User-level LaunchAgent — does not need root.
+    plist_dest="${HOME}/Library/LaunchAgents/sh.breadbox.plist"
+    mkdir -p "${HOME}/Library/LaunchAgents"
+
+    tmp_plist="${TMPDIR:-/tmp}/sh.breadbox.plist.$$"
+    if [ -r "$(dirname "$0")/daemon/sh.breadbox.plist.tmpl" ]; then
+        cp "$(dirname "$0")/daemon/sh.breadbox.plist.tmpl" "$tmp_plist"
+    else
+        download "$plist_template_url" "$tmp_plist" || { warn "Could not fetch launchd template"; return 1; }
+    fi
+
+    compose_cmd="docker compose ${CADDY_PROFILE} -f ${INSTALL_DIR}/${COMPOSE_FILE}"
+    sed -e "s|__INSTALL_DIR__|${INSTALL_DIR}|g" \
+        -e "s|__COMPOSE_CMD__|${compose_cmd}|g" \
+        "$tmp_plist" > "$plist_dest"
+    rm -f "$tmp_plist"
+
+    # bootout is the modern replacement for `launchctl unload`; tolerate
+    # "not currently loaded" errors.
+    launchctl bootout "gui/$(id -u)" "$plist_dest" >/dev/null 2>&1 || true
+    if launchctl bootstrap "gui/$(id -u)" "$plist_dest" 2>/dev/null; then
+        success "Registered launchd agent: ${plist_dest}"
+    else
+        warn "launchctl bootstrap failed. The plist is in place at ${plist_dest};"
+        warn "run 'launchctl bootstrap gui/\$(id -u) ${plist_dest}' from a login shell to finish."
+    fi
+}
+
+register_daemon() {
+    case "$BB_INIT_SYSTEM" in
+        systemd) register_daemon_systemd ;;
+        launchd) register_daemon_launchd ;;
+        *)
+            warn "No supported init system detected (BB_INIT_SYSTEM=${BB_INIT_SYSTEM}). Skipping daemon registration."
+            warn "Breadbox will still start now via 'docker compose up', but won't be re-started automatically on boot."
             ;;
     esac
 }
@@ -242,6 +371,8 @@ try_install_docker() {
 # ---------------------------------------------------------------------------
 AUTO_YES=0
 INSTALL_DOCKER=0
+REGISTER_DAEMON=0
+NO_REGISTER_DAEMON=0
 DOMAIN_ARG=""
 
 for arg in "$@"; do
@@ -249,15 +380,19 @@ for arg in "$@"; do
         --uninstall) do_uninstall ;;
         --yes|-y) AUTO_YES=1 ;;
         --install-docker) INSTALL_DOCKER=1 ;;
+        --register-daemon) REGISTER_DAEMON=1 ;;
+        --no-register-daemon) NO_REGISTER_DAEMON=1 ;;
         --domain=*) DOMAIN_ARG="${arg#--domain=}" ;;
         --help|-h)
             printf "Usage: install.sh [OPTIONS]\n\n"
             printf "Options:\n"
-            printf "  --uninstall         Stop containers and remove installed files\n"
-            printf "  --yes, -y           Skip interactive prompts; accept defaults\n"
-            printf "  --install-docker    Install Docker automatically (Linux only)\n"
-            printf "  --domain=HOST       Configure the install for HTTPS at HOST (enables Caddy)\n"
-            printf "  --help, -h          Show this help message\n"
+            printf "  --uninstall            Stop containers and remove installed files\n"
+            printf "  --yes, -y              Skip interactive prompts; accept defaults\n"
+            printf "  --install-docker       Install Docker automatically (Linux only)\n"
+            printf "  --domain=HOST          Configure the install for HTTPS at HOST (enables Caddy)\n"
+            printf "  --register-daemon      Register launchd (macOS) or systemd (Linux) unit\n"
+            printf "  --no-register-daemon   Skip daemon registration (no boot-time autostart)\n"
+            printf "  --help, -h             Show this help message\n"
             printf "\nEnvironment:\n"
             printf "  INSTALL_DIR   Installation directory\n"
             printf "                Default (root):        /opt/breadbox\n"
@@ -275,8 +410,26 @@ banner
 
 # --- Pre-flight checks ---
 
+info "Platform: ${BB_OS}/${BB_ARCH} (${BB_DISTRO} ${BB_DISTRO_VERSION}, pkg=${BB_PKG_MANAGER}, init=${BB_INIT_SYSTEM})"
 info "Install directory: ${INSTALL_DIR}"
 info "Checking prerequisites..."
+
+# Hard-stop on unsupported OS.
+case "$BB_OS" in
+    linux|darwin) ;;
+    *)
+        die "Unsupported OS '${BB_OS}' (uname -s = $(uname -s 2>/dev/null || echo '?')). Supported: Linux, macOS."
+        ;;
+esac
+
+# Warn on exotic architectures. We only ship amd64 + arm64 images.
+case "$BB_ARCH" in
+    amd64|arm64) ;;
+    *)
+        warn "Detected arch '${BB_ARCH}'. Official images are built for amd64 and arm64."
+        warn "Installation may fail or run under emulation."
+        ;;
+esac
 
 # Docker
 if ! check_command docker; then
@@ -304,7 +457,13 @@ success "Docker daemon is running"
 
 # openssl (for key generation)
 if ! check_command openssl; then
-    die "openssl is not installed. It is needed to generate encryption keys."
+    warn "openssl is not installed (needed for encryption key + db password generation)."
+    if [ "$AUTO_YES" = "1" ] || prompt_yn "Install openssl via ${BB_PKG_MANAGER}?" "y"; then
+        try_install_openssl
+        check_command openssl || die "openssl still not available after install."
+    else
+        die "openssl is required. Install it and re-run this script."
+    fi
 fi
 success "openssl found"
 
@@ -484,6 +643,16 @@ done
 printf "\n"
 
 if [ "$healthy" -eq 1 ]; then
+    # Optional daemon registration
+    if [ "$NO_REGISTER_DAEMON" = "1" ]; then
+        :  # user opted out
+    elif [ "$REGISTER_DAEMON" = "1" ] \
+        || { [ "$BB_INIT_SYSTEM" != "none" ] \
+             && prompt_yn "Register a ${BB_INIT_SYSTEM} unit so Breadbox restarts on boot?" "n"; }; then
+        printf "\n"
+        register_daemon
+    fi
+
     printf "${GREEN}${BOLD}"
     printf "  =========================================\n"
     printf "    Breadbox is running!\n"
