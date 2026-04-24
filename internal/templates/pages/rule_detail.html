@@ -359,12 +359,6 @@
     </button>
   </div>
 
-  <div x-show="applyResult" x-cloak role="alert" class="alert alert-success text-sm mt-3 rounded-xl">
-    <span x-text="applyResult"></span>
-  </div>
-  <div x-show="applyError" x-cloak role="alert" class="alert alert-error text-sm mt-3 rounded-xl">
-    <span x-text="applyError"></span>
-  </div>
   {{end}}
   {{else}}
   <!-- 0-match empty state: matches the tone of other empty cards (e.g. the
@@ -415,6 +409,15 @@
             </label>
           </div>
         </div>
+      </div>
+      <!-- Inline error alert lives *inside* the modal so it's visible while
+           the dialog is still open. The old in-card alert (above the
+           category button) was rendered behind the z-50 backdrop and
+           therefore invisible whenever apply failed — see #701. -->
+      <div x-show="applyError" x-cloak role="alert"
+           class="alert alert-error text-xs mt-4 rounded-xl">
+        <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+        <span x-text="applyError"></span>
       </div>
       <div class="flex items-center justify-end gap-2 mt-5">
         <button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="closeApplyModal()">Cancel</button>
@@ -527,7 +530,6 @@ function quickSetCategory(txId, categoryId) {
 function ruleDetail() {
   return {
     applying: false,
-    applyResult: '',
     applyError: '',
     showApplyModal: false,
     confirmApply: false,
@@ -584,7 +586,6 @@ function ruleDetail() {
     openApplyModal() {
       this.confirmApply = false;
       this.applyError = '';
-      this.applyResult = '';
       this.showApplyModal = true;
     },
     closeApplyModal() {
@@ -594,7 +595,6 @@ function ruleDetail() {
     async applyRetroactively() {
       if (!this.confirmApply) return;
       this.applying = true;
-      this.applyResult = '';
       this.applyError = '';
       try {
         const resp = await fetch('/-/rules/{{.Rule.ID}}/apply', { method: 'POST' });
@@ -604,10 +604,14 @@ function ruleDetail() {
           this.applying = false;
           return;
         }
-        this.applyResult = 'Applied to ' + (data.affected_count || 0) + ' transactions';
+        // Promote success to the global toast (see base.html) so it persists
+        // through the reload window and isn't clipped by the closing modal.
+        const msg = 'Applied to ' + (data.affected_count || 0) + ' transactions';
+        showToast(msg, 'success');
         this.applying = false;
         this.showApplyModal = false;
-        setTimeout(() => location.reload(), 1500);
+        // Reload so the updated application list and hit counts show up.
+        setTimeout(() => location.reload(), 800);
       } catch (e) {
         this.applyError = 'Network error: ' + e.message;
         this.applying = false;
