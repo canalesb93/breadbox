@@ -113,31 +113,17 @@ templ tagListRow(t TagRow) {
 				<span class="text-xs text-base-content/25">&mdash;</span>
 			}
 		</div>
-		<!-- Actions -->
+		<!-- Actions — single always-visible kebab menu so edit/delete are
+		     reachable on every viewport (mouse, touch, keyboard). Matches
+		     the pattern used on /rules and /agents row menus. -->
 		<div class="shrink-0 flex items-center">
-			<div class="hidden sm:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-				<a href={ templ.SafeURL(fmt.Sprintf("/tags/%s/edit", t.ID)) } class="btn btn-ghost btn-xs rounded-lg" title="Edit">
-					<i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-				</a>
-				<button
-					type="button"
-					class="btn btn-ghost btn-xs rounded-lg text-error"
-					data-id={ t.ID }
-					data-slug={ t.Slug }
-					data-count={ fmt.Sprintf("%d", t.TransactionCount) }
-					@click="window.dispatchEvent(new CustomEvent('bb-delete-tag', {detail: {id: $el.dataset.id, slug: $el.dataset.slug, count: parseInt($el.dataset.count) || 0}}))"
-					title="Delete"
-				>
-					<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-				</button>
-			</div>
-			<div class="dropdown dropdown-end sm:hidden">
-				<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square rounded-lg">
+			<div class="dropdown dropdown-end">
+				<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square rounded-lg" aria-label={ fmt.Sprintf("Tag %s actions", t.Slug) }>
 					<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
 				</div>
 				<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-40 p-1">
 					<li>
-						<a href={ templ.SafeURL(fmt.Sprintf("/tags/%s/edit", t.ID)) }>
+						<a href={ templ.SafeURL(fmt.Sprintf("/tags/%s/edit", t.ID)) } aria-label={ fmt.Sprintf("Edit tag %s", t.Slug) }>
 							<i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
 						</a>
 					</li>
@@ -148,6 +134,7 @@ templ tagListRow(t TagRow) {
 							data-id={ t.ID }
 							data-slug={ t.Slug }
 							data-count={ fmt.Sprintf("%d", t.TransactionCount) }
+							aria-label={ fmt.Sprintf("Delete tag %s", t.Slug) }
 							@click="window.dispatchEvent(new CustomEvent('bb-delete-tag', {detail: {id: $el.dataset.id, slug: $el.dataset.slug, count: parseInt($el.dataset.count) || 0}}))"
 						>
 							<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
