@@ -43,7 +43,10 @@ type ToolCallLogResponse struct {
 // MCPSessionDetailResponse is a session with its tool calls.
 type MCPSessionDetailResponse struct {
 	MCPSessionResponse
-	ToolCalls []ToolCallLogResponse `json:"tool_calls"`
+	ToolCalls  []ToolCallLogResponse `json:"tool_calls"`
+	ErrorCount int                   `json:"error_count"`
+	WriteCount int                   `json:"write_count"`
+	ReadCount  int                   `json:"read_count"`
 }
 
 // ToolCallLogInput is the input for logging a tool call.
@@ -197,11 +200,34 @@ func (s *Service) GetMCPSessionDetail(ctx context.Context, idOrShort string) (MC
 	}
 
 	session.ToolCallCount = int64(len(calls))
+	errorCount, writeCount, readCount := summarizeToolCalls(calls)
 
 	return MCPSessionDetailResponse{
 		MCPSessionResponse: session,
 		ToolCalls:          calls,
+		ErrorCount:         errorCount,
+		WriteCount:         writeCount,
+		ReadCount:          readCount,
 	}, nil
+}
+
+// summarizeToolCalls aggregates error / write / read counts across tool calls.
+// Calls with classifications other than "write" or "read" are not counted in
+// the split (and thus won't distort the header pill); errors are counted
+// independently of classification so a failed write still surfaces.
+func summarizeToolCalls(calls []ToolCallLogResponse) (errorCount, writeCount, readCount int) {
+	for _, c := range calls {
+		if c.IsError {
+			errorCount++
+		}
+		switch c.Classification {
+		case "write":
+			writeCount++
+		case "read":
+			readCount++
+		}
+	}
+	return errorCount, writeCount, readCount
 }
 
 // ResolveSessionUUID resolves a session ID string (UUID or short_id) to pgtype.UUID.
