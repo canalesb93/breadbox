@@ -128,6 +128,13 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.KbdChord(keys...), nil
 	},
+	"KbdCombo": func(data any) (templ.Component, error) {
+		keys, err := toStringSlice(data)
+		if err != nil {
+			return nil, fmt.Errorf("KbdCombo: %w", err)
+		}
+		return components.KbdCombo(keys...), nil
+	},
 	"ConditionRow": func(data any) (templ.Component, error) {
 		m, ok := data.(map[string]any)
 		if !ok {
@@ -193,6 +200,31 @@ func assertTagChipData(data any) (components.TagChipData, error) {
 		return v, nil
 	default:
 		return components.TagChipData{}, fmt.Errorf("unsupported tag chip type %T", data)
+	}
+}
+
+// toStringSlice coerces the value passed via renderComponent into a
+// []string. Accepts []string directly (from Go call sites) and []any
+// (produced by the template-side `strs` funcmap). Keeps component
+// adapters tolerant of both paths without caring which one fed them.
+func toStringSlice(v any) ([]string, error) {
+	switch s := v.(type) {
+	case []string:
+		return s, nil
+	case []any:
+		out := make([]string, 0, len(s))
+		for i, item := range s {
+			str, ok := item.(string)
+			if !ok {
+				return nil, fmt.Errorf("element %d: want string, got %T", i, item)
+			}
+			out = append(out, str)
+		}
+		return out, nil
+	case nil:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("want []string or []any, got %T", v)
 	}
 }
 
@@ -363,6 +395,10 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 		funcMap: template.FuncMap{
 			"sub": func(a, b int) int { return a - b },
 			"add": func(a, b int) int { return a + b },
+			// strs collects variadic string args into a []string so
+			// templates can pass slices through `renderComponent`
+			// (e.g. `{{renderComponent "KbdCombo" (strs "cmd" "k")}}`).
+			"strs": func(vals ...string) []string { return vals },
 			"commaInt": func(n any) string {
 				var s string
 				switch v := n.(type) {

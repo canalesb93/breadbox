@@ -332,3 +332,38 @@ func TestAmount2f(t *testing.T) {
 		}
 	}
 }
+
+func TestKbdGlyph(t *testing.T) {
+	// Covers modifier names (case-insensitive), arrows, special keys, and
+	// the single-letter uppercase fallback. Must stay in lock-step with the
+	// JS twin `bbKbdGlyph` in internal/templates/layout/base.html.
+	tests := []struct {
+		in, want string
+	}{
+		{"cmd", "⌘"},
+		{"CMD", "⌘"},
+		{"meta", "⌘"},
+		{"shift", "⇧"},
+		{"ctrl", "⌃"},
+		{"alt", "⌥"},
+		{"option", "⌥"},
+		{"opt", "⌥"},
+		{"enter", "↵"},
+		{"return", "↵"},
+		{"esc", "esc"},
+		{"tab", "⇥"},
+		{"space", "␣"},
+		{"up", "↑"},
+		{"down", "↓"},
+		{"left", "←"},
+		{"right", "→"},
+		{"k", "K"}, // single-letter → uppercase keycap
+		{"?", "?"},
+		{"F2", "F2"}, // multi-char pass-through
+	}
+	for _, tc := range tests {
+		if got := kbdGlyph(tc.in); got != tc.want {
+			t.Errorf("kbdGlyph(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
