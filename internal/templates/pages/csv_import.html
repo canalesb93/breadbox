@@ -75,11 +75,16 @@
         <p class="text-xs text-base-content/40 mt-2">Supported: CSV, TSV, TXT files up to 10MB. Max 50,000 rows.</p>
       </fieldset>
 
+      <div id="upload-alert" role="alert" class="hidden mb-4 flex items-start gap-3 rounded-xl bg-error/10 text-error px-4 py-3 text-sm">
+        <i data-lucide="alert-circle" class="w-4 h-4 shrink-0 mt-0.5"></i>
+        <span id="upload-status"></span>
+      </div>
+
       <div class="flex items-center gap-3 pt-2">
         <button type="button" id="upload-btn" class="btn btn-primary btn-sm rounded-xl" onclick="uploadFile()">
           <i data-lucide="upload" class="w-4 h-4"></i> Upload &amp; Parse
         </button>
-        <p id="upload-status" class="text-sm text-error"></p>
+        <p id="upload-progress" class="text-sm text-base-content/60"></p>
       </div>
     </div>
   </div>
@@ -309,27 +314,44 @@
   var detectedDateFormat = "";
   var totalRows = 0;
 
+  function showUploadError(msg) {
+    var alert = document.getElementById("upload-alert");
+    var status = document.getElementById("upload-status");
+    status.textContent = msg;
+    alert.classList.remove("hidden");
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+
+  function clearUploadError() {
+    var alert = document.getElementById("upload-alert");
+    var status = document.getElementById("upload-status");
+    status.textContent = "";
+    alert.classList.add("hidden");
+  }
+
   window.uploadFile = function() {
     var fileInput = document.getElementById("csv-file");
-    var status = document.getElementById("upload-status");
+    var progress = document.getElementById("upload-progress");
     var btn = document.getElementById("upload-btn");
 
+    clearUploadError();
+
     if (!fileInput.files.length) {
-      status.textContent = "Please select a file.";
+      showUploadError("Please select a file.");
       return;
     }
 
     {{if not .ConnectionID}}
     var userSelect = document.getElementById("csv-user-id");
     if (!userSelect.value) {
-      status.textContent = "Please select a family member.";
+      showUploadError("Please select a family member.");
       return;
     }
     {{end}}
 
     btn.disabled = true;
     btn.classList.add("btn-disabled");
-    status.textContent = "Uploading...";
+    progress.textContent = "Uploading...";
 
     var formData = new FormData();
     formData.append("file", fileInput.files[0]);
@@ -343,19 +365,20 @@
     .then(function(res) {
       btn.disabled = false;
       btn.classList.remove("btn-disabled");
+      progress.textContent = "";
       if (!res.ok) {
-        status.textContent = res.data.error || "Upload failed.";
+        showUploadError(res.data.error || "Upload failed.");
         return;
       }
       uploadData = res.data;
       totalRows = res.data.total_rows;
-      status.textContent = "";
       setupStep2(res.data);
     })
     .catch(function() {
       btn.disabled = false;
       btn.classList.remove("btn-disabled");
-      status.textContent = "Network error.";
+      progress.textContent = "";
+      showUploadError("Network error.");
     });
   };
 
