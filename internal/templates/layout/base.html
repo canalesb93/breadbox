@@ -2010,16 +2010,24 @@
       // Returns the first spec whose `keys` matches the given single key within
       // the active scope set (current scope + global). Chord specs are skipped
       // here — chord resolution happens once we have a pending prefix.
+      //
+      // Page-scoped specs take precedence over global ones on the same key, so
+      // a page can shadow a global binding (e.g. transactions rebinding `/` to
+      // focus the in-page search input instead of opening the command palette).
       function matchSingle(reg, key) {
         var scope = reg.currentScope;
+        var globalMatch = null;
         for (var i = 0; i < reg.items.length; i++) {
           var s = reg.items[i];
           if (s.scope !== 'global' && s.scope !== scope) continue;
           var k = s.keys;
-          if (typeof k === 'string' && k === key) return s;
-          if (Array.isArray(k) && k.length === 1 && k[0] === key) return s;
+          var matches = (typeof k === 'string' && k === key) ||
+            (Array.isArray(k) && k.length === 1 && k[0] === key);
+          if (!matches) continue;
+          if (s.scope === scope && scope !== 'global') return s;
+          if (s.scope === 'global' && !globalMatch) globalMatch = s;
         }
-        return null;
+        return globalMatch;
       }
 
       function matchChord(reg, prefix, key) {
