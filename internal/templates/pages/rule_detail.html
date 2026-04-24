@@ -1,7 +1,11 @@
 {{define "content"}}
 {{template "breadcrumb" .}}
 
-<div x-data="ruleDetail()">
+<div x-data="ruleDetail()"
+     x-init="$store.shortcuts && $store.shortcuts.setScope('rule-detail'); registerShortcuts()"
+     x-destroy="$store.shortcuts && $store.shortcuts.setScope('global'); unregisterShortcuts()"
+     @keydown.meta.enter.window.prevent="if (!showApplyModal) toggleRule()"
+     @keydown.ctrl.enter.window.prevent="if (!showApplyModal) toggleRule()">
 
 {{$isSystem := eq .Rule.CreatedByType "system"}}
 {{$matchAll := isMatchAllCondition .Rule.Conditions}}
@@ -319,7 +323,7 @@
 
   <div class="mt-4 flex items-center justify-between">
     <p class="text-xs text-base-content/40">Apply this rule to categorize these existing transactions</p>
-    <button class="btn btn-sm btn-outline rounded-xl" @click="openApplyModal()" :disabled="applying">
+    <button class="btn btn-sm btn-outline rounded-xl" data-apply-btn @click="openApplyModal()" :disabled="applying">
       <span x-show="applying" class="loading loading-spinner loading-xs"></span>
       <i data-lucide="play" class="w-3.5 h-3.5" x-show="!applying"></i>
       Categorize as {{if .ActionCategoryName}}{{.ActionCategoryName}}{{else}}matched category{{end}}
@@ -473,6 +477,56 @@ function ruleDetail() {
     applyError: '',
     showApplyModal: false,
     confirmApply: false,
+    // Register page-scoped shortcuts so they surface in the `?` help modal.
+    // `Cmd+Enter` (toggle) is wired via inline @keydown.meta.enter.window
+    // because the global dispatcher short-circuits on modifier keys; this
+    // registry entry is visible-only so the help modal advertises it.
+    // `Esc` closes the apply modal via @keydown.escape.window on the modal
+    // itself — registered here (visible-only) for discoverability.
+    registerShortcuts() {
+      if (!window.Alpine || !Alpine.store('shortcuts')) return;
+      var reg = Alpine.store('shortcuts');
+      var self = this;
+      reg.register({
+        id: 'rule-detail.save',
+        keys: 'cmd+enter',
+        description: 'Toggle rule (enable / disable)',
+        group: 'Actions',
+        scope: 'rule-detail',
+        visible: true
+        // no action — dispatched by inline @keydown.meta.enter on the page root
+      });
+      reg.register({
+        id: 'rule-detail.apply',
+        keys: 'a',
+        description: 'Apply rule to matching transactions',
+        group: 'Actions',
+        scope: 'rule-detail',
+        when: function() {
+          return !!document.querySelector('[data-apply-btn]');
+        },
+        action: function() {
+          var btn = document.querySelector('[data-apply-btn]');
+          if (btn) btn.click();
+        }
+      });
+      reg.register({
+        id: 'rule-detail.esc',
+        keys: 'Esc',
+        description: 'Close apply dialog',
+        group: 'Actions',
+        scope: 'rule-detail',
+        visible: true
+        // no action — handled by @keydown.escape.window on the modal itself
+      });
+    },
+    unregisterShortcuts() {
+      if (!window.Alpine || !Alpine.store('shortcuts')) return;
+      var reg = Alpine.store('shortcuts');
+      reg.unregister('rule-detail.save');
+      reg.unregister('rule-detail.apply');
+      reg.unregister('rule-detail.esc');
+    },
     openApplyModal() {
       this.confirmApply = false;
       this.applyError = '';
