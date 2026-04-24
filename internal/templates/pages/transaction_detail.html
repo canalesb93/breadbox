@@ -223,16 +223,40 @@
     </div>
   </div>
 
-  {{if .Activity}}
+  {{if .ActivityDays}}
   <div class="px-4 sm:px-5 border-t border-base-200 space-y-0">
-    {{range .Activity}}
-    <div class="flex items-start gap-3 py-3 border-b border-base-200/50 last:border-b-0 group">
-      <!-- Icon -->
-      {{if eq .Type "rule"}}
+    {{range .ActivityDays}}
+    <div class="pt-4 pb-1 first:pt-3">
+      <h3 class="text-[11px] font-semibold uppercase tracking-wide text-base-content/40">{{.Label}}</h3>
+    </div>
+    {{range .Events}}
+    {{if and (eq .Type "rule") .RuleID}}
+    <a href="/rules/{{.RuleID}}" class="flex items-start gap-3 py-3 border-b border-base-300/60 dark:border-base-200 last:border-b-0 group -mx-1 px-1 rounded-lg hover:bg-base-200/40 transition-colors">
       <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
         <i data-lucide="zap" class="w-4 h-4 text-info" aria-hidden="true"></i>
       </div>
-      {{else if eq .Type "review"}}
+      <div class="flex-1 min-w-0">
+        {{if .Summary}}
+        <p class="text-sm">
+          <span class="font-medium line-clamp-2 sm:line-clamp-none group-hover:text-primary break-words">{{.Summary}}</span>
+        </p>
+        {{end}}
+        {{if .Detail}}
+        <p class="text-sm text-base-content/60 mt-1 whitespace-pre-wrap leading-relaxed">{{.Detail}}</p>
+        {{end}}
+        <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+          {{if .ActorName}}<span class="text-xs text-base-content/40">{{.ActorName}}</span>{{end}}
+          {{if .Timestamp}}
+          <span class="text-xs text-base-content/30" aria-hidden="true">&middot;</span>
+          <time datetime="{{.Timestamp}}" class="text-xs text-base-content/30" title="{{formatDateTime .Timestamp}}">{{relativeTime .Timestamp}}</time>
+          {{end}}
+        </div>
+      </div>
+    </a>
+    {{else}}
+    <div class="flex items-start gap-3 py-3 border-b border-base-300/60 dark:border-base-200 last:border-b-0 group">
+      <!-- Icon -->
+      {{if eq .Type "review"}}
       <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5
         {{if eq .ReviewStatus "approved"}}bg-success/10
         {{else if eq .ReviewStatus "rejected"}}bg-error/10
@@ -259,11 +283,7 @@
       <div class="flex-1 min-w-0">
         {{if .Summary}}
         <p class="text-sm">
-          {{if and (eq .Type "rule") .RuleID}}
-          <a href="/rules/{{.RuleID}}" class="font-medium hover:text-primary">{{.Summary}}</a>
-          {{else}}
-          <span class="font-medium">{{.Summary}}</span>
-          {{end}}
+          <span class="font-medium break-words">{{.Summary}}</span>
         </p>
         {{end}}
         {{if .Detail}}
@@ -293,6 +313,8 @@
       </button>
       {{end}}
     </div>
+    {{end}}
+    {{end}}
     {{end}}
   </div>
   {{end}}

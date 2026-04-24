@@ -278,6 +278,67 @@ func TestBuildActivityTimeline_RuleAppliedNamedStillQuoted(t *testing.T) {
 	}
 }
 
+// groupActivityByDay buckets the sorted-desc activity slice into per-day
+// groups so the template can render day separators. Entries without a
+// parseable timestamp are dropped. Ordering within a day is preserved.
+func TestGroupActivityByDay_BucketsByLocalDate(t *testing.T) {
+	// Use times far from midnight so the UTC→local conversion lands on the
+	// same calendar date regardless of the server's timezone offset.
+	entries := []service.ActivityEntry{
+		{Type: "comment", Timestamp: "2026-04-16T15:00:00Z", Summary: "a"},
+		{Type: "comment", Timestamp: "2026-04-16T14:00:00Z", Summary: "b"},
+		{Type: "comment", Timestamp: "2026-04-14T15:00:00Z", Summary: "c"},
+	}
+
+	groups := groupActivityByDay(entries)
+
+	if len(groups) != 2 {
+		t.Fatalf("expected 2 day groups, got %d", len(groups))
+	}
+	if len(groups[0].Events) != 2 {
+		t.Errorf("expected 2 events in first group, got %d", len(groups[0].Events))
+	}
+	if len(groups[1].Events) != 1 {
+		t.Errorf("expected 1 event in second group, got %d", len(groups[1].Events))
+	}
+	// Input order (desc) is preserved within a bucket.
+	if groups[0].Events[0].Summary != "a" || groups[0].Events[1].Summary != "b" {
+		t.Errorf("expected events in input order, got %v, %v", groups[0].Events[0].Summary, groups[0].Events[1].Summary)
+	}
+	// Labels are non-empty.
+	for i, g := range groups {
+		if g.Label == "" {
+			t.Errorf("group %d has empty Label", i)
+		}
+		if g.Date == "" {
+			t.Errorf("group %d has empty Date", i)
+		}
+	}
+}
+
+func TestGroupActivityByDay_EmptyInput(t *testing.T) {
+	if groups := groupActivityByDay(nil); groups != nil {
+		t.Errorf("expected nil for nil input, got %v", groups)
+	}
+	if groups := groupActivityByDay([]service.ActivityEntry{}); groups != nil {
+		t.Errorf("expected nil for empty input, got %v", groups)
+	}
+}
+
+func TestGroupActivityByDay_DropsUnparseableTimestamps(t *testing.T) {
+	entries := []service.ActivityEntry{
+		{Type: "comment", Timestamp: "2026-04-16T09:00:00Z", Summary: "ok"},
+		{Type: "comment", Timestamp: "not-a-date", Summary: "bad"},
+	}
+	groups := groupActivityByDay(entries)
+	if len(groups) != 1 {
+		t.Fatalf("expected 1 day group, got %d", len(groups))
+	}
+	if len(groups[0].Events) != 1 || groups[0].Events[0].Summary != "ok" {
+		t.Errorf("expected only the parseable entry to survive, got %+v", groups[0].Events)
+	}
+}
+
 func TestBuildActivityTimeline_LegacyPrefixCommentSuppressed(t *testing.T) {
 	annotations := []service.Annotation{{
 		ID:        "ann-legacy",
