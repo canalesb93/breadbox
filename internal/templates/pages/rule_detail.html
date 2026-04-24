@@ -321,9 +321,9 @@
   <p class="text-xs text-base-content/40 mt-2">Showing 10 of {{commaInt .Preview.MatchCount}}</p>
   {{end}}
 
-  <div class="mt-4 flex items-center justify-between">
+  <div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
     <p class="text-xs text-base-content/40">Apply this rule to categorize these existing transactions</p>
-    <button class="btn btn-sm btn-outline rounded-xl" data-apply-btn @click="openApplyModal()" :disabled="applying">
+    <button class="btn btn-sm btn-outline rounded-xl w-full sm:w-auto" data-apply-btn @click="openApplyModal()" :disabled="applying">
       <span x-show="applying" class="loading loading-spinner loading-xs"></span>
       <i data-lucide="play" class="w-3.5 h-3.5" x-show="!applying"></i>
       Categorize as {{if .ActionCategoryName}}{{.ActionCategoryName}}{{else}}matched category{{end}}
