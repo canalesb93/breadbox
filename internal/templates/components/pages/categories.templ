@@ -367,33 +367,17 @@ templ categoryTileInner(c service.CategoryResponse, child bool) {
 	}
 }
 
-// categoryRowActions emits the trailing edit/delete controls — desktop
-// uses inline ghost buttons, mobile collapses to an overflow menu.
+// categoryRowActions emits the trailing edit/delete controls as a single
+// always-visible kebab menu so actions are reachable on every viewport
+// (mouse, touch, keyboard). Matches the pattern used on /tags (PR #728).
 templ categoryRowActions(c service.CategoryResponse, child bool) {
-	<div class="hidden sm:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-		<a href={ templ.SafeURL(fmt.Sprintf("/categories/%s/edit", c.ID)) } class="btn btn-ghost btn-xs rounded-lg" title="Edit">
-			<i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-		</a>
-		if !c.IsSystem {
-			<button
-				type="button"
-				class="btn btn-ghost btn-xs rounded-lg text-error"
-				data-id={ c.ID }
-				data-name={ c.DisplayName }
-				@click.prevent="$dispatch('delete-category', {id: $el.dataset.id, name: $el.dataset.name})"
-				title="Delete"
-			>
-				<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-			</button>
-		}
-	</div>
-	<div class="dropdown dropdown-end sm:hidden">
-		<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square rounded-lg">
+	<div class="dropdown dropdown-end">
+		<div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square rounded-lg" aria-label={ fmt.Sprintf("Category %s actions", c.DisplayName) }>
 			<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
 		</div>
 		<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-40 p-1">
 			<li>
-				<a href={ templ.SafeURL(fmt.Sprintf("/categories/%s/edit", c.ID)) }>
+				<a href={ templ.SafeURL(fmt.Sprintf("/categories/%s/edit", c.ID)) } aria-label={ fmt.Sprintf("Edit category %s", c.DisplayName) }>
 					<i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
 				</a>
 			</li>
@@ -404,6 +388,7 @@ templ categoryRowActions(c service.CategoryResponse, child bool) {
 						class="text-error"
 						data-id={ c.ID }
 						data-name={ c.DisplayName }
+						aria-label={ fmt.Sprintf("Delete category %s", c.DisplayName) }
 						@click="$dispatch('delete-category', {id: $el.dataset.id, name: $el.dataset.name})"
 					>
 						<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
