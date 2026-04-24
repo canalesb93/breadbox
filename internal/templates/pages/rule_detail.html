@@ -275,16 +275,44 @@
 
 <!-- Pending Matches: existing transactions that would match this rule's
      condition but haven't been touched by it yet. Retroactive apply runs
-     set_category + add_tag + remove_tag (add_comment is sync-only). Shown
-     for any rule with at least one applicable action. -->
-{{if and .Preview (gt .Preview.MatchCount 0) (ruleHasRetroactiveAction .Rule.Actions)}}
+     set_category + add_tag + remove_tag (add_comment is sync-only).
+     The card always renders when preview data exists so users get explicit
+     confirmation that preview ran, even when there are zero matches or the
+     rule is comment-only (non-retroactive). -->
+{{if .Preview}}
+{{$retro := ruleHasRetroactiveAction .Rule.Actions}}
 <div class="bb-card p-5 mb-4">
   <div class="flex items-center justify-between mb-1">
     <span class="label-text text-sm font-medium">Matching transactions</span>
-    <span class="badge badge-soft badge-warning badge-sm">{{commaInt .Preview.MatchCount}} pending</span>
+    {{if gt .Preview.MatchCount 0}}
+      {{if $retro}}
+      <span class="badge badge-soft badge-warning badge-sm">{{commaInt .Preview.MatchCount}} pending</span>
+      {{else}}
+      <span class="badge badge-soft badge-ghost badge-sm">{{commaInt .Preview.MatchCount}} matched</span>
+      {{end}}
+    {{else}}
+      <span class="badge badge-soft badge-success badge-sm">0 pending</span>
+    {{end}}
   </div>
-  <p class="text-xs text-base-content/40 mb-3">These existing transactions match the rule but haven't been touched by it yet.</p>
+  {{if gt .Preview.MatchCount 0}}
+    {{if $retro}}
+    <p class="text-xs text-base-content/40 mb-3">These existing transactions match the rule but haven't been touched by it yet.</p>
+    {{else}}
+    <p class="text-xs text-base-content/40 mb-3">These existing transactions match the rule's condition. This rule only adds comments, which fire on sync — no retroactive preview is available.</p>
+    {{end}}
+  {{else}}
+    {{if $retro}}
+      {{if gt .Rule.HitCount 0}}
+      <p class="text-xs text-base-content/40 mb-3">All matching transactions have already been touched by this rule. Future syncs will pick up new ones.</p>
+      {{else}}
+      <p class="text-xs text-base-content/40 mb-3">No existing transactions match. The rule will fire on future syncs.</p>
+      {{end}}
+    {{else}}
+    <p class="text-xs text-base-content/40 mb-3">This rule only adds comments, which fire on sync. No retroactive preview is available.</p>
+    {{end}}
+  {{end}}
 
+  {{if gt .Preview.MatchCount 0}}
   {{if .PreviewTxns}}
   <div class="bb-card overflow-hidden">
     <div class="divide-y divide-base-300/50">
@@ -321,6 +349,7 @@
   <p class="text-xs text-base-content/40 mt-2">Showing 10 of {{commaInt .Preview.MatchCount}}</p>
   {{end}}
 
+  {{if $retro}}
   <div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
     <p class="text-xs text-base-content/40">Apply this rule to categorize these existing transactions</p>
     <button class="btn btn-sm btn-outline rounded-xl w-full sm:w-auto" data-apply-btn @click="openApplyModal()" :disabled="applying">
@@ -336,7 +365,28 @@
   <div x-show="applyError" x-cloak role="alert" class="alert alert-error text-sm mt-3 rounded-xl">
     <span x-text="applyError"></span>
   </div>
+  {{end}}
+  {{else}}
+  <!-- 0-match empty state: matches the tone of other empty cards (e.g. the
+       "No applications yet" block above) so the absence-of-section no longer
+       reads as a loading failure. -->
+  <div class="flex flex-col items-center justify-center text-center py-6 gap-2">
+    <div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
+      <i data-lucide="check" class="w-5 h-5 text-success"></i>
+    </div>
+    {{if $retro}}
+      {{if gt .Rule.HitCount 0}}
+      <p class="text-sm text-base-content/60">Nothing left to apply retroactively.</p>
+      {{else}}
+      <p class="text-sm text-base-content/60">No existing transactions match yet.</p>
+      {{end}}
+    {{else}}
+    <p class="text-sm text-base-content/60">Comment-only rule — runs on sync.</p>
+    {{end}}
+  </div>
+  {{end}}
 
+  {{if and (gt .Preview.MatchCount 0) $retro}}
   <!-- Retroactive apply confirmation modal — teleported to <body> so the
        SPA progress bar's filter/opacity on <main> doesn't break the
        fixed-positioning containing block. -->
@@ -380,6 +430,7 @@
     </div>
   </div>
   </template>
+  {{end}}
 </div>
 {{end}}
 
