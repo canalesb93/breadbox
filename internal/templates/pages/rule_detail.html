@@ -600,7 +600,7 @@ function ruleDetail() {
         const resp = await fetch('/-/rules/{{.Rule.ID}}/apply', { method: 'POST' });
         const data = await resp.json();
         if (!resp.ok) {
-          this.applyError = data.error || 'Failed to apply rule';
+          this.applyError = data.error?.message || data.error || 'Failed to apply rule';
           this.applying = false;
           return;
         }

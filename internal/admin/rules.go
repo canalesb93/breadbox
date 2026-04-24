@@ -312,11 +312,11 @@ func CreateRuleAdminHandler(svc *service.Service, sm *scs.SessionManager) http.H
 		}
 
 		if body.Name == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "name is required"})
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "name is required")
 			return
 		}
 		if len(body.Actions) == 0 && body.CategorySlug == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "either actions or category_slug is required"})
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "either actions or category_slug is required")
 			return
 		}
 
@@ -335,11 +335,7 @@ func CreateRuleAdminHandler(svc *service.Service, sm *scs.SessionManager) http.H
 
 		rule, err := svc.CreateTransactionRule(r.Context(), params)
 		if err != nil {
-			if errors.Is(err, service.ErrInvalidParameter) {
-				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-				return
-			}
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to create rule"})
+			handleRuleError(w, err, "Failed to create rule")
 			return
 		}
 
@@ -377,14 +373,7 @@ func UpdateRuleAdminHandler(svc *service.Service, sm *scs.SessionManager) http.H
 			ExpiresAt:    body.ExpiresAt,
 		})
 		if err != nil {
-			switch {
-			case errors.Is(err, service.ErrNotFound):
-				writeJSON(w, http.StatusNotFound, map[string]any{"error": "rule not found"})
-			case errors.Is(err, service.ErrInvalidParameter):
-				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-			default:
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to update rule"})
-			}
+			handleRuleError(w, err, "Failed to update rule")
 			return
 		}
 
@@ -398,11 +387,7 @@ func DeleteRuleAdminHandler(svc *service.Service) http.HandlerFunc {
 		id := chi.URLParam(r, "id")
 
 		if err := svc.DeleteTransactionRule(r.Context(), id); err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				writeJSON(w, http.StatusNotFound, map[string]any{"error": "rule not found"})
-				return
-			}
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to delete rule"})
+			handleRuleError(w, err, "Failed to delete rule")
 			return
 		}
 
@@ -418,11 +403,7 @@ func ToggleRuleAdminHandler(svc *service.Service) http.HandlerFunc {
 		// Get current state
 		existing, err := svc.GetTransactionRule(r.Context(), id)
 		if err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				writeJSON(w, http.StatusNotFound, map[string]any{"error": "rule not found"})
-				return
-			}
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to get rule"})
+			handleRuleError(w, err, "Failed to get rule")
 			return
 		}
 
@@ -431,7 +412,7 @@ func ToggleRuleAdminHandler(svc *service.Service) http.HandlerFunc {
 			Enabled: &newEnabled,
 		})
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to toggle rule"})
+			handleRuleError(w, err, "Failed to toggle rule")
 			return
 		}
 
@@ -454,11 +435,7 @@ func PreviewRuleAdminHandler(svc *service.Service) http.HandlerFunc {
 
 		result, err := svc.PreviewRule(r.Context(), input.Conditions, input.SampleSize)
 		if err != nil {
-			if errors.Is(err, service.ErrInvalidParameter) {
-				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-				return
-			}
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to preview rule"})
+			handleRuleError(w, err, "Failed to preview rule")
 			return
 		}
 
@@ -473,15 +450,7 @@ func ApplyRuleAdminHandler(svc *service.Service) http.HandlerFunc {
 
 		count, err := svc.ApplyRuleRetroactively(r.Context(), id)
 		if err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				writeJSON(w, http.StatusNotFound, map[string]any{"error": "rule not found"})
-				return
-			}
-			if errors.Is(err, service.ErrInvalidParameter) {
-				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-				return
-			}
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to apply rule"})
+			handleRuleError(w, err, "Failed to apply rule")
 			return
 		}
 
@@ -489,5 +458,19 @@ func ApplyRuleAdminHandler(svc *service.Service) http.HandlerFunc {
 			"rule_id":        id,
 			"affected_count": count,
 		})
+	}
+}
+
+// handleRuleError maps service-layer errors returned by rule mutations to the
+// canonical {"error": {"code", "message"}} envelope. `fallback` is the
+// human-readable message used when the error isn't a recognized sentinel.
+func handleRuleError(w http.ResponseWriter, err error, fallback string) {
+	switch {
+	case errors.Is(err, service.ErrNotFound):
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "Rule not found")
+	case errors.Is(err, service.ErrInvalidParameter):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", fallback)
 	}
 }
