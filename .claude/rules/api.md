@@ -17,7 +17,7 @@ All error responses use:
 
 - Codes are **stable contracts** — treat them as API surface. Don't rename on a whim.
 - REST handlers use `internal/api/response.go` helpers (`writeError`, `writeJSON`). Admin handlers use `internal/admin/response.go` equivalents. Don't hand-roll either.
-- 4xx for client errors, 5xx only for actual server bugs. Validation errors are 400 with a specific code like `INVALID_DATE_RANGE`.
+- 4xx for client errors, 5xx only for actual server bugs. Validation errors on the public REST API return **`400`** with either `VALIDATION_ERROR` or a more specific code like `INVALID_PARAMETER` / `INVALID_CURSOR` / `INVALID_DATE_RANGE`. Admin form submissions under `/admin/api/*` return `422 VALIDATION_ERROR` instead (classic browser-form convention) — don't conflate the two.
 
 ## Auth
 
@@ -48,15 +48,31 @@ Filtering happens in handlers via `service.FilterFields(response, parsedFields)`
 
 Query endpoints (`/api/v1/transactions`, `/rules`, `/reviews`, `/merchants`) share a filter vocabulary built on positional `$N` SQL. See `internal/service/` for the composable filter builders. Handlers just parse query params and pass them in.
 
+## List response envelopes
+
+Two shapes, picked per-resource:
+
+- **Bounded resources** (households are small: accounts, users, connections, categories, agent reports) return a **bare JSON array**. No pagination metadata, no wrapper.
+
+  ```json
+  [ { "id": "...", ... }, { "id": "...", ... } ]
+  ```
+
+- **Paginated resources** (transactions, rules, reviews, merchants, sync logs) return a **resource-keyed object**:
+
+  ```json
+  { "transactions": [...], "next_cursor": "opaque-string-or-null", "has_more": false, "limit": 50 }
+  ```
+
+  The list key matches the resource (`transactions`, `rules`, `reviews`, etc.). Pagination metadata fields (`next_cursor`, `has_more`, `total`, `limit`) are included when meaningful for that endpoint.
+
+There is **no** `{ "data": [...] }` envelope. Old drafts of `docs/rest-api.md` showed one; reality is resource-keyed. When adding a new paginated list endpoint, pick a resource key and follow the paginated shape above.
+
 ## Pagination
 
-Cursor pagination (not OFFSET) for transactions, rules, reviews. Response envelope:
+Cursor pagination (not OFFSET) for the public REST API. Pass `cursor=...` from a previous response's `next_cursor` to fetch the next page. Only works with the default sort (date DESC) for transactions.
 
-```json
-{ "data": [...], "next_cursor": "opaque-string-or-null" }
-```
-
-Pass `cursor=...` on the next request. Only works with default sort (date DESC) for transactions.
+`TransactionRuleListResult` additionally carries offset fields (`page`, `page_size`, `total_pages`) — these are populated **only** when the admin UI calls the service layer with `Page > 0` and are consumed by the admin template, not emitted by the REST handler. The public `/api/v1/rules` endpoint uses cursor pagination exclusively; the offset fields stay zero-valued and are elided via `omitempty`.
 
 ## Search modes
 
