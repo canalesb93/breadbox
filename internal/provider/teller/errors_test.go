@@ -3,6 +3,7 @@ package teller
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 
 	"breadbox/internal/provider"
@@ -56,7 +57,7 @@ func TestClassifyHTTPError_ServerAndRateLimitErrors_NoSyncRetryable(t *testing.T
 			if errors.Is(err, provider.ErrReauthRequired) {
 				t.Errorf("errors.Is(err, ErrReauthRequired) = true for status %d, want false", tt.statusCode)
 			}
-			if !containsSubstring(err.Error(), tt.wantSubstr) {
+			if !strings.Contains(err.Error(), tt.wantSubstr) {
 				t.Errorf("error %q does not contain %q", err.Error(), tt.wantSubstr)
 			}
 		})
@@ -102,20 +103,8 @@ func TestClassifyHTTPError_ContainsOperationContext(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	msg := err.Error()
-	if !containsSubstring(msg, "balance get") {
+	if !strings.Contains(msg, "balance get") {
 		t.Errorf("error message %q does not contain operation name 'balance get'", msg)
 	}
 }
 
-func containsSubstring(s, substr string) bool {
-	return len(s) >= len(substr) && searchSubstring(s, substr)
-}
-
-func searchSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
