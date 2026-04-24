@@ -21,6 +21,7 @@ func parseTransactionFilters(w http.ResponseWriter, r *http.Request) (
 	minAmount, maxAmount *float64,
 	pending *bool,
 	search, searchMode, excludeSearch *string,
+	tags, anyTag []string,
 	ok bool,
 ) {
 	q := r.URL.Query()
@@ -91,6 +92,9 @@ func parseTransactionFilters(w http.ResponseWriter, r *http.Request) (
 		return
 	}
 
+	tags = parseCSVParam(q, "tags")
+	anyTag = parseCSVParam(q, "any_tag")
+
 	ok = true
 	return
 }
@@ -106,7 +110,7 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			return
 		}
 
-		startDate, endDate, accountID, userID, categorySlug, minAmount, maxAmount, pending, search, searchMode, excludeSearch, ok := parseTransactionFilters(w, r)
+		startDate, endDate, accountID, userID, categorySlug, minAmount, maxAmount, pending, search, searchMode, excludeSearch, tags, anyTag, ok := parseTransactionFilters(w, r)
 		if !ok {
 			return
 		}
@@ -146,6 +150,8 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			ExcludeSearch: excludeSearch,
 			SortBy:        sortBy,
 			SortOrder:     sortOrder,
+			Tags:          tags,
+			AnyTag:        anyTag,
 		}
 
 		// Parse fields for field selection.
@@ -186,7 +192,7 @@ func ListTransactionsHandler(svc *service.Service) http.HandlerFunc {
 // CountTransactionsHandler returns the number of transactions matching optional filters.
 func CountTransactionsHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		startDate, endDate, accountID, userID, categorySlug, minAmount, maxAmount, pending, search, searchMode, excludeSearch, ok := parseTransactionFilters(w, r)
+		startDate, endDate, accountID, userID, categorySlug, minAmount, maxAmount, pending, search, searchMode, excludeSearch, tags, anyTag, ok := parseTransactionFilters(w, r)
 		if !ok {
 			return
 		}
@@ -203,6 +209,8 @@ func CountTransactionsHandler(svc *service.Service) http.HandlerFunc {
 			Search:        search,
 			SearchMode:    searchMode,
 			ExcludeSearch: excludeSearch,
+			Tags:          tags,
+			AnyTag:        anyTag,
 		}
 
 		count, err := svc.CountTransactionsFiltered(r.Context(), params)

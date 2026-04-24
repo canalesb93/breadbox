@@ -115,6 +115,7 @@ func buildTestRouter(svc *service.Service) http.Handler {
 		r.Get("/account-links/{id}/matches", ListTransactionMatchesHandler(svc))
 		r.Get("/reports", ListReportsHandler(svc))
 		r.Get("/reports/unread-count", UnreadReportCountHandler(svc))
+		r.Get("/tags", ListTagsHandler(svc))
 
 		// Write endpoints — require full_access scope
 		r.Group(func(r chi.Router) {
@@ -143,6 +144,8 @@ func buildTestRouter(svc *service.Service) http.Handler {
 			r.Post("/transaction-matches/manual", ManualMatchHandler(svc))
 			r.Post("/reports", CreateReportHandler(svc))
 			r.Patch("/reports/{id}/read", MarkReportReadHandler(svc))
+			r.Post("/transactions/{id}/tags", AddTransactionTagHandler(svc))
+			r.Delete("/transactions/{id}/tags/{slug}", RemoveTransactionTagHandler(svc))
 		})
 	})
 	return r
