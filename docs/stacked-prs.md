@@ -21,6 +21,14 @@ Stacks have real overhead — more branches, more restacks, more PRs to review. 
 
 A good rule of thumb: if you can't write a short, standalone "why this PR exists" description for each PR in the stack, don't stack.
 
+### Every PR in a stack must independently pass CI
+
+The purpose of stacking is to produce **smaller, easier-to-review** changes — not to split a single atomic change into intermediate states that don't compile. Each PR's tip must build, vet, and test cleanly on its own.
+
+A migration + code rename is the canonical trap: landing the column rename without the matching Go references looks like a clean "schema PR," but `go vet` at its tip is broken until the next PR lands. CI runs per-PR; stacking does not help. The split was wrong.
+
+**Rule:** at every branch tip in the stack, `go build ./...`, `go vet ./...`, and `go test ./...` must all pass. If they don't, fold the next PR back in (`gt fold`) until the tip is green. Split by review size and review shape — not by whether the compiler is temporarily broken.
+
 ## Conventions
 
 ### Branch naming
@@ -170,9 +178,11 @@ gt checkout <branch>                             # jump to any branch
 
 ## CI
 
-Each PR in a stack runs CI independently against its own tip. There's no merge-queue coordination — if you need the bottom PR's changes to make the middle PR's CI green, that's the correct behavior; merge the bottom first.
+Each PR in a stack runs CI independently against its own tip. There is **no merge-queue coordination and no cross-PR CI**. A middle PR that only compiles once the bottom PR is merged is *not* acceptable — its CI will be red and will block it, and "merge the bottom first" does not rescue a bottom PR that itself depends on downstream code changes to compile (see "Every PR in a stack must independently pass CI" above).
 
-GitHub's auto-merge (via `--merge-when-ready` or `gh pr merge --auto`) waits on CI for the branch being landed, not the rest of the stack.
+If you've already opened the stack and realize a PR's tip is broken, the fix is to fold the next branch back in with `gt fold` so the combined branch is self-contained, then `gt submit --stack` to update the remaining PRs.
+
+GitHub's auto-merge (via `--merge-when-ready` or `gh pr merge --auto`) waits on CI for the branch being landed, not the rest of the stack — which is exactly why each branch must already be green on its own.
 
 ## Cheat sheet
 
