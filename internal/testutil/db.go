@@ -180,11 +180,11 @@ func MustCreateTransaction(t *testing.T, q *db.Queries, acctID pgtype.UUID, extI
 	t.Helper()
 	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
 		AccountID:             acctID,
-		ExternalTransactionID: extID,
+		ProviderTransactionID: extID,
 		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
 		Date:                  pgtype.Date{Time: MustParseDate(date), Valid: true},
-		Name:                  name,
+		ProviderName:          name,
 	})
 	if err != nil {
 		t.Fatalf("MustCreateTransaction(%q): %v", name, err)

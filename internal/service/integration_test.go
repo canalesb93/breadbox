@@ -741,11 +741,11 @@ func TestImportCategoriesTSV_MergeInto(t *testing.T) {
 
 	_, err = queries.UpsertTransaction(ctx, db.UpsertTransactionParams{
 		AccountID:             acct.ID,
-		ExternalTransactionID: "txn_merge_1",
+		ProviderTransactionID: "txn_merge_1",
 		Amount:                pgtype.Numeric{Int: big.NewInt(550), Exp: -2, Valid: true},
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
 		Date:                  pgtype.Date{Time: testutil.MustParseDate("2025-01-15"), Valid: true},
-		Name:                  "Starbucks",
+		ProviderName:          "Starbucks",
 		CategoryID:            sourceCat.ID,
 	})
 	if err != nil {
@@ -778,7 +778,7 @@ func TestImportCategoriesTSV_MergeInto(t *testing.T) {
 	// Verify transaction was reassigned to target.
 	var gotCatID pgtype.UUID
 	err = pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_merge_1'",
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_merge_1'",
 	).Scan(&gotCatID)
 	if err != nil {
 		t.Fatalf("query transaction: %v", err)
@@ -981,7 +981,7 @@ func TestBatchSetTransactionCategory_Success(t *testing.T) {
 
 	// Verify txn3 is unchanged (no category_id set)
 	var gotCatIDNullable pgtype.UUID
-	err = pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_batch_3'").Scan(&gotCatIDNullable)
+	err = pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_batch_3'").Scan(&gotCatIDNullable)
 	if err != nil {
 		t.Fatalf("query txn3 category: %v", err)
 	}
@@ -1075,7 +1075,7 @@ func TestBulkRecategorizeByFilter_SearchFilter(t *testing.T) {
 
 	// Verify UBER transactions got the target category and category_override=true
 	rows, err := pool.Query(ctx,
-		"SELECT external_transaction_id, category_id, category_override FROM transactions WHERE name ILIKE '%UBER%' ORDER BY external_transaction_id")
+		"SELECT provider_transaction_id, category_id, category_override FROM transactions WHERE provider_name ILIKE '%UBER%' ORDER BY provider_transaction_id")
 	if err != nil {
 		t.Fatalf("query UBER txns: %v", err)
 	}
@@ -1098,7 +1098,7 @@ func TestBulkRecategorizeByFilter_SearchFilter(t *testing.T) {
 	// Verify non-UBER transactions are unchanged
 	var unchangedCount int
 	err = pool.QueryRow(ctx,
-		"SELECT COUNT(*) FROM transactions WHERE name NOT ILIKE '%UBER%' AND category_id IS NULL").Scan(&unchangedCount)
+		"SELECT COUNT(*) FROM transactions WHERE provider_name NOT ILIKE '%UBER%' AND category_id IS NULL").Scan(&unchangedCount)
 	if err != nil {
 		t.Fatalf("query unchanged: %v", err)
 	}
@@ -1198,7 +1198,7 @@ func TestApplyRuleRetroactively_MatchesAndSkipsOverrides(t *testing.T) {
 	for _, extID := range []string{"txn_sb_1", "txn_sb_2"} {
 		var catID pgtype.UUID
 		err = pool.QueryRow(ctx,
-			"SELECT category_id FROM transactions WHERE external_transaction_id = $1", extID).Scan(&catID)
+			"SELECT category_id FROM transactions WHERE provider_transaction_id = $1", extID).Scan(&catID)
 		if err != nil {
 			t.Fatalf("query %s: %v", extID, err)
 		}
@@ -1210,7 +1210,7 @@ func TestApplyRuleRetroactively_MatchesAndSkipsOverrides(t *testing.T) {
 	// Verify txn_sb_3 still has override category (not changed)
 	var overrideCatID pgtype.UUID
 	err = pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_sb_3'").Scan(&overrideCatID)
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_sb_3'").Scan(&overrideCatID)
 	if err != nil {
 		t.Fatalf("query txn_sb_3: %v", err)
 	}
@@ -1222,7 +1222,7 @@ func TestApplyRuleRetroactively_MatchesAndSkipsOverrides(t *testing.T) {
 	for _, extID := range []string{"txn_other_1", "txn_other_2"} {
 		var catID pgtype.UUID
 		err = pool.QueryRow(ctx,
-			"SELECT category_id FROM transactions WHERE external_transaction_id = $1", extID).Scan(&catID)
+			"SELECT category_id FROM transactions WHERE provider_transaction_id = $1", extID).Scan(&catID)
 		if err != nil {
 			t.Fatalf("query %s: %v", extID, err)
 		}
@@ -1308,7 +1308,7 @@ func TestApplyAllRulesRetroactively_PriorityWins(t *testing.T) {
 	// Verify "Starbucks Coffee" got coffee category (higher priority rule won)
 	var catID pgtype.UUID
 	err = pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_sb'").Scan(&catID)
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_sb'").Scan(&catID)
 	if err != nil {
 		t.Fatalf("query txn_sb: %v", err)
 	}
@@ -1318,7 +1318,7 @@ func TestApplyAllRulesRetroactively_PriorityWins(t *testing.T) {
 
 	// Verify "Shell Gas" got gas category
 	err = pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_gas'").Scan(&catID)
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_gas'").Scan(&catID)
 	if err != nil {
 		t.Fatalf("query txn_gas: %v", err)
 	}
@@ -1329,7 +1329,7 @@ func TestApplyAllRulesRetroactively_PriorityWins(t *testing.T) {
 	// Verify "Amazon Purchase" is unchanged
 	var unrelatedCatID pgtype.UUID
 	err = pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_unrelated'").Scan(&unrelatedCatID)
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_unrelated'").Scan(&unrelatedCatID)
 	if err != nil {
 		t.Fatalf("query txn_unrelated: %v", err)
 	}

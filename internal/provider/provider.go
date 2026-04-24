@@ -88,6 +88,7 @@ type Transaction struct {
 	PaymentChannel     string // online, in store, other
 	Pending            bool
 	ISOCurrencyCode    string
+	Raw                []byte // provider raw JSON payload; nil if unavailable
 }
 
 type WebhookPayload struct {

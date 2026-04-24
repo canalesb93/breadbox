@@ -18,8 +18,8 @@ SELECT * FROM transaction_matches WHERE dependent_transaction_id = $1;
 
 -- name: ListTransactionMatchesByLink :many
 SELECT tm.*,
-       pt.name AS primary_txn_name, pt.amount AS primary_txn_amount, pt.date AS primary_txn_date, pt.merchant_name AS primary_txn_merchant,
-       dt.name AS dependent_txn_name, dt.amount AS dependent_txn_amount, dt.date AS dependent_txn_date, dt.merchant_name AS dependent_txn_merchant
+       pt.provider_name AS primary_txn_name, pt.amount AS primary_txn_amount, pt.date AS primary_txn_date, pt.provider_merchant_name AS primary_txn_merchant,
+       dt.provider_name AS dependent_txn_name, dt.amount AS dependent_txn_amount, dt.date AS dependent_txn_date, dt.provider_merchant_name AS dependent_txn_merchant
 FROM transaction_matches tm
 JOIN transactions pt ON tm.primary_transaction_id = pt.id
 JOIN transactions dt ON tm.dependent_transaction_id = dt.id

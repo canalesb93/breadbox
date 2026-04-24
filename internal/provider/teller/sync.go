@@ -195,6 +195,11 @@ func mapTellerTransaction(txn tellerTransaction, currencyMap map[string]string, 
 		t.MerchantName = &name
 	}
 
+	// Store the raw Teller transaction as JSON for audit / future use.
+	if raw, err := json.Marshal(txn); err == nil {
+		t.Raw = raw
+	}
+
 	return t, nil
 }
 

@@ -1144,10 +1144,10 @@ func TestApplyRuleRetroactively_AddTagMaterialized(t *testing.T) {
 			SELECT added_by_type FROM transaction_tags
 			WHERE transaction_id = $1 AND tag_id = $2`, txn.ID, tag.ID).Scan(&addedByType)
 		if err != nil {
-			t.Fatalf("query transaction_tags for %s: %v", txn.ExternalTransactionID, err)
+			t.Fatalf("query transaction_tags for %s: %v", txn.ProviderTransactionID, err)
 		}
 		if addedByType != "rule" {
-			t.Errorf("%s: added_by_type got %q, want 'rule'", txn.ExternalTransactionID, addedByType)
+			t.Errorf("%s: added_by_type got %q, want 'rule'", txn.ProviderTransactionID, addedByType)
 		}
 
 		// tag_added annotation with rule_id set and tag_id matching.
@@ -1158,10 +1158,10 @@ func TestApplyRuleRetroactively_AddTagMaterialized(t *testing.T) {
 			  AND tag_id = $2 AND rule_id = $3`,
 			txn.ID, tag.ID, rule.ID).Scan(&annCount)
 		if err != nil {
-			t.Fatalf("count tag_added annotations for %s: %v", txn.ExternalTransactionID, err)
+			t.Fatalf("count tag_added annotations for %s: %v", txn.ProviderTransactionID, err)
 		}
 		if annCount != 1 {
-			t.Errorf("%s: tag_added annotations with rule_id: got %d, want 1", txn.ExternalTransactionID, annCount)
+			t.Errorf("%s: tag_added annotations with rule_id: got %d, want 1", txn.ProviderTransactionID, annCount)
 		}
 	}
 
@@ -1219,7 +1219,7 @@ func TestApplyRuleRetroactively_RemoveTagMaterialized(t *testing.T) {
 			INSERT INTO transaction_tags (transaction_id, tag_id, added_by_type, added_by_name)
 			VALUES ($1, $2, 'user', 'test')`, txn.ID, tag.ID)
 		if err != nil {
-			t.Fatalf("seed transaction_tags for %s: %v", txn.ExternalTransactionID, err)
+			t.Fatalf("seed transaction_tags for %s: %v", txn.ProviderTransactionID, err)
 		}
 	}
 
@@ -1250,10 +1250,10 @@ func TestApplyRuleRetroactively_RemoveTagMaterialized(t *testing.T) {
 		if err := pool.QueryRow(ctx,
 			`SELECT COUNT(*) FROM transaction_tags WHERE transaction_id = $1 AND tag_id = $2`,
 			txn.ID, tag.ID).Scan(&ttCount); err != nil {
-			t.Fatalf("count transaction_tags for %s: %v", txn.ExternalTransactionID, err)
+			t.Fatalf("count transaction_tags for %s: %v", txn.ProviderTransactionID, err)
 		}
 		if ttCount != 0 {
-			t.Errorf("%s: transaction_tags should be empty, got %d rows", txn.ExternalTransactionID, ttCount)
+			t.Errorf("%s: transaction_tags should be empty, got %d rows", txn.ProviderTransactionID, ttCount)
 		}
 
 		var note string
@@ -1264,11 +1264,11 @@ func TestApplyRuleRetroactively_RemoveTagMaterialized(t *testing.T) {
 			  AND tag_id = $2 AND rule_id = $3`,
 			txn.ID, tag.ID, rule.ID).Scan(&note)
 		if err != nil {
-			t.Fatalf("query tag_removed annotation for %s: %v", txn.ExternalTransactionID, err)
+			t.Fatalf("query tag_removed annotation for %s: %v", txn.ProviderTransactionID, err)
 		}
 		if !strings.Contains(note, rule.Name) {
 			t.Errorf("%s: tag_removed payload note %q does not reference rule name %q",
-				txn.ExternalTransactionID, note, rule.Name)
+				txn.ProviderTransactionID, note, rule.Name)
 		}
 	}
 
@@ -1528,7 +1528,7 @@ func TestApplyAllRulesRetroactively_SamePriorityTie(t *testing.T) {
 	// Later-created rule B wins the category assignment.
 	var winningCat pgtype.UUID
 	if err := pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_tie'",
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_tie'",
 	).Scan(&winningCat); err != nil {
 		t.Fatalf("query winning category: %v", err)
 	}

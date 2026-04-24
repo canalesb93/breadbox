@@ -51,7 +51,7 @@ func (m *Matcher) ReconcileLink(ctx context.Context, link db.AccountLink) (int, 
 
 	// Find unmatched dependent transactions.
 	unmatchedQuery := `
-		SELECT t.id, t.date, t.amount, t.name, COALESCE(t.merchant_name, '') AS merchant_name
+		SELECT t.id, t.date, t.amount, t.provider_name, COALESCE(t.provider_merchant_name, '') AS provider_merchant_name
 		FROM transactions t
 		WHERE t.account_id = $1
 		  AND t.deleted_at IS NULL
@@ -96,7 +96,7 @@ func (m *Matcher) ReconcileLink(ctx context.Context, link db.AccountLink) (int, 
 	for _, dep := range unmatched {
 		// Find candidate primary transactions: same amount, date within tolerance, not already matched.
 		candidateQuery := `
-			SELECT t.id, t.name, COALESCE(t.merchant_name, '') AS merchant_name
+			SELECT t.id, t.provider_name, COALESCE(t.provider_merchant_name, '') AS provider_merchant_name
 			FROM transactions t
 			WHERE t.account_id = $1
 			  AND t.deleted_at IS NULL

@@ -51,11 +51,11 @@ func mustCreateTransactionWithCategory(t *testing.T, q *db.Queries, acctID, catI
 	t.Helper()
 	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
 		AccountID:             acctID,
-		ExternalTransactionID: extID,
+		ProviderTransactionID: extID,
 		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
 		Date:                  pgtype.Date{Time: testutil.MustParseDate(date), Valid: true},
-		Name:                  name,
+		ProviderName:          name,
 		CategoryID:            catID,
 	})
 	if err != nil {
@@ -371,7 +371,7 @@ func TestDeleteCategory_ReassignsTransactionsToUncategorized(t *testing.T) {
 
 	// Transaction should now be uncategorized
 	var gotCatID pgtype.UUID
-	err = pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_doomed'").Scan(&gotCatID)
+	err = pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_doomed'").Scan(&gotCatID)
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}
@@ -440,7 +440,7 @@ func TestMergeCategories_Success(t *testing.T) {
 	// Transaction should be in target
 	tgtUID, _ := parseUUIDForTest(target.ID)
 	var gotCatID pgtype.UUID
-	err = pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_merge'").Scan(&gotCatID)
+	err = pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_merge'").Scan(&gotCatID)
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}
@@ -595,7 +595,7 @@ func TestMergeCategories_ParentWithChildren(t *testing.T) {
 	// All three transactions should be reassigned to target.
 	for _, extID := range []string{"txn_parent", "txn_child1", "txn_child2"} {
 		var gotCatID pgtype.UUID
-		err := pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE external_transaction_id = $1", extID).Scan(&gotCatID)
+		err := pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE provider_transaction_id = $1", extID).Scan(&gotCatID)
 		if err != nil {
 			t.Fatalf("query %s: %v", extID, err)
 		}
@@ -793,7 +793,7 @@ func TestBulkRecategorizeByFilter_ByNameSearch(t *testing.T) {
 
 	// Walmart should be unchanged
 	var walmartCatID pgtype.UUID
-	pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE external_transaction_id = 'bulk_txn_3'").Scan(&walmartCatID)
+	pool.QueryRow(ctx, "SELECT category_id FROM transactions WHERE provider_transaction_id = 'bulk_txn_3'").Scan(&walmartCatID)
 	if walmartCatID != uncat.ID {
 		t.Errorf("Walmart should still be uncategorized")
 	}

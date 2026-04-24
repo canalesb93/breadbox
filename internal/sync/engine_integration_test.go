@@ -315,7 +315,7 @@ func TestSync_ModifyTransactions(t *testing.T) {
 	var name string
 	var pending bool
 	err := pool.QueryRow(ctx,
-		"SELECT name, pending FROM transactions WHERE external_transaction_id = 'txn_1'",
+		"SELECT provider_name, pending FROM transactions WHERE provider_transaction_id = 'txn_1'",
 	).Scan(&name, &pending)
 	if err != nil {
 		t.Fatalf("query transaction: %v", err)
@@ -369,7 +369,7 @@ func TestSync_RemoveTransactions(t *testing.T) {
 	// Verify transaction was soft-deleted.
 	var deletedAt pgtype.Timestamptz
 	err := pool.QueryRow(ctx,
-		"SELECT deleted_at FROM transactions WHERE external_transaction_id = 'txn_1'",
+		"SELECT deleted_at FROM transactions WHERE provider_transaction_id = 'txn_1'",
 	).Scan(&deletedAt)
 	if err != nil {
 		t.Fatalf("query transaction: %v", err)
@@ -667,7 +667,7 @@ func TestSync_RuleCategoryDuringSync(t *testing.T) {
 	// Verify category was resolved via transaction rule.
 	var categoryID pgtype.UUID
 	err := pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_food'",
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_food'",
 	).Scan(&categoryID)
 	if err != nil {
 		t.Fatalf("query transaction: %v", err)
@@ -939,7 +939,7 @@ func TestSync_BalanceUpdateFailure_NonFatal(t *testing.T) {
 	// Transaction should still be created.
 	var count int
 	err := pool.QueryRow(ctx,
-		"SELECT count(*) FROM transactions WHERE external_transaction_id = 'txn_1'",
+		"SELECT count(*) FROM transactions WHERE provider_transaction_id = 'txn_1'",
 	).Scan(&count)
 	if err != nil {
 		t.Fatalf("count transactions: %v", err)
@@ -1020,7 +1020,7 @@ func TestSync_TellerStalePendingCleanup(t *testing.T) {
 	// Stale pending transaction should be soft-deleted.
 	var staleDeletedAt pgtype.Timestamptz
 	err = pool.QueryRow(ctx,
-		"SELECT deleted_at FROM transactions WHERE external_transaction_id = 'stale_pending_1'",
+		"SELECT deleted_at FROM transactions WHERE provider_transaction_id = 'stale_pending_1'",
 	).Scan(&staleDeletedAt)
 	if err != nil {
 		t.Fatalf("query stale txn: %v", err)
@@ -1032,7 +1032,7 @@ func TestSync_TellerStalePendingCleanup(t *testing.T) {
 	// Posted transaction should NOT be deleted.
 	var postedDeletedAt pgtype.Timestamptz
 	err = pool.QueryRow(ctx,
-		"SELECT deleted_at FROM transactions WHERE external_transaction_id = 'posted_1'",
+		"SELECT deleted_at FROM transactions WHERE provider_transaction_id = 'posted_1'",
 	).Scan(&postedDeletedAt)
 	if err != nil {
 		t.Fatalf("query posted txn: %v", err)
@@ -1131,7 +1131,7 @@ func TestSync_RuleBasedCategorization(t *testing.T) {
 	// Verify the transaction was categorized by the rule.
 	var categoryID pgtype.UUID
 	err = pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_coffee'",
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_coffee'",
 	).Scan(&categoryID)
 	if err != nil {
 		t.Fatalf("query transaction: %v", err)
@@ -1261,7 +1261,7 @@ func TestSync_UnchangedTransactions_SkipRuleReapplication(t *testing.T) {
 	err = pool.QueryRow(ctx,
 		`SELECT created_at FROM annotations
 		 WHERE kind = 'rule_applied'
-		   AND transaction_id = (SELECT id FROM transactions WHERE external_transaction_id = 'txn_coffee')
+		   AND transaction_id = (SELECT id FROM transactions WHERE provider_transaction_id = 'txn_coffee')
 		 ORDER BY created_at ASC
 		 LIMIT 1`,
 	).Scan(&appliedAt1)
@@ -1300,7 +1300,7 @@ func TestSync_UnchangedTransactions_SkipRuleReapplication(t *testing.T) {
 	err = pool.QueryRow(ctx,
 		`SELECT COUNT(*), MIN(created_at) FROM annotations
 		 WHERE kind = 'rule_applied'
-		   AND transaction_id = (SELECT id FROM transactions WHERE external_transaction_id = 'txn_coffee')`,
+		   AND transaction_id = (SELECT id FROM transactions WHERE provider_transaction_id = 'txn_coffee')`,
 	).Scan(&annotationCount, &appliedAt2)
 	if err != nil {
 		t.Fatalf("query rule annotation after second sync: %v", err)
@@ -1391,7 +1391,7 @@ func TestRule_NullConditions_MatchesAll(t *testing.T) {
 
 	var categoryID pgtype.UUID
 	err := pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_match_all'",
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_match_all'",
 	).Scan(&categoryID)
 	if err != nil {
 		t.Fatalf("query transaction: %v", err)
@@ -1458,7 +1458,7 @@ func TestRule_Trigger_OnCreate_SkipsOnUpdate(t *testing.T) {
 	// Verify rule fired on create.
 	var initialCatID pgtype.UUID
 	err = pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_on_create'",
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_on_create'",
 	).Scan(&initialCatID)
 	if err != nil {
 		t.Fatalf("query transaction after first sync: %v", err)
@@ -1470,7 +1470,7 @@ func TestRule_Trigger_OnCreate_SkipsOnUpdate(t *testing.T) {
 	// Manually move the transaction to a different category so we can detect
 	// re-fires (an on_update fire would overwrite our manual move).
 	_, err = pool.Exec(ctx,
-		"UPDATE transactions SET category_id = $1 WHERE external_transaction_id = 'txn_on_create'",
+		"UPDATE transactions SET category_id = $1 WHERE provider_transaction_id = 'txn_on_create'",
 		other.ID,
 	)
 	if err != nil {
@@ -1500,7 +1500,7 @@ func TestRule_Trigger_OnCreate_SkipsOnUpdate(t *testing.T) {
 	// on_create rule should NOT have re-fired — manual category should remain.
 	var finalCatID pgtype.UUID
 	err = pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_on_create'",
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_on_create'",
 	).Scan(&finalCatID)
 	if err != nil {
 		t.Fatalf("query transaction after second sync: %v", err)
@@ -1555,7 +1555,7 @@ func TestRule_Trigger_OnUpdate_SkipsOnCreate(t *testing.T) {
 	// Rule did NOT fire on create — category should remain NULL.
 	var categoryID pgtype.UUID
 	err := pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_only_on_update'",
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_only_on_update'",
 	).Scan(&categoryID)
 	if err != nil {
 		t.Fatalf("query transaction: %v", err)
@@ -1619,7 +1619,7 @@ func TestRule_TypedActions_SetCategory_RespectsOverride(t *testing.T) {
 	// Sanity: rule fired on initial insert.
 	var initialCatID pgtype.UUID
 	err = pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_override'",
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_override'",
 	).Scan(&initialCatID)
 	if err != nil {
 		t.Fatalf("query transaction after first sync: %v", err)
@@ -1630,7 +1630,7 @@ func TestRule_TypedActions_SetCategory_RespectsOverride(t *testing.T) {
 
 	// Set a manual override pointing at the other category.
 	_, err = pool.Exec(ctx,
-		"UPDATE transactions SET category_id = $1, category_override = TRUE WHERE external_transaction_id = 'txn_override'",
+		"UPDATE transactions SET category_id = $1, category_override = TRUE WHERE provider_transaction_id = 'txn_override'",
 		other.ID,
 	)
 	if err != nil {
@@ -1661,7 +1661,7 @@ func TestRule_TypedActions_SetCategory_RespectsOverride(t *testing.T) {
 
 	var finalCatID pgtype.UUID
 	err = pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_override'",
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_override'",
 	).Scan(&finalCatID)
 	if err != nil {
 		t.Fatalf("query transaction after second sync: %v", err)
@@ -1724,7 +1724,7 @@ func TestRule_ExpiredRule_NotFired(t *testing.T) {
 
 	var catID pgtype.UUID
 	if err := pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_expired'",
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_expired'",
 	).Scan(&catID); err != nil {
 		t.Fatalf("query transaction: %v", err)
 	}
@@ -1804,7 +1804,7 @@ func TestRule_DisabledRule_NotFired_DuringSync(t *testing.T) {
 
 	var catID pgtype.UUID
 	if err := pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_disabled'",
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_disabled'",
 	).Scan(&catID); err != nil {
 		t.Fatalf("query transaction: %v", err)
 	}
@@ -1876,13 +1876,13 @@ func TestRule_OverrideSuppressesSetCategoryButNotOthers(t *testing.T) {
 	// Pin a manual override on the row, swap the user's category, and remove
 	// the tag so the second sync has a clean slate to re-apply it.
 	if _, err := pool.Exec(ctx,
-		"UPDATE transactions SET category_id = $1, category_override = TRUE WHERE external_transaction_id = 'txn_override_combo'",
+		"UPDATE transactions SET category_id = $1, category_override = TRUE WHERE provider_transaction_id = 'txn_override_combo'",
 		overrideCat.ID,
 	); err != nil {
 		t.Fatalf("set override: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
-		`DELETE FROM transaction_tags WHERE transaction_id = (SELECT id FROM transactions WHERE external_transaction_id = 'txn_override_combo')`,
+		`DELETE FROM transaction_tags WHERE transaction_id = (SELECT id FROM transactions WHERE provider_transaction_id = 'txn_override_combo')`,
 	); err != nil {
 		t.Fatalf("clear tags: %v", err)
 	}
@@ -1908,7 +1908,7 @@ func TestRule_OverrideSuppressesSetCategoryButNotOthers(t *testing.T) {
 	// the rule's food_and_drink.
 	var finalCatID pgtype.UUID
 	if err := pool.QueryRow(ctx,
-		"SELECT category_id FROM transactions WHERE external_transaction_id = 'txn_override_combo'",
+		"SELECT category_id FROM transactions WHERE provider_transaction_id = 'txn_override_combo'",
 	).Scan(&finalCatID); err != nil {
 		t.Fatalf("query transaction: %v", err)
 	}
@@ -1922,7 +1922,7 @@ func TestRule_OverrideSuppressesSetCategoryButNotOthers(t *testing.T) {
 		SELECT COUNT(*) FROM transaction_tags tt
 		JOIN tags t ON tt.tag_id = t.id
 		JOIN transactions tr ON tt.transaction_id = tr.id
-		WHERE tr.external_transaction_id = 'txn_override_combo' AND t.slug = 'caffeine'`,
+		WHERE tr.provider_transaction_id = 'txn_override_combo' AND t.slug = 'caffeine'`,
 	).Scan(&tagAttached); err != nil {
 		t.Fatalf("count tag attachment: %v", err)
 	}

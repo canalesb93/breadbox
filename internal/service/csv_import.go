@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -224,18 +225,25 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 		// Set to uncategorized — transaction rules will categorize on next sync.
 		categoryID := uncategorizedID
 
+		// Marshal raw CSV row as JSON for audit purposes.
+		var providerRaw []byte
+		if raw, err := json.Marshal(row); err == nil {
+			providerRaw = raw
+		}
+
 		txn, err := s.Queries.UpsertTransaction(ctx, db.UpsertTransactionParams{
-			AccountID:             accountID,
-			ExternalTransactionID: externalTxnID,
-			Amount:                amountNumeric,
-			IsoCurrencyCode:       pgconv.Text("USD"),
-			Date:                  pgtype.Date{Time: dateVal, Valid: true},
-			Name:                  desc,
-			MerchantName:          pgtype.Text{String: merchant, Valid: merchant != ""},
-			CategoryPrimary:       pgtype.Text{String: category, Valid: category != ""},
-			PaymentChannel:        pgconv.Text("other"),
-			Pending:               false,
-			CategoryID:            categoryID,
+			AccountID:               accountID,
+			ProviderTransactionID:   externalTxnID,
+			Amount:                  amountNumeric,
+			IsoCurrencyCode:         pgconv.Text("USD"),
+			Date:                    pgtype.Date{Time: dateVal, Valid: true},
+			ProviderName:            desc,
+			ProviderMerchantName:    pgtype.Text{String: merchant, Valid: merchant != ""},
+			ProviderCategoryPrimary: pgtype.Text{String: category, Valid: category != ""},
+			ProviderPaymentChannel:  pgconv.Text("other"),
+			Pending:                 false,
+			CategoryID:              categoryID,
+			ProviderRaw:             providerRaw,
 		})
 		if err != nil {
 			result.SkippedCount++

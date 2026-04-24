@@ -1033,11 +1033,11 @@ func upsertTxnWithCategory(t *testing.T, q *db.Queries, acctID pgtype.UUID, extI
 	t.Helper()
 	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
 		AccountID:             acctID,
-		ExternalTransactionID: extID,
+		ProviderTransactionID: extID,
 		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
 		Date:                  pgtype.Date{Time: testutil.MustParseDate(date), Valid: true},
-		Name:                  name,
+		ProviderName:          name,
 		CategoryID:            categoryID,
 	})
 	if err != nil {
@@ -1050,11 +1050,11 @@ func upsertTxnPending(t *testing.T, q *db.Queries, acctID pgtype.UUID, extID, na
 	t.Helper()
 	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
 		AccountID:             acctID,
-		ExternalTransactionID: extID,
+		ProviderTransactionID: extID,
 		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
 		Date:                  pgtype.Date{Time: testutil.MustParseDate(date), Valid: true},
-		Name:                  name,
+		ProviderName:          name,
 		Pending:               true,
 	})
 	if err != nil {
@@ -1191,11 +1191,11 @@ func upsertTxnWithAmount(t *testing.T, q *db.Queries, acctID pgtype.UUID, extID,
 	t.Helper()
 	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
 		AccountID:             acctID,
-		ExternalTransactionID: extID,
+		ProviderTransactionID: extID,
 		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
 		Date:                  pgtype.Date{Time: testutil.MustParseDate(date), Valid: true},
-		Name:                  name,
+		ProviderName:          name,
 	})
 	if err != nil {
 		t.Fatalf("upsertTxnWithAmount(%q): %v", name, err)
@@ -1212,12 +1212,12 @@ func upsertTxnWithMerchant(t *testing.T, q *db.Queries, acctID pgtype.UUID, extI
 	t.Helper()
 	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
 		AccountID:             acctID,
-		ExternalTransactionID: extID,
+		ProviderTransactionID: extID,
 		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
 		Date:                  pgtype.Date{Time: testutil.MustParseDate(date), Valid: true},
-		Name:                  name,
-		MerchantName:          pgtype.Text{String: merchant, Valid: true},
+		ProviderName:          name,
+		ProviderMerchantName:  pgtype.Text{String: merchant, Valid: true},
 	})
 	if err != nil {
 		t.Fatalf("upsertTxnWithMerchant(%q): %v", name, err)
