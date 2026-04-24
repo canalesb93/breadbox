@@ -1,4 +1,11 @@
 {{define "content"}}
+{{/*
+  Set the shortcut-registry scope so base.html's global dispatcher routes
+  n (registered below) to the Create Backup submit button, and so the
+  ? help modal surfaces it under "This page". Reset on Alpine teardown.
+*/}}
+<div x-data x-init="$store.shortcuts.setScope('backups')" x-destroy="$store.shortcuts.setScope('global')"></div>
+
 <div class="bb-page-header">
   <div>
     <h1 class="bb-page-title">Backups</h1>
@@ -8,7 +15,7 @@
     {{if not .Error}}
     <form method="POST" action="/-/backups/create">
       <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-      <button type="submit" class="btn btn-primary btn-sm rounded-xl" {{if not .PreflightOK}}disabled title="{{.PreflightMessage}}"{{end}}>
+      <button type="submit" data-new-backup class="btn btn-primary btn-sm rounded-xl" {{if not .PreflightOK}}disabled title="{{.PreflightMessage}}"{{end}}>
         {{if .PreflightOK}}
         <i data-lucide="download" class="w-4 h-4"></i>
         {{else}}
@@ -295,5 +302,25 @@
   var el = document.querySelector(location.hash);
   if (el) setTimeout(function() { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
 })();
+
+// Register backups-scoped keyboard shortcuts. `n` clicks the Create Backup
+// submit button so the real POST form handles CSRF + preflight gating —
+// the shortcut is purely a UI affordance.
+document.addEventListener('alpine:init', function() {
+  var reg = Alpine.store('shortcuts');
+  if (!reg) return;
+
+  reg.register({
+    id: 'backups.new',
+    keys: 'n',
+    description: 'Create backup',
+    group: 'New',
+    scope: 'backups',
+    action: function() {
+      var btn = document.querySelector('[data-new-backup]');
+      if (btn && !btn.disabled) btn.click();
+    },
+  });
+});
 </script>
 {{end}}

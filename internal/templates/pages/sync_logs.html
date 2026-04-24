@@ -1,4 +1,11 @@
 {{define "content"}}
+{{/*
+  Set the shortcut-registry scope so base.html's global dispatcher routes
+  r (registered below) to this page's handler, and so the ? help modal
+  surfaces it under "This page". Reset to 'global' on Alpine teardown.
+*/}}
+<div x-data x-init="$store.shortcuts.setScope('sync-logs')" x-destroy="$store.shortcuts.setScope('global')"></div>
+
 <div class="bb-page-header">
   <div>
     <h1 class="bb-page-title">Sync Logs</h1>
@@ -287,4 +294,23 @@
   </div>
 </div>
 {{end}}
+
+<script>
+// Register sync-logs scoped keyboard shortcuts in the global registry.
+// No explicit "refresh" button on this page, so `r` reloads the page —
+// matches the user's mental model (list view, no client-side re-fetch yet).
+document.addEventListener('alpine:init', function() {
+  var reg = Alpine.store('shortcuts');
+  if (!reg) return;
+
+  reg.register({
+    id: 'sync-logs.refresh',
+    keys: 'r',
+    description: 'Refresh sync logs',
+    group: 'Actions',
+    scope: 'sync-logs',
+    action: function() { window.location.reload(); },
+  });
+});
+</script>
 {{end}}

@@ -9,6 +9,12 @@ import (
 // Dashboard renders the admin home page: agent reports and recent transactions.
 // Hosted inside base.html via TemplateRenderer.RenderWithTempl.
 templ Dashboard(p DashboardProps) {
+	<!--
+		Set the shortcut-registry scope so the ? help modal reflects "This page"
+		accurately (dashboard has no custom shortcuts — navigation lives via the
+		g+_ chords already). Reset to 'global' on Alpine teardown.
+	-->
+	<div x-data x-init="$store.shortcuts.setScope('dashboard')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	if p.ShowUpdateBanner {
 		@dashUpdateBanner(p)
 	}

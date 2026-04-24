@@ -1,10 +1,17 @@
 {{define "content"}}
+{{/*
+  Set the shortcut-registry scope so base.html's global dispatcher routes
+  n (registered below) to the Add Member link, and so the ? help modal
+  surfaces it under "This page". Reset on Alpine teardown.
+*/}}
+<div x-data x-init="$store.shortcuts.setScope('users')" x-destroy="$store.shortcuts.setScope('global')"></div>
+
 <div class="bb-page-header">
   <div>
     <h1 class="bb-page-title">Household</h1>
     <p class="text-sm text-base-content/50 mt-1">Manage who has bank connections in Breadbox</p>
   </div>
-  <a href="/users/new" class="btn btn-primary btn-sm rounded-xl">
+  <a href="/users/new" data-new-user class="btn btn-primary btn-sm rounded-xl">
     <i data-lucide="plus" class="w-4 h-4"></i>
     Add Member
   </a>
@@ -215,4 +222,26 @@
   </div>
 </div>
 {{end}}
+
+<script>
+// Register users-scoped keyboard shortcuts. `n` clicks the Add Member
+// link (anchor tag). Using .click() respects the browser's normal
+// navigation so we don't need to duplicate the href here.
+document.addEventListener('alpine:init', function() {
+  var reg = Alpine.store('shortcuts');
+  if (!reg) return;
+
+  reg.register({
+    id: 'users.new',
+    keys: 'n',
+    description: 'Add member',
+    group: 'New',
+    scope: 'users',
+    action: function() {
+      var el = document.querySelector('[data-new-user]');
+      if (el) el.click();
+    },
+  });
+});
+</script>
 {{end}}
