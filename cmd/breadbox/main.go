@@ -39,7 +39,7 @@ var version = "dev"
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: breadbox <command>")
-		fmt.Fprintln(os.Stderr, "commands: serve, migrate, seed, mcp-stdio, create-admin, reset-password, version")
+		fmt.Fprintln(os.Stderr, "commands: serve, migrate, seed, mcp-stdio, create-admin, reset-password, doctor, version")
 		os.Exit(1)
 	}
 
@@ -72,6 +72,12 @@ func main() {
 	case "reset-password":
 		if err := runResetPassword(); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+	case "doctor":
+		if err := runDoctor(); err != nil {
+			// runDoctor already printed the report; exit non-zero without the
+			// "error:" prefix other commands use.
 			os.Exit(1)
 		}
 	case "version":
