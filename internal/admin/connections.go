@@ -14,6 +14,7 @@ import (
 	"breadbox/internal/provider"
 	"breadbox/internal/service"
 	bsync "breadbox/internal/sync"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -220,22 +221,137 @@ func ConnectionsListHandler(a *app.App, svc *service.Service, sm *scs.SessionMan
 		})
 
 		data := map[string]any{
-			"PageTitle":        "Connections",
-			"CurrentPage":      "connections",
-			"Connections":      enriched,
-			"CSRFToken":        GetCSRFToken(r),
-			"Flash":            GetFlash(ctx, sm),
-			"TotalAssets":      totalAssets,
-			"TotalLiabilities": totalLiabilities,
-			"NetWorth":         netWorth,
-			"HasAnyBalance":    hasAnyBalance,
-			"Tab":              tab,
-			"Links":            links,
-			"LinkAccounts":     linkAccounts,
-			"Users":            users,
+			"PageTitle":   "Connections",
+			"CurrentPage": "connections",
+			"CSRFToken":   GetCSRFToken(r),
+			"Flash":       GetFlash(ctx, sm),
 		}
-		tr.Render(w, r, "connections.html", data)
+		props := buildConnectionsProps(connectionsListInput{
+			Tab:              tab,
+			CSRFToken:        GetCSRFToken(r),
+			Connections:      enriched,
+			Users:            users,
+			Links:            links,
+			LinkAccounts:     linkAccounts,
+			NetWorth:         netWorth,
+			TotalAssets:      totalAssets,
+			TotalLiabilities: totalLiabilities,
+			HasAnyBalance:    hasAnyBalance,
+		})
+		tr.RenderWithTempl(w, r, data, pages.Connections(props))
 	}
+}
+
+// connectionsListInput collects the values the handler computes for the
+// list page. Building props through this struct keeps the conversion from
+// db rows + ad-hoc maps into typed templ props in one place.
+type connectionsListInput struct {
+	Tab              string
+	CSRFToken        string
+	Connections      []ConnectionWithAccounts
+	Users            []db.User
+	Links            []service.AccountLinkResponse
+	LinkAccounts     []AccountForLink
+	NetWorth         float64
+	TotalAssets      float64
+	TotalLiabilities float64
+	HasAnyBalance    bool
+}
+
+// buildConnectionsProps converts the handler's inputs into the typed
+// pages.ConnectionsProps the templ component renders.
+func buildConnectionsProps(in connectionsListInput) pages.ConnectionsProps {
+	props := pages.ConnectionsProps{
+		Tab:              in.Tab,
+		CSRFToken:        in.CSRFToken,
+		NetWorth:         in.NetWorth,
+		TotalAssets:      in.TotalAssets,
+		TotalLiabilities: in.TotalLiabilities,
+		HasAnyBalance:    in.HasAnyBalance,
+	}
+
+	for _, u := range in.Users {
+		first := ""
+		if u.Name != "" {
+			first = u.Name[:1]
+		}
+		props.Users = append(props.Users, pages.ConnectionsUserFilter{
+			ID:    pgconv.FormatUUID(u.ID),
+			Name:  u.Name,
+			First: first,
+		})
+	}
+
+	for _, c := range in.Connections {
+		row := pages.ConnectionsRow{
+			ID:                   pgconv.FormatUUID(c.ID),
+			UserID:               pgconv.FormatUUID(c.UserID),
+			Provider:             string(c.Provider),
+			Status:               string(c.Status),
+			InstitutionName:      c.InstitutionName.String,
+			UserName:             c.UserName.String,
+			Paused:               c.Paused,
+			IsStale:              c.IsStale,
+			NewAccountsAvailable: c.NewAccountsAvailable,
+			LastSyncStatus:       c.LastSyncStatus,
+			LastSyncErrorMessage: c.LastSyncErrorMessage.String,
+			LastSyncedAtValid:    c.LastSyncedAt.Valid,
+			ErrorCodeValid:       c.ErrorCode.Valid,
+			ErrorCode:            c.ErrorCode.String,
+			ErrorMessageValid:    c.ErrorMessage.Valid,
+			HasBalance:           c.HasBalance,
+			TotalBalance:         c.TotalBalance,
+			AccountCount:         c.AccountCount,
+		}
+		if c.LastSyncedAt.Valid {
+			row.LastSyncedAtRelative = relativeTime(c.LastSyncedAt.Time)
+		}
+		for _, a := range c.Accounts {
+			row.Accounts = append(row.Accounts, pages.ConnectionsAccountRow{
+				ID:                pgconv.FormatUUID(a.ID),
+				Name:              a.Name,
+				DisplayNameValid:  a.DisplayName.Valid,
+				DisplayName:       a.DisplayName.String,
+				Type:              a.Type,
+				SubtypeValid:      a.Subtype.Valid,
+				Subtype:           a.Subtype.String,
+				MaskValid:         a.Mask.Valid,
+				Mask:              a.Mask.String,
+				IsDependentLinked: a.IsDependentLinked,
+				Excluded:          a.Excluded,
+				HasBalance:        a.HasBalance,
+				BalanceFloat:      a.BalanceFloat,
+			})
+		}
+		props.Connections = append(props.Connections, row)
+	}
+
+	for _, l := range in.Links {
+		props.Links = append(props.Links, pages.ConnectionsLinkRow{
+			ID:                      l.ID,
+			PrimaryAccountName:      l.PrimaryAccountName,
+			PrimaryUserName:         l.PrimaryUserName,
+			DependentAccountName:    l.DependentAccountName,
+			DependentUserName:       l.DependentUserName,
+			Enabled:                 l.Enabled,
+			MatchCount:              l.MatchCount,
+			UnmatchedDependentCount: l.UnmatchedDependentCount,
+			MatchStrategy:           l.MatchStrategy,
+			MatchToleranceDays:      l.MatchToleranceDays,
+		})
+	}
+
+	for _, a := range in.LinkAccounts {
+		props.LinkAccounts = append(props.LinkAccounts, pages.ConnectionsLinkAccount{
+			ID:              a.ID,
+			DisplayName:     a.DisplayName,
+			Mask:            a.Mask,
+			UserName:        a.UserName,
+			InstitutionName: a.InstitutionName,
+		})
+	}
+
+	return props
 }
 
 // NewConnectionHandler serves GET /admin/connections/new.
