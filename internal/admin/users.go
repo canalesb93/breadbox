@@ -238,18 +238,14 @@ func CreateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 
 		req.Name = strings.TrimSpace(req.Name)
 		if req.Name == "" {
-			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Name is required"},
-			})
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Name is required")
 			return
 		}
 
 		var emailText pgtype.Text
 		if req.Email != nil && *req.Email != "" {
 			if _, err := mail.ParseAddress(*req.Email); err != nil {
-				writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-					"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Invalid email format"},
-				})
+				writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Invalid email format")
 				return
 			}
 			emailText = pgtype.Text{String: *req.Email, Valid: true}
@@ -262,13 +258,11 @@ func CreateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				writeJSON(w, http.StatusConflict, map[string]any{
-					"error": map[string]string{"code": "DUPLICATE_EMAIL", "message": "A family member with this email already exists"},
-				})
+				writeError(w, http.StatusConflict, "DUPLICATE_EMAIL", "A family member with this email already exists")
 				return
 			}
 			a.Logger.Error("create user", "error", err)
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create user"})
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create user")
 			return
 		}
 
@@ -297,7 +291,7 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 
 		var userID pgtype.UUID
 		if err := userID.Scan(idStr); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid user ID")
 			return
 		}
 
@@ -310,9 +304,7 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		existing, err := a.Queries.GetUser(r.Context(), userID)
 		if err != nil {
 			a.Logger.Error("get user for update", "error", err)
-			writeJSON(w, http.StatusNotFound, map[string]any{
-				"error": map[string]string{"code": "NOT_FOUND", "message": "User not found"},
-			})
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "User not found")
 			return
 		}
 
@@ -320,9 +312,7 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		if req.Name != nil {
 			trimmed := strings.TrimSpace(*req.Name)
 			if trimmed == "" {
-				writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-					"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Name must not be empty"},
-				})
+				writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Name must not be empty")
 				return
 			}
 			name = trimmed
@@ -334,9 +324,7 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 				email = pgtype.Text{}
 			} else {
 				if _, err := mail.ParseAddress(*req.Email); err != nil {
-					writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-						"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Invalid email format"},
-					})
+					writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Invalid email format")
 					return
 				}
 				email = pgtype.Text{String: *req.Email, Valid: true}
@@ -351,13 +339,11 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				writeJSON(w, http.StatusConflict, map[string]any{
-					"error": map[string]string{"code": "DUPLICATE_EMAIL", "message": "A family member with this email already exists"},
-				})
+				writeError(w, http.StatusConflict, "DUPLICATE_EMAIL", "A family member with this email already exists")
 				return
 			}
 			a.Logger.Error("update user", "error", err)
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update user"})
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update user")
 			return
 		}
 
