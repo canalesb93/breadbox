@@ -60,7 +60,7 @@
 {{range .Rules}}
 {{$matchAll := isMatchAllCondition .Conditions}}
 {{$isSystem := eq .CreatedByType "system"}}
-<div class="bb-card p-0 overflow-hidden cursor-pointer hover:bg-base-200/30 transition-colors{{if not .Enabled}} opacity-60{{end}}"
+<div class="bb-card p-0 cursor-pointer hover:bg-base-200/30 transition-colors relative focus-within:z-30 has-[:focus-within]:z-30{{if not .Enabled}} opacity-60{{end}}"
      data-rule-row
      data-rule-id="{{.ID}}"
      data-open-url="/rules/{{.ID}}"
@@ -159,23 +159,40 @@
       </div>
     </div>
 
-    <!-- Actions -->
-    <div class="flex items-center justify-end gap-0.5 flex-shrink-0 w-24">
-      <button class="btn btn-ghost btn-xs btn-square rounded-lg" data-toggle-enabled title="{{if .Enabled}}Disable{{else}}Enable{{end}}" @click.stop="toggleRule('{{.ID}}')">
-        {{if .Enabled}}<i data-lucide="pause" class="w-3.5 h-3.5"></i>{{else}}<i data-lucide="play" class="w-3.5 h-3.5"></i>{{end}}
-      </button>
-      <a href="/rules/{{.ID}}/edit" class="btn btn-ghost btn-xs btn-square rounded-lg" title="Edit" @click.stop>
+    <!-- Actions — Edit stays as the always-visible primary action (most
+         frequent operation in a rules list); Enable/Disable and Delete
+         move into a kebab dropdown to free up width on mobile and put
+         destructive Delete behind a label instead of flush against Edit.
+         Matches the pattern used on /tags (#728). -->
+    <div class="flex items-center justify-end gap-0.5 flex-shrink-0">
+      <a href="/rules/{{.ID}}/edit" class="btn btn-ghost btn-xs btn-square rounded-lg" title="Edit" aria-label="Edit rule {{.Name}}" @click.stop>
         <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
       </a>
-      {{if $isSystem}}
-      <button class="btn btn-ghost btn-xs btn-square rounded-lg text-base-content/20 cursor-not-allowed" title="System rules cannot be deleted (you can disable them instead)" disabled>
-        <i data-lucide="shield" class="w-3.5 h-3.5"></i>
-      </button>
-      {{else}}
-      <button class="btn btn-ghost btn-xs btn-square rounded-lg text-error/60" data-delete-action title="Delete" :disabled="deleting" @click.stop="deleteRule('{{.ID}}', $el)">
-        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-      </button>
-      {{end}}
+      <div class="dropdown dropdown-end" @click.stop>
+        <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square rounded-lg" aria-label="Rule {{.Name}} actions">
+          <i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
+        </div>
+        <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
+          <li>
+            <button type="button" data-toggle-enabled aria-label="{{if .Enabled}}Disable{{else}}Enable{{end}} rule {{.Name}}" @click.stop="toggleRule('{{.ID}}'); document.activeElement && document.activeElement.blur()">
+              {{if .Enabled}}<i data-lucide="pause" class="w-3.5 h-3.5"></i> Disable{{else}}<i data-lucide="play" class="w-3.5 h-3.5"></i> Enable{{end}}
+            </button>
+          </li>
+          {{if $isSystem}}
+          <li class="disabled">
+            <span class="text-base-content/40 cursor-not-allowed" title="System rules cannot be deleted — disable instead">
+              <i data-lucide="shield" class="w-3.5 h-3.5"></i> System (no delete)
+            </span>
+          </li>
+          {{else}}
+          <li>
+            <button type="button" class="text-error" data-delete-action aria-label="Delete rule {{.Name}}" :disabled="deleting" @click.stop="deleteRule('{{.ID}}', $el); document.activeElement && document.activeElement.blur()">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
+            </button>
+          </li>
+          {{end}}
+        </ul>
+      </div>
     </div>
   </div>
 </div>
