@@ -15,6 +15,7 @@ import (
 	plaidprovider "breadbox/internal/provider/plaid"
 	tellerprovider "breadbox/internal/provider/teller"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -45,35 +46,39 @@ func ProvidersGetHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 			"CurrentPage": "providers",
 			"CSRFToken":   GetCSRFToken(r),
 			"Flash":       GetFlash(r.Context(), sm),
-
-			// Plaid state
-			"PlaidConfigured": a.Providers["plaid"] != nil,
-			"PlaidFromEnv":    os.Getenv("PLAID_CLIENT_ID") != "",
-			"PlaidClientID":   a.Config.PlaidClientID,
-			"PlaidEnv":        a.Config.PlaidEnv,
-			"WebhookURL":      a.Config.WebhookURL,
-			"ConfigSources":   a.Config.ConfigSources,
-
-			// Teller state
-			"TellerConfigured":        a.Providers["teller"] != nil,
-			"TellerFromEnv":           os.Getenv("TELLER_APP_ID") != "",
-			"TellerAppID":             a.Config.TellerAppID,
-			"TellerEnv":               a.Config.TellerEnv,
-			"TellerCertFromEnv":       a.Config.TellerCertPath != "",
-			"TellerCertConfigured":    a.Config.TellerCertPath != "" || len(a.Config.TellerCertPEM) > 0,
-			"TellerWebhookConfigured": a.Config.TellerWebhookSecret != "",
-
-			// Encryption key available (needed to store PEM)
-			"HasEncryptionKey": len(a.Config.EncryptionKey) > 0,
-
-			// Provider health summaries
-			"ProviderHealth": providerHealth,
-
-			// Sync interval for webhook fallback message
-			"SyncInterval": a.Config.SyncIntervalMinutes,
 		}
-		tr.Render(w, r, "providers.html", data)
+
+		props := pages.ProvidersProps{
+			CSRFToken:     GetCSRFToken(r),
+			ConfigSources: a.Config.ConfigSources,
+
+			PlaidConfigured: a.Providers["plaid"] != nil,
+			PlaidFromEnv:    os.Getenv("PLAID_CLIENT_ID") != "",
+			PlaidClientID:   a.Config.PlaidClientID,
+			PlaidEnv:        a.Config.PlaidEnv,
+			WebhookURL:      a.Config.WebhookURL,
+
+			TellerConfigured:        a.Providers["teller"] != nil,
+			TellerFromEnv:           os.Getenv("TELLER_APP_ID") != "",
+			TellerAppID:             a.Config.TellerAppID,
+			TellerEnv:               a.Config.TellerEnv,
+			TellerCertFromEnv:       a.Config.TellerCertPath != "",
+			TellerCertConfigured:    a.Config.TellerCertPath != "" || len(a.Config.TellerCertPEM) > 0,
+			TellerWebhookConfigured: a.Config.TellerWebhookSecret != "",
+
+			HasEncryptionKey:    len(a.Config.EncryptionKey) > 0,
+			SyncIntervalMinutes: a.Config.SyncIntervalMinutes,
+			ProviderHealth:      providerHealth,
+		}
+		renderProviders(w, r, tr, data, props)
 	}
+}
+
+// renderProviders mirrors the renderSettings / renderLogs pattern: hands
+// the typed ProvidersProps to the templ component and uses
+// RenderWithTempl to host it inside base.html.
+func renderProviders(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.ProvidersProps) {
+	tr.RenderWithTempl(w, r, data, pages.Providers(props))
 }
 
 // ProvidersSavePlaidHandler serves POST /admin/providers/plaid.
