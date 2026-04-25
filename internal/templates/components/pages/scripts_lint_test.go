@@ -46,9 +46,6 @@ var existingAntiPatternAllowlist = map[string]struct{}{
 	// `categoryPicker(...)` factory shared across category_form, transactions,
 	// account_detail, transaction_detail. See #827's Phase 2 queue.
 	"category_form.templ:88": {},
-	// `reportDetail(id, isRead)` — extracted as part of report_detail's
-	// Phase 2 PR.
-	"report_detail.templ:18": {},
 	// `avatarEditor(userId)` — extracted whenever user_form gets ported.
 	"user_form.templ:172": {},
 }
