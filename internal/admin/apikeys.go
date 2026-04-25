@@ -3,6 +3,7 @@ package admin
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
@@ -80,37 +81,86 @@ func AccessPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templat
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		// Split keys into active and revoked for cleaner display
-		var activeKeys, revokedKeys []service.APIKeyResponse
+		// Split keys into active and revoked for cleaner display.
+		var activeKeys, revokedKeys []pages.AccessKeyRow
 		for _, k := range keys {
+			row := buildAccessKeyRow(k)
 			if k.RevokedAt != nil {
-				revokedKeys = append(revokedKeys, k)
+				revokedKeys = append(revokedKeys, row)
 			} else {
-				activeKeys = append(activeKeys, k)
+				activeKeys = append(activeKeys, row)
 			}
 		}
-		var activeClients, revokedClients []service.OAuthClientResponse
+		var activeClients, revokedClients []pages.AccessClientRow
 		for _, c := range clients {
+			row := buildAccessClientRow(c)
 			if c.RevokedAt != nil {
-				revokedClients = append(revokedClients, c)
+				revokedClients = append(revokedClients, row)
 			} else {
-				activeClients = append(activeClients, c)
+				activeClients = append(activeClients, row)
 			}
 		}
-		data := map[string]any{
-			"PageTitle":      "Access",
-			"CurrentPage":    "access",
-			"Keys":           keys,
-			"ActiveKeys":     activeKeys,
-			"RevokedKeys":    revokedKeys,
-			"Clients":        clients,
-			"ActiveClients":  activeClients,
-			"RevokedClients": revokedClients,
-			"Flash":          GetFlash(r.Context(), sm),
-			"CSRFToken":      GetCSRFToken(r),
+		data := BaseTemplateData(r, sm, "access", "Access")
+		props := pages.AccessProps{
+			IsAdmin:        IsAdmin(sm, r),
+			CSRFToken:      GetCSRFToken(r),
+			ActiveKeys:     activeKeys,
+			RevokedKeys:    revokedKeys,
+			HasAnyKeys:     len(keys) > 0,
+			ActiveClients:  activeClients,
+			RevokedClients: revokedClients,
+			HasAnyClients:  len(clients) > 0,
 		}
-		tr.Render(w, r, "access.html", data)
+		renderAccess(w, r, tr, data, props)
 	}
+}
+
+// renderAccess mirrors the renderLogs / renderRules pattern: it hands the
+// typed AccessProps to the templ component and uses RenderWithTempl to host
+// it inside base.html.
+func renderAccess(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.AccessProps) {
+	tr.RenderWithTempl(w, r, data, pages.Access(props))
+}
+
+// buildAccessKeyRow flattens a service.APIKeyResponse into the templ-side
+// view-model, pre-rendering the date helpers (`formatDateShort`,
+// `relativeTime`) the old html/template called via funcMap.
+func buildAccessKeyRow(k service.APIKeyResponse) pages.AccessKeyRow {
+	return pages.AccessKeyRow{
+		ID:               k.ID,
+		Name:             k.Name,
+		KeyPrefix:        k.KeyPrefix,
+		Scope:            k.Scope,
+		CreatedAtShort:   formatDateShortFromRFC3339(k.CreatedAt),
+		LastUsedRelative: relativeTimeFromRFC3339Ptr(k.LastUsedAt),
+	}
+}
+
+// buildAccessClientRow flattens a service.OAuthClientResponse into the
+// templ-side view-model, pre-rendering the creation date.
+func buildAccessClientRow(c service.OAuthClientResponse) pages.AccessClientRow {
+	return pages.AccessClientRow{
+		ID:             c.ID,
+		Name:           c.Name,
+		ClientIDPrefix: c.ClientIDPrefix,
+		Scope:          c.Scope,
+		CreatedAtShort: formatDateShortFromRFC3339(c.CreatedAt),
+	}
+}
+
+// formatDateShortFromRFC3339 mirrors the `formatDateShort` funcMap helper
+// for a string-typed timestamp: parses RFC3339 and renders as
+// "Jan 2, 3:04 PM" in the local timezone. Returns the input verbatim on
+// parse failure (matching the helper's fall-through).
+func formatDateShortFromRFC3339(s string) string {
+	if s == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return s
+	}
+	return t.Local().Format("Jan 2, 3:04 PM")
 }
 
 // APIKeyNewPageHandler serves GET /admin/api-keys/new.
