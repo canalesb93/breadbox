@@ -142,6 +142,7 @@ func buildAccessClientRow(c service.OAuthClientResponse) pages.AccessClientRow {
 	return pages.AccessClientRow{
 		ID:             c.ID,
 		Name:           c.Name,
+		ClientID:       c.ClientID,
 		ClientIDPrefix: c.ClientIDPrefix,
 		Scope:          c.Scope,
 		CreatedAtShort: formatDateShortFromRFC3339(c.CreatedAt),

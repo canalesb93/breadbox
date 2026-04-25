@@ -32,6 +32,7 @@ type AccessKeyRow struct {
 type AccessClientRow struct {
 	ID             string
 	Name           string
+	ClientID       string
 	ClientIDPrefix string
 	Scope          string
 	CreatedAtShort string
