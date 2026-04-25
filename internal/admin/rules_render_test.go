@@ -1,7 +1,7 @@
 package admin
 
 import (
-	"bytes"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -38,13 +38,15 @@ func TestRulesTemplateRenders(t *testing.T) {
 		"Version":        "dev",
 	}
 
-	var buf bytes.Buffer
-	err = tr.RenderTo(&buf, "rules.html", data)
-	if err != nil {
-		t.Fatalf("RenderTo error: %v", err)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/rules", nil)
+	tr.Render(w, r, "rules.html", data)
+
+	if w.Code != 200 {
+		t.Fatalf("Render returned status %d, body=%q", w.Code, w.Body.String())
 	}
 
-	html := buf.String()
+	html := w.Body.String()
 
 	if !strings.Contains(html, `rulesPage()`) {
 		t.Error("rules Alpine component not initialized")
@@ -53,5 +55,5 @@ func TestRulesTemplateRenders(t *testing.T) {
 		t.Error("empty-state message not rendered")
 	}
 
-	t.Logf("Rendered %d bytes", buf.Len())
+	t.Logf("Rendered %d bytes", w.Body.Len())
 }

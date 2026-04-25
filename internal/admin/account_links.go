@@ -11,70 +11,14 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// AccountForLink is a simplified account for the link creation form.
+// AccountForLink is a simplified account row used by the account-link creation
+// form on the connections page.
 type AccountForLink struct {
 	ID              string
 	DisplayName     string
 	Mask            string
 	UserName        string
 	InstitutionName string
-}
-
-// AccountLinksPageHandler serves GET /admin/account-links.
-func AccountLinksPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		links, err := svc.ListAccountLinks(ctx)
-		if err != nil {
-			a.Logger.Error("list account links", "error", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		// Load accounts for the creation form.
-		accounts, err := svc.ListAccounts(ctx, nil)
-		if err != nil {
-			a.Logger.Error("list accounts", "error", err)
-		}
-
-		var acctList []AccountForLink
-		for _, acct := range accounts {
-			// Use display name from account detail (respects COALESCE(display_name, name)).
-			displayName := acct.Name
-			userName := ""
-			if acct.ConnectionID != nil {
-				detail, err := svc.GetAccountDetail(ctx, acct.ID)
-				if err == nil {
-					if detail.DisplayName != nil && *detail.DisplayName != "" {
-						displayName = *detail.DisplayName
-					}
-					userName = detail.UserName
-				}
-			}
-			mask := ""
-			if acct.Mask != nil {
-				mask = *acct.Mask
-			}
-			instName := ""
-			if acct.InstitutionName != nil {
-				instName = *acct.InstitutionName
-			}
-			acctList = append(acctList, AccountForLink{
-				ID:              acct.ID,
-				DisplayName:     displayName,
-				Mask:            mask,
-				UserName:        userName,
-				InstitutionName: instName,
-			})
-		}
-
-		data := BaseTemplateData(r, sm, "account-links", "Account Links")
-		data["Links"] = links
-		data["Accounts"] = acctList
-
-		tr.Render(w, r, "account_links.html", data)
-	}
 }
 
 // AccountLinkDetailHandler serves GET /admin/account-links/{id}.

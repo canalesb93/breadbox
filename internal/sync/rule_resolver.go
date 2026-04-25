@@ -376,11 +376,6 @@ func compileCondition(c *Condition) (*compiledCondition, error) {
 	return cc, nil
 }
 
-// UncategorizedID returns the UUID of the "uncategorized" fallback category.
-func (r *RuleResolver) UncategorizedID() pgtype.UUID {
-	return r.uncategorizedID
-}
-
 // CategorySlug returns the slug for a category UUID, or empty string if unknown.
 func (r *RuleResolver) CategorySlug(id pgtype.UUID) string {
 	if !id.Valid {

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io"
 	"log"
 	"math"
 	"net/http"
@@ -1112,7 +1111,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/api_keys.html",
 		"pages/api_key_new.html",
 		"pages/api_key_created.html",
-		"pages/sync_logs.html",
 		"pages/sync_log_detail.html",
 		"pages/providers.html",
 		"pages/csv_import.html",
@@ -1123,7 +1121,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// both render via RenderWithTempl using the _templ_shell template
 		// key (see pages.Categories and pages.CategoryForm).
 		"pages/transaction_detail.html",
-		"pages/mcp_settings.html",
 		"pages/rules.html",
 		// pages/tags.html and pages/tag_form.html removed — both render
 		// via RenderWithTempl using the _templ_shell template key
@@ -1131,17 +1128,17 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/rule_form.html",
 		"pages/rule_detail.html",
 		"pages/backups.html",
-		"pages/account_links.html",
 		"pages/account_link_detail.html",
 		"pages/reports.html",
 		"pages/report_detail.html",
-		"pages/webhook_events.html",
 		"pages/logs.html",
 		"pages/oauth_clients.html",
 		"pages/oauth_client_new.html",
 		"pages/oauth_client_created.html",
-		"pages/agent_wizard.html",
-		"pages/mcp_guide.html",
+		// pages/mcp_guide.html, pages/agent_wizard.html, and pages/mcp_settings.html
+		// are not registered as standalone base pages — their standalone routes
+		// redirect to /agents and they're only consumed as composite extras
+		// (see compositePages below).
 		"pages/prompt_builder.html",
 		"pages/session_detail.html",
 		"pages/my_account.html",
@@ -1194,27 +1191,6 @@ func (tr *TemplateRenderer) parseBasePage(pagePath string) error {
 	name := path.Base(pagePath)
 	tr.templates[name] = t
 	tr.specs[name] = files
-	return nil
-}
-
-// RegisterBasePage registers a page template that uses the base layout.
-// pagePath is relative to the templates FS root, e.g. "pages/dashboard.html".
-// The template is accessible by its base filename, e.g. "dashboard.html".
-func (tr *TemplateRenderer) RegisterBasePage(pagePath string) error {
-	files := []string{"layout/base.html"}
-	files = append(files, templatePartials...)
-	files = append(files, pagePath)
-
-	t, err := template.New("").Funcs(tr.funcMap).ParseFS(templates.FS, files...)
-	if err != nil {
-		return err
-	}
-
-	name := path.Base(pagePath)
-	tr.mu.Lock()
-	tr.templates[name] = t
-	tr.specs[name] = files
-	tr.mu.Unlock()
 	return nil
 }
 
@@ -1320,23 +1296,6 @@ func (tr *TemplateRenderer) RenderWithTempl(w http.ResponseWriter, r *http.Reque
 	tr.Render(w, r, "_templ_shell.html", data)
 }
 
-// RenderPartial renders a named block from a template without the layout wrapper.
-// name is the template key (e.g. "transactions.html"), block is the define name
-// (e.g. "tx-results-partial"). Used for HTML fragment responses (AJAX swap).
-func (tr *TemplateRenderer) RenderPartial(w http.ResponseWriter, r *http.Request, name, block string, data interface{}) {
-	tr.mu.RLock()
-	t, ok := tr.templates[name]
-	tr.mu.RUnlock()
-	if !ok {
-		http.Error(w, "template not found: "+name, http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := t.ExecuteTemplate(w, block, data); err != nil {
-		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
-	}
-}
-
 // BaseTemplateData returns the common fields needed by every template as a map.
 // Handlers can add page-specific fields to the returned map before rendering.
 func BaseTemplateData(r *http.Request, sm *scs.SessionManager, currentPage, pageTitle string) map[string]any {
@@ -1400,11 +1359,6 @@ func (tr *TemplateRenderer) SetVersion(v string) {
 // SetVersionChecker sets the version checker for auto-injecting update status into template data.
 func (tr *TemplateRenderer) SetVersionChecker(vc *version.Checker) {
 	tr.versionChecker = vc
-}
-
-// AdminUsername returns the username from the session for use in template data maps.
-func AdminUsername(r *http.Request, sm *scs.SessionManager) string {
-	return sm.GetString(r.Context(), sessionKeyAccountUsername)
 }
 
 // ruleFieldLabel maps a rule-condition field name to its human-readable
@@ -1524,13 +1478,3 @@ func ruleValueFormat(v any) string {
 	}
 }
 
-// RenderTo writes the named template to any io.Writer.
-func (tr *TemplateRenderer) RenderTo(w io.Writer, name string, data interface{}) error {
-	tr.mu.RLock()
-	t, ok := tr.templates[name]
-	tr.mu.RUnlock()
-	if !ok {
-		return fmt.Errorf("template not found: %s", name)
-	}
-	return t.ExecuteTemplate(w, "layout", data)
-}

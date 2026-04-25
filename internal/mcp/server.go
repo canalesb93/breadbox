@@ -541,14 +541,6 @@ func (s *MCPServer) BuildServer(cfg MCPServerConfig) *mcpsdk.Server {
 	return server
 }
 
-// Server returns a default MCP server with all tools registered (for backward compat / stdio).
-func (s *MCPServer) Server() *mcpsdk.Server {
-	return s.BuildServer(MCPServerConfig{
-		Mode:        "read_write",
-		APIKeyScope: "full_access",
-	})
-}
-
 // registerResources adds MCP resources to a server.
 func (s *MCPServer) registerResources(server *mcpsdk.Server) {
 	server.AddResource(&mcpsdk.Resource{
