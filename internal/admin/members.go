@@ -9,6 +9,7 @@ import (
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -180,24 +181,39 @@ func MyAccountHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, 
 		isUnlinked := userIDStr == ""
 		data["IsUnlinked"] = isUnlinked
 
-		if isUnlinked {
-			// Fetch users that don't have a login account for the "link existing" option.
-			unlinked, err := a.Queries.ListUsersWithoutAuthAccount(r.Context())
-			if err == nil {
-				data["UnlinkedUsers"] = unlinked
-			}
+		props := pages.MyAccountProps{
+			UserID:     userIDStr,
+			IsUnlinked: isUnlinked,
+			CSRFToken:  GetCSRFToken(r),
 		}
 
-		// Load the user's connections and accounts for display.
+		// Load the user's connections for display.
 		if userIDStr != "" {
 			conns, err := svc.ListConnections(r.Context(), &userIDStr)
 			if err == nil {
-				data["Connections"] = conns
+				for _, c := range conns {
+					inst := ""
+					if c.InstitutionName != nil {
+						inst = *c.InstitutionName
+					}
+					props.Connections = append(props.Connections, pages.MyAccountConnectionRow{
+						ID:              c.ID,
+						Provider:        c.Provider,
+						Status:          c.Status,
+						InstitutionName: inst,
+					})
+				}
 			}
 		}
 
-		tr.Render(w, r, "my_account.html", data)
+		renderMyAccount(tr, w, r, data, props)
 	}
+}
+
+// renderMyAccount drives the /my-account page through the templ component.
+// Mirrors the canonical pattern from #807 (users) / #808 (access).
+func renderMyAccount(tr *TemplateRenderer, w http.ResponseWriter, r *http.Request, data map[string]any, props pages.MyAccountProps) {
+	tr.RenderWithTempl(w, r, data, pages.MyAccount(props))
 }
 
 // LinkAdminToUserHandler serves POST /my-account/link-user -- link an unlinked admin to a household member.
