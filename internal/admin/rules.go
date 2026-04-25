@@ -200,14 +200,7 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		// carries the per-application action so the rule_detail template can
 		// prefix each row with a prominent "what happened" pill.
 		applicationTxns := make([]service.AdminTransactionRow, 0, len(applications))
-		applicationMeta := make(map[string]struct {
-			ActionField        string
-			ActionValue        string
-			ActionDisplay      string
-			ActionCategoryColor *string
-			ActionCategoryIcon  *string
-			AppliedBy          string
-		}, len(applications))
+		applicationMeta := make(map[string]pages.RuleApplicationMeta, len(applications))
 		if len(applications) > 0 {
 			txnIDs := make([]string, 0, len(applications))
 			for _, a := range applications {
@@ -221,20 +214,13 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 						cIcon = m.Icon
 					}
 				}
-				applicationMeta[a.TransactionID] = struct {
-					ActionField        string
-					ActionValue        string
-					ActionDisplay      string
-					ActionCategoryColor *string
-					ActionCategoryIcon  *string
-					AppliedBy          string
-				}{
-					ActionField:        a.ActionField,
-					ActionValue:        a.ActionValue,
-					ActionDisplay:      display,
+				applicationMeta[a.TransactionID] = pages.RuleApplicationMeta{
+					ActionField:         a.ActionField,
+					ActionValue:         a.ActionValue,
+					ActionDisplay:       display,
 					ActionCategoryColor: cColor,
 					ActionCategoryIcon:  cIcon,
-					AppliedBy:          a.AppliedBy,
+					AppliedBy:           a.AppliedBy,
 				}
 			}
 			if rows, err := svc.GetAdminTransactionRowsByIDs(ctx, txnIDs); err == nil {
@@ -268,33 +254,95 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 		}
 
 		data := BaseTemplateData(r, sm, "rules", rule.Name)
-		data["Rule"] = rule
-		data["Preview"] = preview
-		data["Stats"] = stats
-		data["Applications"] = applications
-		data["ApplicationTxns"] = applicationTxns
-		data["ApplicationMeta"] = applicationMeta
-		data["PreviewTxns"] = previewTxns
-		data["HasMoreApplications"] = hasMoreApps
-		data["SyncHistory"] = syncHistory
-		data["ActionCategoryName"] = actionCategoryName
-		// Categories feed window.__bbCategories for the inline category picker
-		// on tx-row partials used in Recent Applications and Matching sections.
-		data["Categories"] = categories
+		renderRuleDetail(w, r, tr, data, rule, preview, stats, applications, applicationTxns, applicationMeta, previewTxns, hasMoreApps, syncHistory, actionCategoryName, categories)
+	}
+}
 
-		// Parse last_hit_at for relative time display
-		if rule.LastHitAt != nil {
-			if t, err := time.Parse(time.RFC3339, *rule.LastHitAt); err == nil {
-				data["LastActiveTime"] = t
-			}
-		}
-		data["ConditionSummary"] = service.ConditionSummary(rule.Conditions)
-		data["Breadcrumbs"] = []Breadcrumb{
+// renderRuleDetail builds the typed templ props from the loose handler-side
+// values and forwards through tr.RenderWithTempl. Mirrors the html/template
+// data map the previous Render call assembled, except condition rows are
+// pre-formatted here using the same ruleFieldLabel / ruleOpLabel /
+// ruleValueFormat helpers the funcMap exposed.
+func renderRuleDetail(
+	w http.ResponseWriter,
+	r *http.Request,
+	tr *TemplateRenderer,
+	data map[string]any,
+	rule *service.TransactionRuleResponse,
+	preview *service.RulePreviewResult,
+	stats *service.RuleStats,
+	applications []service.RuleApplicationRow,
+	applicationTxns []service.AdminTransactionRow,
+	applicationMeta map[string]pages.RuleApplicationMeta,
+	previewTxns []service.AdminTransactionRow,
+	hasMoreApps bool,
+	syncHistory []map[string]any,
+	actionCategoryName string,
+	categories []service.CategoryResponse,
+) {
+	props := pages.RuleDetailProps{
+		Rule:                rule,
+		Preview:             preview,
+		Stats:               stats,
+		Applications:        applications,
+		ApplicationTxns:     applicationTxns,
+		ApplicationMeta:     applicationMeta,
+		PreviewTxns:         previewTxns,
+		HasMoreApplications: hasMoreApps,
+		SyncHistory:         syncHistory,
+		ActionCategoryName:  actionCategoryName,
+		Categories:          categories,
+		ConditionSummary:    service.ConditionSummary(rule.Conditions),
+		TriggerLabel:        service.TriggerLabel(rule.Trigger),
+		ConditionRows:       buildRuleDetailConditionRows(rule.Conditions),
+		Breadcrumbs: []components.Breadcrumb{
 			{Label: "Rules", Href: "/rules"},
 			{Label: rule.Name},
-		}
+		},
+	}
 
-		tr.Render(w, r, "rule_detail.html", data)
+	// Parse last_hit_at for relative time display.
+	if rule.LastHitAt != nil {
+		if t, err := time.Parse(time.RFC3339, *rule.LastHitAt); err == nil {
+			props.LastActiveTime = t
+			props.HasLastActive = true
+		}
+	}
+
+	tr.RenderWithTempl(w, r, data, pages.RuleDetail(props))
+}
+
+// buildRuleDetailConditionRows pre-formats the visible condition rows for
+// the rule_detail page. Returns an empty slice when the condition is
+// match-all, a leaf, or a degenerate empty tree — the templ branches on
+// len(...) plus the ConditionSummary fallback to render those cases.
+func buildRuleDetailConditionRows(c service.Condition) []components.ConditionRowProps {
+	row := func(cond service.Condition, idx int, conj string) components.ConditionRowProps {
+		return components.ConditionRowProps{
+			IsFirst:     idx == 0,
+			Conj:        conj,
+			FieldLabel:  ruleFieldLabel(cond.Field),
+			OpLabel:     ruleOpLabel(cond.Op, cond.Field),
+			ValueFormat: ruleValueFormat(cond.Value),
+		}
+	}
+	switch {
+	case len(c.And) > 0:
+		out := make([]components.ConditionRowProps, len(c.And))
+		for i, sub := range c.And {
+			out[i] = row(sub, i, "AND")
+		}
+		return out
+	case len(c.Or) > 0:
+		out := make([]components.ConditionRowProps, len(c.Or))
+		for i, sub := range c.Or {
+			out[i] = row(sub, i, "OR")
+		}
+		return out
+	case c.Field != "":
+		return []components.ConditionRowProps{row(c, 0, "")}
+	default:
+		return nil
 	}
 }
 
