@@ -1068,7 +1068,8 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// dashboard.html, settings.html, 404.html, and 500.html removed —
 		// those pages render via RenderWithTempl which uses the
 		// _templ_shell template key.
-		"pages/connections.html",
+		// pages/connections.html removed — renders via RenderWithTempl
+		// using the _templ_shell template key (see pages.Connections).
 		"pages/connection_new.html",
 		"pages/connection_detail.html",
 		"pages/connection_reauth.html",

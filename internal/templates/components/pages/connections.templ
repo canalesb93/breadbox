@@ -1,0 +1,655 @@
+package pages
+
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
+
+// Connections renders the bank-connections list page (and the Account
+// Links secondary tab). Hosts inside the base layout via
+// TemplateRenderer.RenderWithTempl. Mirrors the previous
+// internal/templates/pages/connections.html byte-for-byte (responsive
+// classes, Alpine directives, ARIA, scripts).
+templ Connections(p ConnectionsProps) {
+	<!--
+		Set the shortcut-registry scope so base.html's global dispatcher routes
+		j/k/s/e/Enter (registered below) to this page's handlers, and so the
+		? help modal surfaces them under "This page". Reset to 'global' on
+		Alpine teardown so other pages don't inherit the scope.
+	-->
+	<div x-data x-init="$store.shortcuts.setScope('connections')" x-destroy="$store.shortcuts.setScope('global')"></div>
+	<div
+		x-data={ fmt.Sprintf("{ tab: %q, filterUser: 'all' }", p.Tab) }
+		x-init="$watch('tab', function(v) { var u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); })"
+	>
+		<!-- Page Header -->
+		<div class="bb-page-header">
+			<div class="flex items-baseline gap-3 flex-wrap">
+				<h1 class="bb-page-title">Connections</h1>
+				if len(p.Connections) > 0 {
+					<span class="text-sm text-base-content/40" x-show="tab === 'connections'">{ connectionsCountLabel(len(p.Connections)) }</span>
+				}
+			</div>
+			<div class="flex items-center gap-2 flex-wrap">
+				<div x-show="tab === 'connections'" x-cloak class="flex items-center gap-2">
+					if len(p.Connections) > 0 {
+						<div x-data="syncAllBtn()">
+							<button
+								class="btn btn-outline btn-sm rounded-xl gap-2"
+								:disabled="state !== 'idle'"
+								@click="triggerSyncAll()"
+								:title="state === 'syncing' ? 'Syncing all connections...' : 'Sync all connections now'"
+							>
+								<i data-lucide="refresh-cw" class="w-4 h-4" x-show="state === 'idle'"></i>
+								<span class="loading loading-spinner loading-xs" x-show="state === 'syncing'" x-cloak></span>
+								<i data-lucide="check" class="w-4 h-4 text-success" x-show="state === 'done'" x-cloak></i>
+								<span x-text="state === 'syncing' ? 'Syncing...' : state === 'done' ? 'Triggered!' : 'Sync All'"></span>
+							</button>
+						</div>
+					}
+					<a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">
+						<i data-lucide="plus" class="w-4 h-4"></i>
+						Connect Bank
+					</a>
+				</div>
+				<button x-show="tab === 'links'" x-cloak class="btn btn-primary btn-sm rounded-xl" onclick="document.getElementById('create-link-modal').showModal()">
+					<i data-lucide="plus" class="w-4 h-4"></i> New Link
+				</button>
+			</div>
+		</div>
+		<!-- Tab Switcher -->
+		<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 mb-6 w-fit">
+			<button
+				@click="tab = 'connections'"
+				:class="tab === 'connections' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+				class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2"
+			>
+				<i data-lucide="link" class="w-3.5 h-3.5"></i>
+				Connections
+			</button>
+			<button
+				@click="tab = 'links'"
+				:class="tab === 'links' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+				class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2"
+			>
+				<i data-lucide="link-2" class="w-3.5 h-3.5"></i>
+				Account Links
+			</button>
+		</div>
+		<!-- Family Member Filter -->
+		if len(p.Users) > 1 {
+			<div class="flex items-center gap-1 border-b border-base-200/80 mb-6 overflow-x-auto" x-show="tab === 'connections'">
+				<button
+					@click="filterUser = 'all'"
+					:class="filterUser === 'all' ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'"
+					class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap"
+				>
+					<span class="w-5 h-5 rounded-full bg-base-300/60 flex items-center justify-center text-[0.6rem] font-semibold text-base-content/50 shrink-0">
+						<i data-lucide="users" class="w-3 h-3"></i>
+					</span>
+					All
+				</button>
+				for _, u := range p.Users {
+					@connectionsUserFilterBtn(u)
+				}
+			</div>
+		}
+		<!-- ==================== CONNECTIONS TAB ==================== -->
+		<div x-show="tab === 'connections'">
+			if len(p.Connections) > 0 {
+				<!-- Financial Summary Bar -->
+				if p.HasAnyBalance {
+					<div class="bb-card p-0 overflow-hidden mb-6" x-show="filterUser === 'all'">
+						<div class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-base-300">
+							<div class="px-5 py-4">
+								<div class="text-xs font-medium text-base-content/50 mb-1">Net Worth</div>
+								<div class="text-2xl font-semibold tabular-nums tracking-tight">{ components.FormatAmount(p.NetWorth) }</div>
+							</div>
+							<div class="px-5 py-4">
+								<div class="text-xs font-medium text-base-content/50 mb-1">Assets</div>
+								<div class="text-2xl font-semibold tabular-nums tracking-tight text-success">{ components.FormatAmount(p.TotalAssets) }</div>
+							</div>
+							<div class="px-5 py-4">
+								<div class="text-xs font-medium text-base-content/50 mb-1">Liabilities</div>
+								<div class="text-2xl font-semibold tabular-nums tracking-tight text-error">{ components.FormatAmount(p.TotalLiabilities) }</div>
+							</div>
+						</div>
+					</div>
+				}
+				<!-- Connection Cards -->
+				<div class="flex flex-col gap-4 bb-stagger" id="bb-connections-list">
+					for _, c := range p.Connections {
+						@connectionsCard(c)
+					}
+				</div>
+			} else {
+				<!-- Empty State -->
+				<div class="bb-card">
+					<div class="flex flex-col items-center text-center py-16 px-6">
+						<div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
+							<i data-lucide="building-2" class="w-8 h-8 text-base-content/20"></i>
+						</div>
+						<h3 class="text-lg font-semibold mb-1">No bank connections yet</h3>
+						<p class="text-sm text-base-content/60 max-w-sm mb-4">Connect your first bank to start syncing transactions and tracking your finances.</p>
+						<a href="/connections/new" class="btn btn-primary btn-sm rounded-xl">
+							<i data-lucide="plus" class="w-4 h-4"></i>
+							Connect Your First Bank
+						</a>
+					</div>
+				</div>
+			}
+			@connectionsScripts()
+		</div>
+		<!-- /connections tab -->
+		<!-- ==================== ACCOUNT LINKS TAB ==================== -->
+		<div x-show="tab === 'links'" x-cloak>
+			if len(p.Links) > 0 {
+				<div class="space-y-3 bb-stagger">
+					for _, l := range p.Links {
+						@connectionsLinkRow(l, p.CSRFToken)
+					}
+				</div>
+			} else {
+				<div class="bb-card p-12 text-center">
+					<div class="flex flex-col items-center">
+						<div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
+							<i data-lucide="link-2" class="w-8 h-8 text-base-content/25"></i>
+						</div>
+						<h3 class="text-lg font-semibold mb-1">No Account Links</h3>
+						<p class="text-sm text-base-content/50 mb-5 max-w-sm">
+							Account links connect authorized user accounts to primary accounts for deduplication.
+							If two family members connect the same credit card, linking prevents double-counting.
+						</p>
+						<button class="btn btn-primary btn-sm rounded-xl" onclick="document.getElementById('create-link-modal').showModal()">
+							<i data-lucide="plus" class="w-4 h-4"></i> Create First Link
+						</button>
+					</div>
+				</div>
+			}
+		</div>
+		<!-- /links tab -->
+		<!-- Create Account Link Modal -->
+		@connectionsCreateLinkModal(p)
+	</div>
+	<!-- /alpine x-data tabs -->
+}
+
+templ connectionsUserFilterBtn(u ConnectionsUserFilter) {
+	<button
+		@click={ fmt.Sprintf("filterUser = %q", u.ID) }
+		:class={ fmt.Sprintf("filterUser === %q ? 'text-base-content border-primary' : 'text-base-content/40 border-transparent hover:text-base-content/60 hover:border-base-300'", u.ID) }
+		class="flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all duration-150 bg-transparent cursor-pointer whitespace-nowrap"
+	>
+		<span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[0.6rem] font-semibold text-primary shrink-0 uppercase">{ u.First }</span>
+		{ u.Name }
+	</button>
+}
+
+templ connectionsCard(c ConnectionsRow) {
+	<div
+		class="bb-card overflow-hidden bb-conn-row"
+		data-connection-row
+		data-open-url={ "/connections/" + c.ID }
+		data-edit-url={ "/connections/" + c.ID }
+		data-filter-user={ c.UserID }
+		x-show={ fmt.Sprintf("filterUser === 'all' || filterUser === %q", c.UserID) }
+	>
+		<!-- Connection Header — non-nested interactives (a11y: link + sibling button) -->
+		<div class="group px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between gap-3 sm:gap-4">
+			<a href={ templ.SafeURL("/connections/" + c.ID) } class="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 no-underline" aria-label={ "Open " + c.InstitutionName + " connection" }>
+				<div class="hidden sm:flex w-10 h-10 rounded-lg bg-base-200/60 items-center justify-center shrink-0">
+					switch c.Provider {
+						case "plaid":
+							<i data-lucide="building-2" class="w-5 h-5 text-info"></i>
+						case "teller":
+							<i data-lucide="landmark" class="w-5 h-5 text-success"></i>
+						default:
+							<i data-lucide="file-spreadsheet" class="w-5 h-5 text-warning"></i>
+					}
+				</div>
+				<div class="min-w-0">
+					<div class="flex items-center gap-2 flex-wrap">
+						<h3 class="font-semibold text-sm sm:text-base group-hover:text-primary transition-colors truncate max-w-[10rem] sm:max-w-none">{ c.InstitutionName }</h3>
+						if c.IsStale {
+							<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-warning/10 text-warning">Stale</span>
+						} else if c.LastSyncStatus == "error" && c.Status == "active" {
+							<span class="relative group/err">
+								<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-error/10 text-error cursor-help">Sync Error</span>
+								if c.LastSyncErrorMessage != "" {
+									<span class="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/err:block w-64 sm:w-80 px-3 py-2.5 rounded-lg bg-base-300 text-xs shadow-lg border border-error/20 leading-relaxed">
+										<span class="flex items-center gap-1.5 text-error font-medium mb-1"><i data-lucide="alert-circle" class="w-3 h-3"></i>Last sync failed</span>
+										<span class="text-base-content/70">{ c.LastSyncErrorMessage }</span>
+									</span>
+								}
+							</span>
+						} else {
+							@templ.Raw(connectionsStatusBadge(c.Status))
+						}
+						if c.Paused {
+							<span class="badge badge-ghost badge-xs">Paused</span>
+						}
+					</div>
+					<div class="flex items-center gap-2 text-xs text-base-content/40 mt-0.5">
+						<span>{ c.UserName }</span>
+						<span class="text-base-content/20">&middot;</span>
+						<span class="capitalize">{ c.Provider }</span>
+						<span class="text-base-content/20">&middot;</span>
+						if c.LastSyncedAtValid {
+							<span>{ c.LastSyncedAtRelative }</span>
+						} else {
+							<span>Never synced</span>
+						}
+					</div>
+				</div>
+			</a>
+			<div class="flex items-center gap-2 sm:gap-3 shrink-0">
+				<!-- Sync Now button (non-CSV active connections only) -->
+				if c.Provider != "csv" && c.Status == "active" {
+					<div x-data={ fmt.Sprintf("syncBtn(%q)", c.ID) }>
+						<button
+							type="button"
+							data-sync-btn
+							class="w-8 h-8 rounded-full flex items-center justify-center text-base-content/30 hover:text-primary hover:bg-primary/10 transition-colors"
+							:disabled="state !== 'idle'"
+							@click="triggerSync()"
+							:aria-label={ fmt.Sprintf("state === 'syncing' ? 'Syncing...' : 'Sync %s now'", c.InstitutionName) }
+							:title="state === 'syncing' ? 'Syncing...' : 'Sync Now'"
+						>
+							<i data-lucide="refresh-cw" class="w-4 h-4" x-show="state === 'idle'" :class="state === 'idle' ? '' : 'hidden'"></i>
+							<span class="loading loading-spinner loading-xs" x-show="state === 'syncing'" x-cloak></span>
+							<i data-lucide="check" class="w-4 h-4 text-success" x-show="state === 'done'" x-cloak></i>
+						</button>
+					</div>
+				}
+				<!-- Connection total balance -->
+				if c.HasBalance {
+					<a href={ templ.SafeURL("/connections/" + c.ID) } class="text-right no-underline text-inherit" tabindex="-1" aria-hidden="true">
+						<div class="text-base sm:text-lg font-semibold tabular-nums tracking-tight">{ components.FormatAmount(c.TotalBalance) }</div>
+						<div class="text-xs text-base-content/40">
+							{ fmt.Sprintf("%d", c.AccountCount) }
+							<span class="hidden sm:inline">{ connectionsAccountSuffix(c.AccountCount, false) }</span>
+							<span class="sm:hidden">{ connectionsAccountSuffix(c.AccountCount, true) }</span>
+						</div>
+					</a>
+				} else {
+					<a href={ templ.SafeURL("/connections/" + c.ID) } class="text-right no-underline text-inherit" tabindex="-1" aria-hidden="true">
+						<div class="text-xs text-base-content/40">
+							{ fmt.Sprintf("%d", c.AccountCount) }
+							<span class="hidden sm:inline">{ connectionsAccountSuffix(c.AccountCount, false) }</span>
+							<span class="sm:hidden">{ connectionsAccountSuffix(c.AccountCount, true) }</span>
+						</div>
+					</a>
+				}
+			</div>
+		</div>
+		<!-- Connection-level error message (e.g. reauth needed) -->
+		if c.ErrorMessageValid {
+			<div class="mx-4 sm:mx-6 mb-4 flex items-center justify-between gap-2 text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+				<div class="flex items-center gap-2 min-w-0">
+					<i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0"></i>
+					<span class="truncate">{ connectionsErrorMessage(c.ErrorCode) }</span>
+				</div>
+				if c.Provider != "csv" && (c.ErrorCode == "ITEM_LOGIN_REQUIRED" || c.ErrorCode == "INSUFFICIENT_CREDENTIALS" || c.ErrorCode == "INVALID_CREDENTIALS" || c.Status == "pending_reauth") {
+					<a href={ templ.SafeURL("/connections/" + c.ID + "/reauth") } class="btn btn-warning btn-xs rounded-lg shrink-0" @click.stop>Re-authenticate</a>
+				} else {
+					<a href={ templ.SafeURL("/connections/" + c.ID) } class="btn btn-ghost btn-xs rounded-lg shrink-0" @click.stop>View Details</a>
+				}
+			</div>
+		}
+		<!-- Error message communicated via badge tooltip on hover -->
+		if c.NewAccountsAvailable {
+			<div class="mx-4 sm:mx-6 mb-4 flex items-center gap-2 text-xs text-info bg-info/10 rounded-lg px-3 py-2">
+				<i data-lucide="plus-circle" class="w-3.5 h-3.5 shrink-0"></i>
+				<span>New accounts available to link</span>
+			</div>
+		}
+		<!-- Account List -->
+		if len(c.Accounts) > 0 {
+			<div class="border-t border-base-300">
+				for _, a := range c.Accounts {
+					@connectionsAccountRow(a)
+				}
+			</div>
+		}
+	</div>
+}
+
+templ connectionsAccountRow(a ConnectionsAccountRow) {
+	<a href={ templ.SafeURL("/accounts/" + a.ID) } class="flex items-center justify-between px-5 py-3 hover:bg-base-200/40 transition-colors no-underline border-b border-base-300 last:border-b-0 group/acct">
+		<div class="flex items-center gap-3 min-w-0">
+			<!-- Account type icon -->
+			<div class="w-7 h-7 rounded-md bg-base-200/60 flex items-center justify-center shrink-0">
+				switch a.Type {
+					case "credit":
+						<i data-lucide="credit-card" class="w-3.5 h-3.5 text-base-content/40"></i>
+					case "loan":
+						<i data-lucide="landmark" class="w-3.5 h-3.5 text-base-content/40"></i>
+					case "investment":
+						<i data-lucide="trending-up" class="w-3.5 h-3.5 text-base-content/40"></i>
+					default:
+						<i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content/40"></i>
+				}
+			</div>
+			<div class="min-w-0">
+				<div class="flex items-center gap-1.5 flex-wrap">
+					<span class="text-sm font-medium truncate group-hover/acct:text-primary transition-colors">
+						if a.DisplayNameValid {
+							{ a.DisplayName }
+						} else {
+							{ a.Name }
+						}
+					</span>
+					if a.IsDependentLinked {
+						<span class="badge badge-soft badge-info badge-xs" title="Dependent-linked: balance and transactions are attributed to a linked user and excluded from this user's totals">Linked</span>
+					}
+				</div>
+				<div class="text-xs text-base-content/40">
+					if a.SubtypeValid {
+						<span class="capitalize">{ connectionsHumanize(a.Subtype) }</span>
+					}
+					if a.MaskValid {
+						<span class="text-base-content/25">&middot;</span>
+						{ " ····" + a.Mask }
+					}
+					if a.Excluded {
+						<span class="text-base-content/25">&middot;</span>
+						<span class="text-warning">Excluded</span>
+					}
+				</div>
+			</div>
+		</div>
+		<div class="text-right shrink-0">
+			if a.HasBalance {
+				<span class={ "text-sm font-medium tabular-nums", templ.KV("text-error", a.BalanceFloat < 0.0) }>{ components.FormatAmount(a.BalanceFloat) }</span>
+			} else {
+				<span class="text-xs text-base-content/30">&mdash;</span>
+			}
+		</div>
+	</a>
+}
+
+templ connectionsLinkRow(l ConnectionsLinkRow, csrfToken string) {
+	<div class="bb-card p-5">
+		<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+			<div class="flex-1 min-w-0">
+				<!-- Account link: stacked on mobile, inline on desktop -->
+				<div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+					<div class="flex items-center gap-2 min-w-0">
+						<div class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/8 shrink-0">
+							<i data-lucide="credit-card" class="w-4 h-4 text-primary"></i>
+						</div>
+						<div class="min-w-0">
+							<span class="font-semibold text-sm truncate block">{ l.PrimaryAccountName }</span>
+							<span class="text-xs text-base-content/40">{ l.PrimaryUserName }</span>
+						</div>
+					</div>
+					<i data-lucide="arrow-right" class="w-4 h-4 text-base-content/30 shrink-0 hidden sm:block"></i>
+					<i data-lucide="arrow-down" class="w-4 h-4 text-base-content/30 shrink-0 sm:hidden ml-3"></i>
+					<div class="flex items-center gap-2 min-w-0 sm:ml-0 ml-3">
+						<div class="flex items-center justify-center w-8 h-8 rounded-lg bg-secondary/8 shrink-0">
+							<i data-lucide="credit-card" class="w-4 h-4 text-secondary"></i>
+						</div>
+						<div class="min-w-0">
+							<span class="font-semibold text-sm truncate block">{ l.DependentAccountName }</span>
+							<span class="text-xs text-base-content/40">{ l.DependentUserName }</span>
+						</div>
+					</div>
+					if !l.Enabled {
+						<span class="badge badge-ghost badge-sm">Disabled</span>
+					}
+				</div>
+				<!-- Stats row -->
+				<div class="flex items-center gap-3 sm:gap-4 mt-3 text-xs text-base-content/50 flex-wrap">
+					<span class="flex items-center gap-1">
+						<i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-success"></i>
+						{ fmt.Sprintf("%d matched", l.MatchCount) }
+					</span>
+					if l.UnmatchedDependentCount > 0 {
+						<span class="flex items-center gap-1">
+							<i data-lucide="help-circle" class="w-3.5 h-3.5 text-warning"></i>
+							{ fmt.Sprintf("%d unmatched", l.UnmatchedDependentCount) }
+						</span>
+					}
+					<span class="hidden sm:inline">{ "Strategy: " + l.MatchStrategy }</span>
+					if l.MatchToleranceDays > 0 {
+						<span class="hidden sm:inline">{ fmt.Sprintf("Tolerance: %dd", l.MatchToleranceDays) }</span>
+					}
+				</div>
+			</div>
+			<!-- Actions -->
+			<div class="flex items-center gap-1 shrink-0 sm:self-start self-end">
+				<form method="POST" action={ templ.SafeURL(connectionsLinkActionURL(l.ID, "reconcile")) } class="inline">
+					<input type="hidden" name="_csrf" value={ csrfToken }/>
+					<button type="submit" class="btn btn-ghost btn-xs rounded-lg" title="Run reconciliation">
+						<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+					</button>
+				</form>
+				<a href={ templ.SafeURL("/account-links/" + l.ID) } class="btn btn-ghost btn-xs rounded-lg" title="View matches">
+					<i data-lucide="list" class="w-3.5 h-3.5"></i>
+				</a>
+				<form
+					method="POST"
+					action={ templ.SafeURL(connectionsLinkActionURL(l.ID, "delete")) }
+					class="inline"
+					x-data
+					@submit.prevent="bbConfirm({title:'Delete account link?',message:'All transaction attribution from this link will be cleared. This cannot be undone.',confirmLabel:'Delete',variant:'danger'}).then(ok => { if(ok) $el.submit(); })"
+				>
+					<input type="hidden" name="_csrf" value={ csrfToken }/>
+					<button type="submit" class="btn btn-ghost btn-xs text-error rounded-lg" title="Delete link">
+						<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+					</button>
+				</form>
+			</div>
+		</div>
+	</div>
+}
+
+// connectionsScripts ships the per-page Alpine factories (syncAllBtn,
+// syncBtn) and the j/k/Enter/s keyboard-shortcut registrations. Preserved
+// byte-for-byte from the original pages/connections.html so the regression
+// audit passes.
+templ connectionsScripts() {
+	<script>
+		function syncAllBtn() {
+		  return {
+		    state: 'idle',
+		    triggerSyncAll() {
+		      if (this.state !== 'idle') return;
+		      this.state = 'syncing';
+		      var self = this;
+		      fetch('/-/connections/sync-all', { method: 'POST' })
+		        .then(function(res) {
+		          if (res.ok) {
+		            self.state = 'done';
+		            self.$nextTick(function() { lucide.createIcons(); });
+		            window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Sync triggered for all connections.', type: 'success' } }));
+		            setTimeout(function() { self.state = 'idle'; self.$nextTick(function() { lucide.createIcons(); }); }, 8000);
+		          } else {
+		            return res.json().then(function(data) {
+		              window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: data.error || 'Failed to trigger sync.', type: 'error' } }));
+		              self.state = 'idle';
+		              self.$nextTick(function() { lucide.createIcons(); });
+		            });
+		          }
+		        })
+		        .catch(function() {
+		          window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Network error. Please try again.', type: 'error' } }));
+		          self.state = 'idle';
+		          self.$nextTick(function() { lucide.createIcons(); });
+		        });
+		    }
+		  };
+		}
+
+		function syncBtn(connId) {
+		  return {
+		    state: 'idle',
+		    triggerSync() {
+		      if (this.state !== 'idle') return;
+		      this.state = 'syncing';
+		      var self = this;
+		      fetch('/-/connections/' + connId + '/sync', { method: 'POST' })
+		        .then(function(res) {
+		          if (res.ok) {
+		            self.state = 'done';
+		            self.$nextTick(function() { lucide.createIcons(); });
+		            window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Sync triggered for this connection.', type: 'success' } }));
+		            setTimeout(function() { self.state = 'idle'; self.$nextTick(function() { lucide.createIcons(); }); }, 5000);
+		          } else {
+		            return res.json().then(function(data) {
+		              window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: data.error || 'Failed to trigger sync.', type: 'error' } }));
+		              self.state = 'idle';
+		              self.$nextTick(function() { lucide.createIcons(); });
+		            });
+		          }
+		        })
+		        .catch(function() {
+		          window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Network error. Please try again.', type: 'error' } }));
+		          self.state = 'idle';
+		          self.$nextTick(function() { lucide.createIcons(); });
+		        });
+		    }
+		  };
+		}
+
+		// Keyboard navigation for the connections list. Reads the DOM for visible
+		// rows (respecting the family-member filter via data-filter-user + Alpine's
+		// x-show display:none) instead of mirroring connection data into a store.
+		// The base.html dispatcher already guards against input focus, overlays,
+		// and touch devices, so these handlers just do the thing.
+		var bbConnNav = {
+		  focusedIdx: -1,
+		  FOCUSED_CLASS: 'bb-tx-row--focused', // reuse the tx-list focus styling
+		  visibleRows: function() {
+		    var all = document.querySelectorAll('[data-connection-row]');
+		    var out = [];
+		    for (var i = 0; i < all.length; i++) {
+		      // offsetParent is null when x-show has display:none'd the row
+		      if (all[i].offsetParent !== null) out.push(all[i]);
+		    }
+		    return out;
+		  },
+		  clearFocus: function() {
+		    var rows = document.querySelectorAll('[data-connection-row].' + this.FOCUSED_CLASS);
+		    for (var i = 0; i < rows.length; i++) rows[i].classList.remove(this.FOCUSED_CLASS);
+		  },
+		  setFocus: function(idx) {
+		    var rows = this.visibleRows();
+		    if (!rows.length) { this.focusedIdx = -1; return; }
+		    if (idx < 0) idx = 0;
+		    if (idx >= rows.length) idx = rows.length - 1;
+		    this.clearFocus();
+		    rows[idx].classList.add(this.FOCUSED_CLASS);
+		    this.focusedIdx = idx;
+		    rows[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		  },
+		  next: function() {
+		    var rows = this.visibleRows();
+		    if (!rows.length) return;
+		    this.setFocus(this.focusedIdx < 0 ? 0 : this.focusedIdx + 1);
+		  },
+		  prev: function() {
+		    var rows = this.visibleRows();
+		    if (!rows.length) return;
+		    this.setFocus(this.focusedIdx < 0 ? 0 : this.focusedIdx - 1);
+		  },
+		  currentRow: function() {
+		    var rows = this.visibleRows();
+		    if (this.focusedIdx < 0 || this.focusedIdx >= rows.length) return null;
+		    return rows[this.focusedIdx];
+		  },
+		};
+
+		document.addEventListener('alpine:init', function() {
+		  var reg = Alpine.store('shortcuts');
+		  if (!reg) return;
+
+		  reg.register({
+		    id: 'connections.next',
+		    keys: 'j',
+		    description: 'Move down',
+		    group: 'Navigation',
+		    scope: 'connections',
+		    action: function() { bbConnNav.next(); },
+		  });
+
+		  reg.register({
+		    id: 'connections.prev',
+		    keys: 'k',
+		    description: 'Move up',
+		    group: 'Navigation',
+		    scope: 'connections',
+		    action: function() { bbConnNav.prev(); },
+		  });
+
+		  reg.register({
+		    id: 'connections.open',
+		    keys: 'Enter',
+		    description: 'Open connection',
+		    group: 'Actions',
+		    scope: 'connections',
+		    action: function() {
+		      var row = bbConnNav.currentRow();
+		      if (!row) return;
+		      var url = row.getAttribute('data-open-url');
+		      if (url) window.location.href = url;
+		    },
+		  });
+
+		  reg.register({
+		    id: 'connections.sync',
+		    keys: 's',
+		    description: 'Sync connection',
+		    group: 'Actions',
+		    scope: 'connections',
+		    action: function() {
+		      var row = bbConnNav.currentRow();
+		      if (!row) return;
+		      // Reuse the existing syncBtn Alpine component's click handler so CSRF,
+		      // toast, and UI-state logic (disabled, spinner, 5s cooldown) stay in
+		      // one place. Inactive and CSV connections don't render the button —
+		      // no-op in that case.
+		      var btn = row.querySelector('[data-sync-btn]');
+		      if (btn) btn.click();
+		    },
+		  });
+
+		});
+	</script>
+}
+
+templ connectionsCreateLinkModal(p ConnectionsProps) {
+	<dialog id="create-link-modal" class="modal modal-bottom sm:modal-middle">
+		<div class="modal-box rounded-xl max-w-lg">
+			<h3 class="font-bold text-lg">Create Account Link</h3>
+			<p class="text-sm text-base-content/50 mt-1">Link a dependent (authorized user) account to the primary cardholder's account.</p>
+			<form method="POST" action="/-/account-links" class="mt-4 space-y-4" x-data="{ loading: false }" @submit="loading = true">
+				<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				<div class="form-control">
+					<label class="label label-text text-sm font-medium">Primary Account</label>
+					<select name="primary_account_id" class="select select-bordered select-sm w-full rounded-xl" required>
+						<option value="">Select the primary cardholder's account...</option>
+						for _, a := range p.LinkAccounts {
+							<option value={ a.ID }>{ connectionsLinkAccountLabel(a) }</option>
+						}
+					</select>
+				</div>
+				<div class="form-control">
+					<label class="label label-text text-sm font-medium">Dependent Account</label>
+					<select name="dependent_account_id" class="select select-bordered select-sm w-full rounded-xl" required>
+						<option value="">Select the authorized user's account...</option>
+						for _, a := range p.LinkAccounts {
+							<option value={ a.ID }>{ connectionsLinkAccountLabel(a) }</option>
+						}
+					</select>
+				</div>
+				<div class="modal-action">
+					<button type="button" class="btn btn-ghost btn-sm rounded-xl" onclick="document.getElementById('create-link-modal').close()">Cancel</button>
+					<button type="submit" class="btn btn-primary btn-sm rounded-xl" :class="{ 'loading': loading }" :disabled="loading">Create Link</button>
+				</div>
+			</form>
+		</div>
+		<form method="dialog" class="modal-backdrop"><button>close</button></form>
+	</dialog>
+}
