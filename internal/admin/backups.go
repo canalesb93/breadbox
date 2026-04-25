@@ -10,6 +10,7 @@ import (
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -24,7 +25,11 @@ func BackupsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		if a.BackupService == nil {
 			data := BaseTemplateData(r, sm, "backups", "Backups")
 			data["Error"] = "Backup service is not available. pg_dump may not be installed."
-			tr.Render(w, r, "backups.html", data)
+			props := pages.BackupsProps{
+				CSRFToken: GetCSRFToken(r),
+				Error:     "Backup service is not available. pg_dump may not be installed.",
+			}
+			renderBackups(w, r, tr, data, props)
 			return
 		}
 
@@ -51,8 +56,40 @@ func BackupsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 		data["BackupDir"] = a.BackupService.BackupDir()
 		data["PreflightOK"] = preflight.OK
 		data["PreflightMessage"] = preflight.Message
-		tr.Render(w, r, "backups.html", data)
+
+		props := pages.BackupsProps{
+			CSRFToken:        GetCSRFToken(r),
+			HasEncryptionKey: len(a.Config.EncryptionKey) > 0,
+			BackupCount:      len(backups),
+			TotalSize:        service.FormatBytes(totalSize),
+			Schedule:         schedule,
+			RetentionDays:    retentionDays,
+			BackupDir:        a.BackupService.BackupDir(),
+			PreflightOK:      preflight.OK,
+			PreflightMessage: preflight.Message,
+			Backups:          make([]pages.BackupRow, 0, len(backups)),
+		}
+		for _, b := range backups {
+			props.Backups = append(props.Backups, pages.BackupRow{
+				Filename:      b.Filename,
+				SizeFormatted: service.FormatBytes(b.Size),
+				CreatedAtRel:  relativeTime(b.CreatedAt),
+				Trigger:       b.Trigger,
+				DownloadHref:  "/-/backups/" + b.Filename + "/download",
+				RestoreAction: "/-/backups/" + b.Filename + "/restore",
+				DeleteAction:  "/-/backups/" + b.Filename + "/delete",
+			})
+		}
+
+		renderBackups(w, r, tr, data, props)
 	}
+}
+
+// renderBackups mirrors the renderLogs / renderCSVImport pattern: hands
+// the typed BackupsProps to the templ component and uses RenderWithTempl
+// to host it inside base.html.
+func renderBackups(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.BackupsProps) {
+	tr.RenderWithTempl(w, r, data, pages.Backups(props))
 }
 
 // CreateBackupHandler serves POST /-/backups/create — triggers a manual backup.
