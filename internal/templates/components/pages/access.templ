@@ -105,16 +105,27 @@ templ accessActiveClientRow(c AccessClientRow, isAdmin bool, csrfToken string) {
 			</div>
 		</div>
 		if isAdmin {
-			<form method="POST" action={ templ.SafeURL(accessOAuthClientRevokeURL(c.ID)) } class="shrink-0">
-				<input type="hidden" name="_csrf" value={ csrfToken }/>
-				<button type="button" class="btn btn-ghost btn-xs rounded-lg text-base-content/40 hover:text-error" x-show="!confirming" @click="confirming = true">
-					Revoke
-				</button>
-				<span x-show="confirming" x-cloak class="flex items-center gap-1.5 justify-end">
-					<button type="submit" class="btn btn-error btn-xs btn-soft rounded-lg">Confirm</button>
-					<button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="confirming = false">Cancel</button>
-				</span>
-			</form>
+			<div class="shrink-0 flex items-center">
+				<div class="dropdown dropdown-end" x-show="!confirming">
+					<div tabindex="0" role="button" class={ "btn btn-ghost btn-xs btn-square rounded-lg text-base-content/40" } aria-label={ "Actions for OAuth client " + c.Name } title="More actions">
+						<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
+					</div>
+					<ul tabindex="0" class="dropdown-content menu menu-sm bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
+						<li>
+							<button type="button" class="text-error" @click="confirming = true; document.activeElement.blur()">
+								<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Revoke&hellip;
+							</button>
+						</li>
+					</ul>
+				</div>
+				<form method="POST" action={ templ.SafeURL(accessOAuthClientRevokeURL(c.ID)) } x-show="confirming" x-cloak>
+					<input type="hidden" name="_csrf" value={ csrfToken }/>
+					<span class="flex items-center gap-1.5 justify-end">
+						<button type="submit" class="btn btn-error btn-xs btn-soft rounded-lg">Confirm</button>
+						<button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="confirming = false">Cancel</button>
+					</span>
+				</form>
+			</div>
 		}
 	</div>
 }
@@ -228,16 +239,27 @@ templ accessActiveKeyRow(k AccessKeyRow, isAdmin bool, csrfToken string) {
 			</div>
 		</div>
 		if isAdmin {
-			<form method="POST" action={ templ.SafeURL(accessAPIKeyRevokeURL(k.ID)) } class="shrink-0">
-				<input type="hidden" name="_csrf" value={ csrfToken }/>
-				<button type="button" class="btn btn-ghost btn-xs rounded-lg text-base-content/40 hover:text-error" x-show="!confirming" @click="confirming = true">
-					Revoke
-				</button>
-				<span x-show="confirming" x-cloak class="flex items-center gap-1.5 justify-end">
-					<button type="submit" class="btn btn-error btn-xs btn-soft rounded-lg">Confirm</button>
-					<button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="confirming = false">Cancel</button>
-				</span>
-			</form>
+			<div class="shrink-0 flex items-center">
+				<div class="dropdown dropdown-end" x-show="!confirming">
+					<div tabindex="0" role="button" class={ "btn btn-ghost btn-xs btn-square rounded-lg text-base-content/40" } aria-label={ "Actions for API key " + k.Name } title="More actions">
+						<i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
+					</div>
+					<ul tabindex="0" class="dropdown-content menu menu-sm bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
+						<li>
+							<button type="button" class="text-error" @click="confirming = true; document.activeElement.blur()">
+								<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Revoke&hellip;
+							</button>
+						</li>
+					</ul>
+				</div>
+				<form method="POST" action={ templ.SafeURL(accessAPIKeyRevokeURL(k.ID)) } x-show="confirming" x-cloak>
+					<input type="hidden" name="_csrf" value={ csrfToken }/>
+					<span class="flex items-center gap-1.5 justify-end">
+						<button type="submit" class="btn btn-error btn-xs btn-soft rounded-lg">Confirm</button>
+						<button type="button" class="btn btn-ghost btn-xs rounded-lg" @click="confirming = false">Cancel</button>
+					</span>
+				</form>
+			</div>
 		}
 	</div>
 }
