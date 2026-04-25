@@ -13,6 +13,7 @@ import (
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
 	bsync "breadbox/internal/sync"
+	"breadbox/internal/timefmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -407,7 +408,7 @@ func (s *Service) GetSyncHealthSummary(ctx context.Context) (*SyncHealthSummary,
 	}
 
 	if lastSyncTime.Valid {
-		t := relativeTimeStr(lastSyncTime.Time)
+		t := timefmt.Relative(lastSyncTime.Time)
 		summary.LastSyncTime = &t
 	}
 
@@ -431,33 +432,6 @@ func (s *Service) GetSyncHealthSummary(ctx context.Context) (*SyncHealthSummary,
 	}
 
 	return summary, nil
-}
-
-// relativeTimeStr converts a time to a human-readable relative string.
-func relativeTimeStr(t time.Time) string {
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		mins := int(d.Minutes())
-		if mins == 1 {
-			return "1 minute ago"
-		}
-		return fmt.Sprintf("%d minutes ago", mins)
-	case d < 24*time.Hour:
-		hours := int(d.Hours())
-		if hours == 1 {
-			return "1 hour ago"
-		}
-		return fmt.Sprintf("%d hours ago", hours)
-	default:
-		days := int(d.Hours() / 24)
-		if days == 1 {
-			return "1 day ago"
-		}
-		return fmt.Sprintf("%d days ago", days)
-	}
 }
 
 // ListSyncLogAccounts returns the per-account breakdown for a specific sync log.
@@ -630,7 +604,7 @@ func (s *Service) GetProviderHealthSummaries(ctx context.Context) (map[string]*P
 		}
 		summary.LastSyncStatus = status
 		if syncTime.Valid {
-			t := relativeTimeStr(syncTime.Time)
+			t := timefmt.Relative(syncTime.Time)
 			summary.LastSyncTime = &t
 		}
 		if errMessage.Valid && errMessage.String != "" {

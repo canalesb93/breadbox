@@ -2,32 +2,7 @@ package service
 
 import (
 	"testing"
-	"time"
 )
-
-func TestRelativeTimeStr(t *testing.T) {
-	tests := []struct {
-		name string
-		t    time.Time
-		want string
-	}{
-		{"just now", time.Now().Add(-10 * time.Second), "just now"},
-		{"1 minute ago", time.Now().Add(-90 * time.Second), "1 minute ago"},
-		{"5 minutes ago", time.Now().Add(-5 * time.Minute), "5 minutes ago"},
-		{"1 hour ago", time.Now().Add(-90 * time.Minute), "1 hour ago"},
-		{"3 hours ago", time.Now().Add(-3 * time.Hour), "3 hours ago"},
-		{"1 day ago", time.Now().Add(-36 * time.Hour), "1 day ago"},
-		{"5 days ago", time.Now().Add(-5 * 24 * time.Hour), "5 days ago"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := relativeTimeStr(tt.t)
-			if got != tt.want {
-				t.Errorf("relativeTimeStr() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
 
 func TestSyncHealthSummaryOverallHealth(t *testing.T) {
 	// Test the health determination logic by constructing summaries
