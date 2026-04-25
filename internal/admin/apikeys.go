@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -112,19 +114,24 @@ func AccessPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templat
 }
 
 // APIKeyNewPageHandler serves GET /admin/api-keys/new.
-func APIKeyNewPageHandler(tr *TemplateRenderer) http.HandlerFunc {
+func APIKeyNewPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		data := map[string]any{
-			"PageTitle":   "Create API Key",
-			"CurrentPage": "access",
-			"CSRFToken":   GetCSRFToken(r),
-			"Breadcrumbs": []Breadcrumb{
+		data := BaseTemplateData(r, sm, "access", "Create API Key")
+		renderAPIKeyNew(w, r, tr, data, pages.APIKeyNewProps{
+			CSRFToken: GetCSRFToken(r),
+			Breadcrumbs: []components.Breadcrumb{
 				{Label: "Access", Href: "/access"},
 				{Label: "Create API Key"},
 			},
-		}
-		tr.Render(w, r, "api_key_new.html", data)
+		})
 	}
+}
+
+// renderAPIKeyNew mirrors the renderCSVImport / renderCategoryForm pattern:
+// hands the typed APIKeyNewProps to the templ component and uses
+// RenderWithTempl to host it inside base.html.
+func renderAPIKeyNew(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.APIKeyNewProps) {
+	tr.RenderWithTempl(w, r, data, pages.APIKeyNew(props))
 }
 
 // APIKeyCreatePageHandler serves POST /admin/api-keys/new.
@@ -165,19 +172,23 @@ func APIKeyCreatedPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http
 			http.Redirect(w, r, "/access", http.StatusSeeOther)
 			return
 		}
-		data := map[string]any{
-			"PageTitle":    "API Key Created",
-			"CurrentPage":  "access",
-			"PlaintextKey": key,
-			"KeyName":      name,
-			"CSRFToken":    GetCSRFToken(r),
-			"Breadcrumbs": []Breadcrumb{
+		data := BaseTemplateData(r, sm, "access", "API Key Created")
+		renderAPIKeyCreated(w, r, tr, data, pages.APIKeyCreatedProps{
+			KeyName:      name,
+			PlaintextKey: key,
+			Breadcrumbs: []components.Breadcrumb{
 				{Label: "Access", Href: "/access"},
 				{Label: "Key Created"},
 			},
-		}
-		tr.Render(w, r, "api_key_created.html", data)
+		})
 	}
+}
+
+// renderAPIKeyCreated mirrors renderAPIKeyNew: hands the typed
+// APIKeyCreatedProps to the templ component and uses RenderWithTempl
+// to host it inside base.html.
+func renderAPIKeyCreated(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.APIKeyCreatedProps) {
+	tr.RenderWithTempl(w, r, data, pages.APIKeyCreated(props))
 }
 
 // APIKeyRevokePageHandler serves POST /admin/api-keys/{id}/revoke.

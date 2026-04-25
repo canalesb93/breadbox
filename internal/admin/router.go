@@ -116,7 +116,7 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 				http.Redirect(w, r, "/access", http.StatusMovedPermanently)
 			})
-			r.Get("/new", APIKeyNewPageHandler(tr))
+			r.Get("/new", APIKeyNewPageHandler(sm, tr))
 			r.Post("/new", APIKeyCreatePageHandler(svc, sm, tr))
 			r.Get("/{id}/created", APIKeyCreatedPageHandler(sm, tr))
 			// Revoke is admin-only — handled in the admin group below.
