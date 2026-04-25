@@ -554,7 +554,7 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		ProviderTransactionID:        txn.ExternalID,
 		ProviderPendingTransactionID: optionalText(txn.PendingExternalID),
 		Amount:                       decimalToNumeric(txn.Amount),
-		IsoCurrencyCode:              pgtype.Text{String: txn.ISOCurrencyCode, Valid: txn.ISOCurrencyCode != ""},
+		IsoCurrencyCode:              pgconv.TextIfNotEmpty(txn.ISOCurrencyCode),
 		Date:                         pgtype.Date{Time: txn.Date, Valid: true},
 		AuthorizedDate:               optionalDate(txn.AuthorizedDate),
 		Datetime:                     optionalTimestamptz(txn.Datetime),
@@ -564,7 +564,7 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		ProviderCategoryPrimary:      optionalText(txn.CategoryPrimary),
 		ProviderCategoryDetailed:     optionalText(txn.CategoryDetailed),
 		ProviderCategoryConfidence:   optionalText(txn.CategoryConfidence),
-		ProviderPaymentChannel:       pgtype.Text{String: txn.PaymentChannel, Valid: txn.PaymentChannel != ""},
+		ProviderPaymentChannel:       pgconv.TextIfNotEmpty(txn.PaymentChannel),
 		Pending:                      txn.Pending,
 		ProviderRaw:                  txn.Raw,
 	}
@@ -979,7 +979,7 @@ func (e *Engine) updateBalances(ctx context.Context, q *db.Queries, prov provide
 			BalanceCurrent:    decimalToNumeric(bal.Current),
 			BalanceAvailable:  optionalDecimalToNumeric(bal.Available),
 			BalanceLimit:      optionalDecimalToNumeric(bal.Limit),
-			IsoCurrencyCode:   pgtype.Text{String: bal.ISOCurrencyCode, Valid: bal.ISOCurrencyCode != ""},
+			IsoCurrencyCode:   pgconv.TextIfNotEmpty(bal.ISOCurrencyCode),
 		}
 		if err := q.UpdateAccountBalances(ctx, params); err != nil {
 			logger.Error("update account balance", "account", bal.AccountExternalID, "error", err)

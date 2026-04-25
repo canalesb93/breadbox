@@ -220,6 +220,20 @@ func TestTextFromPtr_EmptyPointer(t *testing.T) {
 	}
 }
 
+func TestTextIfNotEmpty_NonEmpty(t *testing.T) {
+	got := TextIfNotEmpty("hello")
+	if !got.Valid || got.String != "hello" {
+		t.Errorf("TextIfNotEmpty(hello) = %+v, want {hello true}", got)
+	}
+}
+
+func TestTextIfNotEmpty_Empty(t *testing.T) {
+	got := TextIfNotEmpty("")
+	if got.Valid {
+		t.Errorf("TextIfNotEmpty(\"\") = %+v, want invalid (NULL)", got)
+	}
+}
+
 func TestTimestampStr_Valid(t *testing.T) {
 	ts := pgtype.Timestamptz{
 		Time:  time.Date(2024, 3, 15, 14, 30, 0, 0, time.UTC),

@@ -141,7 +141,7 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 			{Key: "plaid_client_id", Value: pgconv.Text(plaidClientID)},
 			{Key: "plaid_secret", Value: pgconv.Text(plaidSecret)},
 			{Key: "plaid_env", Value: pgconv.Text(plaidEnv)},
-			{Key: "webhook_url", Value: pgtype.Text{String: webhookURL, Valid: webhookURL != ""}},
+			{Key: "webhook_url", Value: pgconv.TextIfNotEmpty(webhookURL)},
 		}
 		for _, entry := range entries {
 			if err := a.Queries.SetAppConfig(ctx, entry); err != nil {

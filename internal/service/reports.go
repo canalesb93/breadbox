@@ -5,8 +5,7 @@ import (
 	"fmt"
 
 	"breadbox/internal/db"
-
-	"github.com/jackc/pgx/v5/pgtype"
+	"breadbox/internal/pgconv"
 )
 
 // AgentReportResponse is the API response type for agent reports.
@@ -85,11 +84,11 @@ func (s *Service) CreateAgentReport(ctx context.Context, title, body string, act
 		Title:         title,
 		Body:          body,
 		CreatedByType: actor.Type,
-		CreatedByID:   pgtype.Text{String: actor.ID, Valid: actor.ID != ""},
+		CreatedByID:   pgconv.TextIfNotEmpty(actor.ID),
 		CreatedByName: createdByName,
 		Priority:      priority,
 		Tags:          tags,
-		Author:        pgtype.Text{String: author, Valid: author != ""},
+		Author:        pgconv.TextIfNotEmpty(author),
 		SessionID:     sessUUID,
 	})
 	if err != nil {

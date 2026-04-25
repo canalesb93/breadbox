@@ -177,7 +177,7 @@ func (s *Service) UpdateTag(ctx context.Context, id string, params UpdateTagPara
 		color = pgtype.Text{String: *existing.Color, Valid: true}
 	}
 	if params.Color != nil {
-		color = pgtype.Text{String: *params.Color, Valid: *params.Color != ""}
+		color = pgconv.TextIfNotEmpty(*params.Color)
 	}
 
 	icon := pgtype.Text{}
@@ -185,7 +185,7 @@ func (s *Service) UpdateTag(ctx context.Context, id string, params UpdateTagPara
 		icon = pgtype.Text{String: *existing.Icon, Valid: true}
 	}
 	if params.Icon != nil {
-		icon = pgtype.Text{String: *params.Icon, Valid: *params.Icon != ""}
+		icon = pgconv.TextIfNotEmpty(*params.Icon)
 	}
 
 	existingUID, _ := parseUUID(existing.ID)
