@@ -83,7 +83,7 @@ ACCOUNT LINKING:
 
 REPORTS & COMMUNICATION:
 - Tools: submit_report, add_transaction_comment, list_annotations
-- list_annotations is the canonical read path for the per-transaction activity timeline (comments + tag events + rule applications + category sets). Use it to see prior context before acting. Pass kinds=['comment'] for the comment-only view; pass kinds=['comment','tag_added','tag_removed','category_set'] to skip rule churn.
+- list_annotations is the canonical read path for the per-transaction activity timeline. Each row has a generic kind (comment | rule | tag | category) plus an action (added | removed | set | applied) for the specific event. Filter via kinds=['comment'] for the comment-only view, kinds=['tag'] for both add+remove tag events, kinds=['comment','tag','category'] to skip rule churn.
 - list_transaction_comments is deprecated — keep agents on list_annotations(kinds=['comment']).
 - Before submitting reports, read breadbox://report-format for report structure and formatting guidelines.
 
@@ -405,7 +405,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"List all tags registered in the system. Each tag has a slug (stable identifier) and a display_name. Tags attached to transactions can be queried via the tags / any_tag filters on query_transactions.",
 			s.handleListTags, svc),
 		makeToolDefLogged("list_annotations", ToolRead,
-			"List the activity timeline for a transaction. Each annotation is a single event: comment, tag_added, tag_removed, rule_applied, or category_set. Ordered by created_at ASC. Payload carries kind-specific fields (content for comments, slug for tags, rule_name for rule applications). Pass kinds=['comment'] for the comment-only view (replaces the deprecated list_transaction_comments). Empty kinds returns the full timeline.",
+			"List the activity timeline for a transaction, ordered by created_at ASC. Each row carries a generic `kind` (comment | rule | tag | category) plus an `action` (added | removed | set | applied) for the specific event — branch on `action` when the distinction matters (e.g. tag added vs removed). Payload carries kind-specific fields (content for comments, slug for tag events, rule_name for rule applications). Pass kinds=['comment'] for the comment-only view (replaces the deprecated list_transaction_comments); pass kinds=['tag'] for all tag events. Empty kinds returns the full timeline.",
 			s.handleListAnnotations, svc),
 		makeToolDefLogged("add_transaction_tag", ToolWrite,
 			"Attach a tag to a transaction. Tags are an open-ended labeling system — auto-creates a persistent tag if the slug doesn't exist yet. Use note to attach a short rationale that is stored on the tag_added annotation. Idempotent: returns already_present=true if the tag was already attached.",

@@ -249,9 +249,10 @@ func TestListAccountsResponseShape(t *testing.T) {
 	requireAbsent(t, "list_accounts[0]", acct, "provider")
 }
 
-// TestListAnnotationsResponseShape pins annotation event shape: `kind` (not
-// `type`), actor split across actor_type/actor_name/actor_id (not a single
-// `actor` string).
+// TestListAnnotationsResponseShape pins annotation event shape: generic `kind`
+// (comment | rule | tag | category) paired with an `action` field for the
+// specific event, actor split across actor_type/actor_name/actor_id (not a
+// single `actor` string), and the raw DB-only kind values must NOT leak.
 func TestListAnnotationsResponseShape(t *testing.T) {
 	f := seedFixtures(t)
 	res, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
@@ -259,26 +260,42 @@ func TestListAnnotationsResponseShape(t *testing.T) {
 	})
 	out := decodeToolResult[[]any](t, "list_annotations", res, err)
 	if len(out) == 0 {
-		t.Fatal("expected at least one annotation (tag_added from seeding)")
+		t.Fatal("expected at least one annotation (tag from seeding)")
 	}
 	ann := asObject(t, "list_annotations[0]", out[0])
 	requireKeys(t, "list_annotations[0]", ann,
-		"id", "transaction_id", "kind",
+		"id", "transaction_id", "kind", "action",
 		"actor_type", "actor_name", "created_at",
 	)
 	requireAbsent(t, "list_annotations[0]", ann, "actor", "type", "event_type")
+
+	kind, _ := ann["kind"].(string)
+	switch kind {
+	case "comment", "rule", "tag", "category":
+		// expected generic kind
+	default:
+		t.Errorf("list_annotations[0]: kind=%q is not one of the generic MCP kinds", kind)
+	}
+	if kind == "tag" {
+		if action, _ := ann["action"].(string); action != "added" && action != "removed" {
+			t.Errorf("list_annotations[0]: tag row must carry action=added|removed, got %q", action)
+		}
+	}
 }
 
-// TestListAnnotationsKindsFilter pins behavioral parity with the deprecated
-// list_transaction_comments tool. Both tools must return the same comment-row
-// IDs when list_annotations is filtered to kinds=['comment']. Also verifies
-// the kinds filter actually scopes the response and that an invalid kind is
-// rejected at the boundary.
+// TestListAnnotationsKindsFilter exercises the generic-kind filter and pins
+// behavioral parity with the deprecated list_transaction_comments tool. Both
+// tools must return the same comment-row IDs when list_annotations is filtered
+// to kinds=['comment']. Also verifies kinds=['tag'] returns both add+remove
+// events, that raw DB kinds (tag_added, tag_removed, rule_applied, category_set)
+// are NOT accepted at the MCP boundary, and that unknown kinds are rejected.
 func TestListAnnotationsKindsFilter(t *testing.T) {
 	f := seedFixtures(t)
 
 	// Seed at least one comment so list_transaction_comments has something to
-	// return — the base fixture only seeds a tag_added annotation.
+	// return — the base fixture only seeds a tag-added annotation. Also remove
+	// the seeded tag to produce a tag-removed event so the kinds=['tag'] check
+	// has both sides to find.
 	addRes, _, err := f.svc.handleAddTransactionComment(f.ctx, nil, addTransactionCommentInput{
 		WriteSessionContext: WriteSessionContext{SessionID: "sess", Reason: "kinds-parity"},
 		TransactionID:       f.txnID,
@@ -286,13 +303,21 @@ func TestListAnnotationsKindsFilter(t *testing.T) {
 	})
 	_ = decodeToolResult[map[string]any](t, "add_transaction_comment", addRes, err)
 
-	// Unfiltered: full timeline includes the tag_added + the comment.
+	rmRes, _, err := f.svc.handleRemoveTransactionTag(f.ctx, nil, removeTransactionTagInput{
+		WriteSessionContext: WriteSessionContext{SessionID: "sess", Reason: "kinds-tag-pair"},
+		TransactionID:       f.txnID,
+		TagSlug:             "needs-review",
+		Note:                "kinds-filter test",
+	})
+	_ = decodeToolResult[map[string]any](t, "remove_transaction_tag", rmRes, err)
+
+	// Unfiltered: full timeline includes the tag add + tag remove + comment.
 	allRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
 		TransactionID: f.txnID,
 	})
 	all := decodeToolResult[[]any](t, "list_annotations", allRes, err)
-	if len(all) < 2 {
-		t.Fatalf("expected at least 2 annotations (tag_added + comment), got %d", len(all))
+	if len(all) < 3 {
+		t.Fatalf("expected at least 3 annotations (tag added + tag removed + comment), got %d", len(all))
 	}
 
 	// Filtered to kind=comment.
@@ -307,12 +332,43 @@ func TestListAnnotationsKindsFilter(t *testing.T) {
 	commentIDs := map[string]struct{}{}
 	for i, raw := range comments {
 		ann := asObject(t, "list_annotations[comment]", raw)
-		kind, _ := ann["kind"].(string)
-		if kind != "comment" {
+		if kind, _ := ann["kind"].(string); kind != "comment" {
 			t.Errorf("list_annotations[%d]: kinds=['comment'] yielded kind=%q", i, kind)
+		}
+		if action, ok := ann["action"]; ok && action != "" {
+			t.Errorf("list_annotations[%d]: comment row should not carry action, got %v", i, action)
 		}
 		id, _ := ann["id"].(string)
 		commentIDs[id] = struct{}{}
+	}
+
+	// kinds=['tag'] expands to both tag_added and tag_removed at the DB layer;
+	// the response should carry generic kind=tag plus action=added|removed.
+	tagRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+		Kinds:         []string{"tag"},
+	})
+	tags := decodeToolResult[[]any](t, "list_annotations", tagRes, err)
+	if len(tags) < 2 {
+		t.Fatalf("kinds=['tag'] expected to expand to add+remove (>=2 rows), got %d", len(tags))
+	}
+	sawAdded, sawRemoved := false, false
+	for i, raw := range tags {
+		ann := asObject(t, "list_annotations[tag]", raw)
+		if kind, _ := ann["kind"].(string); kind != "tag" {
+			t.Errorf("list_annotations[%d]: kinds=['tag'] yielded kind=%q", i, kind)
+		}
+		switch ann["action"] {
+		case "added":
+			sawAdded = true
+		case "removed":
+			sawRemoved = true
+		default:
+			t.Errorf("list_annotations[%d]: tag row carries unexpected action %v", i, ann["action"])
+		}
+	}
+	if !sawAdded || !sawRemoved {
+		t.Errorf("kinds=['tag'] should surface both actions; sawAdded=%v sawRemoved=%v", sawAdded, sawRemoved)
 	}
 
 	// Parity with the deprecated list_transaction_comments tool: same set
@@ -332,7 +388,19 @@ func TestListAnnotationsKindsFilter(t *testing.T) {
 		}
 	}
 
-	// Invalid kind is rejected at the boundary instead of silently returning
+	// Raw DB kinds are NOT accepted at the MCP boundary — agents must use the
+	// generic names.
+	for _, rawKind := range []string{"tag_added", "tag_removed", "rule_applied", "category_set"} {
+		res, _, _ := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+			TransactionID: f.txnID,
+			Kinds:         []string{rawKind},
+		})
+		if res == nil || !res.IsError {
+			t.Errorf("expected error envelope for raw DB kind %q (must use generic name)", rawKind)
+		}
+	}
+
+	// Unknown kind is rejected at the boundary instead of silently returning
 	// an empty slice.
 	badRes, _, _ := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
 		TransactionID: f.txnID,

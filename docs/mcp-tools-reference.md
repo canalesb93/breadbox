@@ -193,14 +193,21 @@ Use this to close a review entry: `set category + remove needs-review (with note
 
 ### list_annotations (Read)
 
-Return the activity timeline for a transaction. Each row is one of: `comment`, `tag_added`, `tag_removed`, `rule_applied`, `category_set`.
+Return the activity timeline for a transaction. Each row carries a generic `kind` plus an `action` for the specific event:
+
+| `kind` | `action` values | Notes |
+|--------|-----------------|-------|
+| `comment` | _(omitted)_ | Free-form comment. `payload.content` carries the body. |
+| `rule` | `applied` | A transaction rule fired. `payload.rule_name`, `rule_id` populated. |
+| `tag` | `added` / `removed` | Tag attached to or detached from the transaction. `tag_id` and `payload.slug` populated. |
+| `category` | `set` | Category was set (manual override or via rule). |
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `transaction_id` | string | UUID or short ID. Required. |
-| `kinds` | array | Optional kind filter. Any of: `comment`, `rule_applied`, `tag_added`, `tag_removed`, `category_set`. Empty (default) returns all kinds. |
+| `kinds` | array | Optional kind filter. Any of: `comment`, `rule`, `tag`, `category`. Empty (default) returns all kinds. |
 
-The `kinds` filter is the canonical replacement for the deprecated `list_transaction_comments` tool — pass `kinds=['comment']` for the comment-only view. Pass `kinds=['comment','tag_added','tag_removed','category_set']` to skip rule-application churn.
+The `kinds` filter is the canonical replacement for the deprecated `list_transaction_comments` tool — pass `kinds=['comment']` for the comment-only view. Pass `kinds=['comment','tag','category']` to skip rule-application churn. Branch on `action` when the add-vs-remove distinction matters (e.g. building a tag-history view).
 
 ### create_tag / update_tag / delete_tag (Write)
 
