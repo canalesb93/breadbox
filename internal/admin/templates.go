@@ -432,14 +432,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				return float64(a)
 			},
 			"syncDuration": func(start, end time.Time) string {
-				d := end.Sub(start)
-				if d < time.Second {
-					return fmt.Sprintf("%dms", d.Milliseconds())
-				}
-				if d < time.Minute {
-					return fmt.Sprintf("%.1fs", d.Seconds())
-				}
-				return fmt.Sprintf("%.0fm", d.Minutes())
+				return service.FormatDurationMs(end.Sub(start).Milliseconds())
 			},
 			"formatDurationMs": func(ms int32) string { return service.FormatDurationMs(int64(ms)) },
 			"relativeTime": func(t interface{}) string {
