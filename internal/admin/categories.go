@@ -328,9 +328,7 @@ func ImportCategoriesTSVAdminHandler(svc *service.Service) http.HandlerFunc {
 
 		result, err := svc.ImportCategoriesTSV(r.Context(), string(body), replaceMode)
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{
-				"error": map[string]string{"code": "IMPORT_ERROR", "message": err.Error()},
-			})
+			writeError(w, http.StatusBadRequest, "IMPORT_ERROR", err.Error())
 			return
 		}
 		writeJSON(w, http.StatusOK, result)

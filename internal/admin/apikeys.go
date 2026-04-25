@@ -24,9 +24,7 @@ func CreateAPIKeyHandler(svc *service.Service) http.HandlerFunc {
 		}
 		req.Name = strings.TrimSpace(req.Name)
 		if req.Name == "" {
-			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Name is required"},
-			})
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Name is required")
 			return
 		}
 		if req.Scope == "" {
@@ -34,7 +32,7 @@ func CreateAPIKeyHandler(svc *service.Service) http.HandlerFunc {
 		}
 		result, err := svc.CreateAPIKey(r.Context(), req.Name, req.Scope)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create API key"})
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create API key")
 			return
 		}
 		writeJSON(w, http.StatusCreated, result)
@@ -46,7 +44,7 @@ func ListAPIKeysHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		keys, err := svc.ListAPIKeys(r.Context())
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to list API keys"})
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list API keys")
 			return
 		}
 		writeJSON(w, http.StatusOK, keys)
@@ -58,7 +56,7 @@ func RevokeAPIKeyHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		if err := svc.RevokeAPIKey(r.Context(), id); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to revoke API key"})
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to revoke API key")
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)

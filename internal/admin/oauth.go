@@ -450,19 +450,17 @@ func CreateOAuthClientHandler(svc *service.Service) http.HandlerFunc {
 			Scope string `json:"scope"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
 			return
 		}
 		req.Name = strings.TrimSpace(req.Name)
 		if req.Name == "" {
-			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Name is required"},
-			})
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Name is required")
 			return
 		}
 		result, err := svc.CreateOAuthClient(r.Context(), req.Name, req.Scope)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create OAuth client"})
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create OAuth client")
 			return
 		}
 		writeJSON(w, http.StatusCreated, result)
@@ -473,7 +471,7 @@ func ListOAuthClientsHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		clients, err := svc.ListOAuthClients(r.Context())
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to list OAuth clients"})
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list OAuth clients")
 			return
 		}
 		writeJSON(w, http.StatusOK, clients)
@@ -484,7 +482,7 @@ func RevokeOAuthClientHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		if err := svc.RevokeOAuthClient(r.Context(), id); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to revoke OAuth client"})
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to revoke OAuth client")
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)

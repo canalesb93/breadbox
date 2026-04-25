@@ -32,31 +32,23 @@ func CreateLoginAccountHandler(svc *service.Service, sm *scs.SessionManager) htt
 
 		req.Username = strings.TrimSpace(req.Username)
 		if req.Username == "" {
-			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Email is required"},
-			})
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Email is required")
 			return
 		}
 
 		// Validate email format since username = email.
 		if _, err := mail.ParseAddress(req.Username); err != nil {
-			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Please enter a valid email address"},
-			})
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Please enter a valid email address")
 			return
 		}
 
 		if len(req.Username) > 64 {
-			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Email must be 64 characters or fewer"},
-			})
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Email must be 64 characters or fewer")
 			return
 		}
 
 		if req.UserID == "" {
-			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-				"error": map[string]string{"code": "VALIDATION_ERROR", "message": "Family member (user_id) is required"},
-			})
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Family member (user_id) is required")
 			return
 		}
 
@@ -71,18 +63,14 @@ func CreateLoginAccountHandler(svc *service.Service, sm *scs.SessionManager) htt
 		})
 		if err != nil {
 			if strings.Contains(err.Error(), "username already taken") {
-				writeJSON(w, http.StatusConflict, map[string]any{
-					"error": map[string]string{"code": "EMAIL_TAKEN", "message": "This email is already in use as a login"},
-				})
+				writeError(w, http.StatusConflict, "EMAIL_TAKEN", "This email is already in use as a login")
 				return
 			}
 			if strings.Contains(err.Error(), "already has a login account") {
-				writeJSON(w, http.StatusConflict, map[string]any{
-					"error": map[string]string{"code": "DUPLICATE_MEMBER", "message": "This family member already has a login account"},
-				})
+				writeError(w, http.StatusConflict, "DUPLICATE_MEMBER", "This family member already has a login account")
 				return
 			}
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create login account"})
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create login account")
 			return
 		}
 
@@ -95,7 +83,7 @@ func ListLoginAccountsHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		members, err := svc.ListLoginAccounts(r.Context())
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to list login accounts"})
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list login accounts")
 			return
 		}
 		writeJSON(w, http.StatusOK, members)
@@ -115,9 +103,7 @@ func UpdateLoginAccountRoleHandler(svc *service.Service, sm *scs.SessionManager)
 		}
 
 		if err := svc.UpdateLoginAccountRole(r.Context(), id, req.Role); err != nil {
-			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-				"error": map[string]string{"code": "VALIDATION_ERROR", "message": err.Error()},
-			})
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 			return
 		}
 
@@ -131,7 +117,7 @@ func DeleteLoginAccountHandler(svc *service.Service, sm *scs.SessionManager) htt
 		id := chi.URLParam(r, "id")
 
 		if err := svc.DeleteLoginAccount(r.Context(), id); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete login account"})
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete login account")
 			return
 		}
 
@@ -147,12 +133,10 @@ func RegenerateSetupTokenHandler(svc *service.Service, sm *scs.SessionManager) h
 		token, err := svc.RegenerateSetupToken(r.Context(), id)
 		if err != nil {
 			if strings.Contains(err.Error(), "already has a password") {
-				writeJSON(w, http.StatusConflict, map[string]any{
-					"error": map[string]string{"code": "PASSWORD_ALREADY_SET", "message": "This account already has a password set"},
-				})
+				writeError(w, http.StatusConflict, "PASSWORD_ALREADY_SET", "This account already has a password set")
 				return
 			}
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to regenerate setup token"})
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to regenerate setup token")
 			return
 		}
 
@@ -170,7 +154,7 @@ func WipeUserDataHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		txnCount, err := a.Service.WipeUserData(r.Context(), id)
 		if err != nil {
 			a.Logger.Error("wipe user data", "error", err, "user_id", id)
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to wipe user data"})
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to wipe user data")
 			return
 		}
 
