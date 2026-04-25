@@ -183,9 +183,11 @@ func runServe() error {
 		}
 	}
 
-	// Validate ENCRYPTION_KEY when bank providers are configured.
+	// Encryption key is auto-managed: env var → ${BREADBOX_DATA_DIR}/encryption.key → generate.
+	// If we still have no key here it means BREADBOX_DATA_DIR is unset *and* ENCRYPTION_KEY is
+	// unset, which only happens in test contexts; warn rather than crash.
 	if cfg.EncryptionKey == nil && (cfg.PlaidClientID != "" || cfg.TellerAppID != "") {
-		return fmt.Errorf("ENCRYPTION_KEY is required when Plaid or Teller providers are configured. Generate one with: openssl rand -hex 32")
+		logger.Warn("ENCRYPTION_KEY unavailable and no data dir to write one — encrypted provider credentials will not work")
 	}
 
 	// Clean up orphaned sync logs from previous crashes.
@@ -213,7 +215,7 @@ func runServe() error {
 				backupDir = filepath.Join(".", "backups")
 			}
 		}
-		bs := service.NewBackupService(cfg.DatabaseURL, backupDir, logger)
+		bs := service.NewBackupService(cfg.DatabaseURL, backupDir, cfg.EncryptionKeyPath, logger)
 		a.BackupService = bs
 
 		// Schedule automated backups — runs every hour, checks app_config for actual schedule.
@@ -274,8 +276,12 @@ func runServe() error {
 		tellerStatus = fmt.Sprintf("configured (%s)", cfg.TellerEnv)
 	}
 	encryptionStatus := "configured"
+	encryptionFingerprint := ""
+	encryptionSource := cfg.EncryptionKeySource
 	if cfg.EncryptionKey == nil {
 		encryptionStatus = "NOT SET"
+	} else {
+		encryptionFingerprint = config.EncryptionKeyFingerprint(cfg.EncryptionKey)
 	}
 	adminStatus := "none"
 	adminCount, err := a.Queries.CountAuthAccounts(ctx)
@@ -291,6 +297,9 @@ func runServe() error {
 		"plaid", plaidStatus,
 		"teller", tellerStatus,
 		"encryption_key", encryptionStatus,
+		"encryption_key_source", encryptionSource,
+		"encryption_key_fingerprint", encryptionFingerprint,
+		"data_dir", cfg.DataDir,
 		"admin", adminStatus,
 		"sync_interval", fmt.Sprintf("%dm", cfg.SyncIntervalMinutes),
 		"webhook", webhookStatus,
@@ -298,6 +307,12 @@ func runServe() error {
 	)
 	if cfg.EncryptionKey == nil {
 		logger.Warn("ENCRYPTION_KEY not set — encrypted provider credentials will not work")
+	} else if cfg.EncryptionKeySource == config.EncryptionKeySourceGenerated {
+		logger.Info("encryption key generated and persisted",
+			"path", cfg.EncryptionKeyPath,
+			"fingerprint", encryptionFingerprint,
+			"hint", "this key lives in the data dir and is included in backup bundles; loss = unrecoverable provider credentials",
+		)
 	}
 	if adminCount == 0 {
 		logger.Warn("no admin account — create one at /setup or via 'breadbox create-admin'")

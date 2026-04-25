@@ -26,7 +26,7 @@ breadbox doctor [--json] [--skip-external]
 | `config load` | `.local.env` / `.docker.env` parse cleanly and required env vars decode. |
 | `database` | `DATABASE_URL` is set, Postgres accepts a connection, and `Ping` succeeds. |
 | `migrations` | The `goose_db_version` in the DB matches the highest numeric prefix among embedded migrations. Reports "behind" (needs `breadbox migrate`) or "ahead" (binary downgrade). |
-| `encryption key` | `ENCRYPTION_KEY` is set (required if Plaid or Teller is configured), hex-decodes to exactly 32 bytes, and is accepted by AES. |
+| `encryption key` | A 32-byte AES key is available, sourced from one of: `ENCRYPTION_KEY` env (BYO), `${BREADBOX_DATA_DIR}/encryption.key` (auto-managed file), or freshly generated this boot. Reports `source=…` and a stable 8-char SHA-256 fingerprint. |
 | `plaid` | When `PLAID_CLIENT_ID` is set: `PLAID_SECRET` is present and `PLAID_ENV` is one of `sandbox`/`development`/`production`. |
 | `teller` | When `TELLER_APP_ID` is set: `TELLER_ENV` is valid, cert/key paths (if any) exist and are readable, or PEM bytes are available via `app_config`. |
 | `provider credentials` | Walks every non-disconnected `bank_connections` row and verifies `encrypted_credentials` decrypts with the current key. Catches silent `ENCRYPTION_KEY` rotations. |
@@ -34,10 +34,12 @@ breadbox doctor [--json] [--skip-external]
 | `scheduler` | `sync_interval_minutes` is positive; any `BACKUP_CRON` / `SYNC_CRON` env value parses as a 5-field cron expression. |
 | `public url` | When `PUBLIC_URL` or `DOMAIN` is set (and `--skip-external` isn't): DNS resolves and `GET /health/ready` returns < 400. |
 
-> **Encryption-key fingerprint vs stored hash:** deferred to issue #688. Once
-> the fingerprint is persisted at setup, `doctor` will compare it against the
-> key in the environment to catch rotations even before any bank connection
-> exists. Until then, the credential-decrypt walk is the proxy.
+> **Persisted-fingerprint vs live-key comparison** is still tracked under
+> issue #688 as Phase 2/3 work. With the auto-managed key file in place,
+> `doctor` already reports the live fingerprint; once the setup wizard records
+> a fingerprint at first boot, the check can compare the two and surface
+> silent rotations even before any bank connection exists. Until then, the
+> credential-decrypt walk is the proxy.
 
 ## Example output
 

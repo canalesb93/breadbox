@@ -139,8 +139,9 @@ do_uninstall() {
     printf "  ${INSTALL_DIR}/.env\n"
     printf "  ${INSTALL_DIR}/.breadbox-version\n"
     printf "\n"
-    printf "${YELLOW}Docker volumes (postgres_data, caddy_data, caddy_config) are NOT removed.${NC}\n"
-    printf "To remove volumes: docker volume rm breadbox_postgres_data breadbox_caddy_data breadbox_caddy_config\n"
+    printf "${YELLOW}Docker volumes (postgres_data, breadbox_data, caddy_data, caddy_config) are NOT removed.${NC}\n"
+    printf "${DIM}breadbox_data holds the auto-managed encryption.key — removing it makes existing bank credentials unrecoverable.${NC}\n"
+    printf "To remove volumes: docker volume rm breadbox_postgres_data breadbox_breadbox_data breadbox_caddy_data breadbox_caddy_config\n"
     printf "\n"
 
     printf "Continue? [y/N] "
@@ -455,9 +456,9 @@ if ! docker info >/dev/null 2>&1; then
 fi
 success "Docker daemon is running"
 
-# openssl (for key generation)
+# openssl (for db password generation; the encryption key is auto-managed by the server)
 if ! check_command openssl; then
-    warn "openssl is not installed (needed for encryption key + db password generation)."
+    warn "openssl is not installed (needed for db password generation)."
     if [ "$AUTO_YES" = "1" ] || prompt_yn "Install openssl via ${BB_PKG_MANAGER}?" "y"; then
         try_install_openssl
         check_command openssl || die "openssl still not available after install."
@@ -559,7 +560,6 @@ printf "%s\n" "$IMAGE_TAG" > "${INSTALL_DIR}/.breadbox-version"
 if [ "$ENV_EXISTS" -eq 0 ]; then
     info "Generating secrets..."
 
-    ENCRYPTION_KEY=$(openssl rand -hex 32)
     POSTGRES_PASSWORD=$(openssl rand -hex 24)
 
     # Emit DOMAIN= (commented when not set) so users can flip it later without
@@ -582,7 +582,13 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_DB=breadbox
 
 # --- Security ---
-ENCRYPTION_KEY=${ENCRYPTION_KEY}
+# Encryption key is auto-managed: the breadbox container generates one on
+# first boot and stores it inside the breadbox_data volume at
+# /data/encryption.key. The key is included in backup bundles produced by the
+# Backups page, so a single archive restores the full install. To bring your
+# own key (e.g. for stricter separation), uncomment the next line and replace
+# the value with the output of: openssl rand -hex 32
+# ENCRYPTION_KEY=
 
 # --- Server ---
 SERVER_PORT=8080
@@ -666,6 +672,7 @@ if [ "$healthy" -eq 1 ]; then
     fi
     info "Config file:   ${INSTALL_DIR}/.env"
     info "Version pin:   ${INSTALL_DIR}/.breadbox-version (${IMAGE_TAG})"
+    info "Encryption key: stored in the breadbox_data volume at /data/encryption.key (auto-managed; bundled in backups)"
     if [ -n "$CADDY_PROFILE" ]; then
         info "View logs:     cd ${INSTALL_DIR} && docker compose --profile caddy -f ${COMPOSE_FILE} logs -f"
     else

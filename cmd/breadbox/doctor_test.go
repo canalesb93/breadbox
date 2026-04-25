@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"strings"
 	"testing"
@@ -9,51 +10,53 @@ import (
 )
 
 func TestCheckEncryptionKey(t *testing.T) {
+	validKey := bytes.Repeat([]byte{0xab}, 32)
+
 	tests := []struct {
 		name       string
-		envKey     string
 		cfg        *config.Config
 		wantStatus string
 		wantMsgSub string
 	}{
 		{
-			name:       "unset and no provider skips",
-			envKey:     "",
+			name:       "no key and no provider skips",
 			cfg:        &config.Config{},
 			wantStatus: doctorStatusSkip,
 		},
 		{
-			name:       "unset with plaid fails",
-			envKey:     "",
+			name:       "no key with plaid fails",
 			cfg:        &config.Config{PlaidClientID: "id"},
 			wantStatus: doctorStatusFail,
-			wantMsgSub: "ENCRYPTION_KEY is required",
-		},
-		{
-			name:       "invalid hex fails",
-			envKey:     "zzzz",
-			cfg:        &config.Config{},
-			wantStatus: doctorStatusFail,
-			wantMsgSub: "not valid hex",
+			wantMsgSub: "no encryption key available",
 		},
 		{
 			name:       "wrong length fails",
-			envKey:     "deadbeef",
-			cfg:        &config.Config{},
+			cfg:        &config.Config{EncryptionKey: bytes.Repeat([]byte{0x01}, 16), EncryptionKeySource: "file"},
 			wantStatus: doctorStatusFail,
-			wantMsgSub: "must decode to 32 bytes",
+			wantMsgSub: "expected 32 bytes",
 		},
 		{
-			name:       "valid 32-byte hex passes",
-			envKey:     strings.Repeat("ab", 32),
-			cfg:        &config.Config{},
+			name:       "valid env key passes and reports source",
+			cfg:        &config.Config{EncryptionKey: validKey, EncryptionKeySource: config.EncryptionKeySourceEnv},
 			wantStatus: doctorStatusPass,
+			wantMsgSub: "source=env",
+		},
+		{
+			name:       "valid file key passes and reports source + path",
+			cfg:        &config.Config{EncryptionKey: validKey, EncryptionKeySource: config.EncryptionKeySourceFile, EncryptionKeyPath: "/data/encryption.key"},
+			wantStatus: doctorStatusPass,
+			wantMsgSub: "source=file",
+		},
+		{
+			name:       "generated key passes and reports source",
+			cfg:        &config.Config{EncryptionKey: validKey, EncryptionKeySource: config.EncryptionKeySourceGenerated, EncryptionKeyPath: "/data/encryption.key"},
+			wantStatus: doctorStatusPass,
+			wantMsgSub: "source=generated",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv("ENCRYPTION_KEY", tc.envKey)
 			got := checkEncryptionKey(tc.cfg)
 			if got.Status != tc.wantStatus {
 				t.Fatalf("status: got %q, want %q (msg=%q)", got.Status, tc.wantStatus, got.Message)
@@ -62,6 +65,22 @@ func TestCheckEncryptionKey(t *testing.T) {
 				t.Fatalf("message: got %q, want substring %q", got.Message, tc.wantMsgSub)
 			}
 		})
+	}
+}
+
+func TestCheckEncryptionKey_PassReportsFingerprint(t *testing.T) {
+	cfg := &config.Config{
+		EncryptionKey:       bytes.Repeat([]byte{0xab}, 32),
+		EncryptionKeySource: config.EncryptionKeySourceFile,
+		EncryptionKeyPath:   "/data/encryption.key",
+	}
+	got := checkEncryptionKey(cfg)
+	if got.Status != doctorStatusPass {
+		t.Fatalf("status: got %q, want pass", got.Status)
+	}
+	wantFP := config.EncryptionKeyFingerprint(cfg.EncryptionKey)
+	if !strings.Contains(got.Message, "fingerprint="+wantFP) {
+		t.Fatalf("message %q missing fingerprint %q", got.Message, wantFP)
 	}
 }
 
