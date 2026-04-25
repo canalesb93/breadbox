@@ -2,9 +2,13 @@ package admin
 
 import (
 	"net/http"
+	"net/url"
+	"time"
 
 	"breadbox/internal/app"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 )
@@ -23,8 +27,9 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 			"CurrentPage": "logs",
 			"CSRFToken":   GetCSRFToken(r),
 			"Flash":       GetFlash(ctx, sm),
-			"Tab":         tab,
 		}
+
+		props := pages.LogsProps{Tab: tab}
 
 		// Always fetch sync logs data.
 		{
@@ -101,26 +106,64 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 				"date_to":       filterDateTo,
 			}, "page")
 
-			data["Logs"] = result.Logs
-			data["Connections"] = connections
-			data["FilterConnID"] = filterConnID
-			data["FilterStatus"] = filterStatus
-			data["FilterTrigger"] = filterTrigger
-			data["FilterDateFrom"] = filterDateFrom
-			data["FilterDateTo"] = filterDateTo
-			data["HasAdvancedFilters"] = hasAdvancedFilters
-			data["Page"] = result.Page
-			data["TotalPages"] = result.TotalPages
-			data["Total"] = result.Total
-			data["PageSize"] = pageSize
-			data["ShowingStart"] = showingStart
-			data["ShowingEnd"] = showingEnd
-			data["PaginationBase"] = pBase
-			data["Stats"] = stats
-			data["SuccessCount"] = successCount
-			data["ErrorCount"] = errorCount
-			data["InProgressCount"] = inProgressCount
-			data["WarningCount"] = stats.WarningCount
+			// Connection filter options.
+			connOpts := make([]pages.LogsConnectionOption, 0, len(connections))
+			for _, c := range connections {
+				id := pgconv.FormatUUID(c.ID)
+				connOpts = append(connOpts, pages.LogsConnectionOption{
+					ID:       id,
+					Name:     c.InstitutionName.String,
+					Selected: id == filterConnID,
+				})
+			}
+
+			// Project sync log rows into the templ view-model with
+			// pre-rendered relative timestamps.
+			rows := make([]pages.LogsSyncRow, 0, len(result.Logs))
+			for _, l := range result.Logs {
+				rows = append(rows, pages.LogsSyncRow{
+					ID:                   l.ID,
+					InstitutionName:      l.InstitutionName,
+					Trigger:              l.Trigger,
+					Status:               l.Status,
+					StartedAtRelative:    relativeTimeFromRFC3339Ptr(l.StartedAt),
+					Duration:             l.Duration,
+					AccountsAffected:     l.AccountsAffected,
+					FriendlyErrorMessage: l.FriendlyErrorMessage,
+					ErrorMessage:         l.ErrorMessage,
+					WarningMessage:       l.WarningMessage,
+					AddedCount:           l.AddedCount,
+					ModifiedCount:        l.ModifiedCount,
+					RemovedCount:         l.RemovedCount,
+					UnchangedCount:       l.UnchangedCount,
+				})
+			}
+
+			props.Stats = stats
+			props.HasAdvancedFilters = hasAdvancedFilters
+			props.Connections = connOpts
+			props.FilterConnID = filterConnID
+			props.FilterStatus = filterStatus
+			props.FilterTrigger = filterTrigger
+			props.FilterDateFrom = filterDateFrom
+			props.FilterDateTo = filterDateTo
+			props.Logs = rows
+			props.Total = result.Total
+			props.Page = result.Page
+			props.TotalPages = result.TotalPages
+			props.ShowingStart = showingStart
+			props.ShowingEnd = showingEnd
+			props.PaginationBase = pBase
+			props.SuccessCount = successCount
+			props.ErrorCount = errorCount
+			props.InProgressCount = inProgressCount
+
+			// Pre-encode the status-tab query strings (mirrors the
+			// `syncLogFilterQuery` funcMap helper).
+			props.StatusQueryAll = encodeSyncStatusQuery("", filterConnID, filterTrigger, filterDateFrom, filterDateTo)
+			props.StatusQuerySuccess = encodeSyncStatusQuery("success", filterConnID, filterTrigger, filterDateFrom, filterDateTo)
+			props.StatusQueryError = encodeSyncStatusQuery("error", filterConnID, filterTrigger, filterDateFrom, filterDateTo)
+			props.StatusQueryInProgress = encodeSyncStatusQuery("in_progress", filterConnID, filterTrigger, filterDateFrom, filterDateTo)
 		}
 
 		// Always fetch webhook events data.
@@ -170,19 +213,94 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 				"wh_status":   whFilterStatus,
 			}, "wh_page")
 
-			data["WHEvents"] = result.Events
-			data["WHPage"] = result.Page
-			data["WHTotalPages"] = result.TotalPages
-			data["WHTotal"] = result.Total
-			data["WHPageSize"] = whPageSize
-			data["WHShowingStart"] = whShowingStart
-			data["WHShowingEnd"] = whShowingEnd
-			data["WHPaginationBase"] = whPBase
-			data["WHStats"] = whStats
-			data["WHFilterProvider"] = whFilterProvider
-			data["WHFilterStatus"] = whFilterStatus
+			// Project webhook events into the templ view-model with
+			// pre-rendered relative + full timestamps.
+			whRows := make([]pages.LogsWebhookRow, 0, len(result.Events))
+			for _, e := range result.Events {
+				whRows = append(whRows, pages.LogsWebhookRow{
+					ID:                e.ID,
+					Provider:          e.Provider,
+					EventType:         e.EventType,
+					Status:            e.Status,
+					ConnectionID:      e.ConnectionID,
+					InstitutionName:   e.InstitutionName,
+					PayloadHash:       e.PayloadHash,
+					ErrorMessage:      e.ErrorMessage,
+					CreatedAtRelative: relativeTimeFromRFC3339Ptr(e.CreatedAt),
+					CreatedAtFull:     formatDateTimeFromRFC3339Ptr(e.CreatedAt),
+				})
+			}
+
+			props.WHEvents = whRows
+			props.WHTotal = result.Total
+			props.WHPage = result.Page
+			props.WHTotalPages = result.TotalPages
+			props.WHShowingStart = whShowingStart
+			props.WHShowingEnd = whShowingEnd
+			props.WHPaginationBase = whPBase
+			props.WHStats = whStats
+			props.WHFilterProvider = whFilterProvider
+			props.WHFilterStatus = whFilterStatus
 		}
 
-		tr.Render(w, r, "logs.html", data)
+		renderLogs(w, r, tr, data, props)
 	}
+}
+
+// renderLogs mirrors the renderSettings / renderPromptBuilder pattern:
+// it hands the typed LogsProps to the templ component and uses
+// RenderWithTempl to host it inside base.html.
+func renderLogs(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.LogsProps) {
+	tr.RenderWithTempl(w, r, data, pages.Logs(props))
+}
+
+// encodeSyncStatusQuery mirrors the `syncLogFilterQuery` funcMap helper:
+// builds a url.Values-encoded query string (no leading "?") from the
+// non-empty filter values.
+func encodeSyncStatusQuery(status, connID, trigger, dateFrom, dateTo string) string {
+	v := url.Values{}
+	if status != "" {
+		v.Set("status", status)
+	}
+	if connID != "" {
+		v.Set("connection_id", connID)
+	}
+	if trigger != "" {
+		v.Set("trigger", trigger)
+	}
+	if dateFrom != "" {
+		v.Set("date_from", dateFrom)
+	}
+	if dateTo != "" {
+		v.Set("date_to", dateTo)
+	}
+	return v.Encode()
+}
+
+// relativeTimeFromRFC3339Ptr parses a *string RFC3339 timestamp and
+// returns a humanised "X minutes ago" string. Mirrors the *string
+// branch of the `relativeTime` funcMap helper.
+func relativeTimeFromRFC3339Ptr(s *string) string {
+	if s == nil || *s == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, *s)
+	if err != nil {
+		return *s
+	}
+	return relativeTime(t)
+}
+
+// formatDateTimeFromRFC3339Ptr parses a *string RFC3339 timestamp into
+// the local "Jan 2, 2006 3:04 PM" rendering used by the `formatDateTime`
+// funcMap helper.
+func formatDateTimeFromRFC3339Ptr(s *string) string {
+	if s == nil || *s == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, *s)
+	if err != nil {
+		return *s
+	}
+	return t.Local().Format("Jan 2, 2006 3:04 PM")
 }

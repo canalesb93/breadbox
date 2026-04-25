@@ -1,0 +1,889 @@
+package pages
+
+import (
+	"fmt"
+
+	"breadbox/internal/service"
+)
+
+// Logs renders the combined sync-logs + webhook-events page body.
+// Hosts inside the base layout via TemplateRenderer.RenderWithTempl —
+// the handler builds typed props in admin/logs.go and the bridge drops
+// the rendered HTML into base.html's TemplContent slot.
+templ Logs(p LogsProps) {
+	<div
+		x-data={ fmt.Sprintf("{ tab: '%s' }", p.Tab) }
+		x-init="$watch('tab', function(v) { var u = new URL(window.location); u.searchParams.set('tab', v); history.replaceState(null, '', u); })"
+	>
+		<div class="bb-page-header">
+			<div>
+				<h1 class="bb-page-title">Logs</h1>
+				<p class="text-sm text-base-content/50 mt-1">Sync history and webhook events</p>
+			</div>
+		</div>
+		<!-- Tab Switcher -->
+		<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 mb-6 w-fit">
+			<button
+				@click="tab = 'syncs'"
+				:class="tab === 'syncs' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+				class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2"
+			>
+				<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+				Sync Logs
+			</button>
+			<button
+				@click="tab = 'webhooks'"
+				:class="tab === 'webhooks' ? 'bg-base-100 text-base-content shadow-sm' : 'text-base-content/40 hover:text-base-content/60'"
+				class="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2"
+			>
+				<i data-lucide="webhook" class="w-3.5 h-3.5"></i>
+				Webhooks
+			</button>
+		</div>
+		<!-- ==================== SYNC LOGS TAB ==================== -->
+		<div x-show="tab === 'syncs'" x-cloak>
+			@logsSyncStats(p)
+			@logsSyncFilterBar(p)
+			@logsSyncStatusTabs(p)
+			if len(p.Logs) > 0 {
+				<!-- Results count -->
+				<div class="text-xs text-base-content/40 mb-3 px-1">
+					{ fmt.Sprintf("%d sync log%s", p.Total, pluralS64(p.Total)) }
+				</div>
+				<!-- Timeline view -->
+				<div class="space-y-1 bb-stagger">
+					for _, l := range p.Logs {
+						@logsSyncRow(l)
+					}
+				</div>
+				if p.TotalPages > 1 {
+					@logsPaginator(p.Page, p.TotalPages, p.Total, p.ShowingStart, p.ShowingEnd, p.PaginationBase)
+				}
+			} else {
+				@logsSyncEmpty(p)
+			}
+		</div>
+		<!-- ==================== WEBHOOKS TAB ==================== -->
+		<div x-show="tab === 'webhooks'" x-cloak>
+			@logsWebhookStats(p)
+			@logsWebhookStatusTabs(p)
+			if len(p.WHEvents) > 0 {
+				<!-- Results count -->
+				<div class="text-xs text-base-content/40 mb-3 px-1">
+					{ fmt.Sprintf("%d webhook event%s", p.WHTotal, pluralS64(p.WHTotal)) }
+				</div>
+				<!-- Event list -->
+				<div class="space-y-1 bb-stagger">
+					for _, e := range p.WHEvents {
+						@logsWebhookRow(e)
+					}
+				</div>
+				if p.WHTotalPages > 1 {
+					@logsPaginator(p.WHPage, p.WHTotalPages, p.WHTotal, p.WHShowingStart, p.WHShowingEnd, p.WHPaginationBase)
+				}
+			} else {
+				@logsWebhookEmpty(p)
+			}
+		</div>
+	</div>
+}
+
+// ====================================================================
+// Sync logs tab
+// ====================================================================
+
+templ logsSyncStats(p LogsProps) {
+	if p.Stats != nil {
+		<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 bb-stagger">
+			<!-- Success Rate -->
+			<div class="bb-card p-4">
+				<div class="flex items-center gap-3">
+					<div class={ "w-9 h-9 rounded-lg flex items-center justify-center shrink-0", successRateBg(p.Stats.SuccessRate) }>
+						if p.Stats.SuccessRate > 80.0 {
+							<i data-lucide="check-circle-2" class="w-4 h-4 text-success"></i>
+						} else if p.Stats.SuccessRate > 50.0 {
+							<i data-lucide="alert-triangle" class="w-4 h-4 text-warning"></i>
+						} else {
+							<i data-lucide="x-circle" class="w-4 h-4 text-error"></i>
+						}
+					</div>
+					<div>
+						<div class={ "text-2xl font-semibold tabular-nums leading-none", successRateText(p.Stats.SuccessRate) }>
+							{ fmt.Sprintf("%.0f%%", p.Stats.SuccessRate) }
+						</div>
+						<div class="text-xs text-base-content/40 mt-0.5">Success rate</div>
+					</div>
+				</div>
+			</div>
+			<!-- Errors -->
+			<div class="bb-card p-4">
+				<div class="flex items-center gap-3">
+					<div class={ "w-9 h-9 rounded-lg flex items-center justify-center shrink-0", errorBg(p.Stats.ErrorCount > 0) }>
+						<i data-lucide="alert-circle" class={ "w-4 h-4", errorIconClass(p.Stats.ErrorCount > 0) }></i>
+					</div>
+					<div>
+						<div class={ "text-2xl font-semibold tabular-nums leading-none", errorTextClass(p.Stats.ErrorCount > 0) }>
+							{ fmt.Sprintf("%d", p.Stats.ErrorCount) }
+						</div>
+						<div class="text-xs text-base-content/40 mt-0.5">Errors</div>
+					</div>
+				</div>
+			</div>
+			<!-- Avg Duration -->
+			<div class="bb-card p-4">
+				<div class="flex items-center gap-3">
+					<div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+						<i data-lucide="timer" class="w-4 h-4 text-base-content/40"></i>
+					</div>
+					<div>
+						<div class="text-2xl font-semibold tabular-nums leading-none">
+							{ formatAvgDuration(p.Stats.AvgDurationMs) }
+						</div>
+						<div class="text-xs text-base-content/40 mt-0.5">Avg duration</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+templ logsSyncFilterBar(p LogsProps) {
+	<div class="bb-card mb-6" x-data={ fmt.Sprintf("{ filtersOpen: %t }", p.HasAdvancedFilters) }>
+		<div class="p-0">
+			<button type="button" class="bb-filter-toggle" @click="filtersOpen = !filtersOpen">
+				<div class="flex items-center gap-2">
+					<i data-lucide="sliders-horizontal" class="w-4 h-4 text-base-content/60"></i>
+					<span>Filters</span>
+					if p.HasAdvancedFilters {
+						<span class="badge badge-primary badge-xs">Active</span>
+					}
+				</div>
+				<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/40 transition-transform duration-200" :class="filtersOpen ? 'rotate-180' : ''"></i>
+			</button>
+			<form
+				method="GET"
+				action="/logs"
+				x-show="filtersOpen"
+				x-cloak
+				x-collapse
+				class="bb-filter-form px-4 pb-4 pt-2"
+			>
+				<input type="hidden" name="tab" value="syncs"/>
+				if p.FilterStatus != "" {
+					<input type="hidden" name="status" value={ p.FilterStatus }/>
+				}
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+					<label class="bb-filter-label">
+						Connection
+						<select name="connection_id" class="select select-sm select-bordered w-full">
+							<option value="">All connections</option>
+							for _, c := range p.Connections {
+								if c.Selected {
+									<option value={ c.ID } selected>{ c.Name }</option>
+								} else {
+									<option value={ c.ID }>{ c.Name }</option>
+								}
+							}
+						</select>
+					</label>
+					<label class="bb-filter-label">
+						Trigger
+						<select name="trigger" class="select select-sm select-bordered w-full">
+							<option value="">All triggers</option>
+							@triggerOption("cron", "Cron", p.FilterTrigger)
+							@triggerOption("manual", "Manual", p.FilterTrigger)
+							@triggerOption("webhook", "Webhook", p.FilterTrigger)
+							@triggerOption("initial", "Initial", p.FilterTrigger)
+						</select>
+					</label>
+					<label class="bb-filter-label">
+						From Date
+						<input type="date" name="date_from" value={ p.FilterDateFrom } class="input input-sm input-bordered w-full"/>
+					</label>
+					<label class="bb-filter-label">
+						To Date
+						<input type="date" name="date_to" value={ p.FilterDateTo } class="input input-sm input-bordered w-full"/>
+					</label>
+				</div>
+				<div class="bb-filter-actions">
+					<a href="/logs?tab=syncs" class="btn btn-sm btn-ghost rounded-xl">Reset</a>
+					<button type="submit" class="btn btn-sm btn-primary rounded-xl">
+						<i data-lucide="search" class="w-3.5 h-3.5"></i>
+						Apply Filters
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+}
+
+templ triggerOption(value, label, current string) {
+	if value == current {
+		<option value={ value } selected>{ label }</option>
+	} else {
+		<option value={ value }>{ label }</option>
+	}
+}
+
+templ logsSyncStatusTabs(p LogsProps) {
+	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+		<!-- Status pill tabs -->
+		<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 overflow-x-auto">
+			<a
+				href={ statusTabHref(p.StatusQueryAll) }
+				class={ statusPillClass(p.FilterStatus == "") }
+			>
+				All
+				<span class="text-[0.6rem] tabular-nums opacity-60">{ statsTotalSync(p.Stats) }</span>
+			</a>
+			<a
+				href={ statusTabHref(p.StatusQuerySuccess) }
+				class={ statusPillClass(p.FilterStatus == "success") }
+			>
+				<span class="w-1.5 h-1.5 rounded-full bg-success shrink-0"></span>
+				Success
+				<span class="text-[0.6rem] tabular-nums opacity-60">{ fmt.Sprintf("%d", p.SuccessCount) }</span>
+			</a>
+			<a
+				href={ statusTabHref(p.StatusQueryError) }
+				class={ statusPillClass(p.FilterStatus == "error") }
+			>
+				<span class="w-1.5 h-1.5 rounded-full bg-error shrink-0"></span>
+				Errors
+				<span class="text-[0.6rem] tabular-nums opacity-60">{ fmt.Sprintf("%d", p.ErrorCount) }</span>
+			</a>
+			<a
+				href={ statusTabHref(p.StatusQueryInProgress) }
+				class={ statusPillClass(p.FilterStatus == "in_progress") }
+			>
+				<span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0"></span>
+				In Progress
+				<span class="text-[0.6rem] tabular-nums opacity-60">{ fmt.Sprintf("%d", p.InProgressCount) }</span>
+			</a>
+		</div>
+		if hasAnySyncFilter(p) {
+			<a href="/logs?tab=syncs" class="btn btn-ghost btn-xs rounded-lg gap-1.5 text-base-content/50 hover:text-base-content/80">
+				<i data-lucide="x" class="w-3 h-3"></i>
+				Clear all filters
+			</a>
+		}
+	</div>
+}
+
+templ logsSyncRow(l LogsSyncRow) {
+	<div class={ "bb-card bb-card--interactive group transition-all duration-150", syncRowBorder(l.Status) }>
+		<a href={ templ.SafeURL("/sync-logs/" + l.ID) } class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 py-3 px-4 no-underline">
+			<!-- Top row: status icon + main content + (desktop) changes -->
+			<div class="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+				<!-- Status indicator -->
+				<div class="relative shrink-0">
+					<div class={ "w-8 h-8 rounded-lg flex items-center justify-center", syncStatusBg(l.Status) }>
+						switch l.Status {
+							case "success":
+								<i data-lucide="check" class="w-3.5 h-3.5 text-success"></i>
+							case "error":
+								<i data-lucide="x" class="w-3.5 h-3.5 text-error"></i>
+							case "in_progress":
+								<i data-lucide="loader" class="w-3.5 h-3.5 text-warning animate-spin"></i>
+							default:
+								<i data-lucide="minus" class="w-3.5 h-3.5 text-base-content/30"></i>
+						}
+					</div>
+				</div>
+				<!-- Main content -->
+				<div class="flex-1 min-w-0">
+					<div class="flex items-center gap-2">
+						<span class="text-sm font-medium group-hover:text-primary transition-colors truncate">{ l.InstitutionName }</span>
+						<span class="badge badge-ghost badge-xs opacity-60 shrink-0">{ l.Trigger }</span>
+					</div>
+					<div class="flex items-center gap-3 mt-0.5 text-xs text-base-content/40">
+						<span>{ l.StartedAtRelative }</span>
+						if l.Duration != nil && *l.Duration != "" {
+							<span class="text-base-content/25">&middot;</span>
+							<span class="tabular-nums">{ *l.Duration }</span>
+						}
+						if l.AccountsAffected > 0 {
+							<span class="text-base-content/25">&middot;</span>
+							<span>{ fmt.Sprintf("%d account%s", l.AccountsAffected, pluralS64(l.AccountsAffected)) }</span>
+						}
+					</div>
+					if l.Status == "error" && l.FriendlyErrorMessage != nil && *l.FriendlyErrorMessage != "" {
+						<div class="mt-1 text-xs text-error/60 truncate" title={ *l.FriendlyErrorMessage }>{ *l.FriendlyErrorMessage }</div>
+					} else if l.Status == "error" && l.ErrorMessage != nil && *l.ErrorMessage != "" {
+						<div class="mt-1 text-xs text-error/60 truncate font-mono" title={ *l.ErrorMessage }>{ *l.ErrorMessage }</div>
+					}
+				</div>
+			</div>
+			<!-- Changes + Status (wraps to second line on mobile) -->
+			<div class="flex items-center gap-3 sm:gap-4 shrink-0 pl-11 sm:pl-0">
+				if l.AddedCount != 0 || l.ModifiedCount != 0 || l.RemovedCount != 0 || l.UnchangedCount != 0 {
+					<div class="flex items-center gap-2 text-xs tabular-nums">
+						if l.AddedCount != 0 {
+							<span class="text-success font-medium">{ fmt.Sprintf("+%d", l.AddedCount) }</span>
+						}
+						if l.ModifiedCount != 0 {
+							<span class="text-info font-medium">{ fmt.Sprintf("~%d", l.ModifiedCount) }</span>
+						}
+						if l.RemovedCount != 0 {
+							<span class="text-error font-medium">{ fmt.Sprintf("-%d", l.RemovedCount) }</span>
+						}
+						if l.UnchangedCount != 0 {
+							<span class="text-base-content/30 font-medium" title={ fmt.Sprintf("%d unchanged transactions", l.UnchangedCount) }>{ fmt.Sprintf("=%d", l.UnchangedCount) }</span>
+						}
+					</div>
+				}
+				if l.WarningMessage != nil && *l.WarningMessage != "" {
+					<span class="badge badge-soft badge-warning badge-sm gap-1">
+						<i data-lucide="alert-triangle" class="w-3 h-3"></i>warning
+					</span>
+				}
+			</div>
+		</a>
+	</div>
+}
+
+templ logsSyncEmpty(p LogsProps) {
+	<div class="bb-card p-12 text-center">
+		<div class="flex flex-col items-center">
+			<div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
+				<i data-lucide="refresh-cw" class="w-8 h-8 text-base-content/25"></i>
+			</div>
+			<h3 class="text-lg font-semibold mb-1">No sync logs found</h3>
+			<p class="text-sm text-base-content/50 mb-5">
+				if hasAnySyncFilter(p) {
+					Try adjusting your filters.
+				} else {
+					Sync logs will appear here after your first bank sync.
+				}
+			</p>
+			if hasAnySyncFilter(p) {
+				<a href="/logs?tab=syncs" class="btn btn-ghost btn-sm rounded-xl">Clear filters</a>
+			}
+		</div>
+	</div>
+}
+
+// ====================================================================
+// Webhook events tab
+// ====================================================================
+
+templ logsWebhookStats(p LogsProps) {
+	if p.WHStats != nil {
+		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 bb-stagger">
+			<!-- Total Events -->
+			<div class="bb-card p-4">
+				<div class="flex items-center gap-3">
+					<div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+						<i data-lucide="webhook" class="w-4 h-4 text-base-content/40"></i>
+					</div>
+					<div>
+						<div class="text-2xl font-semibold tabular-nums leading-none">{ fmt.Sprintf("%d", p.WHStats.TotalEvents) }</div>
+						<div class="text-xs text-base-content/40 mt-0.5">Total events</div>
+					</div>
+				</div>
+			</div>
+			<!-- Processed -->
+			<div class="bb-card p-4">
+				<div class="flex items-center gap-3">
+					<div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
+						<i data-lucide="check-circle-2" class="w-4 h-4 text-success"></i>
+					</div>
+					<div>
+						<div class="text-2xl font-semibold tabular-nums leading-none text-success">{ fmt.Sprintf("%d", p.WHStats.ProcessedCount) }</div>
+						<div class="text-xs text-base-content/40 mt-0.5">Processed</div>
+					</div>
+				</div>
+			</div>
+			<!-- Received (in-flight) -->
+			<div class="bb-card p-4">
+				<div class="flex items-center gap-3">
+					<div class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+						<i data-lucide="clock" class="w-4 h-4 text-warning"></i>
+					</div>
+					<div>
+						<div class={ "text-2xl font-semibold tabular-nums leading-none", warningTextClass(p.WHStats.ReceivedCount > 0) }>
+							{ fmt.Sprintf("%d", p.WHStats.ReceivedCount) }
+						</div>
+						<div class="text-xs text-base-content/40 mt-0.5">In-flight</div>
+					</div>
+				</div>
+			</div>
+			<!-- Errors -->
+			<div class="bb-card p-4">
+				<div class="flex items-center gap-3">
+					<div class={ "w-9 h-9 rounded-lg flex items-center justify-center shrink-0", errorBg(p.WHStats.ErrorCount > 0) }>
+						<i data-lucide="alert-circle" class={ "w-4 h-4", errorIconClass(p.WHStats.ErrorCount > 0) }></i>
+					</div>
+					<div>
+						<div class={ "text-2xl font-semibold tabular-nums leading-none", errorTextClass(p.WHStats.ErrorCount > 0) }>
+							{ fmt.Sprintf("%d", p.WHStats.ErrorCount) }
+						</div>
+						<div class="text-xs text-base-content/40 mt-0.5">Errors</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+templ logsWebhookStatusTabs(p LogsProps) {
+	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+		<!-- Status pill tabs -->
+		<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 overflow-x-auto">
+			<a
+				href={ templ.SafeURL(webhookTabHref("", p.WHFilterProvider)) }
+				class={ statusPillClass(p.WHFilterStatus == "") }
+			>
+				All
+				<span class="text-[0.6rem] tabular-nums opacity-60">{ webhookStatsTotal(p.WHStats) }</span>
+			</a>
+			<a
+				href={ templ.SafeURL(webhookTabHref("processed", p.WHFilterProvider)) }
+				class={ statusPillClass(p.WHFilterStatus == "processed") }
+			>
+				<span class="w-1.5 h-1.5 rounded-full bg-success shrink-0"></span>
+				Processed
+				<span class="text-[0.6rem] tabular-nums opacity-60">{ webhookStatsProcessed(p.WHStats) }</span>
+			</a>
+			<a
+				href={ templ.SafeURL(webhookTabHref("received", p.WHFilterProvider)) }
+				class={ statusPillClass(p.WHFilterStatus == "received") }
+			>
+				<span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0"></span>
+				In-flight
+				<span class="text-[0.6rem] tabular-nums opacity-60">{ webhookStatsReceived(p.WHStats) }</span>
+			</a>
+			<a
+				href={ templ.SafeURL(webhookTabHref("error", p.WHFilterProvider)) }
+				class={ statusPillClass(p.WHFilterStatus == "error") }
+			>
+				<span class="w-1.5 h-1.5 rounded-full bg-error shrink-0"></span>
+				Errors
+				<span class="text-[0.6rem] tabular-nums opacity-60">{ webhookStatsErrors(p.WHStats) }</span>
+			</a>
+		</div>
+		<!-- Provider filter dropdown -->
+		<form method="GET" action="/logs" class="flex items-center gap-2">
+			<input type="hidden" name="tab" value="webhooks"/>
+			if p.WHFilterStatus != "" {
+				<input type="hidden" name="wh_status" value={ p.WHFilterStatus }/>
+			}
+			<select
+				name="wh_provider"
+				class="select select-sm select-bordered rounded-xl text-xs min-w-[10rem]"
+				onchange="this.form.submit()"
+			>
+				<option value="">All providers</option>
+				@providerOption("plaid", "Plaid", p.WHFilterProvider)
+				@providerOption("teller", "Teller", p.WHFilterProvider)
+			</select>
+			if p.WHFilterProvider != "" {
+				<a href={ templ.SafeURL(webhookClearProviderHref(p.WHFilterStatus)) } class="btn btn-ghost btn-xs rounded-lg">
+					<i data-lucide="x" class="w-3 h-3"></i>
+				</a>
+			}
+		</form>
+	</div>
+}
+
+templ providerOption(value, label, current string) {
+	if value == current {
+		<option value={ value } selected>{ label }</option>
+	} else {
+		<option value={ value }>{ label }</option>
+	}
+}
+
+templ logsWebhookRow(e LogsWebhookRow) {
+	<div class={ "bb-card group transition-all duration-150", webhookRowBorder(e.Status) } x-data="{ open: false }">
+		<div class="flex items-center gap-4 py-3 px-4 cursor-pointer" @click="open = !open">
+			<!-- Status indicator -->
+			<div class="relative shrink-0">
+				<div class={ "w-8 h-8 rounded-lg flex items-center justify-center", webhookStatusBg(e.Status) }>
+					switch e.Status {
+						case "processed":
+							<i data-lucide="check" class="w-3.5 h-3.5 text-success"></i>
+						case "error":
+							<i data-lucide="x" class="w-3.5 h-3.5 text-error"></i>
+						default:
+							<i data-lucide="clock" class="w-3.5 h-3.5 text-warning"></i>
+					}
+				</div>
+			</div>
+			<!-- Main content -->
+			<div class="flex-1 min-w-0">
+				<div class="flex items-center gap-2">
+					<span class="text-sm font-medium">{ e.EventType }</span>
+					<span class="badge badge-ghost badge-xs opacity-60">{ e.Provider }</span>
+				</div>
+				<div class="flex items-center gap-3 mt-0.5 text-xs text-base-content/40">
+					<span>{ e.CreatedAtRelative }</span>
+					if e.InstitutionName != nil && *e.InstitutionName != "" {
+						<span class="text-base-content/25">&middot;</span>
+						<span>{ *e.InstitutionName }</span>
+					}
+				</div>
+			</div>
+			<!-- Status badge + expand -->
+			<div class="flex items-center gap-3 shrink-0">
+				switch e.Status {
+					case "processed":
+						<span class="badge badge-soft badge-success badge-sm">processed</span>
+					case "error":
+						<span class="badge badge-soft badge-error badge-sm">error</span>
+					default:
+						<span class="badge badge-soft badge-warning badge-sm">{ e.Status }</span>
+				}
+				<button class="btn btn-ghost btn-xs btn-square rounded-lg text-base-content/30 hover:text-base-content/60 transition-colors">
+					<i data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
+				</button>
+			</div>
+		</div>
+		<!-- Expandable detail -->
+		<div
+			x-show="open"
+			x-cloak
+			x-transition:enter="transition ease-out duration-150"
+			x-transition:enter-start="opacity-0"
+			x-transition:enter-end="opacity-100"
+			x-transition:leave="transition ease-in duration-100"
+			x-transition:leave-start="opacity-100"
+			x-transition:leave-end="opacity-0"
+			class="border-t border-base-200"
+		>
+			<div class="px-4 py-3 ml-12 space-y-2">
+				if e.ConnectionID != nil && *e.ConnectionID != "" {
+					<div class="flex items-center gap-2 text-xs">
+						<span class="text-base-content/40 w-24 shrink-0">Connection</span>
+						<a href={ templ.SafeURL("/connections/" + *e.ConnectionID) } class="font-medium hover:text-primary transition-colors font-mono text-xs">
+							if e.InstitutionName != nil && *e.InstitutionName != "" {
+								{ *e.InstitutionName }
+							} else {
+								{ *e.ConnectionID }
+							}
+						</a>
+					</div>
+				}
+				<div class="flex items-center gap-2 text-xs">
+					<span class="text-base-content/40 w-24 shrink-0">Payload hash</span>
+					<span class="font-mono text-base-content/50 text-[0.65rem] break-all select-all">{ e.PayloadHash }</span>
+				</div>
+				<div class="flex items-center gap-2 text-xs">
+					<span class="text-base-content/40 w-24 shrink-0">Received at</span>
+					<span class="font-medium">{ e.CreatedAtFull }</span>
+				</div>
+				if e.ErrorMessage != nil && *e.ErrorMessage != "" {
+					<div class="flex items-start gap-2 text-xs mt-2">
+						<i data-lucide="alert-circle" class="w-3.5 h-3.5 text-error/60 shrink-0 mt-0.5"></i>
+						<p class="text-error/80 font-mono break-all leading-relaxed">{ *e.ErrorMessage }</p>
+					</div>
+				}
+			</div>
+		</div>
+	</div>
+}
+
+templ logsWebhookEmpty(p LogsProps) {
+	<div class="bb-card p-12 text-center">
+		<div class="flex flex-col items-center">
+			<div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
+				<i data-lucide="webhook" class="w-8 h-8 text-base-content/25"></i>
+			</div>
+			<h3 class="text-lg font-semibold mb-1">No webhook events</h3>
+			<p class="text-sm text-base-content/50 mb-5">
+				if p.WHFilterProvider != "" || p.WHFilterStatus != "" {
+					Try adjusting your filters.
+				} else {
+					Webhook events will appear here when providers send notifications.
+				}
+			</p>
+			if p.WHFilterProvider != "" || p.WHFilterStatus != "" {
+				<a href="/logs?tab=webhooks" class="btn btn-ghost btn-sm rounded-xl">Clear filters</a>
+			}
+		</div>
+	</div>
+}
+
+// ====================================================================
+// Shared paginator (mirrors the bb-paginator markup in source HTML)
+// ====================================================================
+
+templ logsPaginator(page, totalPages int, total int64, showingStart, showingEnd int, base string) {
+	<div class="bb-paginator">
+		<span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
+			@templ.Raw(fmt.Sprintf("Showing %d&ndash;%d of %d", showingStart, showingEnd, total))
+		</span>
+		<div class="bb-paginator__nav">
+			if page > 2 {
+				<a href={ templ.SafeURL(fmt.Sprintf("%s%d", base, 1)) } class="bb-paginator__btn" title="First page">
+					<i data-lucide="chevrons-left" class="w-3.5 h-3.5"></i>
+				</a>
+			}
+			if page > 1 {
+				<a href={ templ.SafeURL(fmt.Sprintf("%s%d", base, page-1)) } class="bb-paginator__btn" title="Previous page">
+					<i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+				</a>
+			}
+			for _, n := range pageRange(page, totalPages) {
+				if n == 0 {
+					<span class="bb-paginator__ellipsis">&hellip;</span>
+				} else if n == page {
+					<span class="bb-paginator__btn bb-paginator__btn--active">{ fmt.Sprintf("%d", n) }</span>
+				} else {
+					<a href={ templ.SafeURL(fmt.Sprintf("%s%d", base, n)) } class="bb-paginator__btn">{ fmt.Sprintf("%d", n) }</a>
+				}
+			}
+			if page < totalPages {
+				<a href={ templ.SafeURL(fmt.Sprintf("%s%d", base, page+1)) } class="bb-paginator__btn" title="Next page">
+					<i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+				</a>
+			}
+			if page < totalPages-1 {
+				<a href={ templ.SafeURL(fmt.Sprintf("%s%d", base, totalPages)) } class="bb-paginator__btn" title="Last page">
+					<i data-lucide="chevrons-right" class="w-3.5 h-3.5"></i>
+				</a>
+			}
+		</div>
+	</div>
+}
+
+// ====================================================================
+// Helpers
+// ====================================================================
+
+// pluralS64 returns "s" when n != 1, mirroring the {{if ne .X 1}}s{{end}}
+// pattern used in the source HTML.
+func pluralS64(n int64) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
+func successRateBg(rate float64) string {
+	switch {
+	case rate > 80.0:
+		return "bg-success/10"
+	case rate > 50.0:
+		return "bg-warning/10"
+	default:
+		return "bg-error/10"
+	}
+}
+
+func successRateText(rate float64) string {
+	switch {
+	case rate > 80.0:
+		return "text-success"
+	case rate > 50.0:
+		return "text-warning"
+	default:
+		return "text-error"
+	}
+}
+
+func errorBg(hasErrors bool) string {
+	if hasErrors {
+		return "bg-error/10"
+	}
+	return "bg-base-200/60"
+}
+
+func errorIconClass(hasErrors bool) string {
+	if hasErrors {
+		return "text-error/70"
+	}
+	return "text-base-content/40"
+}
+
+func errorTextClass(hasErrors bool) string {
+	if hasErrors {
+		return "text-error"
+	}
+	return ""
+}
+
+func warningTextClass(active bool) string {
+	if active {
+		return "text-warning"
+	}
+	return ""
+}
+
+// formatAvgDuration mirrors the {{if gt .Stats.AvgDurationMs 999.0}}…s{{else}}…ms{{end}}
+// branch in the source HTML.
+func formatAvgDuration(ms float64) string {
+	if ms > 999.0 {
+		return fmt.Sprintf("%.1fs", ms/1000.0)
+	}
+	return fmt.Sprintf("%.0fms", ms)
+}
+
+func syncStatusBg(status string) string {
+	switch status {
+	case "success":
+		return "bg-success/10"
+	case "error":
+		return "bg-error/10"
+	case "in_progress":
+		return "bg-warning/10"
+	default:
+		return "bg-base-200/50"
+	}
+}
+
+func syncRowBorder(status string) string {
+	if status == "error" {
+		return "border-error/20 hover:border-error/30"
+	}
+	return ""
+}
+
+func webhookStatusBg(status string) string {
+	switch status {
+	case "processed":
+		return "bg-success/10"
+	case "error":
+		return "bg-error/10"
+	default:
+		return "bg-warning/10"
+	}
+}
+
+func webhookRowBorder(status string) string {
+	if status == "error" {
+		return "border-error/20"
+	}
+	return ""
+}
+
+// statusPillClass returns the active/inactive pill styling for the
+// status filter tabs. Mirrors the inline `{{if eq .FilterStatus "x"}}…
+// {{else}}…{{end}}` pattern used in the source HTML.
+func statusPillClass(active bool) string {
+	base := "px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150 no-underline flex items-center gap-1.5 whitespace-nowrap"
+	if active {
+		return base + " bg-base-100 text-base-content shadow-sm"
+	}
+	return base + " text-base-content/40 hover:text-base-content/60"
+}
+
+// statusTabHref renders /logs?tab=syncs&<query> as a SafeURL — query is
+// already url.Values-encoded by the handler.
+func statusTabHref(query string) templ.SafeURL {
+	if query == "" {
+		return templ.SafeURL("/logs?tab=syncs&")
+	}
+	return templ.SafeURL("/logs?tab=syncs&" + query)
+}
+
+// statsTotalSync returns the formatted Stats.TotalSyncs count.
+// Returns "0" when stats is nil (the empty-DB case).
+func statsTotalSync(s *service.SyncLogStats) string {
+	if s == nil {
+		return "0"
+	}
+	return fmt.Sprintf("%d", s.TotalSyncs)
+}
+
+func webhookStatsTotal(s *service.WebhookEventStats) string {
+	if s == nil {
+		return "0"
+	}
+	return fmt.Sprintf("%d", s.TotalEvents)
+}
+
+func webhookStatsProcessed(s *service.WebhookEventStats) string {
+	if s == nil {
+		return "0"
+	}
+	return fmt.Sprintf("%d", s.ProcessedCount)
+}
+
+func webhookStatsReceived(s *service.WebhookEventStats) string {
+	if s == nil {
+		return "0"
+	}
+	return fmt.Sprintf("%d", s.ReceivedCount)
+}
+
+func webhookStatsErrors(s *service.WebhookEventStats) string {
+	if s == nil {
+		return "0"
+	}
+	return fmt.Sprintf("%d", s.ErrorCount)
+}
+
+// hasAnySyncFilter mirrors the `{{if or .FilterConnID .FilterTrigger
+// .FilterDateFrom .FilterDateTo .FilterStatus}}` guard in the source
+// HTML.
+func hasAnySyncFilter(p LogsProps) bool {
+	return p.FilterConnID != "" || p.FilterTrigger != "" || p.FilterDateFrom != "" || p.FilterDateTo != "" || p.FilterStatus != ""
+}
+
+// webhookTabHref builds /logs?tab=webhooks[&wh_status=…][&wh_provider=…].
+// The empty status case (the "All" tab) only appends the provider clause.
+func webhookTabHref(status, provider string) string {
+	href := "/logs?tab=webhooks"
+	if status != "" {
+		href += "&wh_status=" + status
+	}
+	if provider != "" {
+		href += "&wh_provider=" + provider
+	}
+	return href
+}
+
+// webhookClearProviderHref builds the "x" link that clears just the
+// provider filter while preserving the status tab.
+func webhookClearProviderHref(status string) string {
+	href := "/logs?tab=webhooks"
+	if status != "" {
+		href += "&wh_status=" + status
+	}
+	return href
+}
+
+// pageRange mirrors the admin funcMap helper of the same name. Returns
+// page numbers to display with 0 as an ellipsis sentinel. Local copy so
+// the pages package doesn't have to back-import internal/admin.
+func pageRange(current, total int) []int {
+	if total <= 7 {
+		out := make([]int, total)
+		for i := range out {
+			out[i] = i + 1
+		}
+		return out
+	}
+	seen := map[int]bool{}
+	add := func(p int) {
+		if p >= 1 && p <= total {
+			seen[p] = true
+		}
+	}
+	add(1)
+	add(total)
+	for d := -1; d <= 1; d++ {
+		add(current + d)
+	}
+	sorted := make([]int, 0, len(seen))
+	for p := range seen {
+		sorted = append(sorted, p)
+	}
+	// Sort.
+	for i := 0; i < len(sorted); i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			if sorted[j] < sorted[i] {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+	result := make([]int, 0, len(sorted)*2)
+	for i, p := range sorted {
+		if i > 0 && p > sorted[i-1]+1 {
+			result = append(result, 0) // ellipsis
+		}
+		result = append(result, p)
+	}
+	return result
+}
