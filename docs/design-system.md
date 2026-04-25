@@ -797,7 +797,7 @@ Run `templ fmt .` before committing — it normalizes whitespace and attribute o
 
 ## 14. Alpine page components
 
-Page-level Alpine factories — the things rendered as `x-data="..."` at the root of an admin page — live in `static/js/admin/components/<pageSlug>.js` and load via `<script src="..." defer>`. This keeps JS out of templ files and out of `_scripts.go` Go-string sidecars, so editors give you syntax highlighting, the formatter works, and refactors are mechanical.
+Page-level Alpine factories — the things rendered as `x-data="..."` at the root of an admin page — live in `static/js/admin/components/<pageSlug>.js` and load via a synchronous `<script src="...">` placed at the top of the templ component. This keeps JS out of templ files and out of `_scripts.go` Go-string sidecars, so editors give you syntax highlighting, the formatter works, and refactors are mechanical.
 
 Tracker for the migration: #827 (foundation: #828; reference port: `prompt_builder`).
 
@@ -845,20 +845,20 @@ In the `.templ` page:
 
 ```templ
 templ MyPage(p MyPageProps) {
+  <script src="/static/js/admin/components/my_page.js"></script>
   // ... markup ...
   @templ.JSONScript("my-page-data", p.Items)
   <div x-data="myPage" data-mode={ p.Mode }>
     // ... interactive markup using methods + state from the factory ...
   </div>
-  <script src="/static/js/admin/components/my_page.js" defer></script>
 }
 ```
 
 Three things to notice:
 
+- The component `<script src="...">` is **at the top of the templ component** and **NOT marked `defer`**. Alpine itself loads via `<script defer>` in `<head>`, so its `alpine:init` event would fire before a deferred component script could register the factory. Loading synchronously here means the parser runs your `Alpine.data('myPage', ...)` registration BEFORE Alpine wakes up. The script is small and same-origin, so the synchronous fetch is a non-issue. (Alternatively a `<script defer>` placed in `<head>` would also work because of document-order defer execution; keeping it in the component is more co-located.)
 - `x-data="myPage"` is a **string literal** — not `x-data={ "myPage(...)" }`. That Go-expression form is the regression #827 is undoing and is enforced against by the lint in `internal/templates/components/pages/scripts_lint_test.go`.
 - `@templ.JSONScript("my-page-data", p.Items)` renders `<script id="my-page-data" type="application/json">[...]</script>` with proper escaping. The factory parses it once in `init()`. This is the documented templ helper for passing complex server data to client JS.
-- `<script src="..." defer>` lives in the templ component itself (or the page's root) so the factory loads alongside the page that needs it. No global script bag, no `_scripts.go` sidecar.
 
 ### Two data-passing patterns — pick one
 

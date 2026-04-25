@@ -93,7 +93,7 @@ Use Alpine inline patterns (modal + `x-data` state). Never blocking browser dial
 
 ## JavaScript and Alpine
 
-Page-level Alpine factories live in `static/js/admin/components/<pageSlug>.js`. They register via `Alpine.data()` inside an `alpine:init` listener, take **no arguments**, and parse their initial state from a sibling `@templ.JSONScript("<page>-data", p.X)` tag (or from `data-*` attributes for scalars). Templ wires the factory in with `<script src="/static/js/admin/components/<pageSlug>.js" defer></script>` and a string-literal `x-data="factoryName"`.
+Page-level Alpine factories live in `static/js/admin/components/<pageSlug>.js`. They register via `Alpine.data()` inside an `alpine:init` listener, take **no arguments**, and parse their initial state from a sibling `@templ.JSONScript("<page>-data", p.X)` tag (or from `data-*` attributes for scalars). Templ wires the factory in with `<script src="/static/js/admin/components/<pageSlug>.js"></script>` placed at the **top of the templ component** (no `defer` — Alpine in `<head>` is already deferred and would otherwise fire `alpine:init` before the factory registers) and a string-literal `x-data="factoryName"` on the root element.
 
 The full convention — file layout, factory shape, data-passing patterns, and a worked example — is in `docs/design-system.md` → "Alpine page components". The reference implementation is `static/js/admin/components/prompt_builder.js` (powering `/agent-wizard/{type}`).
 
