@@ -179,19 +179,19 @@ func AddTransactionTagAdminHandler(a *app.App, sm *scs.SessionManager, svc *serv
 		}
 		body.Slug = strings.TrimSpace(body.Slug)
 		if body.Slug == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "slug is required"})
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "slug is required")
 			return
 		}
 		added, alreadyPresent, err := svc.AddTransactionTag(r.Context(), txnID, body.Slug, actor, body.Note)
 		if err != nil {
 			switch {
 			case errors.Is(err, service.ErrNotFound):
-				writeJSON(w, http.StatusNotFound, map[string]any{"error": "transaction not found"})
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
 			case errors.Is(err, service.ErrInvalidParameter):
-				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+				writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 			default:
 				a.Logger.Error("add transaction tag", "error", err)
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal server error"})
+				writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 			}
 			return
 		}
@@ -226,12 +226,12 @@ func RemoveTransactionTagAdminHandler(a *app.App, sm *scs.SessionManager, svc *s
 		if err != nil {
 			switch {
 			case errors.Is(err, service.ErrNotFound):
-				writeJSON(w, http.StatusNotFound, map[string]any{"error": "transaction not found"})
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
 			case errors.Is(err, service.ErrInvalidParameter):
-				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+				writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 			default:
 				a.Logger.Error("remove transaction tag", "error", err)
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal server error"})
+				writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 			}
 			return
 		}

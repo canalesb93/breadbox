@@ -1331,11 +1331,11 @@ func BulkUpdateTransactionsAdminHandler(a *app.App, sm *scs.SessionManager, svc 
 			return
 		}
 		if len(body.Operations) == 0 {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "operations required"})
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "operations required")
 			return
 		}
 		if len(body.Operations) > 50 {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "maximum 50 operations per batch"})
+			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "maximum 50 operations per batch")
 			return
 		}
 
