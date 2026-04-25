@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
 )
 
 // Logs renders the combined sync-logs + webhook-events page body.
@@ -91,7 +92,6 @@ templ Logs(p LogsProps) {
 // ====================================================================
 // Sync logs tab
 // ====================================================================
-
 templ logsSyncStats(p LogsProps) {
 	if p.Stats != nil {
 		<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 bb-stagger">
@@ -366,7 +366,6 @@ templ logsSyncEmpty(p LogsProps) {
 // ====================================================================
 // Webhook events tab
 // ====================================================================
-
 templ logsWebhookStats(p LogsProps) {
 	if p.WHStats != nil {
 		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 bb-stagger">
@@ -607,7 +606,6 @@ templ logsWebhookEmpty(p LogsProps) {
 // ====================================================================
 // Shared paginator (mirrors the bb-paginator markup in source HTML)
 // ====================================================================
-
 templ logsPaginator(page, totalPages int, total int64, showingStart, showingEnd int, base string) {
 	<div class="bb-paginator">
 		<span class="text-xs text-base-content/50 tabular-nums hidden sm:inline">
@@ -624,7 +622,7 @@ templ logsPaginator(page, totalPages int, total int64, showingStart, showingEnd 
 					<i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
 				</a>
 			}
-			for _, n := range pageRange(page, totalPages) {
+			for _, n := range components.PageRange(page, totalPages) {
 				if n == 0 {
 					<span class="bb-paginator__ellipsis">&hellip;</span>
 				} else if n == page {
@@ -842,48 +840,4 @@ func webhookClearProviderHref(status string) string {
 		href += "&wh_status=" + status
 	}
 	return href
-}
-
-// pageRange mirrors the admin funcMap helper of the same name. Returns
-// page numbers to display with 0 as an ellipsis sentinel. Local copy so
-// the pages package doesn't have to back-import internal/admin.
-func pageRange(current, total int) []int {
-	if total <= 7 {
-		out := make([]int, total)
-		for i := range out {
-			out[i] = i + 1
-		}
-		return out
-	}
-	seen := map[int]bool{}
-	add := func(p int) {
-		if p >= 1 && p <= total {
-			seen[p] = true
-		}
-	}
-	add(1)
-	add(total)
-	for d := -1; d <= 1; d++ {
-		add(current + d)
-	}
-	sorted := make([]int, 0, len(seen))
-	for p := range seen {
-		sorted = append(sorted, p)
-	}
-	// Sort.
-	for i := 0; i < len(sorted); i++ {
-		for j := i + 1; j < len(sorted); j++ {
-			if sorted[j] < sorted[i] {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
-	result := make([]int, 0, len(sorted)*2)
-	for i, p := range sorted {
-		if i > 0 && p > sorted[i-1]+1 {
-			result = append(result, 0) // ellipsis
-		}
-		result = append(result, p)
-	}
-	return result
 }

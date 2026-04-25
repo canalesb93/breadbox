@@ -2,7 +2,6 @@ package components
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"breadbox/internal/service"
@@ -116,7 +115,7 @@ templ TxResults(p TxResultsProps) {
 					</a>
 				}
 				<!-- Page numbers -->
-				for _, n := range pageRange(p.Page, p.TotalPages) {
+				for _, n := range PageRange(p.Page, p.TotalPages) {
 					if n == 0 {
 						<span class="bb-paginator__ellipsis">&hellip;</span>
 					} else if n == p.Page {
@@ -195,40 +194,4 @@ func txMetaScriptHTML(txns []service.AdminTransactionRow) string {
 
 func paginatorURL(base string, page int) templ.SafeURL {
 	return templ.SafeURL(fmt.Sprintf("%s%d", base, page))
-}
-
-// pageRange mirrors the admin funcMap helper of the same name. Returns
-// page numbers to display with 0 as an ellipsis sentinel.
-func pageRange(current, total int) []int {
-	if total <= 7 {
-		pages := make([]int, total)
-		for i := range pages {
-			pages[i] = i + 1
-		}
-		return pages
-	}
-	seen := map[int]bool{}
-	add := func(p int) {
-		if p >= 1 && p <= total {
-			seen[p] = true
-		}
-	}
-	add(1)
-	add(total)
-	for d := -1; d <= 1; d++ {
-		add(current + d)
-	}
-	sorted := make([]int, 0, len(seen))
-	for p := range seen {
-		sorted = append(sorted, p)
-	}
-	sort.Ints(sorted)
-	result := make([]int, 0, len(sorted)*2)
-	for i, p := range sorted {
-		if i > 0 && p > sorted[i-1]+1 {
-			result = append(result, 0) // ellipsis
-		}
-		result = append(result, p)
-	}
-	return result
 }
