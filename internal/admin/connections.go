@@ -656,19 +656,12 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 				errorSyncs++
 			}
 
-			// Calculate duration (prefer stored duration_ms, fall back to timestamps).
-			var durSec float64
-			var hasDur bool
-			if log.DurationMs.Valid {
-				durSec = float64(log.DurationMs.Int32) / 1000.0
-				hasDur = true
-			} else if log.StartedAt.Valid && log.CompletedAt.Valid {
-				durSec = log.CompletedAt.Time.Sub(log.StartedAt.Time).Seconds()
-				hasDur = true
-			}
-			if hasDur && durSec >= 0 && durSec < 600 { // sanity check: under 10 min
-				avgDurationSec += durSec
-				durationCount++
+			if ms, ok := service.SyncLogDurationMs(log.DurationMs, log.StartedAt, log.CompletedAt); ok {
+				durSec := float64(ms) / 1000.0
+				if durSec >= 0 && durSec < 600 { // sanity check: under 10 min
+					avgDurationSec += durSec
+					durationCount++
+				}
 			}
 
 			// Populate day map.
@@ -1206,18 +1199,9 @@ func SyncConnectionStatusHandler(a *app.App) http.HandlerFunc {
 		if log.CompletedAt.Valid {
 			resp["completed_at"] = log.CompletedAt.Time.Format(time.RFC3339)
 		}
-		var durationMs int32
-		var hasDuration bool
-		if log.DurationMs.Valid {
-			durationMs = log.DurationMs.Int32
-			hasDuration = true
-		} else if log.StartedAt.Valid && log.CompletedAt.Valid {
-			durationMs = int32(log.CompletedAt.Time.Sub(log.StartedAt.Time).Milliseconds())
-			hasDuration = true
-		}
-		if hasDuration {
-			resp["duration_ms"] = durationMs
-			resp["duration_label"] = service.FormatDurationMs(int64(durationMs))
+		if ms, ok := service.SyncLogDurationMs(log.DurationMs, log.StartedAt, log.CompletedAt); ok {
+			resp["duration_ms"] = ms
+			resp["duration_label"] = service.FormatDurationMs(int64(ms))
 		}
 		if log.ErrorMessage.Valid {
 			resp["error_message"] = log.ErrorMessage.String
