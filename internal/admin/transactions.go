@@ -913,194 +913,50 @@ func tagDisplayLookup(tags []service.TagResponse) func(string) tagDisplay {
 	}
 }
 
-// buildActivityTimeline produces a sorted activity list from annotations.
-// Review lifecycle events surface as tag_added/tag_removed on the
-// needs-review tag. Comment annotations originally authored as review notes
-// (identified by payload.review_id) render inline on their resolution event.
+// buildActivityTimeline produces a sorted activity list from annotations
+// and is the admin-handler bridge between the service-layer
+// service.Annotation shape (which carries derived fields like Summary, Action,
+// Origin) and the UI-layer service.ActivityEntry shape (which carries
+// presentation extras like TagColor and ReviewStatus).
+//
+// Dedup and summary derivation live in service.EnrichAnnotations; this
+// function delegates to it via the supplied lookups, then maps each
+// enriched annotation to its ActivityEntry.
 //
 // categoryDisplay maps a category slug to a human-readable name
-// ("Food & Drink › Groceries"). Pass a no-op (returning slug unchanged) in
-// tests that don't need humanization.
+// ("Food & Drink › Groceries"). Pass nil to use raw slugs.
 //
 // tagDisplayFn maps a tag slug to its display name + color for rendering a
-// tag chip on tag_added / tag_removed rows. Pass nil in tests that don't
-// exercise tag presentation.
+// tag chip on tag_added / tag_removed rows. Pass nil to use raw slugs.
 func buildActivityTimeline(annotations []service.Annotation, categoryDisplay func(string) string, tagDisplayFn func(string) tagDisplay) []service.ActivityEntry {
-	if categoryDisplay == nil {
-		categoryDisplay = func(s string) string { return s }
+	if len(annotations) == 0 {
+		return nil
 	}
-	if tagDisplayFn == nil {
-		tagDisplayFn = func(slug string) tagDisplay { return tagDisplay{DisplayName: slug} }
-	}
-	var entries []service.ActivityEntry
-
-	// Annotations.
-	for _, a := range annotations {
-		switch a.Kind {
-		case "comment":
-			content, _ := a.Payload["content"].(string)
-			// Filter legacy [Review: ...] prefix duplicates from pre-consolidation imports.
-			if strings.HasPrefix(content, "[Review: ") {
-				continue
-			}
-			// Dedup: suppress a comment that exactly duplicates a same-actor
-			// tag_added.note written within ±2s. update_transactions (MCP
-			// and REST) can write a tag-with-note AND a standalone comment
-			// in one call; the resulting rows land within a few ms of each
-			// other and render as twin adjacent events. The tag row already
-			// inlines the note via .Detail — the comment is redundant.
-			if isDuplicateOfAdjacentTagNote(annotations, a, content) {
-				continue
-			}
-			entry := service.ActivityEntry{
-				Type:               "comment",
-				Timestamp:          a.CreatedAt,
-				ActorName:          a.ActorName,
-				ActorType:          a.ActorType,
-				ActorAvatarVersion: a.ActorAvatarVersion,
-				Detail:             content,
-				CommentID:          a.ShortID,
-			}
-			if a.ActorID != nil && *a.ActorID != "" {
-				id := *a.ActorID
-				entry.ActorID = &id
-			}
-			entries = append(entries, entry)
-
-		case "rule_applied":
-			ruleName, _ := a.Payload["rule_name"].(string)
-			field, _ := a.Payload["action_field"].(string)
-			value, _ := a.Payload["action_value"].(string)
-			appliedBy, _ := a.Payload["applied_by"].(string)
-			// Older rows (and any future bug) can land here with rule_name
-			// empty and rule_id empty — render a generic subject instead of
-			// `Rule "" set category to food_and_drink_groceries`. The
-			// template already skips the /rules/<id> link when RuleID is
-			// empty, so the fallback text renders as plain copy.
-			subject := `Rule "` + ruleName + `"`
-			if ruleName == "" {
-				subject = "A rule"
-			}
-			// Humanize the action value for category actions so we render
-			// "Food & Drink › Groceries" rather than the raw slug.
-			displayValue := value
-			if field == "category" {
-				displayValue = categoryDisplay(value)
-			}
-			summary := subject + " applied"
-			switch field {
-			case "category":
-				summary = subject + " set category to " + displayValue
-			case "tag":
-				summary = subject + " added tag " + value
-			case "comment":
-				summary = subject + " added a comment"
-			}
-			how := "during sync"
-			if appliedBy == "retroactive" {
-				how = "retroactively"
-			}
-			entries = append(entries, service.ActivityEntry{
-				Type:      "rule",
-				Timestamp: a.CreatedAt,
-				// Rules aren't actors — keep the actor slot empty so the
-				// template's actor-meta span is skipped. Origin carries the
-				// "during sync" / "retroactively" qualifier as a subordinate
-				// meta pill next to the timestamp.
-				ActorName: "",
-				ActorType: "system",
-				Summary:   summary,
-				RuleName:  ruleName,
-				RuleID:    derefOr(a.RuleID, ""),
-				Origin:    how,
-			})
-
-		case "tag_added":
-			source, _ := a.Payload["source"].(string)
-			if source == "rule" {
-				// Represented separately via the rule_applied annotation
-				// written alongside tag_added during sync. Skip to avoid
-				// double-rendering. Mirrors the category_set dedup below.
-				continue
-			}
-			slug, _ := a.Payload["slug"].(string)
-			note, _ := a.Payload["note"].(string)
+	// Map the admin's tagDisplay (name + color) to the service-layer tag
+	// display closure (name only). Color stays here in the UI mapping pass.
+	var tagNameLookup func(string) string
+	if tagDisplayFn != nil {
+		tagNameLookup = func(slug string) string {
 			td := tagDisplayFn(slug)
-			entry := service.ActivityEntry{
-				Type:               "tag",
-				Timestamp:          a.CreatedAt,
-				ActorName:          a.ActorName,
-				ActorType:          a.ActorType,
-				ActorAvatarVersion: a.ActorAvatarVersion,
-				Summary:            "Added tag",
-				Detail:             note,
-				TagSlug:            slug,
-				TagDisplayName:     td.DisplayName,
-				TagColor:           td.Color,
-				TagAction:          "added",
+			if td.DisplayName != "" {
+				return td.DisplayName
 			}
-			if a.ActorID != nil && *a.ActorID != "" {
-				id := *a.ActorID
-				entry.ActorID = &id
-			}
-			entries = append(entries, entry)
-
-		case "tag_removed":
-			source, _ := a.Payload["source"].(string)
-			if source == "rule" {
-				// Future-proof: if a rule ever emits a rule-sourced tag_removed
-				// alongside a rule_applied annotation, dedup the same way as
-				// tag_added / category_set so the timeline stays symmetric.
-				continue
-			}
-			slug, _ := a.Payload["slug"].(string)
-			note, _ := a.Payload["note"].(string)
-			td := tagDisplayFn(slug)
-			entry := service.ActivityEntry{
-				Type:               "tag",
-				Timestamp:          a.CreatedAt,
-				ActorName:          a.ActorName,
-				ActorType:          a.ActorType,
-				ActorAvatarVersion: a.ActorAvatarVersion,
-				Summary:            "Removed tag",
-				Detail:             note,
-				TagSlug:            slug,
-				TagDisplayName:     td.DisplayName,
-				TagColor:           td.Color,
-				TagAction:          "removed",
-			}
-			if a.ActorID != nil && *a.ActorID != "" {
-				id := *a.ActorID
-				entry.ActorID = &id
-			}
-			entries = append(entries, entry)
-
-		case "category_set":
-			slug, _ := a.Payload["category_slug"].(string)
-			source, _ := a.Payload["source"].(string)
-			if source == "rule" {
-				// Represented separately via the rule_applied annotation
-				// written alongside category_set during sync. Skip to avoid
-				// double-rendering.
-				continue
-			}
-			displaySlug := categoryDisplay(slug)
-			summary := "Category set to " + displaySlug
-			entry := service.ActivityEntry{
-				Type:               "category",
-				Timestamp:          a.CreatedAt,
-				ActorName:          a.ActorName,
-				ActorType:          a.ActorType,
-				ActorAvatarVersion: a.ActorAvatarVersion,
-				Summary:            summary,
-				CategoryName:       displaySlug,
-			}
-			if a.ActorID != nil && *a.ActorID != "" {
-				id := *a.ActorID
-				entry.ActorID = &id
-			}
-			entries = append(entries, entry)
+			return slug
 		}
+	}
+
+	enriched := service.EnrichAnnotations(annotations, service.EnrichOptions{
+		TagDisplay:      tagNameLookup,
+		CategoryDisplay: categoryDisplay,
+	})
+
+	entries := make([]service.ActivityEntry, 0, len(enriched))
+	for _, a := range enriched {
+		entry, ok := activityEntryFromAnnotation(a, tagDisplayFn)
+		if !ok {
+			continue
+		}
+		entries = append(entries, entry)
 	}
 
 	// Sort by timestamp descending (newest first).
@@ -1109,6 +965,104 @@ func buildActivityTimeline(annotations []service.Annotation, categoryDisplay fun
 	})
 
 	return entries
+}
+
+// activityEntryFromAnnotation maps a single enriched service.Annotation to
+// the UI's ActivityEntry shape. Returns (zero, false) for unknown kinds so
+// the caller can drop them. Tag rows pull color from tagDisplayFn since
+// color is a presentation concern that lives in the admin layer.
+func activityEntryFromAnnotation(a service.Annotation, tagDisplayFn func(string) tagDisplay) (service.ActivityEntry, bool) {
+	switch a.Kind {
+	case "comment":
+		entry := service.ActivityEntry{
+			Type:               "comment",
+			Timestamp:          a.CreatedAt,
+			ActorName:          a.ActorName,
+			ActorType:          a.ActorType,
+			ActorAvatarVersion: a.ActorAvatarVersion,
+			Detail:             a.Content,
+			CommentID:          a.ShortID,
+		}
+		if a.ActorID != nil && *a.ActorID != "" {
+			id := *a.ActorID
+			entry.ActorID = &id
+		}
+		return entry, true
+
+	case "rule_applied":
+		// Subject carries the bare rule name in enrichment; the UI prefers
+		// the full pre-formatted Summary phrase but with the trailing
+		// "during sync" / "retroactively" stripped off (Origin renders
+		// it separately as a meta pill on the timeline row).
+		summary := a.Summary
+		if a.Origin != "" {
+			summary = strings.TrimSuffix(summary, " "+a.Origin)
+		}
+		return service.ActivityEntry{
+			Type:      "rule",
+			Timestamp: a.CreatedAt,
+			ActorName: "",
+			ActorType: "system",
+			Summary:   summary,
+			RuleName:  a.RuleName,
+			RuleID:    derefOr(a.RuleID, ""),
+			Origin:    a.Origin,
+		}, true
+
+	case "tag_added", "tag_removed":
+		// Look up color separately — service-layer enrichment doesn't
+		// carry presentation metadata.
+		var color *string
+		display := a.Subject
+		if tagDisplayFn != nil {
+			td := tagDisplayFn(a.TagSlug)
+			color = td.Color
+			if td.DisplayName != "" {
+				display = td.DisplayName
+			}
+		}
+		summary := "Added tag"
+		action := "added"
+		if a.Kind == "tag_removed" {
+			summary = "Removed tag"
+			action = "removed"
+		}
+		entry := service.ActivityEntry{
+			Type:               "tag",
+			Timestamp:          a.CreatedAt,
+			ActorName:          a.ActorName,
+			ActorType:          a.ActorType,
+			ActorAvatarVersion: a.ActorAvatarVersion,
+			Summary:            summary,
+			Detail:             a.Note,
+			TagSlug:            a.TagSlug,
+			TagDisplayName:     display,
+			TagColor:           color,
+			TagAction:          action,
+		}
+		if a.ActorID != nil && *a.ActorID != "" {
+			id := *a.ActorID
+			entry.ActorID = &id
+		}
+		return entry, true
+
+	case "category_set":
+		entry := service.ActivityEntry{
+			Type:               "category",
+			Timestamp:          a.CreatedAt,
+			ActorName:          a.ActorName,
+			ActorType:          a.ActorType,
+			ActorAvatarVersion: a.ActorAvatarVersion,
+			Summary:            "Category set to " + a.Subject,
+			CategoryName:       a.Subject,
+		}
+		if a.ActorID != nil && *a.ActorID != "" {
+			id := *a.ActorID
+			entry.ActorID = &id
+		}
+		return entry, true
+	}
+	return service.ActivityEntry{}, false
 }
 
 // ActivityDayGroup holds activity entries grouped by calendar day (in the

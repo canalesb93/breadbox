@@ -129,15 +129,32 @@ func mapAnnotationKinds(kinds []string) ([]string, error) {
 }
 
 // mcpAnnotation is the agent-facing annotation shape. `kind` is the generic
-// name (comment | rule | tag | category); `action` carries the specific event
-// (added | removed | set | applied) so agents can branch without parsing the
-// kind string. Comment rows omit `action` since there is only one event.
+// name (comment | rule | tag | category); `action` carries the specific
+// event verb (added | removed | set | applied | commented) so agents can
+// branch without parsing the kind string.
+//
+// `summary` is a human-readable one-liner ("Alice added the food tag") so
+// agents can read activity directly without composing sentences from
+// payload keys; the underlying `payload` is preserved for raw access.
+// `subject` is the canonical object of the event (tag display name,
+// category display name, rule name, or comment body preview), and the
+// top-level resource refs (`tag_slug`, `category_slug`, `rule_name`) make
+// cross-linking cheap.
 type mcpAnnotation struct {
 	ID            string                 `json:"id"`
 	ShortID       string                 `json:"short_id"`
 	TransactionID string                 `json:"transaction_id"`
 	Kind          string                 `json:"kind"`
 	Action        string                 `json:"action,omitempty"`
+	Summary       string                 `json:"summary,omitempty"`
+	Subject       string                 `json:"subject,omitempty"`
+	Origin        string                 `json:"origin,omitempty"`
+	Source        string                 `json:"source,omitempty"`
+	Content       string                 `json:"content,omitempty"`
+	Note          string                 `json:"note,omitempty"`
+	TagSlug       string                 `json:"tag_slug,omitempty"`
+	CategorySlug  string                 `json:"category_slug,omitempty"`
+	RuleName      string                 `json:"rule_name,omitempty"`
 	ActorType     string                 `json:"actor_type"`
 	ActorID       *string                `json:"actor_id,omitempty"`
 	ActorName     string                 `json:"actor_name"`
@@ -168,13 +185,30 @@ func dbKindToMCP(dbKind string) (kind, action string) {
 }
 
 func toMCPAnnotation(a service.Annotation) mcpAnnotation {
-	kind, action := dbKindToMCP(a.Kind)
+	kind, fallbackAction := dbKindToMCP(a.Kind)
+	// Action prefers the enriched value populated by
+	// service.EnrichAnnotations (which leaves it empty for kind=comment
+	// by design); fall back to the legacy kind→action mapping for raw
+	// rows returned via ListAnnotations(Raw=true).
+	action := a.Action
+	if action == "" && a.Kind != "comment" {
+		action = fallbackAction
+	}
 	return mcpAnnotation{
 		ID:            a.ID,
 		ShortID:       a.ShortID,
 		TransactionID: a.TransactionID,
 		Kind:          kind,
 		Action:        action,
+		Summary:       a.Summary,
+		Subject:       a.Subject,
+		Origin:        a.Origin,
+		Source:        a.Source,
+		Content:       a.Content,
+		Note:          a.Note,
+		TagSlug:       a.TagSlug,
+		CategorySlug:  a.CategorySlug,
+		RuleName:      a.RuleName,
 		ActorType:     a.ActorType,
 		ActorID:       a.ActorID,
 		ActorName:     a.ActorName,
