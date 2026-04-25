@@ -560,44 +560,63 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 		showingStart := int64((txResult.Page-1)*pageSize + 1)
 		showingEnd := min(int64(txResult.Page*pageSize), txResult.Total)
 
-		data := map[string]any{
-			"PageTitle":       detail.InstitutionName + " — " + accountDisplayName(detail),
-			"CurrentPage":    "transactions",
-			"CSRFToken":      GetCSRFToken(r),
-			"Flash":          GetFlash(ctx, sm),
-			"Account":        detail,
-			"AccountID":      idStr,
-			"Transactions":   txResult.Transactions,
-			"Categories":     categoryTree,
-			"Page":           txResult.Page,
-			"PageSize":       pageSize,
-			"TotalPages":     txResult.TotalPages,
-			"Total":          txResult.Total,
-			"PaginationBase": acctPaginationBase,
-			"ShowingStart":   showingStart,
-			"ShowingEnd":     showingEnd,
-			"ExportURL":      acctExportURL,
-			"FilterStartDate": q.Get("start_date"),
-			"FilterEndDate":   q.Get("end_date"),
-			"FilterCategory":  q.Get("category"),
-			"FilterPending":   q.Get("pending"),
-			"FilterSearch":    q.Get("search"),
-			// Spending analytics
-			"TotalSpending":         totalSpending,
-			"TxCount30d":            txCount30d,
-			"SpendingChangePercent": spendingChangePercent,
-			"HasSpendingChange":     hasSpendingChange,
-			"IsLiability":           isLiability,
-			"CreditUtilization":     creditUtilization,
-			"HasCreditUtil":         hasCreditUtil,
-			"Breadcrumbs": []Breadcrumb{
-				{Label: "Connections", Href: "/connections"},
-				{Label: detail.InstitutionName, Href: "/connections/" + detail.ConnectionID},
-				{Label: accountDisplayName(detail)},
-			},
+		breadcrumbs := []Breadcrumb{
+			{Label: "Connections", Href: "/connections"},
+			{Label: detail.InstitutionName, Href: "/connections/" + detail.ConnectionID},
+			{Label: accountDisplayName(detail)},
 		}
-		tr.Render(w, r, "account_detail.html", data)
+
+		data := map[string]any{
+			"PageTitle":   detail.InstitutionName + " — " + accountDisplayName(detail),
+			"CurrentPage": "transactions",
+			"CSRFToken":   GetCSRFToken(r),
+			"Flash":       GetFlash(ctx, sm),
+		}
+
+		// Translate admin breadcrumbs to the components shape the templ
+		// component consumes. Same pattern as renderTransactionDetail.
+		componentBreadcrumbs := make([]components.Breadcrumb, 0, len(breadcrumbs))
+		for _, c := range breadcrumbs {
+			componentBreadcrumbs = append(componentBreadcrumbs, components.Breadcrumb{Label: c.Label, Href: c.Href})
+		}
+
+		props := pages.AccountDetailProps{
+			CSRFToken:             GetCSRFToken(r),
+			Breadcrumbs:           componentBreadcrumbs,
+			AccountID:             idStr,
+			Account:               detail,
+			IsLiability:           isLiability,
+			HasCreditUtil:         hasCreditUtil,
+			CreditUtilization:     creditUtilization,
+			TotalSpending:         totalSpending,
+			TxCount30d:            txCount30d,
+			HasSpendingChange:     hasSpendingChange,
+			SpendingChangePercent: spendingChangePercent,
+			FilterStartDate:       r.URL.Query().Get("start_date"),
+			FilterEndDate:         r.URL.Query().Get("end_date"),
+			FilterCategory:        r.URL.Query().Get("category"),
+			FilterPending:         r.URL.Query().Get("pending"),
+			FilterSearch:          r.URL.Query().Get("search"),
+			Transactions:          txResult.Transactions,
+			Page:                  txResult.Page,
+			PageSize:              pageSize,
+			TotalPages:            txResult.TotalPages,
+			Total:                 txResult.Total,
+			ShowingStart:          showingStart,
+			ShowingEnd:            showingEnd,
+			PaginationBase:        acctPaginationBase,
+			ExportURL:             acctExportURL,
+			Categories:            categoryTree,
+		}
+		renderAccountDetail(tr, w, r, data, props)
 	}
+}
+
+// renderAccountDetail hosts the account detail templ component inside
+// base.html. Mirrors the renderTransactionDetail / renderConnections
+// helpers used by the prior templ ports.
+func renderAccountDetail(tr *TemplateRenderer, w http.ResponseWriter, r *http.Request, data map[string]any, props pages.AccountDetailProps) {
+	tr.RenderWithTempl(w, r, data, pages.AccountDetail(props))
 }
 
 func accountDisplayName(detail *service.AdminAccountDetail) string {
