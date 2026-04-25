@@ -400,26 +400,14 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			// (e.g. `{{renderComponent "KbdCombo" (strs "cmd" "k")}}`).
 			"strs": func(vals ...string) []string { return vals },
 			"commaInt": func(n any) string {
-				var s string
 				switch v := n.(type) {
 				case int:
-					s = fmt.Sprintf("%d", v)
+					return components.CommaInt(int64(v))
 				case int64:
-					s = fmt.Sprintf("%d", v)
+					return components.CommaInt(v)
 				default:
-					s = fmt.Sprintf("%v", v)
+					return fmt.Sprintf("%v", v)
 				}
-				if len(s) <= 3 {
-					return s
-				}
-				result := ""
-				for i, c := range s {
-					if i > 0 && (len(s)-i)%3 == 0 {
-						result += ","
-					}
-					result += string(c)
-				}
-				return result
 			},
 			"subf": func(a, b float64) float64 { return a - b },
 			"mulf": func(a, b float64) float64 { return a * b },
@@ -1015,24 +1003,9 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				default:
 					return ""
 				}
-				neg := f < 0
-				abs := math.Abs(f)
-				whole := int(abs)
-				cents := int(math.Round((abs - float64(whole)) * 100))
-				s := fmt.Sprintf("%d", whole)
-				if len(s) > 3 {
-					result := ""
-					for i, c := range s {
-						if i > 0 && (len(s)-i)%3 == 0 {
-							result += ","
-						}
-						result += string(c)
-					}
-					s = result
-				}
-				formatted := fmt.Sprintf("$%s.%02d", s, cents)
-				if neg {
-					formatted = "-" + formatted
+				formatted := "$" + components.CommaAmount(math.Abs(f))
+				if f < 0 {
+					return "-" + formatted
 				}
 				return formatted
 			},
