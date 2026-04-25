@@ -25,6 +25,7 @@ type TagResponse struct {
 	Description string  `json:"description"`
 	Color       *string `json:"color,omitempty"`
 	Icon        *string `json:"icon,omitempty"`
+	Lifecycle   string  `json:"lifecycle"`
 	CreatedAt   string  `json:"created_at"`
 	UpdatedAt   string  `json:"updated_at"`
 }
@@ -44,6 +45,7 @@ type UpdateTagParams struct {
 	Description *string
 	Color       *string
 	Icon        *string
+	Lifecycle   *string
 }
 
 // tagSlugRegex enforces the tag slug format: lowercase alphanumerics with
@@ -188,6 +190,15 @@ func (s *Service) UpdateTag(ctx context.Context, id string, params UpdateTagPara
 		icon = pgtype.Text{String: *params.Icon, Valid: *params.Icon != ""}
 	}
 
+	lifecycle := existing.Lifecycle
+	if params.Lifecycle != nil {
+		v := strings.TrimSpace(*params.Lifecycle)
+		if v != "persistent" && v != "ephemeral" {
+			return nil, fmt.Errorf("%w: lifecycle must be 'persistent' or 'ephemeral'", ErrInvalidParameter)
+		}
+		lifecycle = v
+	}
+
 	existingUID, _ := parseUUID(existing.ID)
 	tag, err := s.Queries.UpdateTag(ctx, db.UpdateTagParams{
 		ID:          existingUID,
@@ -195,6 +206,7 @@ func (s *Service) UpdateTag(ctx context.Context, id string, params UpdateTagPara
 		Description: description,
 		Color:       color,
 		Icon:        icon,
+		Lifecycle:   lifecycle,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -270,6 +282,7 @@ func tagFromRow(t db.Tag) TagResponse {
 		Description: t.Description,
 		Color:       textPtr(t.Color),
 		Icon:        textPtr(t.Icon),
+		Lifecycle:   t.Lifecycle,
 		CreatedAt:   pgconv.TimestampStr(t.CreatedAt),
 		UpdatedAt:   pgconv.TimestampStr(t.UpdatedAt),
 	}
