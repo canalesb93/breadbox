@@ -1,0 +1,59 @@
+function reportDetail(id, initialRead) {
+  return {
+    id: id,
+    isRead: initialRead,
+    toast: '',
+    _toastTimer: null,
+    flash(msg) {
+      this.toast = msg;
+      clearTimeout(this._toastTimer);
+      this._toastTimer = setTimeout(() => { this.toast = ''; }, 1800);
+    },
+    async toggleRead() {
+      const endpoint = this.isRead ? 'unread' : 'read';
+      try {
+        const res = await fetch('/-/reports/' + this.id + '/' + endpoint, { method: 'POST' });
+        if (!res.ok) throw new Error(String(res.status));
+        this.isRead = !this.isRead;
+        this.flash(this.isRead ? 'Marked as read' : 'Marked as unread');
+        // Re-render the icon for the toggled state.
+        this.$nextTick(() => window.lucide && window.lucide.createIcons && window.lucide.createIcons());
+      } catch (e) {
+        this.flash('Could not update — try again');
+      }
+    },
+    copyLink() {
+      try {
+        navigator.clipboard.writeText(window.location.href);
+        this.flash('Link copied');
+      } catch (e) {
+        this.flash('Copy failed');
+      }
+    }
+  };
+}
+
+// External-link targeting only — styling lives in .bb-report-body (input.css).
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.bb-report-body').forEach(function(el) {
+    var md = el.getAttribute('data-markdown');
+    if (!md) return;
+    el.innerHTML = DOMPurify.sanitize(marked.parse(md));
+    el.querySelectorAll('a').forEach(function(a) {
+      var href = a.getAttribute('href') || '';
+      if (a.href && !a.href.startsWith(window.location.origin) && !href.startsWith('/')) {
+        a.setAttribute('target', '_blank');
+        a.setAttribute('rel', 'noopener');
+      }
+    });
+    el.querySelectorAll('table').forEach(function(t) {
+      if (t.parentNode && t.parentNode.classList && t.parentNode.classList.contains('bb-report-table-wrap')) return;
+      var wrap = document.createElement('div');
+      wrap.className = 'bb-report-table-wrap';
+      t.parentNode.insertBefore(wrap, t);
+      wrap.appendChild(t);
+    });
+    var lastChild = el.lastElementChild;
+    if (lastChild) lastChild.classList.add('!mb-0');
+  });
+});

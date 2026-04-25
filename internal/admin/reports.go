@@ -6,6 +6,7 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
@@ -97,19 +98,7 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 
 		t, _ := time.Parse(time.RFC3339, report.CreatedAt)
 
-		type ReportDetail struct {
-			ID            string
-			Title         string
-			Body          string
-			Priority      string
-			Tags          []string
-			DisplayAuthor string
-			CreatedAt     string
-			CreatedAtRel  string
-			IsRead        bool
-		}
-
-		detail := ReportDetail{
+		detail := pages.ReportDetailReport{
 			ID:            report.ID,
 			Title:         report.Title,
 			Body:          report.Body,
@@ -122,17 +111,26 @@ func ReportDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 		}
 
 		data := BaseTemplateData(r, sm, "reports", report.Title)
-		data["Report"] = detail
 		// Use a short, fixed label for the current-page crumb. Agent report
 		// titles can be full sentences; interpolating them into the breadcrumb
 		// overflows on mobile/tablet and visually competes with the header
 		// card below, which already shows the full title.
-		data["Breadcrumbs"] = []Breadcrumb{
+		breadcrumbs := []components.Breadcrumb{
 			{Label: "Reports", Href: "/reports"},
 			{Label: "Report"},
 		}
-		tr.Render(w, r, "report_detail.html", data)
+		renderReportDetail(w, r, tr, data, pages.ReportDetailProps{
+			Report:      detail,
+			Breadcrumbs: breadcrumbs,
+		})
 	}
+}
+
+// renderReportDetail mirrors renderSyncLogDetail / renderPromptBuilder:
+// hands the typed ReportDetailProps to the templ component and uses
+// RenderWithTempl to host it inside base.html.
+func renderReportDetail(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.ReportDetailProps) {
+	tr.RenderWithTempl(w, r, data, pages.ReportDetail(props))
 }
 
 // MarkReportReadAdminHandler handles POST /-/reports/{id}/read.
