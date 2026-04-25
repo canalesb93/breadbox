@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"breadbox/internal/prompts"
@@ -61,15 +60,12 @@ func PromptBuilderHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.Han
 			return
 		}
 
-		blocksJSON, _ := json.Marshal(blocks)
-
 		data := BaseTemplateData(r, sm, "agents", cfg.Label+" — Prompt Library")
 		data["AgentType"] = agentType
 		data["AgentLabel"] = cfg.Label
 		data["AgentDescription"] = cfg.Description
 		data["AgentIcon"] = cfg.Icon
 		data["AgentColor"] = cfg.Color
-		data["BlocksJSON"] = string(blocksJSON)
 
 		renderPromptBuilder(w, r, tr, data, pages.PromptBuilderProps{
 			AgentType:        agentType,
@@ -77,7 +73,7 @@ func PromptBuilderHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.Han
 			AgentDescription: cfg.Description,
 			AgentIcon:        cfg.Icon,
 			AgentColor:       cfg.Color,
-			BlocksJSON:       string(blocksJSON),
+			Blocks:           blocks,
 		})
 	}
 }

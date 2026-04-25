@@ -5,10 +5,11 @@ package pages
 // passes the typed props and the bridge drops the rendered HTML into
 // base.html's TemplContent slot.
 //
-// The page is a port of internal/templates/pages/prompt_builder.html. The
-// large inline <script> body (Alpine factory + Markdown renderer) is lifted
-// verbatim into prompt_builder_scripts.go; the rest of the markup is
-// reproduced 1:1 here, including the trailing CDN load of marked@15.0.12.
+// Reference port for the "Alpine page components" convention
+// (docs/design-system.md): the Alpine factory lives in
+// static/js/admin/components/prompt_builder.js and reads its initial state
+// from a sibling @templ.JSONScript("prompt-builder-data", p.Blocks) tag. The
+// trailing CDN load of marked@15.0.12 powers the preview Markdown renderer.
 templ PromptBuilder(p PromptBuilderProps) {
 	<div class="bb-page-header">
 		<div>
@@ -21,7 +22,8 @@ templ PromptBuilder(p PromptBuilderProps) {
 			<p class="text-sm text-base-content/50 mt-1">{ p.AgentDescription }</p>
 		</div>
 	</div>
-	<div x-data={ "promptBuilder(" + p.BlocksJSON + ")" } @keydown.window="handleKeyboard($event)" class="space-y-5">
+	@templ.JSONScript("prompt-builder-data", p.Blocks)
+	<div x-data="promptBuilder" @keydown.window="handleKeyboard($event)" class="space-y-5">
 		<!-- How it works -->
 		<div class="rounded-xl bg-base-100 border border-base-300 px-5 py-4 shadow-sm">
 			<h3 class="text-xs font-semibold text-base-content/70 uppercase tracking-wider mb-2.5">How it works</h3>
@@ -356,6 +358,6 @@ templ PromptBuilder(p PromptBuilderProps) {
 			</div>
 		</template><!-- /x-teleport -->
 	</div>
-	@templ.Raw("<script>" + promptBuilderScriptBody + "</script>")
+	<script src="/static/js/admin/components/prompt_builder.js" defer></script>
 	<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
 }
