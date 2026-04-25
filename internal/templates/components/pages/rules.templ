@@ -1,6 +1,10 @@
 package pages
 
-import "fmt"
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
 
 // Rules renders the rules list page. Hosts inside the base layout via
 // TemplateRenderer.RenderWithTempl — the handler builds typed props in
@@ -275,7 +279,7 @@ templ rulesPaginator(p RulesProps) {
 					<i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
 				</a>
 			}
-			for _, n := range pageRange(p.Page, p.TotalPages) {
+			for _, n := range components.PageRange(p.Page, p.TotalPages) {
 				if n == 0 {
 					<span class="bb-paginator__ellipsis">…</span>
 				} else if n == p.Page {
