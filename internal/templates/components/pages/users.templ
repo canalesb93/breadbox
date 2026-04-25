@@ -1,0 +1,272 @@
+package pages
+
+import "fmt"
+
+// Users renders the household-members page. Hosts inside the base layout
+// via TemplateRenderer.RenderWithTempl. Markup mirrors the prior
+// pages/users.html byte-for-byte: sticky page header with the keyboard
+// shortcut scope sentinel, a "created" success alert, the
+// admin-not-linked warning panel (create-new / link-existing tabs), and
+// a grid of member cards with avatar, login badge, and account list.
+templ Users(p UsersProps) {
+	{{/* Set the shortcut-registry scope so base.html's global dispatcher routes
+	     n (registered below) to the Add Member link, and so the ? help modal
+	     surfaces it under "This page". Reset on Alpine teardown. */}}
+	<div x-data x-init="$store.shortcuts.setScope('users')" x-destroy="$store.shortcuts.setScope('global')"></div>
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">Household</h1>
+			<p class="text-sm text-base-content/50 mt-1">Manage who has bank connections in Breadbox</p>
+		</div>
+		<a href="/users/new" data-new-user class="btn btn-primary btn-sm rounded-xl">
+			<i data-lucide="plus" class="w-4 h-4"></i>
+			Add Member
+		</a>
+	</div>
+	if p.Created {
+		<div role="alert" class="alert alert-success rounded-xl mb-6">
+			<i data-lucide="check-circle" class="w-5 h-5"></i>
+			<span>Member created. <a href="/connections/new" class="link font-medium">Connect a bank for them</a></span>
+		</div>
+	}
+	if p.IsUnlinked {
+		@usersUnlinkedPrompt(p)
+	}
+	if len(p.EnrichedUsers) > 0 {
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 bb-stagger">
+			for _, u := range p.EnrichedUsers {
+				@usersMemberCard(u)
+			}
+		</div>
+	} else {
+		@usersEmpty()
+	}
+	<script>
+		// Register users-scoped keyboard shortcuts. `n` clicks the Add Member
+		// link (anchor tag). Using .click() respects the browser's normal
+		// navigation so we don't need to duplicate the href here.
+		document.addEventListener('alpine:init', function() {
+			var reg = Alpine.store('shortcuts');
+			if (!reg) return;
+			reg.register({
+				id: 'users.new',
+				keys: 'n',
+				description: 'Add member',
+				group: 'New',
+				scope: 'users',
+				action: function() {
+					var el = document.querySelector('[data-new-user]');
+					if (el) el.click();
+				},
+			});
+		});
+	</script>
+}
+
+// usersUnlinkedPrompt renders the warning panel shown when the current
+// admin account isn't linked to a household member. Offers two flows:
+// create a new member or link an existing unlinked one.
+templ usersUnlinkedPrompt(p UsersProps) {
+	<!-- Admin link prompt: admin account not yet linked to a household member -->
+	<div class="bb-card p-0 overflow-hidden mb-6 border-warning/30 bg-warning/[0.03]" x-data="{ mode: 'create', open: true }" x-show="open">
+		<div class="p-4 sm:p-5 flex items-start gap-3">
+			<div class="bb-icon-header__tile bb-icon-tile--warning">
+				<i data-lucide="user-plus" class="w-5 h-5"></i>
+			</div>
+			<div class="min-w-0 flex-1">
+				<h3 class="text-sm font-semibold">Link your admin account to a household member</h3>
+				<p class="text-xs text-base-content/60 mt-0.5">Your admin account isn't linked yet. Link it to manage bank connections and view your financial data.</p>
+				if len(p.UnlinkedUsers) > 0 {
+					<div class="flex gap-1 mt-3 mb-3">
+						<button type="button" @click="mode = 'create'"
+							:class="mode === 'create' ? 'btn-primary' : 'btn-ghost'" class="btn btn-xs rounded-lg">Create New</button>
+						<button type="button" @click="mode = 'existing'"
+							:class="mode === 'existing' ? 'btn-primary' : 'btn-ghost'" class="btn btn-xs rounded-lg">Link Existing</button>
+					</div>
+				} else {
+					<div class="mt-3"></div>
+				}
+				<form method="POST" action="/my-account/link-user" x-show="mode === 'create'" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+					if p.CSRFToken != "" {
+						<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+					}
+					<input type="hidden" name="mode" value="create"/>
+					<input type="text" name="name" required placeholder="Your name"
+						class="input input-sm w-full sm:max-w-64 rounded-xl bg-base-200/50"/>
+					<button type="submit" class="btn btn-primary btn-sm rounded-xl gap-1.5 shrink-0">
+						<i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+						Create &amp; Link
+					</button>
+				</form>
+				if len(p.UnlinkedUsers) > 0 {
+					<form method="POST" action="/my-account/link-user" x-show="mode === 'existing'" x-cloak class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+						if p.CSRFToken != "" {
+							<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+						}
+						<input type="hidden" name="mode" value="existing"/>
+						<select name="user_id" required
+							class="select select-sm w-full sm:max-w-64 rounded-xl bg-base-200">
+							<option value="">Select a member…</option>
+							for _, u := range p.UnlinkedUsers {
+								<option value={ u.ID }>{ u.Name }</option>
+							}
+						</select>
+						<button type="submit" class="btn btn-primary btn-sm rounded-xl gap-1.5 shrink-0">
+							<i data-lucide="link" class="w-3.5 h-3.5"></i>
+							Link Account
+						</button>
+					</form>
+				}
+			</div>
+		</div>
+	</div>
+}
+
+// usersMemberCard renders one household member's card: avatar header,
+// optional login badge, accounts list (or no-accounts state), and a
+// member-since footer.
+templ usersMemberCard(u UsersEnrichedRow) {
+	<div class="bb-card overflow-hidden flex flex-col">
+		<!-- Member Header -->
+		<div class="p-4 sm:p-6 pb-4">
+			<div class="flex items-center justify-between gap-3">
+				<div class="flex items-center gap-4 min-w-0">
+					<img src={ u.AvatarURL } alt="" class="w-12 h-12 rounded-full object-cover shrink-0"/>
+					<div>
+						<div class="flex items-center gap-2 flex-wrap">
+							<h3 class="font-semibold text-base">{ u.Name }</h3>
+							if u.HasLogin {
+								<span class={ "badge badge-xs", usersLoginRoleBadgeClass(u.LoginRole) }>{ u.LoginRole }</span>
+								if u.LoginSetupPending {
+									<span class="badge badge-xs badge-warning">setup pending</span>
+								}
+							} else {
+								<span class="badge badge-xs badge-ghost">no login</span>
+							}
+						</div>
+						if u.HasEmail {
+							<p class="text-xs text-base-content/45 mt-0.5">{ u.Email }</p>
+						} else {
+							<p class="text-xs text-base-content/30 italic mt-0.5">No email</p>
+						}
+					</div>
+				</div>
+				<div class="dropdown dropdown-end">
+					<div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square rounded-lg opacity-40 hover:opacity-100 transition-opacity">
+						<i data-lucide="ellipsis-vertical" class="w-5 h-5"></i>
+					</div>
+					<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-xl shadow-lg border border-base-300 z-50 w-44 p-1">
+						<li><a href={ templ.SafeURL(fmt.Sprintf("/users/%s/edit", u.ID)) }><i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit profile</a></li>
+						if u.HasLogin {
+							<li><a href={ templ.SafeURL(fmt.Sprintf("/users/%s/create-login", u.ID)) }><i data-lucide="settings" class="w-3.5 h-3.5"></i> Manage login</a></li>
+						} else {
+							<li><a href={ templ.SafeURL(fmt.Sprintf("/users/%s/create-login", u.ID)) }><i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Create login</a></li>
+						}
+						if u.AccountCount > 0 {
+							<li><a href={ templ.SafeURL(fmt.Sprintf("/transactions?user_id=%s", u.ID)) }><i data-lucide="receipt" class="w-3.5 h-3.5"></i> Transactions</a></li>
+						}
+					</ul>
+				</div>
+			</div>
+		</div>
+		<!-- Accounts List -->
+		if len(u.Accounts) > 0 {
+			<div class="border-t border-base-300">
+				<div class="px-4 sm:px-5 py-2.5 flex items-center justify-between bg-base-200/30">
+					<span class="text-xs font-medium text-base-content/40">{ usersAccountsSummary(u.AccountCount, u.ConnectionCount) }</span>
+				</div>
+				<div class="divide-y divide-base-300/50">
+					for _, a := range u.Accounts {
+						@usersAccountRow(a)
+					}
+				</div>
+			</div>
+		} else {
+			<!-- No accounts state -->
+			<div class="border-t border-base-300 px-4 sm:px-5 py-8 bg-base-200/20 flex-1 flex flex-col items-center justify-center text-center">
+				<div class="w-12 h-12 rounded-xl bg-base-200/60 flex items-center justify-center mb-3">
+					<i data-lucide="landmark" class="w-6 h-6 text-base-content/25"></i>
+				</div>
+				<p class="text-sm text-base-content/40 mb-3">No bank accounts connected</p>
+				<a href="/connections/new" class="btn btn-ghost btn-sm rounded-xl">
+					<i data-lucide="plus" class="w-3.5 h-3.5"></i>
+					Connect a bank
+				</a>
+			</div>
+		}
+		<!-- Footer -->
+		if u.HasCreatedAt {
+			<div class="mt-auto px-4 sm:px-5 py-2.5 border-t border-base-300 text-xs text-base-content/30 bg-base-200/20">
+				<span>Member since { u.CreatedAtLabel }</span>
+			</div>
+		}
+	</div>
+}
+
+// usersAccountRow renders one account inside a member's card. Routes to
+// /accounts/{id} with the same icon-by-type / status-pill / balance
+// layout the prior html/template version used.
+templ usersAccountRow(a UsersAccountRow) {
+	<a href={ templ.SafeURL(fmt.Sprintf("/accounts/%s", a.ID)) } class="flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-base-200/40 transition-colors no-underline group">
+		<div class="w-8 h-8 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0 hidden sm:flex">
+			switch a.Type {
+				case "depository":
+					<i data-lucide="landmark" class="w-3.5 h-3.5 text-base-content/40"></i>
+				case "credit":
+					<i data-lucide="credit-card" class="w-3.5 h-3.5 text-base-content/40"></i>
+				case "loan":
+					<i data-lucide="banknote" class="w-3.5 h-3.5 text-base-content/40"></i>
+				case "investment":
+					<i data-lucide="trending-up" class="w-3.5 h-3.5 text-base-content/40"></i>
+				default:
+					<i data-lucide="wallet" class="w-3.5 h-3.5 text-base-content/40"></i>
+			}
+		</div>
+		<div class="flex-1 min-w-0">
+			<div class="flex items-center gap-1.5">
+				<span class="text-sm font-medium group-hover:text-primary transition-colors truncate">{ a.Name }</span>
+				if a.ConnectionStatus != "" && a.ConnectionStatus != "active" {
+					<span class={ "shrink-0 text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full", usersConnStatusPillClass(a.ConnectionStatus) }>{ usersConnStatusLabel(a.ConnectionStatus) }</span>
+				}
+			</div>
+			<div class="text-xs text-base-content/40 truncate">
+				<span>{ a.InstitutionName }</span>
+				if a.HasMask {
+					<span class="text-base-content/20">&middot;</span>
+					<span>{ a.Mask }</span>
+				}
+				if a.HasSubtype {
+					<span class="text-base-content/20">&middot;</span>
+					<span class="capitalize">{ a.SubtypeLabel }</span>
+				}
+			</div>
+		</div>
+		<div class="text-right shrink-0">
+			if a.HasBalance {
+				<span class={ "text-sm font-semibold tabular-nums", templ.KV("text-error", a.IsLiability) }>
+					{ a.BalanceDisplay }
+				</span>
+				<div class="text-[0.65rem] text-base-content/30 mt-0.5 hidden sm:block">{ a.IsoCurrencyCode }</div>
+			} else {
+				<span class="text-xs text-base-content/30">—</span>
+			}
+		</div>
+	</a>
+}
+
+// usersEmpty renders the "no family members" empty state.
+templ usersEmpty() {
+	<div class="bb-card p-12 text-center">
+		<div class="flex flex-col items-center">
+			<div class="w-16 h-16 rounded-xl bg-base-200/60 flex items-center justify-center mb-4">
+				<i data-lucide="users" class="w-8 h-8 text-base-content/25"></i>
+			</div>
+			<h3 class="text-lg font-semibold mb-1">No family members yet</h3>
+			<p class="text-sm text-base-content/50 mb-5 max-w-sm">Add family members to connect their bank accounts and track spending across the household.</p>
+			<a href="/users/new" class="btn btn-primary btn-sm rounded-xl">
+				<i data-lucide="plus" class="w-4 h-4"></i>
+				Add your first member
+			</a>
+		</div>
+	</div>
+}

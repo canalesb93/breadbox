@@ -1075,7 +1075,8 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// pages/connection_detail.html removed — renders via RenderWithTempl
 		// using the _templ_shell template key (see pages.ConnectionDetail).
 		"pages/connection_reauth.html",
-		"pages/users.html",
+		// pages/users.html removed — renders via RenderWithTempl using
+		// the _templ_shell template key (see pages.Users).
 		// pages/user_form.html removed — renders via RenderWithTempl using
 		// the _templ_shell template key (see pages.UserForm).
 		"pages/access.html",
