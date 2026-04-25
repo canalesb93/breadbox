@@ -284,33 +284,6 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return fmt.Sprintf("%v", v)
 				}
 			},
-			"subf": func(a, b float64) float64 { return a - b },
-			"mulf": func(a, b float64) float64 { return a * b },
-			"divf": func(a, b float64) float64 {
-				if b == 0 {
-					return 0
-				}
-				return a / b
-			},
-			"minf": func(a, b float64) float64 {
-				if a < b {
-					return a
-				}
-				return b
-			},
-			"absf": func(a float64) float64 {
-				if a < 0 {
-					return -a
-				}
-				return a
-			},
-			"itof": func(a int) float64 {
-				return float64(a)
-			},
-			"syncDuration": func(start, end time.Time) string {
-				return service.FormatDurationMs(end.Sub(start).Milliseconds())
-			},
-			"formatDurationMs": func(ms int32) string { return service.FormatDurationMs(int64(ms)) },
 			"relativeTime": func(t interface{}) string {
 				switch v := t.(type) {
 				case time.Time:
@@ -336,9 +309,6 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				default:
 					return ""
 				}
-			},
-			"formatUUID": func(u pgtype.UUID) string {
-				return pgconv.FormatUUID(u)
 			},
 			"formatIntervalMinutes": components.FormatIntervalMinutes,
 			"accountLabel": func(name string, mask interface{}) string {
