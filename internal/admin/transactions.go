@@ -785,31 +785,53 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 		}
 		breadcrumbs = append(breadcrumbs, Breadcrumb{Label: txn.ProviderName})
 
-		data := map[string]any{
-			"PageTitle":       txn.ProviderName,
-			"CurrentPage":     "transactions",
-			"CSRFToken":       GetCSRFToken(r),
-			"Flash":           GetFlash(ctx, sm),
-			"Transaction":     txn,
-			"TransactionID":   idStr,
-			"AccountID":       accountID,
-			"AccountName":     accountName,
-			"UserName":        userName,
-			"InstitutionName": institutionName,
-			"AccountMask":     accountMask,
-			"AccountType":     accountType,
-			"ConnectionID":    connectionID,
-			"Account":         account,
-			"Activity":          activity,
-			"ActivityDays":      activityDays,
-			"HasPendingReview":  hasPendingReview,
-			"CurrentTags":       currentTags,
-			"AvailableTags":     availableTags,
-			"Categories":      categoryTree,
-			"Breadcrumbs":     breadcrumbs,
+		data := BaseTemplateData(r, sm, "transactions", txn.ProviderName)
+
+		// Translate admin breadcrumbs + activity-day groups to the typed
+		// shapes pages.TransactionDetail expects. The component owns its
+		// view-model so the handler is the only place that bridges between
+		// the admin and pages packages.
+		componentBreadcrumbs := make([]components.Breadcrumb, 0, len(breadcrumbs))
+		for _, c := range breadcrumbs {
+			componentBreadcrumbs = append(componentBreadcrumbs, components.Breadcrumb{Label: c.Label, Href: c.Href})
 		}
-		tr.Render(w, r, "transaction_detail.html", data)
+		componentActivityDays := make([]pages.ActivityDayGroup, 0, len(activityDays))
+		for _, day := range activityDays {
+			componentActivityDays = append(componentActivityDays, pages.ActivityDayGroup{
+				Label:  day.Label,
+				Events: day.Events,
+			})
+		}
+
+		props := pages.TransactionDetailProps{
+			CSRFToken:        GetCSRFToken(r),
+			Breadcrumbs:      componentBreadcrumbs,
+			Transaction:      txn,
+			TransactionID:    idStr,
+			AccountID:        accountID,
+			AccountName:      accountName,
+			UserName:         userName,
+			InstitutionName:  institutionName,
+			AccountMask:      accountMask,
+			AccountType:      accountType,
+			ConnectionID:     connectionID,
+			Account:          account,
+			Activity:         activity,
+			ActivityDays:     componentActivityDays,
+			HasPendingReview: hasPendingReview,
+			CurrentTags:      currentTags,
+			AvailableTags:    availableTags,
+			Categories:       categoryTree,
+		}
+		renderTransactionDetail(tr, w, r, data, props)
 	}
+}
+
+// renderTransactionDetail hosts the transaction detail templ component
+// inside base.html. Mirrors the renderSettings / renderConnectionDetail
+// helpers used by the prior templ ports.
+func renderTransactionDetail(tr *TemplateRenderer, w http.ResponseWriter, r *http.Request, data map[string]any, props pages.TransactionDetailProps) {
+	tr.RenderWithTempl(w, r, data, pages.TransactionDetail(props))
 }
 
 // categoryDisplayLookup returns a slug→"Parent › Child" formatter for the
