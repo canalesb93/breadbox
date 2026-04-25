@@ -1,0 +1,42 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// APIKeyNew renders the /api-keys/new page — a small form that creates a
+// new API key (name + scope). Hosts inside the base layout via
+// TemplateRenderer.RenderWithTempl. The markup mirrors the previous
+// html/template version byte-for-byte; the form posts to /api-keys/new
+// which is handled by APIKeyCreatePageHandler in admin/apikeys.go.
+templ APIKeyNew(p APIKeyNewProps) {
+	@components.BreadcrumbNav(p.Breadcrumbs)
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">Create API Key</h1>
+			<p class="text-sm text-base-content/50 mt-1">Generate a new key for API or MCP access</p>
+		</div>
+	</div>
+	<div class="bb-card p-6 max-w-lg">
+		<form method="POST" action="/api-keys/new">
+			<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+			<fieldset class="fieldset mb-5">
+				<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="name">Name</label>
+				<input type="text" id="name" name="name" class="input input-bordered w-full rounded-xl" placeholder="e.g., Claude MCP, Dashboard" required autofocus/>
+				<p class="text-xs text-base-content/40 mt-2">A descriptive name to identify this API key.</p>
+			</fieldset>
+			<fieldset class="fieldset mb-6">
+				<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="scope">Scope</label>
+				<select id="scope" name="scope" class="select select-bordered w-full rounded-xl">
+					<option value="full_access">Full Access — read and write</option>
+					<option value="read_only">Read Only — query data only</option>
+				</select>
+				<p class="text-xs text-base-content/40 mt-2">Read-only keys cannot trigger syncs, categorize transactions, or use write MCP tools. Scope cannot be changed after creation.</p>
+			</fieldset>
+			<div class="flex gap-3 pt-2">
+				<button type="submit" class="btn btn-primary btn-sm rounded-xl">
+					<i data-lucide="plus" class="w-4 h-4"></i> Create API Key
+				</button>
+				<a href="/access" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
+			</div>
+		</form>
+	</div>
+}
