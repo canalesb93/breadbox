@@ -77,6 +77,16 @@ func TextFromPtr(s *string) pgtype.Text {
 	return pgtype.Text{String: *s, Valid: true}
 }
 
+// TextIfNotEmpty wraps a string as pgtype.Text, treating "" as NULL. Use this
+// to collapse `pgtype.Text{String: x, Valid: x != ""}` boilerplate at insert
+// sites where the empty string and NULL should be the same thing.
+func TextIfNotEmpty(s string) pgtype.Text {
+	if s == "" {
+		return pgtype.Text{}
+	}
+	return pgtype.Text{String: s, Valid: true}
+}
+
 // TimestampStr renders a pgtype.Timestamptz as an RFC3339 UTC string. Returns
 // an empty string when the timestamp is NULL. Use for NOT NULL columns where
 // an empty response field is acceptable for the rare invalid case.

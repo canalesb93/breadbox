@@ -518,11 +518,11 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 				ConnectionID:      bankConn.ID,
 				ExternalAccountID: acct.ExternalID,
 				Name:              acct.Name,
-				OfficialName:      pgtype.Text{String: acct.OfficialName, Valid: acct.OfficialName != ""},
+				OfficialName:      pgconv.TextIfNotEmpty(acct.OfficialName),
 				Type:              acct.Type,
-				Subtype:           pgtype.Text{String: acct.Subtype, Valid: acct.Subtype != ""},
-				Mask:              pgtype.Text{String: acct.Mask, Valid: acct.Mask != ""},
-				IsoCurrencyCode:   pgtype.Text{String: acct.ISOCurrencyCode, Valid: acct.ISOCurrencyCode != ""},
+				Subtype:           pgconv.TextIfNotEmpty(acct.Subtype),
+				Mask:              pgconv.TextIfNotEmpty(acct.Mask),
+				IsoCurrencyCode:   pgconv.TextIfNotEmpty(acct.ISOCurrencyCode),
 			})
 			if err != nil {
 				a.Logger.Error("upsert account", "error", err, "external_id", acct.ExternalID)

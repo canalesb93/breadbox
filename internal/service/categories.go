@@ -832,8 +832,8 @@ func (s *Service) ImportCategoriesTSV(ctx context.Context, content string, repla
 			_, err := s.Queries.UpdateCategory(ctx, db.UpdateCategoryParams{
 				ID:          existing.ID,
 				DisplayName: rd.displayName,
-				Icon:        pgtype.Text{String: rd.icon, Valid: rd.icon != ""},
-				Color:       pgtype.Text{String: rd.color, Valid: rd.color != ""},
+				Icon:        pgconv.TextIfNotEmpty(rd.icon),
+				Color:       pgconv.TextIfNotEmpty(rd.color),
 				SortOrder:   rd.sortOrder,
 				Hidden:      rd.hidden,
 			})
