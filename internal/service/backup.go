@@ -1,6 +1,9 @@
 package service
 
 import (
+	"archive/tar"
+	"bufio"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"fmt"
@@ -19,6 +22,20 @@ import (
 	"breadbox/internal/appconfig"
 )
 
+// Bundle layout (inside the .tar.gz produced by CreateBackup):
+//
+//   dump.sql.gz       — the gzipped pg_dump output (always present)
+//   encryption.key    — optional; the auto-managed AES key used to decrypt
+//                        provider credentials. Included when the running
+//                        process has a key file path it can read.
+//
+// Restore tolerates the legacy single-file layout (.sql.gz) for backups taken
+// before this format change. New backups always use the bundled .tar.gz.
+const (
+	bundleDumpEntry          = "dump.sql.gz"
+	bundleEncryptionKeyEntry = "encryption.key"
+)
+
 // BackupInfo describes a backup file on disk.
 type BackupInfo struct {
 	Filename  string    `json:"filename"`
@@ -29,18 +46,23 @@ type BackupInfo struct {
 
 // BackupService handles database backup and restore operations.
 type BackupService struct {
-	databaseURL string
-	backupDir   string
-	logger      *slog.Logger
+	databaseURL       string
+	backupDir         string
+	encryptionKeyPath string // path to the on-disk auto-managed key, "" when using BYO env-var key
+	logger            *slog.Logger
 }
 
 // NewBackupService creates a new BackupService.
 // backupDir is the directory where backup files are stored.
-func NewBackupService(databaseURL, backupDir string, logger *slog.Logger) *BackupService {
+// encryptionKeyPath is the on-disk location of the auto-managed encryption.key
+// (empty string when the operator supplies ENCRYPTION_KEY via the environment
+// — backup bundles then carry no key file, by design).
+func NewBackupService(databaseURL, backupDir, encryptionKeyPath string, logger *slog.Logger) *BackupService {
 	return &BackupService{
-		databaseURL: databaseURL,
-		backupDir:   backupDir,
-		logger:      logger,
+		databaseURL:       databaseURL,
+		backupDir:         backupDir,
+		encryptionKeyPath: encryptionKeyPath,
+		logger:            logger,
 	}
 }
 
@@ -54,9 +76,13 @@ func (bs *BackupService) EnsureBackupDir() error {
 	return os.MkdirAll(bs.backupDir, 0750)
 }
 
-// CreateBackup runs pg_dump and compresses the output to a .sql.gz file.
+// CreateBackup runs pg_dump and produces a .tar.gz bundle containing the
+// gzipped SQL dump and (if available) the auto-managed encryption.key. Bundling
+// the key means a single archive can fully restore an install — no separate
+// "remember to back up your key" step.
+//
 // trigger should be "manual" or "scheduled".
-// Returns the filename of the created backup.
+// Returns the filename of the created bundle.
 func (bs *BackupService) CreateBackup(ctx context.Context, trigger string) (string, error) {
 	if err := bs.EnsureBackupDir(); err != nil {
 		return "", fmt.Errorf("create backup directory: %w", err)
@@ -67,7 +93,7 @@ func (bs *BackupService) CreateBackup(ctx context.Context, trigger string) (stri
 	}
 
 	timestamp := time.Now().UTC().Format("20060102_150405")
-	filename := fmt.Sprintf("breadbox_%s_%s.sql.gz", trigger, timestamp)
+	filename := fmt.Sprintf("breadbox_%s_%s.tar.gz", trigger, timestamp)
 	fullPath := filepath.Join(bs.backupDir, filename)
 
 	// Build pg_dump args. Use --no-owner and --no-acl for portability.
@@ -82,7 +108,6 @@ func (bs *BackupService) CreateBackup(ctx context.Context, trigger string) (stri
 
 	cmd := exec.CommandContext(ctx, "pg_dump", args...)
 
-	// Capture stderr for error reporting.
 	var stderrBuf strings.Builder
 	cmd.Stderr = &stderrBuf
 
@@ -91,58 +116,123 @@ func (bs *BackupService) CreateBackup(ctx context.Context, trigger string) (stri
 		return "", fmt.Errorf("create stdout pipe: %w", err)
 	}
 
-	var fileClosed bool
-	outFile, err := os.Create(fullPath)
-	if err != nil {
-		return "", fmt.Errorf("create backup file: %w", err)
-	}
-	defer func() {
-		if !fileClosed {
-			outFile.Close()
-			os.Remove(fullPath) // cleanup incomplete backup
-		}
-	}()
-
-	gzWriter := gzip.NewWriter(outFile)
-	defer func() {
-		if !fileClosed {
-			gzWriter.Close()
-		}
-	}()
+	// Buffer the gzipped dump in memory so we can write a tar header with the
+	// final size. pg_dump is normally tens of MB on home installs — tractable
+	// to buffer. If this becomes a problem on huge data volumes we can switch
+	// to a temp-file dance, but it adds complexity without measurable benefit
+	// at the current scale.
+	var dumpBuf bytes.Buffer
+	dumpGz := gzip.NewWriter(&dumpBuf)
 
 	if err := cmd.Start(); err != nil {
-		os.Remove(fullPath)
 		return "", fmt.Errorf("start pg_dump: %w", err)
 	}
-	// Ensure the process is always reaped even if we return early.
-	defer func() { _ = cmd.Wait() }()
 
-	if _, err := io.Copy(gzWriter, stdout); err != nil {
+	if _, err := io.Copy(dumpGz, stdout); err != nil {
+		_ = cmd.Wait()
 		return "", fmt.Errorf("write backup data: %w", err)
 	}
-
-	if err := gzWriter.Close(); err != nil {
+	if err := dumpGz.Close(); err != nil {
+		_ = cmd.Wait()
 		return "", fmt.Errorf("close gzip writer: %w", err)
 	}
-	if err := outFile.Close(); err != nil {
-		return "", fmt.Errorf("close backup file: %w", err)
-	}
-	fileClosed = true
 
 	if err := cmd.Wait(); err != nil {
-		os.Remove(fullPath)
 		return "", fmt.Errorf("pg_dump failed: %s: %w", stderrBuf.String(), err)
 	}
 
-	// Verify the file was actually created with content.
+	// Read the auto-managed encryption key (best-effort). We tolerate a missing
+	// file because the BYO-env-var path leaves encryptionKeyPath empty; we
+	// don't want to scare users who knowingly opted out of bundled key storage.
+	var keyBytes []byte
+	if bs.encryptionKeyPath != "" {
+		if data, err := os.ReadFile(bs.encryptionKeyPath); err == nil {
+			keyBytes = data
+		} else if !os.IsNotExist(err) {
+			bs.logger.Warn("backup: could not read encryption key, omitting from bundle",
+				"path", bs.encryptionKeyPath, "error", err)
+		}
+	}
+
+	// Write the tar.gz bundle to disk atomically: build into a tmp file, then
+	// rename. Avoids leaving a partial tarball if the process dies mid-write.
+	tmpPath := fullPath + ".tmp"
+	outFile, err := os.Create(tmpPath)
+	if err != nil {
+		return "", fmt.Errorf("create backup file: %w", err)
+	}
+	cleanup := func() { _ = os.Remove(tmpPath) }
+
+	bundleGz := gzip.NewWriter(outFile)
+	tw := tar.NewWriter(bundleGz)
+
+	now := time.Now().UTC()
+
+	if err := writeTarEntry(tw, bundleDumpEntry, dumpBuf.Bytes(), 0o600, now); err != nil {
+		outFile.Close()
+		cleanup()
+		return "", fmt.Errorf("write dump entry: %w", err)
+	}
+
+	if len(keyBytes) > 0 {
+		if err := writeTarEntry(tw, bundleEncryptionKeyEntry, keyBytes, 0o600, now); err != nil {
+			outFile.Close()
+			cleanup()
+			return "", fmt.Errorf("write key entry: %w", err)
+		}
+	}
+
+	if err := tw.Close(); err != nil {
+		outFile.Close()
+		cleanup()
+		return "", fmt.Errorf("close tar: %w", err)
+	}
+	if err := bundleGz.Close(); err != nil {
+		outFile.Close()
+		cleanup()
+		return "", fmt.Errorf("close bundle gzip: %w", err)
+	}
+	if err := outFile.Sync(); err != nil {
+		outFile.Close()
+		cleanup()
+		return "", fmt.Errorf("sync bundle: %w", err)
+	}
+	if err := outFile.Close(); err != nil {
+		cleanup()
+		return "", fmt.Errorf("close bundle: %w", err)
+	}
+	if err := os.Rename(tmpPath, fullPath); err != nil {
+		cleanup()
+		return "", fmt.Errorf("rename bundle: %w", err)
+	}
+
 	info, err := os.Stat(fullPath)
 	if err != nil || info.Size() == 0 {
 		os.Remove(fullPath)
 		return "", fmt.Errorf("backup file is empty or missing")
 	}
 
-	bs.logger.Info("backup created", "filename", filename, "size", info.Size(), "trigger", trigger)
+	bs.logger.Info("backup created",
+		"filename", filename,
+		"size", info.Size(),
+		"trigger", trigger,
+		"includes_key", len(keyBytes) > 0,
+	)
 	return filename, nil
+}
+
+// writeTarEntry writes a single in-memory blob into the tar archive.
+func writeTarEntry(tw *tar.Writer, name string, data []byte, mode int64, mtime time.Time) error {
+	if err := tw.WriteHeader(&tar.Header{
+		Name:    name,
+		Mode:    mode,
+		Size:    int64(len(data)),
+		ModTime: mtime,
+	}); err != nil {
+		return err
+	}
+	_, err := tw.Write(data)
+	return err
 }
 
 // ListBackups returns all backup files sorted by creation time (newest first).
@@ -161,7 +251,7 @@ func (bs *BackupService) ListBackups() ([]BackupInfo, error) {
 		if entry.IsDir() {
 			continue
 		}
-		if !strings.HasSuffix(entry.Name(), ".sql.gz") {
+		if !isBackupFilename(entry.Name()) {
 			continue
 		}
 
@@ -196,7 +286,7 @@ func (bs *BackupService) GetBackupPath(filename string) (string, error) {
 	if strings.Contains(filename, "/") || strings.Contains(filename, "\\") || strings.Contains(filename, "..") {
 		return "", fmt.Errorf("invalid backup filename")
 	}
-	if !strings.HasSuffix(filename, ".sql.gz") {
+	if !isBackupFilename(filename) {
 		return "", fmt.Errorf("invalid backup file extension")
 	}
 	fullPath := filepath.Join(bs.backupDir, filename)
@@ -206,6 +296,12 @@ func (bs *BackupService) GetBackupPath(filename string) (string, error) {
 		return "", fmt.Errorf("backup file not found: %s", filename)
 	}
 	return fullPath, nil
+}
+
+// isBackupFilename returns true for both the new .tar.gz bundles and the
+// legacy .sql.gz dumps.
+func isBackupFilename(name string) bool {
+	return strings.HasSuffix(name, ".tar.gz") || strings.HasSuffix(name, ".sql.gz")
 }
 
 // DeleteBackup removes a backup file.
@@ -221,68 +317,206 @@ func (bs *BackupService) DeleteBackup(filename string) error {
 	return nil
 }
 
-// RestoreBackup decompresses a .sql.gz file and runs it through psql.
-// This is a destructive operation that replaces the current database contents.
+// RestoreBackup restores from a backup file on disk. Supports both the new
+// .tar.gz bundle format (containing dump.sql.gz + optional encryption.key) and
+// the legacy single .sql.gz dump.
+//
+// Destructive: replaces current database contents.
 func (bs *BackupService) RestoreBackup(ctx context.Context, filename string) error {
 	fullPath, err := bs.GetBackupPath(filename)
 	if err != nil {
 		return err
 	}
 
-	// Check that psql is available.
 	if _, err := exec.LookPath("psql"); err != nil {
 		return fmt.Errorf("psql not found on PATH: %w", err)
 	}
 
-	// Open and decompress the backup file.
 	f, err := os.Open(fullPath)
 	if err != nil {
 		return fmt.Errorf("open backup file: %w", err)
 	}
 	defer f.Close()
 
-	gzReader, err := gzip.NewReader(f)
-	if err != nil {
-		return fmt.Errorf("decompress backup: %w", err)
-	}
-	defer gzReader.Close()
-
-	// Run psql with the decompressed SQL as stdin.
-	// Use --single-transaction for atomicity.
-	args := []string{
-		"--single-transaction",
-		"--set", "ON_ERROR_STOP=on",
-		bs.databaseURL,
-	}
-
-	cmd := exec.CommandContext(ctx, "psql", args...)
-	cmd.Stdin = gzReader
-
-	var stderrBuf strings.Builder
-	cmd.Stderr = &stderrBuf
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("psql restore failed: %s: %w", stderrBuf.String(), err)
+	if err := bs.restoreFromStream(ctx, f); err != nil {
+		return err
 	}
 
 	bs.logger.Info("backup restored", "filename", filename)
 	return nil
 }
 
-// RestoreFromReader decompresses a gzipped SQL stream and runs it through psql.
-// Used for uploaded backup files that aren't yet saved to disk.
+// RestoreFromReader restores from an uploaded archive. Supports both .tar.gz
+// bundles and legacy .sql.gz dumps — the format is detected from the gzip
+// payload (tar header inside, vs raw SQL).
 func (bs *BackupService) RestoreFromReader(ctx context.Context, r io.Reader) error {
-	// Check that psql is available.
 	if _, err := exec.LookPath("psql"); err != nil {
 		return fmt.Errorf("psql not found on PATH: %w", err)
 	}
 
-	gzReader, err := gzip.NewReader(r)
+	if err := bs.restoreFromStream(ctx, r); err != nil {
+		return err
+	}
+
+	bs.logger.Info("backup restored from upload")
+	return nil
+}
+
+// restoreFromStream is the shared body of RestoreBackup and RestoreFromReader.
+// It auto-detects bundle vs legacy and dispatches accordingly.
+func (bs *BackupService) restoreFromStream(ctx context.Context, r io.Reader) error {
+	gz, err := gzip.NewReader(r)
 	if err != nil {
 		return fmt.Errorf("decompress backup: %w", err)
 	}
-	defer gzReader.Close()
+	defer gz.Close()
 
+	// Peek enough bytes to tell whether the gzip payload is a tar archive
+	// (POSIX ustar header puts "ustar" at offset 257) or raw SQL. We use
+	// bufio so the peek doesn't consume the stream — both branches replay
+	// from the buffered reader.
+	br := bufio.NewReaderSize(gz, 8192)
+	header, err := br.Peek(512)
+	if err != nil && err != io.EOF {
+		return fmt.Errorf("peek backup format: %w", err)
+	}
+
+	if isUstarHeader(header) {
+		return bs.restoreFromBundle(ctx, br)
+	}
+	return bs.runPsqlRestore(ctx, br)
+}
+
+// isUstarHeader returns true if buf looks like the first block of a POSIX tar
+// archive (ustar magic at offset 257).
+func isUstarHeader(buf []byte) bool {
+	const magicOffset = 257
+	if len(buf) < magicOffset+5 {
+		return false
+	}
+	return string(buf[magicOffset:magicOffset+5]) == "ustar"
+}
+
+// restoreFromBundle reads the .tar payload (already gunzipped + buffered),
+// extracts dump.sql.gz, restores it, and writes encryption.key back into the
+// data dir if it differs from the live key file.
+func (bs *BackupService) restoreFromBundle(ctx context.Context, r io.Reader) error {
+	tr := tar.NewReader(r)
+
+	var (
+		dumpData    []byte
+		keyData     []byte
+		dumpPresent bool
+	)
+
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("read backup bundle: %w", err)
+		}
+
+		switch hdr.Name {
+		case bundleDumpEntry:
+			data, err := io.ReadAll(tr)
+			if err != nil {
+				return fmt.Errorf("read dump from bundle: %w", err)
+			}
+			dumpData = data
+			dumpPresent = true
+		case bundleEncryptionKeyEntry:
+			data, err := io.ReadAll(tr)
+			if err != nil {
+				return fmt.Errorf("read encryption key from bundle: %w", err)
+			}
+			keyData = data
+		default:
+			// Tolerate (and skip) unknown entries so the format can grow.
+			if _, err := io.Copy(io.Discard, tr); err != nil {
+				return fmt.Errorf("skip bundle entry %q: %w", hdr.Name, err)
+			}
+		}
+	}
+
+	if !dumpPresent {
+		return fmt.Errorf("backup bundle missing %s entry", bundleDumpEntry)
+	}
+
+	// Restore SQL first so a key-write failure doesn't leave a half-applied DB.
+	dumpGz, err := gzip.NewReader(bytes.NewReader(dumpData))
+	if err != nil {
+		return fmt.Errorf("decompress dump entry: %w", err)
+	}
+	defer dumpGz.Close()
+
+	if err := bs.runPsqlRestore(ctx, dumpGz); err != nil {
+		return err
+	}
+
+	// Restore the encryption key file when (a) the bundle includes one and
+	// (b) we have a configured destination path. We write it next to whatever
+	// the running process believes is the current key file — operators using
+	// BYO env vars opt out by leaving encryptionKeyPath empty.
+	if len(keyData) > 0 && bs.encryptionKeyPath != "" {
+		if err := bs.writeRestoredKey(keyData); err != nil {
+			return fmt.Errorf("restore encryption key: %w", err)
+		}
+		bs.logger.Info("encryption key restored from backup bundle", "path", bs.encryptionKeyPath)
+	} else if len(keyData) > 0 {
+		bs.logger.Warn("backup bundle contains an encryption key but no destination path is configured; ignoring")
+	}
+
+	return nil
+}
+
+// writeRestoredKey atomically replaces the live encryption key file with the
+// bundle's copy. Skips the write when the contents already match — avoids a
+// no-op rename and makes restores against the same install idempotent.
+func (bs *BackupService) writeRestoredKey(data []byte) error {
+	if existing, err := os.ReadFile(bs.encryptionKeyPath); err == nil {
+		if bytes.Equal(bytes.TrimSpace(existing), bytes.TrimSpace(data)) {
+			return nil
+		}
+	}
+
+	dir := filepath.Dir(bs.encryptionKeyPath)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("ensure key dir: %w", err)
+	}
+
+	tmp, err := os.CreateTemp(dir, filepath.Base(bs.encryptionKeyPath)+".tmp.*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	cleanup := func() { _ = os.Remove(tmpName) }
+
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
+		cleanup()
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		cleanup()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		cleanup()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return err
+	}
+	return os.Rename(tmpName, bs.encryptionKeyPath)
+}
+
+// runPsqlRestore pipes the supplied SQL stream into psql.
+func (bs *BackupService) runPsqlRestore(ctx context.Context, r io.Reader) error {
 	args := []string{
 		"--single-transaction",
 		"--set", "ON_ERROR_STOP=on",
@@ -290,7 +524,7 @@ func (bs *BackupService) RestoreFromReader(ctx context.Context, r io.Reader) err
 	}
 
 	cmd := exec.CommandContext(ctx, "psql", args...)
-	cmd.Stdin = gzReader
+	cmd.Stdin = r
 
 	var stderrBuf strings.Builder
 	cmd.Stderr = &stderrBuf
@@ -298,8 +532,6 @@ func (bs *BackupService) RestoreFromReader(ctx context.Context, r io.Reader) err
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("psql restore failed: %s: %w", stderrBuf.String(), err)
 	}
-
-	bs.logger.Info("backup restored from upload")
 	return nil
 }
 
@@ -361,9 +593,10 @@ func ParseDatabaseName(databaseURL string) string {
 }
 
 // parseTriggerFromFilename extracts the trigger type from a backup filename.
-// Expected format: breadbox_<trigger>_<timestamp>.sql.gz
+// Expected format: breadbox_<trigger>_<timestamp>.{tar.gz|sql.gz}
 func parseTriggerFromFilename(filename string) string {
-	name := strings.TrimSuffix(filename, ".sql.gz")
+	name := strings.TrimSuffix(filename, ".tar.gz")
+	name = strings.TrimSuffix(name, ".sql.gz")
 	parts := strings.SplitN(name, "_", 3) // breadbox, trigger, timestamp
 	if len(parts) >= 2 {
 		switch parts[1] {

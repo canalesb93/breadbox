@@ -6,10 +6,23 @@ import "time"
 type Config struct {
 	// Derived from environment
 	DatabaseURL   string
-	EncryptionKey []byte // 32 bytes, decoded from hex
-	ServerPort    string
-	Environment   string
-	LogLevel      string // LOG_LEVEL: debug, info, warn, error
+	EncryptionKey []byte // 32 bytes, decoded from hex (env) or random bytes (file/generated)
+	// EncryptionKeySource describes where the live key came from:
+	//   "env"        — ENCRYPTION_KEY env var (BYO)
+	//   "file"       — read from ${BREADBOX_DATA_DIR}/encryption.key
+	//   "generated"  — freshly generated this boot and written to the data dir
+	//   ""           — no key (no provider configured, env unset, generation skipped)
+	EncryptionKeySource string
+	// EncryptionKeyPath is the on-disk location consulted/used for the file/generated
+	// sources. Empty when the key came from env or no key is set.
+	EncryptionKeyPath string
+	// DataDir is the resolved data directory used for the encryption key file
+	// (and any future per-install state). Sourced from BREADBOX_DATA_DIR with a
+	// docker (/data) vs local (./data) default.
+	DataDir     string
+	ServerPort  string
+	Environment string
+	LogLevel    string // LOG_LEVEL: debug, info, warn, error
 
 	// May come from env (overrides app_config) or app_config table
 	PlaidClientID string

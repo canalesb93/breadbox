@@ -187,8 +187,8 @@ func RestoreBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 			}
 			defer file.Close()
 
-			if !strings.HasSuffix(header.Filename, ".sql.gz") {
-				SetFlash(ctx, sm, "error", "Invalid file type. Only .sql.gz files are supported.")
+			if !strings.HasSuffix(header.Filename, ".tar.gz") && !strings.HasSuffix(header.Filename, ".sql.gz") {
+				SetFlash(ctx, sm, "error", "Invalid file type. Only .tar.gz bundles and legacy .sql.gz dumps are supported.")
 				http.Redirect(w, r, "/backups", http.StatusSeeOther)
 				return
 			}

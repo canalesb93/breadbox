@@ -45,7 +45,7 @@ The script will:
 3. Download `docker-compose.prod.yml` and `Caddyfile`, pinned to that release
 4. Write `.breadbox-version` so `update.sh` preserves the pin
 5. Prompt for an optional public domain (leave blank for localhost-only)
-6. Generate `ENCRYPTION_KEY` and database password
+6. Generate the database password (the encryption key is auto-managed by the server on first boot — see "Encryption key" below)
 7. Create a `.env` file (will not overwrite an existing one)
 8. Start Breadbox + Postgres. Caddy is started only if you configured a domain
    (via the `caddy` compose profile).
@@ -126,16 +126,21 @@ curl -fsSL "$BASE/.env.example" -o .env
 Edit `.env` and set the required values:
 
 ```bash
-# Generate secrets
-openssl rand -hex 32          # → ENCRYPTION_KEY
+# Generate the database password
 openssl rand -base64 32       # → POSTGRES_PASSWORD (also update DATABASE_URL)
 ```
 
 Key variables:
 - `DOMAIN` — Your domain name (e.g., `breadbox.example.com`)
-- `ENCRYPTION_KEY` — 64-character hex string for encrypting bank credentials
 - `POSTGRES_PASSWORD` — Strong password for PostgreSQL
 - `DATABASE_URL` — Connection string (update the password to match `POSTGRES_PASSWORD`)
+
+> **Encryption key.** `ENCRYPTION_KEY` is auto-managed: the server generates one
+> on first boot and persists it inside the `breadbox_data` volume at
+> `/data/encryption.key`. Backup bundles include the key so a single archive
+> restores the full install. Set `ENCRYPTION_KEY=$(openssl rand -hex 32)` in
+> `.env` only if you want stricter separation (env var wins, file path is never
+> touched, bundles omit the key).
 
 ### 5. Start Services
 
@@ -239,7 +244,8 @@ This gives the container access to the Docker daemon. The actual container resta
 |----------|----------|---------|-------------|
 | `DOMAIN` | Yes | — | Domain name for Caddy HTTPS |
 | `DATABASE_URL` | Yes | — | PostgreSQL connection string |
-| `ENCRYPTION_KEY` | Yes* | — | 64-char hex key for encrypting bank credentials |
+| `BREADBOX_DATA_DIR` | No | `/data` (docker), `./data` (local) | Where the auto-managed `encryption.key` lives |
+| `ENCRYPTION_KEY` | No | auto-generated | 64-char hex key for encrypting bank credentials. Set explicitly to BYO; otherwise the server generates one in `BREADBOX_DATA_DIR` on first boot. |
 | `SERVER_PORT` | No | `8080` | HTTP listen port |
 | `ENVIRONMENT` | No | `docker` | Runtime environment (`local`, `docker`) |
 | `LOG_LEVEL` | No | `info` | Log level (`debug`, `info`, `warn`, `error`) |

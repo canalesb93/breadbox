@@ -3,10 +3,10 @@ package config
 import (
 	"context"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"breadbox/internal/crypto"
 
@@ -38,6 +38,14 @@ func Load() (*Config, error) {
 		ConfigSources: make(map[string]string),
 	}
 
+	// Resolve the on-disk data directory used for the auto-managed encryption
+	// key (and any future per-install state). Explicit env wins; otherwise pick
+	// /data in containers and ./data locally.
+	cfg.DataDir = strings.TrimSpace(os.Getenv("BREADBOX_DATA_DIR"))
+	if cfg.DataDir == "" {
+		cfg.DataDir = defaultDataDir(env)
+	}
+
 	// Database URL: prefer DATABASE_URL, fall back to individual vars.
 	cfg.DatabaseURL = os.Getenv("DATABASE_URL")
 	if cfg.DatabaseURL == "" {
@@ -54,18 +62,22 @@ func Load() (*Config, error) {
 		}
 	}
 
-	// Encryption key: 64-char hex → 32 bytes.
-	keyHex := os.Getenv("ENCRYPTION_KEY")
-	if keyHex != "" {
-		key, err := hex.DecodeString(keyHex)
-		if err != nil {
-			return nil, fmt.Errorf("ENCRYPTION_KEY: invalid hex: %w", err)
-		}
-		if len(key) != 32 {
-			return nil, fmt.Errorf("ENCRYPTION_KEY: expected 32 bytes, got %d", len(key))
-		}
-		cfg.EncryptionKey = key
+	// Encryption key resolution order:
+	//   1. ENCRYPTION_KEY env var (BYO, today's behavior)
+	//   2. ${BREADBOX_DATA_DIR}/encryption.key
+	//   3. Generate fresh, persist to the data dir
+	//
+	// Generation is unconditional — installs without a key would otherwise lose
+	// access to encrypted provider credentials the moment a user configures
+	// Plaid/Teller. Logging the source + fingerprint is the caller's job (see
+	// cmd/breadbox/main.go).
+	key, source, path, err := resolveEncryptionKey(os.Getenv("ENCRYPTION_KEY"), cfg.DataDir)
+	if err != nil {
+		return nil, err
 	}
+	cfg.EncryptionKey = key
+	cfg.EncryptionKeySource = source
+	cfg.EncryptionKeyPath = path
 
 	// Plaid env-var overrides (may also come from app_config).
 	cfg.PlaidClientID = os.Getenv("PLAID_CLIENT_ID")

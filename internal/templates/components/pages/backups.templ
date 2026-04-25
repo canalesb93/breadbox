@@ -35,25 +35,33 @@ templ Backups(p BackupsProps) {
 		</div>
 	</div>
 	<div class="grid gap-6 bb-stagger">
-		<!-- Encryption Key Warning -->
-		<div class="alert alert-warning rounded-xl">
-			<i data-lucide="shield-alert" class="w-5 h-5 flex-shrink-0"></i>
-			<div>
-				<h3 class="font-semibold text-sm">Back up your ENCRYPTION_KEY separately</h3>
-				<p class="text-xs mt-1 leading-relaxed">
-					Database backups contain encrypted bank credentials that are useless without the matching
-					<code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code>.
-					If you lose the key, all bank connections must be re-linked from scratch. Store it in a
-					password manager or secure vault — never commit it to version control.
-				</p>
-				if !p.HasEncryptionKey {
-					<p class="text-xs mt-2 text-error font-semibold">
-						<i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-0.5"></i>
-						No encryption key is currently set. Bank credentials cannot be stored or restored.
+		<!-- Encryption Key Status -->
+		if p.HasEncryptionKey {
+			<div class="alert alert-info rounded-xl">
+				<i data-lucide="shield-check" class="w-5 h-5 flex-shrink-0"></i>
+				<div>
+					<h3 class="font-semibold text-sm">Encryption key bundled with backups</h3>
+					<p class="text-xs mt-1 leading-relaxed">
+						Backups created here are <code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">.tar.gz</code> bundles
+						that include both the database dump and the auto-managed encryption key. A single archive is enough to
+						fully restore an install. Operators using a BYO <code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code>
+						env var get a key-less bundle (the key stays out of the archive by design).
 					</p>
-				}
+				</div>
 			</div>
-		</div>
+		} else {
+			<div class="alert alert-error rounded-xl">
+				<i data-lucide="alert-triangle" class="w-5 h-5 flex-shrink-0"></i>
+				<div>
+					<h3 class="font-semibold text-sm">No encryption key available</h3>
+					<p class="text-xs mt-1 leading-relaxed">
+						Bank credentials cannot be stored or restored. Confirm the data directory is writable, or set
+						<code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY=$(openssl rand -hex 32)</code> in
+						the server environment.
+					</p>
+				</div>
+			</div>
+		}
 		if p.Error != "" {
 			<div class="alert alert-error rounded-xl">
 				<i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0"></i>
@@ -294,7 +302,7 @@ templ backupsRestoreSection(p BackupsProps) {
 			<i data-lucide="upload" class="w-5 h-5 text-base-content/40 flex-shrink-0"></i>
 			<div class="min-w-0 flex-1">
 				<h2 class="font-semibold">Restore from File</h2>
-				<p class="text-xs text-base-content/40" x-show="!expanded">Upload a .sql.gz backup file to restore</p>
+				<p class="text-xs text-base-content/40" x-show="!expanded">Upload a .tar.gz (or legacy .sql.gz) backup file to restore</p>
 				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Upload a previously downloaded backup to restore</p>
 			</div>
 			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
@@ -303,9 +311,11 @@ templ backupsRestoreSection(p BackupsProps) {
 			<div class="px-4 sm:px-5 py-4">
 				<div class="text-xs text-error/80 bg-error/5 rounded-lg p-3 mb-4">
 					<i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-1"></i>
-					<strong>Warning:</strong> Restoring a backup will replace all current data. Make sure you have the correct
-					<code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">ENCRYPTION_KEY</code> that matches the backup,
-					or bank connections will need to be re-linked.
+					<strong>Warning:</strong> Restoring a backup will replace all current data. New
+					<code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">.tar.gz</code> bundles also restore the
+					encryption key automatically. Legacy <code class="text-xs bg-base-300/50 px-1 py-0.5 rounded">.sql.gz</code>
+					dumps require the matching encryption key to already be in place — otherwise bank connections will
+					need to be re-linked.
 				</div>
 				<form
 					method="POST"
@@ -324,12 +334,12 @@ templ backupsRestoreSection(p BackupsProps) {
 					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 					<input type="hidden" name="restore_source" value="upload"/>
 					<div class="max-w-md">
-						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="backup_file">Backup File (.sql.gz)</label>
+						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="backup_file">Backup File (.tar.gz or legacy .sql.gz)</label>
 						<input
 							type="file"
 							id="backup_file"
 							name="backup_file"
-							accept=".sql.gz,.gz"
+							accept=".tar.gz,.sql.gz,.gz"
 							class="file-input file-input-bordered file-input-sm w-full rounded-xl"
 							@change="filename = $event.target.files[0]?.name || ''"
 							required

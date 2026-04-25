@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/aes"
-	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -335,58 +334,62 @@ func latestEmbeddedMigration() (int64, error) {
 	return versions[len(versions)-1], nil
 }
 
-// checkEncryptionKey validates ENCRYPTION_KEY is set and hex-decodes to 32 bytes.
-// TODO(#688): once we persist a key fingerprint, compare it against the live key here
-// to catch silent key rotations that would break decrypt for existing connections.
+// checkEncryptionKey reports the live encryption key, where it came from
+// (env / file / generated this boot), and a stable 8-char fingerprint so
+// operators can tell two installs apart in logs.
+//
+// Resolution already happened in config.Load() — by the time we run, cfg
+// holds the canonical state. We re-validate the bytes (length + AES-cipher
+// acceptance) defensively.
 func checkEncryptionKey(cfg *config.Config) doctorCheck {
-	raw := os.Getenv("ENCRYPTION_KEY")
 	providerConfigured := cfg.PlaidClientID != "" || cfg.TellerAppID != ""
 
-	if raw == "" {
+	if len(cfg.EncryptionKey) == 0 {
 		if providerConfigured {
 			return doctorCheck{
 				Name:        "encryption key",
 				Status:      doctorStatusFail,
-				Message:     "ENCRYPTION_KEY is required when a bank provider is configured",
-				Remediation: "generate one with: openssl rand -hex 32",
+				Message:     "no encryption key available and a bank provider is configured",
+				Remediation: "set BREADBOX_DATA_DIR to a writable path, or set ENCRYPTION_KEY=$(openssl rand -hex 32)",
 			}
 		}
 		return doctorCheck{
 			Name:    "encryption key",
 			Status:  doctorStatusSkip,
-			Message: "not set (no bank provider configured)",
+			Message: "no key (no bank provider configured)",
 		}
 	}
 
-	key, err := hex.DecodeString(raw)
-	if err != nil {
+	if len(cfg.EncryptionKey) != 32 {
 		return doctorCheck{
 			Name:        "encryption key",
 			Status:      doctorStatusFail,
-			Message:     "ENCRYPTION_KEY is not valid hex",
-			Remediation: "regenerate with: openssl rand -hex 32",
+			Message:     fmt.Sprintf("expected 32 bytes, got %d", len(cfg.EncryptionKey)),
+			Remediation: "delete the corrupted encryption key file or set ENCRYPTION_KEY=$(openssl rand -hex 32)",
 		}
 	}
-	if len(key) != 32 {
-		return doctorCheck{
-			Name:        "encryption key",
-			Status:      doctorStatusFail,
-			Message:     fmt.Sprintf("ENCRYPTION_KEY must decode to 32 bytes, got %d", len(key)),
-			Remediation: "regenerate with: openssl rand -hex 32",
-		}
-	}
-	if _, err := aes.NewCipher(key); err != nil {
+	if _, err := aes.NewCipher(cfg.EncryptionKey); err != nil {
 		return doctorCheck{
 			Name:        "encryption key",
 			Status:      doctorStatusFail,
 			Message:     "key rejected by AES cipher: " + err.Error(),
-			Remediation: "regenerate with: openssl rand -hex 32",
+			Remediation: "delete the corrupted encryption key file or set ENCRYPTION_KEY=$(openssl rand -hex 32)",
 		}
+	}
+
+	fp := config.EncryptionKeyFingerprint(cfg.EncryptionKey)
+	source := cfg.EncryptionKeySource
+	if source == "" {
+		source = "unknown"
+	}
+	msg := fmt.Sprintf("source=%s fingerprint=%s", source, fp)
+	if cfg.EncryptionKeyPath != "" && source != config.EncryptionKeySourceEnv {
+		msg += fmt.Sprintf(" path=%s", cfg.EncryptionKeyPath)
 	}
 	return doctorCheck{
 		Name:    "encryption key",
 		Status:  doctorStatusPass,
-		Message: "set and 32 bytes",
+		Message: msg,
 	}
 }
 
