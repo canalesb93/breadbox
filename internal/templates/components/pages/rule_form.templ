@@ -7,9 +7,24 @@ import "breadbox/internal/templates/components"
 // previous html/template version byte-for-byte so behavior (visual condition
 // builder, Alpine factory, JSON editor toggle, action validation) is
 // preserved.
+//
+// The Alpine factory lives in static/js/admin/components/rule_form.js and
+// reads its initial state from the sibling
+// @templ.JSONScript("rule-form-data", p.Rule) tag (only emitted in edit
+// mode) plus the data-is-edit attribute on the x-data root. The factory
+// <script> is loaded synchronously at the top of the component (not
+// `defer`) so Alpine.data('ruleForm', ...) is registered before Alpine —
+// itself <script defer> in <head> — fires alpine:init.
 templ RuleForm(p RuleFormProps) {
+	<!-- Component factory + initial-state JSON (edit mode only). Loaded
+	     synchronously (no defer) so the Alpine.data() registration runs
+	     before Alpine — itself deferred from <head> — fires alpine:init. -->
+	<script src="/static/js/admin/components/rule_form.js"></script>
 	@components.BreadcrumbNav(p.Breadcrumbs)
-	<div x-data="ruleForm()">
+	if p.Rule != nil {
+		@templ.JSONScript("rule-form-data", p.Rule)
+	}
+	<div x-data="ruleForm" data-is-edit={ ruleFormIsEditAttr(p.IsEdit) }>
 		<div class="bb-page-header">
 			<div>
 				<h1 class="bb-page-title" x-text="isEdit ? 'Edit Rule' : 'New Rule'"></h1>
@@ -370,5 +385,4 @@ templ RuleForm(p RuleFormProps) {
 			</form>
 		</div>
 	</div>
-	@templ.Raw(ruleFormBootstrap(p))
 }
