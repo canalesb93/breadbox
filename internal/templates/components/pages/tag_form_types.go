@@ -64,6 +64,14 @@ func tagColorOr(t *service.TagResponse) string {
 	return *t.Color
 }
 
+// tagLifecycleOr returns the tag's lifecycle or the default ('persistent').
+func tagLifecycleOr(t *service.TagResponse) string {
+	if t == nil || t.Lifecycle == "" {
+		return "persistent"
+	}
+	return t.Lifecycle
+}
+
 // tagFormBootstrap renders the Alpine component bootstrap. Extracting it
 // as a Go function keeps the templ template clean and lets us interpolate
 // Go values via jsStringLit rather than inside a <script> block.
@@ -77,7 +85,8 @@ function tagForm() {
     displayName: %s,
     description: %s,
     color: %s,
-    icon: %s
+    icon: %s,
+    lifecycle: %s
   };
   return {
     isEdit: isEdit,
@@ -87,7 +96,9 @@ function tagForm() {
     description: initial.description,
     color: initial.color,
     icon: initial.icon,
+    lifecycle: initial.lifecycle,
     submitting: false,
+    deleting: false,
     error: '',
     presetColors: ['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#64748b','#78716c'],
 
@@ -111,7 +122,8 @@ function tagForm() {
           display_name: displayName,
           description: this.description || '',
           color: this.color || null,
-          icon: this.icon || null
+          icon: this.icon || null,
+          lifecycle: this.lifecycle || 'persistent'
         };
       } else {
         url = '/-/tags';
@@ -149,6 +161,42 @@ function tagForm() {
           self.restorePageState();
           self.error = 'Network error. Please try again.';
         });
+    },
+
+    deleteTag: function() {
+      if (!this.isEdit || !this.tagId) return;
+      var self = this;
+      var label = (this.displayName || this.slug || 'this tag');
+      var confirmFn = window.bbConfirm
+        ? window.bbConfirm({title: 'Delete tag?', message: 'Delete tag "' + label + '"? This removes it from all transactions. Activity annotations are preserved.', confirmLabel: 'Delete', variant: 'danger'})
+        : Promise.resolve(window.confirm('Delete tag "' + label + '"?'));
+      Promise.resolve(confirmFn).then(function(ok) {
+        if (!ok) return;
+        self.deleting = true;
+        fetch('/-/tags/' + self.tagId, { method: 'DELETE' })
+          .then(function(res) {
+            if (res.ok) {
+              window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Tag deleted', type:'success'}}));
+              setTimeout(function() { window.location.href = '/tags'; }, 300);
+              return;
+            }
+            return res.json().then(function(data) {
+              self.deleting = false;
+              self.restorePageState();
+              var msg = (data && data.error && data.error.message) ? data.error.message : 'Delete failed.';
+              window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: msg, type:'error'}}));
+            }).catch(function() {
+              self.deleting = false;
+              self.restorePageState();
+              window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Delete failed.', type:'error'}}));
+            });
+          })
+          .catch(function() {
+            self.deleting = false;
+            self.restorePageState();
+            window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Network error.', type:'error'}}));
+          });
+      });
     }
   };
 }
@@ -160,5 +208,6 @@ function tagForm() {
 		jsStringLit(tagDescriptionOr(p.Tag)),
 		jsStringLit(tagColorOr(p.Tag)),
 		jsStringLit(tagIconOr(p.Tag)),
+		jsStringLit(tagLifecycleOr(p.Tag)),
 	)
 }

@@ -21,6 +21,7 @@ SET display_name = $2,
     description = $3,
     color = $4,
     icon = $5,
+    lifecycle = $6,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;

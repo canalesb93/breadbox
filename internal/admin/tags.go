@@ -133,6 +133,7 @@ func UpdateTagAdminHandler(svc *service.Service) http.HandlerFunc {
 			Description *string `json:"description"`
 			Color       *string `json:"color"`
 			Icon        *string `json:"icon"`
+			Lifecycle   *string `json:"lifecycle"`
 		}
 		if !decodeJSON(w, r, &req) {
 			return
@@ -142,6 +143,7 @@ func UpdateTagAdminHandler(svc *service.Service) http.HandlerFunc {
 			Description: req.Description,
 			Color:       req.Color,
 			Icon:        req.Icon,
+			Lifecycle:   req.Lifecycle,
 		})
 		if err != nil {
 			handleTagError(w, err)

@@ -117,6 +117,28 @@ templ TagForm(p TagFormProps) {
 							placeholder="Short explanation of when to use this tag"
 						/>
 					</div>
+					if p.IsEdit {
+						<!-- Lifecycle -->
+						<div>
+							<label class="block text-xs font-medium text-base-content/50 mb-1.5">Lifecycle</label>
+							<div class="flex flex-col sm:flex-row gap-2">
+								<label class="flex-1 flex items-start gap-2.5 p-3 rounded-xl border border-base-300/60 cursor-pointer hover:bg-base-200/40 transition-colors" :class="lifecycle === 'persistent' ? 'bg-base-200/40 border-base-content/20' : ''">
+									<input type="radio" name="lifecycle" value="persistent" class="radio radio-xs mt-0.5" x-model="lifecycle"/>
+									<span class="flex-1 min-w-0">
+										<span class="block text-sm font-medium">Persistent</span>
+										<span class="block text-xs text-base-content/50 mt-0.5">Stays on transactions until removed.</span>
+									</span>
+								</label>
+								<label class="flex-1 flex items-start gap-2.5 p-3 rounded-xl border border-base-300/60 cursor-pointer hover:bg-base-200/40 transition-colors" :class="lifecycle === 'ephemeral' ? 'bg-base-200/40 border-base-content/20' : ''">
+									<input type="radio" name="lifecycle" value="ephemeral" class="radio radio-xs mt-0.5" x-model="lifecycle"/>
+									<span class="flex-1 min-w-0">
+										<span class="block text-sm font-medium">Ephemeral</span>
+										<span class="block text-xs text-base-content/50 mt-0.5">Auto-clears once the work is done (e.g. needs-review).</span>
+									</span>
+								</label>
+							</div>
+						</div>
+					}
 					<!-- Icon + color -->
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<div>
@@ -182,6 +204,35 @@ templ TagForm(p TagFormProps) {
 				</button>
 			</div>
 		</form>
+		if p.IsEdit {
+			<div class="bb-card mt-6 border-error/30">
+				<div class="p-5 sm:p-6">
+					<div class="bb-icon-header">
+						<div class="bb-icon-header__tile bg-error/10 text-error">
+							<i data-lucide="alert-triangle" class="w-5 h-5"></i>
+						</div>
+						<div class="bb-icon-header__text">
+							<h2 class="text-sm font-semibold">Danger zone</h2>
+							<p class="text-xs text-base-content/45">Deleting a tag removes it from all transactions. Activity annotations are preserved.</p>
+						</div>
+					</div>
+					<div class="mt-4">
+						<button
+							type="button"
+							class="btn btn-sm btn-error btn-outline rounded-xl gap-1.5"
+							@click="deleteTag()"
+							:disabled="deleting"
+						>
+							<span x-show="!deleting" class="inline-flex items-center gap-1.5">
+								<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+								<span>Delete tag</span>
+							</span>
+							<span x-show="deleting" class="loading loading-spinner loading-xs"></span>
+						</button>
+					</div>
+				</div>
+			</div>
+		}
 	</div>
 	@templ.Raw(tagFormBootstrap(p))
 }
