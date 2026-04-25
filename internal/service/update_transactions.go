@@ -308,8 +308,8 @@ func (s *Service) runUpdateOpInTx(ctx context.Context, tx pgx.Tx, op UpdateTrans
 	if op.Comment != nil {
 		content := strings.TrimSpace(*op.Comment)
 		if content != "" {
-			if len(content) > maxCommentLength {
-				return fmt.Errorf("%w: comment exceeds %d chars", ErrInvalidParameter, maxCommentLength)
+			if len(content) > MaxCommentLength {
+				return fmt.Errorf("%w: comment exceeds %d chars", ErrInvalidParameter, MaxCommentLength)
 			}
 			payload := map[string]interface{}{"content": content}
 			if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
