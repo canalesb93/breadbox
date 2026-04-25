@@ -45,13 +45,6 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.TxRow(tx), nil
 	},
-	"TxRowCompact": func(data any) (templ.Component, error) {
-		tx, err := assertAdminTxRow(data)
-		if err != nil {
-			return nil, err
-		}
-		return components.TxRowCompact(tx), nil
-	},
 	"Flash": func(data any) (templ.Component, error) {
 		f, ok := data.(*Flash)
 		if !ok {
@@ -65,20 +58,6 @@ var componentRegistry = map[string]componentAdapter{
 			return templ.NopComponent, nil
 		}
 		return components.Flash(f.Type, f.Message), nil
-	},
-	"TagChip": func(data any) (templ.Component, error) {
-		td, err := assertTagChipData(data)
-		if err != nil {
-			return nil, err
-		}
-		return components.TagChip(td), nil
-	},
-	"TagChipSm": func(data any) (templ.Component, error) {
-		td, err := assertTagChipData(data)
-		if err != nil {
-			return nil, err
-		}
-		return components.TagChipSm(td), nil
 	},
 	"Breadcrumb": func(data any) (templ.Component, error) {
 		crumbs, ok := data.([]Breadcrumb)
@@ -107,13 +86,6 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.Nav(navPropsFromData(m)), nil
 	},
-	"TxResults": func(data any) (templ.Component, error) {
-		m, ok := data.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("want map[string]any, got %T", data)
-		}
-		return components.TxResults(txResultsPropsFromData(m)), nil
-	},
 	"Kbd": func(data any) (templ.Component, error) {
 		key, ok := data.(string)
 		if !ok {
@@ -135,40 +107,6 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.KbdCombo(keys...), nil
 	},
-	"ConditionRow": func(data any) (templ.Component, error) {
-		m, ok := data.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("want map[string]any, got %T", data)
-		}
-		var cond service.Condition
-		switch c := m["Cond"].(type) {
-		case service.Condition:
-			cond = c
-		case *service.Condition:
-			if c != nil {
-				cond = *c
-			}
-		default:
-			return nil, fmt.Errorf("ConditionRow: want service.Condition in Cond, got %T", m["Cond"])
-		}
-		idx := 0
-		switch v := m["Idx"].(type) {
-		case int:
-			idx = v
-		case int32:
-			idx = int(v)
-		case int64:
-			idx = int(v)
-		}
-		conj, _ := m["Conj"].(string)
-		return components.ConditionRow(components.ConditionRowProps{
-			IsFirst:     idx == 0,
-			Conj:        conj,
-			FieldLabel:  ruleFieldLabel(cond.Field),
-			OpLabel:     ruleOpLabel(cond.Op, cond.Field),
-			ValueFormat: ruleValueFormat(cond.Value),
-		}), nil
-	},
 }
 
 // assertAdminTxRow extracts a service.AdminTransactionRow from data,
@@ -181,26 +119,6 @@ func assertAdminTxRow(data any) (service.AdminTransactionRow, error) {
 		return *p, nil
 	}
 	return service.AdminTransactionRow{}, fmt.Errorf("want service.AdminTransactionRow, got %T", data)
-}
-
-// assertTagChipData extracts a components.TagChipData from the several types
-// that the tag-chip bridge accepts.
-func assertTagChipData(data any) (components.TagChipData, error) {
-	switch v := data.(type) {
-	case service.TagResponse:
-		return components.TagChipDataFromResponse(v), nil
-	case *service.TagResponse:
-		if v == nil {
-			return components.TagChipData{}, nil
-		}
-		return components.TagChipDataFromResponse(*v), nil
-	case service.AdminTransactionTag:
-		return components.TagChipDataFromTx(v), nil
-	case components.TagChipData:
-		return v, nil
-	default:
-		return components.TagChipData{}, fmt.Errorf("unsupported tag chip type %T", data)
-	}
 }
 
 // toStringSlice coerces the value passed via renderComponent into a
@@ -302,49 +220,6 @@ func navPropsFromData(m map[string]any) components.NavProps {
 		p.PendingReviews = badges.PendingReviews
 	}
 	return p
-}
-
-// txResultsPropsFromData copies the AJAX transaction-list fields out of
-// the render-time data map into a typed struct the TxResults templ
-// component consumes. Called by the "TxResults" bridge entry and by
-// the TransactionSearchHandler (which renders the fragment directly).
-func txResultsPropsFromData(m map[string]any) components.TxResultsProps {
-	getInt := func(key string) int {
-		switch v := m[key].(type) {
-		case int:
-			return v
-		case int32:
-			return int(v)
-		case int64:
-			return int(v)
-		}
-		return 0
-	}
-	props := components.TxResultsProps{
-		Page:           getInt("Page"),
-		TotalPages:     getInt("TotalPages"),
-		PageSize:       getInt("PageSize"),
-		Total:          getInt("Total"),
-		ShowingStart:   getInt("ShowingStart"),
-		ShowingEnd:     getInt("ShowingEnd"),
-		PaginationBase: fmt.Sprintf("%v", m["PaginationBase"]),
-	}
-	if txns, ok := m["Transactions"].([]service.AdminTransactionRow); ok {
-		props.Transactions = txns
-	}
-	if groups, ok := m["DateGroups"].([]DateGroup); ok {
-		props.DateGroups = make([]components.TxResultsDateGroup, len(groups))
-		for i, g := range groups {
-			props.DateGroups[i] = components.TxResultsDateGroup{
-				Date:         g.Date,
-				Label:        g.Label,
-				Transactions: g.Transactions,
-				DaySpending:  g.DaySpending,
-				DayIncome:    g.DayIncome,
-			}
-		}
-	}
-	return props
 }
 
 // Flash represents a one-time message shown to the user after a redirect.
@@ -1055,10 +930,6 @@ var templatePartials = []string{
 	"partials/category_picker.html",
 	"partials/breadcrumb.html",
 	"partials/tx_row.html",
-	"partials/tx_row_compact.html",
-	"partials/tx_results.html",
-	"partials/tag_chip.html",
-	"partials/condition_row.html",
 }
 
 func (tr *TemplateRenderer) parseTemplates() error {

@@ -1,7 +1,0 @@
-{{/*
-  Thin html/template facade around the templ component in
-  internal/templates/components/condition_row.templ. Callers still pass
-  a dict with Cond, Idx, Conj — the bridge pre-formats the labels before
-  handing the component a typed ConditionRowProps. See issue #462.
-*/}}
-{{define "condition-row"}}{{renderComponent "ConditionRow" .}}{{end}}

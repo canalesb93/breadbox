@@ -1,7 +1,0 @@
-{{/*
-  Thin html/template facade around the templ TxResults component in
-  internal/templates/components/tx_results.templ. Callers pass the full
-  layout data map; the bridge's txResultsPropsFromData extracts the
-  DateGroups, Transactions, and paginator fields. See issue #462.
-*/}}
-{{define "tx-results-partial"}}{{renderComponent "TxResults" .}}{{end}}
