@@ -14,6 +14,7 @@ import (
 	"breadbox/internal/provider"
 	"breadbox/internal/service"
 	bsync "breadbox/internal/sync"
+	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
@@ -369,18 +370,42 @@ func NewConnectionHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 		data := map[string]any{
 			"PageTitle":   "Connect New Bank",
 			"CurrentPage": "connections",
-			"Users":       users,
 			"CSRFToken":   GetCSRFToken(r),
-			"HasPlaid":    a.Providers["plaid"] != nil,
-			"HasTeller":   a.Providers["teller"] != nil,
-			"TellerEnv":   a.Config.TellerEnv,
-			"Breadcrumbs": []Breadcrumb{
-				{Label: "Connections", Href: "/connections"},
-				{Label: "Connect New Bank"},
-			},
 		}
-		tr.Render(w, r, "connection_new.html", data)
+		renderConnectionNew(w, r, tr, data, users, a.Providers["plaid"] != nil, a.Providers["teller"] != nil, a.Config.TellerEnv)
 	}
+}
+
+// renderConnectionNew converts the handler's inputs into the typed
+// pages.ConnectionNewProps the templ component renders, then dispatches
+// through TemplateRenderer.RenderWithTempl. Mirrors the handler-side
+// helper pattern used by buildConnectionsProps + Connections.
+func renderConnectionNew(
+	w http.ResponseWriter,
+	r *http.Request,
+	tr *TemplateRenderer,
+	data map[string]any,
+	users []db.User,
+	hasPlaid, hasTeller bool,
+	tellerEnv string,
+) {
+	props := pages.ConnectionNewProps{
+		Breadcrumbs: []components.Breadcrumb{
+			{Label: "Connections", Href: "/connections"},
+			{Label: "Connect New Bank"},
+		},
+		CSRFToken: GetCSRFToken(r),
+		HasPlaid:  hasPlaid,
+		HasTeller: hasTeller,
+		TellerEnv: tellerEnv,
+	}
+	for _, u := range users {
+		props.Users = append(props.Users, pages.ConnectionNewUser{
+			ID:   pgconv.FormatUUID(u.ID),
+			Name: u.Name,
+		})
+	}
+	tr.RenderWithTempl(w, r, data, pages.ConnectionNew(props))
 }
 
 // linkTokenRequest is the JSON body for POST /admin/api/link-token.

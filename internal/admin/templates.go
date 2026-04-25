@@ -1070,7 +1070,8 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// _templ_shell template key.
 		// pages/connections.html removed — renders via RenderWithTempl
 		// using the _templ_shell template key (see pages.Connections).
-		"pages/connection_new.html",
+		// pages/connection_new.html removed — renders via RenderWithTempl
+		// using the _templ_shell template key (see pages.ConnectionNew).
 		"pages/connection_detail.html",
 		"pages/connection_reauth.html",
 		"pages/users.html",
