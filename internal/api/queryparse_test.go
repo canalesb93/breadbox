@@ -286,23 +286,40 @@ func TestParseEnumParam(t *testing.T) {
 	}
 }
 
-func TestJoinStrings(t *testing.T) {
+func TestParseCSVParam(t *testing.T) {
 	tests := []struct {
-		name string
-		ss   []string
-		want string
+		name  string
+		query string
+		key   string
+		want  []string
 	}{
-		{"empty", nil, ""},
-		{"single", []string{"a"}, "a"},
-		{"two", []string{"a", "b"}, "a, b"},
-		{"three", []string{"date", "amount", "name"}, "date, amount, name"},
+		{"absent returns nil", "", "tags", nil},
+		{"empty value returns nil", "tags=", "tags", nil},
+		{"only commas returns nil", "tags=,,,", "tags", nil},
+		{"only whitespace returns nil", "tags=%20%20,%20", "tags", nil},
+		{"single value", "tags=alpha", "tags", []string{"alpha"}},
+		{"comma-separated", "tags=a,b,c", "tags", []string{"a", "b", "c"}},
+		{"trims whitespace", "tags=%20a%20,%20b%20,c", "tags", []string{"a", "b", "c"}},
+		{"drops empty tokens", "tags=a,,b,", "tags", []string{"a", "b"}},
+		{"repeated param", "tags=a&tags=b", "tags", []string{"a", "b"}},
+		{"repeated and comma combined", "tags=a,b&tags=c", "tags", []string{"a", "b", "c"}},
+		{"dedupes across tokens", "tags=a,b,a", "tags", []string{"a", "b"}},
+		{"dedupes across repeated params", "tags=a&tags=a&tags=b", "tags", []string{"a", "b"}},
+		{"preserves inner spaces", "tags=foo%20bar,baz", "tags", []string{"foo bar", "baz"}},
+		{"different key", "any_tag=x,y", "any_tag", []string{"x", "y"}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := joinStrings(tt.ss)
-			if got != tt.want {
-				t.Errorf("joinStrings() = %q, want %q", got, tt.want)
+			q, _ := url.ParseQuery(tt.query)
+			got := parseCSVParam(q, tt.key)
+			if len(got) != len(tt.want) {
+				t.Fatalf("parseCSVParam() = %q, want %q", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("parseCSVParam()[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
 			}
 		})
 	}

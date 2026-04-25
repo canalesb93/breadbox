@@ -108,7 +108,7 @@ func parseEnumParam(q url.Values, key string, allowed []string) (*string, error)
 			return &v, nil
 		}
 	}
-	return nil, fmt.Errorf("%s must be one of: %s", key, joinStrings(allowed))
+	return nil, fmt.Errorf("%s must be one of: %s", key, strings.Join(allowed, ", "))
 }
 
 // parseCSVParam collects a repeatable/comma-separated query parameter into a
@@ -135,19 +135,4 @@ func parseCSVParam(q url.Values, key string) []string {
 		}
 	}
 	return out
-}
-
-// joinStrings joins strings with ", " for error messages.
-func joinStrings(ss []string) string {
-	switch len(ss) {
-	case 0:
-		return ""
-	case 1:
-		return ss[0]
-	}
-	result := ss[0]
-	for _, s := range ss[1:] {
-		result += ", " + s
-	}
-	return result
 }
