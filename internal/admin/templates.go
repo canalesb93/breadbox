@@ -1085,7 +1085,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// pages/api_key_new.html and pages/api_key_created.html removed —
 		// both render via RenderWithTempl using the _templ_shell template
 		// key (see pages.APIKeyNew and pages.APIKeyCreated).
-		"pages/sync_log_detail.html",
 		// pages/providers.html removed — renders via RenderWithTempl using
 		// the _templ_shell template key (see pages.Providers).
 		// pages/csv_import.html removed — renders via RenderWithTempl using
