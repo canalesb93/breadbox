@@ -1,8 +1,6 @@
 package admin
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -529,12 +527,3 @@ func isForwardedHTTPS(r *http.Request) bool {
 func parseUUID(s string) (pgtype.UUID, error) {
 	return pgconv.ParseUUID(s)
 }
-
-func generateState() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return base64.RawURLEncoding.EncodeToString(b)
-}
-
-// unused but keeping for potential future use
-var _ = generateState

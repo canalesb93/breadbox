@@ -214,17 +214,6 @@ func FormatIntervalMinutes(minutes int) string {
 	return fmt.Sprintf("%dm", minutes)
 }
 
-// AvatarURLVersioned returns an avatar path with an optional cache-busting
-// version suffix. Pass an empty version for no suffix. Extends avatarURL
-// to match the admin funcMap's two-argument form.
-func AvatarURLVersioned(id, version string) string {
-	base := avatarURL(id)
-	if version == "" {
-		return base
-	}
-	return base + "?v=" + version
-}
-
 // Exported wrappers for the shared formatting helpers. Used by the admin
 // funcMap (internal/admin/templates.go) and other packages so there's one
 // canonical implementation. Keep these in lock-step with their lowercase

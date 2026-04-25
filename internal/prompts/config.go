@@ -121,15 +121,6 @@ func GetAgentConfig(agentType string) (AgentTypeConfig, bool) {
 	return cfg, ok
 }
 
-// AllAgentTypes returns all registered agent type slugs.
-func AllAgentTypes() []string {
-	types := make([]string, 0, len(agentConfigs))
-	for k := range agentConfigs {
-		types = append(types, k)
-	}
-	return types
-}
-
 // LoadBlock reads a block .md file, parsing title and description from the first lines.
 func LoadBlock(id string) (Block, error) {
 	data, err := blocksFS.ReadFile("blocks/" + id + ".md")

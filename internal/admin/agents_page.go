@@ -9,6 +9,13 @@ import (
 	"github.com/alexedwards/scs/v2"
 )
 
+// AgentWizardStats holds live stats shown on the agent wizard cards.
+type AgentWizardStats struct {
+	PendingReviews int64
+	TotalRules     int64
+	TotalAccounts  int64
+}
+
 // AgentsPageHandler serves GET /admin/agents — combined Getting Started + Agent Wizard + MCP Settings.
 func AgentsPageHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
