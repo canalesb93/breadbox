@@ -1,0 +1,131 @@
+package pages
+
+import "strconv"
+
+// SessionDetail renders the per-MCP-session detail page body. Hosts
+// inside the base layout via TemplateRenderer.RenderWithTempl — the
+// handler builds typed props in admin/sessions.go and the bridge drops
+// the rendered HTML into base.html's TemplContent slot.
+templ SessionDetail(p SessionDetailProps) {
+	<div class="bb-page-header">
+		<div>
+			<div class="flex items-center gap-2 text-sm text-base-content/50 mb-1">
+				<a href="/agents?tab=activity" class="hover:text-base-content">Activity</a>
+				<i data-lucide="chevron-right" class="w-3 h-3"></i>
+				<span>Session</span>
+			</div>
+			<h1 class="bb-page-title">{ p.Session.Purpose }</h1>
+			<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-base-content/50 mt-1">
+				if p.Session.AgentName != "" {
+					<span class="flex items-center gap-1">
+						<i data-lucide="bot" class="w-3.5 h-3.5"></i>
+						{ p.Session.AgentName }
+					</span>
+				} else {
+					<span class="flex items-center gap-1">
+						<i data-lucide="key" class="w-3.5 h-3.5"></i>
+						{ p.Session.APIKeyName }
+					</span>
+				}
+				<span>{ p.Session.CreatedAt }</span>
+				<span>{ strconv.FormatInt(p.Session.ToolCallCount, 10) } tool calls</span>
+				if p.Session.ErrorCount > 0 {
+					<span class="inline-flex items-center gap-1 badge badge-sm badge-error">
+						<i data-lucide="alert-triangle" class="w-3 h-3"></i>
+						{ strconv.Itoa(p.Session.ErrorCount) } { sessionErrorWord(p.Session.ErrorCount) }
+					</span>
+				}
+				if p.Session.WriteCount > 0 || p.Session.ReadCount > 0 {
+					<span class="text-base-content/60">{ strconv.Itoa(p.Session.WriteCount) } write · { strconv.Itoa(p.Session.ReadCount) } read</span>
+				}
+			</div>
+		</div>
+	</div>
+	if len(p.ToolCalls) > 0 {
+		<div class="space-y-2">
+			for _, c := range p.ToolCalls {
+				@sessionDetailToolCard(c)
+			}
+		</div>
+	} else {
+		<div class="card bg-base-100 shadow-sm">
+			<div class="card-body items-center text-center py-12">
+				<i data-lucide="scroll-text" class="w-12 h-12 text-base-content/20 mb-3"></i>
+				<h3 class="font-medium text-base-content/70">No tool calls recorded</h3>
+				<p class="text-sm text-base-content/50">This session has no recorded tool calls yet.</p>
+			</div>
+		</div>
+	}
+}
+
+// sessionDetailToolCard renders one tool-call row with the Alpine
+// expand/collapse state preserved 1:1 from the original template.
+templ sessionDetailToolCard(c SessionDetailToolCall) {
+	<div class="card bg-base-100 shadow-sm" x-data="{ expanded: false }">
+		<div class="card-body p-3 cursor-pointer" @click="expanded = !expanded">
+			<div class="flex items-center gap-2 sm:gap-3 min-w-0">
+				<!-- Classification badge -->
+				if c.Classification == "write" {
+					<span class="badge badge-sm badge-warning shrink-0">write</span>
+				} else {
+					<span class="badge badge-sm badge-info shrink-0">read</span>
+				}
+				<!-- Tool name (truncates before pushing trailing cluster off-screen) -->
+				<span class="font-mono text-sm font-medium truncate min-w-0 flex-1">{ c.ToolName }</span>
+				<!-- Error badge (stays next to tool name, never wraps to right cluster) -->
+				if c.IsError {
+					<span class="badge badge-sm badge-error shrink-0">error</span>
+				}
+				<!-- Trailing cluster: sequence (always distinguishes rows) + offset (timing delta from the first call). Relative time moves to the expanded block. -->
+				<span class="flex items-center gap-2 shrink-0 whitespace-nowrap">
+					if c.Sequence > 0 {
+						<span class="text-xs text-base-content/60 font-mono tabular-nums" title={ c.CreatedAtRel }>
+							#{ strconv.Itoa(c.Sequence) }
+							if c.OffsetLabel != "" {
+								{ " " }
+								<span class="text-base-content/40">{ c.OffsetLabel }</span>
+							}
+						</span>
+					}
+					if c.HasDuration {
+						<span class="text-xs text-base-content/40 tabular-nums">{ strconv.FormatInt(int64(c.DurationMs), 10) }ms</span>
+					}
+					<i data-lucide="chevron-down" class="w-3.5 h-3.5 text-base-content/30 transition-transform" :class="expanded && 'rotate-180'"></i>
+				</span>
+			</div>
+			if c.Reason != "" {
+				<p class="text-sm text-base-content/60 mt-1 ml-14">{ c.Reason }</p>
+			}
+		</div>
+		<!-- Expanded detail -->
+		<div x-show="expanded" x-cloak class="border-t border-base-200 p-3">
+			<!-- Absolute timestamp (keeps created-at available on mobile where the relative label is hidden) -->
+			<div class="mb-3 text-xs text-base-content/50">
+				<span class="font-medium">Called</span>
+				<time datetime={ c.CreatedAt }>{ c.CreatedAtAbs }</time>
+				<span class="text-base-content/30">· { c.CreatedAtRel }</span>
+			</div>
+			if c.RequestPretty != "" {
+				<div class="mb-3">
+					<div class="text-xs font-medium text-base-content/50 mb-1">Request</div>
+					<pre class="text-xs bg-base-200/50 rounded-lg p-3 overflow-x-auto max-h-64 overflow-y-auto"><code>{ c.RequestPretty }</code></pre>
+				</div>
+			}
+			if c.ResponsePretty != "" {
+				<div>
+					<div class="text-xs font-medium text-base-content/50 mb-1">Response</div>
+					<pre class="text-xs bg-base-200/50 rounded-lg p-3 overflow-x-auto max-h-64 overflow-y-auto"><code>{ c.ResponsePretty }</code></pre>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+// sessionErrorWord mirrors the inline {{if ne .Session.ErrorCount 1}}s{{end}}
+// pluralization on the error badge label.
+func sessionErrorWord(n int) string {
+	if n == 1 {
+		return "error"
+	}
+	return "errors"
+}
