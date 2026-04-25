@@ -96,7 +96,7 @@ func SettingsSyncPostHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 
 		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 			Key:   "sync_interval_minutes",
-			Value: pgtype.Text{String: fmt.Sprintf("%d", syncInterval), Valid: true},
+			Value: pgtype.Text{String: strconv.Itoa(syncInterval), Valid: true},
 		}); err != nil {
 			a.Logger.Error("save sync interval", "error", err)
 			SetFlash(ctx, sm, "error", "Failed to save sync interval.")
@@ -139,7 +139,7 @@ func SettingsRetentionPostHandler(a *app.App, sm *scs.SessionManager) http.Handl
 
 		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 			Key:   "sync_log_retention_days",
-			Value: pgtype.Text{String: fmt.Sprintf("%d", retentionDays), Valid: true},
+			Value: pgtype.Text{String: strconv.Itoa(retentionDays), Valid: true},
 		}); err != nil {
 			a.Logger.Error("save sync log retention", "error", err)
 			SetFlash(ctx, sm, "error", "Failed to save retention setting.")

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"breadbox/internal/service"
@@ -764,7 +765,7 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 	for i, r := range input.Rules {
 		if r.Name == "" || (len(r.Actions) == 0 && r.CategorySlug == "") {
 			errors = append(errors, map[string]string{
-				"index": fmt.Sprintf("%d", i),
+				"index": strconv.Itoa(i),
 				"error": "name and either actions or category_slug are required",
 			})
 			continue
@@ -774,7 +775,7 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 		conditions, err := parseConditions(r.Conditions)
 		if err != nil {
 			errors = append(errors, map[string]string{
-				"index": fmt.Sprintf("%d", i),
+				"index": strconv.Itoa(i),
 				"name":  r.Name,
 				"error": err.Error(),
 			})
@@ -794,7 +795,7 @@ func (s *MCPServer) handleBatchCreateRules(ctx context.Context, _ *mcpsdk.CallTo
 		})
 		if err != nil {
 			errors = append(errors, map[string]string{
-				"index": fmt.Sprintf("%d", i),
+				"index": strconv.Itoa(i),
 				"name":  r.Name,
 				"error": err.Error(),
 			})

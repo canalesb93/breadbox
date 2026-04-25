@@ -9,6 +9,7 @@ package components
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -177,7 +178,7 @@ func commaAmount(f float64) string {
 // 1234567 → "1,234,567". Used by FormatBalance and templates that need
 // a plain integer count formatted with commas.
 func CommaInt(n int64) string {
-	s := fmt.Sprintf("%d", n)
+	s := strconv.FormatInt(n, 10)
 	if len(s) <= 3 {
 		return s
 	}

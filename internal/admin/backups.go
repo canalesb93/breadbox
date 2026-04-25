@@ -234,7 +234,7 @@ func BackupScheduleHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 		// Save retention.
 		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 			Key:   "backup_retention_days",
-			Value: pgtype.Text{String: fmt.Sprintf("%d", retentionDays), Valid: true},
+			Value: pgtype.Text{String: strconv.Itoa(retentionDays), Valid: true},
 		}); err != nil {
 			a.Logger.Error("save backup retention", "error", err)
 			SetFlash(ctx, sm, "error", "Failed to save retention setting.")

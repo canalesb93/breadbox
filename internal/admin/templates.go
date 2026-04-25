@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -640,7 +641,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				if n > 99 {
 					return "99+"
 				}
-				return fmt.Sprintf("%d", n)
+				return strconv.FormatInt(n, 10)
 			},
 			"deref": func(s *string) string {
 				if s == nil {
@@ -798,7 +799,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					switch v := args[1].(type) {
 					case pgtype.Timestamptz:
 						if v.Valid {
-							base += "?v=" + fmt.Sprintf("%d", v.Time.Unix())
+							base += "?v=" + strconv.FormatInt(v.Time.Unix(), 10)
 						}
 					case string:
 						if v != "" {
