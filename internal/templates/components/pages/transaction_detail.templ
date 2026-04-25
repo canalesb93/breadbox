@@ -254,7 +254,7 @@ templ txdMain(p TransactionDetailProps) {
 
 templ txdActivity(p TransactionDetailProps) {
 	<!-- Activity Timeline -->
-	<section id="activity" aria-labelledby="activity-heading" class="bb-card p-0 overflow-hidden" x-data={ fmt.Sprintf("commentManager(%d)", p.MaxCommentLength) }>
+	<section id="activity" aria-labelledby="activity-heading" class="bb-card p-0 overflow-hidden" x-data={ fmt.Sprintf("commentManager(%d, %t)", p.MaxCommentLength, p.HasPendingReview) } @bb-toggle-pin-review.window="if (!hasPendingReview) pinReview = !pinReview">
 		<div class="px-4 sm:px-5 pt-5 pb-3 flex items-center gap-2">
 			<i data-lucide="activity" class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>
 			<h2 id="activity-heading" class="text-sm font-semibold text-base-content/50">Activity</h2>
@@ -268,35 +268,49 @@ templ txdActivity(p TransactionDetailProps) {
 		</div>
 		<!-- Add Note -->
 		<div class="px-4 sm:px-5 pb-4">
-			<label for="bb-txd-comment" class="sr-only">Add a note</label>
-			<textarea
-				id="bb-txd-comment"
-				x-ref="composer"
-				x-model="newComment"
-				@input="autosize($event.target)"
-				@keydown.meta.enter.prevent="canSubmit() && addComment()"
-				@keydown.ctrl.enter.prevent="canSubmit() && addComment()"
-				rows="1"
-				placeholder="Add a note..."
-				maxlength={ fmt.Sprintf("%d", p.MaxCommentLength) }
-				aria-describedby="bb-txd-comment-counter"
-				class="block w-full text-sm bg-base-200/50 border border-base-content/10 focus:border-primary focus:outline-none focus:ring-0 rounded-xl resize-none leading-6 px-3 py-1.5 h-9 min-h-9 max-h-36 overflow-y-hidden whitespace-pre-wrap break-words"
-			></textarea>
-			<div class="mt-1.5 px-0.5 text-[11px] text-base-content/40 flex items-center gap-2 min-h-[1.75rem]">
+			<label for="bb-txd-comment" class="sr-only">Add a comment</label>
+			<div class="relative">
+				<textarea
+					id="bb-txd-comment"
+					x-ref="composer"
+					x-model="newComment"
+					@input="autosize($event.target)"
+					@keydown.meta.enter.prevent="canSubmit() && addComment()"
+					@keydown.ctrl.enter.prevent="canSubmit() && addComment()"
+					@keydown.escape.prevent="$event.target.blur()"
+					rows="1"
+					placeholder="Add a comment..."
+					maxlength={ fmt.Sprintf("%d", p.MaxCommentLength) }
+					aria-describedby="bb-txd-comment-counter"
+					class="block w-full text-sm bg-base-200/50 border border-base-content/10 focus:border-primary focus:outline-none focus:ring-0 rounded-xl resize-none leading-6 px-3 py-1.5 h-9 min-h-9 max-h-36 overflow-y-hidden whitespace-pre-wrap break-words transition-all duration-150"
+					:class="{ 'pr-16': counterState() !== 'ok' }"
+				></textarea>
 				<span
 					id="bb-txd-comment-counter"
-					class="ml-auto tabular-nums"
-					:class="{ 'text-warning': counterState() === 'warn', 'text-error font-medium': counterState() === 'error', 'invisible': newComment.length === 0 }"
+					class="pointer-events-none absolute bottom-1.5 right-2 text-[10px] tabular-nums leading-none px-1.5 py-0.5 rounded bg-base-100/80 backdrop-blur-sm transition-opacity duration-150"
+					:class="counterState() === 'warn' ? 'text-warning' : counterState() === 'error' ? 'text-error font-medium' : 'text-base-content/40'"
+					x-show="counterState() !== 'ok'"
+					x-cloak
 					aria-live="polite"
 				>
-					<span x-text="newComment.length"></span> / <span x-text="maxLength"></span>
+					<span x-text="newComment.length"></span>/<span x-text="maxLength"></span>
 				</span>
+			</div>
+			<div class="mt-1.5 px-0.5 flex items-center justify-end gap-2 min-h-[1.75rem]">
+				if !p.HasPendingReview {
+					<label class="btn btn-sm btn-ghost rounded-xl gap-2 cursor-pointer transition-all duration-200" :title="pinReview ? 'Posting will also tag this transaction needs-review (Shift+R)' : 'Also tag needs-review when posting (Shift+R)'">
+						<input type="checkbox" class="checkbox checkbox-xs checkbox-primary" x-model="pinReview"/>
+						<span class="text-xs font-medium">Toggle Needs Review</span>
+					</label>
+				}
 				<button
 					@click="addComment()"
 					class="btn btn-sm btn-primary rounded-xl gap-1.5 transition-all duration-200"
 					:disabled="!canSubmit()"
 				>
-					<span class="text-xs font-medium">Comment</span>
+					<i data-lucide="message-square" class="w-3.5 h-3.5" x-show="!pinReview" aria-hidden="true"></i>
+					<i data-lucide="message-square-x" class="w-3.5 h-3.5" x-show="pinReview" x-cloak aria-hidden="true"></i>
+					<span class="text-xs font-medium" x-text="pinReview ? 'Comment & flag' : 'Comment'"></span>
 					<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5" x-show="!$store.device.isTouch">⌘↵</span>
 				</button>
 			</div>
@@ -758,7 +772,7 @@ document.addEventListener('alpine:init', function() {
   reg.register({
     id: 'transaction-detail.compose-note',
     keys: 'n',
-    description: 'Add a note',
+    description: 'Add a comment',
     group: 'Actions',
     scope: 'transaction-detail',
     action: function() {
@@ -766,6 +780,17 @@ document.addEventListener('alpine:init', function() {
       if (!el) return;
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       el.focus();
+    },
+  });
+
+  reg.register({
+    id: 'transaction-detail.toggle-needs-review',
+    keys: 'shift+r',
+    description: 'Toggle: also mark Needs Review on post',
+    group: 'Actions',
+    scope: 'transaction-detail',
+    action: function() {
+      window.dispatchEvent(new CustomEvent('bb-toggle-pin-review'));
     },
   });
 
@@ -830,10 +855,12 @@ function showToast(message, type) {
   window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type || 'error' } }));
 }
 
-function commentManager(maxLen) {
+function commentManager(maxLen, hasPendingReview) {
   return {
     newComment: '',
     maxLength: maxLen || 10000,
+    hasPendingReview: !!hasPendingReview,
+    pinReview: false,
     canSubmit() {
       var trimmed = this.newComment.trim().length;
       return trimmed > 0 && this.newComment.length <= this.maxLength;
@@ -860,21 +887,43 @@ function commentManager(maxLen) {
       var self = this;
       var content = this.newComment.trim();
       if (!content || !this.canSubmit()) return;
+      var shouldPin = this.pinReview && !this.hasPendingReview;
       fetch('/-/transactions/%[2]s/comments', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({content: content})
       })
       .then(function(res) {
-        if (res.ok) {
-          self.newComment = '';
-          showToast('Comment added.', 'success');
-          location.reload();
-        } else {
+        if (!res.ok) {
           return res.json().then(function(data) {
             showToast(data.error || 'Failed to add comment.');
           });
         }
+        if (!shouldPin) {
+          self.newComment = '';
+          showToast('Comment added.', 'success');
+          location.reload();
+          return;
+        }
+        return fetch('/-/transactions/%[2]s/tags', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({slug: 'needs-review', note: ''})
+        })
+        .then(function(tagRes) {
+          self.newComment = '';
+          if (tagRes.ok) {
+            showToast('Comment added; tagged needs-review.', 'success');
+          } else {
+            showToast('Comment added (tag failed).', 'warning');
+          }
+          location.reload();
+        })
+        .catch(function() {
+          self.newComment = '';
+          showToast('Comment added (tag failed).', 'warning');
+          location.reload();
+        });
       })
       .catch(function() { showToast('Network error.'); });
     },
