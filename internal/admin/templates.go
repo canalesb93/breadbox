@@ -1106,7 +1106,8 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// are not registered as standalone base pages — their standalone routes
 		// redirect to /agents and they're only consumed as composite extras
 		// (see compositePages below).
-		"pages/prompt_builder.html",
+		// pages/prompt_builder.html removed — renders via RenderWithTempl using
+		// the _templ_shell template key (see pages.PromptBuilder).
 		"pages/session_detail.html",
 		"pages/my_account.html",
 		"pages/getting_started.html",
