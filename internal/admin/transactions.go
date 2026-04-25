@@ -310,14 +310,14 @@ func renderTransactions(w http.ResponseWriter, r *http.Request, tr *TemplateRend
 		Users:             userOpts,
 		Categories:        in.categories,
 		AllTags:           in.allTags,
-		FilterStartDate:   stringOrEmpty(dateParamPtr(r, "start_date")),
-		FilterEndDate:     stringOrEmpty(dateParamPtr(r, "end_date")),
+		FilterStartDate:   q.Get("start_date"),
+		FilterEndDate:     q.Get("end_date"),
 		FilterAccountID:   stringOrEmpty(in.params.AccountID),
 		FilterUserID:      stringOrEmpty(in.params.UserID),
 		FilterConnID:      stringOrEmpty(in.params.ConnectionID),
 		FilterCategory:    stringOrEmpty(in.params.CategorySlug),
-		FilterMinAmount:   stringOrEmpty(floatParamPtr(r, "min_amount")),
-		FilterMaxAmount:   stringOrEmpty(floatParamPtr(r, "max_amount")),
+		FilterMinAmount:   q.Get("min_amount"),
+		FilterMaxAmount:   q.Get("max_amount"),
 		FilterPending:     q.Get("pending"),
 		FilterSearch:      q.Get("search"),
 		FilterSearchMode:  q.Get("search_mode"),
@@ -602,11 +602,11 @@ func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRender
 			"ShowingStart":   showingStart,
 			"ShowingEnd":     showingEnd,
 			"ExportURL":      acctExportURL,
-			"FilterStartDate": stringOrEmpty(dateParamPtr(r, "start_date")),
-			"FilterEndDate":   stringOrEmpty(dateParamPtr(r, "end_date")),
-			"FilterCategory":  r.URL.Query().Get("category"),
-			"FilterPending":   r.URL.Query().Get("pending"),
-			"FilterSearch":    r.URL.Query().Get("search"),
+			"FilterStartDate": q.Get("start_date"),
+			"FilterEndDate":   q.Get("end_date"),
+			"FilterCategory":  q.Get("category"),
+			"FilterPending":   q.Get("pending"),
+			"FilterSearch":    q.Get("search"),
 			// Spending analytics
 			"TotalSpending":         totalSpending,
 			"TxCount30d":            txCount30d,
@@ -630,22 +630,6 @@ func accountDisplayName(detail *service.AdminAccountDetail) string {
 		return *detail.DisplayName
 	}
 	return detail.Name
-}
-
-func dateParamPtr(r *http.Request, key string) *string {
-	v := r.URL.Query().Get(key)
-	if v == "" {
-		return nil
-	}
-	return &v
-}
-
-func floatParamPtr(r *http.Request, key string) *string {
-	v := r.URL.Query().Get(key)
-	if v == "" {
-		return nil
-	}
-	return &v
 }
 
 // TransactionDetailHandler serves GET /admin/transactions/{id}.
