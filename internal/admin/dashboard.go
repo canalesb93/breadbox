@@ -269,14 +269,8 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 			if string(conn.Status) == "disconnected" {
 				continue
 			}
-			name := "Unknown"
-			if conn.InstitutionName.Valid {
-				name = conn.InstitutionName.String
-			}
-			errMsg := ""
-			if conn.ErrorMessage.Valid {
-				errMsg = conn.ErrorMessage.String
-			}
+			name := pgconv.TextOr(conn.InstitutionName, "Unknown")
+			errMsg := pgconv.TextOr(conn.ErrorMessage, "")
 			lastSync := "Never"
 			isStale := ConnectionStaleness(
 				a.Config.SyncIntervalMinutes,

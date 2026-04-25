@@ -78,27 +78,12 @@ func UsersListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) 
 				eu.ConnectionCount = int64(len(connSet))
 				for _, acct := range accounts {
 					bal, hasBal := pgconv.NumericToFloat(acct.BalanceCurrent)
-					subtype := ""
-					if acct.Subtype.Valid {
-						// Clean up subtype for display (e.g. "credit_card" -> "Credit Card")
-						subtype = strings.ReplaceAll(acct.Subtype.String, "_", " ")
-					}
-					mask := ""
-					if acct.Mask.Valid {
-						mask = acct.Mask.String
-					}
-					institution := ""
-					if acct.InstitutionName.Valid {
-						institution = acct.InstitutionName.String
-					}
-					currency := "USD"
-					if acct.IsoCurrencyCode.Valid {
-						currency = acct.IsoCurrencyCode.String
-					}
-					displayName := acct.Name
-					if acct.DisplayName.Valid {
-						displayName = acct.DisplayName.String
-					}
+					// Clean up subtype for display (e.g. "credit_card" -> "Credit Card")
+					subtype := strings.ReplaceAll(pgconv.TextOr(acct.Subtype, ""), "_", " ")
+					mask := pgconv.TextOr(acct.Mask, "")
+					institution := pgconv.TextOr(acct.InstitutionName, "")
+					currency := pgconv.TextOr(acct.IsoCurrencyCode, "USD")
+					displayName := pgconv.TextOr(acct.DisplayName, acct.Name)
 
 					isLiability := IsLiabilityAccount(acct.Type)
 					displayBal := bal

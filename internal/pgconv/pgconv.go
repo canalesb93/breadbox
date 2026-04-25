@@ -51,6 +51,16 @@ func TextPtr(t pgtype.Text) *string {
 	return &t.String
 }
 
+// TextOr returns the underlying string value of a pgtype.Text, or fallback
+// when the text is NULL. Use this to collapse `if t.Valid { x = t.String }`
+// boilerplate at display/serialization sites.
+func TextOr(t pgtype.Text, fallback string) string {
+	if !t.Valid {
+		return fallback
+	}
+	return t.String
+}
+
 // Text wraps a string as a non-NULL pgtype.Text. Empty strings are preserved
 // as valid (non-NULL) empty values — use TextFromPtr when an empty/missing
 // input should map to NULL.

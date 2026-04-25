@@ -162,6 +162,27 @@ func TestTextPtr_Invalid(t *testing.T) {
 	}
 }
 
+func TestTextOr_Valid(t *testing.T) {
+	got := TextOr(pgtype.Text{String: "hello", Valid: true}, "fallback")
+	if got != "hello" {
+		t.Errorf("TextOr(valid) = %q, want %q", got, "hello")
+	}
+}
+
+func TestTextOr_EmptyValid(t *testing.T) {
+	got := TextOr(pgtype.Text{String: "", Valid: true}, "fallback")
+	if got != "" {
+		t.Errorf("TextOr(empty valid) = %q, want empty — fallback only kicks in for NULL", got)
+	}
+}
+
+func TestTextOr_Invalid(t *testing.T) {
+	got := TextOr(pgtype.Text{Valid: false}, "fallback")
+	if got != "fallback" {
+		t.Errorf("TextOr(invalid) = %q, want %q", got, "fallback")
+	}
+}
+
 func TestText(t *testing.T) {
 	got := Text("hello")
 	if !got.Valid || got.String != "hello" {

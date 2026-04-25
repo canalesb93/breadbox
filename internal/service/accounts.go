@@ -83,12 +83,8 @@ func (s *Service) GetAccountDetail(ctx context.Context, id string) (*AdminAccoun
 			conn, err := s.Queries.GetBankConnection(ctx, connID)
 			if err == nil {
 				detail.Provider = string(conn.Provider)
-				if conn.InstitutionName.Valid {
-					detail.InstitutionName = conn.InstitutionName.String
-				}
-				if conn.UserName.Valid {
-					detail.UserName = conn.UserName.String
-				}
+				detail.InstitutionName = pgconv.TextOr(conn.InstitutionName, "")
+				detail.UserName = pgconv.TextOr(conn.UserName, "")
 			}
 		}
 	}
