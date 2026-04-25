@@ -630,22 +630,14 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 		var avgDurationSec float64
 		var durationCount int
 		// Build a map of day -> status for the last 14 days (sync timeline).
-		type DaySync struct {
-			Date       string
-			Label      string
-			ShortLabel string
-			Success    int
-			Error      int
-			Total      int
-		}
-		dayMap := make(map[string]*DaySync)
+		dayMap := make(map[string]*connectionDaySync)
 		now := time.Now()
 		for i := 13; i >= 0; i-- {
 			day := now.AddDate(0, 0, -i)
 			key := day.Format("2006-01-02")
 			label := day.Format("Jan 2")
 			shortLabel := day.Format("2")
-			dayMap[key] = &DaySync{Date: key, Label: label, ShortLabel: shortLabel}
+			dayMap[key] = &connectionDaySync{Date: key, Label: label, ShortLabel: shortLabel}
 		}
 
 		for _, log := range allSyncLogs {
@@ -703,7 +695,7 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 		}
 
 		// Build the ordered daySyncs slice from the (now-populated) map.
-		var daySyncs []DaySync
+		var daySyncs []connectionDaySync
 		for i := 13; i >= 0; i-- {
 			day := now.AddDate(0, 0, -i)
 			key := day.Format("2006-01-02")
@@ -735,40 +727,234 @@ func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRen
 		}, a.Config.SyncIntervalMinutes, now)
 
 		data := map[string]any{
-			"PageTitle":            conn.InstitutionName.String,
-			"CurrentPage":         "connections",
-			"Connection":          conn,
-			"Accounts":            accounts,
-			"SyncLogs":            syncLogs,
-			"ConnID":              idStr,
-			"CSRFToken":           GetCSRFToken(r),
-			"Breadcrumbs": []Breadcrumb{
-				{Label: "Connections", Href: "/connections"},
-				{Label: conn.InstitutionName.String},
-			},
-			// Sync health stats
-			"TotalSyncs":          totalSyncs,
-			"SuccessSyncs":        successSyncs,
-			"ErrorSyncs":          errorSyncs,
-			"SuccessRate":         successRate,
-			"TotalAdded":          totalAdded,
-			"TotalModified":       totalModified,
-			"TotalRemoved":        totalRemoved,
-			"AvgDurationSec":      avgDurationSec,
-			"LastSuccessTime":     lastSuccessTime,
-			"LastSuccessRelative": lastSuccessRelative,
-			"DaySyncs":            daySyncs,
-			// Account totals
-			"TotalBalance":        totalBalance,
-			"HasBalance":          hasBalance,
-			// Next sync schedule
-			"NextSync":            nextSync,
-			// Latest sync log status (for header badge — matches list page).
-			"LastSyncStatus":       lastSyncStatus,
-			"LastSyncErrorMessage": lastSyncErrorMessage,
+			"PageTitle":   conn.InstitutionName.String,
+			"CurrentPage": "connections",
+			"CSRFToken":   GetCSRFToken(r),
 		}
-		tr.Render(w, r, "connection_detail.html", data)
+		props := buildConnectionDetailProps(connectionDetailInput{
+			ConnID:               idStr,
+			CSRFToken:            GetCSRFToken(r),
+			Conn:                 conn,
+			Accounts:             accounts,
+			SyncLogs:             syncLogs,
+			LastSyncStatus:       lastSyncStatus,
+			LastSyncErrorMessage: lastSyncErrorMessage,
+			TotalSyncs:           totalSyncs,
+			SuccessSyncs:         successSyncs,
+			ErrorSyncs:           errorSyncs,
+			SuccessRate:          successRate,
+			TotalAdded:           totalAdded,
+			TotalModified:        totalModified,
+			TotalRemoved:         totalRemoved,
+			AvgDurationSec:       avgDurationSec,
+			LastSuccessTime:      lastSuccessTime,
+			LastSuccessRelative:  lastSuccessRelative,
+			DaySyncs:             daySyncs,
+			TotalBalance:         totalBalance,
+			HasBalance:           hasBalance,
+			NextSync:             nextSync,
+		})
+		// Mirror the breadcrumbs as components.Breadcrumb so the templ
+		// component can render them via the shared BreadcrumbNav helper.
+		props.Breadcrumbs = []components.Breadcrumb{
+			{Label: "Connections", Href: "/connections"},
+			{Label: conn.InstitutionName.String},
+		}
+		tr.RenderWithTempl(w, r, data, pages.ConnectionDetail(props))
 	}
+}
+
+// connectionDetailInput collects the values the handler computes for the
+// detail page. Building props through this struct keeps the conversion
+// from db rows + ad-hoc maps into typed templ props in one place.
+type connectionDetailInput struct {
+	ConnID               string
+	CSRFToken            string
+	Conn                 db.GetBankConnectionRow
+	Accounts             []db.Account
+	SyncLogs             []db.SyncLog
+	LastSyncStatus       string
+	LastSyncErrorMessage pgtype.Text
+	TotalSyncs           int
+	SuccessSyncs         int
+	ErrorSyncs           int
+	SuccessRate          float64
+	TotalAdded           int
+	TotalModified        int
+	TotalRemoved         int
+	AvgDurationSec       float64
+	LastSuccessTime      string
+	LastSuccessRelative  string
+	DaySyncs             []connectionDaySync
+	TotalBalance         float64
+	HasBalance           bool
+	NextSync             NextSyncInfo
+}
+
+// buildConnectionDetailProps converts the handler's inputs into the typed
+// pages.ConnectionDetailProps the templ component renders.
+func buildConnectionDetailProps(in connectionDetailInput) pages.ConnectionDetailProps {
+	props := pages.ConnectionDetailProps{
+		ConnID:    in.ConnID,
+		CSRFToken: in.CSRFToken,
+		// Connection fields
+		Provider:                          string(in.Conn.Provider),
+		Status:                            string(in.Conn.Status),
+		InstitutionName:                   in.Conn.InstitutionName.String,
+		UserName:                          in.Conn.UserName.String,
+		UserNameValid:                     in.Conn.UserName.Valid,
+		Paused:                            in.Conn.Paused,
+		ConsecutiveFailures:               in.Conn.ConsecutiveFailures,
+		HasErrorCode:                      in.Conn.ErrorCode.Valid,
+		ErrorCode:                         in.Conn.ErrorCode.String,
+		HasErrorMessage:                   in.Conn.ErrorMessage.Valid,
+		ErrorMessage:                      in.Conn.ErrorMessage.String,
+		LastSyncedAtValid:                 in.Conn.LastSyncedAt.Valid,
+		CreatedAtValid:                    in.Conn.CreatedAt.Valid,
+		LastErrorAtValid:                  in.Conn.LastErrorAt.Valid,
+		SyncIntervalOverrideMinutesValid:  in.Conn.SyncIntervalOverrideMinutes.Valid,
+		SyncIntervalOverrideMinutesValue:  in.Conn.SyncIntervalOverrideMinutes.Int32,
+
+		LastSyncStatus:             in.LastSyncStatus,
+		LastSyncErrorMessageValid:  in.LastSyncErrorMessage.Valid,
+		LastSyncErrorMessageString: in.LastSyncErrorMessage.String,
+
+		TotalSyncs:          in.TotalSyncs,
+		SuccessSyncs:        in.SuccessSyncs,
+		ErrorSyncs:          in.ErrorSyncs,
+		SuccessRate:         in.SuccessRate,
+		TotalAdded:          in.TotalAdded,
+		TotalModified:       in.TotalModified,
+		TotalRemoved:        in.TotalRemoved,
+		AvgDurationSec:      in.AvgDurationSec,
+		LastSuccessTime:     in.LastSuccessTime,
+		LastSuccessRelative: in.LastSuccessRelative,
+
+		TotalBalance: in.TotalBalance,
+		HasBalance:   in.HasBalance,
+
+		NextSync: pages.NextSyncInfo{
+			Label:                    in.NextSync.Label,
+			IsOverdue:                in.NextSync.IsOverdue,
+			IsPaused:                 in.NextSync.IsPaused,
+			IsDisconnected:           in.NextSync.IsDisconnected,
+			EffectiveIntervalMinutes: in.NextSync.EffectiveIntervalMinutes,
+		},
+	}
+
+	if in.Conn.LastSyncedAt.Valid {
+		props.LastSyncedAtRelative = relativeTime(in.Conn.LastSyncedAt.Time)
+	}
+	if in.Conn.CreatedAt.Valid {
+		props.CreatedAtFormatted = in.Conn.CreatedAt.Time.Format("Jan 2, 2006")
+	}
+	if in.Conn.LastErrorAt.Valid {
+		props.LastErrorAtRelative = relativeTime(in.Conn.LastErrorAt.Time)
+	}
+
+	for _, ds := range in.DaySyncs {
+		props.DaySyncs = append(props.DaySyncs, pages.DaySyncRow{
+			Date:       ds.Date,
+			Label:      ds.Label,
+			ShortLabel: ds.ShortLabel,
+			Success:    ds.Success,
+			Error:      ds.Error,
+			Total:      ds.Total,
+		})
+	}
+
+	for _, a := range in.Accounts {
+		row := pages.AccountRow{
+			ID:                  pgconv.FormatUUID(a.ID),
+			Name:                a.Name,
+			Type:                a.Type,
+			SubtypeValid:        a.Subtype.Valid,
+			SubtypeString:       a.Subtype.String,
+			MaskValid:           a.Mask.Valid,
+			MaskString:          a.Mask.String,
+			BalanceCurrentValid: a.BalanceCurrent.Valid,
+			BalanceAvailableValid: a.BalanceAvailable.Valid,
+			DisplayName:         a.DisplayName.String,
+			Excluded:            a.Excluded,
+		}
+		if a.BalanceCurrent.Valid {
+			row.BalanceCurrentText = formatNumericAbsCurrency(a.BalanceCurrent)
+		}
+		if a.BalanceAvailable.Valid {
+			row.BalanceAvailableText = formatNumericAbsCurrency(a.BalanceAvailable)
+		}
+		props.Accounts = append(props.Accounts, row)
+	}
+
+	for _, sl := range in.SyncLogs {
+		row := pages.SyncLogRow{
+			ShortID:            sl.ShortID,
+			Status:             string(sl.Status),
+			Trigger:            string(sl.Trigger),
+			StartedAtValid:     sl.StartedAt.Valid,
+			AddedCount:         sl.AddedCount,
+			ModifiedCount:      sl.ModifiedCount,
+			RemovedCount:       sl.RemovedCount,
+			UnchangedCount:     sl.UnchangedCount,
+			ErrorMessageValid:  sl.ErrorMessage.Valid,
+			ErrorMessageString: sl.ErrorMessage.String,
+		}
+		if sl.StartedAt.Valid {
+			row.StartedAtRelative = relativeTime(sl.StartedAt.Time)
+		}
+		if sl.DurationMs.Valid {
+			row.HasDuration = true
+			row.DurationLabel = service.FormatDurationMs(int64(sl.DurationMs.Int32))
+		} else if sl.StartedAt.Valid && sl.CompletedAt.Valid {
+			row.HasDuration = true
+			row.DurationLabel = formatSyncDuration(sl.StartedAt.Time, sl.CompletedAt.Time)
+		}
+		if string(sl.Status) == "error" && sl.ErrorMessage.Valid {
+			row.ErrorMessageFriendly = bsync.FriendlyError(sl.ErrorMessage.String)
+		}
+		props.SyncLogs = append(props.SyncLogs, row)
+	}
+
+	return props
+}
+
+// connectionDaySync mirrors the local DaySync type used in the handler so
+// callers don't have to reach inside the closure-defined struct. The
+// fields match 1:1.
+type connectionDaySync struct {
+	Date       string
+	Label      string
+	ShortLabel string
+	Success    int
+	Error      int
+	Total      int
+}
+
+// formatNumericAbsCurrency formats a NUMERIC balance as |amount| currency,
+// matching the funcMap "formatNumeric" helper that the old template used
+// for both BalanceCurrent and BalanceAvailable.
+func formatNumericAbsCurrency(n pgtype.Numeric) string {
+	f, ok := pgconv.NumericToFloat(n)
+	if !ok {
+		return ""
+	}
+	if f < 0 {
+		f = -f
+	}
+	return service.FormatCurrency(f)
+}
+
+// formatSyncDuration mirrors the funcMap "syncDuration" helper used for
+// historical sync rows that pre-date the duration_ms column.
+func formatSyncDuration(start, end time.Time) string {
+	d := end.Sub(start)
+	if d < time.Second {
+		return fmt.Sprintf("%dms", d.Milliseconds())
+	}
+	if d < time.Minute {
+		return fmt.Sprintf("%.1fs", d.Seconds())
+	}
+	return fmt.Sprintf("%.0fm", d.Minutes())
 }
 
 // ConnectionReauthHandler serves GET /admin/connections/{id}/reauth.
