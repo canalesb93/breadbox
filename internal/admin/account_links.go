@@ -6,6 +6,8 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -38,15 +40,49 @@ func AccountLinkDetailHandler(a *app.App, svc *service.Service, sm *scs.SessionM
 		}
 
 		data := BaseTemplateData(r, sm, "connections", "Transaction Matches")
-		data["Link"] = link
-		data["Matches"] = matches
-		data["Breadcrumbs"] = []Breadcrumb{
+		renderAccountLinkDetail(tr, w, r, data, link, matches)
+	}
+}
+
+// renderAccountLinkDetail builds typed pages.AccountLinkDetailProps from
+// the service-layer responses and routes through RenderWithTempl. Mirrors
+// the renderConnections / renderAccountDetail helper pattern.
+func renderAccountLinkDetail(tr *TemplateRenderer, w http.ResponseWriter, r *http.Request, data map[string]any, link *service.AccountLinkResponse, matches []service.TransactionMatchResponse) {
+	rows := make([]pages.AccountLinkDetailMatchRow, len(matches))
+	for i, m := range matches {
+		rows[i] = pages.AccountLinkDetailMatchRow{
+			ID:                     m.ID,
+			Date:                   m.Date,
+			Amount:                 m.Amount,
+			PrimaryTransactionID:   m.PrimaryTransactionID,
+			PrimaryTxnName:         m.PrimaryTxnName,
+			PrimaryTxnMerchant:     derefString(m.PrimaryTxnMerchant),
+			DependentTransactionID: m.DependentTransactionID,
+			DependentTxnName:       m.DependentTxnName,
+			DependentTxnMerchant:   derefString(m.DependentTxnMerchant),
+			MatchConfidence:        m.MatchConfidence,
+			MatchedOn:              m.MatchedOn,
+		}
+	}
+	props := pages.AccountLinkDetailProps{
+		Breadcrumbs: []components.Breadcrumb{
 			{Label: "Account Links", Href: "/connections?tab=links"},
 			{Label: link.PrimaryAccountName + " → " + link.DependentAccountName},
-		}
-
-		tr.Render(w, r, "account_link_detail.html", data)
+		},
+		CSRFToken:               GetCSRFToken(r),
+		LinkID:                  link.ID,
+		MatchCount:              link.MatchCount,
+		UnmatchedDependentCount: link.UnmatchedDependentCount,
+		Matches:                 rows,
 	}
+	tr.RenderWithTempl(w, r, data, pages.AccountLinkDetail(props))
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // CreateAccountLinkAdminHandler handles POST /-/account-links.
