@@ -235,6 +235,10 @@ func RelativeDate(s string) string { return relativeDate(s) }
 // See formatAmount.
 func FormatAmount(amount float64) string { return formatAmount(amount) }
 
+// CommaAmount formats a non-negative float as "1,234.56" (no currency prefix
+// or sign). See commaAmount.
+func CommaAmount(f float64) string { return commaAmount(f) }
+
 // TitleCase rewrites ALL-CAPS or all-lowercase input to Title Case, leaving
 // mixed-case input untouched. See titleCase.
 func TitleCase(s string) string { return titleCase(s) }
