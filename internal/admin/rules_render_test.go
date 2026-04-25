@@ -1,59 +1,42 @@
 package admin
 
 import (
-	"net/http/httptest"
+	"context"
 	"strings"
 	"testing"
+
+	"breadbox/internal/templates/components/pages"
 )
 
+// TestRulesTemplateRenders is the post-migration smoke test for the rules
+// list page. The page now renders via templ (pages.Rules) instead of the
+// removed pages/rules.html, so we render the component directly to a
+// strings.Builder rather than going through TemplateRenderer.
 func TestRulesTemplateRenders(t *testing.T) {
-	tr, err := NewTemplateRenderer(nil)
-	if err != nil {
-		t.Fatalf("NewTemplateRenderer: %v", err)
+	props := pages.RulesProps{
+		Rules:          []pages.RulesRow{},
+		Total:          0,
+		Page:           1,
+		PageSize:       50,
+		TotalPages:     1,
+		ShowingStart:   0,
+		ShowingEnd:     0,
+		PaginationBase: "/rules?page=",
 	}
 
-	data := map[string]interface{}{
-		"PageTitle":      "Rules",
-		"CurrentPage":    "rules",
-		"CSRFToken":      "test",
-		"Flash":          nil,
-		"Rules":          []interface{}{},
-		"HasMore":        false,
-		"NextCursor":     "",
-		"Total":          int64(0),
-		"Page":           1,
-		"PageSize":       50,
-		"TotalPages":     1,
-		"PaginationBase": "/rules?page=",
-		"ShowingStart":   0,
-		"ShowingEnd":     int64(0),
-		"ActiveCount":    0,
-		"DisabledCount":  0,
-		"TotalHits":      0,
-		"AgentCreated":   0,
-		"SearchFilter":   "",
-		"CategoryFilter": "",
-		"EnabledFilter":  "",
-		"FlatCategories": []interface{}{},
-		"Version":        "dev",
+	var buf strings.Builder
+	if err := pages.Rules(props).Render(context.Background(), &buf); err != nil {
+		t.Fatalf("Render returned error: %v", err)
 	}
 
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/rules", nil)
-	tr.Render(w, r, "rules.html", data)
+	html := buf.String()
 
-	if w.Code != 200 {
-		t.Fatalf("Render returned status %d, body=%q", w.Code, w.Body.String())
-	}
-
-	html := w.Body.String()
-
-	if !strings.Contains(html, `rulesPage()`) {
+	if !strings.Contains(html, "rulesPage()") {
 		t.Error("rules Alpine component not initialized")
 	}
 	if !strings.Contains(html, "No rules yet") {
 		t.Error("empty-state message not rendered")
 	}
 
-	t.Logf("Rendered %d bytes", w.Body.Len())
+	t.Logf("Rendered %d bytes", buf.Len())
 }

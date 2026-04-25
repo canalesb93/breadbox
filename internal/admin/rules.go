@@ -46,48 +46,46 @@ func RulesPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Template
 			return
 		}
 
-		// Load category tree for the category picker.
-		categories, _ := svc.ListCategoryTree(ctx)
+		renderRules(w, r, sm, tr, result, sortBy, version)
+	}
+}
 
-		// Compute summary stats from the returned rules.
-		var activeCount, disabledCount, totalHits, agentCreated int
-		for _, rule := range result.Rules {
-			if rule.Enabled {
-				activeCount++
-			} else {
-				disabledCount++
-			}
-			totalHits += rule.HitCount
-			if rule.CreatedByType == "agent" {
-				agentCreated++
+// renderRules builds the typed templ props for the rules list page and
+// hosts them inside the base layout via TemplateRenderer.RenderWithTempl.
+// Replaces the old html/template render — the page is now defined in
+// internal/templates/components/pages/rules.templ.
+func renderRules(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, tr *TemplateRenderer, result *service.TransactionRuleListResult, sortBy, version string) {
+	rows := make([]pages.RulesRow, 0, len(result.Rules))
+	for _, rule := range result.Rules {
+		row := pages.BuildRulesRow(rule)
+		if rule.LastHitAt != nil && *rule.LastHitAt != "" {
+			if t, err := time.Parse(time.RFC3339, *rule.LastHitAt); err == nil {
+				row.LastHitAtRelative = relativeTime(t)
 			}
 		}
-
-		// Build pagination base URL (all params except page).
-		paginationBase := buildRulesPaginationBase(r)
-
-		data := BaseTemplateData(r, sm, "rules", "Rules")
-		data["Rules"] = result.Rules
-		data["Total"] = result.Total
-		data["Page"] = result.Page
-		data["PageSize"] = result.PageSize
-		data["TotalPages"] = result.TotalPages
-		data["PaginationBase"] = paginationBase
-		data["ShowingStart"] = (result.Page-1)*result.PageSize + 1
-		data["ShowingEnd"] = min(int64(result.Page*result.PageSize), result.Total)
-		data["ActiveCount"] = activeCount
-		data["DisabledCount"] = disabledCount
-		data["TotalHits"] = totalHits
-		data["AgentCreated"] = agentCreated
-		data["SearchFilter"] = r.URL.Query().Get("search")
-		data["CategoryFilter"] = r.URL.Query().Get("category_slug")
-		data["EnabledFilter"] = r.URL.Query().Get("enabled")
-		data["SortBy"] = sortBy
-		data["FlatCategories"] = flattenCategories(categories)
-		data["Version"] = version
-
-		tr.Render(w, r, "rules.html", data)
+		if rule.ExpiresAt != nil && *rule.ExpiresAt != "" {
+			if t, err := time.Parse(time.RFC3339, *rule.ExpiresAt); err == nil {
+				row.Expired = t.Before(time.Now())
+			}
+		}
+		rows = append(rows, row)
 	}
+
+	props := pages.RulesProps{
+		Rules:          rows,
+		Total:          result.Total,
+		Page:           result.Page,
+		PageSize:       result.PageSize,
+		TotalPages:     result.TotalPages,
+		ShowingStart:   (result.Page-1)*result.PageSize + 1,
+		ShowingEnd:     min(int64(result.Page*result.PageSize), result.Total),
+		PaginationBase: buildRulesPaginationBase(r),
+		SortBy:         sortBy,
+	}
+
+	data := BaseTemplateData(r, sm, "rules", "Rules")
+	data["Version"] = version
+	tr.RenderWithTempl(w, r, data, pages.Rules(props))
 }
 
 // buildRulesPaginationBase returns the pagination base URL for the rules page.
