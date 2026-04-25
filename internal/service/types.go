@@ -396,6 +396,14 @@ type ActivityEntry struct {
 	ActorType string  `json:"actor_type"`         // "user", "agent", "system"
 	ActorID   *string `json:"actor_id,omitempty"` // user UUID when available (for avatar rendering)
 
+	// ActorAvatarVersion is a unix-timestamp string from the actor user's
+	// users.updated_at, used as the `?v=<ts>` cache buster on the rendered
+	// avatar URL. Mirrors the pattern in users.html so that avatar uploads
+	// invalidate the timeline image immediately rather than living in the
+	// browser cache for the avatar handler's 24h max-age window. Empty for
+	// non-user actors and for user actors whose row has been deleted.
+	ActorAvatarVersion string `json:"-"`
+
 	Summary string `json:"summary"`          // Short: "Approved as Food & Drink"
 	Detail  string `json:"detail,omitempty"` // Longer text (review note or comment body)
 

@@ -551,3 +551,90 @@ func TestBuildActivityTimeline_LegacyPrefixCommentSuppressed(t *testing.T) {
 		t.Fatalf("expected legacy [Review: ...] comment to be suppressed, got %d entries", len(entries))
 	}
 }
+
+// ActorAvatarVersion must flow from the joined-row Annotation through into
+// the ActivityEntry for actor-rendered rows (comment, tag_added, tag_removed,
+// category_set). The template uses it to cache-bust the avatar URL so that an
+// avatar upload invalidates the timeline image immediately rather than living
+// in the browser cache for the avatar handler's 24h max-age window. System and
+// agent rows must surface an empty version — no user avatar to fingerprint.
+func TestBuildActivityTimeline_PlumbsAvatarVersion(t *testing.T) {
+	userID := "user-1"
+	annotations := []service.Annotation{
+		{
+			ID:                 "ann-comment",
+			Kind:               "comment",
+			ActorName:          "Alice",
+			ActorType:          "user",
+			ActorID:            &userID,
+			ActorAvatarVersion: "1700000000",
+			Payload:            map[string]interface{}{"content": "Looks right"},
+			CreatedAt:          "2026-04-05T09:00:00Z",
+		},
+		{
+			ID:                 "ann-tag",
+			Kind:               "tag_added",
+			ActorName:          "Alice",
+			ActorType:          "user",
+			ActorID:            &userID,
+			ActorAvatarVersion: "1700000000",
+			Payload:            map[string]interface{}{"slug": "vacation"},
+			CreatedAt:          "2026-04-05T09:01:00Z",
+		},
+		{
+			ID:                 "ann-tag-removed",
+			Kind:               "tag_removed",
+			ActorName:          "Alice",
+			ActorType:          "user",
+			ActorID:            &userID,
+			ActorAvatarVersion: "1700000000",
+			Payload:            map[string]interface{}{"slug": "vacation"},
+			CreatedAt:          "2026-04-05T09:02:00Z",
+		},
+		{
+			ID:                 "ann-cat",
+			Kind:               "category_set",
+			ActorName:          "Alice",
+			ActorType:          "user",
+			ActorID:            &userID,
+			ActorAvatarVersion: "1700000000",
+			Payload:            map[string]interface{}{"category_slug": "groceries"},
+			CreatedAt:          "2026-04-05T09:03:00Z",
+		},
+		{
+			// rule_applied is system-authored — no avatar version.
+			ID:        "ann-rule",
+			Kind:      "rule_applied",
+			ActorName: "",
+			ActorType: "system",
+			Payload: map[string]interface{}{
+				"rule_id":      "rule-1",
+				"rule_name":    "Auto-categorize",
+				"applied_by":   "sync",
+				"action_field": "category",
+				"action_value": "groceries",
+			},
+			CreatedAt: "2026-04-05T09:04:00Z",
+		},
+	}
+
+	entries := buildActivityTimeline(annotations, nil, nil)
+
+	if len(entries) != 5 {
+		t.Fatalf("expected 5 entries, got %d", len(entries))
+	}
+
+	// Find each entry by Type+Summary fingerprint and assert.
+	for _, e := range entries {
+		switch {
+		case e.Type == "comment", e.Type == "tag", e.Type == "category":
+			if e.ActorAvatarVersion != "1700000000" {
+				t.Errorf("user-actor %s entry: ActorAvatarVersion = %q, want %q", e.Type, e.ActorAvatarVersion, "1700000000")
+			}
+		case e.Type == "rule":
+			if e.ActorAvatarVersion != "" {
+				t.Errorf("system rule entry: ActorAvatarVersion = %q, want empty", e.ActorAvatarVersion)
+			}
+		}
+	}
+}

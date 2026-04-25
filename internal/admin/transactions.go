@@ -952,12 +952,13 @@ func buildActivityTimeline(annotations []service.Annotation, categoryDisplay fun
 				continue
 			}
 			entry := service.ActivityEntry{
-				Type:      "comment",
-				Timestamp: a.CreatedAt,
-				ActorName: a.ActorName,
-				ActorType: a.ActorType,
-				Detail:    content,
-				CommentID: a.ShortID,
+				Type:               "comment",
+				Timestamp:          a.CreatedAt,
+				ActorName:          a.ActorName,
+				ActorType:          a.ActorType,
+				ActorAvatarVersion: a.ActorAvatarVersion,
+				Detail:             content,
+				CommentID:          a.ShortID,
 			}
 			if a.ActorID != nil && *a.ActorID != "" {
 				id := *a.ActorID
@@ -1025,16 +1026,17 @@ func buildActivityTimeline(annotations []service.Annotation, categoryDisplay fun
 			note, _ := a.Payload["note"].(string)
 			td := tagDisplayFn(slug)
 			entry := service.ActivityEntry{
-				Type:           "tag",
-				Timestamp:      a.CreatedAt,
-				ActorName:      a.ActorName,
-				ActorType:      a.ActorType,
-				Summary:        "Added tag",
-				Detail:         note,
-				TagSlug:        slug,
-				TagDisplayName: td.DisplayName,
-				TagColor:       td.Color,
-				TagAction:      "added",
+				Type:               "tag",
+				Timestamp:          a.CreatedAt,
+				ActorName:          a.ActorName,
+				ActorType:          a.ActorType,
+				ActorAvatarVersion: a.ActorAvatarVersion,
+				Summary:            "Added tag",
+				Detail:             note,
+				TagSlug:            slug,
+				TagDisplayName:     td.DisplayName,
+				TagColor:           td.Color,
+				TagAction:          "added",
 			}
 			if a.ActorID != nil && *a.ActorID != "" {
 				id := *a.ActorID
@@ -1054,16 +1056,17 @@ func buildActivityTimeline(annotations []service.Annotation, categoryDisplay fun
 			note, _ := a.Payload["note"].(string)
 			td := tagDisplayFn(slug)
 			entry := service.ActivityEntry{
-				Type:           "tag",
-				Timestamp:      a.CreatedAt,
-				ActorName:      a.ActorName,
-				ActorType:      a.ActorType,
-				Summary:        "Removed tag",
-				Detail:         note,
-				TagSlug:        slug,
-				TagDisplayName: td.DisplayName,
-				TagColor:       td.Color,
-				TagAction:      "removed",
+				Type:               "tag",
+				Timestamp:          a.CreatedAt,
+				ActorName:          a.ActorName,
+				ActorType:          a.ActorType,
+				ActorAvatarVersion: a.ActorAvatarVersion,
+				Summary:            "Removed tag",
+				Detail:             note,
+				TagSlug:            slug,
+				TagDisplayName:     td.DisplayName,
+				TagColor:           td.Color,
+				TagAction:          "removed",
 			}
 			if a.ActorID != nil && *a.ActorID != "" {
 				id := *a.ActorID
@@ -1083,12 +1086,13 @@ func buildActivityTimeline(annotations []service.Annotation, categoryDisplay fun
 			displaySlug := categoryDisplay(slug)
 			summary := "Category set to " + displaySlug
 			entry := service.ActivityEntry{
-				Type:         "category",
-				Timestamp:    a.CreatedAt,
-				ActorName:    a.ActorName,
-				ActorType:    a.ActorType,
-				Summary:      summary,
-				CategoryName: displaySlug,
+				Type:               "category",
+				Timestamp:          a.CreatedAt,
+				ActorName:          a.ActorName,
+				ActorType:          a.ActorType,
+				ActorAvatarVersion: a.ActorAvatarVersion,
+				Summary:            summary,
+				CategoryName:       displaySlug,
 			}
 			if a.ActorID != nil && *a.ActorID != "" {
 				id := *a.ActorID

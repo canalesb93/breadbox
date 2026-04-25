@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
@@ -27,6 +28,13 @@ type Annotation struct {
 	TagID         *string                `json:"tag_id,omitempty"`
 	RuleID        *string                `json:"rule_id,omitempty"`
 	CreatedAt     string                 `json:"created_at"`
+
+	// ActorAvatarVersion is the unix timestamp of the user's most recent
+	// users.updated_at, used as a cache-busting `?v=<ts>` query string on
+	// avatar URLs in the activity timeline. Empty for non-user actors and
+	// for user actors whose row has been deleted. Mirrors the pattern in
+	// users.html — see admin/templates.go avatarURL helper.
+	ActorAvatarVersion string `json:"-"`
 }
 
 // writeAnnotationParams is the shared input for writing an annotation row via
@@ -88,14 +96,18 @@ func (s *Service) ListAnnotations(ctx context.Context, transactionID string) ([]
 		return nil, ErrNotFound
 	}
 
-	rows, err := s.Queries.ListAnnotationsByTransaction(ctx, txnID)
+	// Joined variant carries the actor user's updated_at so the timeline
+	// can cache-bust avatar URLs (`?v=<unix>`), matching the pattern used
+	// by users.html. Without it the browser cached the avatar bytes for up
+	// to 24h after a user uploaded a new picture.
+	rows, err := s.Queries.ListAnnotationsWithActorByTransaction(ctx, txnID)
 	if err != nil {
 		return nil, fmt.Errorf("list annotations: %w", err)
 	}
 
 	result := make([]Annotation, len(rows))
 	for i, r := range rows {
-		result[i] = annotationFromRow(r)
+		result[i] = annotationFromActorRow(r)
 	}
 	return result, nil
 }
@@ -131,6 +143,47 @@ func annotationFromRow(a db.Annotation) Annotation {
 		if err := json.Unmarshal(a.Payload, &payload); err == nil {
 			ann.Payload = payload
 		}
+	}
+
+	return ann
+}
+
+// annotationFromActorRow mirrors annotationFromRow but additionally surfaces
+// the joined user's updated_at as a unix-timestamp avatar version string.
+func annotationFromActorRow(a db.ListAnnotationsWithActorByTransactionRow) Annotation {
+	ann := Annotation{
+		ID:            formatUUID(a.ID),
+		ShortID:       a.ShortID,
+		TransactionID: formatUUID(a.TransactionID),
+		Kind:          a.Kind,
+		ActorType:     a.ActorType,
+		ActorID:       textPtr(a.ActorID),
+		ActorName:     a.ActorName,
+		CreatedAt:     pgconv.TimestampStr(a.CreatedAt),
+	}
+
+	if a.SessionID.Valid {
+		s := formatUUID(a.SessionID)
+		ann.SessionID = &s
+	}
+	if a.TagID.Valid {
+		s := formatUUID(a.TagID)
+		ann.TagID = &s
+	}
+	if a.RuleID.Valid {
+		s := formatUUID(a.RuleID)
+		ann.RuleID = &s
+	}
+
+	if len(a.Payload) > 0 && string(a.Payload) != "{}" {
+		var payload map[string]interface{}
+		if err := json.Unmarshal(a.Payload, &payload); err == nil {
+			ann.Payload = payload
+		}
+	}
+
+	if a.ActorUpdatedAt.Valid {
+		ann.ActorAvatarVersion = strconv.FormatInt(a.ActorUpdatedAt.Time.Unix(), 10)
 	}
 
 	return ann
