@@ -4,11 +4,16 @@ import "fmt"
 
 // Backups renders the /admin/backups page body. Hosts inside the base
 // layout via TemplateRenderer.RenderWithTempl. Markup mirrors the
-// previous html/template version byte-for-byte. The bottom <script>
-// block (location.hash auto-scroll + 'n' shortcut registration) is
-// lifted into backupsInlineScript (backups_scripts.go) — it has no
-// inputs so the body is a fixed string.
+// previous html/template version byte-for-byte.
+//
+// Page scripts (location.hash auto-scroll + 'n' shortcut registration)
+// live in static/js/admin/components/backups.js per the
+// "Alpine page components" convention in docs/design-system.md. The
+// <script src> is loaded synchronously (no `defer`) so its alpine:init
+// listener registers before Alpine — itself <script defer> in <head> —
+// fires the event.
 templ Backups(p BackupsProps) {
+	<script src="/static/js/admin/components/backups.js"></script>
 	<div x-data x-init="$store.shortcuts.setScope('backups')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	<div class="bb-page-header">
 		<div>
@@ -75,7 +80,6 @@ templ Backups(p BackupsProps) {
 			@backupsRestoreSection(p)
 		}
 	</div>
-	@templ.Raw(backupsInlineScript())
 }
 
 templ backupsStats(p BackupsProps) {
