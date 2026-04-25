@@ -13,13 +13,28 @@ import (
 // the handler builds typed props in admin/rules.go and the bridge drops
 // the rendered HTML into base.html's TemplContent slot.
 //
+// The Alpine factory lives in static/js/admin/components/rule_detail.js
+// and reads its initial state from the sibling
+// @templ.JSONScript("rule-detail-data", p.Categories) tag plus the two
+// data-* URL attributes on the x-data root. The factory <script> is loaded
+// synchronously at the top of the component (not `defer`) so
+// Alpine.data('ruleDetail', ...) is registered before Alpine — itself
+// <script defer> in <head> — fires alpine:init.
+//
 // The markup mirrors the previous html/template version byte-for-byte so
 // behavior (Alpine bindings, retroactive-apply modal, sync log dropdown,
 // inline category picker via tx-row) is preserved.
 templ RuleDetail(p RuleDetailProps) {
+	<!-- Component factory + initial-state JSON. Loaded synchronously (no
+	     defer) so the Alpine.data() registration runs before Alpine — itself
+	     deferred from <head> — fires alpine:init. -->
+	<script src="/static/js/admin/components/rule_detail.js"></script>
 	@components.BreadcrumbNav(p.Breadcrumbs)
+	@templ.JSONScript("rule-detail-data", p.Categories)
 	<div
-		x-data="ruleDetail()"
+		x-data="ruleDetail"
+		data-apply-url={ "/-/rules/" + ruleID(p.Rule) + "/apply" }
+		data-toggle-url={ "/-/rules/" + ruleID(p.Rule) + "/toggle" }
 		x-init="$store.shortcuts && $store.shortcuts.setScope('rule-detail'); registerShortcuts()"
 		x-destroy="$store.shortcuts && $store.shortcuts.setScope('global'); unregisterShortcuts()"
 		@keydown.meta.enter.window.prevent="if (!showApplyModal) toggleRule()"
@@ -43,7 +58,6 @@ templ RuleDetail(p RuleDetailProps) {
 		}
 	</div>
 	@components.CategoryPickerScript()
-	@templ.Raw(ruleDetailBootstrap(p))
 }
 
 // ruleDetailHeader renders the page-title row with status badges and the
