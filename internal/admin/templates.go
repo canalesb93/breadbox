@@ -1124,7 +1124,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// the _templ_shell template key (see pages.PromptBuilder).
 		// pages/session_detail.html removed — renders via RenderWithTempl using
 		// the _templ_shell template key (see pages.SessionDetail).
-		"pages/my_account.html",
 		// pages/getting_started.html removed — renders via RenderWithTempl
 		// using the _templ_shell template key (see pages.GettingStarted).
 	}
