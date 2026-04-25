@@ -126,8 +126,15 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, _ *TemplateRender
 }
 
 // ActorFromSession builds a service.Actor from the session.
+//
+// Prefers the linked users.id over the auth_accounts.id so that actor_id on
+// annotations matches the avatar handler's lookup key (/avatars/{users.id}).
+// Falls back to auth_accounts.id only for unlinked initial admin accounts.
 func ActorFromSession(sm *scs.SessionManager, r *http.Request) service.Actor {
-	id := sm.GetString(r.Context(), sessionKeyAccountID)
+	id := sm.GetString(r.Context(), sessionKeyUserID)
+	if id == "" {
+		id = sm.GetString(r.Context(), sessionKeyAccountID)
+	}
 	name := sm.GetString(r.Context(), sessionKeyAccountUsername)
 	if name == "" {
 		name = "admin"

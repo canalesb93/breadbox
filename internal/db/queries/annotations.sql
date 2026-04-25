@@ -18,6 +18,13 @@ ORDER BY created_at ASC;
 -- handler's 24h max-age window. annotations.actor_id can hold either a
 -- users.id or an auth_accounts.id depending on the call site; resolve both
 -- by joining auth_accounts and falling back to a direct users join.
+--
+-- Compare in text space (aa.id::text = a.actor_id) rather than casting
+-- a.actor_id::uuid, because actor_id can also hold a non-UUID short_id for
+-- system-actor rows (e.g. rule_applied writes the rule's short_id) and
+-- PostgreSQL does not guarantee short-circuit evaluation of conjunctions in
+-- JOIN conditions — a regex guard alone is not enough to prevent SQLSTATE
+-- 22P02 on the ::uuid cast.
 SELECT
     a.id, a.short_id, a.transaction_id, a.kind, a.actor_type,
     a.actor_id, a.actor_name, a.session_id, a.payload, a.tag_id,
@@ -26,15 +33,13 @@ SELECT
 FROM annotations a
 LEFT JOIN auth_accounts aa
     ON a.actor_type = 'user'
-   AND a.actor_id IS NOT NULL
-   AND a.actor_id::uuid = aa.id
+   AND aa.id::text = a.actor_id
 LEFT JOIN users u_via_account
     ON aa.user_id = u_via_account.id
 LEFT JOIN users u_direct
     ON a.actor_type = 'user'
-   AND a.actor_id IS NOT NULL
    AND aa.id IS NULL
-   AND a.actor_id::uuid = u_direct.id
+   AND u_direct.id::text = a.actor_id
 WHERE a.transaction_id = $1
 ORDER BY a.created_at ASC;
 
