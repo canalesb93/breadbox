@@ -2,6 +2,7 @@ package admin
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"net/mail"
@@ -142,18 +143,16 @@ func UsersListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) 
 			}
 		}
 
-		data := map[string]any{
-			"PageTitle":        "Household",
-			"CurrentPage":      "users",
-			"EnrichedUsers":    enrichedUsers,
-			"LoginAccounts":    loginAccounts,
-			"LoginAccountMap":  loginAccountMap,
-			"CSRFToken":        GetCSRFToken(r),
-			"Created":          r.URL.Query().Get("created") == "1",
-			"IsUnlinked":       isUnlinked,
-			"UnlinkedUsers":    unlinkedUsers,
-		}
-		tr.Render(w, r, "users.html", data)
+		props := buildUsersProps(usersListInput{
+			CSRFToken:       GetCSRFToken(r),
+			Created:         r.URL.Query().Get("created") == "1",
+			IsUnlinked:      isUnlinked,
+			UnlinkedUsers:   unlinkedUsers,
+			EnrichedUsers:   enrichedUsers,
+			LoginAccountMap: loginAccountMap,
+		})
+		data := BaseTemplateData(r, sm, "users", "Household")
+		renderUsersList(tr, w, r, data, props)
 	}
 }
 
@@ -167,6 +166,98 @@ func renderUserForm(sm *scs.SessionManager, tr *TemplateRenderer, w http.Respons
 	}
 	data := BaseTemplateData(r, sm, "users", pageTitle)
 	tr.RenderWithTempl(w, r, data, pages.UserForm(props))
+}
+
+// renderUsersList drives the household-members page through the templ
+// component. Mirrors the canonical pattern from #796 / #793.
+func renderUsersList(tr *TemplateRenderer, w http.ResponseWriter, r *http.Request, data map[string]any, props pages.UsersProps) {
+	tr.RenderWithTempl(w, r, data, pages.Users(props))
+}
+
+// usersListInput collects the values the handler computes for the list
+// page. Building props through this struct keeps the conversion from
+// db rows + admin view-models into typed templ props in one place.
+type usersListInput struct {
+	CSRFToken       string
+	Created         bool
+	IsUnlinked      bool
+	UnlinkedUsers   []db.User
+	EnrichedUsers   []EnrichedUser
+	LoginAccountMap map[string]db.ListAuthAccountsWithUserRow
+}
+
+// buildUsersProps converts the handler's enriched-user/login data into
+// the typed pages.UsersProps the templ component renders.
+func buildUsersProps(in usersListInput) pages.UsersProps {
+	props := pages.UsersProps{
+		CSRFToken:  in.CSRFToken,
+		Created:    in.Created,
+		IsUnlinked: in.IsUnlinked,
+	}
+
+	for _, u := range in.UnlinkedUsers {
+		props.UnlinkedUsers = append(props.UnlinkedUsers, pages.UsersUnlinkedRow{
+			ID:   pgconv.FormatUUID(u.ID),
+			Name: u.Name,
+		})
+	}
+
+	for _, eu := range in.EnrichedUsers {
+		uid := pgconv.FormatUUID(eu.ID)
+		row := pages.UsersEnrichedRow{
+			ID:              uid,
+			Name:            eu.Name,
+			Email:           pgconv.TextOr(eu.Email, ""),
+			HasEmail:        eu.Email.Valid,
+			AvatarURL:       usersAvatarURL(uid, eu.UpdatedAt),
+			AccountCount:    eu.AccountCount,
+			ConnectionCount: eu.ConnectionCount,
+		}
+		if eu.CreatedAt.Valid {
+			row.HasCreatedAt = true
+			row.CreatedAtLabel = eu.CreatedAt.Time.Format("Jan 2006")
+		}
+		if la, ok := in.LoginAccountMap[uid]; ok && la.Username != "" {
+			row.HasLogin = true
+			row.LoginRole = la.Role
+			row.LoginSetupPending = len(la.HashedPassword) == 0
+		}
+		for _, a := range eu.Accounts {
+			row.Accounts = append(row.Accounts, pages.UsersAccountRow{
+				ID:               a.ID,
+				Name:             a.Name,
+				Type:             a.Type,
+				SubtypeLabel:     a.Subtype,
+				HasSubtype:       a.Subtype != "",
+				Mask:             a.Mask,
+				HasMask:          a.Mask != "",
+				InstitutionName:  a.InstitutionName,
+				BalanceDisplay:   components.FormatAmount(a.BalanceCurrent),
+				IsoCurrencyCode:  a.IsoCurrencyCode,
+				IsLiability:      a.IsLiability,
+				HasBalance:       a.HasBalance,
+				ConnectionStatus: a.ConnectionStatus,
+			})
+		}
+		props.EnrichedUsers = append(props.EnrichedUsers, row)
+	}
+
+	return props
+}
+
+// usersAvatarURL builds the per-user avatar URL with a cache-busting `v`
+// query param keyed on UpdatedAt. Mirrors the funcMap "avatarURL" helper
+// in admin/templates.go for the (UUID, Timestamptz) call shape used by
+// the prior users.html template.
+func usersAvatarURL(formattedID string, updatedAt pgtype.Timestamptz) string {
+	if formattedID == "" {
+		return "/avatars/unknown"
+	}
+	base := "/avatars/" + formattedID
+	if updatedAt.Valid {
+		base += fmt.Sprintf("?v=%d", updatedAt.Time.Unix())
+	}
+	return base
 }
 
 // NewUserHandler serves GET /admin/users/new.
