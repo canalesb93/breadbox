@@ -2,6 +2,7 @@ package pages
 
 import (
 	"fmt"
+	"strconv"
 
 	"breadbox/internal/service"
 )
@@ -273,7 +274,7 @@ templ categoryRow(c service.CategoryResponse) {
 				</span>
 				if len(c.Children) > 0 {
 					<span class="text-[0.65rem] font-medium px-1.5 py-0.5 rounded-full bg-base-200/60 text-base-content/40 shrink-0">
-						{ fmt.Sprintf("%d", len(c.Children)) }
+						{ strconv.Itoa(len(c.Children)) }
 					</span>
 				}
 				if c.IsSystem {

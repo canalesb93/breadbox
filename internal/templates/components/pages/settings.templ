@@ -2,6 +2,7 @@ package pages
 
 import (
 	"fmt"
+	"strconv"
 
 	"breadbox/internal/templates/components"
 )
@@ -128,17 +129,17 @@ templ settingsSyncCard(p SettingsProps) {
 
 templ syncIntervalOption(value, current int, label string) {
 	if value == current {
-		<option value={ fmt.Sprintf("%d", value) } selected>{ label }</option>
+		<option value={ strconv.Itoa(value) } selected>{ label }</option>
 	} else {
-		<option value={ fmt.Sprintf("%d", value) }>{ label }</option>
+		<option value={ strconv.Itoa(value) }>{ label }</option>
 	}
 }
 
 templ retentionOption(value, current int, label string) {
 	if value == current {
-		<option value={ fmt.Sprintf("%d", value) } selected>{ label }</option>
+		<option value={ strconv.Itoa(value) } selected>{ label }</option>
 	} else {
-		<option value={ fmt.Sprintf("%d", value) }>{ label }</option>
+		<option value={ strconv.Itoa(value) }>{ label }</option>
 	}
 }
 

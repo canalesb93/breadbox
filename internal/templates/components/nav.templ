@@ -1,6 +1,9 @@
 package components
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 // NavProps carries everything the sidebar needs. The bridge in
 // internal/admin/templates.go assembles this from the layout data map.
@@ -180,5 +183,5 @@ func badgeCount(n int64) string {
 	if n > 99 {
 		return "99+"
 	}
-	return fmt.Sprintf("%d", n)
+	return strconv.FormatInt(n, 10)
 }

@@ -2,6 +2,7 @@ package pages
 
 import (
 	"fmt"
+	"strconv"
 
 	"breadbox/internal/templates/components"
 )
@@ -267,7 +268,7 @@ templ connectionsCard(c ConnectionsRow) {
 					<a href={ templ.SafeURL("/connections/" + c.ID) } class="text-right no-underline text-inherit" tabindex="-1" aria-hidden="true">
 						<div class="text-base sm:text-lg font-semibold tabular-nums tracking-tight">{ components.FormatAmount(c.TotalBalance) }</div>
 						<div class="text-xs text-base-content/40">
-							{ fmt.Sprintf("%d", c.AccountCount) }
+							{ strconv.FormatInt(c.AccountCount, 10) }
 							<span class="hidden sm:inline">{ connectionsAccountSuffix(c.AccountCount, false) }</span>
 							<span class="sm:hidden">{ connectionsAccountSuffix(c.AccountCount, true) }</span>
 						</div>
@@ -275,7 +276,7 @@ templ connectionsCard(c ConnectionsRow) {
 				} else {
 					<a href={ templ.SafeURL("/connections/" + c.ID) } class="text-right no-underline text-inherit" tabindex="-1" aria-hidden="true">
 						<div class="text-xs text-base-content/40">
-							{ fmt.Sprintf("%d", c.AccountCount) }
+							{ strconv.FormatInt(c.AccountCount, 10) }
 							<span class="hidden sm:inline">{ connectionsAccountSuffix(c.AccountCount, false) }</span>
 							<span class="sm:hidden">{ connectionsAccountSuffix(c.AccountCount, true) }</span>
 						</div>

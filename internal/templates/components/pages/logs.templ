@@ -2,6 +2,7 @@ package pages
 
 import (
 	"fmt"
+	"strconv"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
@@ -123,7 +124,7 @@ templ logsSyncStats(p LogsProps) {
 					</div>
 					<div>
 						<div class={ "text-2xl font-semibold tabular-nums leading-none", errorTextClass(p.Stats.ErrorCount > 0) }>
-							{ fmt.Sprintf("%d", p.Stats.ErrorCount) }
+							{ strconv.FormatInt(p.Stats.ErrorCount, 10) }
 						</div>
 						<div class="text-xs text-base-content/40 mt-0.5">Errors</div>
 					</div>
@@ -242,7 +243,7 @@ templ logsSyncStatusTabs(p LogsProps) {
 			>
 				<span class="w-1.5 h-1.5 rounded-full bg-success shrink-0"></span>
 				Success
-				<span class="text-[0.6rem] tabular-nums opacity-60">{ fmt.Sprintf("%d", p.SuccessCount) }</span>
+				<span class="text-[0.6rem] tabular-nums opacity-60">{ strconv.FormatInt(p.SuccessCount, 10) }</span>
 			</a>
 			<a
 				href={ statusTabHref(p.StatusQueryError) }
@@ -250,7 +251,7 @@ templ logsSyncStatusTabs(p LogsProps) {
 			>
 				<span class="w-1.5 h-1.5 rounded-full bg-error shrink-0"></span>
 				Errors
-				<span class="text-[0.6rem] tabular-nums opacity-60">{ fmt.Sprintf("%d", p.ErrorCount) }</span>
+				<span class="text-[0.6rem] tabular-nums opacity-60">{ strconv.FormatInt(p.ErrorCount, 10) }</span>
 			</a>
 			<a
 				href={ statusTabHref(p.StatusQueryInProgress) }
@@ -258,7 +259,7 @@ templ logsSyncStatusTabs(p LogsProps) {
 			>
 				<span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0"></span>
 				In Progress
-				<span class="text-[0.6rem] tabular-nums opacity-60">{ fmt.Sprintf("%d", p.InProgressCount) }</span>
+				<span class="text-[0.6rem] tabular-nums opacity-60">{ strconv.FormatInt(p.InProgressCount, 10) }</span>
 			</a>
 		</div>
 		if hasAnySyncFilter(p) {
@@ -376,7 +377,7 @@ templ logsWebhookStats(p LogsProps) {
 						<i data-lucide="webhook" class="w-4 h-4 text-base-content/40"></i>
 					</div>
 					<div>
-						<div class="text-2xl font-semibold tabular-nums leading-none">{ fmt.Sprintf("%d", p.WHStats.TotalEvents) }</div>
+						<div class="text-2xl font-semibold tabular-nums leading-none">{ strconv.FormatInt(p.WHStats.TotalEvents, 10) }</div>
 						<div class="text-xs text-base-content/40 mt-0.5">Total events</div>
 					</div>
 				</div>
@@ -388,7 +389,7 @@ templ logsWebhookStats(p LogsProps) {
 						<i data-lucide="check-circle-2" class="w-4 h-4 text-success"></i>
 					</div>
 					<div>
-						<div class="text-2xl font-semibold tabular-nums leading-none text-success">{ fmt.Sprintf("%d", p.WHStats.ProcessedCount) }</div>
+						<div class="text-2xl font-semibold tabular-nums leading-none text-success">{ strconv.FormatInt(p.WHStats.ProcessedCount, 10) }</div>
 						<div class="text-xs text-base-content/40 mt-0.5">Processed</div>
 					</div>
 				</div>
@@ -401,7 +402,7 @@ templ logsWebhookStats(p LogsProps) {
 					</div>
 					<div>
 						<div class={ "text-2xl font-semibold tabular-nums leading-none", warningTextClass(p.WHStats.ReceivedCount > 0) }>
-							{ fmt.Sprintf("%d", p.WHStats.ReceivedCount) }
+							{ strconv.FormatInt(p.WHStats.ReceivedCount, 10) }
 						</div>
 						<div class="text-xs text-base-content/40 mt-0.5">In-flight</div>
 					</div>
@@ -415,7 +416,7 @@ templ logsWebhookStats(p LogsProps) {
 					</div>
 					<div>
 						<div class={ "text-2xl font-semibold tabular-nums leading-none", errorTextClass(p.WHStats.ErrorCount > 0) }>
-							{ fmt.Sprintf("%d", p.WHStats.ErrorCount) }
+							{ strconv.FormatInt(p.WHStats.ErrorCount, 10) }
 						</div>
 						<div class="text-xs text-base-content/40 mt-0.5">Errors</div>
 					</div>
@@ -626,9 +627,9 @@ templ logsPaginator(page, totalPages int, total int64, showingStart, showingEnd 
 				if n == 0 {
 					<span class="bb-paginator__ellipsis">&hellip;</span>
 				} else if n == page {
-					<span class="bb-paginator__btn bb-paginator__btn--active">{ fmt.Sprintf("%d", n) }</span>
+					<span class="bb-paginator__btn bb-paginator__btn--active">{ strconv.Itoa(n) }</span>
 				} else {
-					<a href={ templ.SafeURL(fmt.Sprintf("%s%d", base, n)) } class="bb-paginator__btn">{ fmt.Sprintf("%d", n) }</a>
+					<a href={ templ.SafeURL(fmt.Sprintf("%s%d", base, n)) } class="bb-paginator__btn">{ strconv.Itoa(n) }</a>
 				}
 			}
 			if page < totalPages {
@@ -781,35 +782,35 @@ func statsTotalSync(s *service.SyncLogStats) string {
 	if s == nil {
 		return "0"
 	}
-	return fmt.Sprintf("%d", s.TotalSyncs)
+	return strconv.FormatInt(s.TotalSyncs, 10)
 }
 
 func webhookStatsTotal(s *service.WebhookEventStats) string {
 	if s == nil {
 		return "0"
 	}
-	return fmt.Sprintf("%d", s.TotalEvents)
+	return strconv.FormatInt(s.TotalEvents, 10)
 }
 
 func webhookStatsProcessed(s *service.WebhookEventStats) string {
 	if s == nil {
 		return "0"
 	}
-	return fmt.Sprintf("%d", s.ProcessedCount)
+	return strconv.FormatInt(s.ProcessedCount, 10)
 }
 
 func webhookStatsReceived(s *service.WebhookEventStats) string {
 	if s == nil {
 		return "0"
 	}
-	return fmt.Sprintf("%d", s.ReceivedCount)
+	return strconv.FormatInt(s.ReceivedCount, 10)
 }
 
 func webhookStatsErrors(s *service.WebhookEventStats) string {
 	if s == nil {
 		return "0"
 	}
-	return fmt.Sprintf("%d", s.ErrorCount)
+	return strconv.FormatInt(s.ErrorCount, 10)
 }
 
 // hasAnySyncFilter mirrors the `{{if or .FilterConnID .FilterTrigger

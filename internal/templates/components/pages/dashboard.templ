@@ -2,6 +2,7 @@ package pages
 
 import (
 	"fmt"
+	"strconv"
 
 	"breadbox/internal/templates/components"
 )
@@ -37,7 +38,7 @@ templ dashOverviewStats(p DashboardProps) {
 		if p.ErrorCount > 0 {
 			<a href="/connections" class={ "bb-card bb-card--interactive p-4 no-underline group block", templ.KV("col-span-2 lg:col-span-3", p.ReviewsEnabled) }>
 				<div class="text-[0.65rem] uppercase tracking-wider text-warning">Connection Errors</div>
-				<div class="text-2xl font-bold tabular-nums tracking-tight mt-1 text-error/80">{ fmt.Sprintf("%d", p.ErrorCount) }</div>
+				<div class="text-2xl font-bold tabular-nums tracking-tight mt-1 text-error/80">{ strconv.Itoa(p.ErrorCount) }</div>
 				<div class="text-[0.65rem] text-base-content/40 mt-1 group-hover:text-primary/70 transition-colors">Fix &rarr;</div>
 			</a>
 		}
