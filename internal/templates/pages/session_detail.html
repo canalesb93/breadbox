@@ -55,12 +55,14 @@
           <span class="badge badge-sm badge-error shrink-0">error</span>
         {{end}}
 
-        <!-- Trailing cluster: keep duration + caret always visible; hide relative time on mobile -->
+        <!-- Trailing cluster: sequence (always distinguishes rows) + offset (timing delta from the first call). Relative time moves to the expanded block. -->
         <span class="flex items-center gap-2 shrink-0 whitespace-nowrap">
+          {{if .Sequence}}
+            <span class="text-xs text-base-content/60 font-mono tabular-nums" title="{{relativeTime .CreatedAt}}">#{{.Sequence}}{{if .OffsetLabel}} <span class="text-base-content/40">{{.OffsetLabel}}</span>{{end}}</span>
+          {{end}}
           {{if .DurationMs}}
             <span class="text-xs text-base-content/40 tabular-nums">{{derefInt32 .DurationMs}}ms</span>
           {{end}}
-          <span class="text-xs text-base-content/40 hidden sm:inline">{{relativeTime .CreatedAt}}</span>
           <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-base-content/30 transition-transform" :class="expanded && 'rotate-180'"></i>
         </span>
       </div>

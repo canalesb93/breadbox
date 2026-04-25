@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"breadbox/internal/db"
 	"breadbox/internal/shortid"
@@ -38,6 +39,12 @@ type ToolCallLogResponse struct {
 	ActorName      string           `json:"actor_name"`
 	DurationMs     *int32           `json:"duration_ms,omitempty"`
 	CreatedAt      string           `json:"created_at"`
+	// Sequence is the 1-based ordinal of this call within the session.
+	Sequence int `json:"sequence,omitempty"`
+	// OffsetLabel is a compact human-readable delta from the session's first
+	// recorded tool call (e.g. "+0.0s", "+2.1s", "+1m12s"). Empty when there
+	// is no reference call yet.
+	OffsetLabel string `json:"offset_label,omitempty"`
 }
 
 // MCPSessionDetailResponse is a session with its tool calls.
@@ -195,8 +202,14 @@ func (s *Service) GetMCPSessionDetail(ctx context.Context, idOrShort string) (MC
 	}
 
 	calls := make([]ToolCallLogResponse, len(rows))
+	var base time.Time
+	if len(rows) > 0 {
+		base = rows[0].CreatedAt.Time
+	}
 	for i, r := range rows {
 		calls[i] = toolCallFromRow(r)
+		calls[i].Sequence = i + 1
+		calls[i].OffsetLabel = formatOffset(r.CreatedAt.Time.Sub(base))
 	}
 
 	session.ToolCallCount = int64(len(calls))
@@ -209,6 +222,29 @@ func (s *Service) GetMCPSessionDetail(ctx context.Context, idOrShort string) (MC
 		WriteCount:         writeCount,
 		ReadCount:          readCount,
 	}, nil
+}
+
+// formatOffset renders a duration relative to the session's first tool call
+// as a compact label suitable for inline display next to tool-call rows.
+// Negative values clamp to "+0.0s" so the first row always reads "+0.0s"
+// even if clock skew makes d slightly negative.
+func formatOffset(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	total := d.Seconds()
+	switch {
+	case total < 60:
+		return fmt.Sprintf("+%.1fs", total)
+	case total < 3600:
+		m := int(total) / 60
+		s := int(total) % 60
+		return fmt.Sprintf("+%dm%02ds", m, s)
+	default:
+		h := int(total) / 3600
+		m := (int(total) % 3600) / 60
+		return fmt.Sprintf("+%dh%02dm", h, m)
+	}
 }
 
 // summarizeToolCalls aggregates error / write / read counts across tool calls.
