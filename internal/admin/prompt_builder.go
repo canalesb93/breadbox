@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"breadbox/internal/prompts"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -70,6 +71,20 @@ func PromptBuilderHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.Han
 		data["AgentColor"] = cfg.Color
 		data["BlocksJSON"] = string(blocksJSON)
 
-		tr.Render(w, r, "prompt_builder.html", data)
+		renderPromptBuilder(w, r, tr, data, pages.PromptBuilderProps{
+			AgentType:        agentType,
+			AgentLabel:       cfg.Label,
+			AgentDescription: cfg.Description,
+			AgentIcon:        cfg.Icon,
+			AgentColor:       cfg.Color,
+			BlocksJSON:       string(blocksJSON),
+		})
 	}
+}
+
+// renderPromptBuilder mirrors the renderSettings / renderTransactions pattern:
+// it hands the typed PromptBuilderProps to the templ component and uses
+// RenderWithTempl to host it inside base.html.
+func renderPromptBuilder(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.PromptBuilderProps) {
+	tr.RenderWithTempl(w, r, data, pages.PromptBuilder(props))
 }
