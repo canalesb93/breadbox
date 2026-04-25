@@ -6,6 +6,7 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -52,20 +53,10 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 			rawReports = filtered
 		}
 
-		type ReportItem struct {
-			ID            string
-			Title         string
-			Body          string
-			Priority      string
-			Tags          []string
-			DisplayAuthor string
-			CreatedAt     string
-			IsRead        bool
-		}
-		var reports []ReportItem
+		var reports []pages.ReportsItem
 		for _, r := range rawReports {
 			t, _ := time.Parse(time.RFC3339, r.CreatedAt)
-			reports = append(reports, ReportItem{
+			reports = append(reports, pages.ReportsItem{
 				ID:            r.ID,
 				Title:         r.Title,
 				Body:          r.Body,
@@ -78,10 +69,12 @@ func ReportsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager
 		}
 
 		data := BaseTemplateData(r, sm, "reports", "Agent Reports")
-		data["Reports"] = reports
-		data["FilterStatus"] = statusFilter
-		data["TotalCount"] = len(reports)
-		tr.Render(w, r, "reports.html", data)
+		props := pages.ReportsProps{
+			Reports:      reports,
+			FilterStatus: statusFilter,
+			TotalCount:   len(reports),
+		}
+		tr.RenderWithTempl(w, r, data, pages.Reports(props))
 	}
 }
 
