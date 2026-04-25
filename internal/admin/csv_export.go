@@ -17,28 +17,9 @@ func ExportTransactionsCSVHandler(a *app.App, svc *service.Service) http.Handler
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		q := r.URL.Query()
-		params := service.AdminTransactionListParams{
-			Page:         1,
-			PageSize:     -1, // Export all matching rows (no pagination).
-			StartDate:    parseDateParam(r, "start_date"),
-			EndDate:      parseInclusiveDateParam(r, "end_date"),
-			AccountID:    optStrQuery(q, "account_id"),
-			UserID:       optStrQuery(q, "user_id"),
-			ConnectionID: optStrQuery(q, "connection_id"),
-			CategorySlug: optStrQuery(q, "category"),
-			MinAmount:    optFloatQuery(q, "min_amount"),
-			MaxAmount:    optFloatQuery(q, "max_amount"),
-			Search:       optStrQuery(q, "search"),
-		}
-
-		if v := q.Get("pending"); v != "" {
-			b := v == "true"
-			params.Pending = &b
-		}
-		if q.Get("sort") == "asc" {
-			params.SortOrder = "asc"
-		}
+		params := parseAdminTxFilters(r)
+		params.Page = 1
+		params.PageSize = -1 // Export all matching rows (no pagination).
 
 		result, err := svc.ListTransactionsAdmin(ctx, params)
 		if err != nil {
