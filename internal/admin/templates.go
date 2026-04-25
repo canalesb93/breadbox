@@ -1107,7 +1107,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/account_link_detail.html",
 		// pages/reports.html removed — renders via RenderWithTempl using
 		// the _templ_shell template key (see pages.Reports).
-		"pages/report_detail.html",
 		// pages/logs.html removed — renders via RenderWithTempl using the
 		// _templ_shell template key (see pages.Logs).
 		"pages/oauth_clients.html",
