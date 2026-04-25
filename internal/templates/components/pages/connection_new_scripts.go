@@ -1,116 +1,23 @@
-{{define "content"}}
-{{template "breadcrumb" .}}
+package pages
 
-<div class="bb-page-header">
-  <div>
-    <h1 class="bb-page-title">Connect New Bank</h1>
-    <p class="text-sm text-base-content/50 mt-1">Link a bank account to start syncing transactions</p>
-  </div>
-</div>
+import (
+	"encoding/json"
+	"fmt"
+)
 
-{{if not (or .HasPlaid .HasTeller)}}
-<!-- No providers configured -->
-<div class="bb-card p-8 max-w-lg">
-  <div class="flex flex-col items-center text-center">
-    <div class="w-16 h-16 rounded-xl bg-warning/10 flex items-center justify-center mb-4">
-      <i data-lucide="plug-zap" class="w-8 h-8 text-warning"></i>
-    </div>
-    <h2 class="text-lg font-semibold mb-1">No Providers Configured</h2>
-    <p class="text-sm text-base-content/50 mb-6">You need to configure at least one bank provider before creating connections.</p>
-    <a href="/providers" class="btn btn-primary btn-sm rounded-xl">
-      <i data-lucide="settings" class="w-4 h-4"></i> Configure Providers
-    </a>
-  </div>
-</div>
-{{else}}
-<div id="step-select" {{if .ShowLink}}class="hidden"{{end}}>
-  <div class="bb-card p-8 max-w-lg">
-    <div class="flex items-center gap-3 mb-6">
-      <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/8">
-        <i data-lucide="user-plus" class="w-5 h-5 text-primary"></i>
-      </div>
-      <div>
-        <h2 class="text-base font-semibold">Select Details</h2>
-        <p class="text-xs text-base-content/45">Choose provider and family member</p>
-      </div>
-    </div>
-
-    <form id="member-form" class="flex flex-col gap-5">
-      <fieldset class="fieldset">
-        <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Bank Provider</label>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="provider-cards">
-          {{if .HasPlaid}}
-          <label class="relative cursor-pointer">
-            <input type="radio" name="provider" value="plaid" class="peer sr-only" checked>
-            <div class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-300 bg-base-200/30
-                        peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300">
-              <i data-lucide="building-2" class="w-6 h-6 text-base-content/60"></i>
-              <span class="text-sm font-medium">Plaid</span>
-            </div>
-          </label>
-          {{end}}
-          {{if .HasTeller}}
-          <label class="relative cursor-pointer">
-            <input type="radio" name="provider" value="teller" class="peer sr-only" {{if not .HasPlaid}}checked{{end}}>
-            <div class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-300 bg-base-200/30
-                        peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300">
-              <i data-lucide="landmark" class="w-6 h-6 text-base-content/60"></i>
-              <span class="text-sm font-medium">Teller</span>
-            </div>
-          </label>
-          {{end}}
-          <label class="relative cursor-pointer">
-            <input type="radio" name="provider" value="csv" class="peer sr-only">
-            <div class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-base-300 bg-base-200/30
-                        peer-checked:border-primary peer-checked:bg-primary/5 transition-all duration-150 hover:border-base-300">
-              <i data-lucide="file-spreadsheet" class="w-6 h-6 text-base-content/60"></i>
-              <span class="text-sm font-medium">CSV</span>
-            </div>
-          </label>
-        </div>
-      </fieldset>
-
-      <fieldset class="fieldset">
-        <label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="user_id">Family Member</label>
-        <select id="user_id" name="user_id" required class="select select-bordered w-full rounded-xl">
-          <option value="" disabled selected>Select a member...</option>
-          {{range .Users}}
-          <option value="{{formatUUID .ID}}">{{.Name}}</option>
-          {{end}}
-        </select>
-      </fieldset>
-
-      <div class="pt-2">
-        <button type="submit" class="btn btn-primary btn-sm rounded-xl">
-          Continue <i data-lucide="arrow-right" class="w-4 h-4"></i>
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<div id="step-link" class="hidden">
-  <div class="bb-card p-8 max-w-lg">
-    <div class="flex flex-col items-center text-center">
-      <div class="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-        <i data-lucide="link" class="w-8 h-8 text-primary"></i>
-      </div>
-      <h2 class="text-lg font-semibold mb-1">Connect Bank</h2>
-      <p class="text-sm text-base-content/50 mb-1">Connecting for: <span id="member-name" class="font-semibold text-base-content"></span></p>
-      <p id="link-status" class="text-sm text-base-content/50 mb-6">Opening bank connection dialog...</p>
-      <div class="flex items-center gap-3">
-        <button id="retry-btn" class="btn btn-primary btn-sm rounded-xl hidden">
-          <i data-lucide="refresh-cw" class="w-4 h-4"></i> Retry
-        </button>
-        <button id="back-btn" class="btn btn-ghost btn-sm rounded-xl">
-          <i data-lucide="arrow-left" class="w-4 h-4"></i> Back
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
+// connectionNewBootstrap renders the inline <script> that powers the
+// connect-new-bank wizard. Extracted from the templ template so the JS body
+// stays plain text and doesn't compete with templ's `{ }` interpolation.
+//
+// Mirrors the original html/template version byte-for-byte. The single
+// interpolation site is `{{.TellerEnv}}` — Teller's setup needs to know
+// whether to point at sandbox / development / production.
+func connectionNewBootstrap(p ConnectionNewProps) string {
+	jsonStr := func(s string) string {
+		b, _ := json.Marshal(s)
+		return string(b)
+	}
+	return fmt.Sprintf(`<script>
 (function () {
   var memberForm = document.getElementById("member-form");
   var stepSelect = document.getElementById("step-select");
@@ -250,7 +157,7 @@
   function initTellerConnect(appId) {
     var tellerConnect = TellerConnect.setup({
       applicationId: appId,
-      environment: "{{.TellerEnv}}",
+      environment: %s,
       products: ["transactions", "balance"],
       onSuccess: function(enrollment) {
         showMessage("Saving connection...");
@@ -292,6 +199,7 @@
 
   retryBtn.addEventListener("click", startLink);
 })();
-</script>
-{{end}}
-{{end}}
+</script>`,
+		jsonStr(p.TellerEnv),
+	)
+}
