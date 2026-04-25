@@ -1,0 +1,567 @@
+package pages
+
+import (
+	"fmt"
+
+	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
+)
+
+// RuleDetail renders the per-rule detail page (header, what-it-does card,
+// stat tiles, recent applications, pending matches, sync activity).
+// Hosts inside the base layout via TemplateRenderer.RenderWithTempl —
+// the handler builds typed props in admin/rules.go and the bridge drops
+// the rendered HTML into base.html's TemplContent slot.
+//
+// The markup mirrors the previous html/template version byte-for-byte so
+// behavior (Alpine bindings, retroactive-apply modal, sync log dropdown,
+// inline category picker via tx-row) is preserved.
+templ RuleDetail(p RuleDetailProps) {
+	@components.BreadcrumbNav(p.Breadcrumbs)
+	<div
+		x-data="ruleDetail()"
+		x-init="$store.shortcuts && $store.shortcuts.setScope('rule-detail'); registerShortcuts()"
+		x-destroy="$store.shortcuts && $store.shortcuts.setScope('global'); unregisterShortcuts()"
+		@keydown.meta.enter.window.prevent="if (!showApplyModal) toggleRule()"
+		@keydown.ctrl.enter.window.prevent="if (!showApplyModal) toggleRule()"
+	>
+		@ruleDetailHeader(p)
+		@ruleDetailWhatItDoes(p)
+		@ruleDetailStats(p)
+		if p.Rule != nil && p.Rule.HitCount > 0 && p.Stats != nil && p.Stats.UniqueTransactions == 0 {
+			<p class="text-xs text-base-content/40 mb-4 px-1">
+				<i data-lucide="info" class="w-3 h-3 inline-block -mt-0.5"></i>
+				Per-transaction tracking was recently enabled. The "Transactions affected" count will update as this rule runs in future syncs.
+			</p>
+		}
+		@ruleDetailRecentApplications(p)
+		if p.Preview != nil {
+			@ruleDetailPendingMatches(p)
+		}
+		if len(p.SyncHistory) > 0 {
+			@ruleDetailSyncActivity(p)
+		}
+	</div>
+	@components.CategoryPickerScript()
+	@templ.Raw(ruleDetailBootstrap(p))
+}
+
+// ruleDetailHeader renders the page-title row with status badges and the
+// edit/toggle action buttons.
+templ ruleDetailHeader(p RuleDetailProps) {
+	if p.Rule != nil {
+		{{ isSystem := p.Rule.CreatedByType == "system" }}
+		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+			<div class="flex items-center gap-4">
+				<div class={ "w-12", "h-12", "rounded-xl", "flex", "items-center", "justify-center", ruleHeaderTileClass(p.Rule.Enabled, isSystem) }>
+					if !p.Rule.Enabled {
+						<i data-lucide="pause" class="w-6 h-6 text-base-content/30"></i>
+					} else if isSystem {
+						<i data-lucide="shield" class="w-6 h-6 text-info"></i>
+					} else {
+						<i data-lucide="zap" class="w-6 h-6 text-success"></i>
+					}
+				</div>
+				<div>
+					<h1 class="bb-page-title">{ p.Rule.Name }</h1>
+					<div class="flex items-center gap-2 mt-0.5 flex-wrap">
+						if p.Rule.Enabled {
+							<span class="badge badge-soft badge-success badge-sm">Enabled</span>
+						} else {
+							<span class="badge badge-ghost badge-sm">Disabled</span>
+						}
+						if isSystem {
+							<span class="badge badge-soft badge-info badge-sm gap-1" title="Built-in system rule">
+								<i data-lucide="shield" class="w-3 h-3"></i>
+								System rule
+							</span>
+						}
+						<span class="badge badge-ghost badge-sm" title="When this rule fires">{ p.TriggerLabel }</span>
+						<span class="text-xs text-base-content/40">{ fmt.Sprintf("Priority %d", p.Rule.Priority) }</span>
+						<span class="text-xs text-base-content/40">·</span>
+						<span class="text-xs text-base-content/40">{ ruleCreatedByLabel(p.Rule.CreatedByType) }</span>
+						if p.Rule.ExpiresAt != nil {
+							<span class="text-xs text-base-content/40">·</span>
+							<span class="text-xs text-warning">{ "Expires " + *p.Rule.ExpiresAt }</span>
+						}
+					</div>
+				</div>
+			</div>
+			<div class="flex items-center gap-2">
+				<a href={ templ.SafeURL(fmt.Sprintf("/rules/%s/edit", p.Rule.ID)) } class="btn btn-sm btn-outline rounded-xl">
+					<i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
+				</a>
+				<button class="btn btn-sm btn-ghost rounded-xl" @click="toggleRule()">
+					if p.Rule.Enabled {
+						<i data-lucide="pause" class="w-3.5 h-3.5"></i>
+						Disable
+					} else {
+						<i data-lucide="play" class="w-3.5 h-3.5"></i>
+						Enable
+					}
+				</button>
+			</div>
+		</div>
+	}
+}
+
+// ruleDetailWhatItDoes renders the conditions + actions card.
+templ ruleDetailWhatItDoes(p RuleDetailProps) {
+	if p.Rule != nil {
+		{{ matchAll := ruleConditionMatchAll(p.Rule.Conditions) }}
+		{{ conjLabel, conjClass := ruleConditionConjLabel(p.Rule.Conditions) }}
+		<div class="bb-card p-5 mb-4">
+			<span class="label-text text-sm font-medium">What this rule does</span>
+			<div class="mt-3 space-y-3">
+				<!-- Conditions -->
+				<div>
+					<div class="flex items-center justify-between mb-2">
+						<span class="text-xs text-base-content/40 uppercase tracking-wider">When</span>
+						if conjLabel != "" {
+							<span class={ "text-[0.65rem]", "font-medium", "uppercase", "tracking-wider", conjClass }>
+								if conjLabel == "AND" {
+									All must match
+								} else {
+									Any may match
+								}
+							</span>
+						}
+					</div>
+					if matchAll {
+						<div class="flex items-center gap-3 p-3 bg-info/5 border border-info/15 rounded-xl">
+							<div class="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
+								<i data-lucide="infinity" class="w-4 h-4 text-info"></i>
+							</div>
+							<div class="flex-1 min-w-0">
+								<p class="text-sm font-medium">All transactions</p>
+								<p class="text-xs text-base-content/50">No conditions — this rule fires on every transaction.</p>
+							</div>
+						</div>
+					} else if len(p.ConditionRows) > 0 {
+						<div class="space-y-1.5">
+							for _, row := range p.ConditionRows {
+								@components.ConditionRow(row)
+							}
+						</div>
+					} else {
+						<div class="p-3 bg-base-200/50 border border-base-content/10 rounded-xl">
+							<code class="text-xs font-mono text-base-content/70">{ p.ConditionSummary }</code>
+						</div>
+					}
+				</div>
+				<!-- Actions -->
+				<div>
+					<span class="text-xs text-base-content/40 uppercase tracking-wider">Then</span>
+					<div class="mt-1 space-y-1">
+						for _, a := range p.Rule.Actions {
+							@ruleDetailActionRow(p, a)
+						}
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+// ruleDetailActionRow renders one action card under the "Then" header.
+templ ruleDetailActionRow(p RuleDetailProps, a service.RuleAction) {
+	<div class="flex items-center gap-3 p-3 bg-base-200/40 rounded-xl">
+		switch a.Type {
+			case "set_category":
+				<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={ ruleCategoryTileBgStyle(p.Rule) }>
+					if p.Rule != nil && p.Rule.CategoryIcon != nil {
+						<i data-lucide={ *p.Rule.CategoryIcon } class="w-4 h-4" style={ ruleCategoryIconColorStyle(p.Rule) }></i>
+					} else {
+						<i data-lucide="tag" class="w-4 h-4 text-base-content/50"></i>
+					}
+				</div>
+				<div class="flex-1 min-w-0">
+					<p class="text-sm">
+						Set category to
+						if p.ActionCategoryName != "" {
+							<span class="font-semibold">{ p.ActionCategoryName }</span>
+						} else {
+							<span class="font-semibold">{ a.CategorySlug }</span>
+						}
+					</p>
+					if p.ActionCategoryName != "" {
+						<p class="text-xs text-base-content/40">{ a.CategorySlug }</p>
+					}
+				</div>
+			case "add_tag":
+				<div class="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+					<i data-lucide="hash" class="w-4 h-4 text-warning"></i>
+				</div>
+				<div class="flex-1 min-w-0">
+					<p class="text-sm">Add tag <span class="font-semibold">{ a.TagSlug }</span></p>
+					<p class="text-xs text-base-content/40">Tag is attached to matching transactions during sync.</p>
+				</div>
+			case "remove_tag":
+				<div class="w-8 h-8 rounded-lg bg-error/10 flex items-center justify-center shrink-0">
+					<i data-lucide="minus-circle" class="w-4 h-4 text-error"></i>
+				</div>
+				<div class="flex-1 min-w-0">
+					<p class="text-sm">Remove tag <span class="font-semibold">{ a.TagSlug }</span></p>
+					<p class="text-xs text-base-content/40">Tag is removed from matching transactions during sync.</p>
+				</div>
+			case "add_comment":
+				<div class="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
+					<i data-lucide="message-square" class="w-4 h-4 text-info"></i>
+				</div>
+				<div class="flex-1 min-w-0">
+					<p class="text-sm">Add comment</p>
+					<p class="text-xs text-base-content/60 mt-0.5 italic">{ "“" + a.Content + "”" }</p>
+				</div>
+			default:
+				<div class="w-8 h-8 rounded-lg bg-base-200 flex items-center justify-center shrink-0">
+					<i data-lucide="settings" class="w-4 h-4 text-base-content/40"></i>
+				</div>
+				<div class="flex-1 min-w-0">
+					<p class="text-sm">Unknown action type: <span class="font-semibold">{ a.Type }</span></p>
+				</div>
+		}
+	</div>
+}
+
+// ruleDetailStats renders the four stat tiles (hit count, unique txns,
+// pending matches, last active).
+templ ruleDetailStats(p RuleDetailProps) {
+	if p.Rule != nil {
+		<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+			<div class="bb-card p-4">
+				<div class="flex items-center gap-3">
+					<div class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+						<i data-lucide="target" class="w-4 h-4 text-primary"></i>
+					</div>
+					<div>
+						<div class="text-2xl font-semibold tabular-nums leading-none">{ components.CommaInt(int64(p.Rule.HitCount)) }</div>
+						<div class="text-xs text-base-content/40 mt-0.5">Times matched</div>
+					</div>
+				</div>
+			</div>
+			<div class="bb-card p-4">
+				<div class="flex items-center gap-3">
+					<div class="w-9 h-9 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
+						<i data-lucide="layers" class="w-4 h-4 text-info"></i>
+					</div>
+					<div>
+						<div class="text-2xl font-semibold tabular-nums leading-none">{ components.CommaInt(ruleStatsUnique(p.Stats)) }</div>
+						<div class="text-xs text-base-content/40 mt-0.5">Transactions affected</div>
+					</div>
+				</div>
+			</div>
+			<div class="bb-card p-4">
+				<div class="flex items-center gap-3">
+					{{ pendingActive := p.Preview != nil && p.Preview.MatchCount > 0 }}
+					<div class={ "w-9", "h-9", "rounded-lg", "flex", "items-center", "justify-center", "shrink-0", rulePendingTileClass(pendingActive) }>
+						if pendingActive {
+							<i data-lucide="alert-circle" class="w-4 h-4 text-warning"></i>
+						} else {
+							<i data-lucide="check-circle" class="w-4 h-4 text-success"></i>
+						}
+					</div>
+					<div>
+						<div class="text-2xl font-semibold tabular-nums leading-none">
+							if p.Preview != nil {
+								{ components.CommaInt(p.Preview.MatchCount) }
+							} else {
+								0
+							}
+						</div>
+						<div class="text-xs text-base-content/40 mt-0.5">Untouched matches</div>
+					</div>
+				</div>
+			</div>
+			<div class="bb-card p-4">
+				<div class="flex items-center gap-3">
+					<div class="w-9 h-9 rounded-lg bg-base-200/60 flex items-center justify-center shrink-0">
+						<i data-lucide="clock" class="w-4 h-4 text-base-content/40"></i>
+					</div>
+					<div>
+						if p.HasLastActive {
+							<div class="text-sm font-semibold leading-none">{ ruleRelativeTime(p.LastActiveTime) }</div>
+						} else {
+							<div class="text-sm font-semibold leading-none text-base-content/30">Never</div>
+						}
+						<div class="text-xs text-base-content/40 mt-0.5">Last active</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+// ruleDetailRecentApplications renders the "Recent Applications" card —
+// transactions this rule has touched during syncs.
+templ ruleDetailRecentApplications(p RuleDetailProps) {
+	<div class="bb-card p-5 mb-4">
+		<div class="flex items-center justify-between mb-1">
+			<span class="label-text text-sm font-medium">Recent Applications</span>
+			if len(p.Applications) > 0 {
+				<span class="text-xs text-base-content/40 tabular-nums">{ fmt.Sprintf("%d shown", len(p.Applications)) }</span>
+			}
+		</div>
+		<p class="text-xs text-base-content/40 mb-3">Transactions this rule has touched during syncs</p>
+		if len(p.ApplicationTxns) > 0 {
+			<!-- One card wraps the stream: per-application action strip + full tx-row.
+			     Each application is grouped in a divider-separated block so scanning
+			     top-to-bottom reads as "this is what the rule did, on this transaction". -->
+			<div class="bb-card overflow-hidden">
+				<div class="divide-y divide-base-300/50">
+					for _, tx := range p.ApplicationTxns {
+						{{ meta := p.ApplicationMeta[tx.ID] }}
+						<div>
+							if meta.AppliedBy != "sync" {
+								<!-- The rule's action is already described in the "Then" card above,
+								     so don't repeat it per row. Only surface how the row got here
+								     when it wasn't the default ("via sync"). -->
+								<div class="flex items-center justify-end px-4 pt-2 text-[0.65rem] uppercase tracking-wider text-base-content/40">
+									<span class="inline-flex items-center gap-1">
+										if meta.AppliedBy == "retroactive" {
+											<i data-lucide="rewind" class="w-3 h-3"></i>
+											retroactive
+										} else {
+											<i data-lucide="wrench" class="w-3 h-3"></i>
+											{ meta.AppliedBy }
+										}
+									</span>
+								</div>
+							}
+							@components.TxRow(tx)
+						</div>
+					}
+				</div>
+			</div>
+			if p.HasMoreApplications {
+				<p class="text-xs text-base-content/40 mt-2 px-1">Showing most recent 10</p>
+			}
+		} else {
+			<div class="text-center py-6 text-base-content/40 text-sm">
+				<p>No applications yet. This rule will run on matching transactions during the next sync.</p>
+			</div>
+		}
+	</div>
+}
+
+// ruleDetailPendingMatches renders the "Matching transactions" card — only
+// rendered when preview data is available.
+//
+// Retroactive apply runs set_category + add_tag + remove_tag (add_comment
+// is sync-only). The card always renders when preview data exists so users
+// get explicit confirmation that preview ran, even when there are zero
+// matches or the rule is comment-only (non-retroactive).
+templ ruleDetailPendingMatches(p RuleDetailProps) {
+	if p.Rule != nil && p.Preview != nil {
+		{{ retro := ruleHasRetroactiveAction(p.Rule.Actions) }}
+		<div class="bb-card p-5 mb-4">
+			<div class="flex items-center justify-between mb-1">
+				<span class="label-text text-sm font-medium">Matching transactions</span>
+				if p.Preview.MatchCount > 0 {
+					if retro {
+						<span class="badge badge-soft badge-warning badge-sm">{ fmt.Sprintf("%s pending", components.CommaInt(p.Preview.MatchCount)) }</span>
+					} else {
+						<span class="badge badge-soft badge-ghost badge-sm">{ fmt.Sprintf("%s matched", components.CommaInt(p.Preview.MatchCount)) }</span>
+					}
+				} else {
+					<span class="badge badge-soft badge-success badge-sm">0 pending</span>
+				}
+			</div>
+			if p.Preview.MatchCount > 0 {
+				if retro {
+					<p class="text-xs text-base-content/40 mb-3">These existing transactions match the rule but haven't been touched by it yet.</p>
+				} else {
+					<p class="text-xs text-base-content/40 mb-3">These existing transactions match the rule's condition. This rule only adds comments, which fire on sync — no retroactive preview is available.</p>
+				}
+			} else {
+				if retro {
+					if p.Rule.HitCount > 0 {
+						<p class="text-xs text-base-content/40 mb-3">All matching transactions have already been touched by this rule. Future syncs will pick up new ones.</p>
+					} else {
+						<p class="text-xs text-base-content/40 mb-3">No existing transactions match. The rule will fire on future syncs.</p>
+					}
+				} else {
+					<p class="text-xs text-base-content/40 mb-3">This rule only adds comments, which fire on sync. No retroactive preview is available.</p>
+				}
+			}
+			if p.Preview.MatchCount > 0 {
+				if len(p.PreviewTxns) > 0 {
+					<div class="bb-card overflow-hidden">
+						<div class="divide-y divide-base-300/50">
+							for _, tx := range p.PreviewTxns {
+								@components.TxRow(tx)
+							}
+						</div>
+					</div>
+				} else {
+					<div class="bb-card overflow-hidden">
+						<div class="overflow-x-auto">
+							<table class="table table-sm">
+								<thead>
+									<tr>
+										<th class="text-xs">Name</th>
+										<th class="text-xs text-right">Amount</th>
+										<th class="text-xs">Date</th>
+									</tr>
+								</thead>
+								<tbody>
+									for _, m := range p.Preview.SampleMatches {
+										<tr>
+											<td class="text-sm">{ m.ProviderName }</td>
+											<td class="text-sm text-right tabular-nums bb-amount">{ fmt.Sprintf("%.2f", m.Amount) }</td>
+											<td class="text-sm text-base-content/60">{ m.Date }</td>
+										</tr>
+									}
+								</tbody>
+							</table>
+						</div>
+					</div>
+				}
+				if p.Preview.MatchCount > 10 {
+					<p class="text-xs text-base-content/40 mt-2">{ fmt.Sprintf("Showing 10 of %s", components.CommaInt(p.Preview.MatchCount)) }</p>
+				}
+				if retro {
+					<div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+						<p class="text-xs text-base-content/40">Apply this rule to categorize these existing transactions</p>
+						<button class="btn btn-sm btn-outline rounded-xl w-full sm:w-auto" data-apply-btn @click="openApplyModal()" :disabled="applying">
+							<span x-show="applying" class="loading loading-spinner loading-xs"></span>
+							<i data-lucide="play" class="w-3.5 h-3.5" x-show="!applying"></i>
+							if p.ActionCategoryName != "" {
+								{ "Categorize as " + p.ActionCategoryName }
+							} else {
+								Categorize as matched category
+							}
+						</button>
+					</div>
+				}
+			} else {
+				<!-- 0-match empty state: matches the tone of other empty cards (e.g. the
+				     "No applications yet" block above) so the absence-of-section no longer
+				     reads as a loading failure. -->
+				<div class="flex flex-col items-center justify-center text-center py-6 gap-2">
+					<div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
+						<i data-lucide="check" class="w-5 h-5 text-success"></i>
+					</div>
+					if retro {
+						if p.Rule.HitCount > 0 {
+							<p class="text-sm text-base-content/60">Nothing left to apply retroactively.</p>
+						} else {
+							<p class="text-sm text-base-content/60">No existing transactions match yet.</p>
+						}
+					} else {
+						<p class="text-sm text-base-content/60">Comment-only rule — runs on sync.</p>
+					}
+				</div>
+			}
+			if p.Preview.MatchCount > 0 && retro {
+				@ruleDetailApplyModal(p)
+			}
+		</div>
+	}
+}
+
+// ruleDetailApplyModal renders the retroactive-apply confirmation dialog.
+// Teleported to <body> so the SPA progress bar's filter/opacity on <main>
+// doesn't break the fixed-positioning containing block.
+templ ruleDetailApplyModal(p RuleDetailProps) {
+	if p.Preview != nil {
+		<template x-teleport="body">
+			<div x-show="showApplyModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" @click.self="closeApplyModal()">
+				<div class="bb-card max-w-md w-full p-6 bg-base-100 shadow-xl rounded-2xl" role="dialog" aria-modal="true" @keydown.escape.window="closeApplyModal()">
+					<div class="flex items-start gap-3">
+						<div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
+							<i data-lucide="alert-triangle" class="w-5 h-5 text-warning"></i>
+						</div>
+						<div class="flex-1 min-w-0">
+							<h3 class="text-base font-semibold">Apply this rule retroactively?</h3>
+							<p class="text-sm text-base-content/60 mt-1">
+								@templ.Raw(ruleApplyModalCountSentence(p.Preview.MatchCount))
+							</p>
+							<ul class="mt-3 text-xs text-base-content/50 space-y-1 list-disc pl-4">
+								<li><code class="text-[10px]">set_category</code> skips transactions where you've set a manual override.</li>
+								<li><code class="text-[10px]">add_tag</code> / <code class="text-[10px]">remove_tag</code> apply to every match regardless of override.</li>
+								<li><code class="text-[10px]">add_comment</code> is sync-only — it won't fire retroactively.</li>
+							</ul>
+							<div class="form-control mt-4">
+								<label class="label cursor-pointer justify-start gap-2 py-1">
+									<input type="checkbox" x-model="confirmApply" class="checkbox checkbox-sm checkbox-warning"/>
+									<span class="label-text text-xs">I understand this cannot be undone in bulk.</span>
+								</label>
+							</div>
+						</div>
+					</div>
+					<!-- Inline error alert lives *inside* the modal so it's visible while
+					     the dialog is still open. The old in-card alert (above the
+					     category button) was rendered behind the z-50 backdrop and
+					     therefore invisible whenever apply failed — see #701. -->
+					<div x-show="applyError" x-cloak role="alert" class="alert alert-error text-xs mt-4 rounded-xl">
+						<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+						<span x-text="applyError"></span>
+					</div>
+					<div class="flex items-center justify-end gap-2 mt-5">
+						<button type="button" class="btn btn-sm btn-ghost rounded-xl" @click="closeApplyModal()">Cancel</button>
+						<button
+							type="button"
+							class="btn btn-sm rounded-xl btn-warning disabled:bg-warning/40 disabled:text-warning disabled:border-transparent disabled:!opacity-100"
+							:disabled="!confirmApply || applying"
+							@click="applyRetroactively()"
+						>
+							<span x-show="applying" class="loading loading-spinner loading-xs"></span>
+							<i data-lucide="play" class="w-3.5 h-3.5" x-show="!applying"></i>
+							{ fmt.Sprintf("Apply to %s", components.CommaInt(p.Preview.MatchCount)) }
+						</button>
+					</div>
+				</div>
+			</div>
+		</template>
+	}
+}
+
+// ruleDetailSyncActivity renders the collapsed sync history dropdown.
+templ ruleDetailSyncActivity(p RuleDetailProps) {
+	<div class="bb-card p-0 mb-4" x-data="{ open: false }">
+		<button type="button" class="w-full flex items-center justify-between p-5" @click="open = !open">
+			<div>
+				<span class="label-text text-sm font-medium">Sync Log</span>
+				<span class="text-xs text-base-content/40 ml-2">{ fmt.Sprintf("%d recent syncs", len(p.SyncHistory)) }</span>
+			</div>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/40 transition-transform" :class="open ? 'rotate-180' : ''"></i>
+		</button>
+		<div x-show="open" x-cloak class="px-5 pb-5 space-y-2">
+			for _, h := range p.SyncHistory {
+				@ruleDetailSyncRow(h)
+			}
+		</div>
+	</div>
+}
+
+// ruleDetailSyncRow renders one sync history list entry.
+templ ruleDetailSyncRow(h map[string]any) {
+	{{ syncID, _ := h["sync_id"].(string) }}
+	{{ status, _ := h["status"].(string) }}
+	{{ startedAt, _ := h["started_at"].(string) }}
+	{{ instPtr, _ := h["institution"].(*string) }}
+	{{ hits := syncHistoryHitCount(h) }}
+	<a href={ templ.SafeURL("/sync-logs/" + syncID) } class="flex items-center justify-between p-3 bg-base-200/40 rounded-xl hover:bg-base-200/60 transition-colors">
+		<div class="flex items-center gap-3">
+			<div class={ "w-8", "h-8", "rounded-lg", "flex", "items-center", "justify-center", syncStatusBgClass(status) }>
+				if status == "success" {
+					<i data-lucide="check" class="w-4 h-4 text-success"></i>
+				} else {
+					<i data-lucide="x" class="w-4 h-4 text-error"></i>
+				}
+			</div>
+			<div>
+				<span class="text-sm font-medium">
+					if instPtr != nil {
+						{ *instPtr }
+					}
+				</span>
+				<span class="text-xs text-base-content/40 ml-2">{ startedAt }</span>
+			</div>
+		</div>
+		<div class="flex items-center gap-2">
+			<span class="text-sm font-semibold tabular-nums">{ fmt.Sprintf("%d", hits) }</span>
+			<span class="text-xs text-base-content/40">hits</span>
+		</div>
+	</a>
+}
