@@ -33,27 +33,19 @@ func (s *Service) GetMCPConfig(ctx context.Context) (*MCPConfig, error) {
 	for _, row := range rows {
 		switch row.Key {
 		case "mcp_mode":
-			if row.Value.Valid {
-				cfg.Mode = row.Value.String
-			}
+			cfg.Mode = pgconv.TextOr(row.Value, cfg.Mode)
 		case "mcp_disabled_tools":
-			if row.Value.Valid && row.Value.String != "" {
-				if err := json.Unmarshal([]byte(row.Value.String), &cfg.DisabledTools); err != nil {
+			if raw := pgconv.TextOr(row.Value, ""); raw != "" {
+				if err := json.Unmarshal([]byte(raw), &cfg.DisabledTools); err != nil {
 					cfg.DisabledTools = []string{}
 				}
 			}
 		case "mcp_instructions":
-			if row.Value.Valid {
-				cfg.Instructions = row.Value.String
-			}
+			cfg.Instructions = pgconv.TextOr(row.Value, "")
 		case "mcp_review_guidelines":
-			if row.Value.Valid {
-				cfg.ReviewGuidelines = row.Value.String
-			}
+			cfg.ReviewGuidelines = pgconv.TextOr(row.Value, "")
 		case "mcp_report_format":
-			if row.Value.Valid {
-				cfg.ReportFormat = row.Value.String
-			}
+			cfg.ReportFormat = pgconv.TextOr(row.Value, "")
 		}
 	}
 
