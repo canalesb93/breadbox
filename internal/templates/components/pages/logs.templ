@@ -229,38 +229,41 @@ templ triggerOption(value, label, current string) {
 templ logsSyncStatusTabs(p LogsProps) {
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
 		<!-- Status pill tabs -->
-		<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 overflow-x-auto">
-			<a
-				href={ statusTabHref(p.StatusQueryAll) }
-				class={ statusPillClass(p.FilterStatus == "") }
-			>
-				All
-				<span class="text-[0.6rem] tabular-nums opacity-60">{ statsTotalSync(p.Stats) }</span>
-			</a>
-			<a
-				href={ statusTabHref(p.StatusQuerySuccess) }
-				class={ statusPillClass(p.FilterStatus == "success") }
-			>
-				<span class="w-1.5 h-1.5 rounded-full bg-success shrink-0"></span>
-				Success
-				<span class="text-[0.6rem] tabular-nums opacity-60">{ strconv.FormatInt(p.SuccessCount, 10) }</span>
-			</a>
-			<a
-				href={ statusTabHref(p.StatusQueryError) }
-				class={ statusPillClass(p.FilterStatus == "error") }
-			>
-				<span class="w-1.5 h-1.5 rounded-full bg-error shrink-0"></span>
-				Errors
-				<span class="text-[0.6rem] tabular-nums opacity-60">{ strconv.FormatInt(p.ErrorCount, 10) }</span>
-			</a>
-			<a
-				href={ statusTabHref(p.StatusQueryInProgress) }
-				class={ statusPillClass(p.FilterStatus == "in_progress") }
-			>
-				<span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0"></span>
-				In Progress
-				<span class="text-[0.6rem] tabular-nums opacity-60">{ strconv.FormatInt(p.InProgressCount, 10) }</span>
-			</a>
+		<div class="relative min-w-0">
+			<div class="flex items-center gap-0.5 bg-base-200/60 rounded-lg p-0.5 overflow-x-auto">
+				<a
+					href={ statusTabHref(p.StatusQueryAll) }
+					class={ statusPillClass(p.FilterStatus == "") }
+				>
+					All
+					<span class="text-[0.6rem] tabular-nums opacity-60">{ statsTotalSync(p.Stats) }</span>
+				</a>
+				<a
+					href={ statusTabHref(p.StatusQuerySuccess) }
+					class={ statusPillClass(p.FilterStatus == "success") }
+				>
+					<span class="w-1.5 h-1.5 rounded-full bg-success shrink-0"></span>
+					Success
+					<span class="text-[0.6rem] tabular-nums opacity-60">{ strconv.FormatInt(p.SuccessCount, 10) }</span>
+				</a>
+				<a
+					href={ statusTabHref(p.StatusQueryError) }
+					class={ statusPillClass(p.FilterStatus == "error") }
+				>
+					<span class="w-1.5 h-1.5 rounded-full bg-error shrink-0"></span>
+					Errors
+					<span class="text-[0.6rem] tabular-nums opacity-60">{ strconv.FormatInt(p.ErrorCount, 10) }</span>
+				</a>
+				<a
+					href={ statusTabHref(p.StatusQueryInProgress) }
+					class={ statusPillClass(p.FilterStatus == "in_progress") }
+				>
+					<span class="w-1.5 h-1.5 rounded-full bg-warning shrink-0"></span>
+					In Progress
+					<span class="text-[0.6rem] tabular-nums opacity-60">{ strconv.FormatInt(p.InProgressCount, 10) }</span>
+				</a>
+			</div>
+			<div aria-hidden="true" class="pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-lg bg-gradient-to-l from-base-100 to-transparent sm:hidden"></div>
 		</div>
 		if hasAnySyncFilter(p) {
 			<a href="/logs?tab=syncs" class="btn btn-ghost btn-xs rounded-lg gap-1.5 text-base-content/50 hover:text-base-content/80">
