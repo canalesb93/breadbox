@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -114,14 +116,17 @@ func RuleFormPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 		// list just means no datalist suggestions.
 		tags, _ := svc.ListTags(ctx)
 
-		data := BaseTemplateData(r, sm, "rules", "New Rule")
-		data["FlatCategories"] = flattenCategories(categories)
-		data["Tags"] = tags
-		data["IsEdit"] = false
-		data["Breadcrumbs"] = []Breadcrumb{
-			{Label: "Rules", Href: "/rules"},
-			{Label: "New Rule"},
+		props := pages.RuleFormProps{
+			IsEdit:         false,
+			FlatCategories: flattenCategories(categories),
+			Tags:           tags,
+			Breadcrumbs: []components.Breadcrumb{
+				{Label: "Rules", Href: "/rules"},
+				{Label: "New Rule"},
+			},
 		}
+
+		data := BaseTemplateData(r, sm, "rules", "New Rule")
 
 		// Edit mode: load existing rule
 		if id := chi.URLParam(r, "id"); id != "" {
@@ -134,16 +139,16 @@ func RuleFormPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templ
 				tr.RenderError(w, r)
 				return
 			}
-			data["Rule"] = rule
-			data["IsEdit"] = true
-			data["PageTitle"] = "Edit Rule"
-			data["Breadcrumbs"] = []Breadcrumb{
+			props.Rule = rule
+			props.IsEdit = true
+			props.Breadcrumbs = []components.Breadcrumb{
 				{Label: "Rules", Href: "/rules"},
 				{Label: rule.Name},
 			}
+			data["PageTitle"] = "Edit Rule"
 		}
 
-		tr.Render(w, r, "rule_form.html", data)
+		tr.RenderWithTempl(w, r, data, pages.RuleForm(props))
 	}
 }
 
