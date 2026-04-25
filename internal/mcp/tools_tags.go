@@ -18,21 +18,22 @@ type listTagsInput struct {
 
 type listAnnotationsInput struct {
 	ReadSessionContext
-	TransactionID string `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
+	TransactionID string   `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
+	Kinds         []string `json:"kinds,omitempty" jsonschema:"Optional kind filter: any of comment, rule, tag, category. Empty = all kinds. Pass ['comment'] for the comment-only timeline (replaces list_transaction_comments). Pass ['tag'] to see both add+remove events; the response carries an 'action' field (added|removed|set|applied) for the specific event."`
 }
 
 type addTransactionTagInput struct {
 	WriteSessionContext
 	TransactionID string `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
 	TagSlug       string `json:"tag_slug" jsonschema:"required,Tag slug to add (e.g. 'needs-review'). Auto-created as persistent if not registered."`
-	Note          string `json:"note,omitempty" jsonschema:"Optional note attached to the tag_added annotation."`
+	Note          string `json:"note,omitempty" jsonschema:"Optional note recorded on the resulting tag annotation (action=added)."`
 }
 
 type removeTransactionTagInput struct {
 	WriteSessionContext
 	TransactionID string `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
 	TagSlug       string `json:"tag_slug" jsonschema:"required,Tag slug to remove"`
-	Note          string `json:"note,omitempty" jsonschema:"Optional rationale recorded on the tag_removed annotation."`
+	Note          string `json:"note,omitempty" jsonschema:"Optional rationale recorded on the resulting tag annotation (action=removed)."`
 }
 
 type createTagInput struct {
@@ -74,14 +75,123 @@ func (s *MCPServer) handleListAnnotations(_ context.Context, _ *mcpsdk.CallToolR
 	if input.TransactionID == "" {
 		return errorResult(fmt.Errorf("transaction_id is required")), nil, nil
 	}
-	annotations, err := s.svc.ListAnnotations(ctx, input.TransactionID)
+	dbKinds, err := mapAnnotationKinds(input.Kinds)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	annotations, err := s.svc.ListAnnotations(ctx, input.TransactionID, service.ListAnnotationsParams{
+		Kinds: dbKinds,
+	})
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			return errorResult(fmt.Errorf("transaction not found")), nil, nil
 		}
 		return errorResult(err), nil, nil
 	}
-	return jsonResult(annotations)
+	return jsonResult(toMCPAnnotations(annotations))
+}
+
+// mcpAnnotationKinds enumerates the generic kinds exposed at the MCP boundary.
+// The DB CHECK constraint stores finer-grained values (tag_added vs tag_removed,
+// rule_applied, category_set) — agents see one normalized name plus an `action`
+// field on each row.
+var mcpAnnotationKinds = map[string][]string{
+	"comment":  {"comment"},
+	"rule":     {"rule_applied"},
+	"tag":      {"tag_added", "tag_removed"},
+	"category": {"category_set"},
+}
+
+// mapAnnotationKinds translates the agent-facing generic kinds into the raw DB
+// kinds the service layer filters by. Returns nil for an empty input (no
+// filter). Rejects unknown kinds at the boundary so agents get a clear error
+// instead of a silent empty slice.
+func mapAnnotationKinds(kinds []string) ([]string, error) {
+	if len(kinds) == 0 {
+		return nil, nil
+	}
+	out := make([]string, 0, len(kinds))
+	seen := make(map[string]bool, len(kinds))
+	for _, k := range kinds {
+		raw, ok := mcpAnnotationKinds[k]
+		if !ok {
+			return nil, fmt.Errorf("invalid kind %q: expected one of comment, rule, tag, category", k)
+		}
+		for _, r := range raw {
+			if seen[r] {
+				continue
+			}
+			seen[r] = true
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+
+// mcpAnnotation is the agent-facing annotation shape. `kind` is the generic
+// name (comment | rule | tag | category); `action` carries the specific event
+// (added | removed | set | applied) so agents can branch without parsing the
+// kind string. Comment rows omit `action` since there is only one event.
+type mcpAnnotation struct {
+	ID            string                 `json:"id"`
+	ShortID       string                 `json:"short_id"`
+	TransactionID string                 `json:"transaction_id"`
+	Kind          string                 `json:"kind"`
+	Action        string                 `json:"action,omitempty"`
+	ActorType     string                 `json:"actor_type"`
+	ActorID       *string                `json:"actor_id,omitempty"`
+	ActorName     string                 `json:"actor_name"`
+	SessionID     *string                `json:"session_id,omitempty"`
+	Payload       map[string]interface{} `json:"payload,omitempty"`
+	TagID         *string                `json:"tag_id,omitempty"`
+	RuleID        *string                `json:"rule_id,omitempty"`
+	CreatedAt     string                 `json:"created_at"`
+}
+
+// dbKindToMCP translates a stored DB kind into the (kind, action) pair surfaced
+// to MCP clients. Unknown kinds round-trip unchanged so future kinds don't
+// silently disappear from the timeline.
+func dbKindToMCP(dbKind string) (kind, action string) {
+	switch dbKind {
+	case "comment":
+		return "comment", ""
+	case "rule_applied":
+		return "rule", "applied"
+	case "tag_added":
+		return "tag", "added"
+	case "tag_removed":
+		return "tag", "removed"
+	case "category_set":
+		return "category", "set"
+	}
+	return dbKind, ""
+}
+
+func toMCPAnnotation(a service.Annotation) mcpAnnotation {
+	kind, action := dbKindToMCP(a.Kind)
+	return mcpAnnotation{
+		ID:            a.ID,
+		ShortID:       a.ShortID,
+		TransactionID: a.TransactionID,
+		Kind:          kind,
+		Action:        action,
+		ActorType:     a.ActorType,
+		ActorID:       a.ActorID,
+		ActorName:     a.ActorName,
+		SessionID:     a.SessionID,
+		Payload:       a.Payload,
+		TagID:         a.TagID,
+		RuleID:        a.RuleID,
+		CreatedAt:     a.CreatedAt,
+	}
+}
+
+func toMCPAnnotations(in []service.Annotation) []mcpAnnotation {
+	out := make([]mcpAnnotation, len(in))
+	for i, a := range in {
+		out[i] = toMCPAnnotation(a)
+	}
+	return out
 }
 
 func (s *MCPServer) handleAddTransactionTag(ctx context.Context, _ *mcpsdk.CallToolRequest, input addTransactionTagInput) (*mcpsdk.CallToolResult, any, error) {

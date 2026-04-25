@@ -17,6 +17,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   - New `provider_raw JSONB` column stores the unmodified provider payload for each transaction
 - **Rule DSL field renames.** Rules condition trees now use `provider_name`, `provider_merchant_name`, `provider_category_primary`, `provider_category_detailed` instead of the unqualified versions.
 
+### Deprecated
+
+- **MCP tool `list_transaction_comments`** is deprecated in favor of `list_annotations` with `kinds=['comment']`. The new `kinds` filter on `list_annotations` returns the same comment data using the canonical annotation shape. The legacy tool still works for now but will be removed in a future release. (#776)
+
+### Added
+
+- **MCP tool `list_annotations`** now accepts an optional `kinds` filter using generic, agent-friendly names: `comment`, `rule`, `tag`, `category`. Each response row carries the generic `kind` plus an `action` field (`added` / `removed` for `tag`, `set` for `category`, `applied` for `rule`) so agents can branch on the specific event without parsing the kind string. Empty preserves the existing full-timeline behavior. Pass `kinds=['comment']` for the comment-only view (replaces `list_transaction_comments`); pass `kinds=['tag']` for both add+remove tag events; pass `kinds=['comment','tag','category']` to skip rule-application churn. The DB-level kinds (`tag_added`, `tag_removed`, `rule_applied`, `category_set`) are no longer accepted at the MCP boundary — use the generic names. The admin UI and other internal code paths still see the raw DB kinds (no behavior change). (#776)
+
 ## [0.1.0] - 2026-04-XX
 
 ### Added
