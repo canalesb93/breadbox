@@ -805,6 +805,7 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			"HasPendingReview":  hasPendingReview,
 			"CurrentTags":       currentTags,
 			"AvailableTags":     availableTags,
+			"MaxCommentLength":  service.MaxCommentLength,
 			"Categories":      categoryTree,
 			"Breadcrumbs":     breadcrumbs,
 		}

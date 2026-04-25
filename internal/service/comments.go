@@ -13,7 +13,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const maxCommentLength = 10000
+// MaxCommentLength caps the character length of a comment body. The admin UI
+// composer surfaces this value in its char counter so the client mirrors the
+// server-side guard.
+const MaxCommentLength = 10000
 
 // Comments are stored as annotations with kind='comment'. CreateComment /
 // ListComments / UpdateComment / DeleteComment read and write the annotations
@@ -22,8 +25,8 @@ const maxCommentLength = 10000
 // CreateComment adds a comment annotation to a transaction.
 func (s *Service) CreateComment(ctx context.Context, params CreateCommentParams) (*CommentResponse, error) {
 	content := strings.TrimSpace(params.Content)
-	if content == "" || len(content) > maxCommentLength {
-		return nil, fmt.Errorf("content must be between 1 and %d characters", maxCommentLength)
+	if content == "" || len(content) > MaxCommentLength {
+		return nil, fmt.Errorf("content must be between 1 and %d characters", MaxCommentLength)
 	}
 
 	// Verify transaction exists and is not soft-deleted.
@@ -121,8 +124,8 @@ func (s *Service) ListComments(ctx context.Context, transactionID string) ([]Com
 // are identified by the annotation's short_id or UUID.
 func (s *Service) UpdateComment(ctx context.Context, id string, params UpdateCommentParams) (*CommentResponse, error) {
 	content := strings.TrimSpace(params.Content)
-	if content == "" || len(content) > maxCommentLength {
-		return nil, fmt.Errorf("content must be between 1 and %d characters", maxCommentLength)
+	if content == "" || len(content) > MaxCommentLength {
+		return nil, fmt.Errorf("content must be between 1 and %d characters", MaxCommentLength)
 	}
 
 	annID, err := s.resolveAnnotationID(ctx, id)
