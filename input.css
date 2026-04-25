@@ -2268,20 +2268,6 @@
     }
   }
 
-  /* When a KbdCombo lives inside a DaisyUI button (e.g. the transaction
-     comment CTA), DaisyUI's button reset wipes the combo's bg. Re-style
-     it relative to the button's own foreground via currentColor so it
-     reads as a key cap on any btn variant in either theme. */
-  .btn .bb-kbd-combo {
-    background: color-mix(in srgb, currentColor 18%, transparent);
-    color: currentColor;
-    border-color: color-mix(in srgb, currentColor 35%, transparent);
-    box-shadow: none;
-  }
-  .btn .bb-kbd-combo__key + .bb-kbd-combo__key {
-    border-left-color: color-mix(in srgb, currentColor 35%, transparent);
-  }
-
   /* ── Triage mode: compact review rows ── */
   .bb-triage-row {
     @apply relative;
