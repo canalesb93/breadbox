@@ -13,6 +13,8 @@ import (
 	"breadbox/internal/pgconv"
 	csvpkg "breadbox/internal/provider/csv"
 	"breadbox/internal/service"
+	"breadbox/internal/templates/components"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -88,6 +90,18 @@ func CSVImportPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			"ConnectionID": connectionID,
 		}
 
+		props := pages.CSVImportProps{
+			CSRFToken:    GetCSRFToken(r),
+			ConnectionID: connectionID,
+			Users:        make([]pages.CSVImportUser, 0, len(users)),
+		}
+		for _, u := range users {
+			props.Users = append(props.Users, pages.CSVImportUser{
+				ID:   pgconv.FormatUUID(u.ID),
+				Name: u.Name,
+			})
+		}
+
 		// If re-importing, load connection details.
 		breadcrumbs := []Breadcrumb{
 			{Label: "Connections", Href: "/connections"},
@@ -99,7 +113,10 @@ func CSVImportPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 				if err == nil {
 					data["ExistingConnectionName"] = conn.InstitutionName.String
 					data["ExistingUserID"] = pgconv.FormatUUID(conn.UserID)
-					data["ExistingUserName"] = conn.UserName
+					data["ExistingUserName"] = conn.UserName.String
+					props.ExistingConnectionName = conn.InstitutionName.String
+					props.ExistingUserID = pgconv.FormatUUID(conn.UserID)
+					props.ExistingUserName = conn.UserName.String
 					breadcrumbs = append(breadcrumbs, Breadcrumb{Label: conn.InstitutionName.String, Href: "/connections/" + connectionID})
 				}
 			}
@@ -107,8 +124,20 @@ func CSVImportPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 		breadcrumbs = append(breadcrumbs, Breadcrumb{Label: "Import CSV"})
 		data["Breadcrumbs"] = breadcrumbs
 
-		tr.Render(w, r, "csv_import.html", data)
+		props.Breadcrumbs = make([]components.Breadcrumb, len(breadcrumbs))
+		for i, b := range breadcrumbs {
+			props.Breadcrumbs[i] = components.Breadcrumb{Label: b.Label, Href: b.Href}
+		}
+
+		renderCSVImport(w, r, tr, data, props)
 	}
+}
+
+// renderCSVImport mirrors the renderSettings / renderPromptBuilder pattern:
+// hands the typed CSVImportProps to the templ component and uses
+// RenderWithTempl to host it inside base.html.
+func renderCSVImport(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.CSVImportProps) {
+	tr.RenderWithTempl(w, r, data, pages.CSVImport(props))
 }
 
 // CSVUploadHandler serves POST /admin/api/csv/upload.

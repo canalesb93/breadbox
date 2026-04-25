@@ -1080,7 +1080,8 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/api_key_created.html",
 		"pages/sync_log_detail.html",
 		"pages/providers.html",
-		"pages/csv_import.html",
+		// pages/csv_import.html removed — renders via RenderWithTempl using
+		// the _templ_shell template key (see pages.CSVImport).
 		// pages/transactions.html removed — renders via RenderWithTempl
 		// using the _templ_shell template key (see pages.Transactions).
 		"pages/account_detail.html",
