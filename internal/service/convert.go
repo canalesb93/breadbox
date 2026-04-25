@@ -57,6 +57,23 @@ func connStatusPtr(s db.ConnectionStatus) *string {
 	return &str
 }
 
+// SyncLogDurationMs returns the duration of a sync log in milliseconds, preferring
+// the persisted duration_ms column and falling back to (completed_at - started_at)
+// when duration_ms is NULL. Returns (0, false) when neither source is available.
+//
+// Use this anywhere a handler or service needs the duration of a sync log row —
+// it consolidates the if-DurationMs.Valid / else-if-both-timestamps pattern that
+// otherwise gets duplicated at every display/serialization site.
+func SyncLogDurationMs(durationMs pgtype.Int4, startedAt, completedAt pgtype.Timestamptz) (int32, bool) {
+	if durationMs.Valid {
+		return durationMs.Int32, true
+	}
+	if startedAt.Valid && completedAt.Valid {
+		return int32(completedAt.Time.Sub(startedAt.Time).Milliseconds()), true
+	}
+	return 0, false
+}
+
 // FormatDurationMs converts milliseconds to a human-readable duration string.
 // Examples: 42ms, 1.2s, 2m 15s
 func FormatDurationMs(ms int64) string {

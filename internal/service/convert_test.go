@@ -194,6 +194,80 @@ func TestFormatDurationMs(t *testing.T) {
 	}
 }
 
+func TestSyncLogDurationMs(t *testing.T) {
+	start := time.Date(2024, 3, 15, 14, 30, 0, 0, time.UTC)
+	end := start.Add(2500 * time.Millisecond)
+
+	tests := []struct {
+		name      string
+		duration  pgtype.Int4
+		started   pgtype.Timestamptz
+		completed pgtype.Timestamptz
+		wantMs    int32
+		wantOK    bool
+	}{
+		{
+			name:     "stored duration_ms wins",
+			duration: pgtype.Int4{Int32: 1234, Valid: true},
+			// timestamps would compute a different value — stored value must win.
+			started:   pgtype.Timestamptz{Time: start, Valid: true},
+			completed: pgtype.Timestamptz{Time: end, Valid: true},
+			wantMs:    1234,
+			wantOK:    true,
+		},
+		{
+			name:      "fallback to timestamps when duration null",
+			duration:  pgtype.Int4{Valid: false},
+			started:   pgtype.Timestamptz{Time: start, Valid: true},
+			completed: pgtype.Timestamptz{Time: end, Valid: true},
+			wantMs:    2500,
+			wantOK:    true,
+		},
+		{
+			name:      "duration null and started null returns false",
+			duration:  pgtype.Int4{Valid: false},
+			started:   pgtype.Timestamptz{Valid: false},
+			completed: pgtype.Timestamptz{Time: end, Valid: true},
+			wantMs:    0,
+			wantOK:    false,
+		},
+		{
+			name:      "duration null and completed null returns false",
+			duration:  pgtype.Int4{Valid: false},
+			started:   pgtype.Timestamptz{Time: start, Valid: true},
+			completed: pgtype.Timestamptz{Valid: false},
+			wantMs:    0,
+			wantOK:    false,
+		},
+		{
+			name:      "all null returns false",
+			duration:  pgtype.Int4{Valid: false},
+			started:   pgtype.Timestamptz{Valid: false},
+			completed: pgtype.Timestamptz{Valid: false},
+			wantMs:    0,
+			wantOK:    false,
+		},
+		{
+			name:     "zero duration is still valid",
+			duration: pgtype.Int4{Int32: 0, Valid: true},
+			wantMs:   0,
+			wantOK:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ms, ok := SyncLogDurationMs(tt.duration, tt.started, tt.completed)
+			if ok != tt.wantOK {
+				t.Errorf("ok = %v, want %v", ok, tt.wantOK)
+			}
+			if ms != tt.wantMs {
+				t.Errorf("ms = %d, want %d", ms, tt.wantMs)
+			}
+		})
+	}
+}
+
 func ptrFloat(f float64) *float64 {
 	return &f
 }
