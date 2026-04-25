@@ -17,6 +17,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   - New `provider_raw JSONB` column stores the unmodified provider payload for each transaction
 - **Rule DSL field renames.** Rules condition trees now use `provider_name`, `provider_merchant_name`, `provider_category_primary`, `provider_category_detailed` instead of the unqualified versions.
 
+### Deprecated
+
+- **MCP tool `list_transaction_comments`** is deprecated in favor of `list_annotations` with `kinds=['comment']`. The new `kinds` filter on `list_annotations` returns the same comment data using the canonical annotation shape. The legacy tool still works for now but will be removed in a future release. (#776)
+
+### Added
+
+- **MCP tool `list_annotations`** now accepts an optional `kinds` filter (`comment`, `rule_applied`, `tag_added`, `tag_removed`, `category_set`). Empty preserves the existing full-timeline behavior. Pass `kinds=['comment']` to get the comment-only view; pass `kinds=['comment','tag_added','tag_removed','category_set']` to skip rule-application churn. (#776)
+
 ## [0.1.0] - 2026-04-XX
 
 ### Added

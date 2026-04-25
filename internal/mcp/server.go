@@ -82,8 +82,9 @@ ACCOUNT LINKING:
 - reconcile_account_link: re-run matching. confirm_match / reject_match: correct errors.
 
 REPORTS & COMMUNICATION:
-- Tools: submit_report, add_transaction_comment, list_transaction_comments, list_annotations
-- list_annotations returns the full activity timeline for a transaction (comments + tag events + rule applications + category sets). Use it to see prior context before acting.
+- Tools: submit_report, add_transaction_comment, list_annotations
+- list_annotations is the canonical read path for the per-transaction activity timeline (comments + tag events + rule applications + category sets). Use it to see prior context before acting. Pass kinds=['comment'] for the comment-only view; pass kinds=['comment','tag_added','tag_removed','category_set'] to skip rule churn.
+- list_transaction_comments is deprecated — keep agents on list_annotations(kinds=['comment']).
 - Before submitting reports, read breadbox://report-format for report structure and formatting guidelines.
 
 USER ROLES:
@@ -334,7 +335,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"Add a free-standing comment to a transaction — narrative that's independent of any specific review decision (flagging unusual charges, noting shared expenses, cross-references, context that outlives a single review cycle). Supports markdown. IMPORTANT: when the comment is the rationale for a tag change or category set, pass it as part of an update_transactions operation (inline `comment`, or `note` on a tags_to_add/tags_to_remove entry) instead — those paths write a single linked annotation so the activity log doesn't double up.",
 			s.handleAddTransactionComment, svc),
 		makeToolDefLogged("list_transaction_comments", ToolRead,
-			"List all comments on a transaction, ordered chronologically. Check comments before making changes to understand prior context and decisions by other agents or family members.",
+			"Deprecated: prefer list_annotations with kinds=['comment']. Returns the same comment data with renamed fields (author_* instead of actor_*, content lifted out of payload). Will be removed in a future release.",
 			s.handleListTransactionComments, svc),
 		makeToolDefLogged("transaction_summary", ToolRead,
 			"Get aggregated transaction totals grouped by category and/or time period. Replaces the need to paginate through thousands of individual transactions for spending analysis. Amounts follow the convention: positive = money out (debit), negative = money in (credit). Only includes non-deleted, non-pending transactions by default.",
@@ -404,7 +405,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"List all tags registered in the system. Each tag has a slug (stable identifier) and a display_name. Tags attached to transactions can be queried via the tags / any_tag filters on query_transactions.",
 			s.handleListTags, svc),
 		makeToolDefLogged("list_annotations", ToolRead,
-			"List the activity timeline for a transaction. Each annotation is a single event: comment, tag_added, tag_removed, rule_applied, or category_set. Ordered by created_at ASC. Payload carries kind-specific fields (content for comments, slug for tags, rule_name for rule applications).",
+			"List the activity timeline for a transaction. Each annotation is a single event: comment, tag_added, tag_removed, rule_applied, or category_set. Ordered by created_at ASC. Payload carries kind-specific fields (content for comments, slug for tags, rule_name for rule applications). Pass kinds=['comment'] for the comment-only view (replaces the deprecated list_transaction_comments). Empty kinds returns the full timeline.",
 			s.handleListAnnotations, svc),
 		makeToolDefLogged("add_transaction_tag", ToolWrite,
 			"Attach a tag to a transaction. Tags are an open-ended labeling system — auto-creates a persistent tag if the slug doesn't exist yet. Use note to attach a short rationale that is stored on the tag_added annotation. Idempotent: returns already_present=true if the tag was already attached.",

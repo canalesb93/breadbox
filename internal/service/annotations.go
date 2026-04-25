@@ -88,9 +88,20 @@ func writeAnnotation(ctx context.Context, q *db.Queries, params writeAnnotationP
 	return nil
 }
 
-// ListAnnotations returns all annotations for a transaction, ordered by
-// created_at ASC. Drives the transaction detail activity timeline.
-func (s *Service) ListAnnotations(ctx context.Context, transactionID string) ([]Annotation, error) {
+// ListAnnotationsParams carries optional filters for ListAnnotations. Empty
+// fields preserve current behavior (return everything).
+type ListAnnotationsParams struct {
+	// Kinds limits results to specific annotation kinds (any of:
+	// comment | rule_applied | tag_added | tag_removed | category_set).
+	// Empty = no filter.
+	Kinds []string
+}
+
+// ListAnnotations returns annotations for a transaction, ordered by created_at
+// ASC. Drives the transaction detail activity timeline. Pass an empty
+// ListAnnotationsParams for the full timeline; use Kinds to scope the result
+// (e.g. comments only).
+func (s *Service) ListAnnotations(ctx context.Context, transactionID string, params ListAnnotationsParams) ([]Annotation, error) {
 	txnID, err := s.resolveTransactionID(ctx, transactionID)
 	if err != nil {
 		return nil, ErrNotFound
@@ -105,11 +116,28 @@ func (s *Service) ListAnnotations(ctx context.Context, transactionID string) ([]
 		return nil, fmt.Errorf("list annotations: %w", err)
 	}
 
-	result := make([]Annotation, len(rows))
-	for i, r := range rows {
-		result[i] = annotationFromActorRow(r)
+	keep := annotationKindFilter(params.Kinds)
+	result := make([]Annotation, 0, len(rows))
+	for _, r := range rows {
+		if keep != nil && !keep[r.Kind] {
+			continue
+		}
+		result = append(result, annotationFromActorRow(r))
 	}
 	return result, nil
+}
+
+// annotationKindFilter builds an O(1) lookup set from a kinds slice. Returns
+// nil when no filter is supplied so callers can short-circuit.
+func annotationKindFilter(kinds []string) map[string]bool {
+	if len(kinds) == 0 {
+		return nil
+	}
+	set := make(map[string]bool, len(kinds))
+	for _, k := range kinds {
+		set[k] = true
+	}
+	return set
 }
 
 // annotationFromRow converts a db.Annotation into its service-layer response.

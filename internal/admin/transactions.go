@@ -663,7 +663,7 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 		// Annotations are the canonical activity-timeline source. Review
 		// lifecycle events flow through tag_added / tag_removed annotations
 		// for the needs-review tag.
-		annotations, err := svc.ListAnnotations(ctx, idStr)
+		annotations, err := svc.ListAnnotations(ctx, idStr, service.ListAnnotationsParams{})
 		if err != nil && !errors.Is(err, service.ErrNotFound) {
 			a.Logger.Error("list transaction annotations", "error", err)
 		}

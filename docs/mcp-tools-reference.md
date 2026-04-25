@@ -195,6 +195,13 @@ Use this to close a review entry: `set category + remove needs-review (with note
 
 Return the activity timeline for a transaction. Each row is one of: `comment`, `tag_added`, `tag_removed`, `rule_applied`, `category_set`.
 
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `transaction_id` | string | UUID or short ID. Required. |
+| `kinds` | array | Optional kind filter. Any of: `comment`, `rule_applied`, `tag_added`, `tag_removed`, `category_set`. Empty (default) returns all kinds. |
+
+The `kinds` filter is the canonical replacement for the deprecated `list_transaction_comments` tool — pass `kinds=['comment']` for the comment-only view. Pass `kinds=['comment','tag_added','tag_removed','category_set']` to skip rule-application churn.
+
 ### create_tag / update_tag / delete_tag (Write)
 
 Admin-only tag CRUD. Agents typically don't need these — `add_transaction_tag` auto-creates tags on demand. Use these to set display name, color, or cascade-delete a tag.
@@ -353,9 +360,9 @@ Add a comment to a transaction.
 | `transaction_id` | string | Transaction ID |
 | `body` | string | Comment text |
 
-### list_transaction_comments (Read)
+### list_transaction_comments (Read) — Deprecated
 
-List comments on a transaction.
+Deprecated: prefer `list_annotations` with `kinds=['comment']`. Returns the same comment data with renamed fields (`author_*` instead of `actor_*`, `content` lifted out of `payload`). Will be removed in a future release.
 
 ### submit_report (Write)
 

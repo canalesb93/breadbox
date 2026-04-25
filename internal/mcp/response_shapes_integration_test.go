@@ -269,6 +269,80 @@ func TestListAnnotationsResponseShape(t *testing.T) {
 	requireAbsent(t, "list_annotations[0]", ann, "actor", "type", "event_type")
 }
 
+// TestListAnnotationsKindsFilter pins behavioral parity with the deprecated
+// list_transaction_comments tool. Both tools must return the same comment-row
+// IDs when list_annotations is filtered to kinds=['comment']. Also verifies
+// the kinds filter actually scopes the response and that an invalid kind is
+// rejected at the boundary.
+func TestListAnnotationsKindsFilter(t *testing.T) {
+	f := seedFixtures(t)
+
+	// Seed at least one comment so list_transaction_comments has something to
+	// return — the base fixture only seeds a tag_added annotation.
+	addRes, _, err := f.svc.handleAddTransactionComment(f.ctx, nil, addTransactionCommentInput{
+		WriteSessionContext: WriteSessionContext{SessionID: "sess", Reason: "kinds-parity"},
+		TransactionID:       f.txnID,
+		Content:             "Kinds-filter parity check",
+	})
+	_ = decodeToolResult[map[string]any](t, "add_transaction_comment", addRes, err)
+
+	// Unfiltered: full timeline includes the tag_added + the comment.
+	allRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+	})
+	all := decodeToolResult[[]any](t, "list_annotations", allRes, err)
+	if len(all) < 2 {
+		t.Fatalf("expected at least 2 annotations (tag_added + comment), got %d", len(all))
+	}
+
+	// Filtered to kind=comment.
+	commentRes, _, err := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+		Kinds:         []string{"comment"},
+	})
+	comments := decodeToolResult[[]any](t, "list_annotations", commentRes, err)
+	if len(comments) == 0 {
+		t.Fatal("kinds=['comment'] returned 0 rows; expected at least the seeded comment")
+	}
+	commentIDs := map[string]struct{}{}
+	for i, raw := range comments {
+		ann := asObject(t, "list_annotations[comment]", raw)
+		kind, _ := ann["kind"].(string)
+		if kind != "comment" {
+			t.Errorf("list_annotations[%d]: kinds=['comment'] yielded kind=%q", i, kind)
+		}
+		id, _ := ann["id"].(string)
+		commentIDs[id] = struct{}{}
+	}
+
+	// Parity with the deprecated list_transaction_comments tool: same set
+	// of annotation IDs.
+	legacyRes, _, err := f.svc.handleListTransactionComments(f.ctx, nil, listTransactionCommentsInput{
+		TransactionID: f.txnID,
+	})
+	legacy := decodeToolResult[[]any](t, "list_transaction_comments", legacyRes, err)
+	if len(legacy) != len(comments) {
+		t.Fatalf("parity: list_transaction_comments returned %d rows, list_annotations(kinds=['comment']) returned %d", len(legacy), len(comments))
+	}
+	for i, raw := range legacy {
+		c := asObject(t, "list_transaction_comments[parity]", raw)
+		id, _ := c["id"].(string)
+		if _, ok := commentIDs[id]; !ok {
+			t.Errorf("list_transaction_comments[%d] id=%q missing from list_annotations(kinds=['comment'])", i, id)
+		}
+	}
+
+	// Invalid kind is rejected at the boundary instead of silently returning
+	// an empty slice.
+	badRes, _, _ := f.svc.handleListAnnotations(f.ctx, nil, listAnnotationsInput{
+		TransactionID: f.txnID,
+		Kinds:         []string{"bogus_kind"},
+	})
+	if badRes == nil || !badRes.IsError {
+		t.Fatalf("expected error envelope for invalid kind, got %+v", badRes)
+	}
+}
+
 // TestListTransactionMatchesResponseShape pins matched_on (not matched_fields),
 // match_confidence (not confidence), account_link_id (not link_id), plus
 // the denormalized txn fields agents rely on.

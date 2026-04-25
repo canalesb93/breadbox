@@ -18,7 +18,8 @@ type listTagsInput struct {
 
 type listAnnotationsInput struct {
 	ReadSessionContext
-	TransactionID string `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
+	TransactionID string   `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
+	Kinds         []string `json:"kinds,omitempty" jsonschema:"Optional kind filter: any of comment, rule_applied, tag_added, tag_removed, category_set. Empty = all kinds. Pass ['comment'] to get the comment-only timeline that list_transaction_comments used to provide."`
 }
 
 type addTransactionTagInput struct {
@@ -74,7 +75,14 @@ func (s *MCPServer) handleListAnnotations(_ context.Context, _ *mcpsdk.CallToolR
 	if input.TransactionID == "" {
 		return errorResult(fmt.Errorf("transaction_id is required")), nil, nil
 	}
-	annotations, err := s.svc.ListAnnotations(ctx, input.TransactionID)
+	for _, k := range input.Kinds {
+		if !validAnnotationKind(k) {
+			return errorResult(fmt.Errorf("invalid kind %q: expected one of comment, rule_applied, tag_added, tag_removed, category_set", k)), nil, nil
+		}
+	}
+	annotations, err := s.svc.ListAnnotations(ctx, input.TransactionID, service.ListAnnotationsParams{
+		Kinds: input.Kinds,
+	})
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			return errorResult(fmt.Errorf("transaction not found")), nil, nil
@@ -82,6 +90,16 @@ func (s *MCPServer) handleListAnnotations(_ context.Context, _ *mcpsdk.CallToolR
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(annotations)
+}
+
+// validAnnotationKind enforces the annotations.kind CHECK constraint at the
+// MCP boundary so agents get a clear error instead of a silent empty result.
+func validAnnotationKind(k string) bool {
+	switch k {
+	case "comment", "rule_applied", "tag_added", "tag_removed", "category_set":
+		return true
+	}
+	return false
 }
 
 func (s *MCPServer) handleAddTransactionTag(ctx context.Context, _ *mcpsdk.CallToolRequest, input addTransactionTagInput) (*mcpsdk.CallToolResult, any, error) {
