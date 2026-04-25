@@ -7,6 +7,7 @@ import (
 	"breadbox/internal/appconfig"
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 )
@@ -81,21 +82,30 @@ func GettingStartedHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRende
 		dismissed := appconfig.Bool(ctx, a.Queries, "onboarding_dismissed", false)
 
 		data := BaseTemplateData(r, sm, "getting-started", "Getting Started")
-		data["HasMember"] = hasMember
-		data["HasProvider"] = hasProvider
-		data["HasConnection"] = hasConnection
-		data["HasSync"] = hasSync
-		data["HasAPIKey"] = hasAPIKey
-		data["CompletedSteps"] = completedSteps
-		data["TotalSteps"] = 5
-		data["ConnectionCount"] = connCount
-		data["AccountCount"] = accountCount
-		data["TransactionCount"] = txCount
-		data["SuccessfulSyncs"] = successfulSyncs
-		data["OnboardingDismissed"] = dismissed
-
-		tr.Render(w, r, "getting_started.html", data)
+		props := pages.GettingStartedProps{
+			HasMember:           hasMember,
+			HasProvider:         hasProvider,
+			HasConnection:       hasConnection,
+			HasSync:             hasSync,
+			HasAPIKey:           hasAPIKey,
+			CompletedSteps:      completedSteps,
+			TotalSteps:          5,
+			ConnectionCount:     connCount,
+			AccountCount:        accountCount,
+			TransactionCount:    txCount,
+			SuccessfulSyncs:     successfulSyncs,
+			OnboardingDismissed: dismissed,
+			CSRFToken:           GetCSRFToken(r),
+		}
+		renderGettingStarted(w, r, tr, data, props)
 	}
+}
+
+// renderGettingStarted mirrors the renderLogs / renderPromptBuilder pattern:
+// it hands the typed GettingStartedProps to the templ component and uses
+// RenderWithTempl to host it inside base.html.
+func renderGettingStarted(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.GettingStartedProps) {
+	tr.RenderWithTempl(w, r, data, pages.GettingStarted(props))
 }
 
 // DismissGettingStartedHandler handles POST /getting-started/dismiss.
