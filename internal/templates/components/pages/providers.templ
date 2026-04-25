@@ -11,7 +11,17 @@ import (
 // base layout via TemplateRenderer.RenderWithTempl — the handler
 // builds typed props in admin/providers.go and the bridge drops the
 // rendered HTML into base.html's TemplContent slot.
+//
+// The Alpine factory `providerCard` lives in
+// static/js/admin/components/providers.js per the "Alpine page components"
+// convention (docs/design-system.md → section 14). Each card identifies
+// itself via `data-provider="<name>"` on the x-data root, read inside
+// testConnection() — not via a factory argument.
 templ Providers(p ProvidersProps) {
+	<!-- Component factory. Loaded synchronously (no defer) so the
+	     Alpine.data() registration runs before Alpine — itself deferred
+	     from <head> — fires alpine:init. -->
+	<script src="/static/js/admin/components/providers.js"></script>
 	<div class="bb-page-header">
 		<div>
 			<h1 class="bb-page-title">Providers</h1>
@@ -23,45 +33,14 @@ templ Providers(p ProvidersProps) {
 		@providersTellerCard(p, p.ProviderHealth["teller"])
 		@providersCSVCard(p.ProviderHealth["csv"])
 	</div>
-	<script>
-		function providerCard(name) {
-			return {
-				showConfig: false,
-				saving: false,
-				testing: false,
-				testResult: '',
-				testSuccess: false,
-
-				testConnection() {
-					this.testing = true;
-					this.testResult = '';
-					fetch('/-/test-provider/' + name, { method: 'POST' })
-						.then(res => res.json())
-						.then(data => {
-							this.testing = false;
-							this.testSuccess = data.success;
-							this.testResult = data.message || data.error || 'Unknown result';
-							setTimeout(() => { this.testResult = ''; }, 8000);
-						})
-						.catch(() => {
-							this.testing = false;
-							this.testSuccess = false;
-							this.testResult = 'Network error';
-							setTimeout(() => { this.testResult = ''; }, 8000);
-						});
-				}
-			};
-		}
-	</script>
 }
 
 // ====================================================================
 // Plaid card
 // ====================================================================
-
 templ providersPlaidCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 	<!-- ─── Plaid ─── -->
-	<div class="bb-card p-0 overflow-hidden" x-data="providerCard('plaid')">
+	<div class="bb-card p-0 overflow-hidden" x-data="providerCard" data-provider="plaid">
 		<div class="px-4 sm:px-5 py-4 border-b border-base-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 min-w-0">
 			<div class="flex items-center gap-3 min-w-0">
 				<div class="w-10 h-10 rounded-xl bg-info/8 flex items-center justify-center flex-shrink-0">
@@ -200,10 +179,9 @@ templ plaidEnvOption(value, current, label string) {
 // ====================================================================
 // Teller card
 // ====================================================================
-
 templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 	<!-- ─── Teller ─── -->
-	<div class="bb-card p-0 overflow-hidden" x-data="providerCard('teller')">
+	<div class="bb-card p-0 overflow-hidden" x-data="providerCard" data-provider="teller">
 		<div class="px-4 sm:px-5 py-4 border-b border-base-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 min-w-0">
 			<div class="flex items-center gap-3 min-w-0">
 				<div class="w-10 h-10 rounded-xl bg-success/8 flex items-center justify-center flex-shrink-0">
@@ -360,7 +338,6 @@ templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 // ====================================================================
 // CSV Import card
 // ====================================================================
-
 templ providersCSVCard(h *service.ProviderHealthSummary) {
 	<!-- ─── CSV Import ─── -->
 	<div class="bb-card p-0 overflow-hidden">
