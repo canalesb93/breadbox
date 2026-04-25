@@ -253,255 +253,291 @@ templ txdMain(p TransactionDetailProps) {
 }
 
 templ txdActivity(p TransactionDetailProps) {
-	<!-- Activity Timeline -->
+	<!-- Activity Timeline (GitHub-style) -->
 	<section id="activity" aria-labelledby="activity-heading" class="bb-card p-0 overflow-hidden" x-data={ fmt.Sprintf("commentManager(%d, %t)", p.MaxCommentLength, p.HasPendingReview) } @bb-toggle-pin-review.window="if (!hasPendingReview) pinReview = !pinReview">
-		<div class="px-4 sm:px-5 pt-5 pb-3 flex items-center gap-2">
+		<header class="px-4 sm:px-5 pt-5 pb-4 flex items-center gap-2">
 			<i data-lucide="activity" class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>
-			<h2 id="activity-heading" class="text-sm font-semibold text-base-content/50">Activity</h2>
-			<span class="text-xs text-base-content/30">
-				if len(p.Activity) > 0 {
-					{ fmt.Sprintf("%d events", len(p.Activity)) }
-				} else {
-					0 events
-				}
-			</span>
-		</div>
-		<!-- Add Note -->
-		<div class="px-4 sm:px-5 pb-4">
-			<label for="bb-txd-comment" class="sr-only">Add a comment</label>
-			<div class="relative">
-				<textarea
-					id="bb-txd-comment"
-					x-ref="composer"
-					x-model="newComment"
-					@input="autosize($event.target)"
-					@keydown.meta.enter.prevent="canSubmit() && addComment()"
-					@keydown.ctrl.enter.prevent="canSubmit() && addComment()"
-					@keydown.escape.prevent="$event.target.blur()"
-					rows="1"
-					placeholder="Add a comment..."
-					maxlength={ fmt.Sprintf("%d", p.MaxCommentLength) }
-					aria-describedby="bb-txd-comment-counter"
-					class="block w-full text-sm bg-base-200/50 border border-base-content/10 focus:border-primary focus:outline-none focus:ring-0 rounded-xl resize-none leading-6 px-3 py-1.5 h-9 min-h-9 max-h-36 overflow-y-hidden whitespace-pre-wrap break-words transition-all duration-150"
-					:class="{ 'pr-16': counterState() !== 'ok' }"
-				></textarea>
-				<span
-					id="bb-txd-comment-counter"
-					class="pointer-events-none absolute bottom-1.5 right-2 text-[10px] tabular-nums leading-none px-1.5 py-0.5 rounded bg-base-100/80 backdrop-blur-sm transition-opacity duration-150"
-					:class="counterState() === 'warn' ? 'text-warning' : counterState() === 'error' ? 'text-error font-medium' : 'text-base-content/40'"
-					x-show="counterState() !== 'ok'"
-					x-cloak
-					aria-live="polite"
-				>
-					<span x-text="newComment.length"></span>/<span x-text="maxLength"></span>
-				</span>
-			</div>
-			<div class="mt-1.5 px-0.5 flex items-center justify-end gap-2 min-h-[1.75rem]">
-				if !p.HasPendingReview {
-					<label class="btn btn-sm btn-ghost rounded-xl gap-2 cursor-pointer transition-all duration-200" :title="pinReview ? 'Posting will also tag this transaction needs-review (Shift+R)' : 'Also tag needs-review when posting (Shift+R)'">
-						<input type="checkbox" class="checkbox checkbox-xs checkbox-primary" x-model="pinReview"/>
-						<span class="text-xs font-medium">Toggle Needs Review</span>
-					</label>
-				}
-				<button
-					@click="addComment()"
-					class="btn btn-sm btn-primary rounded-xl gap-1.5 transition-all duration-200"
-					:disabled="!canSubmit()"
-				>
-					<i data-lucide="message-square" class="w-3.5 h-3.5" x-show="!pinReview" aria-hidden="true"></i>
-					<i data-lucide="message-square-x" class="w-3.5 h-3.5" x-show="pinReview" x-cloak aria-hidden="true"></i>
-					<span class="text-xs font-medium" x-text="pinReview ? 'Comment & flag' : 'Comment'"></span>
-					<span class="hidden sm:inline ml-1 text-[10px] opacity-60 border border-current/30 rounded px-1 leading-none py-0.5" x-show="!$store.device.isTouch">⌘↵</span>
-				</button>
-			</div>
-		</div>
+			<h2 id="activity-heading" class="text-sm font-semibold text-base-content/60">Activity</h2>
+			if len(p.Activity) > 0 {
+				<span class="text-xs text-base-content/40 tabular-nums">{ fmt.Sprintf("%d events", len(p.Activity)) }</span>
+			}
+		</header>
 		if len(p.ActivityDays) > 0 {
-			<div class="px-4 sm:px-5 border-t border-base-200 space-y-0">
-				for _, day := range p.ActivityDays {
-					<div class="pt-4 pb-1 first:pt-3">
-						<h3 class="text-[11px] font-semibold uppercase tracking-wide text-base-content/40">{ day.Label }</h3>
-					</div>
+			<ol class="bb-timeline relative pl-4 sm:pl-5 pr-4 sm:pr-5 pb-2" role="list" aria-label="Transaction activity timeline">
+				<!-- Continuous left rail. Spans the full timeline excluding top/bottom padding. -->
+				<span class="absolute left-[27px] sm:left-[31px] top-2 bottom-12 w-px bg-base-200" aria-hidden="true"></span>
+				for di, day := range p.ActivityDays {
+					@txdTimelineDay(day.Label, di == 0)
 					for _, event := range day.Events {
-						@txdActivityEvent(event)
+						if event.Type == "comment" {
+							@txdTimelineComment(event)
+						} else {
+							@txdTimelineSystem(event)
+						}
 					}
 				}
-			</div>
+				@txdTimelineComposer(p)
+			</ol>
 		} else {
-			<div class="px-4 sm:px-5 border-t border-base-200 py-8 text-center">
-				<i data-lucide="clock" class="w-6 h-6 text-base-content/20 mx-auto" aria-hidden="true"></i>
-				<p class="text-sm text-base-content/40 mt-2">No activity yet.</p>
-				<p class="text-xs text-base-content/30 mt-1">Comments, tag changes, and rule hits will appear here.</p>
-			</div>
+			@txdTimelineEmptyComposer(p)
 		}
 	</section>
 }
 
-// txdActivityEvent renders a single timeline row: rule-applied (linked),
-// comment (chat-bubble), or generic event row (review / tag / category /
-// fallback). The original three-way branch in transaction_detail.html is
-// preserved here.
-templ txdActivityEvent(e service.ActivityEntry) {
-	if e.Type == "rule" && e.RuleID != "" {
-		<a href={ templ.SafeURL("/rules/" + e.RuleID) } class="flex items-start gap-3 py-3 border-b border-base-300/60 dark:border-base-200 last:border-b-0 group -mx-1 px-1 rounded-lg hover:bg-base-200/40 transition-colors">
-			<div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
-				<i data-lucide="zap" class="w-4 h-4 text-info" aria-hidden="true"></i>
-			</div>
-			<div class="flex-1 min-w-0">
-				if e.Summary != "" {
-					<p class="text-sm">
-						<span class="font-medium line-clamp-2 sm:line-clamp-none group-hover:text-primary break-words">{ e.Summary }</span>
-					</p>
+// txdTimelineDay renders a horizontal day separator with a small dot anchored
+// on the rail. The first day's separator gets a tighter top margin so the
+// timeline doesn't open with a large gap.
+templ txdTimelineDay(label string, first bool) {
+	<li class={ "relative flex items-center gap-3 select-none", templ.KV("pt-1 pb-3", first), templ.KV("pt-5 pb-3", !first) } role="separator" aria-label={ label }>
+		<span class="relative z-10 w-3 h-3 rounded-full bg-base-300 ring-4 ring-base-100" aria-hidden="true"></span>
+		<h3 class="text-[11px] font-semibold uppercase tracking-wider text-base-content/40">{ label }</h3>
+		<span class="flex-1 h-px bg-base-200" aria-hidden="true"></span>
+	</li>
+}
+
+// txdTimelineSystem renders a compact one-liner row for tag / category /
+// rule / review events. Icon tile sits on the rail; sentence flows to the
+// right of the rail.
+templ txdTimelineSystem(e service.ActivityEntry) {
+	<li class="relative flex items-start gap-3 py-2 group">
+		<div class="relative z-10 shrink-0 w-6 h-6 mt-0.5">
+			@txdSystemIcon(e)
+		</div>
+		<div class="flex-1 min-w-0 pt-0.5 text-sm leading-snug text-base-content/75 break-words">
+			@txdSystemSentence(e)
+			<span class="text-base-content/40 ml-1">
+				if e.Origin != "" {
+					<span class="italic">&middot; { e.Origin }</span>
 				}
-				if e.Detail != "" {
-					<p class="text-sm text-base-content/60 mt-1 whitespace-pre-wrap leading-relaxed">{ e.Detail }</p>
+				if e.Timestamp != "" {
+					<span aria-hidden="true">&middot;</span>
+					<time datetime={ e.Timestamp } class="tabular-nums" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStr(e.Timestamp) }</time>
 				}
-				<div class="flex items-center gap-1.5 mt-1 flex-wrap">
-					if e.ActorName != "" {
-						<span class="text-xs text-base-content/40">{ e.ActorName }</span>
-					}
-					if e.Origin != "" {
-						<span class="text-xs text-base-content/40 italic">{ "Applied " + e.Origin }</span>
-					}
-					if e.Timestamp != "" {
-						<span class="text-xs text-base-content/30" aria-hidden="true">&middot;</span>
-						<time datetime={ e.Timestamp } class="text-xs text-base-content/30" title={ formatDateTimeStr(e.Timestamp) }>{ clockTimeStr(e.Timestamp) }</time>
-					}
-				</div>
-			</div>
-		</a>
-	} else if e.Type == "comment" {
-		<div class="flex items-start gap-3 py-3 border-b border-base-300/60 dark:border-base-200 last:border-b-0 group">
-			<!-- Avatar -->
-			if e.ActorType == "agent" {
-				<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
-					<i data-lucide="bot" class="w-4 h-4 text-primary" aria-hidden="true"></i>
-				</div>
-			} else if e.ActorType == "user" && e.ActorID != nil && *e.ActorID != "" {
-				<img src={ avatarURLStr(*e.ActorID, e.ActorAvatarVersion) } alt={ e.ActorName + " avatar" } class="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5" title={ e.ActorName }/>
+			</span>
+		</div>
+	</li>
+}
+
+// txdSystemSentence assembles the actor-verb-object phrase shown next to a
+// system-event icon. For rule rows the prebuilt Summary is rendered as-is
+// (optionally linked to /rules/<id>); for actor-driven rows we compose:
+//   <strong>Alice</strong> added the <chip>food</chip>
+//   <strong>Alice</strong> set category to <em>Groceries</em>
+templ txdSystemSentence(e service.ActivityEntry) {
+	if e.Type == "rule" {
+		if e.RuleID != "" {
+			<a href={ templ.SafeURL("/rules/" + e.RuleID) } class="font-medium text-base-content hover:text-primary transition-colors break-words">{ e.Summary }</a>
+		} else {
+			<span class="font-medium text-base-content break-words">{ e.Summary }</span>
+		}
+	} else if e.Type == "tag" {
+		if e.ActorName != "" {
+			@txdActorInline(e)
+			if e.TagAction == "removed" {
+				<span>removed </span>
 			} else {
-				<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
-					<span class="text-xs font-semibold text-primary leading-none">{ components.FirstChar(e.ActorName) }</span>
-				</div>
+				<span>added </span>
 			}
-			<!-- Bubble -->
-			<div class="flex-1 min-w-0 flex flex-col items-start">
-				<div class="rounded-2xl bg-base-200/60 px-3 py-2 max-w-[85%] sm:max-w-[75%] inline-block">
-					<div class="flex items-baseline gap-1.5 flex-wrap mb-0.5">
-						if e.ActorName != "" {
-							<span class="text-xs font-semibold text-base-content/70">{ e.ActorName }</span>
-						}
-						if e.Timestamp != "" {
-							<time datetime={ e.Timestamp } class="text-[11px] text-base-content/40" title={ formatDateTimeStr(e.Timestamp) }>{ clockTimeStr(e.Timestamp) }</time>
-						}
-					</div>
-					if e.Detail != "" {
-						<p class="text-sm whitespace-pre-wrap leading-relaxed break-words">{ e.Detail }</p>
-					}
-				</div>
-			</div>
-			<!-- Delete button -->
-			if e.CommentID != "" {
-				<button class="btn btn-ghost btn-xs rounded-lg sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-error/50 hover:text-error" @click={ "deleteComment('" + e.CommentID + "')" } aria-label={ "Delete comment by " + e.ActorName + " from " + relativeTimeStr(e.Timestamp) } title="Delete">
-					<i data-lucide="trash-2" class="w-3.5 h-3.5" aria-hidden="true"></i>
-				</button>
+		} else {
+			if e.TagAction == "removed" {
+				<span class="font-medium text-base-content">Removed </span>
+			} else {
+				<span class="font-medium text-base-content">Added </span>
 			}
-		</div>
+		}
+		@txdInlineTagChip(e)
+		if e.Detail != "" {
+			<span class="text-base-content/55">&mdash; { e.Detail }</span>
+		}
+	} else if e.Type == "category" {
+		if e.ActorName != "" {
+			@txdActorInline(e)
+			<span>set category to </span>
+		} else {
+			<span class="font-medium text-base-content">Set category to </span>
+		}
+		<span class="font-medium text-base-content">{ e.CategoryName }</span>
 	} else {
-		<div class="flex items-start gap-3 py-3 border-b border-base-300/60 dark:border-base-200 last:border-b-0 group">
-			@txdActivityIcon(e)
-			<!-- Content -->
-			<div class="flex-1 min-w-0">
-				if e.Summary != "" {
-					<p class="text-sm">
-						<span class="font-medium break-words">{ e.Summary }</span>
-						if e.Type == "tag" && e.TagSlug != "" {
-							@txdInlineTagChip(e)
-						}
-					</p>
-				}
-				if e.Detail != "" {
-					if e.Type == "review" && e.ReviewStatus == "pending" {
-						<!-- "Added to review queue" shown as blue label in subtitle -->
-					} else {
-						<p class="text-sm text-base-content/60 mt-1 whitespace-pre-wrap leading-relaxed">{ e.Detail }</p>
-					}
-				}
-				<div class="flex items-center gap-1.5 mt-1 flex-wrap">
-					if e.ActorName != "" {
-						<span class="text-xs text-base-content/40">{ e.ActorName }</span>
-					}
-					if e.Origin != "" {
-						<span class="text-xs text-base-content/40 italic">{ "Applied " + e.Origin }</span>
-					}
-					if e.Type == "review" && e.ReviewStatus == "pending" && e.Detail != "" {
-						<span class="text-xs text-base-content/30">&middot;</span>
-						<span class="text-xs text-info font-medium">{ e.Detail }</span>
-					}
-					if e.Timestamp != "" {
-						<span class="text-xs text-base-content/30" aria-hidden="true">&middot;</span>
-						<time datetime={ e.Timestamp } class="text-xs text-base-content/30" title={ formatDateTimeStr(e.Timestamp) }>{ clockTimeStr(e.Timestamp) }</time>
-					}
-				</div>
-			</div>
-			<!-- Delete button (comments only) -->
-			if e.CommentID != "" {
-				<button class="btn btn-ghost btn-xs rounded-lg sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-error/50 hover:text-error" @click={ "deleteComment('" + e.CommentID + "')" } aria-label={ "Delete comment by " + e.ActorName + " from " + relativeTimeStr(e.Timestamp) } title="Delete">
-					<i data-lucide="trash-2" class="w-3.5 h-3.5" aria-hidden="true"></i>
-				</button>
-			}
-		</div>
+		<!-- Review (legacy) and any unknown kind: fall back to Summary -->
+		if e.Summary != "" {
+			<span class="font-medium text-base-content break-words">{ e.Summary }</span>
+		}
+		if e.Detail != "" {
+			<span class="text-base-content/55">&mdash; { e.Detail }</span>
+		}
 	}
 }
 
-// txdActivityIcon renders the leading icon tile for review/tag/category
-// rows and a default avatar/agent fallback. Mirrors the original
-// {{if eq .Type "review"}}…{{else if eq .Type "tag"}}…{{else if eq .Type "category"}}…
-// branch in transaction_detail.html.
-templ txdActivityIcon(e service.ActivityEntry) {
-	if e.Type == "review" {
-		<div class={ "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5", txdReviewBg(e.ReviewStatus) } aria-hidden="true">
-			if e.ReviewStatus == "approved" {
-				<i data-lucide="check-circle" class="w-4 h-4 text-success" aria-hidden="true"></i>
-			} else if e.ReviewStatus == "rejected" {
-				<i data-lucide="x-circle" class="w-4 h-4 text-error" aria-hidden="true"></i>
-			} else if e.ReviewStatus == "skipped" {
-				<i data-lucide="skip-forward" class="w-4 h-4 text-warning" aria-hidden="true"></i>
+// txdActorInline renders the bold actor-name span used inside a system-event
+// sentence. Avatar isn't shown inline (it'd compete with the event icon);
+// the actor's identity reads from the bold name.
+templ txdActorInline(e service.ActivityEntry) {
+	<strong class="font-semibold text-base-content">{ e.ActorName }</strong>
+}
+
+// txdSystemIcon renders the small (24px) kind-specific icon tile that sits
+// on the rail for a system event row. Tinted by event type.
+templ txdSystemIcon(e service.ActivityEntry) {
+	if e.Type == "tag" {
+		<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-100", txdTagOuterBg(e.TagAction) } aria-hidden="true">
+			if e.TagAction == "removed" {
+				<i data-lucide="minus" class={ "w-3 h-3", txdTagIconColor(e.TagAction) }></i>
 			} else {
-				<i data-lucide="scan-search" class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>
+				<i data-lucide="plus" class={ "w-3 h-3", txdTagIconColor(e.TagAction) }></i>
 			}
-		</div>
-	} else if e.Type == "tag" {
-		<div class="relative w-8 h-8 shrink-0 mt-0.5" aria-hidden="true">
-			<div class={ "w-8 h-8 rounded-full flex items-center justify-center", txdTagOuterBg(e.TagAction) }>
-				<i data-lucide="tag" class={ "w-4 h-4", txdTagIconColor(e.TagAction) }></i>
-			</div>
-			<div class={ "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border border-base-100 flex items-center justify-center", txdTagBadgeBg(e.TagAction) }>
-				if e.TagAction == "removed" {
-					<i data-lucide="minus" class="w-2 h-2 text-base-100"></i>
-				} else {
-					<i data-lucide="plus" class="w-2 h-2 text-base-100"></i>
-				}
-			</div>
-		</div>
+		</span>
 	} else if e.Type == "category" {
-		<div class="w-8 h-8 rounded-full bg-warning/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
-			<i data-lucide="folder" class="w-4 h-4 text-warning" aria-hidden="true"></i>
-		</div>
-	} else if e.ActorType == "agent" {
-		<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
-			<i data-lucide="bot" class="w-4 h-4 text-primary" aria-hidden="true"></i>
-		</div>
-	} else if e.ActorType == "user" && e.ActorID != nil && *e.ActorID != "" {
-		<img src={ avatarURLStr(*e.ActorID, e.ActorAvatarVersion) } alt={ e.ActorName + " avatar" } class="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5" title={ e.ActorName }/>
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-warning/15 ring-4 ring-base-100" aria-hidden="true">
+			<i data-lucide="folder" class="w-3 h-3 text-warning"></i>
+		</span>
 	} else if e.Type == "rule" {
-		<div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
-			<i data-lucide="zap" class="w-4 h-4 text-info" aria-hidden="true"></i>
-		</div>
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-info/15 ring-4 ring-base-100" aria-hidden="true">
+			<i data-lucide="zap" class="w-3 h-3 text-info"></i>
+		</span>
+	} else if e.Type == "review" {
+		<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-100", txdReviewBg(e.ReviewStatus) } aria-hidden="true">
+			if e.ReviewStatus == "approved" {
+				<i data-lucide="check" class="w-3 h-3 text-success"></i>
+			} else if e.ReviewStatus == "rejected" {
+				<i data-lucide="x" class="w-3 h-3 text-error"></i>
+			} else if e.ReviewStatus == "skipped" {
+				<i data-lucide="skip-forward" class="w-3 h-3 text-warning"></i>
+			} else {
+				<i data-lucide="scan-search" class="w-3 h-3 text-base-content/50"></i>
+			}
+		</span>
 	} else {
-		<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
-			<span class="text-xs font-semibold text-primary leading-none">{ components.FirstChar(e.ActorName) }</span>
-		</div>
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true">
+			<i data-lucide="circle" class="w-3 h-3 text-base-content/40"></i>
+		</span>
 	}
+}
+
+// txdTimelineComment renders a comment as a bordered card with a header bar
+// (author + verb + timestamp + delete) and a body. Avatar sits on the rail.
+templ txdTimelineComment(e service.ActivityEntry) {
+	<li class="relative flex items-start gap-3 py-2 group">
+		<div class="relative z-10 shrink-0 w-6 h-6 mt-0.5 flex items-center justify-center">
+			@txdCommentAvatar(e)
+		</div>
+		<div class="flex-1 min-w-0">
+			<article class="rounded-lg border border-base-200 bg-base-100 overflow-hidden">
+				<header class="px-3 py-2 bg-base-200/40 border-b border-base-200 flex items-baseline gap-1.5 flex-wrap">
+					if e.ActorName != "" {
+						<strong class="text-xs font-semibold text-base-content">{ e.ActorName }</strong>
+					}
+					<span class="text-xs text-base-content/50">commented</span>
+					if e.Timestamp != "" {
+						<time datetime={ e.Timestamp } class="text-[11px] text-base-content/40 tabular-nums" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStr(e.Timestamp) }</time>
+					}
+					if e.CommentID != "" {
+						<button class="ml-auto rounded-md p-1 -m-1 text-base-content/30 hover:text-error hover:bg-error/5 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition" @click={ "deleteComment('" + e.CommentID + "')" } aria-label={ "Delete comment by " + e.ActorName } title="Delete comment">
+							<i data-lucide="trash-2" class="w-3.5 h-3.5" aria-hidden="true"></i>
+						</button>
+					}
+				</header>
+				if e.Detail != "" {
+					<div class="px-3 py-2.5 text-sm text-base-content/85 whitespace-pre-wrap leading-relaxed break-words">{ e.Detail }</div>
+				}
+			</article>
+		</div>
+	</li>
+}
+
+// txdCommentAvatar renders the 24px avatar for a comment. User actors get
+// their image; agents get a bot icon; anonymous/system gets initials.
+templ txdCommentAvatar(e service.ActivityEntry) {
+	if e.ActorType == "user" && e.ActorID != nil && *e.ActorID != "" {
+		<img src={ avatarURLStr(*e.ActorID, e.ActorAvatarVersion) } alt={ e.ActorName + " avatar" } class="w-6 h-6 rounded-full object-cover ring-4 ring-base-100" title={ e.ActorName }/>
+	} else if e.ActorType == "agent" {
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 ring-4 ring-base-100" aria-hidden="true" title={ e.ActorName }>
+			<i data-lucide="bot" class="w-3 h-3 text-primary"></i>
+		</span>
+	} else {
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true" title={ e.ActorName }>
+			<span class="text-[10px] font-semibold text-base-content/60 leading-none">{ components.FirstChar(e.ActorName) }</span>
+		</span>
+	}
+}
+
+// txdTimelineComposer renders the inline comment composer at the bottom of
+// the timeline, styled as a comment card so it visually matches the rows
+// above it. The form controls remain wired to the existing commentManager()
+// Alpine component.
+templ txdTimelineComposer(p TransactionDetailProps) {
+	<li class="relative flex items-start gap-3 pt-3 pb-1">
+		<div class="relative z-10 shrink-0 w-6 h-6 mt-0.5 flex items-center justify-center" aria-hidden="true">
+			<span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 ring-4 ring-base-100">
+				<i data-lucide="message-square" class="w-3 h-3 text-primary"></i>
+			</span>
+		</div>
+		<div class="flex-1 min-w-0">
+			@txdComposerCard(p)
+		</div>
+	</li>
+}
+
+// txdTimelineEmptyComposer is shown when there are no events. Composer
+// renders without a rail so the empty state isn't visually noisy.
+templ txdTimelineEmptyComposer(p TransactionDetailProps) {
+	<div class="px-4 sm:px-5 pb-5">
+		@txdComposerCard(p)
+		<div class="mt-5 pt-4 border-t border-base-200 text-center">
+			<i data-lucide="clock" class="w-5 h-5 text-base-content/20 mx-auto" aria-hidden="true"></i>
+			<p class="text-xs text-base-content/40 mt-1.5">No activity yet. Comments, tag changes, and rule hits appear here.</p>
+		</div>
+	</div>
+}
+
+// txdComposerCard is the textarea + submit card. Visually mirrors a comment
+// bubble (header bar swapped for the focused-state hint). Carries the
+// "Toggle Needs Review" affordance from #846 — when on, posting also tags
+// the transaction needs-review.
+templ txdComposerCard(p TransactionDetailProps) {
+	<div class="rounded-lg border border-base-200 bg-base-100 overflow-hidden focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition">
+		<label for="bb-txd-comment" class="sr-only">Add a comment</label>
+		<textarea
+			id="bb-txd-comment"
+			x-ref="composer"
+			x-model="newComment"
+			@input="autosize($event.target)"
+			@keydown.meta.enter.prevent="canSubmit() && addComment()"
+			@keydown.ctrl.enter.prevent="canSubmit() && addComment()"
+			@keydown.escape.prevent="$event.target.blur()"
+			rows="2"
+			placeholder="Add a comment..."
+			maxlength={ fmt.Sprintf("%d", p.MaxCommentLength) }
+			aria-describedby="bb-txd-comment-counter"
+			class="block w-full text-sm bg-transparent border-0 focus:outline-none focus:ring-0 resize-none leading-6 px-3 py-2.5 min-h-[5rem] max-h-48 whitespace-pre-wrap break-words"
+		></textarea>
+		<div class="px-3 py-2 bg-base-200/40 border-t border-base-200 flex items-center gap-2 min-h-[2.5rem]">
+			<span class="text-[11px] text-base-content/40 tabular-nums">
+				<span
+					id="bb-txd-comment-counter"
+					:class="{ 'text-warning': counterState() === 'warn', 'text-error font-medium': counterState() === 'error', 'invisible': newComment.length === 0 }"
+					aria-live="polite"
+				>
+					<span x-text="newComment.length"></span>/<span x-text="maxLength"></span>
+				</span>
+			</span>
+			if !p.HasPendingReview {
+				<label class="ml-auto btn btn-sm btn-ghost rounded-md gap-2 cursor-pointer transition-all duration-200" :title="pinReview ? 'Posting will also tag this transaction needs-review (Shift+R)' : 'Also tag needs-review when posting (Shift+R)'">
+					<input type="checkbox" class="checkbox checkbox-xs checkbox-primary" x-model="pinReview"/>
+					<span class="text-xs font-medium">Toggle Needs Review</span>
+				</label>
+			}
+			<button
+				@click="addComment()"
+				class={ "btn btn-sm btn-primary rounded-md gap-1.5", templ.KV("ml-auto", p.HasPendingReview) }
+				:disabled="!canSubmit()"
+			>
+				<i data-lucide="message-square" class="w-3.5 h-3.5" x-show="!pinReview" aria-hidden="true"></i>
+				<i data-lucide="message-square-x" class="w-3.5 h-3.5" x-show="pinReview" x-cloak aria-hidden="true"></i>
+				<span class="text-xs font-medium" x-text="pinReview ? 'Comment &amp; flag' : 'Comment'"></span>
+				<span class="hidden sm:inline ml-0.5 text-[10px] opacity-70 border border-current/30 rounded px-1 leading-none py-0.5" x-show="!$store.device.isTouch">⌘↵</span>
+			</button>
+		</div>
+	</div>
 }
 
 // txdInlineTagChip renders the inline tag pill that follows the summary
@@ -573,25 +609,21 @@ func txdReviewBg(status string) string {
 	}
 }
 
+// txdTagOuterBg / txdTagIconColor pick the kind-specific tint for the
+// 24px tag-event icon tile on the GitHub-style timeline. "added" reads as
+// success (green); "removed" reads as muted-error (red).
 func txdTagOuterBg(action string) string {
 	if action == "removed" {
-		return "bg-base-200"
+		return "bg-error/15"
 	}
-	return "bg-primary/10"
+	return "bg-success/15"
 }
 
 func txdTagIconColor(action string) string {
 	if action == "removed" {
-		return "text-base-content/50"
+		return "text-error"
 	}
-	return "text-primary"
-}
-
-func txdTagBadgeBg(action string) string {
-	if action == "removed" {
-		return "bg-error/80"
-	}
-	return "bg-success/80"
+	return "text-success"
 }
 
 // accountTypeLabel mirrors the admin funcMap "accountTypeLabel" for the
