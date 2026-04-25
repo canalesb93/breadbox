@@ -353,9 +353,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 						m = *v
 					}
 				case pgtype.Text:
-					if v.Valid {
-						m = v.String
-					}
+					m = pgconv.TextOr(v, "")
 				}
 				if m != "" {
 					return name + " ••" + m

@@ -200,10 +200,7 @@ func (e *Engine) runSync(ctx context.Context, connectionID pgtype.UUID, logger *
 	}
 
 	// Track cursors for pagination.
-	previousCursor := ""
-	if conn.SyncCursor.Valid {
-		previousCursor = conn.SyncCursor.String
-	}
+	previousCursor := pgconv.TextOr(conn.SyncCursor, "")
 	cursor := previousCursor
 
 	// Load rule resolver (rules + category mappings) for this provider.

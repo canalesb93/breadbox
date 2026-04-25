@@ -11,6 +11,7 @@ import (
 
 	"breadbox/internal/appconfig"
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	bsync "breadbox/internal/sync"
 
 	"github.com/jackc/pgx/v5"
@@ -99,10 +100,7 @@ func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow
 		duration = &d
 	}
 
-	instName := ""
-	if institutionName.Valid {
-		instName = institutionName.String
-	}
+	instName := pgconv.TextOr(institutionName, "")
 
 	// Get account count.
 	accountCount, _ := s.Queries.CountAffectedAccountsBySyncLog(ctx, uid)
@@ -209,10 +207,7 @@ func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListP
 			durationMsPtr = &ms
 		}
 
-		instName := ""
-		if institutionName.Valid {
-			instName = institutionName.String
-		}
+		instName := pgconv.TextOr(institutionName, "")
 
 		row := SyncLogRow{
 			ID:              formatUUID(id),
@@ -416,9 +411,7 @@ func (s *Service) GetSyncHealthSummary(ctx context.Context) (*SyncHealthSummary,
 		summary.LastSyncTime = &t
 	}
 
-	if lastStatus.Valid {
-		summary.LastSyncStatus = lastStatus.String
-	}
+	summary.LastSyncStatus = pgconv.TextOr(lastStatus, "")
 
 	// Determine overall health: healthy, degraded, or unhealthy.
 	// - unhealthy: success rate < 50% with 2+ syncs, or all recent syncs failed
