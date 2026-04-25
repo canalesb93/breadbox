@@ -1559,6 +1559,9 @@
     width: min(95vw, 640px);
     max-height: min(80vh, 560px);
     overflow-y: auto;
+    /* Keep trackpad rubber-band contained so the page behind doesn't bleed
+       through at the top/bottom of the dialog scroll on macOS. */
+    overscroll-behavior: contain;
     box-shadow: 0 16px 70px oklch(0 0 0 / 0.15), 0 0 0 1px oklch(0 0 0 / 0.04);
     animation: bb-shortcuts-dialog-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -1606,11 +1609,89 @@
     @apply px-6 py-5;
   }
 
+  /* A "section" wraps either the page-scoped or global block. The page
+     section is tinted with a subtle accent so users can tell at-a-glance
+     which shortcuts only work here vs. everywhere. The global section is
+     plain (no card chrome) when shown alongside a page section. */
+  .bb-shortcuts-section {
+    @apply mb-5;
+  }
+
+  .bb-shortcuts-section:last-child {
+    @apply mb-0;
+  }
+
+  .bb-shortcuts-section--page {
+    @apply rounded-lg px-4 py-4 mb-5;
+    background: oklch(from var(--color-info) l c h / 0.07);
+    border: 1px solid oklch(from var(--color-info) l c h / 0.2);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bb-shortcuts-section--page {
+      background: oklch(from var(--color-info) l c h / 0.10);
+      border-color: oklch(from var(--color-info) l c h / 0.3);
+    }
+  }
+
+  /* Accent rail down the left edge so it's instantly readable as "scoped". */
+  .bb-shortcuts-section--page {
+    position: relative;
+  }
+
+  .bb-shortcuts-section--page::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.75rem;
+    bottom: 0.75rem;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--color-info);
+    opacity: 0.55;
+  }
+
+  .bb-shortcuts-section--global {
+    @apply pt-1;
+  }
+
+  .bb-shortcuts-section-head {
+    @apply flex items-baseline gap-2 mb-3;
+  }
+
+  .bb-shortcuts-section-eyebrow {
+    @apply text-[0.6rem] font-semibold uppercase tracking-[0.08em];
+    color: var(--color-info);
+  }
+
+  .bb-shortcuts-section--global .bb-shortcuts-section-eyebrow {
+    @apply text-base-content/45;
+  }
+
+  .bb-shortcuts-section-title {
+    @apply text-[0.7rem] font-medium text-base-content/55;
+  }
+
+  .bb-shortcuts-section-title::before {
+    content: '·';
+    @apply mr-1.5 text-base-content/30;
+  }
+
   .bb-shortcuts-group {
     @apply mb-5;
   }
 
   .bb-shortcuts-group:last-child {
+    @apply mb-0;
+  }
+
+  /* Inside a page section we don't need much extra vertical rhythm — the
+     card chrome already separates groups from the global block. */
+  .bb-shortcuts-section--page .bb-shortcuts-group {
+    @apply mb-3;
+  }
+
+  .bb-shortcuts-section--page .bb-shortcuts-group:last-child {
     @apply mb-0;
   }
 
