@@ -7,15 +7,22 @@ import "breadbox/internal/templates/components"
 // handler builds typed props in admin/reports.go and the bridge drops
 // the rendered HTML into base.html's TemplContent slot.
 //
-// The page is a port of internal/templates/pages/report_detail.html.
-// The two CDN <script> tags (marked + DOMPurify, with their SRI hashes
-// and crossorigin attrs) and the inline <script> body (Alpine factory
-// + Markdown rendering listener) are reproduced byte-for-byte —
-// the inline body is lifted into report_detail_scripts.go and embedded
-// here via @templ.Raw.
+// The Alpine factory lives in static/js/admin/components/report_detail.js
+// (per docs/design-system.md → "Alpine page components"). Two CDN
+// dependencies — marked + DOMPurify — are loaded as siblings of the
+// component script with their SRI hashes intact. Loading is synchronous
+// (no defer) and at the top of the component so the factory is
+// registered before Alpine — itself <script defer> in <head> — fires
+// alpine:init.
 templ ReportDetail(p ReportDetailProps) {
+	<!-- CDN dependencies for the body markdown renderer, then the
+	     report_detail Alpine factory. Loaded synchronously (no defer)
+	     so Alpine.data() registration runs before alpine:init. -->
+	<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.0/dist/purify.min.js" integrity="sha384-lExbHoPFNjOW+xMze1tJWzpODN3bi/yx3zhbwRoZWaIYxjl89HxJcI2BxPTNa9M7" crossorigin="anonymous"></script>
+	<script src="/static/js/admin/components/report_detail.js"></script>
 	@components.BreadcrumbNav(p.Breadcrumbs)
-	<div x-data={ "reportDetail('" + p.Report.ID + "', " + boolLiteral(p.Report.IsRead) + ")" } class="max-w-4xl">
+	<div x-data="reportDetail" data-report-id={ p.Report.ID } data-is-read={ boolLiteral(p.Report.IsRead) } class="max-w-4xl">
 		<!-- Toast for copy + mark-unread feedback -->
 		<div class="toast toast-top toast-center z-50" x-show="toast" x-cloak x-transition.opacity>
 			<div class="alert alert-success text-xs rounded-xl shadow-md">
@@ -82,14 +89,10 @@ templ ReportDetail(p ReportDetailProps) {
 			</div>
 		</div>
 	</div>
-	<!-- Alpine component + Markdown rendering -->
-	@templ.Raw(`<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>`)
-	@templ.Raw(`<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.0/dist/purify.min.js" integrity="sha384-lExbHoPFNjOW+xMze1tJWzpODN3bi/yx3zhbwRoZWaIYxjl89HxJcI2BxPTNa9M7" crossorigin="anonymous"></script>`)
-	@templ.Raw("<script>" + reportDetailScriptBody + "</script>")
 }
 
 // boolLiteral mirrors the html/template default rendering of a bool —
-// `true` or `false` — so the x-data attribute matches the original
+// `true` or `false` — so the data-is-read attribute matches the original
 // `{{.Report.IsRead}}` interpolation byte-for-byte.
 func boolLiteral(b bool) string {
 	if b {
