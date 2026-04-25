@@ -329,7 +329,7 @@
         <i data-lucide="bot" class="w-4 h-4 text-primary" aria-hidden="true"></i>
       </div>
       {{else if and (eq .ActorType "user") .ActorID}}
-      <img src="{{avatarURL (deref .ActorID)}}" alt="{{.ActorName}} avatar" class="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5" title="{{.ActorName}}">
+      <img src="{{avatarURL (deref .ActorID) .ActorAvatarVersion}}" alt="{{.ActorName}} avatar" class="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5" title="{{.ActorName}}">
       {{else if eq .Type "rule"}}
       <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
         <i data-lucide="zap" class="w-4 h-4 text-info" aria-hidden="true"></i>
