@@ -9,6 +9,7 @@ package components
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -246,3 +247,42 @@ func TitleCase(s string) string { return titleCase(s) }
 
 // PluralS returns "" for n == 1, else "s". See pluralS.
 func PluralS[T pluralInt](n T) string { return pluralS(n) }
+
+// PageRange returns the page numbers to display in a paginator. For totals
+// up to 7 it returns every page. Beyond that, it returns first, last,
+// current, and current's neighbors, inserting 0 as an ellipsis sentinel
+// wherever a gap would appear. Used by the admin funcMap and any templ
+// component that renders pagination, so all paginators stay aligned.
+func PageRange(current, total int) []int {
+	if total <= 7 {
+		out := make([]int, total)
+		for i := range out {
+			out[i] = i + 1
+		}
+		return out
+	}
+	seen := map[int]bool{}
+	add := func(p int) {
+		if p >= 1 && p <= total {
+			seen[p] = true
+		}
+	}
+	add(1)
+	add(total)
+	for d := -1; d <= 1; d++ {
+		add(current + d)
+	}
+	sorted := make([]int, 0, len(seen))
+	for p := range seen {
+		sorted = append(sorted, p)
+	}
+	slices.Sort(sorted)
+	result := make([]int, 0, len(sorted)*2)
+	for i, p := range sorted {
+		if i > 0 && p > sorted[i-1]+1 {
+			result = append(result, 0) // ellipsis
+		}
+		result = append(result, p)
+	}
+	return result
+}

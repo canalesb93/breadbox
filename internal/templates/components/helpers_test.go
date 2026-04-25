@@ -333,6 +333,36 @@ func TestAmount2f(t *testing.T) {
 	}
 }
 
+func TestPageRange(t *testing.T) {
+	tests := []struct {
+		name             string
+		current, total   int
+		want             []int
+	}{
+		{"zero pages", 1, 0, []int{}},
+		{"single page", 1, 1, []int{1}},
+		{"all pages shown when ≤ 7", 3, 7, []int{1, 2, 3, 4, 5, 6, 7}},
+		{"first page on long total inserts ellipsis", 1, 20, []int{1, 2, 0, 20}},
+		{"last page on long total inserts ellipsis", 20, 20, []int{1, 0, 19, 20}},
+		{"middle page shows both ellipses", 10, 20, []int{1, 0, 9, 10, 11, 0, 20}},
+		{"current near start collapses leading ellipsis", 3, 20, []int{1, 2, 3, 4, 0, 20}},
+		{"current near end collapses trailing ellipsis", 18, 20, []int{1, 0, 17, 18, 19, 20}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := PageRange(tc.current, tc.total)
+			if len(got) != len(tc.want) {
+				t.Fatalf("PageRange(%d, %d) = %v, want %v", tc.current, tc.total, got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Errorf("PageRange(%d, %d)[%d] = %d, want %d (full: %v)", tc.current, tc.total, i, got[i], tc.want[i], got)
+				}
+			}
+		})
+	}
+}
+
 func TestKbdGlyph(t *testing.T) {
 	// Covers modifier names (case-insensitive), arrows, special keys, and
 	// the single-letter uppercase fallback. Must stay in lock-step with the
