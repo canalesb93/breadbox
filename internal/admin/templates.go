@@ -1079,7 +1079,8 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// the _templ_shell template key (see pages.Users).
 		// pages/user_form.html removed — renders via RenderWithTempl using
 		// the _templ_shell template key (see pages.UserForm).
-		"pages/access.html",
+		// pages/access.html removed — renders via RenderWithTempl using
+		// the _templ_shell template key (see pages.Access).
 		// pages/api_keys.html removed — was dead (no handler rendered it after
 		// the API keys list moved into pages/access.html in PR #808).
 		// pages/api_key_new.html and pages/api_key_created.html removed —
