@@ -2337,6 +2337,20 @@
           return;
         }
 
+        // Shift-modified single-letter match (e.g. 'shift+r'). Cmd/Ctrl/Alt
+        // are still rejected up top; Shift is folded into e.key by the browser
+        // (shift+r → e.key='R'). Specs that opt in via 'shift+<letter>' are
+        // tried first, then fall through to plain single-key matching so
+        // existing 'R'/'/'/'?' bindings still work as before.
+        if (e.shiftKey && key.length === 1 && /[a-zA-Z]/.test(key)) {
+          var modSpec = matchSingle(reg, 'shift+' + key.toLowerCase());
+          if (shouldFire(modSpec) && typeof modSpec.action === 'function') {
+            e.preventDefault();
+            modSpec.action();
+            return;
+          }
+        }
+
         // Single-key match.
         var spec = matchSingle(reg, key);
         if (shouldFire(spec) && typeof spec.action === 'function') {
