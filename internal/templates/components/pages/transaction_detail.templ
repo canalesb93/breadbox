@@ -278,17 +278,10 @@ templ txdActivity(p TransactionDetailProps) {
 				rows="1"
 				placeholder="Add a note..."
 				maxlength={ fmt.Sprintf("%d", p.MaxCommentLength) }
-				aria-describedby="bb-txd-comment-counter bb-txd-comment-hint"
+				aria-describedby="bb-txd-comment-counter"
 				class="block w-full text-sm bg-base-200/50 border border-base-content/10 focus:border-primary focus:outline-none focus:ring-0 rounded-xl resize-none leading-6 px-3 py-1.5 h-9 min-h-9 max-h-36 overflow-y-hidden whitespace-pre-wrap break-words"
 			></textarea>
 			<div class="mt-1.5 px-0.5 text-[11px] text-base-content/40 flex items-center gap-2 min-h-[1.75rem]">
-				<span id="bb-txd-comment-hint" class="hidden sm:inline-flex items-center gap-1.5 flex-wrap" x-show="!$store.device.isTouch && newComment.length === 0">
-					@components.KbdCombo("cmd", "enter")
-					<span>to post</span>
-					<span class="text-base-content/30" aria-hidden="true">·</span>
-					@components.Kbd("n")
-					<span>to focus</span>
-				</span>
 				<span
 					id="bb-txd-comment-counter"
 					class="ml-auto tabular-nums"
