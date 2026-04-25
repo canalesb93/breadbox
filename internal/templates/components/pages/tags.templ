@@ -2,6 +2,7 @@ package pages
 
 import (
 	"fmt"
+	"strconv"
 
 	"breadbox/internal/templates/components"
 )
@@ -106,7 +107,7 @@ templ tagListRow(t TagRow) {
 					class="inline-flex items-baseline gap-1 text-xs text-base-content/70 hover:text-base-content"
 					title="View transactions"
 				>
-					<span class="font-medium">{ fmt.Sprintf("%d", t.TransactionCount) }</span>
+					<span class="font-medium">{ strconv.FormatInt(t.TransactionCount, 10) }</span>
 					<span class="text-base-content/40 hidden sm:inline">{ tagCountLabel(t.TransactionCount) }</span>
 				</a>
 			} else {
@@ -133,7 +134,7 @@ templ tagListRow(t TagRow) {
 							class="text-error"
 							data-id={ t.ID }
 							data-slug={ t.Slug }
-							data-count={ fmt.Sprintf("%d", t.TransactionCount) }
+							data-count={ strconv.FormatInt(t.TransactionCount, 10) }
 							aria-label={ fmt.Sprintf("Delete tag %s", t.Slug) }
 							@click="window.dispatchEvent(new CustomEvent('bb-delete-tag', {detail: {id: $el.dataset.id, slug: $el.dataset.slug, count: parseInt($el.dataset.count) || 0}}))"
 						>
