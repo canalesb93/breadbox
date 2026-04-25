@@ -1,0 +1,266 @@
+package pages
+
+import (
+	"breadbox/internal/templates/components"
+)
+
+// UserForm renders the create/edit member form. Hosts inside the base
+// layout via TemplateRenderer.RenderWithTempl. The markup mirrors the
+// previous html/template version byte-for-byte so behavior (avatar
+// preview / upload / regenerate, optional login-account creation, error
+// states) is preserved.
+templ UserForm(p UserFormProps) {
+	@components.BreadcrumbNav(p.Breadcrumbs)
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">
+				if p.IsEdit {
+					Edit { userFormName(p.User) }
+				} else {
+					Add Member
+				}
+			</h1>
+			<p class="text-sm text-base-content/50 mt-1">
+				if p.IsEdit {
+					Update member details
+				} else {
+					Add a new person to your household
+				}
+			</p>
+		</div>
+	</div>
+	if p.IsEdit {
+		@userFormEdit(p)
+	} else {
+		@userFormCreate()
+	}
+}
+
+// userFormCreate renders the create flow (Alpine `userForm()` factory).
+templ userFormCreate() {
+	<div x-data="userForm()" class="max-w-lg">
+		<!-- Success state: show setup URL after login creation -->
+		<template x-if="setupURL">
+			<div class="bb-card p-8">
+				<div class="flex items-center gap-3 mb-6">
+					<div class="flex items-center justify-center w-10 h-10 rounded-xl bg-success/10">
+						<i data-lucide="check-circle" class="w-5 h-5 text-success"></i>
+					</div>
+					<div>
+						<h2 class="text-base font-semibold">Member Created</h2>
+						<p class="text-xs text-base-content/45">Share the setup link so they can set their password</p>
+					</div>
+				</div>
+				<p class="text-sm text-base-content/60 mb-4">Share this link with the new member so they can set their password and start using Breadbox.</p>
+				<div class="flex items-center gap-2 mb-4" x-data="{ copied: false }">
+					<input
+						type="text"
+						:value="setupURL"
+						readonly
+						class="input input-bordered input-sm rounded-xl flex-1 text-xs font-mono bg-base-200 select-all cursor-text"
+					/>
+					<button
+						@click="navigator.clipboard.writeText(setupURL); copied = true; setTimeout(() => copied = false, 2000)"
+						class="btn btn-sm btn-primary rounded-xl"
+						:class="copied ? 'btn-success' : ''"
+					>
+						<i x-show="!copied" data-lucide="copy" class="w-4 h-4"></i>
+						<i x-show="copied" data-lucide="check" class="w-4 h-4"></i>
+						<span x-text="copied ? 'Copied!' : 'Copy Link'"></span>
+					</button>
+				</div>
+				<p class="text-xs text-base-content/40 mb-6">This link expires in 7 days. You can regenerate it from the Household page.</p>
+				<a href="/users" class="btn btn-ghost btn-sm rounded-xl">
+					<i data-lucide="arrow-left" class="w-4 h-4"></i>
+					Back to Household
+				</a>
+			</div>
+		</template>
+		<!-- Form state -->
+		<template x-if="!setupURL">
+			<div class="bb-card p-8">
+				<!-- Avatar preview + header -->
+				<div class="flex items-center gap-4 mb-6">
+					<div class="relative group">
+						<img :src="avatarPreviewSrc" alt="" class="w-14 h-14 rounded-full object-cover ring-2 ring-base-300"/>
+						<button
+							type="button"
+							@click="shuffleAvatar()"
+							class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+							title="Shuffle pattern"
+						>
+							<i data-lucide="refresh-cw" class="w-4 h-4 text-white"></i>
+						</button>
+					</div>
+					<div>
+						<h2 class="text-base font-semibold">New Member</h2>
+						<p class="text-xs text-base-content/45">Enter their name and optional email</p>
+					</div>
+				</div>
+				<form @submit.prevent="submit()">
+					<fieldset class="fieldset mb-5">
+						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="name">
+							Name <span class="text-error text-xs">*</span>
+						</label>
+						<input
+							type="text"
+							id="name"
+							name="name"
+							class="input input-bordered w-full rounded-xl"
+							required
+							maxlength="128"
+							placeholder="e.g., Alex Canales"
+							@input="updateAvatarPreview($event.target.value)"
+						/>
+					</fieldset>
+					<fieldset class="fieldset mb-5">
+						<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="email">
+							Email
+							<span x-show="!createLogin" class="text-xs text-base-content/30">(optional)</span>
+							<span x-show="createLogin" class="text-xs text-warning">(required for login)</span>
+						</label>
+						<input
+							type="email"
+							id="email"
+							name="email"
+							class="input input-bordered w-full rounded-xl"
+							:required="createLogin"
+							placeholder="e.g., alex@example.com"
+						/>
+					</fieldset>
+					<!-- Create login account toggle (new users only) -->
+					<div class="border-t border-base-300 pt-5 mb-6">
+						<label class="flex items-center justify-between cursor-pointer">
+							<div>
+								<span class="text-sm font-medium text-base-content/70">Create login account</span>
+								<p class="text-xs text-base-content/40 mt-0.5">Allow this member to sign in to Breadbox</p>
+							</div>
+							<input type="checkbox" x-model="createLogin" class="toggle toggle-primary toggle-sm"/>
+						</label>
+						<!-- Role dropdown (shown when toggle is on) -->
+						<div x-show="createLogin" x-collapse>
+							<fieldset class="fieldset mt-4">
+								<label class="text-sm font-medium text-base-content/70 mb-1.5 block" for="login_role">
+									Role
+								</label>
+								<select id="login_role" name="login_role" x-model="role" class="select select-bordered w-full rounded-xl bg-base-200">
+									<option value="viewer">Viewer — can only see their own data</option>
+									<option value="editor">Editor — can view and edit all household data</option>
+								</select>
+							</fieldset>
+						</div>
+					</div>
+					<template x-if="error">
+						<div class="rounded-xl bg-error/10 border border-error/20 text-error text-sm px-4 py-3 mb-4" x-text="error"></div>
+					</template>
+					<div class="flex gap-3 pt-2">
+						<button type="submit" class="btn btn-primary btn-sm rounded-xl whitespace-nowrap" :disabled="submitting">
+							<span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="plus" class="w-4 h-4"></i> Create Member</span>
+							<span x-show="submitting" class="loading loading-spinner loading-sm"></span>
+						</button>
+						<a href="/users" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
+					</div>
+				</form>
+			</div>
+		</template>
+	</div>
+	@templ.Raw(userFormCreateBootstrap())
+}
+
+// userFormEdit renders the edit flow (Alpine `avatarEditor(userId)` factory).
+templ userFormEdit(p UserFormProps) {
+	<div x-data={ "avatarEditor('" + p.UserID + "')" } class="max-w-lg">
+		<form @submit.prevent="submitForm()" class="bb-card p-0 overflow-hidden">
+			<!-- Header + fields -->
+			<div class="p-5 sm:p-6">
+				<!-- Avatar header -->
+				<div class="bb-icon-header">
+					<div class="relative group shrink-0">
+						<img :src="avatarSrc" alt="" class="w-10 h-10 rounded-full object-cover ring-2 ring-base-300"/>
+						<button
+							type="button"
+							@click="$refs.fileInput.click()"
+							class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+							title="Upload photo"
+						>
+							<i data-lucide="camera" class="w-4 h-4 text-white"></i>
+						</button>
+						<input type="file" x-ref="fileInput" accept="image/png,image/jpeg,image/gif" class="hidden" @change="onFileSelect"/>
+					</div>
+					<div class="bb-icon-header__text">
+						<h2 class="text-sm font-semibold truncate">{ userFormName(p.User) }</h2>
+						<p class="text-xs text-base-content/45">
+							<button type="button" @click="$refs.fileInput.click()" class="link link-hover inline-flex items-center gap-1"><i data-lucide="upload" class="w-3 h-3"></i>Upload photo</button>
+							<span class="text-base-content/20">·</span>
+							<button type="button" @click="regenerate()" class="link link-hover inline-flex items-center gap-1"><i data-lucide="refresh-cw" class="w-3 h-3"></i>Regenerate</button>
+							<template x-if="hasCustomAvatar">
+								<span>
+									<span class="text-base-content/20">·</span>
+									<button type="button" @click="removeAvatar()" class="link link-hover text-error/70 hover:text-error">Remove</button>
+								</span>
+							</template>
+						</p>
+					</div>
+				</div>
+				<template x-if="avatarError">
+					<div role="alert" class="bb-form-error mb-4">
+						<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+						<span x-text="avatarError"></span>
+					</div>
+				</template>
+				<template x-if="avatarUploading">
+					<p class="text-xs text-base-content/50 mb-4 inline-flex items-center gap-1.5">
+						<span class="loading loading-spinner loading-xs"></span>
+						Uploading photo...
+					</p>
+				</template>
+				<!-- Form fields -->
+				<div class="space-y-4">
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="name">
+							Name <span class="text-error">*</span>
+						</label>
+						<input
+							type="text"
+							id="name"
+							name="name"
+							class="bb-form-input"
+							required
+							maxlength="128"
+							value={ userFormName(p.User) }
+							placeholder="e.g., Alex Canales"
+						/>
+					</div>
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="email">
+							Email <span class="text-base-content/30">(optional)</span>
+						</label>
+						<input
+							type="email"
+							id="email"
+							name="email"
+							class="bb-form-input"
+							value={ userFormEmail(p.User) }
+							placeholder="e.g., alex@example.com"
+						/>
+					</div>
+					<template x-if="formError">
+						<div role="alert" class="bb-form-error">
+							<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+							<span x-text="formError"></span>
+						</div>
+					</template>
+				</div>
+			</div>
+			<!-- Action row -->
+			<div class="bb-action-row">
+				<a href="/users" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
+				<button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32" :disabled="submitting">
+					<span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save Changes</span>
+					<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+				</button>
+			</div>
+		</form>
+	</div>
+	@templ.Raw(userFormEditBootstrap(p))
+}

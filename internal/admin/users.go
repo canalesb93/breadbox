@@ -10,6 +10,8 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
+	"breadbox/internal/templates/components"
+	"breadbox/internal/templates/components/pages"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -155,25 +157,33 @@ func UsersListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) 
 	}
 }
 
+// renderUserForm renders the create/edit user form via the templ component.
+// Both NewUserHandler and EditUserHandler funnel through here so the page
+// title, breadcrumbs, and IsEdit flag are derived in one place.
+func renderUserForm(sm *scs.SessionManager, tr *TemplateRenderer, w http.ResponseWriter, r *http.Request, props pages.UserFormProps) {
+	pageTitle := "Add Family Member"
+	if props.IsEdit && props.User != nil {
+		pageTitle = "Edit " + props.User.Name
+	}
+	data := BaseTemplateData(r, sm, "users", pageTitle)
+	tr.RenderWithTempl(w, r, data, pages.UserForm(props))
+}
+
 // NewUserHandler serves GET /admin/users/new.
-func NewUserHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
+func NewUserHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		data := map[string]any{
-			"PageTitle":   "Add Family Member",
-			"CurrentPage": "users",
-			"IsEdit":      false,
-			"CSRFToken":   GetCSRFToken(r),
-			"Breadcrumbs": []Breadcrumb{
+		renderUserForm(sm, tr, w, r, pages.UserFormProps{
+			IsEdit: false,
+			Breadcrumbs: []components.Breadcrumb{
 				{Label: "Household", Href: "/users"},
 				{Label: "Add Member"},
 			},
-		}
-		tr.Render(w, r, "user_form.html", data)
+		})
 	}
 }
 
 // EditUserHandler serves GET /admin/users/{id}/edit.
-func EditUserHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
+func EditUserHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		idStr := chi.URLParam(r, "id")
@@ -191,19 +201,15 @@ func EditUserHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			return
 		}
 
-		data := map[string]any{
-			"PageTitle":   "Edit " + user.Name,
-			"CurrentPage": "users",
-			"IsEdit":      true,
-			"User":        user,
-			"UserID":      idStr,
-			"CSRFToken":   GetCSRFToken(r),
-			"Breadcrumbs": []Breadcrumb{
+		renderUserForm(sm, tr, w, r, pages.UserFormProps{
+			IsEdit: true,
+			User:   &user,
+			UserID: idStr,
+			Breadcrumbs: []components.Breadcrumb{
 				{Label: "Household", Href: "/users"},
 				{Label: user.Name},
 			},
-		}
-		tr.Render(w, r, "user_form.html", data)
+		})
 	}
 }
 
