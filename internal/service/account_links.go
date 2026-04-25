@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -161,10 +162,10 @@ func (s *Service) GetAccountLink(ctx context.Context, id string) (*AccountLinkRe
 		ShortID:                 row.ShortID,
 		PrimaryAccountID:        formatUUID(row.PrimaryAccountID),
 		PrimaryAccountName:      row.PrimaryAccountDisplayName,
-		PrimaryUserName:         textPtrVal(row.PrimaryUserName),
+		PrimaryUserName:         pgconv.TextOr(row.PrimaryUserName, ""),
 		DependentAccountID:      formatUUID(row.DependentAccountID),
 		DependentAccountName:    row.DependentAccountDisplayName,
-		DependentUserName:       textPtrVal(row.DependentUserName),
+		DependentUserName:       pgconv.TextOr(row.DependentUserName, ""),
 		MatchStrategy:           row.MatchStrategy,
 		MatchToleranceDays:      int(row.MatchToleranceDays),
 		Enabled:                 row.Enabled,
@@ -192,10 +193,10 @@ func (s *Service) ListAccountLinks(ctx context.Context) ([]AccountLinkResponse, 
 			ShortID:                 row.ShortID,
 			PrimaryAccountID:        formatUUID(row.PrimaryAccountID),
 			PrimaryAccountName:      row.PrimaryAccountDisplayName,
-			PrimaryUserName:         textPtrVal(row.PrimaryUserName),
+			PrimaryUserName:         pgconv.TextOr(row.PrimaryUserName, ""),
 			DependentAccountID:      formatUUID(row.DependentAccountID),
 			DependentAccountName:    row.DependentAccountDisplayName,
-			DependentUserName:       textPtrVal(row.DependentUserName),
+			DependentUserName:       pgconv.TextOr(row.DependentUserName, ""),
 			MatchStrategy:           row.MatchStrategy,
 			MatchToleranceDays:      int(row.MatchToleranceDays),
 			Enabled:                 row.Enabled,
@@ -500,10 +501,3 @@ func (s *Service) RunMatchReconciliation(ctx context.Context, linkID string) (*M
 	}, nil
 }
 
-// textPtrVal returns the string value of a pgtype.Text, or empty string if null.
-func textPtrVal(t pgtype.Text) string {
-	if !t.Valid {
-		return ""
-	}
-	return t.String
-}
