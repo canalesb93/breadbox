@@ -1,0 +1,512 @@
+package pages
+
+import (
+	"fmt"
+
+	"breadbox/internal/templates/components"
+)
+
+// ConnectionDetail renders the per-connection detail page (sync health,
+// accounts, sync history, and provider-specific actions). Hosts inside the
+// base layout via TemplateRenderer.RenderWithTempl — the handler passes the
+// typed props and the bridge drops the rendered HTML into base.html's
+// TemplContent slot.
+//
+// Mirrors the previous internal/templates/pages/connection_detail.html
+// byte-for-byte (responsive classes, Alpine directives, ARIA, scripts).
+templ ConnectionDetail(p ConnectionDetailProps) {
+	<div class="max-w-full overflow-x-hidden">
+		@components.BreadcrumbNav(p.Breadcrumbs)
+		if p.Status == "error" || p.Status == "pending_reauth" {
+			<div class="bb-card border-error/30 bg-error/5 px-5 py-4 mb-6 flex items-center gap-4 flex-wrap">
+				<div class="w-9 h-9 rounded-xl bg-error/10 flex items-center justify-center shrink-0">
+					<i data-lucide="alert-triangle" class="w-4 h-4 text-error"></i>
+				</div>
+				<div class="flex-1 min-w-0">
+					<p class="font-semibold text-sm">This connection needs re-authentication</p>
+					if p.HasErrorCode {
+						<p class="text-xs text-base-content/50 mt-0.5">{ connDetailErrorMessage(p.ErrorCode) }</p>
+					} else if p.HasErrorMessage {
+						<p class="text-xs text-base-content/50 mt-0.5 truncate">{ p.ErrorMessage }</p>
+					}
+				</div>
+				<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-error rounded-xl shrink-0">Re-authenticate</a>
+			</div>
+		}
+		if p.ConsecutiveFailures >= 3 && !(p.Status == "error" || p.Status == "pending_reauth") {
+			<div class="bb-card border-warning/30 bg-warning/5 p-5 mb-6 flex items-start gap-4">
+				<div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
+					<i data-lucide="alert-triangle" class="w-5 h-5 text-warning"></i>
+				</div>
+				<div class="flex-1 min-w-0">
+					<p class="font-semibold text-sm">{ fmt.Sprintf("This connection has failed %d syncs in a row", p.ConsecutiveFailures) }</p>
+					<p class="text-sm text-base-content/60 mt-0.5">
+						Recent syncs have been failing consistently. Check the sync history below for error details.
+						if p.LastErrorAtValid {
+							{ " Last error was " + p.LastErrorAtRelative + "." }
+						}
+					</p>
+				</div>
+			</div>
+		}
+		<!-- Header with actions -->
+		<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+			<div class="flex items-center gap-4 min-w-0">
+				<div class={ "w-11 h-11 rounded-xl flex items-center justify-center shrink-0", connDetailHeaderTileBg(p.Provider) }>
+					switch p.Provider {
+						case "plaid":
+							<i data-lucide="building-2" class="w-5 h-5 text-info"></i>
+						case "teller":
+							<i data-lucide="landmark" class="w-5 h-5 text-success"></i>
+						default:
+							<i data-lucide="file-spreadsheet" class="w-5 h-5 text-warning"></i>
+					}
+				</div>
+				<div class="min-w-0">
+					<div class="flex items-center gap-2.5 flex-wrap">
+						<h1 class="bb-page-title truncate">{ p.InstitutionName }</h1>
+						if p.LastSyncStatus == "error" && p.Status == "active" {
+							<span class="relative group/err">
+								<span class="text-[0.7rem] font-medium px-2 py-0.5 rounded-full bg-error/10 text-error cursor-help">Sync Error</span>
+								if p.LastSyncErrorMessageValid {
+									<span class="absolute left-0 top-full mt-1.5 z-50 hidden group-hover/err:block w-64 sm:w-80 px-3 py-2.5 rounded-lg bg-base-300 text-xs shadow-lg border border-error/20 leading-relaxed">
+										<span class="flex items-center gap-1.5 text-error font-medium mb-1"><i data-lucide="alert-circle" class="w-3 h-3"></i>Last sync failed</span>
+										<span class="text-base-content/70">{ p.LastSyncErrorMessageString }</span>
+									</span>
+								}
+							</span>
+						} else {
+							@templ.Raw(connDetailStatusBadge(p.Status))
+						}
+						if p.Paused {
+							<span class="badge badge-ghost badge-sm">Paused</span>
+						}
+					</div>
+					<div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/40">
+						<span class="capitalize">{ p.Provider }</span>
+						if p.UserNameValid {
+							<span>&middot;</span>
+							<span>{ p.UserName }</span>
+						}
+						if p.LastSyncedAtValid {
+							<span>&middot;</span>
+							<span>{ "Synced " + p.LastSyncedAtRelative }</span>
+						}
+					</div>
+				</div>
+			</div>
+			<div class="flex items-center gap-2 flex-wrap shrink-0" x-data="{ confirming: false }">
+				if p.Status == "error" || p.Status == "pending_reauth" {
+					<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-outline rounded-xl">Re-authenticate</a>
+				}
+				if p.Provider == "csv" {
+					<a href={ templ.SafeURL("/connections/import-csv?connection_id=" + p.ConnID) } class="btn btn-sm btn-outline rounded-xl">
+						<i data-lucide="upload" class="w-3.5 h-3.5"></i>
+						Import More
+					</a>
+				}
+				if p.Status == "active" {
+					<button class="btn btn-sm btn-primary rounded-xl" onclick="syncConnection()" id="sync-btn">
+						<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+						Sync Now
+					</button>
+				}
+				<button class="btn btn-sm btn-ghost rounded-xl" onclick="togglePause()" id="pause-btn">
+					if p.Paused {
+						<i data-lucide="play" class="w-3.5 h-3.5"></i>
+						Resume
+					} else {
+						<i data-lucide="pause" class="w-3.5 h-3.5"></i>
+						Pause
+					}
+				</button>
+				<button class="btn btn-sm btn-ghost text-error/70 hover:text-error rounded-xl" x-show="!confirming" @click="confirming = true" id="remove-btn">
+					<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+				</button>
+				<span x-show="confirming" x-cloak class="inline-flex gap-2">
+					<button class="btn btn-error btn-sm rounded-xl" @click="removeConnection()">Yes, Remove</button>
+					<button class="btn btn-ghost btn-sm rounded-xl" @click="confirming = false">Cancel</button>
+				</span>
+			</div>
+		</div>
+		<!-- Sync Health Stats -->
+		if p.TotalSyncs > 0 {
+			@connDetailSyncHealth(p)
+			@connDetailSyncTimeline(p)
+		}
+		<!-- Connection Details + Sync Settings -->
+		@connDetailInfoGrid(p)
+		<!-- Accounts -->
+		if len(p.Accounts) > 0 {
+			@connDetailAccounts(p)
+		} else {
+			<div class="bb-card mb-6">
+				<div class="flex flex-col items-center justify-center py-12 text-base-content/30">
+					<i data-lucide="wallet" class="w-10 h-10 mb-3 opacity-50"></i>
+					<p class="text-sm">No accounts found for this connection</p>
+					<p class="text-xs mt-1">Accounts will appear after the first sync</p>
+				</div>
+			</div>
+		}
+		<!-- Sync History -->
+		@connDetailSyncHistory(p)
+		@templ.Raw(connDetailScripts(p))
+	</div>
+}
+
+templ connDetailSyncHealth(p ConnectionDetailProps) {
+	<div class="bb-card p-0 mb-6 overflow-hidden">
+		<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-base-300/40">
+			<div class="p-4">
+				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Success Rate</div>
+				<div class="flex items-baseline gap-1">
+					<span class={ "text-xl font-bold tabular-nums", connDetailSuccessRateClass(p.SuccessRate) }>{ fmt.Sprintf("%.0f%%", p.SuccessRate) }</span>
+					<span class="text-[0.6rem] text-base-content/30 tabular-nums">{ fmt.Sprintf("%d/%d", p.SuccessSyncs, p.TotalSyncs) }</span>
+				</div>
+			</div>
+			<div class="p-4">
+				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Last Sync</div>
+				<div class="text-sm font-semibold truncate">
+					if p.LastSuccessRelative != "" {
+						{ p.LastSuccessRelative }
+					} else {
+						<span class="text-base-content/30">Never</span>
+					}
+				</div>
+				if p.LastSuccessTime != "" {
+					<div class="text-[0.6rem] text-base-content/30 mt-0.5 truncate" title={ p.LastSuccessTime }>{ p.LastSuccessTime }</div>
+				}
+			</div>
+			<div class="p-4">
+				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Next Sync</div>
+				<div class={ "text-sm font-semibold truncate", templ.KV("text-info", p.NextSync.IsOverdue) }>
+					if p.NextSync.IsDisconnected {
+						<span class="text-base-content/30">N/A</span>
+					} else if p.NextSync.IsPaused {
+						<span class="text-base-content/30">Paused</span>
+					} else {
+						{ p.NextSync.Label }
+					}
+				</div>
+				if !p.NextSync.IsDisconnected && !p.NextSync.IsPaused {
+					<div class="text-[0.6rem] text-base-content/30 mt-0.5 tabular-nums">{ "every " + components.FormatIntervalMinutes(p.NextSync.EffectiveIntervalMinutes) }</div>
+				}
+			</div>
+			<div class="p-4">
+				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Transactions</div>
+				<div class="text-xl font-bold tabular-nums">{ fmt.Sprintf("%d", p.TotalAdded) }</div>
+				<div class="text-[0.6rem] text-base-content/30 mt-0.5 tabular-nums">
+					if p.TotalModified > 0 {
+						{ fmt.Sprintf("%d mod", p.TotalModified) }
+					}
+					if p.TotalRemoved > 0 {
+						{ " · " }
+						{ fmt.Sprintf("%d del", p.TotalRemoved) }
+					}
+					if p.TotalModified == 0 && p.TotalRemoved == 0 {
+						total synced
+					}
+				</div>
+			</div>
+			<div class="p-4">
+				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Avg Duration</div>
+				<div class="text-xl font-bold tabular-nums">
+					@templ.Raw(connDetailAvgDuration(p.AvgDurationSec))
+				</div>
+				<div class="text-[0.6rem] text-base-content/30 mt-0.5">per sync</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ connDetailSyncTimeline(p ConnectionDetailProps) {
+	<div class="bb-card p-5 mb-6">
+		<div class="flex items-center justify-between mb-4">
+			<div class="flex items-center gap-3">
+				<h2 class="text-sm font-semibold text-base-content/70">Sync Activity</h2>
+				<div class="flex items-center gap-3 text-[0.6rem] text-base-content/35">
+					<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-success/60"></span>Success</span>
+					<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-error/60"></span>Error</span>
+				</div>
+			</div>
+			<span class="text-xs text-base-content/30">14 days</span>
+		</div>
+		<div class="flex items-end gap-1.5" style="height: 72px;">
+			for _, ds := range p.DaySyncs {
+				@connDetailDayBar(ds)
+			}
+		</div>
+	</div>
+}
+
+templ connDetailDayBar(ds DaySyncRow) {
+	<div class="flex-1 flex flex-col items-center gap-1 group relative">
+		if ds.Total > 0 {
+			<div class="flex flex-col-reverse gap-px w-full rounded-md overflow-hidden" style="height: 52px;">
+				if ds.Success > 0 {
+					<div class="w-full bg-success/50 transition-all duration-200 group-hover:bg-success/70" style={ connDetailBarStyle(ds.Success, ds.Error, ds.Total) }></div>
+				}
+				if ds.Error > 0 {
+					<div class="w-full bg-error/50 transition-all duration-200 group-hover:bg-error/70" style={ connDetailBarStyle(ds.Error, ds.Success, ds.Total) }></div>
+				}
+			</div>
+		} else {
+			<div class="w-full flex items-end" style="height: 52px;">
+				<div class="w-full h-[3px] rounded-full bg-base-300/30"></div>
+			</div>
+		}
+		<div class="text-[0.5rem] text-base-content/25 tabular-nums leading-none select-none">{ ds.ShortLabel }</div>
+		<!-- Tooltip -->
+		<div class="absolute -top-9 left-1/2 -translate-x-1/2 bg-base-content text-base-100 text-[0.6rem] px-2 py-1 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 tabular-nums shadow-sm">
+			{ fmt.Sprintf("%s: %d sync%s", ds.Label, ds.Total, connDetailPluralSyncs(ds.Total)) }
+			if ds.Error > 0 {
+				{ fmt.Sprintf(" (%d err)", ds.Error) }
+			}
+		</div>
+	</div>
+}
+
+templ connDetailInfoGrid(p ConnectionDetailProps) {
+	<div class="bb-card p-0 mb-6 overflow-hidden">
+		<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-base-300/40">
+			<div class="p-4">
+				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Family Member</div>
+				<div class="text-sm font-semibold truncate">{ p.UserName }</div>
+			</div>
+			<div class="p-4">
+				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Provider</div>
+				<div class="text-sm font-semibold capitalize">{ p.Provider }</div>
+			</div>
+			<div class="p-4">
+				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Connected</div>
+				<div class="text-sm font-semibold">
+					if p.CreatedAtValid {
+						{ p.CreatedAtFormatted }
+					} else {
+						<span class="text-base-content/30">&mdash;</span>
+					}
+				</div>
+			</div>
+			<div class="p-4">
+				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Last Synced</div>
+				<div class="text-sm font-semibold">
+					if p.LastSyncedAtValid {
+						{ p.LastSyncedAtRelative }
+					} else {
+						<span class="text-base-content/30">Never</span>
+					}
+				</div>
+			</div>
+			<div class="p-4">
+				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Sync Interval</div>
+				<div>
+					<select id="sync-interval" onchange="updateSyncInterval(this.value)" class="select select-xs select-bordered w-full rounded-lg">
+						@connDetailIntervalOption("", "Global default", !p.SyncIntervalOverrideMinutesValid, false, false)
+						@connDetailIntervalOption("15", "Every 15 min", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 15)
+						@connDetailIntervalOption("30", "Every 30 min", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 30)
+						@connDetailIntervalOption("60", "Every hour", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 60)
+						@connDetailIntervalOption("120", "Every 2 hours", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 120)
+						@connDetailIntervalOption("240", "Every 4 hours", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 240)
+						@connDetailIntervalOption("720", "Every 12 hours", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 720)
+						@connDetailIntervalOption("1440", "Every 24 hours", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 1440)
+					</select>
+					<span id="interval-status" class="text-[0.6rem] text-base-content/30 mt-0.5 block"></span>
+				</div>
+			</div>
+		</div>
+		if p.ConsecutiveFailures > 0 {
+			<div class="border-t border-base-300/40 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-base-300/40">
+				<div class="p-4">
+					<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Consecutive Failures</div>
+					<div class="text-sm font-semibold text-warning">{ fmt.Sprintf("%d", p.ConsecutiveFailures) }</div>
+				</div>
+				<div class="p-4">
+					<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Last Error</div>
+					<div class="text-sm font-semibold">
+						if p.LastErrorAtValid {
+							{ p.LastErrorAtRelative }
+						} else {
+							<span class="text-base-content/30">&mdash;</span>
+						}
+					</div>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+templ connDetailIntervalOption(value, label string, defaultSelected, overrideValid, match bool) {
+	if defaultSelected {
+		<option value={ value } selected>{ label }</option>
+	} else if overrideValid && match {
+		<option value={ value } selected>{ label }</option>
+	} else {
+		<option value={ value }>{ label }</option>
+	}
+}
+
+templ connDetailAccounts(p ConnectionDetailProps) {
+	<div class="mb-6">
+		<div class="flex items-center justify-between mb-3">
+			<h2 class="text-sm font-semibold text-base-content/70">Accounts</h2>
+			<span class="text-xs text-base-content/30">
+				{ fmt.Sprintf("%d total", len(p.Accounts)) }
+				if p.HasBalance {
+					{ " · " + components.FormatBalance(p.TotalBalance) }
+				}
+			</span>
+		</div>
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bb-stagger">
+			for _, a := range p.Accounts {
+				@connDetailAccountCard(a)
+			}
+		</div>
+	</div>
+}
+
+templ connDetailAccountCard(a AccountRow) {
+	<div class={ "bb-card p-0 overflow-hidden", templ.KV("opacity-50", a.Excluded) }>
+		<div class="flex h-full">
+			<!-- Colored accent bar by account type -->
+			<div class={ "w-1 shrink-0", connDetailAccentBar(a.Type) }></div>
+			<div class="flex-1 p-4">
+				<div class="flex items-start justify-between gap-2 mb-3">
+					<div class="flex items-center gap-2.5 min-w-0">
+						<div class={ "w-8 h-8 rounded-lg flex items-center justify-center shrink-0", connDetailAccountTileBg(a.Type) }>
+							<i data-lucide={ connDetailAccountIcon(a.Type) } class={ "w-4 h-4", connDetailAccountIconColor(a.Type) }></i>
+						</div>
+						<div class="min-w-0">
+							<a href={ templ.SafeURL("/accounts/" + a.ID) } class="text-sm font-medium hover:text-primary transition-colors no-underline block truncate">
+								{ a.Name }
+							</a>
+							<div class="text-xs text-base-content/40">
+								{ connDetailAccountTypeLabel(a.Type, a.SubtypeString, a.SubtypeValid) }
+								if a.MaskValid {
+									{ " · ····" + a.MaskString }
+								}
+							</div>
+						</div>
+					</div>
+					if a.Excluded {
+						<span class="badge badge-ghost badge-xs shrink-0">Excluded</span>
+					}
+				</div>
+				<!-- Balances -->
+				<div class="flex items-end justify-between gap-3">
+					<div class="min-w-0">
+						if a.BalanceCurrentValid {
+							<div class="text-[0.6rem] text-base-content/35 uppercase tracking-wider mb-0.5">Current</div>
+							<div class={ "text-lg font-bold tabular-nums", connDetailBalanceColor(a.Type) }>{ a.BalanceCurrentText }</div>
+						} else {
+							<div class="text-xs text-base-content/30">No balance data</div>
+						}
+					</div>
+					if a.BalanceAvailableValid {
+						<div class="text-right">
+							<div class="text-[0.6rem] text-base-content/35 uppercase tracking-wider mb-0.5">Available</div>
+							<div class="text-sm font-medium tabular-nums text-base-content/60">{ a.BalanceAvailableText }</div>
+						</div>
+					}
+				</div>
+				<!-- Inline actions -->
+				<div class="flex items-center gap-2 mt-3 pt-3 border-t border-base-300/40">
+					@templ.Raw(connDetailDisplayNameInput(a))
+					<label class="flex items-center gap-1.5 text-xs text-base-content/40 cursor-pointer shrink-0" title="Exclude from sync">
+						@templ.Raw(connDetailExcludeCheckbox(a))
+						<span>Exclude</span>
+					</label>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ connDetailSyncHistory(p ConnectionDetailProps) {
+	<div class="bb-card p-0 overflow-hidden">
+		<div class="px-4 sm:px-5 pt-4 pb-3 flex items-center justify-between">
+			<h2 class="text-sm font-semibold text-base-content/70">Sync History</h2>
+			<span class="text-xs text-base-content/30">Last 10</span>
+		</div>
+		<div id="sync-history-content">
+			<div id="sync-history-list" class={ "px-4 sm:px-5 pb-4", templ.KV("hidden", len(p.SyncLogs) == 0) }>
+				for _, sl := range p.SyncLogs {
+					@connDetailSyncLogRow(sl)
+				}
+			</div>
+			<div id="sync-history-empty" class={ "px-4 sm:px-5 pb-4", templ.KV("hidden", len(p.SyncLogs) > 0) }>
+				<div class="flex flex-col items-center justify-center py-10 text-base-content/30">
+					<i data-lucide="refresh-cw" class="w-10 h-10 mb-3 opacity-50"></i>
+					<p class="text-sm">No sync history yet</p>
+				</div>
+			</div>
+		</div>
+		<!-- /sync-history-content -->
+	</div>
+}
+
+templ connDetailSyncLogRow(sl SyncLogRow) {
+	<div
+		class="flex gap-3 py-3 border-b border-base-300/30 last:border-0"
+		data-sync-log-row={ sl.ShortID }
+		data-sync-log-status={ sl.Status }
+	>
+		<div class="flex flex-col items-center shrink-0 pt-0.5" data-sync-log-icon>
+			<div class={ "w-6 h-6 rounded-full flex items-center justify-center", connDetailSyncIconBg(sl.Status) }>
+				switch sl.Status {
+					case "success":
+						<i data-lucide="check" class="w-3 h-3 text-success"></i>
+					case "error":
+						<i data-lucide="x" class="w-3 h-3 text-error"></i>
+					default:
+						<span class="loading loading-spinner loading-xs text-primary"></span>
+				}
+			</div>
+		</div>
+		<div class="flex-1 min-w-0 flex items-center justify-between gap-2">
+			<div class="min-w-0">
+				<div class="flex items-center gap-2 flex-wrap">
+					<span class="text-sm font-medium capitalize">{ sl.Trigger }</span>
+					<span class="text-xs text-base-content/35 tabular-nums" data-sync-log-time>{ sl.StartedAtRelative }</span>
+					<span class={ "text-[0.6rem] text-base-content/25 tabular-nums bg-base-200/50 px-1.5 py-0.5 rounded-full", templ.KV("hidden", !sl.HasDuration) } data-sync-log-duration>
+						if sl.HasDuration {
+							{ sl.DurationLabel }
+						}
+					</span>
+				</div>
+				<p class={ "text-xs text-error/60 mt-0.5 truncate", templ.KV("hidden", !(sl.Status == "error" && sl.ErrorMessageValid)) } data-sync-log-error title={ connDetailErrTitle(sl) }>
+					if sl.Status == "error" && sl.ErrorMessageValid {
+						if sl.ErrorMessageFriendly != "" {
+							{ sl.ErrorMessageFriendly }
+						} else {
+							{ sl.ErrorMessageString }
+						}
+					}
+				</p>
+			</div>
+			<div class="flex items-center gap-2.5 tabular-nums text-xs shrink-0" data-sync-log-counts>
+				<div class={ "flex items-center gap-1.5", templ.KV("hidden", !(sl.AddedCount != 0 || sl.ModifiedCount != 0 || sl.RemovedCount != 0)) } data-sync-log-counts-main>
+					<span class={ "text-success font-medium", templ.KV("hidden", sl.AddedCount == 0) } data-sync-log-added>
+						if sl.AddedCount != 0 {
+							{ fmt.Sprintf("+%d", sl.AddedCount) }
+						}
+					</span>
+					<span class={ "text-info font-medium", templ.KV("hidden", sl.ModifiedCount == 0) } data-sync-log-modified>
+						if sl.ModifiedCount != 0 {
+							{ fmt.Sprintf("~%d", sl.ModifiedCount) }
+						}
+					</span>
+					<span class={ "text-error font-medium", templ.KV("hidden", sl.RemovedCount == 0) } data-sync-log-removed>
+						if sl.RemovedCount != 0 {
+							{ fmt.Sprintf("-%d", sl.RemovedCount) }
+						}
+					</span>
+				</div>
+				<span class={ "text-base-content/25 text-[0.6rem]", templ.KV("hidden", sl.UnchangedCount == 0) } data-sync-log-unchanged title={ fmt.Sprintf("%d unchanged", sl.UnchangedCount) }>
+					if sl.UnchangedCount != 0 {
+						{ fmt.Sprintf("=%d", sl.UnchangedCount) }
+					}
+				</span>
+			</div>
+		</div>
+	</div>
+}
