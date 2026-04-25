@@ -31,8 +31,11 @@ func TestRulesTemplateRenders(t *testing.T) {
 
 	html := buf.String()
 
-	if !strings.Contains(html, "rulesPage()") {
+	if !strings.Contains(html, `x-data="rulesPage"`) {
 		t.Error("rules Alpine component not initialized")
+	}
+	if !strings.Contains(html, `src="/static/js/admin/components/rules.js"`) {
+		t.Error("rules.js script tag not rendered")
 	}
 	if !strings.Contains(html, "No rules yet") {
 		t.Error("empty-state message not rendered")
