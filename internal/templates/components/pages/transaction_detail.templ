@@ -253,7 +253,7 @@ templ txdMain(p TransactionDetailProps) {
 
 templ txdActivity(p TransactionDetailProps) {
 	<!-- Activity Timeline -->
-	<section id="activity" aria-labelledby="activity-heading" class="bb-card p-0 overflow-hidden" x-data="commentManager()">
+	<section id="activity" aria-labelledby="activity-heading" class="bb-card p-0 overflow-hidden" x-data={ fmt.Sprintf("commentManager(%d)", p.MaxCommentLength) }>
 		<div class="px-4 sm:px-5 pt-5 pb-3 flex items-center gap-2">
 			<i data-lucide="activity" class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>
 			<h2 id="activity-heading" class="text-sm font-semibold text-base-content/50">Activity</h2>
@@ -267,12 +267,41 @@ templ txdActivity(p TransactionDetailProps) {
 		</div>
 		<!-- Add Note -->
 		<div class="px-4 sm:px-5 pb-4">
-			<div class="flex gap-2 items-center">
+			<div class="flex gap-2 items-start">
 				<label for="bb-txd-comment" class="sr-only">Add a note</label>
-				<input id="bb-txd-comment" type="text" x-model="newComment" placeholder="Add a note..." class="input input-bordered input-sm h-9 flex-1 bg-base-200/50 rounded-xl" @keydown.enter.prevent="newComment.trim() && addComment()"/>
-				<button @click="addComment()" class="btn btn-sm h-9 rounded-xl btn-primary btn-square" :disabled="!newComment.trim()" aria-label="Post note">
+				<textarea
+					id="bb-txd-comment"
+					x-ref="composer"
+					x-model="newComment"
+					@input="autosize($event.target)"
+					@keydown.meta.enter.prevent="canSubmit() && addComment()"
+					@keydown.ctrl.enter.prevent="canSubmit() && addComment()"
+					rows="1"
+					placeholder="Add a note..."
+					maxlength={ fmt.Sprintf("%d", p.MaxCommentLength) }
+					aria-describedby="bb-txd-comment-counter bb-txd-comment-hint"
+					class="flex-1 block w-full text-sm bg-base-200/50 border border-base-content/10 focus:border-primary focus:outline-none focus:ring-0 rounded-xl resize-none leading-6 px-3 py-1.5 h-9 min-h-9 max-h-36 overflow-y-hidden whitespace-pre-wrap break-words"
+				></textarea>
+				<button @click="addComment()" class="btn btn-sm h-9 rounded-xl btn-primary btn-square shrink-0" :disabled="!canSubmit()" aria-label="Post note">
 					<i data-lucide="send" class="w-3.5 h-3.5" aria-hidden="true"></i>
 				</button>
+			</div>
+			<div class="mt-1.5 px-0.5 text-[11px] text-base-content/40 flex items-center gap-2">
+				<span id="bb-txd-comment-hint" class="hidden sm:inline-flex items-center gap-1.5 flex-wrap" x-show="!$store.device.isTouch">
+					@components.KbdCombo("cmd", "enter")
+					<span>to post</span>
+					<span class="text-base-content/30" aria-hidden="true">·</span>
+					@components.Kbd("n")
+					<span>to focus</span>
+				</span>
+				<span
+					id="bb-txd-comment-counter"
+					class="ml-auto tabular-nums"
+					:class="{ 'text-warning': counterState() === 'warn', 'text-error font-medium': counterState() === 'error', 'invisible': newComment.length === 0 }"
+					aria-live="polite"
+				>
+					<span x-text="newComment.length"></span> / <span x-text="maxLength"></span>
+				</span>
 			</div>
 		</div>
 		if len(p.ActivityDays) > 0 {
@@ -751,6 +780,20 @@ document.addEventListener('alpine:init', function() {
   });
 
   reg.register({
+    id: 'transaction-detail.compose-note',
+    keys: 'n',
+    description: 'Add a note',
+    group: 'Actions',
+    scope: 'transaction-detail',
+    action: function() {
+      var el = document.getElementById('bb-txd-comment');
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.focus();
+    },
+  });
+
+  reg.register({
     id: 'transaction-detail.expand-system-details',
     keys: 'e',
     description: 'Toggle system details',
@@ -811,13 +854,36 @@ function showToast(message, type) {
   window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type || 'error' } }));
 }
 
-function commentManager() {
+function commentManager(maxLen) {
   return {
     newComment: '',
+    maxLength: maxLen || 10000,
+    canSubmit() {
+      var trimmed = this.newComment.trim().length;
+      return trimmed > 0 && this.newComment.length <= this.maxLength;
+    },
+    counterState() {
+      if (this.newComment.length === 0) return 'ok';
+      var ratio = this.newComment.length / this.maxLength;
+      if (ratio >= 1) return 'error';
+      if (ratio >= 0.9) return 'warn';
+      return 'ok';
+    },
+    autosize(el) {
+      // Reset to natural height so scrollHeight reflects current content,
+      // not the previously-set explicit height. Cap at max-h-36 (9rem ≈ 144px)
+      // so the composer never balloons past ~6 rows; overflow scrolls inside.
+      if (!el) return;
+      el.style.height = 'auto';
+      var max = 144;
+      var next = Math.min(el.scrollHeight, max);
+      el.style.height = next + 'px';
+      el.style.overflowY = el.scrollHeight > max ? 'auto' : 'hidden';
+    },
     addComment() {
       var self = this;
       var content = this.newComment.trim();
-      if (!content) return;
+      if (!content || !this.canSubmit()) return;
       fetch('/-/transactions/%[2]s/comments', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},

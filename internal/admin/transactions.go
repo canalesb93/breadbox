@@ -800,6 +800,7 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			CurrentTags:      currentTags,
 			AvailableTags:    availableTags,
 			Categories:       categoryTree,
+			MaxCommentLength: service.MaxCommentLength,
 		}
 		renderTransactionDetail(tr, w, r, data, props)
 	}

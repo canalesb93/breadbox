@@ -49,4 +49,8 @@ type TransactionDetailProps struct {
 
 	// Two-level category tree powering the inline category picker.
 	Categories []service.CategoryResponse
+
+	// MaxCommentLength is the server-side cap (service.MaxCommentLength)
+	// surfaced to the composer so the char counter mirrors it.
+	MaxCommentLength int
 }
