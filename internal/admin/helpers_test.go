@@ -141,6 +141,117 @@ func TestSplitCSV(t *testing.T) {
 	}
 }
 
+func TestParseAdminTxFilters(t *testing.T) {
+	r := httptest.NewRequest("GET",
+		"/?start_date=2026-04-01&end_date=2026-04-30"+
+			"&account_id=acc1&user_id=u1&connection_id=c1&category=food"+
+			"&min_amount=10.5&max_amount=99&search=coffee"+
+			"&pending=true&search_mode=words&search_field=name"+
+			"&sort=asc&tags=a,b&any_tag=c,d", nil)
+
+	p := parseAdminTxFilters(r)
+
+	if p.StartDate == nil || !p.StartDate.Equal(time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("StartDate = %v, want 2026-04-01", p.StartDate)
+	}
+	if p.EndDate == nil || !p.EndDate.Equal(time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("EndDate = %v, want 2026-05-01 (inclusive +1d)", p.EndDate)
+	}
+	if p.AccountID == nil || *p.AccountID != "acc1" {
+		t.Errorf("AccountID = %v, want acc1", p.AccountID)
+	}
+	if p.UserID == nil || *p.UserID != "u1" {
+		t.Errorf("UserID = %v, want u1", p.UserID)
+	}
+	if p.ConnectionID == nil || *p.ConnectionID != "c1" {
+		t.Errorf("ConnectionID = %v, want c1", p.ConnectionID)
+	}
+	if p.CategorySlug == nil || *p.CategorySlug != "food" {
+		t.Errorf("CategorySlug = %v, want food", p.CategorySlug)
+	}
+	if p.MinAmount == nil || *p.MinAmount != 10.5 {
+		t.Errorf("MinAmount = %v, want 10.5", p.MinAmount)
+	}
+	if p.MaxAmount == nil || *p.MaxAmount != 99 {
+		t.Errorf("MaxAmount = %v, want 99", p.MaxAmount)
+	}
+	if p.Search == nil || *p.Search != "coffee" {
+		t.Errorf("Search = %v, want coffee", p.Search)
+	}
+	if p.Pending == nil || *p.Pending != true {
+		t.Errorf("Pending = %v, want true", p.Pending)
+	}
+	if p.SearchMode == nil || *p.SearchMode != "words" {
+		t.Errorf("SearchMode = %v, want words", p.SearchMode)
+	}
+	if p.SearchField == nil || *p.SearchField != "name" {
+		t.Errorf("SearchField = %v, want name", p.SearchField)
+	}
+	if p.SortOrder != "asc" {
+		t.Errorf("SortOrder = %q, want asc", p.SortOrder)
+	}
+	if got, want := p.Tags, []string{"a", "b"}; !equalStrings(got, want) {
+		t.Errorf("Tags = %v, want %v", got, want)
+	}
+	if got, want := p.AnyTag, []string{"c", "d"}; !equalStrings(got, want) {
+		t.Errorf("AnyTag = %v, want %v", got, want)
+	}
+	if p.Page != 0 || p.PageSize != 0 {
+		t.Errorf("Page/PageSize = %d/%d, want 0/0 (caller-controlled)", p.Page, p.PageSize)
+	}
+}
+
+func TestParseAdminTxFiltersEmpty(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
+	p := parseAdminTxFilters(r)
+
+	if p.StartDate != nil || p.EndDate != nil ||
+		p.AccountID != nil || p.UserID != nil || p.ConnectionID != nil ||
+		p.CategorySlug != nil || p.MinAmount != nil || p.MaxAmount != nil ||
+		p.Search != nil || p.Pending != nil ||
+		p.SearchMode != nil || p.SearchField != nil {
+		t.Errorf("expected all-nil filter pointers on empty request, got %+v", p)
+	}
+	if p.SortOrder != "" {
+		t.Errorf("SortOrder = %q, want empty (defaults to desc downstream)", p.SortOrder)
+	}
+	if len(p.Tags) != 0 || len(p.AnyTag) != 0 {
+		t.Errorf("Tags/AnyTag should be empty, got %v/%v", p.Tags, p.AnyTag)
+	}
+}
+
+func TestParseAdminTxFiltersIgnoresInvalid(t *testing.T) {
+	// Invalid search_mode and search_field should be silently dropped, not
+	// passed through to the service layer. Matches admin "silent failure"
+	// semantics for stale URLs.
+	r := httptest.NewRequest("GET", "/?search_mode=bogus&search_field=bogus&min_amount=abc&start_date=not-a-date", nil)
+	p := parseAdminTxFilters(r)
+	if p.SearchMode != nil {
+		t.Errorf("SearchMode should be nil for invalid value, got %v", *p.SearchMode)
+	}
+	if p.SearchField != nil {
+		t.Errorf("SearchField should be nil for invalid value, got %v", *p.SearchField)
+	}
+	if p.MinAmount != nil {
+		t.Errorf("MinAmount should be nil for non-numeric, got %v", *p.MinAmount)
+	}
+	if p.StartDate != nil {
+		t.Errorf("StartDate should be nil for malformed date, got %v", *p.StartDate)
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestIsLiabilityAccount(t *testing.T) {
 	tests := []struct {
 		accountType string

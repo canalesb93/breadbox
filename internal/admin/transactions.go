@@ -95,47 +95,54 @@ func smartDateLabel(dateStr, today, yesterday string) string {
 	return t.Format("Mon, Jan 2, 2006")
 }
 
+// parseAdminTxFilters reads the standard transaction-list filter query params
+// from r and returns an AdminTransactionListParams populated with everything
+// except Page/PageSize. Callers control pagination semantics — list/search use
+// the user's per_page choice; per-account or single-shot views set their own.
+func parseAdminTxFilters(r *http.Request) service.AdminTransactionListParams {
+	q := r.URL.Query()
+	params := service.AdminTransactionListParams{
+		StartDate:    parseDateParam(r, "start_date"),
+		EndDate:      parseInclusiveDateParam(r, "end_date"),
+		AccountID:    optStrQuery(q, "account_id"),
+		UserID:       optStrQuery(q, "user_id"),
+		ConnectionID: optStrQuery(q, "connection_id"),
+		CategorySlug: optStrQuery(q, "category"),
+		MinAmount:    optFloatQuery(q, "min_amount"),
+		MaxAmount:    optFloatQuery(q, "max_amount"),
+		Search:       optStrQuery(q, "search"),
+	}
+	if v := q.Get("pending"); v != "" {
+		b := v == "true"
+		params.Pending = &b
+	}
+	if v := q.Get("search_mode"); v != "" && service.ValidateSearchMode(v) {
+		params.SearchMode = &v
+	}
+	if v := q.Get("search_field"); v != "" && service.ValidateSearchField(v) {
+		params.SearchField = &v
+	}
+	if q.Get("sort") == "asc" {
+		params.SortOrder = "asc"
+	}
+	// Tag filters. ?tags=needs-review,foo (AND) and ?any_tag=a,b (OR).
+	if v := q.Get("tags"); v != "" {
+		params.Tags = splitCSV(v)
+	}
+	if v := q.Get("any_tag"); v != "" {
+		params.AnyTag = splitCSV(v)
+	}
+	return params
+}
+
 // TransactionListHandler serves GET /admin/transactions.
 func TransactionListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		q := r.URL.Query()
-		params := service.AdminTransactionListParams{
-			Page:         parsePage(r),
-			PageSize:     parsePerPage(r, 50, 25, 50, 100),
-			StartDate:    parseDateParam(r, "start_date"),
-			EndDate:      parseInclusiveDateParam(r, "end_date"),
-			AccountID:    optStrQuery(q, "account_id"),
-			UserID:       optStrQuery(q, "user_id"),
-			ConnectionID: optStrQuery(q, "connection_id"),
-			CategorySlug: optStrQuery(q, "category"),
-			MinAmount:    optFloatQuery(q, "min_amount"),
-			MaxAmount:    optFloatQuery(q, "max_amount"),
-			Search:       optStrQuery(q, "search"),
-		}
-
-		if v := q.Get("pending"); v != "" {
-			b := v == "true"
-			params.Pending = &b
-		}
-		if v := q.Get("search_mode"); v != "" && service.ValidateSearchMode(v) {
-			params.SearchMode = &v
-		}
-		if v := q.Get("search_field"); v != "" && service.ValidateSearchField(v) {
-			params.SearchField = &v
-		}
-		if q.Get("sort") == "asc" {
-			params.SortOrder = "asc"
-		}
-
-		// Tag filters. ?tags=needs-review,foo (AND) and ?any_tag=a,b (OR).
-		if v := q.Get("tags"); v != "" {
-			params.Tags = splitCSV(v)
-		}
-		if v := q.Get("any_tag"); v != "" {
-			params.AnyTag = splitCSV(v)
-		}
+		params := parseAdminTxFilters(r)
+		params.Page = parsePage(r)
+		params.PageSize = parsePerPage(r, 50, 25, 50, 100)
 
 		// Scope to viewer's own data. Editors and admins see all.
 		if !IsEditor(sm, r) {
@@ -348,41 +355,9 @@ func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		q := r.URL.Query()
-		params := service.AdminTransactionListParams{
-			Page:         parsePage(r),
-			PageSize:     parsePerPage(r, 50, 25, 50, 100),
-			StartDate:    parseDateParam(r, "start_date"),
-			EndDate:      parseInclusiveDateParam(r, "end_date"),
-			AccountID:    optStrQuery(q, "account_id"),
-			UserID:       optStrQuery(q, "user_id"),
-			ConnectionID: optStrQuery(q, "connection_id"),
-			CategorySlug: optStrQuery(q, "category"),
-			MinAmount:    optFloatQuery(q, "min_amount"),
-			MaxAmount:    optFloatQuery(q, "max_amount"),
-			Search:       optStrQuery(q, "search"),
-		}
-
-		if v := q.Get("pending"); v != "" {
-			b := v == "true"
-			params.Pending = &b
-		}
-		if v := q.Get("search_mode"); v != "" && service.ValidateSearchMode(v) {
-			params.SearchMode = &v
-		}
-		if v := q.Get("search_field"); v != "" && service.ValidateSearchField(v) {
-			params.SearchField = &v
-		}
-		if q.Get("sort") == "asc" {
-			params.SortOrder = "asc"
-		}
-
-		if v := q.Get("tags"); v != "" {
-			params.Tags = splitCSV(v)
-		}
-		if v := q.Get("any_tag"); v != "" {
-			params.AnyTag = splitCSV(v)
-		}
+		params := parseAdminTxFilters(r)
+		params.Page = parsePage(r)
+		params.PageSize = parsePerPage(r, 50, 25, 50, 100)
 
 		// Scope to viewer's own data. Editors and admins see all.
 		if !IsEditor(sm, r) {
