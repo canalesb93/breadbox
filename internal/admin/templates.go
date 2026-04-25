@@ -1124,7 +1124,6 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/my_account.html",
 		// pages/getting_started.html removed — renders via RenderWithTempl
 		// using the _templ_shell template key (see pages.GettingStarted).
-		"pages/create_login.html",
 	}
 
 	// Pages that need multiple page files parsed together (for sub-template sharing).

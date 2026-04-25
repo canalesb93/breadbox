@@ -457,10 +457,14 @@ func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			return
 		}
 
-		// Check if user already has a login account — redirect to manage page.
+		userEmail := ""
+		if user.Email.Valid {
+			userEmail = user.Email.String
+		}
+
+		// Check if user already has a login account — render manage view.
 		loginAccount, err := a.Queries.GetAuthAccountByUserID(ctx, userID)
 		if err == nil {
-			// Already has a login — render the manage view.
 			setupURL := ""
 			if loginAccount.SetupToken.Valid {
 				scheme := "https"
@@ -468,6 +472,11 @@ func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 					scheme = "http"
 				}
 				setupURL = scheme + "://" + r.Host + "/setup-account/" + loginAccount.SetupToken.String
+			}
+			breadcrumbs := []Breadcrumb{
+				{Label: "Household", Href: "/users"},
+				{Label: user.Name, Href: "/users/" + idStr + "/edit"},
+				{Label: "Login Account"},
 			}
 			data := map[string]any{
 				"PageTitle":    "Manage Login — " + user.Name,
@@ -478,17 +487,29 @@ func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 				"LoginAccount": loginAccount,
 				"SetupURL":     setupURL,
 				"CSRFToken":    GetCSRFToken(r),
-				"Breadcrumbs": []Breadcrumb{
-					{Label: "Household", Href: "/users"},
-					{Label: user.Name, Href: "/users/" + idStr + "/edit"},
-					{Label: "Login Account"},
-				},
+				"Breadcrumbs":  breadcrumbs,
 			}
-			tr.Render(w, r, "create_login.html", data)
+			renderCreateLogin(w, r, tr, data, pages.CreateLoginProps{
+				IsManage:         true,
+				UserID:           idStr,
+				UserName:         user.Name,
+				UserEmail:        userEmail,
+				LoginAccountID:   pgconv.FormatUUID(loginAccount.ID),
+				LoginUsername:    loginAccount.Username,
+				LoginRole:        loginAccount.Role,
+				LoginPasswordSet: len(loginAccount.HashedPassword) > 0,
+				SetupURL:         setupURL,
+				Breadcrumbs:      breadcrumbsToComponent(breadcrumbs),
+			})
 			return
 		}
 
 		// No login account — show create form.
+		breadcrumbs := []Breadcrumb{
+			{Label: "Household", Href: "/users"},
+			{Label: user.Name, Href: "/users/" + idStr + "/edit"},
+			{Label: "Create Login"},
+		}
 		data := map[string]any{
 			"PageTitle":   "Create Login — " + user.Name,
 			"CurrentPage": "users",
@@ -496,13 +517,33 @@ func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 			"User":        user,
 			"UserID":      idStr,
 			"CSRFToken":   GetCSRFToken(r),
-			"Breadcrumbs": []Breadcrumb{
-				{Label: "Household", Href: "/users"},
-				{Label: user.Name, Href: "/users/" + idStr + "/edit"},
-				{Label: "Create Login"},
-			},
+			"Breadcrumbs": breadcrumbs,
 		}
-		tr.Render(w, r, "create_login.html", data)
+		renderCreateLogin(w, r, tr, data, pages.CreateLoginProps{
+			IsManage:    false,
+			UserID:      idStr,
+			UserName:    user.Name,
+			UserEmail:   userEmail,
+			Breadcrumbs: breadcrumbsToComponent(breadcrumbs),
+		})
 	}
+}
+
+// renderCreateLogin hosts the typed CreateLogin templ component inside
+// base.html via RenderWithTempl. Mirrors the renderCSVImport / renderLogs
+// pattern from the rest of the templ migration.
+func renderCreateLogin(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.CreateLoginProps) {
+	tr.RenderWithTempl(w, r, data, pages.CreateLogin(props))
+}
+
+// breadcrumbsToComponent converts the admin Breadcrumb slice (used by the
+// legacy html/template breadcrumb partial) into the components.Breadcrumb
+// slice consumed by templ-based pages.
+func breadcrumbsToComponent(crumbs []Breadcrumb) []components.Breadcrumb {
+	out := make([]components.Breadcrumb, len(crumbs))
+	for i, b := range crumbs {
+		out[i] = components.Breadcrumb{Label: b.Label, Href: b.Href}
+	}
+	return out
 }
 
