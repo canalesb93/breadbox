@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 
 	mw "breadbox/internal/middleware"
@@ -36,11 +35,7 @@ func GetConnectionStatusHandler(svc *service.Service) http.HandlerFunc {
 
 		status, err := svc.GetConnectionStatus(r.Context(), id)
 		if err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Connection not found")
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get connection status")
+			writeServiceError(w, err, "Connection not found", "Failed to get connection status")
 			return
 		}
 

@@ -236,11 +236,7 @@ func GetTransactionHandler(svc *service.Service) http.HandlerFunc {
 
 		txn, err := svc.GetTransaction(r.Context(), id)
 		if err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get transaction")
+			writeServiceError(w, err, "Transaction not found", "Failed to get transaction")
 			return
 		}
 
@@ -425,11 +421,7 @@ func ResetTransactionCategoryHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		if err := svc.ResetTransactionCategory(r.Context(), id); err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to reset transaction category")
+			writeServiceError(w, err, "Transaction not found", "Failed to reset transaction category")
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)

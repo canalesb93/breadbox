@@ -1,10 +1,8 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 
-	mw "breadbox/internal/middleware"
 	"breadbox/internal/service"
 )
 
@@ -24,11 +22,7 @@ func TriggerSyncHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		if err := svc.TriggerSync(r.Context(), connectionID); err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Connection not found")
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to trigger sync")
+			writeServiceError(w, err, "Connection not found", "Failed to trigger sync")
 			return
 		}
 
