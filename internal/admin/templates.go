@@ -816,9 +816,10 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// the _templ_shell template key (see pages.Reports).
 		// pages/logs.html removed — renders via RenderWithTempl using the
 		// _templ_shell template key (see pages.Logs).
-		"pages/oauth_clients.html",
-		"pages/oauth_client_new.html",
-		"pages/oauth_client_created.html",
+		// pages/oauth_clients.html removed — was dead (consolidated into pages/access.html).
+		// pages/oauth_client_new.html and pages/oauth_client_created.html removed —
+		// both render via RenderWithTempl using the _templ_shell template
+		// key (see pages.OAuthClientNew and pages.OAuthClientCreated).
 		// pages/mcp_guide.html, pages/agent_wizard.html, and pages/mcp_settings.html
 		// are not registered as standalone base pages — their standalone routes
 		// redirect to /agents and they're only consumed as composite extras
