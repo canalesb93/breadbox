@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
@@ -46,14 +45,7 @@ func AddTransactionTagHandler(svc *service.Service) http.HandlerFunc {
 		actor := service.ActorFromContext(r.Context())
 		added, alreadyPresent, err := svc.AddTransactionTag(r.Context(), txnID, body.Slug, actor)
 		if err != nil {
-			switch {
-			case errors.Is(err, service.ErrNotFound):
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
-			case errors.Is(err, service.ErrInvalidParameter):
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
-			default:
-				mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to add transaction tag")
-			}
+			writeServiceError(w, err, "Transaction not found", "Failed to add transaction tag")
 			return
 		}
 		writeData(w, map[string]any{
@@ -75,14 +67,7 @@ func RemoveTransactionTagHandler(svc *service.Service) http.HandlerFunc {
 		actor := service.ActorFromContext(r.Context())
 		removed, alreadyAbsent, err := svc.RemoveTransactionTag(r.Context(), txnID, slug, actor)
 		if err != nil {
-			switch {
-			case errors.Is(err, service.ErrNotFound):
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
-			case errors.Is(err, service.ErrInvalidParameter):
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
-			default:
-				mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to remove transaction tag")
-			}
+			writeServiceError(w, err, "Transaction not found", "Failed to remove transaction tag")
 			return
 		}
 		writeData(w, map[string]any{
