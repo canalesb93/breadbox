@@ -599,7 +599,7 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 	params := db.UpsertTransactionParams{
 		AccountID:                    accountID,
 		ProviderTransactionID:        txn.ExternalID,
-		ProviderPendingTransactionID: optionalText(txn.PendingExternalID),
+		ProviderPendingTransactionID: pgconv.TextPtrIfNotEmpty(txn.PendingExternalID),
 		Amount:                       decimalToNumeric(txn.Amount),
 		IsoCurrencyCode:              pgconv.TextIfNotEmpty(txn.ISOCurrencyCode),
 		Date:                         pgconv.Date(txn.Date),
@@ -607,10 +607,10 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		Datetime:                     optionalTimestamptz(txn.Datetime),
 		AuthorizedDatetime:           optionalTimestamptz(txn.AuthorizedDatetime),
 		ProviderName:                 txn.Name,
-		ProviderMerchantName:         optionalText(txn.MerchantName),
-		ProviderCategoryPrimary:      optionalText(txn.CategoryPrimary),
-		ProviderCategoryDetailed:     optionalText(txn.CategoryDetailed),
-		ProviderCategoryConfidence:   optionalText(txn.CategoryConfidence),
+		ProviderMerchantName:         pgconv.TextPtrIfNotEmpty(txn.MerchantName),
+		ProviderCategoryPrimary:      pgconv.TextPtrIfNotEmpty(txn.CategoryPrimary),
+		ProviderCategoryDetailed:     pgconv.TextPtrIfNotEmpty(txn.CategoryDetailed),
+		ProviderCategoryConfidence:   pgconv.TextPtrIfNotEmpty(txn.CategoryConfidence),
 		ProviderPaymentChannel:       pgconv.TextIfNotEmpty(txn.PaymentChannel),
 		Pending:                      txn.Pending,
 		ProviderRaw:                  txn.Raw,
@@ -1266,13 +1266,6 @@ func classifyUpsertResult(txn db.Transaction, upsertStart time.Time) (isNew bool
 }
 
 // --- helpers ---
-
-func optionalText(s *string) pgtype.Text {
-	if s == nil || *s == "" {
-		return pgtype.Text{}
-	}
-	return pgtype.Text{String: *s, Valid: true}
-}
 
 func optionalTimestamptz(t *time.Time) pgtype.Timestamptz {
 	if t == nil {

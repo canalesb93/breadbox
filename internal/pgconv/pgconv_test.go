@@ -234,6 +234,29 @@ func TestTextIfNotEmpty_Empty(t *testing.T) {
 	}
 }
 
+func TestTextPtrIfNotEmpty_Nil(t *testing.T) {
+	got := TextPtrIfNotEmpty(nil)
+	if got.Valid {
+		t.Errorf("TextPtrIfNotEmpty(nil) = %+v, want invalid (NULL)", got)
+	}
+}
+
+func TestTextPtrIfNotEmpty_EmptyPointer(t *testing.T) {
+	s := ""
+	got := TextPtrIfNotEmpty(&s)
+	if got.Valid {
+		t.Errorf("TextPtrIfNotEmpty(&\"\") = %+v, want invalid (NULL)", got)
+	}
+}
+
+func TestTextPtrIfNotEmpty_NonEmpty(t *testing.T) {
+	s := "hello"
+	got := TextPtrIfNotEmpty(&s)
+	if !got.Valid || got.String != "hello" {
+		t.Errorf("TextPtrIfNotEmpty(&hello) = %+v, want {hello true}", got)
+	}
+}
+
 func TestDate(t *testing.T) {
 	when := time.Date(2024, 3, 15, 0, 0, 0, 0, time.UTC)
 	got := Date(when)

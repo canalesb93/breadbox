@@ -88,6 +88,17 @@ func TextIfNotEmpty(s string) pgtype.Text {
 	return pgtype.Text{String: s, Valid: true}
 }
 
+// TextPtrIfNotEmpty wraps *string as pgtype.Text, treating both nil and the
+// empty string as NULL. Pointer counterpart to TextIfNotEmpty — use when an
+// optional input that was either omitted (nil) or explicitly cleared ("")
+// should map to NULL.
+func TextPtrIfNotEmpty(s *string) pgtype.Text {
+	if s == nil || *s == "" {
+		return pgtype.Text{}
+	}
+	return pgtype.Text{String: *s, Valid: true}
+}
+
 // Date wraps a time.Time as a non-NULL pgtype.Date. Use this to collapse
 // `pgtype.Date{Time: t, Valid: true}` boilerplate at insert and query-arg
 // sites where the value is always present.

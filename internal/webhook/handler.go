@@ -101,13 +101,11 @@ func NewHandler(providers map[string]provider.Provider, engine *sync.Engine, que
 			if event.NeedsReauth {
 				status = db.ConnectionStatusPendingReauth
 			}
-			errCode := pgconv.TextFromPtr(event.ErrorCode)
-			errMsg := pgconv.TextFromPtr(event.ErrorMessage)
 			processErr = queries.UpdateBankConnectionStatus(r.Context(), db.UpdateBankConnectionStatusParams{
 				ID:           conn.ID,
 				Status:       status,
-				ErrorCode:    errCode,
-				ErrorMessage: errMsg,
+				ErrorCode:    pgconv.TextFromPtr(event.ErrorCode),
+				ErrorMessage: pgconv.TextFromPtr(event.ErrorMessage),
 			})
 			if processErr != nil {
 				logger.Error("failed to update connection status", "error", processErr)
@@ -158,14 +156,13 @@ func logWebhookEvent(ctx context.Context, queries *db.Queries, logger *slog.Logg
 	if payloadHash != nil {
 		hash = *payloadHash
 	}
-	errText := pgconv.TextFromPtr(errMsg)
 	evt, err := queries.CreateWebhookEvent(ctx, db.CreateWebhookEventParams{
 		Provider:       providerType,
 		EventType:      eventType,
 		ConnectionID:   connectionID,
 		RawPayloadHash: hash,
 		Status:         status,
-		ErrorMessage:   errText,
+		ErrorMessage:   pgconv.TextFromPtr(errMsg),
 	})
 	if err != nil {
 		// Don't fail the webhook handler if event logging fails.
@@ -180,11 +177,10 @@ func updateWebhookEventStatus(ctx context.Context, queries *db.Queries, logger *
 	if !eventID.Valid {
 		return // Event logging failed earlier, skip update.
 	}
-	errText := pgconv.TextFromPtr(errMsg)
 	if err := queries.UpdateWebhookEventStatus(ctx, db.UpdateWebhookEventStatusParams{
 		ID:           eventID,
 		Status:       status,
-		ErrorMessage: errText,
+		ErrorMessage: pgconv.TextFromPtr(errMsg),
 	}); err != nil {
 		logger.Warn("failed to update webhook event status", "event_id", fmt.Sprintf("%x", eventID.Bytes), "error", err)
 	}
