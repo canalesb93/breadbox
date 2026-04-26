@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -174,7 +173,6 @@ func AddTransactionTagAdminHandler(a *app.App, sm *scs.SessionManager, svc *serv
 
 		var body struct {
 			Slug string `json:"slug"`
-			Note string `json:"note,omitempty"`
 		}
 		if !decodeJSON(w, r, &body) {
 			return
@@ -184,7 +182,7 @@ func AddTransactionTagAdminHandler(a *app.App, sm *scs.SessionManager, svc *serv
 			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "slug is required")
 			return
 		}
-		added, alreadyPresent, err := svc.AddTransactionTag(r.Context(), txnID, body.Slug, actor, body.Note)
+		added, alreadyPresent, err := svc.AddTransactionTag(r.Context(), txnID, body.Slug, actor)
 		if err != nil {
 			switch {
 			case errors.Is(err, service.ErrNotFound):
@@ -207,24 +205,13 @@ func AddTransactionTagAdminHandler(a *app.App, sm *scs.SessionManager, svc *serv
 }
 
 // RemoveTransactionTagAdminHandler handles DELETE /-/transactions/{id}/tags/{slug}.
-// Query/body: optional note recorded on the tag_removed annotation. Accepts
-// either form-encoded or JSON.
 func RemoveTransactionTagAdminHandler(a *app.App, sm *scs.SessionManager, svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		txnID := chi.URLParam(r, "id")
 		slug := chi.URLParam(r, "slug")
 		actor := ActorFromSession(sm, r)
 
-		note := strings.TrimSpace(r.URL.Query().Get("note"))
-		if note == "" {
-			var body struct {
-				Note string `json:"note"`
-			}
-			_ = json.NewDecoder(r.Body).Decode(&body)
-			note = strings.TrimSpace(body.Note)
-		}
-
-		removed, alreadyAbsent, err := svc.RemoveTransactionTag(r.Context(), txnID, slug, actor, note)
+		removed, alreadyAbsent, err := svc.RemoveTransactionTag(r.Context(), txnID, slug, actor)
 		if err != nil {
 			switch {
 			case errors.Is(err, service.ErrNotFound):

@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"breadbox/internal/pgconv"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -70,14 +72,14 @@ func benchBuildListTransactionsQuery(params benchListParams) (string, []any) {
 	if params.StartDate != nil {
 		buf.WriteString(" AND t.date >= $")
 		buf.WriteString(strconv.Itoa(argN))
-		args = append(args, pgtype.Date{Time: *params.StartDate, Valid: true})
+		args = append(args, pgconv.Date(*params.StartDate))
 		argN++
 	}
 
 	if params.EndDate != nil {
 		buf.WriteString(" AND t.date < $")
 		buf.WriteString(strconv.Itoa(argN))
-		args = append(args, pgtype.Date{Time: *params.EndDate, Valid: true})
+		args = append(args, pgconv.Date(*params.EndDate))
 		argN++
 	}
 
@@ -142,7 +144,7 @@ func benchBuildListTransactionsQuery(params benchListParams) (string, []any) {
 		buf.WriteString(", $")
 		buf.WriteString(strconv.Itoa(argN + 1))
 		buf.WriteByte(')')
-		args = append(args, pgtype.Date{Time: *params.CursorDate, Valid: true}, *params.CursorID)
+		args = append(args, pgconv.Date(*params.CursorDate), *params.CursorID)
 		argN += 2
 	}
 
@@ -212,14 +214,14 @@ func benchBuildCountTransactionsQuery(params benchCountParams) (string, []any) {
 	if params.StartDate != nil {
 		buf.WriteString(" AND t.date >= $")
 		buf.WriteString(strconv.Itoa(argN))
-		args = append(args, pgtype.Date{Time: *params.StartDate, Valid: true})
+		args = append(args, pgconv.Date(*params.StartDate))
 		argN++
 	}
 
 	if params.EndDate != nil {
 		buf.WriteString(" AND t.date < $")
 		buf.WriteString(strconv.Itoa(argN))
-		args = append(args, pgtype.Date{Time: *params.EndDate, Valid: true})
+		args = append(args, pgconv.Date(*params.EndDate))
 		argN++
 	}
 
@@ -344,14 +346,14 @@ func benchBuildAdminListQuery(params benchAdminListParams) (string, []any) {
 	if params.StartDate != nil {
 		buf.WriteString(" AND t.date >= $")
 		buf.WriteString(strconv.Itoa(argN))
-		args = append(args, pgtype.Date{Time: *params.StartDate, Valid: true})
+		args = append(args, pgconv.Date(*params.StartDate))
 		argN++
 	}
 
 	if params.EndDate != nil {
 		buf.WriteString(" AND t.date < $")
 		buf.WriteString(strconv.Itoa(argN))
-		args = append(args, pgtype.Date{Time: *params.EndDate, Valid: true})
+		args = append(args, pgconv.Date(*params.EndDate))
 		argN++
 	}
 

@@ -397,3 +397,47 @@ func TestKbdGlyph(t *testing.T) {
 		}
 	}
 }
+
+func TestStatusBadge(t *testing.T) {
+	tests := []struct {
+		status string
+		want   string
+	}{
+		{"active", `<span class="badge badge-soft badge-success badge-sm">Active</span>`},
+		{"pending_reauth", `<span class="badge badge-soft badge-warning badge-sm">Reauth Needed</span>`},
+		{"error", `<span class="badge badge-soft badge-error badge-sm">Error</span>`},
+		{"disconnected", `<span class="badge badge-ghost badge-sm">Disconnected</span>`},
+		{"", `<span class="badge badge-ghost badge-sm">Disconnected</span>`},
+		{"unknown", `<span class="badge badge-ghost badge-sm">Disconnected</span>`},
+	}
+	for _, tc := range tests {
+		t.Run(tc.status, func(t *testing.T) {
+			if got := StatusBadge(tc.status); got != tc.want {
+				t.Errorf("StatusBadge(%q) = %q, want %q", tc.status, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestErrorMessage(t *testing.T) {
+	tests := []struct {
+		code string
+		want string
+	}{
+		{"ITEM_LOGIN_REQUIRED", "Your bank login has changed. Please re-authenticate."},
+		{"INSUFFICIENT_CREDENTIALS", "Additional credentials are needed. Please re-authenticate."},
+		{"INVALID_CREDENTIALS", "Your bank credentials are incorrect. Please re-authenticate."},
+		{"MFA_NOT_SUPPORTED", "This connection requires MFA which is not supported. Please reconnect."},
+		{"NO_ACCOUNTS", "No accounts found for this connection."},
+		{"enrollment.disconnected", "This bank connection has been disconnected."},
+		{"UNKNOWN_CODE", "UNKNOWN_CODE"},
+		{"", ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.code, func(t *testing.T) {
+			if got := ErrorMessage(tc.code); got != tc.want {
+				t.Errorf("ErrorMessage(%q) = %q, want %q", tc.code, got, tc.want)
+			}
+		})
+	}
+}

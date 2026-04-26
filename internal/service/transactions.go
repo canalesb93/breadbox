@@ -161,14 +161,14 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 	if params.StartDate != nil {
 		buf.WriteString(" AND t.date >= $")
 		buf.WriteString(strconv.Itoa(argN))
-		args = append(args, pgtype.Date{Time: *params.StartDate, Valid: true})
+		args = append(args, pgconv.Date(*params.StartDate))
 		argN++
 	}
 
 	if params.EndDate != nil {
 		buf.WriteString(" AND t.date < $")
 		buf.WriteString(strconv.Itoa(argN))
-		args = append(args, pgtype.Date{Time: *params.EndDate, Valid: true})
+		args = append(args, pgconv.Date(*params.EndDate))
 		argN++
 	}
 
@@ -271,7 +271,7 @@ func (s *Service) ListTransactions(ctx context.Context, params TransactionListPa
 		buf.WriteString(", $")
 		buf.WriteString(strconv.Itoa(argN + 1))
 		buf.WriteByte(')')
-		args = append(args, pgtype.Date{Time: cursorDate, Valid: true}, cursorUUID)
+		args = append(args, pgconv.Date(cursorDate), cursorUUID)
 		argN += 2
 	}
 
@@ -556,14 +556,14 @@ func (s *Service) CountTransactionsFiltered(ctx context.Context, params Transact
 	if params.StartDate != nil {
 		buf.WriteString(" AND t.date >= $")
 		buf.WriteString(strconv.Itoa(argN))
-		args = append(args, pgtype.Date{Time: *params.StartDate, Valid: true})
+		args = append(args, pgconv.Date(*params.StartDate))
 		argN++
 	}
 
 	if params.EndDate != nil {
 		buf.WriteString(" AND t.date < $")
 		buf.WriteString(strconv.Itoa(argN))
-		args = append(args, pgtype.Date{Time: *params.EndDate, Valid: true})
+		args = append(args, pgconv.Date(*params.EndDate))
 		argN++
 	}
 
@@ -736,14 +736,14 @@ func (s *Service) ListTransactionsAdmin(ctx context.Context, params AdminTransac
 	if params.StartDate != nil {
 		buf.WriteString(" AND t.date >= $")
 		buf.WriteString(strconv.Itoa(argN))
-		args = append(args, pgtype.Date{Time: *params.StartDate, Valid: true})
+		args = append(args, pgconv.Date(*params.StartDate))
 		argN++
 	}
 
 	if params.EndDate != nil {
 		buf.WriteString(" AND t.date < $")
 		buf.WriteString(strconv.Itoa(argN))
-		args = append(args, pgtype.Date{Time: *params.EndDate, Valid: true})
+		args = append(args, pgconv.Date(*params.EndDate))
 		argN++
 	}
 

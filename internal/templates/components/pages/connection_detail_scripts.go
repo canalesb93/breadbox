@@ -5,26 +5,6 @@ import (
 	"strings"
 )
 
-// connDetailErrorMessage maps Plaid/Teller error codes to human-readable
-// messages. Mirrors the funcMap "errorMessage" helper in admin/templates.go.
-func connDetailErrorMessage(code string) string {
-	switch code {
-	case "ITEM_LOGIN_REQUIRED":
-		return "Your bank login has changed. Please re-authenticate."
-	case "INSUFFICIENT_CREDENTIALS":
-		return "Additional credentials are needed. Please re-authenticate."
-	case "INVALID_CREDENTIALS":
-		return "Your bank credentials are incorrect. Please re-authenticate."
-	case "MFA_NOT_SUPPORTED":
-		return "This connection requires MFA which is not supported. Please reconnect."
-	case "NO_ACCOUNTS":
-		return "No accounts found for this connection."
-	case "enrollment.disconnected":
-		return "This bank connection has been disconnected."
-	}
-	return code
-}
-
 // connDetailHeaderTileBg returns the icon-tile background class by provider.
 func connDetailHeaderTileBg(provider string) string {
 	switch provider {
@@ -34,22 +14,6 @@ func connDetailHeaderTileBg(provider string) string {
 		return "bg-success/10"
 	default:
 		return "bg-warning/10"
-	}
-}
-
-// connDetailStatusBadge returns the inline HTML for the status badge.
-// Mirrors the funcMap "statusBadge" helper in admin/templates.go. Returned
-// as a string for use with @templ.Raw to preserve the literal markup.
-func connDetailStatusBadge(status string) string {
-	switch status {
-	case "active":
-		return `<span class="badge badge-soft badge-success badge-sm">Active</span>`
-	case "pending_reauth":
-		return `<span class="badge badge-soft badge-warning badge-sm">Reauth Needed</span>`
-	case "error":
-		return `<span class="badge badge-soft badge-error badge-sm">Error</span>`
-	default:
-		return `<span class="badge badge-ghost badge-sm">Disconnected</span>`
 	}
 }
 
@@ -95,15 +59,6 @@ func connDetailBarStyle(mine, other, total int) string {
 		return fmt.Sprintf("height: %.0fpx; min-height: 4px;", px)
 	}
 	return "height: 52px; min-height: 4px;"
-}
-
-// connDetailPluralSyncs returns "" or "s" based on count for the sync
-// timeline tooltip — mirrors `{{if ne .Total 1}}s{{end}}`.
-func connDetailPluralSyncs(n int) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
 }
 
 // connDetailAccentBar returns the colored accent-bar class for an account

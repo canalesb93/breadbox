@@ -560,13 +560,13 @@ func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecat
 
 	if params.StartDate != nil {
 		query += fmt.Sprintf(" AND t.date >= $%d", argN)
-		args = append(args, pgtype.Date{Time: *params.StartDate, Valid: true})
+		args = append(args, pgconv.Date(*params.StartDate))
 		argN++
 	}
 
 	if params.EndDate != nil {
 		query += fmt.Sprintf(" AND t.date < $%d", argN)
-		args = append(args, pgtype.Date{Time: *params.EndDate, Valid: true})
+		args = append(args, pgconv.Date(*params.EndDate))
 		argN++
 	}
 
@@ -649,13 +649,6 @@ func GenerateSlug(displayName string) string {
 	s = strings.Trim(s, "_")
 
 	return s
-}
-
-func derefStr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }
 
 // --- Bulk TSV export/import ---
@@ -809,21 +802,11 @@ func (s *Service) ImportCategoriesTSV(ctx context.Context, content string, repla
 			return
 		}
 
-		var iconPtr, colorPtr *string
-		if rd.icon != "" {
-			iconPtr = &rd.icon
-		}
-		if rd.color != "" {
-			colorPtr = &rd.color
-		}
-
 		if err == nil {
 			// Existing category — check if update needed
-			existingIcon := derefStr(textPtr(existing.Icon))
-			existingColor := derefStr(textPtr(existing.Color))
 			if existing.DisplayName == rd.displayName &&
-				existingIcon == rd.icon &&
-				existingColor == rd.color &&
+				pgconv.TextOr(existing.Icon, "") == rd.icon &&
+				pgconv.TextOr(existing.Color, "") == rd.color &&
 				existing.SortOrder == rd.sortOrder &&
 				existing.Hidden == rd.hidden {
 				result.Unchanged++
@@ -858,8 +841,8 @@ func (s *Service) ImportCategoriesTSV(ctx context.Context, content string, repla
 				Slug:        rd.slug,
 				DisplayName: rd.displayName,
 				ParentID:    parentID,
-				Icon:        pgconv.TextFromPtr(iconPtr),
-				Color:       pgconv.TextFromPtr(colorPtr),
+				Icon:        pgconv.TextIfNotEmpty(rd.icon),
+				Color:       pgconv.TextIfNotEmpty(rd.color),
 				SortOrder:   rd.sortOrder,
 				IsSystem:    false,
 				Hidden:      rd.hidden,

@@ -58,7 +58,7 @@ REVIEW WORKFLOW (tag-based):
 - The "review queue" is just transactions tagged "needs-review". Fresh installs have a seeded rule that auto-tags new transactions on sync.
 - find-work: query_transactions(tags=["needs-review"])
 - do-work: update_transactions(operations: [...]) — atomic compound op per transaction. Each operation can set_category + add/remove tags + attach a comment in a single write. Max 50 operations per call.
-- signal-done: the update_transactions operation's tags_to_remove entry is how you close a review. Including a note is strongly recommended — it lands on the audit trail.
+- signal-done: the update_transactions operation's tags_to_remove entry is how you close a review. Pair it with the 'comment' field on the same operation to record the rationale — the comment is the canonical audit artifact (tag adds/removes no longer carry per-action notes).
 - If you can't confidently categorize a transaction, leave the tag on it. The tag IS the queue.
 - Tag tools: list_tags, add_transaction_tag (single), remove_transaction_tag (single), list_annotations (activity timeline), plus update_transactions for compound ops.
 - Before processing reviews or creating rules, read breadbox://review-guidelines for detailed guidelines.
@@ -97,19 +97,19 @@ USER ROLES:
 // User-editable via the MCP Settings page.
 const DefaultReviewGuidelines = `REVIEW PRINCIPLES — follow these strictly:
 
-1. THE REVIEW QUEUE IS A TAG. Transactions tagged "needs-review" are the queue. Find them with query_transactions(tags=["needs-review"]). Close them with update_transactions operations that remove the needs-review tag. Including a note explaining the decision is strongly recommended — it lands on the audit trail.
+1. THE REVIEW QUEUE IS A TAG. Transactions tagged "needs-review" are the queue. Find them with query_transactions(tags=["needs-review"]). Close them with update_transactions operations that remove the needs-review tag. Pair every removal with a 'comment' on the same operation explaining the decision — the comment is the audit trail (tag changes no longer carry their own per-action notes).
 
 2. EVERY REVIEW MUST BE INDIVIDUALLY ASSESSED. You must look at each transaction before closing it. Even when processing in batches via update_transactions (max 50 operations per call), you must have examined each transaction's name, amount, and context to determine the correct category. There is no auto-close mechanism — quality depends on your judgment.
 
 3. RULES ARE FORWARD-LOOKING. Transaction rules apply automatically to NEW transactions during sync. Do NOT use apply_rules or apply_retroactively=true during routine reviews. These are reserved for explicit one-off bulk work (initial setup only). During routine work, create rules and let them match future syncs naturally.
 
-4. PRIOR ANNOTATIONS ARE HUMAN CORRECTIONS. When a transaction has a history (list_annotations shows prior comments, rule applications, or category sets authored by humans), read that context first. A human's explicit decision overrides your prior categorization. Acknowledge the correction in the note you pass on the update_transactions tags_to_remove entry — that note lands on the audit trail.
+4. PRIOR ANNOTATIONS ARE HUMAN CORRECTIONS. When a transaction has a history (list_annotations shows prior comments, rule applications, or category sets authored by humans), read that context first. A human's explicit decision overrides your prior categorization. Acknowledge the correction in the 'comment' field on the update_transactions operation that closes the review — that comment lands on the audit trail.
 
-5. LEAVE THE TAG ON RATHER THAN GUESS. If you cannot confidently determine the correct category, do NOT remove the needs-review tag. Leaving it attached keeps the transaction in the queue for a future pass. Never remove the tag with a placeholder note just to "clear" the queue.
+5. LEAVE THE TAG ON RATHER THAN GUESS. If you cannot confidently determine the correct category, do NOT remove the needs-review tag. Leaving it attached keeps the transaction in the queue for a future pass. Never remove the tag with a placeholder comment just to "clear" the queue.
 
-6. EXPLAIN NON-OBVIOUS DECISIONS VIA THE TAG REMOVAL NOTE. The note you pass on tags_to_remove[{slug: "needs-review", note: "..."}] is the primary audit artifact for the review decision. You can also attach an optional 'comment' in the same update_transactions operation for longer narrative, but don't double-write the same explanation.
+6. EXPLAIN NON-OBVIOUS DECISIONS VIA THE COMMENT FIELD. The 'comment' you pass on the update_transactions operation is the primary audit artifact for the review decision — keep all rationale there, not in tag metadata. Tag adds/removes carry no per-action notes.
 
-7. NEVER BULK-CLOSE WITHOUT EXAMINATION. Do not batch 50 update_transactions operations with a default category and a generic "approved" note. Each item in the batch must have been individually assessed with the correct category assigned and a specific rationale.
+7. NEVER BULK-CLOSE WITHOUT EXAMINATION. Do not batch 50 update_transactions operations with a default category and a generic "approved" comment. Each item in the batch must have been individually assessed with the correct category assigned and a specific rationale.
 
 8. ALWAYS USE CATEGORY_SLUG. When setting categories, use category_slug (e.g., "food_and_drink_groceries") not category_id. Slugs are human-readable, stable, and consistent across sessions.
 
@@ -332,7 +332,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"Remove a manual category override from a transaction and re-resolve its category from the automatic mapping rules. Use this to undo a categorize_transaction action.",
 			s.handleResetTransactionCategory, svc),
 		makeToolDefLogged("add_transaction_comment", ToolWrite,
-			"Add a free-standing comment to a transaction — narrative that's independent of any specific review decision (flagging unusual charges, noting shared expenses, cross-references, context that outlives a single review cycle). Supports markdown. IMPORTANT: when the comment is the rationale for a tag change or category set, pass it as part of an update_transactions operation (inline `comment`, or `note` on a tags_to_add/tags_to_remove entry) instead — those paths write a single linked annotation so the activity log doesn't double up.",
+			"Add a free-standing comment to a transaction — narrative that's independent of any specific review decision (flagging unusual charges, noting shared expenses, cross-references, context that outlives a single review cycle). Supports markdown. IMPORTANT: when the comment is the rationale for a tag change or category set, pass it inline on the same update_transactions operation as the change (use the `comment` field) so the activity log links the rationale to the action atomically.",
 			s.handleAddTransactionComment, svc),
 		makeToolDefLogged("list_transaction_comments", ToolRead,
 			"Deprecated: prefer list_annotations with kinds=['comment']. Returns the same comment data with renamed fields (author_* instead of actor_*, content lifted out of payload). Will be removed in a future release.",
@@ -408,13 +408,13 @@ func (s *MCPServer) buildToolRegistry() {
 			"List the activity timeline for a transaction, ordered by created_at ASC. Each row carries a generic `kind` (comment | rule | tag | category) plus an `action` (added | removed | set | applied) for the specific event — branch on `action` when the distinction matters (e.g. tag added vs removed). Payload carries kind-specific fields (content for comments, slug for tag events, rule_name for rule applications). Pass kinds=['comment'] for the comment-only view (replaces the deprecated list_transaction_comments); pass kinds=['tag'] for all tag events. Empty kinds returns the full timeline.",
 			s.handleListAnnotations, svc),
 		makeToolDefLogged("add_transaction_tag", ToolWrite,
-			"Attach a tag to a transaction. Tags are an open-ended labeling system — auto-creates a persistent tag if the slug doesn't exist yet. Use note to attach a short rationale that is stored on the tag_added annotation. Idempotent: returns already_present=true if the tag was already attached.",
+			"Attach a tag to a transaction. Tags are an open-ended labeling system — auto-creates a persistent tag if the slug doesn't exist yet. Idempotent: returns already_present=true if the tag was already attached. To record decision context for a tag change, leave a comment on the same transaction (add_transaction_comment, or the `comment` field on update_transactions).",
 			s.handleAddTransactionTag, svc),
 		makeToolDefLogged("remove_transaction_tag", ToolWrite,
-			"Remove a tag from a transaction. A note is recommended (it's recorded on the tag_removed annotation for auditability) but not required. Idempotent: returns already_absent=true if the tag wasn't attached.",
+			"Remove a tag from a transaction. Idempotent: returns already_absent=true if the tag wasn't attached. To record why the tag was removed (e.g. closing a needs-review item), pair this with a comment on the same transaction — see update_transactions for the atomic compound op.",
 			s.handleRemoveTransactionTag, svc),
 		makeToolDefLogged("update_transactions", ToolWrite,
-			"Compound write for up to 50 transactions at once. Each operation can: set a category (category_slug), add tags (tags_to_add), remove tags (tags_to_remove), and attach a comment — all atomically per transaction, with annotations written for every change. The preferred tool for closing review work (set category + remove needs-review + explain) in one call. Example operation: {\"transaction_id\":\"k7Xm9pQ2\",\"category_slug\":\"food_and_drink_groceries\",\"tags_to_remove\":[{\"slug\":\"needs-review\",\"note\":\"clearly groceries\"}],\"comment\":\"Costco run\"}. on_error: 'continue' (default — each op in its own DB tx, partial failures OK) or 'abort' (one DB tx, rolls back on first error). Notes on tag removal are optional but recommended for workflow tags like needs-review.",
+			"Compound write for up to 50 transactions at once. Each operation can: set a category (category_slug), add tags (tags_to_add), remove tags (tags_to_remove), and attach a comment — all atomically per transaction, with annotations written for every change. The preferred tool for closing review work (set category + remove needs-review + explain) in one call. Use the `comment` field to capture decision rationale; tag adds/removes carry no per-action note — keep all narrative in the comment. Example operation: {\"transaction_id\":\"k7Xm9pQ2\",\"category_slug\":\"food_and_drink_groceries\",\"tags_to_remove\":[{\"slug\":\"needs-review\"}],\"comment\":\"Clearly groceries — Costco run.\"}. on_error: 'continue' (default — each op in its own DB tx, partial failures OK) or 'abort' (one DB tx, rolls back on first error).",
 			s.handleUpdateTransactions, svc),
 		makeToolDefLogged("create_tag", ToolWrite,
 			"Register a new tag in the system. Admin-only write — agents can auto-create tags implicitly via add_transaction_tag (pass a new slug), so use create_tag only when users need to set display_name/color/icon up front. Slug regex: ^[a-z0-9][a-z0-9\\-:]*[a-z0-9]$.",

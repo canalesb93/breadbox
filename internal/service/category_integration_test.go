@@ -54,7 +54,7 @@ func mustCreateTransactionWithCategory(t *testing.T, q *db.Queries, acctID, catI
 		ProviderTransactionID: extID,
 		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
-		Date:                  pgtype.Date{Time: testutil.MustParseDate(date), Valid: true},
+		Date:                  pgconv.Date(testutil.MustParseDate(date)),
 		ProviderName:          name,
 		CategoryID:            catID,
 	})

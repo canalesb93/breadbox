@@ -410,7 +410,14 @@ type ActivityEntry struct {
 	// Type-specific
 	ReviewStatus string `json:"review_status,omitempty"` // approved, rejected, skipped, pending
 	CategoryName string `json:"category_name,omitempty"` // display name
-	RuleName     string `json:"rule_name,omitempty"`
+	// CategoryColor and CategoryIcon drive the icon-tile rendering on
+	// category_set timeline rows so each event reads at a glance with the
+	// same color cue used elsewhere in the app. Empty/nil when the category
+	// is no longer registered (deleted categories fall back to a neutral
+	// folder icon).
+	CategoryColor *string `json:"category_color,omitempty"`
+	CategoryIcon  *string `json:"category_icon,omitempty"`
+	RuleName      string  `json:"rule_name,omitempty"`
 	RuleID       string `json:"rule_id,omitempty"`
 	CommentID    string `json:"comment_id,omitempty"`
 	TagSlug      string `json:"tag_slug,omitempty"` // for tag_added / tag_removed entries

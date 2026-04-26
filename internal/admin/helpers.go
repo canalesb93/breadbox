@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -72,6 +73,33 @@ func parseInclusiveDateParam(r *http.Request, key string) *time.Time {
 	}
 	next := t.AddDate(0, 0, 1)
 	return &next
+}
+
+// pickValues returns a url.Values copy of the requested keys from
+// r.URL.Query(). Empty values are skipped, so the result encodes only the
+// filters actually in effect.
+func pickValues(r *http.Request, keys []string) url.Values {
+	src := r.URL.Query()
+	out := make(url.Values, len(keys))
+	for _, k := range keys {
+		if v := src.Get(k); v != "" {
+			out.Set(k, v)
+		}
+	}
+	return out
+}
+
+// paginationBase builds a "<path>?<filters>&<pageParam>=" prefix (or
+// "<path>?<pageParam>=" when no filters are present) so callers can append the
+// page number directly. The pageParam key is dropped from params if present —
+// the caller is appending a fresh value.
+func paginationBase(path string, params url.Values, pageParam string) string {
+	params.Del(pageParam)
+	encoded := params.Encode()
+	if encoded == "" {
+		return path + "?" + pageParam + "="
+	}
+	return path + "?" + encoded + "&" + pageParam + "="
 }
 
 // splitCSV splits a comma-separated string into trimmed non-empty entries.

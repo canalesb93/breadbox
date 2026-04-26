@@ -698,7 +698,7 @@ func (s *Service) CreateTransactionRule(ctx context.Context, params CreateTransa
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid expires_in %q: %v", ErrInvalidParameter, params.ExpiresIn, err)
 		}
-		expiresAt = pgtype.Timestamptz{Time: time.Now().Add(dur), Valid: true}
+		expiresAt = pgconv.Timestamptz(time.Now().Add(dur))
 	}
 
 	createdByType := params.Actor.Type
@@ -932,7 +932,7 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 		} else {
 			whereSQL += " AND " + cursorClause
 		}
-		args = append(args, pgtype.Timestamptz{Time: cursorTime, Valid: true}, cursorUUID)
+		args = append(args, pgconv.Timestamptz(cursorTime), cursorUUID)
 		argN += 2
 	}
 
@@ -1063,11 +1063,11 @@ func (s *Service) UpdateTransactionRule(ctx context.Context, id string, params U
 			if err != nil {
 				return nil, fmt.Errorf("%w: invalid expires_at format, use RFC3339", ErrInvalidParameter)
 			}
-			expiresAt = pgtype.Timestamptz{Time: t, Valid: true}
+			expiresAt = pgconv.Timestamptz(t)
 		}
 	} else if existing.ExpiresAt != nil {
 		t, _ := time.Parse(time.RFC3339, *existing.ExpiresAt)
-		expiresAt = pgtype.Timestamptz{Time: t, Valid: true}
+		expiresAt = pgconv.Timestamptz(t)
 	}
 
 	var conditionsArg any
@@ -2339,7 +2339,7 @@ func (s *Service) ListRuleApplications(ctx context.Context, ruleID string, limit
 			return nil, false, ErrInvalidCursor
 		}
 		query += fmt.Sprintf(" AND (ann.created_at, ann.id) < ($%d, $%d)", argN, argN+1)
-		args = append(args, pgtype.Timestamptz{Time: cursorTime, Valid: true}, cursorUUID)
+		args = append(args, pgconv.Timestamptz(cursorTime), cursorUUID)
 		argN += 2
 	}
 
