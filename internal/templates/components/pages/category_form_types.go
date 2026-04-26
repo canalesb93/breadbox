@@ -19,17 +19,6 @@ type CategoryFormProps struct {
 	Breadcrumbs []components.Breadcrumb
 }
 
-// categoriesJSON marshals the parent-picker dataset. The helper exists so
-// the templ template can emit the JSON directly into an x-data attribute
-// without having to reach for encoding/json in markup.
-func categoriesJSON(cs []service.CategoryResponse) string {
-	b, err := json.Marshal(cs)
-	if err != nil {
-		return "[]"
-	}
-	return string(b)
-}
-
 // categoryColorOr returns the current color value or a sensible default
 // for the form's live preview. Keeps the preview header on-brand when a
 // category has no color set.

@@ -34,6 +34,7 @@ templ TransactionDetail(p TransactionDetailProps) {
 	     Alpine.data() registrations run before Alpine — itself deferred from
 	     <head> — fires alpine:init. -->
 	<script src="/static/js/admin/components/transaction_detail.js"></script>
+	@components.CategoryPickerScript()
 	@components.CategoryPickerStyles()
 	<!--
 		Set the shortcut-registry scope so base.html's global dispatcher routes
@@ -49,7 +50,6 @@ templ TransactionDetail(p TransactionDetailProps) {
 	}
 	@txdMain(p)
 	@txdActivity(p)
-	@components.CategoryPickerScript()
 }
 
 templ txdHero(p TransactionDetailProps) {
@@ -214,7 +214,18 @@ templ txdMain(p TransactionDetailProps) {
 		>
 			<div>
 				<h2 class="text-sm font-semibold text-base-content/50 mb-3">Category</h2>
-				<div class="bb-cat-picker" data-picker-source="txd-cat" x-data={ txdCategoryPickerInit(p) } @category-change="setCategoryFromPicker($event.detail)">
+				<div
+					class="bb-cat-picker"
+					data-picker-source="txd-cat"
+					x-data="categoryPicker"
+					data-mode="assign"
+					data-source-id="txd-cat"
+					data-placeholder="Uncategorized"
+					data-allow-empty="true"
+					data-empty-label="Uncategorized"
+					data-initial={ txdCategoryInitial(p) }
+					@category-change="setCategoryFromPicker($event.detail)"
+				>
 					<button type="button" class="w-full flex items-center gap-3 p-3 rounded-xl bg-base-200/50 hover:bg-base-200 transition-colors" @click="openPicker()">
 						<template x-if="displayColor"><span class="w-3 h-3 rounded-full shrink-0" :style="'background-color:' + displayColor"></span></template>
 						<span x-text="displayLabel" class="text-sm font-medium flex-1 text-left"></span>
@@ -729,20 +740,17 @@ func avatarURLStr(id, version string) string {
 	return url
 }
 
-// txdCategoryPickerInit emits the x-data initializer for the inline
-// category picker. Categories flow into the shared `categoryPicker`
-// factory through `window.__bbCategories` (seeded by
-// transaction_detail.js from the @templ.JSONScript payload), matching
-// the convention used by tx_row.templ.
-func txdCategoryPickerInit(p TransactionDetailProps) string {
-	initial := ""
+// txdCategoryInitial returns the current category UUID for the picker's
+// data-initial attribute, or an empty string when the transaction has no
+// category. The shared `categoryPicker` factory reads this via the
+// `data-initial` attribute on its root and uses window.__bbCategories
+// (seeded by transaction_detail.js from the @templ.JSONScript payload)
+// for the option list.
+func txdCategoryInitial(p TransactionDetailProps) string {
 	if p.Transaction != nil && p.Transaction.Category != nil && p.Transaction.Category.ID != nil {
-		initial = *p.Transaction.Category.ID
+		return *p.Transaction.Category.ID
 	}
-	return fmt.Sprintf(
-		"categoryPicker({categories: window.__bbCategories, mode: 'assign', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', initial: '%s', sourceId: 'txd-cat'})",
-		initial,
-	)
+	return ""
 }
 
 // txdCategoryOverrideAttr returns "true" / "false" for the data-category-override

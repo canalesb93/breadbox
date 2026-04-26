@@ -131,7 +131,13 @@ templ TxRow(tx service.AdminTransactionRow) {
 				<div
 					class="bb-cat-picker"
 					data-picker-source={ "tx-cat-" + tx.ID }
-					x-data={ txCategoryPickerInit(tx.ID, tx.CategoryID) }
+					x-data="categoryPicker"
+					data-mode="assign"
+					data-source-id={ "tx-cat-" + tx.ID }
+					data-placeholder="Uncategorized"
+					data-allow-empty="true"
+					data-empty-label="Uncategorized"
+					data-initial={ txCategoryInitial(tx.CategoryID) }
 					x-init={ fmt.Sprintf("$watch('selectedId', (v, old) => { if (old !== undefined && v !== old && !($store.bulk && $store.bulk.processing)) { quickSetCategory('%s', v) } })", tx.ID) }
 				>
 					<button type="button" class="btn btn-ghost btn-xs gap-1.5 rounded-lg" @click="openPicker()">
@@ -249,16 +255,15 @@ func txAvatarColorStyle(color *string) string {
 	return "--avatar-color: oklch(0.65 0 0)"
 }
 
-// txCategoryPickerInit builds the x-data payload for the inline picker. Short
-// IDs are base62 and category IDs are UUIDs, so single-quote interpolation is
-// safe — anything else is rejected upstream at parseID.
-func txCategoryPickerInit(txID string, categoryID *string) string {
-	initial := ""
+// txCategoryInitial returns the category UUID for the picker's data-initial
+// attribute, or empty string when the row is uncategorized. The shared
+// `categoryPicker` factory reads this via `data-initial` and pulls the
+// option list from window.__bbCategories (seeded by the host page's
+// component module — transactions.templ inline bootstrap, account_detail.js,
+// transaction_detail.js, rule_detail.js).
+func txCategoryInitial(categoryID *string) string {
 	if categoryID != nil {
-		initial = *categoryID
+		return *categoryID
 	}
-	return fmt.Sprintf(
-		"categoryPicker({categories: window.__bbCategories, mode: 'assign', initial: '%s', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', sourceId: 'tx-cat-%s'})",
-		initial, txID,
-	)
+	return ""
 }
