@@ -210,7 +210,7 @@ func TestSyncLogDurationMs(t *testing.T) {
 	}{
 		{
 			name:     "stored duration_ms wins",
-			duration: pgtype.Int4{Int32: 1234, Valid: true},
+			duration: pgconv.Int4(1234),
 			// timestamps would compute a different value — stored value must win.
 			started:   pgconv.Timestamptz(start),
 			completed: pgconv.Timestamptz(end),
@@ -251,7 +251,7 @@ func TestSyncLogDurationMs(t *testing.T) {
 		},
 		{
 			name:     "zero duration is still valid",
-			duration: pgtype.Int4{Int32: 0, Valid: true},
+			duration: pgconv.Int4(0),
 			wantMs:   0,
 			wantOK:   true,
 		},

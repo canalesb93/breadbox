@@ -1339,7 +1339,7 @@ func UpdateConnectionSyncIntervalHandler(a *app.App, sm *scs.SessionManager) htt
 
 		var interval pgtype.Int4
 		if req.Minutes != nil {
-			interval = pgtype.Int4{Int32: *req.Minutes, Valid: true}
+			interval = pgconv.Int4(*req.Minutes)
 		}
 
 		conn, err := a.Queries.UpdateConnectionSyncInterval(r.Context(), db.UpdateConnectionSyncIntervalParams{

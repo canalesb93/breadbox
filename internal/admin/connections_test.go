@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -177,7 +178,7 @@ func TestComputeNextSync(t *testing.T) {
 				Time:  lastSynced,
 				Valid: true,
 			},
-			SyncIntervalOverrideMinutes: pgtype.Int4{Int32: 30, Valid: true},
+			SyncIntervalOverrideMinutes: pgconv.Int4(30),
 		}
 		info := computeNextSync(p, globalInterval, now)
 		if info.IsOverdue {
@@ -201,7 +202,7 @@ func TestComputeNextSync(t *testing.T) {
 				Time:  lastSynced,
 				Valid: true,
 			},
-			SyncIntervalOverrideMinutes: pgtype.Int4{Int32: 60, Valid: true},
+			SyncIntervalOverrideMinutes: pgconv.Int4(60),
 		}
 		info := computeNextSync(p, globalInterval, now)
 		if info.IsOverdue {

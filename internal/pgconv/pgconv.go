@@ -3,6 +3,7 @@ package pgconv
 
 import (
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -131,4 +132,18 @@ func DateStrPtr(d pgtype.Date) *string {
 	}
 	s := d.Time.Format("2006-01-02")
 	return &s
+}
+
+// Int4 wraps an int32 as a non-NULL pgtype.Int4. Use this to collapse
+// `pgtype.Int4{Int32: n, Valid: true}` boilerplate at insert and query-arg
+// sites where the value is always present.
+func Int4(n int32) pgtype.Int4 {
+	return pgtype.Int4{Int32: n, Valid: true}
+}
+
+// NumericCents wraps an int64 cents value as a non-NULL pgtype.Numeric with
+// Exp=-2. Use for monetary amounts at insert and test sites: NumericCents(1050)
+// represents 10.50 in the underlying NUMERIC(12,2) column.
+func NumericCents(cents int64) pgtype.Numeric {
+	return pgtype.Numeric{Int: big.NewInt(cents), Exp: -2, Valid: true}
 }

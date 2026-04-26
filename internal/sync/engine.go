@@ -118,7 +118,7 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 	var durationMs pgtype.Int4
 	if syncLog.StartedAt.Valid {
 		ms := completedAt.Sub(syncLog.StartedAt.Time).Milliseconds()
-		durationMs = pgtype.Int4{Int32: int32(ms), Valid: true}
+		durationMs = pgconv.Int4(int32(ms))
 	}
 
 	if err := e.db.UpdateSyncLog(ctx, db.UpdateSyncLogParams{
