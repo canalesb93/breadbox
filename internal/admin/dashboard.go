@@ -2,7 +2,6 @@ package admin
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
 	"net/http"
 	"sort"
@@ -13,6 +12,7 @@ import (
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
+	"breadbox/internal/timefmt"
 )
 
 // DashboardHandler serves GET /admin/ — the dashboard home page.
@@ -424,29 +424,10 @@ func DashboardHandler(a *app.App, svc *service.Service, tr *TemplateRenderer) ht
 	}
 }
 
-// relativeTime converts a time to a human-readable relative string.
+// relativeTime is a thin alias for timefmt.Relative kept so admin call sites
+// (and the funcMap registration in templates.go) can refer to a short, local
+// name. Concentrating the implementation in internal/timefmt prevents drift
+// between admin and service copies.
 func relativeTime(t time.Time) string {
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		mins := int(d.Minutes())
-		if mins == 1 {
-			return "1 minute ago"
-		}
-		return fmt.Sprintf("%d minutes ago", mins)
-	case d < 24*time.Hour:
-		hours := int(d.Hours())
-		if hours == 1 {
-			return "1 hour ago"
-		}
-		return fmt.Sprintf("%d hours ago", hours)
-	default:
-		days := int(d.Hours() / 24)
-		if days == 1 {
-			return "1 day ago"
-		}
-		return fmt.Sprintf("%d days ago", days)
-	}
+	return timefmt.Relative(t)
 }

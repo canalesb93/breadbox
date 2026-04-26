@@ -354,27 +354,28 @@
        below for the current bindings. -->
   <div x-data="shortcutsHelp()" x-show="open" x-cloak
        @open-shortcuts.window="openHelp()"
-       @keydown.window.escape="if (open) { open = false; $event.stopPropagation(); }">
-    <div class="bb-shortcuts-backdrop" @click="open = false"></div>
+       @keydown.window.escape="if (open) { closeHelp(); $event.stopPropagation(); }">
+    <div class="bb-shortcuts-backdrop" @click="closeHelp()"></div>
     <div class="bb-shortcuts-dialog">
       <div class="bb-shortcuts-header">
         <span class="bb-shortcuts-title">Keyboard Shortcuts</span>
-        <button class="bb-shortcuts-close" @click="open = false">
+        <button class="bb-shortcuts-close" @click="closeHelp()">
           <i data-lucide="x"></i>
         </button>
       </div>
       <div class="bb-shortcuts-body">
-        <!-- Page section: shortcuts scoped to the current page (populated by
-             pages that call $store.shortcuts.register with a page scope + set
-             $store.shortcuts.currentScope). Rendered ABOVE Global so the
-             page-specific actions are the first thing users see. Hidden
-             entirely when the current scope is 'global' or no page-scoped
-             shortcuts are registered. -->
+        <!-- Page section: shortcuts scoped to the current page. Rendered ABOVE
+             Global so the page-specific actions are the first thing users see.
+             Wrapped in a tinted card with an accent rail so it visually
+             separates from the (always-on) Global section below. Hidden when
+             the current scope is 'global' or no page-scoped shortcuts are
+             registered. -->
         <template x-if="sections.page.length > 0">
-          <div>
-            <div class="bb-shortcuts-group" style="padding-top:0.25rem;">
-              <div class="bb-shortcuts-group-label" style="opacity:0.65;" x-text="sections.pageLabel"></div>
-            </div>
+          <section class="bb-shortcuts-section bb-shortcuts-section--page">
+            <header class="bb-shortcuts-section-head">
+              <span class="bb-shortcuts-section-eyebrow">On this page</span>
+              <span class="bb-shortcuts-section-title" x-text="sections.pageLabel"></span>
+            </header>
             <template x-for="group in sections.page" :key="'page-' + group.label">
               <div class="bb-shortcuts-group">
                 <div class="bb-shortcuts-group-label" x-text="group.label"></div>
@@ -386,19 +387,31 @@
                 </template>
               </div>
             </template>
-          </div>
+          </section>
         </template>
-        <!-- Global section: shortcuts available on every page. -->
-        <template x-for="group in sections.global" :key="'global-' + group.label">
-          <div class="bb-shortcuts-group">
-            <div class="bb-shortcuts-group-label" x-text="group.label"></div>
-            <template x-for="item in group.items" :key="item.id">
-              <div class="bb-shortcuts-row">
-                <span class="bb-shortcuts-label" x-text="item.description"></span>
-                <span class="bb-shortcuts-keys" x-html="renderTokens(item.tokens)"></span>
+        <!-- Global section: shortcuts available on every page. The header is
+             only shown when there's a page section above it — when only global
+             shortcuts exist, the header is redundant. -->
+        <template x-if="sections.global.length > 0">
+          <section class="bb-shortcuts-section bb-shortcuts-section--global">
+            <template x-if="sections.page.length > 0">
+              <header class="bb-shortcuts-section-head">
+                <span class="bb-shortcuts-section-eyebrow">Global</span>
+                <span class="bb-shortcuts-section-title">Available everywhere</span>
+              </header>
+            </template>
+            <template x-for="group in sections.global" :key="'global-' + group.label">
+              <div class="bb-shortcuts-group">
+                <div class="bb-shortcuts-group-label" x-text="group.label"></div>
+                <template x-for="item in group.items" :key="item.id">
+                  <div class="bb-shortcuts-row">
+                    <span class="bb-shortcuts-label" x-text="item.description"></span>
+                    <span class="bb-shortcuts-keys" x-html="renderTokens(item.tokens)"></span>
+                  </div>
+                </template>
               </div>
             </template>
-          </div>
+          </section>
         </template>
         <template x-if="sections.global.length === 0 && sections.page.length === 0">
           <div class="bb-shortcuts-group">
@@ -1883,12 +1896,21 @@
           // dynamic scope changes) surface immediately.
           this.sections = buildSections();
           this.open = true;
+          // Freeze the body so trackpad rubber-band on the page behind doesn't
+          // bleed through the dialog (visible at the top/bottom of the dialog
+          // scroll on macOS).
+          if (window.bbLockScroll) window.bbLockScroll();
           setTimeout(function() {
             var dialog = document.querySelector('.bb-shortcuts-dialog');
             if (dialog && typeof lucide !== 'undefined') {
               lucide.createIcons({ nodes: [dialog] });
             }
           }, 50);
+        },
+        closeHelp: function() {
+          if (!this.open) return;
+          this.open = false;
+          if (window.bbUnlockScroll) window.bbUnlockScroll();
         }
       };
     }
@@ -2313,6 +2335,20 @@
             prefixTimeout = null;
           }, COMBO_WINDOW);
           return;
+        }
+
+        // Shift-modified single-letter match (e.g. 'shift+r'). Cmd/Ctrl/Alt
+        // are still rejected up top; Shift is folded into e.key by the browser
+        // (shift+r → e.key='R'). Specs that opt in via 'shift+<letter>' are
+        // tried first, then fall through to plain single-key matching so
+        // existing 'R'/'/'/'?' bindings still work as before.
+        if (e.shiftKey && key.length === 1 && /[a-zA-Z]/.test(key)) {
+          var modSpec = matchSingle(reg, 'shift+' + key.toLowerCase());
+          if (shouldFire(modSpec) && typeof modSpec.action === 'function') {
+            e.preventDefault();
+            modSpec.action();
+            return;
+          }
         }
 
         // Single-key match.

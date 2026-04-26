@@ -101,13 +101,8 @@ func NewHandler(providers map[string]provider.Provider, engine *sync.Engine, que
 			if event.NeedsReauth {
 				status = db.ConnectionStatusPendingReauth
 			}
-			var errCode, errMsg pgtype.Text
-			if event.ErrorCode != nil {
-				errCode = pgtype.Text{String: *event.ErrorCode, Valid: true}
-			}
-			if event.ErrorMessage != nil {
-				errMsg = pgtype.Text{String: *event.ErrorMessage, Valid: true}
-			}
+			errCode := pgconv.TextFromPtr(event.ErrorCode)
+			errMsg := pgconv.TextFromPtr(event.ErrorMessage)
 			processErr = queries.UpdateBankConnectionStatus(r.Context(), db.UpdateBankConnectionStatusParams{
 				ID:           conn.ID,
 				Status:       status,
@@ -122,7 +117,7 @@ func NewHandler(providers map[string]provider.Provider, engine *sync.Engine, que
 			var expTime pgtype.Timestamptz
 			if event.ConsentExpirationTime != nil {
 				if t, err := time.Parse(time.RFC3339, *event.ConsentExpirationTime); err == nil {
-					expTime = pgtype.Timestamptz{Time: t, Valid: true}
+					expTime = pgconv.Timestamptz(t)
 				}
 			}
 			processErr = queries.UpdateConnectionConsentExpiration(r.Context(), db.UpdateConnectionConsentExpirationParams{
@@ -163,10 +158,7 @@ func logWebhookEvent(ctx context.Context, queries *db.Queries, logger *slog.Logg
 	if payloadHash != nil {
 		hash = *payloadHash
 	}
-	var errText pgtype.Text
-	if errMsg != nil {
-		errText = pgtype.Text{String: *errMsg, Valid: true}
-	}
+	errText := pgconv.TextFromPtr(errMsg)
 	evt, err := queries.CreateWebhookEvent(ctx, db.CreateWebhookEventParams{
 		Provider:       providerType,
 		EventType:      eventType,
@@ -188,10 +180,7 @@ func updateWebhookEventStatus(ctx context.Context, queries *db.Queries, logger *
 	if !eventID.Valid {
 		return // Event logging failed earlier, skip update.
 	}
-	var errText pgtype.Text
-	if errMsg != nil {
-		errText = pgtype.Text{String: *errMsg, Valid: true}
-	}
+	errText := pgconv.TextFromPtr(errMsg)
 	if err := queries.UpdateWebhookEventStatus(ctx, db.UpdateWebhookEventStatusParams{
 		ID:           eventID,
 		Status:       status,

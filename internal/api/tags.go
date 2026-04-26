@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
@@ -26,14 +25,13 @@ func ListTagsHandler(svc *service.Service) http.HandlerFunc {
 
 // AddTransactionTagHandler attaches a tag to a transaction. Auto-creates the
 // tag if the slug is not yet registered. Mirrors the admin-side handler.
-// POST /api/v1/transactions/{id}/tags — body: {"slug":"...", "note":"..."}.
+// POST /api/v1/transactions/{id}/tags — body: {"slug":"..."}.
 func AddTransactionTagHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		txnID := chi.URLParam(r, "id")
 
 		var body struct {
 			Slug string `json:"slug"`
-			Note string `json:"note,omitempty"`
 		}
 		if !decodeJSON(w, r, &body) {
 			return
@@ -45,16 +43,9 @@ func AddTransactionTagHandler(svc *service.Service) http.HandlerFunc {
 		}
 
 		actor := service.ActorFromContext(r.Context())
-		added, alreadyPresent, err := svc.AddTransactionTag(r.Context(), txnID, body.Slug, actor, body.Note)
+		added, alreadyPresent, err := svc.AddTransactionTag(r.Context(), txnID, body.Slug, actor)
 		if err != nil {
-			switch {
-			case errors.Is(err, service.ErrNotFound):
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
-			case errors.Is(err, service.ErrInvalidParameter):
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
-			default:
-				mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to add transaction tag")
-			}
+			writeServiceError(w, err, "Transaction not found", "Failed to add transaction tag")
 			return
 		}
 		writeData(w, map[string]any{
@@ -67,35 +58,16 @@ func AddTransactionTagHandler(svc *service.Service) http.HandlerFunc {
 }
 
 // RemoveTransactionTagHandler removes a tag from a transaction.
-// DELETE /api/v1/transactions/{id}/tags/{slug} — optional ?note=... or JSON
-// body {"note":"..."} recorded on the tag_removed annotation.
+// DELETE /api/v1/transactions/{id}/tags/{slug}.
 func RemoveTransactionTagHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		txnID := chi.URLParam(r, "id")
 		slug := chi.URLParam(r, "slug")
 
-		note := strings.TrimSpace(r.URL.Query().Get("note"))
-		if note == "" && r.ContentLength > 0 {
-			var body struct {
-				Note string `json:"note"`
-			}
-			if !decodeJSON(w, r, &body) {
-				return
-			}
-			note = strings.TrimSpace(body.Note)
-		}
-
 		actor := service.ActorFromContext(r.Context())
-		removed, alreadyAbsent, err := svc.RemoveTransactionTag(r.Context(), txnID, slug, actor, note)
+		removed, alreadyAbsent, err := svc.RemoveTransactionTag(r.Context(), txnID, slug, actor)
 		if err != nil {
-			switch {
-			case errors.Is(err, service.ErrNotFound):
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
-			case errors.Is(err, service.ErrInvalidParameter):
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
-			default:
-				mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to remove transaction tag")
-			}
+			writeServiceError(w, err, "Transaction not found", "Failed to remove transaction tag")
 			return
 		}
 		writeData(w, map[string]any{

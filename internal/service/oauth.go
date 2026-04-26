@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -180,7 +181,7 @@ func (s *Service) CreateAuthorizationCode(ctx context.Context, clientID string, 
 	}
 
 	codeHash := hashToken(code)
-	expiresAt := pgtype.Timestamptz{Time: time.Now().Add(authCodeTTL), Valid: true}
+	expiresAt := pgconv.Timestamptz(time.Now().Add(authCodeTTL))
 
 	err = s.Queries.CreateOAuthAuthorizationCode(ctx, db.CreateOAuthAuthorizationCodeParams{
 		CodeHash:            codeHash,
@@ -318,7 +319,7 @@ func (s *Service) issueTokenPair(ctx context.Context, clientID string, adminID p
 	}
 
 	accessTokenHash := hashToken(accessTokenStr)
-	accessExpiresAt := pgtype.Timestamptz{Time: time.Now().Add(accessTokenTTL), Valid: true}
+	accessExpiresAt := pgconv.Timestamptz(time.Now().Add(accessTokenTTL))
 
 	accessToken, err := s.Queries.CreateOAuthAccessToken(ctx, db.CreateOAuthAccessTokenParams{
 		TokenHash: accessTokenHash,
@@ -338,7 +339,7 @@ func (s *Service) issueTokenPair(ctx context.Context, clientID string, adminID p
 	}
 
 	refreshTokenHash := hashToken(refreshTokenStr)
-	refreshExpiresAt := pgtype.Timestamptz{Time: time.Now().Add(refreshTokenTTL), Valid: true}
+	refreshExpiresAt := pgconv.Timestamptz(time.Now().Add(refreshTokenTTL))
 
 	_, err = s.Queries.CreateOAuthRefreshToken(ctx, db.CreateOAuthRefreshTokenParams{
 		TokenHash:     refreshTokenHash,

@@ -27,19 +27,20 @@ func TestUpdateTransactions_CompoundOp(t *testing.T) {
 	testutil.MustCreateTag(t, queries, "needs-review", "Needs Review")
 
 	// Pre-attach needs-review to mimic the seeded auto-rule.
-	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", ID: "u1", Name: "Tester"}, ""); err != nil {
+	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", ID: "u1", Name: "Tester"}); err != nil {
 		t.Fatalf("seed AddTransactionTag: %v", err)
 	}
 
-	// Compound op: set category, add a new tag, remove needs-review with a note,
-	// and attach a comment.
+	// Compound op: set category, add a new tag, remove needs-review, and
+	// attach a comment carrying the rationale (notes on tag actions are
+	// deprecated — the comment is the audit artifact).
 	results, err := svc.UpdateTransactions(ctx, service.UpdateTransactionsParams{
 		Operations: []service.UpdateTransactionsOp{{
 			TransactionID: txn.ShortID,
 			CategorySlug:  strPtr("food_and_drink_groceries"),
 			TagsToAdd:     []service.UpdateTransactionsTagOp{{Slug: "subscription:monthly"}},
-			TagsToRemove:  []service.UpdateTransactionsTagOp{{Slug: "needs-review", Note: "clearly groceries"}},
-			Comment:       strPtr("Costco run"),
+			TagsToRemove:  []service.UpdateTransactionsTagOp{{Slug: "needs-review"}},
+			Comment:       strPtr("Clearly groceries — Costco run."),
 		}},
 		Actor: service.Actor{Type: "user", ID: "u1", Name: "Tester"},
 	})
@@ -175,23 +176,23 @@ func TestUpdateTransactions_AbortMode_RollsBack(t *testing.T) {
 	}
 }
 
-// TestUpdateTransactions_TagRemovalWithoutNote verifies that tag removal
-// without a note succeeds — note is optional.
-func TestUpdateTransactions_TagRemovalWithoutNote(t *testing.T) {
+// TestUpdateTransactions_TagRemoval verifies that tag removal via the
+// compound op writes a tag_removed annotation and detaches the tag.
+func TestUpdateTransactions_TagRemoval(t *testing.T) {
 	svc, queries, _ := newService(t)
 	ctx := context.Background()
 	acctID := seedTxnFixture(t, queries)
 	txn := testutil.MustCreateTransaction(t, queries, acctID, "tx_c", "Subscription", 999, "2026-04-03")
 
 	testutil.MustCreateTag(t, queries, "needs-review", "Needs Review")
-	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", ID: "u1", Name: "Tester"}, ""); err != nil {
+	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", ID: "u1", Name: "Tester"}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
 	results, err := svc.UpdateTransactions(ctx, service.UpdateTransactionsParams{
 		Operations: []service.UpdateTransactionsOp{{
 			TransactionID: txn.ShortID,
-			TagsToRemove:  []service.UpdateTransactionsTagOp{{Slug: "needs-review", Note: ""}},
+			TagsToRemove:  []service.UpdateTransactionsTagOp{{Slug: "needs-review"}},
 		}},
 		Actor: service.Actor{Type: "user", ID: "u1", Name: "Tester"},
 	})

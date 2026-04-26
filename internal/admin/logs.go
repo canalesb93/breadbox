@@ -97,14 +97,11 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 			if int64(showingEnd) > result.Total {
 				showingEnd = int(result.Total)
 			}
-			pBase := paginationBase("/logs", map[string]string{
-				"tab":           "syncs",
-				"connection_id": filterConnID,
-				"status":        filterStatus,
-				"trigger":       filterTrigger,
-				"date_from":     filterDateFrom,
-				"date_to":       filterDateTo,
-			}, "page")
+			pVals := pickValues(r, []string{
+				"connection_id", "status", "trigger", "date_from", "date_to",
+			})
+			pVals.Set("tab", "syncs")
+			pBase := paginationBase("/logs", pVals, "page")
 
 			// Connection filter options.
 			connOpts := make([]pages.LogsConnectionOption, 0, len(connections))
@@ -207,11 +204,9 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 			if int64(whShowingEnd) > result.Total {
 				whShowingEnd = int(result.Total)
 			}
-			whPBase := paginationBase("/logs", map[string]string{
-				"tab":         "webhooks",
-				"wh_provider": whFilterProvider,
-				"wh_status":   whFilterStatus,
-			}, "wh_page")
+			whVals := pickValues(r, []string{"wh_provider", "wh_status"})
+			whVals.Set("tab", "webhooks")
+			whPBase := paginationBase("/logs", whVals, "wh_page")
 
 			// Project webhook events into the templ view-model with
 			// pre-rendered relative + full timestamps.

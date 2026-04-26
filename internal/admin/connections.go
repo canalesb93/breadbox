@@ -895,12 +895,9 @@ func buildConnectionDetailProps(in connectionDetailInput) pages.ConnectionDetail
 		if sl.StartedAt.Valid {
 			row.StartedAtRelative = relativeTime(sl.StartedAt.Time)
 		}
-		if sl.DurationMs.Valid {
+		if ms, ok := service.SyncLogDurationMs(sl.DurationMs, sl.StartedAt, sl.CompletedAt); ok {
 			row.HasDuration = true
-			row.DurationLabel = service.FormatDurationMs(int64(sl.DurationMs.Int32))
-		} else if sl.StartedAt.Valid && sl.CompletedAt.Valid {
-			row.HasDuration = true
-			row.DurationLabel = formatSyncDuration(sl.StartedAt.Time, sl.CompletedAt.Time)
+			row.DurationLabel = service.FormatDurationMs(int64(ms))
 		}
 		if string(sl.Status) == "error" && sl.ErrorMessage.Valid {
 			row.ErrorMessageFriendly = bsync.FriendlyError(sl.ErrorMessage.String)
@@ -935,19 +932,6 @@ func formatNumericAbsCurrency(n pgtype.Numeric) string {
 		f = -f
 	}
 	return service.FormatCurrency(f)
-}
-
-// formatSyncDuration mirrors the funcMap "syncDuration" helper used for
-// historical sync rows that pre-date the duration_ms column.
-func formatSyncDuration(start, end time.Time) string {
-	d := end.Sub(start)
-	if d < time.Second {
-		return fmt.Sprintf("%dms", d.Milliseconds())
-	}
-	if d < time.Minute {
-		return fmt.Sprintf("%.1fs", d.Seconds())
-	}
-	return fmt.Sprintf("%.0fm", d.Minutes())
 }
 
 // ConnectionReauthHandler serves GET /admin/connections/{id}/reauth.
@@ -1285,8 +1269,8 @@ func UpdateAccountDisplayNameHandler(a *app.App, sm *scs.SessionManager) http.Ha
 		}
 
 		var displayName pgtype.Text
-		if req.DisplayName != nil && *req.DisplayName != "" {
-			displayName = pgtype.Text{String: *req.DisplayName, Valid: true}
+		if req.DisplayName != nil {
+			displayName = pgconv.TextIfNotEmpty(*req.DisplayName)
 		}
 
 		account, err := a.Queries.UpdateAccountDisplayName(r.Context(), db.UpdateAccountDisplayNameParams{

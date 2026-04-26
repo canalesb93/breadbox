@@ -233,7 +233,7 @@ templ connectionsCard(c ConnectionsRow) {
 								}
 							</span>
 						} else {
-							@templ.Raw(connectionsStatusBadge(c.Status))
+							@templ.Raw(components.StatusBadge(c.Status))
 						}
 						if c.Paused {
 							<span class="badge badge-ghost badge-xs">Paused</span>
@@ -297,7 +297,7 @@ templ connectionsCard(c ConnectionsRow) {
 			<div class="mx-4 sm:mx-6 mb-4 flex items-center justify-between gap-2 text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
 				<div class="flex items-center gap-2 min-w-0">
 					<i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0"></i>
-					<span class="truncate">{ connectionsErrorMessage(c.ErrorCode) }</span>
+					<span class="truncate">{ components.ErrorMessage(c.ErrorCode) }</span>
 				</div>
 				if c.Provider != "csv" && (c.ErrorCode == "ITEM_LOGIN_REQUIRED" || c.ErrorCode == "INSUFFICIENT_CREDENTIALS" || c.ErrorCode == "INVALID_CREDENTIALS" || c.Status == "pending_reauth") {
 					<a href={ templ.SafeURL("/connections/" + c.ID + "/reauth") } class="btn btn-warning btn-xs rounded-lg shrink-0" @click.stop>Re-authenticate</a>

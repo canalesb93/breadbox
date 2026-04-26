@@ -6,6 +6,7 @@ import (
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
+	"breadbox/internal/timefmt"
 )
 
 // RuleDetailProps mirrors the data the old rule_detail.html read off the
@@ -154,32 +155,10 @@ func ruleStatsUnique(s *service.RuleStats) int64 {
 }
 
 // ruleRelativeTime renders a time.Time as "just now / N minutes ago / ..."
-// — mirrors admin.relativeTime so the LastActiveTime stat reads identically
-// to the original page.
+// for the LastActiveTime stat. Thin alias over timefmt.Relative so the templ
+// caller can stay package-local without importing timefmt.
 func ruleRelativeTime(t time.Time) string {
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		mins := int(d.Minutes())
-		if mins == 1 {
-			return "1 minute ago"
-		}
-		return fmt.Sprintf("%d minutes ago", mins)
-	case d < 24*time.Hour:
-		hours := int(d.Hours())
-		if hours == 1 {
-			return "1 hour ago"
-		}
-		return fmt.Sprintf("%d hours ago", hours)
-	default:
-		days := int(d.Hours() / 24)
-		if days == 1 {
-			return "1 day ago"
-		}
-		return fmt.Sprintf("%d days ago", days)
-	}
+	return timefmt.Relative(t)
 }
 
 // ruleApplyModalCountSentence renders the body sentence in the apply

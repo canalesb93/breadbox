@@ -200,7 +200,7 @@ func TestListSyncLogsPaginated_WithData(t *testing.T) {
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt:    pgconv.Timestamptz(now),
 	})
 	if err != nil {
 		t.Fatalf("CreateSyncLog: %v", err)
@@ -241,14 +241,14 @@ func TestListSyncLogsPaginated_FilterByConnection(t *testing.T) {
 			ConnectionID: conn1.ID,
 			Trigger:      db.SyncTriggerManual,
 			Status:       db.SyncStatusSuccess,
-			StartedAt:    pgtype.Timestamptz{Time: now.Add(time.Duration(i) * time.Minute), Valid: true},
+			StartedAt:    pgconv.Timestamptz(now.Add(time.Duration(i) * time.Minute)),
 		})
 	}
 	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
 		ConnectionID: conn2.ID,
 		Trigger:      db.SyncTriggerCron,
 		Status:       db.SyncStatusError,
-		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt:    pgconv.Timestamptz(now),
 	})
 
 	conn1ID := pgconv.FormatUUID(conn1.ID)
@@ -277,13 +277,13 @@ func TestListSyncLogsPaginated_FilterByStatus(t *testing.T) {
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt:    pgconv.Timestamptz(now),
 	})
 	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerCron,
 		Status:       db.SyncStatusError,
-		StartedAt:    pgtype.Timestamptz{Time: now.Add(time.Minute), Valid: true},
+		StartedAt:    pgconv.Timestamptz(now.Add(time.Minute)),
 	})
 
 	status := "error"
@@ -316,7 +316,7 @@ func TestListSyncLogsPaginated_Pagination(t *testing.T) {
 			ConnectionID: conn.ID,
 			Trigger:      db.SyncTriggerManual,
 			Status:       db.SyncStatusSuccess,
-			StartedAt:    pgtype.Timestamptz{Time: now.Add(time.Duration(i) * time.Minute), Valid: true},
+			StartedAt:    pgconv.Timestamptz(now.Add(time.Duration(i) * time.Minute)),
 		})
 	}
 
@@ -378,13 +378,13 @@ func TestCountSyncLogsFiltered_Basic(t *testing.T) {
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt:    pgconv.Timestamptz(now),
 	})
 	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerCron,
 		Status:       db.SyncStatusError,
-		StartedAt:    pgtype.Timestamptz{Time: now.Add(time.Minute), Valid: true},
+		StartedAt:    pgconv.Timestamptz(now.Add(time.Minute)),
 	})
 
 	// Count all
@@ -423,12 +423,12 @@ func TestSyncLogStats_WithData(t *testing.T) {
 			ConnectionID: conn.ID,
 			Trigger:      db.SyncTriggerManual,
 			Status:       db.SyncStatusInProgress,
-			StartedAt:    pgtype.Timestamptz{Time: now.Add(time.Duration(i) * time.Minute), Valid: true},
+			StartedAt:    pgconv.Timestamptz(now.Add(time.Duration(i) * time.Minute)),
 		})
 		queries.UpdateSyncLog(ctx, db.UpdateSyncLogParams{
 			ID:            log.ID,
 			Status:        db.SyncStatusSuccess,
-			CompletedAt:   pgtype.Timestamptz{Time: now.Add(time.Duration(i)*time.Minute + 5*time.Second), Valid: true},
+			CompletedAt:   pgconv.Timestamptz(now.Add(time.Duration(i)*time.Minute + 5*time.Second)),
 			AddedCount:    int32(i + 1),
 			ModifiedCount: 0,
 			RemovedCount:  0,
@@ -438,12 +438,12 @@ func TestSyncLogStats_WithData(t *testing.T) {
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerCron,
 		Status:       db.SyncStatusInProgress,
-		StartedAt:    pgtype.Timestamptz{Time: now.Add(5 * time.Minute), Valid: true},
+		StartedAt:    pgconv.Timestamptz(now.Add(5 * time.Minute)),
 	})
 	queries.UpdateSyncLog(ctx, db.UpdateSyncLogParams{
 		ID:            errLog.ID,
 		Status:        db.SyncStatusError,
-		CompletedAt:   pgtype.Timestamptz{Time: now.Add(5*time.Minute + 2*time.Second), Valid: true},
+		CompletedAt:   pgconv.Timestamptz(now.Add(5*time.Minute + 2*time.Second)),
 		ErrorMessage:  pgtype.Text{String: "provider error", Valid: true},
 	})
 
@@ -485,13 +485,13 @@ func TestSyncLogStats_FilterByConnection(t *testing.T) {
 		ConnectionID: conn1.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt:    pgconv.Timestamptz(now),
 	})
 	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
 		ConnectionID: conn2.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt:    pgconv.Timestamptz(now),
 	})
 
 	conn1ID := pgconv.FormatUUID(conn1.ID)
@@ -521,19 +521,19 @@ func TestListSyncLogsPaginated_FilterByTrigger(t *testing.T) {
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt:    pgconv.Timestamptz(now),
 	})
 	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerCron,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: now.Add(time.Minute), Valid: true},
+		StartedAt:    pgconv.Timestamptz(now.Add(time.Minute)),
 	})
 	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerCron,
 		Status:       db.SyncStatusError,
-		StartedAt:    pgtype.Timestamptz{Time: now.Add(2 * time.Minute), Valid: true},
+		StartedAt:    pgconv.Timestamptz(now.Add(2 * time.Minute)),
 	})
 
 	// Filter by manual trigger.
@@ -580,13 +580,13 @@ func TestCountSyncLogsFiltered_ByTrigger(t *testing.T) {
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt:    pgconv.Timestamptz(now),
 	})
 	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerWebhook,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: now.Add(time.Minute), Valid: true},
+		StartedAt:    pgconv.Timestamptz(now.Add(time.Minute)),
 	})
 
 	trigger := "webhook"
@@ -619,19 +619,19 @@ func TestListSyncLogsPaginated_FilterByDateRange(t *testing.T) {
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: day1, Valid: true},
+		StartedAt:    pgconv.Timestamptz(day1),
 	})
 	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerCron,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: day2, Valid: true},
+		StartedAt:    pgconv.Timestamptz(day2),
 	})
 	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusError,
-		StartedAt:    pgtype.Timestamptz{Time: day3, Valid: true},
+		StartedAt:    pgconv.Timestamptz(day3),
 	})
 
 	// Filter: from March 10 onward — should return day2 and day3.
@@ -692,21 +692,21 @@ func TestListSyncLogsPaginated_CombinedFilters(t *testing.T) {
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: day1, Valid: true},
+		StartedAt:    pgconv.Timestamptz(day1),
 	})
 	// Cron success on day1.
 	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerCron,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: day1.Add(time.Hour), Valid: true},
+		StartedAt:    pgconv.Timestamptz(day1.Add(time.Hour)),
 	})
 	// Manual error on day2.
 	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusError,
-		StartedAt:    pgtype.Timestamptz{Time: day2, Valid: true},
+		StartedAt:    pgconv.Timestamptz(day2),
 	})
 
 	// Filter: manual + success + day1 range — should return 1.
@@ -753,13 +753,13 @@ func TestSyncLogStats_FilterByTriggerAndDate(t *testing.T) {
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: day1, Valid: true},
+		StartedAt:    pgconv.Timestamptz(day1),
 	})
 	queries.CreateSyncLog(ctx, db.CreateSyncLogParams{
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerCron,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: day2, Valid: true},
+		StartedAt:    pgconv.Timestamptz(day2),
 	})
 
 	// Stats for manual trigger only.
@@ -803,7 +803,7 @@ func TestGetConnectionStatus_WithSyncLog(t *testing.T) {
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt:    pgconv.Timestamptz(now),
 	})
 
 	connID := pgconv.FormatUUID(conn.ID)
@@ -1372,8 +1372,8 @@ func TestCountSyncLogs(t *testing.T) {
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true},
-		CompletedAt:  pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt:    pgconv.Timestamptz(now.Add(-time.Minute)),
+		CompletedAt:  pgconv.Timestamptz(now),
 	})
 	if err != nil {
 		t.Fatalf("CreateSyncLog failed: %v", err)
@@ -1401,8 +1401,8 @@ func TestCleanupSyncLogs_DeletesOldLogs(t *testing.T) {
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerCron,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: oldTime, Valid: true},
-		CompletedAt:  pgtype.Timestamptz{Time: oldTime.Add(time.Second), Valid: true},
+		StartedAt:    pgconv.Timestamptz(oldTime),
+		CompletedAt:  pgconv.Timestamptz(oldTime.Add(time.Second)),
 	})
 	if err != nil {
 		t.Fatalf("CreateSyncLog (old) failed: %v", err)
@@ -1414,8 +1414,8 @@ func TestCleanupSyncLogs_DeletesOldLogs(t *testing.T) {
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusSuccess,
-		StartedAt:    pgtype.Timestamptz{Time: recentTime, Valid: true},
-		CompletedAt:  pgtype.Timestamptz{Time: recentTime.Add(time.Second), Valid: true},
+		StartedAt:    pgconv.Timestamptz(recentTime),
+		CompletedAt:  pgconv.Timestamptz(recentTime.Add(time.Second)),
 	})
 	if err != nil {
 		t.Fatalf("CreateSyncLog (recent) failed: %v", err)
@@ -1453,7 +1453,7 @@ func TestCleanupSyncLogs_SkipsInProgress(t *testing.T) {
 		ConnectionID: conn.ID,
 		Trigger:      db.SyncTriggerCron,
 		Status:       db.SyncStatusInProgress,
-		StartedAt:    pgtype.Timestamptz{Time: oldTime, Valid: true},
+		StartedAt:    pgconv.Timestamptz(oldTime),
 	})
 	if err != nil {
 		t.Fatalf("CreateSyncLog (in_progress) failed: %v", err)

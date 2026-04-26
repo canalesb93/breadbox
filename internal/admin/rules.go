@@ -3,9 +3,7 @@ package admin
 import (
 	"errors"
 	"net/http"
-	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"breadbox/internal/service"
@@ -90,19 +88,9 @@ func renderRules(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager,
 
 // buildRulesPaginationBase returns the pagination base URL for the rules page.
 func buildRulesPaginationBase(r *http.Request) string {
-	params := []string{"search", "category_slug", "enabled", "per_page", "sort_by"}
-	q := r.URL.Query()
-	var qs []string
-	for _, key := range params {
-		if v := q.Get(key); v != "" {
-			qs = append(qs, key+"="+url.QueryEscape(v))
-		}
-	}
-	base := "/rules?page="
-	if len(qs) > 0 {
-		base = "/rules?" + strings.Join(qs, "&") + "&page="
-	}
-	return base
+	return paginationBase("/rules", pickValues(r, []string{
+		"search", "category_slug", "enabled", "per_page", "sort_by",
+	}), "page")
 }
 
 // RuleFormPageHandler serves GET /admin/rules/new and /admin/rules/{id}/edit.

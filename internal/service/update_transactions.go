@@ -27,7 +27,6 @@ type UpdateTransactionsOp struct {
 // UpdateTransactionsTagOp is a single tag add/remove entry.
 type UpdateTransactionsTagOp struct {
 	Slug string
-	Note string
 }
 
 // UpdateTransactionsResult is the per-op outcome returned by UpdateTransactions.
@@ -242,9 +241,6 @@ func (s *Service) runUpdateOpInTx(ctx context.Context, tx pgx.Tx, op UpdateTrans
 			continue
 		}
 		payload := map[string]interface{}{"slug": slug}
-		if t.Note != "" {
-			payload["note"] = t.Note
-		}
 		if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
 			TransactionID: txnUID,
 			Kind:          "tag_added",
@@ -275,7 +271,6 @@ func (s *Service) runUpdateOpInTx(ctx context.Context, tx pgx.Tx, op UpdateTrans
 			}
 			return fmt.Errorf("get tag %q: %w", slug, err)
 		}
-		trimmedNote := strings.TrimSpace(t.Note)
 		rows, err := qtx.RemoveTransactionTag(ctx, db.RemoveTransactionTagParams{
 			TransactionID: txnUID,
 			TagID:         tag.ID,
@@ -288,9 +283,6 @@ func (s *Service) runUpdateOpInTx(ctx context.Context, tx pgx.Tx, op UpdateTrans
 			continue
 		}
 		payload := map[string]interface{}{"slug": slug}
-		if trimmedNote != "" {
-			payload["note"] = trimmedNote
-		}
 		if err := writeAnnotation(ctx, qtx, writeAnnotationParams{
 			TransactionID: txnUID,
 			Kind:          "tag_removed",

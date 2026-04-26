@@ -33,7 +33,7 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 				<div class="flex-1 min-w-0">
 					<p class="font-semibold text-sm">This connection needs re-authentication</p>
 					if p.HasErrorCode {
-						<p class="text-xs text-base-content/50 mt-0.5">{ connDetailErrorMessage(p.ErrorCode) }</p>
+						<p class="text-xs text-base-content/50 mt-0.5">{ components.ErrorMessage(p.ErrorCode) }</p>
 					} else if p.HasErrorMessage {
 						<p class="text-xs text-base-content/50 mt-0.5 truncate">{ p.ErrorMessage }</p>
 					}
@@ -84,7 +84,7 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 								}
 							</span>
 						} else {
-							@templ.Raw(connDetailStatusBadge(p.Status))
+							@templ.Raw(components.StatusBadge(p.Status))
 						}
 						if p.Paused {
 							<span class="badge badge-ghost badge-sm">Paused</span>
@@ -265,7 +265,7 @@ templ connDetailDayBar(ds DaySyncRow) {
 		<div class="text-[0.5rem] text-base-content/25 tabular-nums leading-none select-none">{ ds.ShortLabel }</div>
 		<!-- Tooltip -->
 		<div class="absolute -top-9 left-1/2 -translate-x-1/2 bg-base-content text-base-100 text-[0.6rem] px-2 py-1 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 tabular-nums shadow-sm">
-			{ fmt.Sprintf("%s: %d sync%s", ds.Label, ds.Total, connDetailPluralSyncs(ds.Total)) }
+			{ fmt.Sprintf("%s: %d sync%s", ds.Label, ds.Total, components.PluralS(ds.Total)) }
 			if ds.Error > 0 {
 				{ fmt.Sprintf(" (%d err)", ds.Error) }
 			}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
@@ -33,7 +32,7 @@ type TransactionTagResponse struct {
 //   - added:          true when a new (transaction, tag) pair was created.
 //   - alreadyPresent: true when the pair already existed (no-op, no annotation
 //     written).
-func (s *Service) AddTransactionTag(ctx context.Context, txnID, slug string, actor Actor, note string) (added bool, alreadyPresent bool, _ error) {
+func (s *Service) AddTransactionTag(ctx context.Context, txnID, slug string, actor Actor) (added bool, alreadyPresent bool, _ error) {
 	txnUUID, err := s.resolveTransactionID(ctx, txnID)
 	if err != nil {
 		return false, false, ErrNotFound
@@ -88,9 +87,6 @@ func (s *Service) AddTransactionTag(ctx context.Context, txnID, slug string, act
 
 	// Write annotation for the audit trail.
 	payload := map[string]interface{}{"slug": slug}
-	if note != "" {
-		payload["note"] = note
-	}
 	actorType := actor.Type
 	if actorType == "rule" {
 		// Annotations carry a constrained actor_type set; map "rule" onto
@@ -119,7 +115,7 @@ func (s *Service) AddTransactionTag(ctx context.Context, txnID, slug string, act
 // RemoveTransactionTag removes a tag from a transaction. Returns:
 //   - removed:      true when the (transaction, tag) pair was deleted.
 //   - alreadyAbsent: true when the pair wasn't present (no-op, no error).
-func (s *Service) RemoveTransactionTag(ctx context.Context, txnID, slug string, actor Actor, note string) (removed bool, alreadyAbsent bool, _ error) {
+func (s *Service) RemoveTransactionTag(ctx context.Context, txnID, slug string, actor Actor) (removed bool, alreadyAbsent bool, _ error) {
 	txnUUID, err := s.resolveTransactionID(ctx, txnID)
 	if err != nil {
 		return false, false, ErrNotFound
@@ -138,8 +134,6 @@ func (s *Service) RemoveTransactionTag(ctx context.Context, txnID, slug string, 
 		}
 		return false, false, fmt.Errorf("get tag by slug: %w", err)
 	}
-
-	trimmedNote := strings.TrimSpace(note)
 
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
@@ -164,9 +158,6 @@ func (s *Service) RemoveTransactionTag(ctx context.Context, txnID, slug string, 
 	}
 
 	payload := map[string]interface{}{"slug": slug}
-	if trimmedNote != "" {
-		payload["note"] = trimmedNote
-	}
 	actorType := actor.Type
 	if actorType == "rule" {
 		actorType = "system"

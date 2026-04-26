@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 
 	mw "breadbox/internal/middleware"
@@ -47,15 +46,7 @@ func CreateAccountLinkHandler(svc *service.Service) http.HandlerFunc {
 			MatchToleranceDays: input.MatchToleranceDays,
 		})
 		if err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", err.Error())
-				return
-			}
-			if errors.Is(err, service.ErrInvalidParameter) {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create account link")
+			writeServiceError(w, err, "", "Failed to create account link")
 			return
 		}
 
@@ -69,11 +60,7 @@ func GetAccountLinkHandler(svc *service.Service) http.HandlerFunc {
 		id := chi.URLParam(r, "id")
 		link, err := svc.GetAccountLink(r.Context(), id)
 		if err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Account link not found")
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get account link")
+			writeServiceError(w, err, "Account link not found", "Failed to get account link")
 			return
 		}
 		writeData(w, link)
@@ -100,11 +87,7 @@ func UpdateAccountLinkHandler(svc *service.Service) http.HandlerFunc {
 			Enabled:            input.Enabled,
 		})
 		if err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Account link not found")
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update account link")
+			writeServiceError(w, err, "Account link not found", "Failed to update account link")
 			return
 		}
 		writeData(w, link)
@@ -116,11 +99,7 @@ func DeleteAccountLinkHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		if err := svc.DeleteAccountLink(r.Context(), id); err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Account link not found")
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete account link")
+			writeServiceError(w, err, "Account link not found", "Failed to delete account link")
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -133,11 +112,7 @@ func ReconcileAccountLinkHandler(svc *service.Service) http.HandlerFunc {
 		id := chi.URLParam(r, "id")
 		result, err := svc.RunMatchReconciliation(r.Context(), id)
 		if err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Account link not found")
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to reconcile")
+			writeServiceError(w, err, "Account link not found", "Failed to reconcile")
 			return
 		}
 		writeData(w, result)
@@ -152,11 +127,7 @@ func ListTransactionMatchesHandler(svc *service.Service) http.HandlerFunc {
 
 		matches, err := svc.ListTransactionMatches(r.Context(), id)
 		if err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Account link not found")
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list matches")
+			writeServiceError(w, err, "Account link not found", "Failed to list matches")
 			return
 		}
 		writeData(w, matches)
@@ -168,11 +139,7 @@ func ConfirmMatchHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		if err := svc.ConfirmMatch(r.Context(), id); err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Match not found")
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to confirm match")
+			writeServiceError(w, err, "Match not found", "Failed to confirm match")
 			return
 		}
 		writeData(w, map[string]string{"status": "confirmed"})
@@ -184,11 +151,7 @@ func RejectMatchHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		if err := svc.RejectMatch(r.Context(), id); err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Match not found")
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to reject match")
+			writeServiceError(w, err, "Match not found", "Failed to reject match")
 			return
 		}
 		writeData(w, map[string]string{"status": "rejected"})
@@ -199,7 +162,7 @@ func RejectMatchHandler(svc *service.Service) http.HandlerFunc {
 func ManualMatchHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var input struct {
-			LinkID              string `json:"link_id"`
+			LinkID                 string `json:"link_id"`
 			PrimaryTransactionID   string `json:"primary_transaction_id"`
 			DependentTransactionID string `json:"dependent_transaction_id"`
 		}
@@ -214,15 +177,7 @@ func ManualMatchHandler(svc *service.Service) http.HandlerFunc {
 
 		match, err := svc.ManualMatch(r.Context(), input.LinkID, input.PrimaryTransactionID, input.DependentTransactionID)
 		if err != nil {
-			if errors.Is(err, service.ErrNotFound) {
-				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", err.Error())
-				return
-			}
-			if errors.Is(err, service.ErrInvalidParameter) {
-				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())
-				return
-			}
-			mw.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create match")
+			writeServiceError(w, err, "", "Failed to create match")
 			return
 		}
 

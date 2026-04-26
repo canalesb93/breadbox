@@ -119,7 +119,7 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 		ConnectionID: connID,
 		Trigger:      db.SyncTriggerManual,
 		Status:       db.SyncStatusInProgress,
-		StartedAt:    pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt:    pgconv.Timestamptz(now),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create sync log: %w", err)
@@ -236,7 +236,7 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 			ProviderTransactionID:   externalTxnID,
 			Amount:                  amountNumeric,
 			IsoCurrencyCode:         pgconv.Text("USD"),
-			Date:                    pgtype.Date{Time: dateVal, Valid: true},
+			Date:                    pgconv.Date(dateVal),
 			ProviderName:            desc,
 			ProviderMerchantName:    pgconv.TextIfNotEmpty(merchant),
 			ProviderCategoryPrimary: pgconv.TextIfNotEmpty(category),
@@ -265,13 +265,13 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 	var errorMsg pgtype.Text
 	if result.SkippedCount > 0 && result.NewCount+result.UpdatedCount == 0 {
 		syncStatus = db.SyncStatusError
-		errorMsg = pgtype.Text{String: fmt.Sprintf("all %d rows skipped", result.SkippedCount), Valid: true}
+		errorMsg = pgconv.Text(fmt.Sprintf("all %d rows skipped", result.SkippedCount))
 	}
 
 	err = s.Queries.UpdateSyncLog(ctx, db.UpdateSyncLogParams{
 		ID:            syncLog.ID,
 		Status:        syncStatus,
-		CompletedAt:   pgtype.Timestamptz{Time: completedAt, Valid: true},
+		CompletedAt:   pgconv.Timestamptz(completedAt),
 		AddedCount:    int32(result.NewCount),
 		ModifiedCount: int32(result.UpdatedCount),
 		RemovedCount:  0,

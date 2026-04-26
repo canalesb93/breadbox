@@ -42,7 +42,7 @@ templ Rules(p RulesProps) {
 				if p.TotalPages > 1 {
 					@templ.Raw(fmt.Sprintf("Showing %d&ndash;%d of ", p.ShowingStart, p.ShowingEnd))
 				}
-				{ fmt.Sprintf("%d rule%s found", p.Total, pluralS64(p.Total)) }
+				{ fmt.Sprintf("%d rule%s found", p.Total, components.PluralS(p.Total)) }
 			</div>
 			if len(p.Rules) > 0 {
 				<label class="flex items-center gap-2 text-xs text-base-content/40 whitespace-nowrap">
@@ -146,7 +146,7 @@ templ rulesRow(r RulesRow) {
 					<span class="text-base-content/30 shrink-0">&middot;</span>
 					<span class="inline-flex items-center gap-1 shrink-0 tabular-nums" title={ r.ActionsSummary }>
 						<i data-lucide="zap" class="w-3 h-3"></i>
-						{ fmt.Sprintf("%d action%s", r.ActionsCount, pluralS(r.ActionsCount)) }
+						{ fmt.Sprintf("%d action%s", r.ActionsCount, components.PluralS(r.ActionsCount)) }
 					</span>
 					<span class="text-base-content/30 shrink-0">&middot;</span>
 					<span class="tabular-nums shrink-0">{ fmt.Sprintf("%d hits", r.HitCount) }</span>
@@ -311,15 +311,6 @@ templ rulesPerPageOption(value, current int) {
 	} else {
 		<option value={ fmt.Sprintf("%d", value) }>{ fmt.Sprintf("%d", value) }</option>
 	}
-}
-
-// pluralS mirrors `{{if ne .X 1}}s{{end}}` for int counts. logs.templ
-// already defines pluralS64 for int64; this is the int sibling.
-func pluralS(n int) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
 }
 
 func rulesAvatarStyle(color *string) string {

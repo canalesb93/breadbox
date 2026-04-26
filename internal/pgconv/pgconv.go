@@ -87,6 +87,20 @@ func TextIfNotEmpty(s string) pgtype.Text {
 	return pgtype.Text{String: s, Valid: true}
 }
 
+// Date wraps a time.Time as a non-NULL pgtype.Date. Use this to collapse
+// `pgtype.Date{Time: t, Valid: true}` boilerplate at insert and query-arg
+// sites where the value is always present.
+func Date(t time.Time) pgtype.Date {
+	return pgtype.Date{Time: t, Valid: true}
+}
+
+// Timestamptz wraps a time.Time as a non-NULL pgtype.Timestamptz. Use this
+// to collapse `pgtype.Timestamptz{Time: t, Valid: true}` boilerplate at
+// insert and query-arg sites where the value is always present.
+func Timestamptz(t time.Time) pgtype.Timestamptz {
+	return pgtype.Timestamptz{Time: t, Valid: true}
+}
+
 // TimestampStr renders a pgtype.Timestamptz as an RFC3339 UTC string. Returns
 // an empty string when the timestamp is NULL. Use for NOT NULL columns where
 // an empty response field is acceptable for the rare invalid case.

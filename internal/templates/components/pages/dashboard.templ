@@ -2,7 +2,7 @@ package pages
 
 import (
 	"fmt"
-	"strconv"
+	"strings"
 
 	"breadbox/internal/templates/components"
 )
@@ -35,13 +35,27 @@ templ dashOverviewStats(p DashboardProps) {
 				<div class="text-[0.65rem] text-base-content/40 mt-1 group-hover:text-primary/70 transition-colors">Approve &rarr;</div>
 			</a>
 		}
-		if p.ErrorCount > 0 {
-			<a href="/connections" class={ "bb-card bb-card--interactive p-4 no-underline group block", templ.KV("col-span-2 lg:col-span-3", p.ReviewsEnabled) }>
-				<div class="text-[0.65rem] uppercase tracking-wider text-warning">Connection Errors</div>
-				<div class="text-2xl font-bold tabular-nums tracking-tight mt-1 text-error/80">{ strconv.Itoa(p.ErrorCount) }</div>
-				<div class="text-[0.65rem] text-base-content/40 mt-1 group-hover:text-primary/70 transition-colors">Fix &rarr;</div>
-			</a>
-		}
+	</div>
+}
+
+// dashConnectionErrorsBanner is a compact alert that surfaces failing
+// connections at the top of the dashboard. Replaces the old full-width
+// "Connection Errors" stat card, which left a sea of empty space on
+// desktop when the second row spanned all three columns just to show a
+// single number.
+templ dashConnectionErrorsBanner(p DashboardProps) {
+	<div role="alert" class="alert alert-warning rounded-xl mb-6 items-center">
+		<i data-lucide="alert-triangle" class="w-5 h-5 shrink-0"></i>
+		<div class="flex-1 min-w-0">
+			<h3 class="font-semibold text-sm">{ connectionErrorTitle(p.ErrorCount) }</h3>
+			if names := errorConnectionNames(p.ConnectionHealth); names != "" {
+				<p class="text-xs opacity-80 truncate">{ names }</p>
+			}
+		</div>
+		<a href="/connections" class="btn btn-sm btn-warning rounded-xl shrink-0">
+			<i data-lucide="wrench" class="w-3.5 h-3.5"></i>
+			Fix
+		</a>
 	</div>
 }
 
@@ -67,6 +81,9 @@ templ Dashboard(p DashboardProps) {
 	<div x-data x-init="$store.shortcuts.setScope('dashboard')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	if p.ShowUpdateBanner {
 		@dashUpdateBanner(p)
+	}
+	if p.ErrorCount > 0 {
+		@dashConnectionErrorsBanner(p)
 	}
 	if len(p.Accounts) == 0 {
 		<div class="bb-card mb-6 p-8 text-center">
@@ -230,4 +247,28 @@ templ dashRecentTransactionsCard(p DashboardProps) {
 
 func dashDismissUpdateScript(version string) string {
 	return fmt.Sprintf(`fetch('/-/update/dismiss', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({version: %q}) }).then(() => $el.closest('.alert').remove())`, version)
+}
+
+func connectionErrorTitle(n int) string {
+	if n == 1 {
+		return "1 connection needs attention"
+	}
+	return fmt.Sprintf("%d connections need attention", n)
+}
+
+func errorConnectionNames(rows []ConnectionHealthRow) string {
+	const limit = 3
+	var names []string
+	for _, r := range rows {
+		if r.Status == "error" || r.Status == "pending_reauth" {
+			names = append(names, r.Name)
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	if len(names) <= limit {
+		return strings.Join(names, ", ")
+	}
+	return fmt.Sprintf("%s and %d more", strings.Join(names[:limit], ", "), len(names)-limit)
 }

@@ -730,7 +730,7 @@ func TestImportCategoriesTSV_MergeInto(t *testing.T) {
 		ProviderTransactionID: "txn_merge_1",
 		Amount:                pgtype.Numeric{Int: big.NewInt(550), Exp: -2, Valid: true},
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
-		Date:                  pgtype.Date{Time: testutil.MustParseDate("2025-01-15"), Valid: true},
+		Date:                  pgconv.Date(testutil.MustParseDate("2025-01-15")),
 		ProviderName:          "Starbucks",
 		CategoryID:            sourceCat.ID,
 	})

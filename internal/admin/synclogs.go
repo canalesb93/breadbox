@@ -2,7 +2,6 @@ package admin
 
 import (
 	"net/http"
-	"net/url"
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
@@ -126,20 +125,3 @@ func stringOrEmpty(s *string) string {
 	return *s
 }
 
-// paginationBase builds a URL query string prefix for pagination links.
-// It preserves all current filter params and ends with "&page=" (or "?page=")
-// so the template can append the page number directly.
-func paginationBase(path string, params map[string]string, pageParam string) string {
-	q := url.Values{}
-	for k, v := range params {
-		if v != "" {
-			q.Set(k, v)
-		}
-	}
-	q.Del(pageParam) // remove page param so we can append it fresh
-	encoded := q.Encode()
-	if encoded == "" {
-		return path + "?" + pageParam + "="
-	}
-	return path + "?" + encoded + "&" + pageParam + "="
-}

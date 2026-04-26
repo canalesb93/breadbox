@@ -284,33 +284,6 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return fmt.Sprintf("%v", v)
 				}
 			},
-			"subf": func(a, b float64) float64 { return a - b },
-			"mulf": func(a, b float64) float64 { return a * b },
-			"divf": func(a, b float64) float64 {
-				if b == 0 {
-					return 0
-				}
-				return a / b
-			},
-			"minf": func(a, b float64) float64 {
-				if a < b {
-					return a
-				}
-				return b
-			},
-			"absf": func(a float64) float64 {
-				if a < 0 {
-					return -a
-				}
-				return a
-			},
-			"itof": func(a int) float64 {
-				return float64(a)
-			},
-			"syncDuration": func(start, end time.Time) string {
-				return service.FormatDurationMs(end.Sub(start).Milliseconds())
-			},
-			"formatDurationMs": func(ms int32) string { return service.FormatDurationMs(int64(ms)) },
 			"relativeTime": func(t interface{}) string {
 				switch v := t.(type) {
 				case time.Time:
@@ -337,9 +310,6 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return ""
 				}
 			},
-			"formatUUID": func(u pgtype.UUID) string {
-				return pgconv.FormatUUID(u)
-			},
 			"formatIntervalMinutes": components.FormatIntervalMinutes,
 			"accountLabel": func(name string, mask interface{}) string {
 				// Format an account name with optional last-4 digits for disambiguation.
@@ -361,16 +331,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				return name
 			},
 			"statusBadge": func(status string) template.HTML {
-				switch status {
-				case "active":
-					return `<span class="badge badge-soft badge-success badge-sm">Active</span>`
-				case "pending_reauth":
-					return `<span class="badge badge-soft badge-warning badge-sm">Reauth Needed</span>`
-				case "error":
-					return `<span class="badge badge-soft badge-error badge-sm">Error</span>`
-				default:
-					return `<span class="badge badge-ghost badge-sm">Disconnected</span>`
-				}
+				return template.HTML(components.StatusBadge(status))
 			},
 			"syncBadge": func(status string) template.HTML {
 				switch status {
@@ -384,20 +345,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return template.HTML(`<span class="badge badge-ghost badge-sm">` + template.HTMLEscapeString(status) + `</span>`)
 				}
 			},
-			"errorMessage": func(code string) string {
-				messages := map[string]string{
-					"ITEM_LOGIN_REQUIRED":      "Your bank login has changed. Please re-authenticate.",
-					"INSUFFICIENT_CREDENTIALS": "Additional credentials are needed. Please re-authenticate.",
-					"INVALID_CREDENTIALS":      "Your bank credentials are incorrect. Please re-authenticate.",
-					"MFA_NOT_SUPPORTED":        "This connection requires MFA which is not supported. Please reconnect.",
-					"NO_ACCOUNTS":              "No accounts found for this connection.",
-					"enrollment.disconnected":  "This bank connection has been disconnected.",
-				}
-				if msg, ok := messages[code]; ok {
-					return msg
-				}
-				return code
-			},
+			"errorMessage": components.ErrorMessage,
 			"syncFriendlyError": func(rawErr string) string {
 				return bsync.FriendlyError(rawErr)
 			},

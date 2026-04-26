@@ -90,7 +90,7 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 		ConnectionID: connectionID,
 		Trigger:      trigger,
 		Status:       db.SyncStatusInProgress,
-		StartedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		StartedAt:    pgconv.Timestamptz(time.Now()),
 	})
 	if err != nil {
 		return fmt.Errorf("create sync log: %w", err)
@@ -101,7 +101,7 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 
 	// Update sync_log with final status.
 	completedAt := time.Now()
-	now := pgtype.Timestamptz{Time: completedAt, Valid: true}
+	now := pgconv.Timestamptz(completedAt)
 	status := db.SyncStatusSuccess
 	var errMsg pgtype.Text
 	if syncErr != nil {
@@ -552,7 +552,7 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		ProviderPendingTransactionID: optionalText(txn.PendingExternalID),
 		Amount:                       decimalToNumeric(txn.Amount),
 		IsoCurrencyCode:              pgconv.TextIfNotEmpty(txn.ISOCurrencyCode),
-		Date:                         pgtype.Date{Time: txn.Date, Valid: true},
+		Date:                         pgconv.Date(txn.Date),
 		AuthorizedDate:               optionalDate(txn.AuthorizedDate),
 		Datetime:                     optionalTimestamptz(txn.Datetime),
 		AuthorizedDatetime:           optionalTimestamptz(txn.AuthorizedDatetime),
@@ -824,9 +824,10 @@ func (e *Engine) applyTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.U
 }
 
 // removeTagFromRule deletes a (transaction, tag) row and writes the matching
-// tag_removed annotation. No-op if the tag slug doesn't exist. The rule's
-// name is used as the removal note so the activity timeline carries a source
-// attribution.
+// tag_removed annotation. No-op if the tag slug doesn't exist. Source
+// attribution flows through the parent rule_applied annotation; the
+// rule-source tag_removed row is deduped from the rendered timeline by
+// service.EnrichAnnotations.
 func (e *Engine) removeTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, slug string, ruleID pgtype.UUID, ruleShortID, ruleName string) error {
 	var tagID pgtype.UUID
 	err := tx.QueryRow(ctx, `SELECT id FROM tags WHERE slug = $1`, slug).Scan(&tagID)
@@ -852,7 +853,6 @@ func (e *Engine) removeTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.
 		"source":    "rule",
 		"rule_id":   ruleShortID,
 		"rule_name": ruleName,
-		"note":      fmt.Sprintf("Removed by rule: %s", ruleName),
 	}
 	if err := writeSyncAnnotation(ctx, tx, writeSyncAnnotationParams{
 		TransactionID: txnID,
@@ -1220,14 +1220,14 @@ func optionalTimestamptz(t *time.Time) pgtype.Timestamptz {
 	if t == nil {
 		return pgtype.Timestamptz{}
 	}
-	return pgtype.Timestamptz{Time: *t, Valid: true}
+	return pgconv.Timestamptz(*t)
 }
 
 func optionalDate(t *time.Time) pgtype.Date {
 	if t == nil {
 		return pgtype.Date{}
 	}
-	return pgtype.Date{Time: *t, Valid: true}
+	return pgconv.Date(*t)
 }
 
 func decimalToNumeric(d decimal.Decimal) pgtype.Numeric {

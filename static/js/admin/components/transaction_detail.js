@@ -280,18 +280,25 @@ document.addEventListener('alpine:init', function () {
     };
   });
 
-  // Activity-timeline comment composer. Reads txId + maxLength from data-*.
+  // Activity-timeline comment composer. Reads txId + maxLength +
+  // hasPendingReview from data-*. The `Toggle Needs Review` checkbox in the
+  // composer card binds to `pinReview`; when posting, if pinReview is on
+  // and the transaction doesn't already have a pending review, we also
+  // POST a `needs-review` tag.
   Alpine.data('txdCommentManager', function () {
     return {
       newComment: '',
       maxLength: 10000,
       txId: '',
+      hasPendingReview: false,
+      pinReview: false,
 
       init: function () {
         var ds = this.$el.dataset;
         this.txId = ds.txId || '';
         var parsed = parseInt(ds.maxCommentLength, 10);
         if (!isNaN(parsed) && parsed > 0) this.maxLength = parsed;
+        this.hasPendingReview = ds.hasPendingReview === 'true';
       },
 
       canSubmit: function () {
@@ -324,21 +331,43 @@ document.addEventListener('alpine:init', function () {
         var self = this;
         var content = this.newComment.trim();
         if (!content || !this.canSubmit()) return;
+        var shouldPin = this.pinReview && !this.hasPendingReview;
         fetch('/-/transactions/' + this.txId + '/comments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content: content }),
         })
           .then(function (res) {
-            if (res.ok) {
-              self.newComment = '';
-              showToast('Comment added.', 'success');
-              location.reload();
-            } else {
+            if (!res.ok) {
               return res.json().then(function (data) {
                 showToast(data.error || 'Failed to add comment.');
               });
             }
+            if (!shouldPin) {
+              self.newComment = '';
+              showToast('Comment added.', 'success');
+              location.reload();
+              return;
+            }
+            return fetch('/-/transactions/' + self.txId + '/tags', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ slug: 'needs-review', note: '' }),
+            })
+              .then(function (tagRes) {
+                self.newComment = '';
+                if (tagRes.ok) {
+                  showToast('Comment added; tagged needs-review.', 'success');
+                } else {
+                  showToast('Comment added (tag failed).', 'warning');
+                }
+                location.reload();
+              })
+              .catch(function () {
+                self.newComment = '';
+                showToast('Comment added (tag failed).', 'warning');
+                location.reload();
+              });
           })
           .catch(function () { showToast('Network error.'); });
       },

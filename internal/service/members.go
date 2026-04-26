@@ -173,7 +173,7 @@ func (s *Service) generateSetupToken(ctx context.Context, accountID pgtype.UUID)
 	err := s.Queries.SetAuthAccountSetupToken(ctx, db.SetAuthAccountSetupTokenParams{
 		ID:                  accountID,
 		SetupToken:          pgconv.Text(token),
-		SetupTokenExpiresAt: pgtype.Timestamptz{Time: expiresAt, Valid: true},
+		SetupTokenExpiresAt: pgconv.Timestamptz(expiresAt),
 	})
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("store setup token: %w", err)
