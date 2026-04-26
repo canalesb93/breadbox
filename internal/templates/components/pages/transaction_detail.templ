@@ -366,7 +366,7 @@ templ txdTimelineSystem(e service.ActivityEntry, now time.Time) {
 				if e.Timestamp != "" {
 					<span aria-hidden="true">&middot;</span>
 					<span class="tooltip tooltip-top" data-tip={ formatDateTimeStr(e.Timestamp) }>
-						<time datetime={ e.Timestamp } class="tabular-nums cursor-default" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStrAt(e.Timestamp, now) }</time>
+						<time datetime={ e.Timestamp } class="tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStrAt(e.Timestamp, now) }</time>
 					</span>
 				}
 			</span>
@@ -526,7 +526,7 @@ templ txdTimelineComment(e service.ActivityEntry, now time.Time) {
 				<span class="text-base-content/55">commented</span>
 				if e.Timestamp != "" {
 					<span class="tooltip tooltip-top" data-tip={ formatDateTimeStr(e.Timestamp) }>
-						<time datetime={ e.Timestamp } class="text-base-content/40 tabular-nums cursor-default" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStrAt(e.Timestamp, now) }</time>
+						<time datetime={ e.Timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStrAt(e.Timestamp, now) }</time>
 					</span>
 				}
 				if e.CommentID != "" {
