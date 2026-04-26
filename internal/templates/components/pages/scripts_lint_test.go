@@ -19,9 +19,9 @@ import (
 // static/js/admin/components/<page>.js, the maximum drops; lower this value
 // in the same PR so the lint ratchets down. See #828 / #827.
 //
-// 2026-04-25 audit (post-connections extraction): max = 60 in
-// account_detail.templ:633-697. Ceiling = 60 + 30 = 90.
-const inlineScriptCeiling = 90
+// 2026-04-25 audit (post-account_detail extraction): max = 1 in
+// categories.templ:71-73. Ceiling = 1 + 30 = 31.
+const inlineScriptCeiling = 31
 
 // xDataFactoryAntiPattern catches the regression that #827 / #828 are
 // undoing: an x-data attribute rendered from a Go expression that calls a
