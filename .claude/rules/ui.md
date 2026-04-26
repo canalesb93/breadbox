@@ -20,7 +20,7 @@ paths:
 - `make css` compiles `input.css` → `static/css/styles.css`.
 - `make css-watch` for dev (rebuilds on change).
 - Dockerfile runs `make css` in the build stage. Don't commit `styles.css` changes — it's a build artifact.
-- **CSS is embedded into the binary** via `static/embed.go` (`//go:embed all:css favicon.svg`). In a plain `make dev` server you must **restart** after `make css` for changes to take effect — a browser hard-reload alone won't help because the running binary serves the stale embedded copy. `make dev-watch` avoids this (see below).
+- **CSS and admin JS are embedded into the binary** via `static/embed.go` (`//go:embed all:css all:js favicon.svg`). In a plain `make dev` server you must **restart** after `make css` for changes to take effect — a browser hard-reload alone won't help because the running binary serves the stale embedded copy. `make dev-watch` avoids this (see below).
 
 ## Hot-reload dev loop — prefer this for UI work
 
@@ -90,6 +90,19 @@ DaisyUI `light`/`dark` themes with `prefers-color-scheme` auto-switch. **No hard
 ### Replacing `alert()` / `confirm()`
 
 Use Alpine inline patterns (modal + `x-data` state). Never blocking browser dialogs — they're hostile in an admin context and ignore dark mode.
+
+## JavaScript and Alpine
+
+Page-level Alpine factories live in `static/js/admin/components/<pageSlug>.js`. They register via `Alpine.data()` inside an `alpine:init` listener, take **no arguments**, and parse their initial state from a sibling `@templ.JSONScript("<page>-data", p.X)` tag (or from `data-*` attributes for scalars). Templ wires the factory in with `<script src="/static/js/admin/components/<pageSlug>.js"></script>` placed at the **top of the templ component** (no `defer` — Alpine in `<head>` is already deferred and would otherwise fire `alpine:init` before the factory registers) and a string-literal `x-data="factoryName"` on the root element.
+
+The full convention — file layout, factory shape, data-passing patterns, and a worked example — is in `docs/design-system.md` → "Alpine page components". The reference implementation is `static/js/admin/components/prompt_builder.js` (powering `/agent-wizard/{type}`).
+
+Hard rules enforced by `internal/templates/components/pages/scripts_lint_test.go` (runs as part of `go test ./...`):
+
+- **No `x-data={ "factory(...)"`** — the Go-expression form that interpolates props into the factory call. Use `x-data="factory"` plus `@templ.JSONScript` or `data-*`.
+- **No literal `<script>...</script>` block in `internal/templates/components/pages/*.templ` exceeds 5 content lines.** Anything larger belongs in `static/js/admin/components/<page>.js`. Never raise the ceiling.
+
+When a new admin page needs Alpine, do **not** add a `<page>_scripts.go` sidecar or a multi-line inline `<script>` block — write the factory in `static/js/admin/components/<page>.js` and follow the convention.
 
 ## Keyboard shortcuts
 

@@ -9,6 +9,7 @@ import "fmt"
 // internal/templates/pages/reports.html byte-for-byte (responsive classes,
 // Alpine directives, ARIA, the inline reportsPage() Alpine component).
 templ Reports(p ReportsProps) {
+	<script src="/static/js/admin/components/reports.js"></script>
 	<!--
 		Set the shortcut-registry scope so base.html's global dispatcher routes
 		r (registered below) to a reload, and so the ? help modal surfaces it
@@ -47,7 +48,7 @@ templ Reports(p ReportsProps) {
 	</div>
 	<!-- Reports Inbox -->
 	if len(p.Reports) > 0 {
-		<div class="bb-card" x-data="reportsPage()">
+		<div class="bb-card" x-data="reportsPage">
 			<div class="divide-y divide-base-200/60 bb-stagger">
 				for _, r := range p.Reports {
 					@reportsRow(r)
@@ -62,9 +63,6 @@ templ Reports(p ReportsProps) {
 			<p class="text-base font-medium text-base-content/70 mb-1">{ reportsEmptyTitle(p.FilterStatus) }</p>
 			<p class="text-sm text-base-content/40 max-w-md mx-auto">{ reportsEmptyMessage(p.FilterStatus) }</p>
 		</div>
-	}
-	if len(p.Reports) > 0 {
-		@reportsScripts()
 	}
 }
 
@@ -125,20 +123,3 @@ templ reportsRow(r ReportsItem) {
 	</a>
 }
 
-// reportsScripts emits the inline Alpine factory for the reports inbox.
-// Lifted byte-for-byte from the original pages/reports.html so the
-// regression audit passes — only the wrapping {{if}} guard moves up to
-// the parent component.
-templ reportsScripts() {
-	<script>
-		function reportsPage() {
-		  return {
-		    dismissed: {},
-		    markRead(id) {
-		      this.dismissed[id] = true;
-		      fetch('/-/reports/' + id + '/read', { method: 'POST' });
-		    }
-		  };
-		}
-	</script>
-}

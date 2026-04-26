@@ -10,7 +10,17 @@ import (
 // base layout via TemplateRenderer.RenderWithTempl. The markup mirrors
 // the previous html/template version byte-for-byte so behavior (live
 // preview, icon picker, parent picker, Alpine submit flow) is preserved.
+//
+// The parent picker uses the shared `categoryPicker` Alpine factory from
+// static/js/admin/components/category_picker.js, fed by the JSONScript
+// payload below. CategoryPickerScript emits a synchronous <script src>
+// tag at the top so the factory registers before Alpine — itself
+// deferred from <head> — fires alpine:init.
 templ CategoryForm(p CategoryFormProps) {
+	if !p.IsEdit {
+		@templ.JSONScript("category-form-picker-data", p.Categories)
+	}
+	@components.CategoryPickerScript()
 	@components.BreadcrumbNav(p.Breadcrumbs)
 	@components.CategoryPickerStyles()
 	<div class="bb-page-header">
@@ -85,7 +95,13 @@ templ CategoryForm(p CategoryFormProps) {
 							<div
 								class="bb-cat-picker"
 								data-picker-source="cat-form-parent"
-								x-data={ "categoryPicker({categories: " + categoriesJSON(p.Categories) + ", mode: 'assign', placeholder: 'None (top-level)', allowEmpty: true, emptyLabel: 'None (top-level)', sourceId: 'cat-form-parent'})" }
+								x-data="categoryPicker"
+								data-mode="assign"
+								data-source-id="cat-form-parent"
+								data-placeholder="None (top-level)"
+								data-allow-empty="true"
+								data-empty-label="None (top-level)"
+								data-categories-source="category-form-picker-data"
 								@category-change="parentId = $event.detail.id"
 							>
 								<button type="button" class="select select-bordered w-full text-left flex items-center gap-2 rounded-xl bg-base-200/50" @click="openPicker()">
@@ -216,6 +232,5 @@ templ CategoryForm(p CategoryFormProps) {
 			</div>
 		</form>
 	</div>
-	@components.CategoryPickerScript()
 	@templ.Raw(categoryFormBootstrap(p))
 }

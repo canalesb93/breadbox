@@ -1,7 +1,6 @@
 package pages
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -50,18 +49,14 @@ type RuleApplicationMeta struct {
 	AppliedBy           string
 }
 
-// ruleDetailCategoriesJSON marshals the category tree for the inline
-// window.__bbCategories bootstrap. Returns "null" on failure so the script
-// always parses cleanly.
-func ruleDetailCategoriesJSON(cats []service.CategoryResponse) string {
-	if cats == nil {
-		return "null"
+// ruleID safely returns the rule's ID, or empty string when the rule
+// pointer is nil. Used to build the data-apply-url / data-toggle-url
+// attributes without crashing the template render on a transient nil.
+func ruleID(rule *service.TransactionRuleResponse) string {
+	if rule == nil {
+		return ""
 	}
-	b, err := json.Marshal(cats)
-	if err != nil {
-		return "null"
-	}
-	return string(b)
+	return rule.ID
 }
 
 // ruleConditionConjLabel returns the AND/OR conjunction string used by the

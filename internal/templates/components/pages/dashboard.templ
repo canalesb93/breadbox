@@ -61,7 +61,18 @@ templ dashConnectionErrorsBanner(p DashboardProps) {
 
 // Dashboard renders the admin home page: agent reports and recent transactions.
 // Hosted inside base.html via TemplateRenderer.RenderWithTempl.
+//
+// The dashboard's Alpine factory (`agentReports`) lives in
+// static/js/admin/components/dashboard.js per the Alpine page-components
+// convention (docs/design-system.md). The <script src> below is loaded
+// synchronously — NOT `defer`ed — because Alpine itself ships as
+// <script defer> in <head>, so its alpine:init event fires before any
+// deferred page script could register the factory.
 templ Dashboard(p DashboardProps) {
+	<!-- Component factory for agentReports. Loaded synchronously (no defer)
+	     so the Alpine.data() registration runs before Alpine — itself
+	     deferred from <head> — fires alpine:init. -->
+	<script src="/static/js/admin/components/dashboard.js"></script>
 	<!--
 		Set the shortcut-registry scope so the ? help modal reflects "This page"
 		accurately (dashboard has no custom shortcuts — navigation lives via the
@@ -91,7 +102,6 @@ templ Dashboard(p DashboardProps) {
 		@dashAgentReportsCard(p)
 		@dashRecentTransactionsCard(p)
 	</div>
-	@dashScripts()
 }
 
 templ dashUpdateBanner(p DashboardProps) {
@@ -136,7 +146,7 @@ templ dashUpdateBanner(p DashboardProps) {
 }
 
 templ dashAgentReportsCard(p DashboardProps) {
-	<div class="bb-card flex flex-col h-full" x-data="{ ...agentReports() }">
+	<div class="bb-card flex flex-col h-full" x-data="agentReports">
 		<div class="px-5 py-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-base-200/60 shrink-0">
 			<div class="flex items-center gap-2 min-w-0">
 				<i data-lucide="bot" class="w-4 h-4 text-primary/70 shrink-0"></i>
@@ -231,29 +241,6 @@ templ dashRecentTransactionsCard(p DashboardProps) {
 			</div>
 		}
 	</div>
-}
-
-templ dashScripts() {
-	<!-- Agent Reports: dismiss logic -->
-	<script>
-		function agentReports() {
-			return {
-				dismissed: {},
-				markRead(id) {
-					this.dismissed[id] = true;
-					fetch('/-/reports/' + id + '/read', { method: 'POST' });
-				},
-				markAllRead() {
-					var self = this;
-					document.querySelectorAll('[id^="report-"]').forEach(function(el) {
-						var id = el.id.replace('report-', '');
-						self.dismissed[id] = true;
-					});
-					fetch('/-/reports/read-all', { method: 'POST' });
-				}
-			};
-		}
-	</script>
 }
 
 // ── Helpers ──────────────────────────────────────────────────

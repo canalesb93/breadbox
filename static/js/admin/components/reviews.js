@@ -1,29 +1,28 @@
-/*
- * M3 — Reviews queue keyboard shortcuts.
- *
- * Rendered only when the transactions page is filtered to tags=needs-review
- * (see txReviewQueueShortcuts in transactions.templ). Registers the single
- * review-specific action — approve (a) — at `scope: 'reviews'` on top of the
- * transactions list's existing j/k/Enter/c handlers (still driven by the
- * inline keydown in transactions_scripts.js.html until M1 lands and ports
- * them to the registry).
- *
- * Reject and skip were considered but dropped: the review model is tag-backed
- * (the needs-review tag is the queue), so there is no distinct "rejected"
- * state to record — reject would be semantically identical to approve with
- * different toast copy. Skip, without a tracked snooze-until mechanism, is
- * just `j` (advance focus). We keep the transactions list free of custom
- * logic that doesn't pull its weight.
- *
- * Guards (input focus, open overlays, touch devices) are owned by the global
- * dispatcher in base.html, so these handlers only need to care about "what
- * does this key do" when it fires.
- */
+// M3 Reviews queue keyboard shortcuts.
+//
+// Convention reference: docs/design-system.md -> "Alpine page components".
+//
+// Loaded only when the transactions page is filtered to tags=needs-review
+// (see txReviewQueueShortcuts in transactions.templ). Registers the single
+// review-specific action - approve (a) - at `scope: 'reviews'` on top of the
+// transactions list's existing j/k/Enter/c handlers (registered by
+// transactions.js when the same page boots).
+//
+// Reject and skip were considered but dropped: the review model is tag-backed
+// (the needs-review tag is the queue), so there is no distinct "rejected"
+// state to record - reject would be semantically identical to approve with
+// different toast copy. Skip, without a tracked snooze-until mechanism, is
+// just `j` (advance focus). We keep the transactions list free of custom
+// logic that doesn't pull its weight.
+//
+// Guards (input focus, open overlays, touch devices) are owned by the global
+// dispatcher in base.html, so these handlers only need to care about "what
+// does this key do" when it fires.
 (function () {
   function focusedRow() {
     var nav = window.Alpine && Alpine.store('txNav');
     if (!nav) return null;
-    // Private helper on the store — the store exposes it via `_getRows`
+    // Private helper on the store - the store exposes it via `_getRows`
     // for j/k nav. Fall back to a DOM query if the store shape drifts.
     var rows = typeof nav._getRows === 'function'
       ? nav._getRows()
@@ -42,7 +41,7 @@
   // endpoint the tag chip's remove button uses so CSRF, annotations, and
   // any other server-side side effects stay in one code path. On success,
   // the row is removed from the view (mirrors removeTag's animation in
-  // transactions_scripts.js.html) and focus advances to the next row.
+  // transactions.js) and focus advances to the next row.
   function resolveReview(verb) {
     var row = focusedRow();
     if (!row) return;

@@ -794,3 +794,103 @@ The helper invokes the component's `Render(ctx, w)` and returns `template.HTML` 
 ### `templ fmt`
 
 Run `templ fmt .` before committing — it normalizes whitespace and attribute order in `.templ` files. CI may enforce this. Many editors have a templ LSP that formats on save.
+
+## 14. Alpine page components
+
+Page-level Alpine factories — the things rendered as `x-data="..."` at the root of an admin page — live in `static/js/admin/components/<pageSlug>.js` and load via a synchronous `<script src="...">` placed at the top of the templ component. This keeps JS out of templ files and out of `_scripts.go` Go-string sidecars, so editors give you syntax highlighting, the formatter works, and refactors are mechanical.
+
+History: the migration from inline factories to static modules was tracked in #827 (foundation: #828; reference port: `prompt_builder`).
+
+### File layout
+
+```
+static/js/admin/components/
+  prompt_builder.js          # one factory per page
+  ...
+```
+
+Each file is plain JS (no bundler, no transform). The whole `static/js/` tree is embedded into the binary by `static/embed.go` and served at `/static/*` by `internal/api/router.go`. Dev-watch picks edits up immediately when `BREADBOX_DEV_RELOAD=1` is set (see Section 2).
+
+### Factory shape
+
+Use Alpine's documented `Alpine.data()` form, registered inside an `alpine:init` listener:
+
+```js
+document.addEventListener('alpine:init', function () {
+  Alpine.data('promptBuilder', function () {
+    return {
+      blocks: [],
+
+      init: function () {
+        var dataEl = document.getElementById('prompt-builder-data');
+        if (dataEl) {
+          this.blocks = JSON.parse(dataEl.textContent);
+        }
+      },
+
+      // ...rest of the component (getters, methods, computed values)
+    };
+  });
+});
+```
+
+Two stylistic constraints:
+
+- **The factory takes no arguments.** Alpine officially supports `x-data="foo(arg)"`, but in this codebase the factory is always argument-free. Initial state flows in through `data-*` attributes or a sibling JSON `<script>`, never through Go-string interpolation. This keeps the JS file editor-friendly and forces a clean separation of concerns.
+- **`init()` is where you parse data and wire one-time setup.** `destroy()` is for cleanup of global listeners (e.g. shortcut store registrations). Don't put data parsing inline in expressions — do it once.
+
+### Templ wiring
+
+In the `.templ` page:
+
+```templ
+templ MyPage(p MyPageProps) {
+  <script src="/static/js/admin/components/my_page.js"></script>
+  // ... markup ...
+  @templ.JSONScript("my-page-data", p.Items)
+  <div x-data="myPage" data-mode={ p.Mode }>
+    // ... interactive markup using methods + state from the factory ...
+  </div>
+}
+```
+
+Three things to notice:
+
+- The component `<script src="...">` is **at the top of the templ component** and **NOT marked `defer`**. Alpine itself loads via `<script defer>` in `<head>`, so its `alpine:init` event would fire before a deferred component script could register the factory. Loading synchronously here means the parser runs your `Alpine.data('myPage', ...)` registration BEFORE Alpine wakes up. The script is small and same-origin, so the synchronous fetch is a non-issue. (Alternatively a `<script defer>` placed in `<head>` would also work because of document-order defer execution; keeping it in the component is more co-located.)
+- `x-data="myPage"` is a **string literal** — not `x-data={ "myPage(...)" }`. That Go-expression form is the regression #827 is undoing and is enforced against by the lint in `internal/templates/components/pages/scripts_lint_test.go`.
+- `@templ.JSONScript("my-page-data", p.Items)` renders `<script id="my-page-data" type="application/json">[...]</script>` with proper escaping. The factory parses it once in `init()`. This is the documented templ helper for passing complex server data to client JS.
+
+### Two data-passing patterns — pick one
+
+| Use case | Pattern |
+|---|---|
+| Scalars, IDs, small flags | `data-foo="..."` on the `x-data` root, read via `this.$el.dataset.foo` in `init()` (or directly inside expressions). |
+| Complex initial state — slices, maps, nested objects | `@templ.JSONScript("<page>-data", props.X)` + `JSON.parse(document.getElementById('<page>-data').textContent)` in `init()`. |
+
+Don't mix: pick the one that fits the data shape. `data-*` for primitives, JSON script for structured payloads.
+
+### What NOT to do
+
+- **`x-data={ "myPage(" + p.JSON + ")" }`** — Go-expression `x-data` calling a factory with interpolated args. The lint rejects this. Move the data into a `data-*` attribute or `@templ.JSONScript`.
+- **`@templ.Raw("<script>" + factoryBody + "</script>")`** — embedding a multi-line factory as a Go string. No syntax highlighting, no editor IntelliSense, fragile escaping. Move the body into `static/js/admin/components/`.
+- **A new `<page>_scripts.go` next to `<page>.templ`** — the sidecar pattern was removed by #827. New code uses `static/js/admin/components/`.
+- **A trivial one-liner inline `<script>` for `lucide.createIcons()`** — fine to leave as-is; the lint caps inline blocks at 5 content lines. Anything larger belongs in a JS file.
+
+### Sharing logic across pages
+
+Most pages have their own factory file. For factories that genuinely need to be shared (the canonical example is `categoryPicker`, used by category form, transactions filter bar, and per-row category assignment), put the module in `static/js/admin/components/<name>.js` and have each consumer load the script and pass differing state via `data-*` attributes. Prefer copying first and consolidating only when a third page wants the same logic — premature shared modules are hard to undo.
+
+For shared CDN scripts (e.g. `marked`, `dompurify`) that need to load exactly once across multiple pages, the templ-idiomatic pattern is `templ.OnceHandle`. Use it when a page first needs it; until then, each page pulls in its own `<script src="...">` — duplicate loads are harmless on the admin tier.
+
+### Lint
+
+`internal/templates/components/pages/scripts_lint_test.go` runs as part of `go test ./...` and enforces two rules:
+
+1. **No `x-data={ "factory("` Go-expression form.** Hard fail.
+2. **No literal `<script>...</script>` block in `internal/templates/components/pages/*.templ` exceeds 5 content lines.** Anything larger belongs in `static/js/admin/components/<page>.js`. Never raise the ceiling.
+
+Failure messages include `path:line[-end]` so the offender can be extracted directly.
+
+### Reference implementation
+
+`static/js/admin/components/prompt_builder.js` + `internal/templates/components/pages/prompt_builder.templ` (the `/agent-wizard/{type}` page). Copy this shape for any new Alpine page component.

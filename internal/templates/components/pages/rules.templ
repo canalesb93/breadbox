@@ -11,11 +11,15 @@ import (
 // admin/rules.go and the bridge drops the rendered HTML into base.html's
 // TemplContent slot.
 //
-// Direct port of the old html/template version. The static `<script>`
-// blocks (rulesPage Alpine factory + bbRuleNav keyboard nav) are inlined
-// verbatim with @templ.Raw so the JS bodies don't compete with templ's
-// `{ }` interpolation.
+// Direct port of the old html/template version. The Alpine factory
+// (`rulesPage`), keyboard-navigation module (`bbRuleNav`), and URL helpers
+// live in static/js/admin/components/rules.js — see #827 / docs/design-system.md
+// → "Alpine page components".
 templ Rules(p RulesProps) {
+	<!-- Synchronous (NOT deferred) — Alpine's bundle in <head> is already
+	     deferred and dispatches alpine:init at parse-end, so a deferred
+	     component script would register its listener too late. -->
+	<script src="/static/js/admin/components/rules.js"></script>
 	<!-- Set the shortcut-registry scope so base.html's global dispatcher
 	     routes j/k/Enter/n/Space/d to this page's handlers. Reset on
 	     teardown so other pages don't inherit. -->
@@ -31,7 +35,7 @@ templ Rules(p RulesProps) {
 			</a>
 		</div>
 	</div>
-	<div x-data="rulesPage()">
+	<div x-data="rulesPage">
 		<!-- Rules count + sort -->
 		<div class="flex items-center justify-between flex-wrap gap-3 mb-4 px-1">
 			<div class="text-sm text-base-content/40">
@@ -65,7 +69,6 @@ templ Rules(p RulesProps) {
 		if p.TotalPages > 1 {
 			@rulesPaginator(p)
 		}
-		@templ.Raw(rulesScripts)
 	</div>
 }
 

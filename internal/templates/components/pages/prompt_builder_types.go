@@ -1,14 +1,16 @@
 package pages
 
+import "breadbox/internal/prompts"
+
 // PromptBuilderProps mirrors the data map the old prompt_builder.html read.
-// BlocksJSON is the pre-marshalled JSON literal for the agent's blocks; it's
-// embedded verbatim into the page's `x-data="promptBuilder(...)"` attribute,
-// matching the old `{{.BlocksJSON}}` interpolation byte-for-byte.
+// Blocks is the typed slice rendered into a JSON `<script>` tag via
+// @templ.JSONScript("prompt-builder-data", p.Blocks); the Alpine factory in
+// static/js/admin/components/prompt_builder.js parses it on init.
 type PromptBuilderProps struct {
 	AgentType        string
 	AgentLabel       string
 	AgentDescription string
 	AgentIcon        string
 	AgentColor       string
-	BlocksJSON       string
+	Blocks           []prompts.Block
 }

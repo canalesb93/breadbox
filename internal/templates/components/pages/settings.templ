@@ -12,6 +12,7 @@ import (
 // typed props and the bridge drops the rendered HTML into base.html's
 // TemplContent slot.
 templ Settings(p SettingsProps) {
+	<script src="/static/js/admin/components/settings.js"></script>
 	<!--
 		Set the shortcut-registry scope so the ? help modal reflects "This page"
 		accurately. Settings intentionally has no custom shortcuts — it's a
@@ -31,13 +32,6 @@ templ Settings(p SettingsProps) {
 		@settingsSystemCard(p)
 		@settingsHelpCard(p)
 	</div>
-	<script>
-		(function() {
-			if (!location.hash) return;
-			var el = document.querySelector(location.hash);
-			if (el) setTimeout(function() { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
-		})();
-	</script>
 }
 
 templ settingsSyncCard(p SettingsProps) {

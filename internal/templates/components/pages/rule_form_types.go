@@ -1,8 +1,6 @@
 package pages
 
 import (
-	"encoding/json"
-
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 )
@@ -10,25 +8,21 @@ import (
 // RuleFormProps mirrors the data map the old rule_form.html read off the
 // layout's data map. Kept flat so admin/rules.go can copy fields one-to-one.
 type RuleFormProps struct {
-	IsEdit          bool
-	Rule            *service.TransactionRuleResponse
-	FlatCategories  []service.CategoryResponse
-	Tags            []service.TagResponse
-	Breadcrumbs     []components.Breadcrumb
+	IsEdit         bool
+	Rule           *service.TransactionRuleResponse
+	FlatCategories []service.CategoryResponse
+	Tags           []service.TagResponse
+	Breadcrumbs    []components.Breadcrumb
 }
 
-// ruleJSON marshals the existing rule (or null) for the inline Alpine
-// bootstrap. Returns the literal "null" string when no rule is set so the
-// JS reads `const existingRule = null;` cleanly in create mode.
-func ruleJSON(r *service.TransactionRuleResponse) string {
-	if r == nil {
-		return "null"
+// ruleFormIsEditAttr returns the literal string "true" or "false" for the
+// `data-is-edit` attribute on the x-data root. The factory reads it via
+// `this.$el.dataset.isEdit === 'true'` in init().
+func ruleFormIsEditAttr(b bool) string {
+	if b {
+		return "true"
 	}
-	b, err := json.Marshal(r)
-	if err != nil {
-		return "null"
-	}
-	return string(b)
+	return "false"
 }
 
 // flatCategoryParentLabel returns the parent display name with the trailing

@@ -12,10 +12,18 @@ import (
 // typed props and the bridge drops the rendered HTML into base.html's
 // TemplContent slot.
 //
-// Mirrors the previous internal/templates/pages/connection_detail.html
-// byte-for-byte (responsive classes, Alpine directives, ARIA, scripts).
+// The Alpine factory lives in static/js/admin/components/connection_detail.js
+// and reads the connection ID off the data-conn-id attribute on the x-data
+// root. The factory <script> is loaded synchronously at the top of the
+// component (not `defer`) so Alpine.data('connectionDetail', ...) is
+// registered before Alpine — itself <script defer> in <head> — fires
+// alpine:init.
 templ ConnectionDetail(p ConnectionDetailProps) {
-	<div class="max-w-full overflow-x-hidden">
+	<!-- Component factory. Loaded synchronously (no defer) so the
+	     Alpine.data() registration runs before Alpine — itself deferred
+	     from <head> — fires alpine:init. -->
+	<script src="/static/js/admin/components/connection_detail.js"></script>
+	<div class="max-w-full overflow-x-hidden" x-data="connectionDetail" data-conn-id={ p.ConnID }>
 		@components.BreadcrumbNav(p.Breadcrumbs)
 		if p.Status == "error" || p.Status == "pending_reauth" {
 			<div class="bb-card border-error/30 bg-error/5 px-5 py-4 mb-6 flex items-center gap-4 flex-wrap">
@@ -95,7 +103,7 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 					</div>
 				</div>
 			</div>
-			<div class="flex items-center gap-2 flex-wrap shrink-0" x-data="{ confirming: false }">
+			<div class="flex items-center gap-2 flex-wrap shrink-0">
 				if p.Status == "error" || p.Status == "pending_reauth" {
 					<a href={ templ.SafeURL("/connections/" + p.ConnID + "/reauth") } class="btn btn-sm btn-outline rounded-xl">Re-authenticate</a>
 				}
@@ -106,12 +114,12 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 					</a>
 				}
 				if p.Status == "active" {
-					<button class="btn btn-sm btn-primary rounded-xl" onclick="syncConnection()" id="sync-btn">
+					<button class="btn btn-sm btn-primary rounded-xl" @click="syncConnection()" id="sync-btn">
 						<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
 						Sync Now
 					</button>
 				}
-				<button class="btn btn-sm btn-ghost rounded-xl" onclick="togglePause()" id="pause-btn">
+				<button class="btn btn-sm btn-ghost rounded-xl" @click="togglePause()" id="pause-btn">
 					if p.Paused {
 						<i data-lucide="play" class="w-3.5 h-3.5"></i>
 						Resume
@@ -150,7 +158,6 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 		}
 		<!-- Sync History -->
 		@connDetailSyncHistory(p)
-		@templ.Raw(connDetailScripts(p))
 	</div>
 }
 
@@ -300,7 +307,7 @@ templ connDetailInfoGrid(p ConnectionDetailProps) {
 			<div class="p-4">
 				<div class="text-[0.65rem] font-medium text-base-content/40 uppercase tracking-wider mb-1.5">Sync Interval</div>
 				<div>
-					<select id="sync-interval" onchange="updateSyncInterval(this.value)" class="select select-xs select-bordered w-full rounded-lg">
+					<select id="sync-interval" @change="updateSyncInterval($event.target.value)" class="select select-xs select-bordered w-full rounded-lg">
 						@connDetailIntervalOption("", "Global default", !p.SyncIntervalOverrideMinutesValid, false, false)
 						@connDetailIntervalOption("15", "Every 15 min", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 15)
 						@connDetailIntervalOption("30", "Every 30 min", false, p.SyncIntervalOverrideMinutesValid, p.SyncIntervalOverrideMinutesValue == 30)
@@ -410,9 +417,19 @@ templ connDetailAccountCard(a AccountRow) {
 				</div>
 				<!-- Inline actions -->
 				<div class="flex items-center gap-2 mt-3 pt-3 border-t border-base-300/40">
-					@templ.Raw(connDetailDisplayNameInput(a))
+					<input
+						type="text"
+						value={ a.DisplayName }
+						placeholder="Display name..."
+						@change={ "updateDisplayName('" + a.ID + "', $event.target.value)" }
+						class="input input-xs input-ghost flex-1 hover:input-bordered focus:input-bordered transition-all rounded-lg text-xs"
+					/>
 					<label class="flex items-center gap-1.5 text-xs text-base-content/40 cursor-pointer shrink-0" title="Exclude from sync">
-						@templ.Raw(connDetailExcludeCheckbox(a))
+						if a.Excluded {
+							<input type="checkbox" class="checkbox checkbox-xs" checked @change={ "toggleExcluded('" + a.ID + "', $event.target.checked)" }/>
+						} else {
+							<input type="checkbox" class="checkbox checkbox-xs" @change={ "toggleExcluded('" + a.ID + "', $event.target.checked)" }/>
+						}
 						<span>Exclude</span>
 					</label>
 				</div>
