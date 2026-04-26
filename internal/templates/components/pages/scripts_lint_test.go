@@ -2,7 +2,6 @@ package pages
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,44 +11,22 @@ import (
 
 // inlineScriptCeiling is the maximum number of content lines allowed in a
 // literal inline <script>...</script> block inside a *.templ file in this
-// package. The ceiling is a high-water mark — set to "current measured max +
-// ~30" so existing code passes comfortably and new regressions fail loudly.
-//
-// As Phase 2 of #827 proceeds and pages get extracted to
-// static/js/admin/components/<page>.js, the maximum drops; lower this value
-// in the same PR so the lint ratchets down. See #828 / #827.
-//
-// 2026-04-25 audit (post reviews + transactions extraction — final Phase 2):
-// max = 1 in categories.templ:71-73. Ceiling = 1 + 30 = 31. Phase 2 of #827
-// is complete after this PR — every page-level Alpine factory now lives in
-// static/js/admin/components/.
-const inlineScriptCeiling = 31
+// package. Page-level Alpine factories live in static/js/admin/components/
+// per docs/design-system.md → "Alpine page components"; literal inline
+// scripts in templ files are reserved for trivial DOM glue (e.g. a one-shot
+// lucide.createIcons()).
+const inlineScriptCeiling = 5
 
-// xDataFactoryAntiPattern catches the regression that #827 / #828 are
-// undoing: an x-data attribute rendered from a Go expression that calls a
-// factory with interpolated arguments — e.g.
+// xDataFactoryAntiPattern catches the regression that #827 / #828 removed:
+// an x-data attribute rendered from a Go expression that calls a factory
+// with interpolated arguments — e.g.
 //
 //	x-data={ "promptBuilder(" + p.BlocksJSON + ")" }
 //
-// The string-literal form `x-data="factoryName"` is allowed (it's the new
-// convention). The factory must take no arguments; data flows through
-// @templ.JSONScript or data-* attributes instead.
+// The string-literal form `x-data="factoryName"` is the convention. The
+// factory takes no arguments; data flows through @templ.JSONScript or
+// data-* attributes instead.
 var xDataFactoryAntiPattern = regexp.MustCompile(`x-data=\{\s*"[A-Za-z_$][A-Za-z0-9_$]*\(`)
-
-// existingAntiPatternAllowlist tracks anti-pattern hits that were already in
-// the codebase when the lint shipped (Phase 1 of #827). Each entry is
-// `<basename>:<lineNumber>` and is paired with a comment naming the page
-// that will remove it in its Phase 2 extraction PR.
-//
-// This allowlist must shrink monotonically: every Phase 2 PR that ports a
-// page deletes its entry here. If you find yourself adding to this list,
-// stop — the new Alpine factory belongs in static/js/admin/components/.
-//
-// As of #827's Phase 2 closure, the allowlist is empty: every page-level
-// Alpine factory has been ported to static/js/admin/components/, and the
-// shared categoryPicker factory was extracted in the final PR. Keep the
-// map declaration so the stale-entry check below still compiles.
-var existingAntiPatternAllowlist = map[string]struct{}{}
 
 // TestNoLargeInlineScripts walks every *.templ file under
 // internal/templates/components/pages and enforces two rules:
@@ -60,15 +37,13 @@ var existingAntiPatternAllowlist = map[string]struct{}{}
 //
 // Excluded from the line-count rule: <script src="...">, <script
 // type="application/json">, and any line rendered through Go expressions
-// such as `@templ.Raw("<script>" + body + "</script>")`. Those are tracked
-// in #827's per-page extraction queue rather than enforced here.
+// such as `@templ.Raw("<script>" + body + "</script>")`.
 func TestNoLargeInlineScripts(t *testing.T) {
 	t.Run("AntiPattern_xDataFactoryArgs", func(t *testing.T) {
 		entries, err := filepath.Glob("*.templ")
 		if err != nil {
 			t.Fatalf("glob *.templ: %v", err)
 		}
-		seen := map[string]struct{}{}
 		for _, path := range entries {
 			f, err := os.Open(path)
 			if err != nil {
@@ -83,18 +58,12 @@ func TestNoLargeInlineScripts(t *testing.T) {
 				if !xDataFactoryAntiPattern.MatchString(line) {
 					continue
 				}
-				key := fmt.Sprintf("%s:%d", path, lineNo)
-				seen[key] = struct{}{}
-				if _, exempt := existingAntiPatternAllowlist[key]; exempt {
-					continue
-				}
 				t.Errorf(
 					"%s:%d: x-data factory-with-arguments anti-pattern detected:\n  %s\n"+
 						"Use string-literal x-data=\"factoryName\" + @templ.JSONScript(...) "+
 						"or data-* attributes instead. See docs/design-system.md → "+
-						"\"Alpine page components\". If this is brand-new code, do not "+
-						"add it to the allowlist — port the factory to "+
-						"static/js/admin/components/ instead.",
+						"\"Alpine page components\". Port the factory to "+
+						"static/js/admin/components/ instead of inlining it.",
 					path, lineNo, strings.TrimSpace(line),
 				)
 			}
@@ -102,19 +71,6 @@ func TestNoLargeInlineScripts(t *testing.T) {
 				t.Errorf("scan %s: %v", path, err)
 			}
 			f.Close()
-		}
-		// The allowlist must shrink monotonically: every Phase 2 PR removes
-		// its entry. Stale entries (line moved, file removed, or page already
-		// migrated) need cleanup so the lint stays trustworthy.
-		for k := range existingAntiPatternAllowlist {
-			if _, ok := seen[k]; !ok {
-				t.Errorf(
-					"existingAntiPatternAllowlist has stale entry %q "+
-						"(no matching x-data factory-args occurrence found). "+
-						"Delete the entry — the lint is now clean for that page.",
-					k,
-				)
-			}
 		}
 	})
 
