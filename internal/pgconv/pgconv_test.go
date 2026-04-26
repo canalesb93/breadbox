@@ -234,6 +234,28 @@ func TestTextIfNotEmpty_Empty(t *testing.T) {
 	}
 }
 
+func TestDate(t *testing.T) {
+	when := time.Date(2024, 3, 15, 0, 0, 0, 0, time.UTC)
+	got := Date(when)
+	if !got.Valid {
+		t.Errorf("Date(%v).Valid = false, want true", when)
+	}
+	if !got.Time.Equal(when) {
+		t.Errorf("Date(%v).Time = %v, want %v", when, got.Time, when)
+	}
+}
+
+func TestTimestamptz(t *testing.T) {
+	when := time.Date(2024, 3, 15, 14, 30, 0, 0, time.UTC)
+	got := Timestamptz(when)
+	if !got.Valid {
+		t.Errorf("Timestamptz(%v).Valid = false, want true", when)
+	}
+	if !got.Time.Equal(when) {
+		t.Errorf("Timestamptz(%v).Time = %v, want %v", when, got.Time, when)
+	}
+}
+
 func TestTimestampStr_Valid(t *testing.T) {
 	ts := pgtype.Timestamptz{
 		Time:  time.Date(2024, 3, 15, 14, 30, 0, 0, time.UTC),

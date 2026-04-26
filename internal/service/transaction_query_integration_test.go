@@ -1036,7 +1036,7 @@ func upsertTxnWithCategory(t *testing.T, q *db.Queries, acctID pgtype.UUID, extI
 		ProviderTransactionID: extID,
 		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
-		Date:                  pgtype.Date{Time: testutil.MustParseDate(date), Valid: true},
+		Date:                  pgconv.Date(testutil.MustParseDate(date)),
 		ProviderName:          name,
 		CategoryID:            categoryID,
 	})
@@ -1053,7 +1053,7 @@ func upsertTxnPending(t *testing.T, q *db.Queries, acctID pgtype.UUID, extID, na
 		ProviderTransactionID: extID,
 		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
-		Date:                  pgtype.Date{Time: testutil.MustParseDate(date), Valid: true},
+		Date:                  pgconv.Date(testutil.MustParseDate(date)),
 		ProviderName:          name,
 		Pending:               true,
 	})
@@ -1194,7 +1194,7 @@ func upsertTxnWithAmount(t *testing.T, q *db.Queries, acctID pgtype.UUID, extID,
 		ProviderTransactionID: extID,
 		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
-		Date:                  pgtype.Date{Time: testutil.MustParseDate(date), Valid: true},
+		Date:                  pgconv.Date(testutil.MustParseDate(date)),
 		ProviderName:          name,
 	})
 	if err != nil {
@@ -1215,7 +1215,7 @@ func upsertTxnWithMerchant(t *testing.T, q *db.Queries, acctID pgtype.UUID, extI
 		ProviderTransactionID: extID,
 		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
-		Date:                  pgtype.Date{Time: testutil.MustParseDate(date), Valid: true},
+		Date:                  pgconv.Date(testutil.MustParseDate(date)),
 		ProviderName:          name,
 		ProviderMerchantName:  pgtype.Text{String: merchant, Valid: true},
 	})

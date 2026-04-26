@@ -560,13 +560,13 @@ func (s *Service) BulkRecategorizeByFilter(ctx context.Context, params BulkRecat
 
 	if params.StartDate != nil {
 		query += fmt.Sprintf(" AND t.date >= $%d", argN)
-		args = append(args, pgtype.Date{Time: *params.StartDate, Valid: true})
+		args = append(args, pgconv.Date(*params.StartDate))
 		argN++
 	}
 
 	if params.EndDate != nil {
 		query += fmt.Sprintf(" AND t.date < $%d", argN)
-		args = append(args, pgtype.Date{Time: *params.EndDate, Valid: true})
+		args = append(args, pgconv.Date(*params.EndDate))
 		argN++
 	}
 

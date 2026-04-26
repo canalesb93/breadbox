@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -183,7 +184,7 @@ func MustCreateTransaction(t *testing.T, q *db.Queries, acctID pgtype.UUID, extI
 		ProviderTransactionID: extID,
 		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
-		Date:                  pgtype.Date{Time: MustParseDate(date), Valid: true},
+		Date:                  pgconv.Date(MustParseDate(date)),
 		ProviderName:          name,
 	})
 	if err != nil {
