@@ -361,16 +361,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				return name
 			},
 			"statusBadge": func(status string) template.HTML {
-				switch status {
-				case "active":
-					return `<span class="badge badge-soft badge-success badge-sm">Active</span>`
-				case "pending_reauth":
-					return `<span class="badge badge-soft badge-warning badge-sm">Reauth Needed</span>`
-				case "error":
-					return `<span class="badge badge-soft badge-error badge-sm">Error</span>`
-				default:
-					return `<span class="badge badge-ghost badge-sm">Disconnected</span>`
-				}
+				return template.HTML(components.StatusBadge(status))
 			},
 			"syncBadge": func(status string) template.HTML {
 				switch status {
@@ -384,20 +375,7 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return template.HTML(`<span class="badge badge-ghost badge-sm">` + template.HTMLEscapeString(status) + `</span>`)
 				}
 			},
-			"errorMessage": func(code string) string {
-				messages := map[string]string{
-					"ITEM_LOGIN_REQUIRED":      "Your bank login has changed. Please re-authenticate.",
-					"INSUFFICIENT_CREDENTIALS": "Additional credentials are needed. Please re-authenticate.",
-					"INVALID_CREDENTIALS":      "Your bank credentials are incorrect. Please re-authenticate.",
-					"MFA_NOT_SUPPORTED":        "This connection requires MFA which is not supported. Please reconnect.",
-					"NO_ACCOUNTS":              "No accounts found for this connection.",
-					"enrollment.disconnected":  "This bank connection has been disconnected.",
-				}
-				if msg, ok := messages[code]; ok {
-					return msg
-				}
-				return code
-			},
+			"errorMessage": components.ErrorMessage,
 			"syncFriendlyError": func(rawErr string) string {
 				return bsync.FriendlyError(rawErr)
 			},
