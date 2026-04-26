@@ -34,6 +34,7 @@ type UsersEnrichedRow struct {
 	CreatedAtLabel    string // "Jan 2006"
 	HasLogin          bool
 	LoginRole         string // "admin", "editor", "viewer" — empty when no login
+	LoginUsername     string // auth_accounts.username — typically the email-style admin login
 	LoginSetupPending bool
 	Accounts          []UsersAccountRow
 }

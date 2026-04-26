@@ -30,7 +30,10 @@ templ AccountDetail(p AccountDetailProps) {
 	<!-- Page-component factory + inline-onchange handlers. Loaded
 	     synchronously (no defer) so window.__bbCategories is seeded
 	     before tx_row.templ's inline categoryPicker x-init runs and
-	     before Alpine fires alpine:init. -->
+	     before Alpine fires alpine:init. tx_row_helpers loads first
+	     because account_detail.js calls window.updateRowCategory after
+	     a successful category POST. -->
+	<script src="/static/js/admin/components/tx_row_helpers.js"></script>
 	<script src="/static/js/admin/components/account_detail.js"></script>
 	@components.CategoryPickerScript()
 	@components.CategoryPickerStyles()

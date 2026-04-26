@@ -27,7 +27,10 @@ import (
 templ RuleDetail(p RuleDetailProps) {
 	<!-- Component factory + initial-state JSON. Loaded synchronously (no
 	     defer) so the Alpine.data() registration runs before Alpine — itself
-	     deferred from <head> — fires alpine:init. -->
+	     deferred from <head> — fires alpine:init. tx_row_helpers loads first
+	     because rule_detail.js calls window.updateRowCategory after a
+	     successful category POST on the embedded tx_row partials. -->
+	<script src="/static/js/admin/components/tx_row_helpers.js"></script>
 	<script src="/static/js/admin/components/rule_detail.js"></script>
 	@components.CategoryPickerScript()
 	@components.BreadcrumbNav(p.Breadcrumbs)

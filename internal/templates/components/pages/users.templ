@@ -145,6 +145,8 @@ templ usersMemberCard(u UsersEnrichedRow) {
 						</div>
 						if u.HasEmail {
 							<p class="text-xs text-base-content/45 mt-0.5">{ u.Email }</p>
+						} else if u.LoginUsername != "" {
+							<p class="text-xs text-base-content/45 mt-0.5">{ u.LoginUsername }</p>
 						} else {
 							<p class="text-xs text-base-content/30 italic mt-0.5">No email</p>
 						}

@@ -27,7 +27,10 @@ templ Transactions(p TransactionsProps) {
 	@templ.JSONScript("transactions-data", txDataPayload(p))
 	<!-- Page-component factories. Loaded synchronously (no defer) so the
 	     Alpine.data() registrations run before Alpine - itself deferred from
-	     <head> - fires alpine:init. -->
+	     <head> - fires alpine:init. tx_row_helpers loads before the page
+	     factory because transactions.js reads window.updateRowCategory /
+	     _slugForCategoryId off the shared helper at parse time. -->
+	<script src="/static/js/admin/components/tx_row_helpers.js"></script>
 	<script src="/static/js/admin/components/reviews.js"></script>
 	<script src="/static/js/admin/components/transactions.js"></script>
 	<!--
