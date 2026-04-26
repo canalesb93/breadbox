@@ -799,7 +799,7 @@ Run `templ fmt .` before committing — it normalizes whitespace and attribute o
 
 Page-level Alpine factories — the things rendered as `x-data="..."` at the root of an admin page — live in `static/js/admin/components/<pageSlug>.js` and load via a synchronous `<script src="...">` placed at the top of the templ component. This keeps JS out of templ files and out of `_scripts.go` Go-string sidecars, so editors give you syntax highlighting, the formatter works, and refactors are mechanical.
 
-Tracker for the migration: #827 (foundation: #828; reference port: `prompt_builder`).
+History: the migration from inline factories to static modules was tracked in #827 (foundation: #828; reference port: `prompt_builder`).
 
 ### File layout
 
@@ -873,24 +873,24 @@ Don't mix: pick the one that fits the data shape. `data-*` for primitives, JSON 
 
 - **`x-data={ "myPage(" + p.JSON + ")" }`** — Go-expression `x-data` calling a factory with interpolated args. The lint rejects this. Move the data into a `data-*` attribute or `@templ.JSONScript`.
 - **`@templ.Raw("<script>" + factoryBody + "</script>")`** — embedding a multi-line factory as a Go string. No syntax highlighting, no editor IntelliSense, fragile escaping. Move the body into `static/js/admin/components/`.
-- **A new `<page>_scripts.go` next to `<page>.templ`** — the whole sidecar pattern is what #827 deletes. New code uses `static/js/admin/components/`.
-- **A trivial inline `<script>` for one `lucide.createIcons()` call** — fine to leave as-is; the lint allows up to 180 content lines today and will tighten as Phase 2 progresses. The cutoff for "extract" vs "inline" is roughly: more than ~10 lines of factory logic, or anything that would benefit from being a JS file (closures, helpers, conditional flows).
+- **A new `<page>_scripts.go` next to `<page>.templ`** — the sidecar pattern was removed by #827. New code uses `static/js/admin/components/`.
+- **A trivial one-liner inline `<script>` for `lucide.createIcons()`** — fine to leave as-is; the lint caps inline blocks at 5 content lines. Anything larger belongs in a JS file.
 
 ### Sharing logic across pages
 
-For now, each page has its own factory file. If two pages need the same factory, prefer copying first and consolidating later — premature shared modules are hard to undo. When a third page wants the same logic, factor it out (still as a plain JS file; no bundler).
+Most pages have their own factory file. For factories that genuinely need to be shared (the canonical example is `categoryPicker`, used by category form, transactions filter bar, and per-row category assignment), put the module in `static/js/admin/components/<name>.js` and have each consumer load the script and pass differing state via `data-*` attributes. Prefer copying first and consolidating only when a third page wants the same logic — premature shared modules are hard to undo.
 
-For shared CDN scripts (e.g. `marked`, `dompurify`) that need to load exactly once across multiple pages, the templ-idiomatic pattern is `templ.OnceHandle`. Phase 2 introduces this when a page first needs it; until then, each page pulls in its own `<script src="...">` — duplicate loads are harmless on the admin tier.
+For shared CDN scripts (e.g. `marked`, `dompurify`) that need to load exactly once across multiple pages, the templ-idiomatic pattern is `templ.OnceHandle`. Use it when a page first needs it; until then, each page pulls in its own `<script src="...">` — duplicate loads are harmless on the admin tier.
 
 ### Lint
 
 `internal/templates/components/pages/scripts_lint_test.go` runs as part of `go test ./...` and enforces two rules:
 
-1. **No `x-data={ "factory("` Go-expression form.** Hard fail. Existing pre-Phase-1 occurrences are listed in `existingAntiPatternAllowlist` and removed by their respective Phase 2 PRs.
-2. **No literal `<script>...</script>` block in `internal/templates/components/pages/*.templ` exceeds the line ceiling.** Currently 180 content lines (147 measured max + 33 buffer). Lower this in any PR that creates a new low watermark; never raise it.
+1. **No `x-data={ "factory("` Go-expression form.** Hard fail.
+2. **No literal `<script>...</script>` block in `internal/templates/components/pages/*.templ` exceeds 5 content lines.** Anything larger belongs in `static/js/admin/components/<page>.js`. Never raise the ceiling.
 
-Failure messages include `path:line[-end]` so the next agent can extract the offender directly.
+Failure messages include `path:line[-end]` so the offender can be extracted directly.
 
 ### Reference implementation
 
-`static/js/admin/components/prompt_builder.js` + `internal/templates/components/pages/prompt_builder.templ` (the `/agent-wizard/{type}` page). Copy this shape for any new Alpine page component, and follow `#827`'s per-page PR template when porting an existing page.
+`static/js/admin/components/prompt_builder.js` + `internal/templates/components/pages/prompt_builder.templ` (the `/agent-wizard/{type}` page). Copy this shape for any new Alpine page component.

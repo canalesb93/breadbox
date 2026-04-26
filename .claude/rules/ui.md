@@ -99,8 +99,8 @@ The full convention — file layout, factory shape, data-passing patterns, and a
 
 Hard rules enforced by `internal/templates/components/pages/scripts_lint_test.go` (runs as part of `go test ./...`):
 
-- **No `x-data={ "factory(...)"`** — the Go-expression form that interpolates props into the factory call is the regression #827 / #828 are removing. Use `x-data="factory"` plus `@templ.JSONScript` or `data-*`. A small allowlist tracks pre-existing offenders; do not add to it.
-- **No literal `<script>...</script>` block in `internal/templates/components/pages/*.templ` exceeds 180 content lines.** The ceiling ratchets down as Phase 2 of #827 progresses; lower it (never raise it) when an extraction creates a new low watermark.
+- **No `x-data={ "factory(...)"`** — the Go-expression form that interpolates props into the factory call. Use `x-data="factory"` plus `@templ.JSONScript` or `data-*`.
+- **No literal `<script>...</script>` block in `internal/templates/components/pages/*.templ` exceeds 5 content lines.** Anything larger belongs in `static/js/admin/components/<page>.js`. Never raise the ceiling.
 
 When a new admin page needs Alpine, do **not** add a `<page>_scripts.go` sidecar or a multi-line inline `<script>` block — write the factory in `static/js/admin/components/<page>.js` and follow the convention.
 
