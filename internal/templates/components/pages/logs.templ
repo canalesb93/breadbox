@@ -50,7 +50,7 @@ templ Logs(p LogsProps) {
 			if len(p.Logs) > 0 {
 				<!-- Results count -->
 				<div class="text-xs text-base-content/40 mb-3 px-1">
-					{ fmt.Sprintf("%d sync log%s", p.Total, pluralS64(p.Total)) }
+					{ fmt.Sprintf("%d sync log%s", p.Total, components.PluralS(p.Total)) }
 				</div>
 				<!-- Timeline view -->
 				<div class="space-y-1 bb-stagger">
@@ -72,7 +72,7 @@ templ Logs(p LogsProps) {
 			if len(p.WHEvents) > 0 {
 				<!-- Results count -->
 				<div class="text-xs text-base-content/40 mb-3 px-1">
-					{ fmt.Sprintf("%d webhook event%s", p.WHTotal, pluralS64(p.WHTotal)) }
+					{ fmt.Sprintf("%d webhook event%s", p.WHTotal, components.PluralS(p.WHTotal)) }
 				</div>
 				<!-- Event list -->
 				<div class="space-y-1 bb-stagger">
@@ -308,7 +308,7 @@ templ logsSyncRow(l LogsSyncRow) {
 						}
 						if l.AccountsAffected > 0 {
 							<span class="text-base-content/25">&middot;</span>
-							<span>{ fmt.Sprintf("%d account%s", l.AccountsAffected, pluralS64(l.AccountsAffected)) }</span>
+							<span>{ fmt.Sprintf("%d account%s", l.AccountsAffected, components.PluralS(l.AccountsAffected)) }</span>
 						}
 					</div>
 					if l.Status == "error" && l.FriendlyErrorMessage != nil && *l.FriendlyErrorMessage != "" {
@@ -652,15 +652,6 @@ templ logsPaginator(page, totalPages int, total int64, showingStart, showingEnd 
 // ====================================================================
 // Helpers
 // ====================================================================
-
-// pluralS64 returns "s" when n != 1, mirroring the {{if ne .X 1}}s{{end}}
-// pattern used in the source HTML.
-func pluralS64(n int64) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
-}
 
 func successRateBg(rate float64) string {
 	switch {

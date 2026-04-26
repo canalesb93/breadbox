@@ -258,7 +258,7 @@ templ connDetailDayBar(ds DaySyncRow) {
 		<div class="text-[0.5rem] text-base-content/25 tabular-nums leading-none select-none">{ ds.ShortLabel }</div>
 		<!-- Tooltip -->
 		<div class="absolute -top-9 left-1/2 -translate-x-1/2 bg-base-content text-base-100 text-[0.6rem] px-2 py-1 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 tabular-nums shadow-sm">
-			{ fmt.Sprintf("%s: %d sync%s", ds.Label, ds.Total, connDetailPluralSyncs(ds.Total)) }
+			{ fmt.Sprintf("%s: %d sync%s", ds.Label, ds.Total, components.PluralS(ds.Total)) }
 			if ds.Error > 0 {
 				{ fmt.Sprintf(" (%d err)", ds.Error) }
 			}

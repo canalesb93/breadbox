@@ -97,15 +97,6 @@ func connDetailBarStyle(mine, other, total int) string {
 	return "height: 52px; min-height: 4px;"
 }
 
-// connDetailPluralSyncs returns "" or "s" based on count for the sync
-// timeline tooltip — mirrors `{{if ne .Total 1}}s{{end}}`.
-func connDetailPluralSyncs(n int) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
-}
-
 // connDetailAccentBar returns the colored accent-bar class for an account
 // card (left edge). Mirrors the source map of account types to bg colors.
 func connDetailAccentBar(t string) string {
