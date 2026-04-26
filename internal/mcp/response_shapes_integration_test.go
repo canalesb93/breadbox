@@ -104,7 +104,7 @@ func seedFixtures(t *testing.T) *fixtures {
 	// Use the service-layer helper so a tag_added annotation is written —
 	// list_annotations relies on that to have at least one entry to assert.
 	if _, _, err := svc.AddTransactionTag(ctx, formatUUIDTest(t, txn.ID), "needs-review",
-		service.Actor{Type: "system", Name: "test"}, "seeded"); err != nil {
+		service.Actor{Type: "system", Name: "test"}); err != nil {
 		t.Fatalf("AddTransactionTag: %v", err)
 	}
 
@@ -307,7 +307,6 @@ func TestListAnnotationsKindsFilter(t *testing.T) {
 		WriteSessionContext: WriteSessionContext{SessionID: "sess", Reason: "kinds-tag-pair"},
 		TransactionID:       f.txnID,
 		TagSlug:             "needs-review",
-		Note:                "kinds-filter test",
 	})
 	_ = decodeToolResult[map[string]any](t, "remove_transaction_tag", rmRes, err)
 

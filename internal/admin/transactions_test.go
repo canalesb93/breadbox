@@ -203,14 +203,14 @@ func TestBuildActivityTimeline_RuleAppliedEmptyNameFallsBack(t *testing.T) {
 		CreatedAt: "2026-04-04T12:00:00Z",
 	}}
 
-	categoryDisplay := func(slug string) string {
+	catLookup := func(slug string) categoryDisplay {
 		if slug == "food_and_drink_groceries" {
-			return "Food & Drink › Groceries"
+			return categoryDisplay{DisplayName: "Food & Drink › Groceries"}
 		}
-		return slug
+		return categoryDisplay{DisplayName: slug}
 	}
 
-	entries := buildActivityTimeline(annotations, categoryDisplay, nil)
+	entries := buildActivityTimeline(annotations, catLookup, nil)
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))
@@ -253,14 +253,14 @@ func TestBuildActivityTimeline_RuleAppliedNamedStillQuoted(t *testing.T) {
 		CreatedAt: "2026-04-04T12:00:00Z",
 	}}
 
-	categoryDisplay := func(slug string) string {
+	catLookup := func(slug string) categoryDisplay {
 		if slug == "shopping" {
-			return "Shopping"
+			return categoryDisplay{DisplayName: "Shopping"}
 		}
-		return slug
+		return categoryDisplay{DisplayName: slug}
 	}
 
-	entries := buildActivityTimeline(annotations, categoryDisplay, nil)
+	entries := buildActivityTimeline(annotations, catLookup, nil)
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(entries))

@@ -51,7 +51,7 @@ func TestAddTransactionTag_AutoCreatesTag(t *testing.T) {
 		t.Fatalf("precondition: expected vacation-2026 tag not to exist")
 	}
 
-	added, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "vacation-2026", service.Actor{Type: "user", ID: "u1", Name: "Alice"}, "")
+	added, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "vacation-2026", service.Actor{Type: "user", ID: "u1", Name: "Alice"})
 	if err != nil {
 		t.Fatalf("AddTransactionTag: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestAddTransactionTag_WritesAnnotation(t *testing.T) {
 	acctID := seedTxnFixture(t, queries)
 	txn := testutil.MustCreateTransaction(t, queries, acctID, "txn2", "Coffee", 500, "2026-03-01")
 
-	_, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "agent", ID: "agent-1", Name: "ReviewBot"}, "")
+	_, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "agent", ID: "agent-1", Name: "ReviewBot"})
 	if err != nil {
 		t.Fatalf("AddTransactionTag: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestAddTransactionTag_WritesAnnotation(t *testing.T) {
 	}
 
 	// Idempotent second add: no new annotation.
-	_, alreadyPresent, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "agent", ID: "agent-1", Name: "ReviewBot"}, "")
+	_, alreadyPresent, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "agent", ID: "agent-1", Name: "ReviewBot"})
 	if err != nil {
 		t.Fatalf("second AddTransactionTag: %v", err)
 	}
@@ -109,11 +109,11 @@ func TestRemoveTransactionTag_NoNote(t *testing.T) {
 
 	testutil.MustCreateTag(t, queries, "needs-review", "Needs Review")
 
-	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", Name: "A"}, ""); err != nil {
+	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", Name: "A"}); err != nil {
 		t.Fatalf("AddTransactionTag: %v", err)
 	}
 
-	removed, _, err := svc.RemoveTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", Name: "A"}, "")
+	removed, _, err := svc.RemoveTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", Name: "A"})
 	if err != nil {
 		t.Fatalf("RemoveTransactionTag without note should succeed: %v", err)
 	}
@@ -137,10 +137,10 @@ func TestRemoveTransactionTag_EmptyNoteSucceeds(t *testing.T) {
 
 	testutil.MustCreateTag(t, queries, "watchlist", "Watch")
 
-	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "watchlist", service.Actor{Type: "user", Name: "A"}, ""); err != nil {
+	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "watchlist", service.Actor{Type: "user", Name: "A"}); err != nil {
 		t.Fatalf("AddTransactionTag: %v", err)
 	}
-	removed, _, err := svc.RemoveTransactionTag(ctx, txn.ShortID, "watchlist", service.Actor{Type: "user", Name: "A"}, "")
+	removed, _, err := svc.RemoveTransactionTag(ctx, txn.ShortID, "watchlist", service.Actor{Type: "user", Name: "A"})
 	if err != nil {
 		t.Fatalf("RemoveTransactionTag: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestRemoveTransactionTag_AlreadyAbsent_NoError(t *testing.T) {
 
 	testutil.MustCreateTag(t, queries, "unused", "Unused")
 
-	removed, alreadyAbsent, err := svc.RemoveTransactionTag(ctx, txn.ShortID, "unused", service.Actor{Type: "user", Name: "A"}, "")
+	removed, alreadyAbsent, err := svc.RemoveTransactionTag(ctx, txn.ShortID, "unused", service.Actor{Type: "user", Name: "A"})
 	if err != nil {
 		t.Fatalf("RemoveTransactionTag: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestRemoveTransactionTag_AlreadyAbsent_NoError(t *testing.T) {
 	}
 
 	// Also: slug that doesn't even exist at all returns alreadyAbsent.
-	removed, alreadyAbsent, err = svc.RemoveTransactionTag(ctx, txn.ShortID, "nonexistent", service.Actor{Type: "user", Name: "A"}, "")
+	removed, alreadyAbsent, err = svc.RemoveTransactionTag(ctx, txn.ShortID, "nonexistent", service.Actor{Type: "user", Name: "A"})
 	if err != nil {
 		t.Fatalf("RemoveTransactionTag nonexistent: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestListTransactionTags(t *testing.T) {
 	acctID := seedTxnFixture(t, queries)
 	txn := testutil.MustCreateTransaction(t, queries, acctID, "txn6", "Coffee", 500, "2026-03-01")
 
-	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", ID: "u1", Name: "Alice"}, ""); err != nil {
+	if _, _, err := svc.AddTransactionTag(ctx, txn.ShortID, "needs-review", service.Actor{Type: "user", ID: "u1", Name: "Alice"}); err != nil {
 		t.Fatalf("AddTransactionTag: %v", err)
 	}
 

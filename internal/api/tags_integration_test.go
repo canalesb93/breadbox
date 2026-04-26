@@ -73,7 +73,6 @@ func TestAPI_AddTransactionTag_Success(t *testing.T) {
 
 	resp := env.doPost(t, "/api/v1/transactions/"+txnID+"/tags", map[string]string{
 		"slug": "needs-review",
-		"note": "flagged by bot",
 	})
 	assertStatus(t, resp, http.StatusOK)
 
