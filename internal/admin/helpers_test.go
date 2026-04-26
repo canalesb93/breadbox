@@ -376,3 +376,70 @@ func TestConnectionStaleness(t *testing.T) {
 		})
 	}
 }
+
+func TestCoerceTime(t *testing.T) {
+	ref := time.Date(2024, 5, 1, 12, 0, 0, 0, time.UTC)
+	rfc3339 := ref.Format(time.RFC3339)
+	rfc3339Nano := ref.Format(time.RFC3339Nano)
+	emptyStr := ""
+	junkStr := "not-a-timestamp"
+	rfcStr := rfc3339
+	tests := []struct {
+		name    string
+		in      any
+		wantOK  bool
+		wantRaw string
+		wantEq  bool // expect returned time == ref
+	}{
+		{"time.Time", ref, true, "", true},
+		{"*time.Time non-nil", &ref, true, "", true},
+		{"*time.Time nil", (*time.Time)(nil), false, "", false},
+		{"string RFC3339", rfc3339, true, "", true},
+		{"string RFC3339Nano", rfc3339Nano, true, "", true},
+		{"string empty", "", false, "", false},
+		{"string junk echoes raw", "not-a-timestamp", false, "not-a-timestamp", false},
+		{"*string non-nil RFC3339", &rfcStr, true, "", true},
+		{"*string nil", (*string)(nil), false, "", false},
+		{"*string empty", &emptyStr, false, "", false},
+		{"*string junk echoes raw", &junkStr, false, "not-a-timestamp", false},
+		{"pgtype.Timestamptz valid", pgtype.Timestamptz{Time: ref, Valid: true}, true, "", true},
+		{"pgtype.Timestamptz invalid", pgtype.Timestamptz{}, false, "", false},
+		{"unsupported type", 42, false, "", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, raw, ok := coerceTime(tc.in)
+			if ok != tc.wantOK {
+				t.Errorf("ok = %v, want %v", ok, tc.wantOK)
+			}
+			if raw != tc.wantRaw {
+				t.Errorf("raw = %q, want %q", raw, tc.wantRaw)
+			}
+			if tc.wantEq && !got.Equal(ref) {
+				t.Errorf("time = %v, want %v", got, ref)
+			}
+		})
+	}
+}
+
+func TestFormatCoercedTime(t *testing.T) {
+	ref := time.Date(2024, 5, 1, 12, 0, 0, 0, time.UTC)
+	stamp := func(tm time.Time) string { return tm.UTC().Format("2006-01-02") }
+	tests := []struct {
+		name string
+		in   any
+		want string
+	}{
+		{"valid time", ref, "2024-05-01"},
+		{"empty input", "", ""},
+		{"nil pointer", (*string)(nil), ""},
+		{"junk string echoes raw", "not-a-timestamp", "not-a-timestamp"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := formatCoercedTime(tc.in, stamp); got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

@@ -276,26 +276,14 @@ func encodeSyncStatusQuery(status, connID, trigger, dateFrom, dateTo string) str
 // returns a humanised "X minutes ago" string. Mirrors the *string
 // branch of the `relativeTime` funcMap helper.
 func relativeTimeFromRFC3339Ptr(s *string) string {
-	if s == nil || *s == "" {
-		return ""
-	}
-	t, err := time.Parse(time.RFC3339, *s)
-	if err != nil {
-		return *s
-	}
-	return relativeTime(t)
+	return formatCoercedTime(s, relativeTime)
 }
 
 // formatDateTimeFromRFC3339Ptr parses a *string RFC3339 timestamp into
 // the local "Jan 2, 2006 3:04 PM" rendering used by the `formatDateTime`
 // funcMap helper.
 func formatDateTimeFromRFC3339Ptr(s *string) string {
-	if s == nil || *s == "" {
-		return ""
-	}
-	t, err := time.Parse(time.RFC3339, *s)
-	if err != nil {
-		return *s
-	}
-	return t.Local().Format("Jan 2, 2006 3:04 PM")
+	return formatCoercedTime(s, func(tm time.Time) string {
+		return tm.Local().Format("Jan 2, 2006 3:04 PM")
+	})
 }

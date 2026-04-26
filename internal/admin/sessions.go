@@ -87,27 +87,15 @@ func buildSessionDetailProps(detail service.MCPSessionDetailResponse) pages.Sess
 // for an RFC3339 string. Returns the input unchanged when parsing
 // fails (matches the funcMap fallback).
 func relativeTimeFromRFC3339(s string) string {
-	if s == "" {
-		return ""
-	}
-	parsed, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return s
-	}
-	return relativeTime(parsed)
+	return formatCoercedTime(s, relativeTime)
 }
 
 // formatDateTimeFromRFC3339 mirrors the funcMap "formatDateTime"
 // branch for an RFC3339 string ("Jan 2, 2006 3:04 PM" in local time).
 func formatDateTimeFromRFC3339(s string) string {
-	if s == "" {
-		return ""
-	}
-	parsed, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return s
-	}
-	return parsed.Local().Format("Jan 2, 2006 3:04 PM")
+	return formatCoercedTime(s, func(tm time.Time) string {
+		return tm.Local().Format("Jan 2, 2006 3:04 PM")
+	})
 }
 
 // prettyJSONIndent mirrors the funcMap "prettyJSON" branch for raw

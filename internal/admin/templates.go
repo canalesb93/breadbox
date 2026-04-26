@@ -109,6 +109,71 @@ var componentRegistry = map[string]componentAdapter{
 	},
 }
 
+// coerceTime extracts a time.Time from common template input shapes:
+// time.Time, *time.Time, string, *string, and pgtype.Timestamptz.
+// Returns (t, "", true) when a usable time is available. For unparseable
+// strings returns (zero, raw, false) so callers can echo them back
+// unchanged — matching the historical funcMap fallback. Empty/nil
+// inputs and invalid pgtype.Timestamptz return (zero, "", false).
+//
+// Strings are parsed as RFC3339 first, then RFC3339Nano so timestamps
+// carrying sub-second precision (e.g. some annotation feeds) round-trip
+// correctly through every formatter, not just clockTime.
+func coerceTime(v any) (time.Time, string, bool) {
+	parse := func(s string) (time.Time, bool) {
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			return t, true
+		}
+		if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
+			return t, true
+		}
+		return time.Time{}, false
+	}
+	switch x := v.(type) {
+	case time.Time:
+		return x, "", true
+	case *time.Time:
+		if x == nil {
+			return time.Time{}, "", false
+		}
+		return *x, "", true
+	case string:
+		if x == "" {
+			return time.Time{}, "", false
+		}
+		if t, ok := parse(x); ok {
+			return t, "", true
+		}
+		return time.Time{}, x, false
+	case *string:
+		if x == nil || *x == "" {
+			return time.Time{}, "", false
+		}
+		if t, ok := parse(*x); ok {
+			return t, "", true
+		}
+		return time.Time{}, *x, false
+	case pgtype.Timestamptz:
+		if x.Valid {
+			return x.Time, "", true
+		}
+		return time.Time{}, "", false
+	}
+	return time.Time{}, "", false
+}
+
+// formatCoercedTime resolves v through coerceTime and applies format on
+// success; on parse failure it returns the raw string fallback (or "" for
+// empty/nil inputs). Centralises the "parse-or-echo" branch that every
+// time-rendering funcMap helper used to copy.
+func formatCoercedTime(v any, format func(time.Time) string) string {
+	t, raw, ok := coerceTime(v)
+	if ok {
+		return format(t)
+	}
+	return raw
+}
+
 // assertAdminTxRow extracts a service.AdminTransactionRow from data,
 // accepting both value and pointer forms.
 func assertAdminTxRow(data any) (service.AdminTransactionRow, error) {
@@ -284,31 +349,13 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 					return fmt.Sprintf("%v", v)
 				}
 			},
-			"relativeTime": func(t interface{}) string {
-				switch v := t.(type) {
-				case time.Time:
-					return relativeTime(v)
-				case pgtype.Timestamptz:
-					if v.Valid {
-						return relativeTime(v.Time)
-					}
+			"relativeTime": func(t any) string {
+				// Invalid pgtype.Timestamptz renders as "Never" — special-cased
+				// because every other unparseable input echoes the raw value.
+				if pt, ok := t.(pgtype.Timestamptz); ok && !pt.Valid {
 					return "Never"
-				case string:
-					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
-						return relativeTime(parsed)
-					}
-					return v
-				case *string:
-					if v == nil {
-						return ""
-					}
-					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
-						return relativeTime(parsed)
-					}
-					return *v
-				default:
-					return ""
 				}
+				return formatCoercedTime(t, relativeTime)
 			},
 			"formatIntervalMinutes": components.FormatIntervalMinutes,
 			"accountLabel": func(name string, mask interface{}) string {
@@ -659,99 +706,24 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return acctType
 			},
-			"formatDateTime": func(t interface{}) string {
-				format := func(tm time.Time) string {
+			"formatDateTime": func(t any) string {
+				return formatCoercedTime(t, func(tm time.Time) string {
 					return tm.Local().Format("Jan 2, 2006 3:04 PM")
-				}
-				switch v := t.(type) {
-				case time.Time:
-					return format(v)
-				case *time.Time:
-					if v == nil {
-						return ""
-					}
-					return format(*v)
-				case string:
-					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
-						return format(parsed)
-					}
-					return v
-				case *string:
-					if v == nil {
-						return ""
-					}
-					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
-						return format(parsed)
-					}
-					return *v
-				default:
-					return ""
-				}
+				})
 			},
 			// clockTime renders the local clock portion of a timestamp
 			// ("2:03 AM"). Paired with a same-day day separator on the
 			// activity timeline it disambiguates 10 events that would all
 			// otherwise read "8 days ago" (#707).
-			"clockTime": func(t interface{}) string {
-				format := func(tm time.Time) string {
+			"clockTime": func(t any) string {
+				return formatCoercedTime(t, func(tm time.Time) string {
 					return tm.Local().Format("3:04 PM")
-				}
-				switch v := t.(type) {
-				case time.Time:
-					return format(v)
-				case *time.Time:
-					if v == nil {
-						return ""
-					}
-					return format(*v)
-				case string:
-					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
-						return format(parsed)
-					}
-					if parsed, err := time.Parse(time.RFC3339Nano, v); err == nil {
-						return format(parsed)
-					}
-					return v
-				case *string:
-					if v == nil {
-						return ""
-					}
-					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
-						return format(parsed)
-					}
-					return *v
-				default:
-					return ""
-				}
+				})
 			},
-			"formatDateShort": func(t interface{}) string {
-				format := func(tm time.Time) string {
+			"formatDateShort": func(t any) string {
+				return formatCoercedTime(t, func(tm time.Time) string {
 					return tm.Local().Format("Jan 2, 3:04 PM")
-				}
-				switch v := t.(type) {
-				case time.Time:
-					return format(v)
-				case *time.Time:
-					if v == nil {
-						return ""
-					}
-					return format(*v)
-				case string:
-					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
-						return format(parsed)
-					}
-					return v
-				case *string:
-					if v == nil {
-						return ""
-					}
-					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
-						return format(parsed)
-					}
-					return *v
-				default:
-					return ""
-				}
+				})
 			},
 			"formatDate":   components.FormatDate,
 			"relativeDate": components.RelativeDate,
