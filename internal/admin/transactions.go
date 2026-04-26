@@ -973,6 +973,15 @@ func activityEntryFromAnnotation(a service.Annotation, tagDisplayFn func(string)
 			ActorAvatarVersion: a.ActorAvatarVersion,
 			Detail:             a.Content,
 			CommentID:          a.ShortID,
+			IsDeleted:          a.IsDeleted,
+		}
+		// Tombstoned comments don't echo their original body and don't
+		// expose a CommentID — there's nothing left to delete a second
+		// time, and the trash button on the row would be misleading.
+		if a.IsDeleted {
+			entry.Detail = ""
+			entry.CommentID = ""
+			entry.Summary = a.Summary
 		}
 		if a.ActorID != nil && *a.ActorID != "" {
 			id := *a.ActorID

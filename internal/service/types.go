@@ -436,6 +436,12 @@ type ActivityEntry struct {
 	// with this phrase; Origin keeps the actor slot empty for system rows
 	// and lets the template render origin as a subordinate meta pill.
 	Origin string `json:"origin,omitempty"`
+
+	// IsDeleted flags a tombstoned comment. The activity timeline keeps the
+	// row to preserve audit value — actor + timestamp survive — but renders
+	// it as a muted single-line "<Actor> deleted a comment" sentence
+	// instead of the chat bubble.
+	IsDeleted bool `json:"is_deleted,omitempty"`
 }
 
 type Condition struct {

@@ -25,10 +25,14 @@ ORDER BY created_at ASC;
 -- PostgreSQL does not guarantee short-circuit evaluation of conjunctions in
 -- JOIN conditions — a regex guard alone is not enough to prevent SQLSTATE
 -- 22P02 on the ::uuid cast.
+--
+-- deleted_at is surfaced so the service layer can flag tombstoned comments
+-- without filtering them out — the activity timeline still shows
+-- "<Actor> deleted a comment" rows for audit value.
 SELECT
     a.id, a.short_id, a.transaction_id, a.kind, a.actor_type,
     a.actor_id, a.actor_name, a.session_id, a.payload, a.tag_id,
-    a.rule_id, a.created_at,
+    a.rule_id, a.created_at, a.deleted_at,
     COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at
 FROM annotations a
 LEFT JOIN auth_accounts aa
@@ -61,3 +65,14 @@ RETURNING *;
 
 -- name: DeleteAnnotation :exec
 DELETE FROM annotations WHERE id = $1;
+
+-- name: SoftDeleteAnnotation :exec
+-- Flags an annotation as deleted (sets deleted_at = NOW()) without removing
+-- the row. Used by DeleteComment so the activity timeline preserves the
+-- tombstone — actor + timestamp survive, only the comment payload is
+-- semantically retired. Idempotent: re-soft-deleting an already-tombstoned
+-- row is a no-op since the WHERE clause filters out non-tombstoned rows.
+UPDATE annotations
+SET deleted_at = NOW()
+WHERE id = $1
+  AND deleted_at IS NULL;

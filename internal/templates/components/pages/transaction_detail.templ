@@ -507,7 +507,22 @@ templ txdCategoryIcon(e service.ActivityEntry) {
 // flattened so it visually points at the avatar on the rail. App-wide
 // bubble consolidation will hoist this style into a shared bb-bubble class
 // when the matching pattern lands on transactions and reviews.
+//
+// Tombstoned comments (IsDeleted=true) skip the bubble entirely and route to
+// txdTimelineDeletedComment, which mirrors the system-row layout so a
+// deleted comment reads as a single muted line preserving actor + timestamp.
 templ txdTimelineComment(e service.ActivityEntry, now time.Time) {
+	if e.IsDeleted {
+		@txdTimelineDeletedComment(e, now)
+	} else {
+		@txdTimelineCommentBubble(e, now)
+	}
+}
+
+// txdTimelineCommentBubble renders the chat-bubble variant — the historical
+// shape pulled out so the entry-point templ above can branch cleanly on
+// IsDeleted without duplicating either path.
+templ txdTimelineCommentBubble(e service.ActivityEntry, now time.Time) {
 	<li class="relative flex items-start gap-3 py-2.5 group">
 		<div class="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-base-100">
 			@txdCommentAvatar(e)
@@ -537,6 +552,37 @@ templ txdTimelineComment(e service.ActivityEntry, now time.Time) {
 			</div>
 			if e.Detail != "" {
 				<div class="bb-comment-bubble mt-1">{ e.Detail }</div>
+			}
+		</div>
+	</li>
+}
+
+// txdTimelineDeletedComment renders a tombstoned comment as a muted
+// single-line system-style row using the same rail/icon scaffolding as
+// txdTimelineSystem. The comment body is gone — only "<Actor> deleted a
+// comment · <relative-time>" remains, preserving audit value (we still
+// know who removed what and when) without re-displaying retired content.
+templ txdTimelineDeletedComment(e service.ActivityEntry, now time.Time) {
+	<li class="relative flex items-start gap-3 py-2 group">
+		<div class="relative z-10 shrink-0 w-6 h-6 rounded-full bg-base-100">
+			<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true">
+				<i data-lucide="trash-2" class="w-3 h-3 text-base-content/40"></i>
+			</span>
+		</div>
+		<div class="flex-1 min-w-0 text-xs leading-6 text-base-content/55 italic break-words">
+			if e.ActorName != "" {
+				<span class="font-medium text-base-content/70 not-italic">{ e.ActorName }</span>
+				<span>deleted a comment</span>
+			} else {
+				<span>Comment deleted</span>
+			}
+			if e.Timestamp != "" {
+				<span class="text-base-content/40 ml-1 not-italic">
+					<span aria-hidden="true">&middot;</span>
+					<span class="tooltip tooltip-top" data-tip={ formatDateTimeStr(e.Timestamp) }>
+						<time datetime={ e.Timestamp } class="tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStrAt(e.Timestamp, now) }</time>
+					</span>
+				</span>
 			}
 		</div>
 	</li>
