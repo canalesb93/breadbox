@@ -55,14 +55,22 @@ func FormatRFC3339Ptr(s *string, layout string) string {
 // returns Relative(t). Empty input yields ""; an unparseable string is
 // returned unchanged.
 func RelativeRFC3339(s string) string {
+	return RelativeRFC3339At(s, time.Now())
+}
+
+// RelativeRFC3339At is RelativeRFC3339 with an explicit now anchor. Pages
+// that mix relative-time rendering with day-bucket labels share a single
+// now via this entry point so the two paths can never disagree across
+// midnight or timezone boundaries.
+func RelativeRFC3339At(s string, now time.Time) string {
 	if s == "" {
 		return ""
 	}
 	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return Relative(t)
+		return RelativeAt(t, now)
 	}
 	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
-		return Relative(t)
+		return RelativeAt(t, now)
 	}
 	return s
 }
@@ -75,12 +83,29 @@ func RelativeRFC3339Ptr(s *string) string {
 	return RelativeRFC3339(*s)
 }
 
+// RelativeRFC3339PtrAt is RelativeRFC3339Ptr with an explicit now anchor.
+func RelativeRFC3339PtrAt(s *string, now time.Time) string {
+	if s == nil {
+		return ""
+	}
+	return RelativeRFC3339At(*s, now)
+}
+
 // Relative renders t as a human-readable "X ago" string relative to now.
 // Output buckets: "just now" (<1m), "N minute(s) ago" (<1h),
-// "N hour(s) ago" (<1d), "N day(s) ago" (>=1d). Uses time.Since(t), so
-// future times collapse to the "just now" bucket.
+// "N hour(s) ago" (<1d), "N day(s) ago" (>=1d). Future times collapse
+// to the "just now" bucket. Delegates to RelativeAt with time.Now().
 func Relative(t time.Time) string {
-	d := time.Since(t)
+	return RelativeAt(t, time.Now())
+}
+
+// RelativeAt is Relative with an explicit now anchor. The page-level
+// timeline assembler captures one now at the top and threads it through
+// both the day-grouping and the per-row relative-time helpers via this
+// function so labels ("Today" / "Yesterday") and timestamps
+// ("yesterday" / "5 minutes ago") always agree.
+func RelativeAt(t, now time.Time) string {
+	d := now.Sub(t)
 	switch {
 	case d < time.Minute:
 		return "just now"

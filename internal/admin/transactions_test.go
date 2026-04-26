@@ -4,8 +4,10 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"breadbox/internal/service"
+	"breadbox/internal/timefmt"
 )
 
 func TestBuildPaginationBase_URLEncodesValues(t *testing.T) {
@@ -292,7 +294,7 @@ func TestGroupActivityByDay_BucketsByLocalDate(t *testing.T) {
 		{Type: "comment", Timestamp: "2026-04-14T15:00:00Z", Summary: "c"},
 	}
 
-	groups := groupActivityByDay(entries)
+	groups := groupActivityByDay(entries, time.Now())
 
 	if len(groups) != 2 {
 		t.Fatalf("expected 2 day groups, got %d", len(groups))
@@ -319,10 +321,11 @@ func TestGroupActivityByDay_BucketsByLocalDate(t *testing.T) {
 }
 
 func TestGroupActivityByDay_EmptyInput(t *testing.T) {
-	if groups := groupActivityByDay(nil); groups != nil {
+	now := time.Now()
+	if groups := groupActivityByDay(nil, now); groups != nil {
 		t.Errorf("expected nil for nil input, got %v", groups)
 	}
-	if groups := groupActivityByDay([]service.ActivityEntry{}); groups != nil {
+	if groups := groupActivityByDay([]service.ActivityEntry{}, now); groups != nil {
 		t.Errorf("expected nil for empty input, got %v", groups)
 	}
 }
@@ -332,12 +335,60 @@ func TestGroupActivityByDay_DropsUnparseableTimestamps(t *testing.T) {
 		{Type: "comment", Timestamp: "2026-04-16T09:00:00Z", Summary: "ok"},
 		{Type: "comment", Timestamp: "not-a-date", Summary: "bad"},
 	}
-	groups := groupActivityByDay(entries)
+	groups := groupActivityByDay(entries, time.Now())
 	if len(groups) != 1 {
 		t.Fatalf("expected 1 day group, got %d", len(groups))
 	}
 	if len(groups[0].Events) != 1 || groups[0].Events[0].Summary != "ok" {
 		t.Errorf("expected only the parseable entry to survive, got %+v", groups[0].Events)
+	}
+}
+
+// At a midnight boundary the day-bucket label and the per-row relative-time
+// helper must agree because they share the same now anchor. Before this fix
+// each path captured its own time.Now(), so a row at 23:55 could end up
+// grouped under "Today" with a "yesterday" timestamp (or vice-versa). The
+// fix threads a single now through groupActivityByDay + timefmt.RelativeAt.
+func TestGroupActivityByDay_SharesNowAnchorWithRelative(t *testing.T) {
+	loc := time.Local
+	// Anchor: 2026-04-27 00:10:00 local. The 23:55 row sits in "yesterday"
+	// (2026-04-26) and the 00:05 row in "today" (2026-04-27).
+	now := time.Date(2026, 4, 27, 0, 10, 0, 0, loc)
+	yesterdayLate := time.Date(2026, 4, 26, 23, 55, 0, 0, loc)
+	todayEarly := time.Date(2026, 4, 27, 0, 5, 0, 0, loc)
+
+	entries := []service.ActivityEntry{
+		{Type: "comment", Timestamp: todayEarly.Format(time.RFC3339), Summary: "today-early"},
+		{Type: "comment", Timestamp: yesterdayLate.Format(time.RFC3339), Summary: "yesterday-late"},
+	}
+
+	groups := groupActivityByDay(entries, now)
+	if len(groups) != 2 {
+		t.Fatalf("expected 2 day groups, got %d", len(groups))
+	}
+
+	// First group is the today-early row (input order preserved).
+	today := groups[0]
+	yesterday := groups[1]
+
+	if today.Label != "Today" {
+		t.Errorf("today bucket label = %q, want %q", today.Label, "Today")
+	}
+	if yesterday.Label != "Yesterday" {
+		t.Errorf("yesterday bucket label = %q, want %q", yesterday.Label, "Yesterday")
+	}
+
+	// Per-row relative time, anchored against the same now, must put the
+	// 23:55 row at "15 minutes ago" (a < 1h bucket — i.e. clearly NOT
+	// "1 day ago", which is what an unanchored Relative() drift could
+	// produce if its time.Now() crossed midnight independently).
+	yesterdayRel := timefmt.RelativeAt(yesterdayLate, now)
+	if yesterdayRel != "15 minutes ago" {
+		t.Errorf("yesterday-late relative = %q, want %q", yesterdayRel, "15 minutes ago")
+	}
+	todayRel := timefmt.RelativeAt(todayEarly, now)
+	if todayRel != "5 minutes ago" {
+		t.Errorf("today-early relative = %q, want %q", todayRel, "5 minutes ago")
 	}
 }
 

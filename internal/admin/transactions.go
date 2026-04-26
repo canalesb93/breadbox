@@ -683,8 +683,14 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			timelineTags = nil
 		}
 
+		// Capture a single now anchor so the day-bucket labels
+		// ("Today" / "Yesterday" / weekday) and the per-row relative
+		// timestamps ("5 minutes ago" / "yesterday") agree across
+		// midnight and timezone boundaries. Threaded into the templ via
+		// props.Now → relativeTimeStrAt.
+		now := time.Now()
 		activity := buildActivityTimeline(annotations, categoryDetailLookup(categoryTree), tagDisplayLookup(timelineTags))
-		activityDays := groupActivityByDay(activity)
+		activityDays := groupActivityByDay(activity, now)
 
 		// Load tags currently attached + the registered-tag list (for the inline
 		// add-tag suggestion datalist). Also derive HasPendingReview from the
@@ -795,6 +801,7 @@ func TransactionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 			Account:          account,
 			Activity:         activity,
 			ActivityDays:     componentActivityDays,
+			Now:              now,
 			HasPendingReview: hasPendingReview,
 			CurrentTags:      currentTags,
 			AvailableTags:    availableTags,
@@ -1076,13 +1083,14 @@ type ActivityDayGroup struct {
 // groupActivityByDay groups a sorted-desc activity list into per-day buckets.
 // Timestamp is an RFC3339 string on ActivityEntry; entries with unparseable
 // timestamps are skipped (they're dropped rather than mis-bucketed). Each
-// returned group preserves the relative ordering of the input slice.
-func groupActivityByDay(entries []service.ActivityEntry) []ActivityDayGroup {
+// returned group preserves the relative ordering of the input slice. The
+// now anchor is passed in (rather than read via time.Now()) so the bucket
+// labels share the same reference clock as the per-row relative timestamps.
+func groupActivityByDay(entries []service.ActivityEntry, now time.Time) []ActivityDayGroup {
 	if len(entries) == 0 {
 		return nil
 	}
 
-	now := time.Now()
 	today := now.Format("2006-01-02")
 	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
 
@@ -1100,7 +1108,7 @@ func groupActivityByDay(entries []service.ActivityEntry) []ActivityDayGroup {
 		if !ok {
 			groups = append(groups, ActivityDayGroup{
 				Date:  date,
-				Label: activityDayLabel(date, today, yesterday),
+				Label: activityDayLabel(date, today, yesterday, now),
 			})
 			idx = len(groups) - 1
 			groupIdx[date] = idx
@@ -1114,7 +1122,9 @@ func groupActivityByDay(entries []service.ActivityEntry) []ActivityDayGroup {
 // activityDayLabel returns "Today", "Yesterday", or "Thursday, April 16" /
 // "Thursday, April 16, 2025" for older dates. The long-form weekday/month
 // mirrors GitHub's timeline convention and reads well at mobile widths.
-func activityDayLabel(dateStr, today, yesterday string) string {
+// now provides the reference year for the same-year shortening so the
+// label cannot disagree with the day-grouping anchor across New Year.
+func activityDayLabel(dateStr, today, yesterday string, now time.Time) string {
 	if dateStr == today {
 		return "Today"
 	}
@@ -1125,7 +1135,7 @@ func activityDayLabel(dateStr, today, yesterday string) string {
 	if err != nil {
 		return dateStr
 	}
-	if t.Year() == time.Now().Year() {
+	if t.Year() == now.Year() {
 		return t.Format("Monday, January 2")
 	}
 	return t.Format("Monday, January 2, 2006")
