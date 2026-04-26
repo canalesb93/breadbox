@@ -14,7 +14,6 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // BackupsPageHandler serves GET /backups — the backup management page.
@@ -271,7 +270,7 @@ func BackupScheduleHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 		// Save retention.
 		if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 			Key:   "backup_retention_days",
-			Value: pgtype.Text{String: strconv.Itoa(retentionDays), Valid: true},
+			Value: pgconv.Text(strconv.Itoa(retentionDays)),
 		}); err != nil {
 			a.Logger.Error("save backup retention", "error", err)
 			SetFlash(ctx, sm, "error", "Failed to save retention setting.")

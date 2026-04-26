@@ -13,7 +13,6 @@ import (
 	"breadbox/internal/slugs"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // TagResponse is the API/MCP shape for a tag record.
@@ -72,14 +71,8 @@ func (s *Service) CreateTag(ctx context.Context, params CreateTagParams) (*TagRe
 		return nil, fmt.Errorf("%w: display_name is required", ErrInvalidParameter)
 	}
 
-	color := pgtype.Text{}
-	if params.Color != nil {
-		color = pgtype.Text{String: *params.Color, Valid: true}
-	}
-	icon := pgtype.Text{}
-	if params.Icon != nil {
-		icon = pgtype.Text{String: *params.Icon, Valid: true}
-	}
+	color := pgconv.TextFromPtr(params.Color)
+	icon := pgconv.TextFromPtr(params.Icon)
 
 	tag, err := s.Queries.InsertTag(ctx, db.InsertTagParams{
 		Slug:        params.Slug,
@@ -174,18 +167,12 @@ func (s *Service) UpdateTag(ctx context.Context, id string, params UpdateTagPara
 		description = *params.Description
 	}
 
-	color := pgtype.Text{}
-	if existing.Color != nil {
-		color = pgtype.Text{String: *existing.Color, Valid: true}
-	}
+	color := pgconv.TextFromPtr(existing.Color)
 	if params.Color != nil {
 		color = pgconv.TextIfNotEmpty(*params.Color)
 	}
 
-	icon := pgtype.Text{}
-	if existing.Icon != nil {
-		icon = pgtype.Text{String: *existing.Icon, Valid: true}
-	}
+	icon := pgconv.TextFromPtr(existing.Icon)
 	if params.Icon != nil {
 		icon = pgconv.TextIfNotEmpty(*params.Icon)
 	}
