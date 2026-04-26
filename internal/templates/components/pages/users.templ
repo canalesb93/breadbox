@@ -9,9 +9,12 @@ import "fmt"
 // admin-not-linked warning panel (create-new / link-existing tabs), and
 // a grid of member cards with avatar, login badge, and account list.
 templ Users(p UsersProps) {
-	{{/* Set the shortcut-registry scope so base.html's global dispatcher routes
-	     n (registered below) to the Add Member link, and so the ? help modal
-	     surfaces it under "This page". Reset on Alpine teardown. */}}
+	<script src="/static/js/admin/components/users.js"></script>
+	{{
+		/* Set the shortcut-registry scope so base.html's global dispatcher routes
+		   n (registered below) to the Add Member link, and so the ? help modal
+		   surfaces it under "This page". Reset on Alpine teardown. */
+	}}
 	<div x-data x-init="$store.shortcuts.setScope('users')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	<div class="bb-page-header">
 		<div>
@@ -41,26 +44,6 @@ templ Users(p UsersProps) {
 	} else {
 		@usersEmpty()
 	}
-	<script>
-		// Register users-scoped keyboard shortcuts. `n` clicks the Add Member
-		// link (anchor tag). Using .click() respects the browser's normal
-		// navigation so we don't need to duplicate the href here.
-		document.addEventListener('alpine:init', function() {
-			var reg = Alpine.store('shortcuts');
-			if (!reg) return;
-			reg.register({
-				id: 'users.new',
-				keys: 'n',
-				description: 'Add member',
-				group: 'New',
-				scope: 'users',
-				action: function() {
-					var el = document.querySelector('[data-new-user]');
-					if (el) el.click();
-				},
-			});
-		});
-	</script>
 }
 
 // usersUnlinkedPrompt renders the warning panel shown when the current
@@ -78,10 +61,18 @@ templ usersUnlinkedPrompt(p UsersProps) {
 				<p class="text-xs text-base-content/60 mt-0.5">Your admin account isn't linked yet. Link it to manage bank connections and view your financial data.</p>
 				if len(p.UnlinkedUsers) > 0 {
 					<div class="flex gap-1 mt-3 mb-3">
-						<button type="button" @click="mode = 'create'"
-							:class="mode === 'create' ? 'btn-primary' : 'btn-ghost'" class="btn btn-xs rounded-lg">Create New</button>
-						<button type="button" @click="mode = 'existing'"
-							:class="mode === 'existing' ? 'btn-primary' : 'btn-ghost'" class="btn btn-xs rounded-lg">Link Existing</button>
+						<button
+							type="button"
+							@click="mode = 'create'"
+							:class="mode === 'create' ? 'btn-primary' : 'btn-ghost'"
+							class="btn btn-xs rounded-lg"
+						>Create New</button>
+						<button
+							type="button"
+							@click="mode = 'existing'"
+							:class="mode === 'existing' ? 'btn-primary' : 'btn-ghost'"
+							class="btn btn-xs rounded-lg"
+						>Link Existing</button>
 					</div>
 				} else {
 					<div class="mt-3"></div>
@@ -91,8 +82,13 @@ templ usersUnlinkedPrompt(p UsersProps) {
 						<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 					}
 					<input type="hidden" name="mode" value="create"/>
-					<input type="text" name="name" required placeholder="Your name"
-						class="input input-sm w-full sm:max-w-64 rounded-xl bg-base-200/50"/>
+					<input
+						type="text"
+						name="name"
+						required
+						placeholder="Your name"
+						class="input input-sm w-full sm:max-w-64 rounded-xl bg-base-200/50"
+					/>
 					<button type="submit" class="btn btn-primary btn-sm rounded-xl gap-1.5 shrink-0">
 						<i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
 						Create &amp; Link
@@ -104,8 +100,11 @@ templ usersUnlinkedPrompt(p UsersProps) {
 							<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 						}
 						<input type="hidden" name="mode" value="existing"/>
-						<select name="user_id" required
-							class="select select-sm w-full sm:max-w-64 rounded-xl bg-base-200">
+						<select
+							name="user_id"
+							required
+							class="select select-sm w-full sm:max-w-64 rounded-xl bg-base-200"
+						>
 							<option value="">Select a member…</option>
 							for _, u := range p.UnlinkedUsers {
 								<option value={ u.ID }>{ u.Name }</option>
