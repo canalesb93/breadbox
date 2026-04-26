@@ -31,13 +31,19 @@ function showToast(message, type) {
   window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type || 'error' } }));
 }
 
-// Inline category picker on tx-row fires this on change. Same contract as
-// /transactions and /rules/{id} — keep in sync if that endpoint evolves.
+// Inline category picker on tx-row fires this on change. Mirrors the
+// /transactions and /rules/{id} paths; the post-success
+// `window.updateRowCategory(...)` call is what makes the avatar icon and
+// xl-hidden compact label update without a reload (same shared helper
+// loaded from static/js/admin/components/tx_row_helpers.js).
 function quickSetCategory(txId, categoryId) {
   if (!categoryId) {
     fetch('/-/transactions/' + txId + '/category', { method: 'DELETE' })
       .then(function (r) {
-        if (r.ok || r.status === 204) showToast('Category reset', 'success');
+        if (r.ok || r.status === 204) {
+          showToast('Category reset', 'success');
+          if (window.updateRowCategory) window.updateRowCategory(txId, '');
+        }
       });
     return;
   }
@@ -47,8 +53,14 @@ function quickSetCategory(txId, categoryId) {
     body: JSON.stringify({ category_id: categoryId }),
   })
     .then(function (r) {
-      if (r.ok) showToast('Category updated', 'success');
-      else r.json().then(function (d) { showToast(d.error?.message || 'Failed', 'error'); });
+      if (r.ok) {
+        showToast('Category updated', 'success');
+        if (window.updateRowCategory) {
+          window.updateRowCategory(txId, (window._slugForCategoryId || function () { return ''; })(categoryId));
+        }
+      } else {
+        r.json().then(function (d) { showToast(d.error?.message || 'Failed', 'error'); });
+      }
     });
 }
 

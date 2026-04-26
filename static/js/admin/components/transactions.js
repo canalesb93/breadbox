@@ -181,123 +181,30 @@ function updateRowTags(txId, changes) {
   if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [row] });
 }
 
-/* ── In-place category update on a row ──
+// updateRowCategory + _slugForCategoryId now live in
+// static/js/admin/components/tx_row_helpers.js (loaded by transactions.templ
+// and the other tx_row consumers). The local references below pick them up
+// off `window`, so the rest of this file (bulk path) can keep calling
+// `updateRowCategory(...)` unchanged.
+var updateRowCategory = window.updateRowCategory;
+var _slugForCategoryId = window._slugForCategoryId;
+
+/* ── Single transaction category quick-set ──
  *
- * Updates a row's displayed category (avatar icon + color, mobile label, and
- * inline cat-picker label) from the global category cache, without a reload.
- * Pass the empty string or null to clear the category back to "Uncategorized".
- *
- *   updateRowCategory(txId, 'food_and_drink_groceries')
- *   updateRowCategory(txId, '')   // reset
+ * Posts the new category to the server, then mirrors the bulk path by
+ * calling updateRowCategory() so the avatar icon, mobile compact label,
+ * and any other category-derived row UI all update without a reload.
+ * The inline cat-picker button itself is already reactive (selectedId →
+ * displayLabel via Alpine), but the rest of the row was server-rendered
+ * and stays stale until updateRowCategory rewrites it.
  */
-function updateRowCategory(txId, slug) {
-  if (!txId) return;
-  var row = document.querySelector('.bb-tx-row[data-tx-id="' + CSS.escape(txId) + '"]');
-  if (!row) return;
-
-  // Look up the category metadata (icon, color, display_name, id) by slug.
-  // window.__bbCategories is the parent -> children tree; flatten on the fly.
-  var meta = null, parentMeta = null;
-  if (slug) {
-    var cats = window.__bbCategories || [];
-    for (var i = 0; i < cats.length && !meta; i++) {
-      if (cats[i].slug === slug) { meta = cats[i]; break; }
-      if (cats[i].children) {
-        for (var j = 0; j < cats[i].children.length; j++) {
-          if (cats[i].children[j].slug === slug) {
-            meta = cats[i].children[j];
-            parentMeta = cats[i];
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  // 1) Update the avatar (or convert a letter-avatar to an icon-avatar).
-  // Build via DOM APIs (textContent / safe icon-name whitelist) instead of
-  // string-concat innerHTML - display_name is admin-controlled and could
-  // otherwise smuggle stored XSS through the category metadata.
-  var avatarWrap = row.querySelector('.bb-tx-avatar')?.parentElement;
-  if (avatarWrap) {
-    var color = (meta && (meta.color || (parentMeta && parentMeta.color))) || 'oklch(0.65 0 0)';
-    var icon = meta && (meta.icon || (parentMeta && parentMeta.icon));
-    var avatar = document.createElement('div');
-    if (_safeLucideName(icon)) {
-      avatar.className = 'bb-tx-avatar';
-      avatar.style.setProperty('--avatar-color', color);
-      var iconEl = document.createElement('i');
-      iconEl.setAttribute('data-lucide', icon);
-      iconEl.className = 'w-4 h-4';
-      avatar.appendChild(iconEl);
-      avatarWrap.replaceChildren(avatar);
-      if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [avatarWrap] });
-    } else {
-      // Fall back to letter avatar (no category icon resolved or icon name
-      // failed validation - the latter shouldn't happen for trusted data).
-      var name = row.querySelector('a[href*="/transactions/"]')?.textContent?.trim() || '?';
-      avatar.className = 'bb-tx-avatar bb-tx-avatar--letter';
-      var letter = document.createElement('span');
-      letter.textContent = name.charAt(0).toUpperCase();
-      avatar.appendChild(letter);
-      avatarWrap.replaceChildren(avatar);
-    }
-  }
-
-  // 2) Update the inline cat picker (Alpine reactive - updating selectedId
-  // re-derives displayLabel/displayColor/displayIcon). The picker has an
-  // x-init $watch on selectedId that fires quickSetCategory; that watcher
-  // checks $store.bulk.processing and skips when bulk ops are in flight, so
-  // we don't double-call the API or double-toast on top of the bulk action.
-  var pickerEl = row.querySelector('.bb-cat-picker');
-  if (pickerEl && window.Alpine && Alpine.$data) {
-    var data = Alpine.$data(pickerEl);
-    if (data) data.selectedId = (meta && meta.id) || '';
-  }
-
-  // 3) Update the mobile category label. Use textContent for the
-  // display_name (admin-controlled) so HTML in a category name can't
-  // execute via the bulk update path.
-  var mobileLabel = row.querySelector('span.sm\\:hidden.inline-flex.items-center.gap-1, span.sm\\:hidden.text-base-content\\/25');
-  if (mobileLabel) {
-    var newLabel = document.createElement('span');
-    if (meta) {
-      newLabel.className = 'sm:hidden inline-flex items-center gap-1 shrink-0 min-w-0';
-      var labelColor = (meta.color || (parentMeta && parentMeta.color)) || '';
-      if (labelColor) {
-        var dot = document.createElement('span');
-        dot.className = 'w-1.5 h-1.5 rounded-full shrink-0';
-        dot.style.backgroundColor = labelColor;
-        newLabel.appendChild(dot);
-      }
-      var name = document.createElement('span');
-      name.className = 'text-base-content/50 truncate max-w-24';
-      name.textContent = meta.display_name || meta.slug;
-      newLabel.appendChild(name);
-    } else {
-      newLabel.className = 'sm:hidden text-base-content/25 truncate shrink-0';
-      newLabel.textContent = 'Uncategorized';
-    }
-    mobileLabel.replaceWith(newLabel);
-  }
-}
-
-// Lucide icon names are slug-shaped (e.g. "trending-up", "circle-off"). Reject
-// anything else so a malicious icon value can't break out of the data-lucide
-// attribute and inject scripts when set via innerHTML in `syncChipGlyph` or
-// the avatar update above. Returns the icon if safe, null otherwise.
-function _safeLucideName(name) {
-  if (!name || typeof name !== 'string') return null;
-  return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(name) ? name : null;
-}
-
-/* ── Single transaction category quick-set ── */
 function quickSetCategory(txId, categoryId) {
   if (!categoryId) {
     fetch('/-/transactions/' + txId + '/category', { method: 'DELETE' })
     .then(r => {
       if (r.ok || r.status === 204) {
         window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Category reset', type:'success'}}));
+        updateRowCategory(txId, '');
       }
     });
     return;
@@ -310,11 +217,13 @@ function quickSetCategory(txId, categoryId) {
   .then(r => {
     if (r.ok) {
       window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message:'Category updated', type:'success'}}));
+      updateRowCategory(txId, _slugForCategoryId(categoryId));
     } else {
       r.json().then(d => window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error?.message || 'Failed', type:'error'}})));
     }
   });
 }
+
 
 // Expose helpers to window so inline event handlers, AJAX-injected scripts
 // (eval'd inside _serverFetch), and the per-row inline cat-picker x-init
@@ -323,7 +232,8 @@ window.bbSetPerPage = bbSetPerPage;
 window.computeAppliedCounts = computeAppliedCounts;
 window.removeTag = removeTag;
 window.updateRowTags = updateRowTags;
-window.updateRowCategory = updateRowCategory;
+// updateRowCategory is exposed by tx_row_helpers.js; quickSetCategory is
+// the single-row variant defined above.
 window.quickSetCategory = quickSetCategory;
 
 document.addEventListener('alpine:init', function () {

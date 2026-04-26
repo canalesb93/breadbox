@@ -220,6 +220,7 @@ func buildUsersProps(in usersListInput) pages.UsersProps {
 		if la, ok := in.LoginAccountMap[uid]; ok && la.Username != "" {
 			row.HasLogin = true
 			row.LoginRole = la.Role
+			row.LoginUsername = la.Username
 			row.LoginSetupPending = len(la.HashedPassword) == 0
 		}
 		for _, a := range eu.Accounts {
