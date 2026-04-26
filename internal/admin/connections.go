@@ -953,27 +953,34 @@ func ConnectionReauthHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 			return
 		}
 
+		data := map[string]any{
+			"PageTitle":   "Re-authenticate " + conn.InstitutionName.String,
+			"CurrentPage": "connections",
+			"CSRFToken":   GetCSRFToken(r),
+		}
 		props := pages.ConnectionReauthProps{
-			PageTitle:       "Re-authenticate " + conn.InstitutionName.String,
 			ConnID:          idStr,
 			Provider:        string(conn.Provider),
 			InstitutionName: conn.InstitutionName.String,
 			UserName:        pgconv.TextOr(conn.UserName, ""),
 			TellerAppID:     a.Config.TellerAppID,
 			TellerEnv:       a.Config.TellerEnv,
+			Breadcrumbs: []components.Breadcrumb{
+				{Label: "Connections", Href: "/connections"},
+				{Label: conn.InstitutionName.String, Href: "/connections/" + idStr},
+				{Label: "Re-authenticate"},
+			},
 		}
-		renderConnectionReauth(w, r, props)
+		renderConnectionReauth(w, r, tr, data, props)
 	}
 }
 
-// renderConnectionReauth renders the reauth page directly via the templ
-// component. Wizard-layout pages own their full document — they do NOT go
-// through TemplateRenderer.RenderWithTempl.
-func renderConnectionReauth(w http.ResponseWriter, r *http.Request, props pages.ConnectionReauthProps) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := pages.ConnectionReauth(props).Render(r.Context(), w); err != nil {
-		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
-	}
+// renderConnectionReauth dispatches the reauth page through
+// TemplateRenderer.RenderWithTempl so the templ body lands inside the
+// admin base shell (sidebar + nav). Mirrors the handler-side helper
+// pattern used by renderConnectionNew + ConnectionNew.
+func renderConnectionReauth(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.ConnectionReauthProps) {
+	tr.RenderWithTempl(w, r, data, pages.ConnectionReauth(props))
 }
 
 // ConnectionReauthAPIHandler serves POST /admin/api/connections/{id}/reauth.
