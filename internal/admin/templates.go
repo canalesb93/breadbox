@@ -821,10 +821,13 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// pages/oauth_client_new.html and pages/oauth_client_created.html removed —
 		// both render via RenderWithTempl using the _templ_shell template
 		// key (see pages.OAuthClientNew and pages.OAuthClientCreated).
-		// pages/mcp_guide.html, pages/agent_wizard.html, and pages/mcp_settings.html
-		// are not registered as standalone base pages — their standalone routes
-		// redirect to /agents and they're only consumed as composite extras
-		// (see compositePages below).
+		// pages/agents.html, pages/mcp_guide.html, pages/agent_wizard.html, and
+		// pages/mcp_settings.html removed — the four panes now render together
+		// via RenderWithTempl using the _templ_shell template key (see
+		// pages.Agents which composes pages.MCPGuide, pages.AgentWizard, and
+		// pages.MCPSettings). The standalone routes for the three subpages
+		// (/mcp-getting-started, /agent-wizard, /review-instructions) still
+		// redirect to /agents?tab=...
 		// pages/prompt_builder.html removed — renders via RenderWithTempl using
 		// the _templ_shell template key (see pages.PromptBuilder).
 		// pages/session_detail.html removed — renders via RenderWithTempl using
@@ -833,34 +836,10 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		// using the _templ_shell template key (see pages.GettingStarted).
 	}
 
-	// Pages that need multiple page files parsed together (for sub-template sharing).
-	compositePages := map[string][]string{
-		"pages/agents.html": {
-			"pages/mcp_guide.html",
-			"pages/agent_wizard.html",
-			"pages/mcp_settings.html",
-		},
-	}
-
 	for _, page := range basePages {
 		if err := tr.parseBasePage(page); err != nil {
 			return err
 		}
-	}
-
-	// Composite pages: parsed with extra page files so sub-templates are available.
-	for page, extras := range compositePages {
-		files := []string{"layout/base.html"}
-		files = append(files, templatePartials...)
-		files = append(files, extras...)
-		files = append(files, page)
-		t, err := template.New("").Funcs(tr.funcMap).ParseFS(templates.FS, files...)
-		if err != nil {
-			return fmt.Errorf("parse composite page %s: %w", page, err)
-		}
-		name := path.Base(page)
-		tr.templates[name] = t
-		tr.specs[name] = files
 	}
 
 	return nil
