@@ -15,7 +15,15 @@ import (
 // This is a purely configuration-focused page: no period selector, no
 // spending totals, no per-category amounts. Users manage the two-level
 // taxonomy here; spending analytics live on the Insights page.
+//
+// The categoriesPage Alpine factory + j/k/Enter/Space/e/n keyboard
+// shortcuts live in static/js/admin/components/categories.js. Loaded
+// synchronously at the top of the component (no `defer`) so
+// Alpine.data('categoriesPage', ...) is registered before Alpine —
+// itself <script defer> in <head> — fires alpine:init. See
+// docs/design-system.md → "Alpine page components".
 templ Categories(p CategoriesProps) {
+	<script src="/static/js/admin/components/categories.js"></script>
 	<div class="bb-page-header">
 		<div>
 			<h1 class="bb-page-title">Categories</h1>
@@ -28,24 +36,13 @@ templ Categories(p CategoriesProps) {
 	</div>
 	<!--
 		Set the shortcut-registry scope so base.html's global dispatcher routes
-		j/k/n (registered in bbCategoryNavScript) to this page's handlers, and
-		so the ? help modal surfaces them under "This page". Reset to 'global'
-		on Alpine teardown so other pages don't inherit the scope.
+		j/k/Enter/Space/e/n (registered inside categories.js) to this page's
+		handlers, and so the ? help modal surfaces them under "This page".
+		Reset to 'global' on Alpine teardown so other pages don't inherit the
+		scope.
 	-->
 	<div x-data x-init="$store.shortcuts.setScope('categories')" x-destroy="$store.shortcuts.setScope('global')"></div>
-	<div
-		x-data="{
-			filter: '',
-			expanded: {},
-			toggle(id) { this.expanded[id] = !this.expanded[id]; },
-			isOpen(id) { return !!this.expanded[id] || !!this.filter; },
-			matches(el) {
-				if (!this.filter) return true;
-				return (el.dataset.search || '').includes(this.filter.toLowerCase());
-			}
-		}"
-		class="space-y-4"
-	>
+	<div x-data="categoriesPage" class="space-y-4">
 		<div class="relative">
 			<i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/30 pointer-events-none"></i>
 			<input
@@ -73,179 +70,6 @@ templ Categories(p CategoriesProps) {
 	@deleteCategoryModal()
 	<script>
 		document.addEventListener('DOMContentLoaded', function() { lucide.createIcons(); });
-	</script>
-	@categoriesKeyboardScript()
-}
-
-// categoriesKeyboardScript wires j/k/Enter/Space/e/n into the shared
-// $store.shortcuts registry at scope 'categories'. Enter (and Space) act on
-// the j/k-tracked row — primary rows expand/collapse; subcategory rows jump
-// to the filtered transactions list. `e` opens the edit page for the
-// focused category; `n` clicks the Add Category link. The inline @keydown
-// bindings on primary rows were removed so the dispatcher is the single
-// source of truth — otherwise a Tab-focused row would fire both the Alpine
-// handler and the page-scope shortcut and expansion would double-toggle.
-templ categoriesKeyboardScript() {
-	<script>
-		// Keyboard navigation for the categories tree. Reads the DOM for visible
-		// rows (two levels: primary row + subcategory rows inside each expanded
-		// x-collapse). offsetParent !== null respects both the filter (x-show
-		// on parent/child wrappers) and the collapsed state (x-collapse toggles
-		// display) — collapsed children simply won't appear in visibleRows().
-		var bbCategoryNav = {
-			focusedIdx: -1,
-			FOCUSED_CLASS: 'bb-tx-row--focused', // reuse the tx-list focus styling
-			visibleRows: function() {
-				var all = document.querySelectorAll('[data-category-row]');
-				var out = [];
-				for (var i = 0; i < all.length; i++) {
-					if (all[i].offsetParent !== null) out.push(all[i]);
-				}
-				return out;
-			},
-			clearFocus: function() {
-				var rows = document.querySelectorAll('[data-category-row].' + this.FOCUSED_CLASS);
-				for (var i = 0; i < rows.length; i++) rows[i].classList.remove(this.FOCUSED_CLASS);
-			},
-			setFocus: function(idx) {
-				var rows = this.visibleRows();
-				if (!rows.length) { this.focusedIdx = -1; return; }
-				if (idx < 0) idx = 0;
-				if (idx >= rows.length) idx = rows.length - 1;
-				this.clearFocus();
-				rows[idx].classList.add(this.FOCUSED_CLASS);
-				this.focusedIdx = idx;
-				rows[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-			},
-			next: function() {
-				var rows = this.visibleRows();
-				if (!rows.length) return;
-				this.setFocus(this.focusedIdx < 0 ? 0 : this.focusedIdx + 1);
-			},
-			prev: function() {
-				var rows = this.visibleRows();
-				if (!rows.length) return;
-				this.setFocus(this.focusedIdx < 0 ? 0 : this.focusedIdx - 1);
-			},
-			// Returns the row a keyboard action should target — the j/k-tracked
-			// row when one is set, otherwise any row the user has Tab-focused.
-			// Keeps Enter/Space/e working for users who reach the tree via Tab
-			// instead of j/k.
-			currentRow: function() {
-				var rows = this.visibleRows();
-				if (this.focusedIdx >= 0 && this.focusedIdx < rows.length) return rows[this.focusedIdx];
-				var active = document.activeElement;
-				if (active && active.hasAttribute && active.hasAttribute('data-category-row')) return active;
-				return null;
-			},
-			// Activate the focused row: expand/collapse a primary via click
-			// (reuses the parent Alpine x-data's `toggle(id)`); jump to the
-			// filtered transactions list for a subcategory.
-			activateRow: function() {
-				var row = this.currentRow();
-				if (!row) return;
-				var level = row.getAttribute('data-category-level');
-				if (level === 'primary') {
-					row.click();
-					return;
-				}
-				if (level === 'sub') {
-					var slug = row.getAttribute('data-category-slug');
-					if (slug) window.location.href = '/transactions?category=' + encodeURIComponent(slug);
-				}
-			},
-			editRow: function() {
-				var row = this.currentRow();
-				if (!row) return;
-				var id = row.getAttribute('data-category-id');
-				if (id) window.location.href = '/categories/' + encodeURIComponent(id) + '/edit';
-			},
-		};
-
-		document.addEventListener('alpine:init', function() {
-			var reg = Alpine.store('shortcuts');
-			if (!reg) return;
-
-			reg.register({
-				id: 'categories.next',
-				keys: 'j',
-				description: 'Move down',
-				group: 'Navigation',
-				scope: 'categories',
-				action: function() { bbCategoryNav.next(); },
-			});
-
-			reg.register({
-				id: 'categories.prev',
-				keys: 'k',
-				description: 'Move up',
-				group: 'Navigation',
-				scope: 'categories',
-				action: function() { bbCategoryNav.prev(); },
-			});
-
-			reg.register({
-				id: 'categories.activate',
-				keys: 'Enter',
-				description: 'Expand primary / open subcategory',
-				group: 'Actions',
-				scope: 'categories',
-				action: function() { bbCategoryNav.activateRow(); },
-			});
-
-			reg.register({
-				id: 'categories.activate.space',
-				keys: ' ', // Space — e.key is a literal space
-				description: 'Expand / open (Space)',
-				group: 'Actions',
-				scope: 'categories',
-				visible: false, // Enter is the canonical binding shown in help
-				action: function() { bbCategoryNav.activateRow(); },
-			});
-
-			reg.register({
-				id: 'categories.edit',
-				keys: 'e',
-				description: 'Edit focused category',
-				group: 'Actions',
-				scope: 'categories',
-				action: function() { bbCategoryNav.editRow(); },
-			});
-
-			reg.register({
-				id: 'categories.new',
-				keys: 'n',
-				description: 'New category',
-				group: 'Actions',
-				scope: 'categories',
-				// Shadows the global `n+_` chord while on /categories via the
-				// page-scope-wins guard in base.html's hasChordStartingWith
-				// (added in M4.2). Clicks the Add Category link so middle-click
-				// / cmd-click semantics aren't silently bypassed.
-				action: function() {
-					var btn = document.querySelector('[data-new-category]');
-					if (btn) btn.click();
-				},
-			});
-		});
-
-		// When the user clicks a row (to expand/collapse a primary or select
-		// a sub), sync the j/k ring to that row so subsequent keyboard nav
-		// picks up from there — matches the tx-list convention.
-		document.addEventListener('click', function(e) {
-			var row = e.target && e.target.closest && e.target.closest('[data-category-row]');
-			if (!row) return;
-			// Ignore clicks on action buttons/links inside the row; those
-			// stop propagation already, but belt-and-suspenders in case a
-			// future affordance forgets.
-			if (e.target.closest('a, button')) return;
-			var rows = bbCategoryNav.visibleRows();
-			var idx = rows.indexOf(row);
-			if (idx < 0) return;
-			bbCategoryNav.clearFocus();
-			row.classList.add(bbCategoryNav.FOCUSED_CLASS);
-			bbCategoryNav.focusedIdx = idx;
-		});
 	</script>
 }
 
