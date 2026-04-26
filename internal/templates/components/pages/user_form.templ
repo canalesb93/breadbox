@@ -1,8 +1,6 @@
 package pages
 
-import (
-	"breadbox/internal/templates/components"
-)
+import "breadbox/internal/templates/components"
 
 // UserForm renders the create/edit member form. Hosts inside the base
 // layout via TemplateRenderer.RenderWithTempl. The markup mirrors the
@@ -10,6 +8,10 @@ import (
 // preview / upload / regenerate, optional login-account creation, error
 // states) is preserved.
 templ UserForm(p UserFormProps) {
+	// Synchronous (no defer): the page script must register its alpine:init
+	// listener before Alpine fires the event. See #828 for the debugging
+	// trail behind this rule.
+	<script src="/static/js/admin/components/user_form.js"></script>
 	@components.BreadcrumbNav(p.Breadcrumbs)
 	<div class="bb-page-header">
 		<div>
@@ -36,9 +38,10 @@ templ UserForm(p UserFormProps) {
 	}
 }
 
-// userFormCreate renders the create flow (Alpine `userForm()` factory).
+// userFormCreate renders the create flow (Alpine `userForm` factory in
+// static/js/admin/components/user_form.js).
 templ userFormCreate() {
-	<div x-data="userForm()" class="max-w-lg">
+	<div x-data="userForm" class="max-w-lg">
 		<!-- Success state: show setup URL after login creation -->
 		<template x-if="setupURL">
 			<div class="bb-card p-8">
@@ -164,12 +167,13 @@ templ userFormCreate() {
 			</div>
 		</template>
 	</div>
-	@templ.Raw(userFormCreateBootstrap())
 }
 
-// userFormEdit renders the edit flow (Alpine `avatarEditor(userId)` factory).
+// userFormEdit renders the edit flow (Alpine `avatarEditor` factory in
+// static/js/admin/components/user_form.js). User UUID and the initial
+// hasCustomAvatar flag flow via data-* attrs on the x-data root.
 templ userFormEdit(p UserFormProps) {
-	<div x-data={ "avatarEditor('" + p.UserID + "')" } class="max-w-lg">
+	<div x-data="avatarEditor" data-user-id={ p.UserID } data-has-custom-avatar={ userFormHasAvatarStr(p.User) } class="max-w-lg">
 		<form @submit.prevent="submitForm()" class="bb-card p-0 overflow-hidden">
 			<!-- Header + fields -->
 			<div class="p-5 sm:p-6">
@@ -262,5 +266,4 @@ templ userFormEdit(p UserFormProps) {
 			</div>
 		</form>
 	</div>
-	@templ.Raw(userFormEditBootstrap(p))
 }
