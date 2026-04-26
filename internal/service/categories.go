@@ -180,8 +180,8 @@ func (s *Service) CreateCategory(ctx context.Context, params CreateCategoryParam
 		Slug:        slug,
 		DisplayName: params.DisplayName,
 		ParentID:    parentID,
-		Icon:        pgtype.Text{String: derefStr(params.Icon), Valid: params.Icon != nil},
-		Color:       pgtype.Text{String: derefStr(params.Color), Valid: params.Color != nil},
+		Icon:        pgconv.TextFromPtr(params.Icon),
+		Color:       pgconv.TextFromPtr(params.Color),
 		SortOrder:   params.SortOrder,
 		IsSystem:    false,
 		Hidden:      false,
@@ -225,8 +225,8 @@ func (s *Service) UpdateCategory(ctx context.Context, id string, params UpdateCa
 	cat, err := s.Queries.UpdateCategory(ctx, db.UpdateCategoryParams{
 		ID:          uid,
 		DisplayName: params.DisplayName,
-		Icon:        pgtype.Text{String: derefStr(params.Icon), Valid: params.Icon != nil},
-		Color:       pgtype.Text{String: derefStr(params.Color), Valid: params.Color != nil},
+		Icon:        pgconv.TextFromPtr(params.Icon),
+		Color:       pgconv.TextFromPtr(params.Color),
 		SortOrder:   params.SortOrder,
 		Hidden:      params.Hidden,
 	})
@@ -651,13 +651,6 @@ func GenerateSlug(displayName string) string {
 	return s
 }
 
-func derefStr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
 // --- Bulk TSV export/import ---
 
 // CategoryImportResult summarizes the outcome of a category TSV import.
@@ -809,21 +802,11 @@ func (s *Service) ImportCategoriesTSV(ctx context.Context, content string, repla
 			return
 		}
 
-		var iconPtr, colorPtr *string
-		if rd.icon != "" {
-			iconPtr = &rd.icon
-		}
-		if rd.color != "" {
-			colorPtr = &rd.color
-		}
-
 		if err == nil {
 			// Existing category — check if update needed
-			existingIcon := derefStr(textPtr(existing.Icon))
-			existingColor := derefStr(textPtr(existing.Color))
 			if existing.DisplayName == rd.displayName &&
-				existingIcon == rd.icon &&
-				existingColor == rd.color &&
+				pgconv.TextOr(existing.Icon, "") == rd.icon &&
+				pgconv.TextOr(existing.Color, "") == rd.color &&
 				existing.SortOrder == rd.sortOrder &&
 				existing.Hidden == rd.hidden {
 				result.Unchanged++
@@ -858,8 +841,8 @@ func (s *Service) ImportCategoriesTSV(ctx context.Context, content string, repla
 				Slug:        rd.slug,
 				DisplayName: rd.displayName,
 				ParentID:    parentID,
-				Icon:        pgtype.Text{String: derefStr(iconPtr), Valid: iconPtr != nil},
-				Color:       pgtype.Text{String: derefStr(colorPtr), Valid: colorPtr != nil},
+				Icon:        pgconv.TextIfNotEmpty(rd.icon),
+				Color:       pgconv.TextIfNotEmpty(rd.color),
 				SortOrder:   rd.sortOrder,
 				IsSystem:    false,
 				Hidden:      rd.hidden,
