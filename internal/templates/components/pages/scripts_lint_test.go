@@ -42,11 +42,12 @@ var xDataFactoryAntiPattern = regexp.MustCompile(`x-data=\{\s*"[A-Za-z_$][A-Za-z
 // This allowlist must shrink monotonically: every Phase 2 PR that ports a
 // page deletes its entry here. If you find yourself adding to this list,
 // stop — the new Alpine factory belongs in static/js/admin/components/.
-var existingAntiPatternAllowlist = map[string]struct{}{
-	// `categoryPicker(...)` factory shared across category_form, transactions,
-	// account_detail, transaction_detail. See #827's Phase 2 queue.
-	"category_form.templ:88": {},
-}
+//
+// As of #827's Phase 2 closure, the allowlist is empty: every page-level
+// Alpine factory has been ported to static/js/admin/components/, and the
+// shared categoryPicker factory was extracted in the final PR. Keep the
+// map declaration so the stale-entry check below still compiles.
+var existingAntiPatternAllowlist = map[string]struct{}{}
 
 // TestNoLargeInlineScripts walks every *.templ file under
 // internal/templates/components/pages and enforces two rules:

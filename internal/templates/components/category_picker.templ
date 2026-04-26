@@ -1,174 +1,21 @@
 package components
 
-// CategoryPickerScript and CategoryPickerStyles are the two static blocks
-// the old html/template partials exposed (`category-picker-script` and
-// `category-picker-styles`). Both render byte-identical markup to the
-// original partial — the content is static, so we embed the raw strings
-// verbatim and skip per-request parsing.
+// CategoryPickerScript emits a synchronous <script src> tag that loads the
+// shared `categoryPicker` Alpine factory from
+// static/js/admin/components/category_picker.js. Pages embed this near the
+// top of their templ component (or just before the picker markup) so the
+// factory registers before Alpine — itself <script defer> in <head> —
+// fires alpine:init.
+//
+// CategoryPickerStyles continues to render the small set of legacy inline
+// styles that haven't migrated to the global CSS file yet.
 templ CategoryPickerScript() {
-	@templ.Raw(categoryPickerScriptHTML)
+	<script src="/static/js/admin/components/category_picker.js"></script>
 }
 
 templ CategoryPickerStyles() {
 	@templ.Raw(categoryPickerStylesHTML)
 }
-
-const categoryPickerScriptHTML = `<script>
-function categoryPicker(config) {
-  return {
-    open: false,
-    search: '',
-    selectedId: config.initial || '',
-    selectedLabel: '',
-    categories: config.categories || [],
-    mode: config.mode || 'assign', // 'assign' (UUIDs) or 'filter' (slugs)
-    name: config.name || '',
-    placeholder: config.placeholder || 'Select category...',
-    allowEmpty: config.allowEmpty !== false,
-    emptyLabel: config.emptyLabel || 'All categories',
-    highlightIndex: -1,
-    _bbSourceId: config.sourceId || '',
-
-    get flatList() {
-      let items = [];
-      if (this.allowEmpty) {
-        items.push({ id: '', slug: '', label: this.emptyLabel, isParent: false, indent: false, icon: null, color: null, hidden: false });
-      }
-      for (const cat of this.categories) {
-        // Skip the DB "uncategorized" category when allowEmpty provides its own empty option
-        if (this.allowEmpty && cat.slug === 'uncategorized') continue;
-        items.push({ id: cat.id, slug: cat.slug, label: cat.display_name, isParent: true, indent: false, icon: cat.icon, color: cat.color, hidden: cat.hidden || false });
-        if (cat.children) {
-          for (const child of cat.children) {
-            // Children inherit the parent color when they don't define their own,
-            // so colored dots render consistently regardless of category depth.
-            items.push({ id: child.id, slug: child.slug, label: child.display_name, isParent: false, indent: true, icon: child.icon || cat.icon, color: child.color || cat.color, hidden: child.hidden || false, parentLabel: cat.display_name });
-          }
-        }
-      }
-      return items;
-    },
-
-    get filteredList() {
-      if (!this.search) return this.flatList.filter(i => !i.hidden || i.id === '');
-      const q = this.search.toLowerCase();
-      return this.flatList.filter(i => {
-        if (i.hidden && i.id !== '') return false;
-        if (i.id === '' && !this.allowEmpty) return false;
-        return i.label.toLowerCase().includes(q) || (i.parentLabel && i.parentLabel.toLowerCase().includes(q)) || (i.slug && i.slug.toLowerCase().includes(q));
-      });
-    },
-
-    get value() {
-      return this.mode === 'filter' ? this.selectedSlug : this.selectedId;
-    },
-
-    get selectedSlug() {
-      const item = this.flatList.find(i => (this.mode === 'filter' ? i.slug === this.selectedId : i.id === this.selectedId));
-      return item ? item.slug : '';
-    },
-
-    get displayLabel() {
-      if (!this.selectedId) return this.allowEmpty ? this.emptyLabel : this.placeholder;
-      const item = this.flatList.find(i => (this.mode === 'filter' ? i.slug === this.selectedId : i.id === this.selectedId));
-      if (!item) return this.placeholder;
-      return item.indent ? (item.parentLabel + ' \u203a ' + item.label) : item.label;
-    },
-
-    get displayColor() {
-      if (!this.selectedId) return null;
-      const item = this.flatList.find(i => (this.mode === 'filter' ? i.slug === this.selectedId : i.id === this.selectedId));
-      return item ? item.color : null;
-    },
-
-    get displayIcon() {
-      if (!this.selectedId) return null;
-      const item = this.flatList.find(i => (this.mode === 'filter' ? i.slug === this.selectedId : i.id === this.selectedId));
-      return item ? item.icon : null;
-    },
-
-    itemValue(item) {
-      return this.mode === 'filter' ? item.slug : item.id;
-    },
-
-    select(item) {
-      this.selectedId = this.itemValue(item);
-      this.open = false;
-      this.search = '';
-      this.highlightIndex = -1;
-      this.$dispatch('category-change', { id: item.id, slug: item.slug, label: item.label });
-      this.$nextTick(() => {
-        if (typeof lucide !== 'undefined') lucide.createIcons({ nameAttr: 'data-lucide' });
-      });
-    },
-
-    handleKeydown(e) {
-      const list = this.filteredList;
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        this.highlightIndex = Math.min(this.highlightIndex + 1, list.length - 1);
-        this.scrollToHighlighted();
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        this.highlightIndex = Math.max(this.highlightIndex - 1, 0);
-        this.scrollToHighlighted();
-      } else if (e.key === 'Enter' && this.highlightIndex >= 0 && list[this.highlightIndex]) {
-        e.preventDefault();
-        this.select(list[this.highlightIndex]);
-      } else if (e.key === 'Escape') {
-        this.open = false;
-        this.search = '';
-        this.highlightIndex = -1;
-      }
-    },
-
-    scrollToHighlighted() {
-      this.$nextTick(() => {
-        const el = this.$refs.listbox?.querySelector('[data-highlighted="true"]');
-        if (el) el.scrollIntoView({ block: 'nearest' });
-      });
-    },
-
-    get hasResults() {
-      return this.filteredList.length > 0;
-    },
-
-    openPicker() {
-      this.open = false;
-      this.$dispatch('open-category-picker', {
-        mode: this.mode,
-        allowEmpty: this.allowEmpty,
-        emptyLabel: this.emptyLabel,
-        categories: this.categories,
-        sourceId: this._bbSourceId
-      });
-    },
-
-    init() {
-      // Ensure sourceId is set (prefer config value, fall back to DOM attribute)
-      if (!this._bbSourceId) {
-        this._bbSourceId = this.$el.closest('[data-picker-source]')?.dataset.pickerSource || ('picker-' + Math.random().toString(36).slice(2, 8));
-      }
-
-      // Listen for category-picked responses
-      var self = this;
-      window.addEventListener('category-picked', function(e) {
-        if (e.detail.sourceId === self._bbSourceId) {
-          self.selectedId = self.mode === 'filter' ? e.detail.slug : e.detail.id;
-          self.$dispatch('category-change', { id: e.detail.id, slug: e.detail.slug, label: e.detail.label });
-          self.$nextTick(function() {
-            if (typeof lucide !== 'undefined') lucide.createIcons({ nameAttr: 'data-lucide' });
-          });
-        }
-      });
-
-      this.$nextTick(() => {
-        if (typeof lucide !== 'undefined') lucide.createIcons({ nameAttr: 'data-lucide' });
-      });
-    }
-  };
-}
-</script>`
 
 const categoryPickerStylesHTML = `<style>
   /* Legacy inline picker styles removed — using global overlay via base.html */

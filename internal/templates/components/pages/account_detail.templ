@@ -32,6 +32,7 @@ templ AccountDetail(p AccountDetailProps) {
 	     before tx_row.templ's inline categoryPicker x-init runs and
 	     before Alpine fires alpine:init. -->
 	<script src="/static/js/admin/components/account_detail.js"></script>
+	@components.CategoryPickerScript()
 	@components.CategoryPickerStyles()
 	@components.BreadcrumbNav(p.Breadcrumbs)
 	@acctHeader(p)
@@ -46,7 +47,6 @@ templ AccountDetail(p AccountDetailProps) {
 	} else {
 		@acctEmptyState(p)
 	}
-	@components.CategoryPickerScript()
 }
 
 templ acctHeader(p AccountDetailProps) {
@@ -112,7 +112,8 @@ templ acctSummaryCards(p AccountDetailProps) {
 					}
 					{ fmtBalancePtr(p.Account.BalanceCurrent) }
 				} else {
-					<span class="text-base-content/20">@templ.Raw("&mdash;")</span>
+					<span class="text-base-content/20">@templ.Raw("&mdash;")
+</span>
 				}
 			</div>
 			if p.HasCreditUtil {
@@ -272,7 +273,12 @@ templ acctFilterPanel(p AccountDetailProps) {
 				<div
 					class="bb-cat-picker"
 					data-picker-source="acct-filter-cat"
-					x-data={ acctCategoryPickerInit(p.FilterCategory) }
+					x-data="categoryPicker"
+					data-mode="filter"
+					data-source-id="acct-filter-cat"
+					data-allow-empty="true"
+					data-empty-label="All categories"
+					data-initial={ p.FilterCategory }
 					@category-change="$refs.catInput.value = selectedSlug"
 				>
 					<input type="hidden" name="category" x-ref="catInput" value={ p.FilterCategory }/>
@@ -360,7 +366,8 @@ templ acctPagination(p AccountDetailProps) {
 			<!-- Page numbers -->
 			for _, n := range acctPageRange(p.Page, p.TotalPages) {
 				if n == 0 {
-					<span class="bb-paginator__ellipsis">@templ.Raw("&hellip;")</span>
+					<span class="bb-paginator__ellipsis">@templ.Raw("&hellip;")
+</span>
 				} else if n == p.Page {
 					<span class="bb-paginator__btn bb-paginator__btn--active">{ fmt.Sprintf("%d", n) }</span>
 				} else {
@@ -443,16 +450,6 @@ func acctFiltersOpenInit(p AccountDetailProps) string {
 		return "{ filtersOpen: true }"
 	}
 	return "{ filtersOpen: false }"
-}
-
-// acctCategoryPickerInit builds the categoryPicker() x-data invocation
-// for the filter row. Slug values are server-generated and safe to
-// interpolate without escaping.
-func acctCategoryPickerInit(initial string) string {
-	return fmt.Sprintf(
-		"categoryPicker({categories: window.__bbCategories, mode: 'filter', initial: %q, allowEmpty: true, emptyLabel: 'All categories', sourceId: 'acct-filter-cat'})",
-		initial,
-	)
 }
 
 // acctUtilBarColor returns the credit-utilization bar color class

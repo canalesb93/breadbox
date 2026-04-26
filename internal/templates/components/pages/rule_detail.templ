@@ -29,6 +29,7 @@ templ RuleDetail(p RuleDetailProps) {
 	     defer) so the Alpine.data() registration runs before Alpine — itself
 	     deferred from <head> — fires alpine:init. -->
 	<script src="/static/js/admin/components/rule_detail.js"></script>
+	@components.CategoryPickerScript()
 	@components.BreadcrumbNav(p.Breadcrumbs)
 	@templ.JSONScript("rule-detail-data", p.Categories)
 	<div
@@ -57,7 +58,6 @@ templ RuleDetail(p RuleDetailProps) {
 			@ruleDetailSyncActivity(p)
 		}
 	</div>
-	@components.CategoryPickerScript()
 }
 
 // ruleDetailHeader renders the page-title row with status badges and the
