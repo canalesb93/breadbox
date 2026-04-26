@@ -1,8 +1,8 @@
 package pages
 
 import (
-	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -11,17 +11,35 @@ import (
 )
 
 // TransactionDetail renders the /admin/transactions/{id} detail page —
-// hero header, account context banner, details + category sidebar,
-// activity timeline, and the inline JS that powers category edits, tag
-// management, and comment posting. Hosts inside base.html via
-// TemplateRenderer.RenderWithTempl.
+// hero header, account context banner, details + category sidebar, and
+// activity timeline. Hosts inside base.html via TemplateRenderer.RenderWithTempl.
+//
+// The Alpine factories (txdCategoryEditor, txdTagManager, txdCommentManager)
+// live in static/js/admin/components/transaction_detail.js. Initial state
+// is handed over via three @templ.JSONScript tags emitted at the top of
+// the component plus per-factory `data-*` scalar attributes. The factory
+// <script> is loaded synchronously (not deferred) so Alpine.data() is
+// registered before Alpine — itself <script defer> in <head> — fires
+// alpine:init.
 templ TransactionDetail(p TransactionDetailProps) {
+	<!-- JSONScript payloads must precede the synchronous <script src> below
+	     because the page-component file seeds window.__bbCategories /
+	     window.__bbAllTags from these tags at module load — both globals
+	     are read by the inline categoryPicker (tx_row.templ) and the global
+	     tag picker (base.html) at first render. -->
+	@templ.JSONScript("transaction-detail-data", p.Categories)
+	@templ.JSONScript("transaction-detail-available-tags", p.AvailableTags)
+	@templ.JSONScript("transaction-detail-current-tags", p.CurrentTags)
+	<!-- Component factory. Loaded synchronously (no defer) so the
+	     Alpine.data() registrations run before Alpine — itself deferred from
+	     <head> — fires alpine:init. -->
+	<script src="/static/js/admin/components/transaction_detail.js"></script>
 	@components.CategoryPickerStyles()
 	<!--
 		Set the shortcut-registry scope so base.html's global dispatcher routes
-		c / t / e (registered below) to this page's handlers, and so the
-		? help modal surfaces them under "This page". Reset to 'global' on
-		Alpine teardown so other pages don't inherit the scope.
+		c / t / e (registered in the page factory) to this page's handlers,
+		and so the ? help modal surfaces them under "This page". Reset to
+		'global' on Alpine teardown so other pages don't inherit the scope.
 	-->
 	<div x-data x-init="$store.shortcuts.setScope('transaction-detail')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	@components.BreadcrumbNav(p.Breadcrumbs)
@@ -32,7 +50,6 @@ templ TransactionDetail(p TransactionDetailProps) {
 	@txdMain(p)
 	@txdActivity(p)
 	@components.CategoryPickerScript()
-	@txdScripts(p)
 }
 
 templ txdHero(p TransactionDetailProps) {
@@ -189,7 +206,12 @@ templ txdMain(p TransactionDetailProps) {
 			</div>
 		</div>
 		<!-- Category + Tags Card -->
-		<div class="bb-card p-5 space-y-5" x-data="txCategoryEditor()">
+		<div
+			class="bb-card p-5 space-y-5"
+			x-data="txdCategoryEditor"
+			data-tx-id={ p.TransactionID }
+			data-category-override={ txdCategoryOverrideAttr(p) }
+		>
 			<div>
 				<h2 class="text-sm font-semibold text-base-content/50 mb-3">Category</h2>
 				<div class="bb-cat-picker" data-picker-source="txd-cat" x-data={ txdCategoryPickerInit(p) } @category-change="setCategoryFromPicker($event.detail)">
@@ -212,7 +234,7 @@ templ txdMain(p TransactionDetailProps) {
 				</div>
 			</div>
 			<!-- Tags -->
-			<div x-data="tagManager()">
+			<div x-data="txdTagManager" data-tx-id={ p.TransactionID }>
 				<div class="flex items-center justify-between mb-3">
 					<h2 class="text-sm font-semibold text-base-content/50">Tags</h2>
 				</div>
@@ -253,7 +275,14 @@ templ txdMain(p TransactionDetailProps) {
 
 templ txdActivity(p TransactionDetailProps) {
 	<!-- Activity Timeline -->
-	<section id="activity" aria-labelledby="activity-heading" class="bb-card p-0 overflow-hidden" x-data={ fmt.Sprintf("commentManager(%d)", p.MaxCommentLength) }>
+	<section
+		id="activity"
+		aria-labelledby="activity-heading"
+		class="bb-card p-0 overflow-hidden"
+		x-data="txdCommentManager"
+		data-tx-id={ p.TransactionID }
+		data-max-comment-length={ strconv.Itoa(p.MaxCommentLength) }
+	>
 		<div class="px-4 sm:px-5 pt-5 pb-3 flex items-center gap-2">
 			<i data-lucide="activity" class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>
 			<h2 id="activity-heading" class="text-sm font-semibold text-base-content/50">Activity</h2>
@@ -514,14 +543,6 @@ templ txdInlineTagChip(e service.ActivityEntry) {
 	</span>
 }
 
-// txdScripts emits the inline <script> block: shortcut registry, the
-// txCategoryEditor / commentManager / tagManager Alpine components, and
-// the global tag-cache seed. The two {{toJSON .X}} interpolations from
-// the original template are realized here via json.Marshal.
-templ txdScripts(p TransactionDetailProps) {
-	@templ.Raw("<script>" + txdScriptBody(p) + "</script>")
-}
-
 // ---- helpers ----
 
 // txdHeroTileBg returns the rounded-tile background color class for the
@@ -709,296 +730,26 @@ func avatarURLStr(id, version string) string {
 }
 
 // txdCategoryPickerInit emits the x-data initializer for the inline
-// category picker. Mirrors the original interpolation of {{toJSON
-// .Categories}} and {{.Transaction.Category.ID}} so the markup is
-// byte-identical to the html/template output.
+// category picker. Categories flow into the shared `categoryPicker`
+// factory through `window.__bbCategories` (seeded by
+// transaction_detail.js from the @templ.JSONScript payload), matching
+// the convention used by tx_row.templ.
 func txdCategoryPickerInit(p TransactionDetailProps) string {
-	cats, _ := json.Marshal(p.Categories)
 	initial := ""
 	if p.Transaction != nil && p.Transaction.Category != nil && p.Transaction.Category.ID != nil {
 		initial = *p.Transaction.Category.ID
 	}
 	return fmt.Sprintf(
-		"categoryPicker({categories: %s, mode: 'assign', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', initial: '%s', sourceId: 'txd-cat'})",
-		string(cats), initial,
+		"categoryPicker({categories: window.__bbCategories, mode: 'assign', placeholder: 'Uncategorized', allowEmpty: true, emptyLabel: 'Uncategorized', initial: '%s', sourceId: 'txd-cat'})",
+		initial,
 	)
 }
 
-// txdScriptBody assembles the inline JS block that powers the page:
-// shortcut registry registration (c / t / e), the txCategoryEditor /
-// commentManager / tagManager Alpine factories, and the
-// window.__bbAllTags seed. Lifted verbatim from the original
-// transaction_detail.html with the four template substitutions
-// ({{.TransactionID}}, {{.Transaction.CategoryOverride}}, two {{toJSON
-// ...}}) realized via Sprintf + json.Marshal.
-func txdScriptBody(p TransactionDetailProps) string {
-	availableTagsJSON, _ := json.Marshal(p.AvailableTags)
-	currentTagsJSON, _ := json.Marshal(p.CurrentTags)
-	overrideJS := "false"
+// txdCategoryOverrideAttr returns "true" / "false" for the data-category-override
+// attribute consumed by the txdCategoryEditor Alpine factory's init().
+func txdCategoryOverrideAttr(p TransactionDetailProps) string {
 	if p.Transaction != nil && p.Transaction.CategoryOverride {
-		overrideJS = "true"
+		return "true"
 	}
-
-	return fmt.Sprintf(`
-// Populate global tag cache so the picker works without a re-fetch.
-window.__bbAllTags = %[1]s || [];
-
-// Register transaction-detail scoped keyboard shortcuts in the global registry
-// (base.html). The dispatcher guards against touch, input focus, and open
-// overlays, so these handlers only need to care about "what does this key do".
-// Shortcuts surface automatically in the ? help modal (M0.3) under "This page".
-document.addEventListener('alpine:init', function() {
-  var reg = Alpine.store('shortcuts');
-  if (!reg) return;
-
-  reg.register({
-    id: 'transaction-detail.categorize',
-    keys: 'c',
-    description: 'Categorize transaction',
-    group: 'Actions',
-    scope: 'transaction-detail',
-    action: function() {
-      // Reuse the inline picker trigger — same contract as the click handler,
-      // so the categoryPicker's sourceId + listener wiring stays in one place.
-      var btn = document.querySelector('.bb-cat-picker[data-picker-source="txd-cat"] button');
-      if (btn) btn.click();
-    },
-  });
-
-  reg.register({
-    id: 'transaction-detail.tag',
-    keys: 't',
-    description: 'Edit tags',
-    group: 'Actions',
-    scope: 'transaction-detail',
-    action: function() {
-      // Click the "Add tag / Edit tags" chip so the tagManager component
-      // opens the picker with its current tag state (appliedCounts, etc.).
-      var btn = document.querySelector('.bb-tag-add');
-      if (btn) btn.click();
-    },
-  });
-
-  reg.register({
-    id: 'transaction-detail.compose-note',
-    keys: 'n',
-    description: 'Add a note',
-    group: 'Actions',
-    scope: 'transaction-detail',
-    action: function() {
-      var el = document.getElementById('bb-txd-comment');
-      if (!el) return;
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.focus();
-    },
-  });
-
-  reg.register({
-    id: 'transaction-detail.expand-system-details',
-    keys: 'e',
-    description: 'Toggle system details',
-    group: 'Actions',
-    scope: 'transaction-detail',
-    action: function() {
-      var btn = document.getElementById('bb-txd-system-details-toggle');
-      if (btn) btn.click();
-    },
-  });
-});
-
-function txCategoryEditor() {
-  return {
-    saving: false,
-    isOverride: %[3]s,
-    setCategoryFromPicker(detail) {
-      if (!detail.id) {
-        this.resetCategory();
-        return;
-      }
-      this.saving = true;
-      fetch('/-/transactions/%[2]s/category', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({category_id: detail.id})
-      })
-      .then(r => {
-        this.saving = false;
-        if (r.ok) {
-          this.isOverride = true;
-          showToast('Category updated.', 'success');
-        } else {
-          r.json().then(d => showToast(d.error?.message || 'Failed to update category.'));
-        }
-      })
-      .catch(() => { this.saving = false; showToast('Network error.'); });
-    },
-    resetCategory() {
-      this.saving = true;
-      fetch('/-/transactions/%[2]s/category', { method: 'DELETE' })
-      .then(r => {
-        this.saving = false;
-        if (r.ok || r.status === 204) {
-          this.isOverride = false;
-          showToast('Category reset to auto-detected.', 'success');
-          location.reload();
-        } else {
-          showToast('Failed to reset category.');
-        }
-      })
-      .catch(() => { this.saving = false; showToast('Network error.'); });
-    }
-  };
-}
-
-function showToast(message, type) {
-  window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type || 'error' } }));
-}
-
-function commentManager(maxLen) {
-  return {
-    newComment: '',
-    maxLength: maxLen || 10000,
-    canSubmit() {
-      var trimmed = this.newComment.trim().length;
-      return trimmed > 0 && this.newComment.length <= this.maxLength;
-    },
-    counterState() {
-      if (this.newComment.length === 0) return 'ok';
-      var ratio = this.newComment.length / this.maxLength;
-      if (ratio >= 1) return 'error';
-      if (ratio >= 0.9) return 'warn';
-      return 'ok';
-    },
-    autosize(el) {
-      // Reset to natural height so scrollHeight reflects current content,
-      // not the previously-set explicit height. Cap at max-h-36 (9rem ≈ 144px)
-      // so the composer never balloons past ~6 rows; overflow scrolls inside.
-      if (!el) return;
-      el.style.height = 'auto';
-      var max = 144;
-      var next = Math.min(el.scrollHeight, max);
-      el.style.height = next + 'px';
-      el.style.overflowY = el.scrollHeight > max ? 'auto' : 'hidden';
-    },
-    addComment() {
-      var self = this;
-      var content = this.newComment.trim();
-      if (!content || !this.canSubmit()) return;
-      fetch('/-/transactions/%[2]s/comments', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({content: content})
-      })
-      .then(function(res) {
-        if (res.ok) {
-          self.newComment = '';
-          showToast('Comment added.', 'success');
-          location.reload();
-        } else {
-          return res.json().then(function(data) {
-            showToast(data.error || 'Failed to add comment.');
-          });
-        }
-      })
-      .catch(function() { showToast('Network error.'); });
-    },
-    deleteComment(id) {
-      bbConfirm({title:'Delete comment?',message:'This comment will be permanently removed.',confirmLabel:'Delete',variant:'danger'}).then(function(ok){
-        if(!ok) return;
-        fetch('/-/transactions/%[2]s/comments/' + id, {
-          method: 'DELETE'
-        })
-        .then(function(res) {
-          if (res.ok || res.status === 204) {
-            showToast('Comment deleted.', 'success');
-            location.reload();
-          } else {
-            return res.json().then(function(data) {
-              showToast(data.error || 'Failed to delete comment.');
-            });
-          }
-        })
-        .catch(function() { showToast('Network error.'); });
-      });
-    }
-  };
-}
-
-function tagManager() {
-  // Go marshals nil slices as `+"`null`"+`, so guard with `+"`|| []`"+` to keep the Alpine
-  // scope usable when the transaction has no tags / no registered tags.
-  return {
-    tags: (%[4]s || []).map(function(t) { return {
-      slug: t.slug,
-      displayName: t.display_name,
-      color: t.color,
-      icon: t.icon,
-    }; }),
-    availableTags: %[1]s || [],
-
-    openTagPicker() {
-      // Picker uses the same contract as the bulk bar: the tx's current tags
-      // render as "present" so the user can add and remove in one commit.
-      var counts = {};
-      this.tags.forEach(function(t) { counts[t.slug] = 1; });
-      window.dispatchEvent(new CustomEvent('open-tag-picker', {
-        detail: {
-          sourceId: 'txd-tag',
-          transactionIds: ['%[2]s'],
-          txCount: 1,
-          appliedCounts: counts,
-          availableTags: this.availableTags,
-        }
-      }));
-    },
-
-    applyTagDiff(adds, removes) {
-      adds = adds || []; removes = removes || [];
-      if (adds.length + removes.length === 0) return;
-      var op = {};
-      if (adds.length) op.tags_to_add = adds.map(function(s) { return {slug: s, note: ''}; });
-      if (removes.length) op.tags_to_remove = removes.map(function(s) { return {slug: s, note: ''}; });
-      fetch('/-/transactions/batch-update', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          operations: [Object.assign({transaction_id: '%[2]s'}, op)],
-          on_error: 'continue',
-        }),
-      })
-      .then(function(r) { return r.json().then(function(d) { return {ok: r.ok || r.status === 422, body: d}; }); })
-      .then(function(res) {
-        if (res.ok && res.body && res.body.succeeded > 0) {
-          showToast('Tags updated.', 'success');
-          location.reload();
-        } else {
-          var msg = (res.body && res.body.error && res.body.error.message) || 'Failed to update tags.';
-          showToast(msg);
-        }
-      })
-      .catch(function() { showToast('Network error.'); });
-    },
-
-    removeTag(tag, note) {
-      // Inline × on a tag chip — direct DELETE. Note is optional.
-      var url = '/-/transactions/%[2]s/tags/' + encodeURIComponent(tag.slug);
-      fetch(url, {
-        method: 'DELETE',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({note: note || ''}),
-      })
-      .then(function(res) { return res.json().then(function(d) { return {ok: res.ok, body: d}; }); })
-      .then(function(r) {
-        if (r.ok) {
-          showToast('Tag removed.', 'success');
-          location.reload();
-        } else {
-          showToast(r.body.error || 'Failed to remove tag.');
-        }
-      })
-      .catch(function() { showToast('Network error.'); });
-    },
-  };
-}
-`, string(availableTagsJSON), p.TransactionID, overrideJS, string(currentTagsJSON))
+	return "false"
 }
