@@ -9,15 +9,24 @@ import (
 
 // Connections renders the bank-connections list page (and the Account
 // Links secondary tab). Hosts inside the base layout via
-// TemplateRenderer.RenderWithTempl. Mirrors the previous
-// internal/templates/pages/connections.html byte-for-byte (responsive
-// classes, Alpine directives, ARIA, scripts).
+// TemplateRenderer.RenderWithTempl.
+//
+// The Alpine factories (`syncAllBtn`, `syncBtn`), keyboard-navigation
+// module (`bbConnNav`), and shortcut registrations live in
+// static/js/admin/components/connections.js — see #827 / docs/design-system.md
+// → "Alpine page components".
 templ Connections(p ConnectionsProps) {
+	<!-- Component factories for syncAllBtn / syncBtn and the j/k/Enter/s
+	     keyboard-shortcut registrations. Loaded synchronously (NOT defer)
+	     because Alpine itself is deferred from <head> and dispatches
+	     alpine:init at parse-end — a deferred page script would register
+	     its listener after the event already fired. -->
+	<script src="/static/js/admin/components/connections.js"></script>
 	<!--
 		Set the shortcut-registry scope so base.html's global dispatcher routes
-		j/k/s/e/Enter (registered below) to this page's handlers, and so the
-		? help modal surfaces them under "This page". Reset to 'global' on
-		Alpine teardown so other pages don't inherit the scope.
+		j/k/s/Enter (registered in connections.js) to this page's handlers, and
+		so the ? help modal surfaces them under "This page". Reset to 'global'
+		on Alpine teardown so other pages don't inherit the scope.
 	-->
 	<div x-data x-init="$store.shortcuts.setScope('connections')" x-destroy="$store.shortcuts.setScope('global')"></div>
 	<div
@@ -35,7 +44,7 @@ templ Connections(p ConnectionsProps) {
 			<div class="flex items-center gap-2 flex-wrap">
 				<div x-show="tab === 'connections'" x-cloak class="flex items-center gap-2">
 					if len(p.Connections) > 0 {
-						<div x-data="syncAllBtn()">
+						<div x-data="syncAllBtn">
 							<button
 								class="btn btn-outline btn-sm rounded-xl gap-2"
 								:disabled="state !== 'idle'"
@@ -140,7 +149,6 @@ templ Connections(p ConnectionsProps) {
 					</div>
 				</div>
 			}
-			@connectionsScripts()
 		</div>
 		<!-- /connections tab -->
 		<!-- ==================== ACCOUNT LINKS TAB ==================== -->
@@ -247,7 +255,7 @@ templ connectionsCard(c ConnectionsRow) {
 			<div class="flex items-center gap-2 sm:gap-3 shrink-0">
 				<!-- Sync Now button (non-CSV active connections only) -->
 				if c.Provider != "csv" && c.Status == "active" {
-					<div x-data={ fmt.Sprintf("syncBtn(%q)", c.ID) }>
+					<div x-data="syncBtn" data-conn-id={ c.ID }>
 						<button
 							type="button"
 							data-sync-btn
@@ -444,180 +452,6 @@ templ connectionsLinkRow(l ConnectionsLinkRow, csrfToken string) {
 			</div>
 		</div>
 	</div>
-}
-
-// connectionsScripts ships the per-page Alpine factories (syncAllBtn,
-// syncBtn) and the j/k/Enter/s keyboard-shortcut registrations. Preserved
-// byte-for-byte from the original pages/connections.html so the regression
-// audit passes.
-templ connectionsScripts() {
-	<script>
-		function syncAllBtn() {
-		  return {
-		    state: 'idle',
-		    triggerSyncAll() {
-		      if (this.state !== 'idle') return;
-		      this.state = 'syncing';
-		      var self = this;
-		      fetch('/-/connections/sync-all', { method: 'POST' })
-		        .then(function(res) {
-		          if (res.ok) {
-		            self.state = 'done';
-		            self.$nextTick(function() { lucide.createIcons(); });
-		            window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Sync triggered for all connections.', type: 'success' } }));
-		            setTimeout(function() { self.state = 'idle'; self.$nextTick(function() { lucide.createIcons(); }); }, 8000);
-		          } else {
-		            return res.json().then(function(data) {
-		              window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: data.error || 'Failed to trigger sync.', type: 'error' } }));
-		              self.state = 'idle';
-		              self.$nextTick(function() { lucide.createIcons(); });
-		            });
-		          }
-		        })
-		        .catch(function() {
-		          window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Network error. Please try again.', type: 'error' } }));
-		          self.state = 'idle';
-		          self.$nextTick(function() { lucide.createIcons(); });
-		        });
-		    }
-		  };
-		}
-
-		function syncBtn(connId) {
-		  return {
-		    state: 'idle',
-		    triggerSync() {
-		      if (this.state !== 'idle') return;
-		      this.state = 'syncing';
-		      var self = this;
-		      fetch('/-/connections/' + connId + '/sync', { method: 'POST' })
-		        .then(function(res) {
-		          if (res.ok) {
-		            self.state = 'done';
-		            self.$nextTick(function() { lucide.createIcons(); });
-		            window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Sync triggered for this connection.', type: 'success' } }));
-		            setTimeout(function() { self.state = 'idle'; self.$nextTick(function() { lucide.createIcons(); }); }, 5000);
-		          } else {
-		            return res.json().then(function(data) {
-		              window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: data.error || 'Failed to trigger sync.', type: 'error' } }));
-		              self.state = 'idle';
-		              self.$nextTick(function() { lucide.createIcons(); });
-		            });
-		          }
-		        })
-		        .catch(function() {
-		          window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: 'Network error. Please try again.', type: 'error' } }));
-		          self.state = 'idle';
-		          self.$nextTick(function() { lucide.createIcons(); });
-		        });
-		    }
-		  };
-		}
-
-		// Keyboard navigation for the connections list. Reads the DOM for visible
-		// rows (respecting the family-member filter via data-filter-user + Alpine's
-		// x-show display:none) instead of mirroring connection data into a store.
-		// The base.html dispatcher already guards against input focus, overlays,
-		// and touch devices, so these handlers just do the thing.
-		var bbConnNav = {
-		  focusedIdx: -1,
-		  FOCUSED_CLASS: 'bb-tx-row--focused', // reuse the tx-list focus styling
-		  visibleRows: function() {
-		    var all = document.querySelectorAll('[data-connection-row]');
-		    var out = [];
-		    for (var i = 0; i < all.length; i++) {
-		      // offsetParent is null when x-show has display:none'd the row
-		      if (all[i].offsetParent !== null) out.push(all[i]);
-		    }
-		    return out;
-		  },
-		  clearFocus: function() {
-		    var rows = document.querySelectorAll('[data-connection-row].' + this.FOCUSED_CLASS);
-		    for (var i = 0; i < rows.length; i++) rows[i].classList.remove(this.FOCUSED_CLASS);
-		  },
-		  setFocus: function(idx) {
-		    var rows = this.visibleRows();
-		    if (!rows.length) { this.focusedIdx = -1; return; }
-		    if (idx < 0) idx = 0;
-		    if (idx >= rows.length) idx = rows.length - 1;
-		    this.clearFocus();
-		    rows[idx].classList.add(this.FOCUSED_CLASS);
-		    this.focusedIdx = idx;
-		    rows[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-		  },
-		  next: function() {
-		    var rows = this.visibleRows();
-		    if (!rows.length) return;
-		    this.setFocus(this.focusedIdx < 0 ? 0 : this.focusedIdx + 1);
-		  },
-		  prev: function() {
-		    var rows = this.visibleRows();
-		    if (!rows.length) return;
-		    this.setFocus(this.focusedIdx < 0 ? 0 : this.focusedIdx - 1);
-		  },
-		  currentRow: function() {
-		    var rows = this.visibleRows();
-		    if (this.focusedIdx < 0 || this.focusedIdx >= rows.length) return null;
-		    return rows[this.focusedIdx];
-		  },
-		};
-
-		document.addEventListener('alpine:init', function() {
-		  var reg = Alpine.store('shortcuts');
-		  if (!reg) return;
-
-		  reg.register({
-		    id: 'connections.next',
-		    keys: 'j',
-		    description: 'Move down',
-		    group: 'Navigation',
-		    scope: 'connections',
-		    action: function() { bbConnNav.next(); },
-		  });
-
-		  reg.register({
-		    id: 'connections.prev',
-		    keys: 'k',
-		    description: 'Move up',
-		    group: 'Navigation',
-		    scope: 'connections',
-		    action: function() { bbConnNav.prev(); },
-		  });
-
-		  reg.register({
-		    id: 'connections.open',
-		    keys: 'Enter',
-		    description: 'Open connection',
-		    group: 'Actions',
-		    scope: 'connections',
-		    action: function() {
-		      var row = bbConnNav.currentRow();
-		      if (!row) return;
-		      var url = row.getAttribute('data-open-url');
-		      if (url) window.location.href = url;
-		    },
-		  });
-
-		  reg.register({
-		    id: 'connections.sync',
-		    keys: 's',
-		    description: 'Sync connection',
-		    group: 'Actions',
-		    scope: 'connections',
-		    action: function() {
-		      var row = bbConnNav.currentRow();
-		      if (!row) return;
-		      // Reuse the existing syncBtn Alpine component's click handler so CSRF,
-		      // toast, and UI-state logic (disabled, spinner, 5s cooldown) stay in
-		      // one place. Inactive and CSV connections don't render the button —
-		      // no-op in that case.
-		      var btn = row.querySelector('[data-sync-btn]');
-		      if (btn) btn.click();
-		    },
-		  });
-
-		});
-	</script>
 }
 
 templ connectionsCreateLinkModal(p ConnectionsProps) {
