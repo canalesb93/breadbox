@@ -330,7 +330,7 @@ func CreateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 				writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Invalid email format")
 				return
 			}
-			emailText = pgtype.Text{String: *req.Email, Valid: true}
+			emailText = pgconv.Text(*req.Email)
 		}
 
 		user, err := a.Queries.CreateUser(r.Context(), db.CreateUserParams{
@@ -409,7 +409,7 @@ func UpdateUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 					writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Invalid email format")
 					return
 				}
-				email = pgtype.Text{String: *req.Email, Valid: true}
+				email = pgconv.Text(*req.Email)
 			}
 		}
 

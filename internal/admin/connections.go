@@ -1269,8 +1269,8 @@ func UpdateAccountDisplayNameHandler(a *app.App, sm *scs.SessionManager) http.Ha
 		}
 
 		var displayName pgtype.Text
-		if req.DisplayName != nil && *req.DisplayName != "" {
-			displayName = pgtype.Text{String: *req.DisplayName, Valid: true}
+		if req.DisplayName != nil {
+			displayName = pgconv.TextIfNotEmpty(*req.DisplayName)
 		}
 
 		account, err := a.Queries.UpdateAccountDisplayName(r.Context(), db.UpdateAccountDisplayNameParams{

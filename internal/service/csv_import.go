@@ -265,7 +265,7 @@ func (s *Service) ImportCSV(ctx context.Context, params CSVImportParams) (*CSVIm
 	var errorMsg pgtype.Text
 	if result.SkippedCount > 0 && result.NewCount+result.UpdatedCount == 0 {
 		syncStatus = db.SyncStatusError
-		errorMsg = pgtype.Text{String: fmt.Sprintf("all %d rows skipped", result.SkippedCount), Valid: true}
+		errorMsg = pgconv.Text(fmt.Sprintf("all %d rows skipped", result.SkippedCount))
 	}
 
 	err = s.Queries.UpdateSyncLog(ctx, db.UpdateSyncLogParams{
