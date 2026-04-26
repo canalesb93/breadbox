@@ -368,10 +368,18 @@ templ txdSystemSentence(e service.ActivityEntry) {
 	}
 }
 
-// txdActorInline renders the bold actor-name span used inside a system-event
-// sentence. Avatar isn't shown inline (it'd compete with the event icon);
-// the actor's identity reads from the bold name.
+// txdActorInline renders an actor reference inside a system-event sentence:
+// a tiny (16px) avatar followed by the bold name. Users get their photo;
+// agents get a bot tile; system/anonymous actors fall back to the bold name
+// alone since there is no actor identity to surface visually.
 templ txdActorInline(e service.ActivityEntry) {
+	if e.ActorType == "user" && e.ActorID != nil && *e.ActorID != "" {
+		<img src={ avatarURLStr(*e.ActorID, e.ActorAvatarVersion) } alt="" class="inline-block w-4 h-4 rounded-full object-cover align-text-bottom mr-1" aria-hidden="true"/>
+	} else if e.ActorType == "agent" {
+		<span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary/10 align-text-bottom mr-1" aria-hidden="true">
+			<i data-lucide="bot" class="w-2.5 h-2.5 text-primary"></i>
+		</span>
+	}
 	<strong class="font-semibold text-base-content">{ e.ActorName }</strong>
 }
 
@@ -413,33 +421,34 @@ templ txdSystemIcon(e service.ActivityEntry) {
 	}
 }
 
-// txdTimelineComment renders a comment as a bordered card with a header bar
-// (author + verb + timestamp + delete) and a body. Avatar sits on the rail.
+// txdTimelineComment renders a comment as a chat-bubble: small author/time
+// meta-line above a rounded message blob. The bubble's top-left corner is
+// flattened so it visually points at the avatar on the rail. App-wide
+// bubble consolidation will hoist this style into a shared bb-bubble class
+// when the matching pattern lands on transactions and reviews.
 templ txdTimelineComment(e service.ActivityEntry) {
-	<li class="relative flex items-start gap-3 py-2 group">
+	<li class="relative flex items-start gap-3 py-2.5 group">
 		<div class="relative z-10 shrink-0 w-6 h-6 mt-0.5 flex items-center justify-center">
 			@txdCommentAvatar(e)
 		</div>
 		<div class="flex-1 min-w-0">
-			<article class="rounded-lg border border-base-200 bg-base-100 overflow-hidden">
-				<header class="px-3 py-2 bg-base-200/40 border-b border-base-200 flex items-baseline gap-1.5 flex-wrap">
-					if e.ActorName != "" {
-						<strong class="text-xs font-semibold text-base-content">{ e.ActorName }</strong>
-					}
-					<span class="text-xs text-base-content/50">commented</span>
-					if e.Timestamp != "" {
-						<time datetime={ e.Timestamp } class="text-[11px] text-base-content/40 tabular-nums" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStr(e.Timestamp) }</time>
-					}
-					if e.CommentID != "" {
-						<button class="ml-auto rounded-md p-1 -m-1 text-base-content/30 hover:text-error hover:bg-error/5 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition" @click={ "deleteComment('" + e.CommentID + "')" } aria-label={ "Delete comment by " + e.ActorName } title="Delete comment">
-							<i data-lucide="trash-2" class="w-3.5 h-3.5" aria-hidden="true"></i>
-						</button>
-					}
-				</header>
-				if e.Detail != "" {
-					<div class="px-3 py-2.5 text-sm text-base-content/85 whitespace-pre-wrap leading-relaxed break-words">{ e.Detail }</div>
+			<div class="flex items-baseline gap-1.5 px-1 mb-1 flex-wrap">
+				if e.ActorName != "" {
+					<strong class="text-xs font-semibold text-base-content">{ e.ActorName }</strong>
 				}
-			</article>
+				<span class="text-xs text-base-content/50">commented</span>
+				if e.Timestamp != "" {
+					<time datetime={ e.Timestamp } class="text-[11px] text-base-content/40 tabular-nums" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStr(e.Timestamp) }</time>
+				}
+				if e.CommentID != "" {
+					<button class="ml-auto rounded-md p-1 -m-1 text-base-content/30 hover:text-error hover:bg-error/5 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition" @click={ "deleteComment('" + e.CommentID + "')" } aria-label={ "Delete comment by " + e.ActorName } title="Delete comment">
+						<i data-lucide="trash-2" class="w-3.5 h-3.5" aria-hidden="true"></i>
+					</button>
+				}
+			</div>
+			if e.Detail != "" {
+				<div class="bb-comment-bubble">{ e.Detail }</div>
+			}
 		</div>
 	</li>
 }
@@ -489,12 +498,12 @@ templ txdTimelineEmptyComposer(p TransactionDetailProps) {
 	</div>
 }
 
-// txdComposerCard is the textarea + submit card. Visually mirrors a comment
-// bubble (header bar swapped for the focused-state hint). Carries the
-// "Toggle Needs Review" affordance from #846 — when on, posting also tags
-// the transaction needs-review.
+// txdComposerCard is the textarea + submit card. Mirrors the chat-bubble
+// shape of comment rows (rounded-2xl, flat top-left corner pointing at the
+// composer icon on the rail). Carries the "Toggle Needs Review" affordance
+// from #846 — when on, posting also tags the transaction needs-review.
 templ txdComposerCard(p TransactionDetailProps) {
-	<div class="rounded-lg border border-base-200 bg-base-100 overflow-hidden focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition">
+	<div class="rounded-2xl rounded-tl-md border border-base-200 bg-base-100 overflow-hidden focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition">
 		<label for="bb-txd-comment" class="sr-only">Add a comment</label>
 		<textarea
 			id="bb-txd-comment"
