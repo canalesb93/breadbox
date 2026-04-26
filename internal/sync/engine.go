@@ -824,9 +824,10 @@ func (e *Engine) applyTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.U
 }
 
 // removeTagFromRule deletes a (transaction, tag) row and writes the matching
-// tag_removed annotation. No-op if the tag slug doesn't exist. The rule's
-// name is used as the removal note so the activity timeline carries a source
-// attribution.
+// tag_removed annotation. No-op if the tag slug doesn't exist. Source
+// attribution flows through the parent rule_applied annotation; the
+// rule-source tag_removed row is deduped from the rendered timeline by
+// service.EnrichAnnotations.
 func (e *Engine) removeTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.UUID, slug string, ruleID pgtype.UUID, ruleShortID, ruleName string) error {
 	var tagID pgtype.UUID
 	err := tx.QueryRow(ctx, `SELECT id FROM tags WHERE slug = $1`, slug).Scan(&tagID)
@@ -852,7 +853,6 @@ func (e *Engine) removeTagFromRule(ctx context.Context, tx pgx.Tx, txnID pgtype.
 		"source":    "rule",
 		"rule_id":   ruleShortID,
 		"rule_name": ruleName,
-		"note":      fmt.Sprintf("Removed by rule: %s", ruleName),
 	}
 	if err := writeSyncAnnotation(ctx, tx, writeSyncAnnotationParams{
 		TransactionID: txnID,

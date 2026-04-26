@@ -26,14 +26,12 @@ type addTransactionTagInput struct {
 	WriteSessionContext
 	TransactionID string `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
 	TagSlug       string `json:"tag_slug" jsonschema:"required,Tag slug to add (e.g. 'needs-review'). Auto-created as persistent if not registered."`
-	Note          string `json:"note,omitempty" jsonschema:"Optional note recorded on the resulting tag annotation (action=added)."`
 }
 
 type removeTransactionTagInput struct {
 	WriteSessionContext
 	TransactionID string `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
 	TagSlug       string `json:"tag_slug" jsonschema:"required,Tag slug to remove"`
-	Note          string `json:"note,omitempty" jsonschema:"Optional rationale recorded on the resulting tag annotation (action=removed)."`
 }
 
 type createTagInput struct {
@@ -236,7 +234,7 @@ func (s *MCPServer) handleAddTransactionTag(ctx context.Context, _ *mcpsdk.CallT
 		return errorResult(fmt.Errorf("transaction_id and tag_slug are required")), nil, nil
 	}
 	actor := service.ActorFromContext(ctx)
-	added, alreadyPresent, err := s.svc.AddTransactionTag(context.Background(), input.TransactionID, input.TagSlug, actor, input.Note)
+	added, alreadyPresent, err := s.svc.AddTransactionTag(context.Background(), input.TransactionID, input.TagSlug, actor)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
@@ -256,7 +254,7 @@ func (s *MCPServer) handleRemoveTransactionTag(ctx context.Context, _ *mcpsdk.Ca
 		return errorResult(fmt.Errorf("transaction_id and tag_slug are required")), nil, nil
 	}
 	actor := service.ActorFromContext(ctx)
-	removed, alreadyAbsent, err := s.svc.RemoveTransactionTag(context.Background(), input.TransactionID, input.TagSlug, actor, input.Note)
+	removed, alreadyAbsent, err := s.svc.RemoveTransactionTag(context.Background(), input.TransactionID, input.TagSlug, actor)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
