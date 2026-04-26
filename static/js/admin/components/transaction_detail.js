@@ -27,6 +27,35 @@
 //
 // `showToast` is exposed on `window` to match the contract used by
 // tx-row's inline x-init watcher and the rule_detail page.
+//
+// ---- Optimistic in-place activity-timeline updates (Strategy A) ----
+//
+// Mutating actions (set category, add/remove tag, add/delete comment,
+// pin/unpin needs-review) used to call location.reload() — or, in the
+// category-set case, do nothing visible — to surface the resulting
+// timeline row. We now keep the user on the page:
+//
+//   1. POST/PATCH/DELETE the mutation as before.
+//   2. On 2xx, GET /-/transactions/{id}/timeline/rows?since=<lastTs>.
+//      The server reuses the same templ helpers as the main page (see
+//      pages.TimelineRows in transaction_detail.templ) so row markup is
+//      a single source of truth — no client-side row templating, no
+//      drift risk from a duplicated JS renderer.
+//   3. Insert the returned <li> rows just before the composer at the
+//      bottom of the timeline <ol>. Update the cached "last activity
+//      timestamp" cursor so subsequent fetches only get fresh rows.
+//   4. Update local chip state (category chip, tag chips, pin state) so
+//      the sidebar reflects the change without a reload.
+//
+// Failure path: every catch / non-2xx branch calls restorePageState()
+// (clears the SPA progress bar + content fade left over from any link
+// click) and surfaces a toast. Chip-state rollback happens at the call
+// site so the user sees the prior state restored.
+//
+// Day-grouping: the render endpoint inserts a `<li class="...">Today</li>`
+// separator ahead of the new rows when the new rows fall on a different
+// calendar day than the most recent existing row (see TimelineRowsHandler
+// in internal/admin/transactions.go).
 
 // --- Module-level globals consumed by tx_row + base.html ---
 
@@ -35,6 +64,149 @@ function showToast(message, type) {
 }
 
 window.showToast = showToast;
+
+// restorePageState clears the global SPA progress bar + content fade that
+// auto-starts on internal link clicks. Per .claude/rules/ui.md every
+// async error path must invoke this so the page doesn't stay blurred /
+// non-interactive after a failed fetch. Defined at module scope so all
+// three factories can share a single implementation.
+function restorePageState() {
+  if (window.bbProgress && typeof window.bbProgress.finish === 'function') {
+    window.bbProgress.finish();
+  }
+  var main = document.querySelector('main');
+  if (main) {
+    main.style.opacity = '';
+    main.style.filter = '';
+    main.style.pointerEvents = '';
+  }
+}
+
+// timelineRoot returns the activity <section> element (root of the
+// txdCommentManager factory). Used by the cross-factory helpers below
+// because the comment manager owns the cursor + insertion point but
+// every factory needs to trigger a refresh after its mutation.
+function timelineRoot() {
+  return document.getElementById('activity');
+}
+
+// timelineList returns the <ol class="bb-timeline"> inside the activity
+// section (or null when the timeline started empty — only the
+// txdTimelineEmptyComposer was rendered).
+function timelineList() {
+  var root = timelineRoot();
+  if (!root) return null;
+  return root.querySelector('ol.bb-timeline');
+}
+
+// composerLi finds the <li> wrapping txdComposerCard at the bottom of
+// the timeline. New rows must insert *before* this so the composer
+// stays at the bottom.
+function composerLi() {
+  var ol = timelineList();
+  if (!ol) return null;
+  // The composer is the last child <li>. Use lastElementChild instead
+  // of a class selector because the composer's <li> doesn't carry a
+  // distinguishing class today.
+  return ol.lastElementChild;
+}
+
+// fetchTimelineRows fetches and inserts the rendered <li> rows for any
+// activity entries newer than the cached cursor. The optional
+// `replaceCommentIDs` array forces the endpoint to also return rows for
+// those comment short_ids regardless of cursor age — used by the
+// soft-delete path where the tombstone replaces an existing bubble (its
+// CreatedAt is older than `since`, but `is_deleted` just flipped).
+// Returns a promise that resolves to the number of rows inserted (0 = no
+// new rows, treat as silent success).
+function fetchTimelineRows(txId, replaceCommentIDs) {
+  var root = timelineRoot();
+  if (!root) return Promise.resolve(0);
+  var since = root.dataset.lastActivityTs || '';
+  var params = [];
+  if (since) params.push('since=' + encodeURIComponent(since));
+  if (replaceCommentIDs && replaceCommentIDs.length) {
+    params.push('comment_ids=' + encodeURIComponent(replaceCommentIDs.join(',')));
+  }
+  var url = '/-/transactions/' + encodeURIComponent(txId) + '/timeline/rows';
+  if (params.length) url += '?' + params.join('&');
+  return fetch(url, { headers: { Accept: 'text/html' } })
+    .then(function (res) {
+      if (!res.ok) throw new Error('render-failed');
+      return res.text();
+    })
+    .then(function (html) {
+      if (!html.trim()) return 0;
+      // Parse the fragment. The server returns one or more <li> elements
+      // (plus an optional day separator <li>) — no surrounding wrapper.
+      var tpl = document.createElement('template');
+      tpl.innerHTML = html.trim();
+      var nodes = Array.prototype.slice.call(tpl.content.children);
+      if (nodes.length === 0) return 0;
+
+      // Insertion point: the timeline may already exist (timelineList())
+      // or the page may have rendered txdTimelineEmptyComposer (no <ol>
+      // yet). For the empty case we don't try to materialize the rail —
+      // a single fresh row reading without it is acceptable; the next
+      // page load will render the proper rail. The 99%-case is the
+      // non-empty timeline.
+      var ol = timelineList();
+      var composer = composerLi();
+      if (!ol) {
+        // Empty-state fallback: full reload so the timeline gets its
+        // proper <ol> rail. Rare path; acceptable.
+        window.location.reload();
+        return 0;
+      }
+
+      // Insert each node. For replacement rows (tombstones — the
+      // returned <li> has data-comment-id matching one of the requested
+      // replaceCommentIDs), find the matching bubble <li> and swap it
+      // in place. For genuinely new rows, insert just before the
+      // composer (so the composer stays at the bottom).
+      var inserted = 0;
+      var replaceSet = {};
+      if (replaceCommentIDs && replaceCommentIDs.length) {
+        replaceCommentIDs.forEach(function (id) { replaceSet[id] = true; });
+      }
+      nodes.forEach(function (n) {
+        var commentID = (n.dataset && n.dataset.commentId) || '';
+        if (commentID && replaceSet[commentID]) {
+          var existing = ol.querySelector('li[data-comment-id="' + commentID + '"]');
+          if (existing) {
+            existing.parentNode.replaceChild(n, existing);
+            inserted++;
+            return;
+          }
+        }
+        if (composer) {
+          ol.insertBefore(n, composer);
+        } else {
+          ol.appendChild(n);
+        }
+        inserted++;
+      });
+
+      // Update the cursor so the next fetch only sees newer rows. Every
+      // returned <li> has a <time datetime="..."> child for the activity
+      // entry's timestamp; the last one is the newest. Skip rows that
+      // were replacements (older timestamps would regress the cursor).
+      var lastTime = null;
+      for (var i = nodes.length - 1; i >= 0; i--) {
+        var nodeID = (nodes[i].dataset && nodes[i].dataset.commentId) || '';
+        if (nodeID && replaceSet[nodeID]) continue;
+        var t = nodes[i].querySelector('time[datetime]');
+        if (t) { lastTime = t.getAttribute('datetime'); break; }
+      }
+      if (lastTime) root.dataset.lastActivityTs = lastTime;
+
+      // Re-bootstrap Lucide icons inside the freshly-inserted rows.
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+      return inserted;
+    });
+}
 
 // Seed window.__bbCategories and window.__bbAllTags as early as possible
 // so any inline component (tx_row's categoryPicker, base.html's tag
@@ -143,39 +315,58 @@ document.addEventListener('alpine:init', function () {
           return;
         }
         var self = this;
+        var prevOverride = this.isOverride;
         this.saving = true;
+        // Optimistic chip-state update: flip override badge immediately
+        // so the sidebar reads as "manual" while the request flies.
+        this.isOverride = true;
         fetch('/-/transactions/' + this.txId + '/category', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ category_id: detail.id }),
         })
           .then(function (r) {
-            self.saving = false;
-            if (r.ok) {
-              self.isOverride = true;
-              showToast('Category updated.', 'success');
-            } else {
-              r.json().then(function (d) { showToast(d.error?.message || 'Failed to update category.'); });
+            if (!r.ok && r.status !== 204) {
+              return r.json().then(function (d) {
+                throw new Error((d && d.error && d.error.message) || 'Failed to update category.');
+              });
             }
+            return fetchTimelineRows(self.txId);
           })
-          .catch(function () { self.saving = false; showToast('Network error.'); });
+          .then(function () {
+            self.saving = false;
+            showToast('Category updated.', 'success');
+          })
+          .catch(function (e) {
+            self.saving = false;
+            self.isOverride = prevOverride;
+            restorePageState();
+            showToast((e && e.message) || 'Network error.');
+          });
       },
 
       resetCategory: function () {
         var self = this;
+        var prevOverride = this.isOverride;
         this.saving = true;
+        this.isOverride = false;
         fetch('/-/transactions/' + this.txId + '/category', { method: 'DELETE' })
           .then(function (r) {
-            self.saving = false;
-            if (r.ok || r.status === 204) {
-              self.isOverride = false;
-              showToast('Category reset to auto-detected.', 'success');
-              location.reload();
-            } else {
-              showToast('Failed to reset category.');
+            if (!r.ok && r.status !== 204) {
+              throw new Error('Failed to reset category.');
             }
+            return fetchTimelineRows(self.txId);
           })
-          .catch(function () { self.saving = false; showToast('Network error.'); });
+          .then(function () {
+            self.saving = false;
+            showToast('Category reset to auto-detected.', 'success');
+          })
+          .catch(function (e) {
+            self.saving = false;
+            self.isOverride = prevOverride;
+            restorePageState();
+            showToast((e && e.message) || 'Network error.');
+          });
       },
     };
   });
@@ -230,10 +421,42 @@ document.addEventListener('alpine:init', function () {
         }));
       },
 
+      // tagFromAvailable looks up the {displayName, color, icon} for a
+      // slug from the seeded availableTags list. Falls back to a chip
+      // displaying the slug verbatim when the tag isn't in the registry
+      // (rare; e.g. created concurrently elsewhere).
+      tagFromAvailable: function (slug) {
+        for (var i = 0; i < this.availableTags.length; i++) {
+          var t = this.availableTags[i];
+          if (t.slug === slug) {
+            return {
+              slug: t.slug,
+              displayName: t.display_name || t.slug,
+              color: t.color,
+              icon: t.icon,
+            };
+          }
+        }
+        return { slug: slug, displayName: slug, color: null, icon: null };
+      },
+
       applyTagDiff: function (adds, removes) {
         adds = adds || [];
         removes = removes || [];
         if (adds.length + removes.length === 0) return;
+        var self = this;
+        var prevTags = this.tags.slice();
+        // Optimistic chip-state update: add new chips, drop removed ones.
+        var tagsCopy = prevTags.slice();
+        removes.forEach(function (slug) {
+          tagsCopy = tagsCopy.filter(function (t) { return t.slug !== slug; });
+        });
+        adds.forEach(function (slug) {
+          if (!tagsCopy.some(function (t) { return t.slug === slug; })) {
+            tagsCopy.push(self.tagFromAvailable(slug));
+          }
+        });
+        this.tags = tagsCopy;
         var op = {};
         if (adds.length) op.tags_to_add = adds.map(function (s) { return { slug: s, note: '' }; });
         if (removes.length) op.tags_to_remove = removes.map(function (s) { return { slug: s, note: '' }; });
@@ -247,18 +470,24 @@ document.addEventListener('alpine:init', function () {
         })
           .then(function (r) { return r.json().then(function (d) { return { ok: r.ok || r.status === 422, body: d }; }); })
           .then(function (res) {
-            if (res.ok && res.body && res.body.succeeded > 0) {
-              showToast('Tags updated.', 'success');
-              location.reload();
-            } else {
+            if (!(res.ok && res.body && res.body.succeeded > 0)) {
               var msg = (res.body && res.body.error && res.body.error.message) || 'Failed to update tags.';
-              showToast(msg);
+              throw new Error(msg);
             }
+            return fetchTimelineRows(self.txId);
           })
-          .catch(function () { showToast('Network error.'); });
+          .then(function () { showToast('Tags updated.', 'success'); })
+          .catch(function (e) {
+            self.tags = prevTags;
+            restorePageState();
+            showToast((e && e.message) || 'Network error.');
+          });
       },
 
       removeTag: function (tag, note) {
+        var self = this;
+        var prevTags = this.tags.slice();
+        this.tags = prevTags.filter(function (t) { return t.slug !== tag.slug; });
         // Inline x on a tag chip - direct DELETE. Note is optional.
         var url = '/-/transactions/' + this.txId + '/tags/' + encodeURIComponent(tag.slug);
         fetch(url, {
@@ -268,14 +497,17 @@ document.addEventListener('alpine:init', function () {
         })
           .then(function (res) { return res.json().then(function (d) { return { ok: res.ok, body: d }; }); })
           .then(function (r) {
-            if (r.ok) {
-              showToast('Tag removed.', 'success');
-              location.reload();
-            } else {
-              showToast(r.body.error || 'Failed to remove tag.');
+            if (!r.ok) {
+              throw new Error((r.body && (r.body.error?.message || r.body.error)) || 'Failed to remove tag.');
             }
+            return fetchTimelineRows(self.txId);
           })
-          .catch(function () { showToast('Network error.'); });
+          .then(function () { showToast('Tag removed.', 'success'); })
+          .catch(function (e) {
+            self.tags = prevTags;
+            restorePageState();
+            showToast((e && e.message) || 'Network error.');
+          });
       },
     };
   });
@@ -292,6 +524,7 @@ document.addEventListener('alpine:init', function () {
       txId: '',
       hasPendingReview: false,
       pinReview: false,
+      submitting: false,
 
       init: function () {
         var ds = this.$el.dataset;
@@ -303,7 +536,7 @@ document.addEventListener('alpine:init', function () {
 
       canSubmit: function () {
         var trimmed = this.newComment.trim().length;
-        return trimmed > 0 && this.newComment.length <= this.maxLength;
+        return !this.submitting && trimmed > 0 && this.newComment.length <= this.maxLength;
       },
 
       counterState: function () {
@@ -332,6 +565,8 @@ document.addEventListener('alpine:init', function () {
         var content = this.newComment.trim();
         if (!content || !this.canSubmit()) return;
         var shouldPin = this.pinReview && !this.hasPendingReview;
+        var prevPinReview = this.pinReview;
+        this.submitting = true;
         fetch('/-/transactions/' + this.txId + '/comments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -340,36 +575,59 @@ document.addEventListener('alpine:init', function () {
           .then(function (res) {
             if (!res.ok) {
               return res.json().then(function (data) {
-                showToast(data.error || 'Failed to add comment.');
+                throw new Error((data && data.error) || 'Failed to add comment.');
               });
             }
-            if (!shouldPin) {
-              self.newComment = '';
-              showToast('Comment added.', 'success');
-              location.reload();
-              return;
-            }
+            // Optionally chain the pin tag write.
+            if (!shouldPin) return null;
             return fetch('/-/transactions/' + self.txId + '/tags', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ slug: 'needs-review', note: '' }),
-            })
-              .then(function (tagRes) {
-                self.newComment = '';
-                if (tagRes.ok) {
-                  showToast('Comment added; tagged needs-review.', 'success');
-                } else {
-                  showToast('Comment added (tag failed).', 'warning');
-                }
-                location.reload();
-              })
-              .catch(function () {
-                self.newComment = '';
-                showToast('Comment added (tag failed).', 'warning');
-                location.reload();
-              });
+            }).then(function (tagRes) {
+              if (!tagRes.ok) throw new Error('Tag write failed');
+              return null;
+            });
           })
-          .catch(function () { showToast('Network error.'); });
+          .then(function () {
+            return fetchTimelineRows(self.txId);
+          })
+          .then(function () {
+            self.newComment = '';
+            self.submitting = false;
+            if (shouldPin) {
+              // Update local state so subsequent posts don't try to pin again
+              // and the composer's "Toggle Needs Review" checkbox hides.
+              self.hasPendingReview = true;
+              self.pinReview = false;
+              showToast('Comment added; tagged needs-review.', 'success');
+            } else {
+              showToast('Comment added.', 'success');
+            }
+            // Reset textarea height after successful clear.
+            var ta = document.getElementById('bb-txd-comment');
+            if (ta) self.autosize(ta);
+          })
+          .catch(function (e) {
+            self.submitting = false;
+            self.pinReview = prevPinReview;
+            restorePageState();
+            // Comment write may have succeeded even if the pin tag write
+            // failed; surface a "warning" tone in that path.
+            var msg = (e && e.message) || 'Network error.';
+            if (msg === 'Tag write failed') {
+              showToast('Comment added (tag failed).', 'warning');
+              // Refresh timeline so the comment row still appears even when
+              // the secondary tag write was the one that failed.
+              fetchTimelineRows(self.txId).then(function () {
+                self.newComment = '';
+                var ta = document.getElementById('bb-txd-comment');
+                if (ta) self.autosize(ta);
+              }).catch(function () {});
+            } else {
+              showToast(msg);
+            }
+          });
       },
 
       deleteComment: function (id) {
@@ -380,16 +638,24 @@ document.addEventListener('alpine:init', function () {
             method: 'DELETE',
           })
             .then(function (res) {
-              if (res.ok || res.status === 204) {
-                showToast('Comment deleted.', 'success');
-                location.reload();
-              } else {
+              if (!res.ok && res.status !== 204) {
                 return res.json().then(function (data) {
-                  showToast(data.error || 'Failed to delete comment.');
+                  throw new Error((data && data.error) || 'Failed to delete comment.');
                 });
               }
+              // Pass the deleted comment's short_id as a replacement
+              // ID. The render endpoint will return the tombstone row
+              // for that annotation (PR 4 soft-delete keeps the
+              // annotation in place but flips is_deleted=true), and
+              // fetchTimelineRows swaps it in over the original bubble
+              // by matching data-comment-id.
+              return fetchTimelineRows(self.txId, [id]);
             })
-            .catch(function () { showToast('Network error.'); });
+            .then(function () { showToast('Comment deleted.', 'success'); })
+            .catch(function (e) {
+              restorePageState();
+              showToast((e && e.message) || 'Network error.');
+            });
         });
       },
     };
