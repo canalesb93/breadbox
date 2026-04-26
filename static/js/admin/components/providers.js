@@ -2,25 +2,30 @@
 //
 // Convention reference: docs/design-system.md → "Alpine page components".
 // Each card (Plaid, Teller) instantiates its own copy via x-data="providerCard"
-// and supplies the provider name as a `data-provider` attribute on the root,
-// read inside testConnection() via this.$el.dataset.provider. Keeping the
-// factory argument-free matches the convention; the per-instance variation
-// flows through the DOM, not through factory args.
+// and supplies the provider name as a `data-provider` attribute on the root.
+// We read the attribute once in init() — `this.$el` only points at the
+// x-data root inside init(); inside event-bound methods (e.g.
+// testConnection() called from @click) Alpine binds `this.$el` to the
+// element with the directive (the button), which has no data-provider.
 document.addEventListener('alpine:init', function () {
   Alpine.data('providerCard', function () {
     return {
+      provider: '',
       showConfig: false,
       saving: false,
       testing: false,
       testResult: '',
       testSuccess: false,
 
+      init: function () {
+        this.provider = this.$el.dataset.provider || '';
+      },
+
       testConnection: function () {
         var self = this;
-        var name = this.$el.dataset.provider;
         this.testing = true;
         this.testResult = '';
-        fetch('/-/test-provider/' + name, { method: 'POST' })
+        fetch('/-/test-provider/' + this.provider, { method: 'POST' })
           .then(function (res) { return res.json(); })
           .then(function (data) {
             self.testing = false;
