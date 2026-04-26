@@ -1,7 +1,6 @@
 package pages
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -13,10 +12,26 @@ import (
 // AccountDetail renders the /admin/accounts/{id} detail page — header
 // with type badge + status, balance + spending summary cards, the
 // collapsible Account Settings block, the filterable transaction list
-// (with shared TxRow rows + paginator), and the inline JS that bridges
-// display-name / excluded toggles + window.__bbCategories. Hosts inside
-// base.html via TemplateRenderer.RenderWithTempl.
+// (with shared TxRow rows + paginator), plus a sibling page-component
+// JS module that seeds window.__bbCategories and exposes the
+// updateDisplayName / toggleExcluded handlers consumed by the inline
+// onchange bindings in acctSettings. Hosts inside base.html via
+// TemplateRenderer.RenderWithTempl.
+//
+// Convention reference: docs/design-system.md → "Alpine page components".
+// The page-component <script src> is loaded synchronously (not deferred)
+// so window.__bbCategories is populated before tx_row's inline
+// categoryPicker x-init runs and before Alpine — itself <script defer>
+// in <head> — fires alpine:init. The @templ.JSONScript tag must precede
+// the <script src> below so the IIFE in account_detail.js finds the
+// payload at parse time.
 templ AccountDetail(p AccountDetailProps) {
+	@templ.JSONScript("account-detail-data", p.Categories)
+	<!-- Page-component factory + inline-onchange handlers. Loaded
+	     synchronously (no defer) so window.__bbCategories is seeded
+	     before tx_row.templ's inline categoryPicker x-init runs and
+	     before Alpine fires alpine:init. -->
+	<script src="/static/js/admin/components/account_detail.js"></script>
 	@components.CategoryPickerStyles()
 	@components.BreadcrumbNav(p.Breadcrumbs)
 	@acctHeader(p)
@@ -32,7 +47,6 @@ templ AccountDetail(p AccountDetailProps) {
 		@acctEmptyState(p)
 	}
 	@components.CategoryPickerScript()
-	@acctScripts(p)
 }
 
 templ acctHeader(p AccountDetailProps) {
@@ -384,10 +398,6 @@ templ acctEmptyState(p AccountDetailProps) {
 	</div>
 }
 
-templ acctScripts(p AccountDetailProps) {
-	@templ.Raw(acctScriptsHTML(p))
-}
-
 // --- helpers ---
 
 // acctTypeIcon mirrors the {{if eq .Account.Type ...}} chain at the top
@@ -600,99 +610,4 @@ func htmlAttrEscape(s string) string {
 		`>`, "&gt;",
 	)
 	return r.Replace(s)
-}
-
-// acctScriptsHTML renders the two trailing <script> blocks verbatim
-// from the original page: window.__bbCategories seed + bulk-store
-// stub, and the showToast / quickSetCategory / updateDisplayName /
-// toggleExcluded handlers. Categories JSON is marshalled here; the
-// rest is a static literal.
-func acctScriptsHTML(p AccountDetailProps) string {
-	cats, err := json.Marshal(p.Categories)
-	if err != nil {
-		cats = []byte("[]")
-	}
-	return `<script>
-window.__bbCategories = ` + string(cats) + `;
-
-// Minimal bulk store for tx-row partial compatibility
-document.addEventListener('alpine:init', function() {
-  if (!Alpine.store('bulk')) {
-    Alpine.store('bulk', {
-      selecting: false,
-      sel: [],
-      isIn: function() { return false; },
-      toggle: function() {},
-      toggleMode: function() {},
-      clear: function() {}
-    });
-  }
-});
-</script>
-
-<script>
-function showToast(message, type) {
-  window.dispatchEvent(new CustomEvent('bb-toast', { detail: { message: message, type: type || 'error' } }));
-}
-
-function quickSetCategory(txId, categoryId) {
-  if (!categoryId) {
-    fetch('/-/transactions/' + txId + '/category', { method: 'DELETE' })
-    .then(function(r) {
-      if (r.ok || r.status === 204) showToast('Category reset', 'success');
-    });
-    return;
-  }
-  fetch('/-/transactions/' + txId + '/category', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({category_id: categoryId})
-  })
-  .then(function(r) {
-    if (r.ok) showToast('Category updated', 'success');
-    else r.json().then(function(d) { showToast(d.error?.message || 'Failed', 'error'); });
-  });
-}
-
-function updateDisplayName(accountId, val) {
-  var body = val === "" ? {display_name: null} : {display_name: val};
-  fetch("/-/accounts/" + accountId + "/display-name", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify(body)
-  })
-  .then(function(res) {
-    if (res.ok) {
-      showToast("Display name updated.", "success");
-    } else {
-      return res.json().then(function(data) {
-        showToast(data.error || "Failed to update display name.");
-      });
-    }
-  })
-  .catch(function() {
-    showToast("Network error. Please try again.");
-  });
-}
-
-function toggleExcluded(accountId, checked) {
-  fetch("/-/accounts/" + accountId + "/excluded", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({excluded: checked})
-  })
-  .then(function(res) {
-    if (res.ok) {
-      showToast(checked ? "Account excluded." : "Account included.", "success");
-    } else {
-      return res.json().then(function(data) {
-        showToast(data.error || "Failed to update excluded state.");
-      });
-    }
-  })
-  .catch(function() {
-    showToast("Network error. Please try again.");
-  });
-}
-</script>`
 }
