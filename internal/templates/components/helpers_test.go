@@ -419,6 +419,47 @@ func TestStatusBadge(t *testing.T) {
 	}
 }
 
+func TestSyncBadge(t *testing.T) {
+	tests := []struct {
+		status string
+		want   string
+	}{
+		{"success", `<span class="badge badge-soft badge-success badge-sm">success</span>`},
+		{"error", `<span class="badge badge-soft badge-error badge-sm">error</span>`},
+		{"in_progress", `<span class="badge badge-soft badge-warning badge-sm">in progress</span>`},
+		{"", `<span class="badge badge-ghost badge-sm"></span>`},
+		{"unknown", `<span class="badge badge-ghost badge-sm">unknown</span>`},
+		{"<script>", `<span class="badge badge-ghost badge-sm">&lt;script&gt;</span>`},
+	}
+	for _, tc := range tests {
+		t.Run(tc.status, func(t *testing.T) {
+			if got := SyncBadge(tc.status); got != tc.want {
+				t.Errorf("SyncBadge(%q) = %q, want %q", tc.status, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSyncStatusBg(t *testing.T) {
+	tests := []struct {
+		status string
+		want   string
+	}{
+		{"success", "bg-success/10"},
+		{"error", "bg-error/10"},
+		{"in_progress", "bg-warning/10"},
+		{"", "bg-base-200/50"},
+		{"unknown", "bg-base-200/50"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.status, func(t *testing.T) {
+			if got := SyncStatusBg(tc.status); got != tc.want {
+				t.Errorf("SyncStatusBg(%q) = %q, want %q", tc.status, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestErrorMessage(t *testing.T) {
 	tests := []struct {
 		code string

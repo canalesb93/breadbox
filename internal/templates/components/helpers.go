@@ -8,6 +8,7 @@ package components
 
 import (
 	"fmt"
+	"html"
 	"math"
 	"slices"
 	"strconv"
@@ -261,6 +262,41 @@ func StatusBadge(status string) string {
 		return `<span class="badge badge-soft badge-error badge-sm">Error</span>`
 	default:
 		return `<span class="badge badge-ghost badge-sm">Disconnected</span>`
+	}
+}
+
+// SyncBadge renders the inline HTML for a sync-log status badge. Mirrors
+// the (now-removed) admin funcMap "syncBadge" entry — reused by templ
+// pages via @templ.Raw so every sync-status pill on the dashboard, logs,
+// and detail pages stays aligned. Unknown statuses render the raw value
+// inside a ghost badge with HTML-escaping.
+func SyncBadge(status string) string {
+	switch status {
+	case "success":
+		return `<span class="badge badge-soft badge-success badge-sm">success</span>`
+	case "error":
+		return `<span class="badge badge-soft badge-error badge-sm">error</span>`
+	case "in_progress":
+		return `<span class="badge badge-soft badge-warning badge-sm">in progress</span>`
+	default:
+		return `<span class="badge badge-ghost badge-sm">` + html.EscapeString(status) + `</span>`
+	}
+}
+
+// SyncStatusBg returns the tinted-background utility class for a
+// sync-log status (`bg-success/10`, `bg-error/10`, etc.). Used by both
+// the logs row card and the detail-page header icon container so the
+// two render with the same color.
+func SyncStatusBg(status string) string {
+	switch status {
+	case "success":
+		return "bg-success/10"
+	case "error":
+		return "bg-error/10"
+	case "in_progress":
+		return "bg-warning/10"
+	default:
+		return "bg-base-200/50"
 	}
 }
 
