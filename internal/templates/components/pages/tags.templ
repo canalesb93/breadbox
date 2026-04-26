@@ -12,6 +12,10 @@ import (
 // no per-tag analytics beyond a usage count linking to the filtered
 // transactions view.
 templ Tags(p TagsProps) {
+	<!-- Component factory. Loaded synchronously (no defer) so the
+	     Alpine.data() registration runs before Alpine — itself deferred from
+	     <head> — fires alpine:init. -->
+	<script src="/static/js/admin/components/tags.js"></script>
 	<div class="bb-page-header">
 		<div>
 			<h1 class="bb-page-title">Tags</h1>
@@ -22,7 +26,7 @@ templ Tags(p TagsProps) {
 			Add Tag
 		</a>
 	</div>
-	<div x-data="{filter: ''}" class="space-y-4">
+	<div x-data="tags" class="space-y-4">
 		<div class="relative">
 			<i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/30 pointer-events-none"></i>
 			<input
@@ -47,29 +51,6 @@ templ Tags(p TagsProps) {
 			@tagsEmpty()
 		}
 	</div>
-	<script>
-		window.addEventListener('bb-delete-tag', function(e) {
-			var detail = e.detail;
-			var msg = 'Delete tag "' + detail.slug + '"?';
-			if (detail.count > 0) {
-				msg += '\n\nThis will remove the tag from ' + detail.count + ' transaction' + (detail.count === 1 ? '' : 's') + '. Activity annotations are preserved.';
-			}
-			bbConfirm({title: 'Delete tag?', message: msg, confirmLabel: 'Delete', variant: 'danger'}).then(function(ok) {
-				if (!ok) return;
-				fetch('/-/tags/' + detail.id, {method: 'DELETE'})
-					.then(function(r) {
-						if (r.ok) {
-							window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: 'Tag deleted', type:'success'}}));
-							setTimeout(function() { location.reload(); }, 400);
-						} else {
-							r.json().then(function(d) {
-								window.dispatchEvent(new CustomEvent('bb-toast', {detail:{message: d.error?.message || 'Delete failed', type:'error'}}));
-							});
-						}
-					});
-			});
-		});
-	</script>
 }
 
 // tagListRow renders one tag as a horizontal row: chip preview (natural
@@ -136,7 +117,7 @@ templ tagListRow(t TagRow) {
 							data-slug={ t.Slug }
 							data-count={ strconv.FormatInt(t.TransactionCount, 10) }
 							aria-label={ fmt.Sprintf("Delete tag %s", t.Slug) }
-							@click="window.dispatchEvent(new CustomEvent('bb-delete-tag', {detail: {id: $el.dataset.id, slug: $el.dataset.slug, count: parseInt($el.dataset.count) || 0}}))"
+							@click="deleteTag($el.dataset.id, $el.dataset.slug, $el.dataset.count)"
 						>
 							<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete
 						</button>
