@@ -22,6 +22,7 @@ import (
 	"breadbox/internal/templates"
 	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
+	"breadbox/internal/timefmt"
 	"breadbox/internal/version"
 
 	"github.com/a-h/templ"
@@ -107,6 +108,33 @@ var componentRegistry = map[string]componentAdapter{
 		}
 		return components.KbdCombo(keys...), nil
 	},
+}
+
+// formatTimeAny returns a funcMap-shaped helper that renders a time-ish
+// value via layout in the local timezone. Accepted shapes: time.Time,
+// *time.Time, RFC3339/RFC3339Nano string, *string. Nil pointers and the
+// empty string render as ""; an unparseable string passes through
+// verbatim so callers don't show "0001-01-01..." on bad data. Centralises
+// what used to be three near-identical funcMap entries (#871).
+func formatTimeAny(layout string) func(any) string {
+	format := func(t time.Time) string { return t.Local().Format(layout) }
+	return func(v any) string {
+		switch v := v.(type) {
+		case time.Time:
+			return format(v)
+		case *time.Time:
+			if v == nil {
+				return ""
+			}
+			return format(*v)
+		case string:
+			return timefmt.FormatRFC3339(v, layout)
+		case *string:
+			return timefmt.FormatRFC3339Ptr(v, layout)
+		default:
+			return ""
+		}
+	}
 }
 
 // assertAdminTxRow extracts a service.AdminTransactionRow from data,
@@ -659,100 +687,13 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return acctType
 			},
-			"formatDateTime": func(t interface{}) string {
-				format := func(tm time.Time) string {
-					return tm.Local().Format("Jan 2, 2006 3:04 PM")
-				}
-				switch v := t.(type) {
-				case time.Time:
-					return format(v)
-				case *time.Time:
-					if v == nil {
-						return ""
-					}
-					return format(*v)
-				case string:
-					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
-						return format(parsed)
-					}
-					return v
-				case *string:
-					if v == nil {
-						return ""
-					}
-					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
-						return format(parsed)
-					}
-					return *v
-				default:
-					return ""
-				}
-			},
+			"formatDateTime": formatTimeAny(timefmt.LayoutDateTime),
 			// clockTime renders the local clock portion of a timestamp
 			// ("2:03 AM"). Paired with a same-day day separator on the
 			// activity timeline it disambiguates 10 events that would all
 			// otherwise read "8 days ago" (#707).
-			"clockTime": func(t interface{}) string {
-				format := func(tm time.Time) string {
-					return tm.Local().Format("3:04 PM")
-				}
-				switch v := t.(type) {
-				case time.Time:
-					return format(v)
-				case *time.Time:
-					if v == nil {
-						return ""
-					}
-					return format(*v)
-				case string:
-					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
-						return format(parsed)
-					}
-					if parsed, err := time.Parse(time.RFC3339Nano, v); err == nil {
-						return format(parsed)
-					}
-					return v
-				case *string:
-					if v == nil {
-						return ""
-					}
-					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
-						return format(parsed)
-					}
-					return *v
-				default:
-					return ""
-				}
-			},
-			"formatDateShort": func(t interface{}) string {
-				format := func(tm time.Time) string {
-					return tm.Local().Format("Jan 2, 3:04 PM")
-				}
-				switch v := t.(type) {
-				case time.Time:
-					return format(v)
-				case *time.Time:
-					if v == nil {
-						return ""
-					}
-					return format(*v)
-				case string:
-					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
-						return format(parsed)
-					}
-					return v
-				case *string:
-					if v == nil {
-						return ""
-					}
-					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
-						return format(parsed)
-					}
-					return *v
-				default:
-					return ""
-				}
-			},
+			"clockTime":       formatTimeAny(timefmt.LayoutClock),
+			"formatDateShort": formatTimeAny(timefmt.LayoutDateShort),
 			"formatDate":   components.FormatDate,
 			"relativeDate": components.RelativeDate,
 			"formatNumeric": func(n pgtype.Numeric) string {

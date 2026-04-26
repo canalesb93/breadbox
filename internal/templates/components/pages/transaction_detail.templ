@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
@@ -756,54 +755,26 @@ func accountTypeLabel(acctType, subtype string) string {
 	return acctType
 }
 
-// formatDateTimeStr parses an RFC3339 timestamp and renders it in the
-// admin standard "Jan 2, 2006 3:04 PM" local format. Unparseable input
-// is returned unchanged.
+// formatDateTimeStr renders an RFC3339 timestamp in the admin standard
+// "Jan 2, 2006 3:04 PM" local format. Unparseable input is returned
+// unchanged. Thin wrapper around timefmt.FormatRFC3339 so call sites
+// inside the templ stay short.
 func formatDateTimeStr(s string) string {
-	if s == "" {
-		return ""
-	}
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t.Local().Format("Jan 2, 2006 3:04 PM")
-	}
-	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
-		return t.Local().Format("Jan 2, 2006 3:04 PM")
-	}
-	return s
+	return timefmt.FormatRFC3339(s, timefmt.LayoutDateTime)
 }
 
 // clockTimeStr renders the local clock portion of an RFC3339 timestamp
 // ("3:04 PM"). Used by activity-timeline rows where the day separator
 // already carries the date.
 func clockTimeStr(s string) string {
-	if s == "" {
-		return ""
-	}
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t.Local().Format("3:04 PM")
-	}
-	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
-		return t.Local().Format("3:04 PM")
-	}
-	return s
+	return timefmt.FormatRFC3339(s, timefmt.LayoutClock)
 }
 
 // relativeTimeStr renders an RFC3339 timestamp as a short relative
 // phrase ("just now", "5 minutes ago", "2 days ago"). Used in delete
 // button aria-labels so screen readers get a stable description.
-// Falls back to the raw input string when the timestamp can't be parsed.
 func relativeTimeStr(s string) string {
-	if s == "" {
-		return ""
-	}
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		t, err = time.Parse(time.RFC3339Nano, s)
-		if err != nil {
-			return s
-		}
-	}
-	return timefmt.Relative(t)
+	return timefmt.RelativeRFC3339(s)
 }
 
 // avatarURLStr mirrors the admin "avatarURL" funcMap for the (user_id,
