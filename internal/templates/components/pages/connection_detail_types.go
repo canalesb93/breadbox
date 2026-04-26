@@ -112,7 +112,7 @@ type SyncLogRow struct {
 	HasDuration     bool
 	ErrorMessageValid  bool
 	ErrorMessageString string
-	ErrorMessageFriendly string // syncFriendlyError result; empty if no friendly fallback
+	ErrorMessageFriendly string // sync.FriendlyError(rawErr) result; empty if no friendly fallback
 	AddedCount      int32
 	ModifiedCount   int32
 	RemovedCount    int32

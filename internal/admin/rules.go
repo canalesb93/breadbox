@@ -245,10 +245,9 @@ func RuleDetailPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Tem
 }
 
 // renderRuleDetail builds the typed templ props from the loose handler-side
-// values and forwards through tr.RenderWithTempl. Mirrors the html/template
-// data map the previous Render call assembled, except condition rows are
-// pre-formatted here using the same ruleFieldLabel / ruleOpLabel /
-// ruleValueFormat helpers the funcMap exposed.
+// values and forwards through tr.RenderWithTempl. Condition rows are
+// pre-formatted using the ruleFieldLabel / ruleOpLabel / ruleValueFormat
+// helpers in templates.go.
 func renderRuleDetail(
 	w http.ResponseWriter,
 	r *http.Request,

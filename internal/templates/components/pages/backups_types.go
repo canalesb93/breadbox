@@ -33,7 +33,7 @@ type BackupsProps struct {
 
 	// Backups is the pre-formatted list rendered in the file table. The
 	// handler builds this from service.BackupInfo so the templ doesn't
-	// have to call relativeTime / formatBytes funcMap helpers.
+	// have to format relative times or byte counts at render time.
 	Backups []BackupRow
 }
 

@@ -249,9 +249,9 @@ func TitleCase(s string) string { return titleCase(s) }
 // PluralS returns "" for n == 1, else "s". See pluralS.
 func PluralS[T pluralInt](n T) string { return pluralS(n) }
 
-// StatusBadge renders the inline HTML for a connection-status badge. Same
-// markup as the admin funcMap "statusBadge" entry — reused by templ pages
-// (via @templ.Raw) and the funcMap helper so all three sites stay aligned.
+// StatusBadge renders the inline HTML for a connection-status badge,
+// shared by every templ page that surfaces connection status (via
+// @templ.Raw) so the markup stays aligned across pages.
 func StatusBadge(status string) string {
 	switch status {
 	case "active":
