@@ -5,8 +5,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
-
-	"github.com/jackc/pgx/v5/pgtype"
+	"breadbox/internal/pgconv"
 )
 
 func TestClassifyUpsertResult(t *testing.T) {
@@ -73,8 +72,8 @@ func TestClassifyUpsertResult(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			txn := db.Transaction{
-				CreatedAt: pgtype.Timestamptz{Time: tt.createdAt, Valid: true},
-				UpdatedAt: pgtype.Timestamptz{Time: tt.updatedAt, Valid: true},
+				CreatedAt: pgconv.Timestamptz(tt.createdAt),
+				UpdatedAt: pgconv.Timestamptz(tt.updatedAt),
 			}
 
 			gotNew, gotChanged := classifyUpsertResult(txn, tt.upsertStart)

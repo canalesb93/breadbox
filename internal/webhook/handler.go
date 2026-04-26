@@ -122,7 +122,7 @@ func NewHandler(providers map[string]provider.Provider, engine *sync.Engine, que
 			var expTime pgtype.Timestamptz
 			if event.ConsentExpirationTime != nil {
 				if t, err := time.Parse(time.RFC3339, *event.ConsentExpirationTime); err == nil {
-					expTime = pgtype.Timestamptz{Time: t, Valid: true}
+					expTime = pgconv.Timestamptz(t)
 				}
 			}
 			processErr = queries.UpdateConnectionConsentExpiration(r.Context(), db.UpdateConnectionConsentExpirationParams{

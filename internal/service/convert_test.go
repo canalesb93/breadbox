@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"breadbox/internal/pgconv"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -210,16 +212,16 @@ func TestSyncLogDurationMs(t *testing.T) {
 			name:     "stored duration_ms wins",
 			duration: pgtype.Int4{Int32: 1234, Valid: true},
 			// timestamps would compute a different value — stored value must win.
-			started:   pgtype.Timestamptz{Time: start, Valid: true},
-			completed: pgtype.Timestamptz{Time: end, Valid: true},
+			started:   pgconv.Timestamptz(start),
+			completed: pgconv.Timestamptz(end),
 			wantMs:    1234,
 			wantOK:    true,
 		},
 		{
 			name:      "fallback to timestamps when duration null",
 			duration:  pgtype.Int4{Valid: false},
-			started:   pgtype.Timestamptz{Time: start, Valid: true},
-			completed: pgtype.Timestamptz{Time: end, Valid: true},
+			started:   pgconv.Timestamptz(start),
+			completed: pgconv.Timestamptz(end),
 			wantMs:    2500,
 			wantOK:    true,
 		},
@@ -227,14 +229,14 @@ func TestSyncLogDurationMs(t *testing.T) {
 			name:      "duration null and started null returns false",
 			duration:  pgtype.Int4{Valid: false},
 			started:   pgtype.Timestamptz{Valid: false},
-			completed: pgtype.Timestamptz{Time: end, Valid: true},
+			completed: pgconv.Timestamptz(end),
 			wantMs:    0,
 			wantOK:    false,
 		},
 		{
 			name:      "duration null and completed null returns false",
 			duration:  pgtype.Int4{Valid: false},
-			started:   pgtype.Timestamptz{Time: start, Valid: true},
+			started:   pgconv.Timestamptz(start),
 			completed: pgtype.Timestamptz{Valid: false},
 			wantMs:    0,
 			wantOK:    false,

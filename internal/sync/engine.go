@@ -90,7 +90,7 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 		ConnectionID: connectionID,
 		Trigger:      trigger,
 		Status:       db.SyncStatusInProgress,
-		StartedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		StartedAt:    pgconv.Timestamptz(time.Now()),
 	})
 	if err != nil {
 		return fmt.Errorf("create sync log: %w", err)
@@ -101,7 +101,7 @@ func (e *Engine) Sync(ctx context.Context, connectionID pgtype.UUID, trigger db.
 
 	// Update sync_log with final status.
 	completedAt := time.Now()
-	now := pgtype.Timestamptz{Time: completedAt, Valid: true}
+	now := pgconv.Timestamptz(completedAt)
 	status := db.SyncStatusSuccess
 	var errMsg pgtype.Text
 	if syncErr != nil {
@@ -552,7 +552,7 @@ func (e *Engine) upsertTransaction(ctx context.Context, q *db.Queries, txn *prov
 		ProviderPendingTransactionID: optionalText(txn.PendingExternalID),
 		Amount:                       decimalToNumeric(txn.Amount),
 		IsoCurrencyCode:              pgconv.TextIfNotEmpty(txn.ISOCurrencyCode),
-		Date:                         pgtype.Date{Time: txn.Date, Valid: true},
+		Date:                         pgconv.Date(txn.Date),
 		AuthorizedDate:               optionalDate(txn.AuthorizedDate),
 		Datetime:                     optionalTimestamptz(txn.Datetime),
 		AuthorizedDatetime:           optionalTimestamptz(txn.AuthorizedDatetime),
@@ -1220,14 +1220,14 @@ func optionalTimestamptz(t *time.Time) pgtype.Timestamptz {
 	if t == nil {
 		return pgtype.Timestamptz{}
 	}
-	return pgtype.Timestamptz{Time: *t, Valid: true}
+	return pgconv.Timestamptz(*t)
 }
 
 func optionalDate(t *time.Time) pgtype.Date {
 	if t == nil {
 		return pgtype.Date{}
 	}
-	return pgtype.Date{Time: *t, Valid: true}
+	return pgconv.Date(*t)
 }
 
 func decimalToNumeric(d decimal.Decimal) pgtype.Numeric {

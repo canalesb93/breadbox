@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"breadbox/internal/pgconv"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -278,7 +280,7 @@ func TestConnectionStaleness(t *testing.T) {
 	now := time.Date(2026, 4, 18, 12, 0, 0, 0, time.UTC)
 
 	syncedAt := func(d time.Duration) pgtype.Timestamptz {
-		return pgtype.Timestamptz{Time: now.Add(-d), Valid: true}
+		return pgconv.Timestamptz(now.Add(-d))
 	}
 	neverSynced := pgtype.Timestamptz{Valid: false}
 	override := func(minutes int32) pgtype.Int4 {
