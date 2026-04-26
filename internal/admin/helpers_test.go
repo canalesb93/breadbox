@@ -284,7 +284,7 @@ func TestConnectionStaleness(t *testing.T) {
 	}
 	neverSynced := pgtype.Timestamptz{Valid: false}
 	override := func(minutes int32) pgtype.Int4 {
-		return pgtype.Int4{Int32: minutes, Valid: true}
+		return pgconv.Int4(minutes)
 	}
 	noOverride := pgtype.Int4{Valid: false}
 

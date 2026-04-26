@@ -9,7 +9,6 @@ package service_test
 import (
 	"context"
 	"errors"
-	"math/big"
 	"testing"
 	"time"
 
@@ -1034,7 +1033,7 @@ func upsertTxnWithCategory(t *testing.T, q *db.Queries, acctID pgtype.UUID, extI
 	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
 		AccountID:             acctID,
 		ProviderTransactionID: extID,
-		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
+		Amount:                pgconv.NumericCents(amountCents),
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
 		Date:                  pgconv.Date(testutil.MustParseDate(date)),
 		ProviderName:          name,
@@ -1051,7 +1050,7 @@ func upsertTxnPending(t *testing.T, q *db.Queries, acctID pgtype.UUID, extID, na
 	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
 		AccountID:             acctID,
 		ProviderTransactionID: extID,
-		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
+		Amount:                pgconv.NumericCents(amountCents),
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
 		Date:                  pgconv.Date(testutil.MustParseDate(date)),
 		ProviderName:          name,
@@ -1192,7 +1191,7 @@ func upsertTxnWithAmount(t *testing.T, q *db.Queries, acctID pgtype.UUID, extID,
 	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
 		AccountID:             acctID,
 		ProviderTransactionID: extID,
-		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
+		Amount:                pgconv.NumericCents(amountCents),
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
 		Date:                  pgconv.Date(testutil.MustParseDate(date)),
 		ProviderName:          name,
@@ -1213,7 +1212,7 @@ func upsertTxnWithMerchant(t *testing.T, q *db.Queries, acctID pgtype.UUID, extI
 	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
 		AccountID:             acctID,
 		ProviderTransactionID: extID,
-		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
+		Amount:                pgconv.NumericCents(amountCents),
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
 		Date:                  pgconv.Date(testutil.MustParseDate(date)),
 		ProviderName:          name,

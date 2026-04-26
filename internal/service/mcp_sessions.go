@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 	"breadbox/internal/shortid"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -124,7 +125,7 @@ func (s *Service) LogToolCall(ctx context.Context, input ToolCallLogInput) {
 
 	var durationMs pgtype.Int4
 	if input.DurationMs > 0 {
-		durationMs = pgtype.Int4{Int32: int32(input.DurationMs), Valid: true}
+		durationMs = pgconv.Int4(int32(input.DurationMs))
 	}
 
 	err := s.Queries.CreateToolCallLog(ctx, db.CreateToolCallLogParams{

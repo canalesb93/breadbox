@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"math/big"
 	"strings"
 	"testing"
 
@@ -52,7 +51,7 @@ func mustCreateTransactionWithCategory(t *testing.T, q *db.Queries, acctID, catI
 	txn, err := q.UpsertTransaction(context.Background(), db.UpsertTransactionParams{
 		AccountID:             acctID,
 		ProviderTransactionID: extID,
-		Amount:                pgtype.Numeric{Int: big.NewInt(amountCents), Exp: -2, Valid: true},
+		Amount:                pgconv.NumericCents(amountCents),
 		IsoCurrencyCode:       pgtype.Text{String: "USD", Valid: true},
 		Date:                  pgconv.Date(testutil.MustParseDate(date)),
 		ProviderName:          name,
