@@ -25,7 +25,7 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 				<div class="flex-1 min-w-0">
 					<p class="font-semibold text-sm">This connection needs re-authentication</p>
 					if p.HasErrorCode {
-						<p class="text-xs text-base-content/50 mt-0.5">{ connDetailErrorMessage(p.ErrorCode) }</p>
+						<p class="text-xs text-base-content/50 mt-0.5">{ components.ErrorMessage(p.ErrorCode) }</p>
 					} else if p.HasErrorMessage {
 						<p class="text-xs text-base-content/50 mt-0.5 truncate">{ p.ErrorMessage }</p>
 					}
@@ -76,7 +76,7 @@ templ ConnectionDetail(p ConnectionDetailProps) {
 								}
 							</span>
 						} else {
-							@templ.Raw(connDetailStatusBadge(p.Status))
+							@templ.Raw(components.StatusBadge(p.Status))
 						}
 						if p.Paused {
 							<span class="badge badge-ghost badge-sm">Paused</span>

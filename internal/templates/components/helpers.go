@@ -248,6 +248,43 @@ func TitleCase(s string) string { return titleCase(s) }
 // PluralS returns "" for n == 1, else "s". See pluralS.
 func PluralS[T pluralInt](n T) string { return pluralS(n) }
 
+// StatusBadge renders the inline HTML for a connection-status badge. Same
+// markup as the admin funcMap "statusBadge" entry — reused by templ pages
+// (via @templ.Raw) and the funcMap helper so all three sites stay aligned.
+func StatusBadge(status string) string {
+	switch status {
+	case "active":
+		return `<span class="badge badge-soft badge-success badge-sm">Active</span>`
+	case "pending_reauth":
+		return `<span class="badge badge-soft badge-warning badge-sm">Reauth Needed</span>`
+	case "error":
+		return `<span class="badge badge-soft badge-error badge-sm">Error</span>`
+	default:
+		return `<span class="badge badge-ghost badge-sm">Disconnected</span>`
+	}
+}
+
+// ErrorMessage maps Plaid/Teller connection error codes to human-friendly
+// strings. Mirrors the admin funcMap "errorMessage" entry. Unknown codes
+// pass through unchanged.
+func ErrorMessage(code string) string {
+	switch code {
+	case "ITEM_LOGIN_REQUIRED":
+		return "Your bank login has changed. Please re-authenticate."
+	case "INSUFFICIENT_CREDENTIALS":
+		return "Additional credentials are needed. Please re-authenticate."
+	case "INVALID_CREDENTIALS":
+		return "Your bank credentials are incorrect. Please re-authenticate."
+	case "MFA_NOT_SUPPORTED":
+		return "This connection requires MFA which is not supported. Please reconnect."
+	case "NO_ACCOUNTS":
+		return "No accounts found for this connection."
+	case "enrollment.disconnected":
+		return "This bank connection has been disconnected."
+	}
+	return code
+}
+
 // PageRange returns the page numbers to display in a paginator. For totals
 // up to 7 it returns every page. Beyond that, it returns first, last,
 // current, and current's neighbors, inserting 0 as an ellipsis sentinel
