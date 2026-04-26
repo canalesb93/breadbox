@@ -1077,8 +1077,38 @@ func activityEntryFromAnnotation(a service.Annotation, tagDisplayFn func(string)
 			entry.ActorID = &id
 		}
 		return entry, true
+
+	case "sync_started", "sync_updated":
+		// Sync events: actor is the provider (Plaid / Teller / CSV import).
+		// Summary is the canonical sentence built by EnrichAnnotations; the
+		// templ row renders it as-is via the fallback branch in
+		// txdSystemSentence — same path used by rule rows that pre-format the
+		// sentence in the service layer.
+		entry := service.ActivityEntry{
+			Type:               syncEntryType(a.Kind),
+			Timestamp:          a.CreatedAt,
+			ActorName:          a.ActorName,
+			ActorType:          a.ActorType,
+			ActorAvatarVersion: a.ActorAvatarVersion,
+			Summary:            a.Summary,
+		}
+		if a.ActorID != nil && *a.ActorID != "" {
+			id := *a.ActorID
+			entry.ActorID = &id
+		}
+		return entry, true
 	}
 	return service.ActivityEntry{}, false
+}
+
+// syncEntryType maps the raw DB kind to the ActivityEntry type. Both sync_*
+// kinds collapse to a single "sync" type in the UI — the icon is identical
+// (refresh-cw) and the Summary already differentiates the verb.
+func syncEntryType(dbKind string) string {
+	if dbKind == "sync_started" || dbKind == "sync_updated" {
+		return "sync"
+	}
+	return dbKind
 }
 
 // ActivityDayGroup holds activity entries grouped by calendar day (in the
