@@ -956,19 +956,31 @@ func ConnectionReauthHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 		data := map[string]any{
 			"PageTitle":   "Re-authenticate " + conn.InstitutionName.String,
 			"CurrentPage": "connections",
-			"Connection":  conn,
-			"ConnID":      idStr,
 			"CSRFToken":   GetCSRFToken(r),
-			"TellerAppID": a.Config.TellerAppID,
-			"TellerEnv":   a.Config.TellerEnv,
-			"Breadcrumbs": []Breadcrumb{
+		}
+		props := pages.ConnectionReauthProps{
+			ConnID:          idStr,
+			Provider:        string(conn.Provider),
+			InstitutionName: conn.InstitutionName.String,
+			UserName:        pgconv.TextOr(conn.UserName, ""),
+			TellerAppID:     a.Config.TellerAppID,
+			TellerEnv:       a.Config.TellerEnv,
+			Breadcrumbs: []components.Breadcrumb{
 				{Label: "Connections", Href: "/connections"},
 				{Label: conn.InstitutionName.String, Href: "/connections/" + idStr},
 				{Label: "Re-authenticate"},
 			},
 		}
-		tr.Render(w, r, "connection_reauth.html", data)
+		renderConnectionReauth(w, r, tr, data, props)
 	}
+}
+
+// renderConnectionReauth dispatches the reauth page through
+// TemplateRenderer.RenderWithTempl so the templ body lands inside the
+// admin base shell (sidebar + nav). Mirrors the handler-side helper
+// pattern used by renderConnectionNew + ConnectionNew.
+func renderConnectionReauth(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.ConnectionReauthProps) {
+	tr.RenderWithTempl(w, r, data, pages.ConnectionReauth(props))
 }
 
 // ConnectionReauthAPIHandler serves POST /admin/api/connections/{id}/reauth.

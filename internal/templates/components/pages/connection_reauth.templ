@@ -1,0 +1,88 @@
+package pages
+
+import "breadbox/internal/templates/components"
+
+// ConnectionReauthProps carries the data the connection re-authentication
+// page needs: the connection's identity and provider, plus Teller config
+// for the (occasional) Teller Connect bootstrap.
+//
+// The Alpine factory in static/js/admin/components/connection_reauth.js
+// reads everything from data-* attributes on the root x-data element.
+type ConnectionReauthProps struct {
+	ConnID          string
+	Provider        string
+	InstitutionName string
+	UserName        string
+	TellerAppID     string
+	TellerEnv       string
+	Breadcrumbs     []components.Breadcrumb
+}
+
+// ConnectionReauth renders /connections/{id}/reauth inside the admin
+// base shell (sidebar + breadcrumb + page header). Hosts via
+// TemplateRenderer.RenderWithTempl — the handler passes the typed props
+// and the bridge drops the rendered HTML into _templ_shell.html's
+// TemplContent slot.
+//
+// Bootstraps Plaid Link or Teller Connect on load and posts the
+// resulting public token / enrollment back to the server, redirecting on
+// success. Reference convention (post PR #878): the Alpine factory lives
+// in static/js/admin/components/connection_reauth.js and is loaded
+// synchronously at the top of the component (not `defer`) so
+// Alpine.data('connectionReauth', ...) is registered before Alpine —
+// itself <script defer> in <head> — fires alpine:init.
+templ ConnectionReauth(p ConnectionReauthProps) {
+	<!-- Provider SDK + factory. Loaded synchronously (no defer) so
+	     Alpine.data() registration runs before Alpine — itself
+	     deferred from <head> — fires alpine:init. -->
+	if p.Provider == "plaid" {
+		<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+	} else if p.Provider == "teller" {
+		<script src="https://cdn.teller.io/connect/connect.js"></script>
+	}
+	<script src="/static/js/admin/components/connection_reauth.js"></script>
+	@components.BreadcrumbNav(p.Breadcrumbs)
+	<div class="bb-page-header">
+		<div>
+			<h1 class="bb-page-title">Re-authenticate</h1>
+			<p class="text-sm text-base-content/50 mt-1">{ p.InstitutionName } needs to be re-connected</p>
+		</div>
+	</div>
+	<div class="bb-card p-8 max-w-lg">
+		<div
+			x-data="connectionReauth"
+			data-conn-id={ p.ConnID }
+			data-provider={ p.Provider }
+			data-teller-app-id={ p.TellerAppID }
+			data-teller-env={ p.TellerEnv }
+			class="flex flex-col items-center text-center"
+		>
+			<div class="w-16 h-16 rounded-xl bg-warning/10 flex items-center justify-center mb-4">
+				<i data-lucide="shield-alert" class="w-8 h-8 text-warning"></i>
+			</div>
+			<h2 class="text-lg font-semibold mb-1">{ p.InstitutionName }</h2>
+			<p class="text-sm text-base-content/50 mb-1">
+				Re-connecting for: <span class="font-semibold text-base-content">{ p.UserName }</span>
+			</p>
+			<p
+				class="text-sm mb-6"
+				:class="isError ? 'text-error' : 'text-base-content/50'"
+				x-text="status"
+			></p>
+			<div class="flex items-center gap-3">
+				<button
+					type="button"
+					class="btn btn-primary btn-sm rounded-xl"
+					x-show="canRetry"
+					x-cloak
+					@click="startReauth()"
+				>
+					<i data-lucide="refresh-cw" class="w-4 h-4"></i> Retry
+				</button>
+				<a href={ templ.SafeURL("/connections/" + p.ConnID) } class="btn btn-ghost btn-sm rounded-xl">
+					<i data-lucide="x" class="w-4 h-4"></i> Cancel
+				</a>
+			</div>
+		</div>
+	</div>
+}
