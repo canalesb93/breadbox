@@ -361,18 +361,6 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 			"statusBadge": func(status string) template.HTML {
 				return template.HTML(components.StatusBadge(status))
 			},
-			"syncBadge": func(status string) template.HTML {
-				switch status {
-				case "success":
-					return `<span class="badge badge-soft badge-success badge-sm">success</span>`
-				case "error":
-					return `<span class="badge badge-soft badge-error badge-sm">error</span>`
-				case "in_progress":
-					return `<span class="badge badge-soft badge-warning badge-sm">in progress</span>`
-				default:
-					return template.HTML(`<span class="badge badge-ghost badge-sm">` + template.HTMLEscapeString(status) + `</span>`)
-				}
-			},
 			"errorMessage": components.ErrorMessage,
 			"syncFriendlyError": func(rawErr string) string {
 				return bsync.FriendlyError(rawErr)
