@@ -4,11 +4,25 @@ import "breadbox/internal/templates/components"
 
 // CSVImport renders the /admin/connections/import-csv page — the 4-step
 // CSV-import wizard that runs inside the base layout. Hosts via
-// TemplateRenderer.RenderWithTempl. The markup mirrors the previous
-// html/template version byte-for-byte; the inline <script> body is lifted
-// into csvImportBootstrap (csv_import_scripts.go) so the Alpine state
-// machine + fetch handlers stay readable Go-string text.
+// TemplateRenderer.RenderWithTempl.
+//
+// The Alpine factory lives in static/js/admin/components/csv_import.js
+// and reads its initial state (CSRF token + optional re-import context)
+// from data-* attributes on the x-data root. The factory <script> is
+// loaded synchronously at the top of the component (NOT `defer`) so
+// Alpine.data('csvImport', ...) is registered before Alpine — itself
+// <script defer> in <head> — fires alpine:init.
+//
+// The markup mirrors the previous html/template version byte-for-byte
+// (Alpine x-show step transitions, inline `onclick="..."` handlers).
+// The factory exposes window-level shims (uploadFile, previewData, etc.)
+// so the existing onclick attributes continue to work without a markup
+// migration.
 templ CSVImport(p CSVImportProps) {
+	<!-- Component factory + initial-state via data-* attrs. Loaded
+	     synchronously (no defer) so the Alpine.data() registration runs
+	     before Alpine — itself deferred from <head> — fires alpine:init. -->
+	<script src="/static/js/admin/components/csv_import.js"></script>
 	@components.BreadcrumbNav(p.Breadcrumbs)
 	<div class="bb-page-header">
 		<div>
@@ -17,7 +31,14 @@ templ CSVImport(p CSVImportProps) {
 		</div>
 	</div>
 	<!-- Step indicator -->
-	<div x-data="{step: 1}" x-init="window._csvWizard = {setStep: (s) => { step = s; }}">
+	<div
+		x-data="csvImport"
+		data-csrf-token={ p.CSRFToken }
+		data-connection-id={ p.ConnectionID }
+		data-existing-user-id={ p.ExistingUserID }
+		data-existing-connection-name={ p.ExistingConnectionName }
+		data-existing-user-name={ p.ExistingUserName }
+	>
 		<div x-data="{steps: [{n:1, label:'Upload'}, {n:2, label:'Map Columns'}, {n:3, label:'Confirm'}, {n:4, label:'Done'}]}">
 			<div class="flex items-center gap-0 mb-2 sm:mb-8 max-w-xl" id="step-indicator">
 				<template x-for="(s, i) in steps" :key="i">
@@ -297,5 +318,4 @@ templ CSVImport(p CSVImportProps) {
 			</div>
 		</div>
 	</div>
-	@templ.Raw(csvImportBootstrap(p))
 }
