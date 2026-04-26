@@ -1,14 +1,27 @@
 package admin
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"breadbox/internal/pgconv"
 
+	"github.com/alexedwards/scs/v2"
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// withChiParam wraps r with a chi.RouteContext that has key=value, so
+// chi.URLParam(r, key) returns value when the request bypasses the router.
+func withChiParam(r *http.Request, key, value string) *http.Request {
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add(key, value)
+	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+}
 
 func TestParsePage(t *testing.T) {
 	tests := []struct {
@@ -375,4 +388,82 @@ func TestConnectionStaleness(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseURLUUIDOrInvalid(t *testing.T) {
+	t.Run("valid UUID returns ok", func(t *testing.T) {
+		r := withChiParam(httptest.NewRequest("GET", "/", nil), "id", "11111111-1111-1111-1111-111111111111")
+		w := httptest.NewRecorder()
+		got, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid ID")
+		if !ok {
+			t.Fatalf("ok = false, want true; body=%s", w.Body.String())
+		}
+		if !got.Valid {
+			t.Error("returned UUID is not valid")
+		}
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want default 200 (helper should not write on success)", w.Code)
+		}
+	})
+
+	t.Run("invalid UUID writes 400 with label", func(t *testing.T) {
+		r := withChiParam(httptest.NewRequest("GET", "/", nil), "id", "not-a-uuid")
+		w := httptest.NewRecorder()
+		_, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid connection ID")
+		if ok {
+			t.Fatal("ok = true, want false")
+		}
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("status = %d, want %d", w.Code, http.StatusBadRequest)
+		}
+		var body map[string]string
+		if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if body["error"] != "Invalid connection ID" {
+			t.Errorf("error = %q, want %q", body["error"], "Invalid connection ID")
+		}
+	})
+}
+
+func TestParseURLUUIDOrNotFound(t *testing.T) {
+	sm := scs.New()
+	tr, err := NewTemplateRenderer(sm)
+	if err != nil {
+		t.Fatalf("NewTemplateRenderer: %v", err)
+	}
+
+	// Wrap the request in scs's session middleware so RenderNotFound's
+	// IsViewer call doesn't panic on a missing session context.
+	loadSession := func(r *http.Request) *http.Request {
+		ctx, err := sm.Load(r.Context(), "")
+		if err != nil {
+			t.Fatalf("session load: %v", err)
+		}
+		return r.WithContext(ctx)
+	}
+
+	t.Run("valid UUID returns ok", func(t *testing.T) {
+		r := loadSession(withChiParam(httptest.NewRequest("GET", "/", nil), "id", "22222222-2222-2222-2222-222222222222"))
+		w := httptest.NewRecorder()
+		got, ok := parseURLUUIDOrNotFound(w, r, tr, "id")
+		if !ok {
+			t.Fatalf("ok = false, want true; body=%s", w.Body.String())
+		}
+		if !got.Valid {
+			t.Error("returned UUID is not valid")
+		}
+	})
+
+	t.Run("invalid UUID renders 404", func(t *testing.T) {
+		r := loadSession(withChiParam(httptest.NewRequest("GET", "/", nil), "id", "garbage"))
+		w := httptest.NewRecorder()
+		_, ok := parseURLUUIDOrNotFound(w, r, tr, "id")
+		if ok {
+			t.Fatal("ok = true, want false")
+		}
+		if w.Code != http.StatusNotFound {
+			t.Errorf("status = %d, want %d", w.Code, http.StatusNotFound)
+		}
+	})
 }

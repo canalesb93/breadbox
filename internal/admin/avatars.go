@@ -105,7 +105,7 @@ func resolveUUID(idStr string) (pgtype.UUID, error) {
 // UploadUserAvatarHandler serves POST /-/users/{id}/avatar.
 func UploadUserAvatarHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := parseUserID(w, r)
+		userID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid user ID")
 		if !ok {
 			return
 		}
@@ -116,7 +116,7 @@ func UploadUserAvatarHandler(a *app.App) http.HandlerFunc {
 // DeleteUserAvatarHandler serves DELETE /-/users/{id}/avatar.
 func DeleteUserAvatarHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := parseUserID(w, r)
+		userID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid user ID")
 		if !ok {
 			return
 		}
@@ -132,7 +132,7 @@ func DeleteUserAvatarHandler(a *app.App) http.HandlerFunc {
 // RegenerateUserAvatarHandler serves POST /-/users/{id}/avatar/regenerate.
 func RegenerateUserAvatarHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := parseUserID(w, r)
+		userID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid user ID")
 		if !ok {
 			return
 		}
@@ -210,15 +210,6 @@ func RegenerateMyAvatarHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 }
 
 // --- Helpers ---
-
-func parseUserID(w http.ResponseWriter, r *http.Request) (pgtype.UUID, bool) {
-	var userID pgtype.UUID
-	if err := userID.Scan(chi.URLParam(r, "id")); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid user ID"})
-		return pgtype.UUID{}, false
-	}
-	return userID, true
-}
 
 func requireSessionUser(w http.ResponseWriter, sm *scs.SessionManager, r *http.Request) (pgtype.UUID, bool) {
 	uid := SessionUserID(sm, r)
