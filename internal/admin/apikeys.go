@@ -8,6 +8,7 @@ import (
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
+	"breadbox/internal/timefmt"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -132,7 +133,7 @@ func buildAccessKeyRow(k service.APIKeyResponse) pages.AccessKeyRow {
 		KeyPrefix:        k.KeyPrefix,
 		Scope:            k.Scope,
 		CreatedAtShort:   formatDateShortFromRFC3339(k.CreatedAt),
-		LastUsedRelative: relativeTimeFromRFC3339Ptr(k.LastUsedAt),
+		LastUsedRelative: timefmt.RelativeFromRFC3339Ptr(k.LastUsedAt),
 	}
 }
 

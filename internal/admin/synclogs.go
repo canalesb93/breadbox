@@ -7,6 +7,7 @@ import (
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
+	"breadbox/internal/timefmt"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -82,7 +83,7 @@ func buildSyncLogDetailProps(log *service.SyncLogRow, accounts []service.SyncLog
 			UnchangedCount:    log.UnchangedCount,
 			ErrorMessage:      stringOrEmpty(log.ErrorMessage),
 			WarningMessage:    stringOrEmpty(log.WarningMessage),
-			StartedAtRelative: relativeTimeFromRFC3339Ptr(log.StartedAt),
+			StartedAtRelative: timefmt.RelativeFromRFC3339Ptr(log.StartedAt),
 			Duration:          stringOrEmpty(log.Duration),
 			AccountsAffected:  log.AccountsAffected,
 			TotalRuleHits:     log.TotalRuleHits,

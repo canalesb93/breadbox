@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
+	"breadbox/internal/timefmt"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -46,7 +46,7 @@ func buildSessionDetailProps(detail service.MCPSessionDetailResponse) pages.Sess
 			Purpose:       detail.Purpose,
 			AgentName:     detail.AgentName,
 			APIKeyName:    detail.APIKeyName,
-			CreatedAt:     relativeTimeFromRFC3339(detail.CreatedAt),
+			CreatedAt:     timefmt.RelativeFromRFC3339(detail.CreatedAt),
 			ToolCallCount: detail.ToolCallCount,
 			ErrorCount:    detail.ErrorCount,
 			WriteCount:    detail.WriteCount,
@@ -64,8 +64,8 @@ func buildSessionDetailProps(detail service.MCPSessionDetailResponse) pages.Sess
 				Sequence:       c.Sequence,
 				OffsetLabel:    c.OffsetLabel,
 				CreatedAt:      c.CreatedAt,
-				CreatedAtAbs:   formatDateTimeFromRFC3339(c.CreatedAt),
-				CreatedAtRel:   relativeTimeFromRFC3339(c.CreatedAt),
+				CreatedAtAbs:   timefmt.LocalDateTimeFromRFC3339(c.CreatedAt),
+				CreatedAtRel:   timefmt.RelativeFromRFC3339(c.CreatedAt),
 			}
 			if c.DurationMs != nil {
 				tc.DurationMs = *c.DurationMs
@@ -81,33 +81,6 @@ func buildSessionDetailProps(detail service.MCPSessionDetailResponse) pages.Sess
 		}
 	}
 	return out
-}
-
-// relativeTimeFromRFC3339 mirrors the funcMap "relativeTime" branch
-// for an RFC3339 string. Returns the input unchanged when parsing
-// fails (matches the funcMap fallback).
-func relativeTimeFromRFC3339(s string) string {
-	if s == "" {
-		return ""
-	}
-	parsed, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return s
-	}
-	return relativeTime(parsed)
-}
-
-// formatDateTimeFromRFC3339 mirrors the funcMap "formatDateTime"
-// branch for an RFC3339 string ("Jan 2, 2006 3:04 PM" in local time).
-func formatDateTimeFromRFC3339(s string) string {
-	if s == "" {
-		return ""
-	}
-	parsed, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return s
-	}
-	return parsed.Local().Format("Jan 2, 2006 3:04 PM")
 }
 
 // prettyJSONIndent mirrors the funcMap "prettyJSON" branch for raw

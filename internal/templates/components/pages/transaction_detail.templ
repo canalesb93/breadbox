@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
@@ -179,11 +178,11 @@ templ txdMain(p TransactionDetailProps) {
 						</div>
 						<div>
 							<p class="text-base-content/30 mb-0.5">Created</p>
-							<p class="text-base-content/50">{ formatDateTimeStr(p.Transaction.CreatedAt) }</p>
+							<p class="text-base-content/50">{ timefmt.LocalDateTimeFromRFC3339(p.Transaction.CreatedAt) }</p>
 						</div>
 						<div>
 							<p class="text-base-content/30 mb-0.5">Updated</p>
-							<p class="text-base-content/50">{ formatDateTimeStr(p.Transaction.UpdatedAt) }</p>
+							<p class="text-base-content/50">{ timefmt.LocalDateTimeFromRFC3339(p.Transaction.UpdatedAt) }</p>
 						</div>
 					</div>
 				</div>
@@ -323,8 +322,8 @@ templ txdTimelineSystem(e service.ActivityEntry) {
 				}
 				if e.Timestamp != "" {
 					<span aria-hidden="true">&middot;</span>
-					<span class="tooltip tooltip-top" data-tip={ formatDateTimeStr(e.Timestamp) }>
-						<time datetime={ e.Timestamp } class="tabular-nums cursor-default" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStr(e.Timestamp) }</time>
+					<span class="tooltip tooltip-top" data-tip={ timefmt.LocalDateTimeFromRFC3339(e.Timestamp) }>
+						<time datetime={ e.Timestamp } class="tabular-nums cursor-default" title={ timefmt.LocalDateTimeFromRFC3339(e.Timestamp) }>{ timefmt.RelativeFromRFC3339(e.Timestamp) }</time>
 					</span>
 				}
 			</span>
@@ -483,8 +482,8 @@ templ txdTimelineComment(e service.ActivityEntry) {
 				}
 				<span class="text-base-content/55">commented</span>
 				if e.Timestamp != "" {
-					<span class="tooltip tooltip-top" data-tip={ formatDateTimeStr(e.Timestamp) }>
-						<time datetime={ e.Timestamp } class="text-base-content/40 tabular-nums cursor-default" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStr(e.Timestamp) }</time>
+					<span class="tooltip tooltip-top" data-tip={ timefmt.LocalDateTimeFromRFC3339(e.Timestamp) }>
+						<time datetime={ e.Timestamp } class="text-base-content/40 tabular-nums cursor-default" title={ timefmt.LocalDateTimeFromRFC3339(e.Timestamp) }>{ timefmt.RelativeFromRFC3339(e.Timestamp) }</time>
 					</span>
 				}
 				if e.CommentID != "" {
@@ -720,56 +719,6 @@ func accountTypeLabel(acctType, subtype string) string {
 		return "Investment"
 	}
 	return acctType
-}
-
-// formatDateTimeStr parses an RFC3339 timestamp and renders it in the
-// admin standard "Jan 2, 2006 3:04 PM" local format. Unparseable input
-// is returned unchanged.
-func formatDateTimeStr(s string) string {
-	if s == "" {
-		return ""
-	}
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t.Local().Format("Jan 2, 2006 3:04 PM")
-	}
-	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
-		return t.Local().Format("Jan 2, 2006 3:04 PM")
-	}
-	return s
-}
-
-// clockTimeStr renders the local clock portion of an RFC3339 timestamp
-// ("3:04 PM"). Used by activity-timeline rows where the day separator
-// already carries the date.
-func clockTimeStr(s string) string {
-	if s == "" {
-		return ""
-	}
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t.Local().Format("3:04 PM")
-	}
-	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
-		return t.Local().Format("3:04 PM")
-	}
-	return s
-}
-
-// relativeTimeStr renders an RFC3339 timestamp as a short relative
-// phrase ("just now", "5 minutes ago", "2 days ago"). Used in delete
-// button aria-labels so screen readers get a stable description.
-// Falls back to the raw input string when the timestamp can't be parsed.
-func relativeTimeStr(s string) string {
-	if s == "" {
-		return ""
-	}
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		t, err = time.Parse(time.RFC3339Nano, s)
-		if err != nil {
-			return s
-		}
-	}
-	return timefmt.Relative(t)
 }
 
 // avatarURLStr mirrors the admin "avatarURL" funcMap for the (user_id,
