@@ -953,21 +953,26 @@ func ConnectionReauthHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc 
 			return
 		}
 
-		data := map[string]any{
-			"PageTitle":   "Re-authenticate " + conn.InstitutionName.String,
-			"CurrentPage": "connections",
-			"Connection":  conn,
-			"ConnID":      idStr,
-			"CSRFToken":   GetCSRFToken(r),
-			"TellerAppID": a.Config.TellerAppID,
-			"TellerEnv":   a.Config.TellerEnv,
-			"Breadcrumbs": []Breadcrumb{
-				{Label: "Connections", Href: "/connections"},
-				{Label: conn.InstitutionName.String, Href: "/connections/" + idStr},
-				{Label: "Re-authenticate"},
-			},
+		props := pages.ConnectionReauthProps{
+			PageTitle:       "Re-authenticate " + conn.InstitutionName.String,
+			ConnID:          idStr,
+			Provider:        string(conn.Provider),
+			InstitutionName: conn.InstitutionName.String,
+			UserName:        pgconv.TextOr(conn.UserName, ""),
+			TellerAppID:     a.Config.TellerAppID,
+			TellerEnv:       a.Config.TellerEnv,
 		}
-		tr.Render(w, r, "connection_reauth.html", data)
+		renderConnectionReauth(w, r, props)
+	}
+}
+
+// renderConnectionReauth renders the reauth page directly via the templ
+// component. Wizard-layout pages own their full document — they do NOT go
+// through TemplateRenderer.RenderWithTempl.
+func renderConnectionReauth(w http.ResponseWriter, r *http.Request, props pages.ConnectionReauthProps) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := pages.ConnectionReauth(props).Render(r.Context(), w); err != nil {
+		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
 	}
 }
 
