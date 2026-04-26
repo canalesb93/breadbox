@@ -46,8 +46,6 @@ var existingAntiPatternAllowlist = map[string]struct{}{
 	// `categoryPicker(...)` factory shared across category_form, transactions,
 	// account_detail, transaction_detail. See #827's Phase 2 queue.
 	"category_form.templ:88": {},
-	// `avatarEditor(userId)` — extracted whenever user_form gets ported.
-	"user_form.templ:172": {},
 }
 
 // TestNoLargeInlineScripts walks every *.templ file under
