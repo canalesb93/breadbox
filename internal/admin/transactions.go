@@ -4,7 +4,6 @@ import (
 	"errors"
 	"math"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -1200,67 +1199,36 @@ func DeleteTransactionCommentHandler(a *app.App, sm *scs.SessionManager, svc *se
 	}
 }
 
+// txFilterParams lists the filter keys preserved across pagination and CSV
+// export links on the main transactions list. per_page is appended for
+// pagination but omitted from the export URL.
+var txFilterParams = []string{
+	"start_date", "end_date", "account_id", "user_id",
+	"connection_id", "category", "min_amount", "max_amount",
+	"pending", "search", "search_mode", "search_field", "sort",
+	"tags", "any_tag",
+}
+
 // buildPaginationBase returns the query string for pagination links (all params except page).
 func buildPaginationBase(r *http.Request) string {
-	paginationParams := []string{
-		"start_date", "end_date", "account_id", "user_id",
-		"connection_id", "category", "min_amount", "max_amount",
-		"pending", "search", "search_mode", "search_field", "sort", "per_page",
-		"tags", "any_tag",
-	}
-	q := r.URL.Query()
-	qs := make([]string, 0, len(paginationParams))
-	for _, key := range paginationParams {
-		if v := q.Get(key); v != "" {
-			qs = append(qs, key+"="+url.QueryEscape(v))
-		}
-	}
-	base := "/transactions?page="
-	if len(qs) > 0 {
-		base = "/transactions?" + strings.Join(qs, "&") + "&page="
-	}
-	return base
+	keys := append(append([]string{}, txFilterParams...), "per_page")
+	return paginationBase("/transactions", pickValues(r, keys), "page")
 }
 
 // buildExportURL returns the full CSV export URL with the current filter params.
 func buildExportURL(r *http.Request) string {
-	exportParams := []string{
-		"start_date", "end_date", "account_id", "user_id",
-		"connection_id", "category", "min_amount", "max_amount",
-		"pending", "search", "search_mode", "search_field", "sort",
-		"tags", "any_tag",
+	encoded := pickValues(r, txFilterParams).Encode()
+	if encoded == "" {
+		return "/-/transactions/export-csv"
 	}
-	q := r.URL.Query()
-	qs := make([]string, 0, len(exportParams))
-	for _, key := range exportParams {
-		if v := q.Get(key); v != "" {
-			qs = append(qs, key+"="+url.QueryEscape(v))
-		}
-	}
-	exportURL := "/-/transactions/export-csv"
-	if len(qs) > 0 {
-		exportURL += "?" + strings.Join(qs, "&")
-	}
-	return exportURL
+	return "/-/transactions/export-csv?" + encoded
 }
 
 // buildAccountPaginationBase returns the query string prefix for account detail pagination links.
 func buildAccountPaginationBase(r *http.Request, accountID string) string {
-	paginationParams := []string{
+	return paginationBase("/accounts/"+accountID, pickValues(r, []string{
 		"start_date", "end_date", "category", "pending", "search",
-	}
-	q := r.URL.Query()
-	qs := make([]string, 0, len(paginationParams))
-	for _, key := range paginationParams {
-		if v := q.Get(key); v != "" {
-			qs = append(qs, key+"="+url.QueryEscape(v))
-		}
-	}
-	base := "/accounts/" + accountID + "?page="
-	if len(qs) > 0 {
-		base = "/accounts/" + accountID + "?" + strings.Join(qs, "&") + "&page="
-	}
-	return base
+	}), "page")
 }
 
 // BulkUpdateTransactionsAdminHandler serves POST /-/transactions/batch-update.
