@@ -8,6 +8,7 @@ import (
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
+	"breadbox/internal/timefmt"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -64,7 +65,7 @@ func buildSessionDetailProps(detail service.MCPSessionDetailResponse) pages.Sess
 				Sequence:       c.Sequence,
 				OffsetLabel:    c.OffsetLabel,
 				CreatedAt:      c.CreatedAt,
-				CreatedAtAbs:   formatDateTimeFromRFC3339(c.CreatedAt),
+				CreatedAtAbs:   timefmt.FormatRFC3339Local(c.CreatedAt, timefmt.LayoutDateTimeLocal),
 				CreatedAtRel:   relativeTimeFromRFC3339(c.CreatedAt),
 			}
 			if c.DurationMs != nil {
@@ -95,19 +96,6 @@ func relativeTimeFromRFC3339(s string) string {
 		return s
 	}
 	return relativeTime(parsed)
-}
-
-// formatDateTimeFromRFC3339 mirrors the funcMap "formatDateTime"
-// branch for an RFC3339 string ("Jan 2, 2006 3:04 PM" in local time).
-func formatDateTimeFromRFC3339(s string) string {
-	if s == "" {
-		return ""
-	}
-	parsed, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return s
-	}
-	return parsed.Local().Format("Jan 2, 2006 3:04 PM")
 }
 
 // prettyJSONIndent mirrors the funcMap "prettyJSON" branch for raw

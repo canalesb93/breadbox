@@ -9,6 +9,7 @@ import (
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components/pages"
+	"breadbox/internal/timefmt"
 
 	"github.com/alexedwards/scs/v2"
 )
@@ -222,7 +223,7 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 					PayloadHash:       e.PayloadHash,
 					ErrorMessage:      e.ErrorMessage,
 					CreatedAtRelative: relativeTimeFromRFC3339Ptr(e.CreatedAt),
-					CreatedAtFull:     formatDateTimeFromRFC3339Ptr(e.CreatedAt),
+					CreatedAtFull:     timefmt.FormatRFC3339LocalPtr(e.CreatedAt, timefmt.LayoutDateTimeLocal),
 				})
 			}
 
@@ -286,16 +287,3 @@ func relativeTimeFromRFC3339Ptr(s *string) string {
 	return relativeTime(t)
 }
 
-// formatDateTimeFromRFC3339Ptr parses a *string RFC3339 timestamp into
-// the local "Jan 2, 2006 3:04 PM" rendering used by the `formatDateTime`
-// funcMap helper.
-func formatDateTimeFromRFC3339Ptr(s *string) string {
-	if s == nil || *s == "" {
-		return ""
-	}
-	t, err := time.Parse(time.RFC3339, *s)
-	if err != nil {
-		return *s
-	}
-	return t.Local().Format("Jan 2, 2006 3:04 PM")
-}

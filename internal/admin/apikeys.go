@@ -3,11 +3,11 @@ package admin
 import (
 	"net/http"
 	"strings"
-	"time"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
+	"breadbox/internal/timefmt"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
@@ -131,7 +131,7 @@ func buildAccessKeyRow(k service.APIKeyResponse) pages.AccessKeyRow {
 		Name:             k.Name,
 		KeyPrefix:        k.KeyPrefix,
 		Scope:            k.Scope,
-		CreatedAtShort:   formatDateShortFromRFC3339(k.CreatedAt),
+		CreatedAtShort:   timefmt.FormatRFC3339Local(k.CreatedAt, timefmt.LayoutDateShortLocal),
 		LastUsedRelative: relativeTimeFromRFC3339Ptr(k.LastUsedAt),
 	}
 }
@@ -144,23 +144,8 @@ func buildAccessClientRow(c service.OAuthClientResponse) pages.AccessClientRow {
 		Name:           c.Name,
 		ClientIDPrefix: c.ClientIDPrefix,
 		Scope:          c.Scope,
-		CreatedAtShort: formatDateShortFromRFC3339(c.CreatedAt),
+		CreatedAtShort: timefmt.FormatRFC3339Local(c.CreatedAt, timefmt.LayoutDateShortLocal),
 	}
-}
-
-// formatDateShortFromRFC3339 mirrors the `formatDateShort` funcMap helper
-// for a string-typed timestamp: parses RFC3339 and renders as
-// "Jan 2, 3:04 PM" in the local timezone. Returns the input verbatim on
-// parse failure (matching the helper's fall-through).
-func formatDateShortFromRFC3339(s string) string {
-	if s == "" {
-		return ""
-	}
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return s
-	}
-	return t.Local().Format("Jan 2, 3:04 PM")
 }
 
 // APIKeyNewPageHandler serves GET /admin/api-keys/new.

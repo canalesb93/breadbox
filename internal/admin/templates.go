@@ -22,6 +22,7 @@ import (
 	"breadbox/internal/templates"
 	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
+	"breadbox/internal/timefmt"
 	"breadbox/internal/version"
 
 	"github.com/a-h/templ"
@@ -167,6 +168,31 @@ func renderTemplComponent(name string, data any) template.HTML {
 		return template.HTML(fmt.Sprintf("<!-- renderComponent(%q) render error: %s -->", name, template.HTMLEscapeString(err.Error())))
 	}
 	return template.HTML(buf.String())
+}
+
+// formatTimeAny renders v as a local-time string using layout. Accepts
+// time.Time, *time.Time, RFC3339 string, or *string — the four shapes the
+// admin funcMap date helpers have to cope with — and returns "" for nil
+// pointers, the input verbatim for strings that fail to parse, and "" for
+// any other type. Shared by the formatDateTime / clockTime / formatDateShort
+// funcMap entries so the four-case switch lives in exactly one place.
+func formatTimeAny(v any, layout string) string {
+	format := func(tm time.Time) string { return tm.Local().Format(layout) }
+	switch val := v.(type) {
+	case time.Time:
+		return format(val)
+	case *time.Time:
+		if val == nil {
+			return ""
+		}
+		return format(*val)
+	case string:
+		return timefmt.FormatRFC3339Local(val, layout)
+	case *string:
+		return timefmt.FormatRFC3339LocalPtr(val, layout)
+	default:
+		return ""
+	}
 }
 
 // buildNavProps assembles a NavProps from the already-injected layout data
@@ -659,100 +685,16 @@ func NewTemplateRenderer(sm *scs.SessionManager) (*TemplateRenderer, error) {
 				}
 				return acctType
 			},
-			"formatDateTime": func(t interface{}) string {
-				format := func(tm time.Time) string {
-					return tm.Local().Format("Jan 2, 2006 3:04 PM")
-				}
-				switch v := t.(type) {
-				case time.Time:
-					return format(v)
-				case *time.Time:
-					if v == nil {
-						return ""
-					}
-					return format(*v)
-				case string:
-					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
-						return format(parsed)
-					}
-					return v
-				case *string:
-					if v == nil {
-						return ""
-					}
-					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
-						return format(parsed)
-					}
-					return *v
-				default:
-					return ""
-				}
-			},
-			// clockTime renders the local clock portion of a timestamp
-			// ("2:03 AM"). Paired with a same-day day separator on the
-			// activity timeline it disambiguates 10 events that would all
-			// otherwise read "8 days ago" (#707).
-			"clockTime": func(t interface{}) string {
-				format := func(tm time.Time) string {
-					return tm.Local().Format("3:04 PM")
-				}
-				switch v := t.(type) {
-				case time.Time:
-					return format(v)
-				case *time.Time:
-					if v == nil {
-						return ""
-					}
-					return format(*v)
-				case string:
-					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
-						return format(parsed)
-					}
-					if parsed, err := time.Parse(time.RFC3339Nano, v); err == nil {
-						return format(parsed)
-					}
-					return v
-				case *string:
-					if v == nil {
-						return ""
-					}
-					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
-						return format(parsed)
-					}
-					return *v
-				default:
-					return ""
-				}
-			},
-			"formatDateShort": func(t interface{}) string {
-				format := func(tm time.Time) string {
-					return tm.Local().Format("Jan 2, 3:04 PM")
-				}
-				switch v := t.(type) {
-				case time.Time:
-					return format(v)
-				case *time.Time:
-					if v == nil {
-						return ""
-					}
-					return format(*v)
-				case string:
-					if parsed, err := time.Parse(time.RFC3339, v); err == nil {
-						return format(parsed)
-					}
-					return v
-				case *string:
-					if v == nil {
-						return ""
-					}
-					if parsed, err := time.Parse(time.RFC3339, *v); err == nil {
-						return format(parsed)
-					}
-					return *v
-				default:
-					return ""
-				}
-			},
+			// formatDateTime renders a timestamp as "Jan 2, 2006 3:04 PM" in
+			// the local timezone. clockTime renders only the time portion —
+			// paired with a same-day day separator on the activity timeline
+			// it disambiguates events that would all otherwise read "8 days
+			// ago" (#707). formatDateShort drops the year for tight cells.
+			// All three accept time.Time, *time.Time, RFC3339 string, or
+			// *string and share a single switch via formatTimeAny.
+			"formatDateTime":  func(t any) string { return formatTimeAny(t, timefmt.LayoutDateTimeLocal) },
+			"clockTime":       func(t any) string { return formatTimeAny(t, timefmt.LayoutClockLocal) },
+			"formatDateShort": func(t any) string { return formatTimeAny(t, timefmt.LayoutDateShortLocal) },
 			"formatDate":   components.FormatDate,
 			"relativeDate": components.RelativeDate,
 			"formatNumeric": func(n pgtype.Numeric) string {

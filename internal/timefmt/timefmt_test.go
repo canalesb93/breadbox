@@ -33,3 +33,79 @@ func TestRelative(t *testing.T) {
 		})
 	}
 }
+
+func TestParseRFC3339(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		ok   bool
+	}{
+		{"empty", "", false},
+		{"rfc3339", "2026-01-15T14:30:00Z", true},
+		{"rfc3339 with offset", "2026-01-15T14:30:00-05:00", true},
+		{"rfc3339nano", "2026-01-15T14:30:00.123456789Z", true},
+		{"garbage", "not a date", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ok := ParseRFC3339(tc.in)
+			if ok != tc.ok {
+				t.Errorf("ParseRFC3339(%q) ok = %v, want %v", tc.in, ok, tc.ok)
+			}
+		})
+	}
+}
+
+func TestFormatRFC3339Local(t *testing.T) {
+	// Pin the local zone so the test is deterministic regardless of where it runs.
+	loc, err := time.LoadLocation("UTC")
+	if err != nil {
+		t.Fatalf("load UTC: %v", err)
+	}
+	prev := time.Local
+	time.Local = loc
+	defer func() { time.Local = prev }()
+
+	cases := []struct {
+		name   string
+		in     string
+		layout string
+		want   string
+	}{
+		{"empty returns empty", "", LayoutDateTimeLocal, ""},
+		{"rfc3339 datetime", "2026-01-15T14:30:00Z", LayoutDateTimeLocal, "Jan 15, 2026 2:30 PM"},
+		{"rfc3339 clock", "2026-01-15T14:30:00Z", LayoutClockLocal, "2:30 PM"},
+		{"rfc3339 short", "2026-01-15T14:30:00Z", LayoutDateShortLocal, "Jan 15, 2:30 PM"},
+		{"rfc3339nano", "2026-01-15T14:30:00.123Z", LayoutClockLocal, "2:30 PM"},
+		{"unparseable returns input", "not a date", LayoutDateTimeLocal, "not a date"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := FormatRFC3339Local(tc.in, tc.layout); got != tc.want {
+				t.Errorf("FormatRFC3339Local(%q, %q) = %q, want %q", tc.in, tc.layout, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFormatRFC3339LocalPtr(t *testing.T) {
+	loc, err := time.LoadLocation("UTC")
+	if err != nil {
+		t.Fatalf("load UTC: %v", err)
+	}
+	prev := time.Local
+	time.Local = loc
+	defer func() { time.Local = prev }()
+
+	if got := FormatRFC3339LocalPtr(nil, LayoutDateTimeLocal); got != "" {
+		t.Errorf("FormatRFC3339LocalPtr(nil) = %q, want empty", got)
+	}
+	s := "2026-01-15T14:30:00Z"
+	if got := FormatRFC3339LocalPtr(&s, LayoutDateTimeLocal); got != "Jan 15, 2026 2:30 PM" {
+		t.Errorf("FormatRFC3339LocalPtr(&s) = %q, want Jan 15, 2026 2:30 PM", got)
+	}
+	empty := ""
+	if got := FormatRFC3339LocalPtr(&empty, LayoutDateTimeLocal); got != "" {
+		t.Errorf("FormatRFC3339LocalPtr(&\"\") = %q, want empty", got)
+	}
+}
