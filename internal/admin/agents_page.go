@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"time"
 
 	breadboxmcp "breadbox/internal/mcp"
 	"breadbox/internal/service"
@@ -9,6 +10,19 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 )
+
+// relativeTimeFromRFC3339 parses an RFC3339 timestamp and returns a
+// human-readable relative-time string. Empty input returns empty string.
+func relativeTimeFromRFC3339(s string) string {
+	if s == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return ""
+	}
+	return relativeTime(t)
+}
 
 // AgentWizardStats holds live stats shown on the agent wizard cards.
 type AgentWizardStats struct {
