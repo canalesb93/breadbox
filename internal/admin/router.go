@@ -240,11 +240,11 @@ func NewAdminRouter(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, sv
 			r.Use(RequireEditor(sm))
 
 			// Transaction category override
-			r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc))
-			r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc))
+			r.Post("/transactions/{id}/category", SetTransactionCategoryAdminHandler(svc, sm))
+			r.Delete("/transactions/{id}/category", ResetTransactionCategoryAdminHandler(svc, sm))
 
 			// Transaction bulk categorize
-			r.Post("/transactions/batch-categorize", BatchSetTransactionCategoryAdminHandler(svc))
+			r.Post("/transactions/batch-categorize", BatchSetTransactionCategoryAdminHandler(svc, sm))
 
 			// Batch compound update (bulk actions on transactions list).
 			r.Post("/transactions/batch-update", BulkUpdateTransactionsAdminHandler(a, sm, svc))

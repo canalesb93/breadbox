@@ -198,7 +198,7 @@ func handleCategoryError(w http.ResponseWriter, err error) {
 }
 
 // SetTransactionCategoryAdminHandler handles POST /admin/api/transactions/{id}/category.
-func SetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
+func SetTransactionCategoryAdminHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		var req struct {
@@ -211,7 +211,8 @@ func SetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
 			writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "category_id is required")
 			return
 		}
-		if err := svc.SetTransactionCategory(r.Context(), id, req.CategoryID); err != nil {
+		actor := ActorFromSession(sm, r)
+		if err := svc.SetTransactionCategory(r.Context(), id, req.CategoryID, actor); err != nil {
 			if errors.Is(err, service.ErrNotFound) {
 				writeError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
 				return
@@ -228,10 +229,11 @@ func SetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
 }
 
 // ResetTransactionCategoryAdminHandler handles DELETE /admin/api/transactions/{id}/category.
-func ResetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
+func ResetTransactionCategoryAdminHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
-		if err := svc.ResetTransactionCategory(r.Context(), id); err != nil {
+		actor := ActorFromSession(sm, r)
+		if err := svc.ResetTransactionCategory(r.Context(), id, actor); err != nil {
 			if errors.Is(err, service.ErrNotFound) {
 				writeError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
 				return
@@ -245,7 +247,7 @@ func ResetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerFunc
 
 // BatchSetTransactionCategoryAdminHandler handles POST /admin/api/transactions/batch-categorize.
 // Accepts {items: [{transaction_id, category_id}]} and sets category overrides on all.
-func BatchSetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerFunc {
+func BatchSetTransactionCategoryAdminHandler(svc *service.Service, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Items []struct {
@@ -265,6 +267,7 @@ func BatchSetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerF
 			return
 		}
 
+		actor := ActorFromSession(sm, r)
 		succeeded := 0
 		failed := 0
 		for _, item := range req.Items {
@@ -272,7 +275,7 @@ func BatchSetTransactionCategoryAdminHandler(svc *service.Service) http.HandlerF
 				failed++
 				continue
 			}
-			if err := svc.SetTransactionCategory(r.Context(), item.TransactionID, item.CategoryID); err != nil {
+			if err := svc.SetTransactionCategory(r.Context(), item.TransactionID, item.CategoryID, actor); err != nil {
 				failed++
 				continue
 			}
