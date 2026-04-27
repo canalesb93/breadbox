@@ -568,13 +568,11 @@ func ExchangeTokenHandler(a *app.App) http.HandlerFunc {
 func ConnectionDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		idStr := chi.URLParam(r, "id")
-
-		var connID pgtype.UUID
-		if err := connID.Scan(idStr); err != nil {
-			tr.RenderNotFound(w, r)
+		connID, ok := parseURLUUIDOrNotFound(w, r, tr, "id")
+		if !ok {
 			return
 		}
+		idStr := chi.URLParam(r, "id")
 
 		conn, err := a.Queries.GetBankConnection(ctx, connID)
 		if err != nil {
@@ -938,13 +936,11 @@ func formatNumericAbsCurrency(n pgtype.Numeric) string {
 func ConnectionReauthHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		idStr := chi.URLParam(r, "id")
-
-		var connID pgtype.UUID
-		if err := connID.Scan(idStr); err != nil {
-			tr.RenderNotFound(w, r)
+		connID, ok := parseURLUUIDOrNotFound(w, r, tr, "id")
+		if !ok {
 			return
 		}
+		idStr := chi.URLParam(r, "id")
 
 		conn, err := a.Queries.GetBankConnection(ctx, connID)
 		if err != nil {
@@ -986,12 +982,9 @@ func renderConnectionReauth(w http.ResponseWriter, r *http.Request, tr *Template
 // ConnectionReauthAPIHandler serves POST /admin/api/connections/{id}/reauth.
 func ConnectionReauthAPIHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
 		ctx := r.Context()
-
-		var connID pgtype.UUID
-		if err := connID.Scan(idStr); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid connection ID"})
+		connID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid connection ID")
+		if !ok {
 			return
 		}
 
@@ -1032,11 +1025,8 @@ func ConnectionReauthAPIHandler(a *app.App) http.HandlerFunc {
 // ConnectionReauthCompleteHandler serves POST /admin/api/connections/{id}/reauth-complete.
 func ConnectionReauthCompleteHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
-
-		var connID pgtype.UUID
-		if err := connID.Scan(idStr); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid connection ID"})
+		connID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid connection ID")
+		if !ok {
 			return
 		}
 
@@ -1060,19 +1050,16 @@ func ConnectionReauthCompleteHandler(a *app.App) http.HandlerFunc {
 // DeleteConnectionHandler serves DELETE /admin/api/connections/{id}.
 func DeleteConnectionHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
 		ctx := r.Context()
-
-		var connID pgtype.UUID
-		if err := connID.Scan(idStr); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid connection ID"})
+		connID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid connection ID")
+		if !ok {
 			return
 		}
 
 		// Load connection and call provider to revoke access.
 		conn, err := a.Queries.GetBankConnection(ctx, connID)
 		if err == nil {
-			if prov, ok := a.Providers[string(conn.Provider)]; ok {
+			if prov, provOK := a.Providers[string(conn.Provider)]; provOK {
 				provConn := provider.Connection{
 					ProviderName:         string(conn.Provider),
 					ExternalID:           conn.ExternalID.String,
@@ -1103,7 +1090,7 @@ func DeleteConnectionHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 			return
 		}
 		if deleted > 0 {
-			a.Logger.Info("soft-deleted transactions for connection", "connection_id", idStr, "count", deleted)
+			a.Logger.Info("soft-deleted transactions for connection", "connection_id", pgconv.FormatUUID(connID), "count", deleted)
 		}
 
 		err = txQueries.DeleteBankConnection(ctx, connID)
@@ -1126,13 +1113,11 @@ func DeleteConnectionHandler(a *app.App, sm *scs.SessionManager) http.HandlerFun
 // SyncConnectionHandler serves POST /admin/api/connections/{id}/sync.
 func SyncConnectionHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
-
-		var connID pgtype.UUID
-		if err := connID.Scan(idStr); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid connection ID"})
+		connID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid connection ID")
+		if !ok {
 			return
 		}
+		idStr := chi.URLParam(r, "id")
 
 		if a.SyncEngine == nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Sync engine not initialized"})
@@ -1155,13 +1140,11 @@ func SyncConnectionHandler(a *app.App) http.HandlerFunc {
 // connection — used by the detail page to poll progress without full reloads.
 func SyncConnectionStatusHandler(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
-
-		var connID pgtype.UUID
-		if err := connID.Scan(idStr); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid connection ID"})
+		connID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid connection ID")
+		if !ok {
 			return
 		}
+		idStr := chi.URLParam(r, "id")
 
 		logs, err := a.Queries.GetSyncLogsByConnection(r.Context(), db.GetSyncLogsByConnectionParams{
 			ConnectionID: connID,
@@ -1233,11 +1216,8 @@ func SyncAllConnectionsHandler(a *app.App) http.HandlerFunc {
 // UpdateAccountExcludedHandler serves POST /admin/api/accounts/{id}/excluded.
 func UpdateAccountExcludedHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
-
-		var accountID pgtype.UUID
-		if err := accountID.Scan(idStr); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid account ID"})
+		accountID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid account ID")
+		if !ok {
 			return
 		}
 
@@ -1265,11 +1245,8 @@ func UpdateAccountExcludedHandler(a *app.App, sm *scs.SessionManager) http.Handl
 // UpdateAccountDisplayNameHandler serves POST /admin/api/accounts/{id}/display-name.
 func UpdateAccountDisplayNameHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
-
-		var accountID pgtype.UUID
-		if err := accountID.Scan(idStr); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid account ID"})
+		accountID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid account ID")
+		if !ok {
 			return
 		}
 
@@ -1302,11 +1279,8 @@ func UpdateAccountDisplayNameHandler(a *app.App, sm *scs.SessionManager) http.Ha
 // UpdateConnectionPausedHandler serves POST /admin/api/connections/{id}/paused.
 func UpdateConnectionPausedHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
-
-		var connID pgtype.UUID
-		if err := connID.Scan(idStr); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid connection ID"})
+		connID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid connection ID")
+		if !ok {
 			return
 		}
 
@@ -1334,11 +1308,8 @@ func UpdateConnectionPausedHandler(a *app.App, sm *scs.SessionManager) http.Hand
 // UpdateConnectionSyncIntervalHandler serves POST /admin/api/connections/{id}/sync-interval.
 func UpdateConnectionSyncIntervalHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
-
-		var connID pgtype.UUID
-		if err := connID.Scan(idStr); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid connection ID"})
+		connID, ok := parseURLUUIDOrInvalid(w, r, "id", "Invalid connection ID")
+		if !ok {
 			return
 		}
 

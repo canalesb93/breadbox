@@ -419,13 +419,10 @@ func TransactionSearchHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRe
 func AccountDetailHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		idStr := chi.URLParam(r, "id")
-
-		var accountID pgtype.UUID
-		if err := accountID.Scan(idStr); err != nil {
-			tr.RenderNotFound(w, r)
+		if _, ok := parseURLUUIDOrNotFound(w, r, tr, "id"); !ok {
 			return
 		}
+		idStr := chi.URLParam(r, "id")
 
 		detail, err := svc.GetAccountDetail(ctx, idStr)
 		if err != nil {
