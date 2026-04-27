@@ -55,13 +55,13 @@ templ TransactionDetail(p TransactionDetailProps) {
 
 templ txdHero(p TransactionDetailProps) {
 	<!-- Hero: Transaction name + amount -->
-	<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
-		<div class="flex items-center gap-4">
+	<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+		<div class="flex items-center gap-3 sm:gap-4 min-w-0">
 			<div class={ "w-12 h-12 rounded-xl flex items-center justify-center shrink-0", txdHeroTileBg(p.Transaction.Amount) }>
 				<i data-lucide={ txdHeroIcon(p.Transaction.Amount) } class={ "w-6 h-6", txdHeroIconColor(p.Transaction.Amount) }></i>
 			</div>
-			<div>
-				<h1 class="bb-page-title">{ p.Transaction.ProviderName }</h1>
+			<div class="min-w-0">
+				<h1 class="bb-page-title break-words">{ p.Transaction.ProviderName }</h1>
 				<div class="flex items-center gap-2 mt-0.5 flex-wrap">
 					<span class="text-xs text-base-content/40">{ components.FormatDate(p.Transaction.Date) }</span>
 					if p.Transaction.ProviderMerchantName != nil && *p.Transaction.ProviderMerchantName != "" {
@@ -96,7 +96,7 @@ templ txdHero(p TransactionDetailProps) {
 
 templ txdAccountBanner(p TransactionDetailProps) {
 	<!-- Account Context Banner -->
-	<div class="bb-card p-0 mb-6 overflow-hidden">
+	<div class="bb-card p-0 mb-4 sm:mb-6 overflow-hidden">
 		<div class="flex items-center gap-4 px-5 py-3.5">
 			<div class="w-9 h-9 rounded-lg bg-base-200/70 flex items-center justify-center shrink-0">
 				<i data-lucide="building-2" class="w-5 h-5 text-base-content/40"></i>
@@ -137,7 +137,7 @@ templ txdAccountBanner(p TransactionDetailProps) {
 
 templ txdMain(p TransactionDetailProps) {
 	<!-- Main content: Details + Category sidebar -->
-	<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+	<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
 		<!-- Transaction Details -->
 		<div class="bb-card p-5 lg:col-span-2">
 			<h2 class="text-sm font-semibold text-base-content/50 mb-5">Details</h2>
@@ -679,7 +679,10 @@ templ txdComposerCard(p TransactionDetailProps) {
 			if !p.HasPendingReview {
 				<label class="ml-auto btn btn-sm btn-ghost rounded-md gap-2 cursor-pointer transition-all duration-200" :title="pinReview ? 'Posting will also tag this transaction needs-review (Shift+R)' : 'Also tag needs-review when posting (Shift+R)'">
 					<input type="checkbox" class="checkbox checkbox-xs checkbox-primary" x-model="pinReview"/>
-					<span class="text-xs font-medium">Toggle Needs Review</span>
+					<span class="text-xs font-medium">
+						<span class="sm:hidden">Needs review</span>
+						<span class="hidden sm:inline">Toggle Needs Review</span>
+					</span>
 				</label>
 			}
 			<button

@@ -165,6 +165,7 @@ function fetchTimelineRows(txId, replaceCommentIDs) {
       // in place. For genuinely new rows, insert just before the
       // composer (so the composer stays at the bottom).
       var inserted = 0;
+      var lastAppended = null;
       var replaceSet = {};
       if (replaceCommentIDs && replaceCommentIDs.length) {
         replaceCommentIDs.forEach(function (id) { replaceSet[id] = true; });
@@ -185,7 +186,23 @@ function fetchTimelineRows(txId, replaceCommentIDs) {
           ol.appendChild(n);
         }
         inserted++;
+        lastAppended = n;
       });
+
+      // Mobile auto-scroll: on small viewports the composer (and any
+      // freshly-appended row above it) often lands below the fold. After a
+      // user posts a comment / sets a category / adds a tag the new row
+      // would otherwise be invisible until they scroll manually. Bring the
+      // last appended row into view so the optimistic update is visible.
+      // Skipped for replacement rows (tombstones) — the bubble being swapped
+      // is already on screen if the user just clicked its trash button.
+      if (lastAppended) {
+        // rAF so the layout settles before measuring; smooth scroll so the
+        // motion doubles as a "your action landed" signal.
+        window.requestAnimationFrame(function () {
+          lastAppended.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        });
+      }
 
       // Update the cursor so the next fetch only sees newer rows. Every
       // returned <li> has a <time datetime="..."> child for the activity
