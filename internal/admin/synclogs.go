@@ -5,6 +5,7 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
+	"breadbox/internal/strutil"
 	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
 	"breadbox/internal/timefmt"
@@ -81,10 +82,10 @@ func buildSyncLogDetailProps(log *service.SyncLogRow, accounts []service.SyncLog
 			ModifiedCount:     log.ModifiedCount,
 			RemovedCount:      log.RemovedCount,
 			UnchangedCount:    log.UnchangedCount,
-			ErrorMessage:      stringOrEmpty(log.ErrorMessage),
-			WarningMessage:    stringOrEmpty(log.WarningMessage),
+			ErrorMessage:      strutil.Deref(log.ErrorMessage),
+			WarningMessage:    strutil.Deref(log.WarningMessage),
 			StartedAtRelative: timefmt.RelativeRFC3339Ptr(log.StartedAt),
-			Duration:          stringOrEmpty(log.Duration),
+			Duration:          strutil.Deref(log.Duration),
 			AccountsAffected:  log.AccountsAffected,
 			TotalRuleHits:     log.TotalRuleHits,
 		}
@@ -117,12 +118,5 @@ func buildSyncLogDetailProps(log *service.SyncLogRow, accounts []service.SyncLog
 		}
 	}
 	return out
-}
-
-func stringOrEmpty(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }
 

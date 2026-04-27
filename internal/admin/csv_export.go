@@ -9,6 +9,7 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
+	"breadbox/internal/strutil"
 )
 
 // ExportTransactionsCSVHandler serves GET /admin/-/transactions/export-csv.
@@ -71,13 +72,13 @@ func ExportTransactionsCSVHandler(a *app.App, svc *service.Service) http.Handler
 			row := []string{
 				tx.Date,
 				tx.Name,
-				derefStr(tx.MerchantName),
+				strutil.Deref(tx.MerchantName),
 				strconv.FormatFloat(tx.Amount, 'f', 2, 64),
-				derefStr(tx.IsoCurrencyCode),
+				strutil.Deref(tx.IsoCurrencyCode),
 				tx.AccountName,
 				tx.InstitutionName,
 				tx.UserName,
-				derefStr(tx.CategoryDisplayName),
+				strutil.Deref(tx.CategoryDisplayName),
 				strconv.FormatBool(tx.Pending),
 				tx.ID,
 			}
@@ -89,10 +90,3 @@ func ExportTransactionsCSVHandler(a *app.App, svc *service.Service) http.Handler
 	}
 }
 
-// derefStr safely dereferences a string pointer, returning empty string if nil.
-func derefStr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}

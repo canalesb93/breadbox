@@ -6,6 +6,7 @@ import (
 
 	"breadbox/internal/app"
 	"breadbox/internal/service"
+	"breadbox/internal/strutil"
 	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
 
@@ -56,10 +57,10 @@ func renderAccountLinkDetail(tr *TemplateRenderer, w http.ResponseWriter, r *htt
 			Amount:                 m.Amount,
 			PrimaryTransactionID:   m.PrimaryTransactionID,
 			PrimaryTxnName:         m.PrimaryTxnName,
-			PrimaryTxnMerchant:     derefString(m.PrimaryTxnMerchant),
+			PrimaryTxnMerchant:     strutil.Deref(m.PrimaryTxnMerchant),
 			DependentTransactionID: m.DependentTransactionID,
 			DependentTxnName:       m.DependentTxnName,
-			DependentTxnMerchant:   derefString(m.DependentTxnMerchant),
+			DependentTxnMerchant:   strutil.Deref(m.DependentTxnMerchant),
 			MatchConfidence:        m.MatchConfidence,
 			MatchedOn:              m.MatchedOn,
 		}
@@ -76,13 +77,6 @@ func renderAccountLinkDetail(tr *TemplateRenderer, w http.ResponseWriter, r *htt
 		Matches:                 rows,
 	}
 	tr.RenderWithTempl(w, r, data, pages.AccountLinkDetail(props))
-}
-
-func derefString(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }
 
 // CreateAccountLinkAdminHandler handles POST /-/account-links.

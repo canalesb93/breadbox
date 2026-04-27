@@ -7,6 +7,7 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/pgconv"
 	"breadbox/internal/service"
+	"breadbox/internal/strutil"
 	"breadbox/internal/templates/components/pages"
 	"breadbox/internal/timefmt"
 
@@ -56,9 +57,9 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 				a.Logger.Error("list bank connections for sync log filters", "error", err)
 			}
 
-			filterConnID := stringOrEmpty(params.ConnectionID)
-			filterStatus := stringOrEmpty(params.Status)
-			filterTrigger := stringOrEmpty(params.Trigger)
+			filterConnID := strutil.Deref(params.ConnectionID)
+			filterStatus := strutil.Deref(params.Status)
+			filterTrigger := strutil.Deref(params.Trigger)
 			filterDateFrom := r.URL.Query().Get("date_from")
 			filterDateTo := r.URL.Query().Get("date_to")
 
