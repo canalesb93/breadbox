@@ -19,6 +19,12 @@ ORDER BY created_at ASC;
 -- users.id or an auth_accounts.id depending on the call site; resolve both
 -- by joining auth_accounts and falling back to a direct users join.
 --
+-- Also surfaces the joined users.name so the service layer can prefer the
+-- user's profile name over the value frozen into annotations.actor_name at
+-- write time (which is whatever Actor.Name carried — typically the
+-- auth_accounts.username/email login). Falls back to the stored actor_name
+-- when the join misses or the profile name is blank.
+--
 -- Compare in text space (aa.id::text = a.actor_id) rather than casting
 -- a.actor_id::uuid, because actor_id can also hold a non-UUID short_id for
 -- system-actor rows (e.g. rule_applied writes the rule's short_id) and
@@ -33,7 +39,13 @@ SELECT
     a.id, a.short_id, a.transaction_id, a.kind, a.actor_type,
     a.actor_id, a.actor_name, a.session_id, a.payload, a.tag_id,
     a.rule_id, a.created_at, a.deleted_at,
-    COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at
+    COALESCE(u_via_account.updated_at, u_direct.updated_at) AS actor_updated_at,
+    -- Empty-string-coalesced join of the actor's profile name. The service
+    -- layer prefers this over annotations.actor_name (which is whatever
+    -- Actor.Name carried at write time — typically the auth_accounts
+    -- username/email login) and falls back to actor_name when this is "".
+    -- Non-user actors (system, agent) miss both joins and resolve to "".
+    COALESCE(u_via_account.name, u_direct.name, '')::text AS actor_user_name
 FROM annotations a
 LEFT JOIN auth_accounts aa
     ON a.actor_type = 'user'

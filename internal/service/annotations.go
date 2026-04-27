@@ -235,7 +235,22 @@ func annotationKindFilter(kinds []string) map[string]bool {
 // annotationFromActorRow converts a joined annotation+actor row into its
 // service-layer response, surfacing the actor's updated_at as a unix-timestamp
 // avatar version string.
+//
+// For user-attributed rows we prefer the live users.name carried by the join
+// (a.ActorUserName) over the annotations.actor_name that was frozen in at
+// write time. Actor.Name from a logged-in admin session is the
+// auth_accounts.username (typically an email), so without this preference
+// the timeline rendered "admin@example.com added the Food tag" even when
+// the linked household member had a real profile name. Falls back to the
+// stored actor_name when the join missed (rare, e.g. the user was
+// hard-deleted) or the profile name is blank. Non-user actors (system,
+// agent) always fall through to the stored actor_name.
 func annotationFromActorRow(a db.ListAnnotationsWithActorByTransactionRow) Annotation {
+	displayName := a.ActorName
+	if a.ActorType == "user" && a.ActorUserName != "" {
+		displayName = a.ActorUserName
+	}
+
 	ann := Annotation{
 		ID:            formatUUID(a.ID),
 		ShortID:       a.ShortID,
@@ -243,7 +258,7 @@ func annotationFromActorRow(a db.ListAnnotationsWithActorByTransactionRow) Annot
 		Kind:          a.Kind,
 		ActorType:     a.ActorType,
 		ActorID:       textPtr(a.ActorID),
-		ActorName:     a.ActorName,
+		ActorName:     displayName,
 		CreatedAt:     pgconv.TimestampStr(a.CreatedAt),
 	}
 
