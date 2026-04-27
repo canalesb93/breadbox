@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"breadbox/internal/service"
 
@@ -20,6 +21,9 @@ type listAnnotationsInput struct {
 	ReadSessionContext
 	TransactionID string   `json:"transaction_id" jsonschema:"required,UUID or short ID of the transaction"`
 	Kinds         []string `json:"kinds,omitempty" jsonschema:"Optional kind filter: any of comment, rule, tag, category, sync. Empty = all kinds. Pass ['comment'] for the comment-only timeline (replaces list_transaction_comments). Pass ['tag'] to see both add+remove events; the response carries an 'action' field (added|removed|set|applied|started|updated) for the specific event. Pass ['sync'] to see initial-import + pending-flip rows."`
+	ActorTypes    []string `json:"actor_types,omitempty" jsonschema:"Optional actor-type filter: any of user, agent, system. Empty = all actors. Pass ['user'] for the canonical 'any human input?' check — drops rule churn and prior agent activity in one filter. Combine with kinds for fine-grained slices."`
+	Since         string   `json:"since,omitempty" jsonschema:"Optional RFC3339 timestamp; return only annotations whose created_at is strictly after this time. Lets an agent that already saw the timeline once skip to the new tail. Malformed timestamps are rejected with a clear error."`
+	Limit         int      `json:"limit,omitempty" jsonschema:"Optional cap on returned rows — returns the most recent N (timeline tail) in chronological order. 0 (default) = full timeline; max 200; negative is rejected. Pair with since to bound a delta read."`
 }
 
 type addTransactionTagInput struct {
@@ -77,8 +81,22 @@ func (s *MCPServer) handleListAnnotations(_ context.Context, _ *mcpsdk.CallToolR
 	if err != nil {
 		return errorResult(err), nil, nil
 	}
+	if err := validateActorTypes(input.ActorTypes); err != nil {
+		return errorResult(err), nil, nil
+	}
+	since, err := parseSince(input.Since)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
+	limit, err := normalizeAnnotationLimit(input.Limit)
+	if err != nil {
+		return errorResult(err), nil, nil
+	}
 	annotations, err := s.svc.ListAnnotations(ctx, input.TransactionID, service.ListAnnotationsParams{
-		Kinds: dbKinds,
+		Kinds:      dbKinds,
+		ActorTypes: input.ActorTypes,
+		Since:      since,
+		Limit:      limit,
 	})
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
@@ -87,6 +105,50 @@ func (s *MCPServer) handleListAnnotations(_ context.Context, _ *mcpsdk.CallToolR
 		return errorResult(err), nil, nil
 	}
 	return jsonResult(toMCPAnnotations(annotations))
+}
+
+// validateActorTypes rejects unknown values at the MCP boundary so agents
+// get a clear error listing the accepted set instead of an empty result.
+// The accepted values mirror the annotations.actor_type CHECK constraint.
+func validateActorTypes(in []string) error {
+	for _, v := range in {
+		switch v {
+		case "user", "agent", "system":
+			// ok
+		default:
+			return fmt.Errorf("invalid actor_type %q: expected one of user, agent, system", v)
+		}
+	}
+	return nil
+}
+
+// parseSince accepts an empty string (no filter) or an RFC3339 timestamp.
+// Both RFC3339 and RFC3339Nano are tried so callers can pass fractional
+// seconds without ceremony.
+func parseSince(s string) (time.Time, error) {
+	if s == "" {
+		return time.Time{}, nil
+	}
+	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
+		return t, nil
+	}
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, nil
+	}
+	return time.Time{}, fmt.Errorf("invalid since %q: expected RFC3339 timestamp (e.g. 2026-04-26T12:00:00Z)", s)
+}
+
+// normalizeAnnotationLimit enforces the 0..MaxAnnotationLimit range. 0 means
+// "no cap" (full timeline) so existing callers that pass an empty input keep
+// their behavior. Negative is rejected — almost certainly a bug.
+func normalizeAnnotationLimit(limit int) (int, error) {
+	if limit < 0 {
+		return 0, fmt.Errorf("invalid limit %d: must be 0 (no cap) or a positive integer up to %d", limit, service.MaxAnnotationLimit)
+	}
+	if limit > service.MaxAnnotationLimit {
+		return service.MaxAnnotationLimit, nil
+	}
+	return limit, nil
 }
 
 // mcpAnnotationKinds enumerates the generic kinds exposed at the MCP boundary.

@@ -83,7 +83,14 @@ ACCOUNT LINKING:
 
 REPORTS & COMMUNICATION:
 - Tools: submit_report, add_transaction_comment, list_annotations
-- list_annotations is the canonical read path for the per-transaction activity timeline. Each row has a generic kind (comment | rule | tag | category) plus an action (added | removed | set | applied) for the specific event. Filter via kinds=['comment'] for the comment-only view, kinds=['tag'] for both add+remove tag events, kinds=['comment','tag','category'] to skip rule churn.
+- list_annotations is the canonical read path for the per-transaction activity timeline. Each row has a generic kind (comment | rule | tag | category) plus an action (added | removed | set | applied) for the specific event. Filters compose so agents pull only the slice they need:
+  - kinds=['comment'] — comment-only view (replaces the deprecated list_transaction_comments).
+  - kinds=['tag'] — both add+remove tag events.
+  - kinds=['comment','tag','category'] — skip rule-application churn.
+  - actor_types=['user'] — the canonical "any human input?" check; combine with kinds to scope further.
+  - since=<RFC3339> — return only annotations newer than this timestamp; pair with limit for cheap delta reads.
+  - limit=N (max 200) — most recent N rows in chronological order; bounds the worst case for chatty transactions.
+- PRIOR HUMAN INPUT IS LOAD-BEARING. Before overriding your own categorization or removing a needs-review tag, call list_annotations(transaction_id, actor_types=['user']) — a non-empty result means a human weighed in and that decision wins.
 - list_transaction_comments is deprecated — keep agents on list_annotations(kinds=['comment']).
 - Before submitting reports, read breadbox://report-format for report structure and formatting guidelines.
 
@@ -103,7 +110,7 @@ const DefaultReviewGuidelines = `REVIEW PRINCIPLES — follow these strictly:
 
 3. RULES ARE FORWARD-LOOKING. Transaction rules apply automatically to NEW transactions during sync. Do NOT use apply_rules or apply_retroactively=true during routine reviews. These are reserved for explicit one-off bulk work (initial setup only). During routine work, create rules and let them match future syncs naturally.
 
-4. PRIOR ANNOTATIONS ARE HUMAN CORRECTIONS. When a transaction has a history (list_annotations shows prior comments, rule applications, or category sets authored by humans), read that context first. A human's explicit decision overrides your prior categorization. Acknowledge the correction in the 'comment' field on the update_transactions operation that closes the review — that comment lands on the audit trail.
+4. PRIOR ANNOTATIONS ARE HUMAN CORRECTIONS. When a transaction has a history (list_annotations shows prior comments, rule applications, or category sets authored by humans), read that context first. The cheap targeted read is list_annotations(transaction_id, actor_types=['user']) — it skips rule churn and prior agent activity, returning only what humans did. A human's explicit decision overrides your prior categorization. Acknowledge the correction in the 'comment' field on the update_transactions operation that closes the review — that comment lands on the audit trail.
 
 5. LEAVE THE TAG ON RATHER THAN GUESS. If you cannot confidently determine the correct category, do NOT remove the needs-review tag. Leaving it attached keeps the transaction in the queue for a future pass. Never remove the tag with a placeholder comment just to "clear" the queue.
 
@@ -405,7 +412,7 @@ func (s *MCPServer) buildToolRegistry() {
 			"List all tags registered in the system. Each tag has a slug (stable identifier) and a display_name. Tags attached to transactions can be queried via the tags / any_tag filters on query_transactions.",
 			s.handleListTags, svc),
 		makeToolDefLogged("list_annotations", ToolRead,
-			"List the activity timeline for a transaction, ordered by created_at ASC. Each row carries a generic `kind` (comment | rule | tag | category) plus an `action` (added | removed | set | applied) for the specific event — branch on `action` when the distinction matters (e.g. tag added vs removed). Payload carries kind-specific fields (content for comments, slug for tag events, rule_name for rule applications). Pass kinds=['comment'] for the comment-only view (replaces the deprecated list_transaction_comments); pass kinds=['tag'] for all tag events. Empty kinds returns the full timeline.",
+			"List the activity timeline for a transaction, ordered by created_at ASC. Each row carries a generic `kind` (comment | rule | tag | category) plus an `action` (added | removed | set | applied) for the specific event — branch on `action` when the distinction matters (e.g. tag added vs removed). Payload carries kind-specific fields (content for comments, slug for tag events, rule_name for rule applications). Filters compose: `kinds=['comment']` is the comment-only view (replaces deprecated list_transaction_comments); `actor_types=['user']` is the canonical 'any human input?' check (drops rule churn + agent activity); `since` (RFC3339) skips rows you've already seen; `limit` returns the most recent N (capped at 200). Empty filters return the full timeline. Recommended patterns: before overriding your own categorization, call list_annotations(transaction_id, actor_types=['user']) — if any row exists, a human has weighed in and that decision wins.",
 			s.handleListAnnotations, svc),
 		makeToolDefLogged("add_transaction_tag", ToolWrite,
 			"Attach a tag to a transaction. Tags are an open-ended labeling system — auto-creates a persistent tag if the slug doesn't exist yet. Idempotent: returns already_present=true if the tag was already attached. To record decision context for a tag change, leave a comment on the same transaction (add_transaction_comment, or the `comment` field on update_transactions).",

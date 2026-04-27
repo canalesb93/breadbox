@@ -205,9 +205,32 @@ Return the activity timeline for a transaction. Each row carries a generic `kind
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `transaction_id` | string | UUID or short ID. Required. |
-| `kinds` | array | Optional kind filter. Any of: `comment`, `rule`, `tag`, `category`. Empty (default) returns all kinds. |
+| `kinds` | array | Optional kind filter. Any of: `comment`, `rule`, `tag`, `category`, `sync`. Empty (default) returns all kinds. |
+| `actor_types` | array | Optional actor-type filter. Any of: `user`, `agent`, `system`. Empty (default) returns all actors. Pass `['user']` for the canonical "any human input?" check — drops rule churn + prior agent activity in one filter. |
+| `since` | string | Optional RFC3339 timestamp. Returns only annotations whose `created_at` is strictly after this time. Pair with `limit` for cheap delta reads. |
+| `limit` | int | Optional cap on returned rows; returns the most recent N (timeline tail) in chronological order. `0` (default) returns the full timeline. Max `200`. Negative is rejected. |
 
-The `kinds` filter is the canonical replacement for the deprecated `list_transaction_comments` tool — pass `kinds=['comment']` for the comment-only view. Pass `kinds=['comment','tag','category']` to skip rule-application churn. Branch on `action` when the add-vs-remove distinction matters (e.g. building a tag-history view).
+Filters compose. The canonical "what did humans say on this transaction?" call returns ~3 rows even on a transaction churned by 30 rule applications:
+
+```
+list_annotations(transaction_id="k7Xm9pQ2", actor_types=["user"])
+```
+
+Other useful slices:
+
+- `kinds=['comment']` — comment-only view (replaces the deprecated `list_transaction_comments`).
+- `kinds=['comment','tag','category']` — skip rule-application churn while keeping all decision-shaped events.
+- `actor_types=['user'], kinds=['comment']` — human-authored notes only.
+- `since="2026-04-26T12:00:00Z", limit=50` — delta read after a previous full pull. Pair with `actor_types=['user']` to react only to new human input.
+
+Branch on `action` when the add-vs-remove distinction matters (e.g. building a tag-history view).
+
+**Validation errors** (returned as the standard `{ "error": "..." }` envelope):
+
+- Unknown `kinds` value (e.g. raw DB kind `tag_added`) — must use the generic name (`tag`).
+- Unknown `actor_types` value — must be one of `user`, `agent`, `system`.
+- Malformed `since` — must be an RFC3339 timestamp.
+- Negative `limit`.
 
 ### create_tag / update_tag / delete_tag (Write)
 
