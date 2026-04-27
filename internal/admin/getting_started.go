@@ -117,8 +117,7 @@ func DismissGettingStartedHandler(a *app.App, sm *scs.SessionManager) http.Handl
 			Value: pgconv.Text("true"),
 		}); err != nil {
 			a.Logger.Error("dismiss getting started: set app config", "error", err)
-			SetFlash(r.Context(), sm, "error", "Failed to dismiss guide. Please try again.")
-			http.Redirect(w, r, "/getting-started", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Failed to dismiss guide. Please try again.", "/getting-started")
 			return
 		}
 		SetFlash(r.Context(), sm, "success", "Getting Started guide dismissed. You can re-open it from Settings.")
@@ -135,8 +134,7 @@ func ReopenGettingStartedHandler(a *app.App, sm *scs.SessionManager) http.Handle
 			Value: pgconv.Text("false"),
 		}); err != nil {
 			a.Logger.Error("reopen getting started: set app config", "error", err)
-			SetFlash(r.Context(), sm, "error", "Failed to re-open guide. Please try again.")
-			http.Redirect(w, r, "/settings", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Failed to re-open guide. Please try again.", "/settings")
 			return
 		}
 		SetFlash(r.Context(), sm, "success", "Getting Started guide re-opened.")

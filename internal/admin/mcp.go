@@ -33,8 +33,7 @@ func MCPSaveModeHandler(svc *service.Service, sm *scs.SessionManager) http.Handl
 	return func(w http.ResponseWriter, r *http.Request) {
 		mode := r.FormValue("mode")
 		if err := svc.SaveMCPMode(r.Context(), mode); err != nil {
-			SetFlash(r.Context(), sm, "error", "Invalid mode: must be read_only or read_write")
-			http.Redirect(w, r, "/agents?tab=settings", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Invalid mode: must be read_only or read_write", "/agents?tab=settings")
 			return
 		}
 		SetFlash(r.Context(), sm, "success", "MCP mode updated.")
@@ -46,8 +45,7 @@ func MCPSaveModeHandler(svc *service.Service, sm *scs.SessionManager) http.Handl
 func MCPSaveToolsHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			SetFlash(r.Context(), sm, "error", "Invalid form data")
-			http.Redirect(w, r, "/agents?tab=settings", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Invalid form data", "/agents?tab=settings")
 			return
 		}
 
@@ -65,8 +63,7 @@ func MCPSaveToolsHandler(svc *service.Service, mcpServer *breadboxmcp.MCPServer,
 		}
 
 		if err := svc.SaveMCPDisabledTools(r.Context(), disabled); err != nil {
-			SetFlash(r.Context(), sm, "error", "Failed to save tool settings")
-			http.Redirect(w, r, "/agents?tab=settings", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Failed to save tool settings", "/agents?tab=settings")
 			return
 		}
 		SetFlash(r.Context(), sm, "success", "Tool settings updated.")
@@ -80,8 +77,7 @@ func MCPSaveInstructionsHandler(svc *service.Service, sm *scs.SessionManager) ht
 		instructions := strings.TrimSpace(r.FormValue("instructions"))
 
 		if err := svc.SaveMCPInstructions(r.Context(), instructions); err != nil {
-			SetFlash(r.Context(), sm, "error", err.Error())
-			http.Redirect(w, r, "/agents?tab=settings", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", err.Error(), "/agents?tab=settings")
 			return
 		}
 		SetFlash(r.Context(), sm, "success", "Instructions saved.")
@@ -94,8 +90,7 @@ func MCPSaveReviewGuidelinesHandler(svc *service.Service, sm *scs.SessionManager
 	return func(w http.ResponseWriter, r *http.Request) {
 		guidelines := strings.TrimSpace(r.FormValue("review_guidelines"))
 		if err := svc.SaveMCPReviewGuidelines(r.Context(), guidelines); err != nil {
-			SetFlash(r.Context(), sm, "error", err.Error())
-			http.Redirect(w, r, "/agents?tab=settings#review-guidelines", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", err.Error(), "/agents?tab=settings#review-guidelines")
 			return
 		}
 		SetFlash(r.Context(), sm, "success", "Review guidelines saved.")
@@ -108,8 +103,7 @@ func MCPSaveReportFormatHandler(svc *service.Service, sm *scs.SessionManager) ht
 	return func(w http.ResponseWriter, r *http.Request) {
 		format := strings.TrimSpace(r.FormValue("report_format"))
 		if err := svc.SaveMCPReportFormat(r.Context(), format); err != nil {
-			SetFlash(r.Context(), sm, "error", err.Error())
-			http.Redirect(w, r, "/agents?tab=settings#report-format", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", err.Error(), "/agents?tab=settings#report-format")
 			return
 		}
 		SetFlash(r.Context(), sm, "success", "Report format saved.")

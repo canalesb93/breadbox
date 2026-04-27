@@ -175,8 +175,7 @@ func APIKeyCreatePageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
-			SetFlash(r.Context(), sm, "error", "Name is required")
-			http.Redirect(w, r, "/api-keys/new", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Name is required", "/api-keys/new")
 			return
 		}
 		scope := r.FormValue("scope")
@@ -185,8 +184,7 @@ func APIKeyCreatePageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 		}
 		result, err := svc.CreateAPIKey(r.Context(), name, scope)
 		if err != nil {
-			SetFlash(r.Context(), sm, "error", "Failed to create API key")
-			http.Redirect(w, r, "/api-keys/new", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Failed to create API key", "/api-keys/new")
 			return
 		}
 		// Store the plaintext key in the session so the "created" page can display it once.

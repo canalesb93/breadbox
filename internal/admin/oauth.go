@@ -386,8 +386,7 @@ func OAuthClientCreatePageHandler(svc *service.Service, sm *scs.SessionManager, 
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
-			SetFlash(r.Context(), sm, "error", "Name is required")
-			http.Redirect(w, r, "/oauth-clients/new", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Name is required", "/oauth-clients/new")
 			return
 		}
 		scope := r.FormValue("scope")
@@ -396,8 +395,7 @@ func OAuthClientCreatePageHandler(svc *service.Service, sm *scs.SessionManager, 
 		}
 		result, err := svc.CreateOAuthClient(r.Context(), name, scope)
 		if err != nil {
-			SetFlash(r.Context(), sm, "error", "Failed to create OAuth client")
-			http.Redirect(w, r, "/oauth-clients/new", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "error", "Failed to create OAuth client", "/oauth-clients/new")
 			return
 		}
 		sm.Put(r.Context(), "created_oauth_client_id", result.ClientID)
