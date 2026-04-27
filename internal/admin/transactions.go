@@ -866,6 +866,7 @@ func categoryDetailLookup(tree []service.CategoryResponse) func(string) category
 type tagDisplay struct {
 	DisplayName string
 	Color       *string
+	Icon        *string
 }
 
 // tagDisplayLookup returns a slug -> presentation lookup built from the
@@ -874,7 +875,7 @@ type tagDisplay struct {
 func tagDisplayLookup(tags []service.TagResponse) func(string) tagDisplay {
 	by := make(map[string]tagDisplay, len(tags))
 	for _, t := range tags {
-		by[t.Slug] = tagDisplay{DisplayName: t.DisplayName, Color: t.Color}
+		by[t.Slug] = tagDisplay{DisplayName: t.DisplayName, Color: t.Color, Icon: t.Icon}
 	}
 	return func(slug string) tagDisplay {
 		if slug == "" {
@@ -1032,6 +1033,7 @@ func activityEntryFromAnnotation(a service.Annotation, tagDisplayFn func(string)
 					entry.TagDisplayName = a.TagSlug
 				}
 				entry.TagColor = td.Color
+				entry.TagIcon = td.Icon
 			} else {
 				entry.TagSlug = a.TagSlug
 				entry.TagDisplayName = a.TagSlug
@@ -1052,13 +1054,14 @@ func activityEntryFromAnnotation(a service.Annotation, tagDisplayFn func(string)
 		return entry, true
 
 	case "tag_added", "tag_removed":
-		// Look up color separately — service-layer enrichment doesn't
-		// carry presentation metadata.
-		var color *string
+		// Look up presentation metadata separately — service-layer
+		// enrichment carries identifiers, not display attributes.
+		var color, icon *string
 		display := a.Subject
 		if tagDisplayFn != nil {
 			td := tagDisplayFn(a.TagSlug)
 			color = td.Color
+			icon = td.Icon
 			if td.DisplayName != "" {
 				display = td.DisplayName
 			}
@@ -1080,6 +1083,7 @@ func activityEntryFromAnnotation(a service.Annotation, tagDisplayFn func(string)
 			TagSlug:            a.TagSlug,
 			TagDisplayName:     display,
 			TagColor:           color,
+			TagIcon:            icon,
 			TagAction:          action,
 		}
 		if a.ActorID != nil && *a.ActorID != "" {
