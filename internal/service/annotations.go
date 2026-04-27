@@ -84,6 +84,12 @@ type Annotation struct {
 	TagSlug      string `json:"tag_slug,omitempty"`
 	CategorySlug string `json:"category_slug,omitempty"`
 	RuleName     string `json:"rule_name,omitempty"`
+	// RuleShortID is the rule's 8-char short_id, surfaced from
+	// payload.rule_id so admin UI consumers can link to /rules/<short_id>
+	// without resolving the FK separately. The DB row's rule_id column is
+	// the UUID and stays exposed via Annotation.RuleID; this field is the
+	// human-friendly handle the timeline link uses.
+	RuleShortID string `json:"rule_short_id,omitempty"`
 
 	// ActorAvatarVersion is the unix timestamp of the user's most recent
 	// users.updated_at, used as a cache-busting `?v=<ts>` query string on

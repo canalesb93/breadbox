@@ -1002,16 +1002,54 @@ func activityEntryFromAnnotation(a service.Annotation, tagDisplayFn func(string)
 		if a.Origin != "" {
 			summary = strings.TrimSuffix(summary, " "+a.Origin)
 		}
-		return service.ActivityEntry{
-			Type:      "rule",
-			Timestamp: a.CreatedAt,
-			ActorName: "",
-			ActorType: "system",
-			Summary:   summary,
-			RuleName:  a.RuleName,
-			RuleID:    derefOr(a.RuleID, ""),
-			Origin:    a.Origin,
-		}, true
+		field, _ := a.Payload["action_field"].(string)
+		entry := service.ActivityEntry{
+			Type:        "rule",
+			Timestamp:   a.CreatedAt,
+			ActorName:   "",
+			ActorType:   "system",
+			Summary:     summary,
+			RuleName:    a.RuleName,
+			RuleID:      derefOr(a.RuleID, ""),
+			RuleShortID: a.RuleShortID,
+			ActionField: field,
+			Origin:      a.Origin,
+		}
+		// Hydrate the chip-rendering fields so the templ can render the
+		// rule-driven row with a tag chip or category chip in place of the
+		// plain-text resource that the Summary string carries. The chip
+		// helpers reuse the same fields populated for user-driven
+		// tag_added / category_set rows; keeping the data path unified
+		// means the templ doesn't have to branch by Type to find the
+		// presentation metadata.
+		switch field {
+		case "tag":
+			if tagDisplayFn != nil {
+				td := tagDisplayFn(a.TagSlug)
+				entry.TagSlug = a.TagSlug
+				entry.TagDisplayName = td.DisplayName
+				if entry.TagDisplayName == "" {
+					entry.TagDisplayName = a.TagSlug
+				}
+				entry.TagColor = td.Color
+			} else {
+				entry.TagSlug = a.TagSlug
+				entry.TagDisplayName = a.TagSlug
+			}
+		case "category":
+			if categoryDetail != nil {
+				d := categoryDetail(a.CategorySlug)
+				entry.CategoryName = d.DisplayName
+				if entry.CategoryName == "" {
+					entry.CategoryName = a.CategorySlug
+				}
+				entry.CategoryColor = d.Color
+				entry.CategoryIcon = d.Icon
+			} else {
+				entry.CategoryName = a.CategorySlug
+			}
+		}
+		return entry, true
 
 	case "tag_added", "tag_removed":
 		// Look up color separately — service-layer enrichment doesn't

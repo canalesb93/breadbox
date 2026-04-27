@@ -377,17 +377,15 @@ templ txdTimelineSystem(e service.ActivityEntry, now time.Time) {
 }
 
 // txdSystemSentence assembles the actor-verb-object phrase shown next to a
-// system-event icon. For rule rows the prebuilt Summary is rendered as-is
-// (optionally linked to /rules/<id>); for actor-driven rows we compose:
+// system-event icon. Rule rows render as: rule-name link + verb + chip,
+// matching the bolding pattern of user-driven rows so a rule firing reads
+// the same as a person doing the equivalent action. For actor-driven rows
+// we compose:
 //   <strong>Alice</strong> added the <chip>food</chip>
-//   <strong>Alice</strong> set category to <em>Groceries</em>
+//   <strong>Alice</strong> set category to <chip>Groceries</chip>
 templ txdSystemSentence(e service.ActivityEntry) {
 	if e.Type == "rule" {
-		if e.RuleID != "" {
-			<a href={ templ.SafeURL("/rules/" + e.RuleID) } class="font-medium text-base-content hover:text-primary transition-colors break-words">{ e.Summary }</a>
-		} else {
-			<span class="font-medium text-base-content break-words">{ e.Summary }</span>
-		}
+		@txdRuleSentence(e)
 	} else if e.Type == "sync" {
 		<span class="font-medium text-base-content break-words">{ e.Summary }</span>
 	} else if e.Type == "tag" {
@@ -412,11 +410,11 @@ templ txdSystemSentence(e service.ActivityEntry) {
 	} else if e.Type == "category" {
 		if e.ActorName != "" {
 			@txdActorInline(e)
-			<span>set category to </span>
+			<span>set the category to </span>
 		} else {
-			<span class="font-medium text-base-content">Set category to </span>
+			<span class="font-medium text-base-content">Set the category to </span>
 		}
-		<span class="font-medium text-base-content">{ e.CategoryName }</span>
+		@txdInlineCategoryChip(e)
 	} else {
 		<!-- Review (legacy) and any unknown kind: fall back to Summary -->
 		if e.Summary != "" {
@@ -709,6 +707,85 @@ templ txdComposerCard(p TransactionDetailProps) {
 			</button>
 		</div>
 	</div>
+}
+
+// txdRuleSentence renders the rule_applied row body in the actor-verb-object
+// shape used by user-driven rows: bold rule name (linked to the rule detail
+// page on the *name only* — not the whole row, so the chip stays clickable
+// without accidentally navigating away) → plain verb → resource chip. Falls
+// back to the prebuilt Summary string when the action_field is anything we
+// don't have chip metadata for, preserving forward compatibility with future
+// rule action types.
+templ txdRuleSentence(e service.ActivityEntry) {
+	@txdRuleActor(e)
+	if e.ActionField == "tag" {
+		<span>added the </span>
+		@txdInlineTagChip(e)
+		<span class="ml-1">tag</span>
+	} else if e.ActionField == "category" {
+		<span>set the category to </span>
+		@txdInlineCategoryChip(e)
+	} else {
+		<!-- Unknown / future action_field: fall through to the bare
+		     verb so we never render a stale "set category to <slug>"
+		     when only Summary carries the right phrasing. -->
+		<span class="text-base-content/55">{ txdRuleVerbFallback(e) }</span>
+	}
+}
+
+// txdRuleActor renders the rule's name as either a link to /rules/<short_id>
+// (when the short_id is known) or plain bold text. Only the name itself is
+// the anchor so the chip rendered later in the row stays an independent
+// click target — avoiding the "click the tag, end up on the rule page"
+// regression the previous whole-row link caused.
+templ txdRuleActor(e service.ActivityEntry) {
+	<span>Rule </span>
+	if e.RuleShortID != "" {
+		<a
+			href={ templ.SafeURL("/rules/" + e.RuleShortID) }
+			class="font-semibold text-base-content hover:underline underline-offset-2 decoration-base-content/40 break-words"
+		>{ e.RuleName }</a>
+	} else if e.RuleID != "" {
+		<a
+			href={ templ.SafeURL("/rules/" + e.RuleID) }
+			class="font-semibold text-base-content hover:underline underline-offset-2 decoration-base-content/40 break-words"
+		>{ e.RuleName }</a>
+	} else {
+		<strong class="font-semibold text-base-content">{ e.RuleName }</strong>
+	}
+}
+
+// txdRuleVerbFallback returns the trailing verb-and-object text for rule
+// rows whose action_field doesn't have a chip rendering. Strips the rule
+// name + opening quote off the prebuilt Summary so we don't render the
+// rule name twice when this branch fires.
+func txdRuleVerbFallback(e service.ActivityEntry) string {
+	s := e.Summary
+	prefix := "Rule \"" + e.RuleName + "\" "
+	if strings.HasPrefix(s, prefix) {
+		return s[len(prefix):]
+	}
+	return s
+}
+
+// txdInlineCategoryChip renders a pill matching the canonical bb-tag chip
+// styling (the same look used for tags) but populated from a category's
+// color + icon + display name. Reuses the --tag-color CSS variable so a
+// single CSS class drives both tag and category chips.
+templ txdInlineCategoryChip(e service.ActivityEntry) {
+	<span
+		class="bb-tag bb-tag-sm align-middle"
+		if e.CategoryColor != nil && *e.CategoryColor != "" {
+			style={ "--tag-color: " + *e.CategoryColor }
+		}
+	>
+		if e.CategoryIcon != nil && *e.CategoryIcon != "" {
+			<i data-lucide={ *e.CategoryIcon }></i>
+		} else {
+			<i data-lucide="folder"></i>
+		}
+		<span class="truncate">{ e.CategoryName }</span>
+	</span>
 }
 
 // txdInlineTagChip renders the inline tag pill that follows the summary
