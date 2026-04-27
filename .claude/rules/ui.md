@@ -139,6 +139,10 @@ Full reference, including the canonical global + per-page shortcut tables and ar
 
 Admin list pages (reviews, rules, reports) use AJAX actions with card fade-out animations via Alpine. See `/reviews` (`reviewQueue()` component) for the reference pattern: inline approve/reject/skip/dismiss, optimistic UI, fade transitions, error recovery via `restorePageState()`.
 
+## Activity timeline (transaction detail)
+
+Touching the activity card on `/transactions/{id}` — or anything that wants to reuse the same row-on-rail shape (sync-log detail, agent-run logs) — read `docs/activity-timeline.md` first. It captures the rail / opaque-tile / `leading-6` invariants, the day-grouping + shared `now` anchor contract, the `EnrichAnnotations` dedup rules (including the "tombstones never fold" PR 4 invariant), the Strategy A optimistic-update flow against `GET /-/transactions/{id}/timeline/rows`, and a six-step recipe for adding a new system-event kind end-to-end (migration → emit → enrich → render → MCP → test). Skip it and you'll re-discover the gotchas the hard way — the rail centring, the tombstone branch, and the dedup carve-outs are all load-bearing.
+
 ## Icons
 
 Lucide names only. Nav-level icons are stable; don't rename on a whim (users build muscle memory). Current nav: `home`, `credit-card`, `receipt`, `folder`, `link-2` (account links), `users`, `key`, `bot` (MCP), `list-filter` (rules), `inbox` (reviews), `flag` (reports), `scroll` (sync logs), `settings`.
