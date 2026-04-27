@@ -1,0 +1,249 @@
+package pages
+
+import "fmt"
+
+// MCPSettings renders the MCP Settings tab inside /agents. Originally
+// pages/mcp_settings.html in the html/template tree. The card-level
+// Alpine factories live in static/js/admin/components/mcp_settings.js;
+// initial state for the three editable cards (instructions, review
+// guidelines, report format) flows in via @templ.JSONScript.
+templ MCPSettings(p MCPSettingsProps) {
+	<script src="/static/js/admin/components/mcp_settings.js"></script>
+	@templ.JSONScript("mcp-settings-data", MCPSettingsClient{
+		Instructions:            p.Instructions,
+		DefaultInstructions:     p.DefaultInstructions,
+		ReviewGuidelines:        p.ReviewGuidelines,
+		DefaultReviewGuidelines: p.DefaultReviewGuidelines,
+		ReportFormat:            p.ReportFormat,
+		DefaultReportFormat:     p.DefaultReportFormat,
+	})
+	<div class="grid gap-6 bb-stagger">
+		<!-- Card 1: Server Instructions -->
+		@mcpSettingsEditableCard(mcpSettingsCardSpec{
+			Slug:        "instructions",
+			Action:      "/mcp-settings/instructions",
+			FieldName:   "instructions",
+			Title:       "Server Instructions",
+			SubtitleCol: "Custom instructions sent to agents when they connect via MCP",
+			SubtitleExp: "Instructions sent to agents when they connect via MCP",
+			Icon:        "scroll-text",
+			IconColor:   "info",
+			MaxLen:      20000,
+			MinHeight:   "24rem",
+			SaveLabel:   "Save Instructions",
+			Placeholder: "Server instructions for MCP agents...",
+			ShowWarning: true,
+			CSRFToken:   p.CSRFToken,
+		})
+		<!-- Card 2: Review Guidelines -->
+		@mcpSettingsEditableCard(mcpSettingsCardSpec{
+			Slug:        "review-guidelines",
+			Action:      "/mcp-settings/review-guidelines",
+			FieldName:   "review_guidelines",
+			Title:       "Review Guidelines",
+			SubtitleCol: `Served as <code class="text-xs">breadbox://review-guidelines</code> to agents during reviews`,
+			SubtitleExp: "Guidelines for reviewing transactions and creating rules — agents read this resource before processing reviews",
+			Icon:        "book-open",
+			IconColor:   "success",
+			MaxLen:      30000,
+			MinHeight:   "20rem",
+			SaveLabel:   "Save Guidelines",
+			Placeholder: "Review guidelines for agents...",
+			CSRFToken:   p.CSRFToken,
+		})
+		<!-- Card 3: Report Format -->
+		@mcpSettingsEditableCard(mcpSettingsCardSpec{
+			Slug:        "report-format",
+			Action:      "/mcp-settings/report-format",
+			FieldName:   "report_format",
+			Title:       "Report Format",
+			SubtitleCol: `Served as <code class="text-xs">breadbox://report-format</code> to agents when submitting reports`,
+			SubtitleExp: "Report structure templates and formatting guidelines — agents read this resource before submitting reports",
+			Icon:        "file-text",
+			IconColor:   "warning",
+			MaxLen:      20000,
+			MinHeight:   "20rem",
+			SaveLabel:   "Save Format",
+			Placeholder: "Report format guidelines for agents...",
+			CSRFToken:   p.CSRFToken,
+		})
+		<!-- Card 4: Tools Enabled -->
+		@mcpSettingsToolsCard(p)
+		<!-- Card 5: MCP Connection -->
+		@mcpSettingsConnectionCard()
+	</div>
+}
+
+type mcpSettingsCardSpec struct {
+	Slug        string
+	Action      string
+	FieldName   string
+	Title       string
+	SubtitleCol string // collapsed subtitle (raw HTML allowed via templ.Raw below)
+	SubtitleExp string // expanded subtitle (raw HTML allowed via templ.Raw below)
+	Icon        string
+	IconColor   string // "info" | "success" | "warning" | "primary"
+	MaxLen      int
+	MinHeight   string
+	SaveLabel   string
+	Placeholder string
+	ShowWarning bool
+	CSRFToken   string
+}
+
+templ mcpSettingsEditableCard(c mcpSettingsCardSpec) {
+	<div id={ c.Slug } class="bb-card p-0 overflow-hidden" x-data="mcpSettingsCard" data-slug={ c.Slug }>
+		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+			<!-- NOTE: Avoid bg-secondary/10 + text-secondary for card header icons —
+			     the secondary color has almost no contrast against the light background,
+			     making the icon look transparent/ghostly. Use info or primary instead. -->
+			<div class={ "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0", "bg-" + c.IconColor + "/10" }>
+				<i data-lucide={ c.Icon } class={ "w-5 h-5", "text-" + c.IconColor }></i>
+			</div>
+			<div class="min-w-0 flex-1">
+				<h2 class="font-semibold">{ c.Title }</h2>
+				<p class="text-xs text-base-content/40" x-show="!expanded">@templ.Raw(c.SubtitleCol)
+</p>
+				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>@templ.Raw(c.SubtitleExp)
+</p>
+			</div>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+		</div>
+		<div x-show="expanded" x-collapse>
+			<div class="px-4 sm:px-5 py-4">
+				if c.ShowWarning {
+					<div role="alert" class="alert alert-warning alert-soft mb-4 text-xs rounded-xl">
+						<i data-lucide="triangle-alert" class="w-4 h-4"></i>
+						<span>These instructions guide how agents understand your data model, query patterns, and available tools. Editing may cause agents to misuse tools or produce incorrect results.</span>
+					</div>
+				}
+				<form method="POST" action={ templ.SafeURL(c.Action) }>
+					<input type="hidden" name="_csrf" value={ c.CSRFToken }/>
+					<div class="form-control mb-4">
+						<textarea
+							name={ c.FieldName }
+							class="textarea textarea-bordered font-mono text-xs leading-relaxed w-full rounded-xl"
+							style={ "min-height: " + c.MinHeight }
+							maxlength={ fmt.Sprintf("%d", c.MaxLen) }
+							x-model="value"
+							placeholder={ c.Placeholder }
+						></textarea>
+						<label class="label">
+							<span class="label-text-alt text-base-content/40" x-text={ "value.length + '/' + " + fmt.Sprintf("%d", c.MaxLen) }></span>
+						</label>
+					</div>
+					<div class="flex flex-wrap gap-2 items-center">
+						<button type="submit" class="btn btn-primary btn-sm rounded-xl">{ c.SaveLabel }</button>
+						<button type="button" class="btn btn-ghost btn-sm rounded-xl" @click="resetToDefaults()">Reset to Defaults</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+}
+
+templ mcpSettingsToolsCard(p MCPSettingsProps) {
+	<div id="tools" class="bb-card p-0 overflow-hidden" x-data="mcpSettingsTools">
+		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+			<div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+				<i data-lucide="wrench" class="w-5 h-5 text-primary"></i>
+			</div>
+			<div class="min-w-0 flex-1">
+				<h2 class="font-semibold">Tools Enabled</h2>
+				<p class="text-xs text-base-content/40" x-show="!expanded">
+					{ fmt.Sprintf("%d of %d tools enabled", p.ToolsEnabledCount, p.ToolsTotalCount) }
+					if p.ToolsDisabledCount > 0 {
+						{ fmt.Sprintf(" · %d disabled", p.ToolsDisabledCount) }
+					}
+				</p>
+				<p class="text-xs text-base-content/40" x-show="expanded" x-cloak>Enable or disable individual MCP tools</p>
+			</div>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+		</div>
+		<div x-show="expanded" x-collapse x-cloak>
+			<div class="px-4 sm:px-5 py-4">
+				<p class="text-sm text-base-content/50 mb-4">Disabled tools are hidden from all agents. Read-only API keys cannot invoke write tools regardless of this setting.</p>
+				<form method="POST" action="/mcp-settings/tools">
+					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+					<div class="space-y-6">
+						for _, g := range p.ToolGroups {
+							<div>
+								<h3 class="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-2 px-2 sm:px-3">{ g.Name }</h3>
+								<div class="space-y-1">
+									for _, t := range g.Tools {
+										@mcpSettingsToolRow(t)
+									}
+								</div>
+							</div>
+						}
+					</div>
+					<div class="mt-5">
+						<button type="submit" class="btn btn-primary btn-sm rounded-xl">Save Tools</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+}
+
+templ mcpSettingsToolRow(t MCPSettingsToolInfo) {
+	<div class="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl hover:bg-base-200/50 transition-colors duration-150">
+		if t.Enabled {
+			<input type="checkbox" name="enabled_tools" value={ t.Name } class="toggle toggle-sm toggle-primary mt-0.5 flex-shrink-0" checked/>
+		} else {
+			<input type="checkbox" name="enabled_tools" value={ t.Name } class="toggle toggle-sm toggle-primary mt-0.5 flex-shrink-0"/>
+		}
+		<div class="min-w-0 flex-1">
+			<div class="flex items-center gap-2 flex-wrap">
+				<span class="font-mono text-xs sm:text-sm break-all sm:break-normal">{ t.Name }</span>
+				if t.Classification == "write" {
+					<span class="badge badge-soft badge-warning badge-xs font-medium">write</span>
+				} else {
+					<span class="badge badge-soft badge-success badge-xs font-medium">read</span>
+				}
+			</div>
+			<div class="text-xs text-base-content/40 mt-0.5">{ t.Description }</div>
+		</div>
+	</div>
+}
+
+templ mcpSettingsConnectionCard() {
+	<div id="connection" class="bb-card p-0 overflow-hidden" x-data="mcpSettingsConnection">
+		<div class="px-4 sm:px-5 py-4 flex items-center gap-3 cursor-pointer" :class="expanded && 'border-b border-base-300'" @click="expanded = !expanded">
+			<div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center flex-shrink-0">
+				<i data-lucide="plug" class="w-5 h-5 text-warning"></i>
+			</div>
+			<div class="min-w-0 flex-1">
+				<h2 class="font-semibold">Connection</h2>
+				<p class="text-xs text-base-content/40">Endpoints and config for connecting MCP agents</p>
+			</div>
+			<i data-lucide="chevron-down" class="w-4 h-4 text-base-content/30 transition-transform duration-200 flex-shrink-0" :class="expanded && 'rotate-180'"></i>
+		</div>
+		<div x-show="expanded" x-collapse x-cloak>
+			<div class="px-4 sm:px-5 py-4 space-y-5">
+				<div>
+					<h3 class="font-medium text-sm mb-2 text-base-content/60">HTTP Endpoint</h3>
+					<div class="bg-base-200 rounded-xl p-3 font-mono text-sm break-all text-base-content/70">https://&lt;host&gt;/mcp</div>
+				</div>
+				<div>
+					<h3 class="font-medium text-sm mb-2 text-base-content/60">Stdio Command</h3>
+					<div class="bg-base-200 rounded-xl p-3 font-mono text-sm text-base-content/70">docker exec -i breadbox-app-1 /app/breadbox mcp-stdio</div>
+				</div>
+				<div>
+					<h3 class="font-medium text-sm mb-2 text-base-content/60">Claude Desktop Config (stdio)</h3>
+					<div class="relative">
+						<pre class="bg-base-200 rounded-xl p-4 text-sm font-mono overflow-auto text-base-content/70">{ stdioConfigJSON() }</pre>
+						<button class="btn btn-sm btn-ghost rounded-xl absolute top-2 right-2" @click.stop="copyStdioConfig()">
+							<template x-if="!copiedConfig">
+								<span class="flex items-center gap-1"><i data-lucide="copy" class="w-4 h-4"></i> Copy</span>
+							</template>
+							<template x-if="copiedConfig">
+								<span class="flex items-center gap-1 text-success"><i data-lucide="check" class="w-4 h-4"></i> Copied!</span>
+							</template>
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+}

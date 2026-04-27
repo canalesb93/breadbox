@@ -1,0 +1,214 @@
+package pages
+
+import "fmt"
+
+// AgentWizard renders the Prompt Library tab inside /agents. Originally
+// pages/agent_wizard.html in the html/template tree. Each prompt card
+// owns a tiny `agentWizardCard` Alpine factory (defined in
+// static/js/admin/components/agent_wizard.js) that handles the
+// fetch-copy-flash flow for its slug.
+templ AgentWizard(p AgentWizardProps) {
+	<script src="/static/js/admin/components/agent_wizard.js"></script>
+	<div role="alert" class="alert alert-info alert-soft text-sm rounded-xl mb-6">
+		<i data-lucide="rocket" class="w-4 h-4"></i>
+		<span>New to MCP agents? Follow the <a href="/agents?tab=guide" class="link font-medium">Getting Started guide</a> to connect your first agent.</span>
+	</div>
+	<div class="space-y-8 bb-stagger">
+		<!-- Section: Bulk Reviews -->
+		<div>
+			<div class="flex items-center gap-2 mb-3">
+				<h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wider">Bulk Reviews</h2>
+				if p.Stats.PendingReviews > 0 {
+					<span class="badge badge-primary badge-sm font-mono">{ fmt.Sprintf("%d pending", p.Stats.PendingReviews) }</span>
+				}
+			</div>
+			<div class="space-y-2">
+				@wizardCard(wizardCardData{
+					Slug:      "initial-setup",
+					Title:     "Initial Setup",
+					Icon:      "sparkles",
+					Color:     "primary",
+					BadgeText: "First run",
+					Body:      "Establish rules and categories after connecting your first accounts. Creates broad category mappings per provider.",
+				})
+				@wizardCard(wizardCardData{
+					Slug:      "bulk-review",
+					Title:     "Bulk Review",
+					Icon:      "layers",
+					Color:     "primary",
+					BadgeText: "Thorough",
+					Counter: func() string {
+						if p.Stats.PendingReviews > 0 {
+							return fmt.Sprintf("%d waiting", p.Stats.PendingReviews)
+						}
+						return ""
+					}(),
+					Body: "Review a large queue of pending transactions with careful categorization and rule creation.",
+				})
+				@wizardCard(wizardCardData{
+					Slug:      "quick-review",
+					Title:     "Quick Review",
+					Icon:      "zap",
+					Color:     "primary",
+					BadgeText: "Fast",
+					Body:      "Rapidly clear a large queue using batch operations. Prioritizes speed with reasonable accuracy.",
+				})
+			</div>
+		</div>
+		<!-- Section: Routine -->
+		<div>
+			<div class="flex items-center gap-2 mb-3">
+				<h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wider">Routine</h2>
+			</div>
+			<div class="space-y-2">
+				@wizardCard(wizardCardData{
+					Slug:      "routine-review",
+					Title:     "Routine Review",
+					Icon:      "repeat",
+					Color:     "success",
+					BadgeText: "Recurring",
+					Counter: func() string {
+						if p.Stats.TotalRules > 0 {
+							s := "s"
+							if p.Stats.TotalRules == 1 {
+								s = ""
+							}
+							return fmt.Sprintf("%d active rule%s", p.Stats.TotalRules, s)
+						}
+						return ""
+					}(),
+					Warning: p.Stats.TotalRules == 0,
+					Body:    "Review and categorize new transactions on a daily or weekly schedule. Creates rules for new patterns.",
+				})
+				@wizardCard(wizardCardData{
+					Slug:        "spending-report",
+					Title:       "Spending Report",
+					Icon:        "bar-chart-3",
+					Color:       "violet-500",
+					BadgeText:   "Recurring",
+					BadgeViolet: true,
+					Counter: func() string {
+						if p.Stats.TotalAccounts > 0 {
+							s := "s"
+							if p.Stats.TotalAccounts == 1 {
+								s = ""
+							}
+							return fmt.Sprintf("Across %d account%s", p.Stats.TotalAccounts, s)
+						}
+						return ""
+					}(),
+					Body: "Weekly or monthly summary of spending by category with trend analysis and anomaly callouts.",
+				})
+			</div>
+		</div>
+		<!-- Section: Recommended -->
+		<div>
+			<div class="flex items-center gap-2 mb-3">
+				<h2 class="text-sm font-semibold text-base-content/70 uppercase tracking-wider">Recommended</h2>
+			</div>
+			<div class="space-y-2">
+				@wizardCard(wizardCardData{
+					Slug:      "anomaly-detection",
+					Title:     "Anomaly Detection",
+					Icon:      "shield-alert",
+					Color:     "warning",
+					BadgeText: "Monitoring",
+					Body:      "Watch for unusual charges, duplicate transactions, or unexpected spending spikes across all accounts.",
+				})
+				<!-- Custom Agent (no card factory — direct link) -->
+				<a href="/agent-wizard/custom" class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group no-underline flex items-center border-l-4 border-l-base-300 border-dashed">
+					<div class="w-12 h-12 rounded-xl bg-base-300/50 flex items-center justify-center group-hover:bg-base-300/70 transition-colors flex-shrink-0 ml-4">
+						<i data-lucide="plus" class="w-5 h-5 text-base-content/40"></i>
+					</div>
+					<div class="flex-1 px-4 py-3.5 min-w-0">
+						<div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-0.5">
+							<h3 class="font-semibold text-sm text-base-content/70 group-hover:text-base-content transition-colors">Custom Agent</h3>
+						</div>
+						<p class="text-xs text-base-content/50 leading-relaxed">Start from scratch with your own goals and instructions. Full access to all prompt blocks.</p>
+					</div>
+					<div class="flex-shrink-0 pr-4">
+						<i data-lucide="arrow-right" class="w-4 h-4 text-base-content/20 group-hover:text-base-content/40 group-hover:translate-x-0.5 transition-all"></i>
+					</div>
+				</a>
+			</div>
+		</div>
+	</div>
+}
+
+// wizardCardData captures the per-card variations the old
+// agent_wizard.html spelled out longhand. Color is a Tailwind color
+// fragment — "primary", "success", "warning", or "violet-500".
+type wizardCardData struct {
+	Slug        string
+	Title       string
+	Icon        string
+	Color       string
+	BadgeText   string
+	BadgeViolet bool
+	Counter     string
+	Warning     bool
+	Body        string
+}
+
+// wizardCard renders one /agent-wizard/{slug} link card with an inline
+// copy button that uses the agentWizardCard Alpine factory.
+templ wizardCard(c wizardCardData) {
+	<div
+		x-data="agentWizardCard"
+		class={ "bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 group flex items-center border-l-4",
+			"border-l-" + c.Color }
+	>
+		<a href={ templ.SafeURL("/agent-wizard/" + c.Slug) } class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
+			<div
+				class={ "w-12 h-12 rounded-xl flex items-center justify-center transition-colors flex-shrink-0 ml-4",
+				"bg-" + c.Color + "/10",
+				"group-hover:bg-" + c.Color + "/15" }
+			>
+				<i data-lucide={ c.Icon } class={ "w-5 h-5", "text-" + c.Color }></i>
+			</div>
+			<div class="flex-1 px-4 py-3.5 min-w-0">
+				<div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-0.5">
+					<h3
+						class={ "font-semibold text-sm text-base-content transition-colors",
+						"group-hover:text-" + c.Color }
+					>{ c.Title }</h3>
+					if c.BadgeText != "" {
+						if c.BadgeViolet {
+							<span class="badge badge-xs bg-violet-500/15 text-violet-600 border-0 shrink-0">{ c.BadgeText }</span>
+						} else {
+							<span class={ "badge badge-soft badge-xs shrink-0", "badge-" + c.Color }>{ c.BadgeText }</span>
+						}
+					}
+					if c.Counter != "" {
+						if c.Slug == "bulk-review" {
+							<span class={ "badge badge-xs font-mono shrink-0", "badge-" + c.Color }>{ c.Counter }</span>
+						} else {
+							<span class="text-xs text-base-content/40 shrink-0 whitespace-nowrap">{ c.Counter }</span>
+						}
+					}
+					if c.Warning {
+						<span class="text-xs text-warning font-medium shrink-0">No rules yet — run Initial Setup first</span>
+					}
+				</div>
+				<p class="text-xs text-base-content/50 leading-relaxed">{ c.Body }</p>
+			</div>
+		</a>
+		<button
+			class={ "btn btn-ghost btn-sm rounded-xl text-base-content/30 mr-2 flex-shrink-0",
+				"hover:text-" + c.Color }
+			:class="copied && '!text-success'"
+			@click.stop={ "copyPrompt('" + c.Slug + "')" }
+		>
+			<i data-lucide="copy" class="w-3.5 h-3.5" x-show="!copied"></i>
+			<i data-lucide="check" class="w-3.5 h-3.5" x-show="copied" x-cloak></i>
+			<span class="text-xs" x-text="copied ? 'Copied' : 'Copy'"></span>
+		</button>
+		<a href={ templ.SafeURL("/agent-wizard/" + c.Slug) } class="flex-shrink-0 pr-4 no-underline">
+			<i
+				data-lucide="arrow-right"
+				class={ "w-4 h-4 text-base-content/20 group-hover:translate-x-0.5 transition-all",
+				"group-hover:text-" + c.Color }
+			></i>
+		</a>
+	</div>
+}
