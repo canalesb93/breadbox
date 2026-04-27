@@ -24,11 +24,114 @@ Cross-references to the canonical specs:
 ## Where it's used
 
 - `/transactions/{id}` — the activity card under the main transaction body.
-  This is the canonical implementation and the only consumer today.
+  This is the canonical implementation and the only full consumer today.
 - Future: sync-log detail and agent-run logs are the obvious reuse targets.
   They share the same row-on-rail shape (system-attributed events, occasional
-  human comments, day grouping) and should reuse the same `txdTimeline*`
-  primitives rather than fork them. See "Future extensions" below.
+  human comments, day grouping) and should reuse the shared primitives below
+  rather than fork them. See "Shared primitives" next, and "Future extensions"
+  for the surfaces still on the roadmap.
+
+## Shared primitives
+
+The reusable layout primitives live in:
+
+- `internal/templates/components/timeline.templ` — the templ components.
+- `internal/templates/components/timeline_helpers.go` — local helpers
+  (icon-tone palette, timestamp formatters, heading-id derivation).
+
+Exported surface (data-shape-agnostic — callers pass templ children for
+sentence bodies, custom tiles, and comment markup):
+
+| Component                       | Purpose                                                               |
+|---------------------------------|-----------------------------------------------------------------------|
+| `Timeline`                      | Section wrapper: heading + event count + the `<ol>` rail container.   |
+| `TimelineDay`                   | Horizontal day separator; dot anchored on the rail at 24px tile size. |
+| `TimelineSystemRow`             | One-liner row with icon tile + sentence body + optional timestamp.    |
+| `TimelineSystemRowCustomTile`   | Same row chrome, but the caller renders the entire 24px tile.         |
+| `TimelineCommentRow`            | Comment bubble row with default `<actor> commented · <time>` header.  |
+| `TimelineCommentRowRaw`         | Comment row escape hatch — caller renders the full meta line + body.  |
+| `TimelineEmpty`                 | "No activity yet" treatment (icon + muted message). No rail wrapper.  |
+
+Supporting prop types: `TimelineProps`, `TimelineRowProps`, `TimelineActor`.
+
+The primitives intentionally cover only the rail / tile / day-separator
+chrome and the timestamp suffix. They do not know about `service.Annotation`,
+`service.ActivityEntry`, or any domain enum — callers compose row content via
+templ children. The IconTone palette (`neutral` / `info` / `success` /
+`warning` / `error`) maps to the same Tailwind shades the txn-detail tiles
+already use; callers that need a more bespoke tile (e.g. category color +
+icon, review-status tint) drop down to `TimelineSystemRowCustomTile`.
+
+### Minimal usage example
+
+A day-grouped feed of system events using `Timeline` + `TimelineDay` +
+`TimelineSystemRow`:
+
+```go
+templ MyFeed(p MyFeedProps) {
+    @components.Timeline(components.TimelineProps{
+        Heading: "Activity", HeadingIcon: "activity",
+        EventCount: len(p.Events), AriaLabel: "Activity timeline",
+    }) {
+        for _, day := range p.Days {
+            @components.TimelineDay(day.Label, day.First)
+            for _, e := range day.Events {
+                @components.TimelineSystemRow(components.TimelineRowProps{
+                    Icon: "zap", IconTone: "info",
+                    Timestamp: e.Timestamp, Now: p.Now,
+                }) {
+                    <strong>{ e.Actor }</strong>
+                    <span>{ " " + e.Verb + " " }</span>
+                    <span class="font-medium">{ e.Subject }</span>
+                }
+            }
+        }
+    }
+}
+```
+
+The caller owns the day-bucketing logic (whatever shape its events come in)
+and the per-row sentence; the primitives own the rail centring, the 24px
+tile geometry, the day-separator dot, and the relative-time pill.
+
+### Relationship to the txn-detail page
+
+`/transactions/{id}` still ships its own `txd*` helpers
+(`txdTimelineSystem`, `txdSystemSentence`, `txdSystemIcon`,
+`txdTimelineComment`, `txdTimelineCommentBubble`,
+`txdTimelineDeletedComment`, `txdTimelineComposer`) on top of the
+primitives' chrome. Those helpers carry the page-local sentence rendering,
+icon-kind switch, tombstone branching, and composer — see "Page-local
+responsibilities" below for the carve-out. Migrating the txn-detail page
+fully onto `TimelineSystemRow` / `TimelineCommentRow` is tracked as a
+follow-up; until then, treat the primitives as the canonical reuse layer
+for **new** timeline-shaped surfaces and the `txd*` helpers as the
+canonical consumer of the row chrome.
+
+### Page-local responsibilities
+
+The primitives intentionally don't handle:
+
+- **Tombstone rendering.** The `IsDeleted` branch in `txdTimelineComment`
+  (PR #892) lives at the page layer because the dedup contract requires
+  `EnrichAnnotations` upstream — see "Tombstones never fold" below.
+  Tombstones aren't a styling decision; they're a forensic-audit invariant
+  that has to flow through the service layer first.
+- **System-row sentence formatting.** `txdSystemSentence`, `txdRuleSentence`,
+  and the per-kind verb/subject composition are page-local because each
+  kind's wording is domain-specific (rule names, tag chips, category links,
+  sync provider labels). The primitives accept a children slot precisely so
+  each consumer can render its own phrasing.
+- **Icon mapping.** `txdSystemIcon` switches on `e.Type` to pick a Lucide
+  glyph + tile shade per kind. That mapping is page-local because each
+  kind's icon depends on domain context (category icon, rule zap, sync
+  landmark, etc.). `TimelineRowProps.IconTone` covers the common 5-tone
+  palette; for anything kind-driven, drop into
+  `TimelineSystemRowCustomTile` and render the tile yourself.
+
+If you find yourself wanting to push any of these into the primitives, stop
+— the primitives are layout only. The reuse boundary is "rail chrome stays
+shared, sentence/icon/tombstone branching stays page-local."
 
 ## Rendering contract
 
@@ -152,6 +255,36 @@ parses the RFC3339 string off the entry and delegates to `RelativeAt`. Future
 timeline surfaces should follow this exact pattern: capture one `now` in the
 handler, thread it through both grouping and per-row formatting, and never
 call `time.Now()` from inside the templ.
+
+### `Now` anchor on the shared primitives
+
+The same contract is wired through the shared primitives so day-grouped
+callers don't have to reinvent it:
+
+- `TimelineSystemRow` reads `Props.Now` and passes it to the relative-time
+  helper for the row's timestamp pill.
+- `TimelineSystemRowCustomTile` and `TimelineCommentRow` accept `now` as a
+  positional parameter for the same reason.
+- The internal `relativeTimelineTimestamp` helper delegates to
+  `timefmt.RelativeRFC3339At(s, now)`. A **zero `time.Time`** falls back to
+  wall-clock `time.Now()` at render — that's the contract for non-day-grouped
+  callers (single-entry log rows, sidebars without buckets), so they can drop
+  the primitives in without ceremony.
+
+The wiring rule for **any day-grouped surface** is the same as the txn-detail
+page:
+
+1. Capture `now := time.Now()` once in the handler.
+2. Pass `now` into the day-bucketing helper (whatever yields the
+   `Today` / `Yesterday` / `Monday, April 14` labels).
+3. Pass the same `now` into every row primitive — `TimelineRowProps.Now`,
+   `TimelineSystemRowCustomTile`'s `now` argument, `TimelineCommentRow`'s
+   `now` argument.
+4. Never call `time.Now()` from inside the templ.
+
+Skip step 3 and a render that begins just before midnight will paint a
+`Yesterday` separator above a `5 minutes ago` row — exactly the bug the
+shared anchor is there to prevent.
 
 ## CSS / Tailwind invariants
 
@@ -556,20 +689,31 @@ silently break the Summary string.
   recently" page would need scrolling and pagination, but the per-day
   grouping and row markup are reusable.
 
-When promoting `txdTimeline*` to a shared component, extract them into
-`internal/templates/components/timeline/` with a context-agnostic prop set
-(no `TransactionID` baked in) and have the transaction detail page wrap
-them. Don't refactor speculatively — wait for the second concrete consumer.
+The shared primitive layer landed in PR #908 — see "Shared primitives"
+above. New surfaces should compose `Timeline` / `TimelineDay` /
+`TimelineSystemRow` / `TimelineCommentRow` directly and keep their
+sentence formatting and icon mapping page-local. Migrating the txn-detail
+page itself off `txdTimelineSystem` / `txdTimelineComment` onto the
+primitives is tracked separately; until then both layers coexist on the
+same rail chrome without drift.
 
 ## See also
 
+- `internal/templates/components/timeline.templ` +
+  `timeline_helpers.go` — the shared primitive layer: `Timeline`,
+  `TimelineDay`, `TimelineSystemRow`, `TimelineSystemRowCustomTile`,
+  `TimelineCommentRow`, `TimelineCommentRowRaw`, `TimelineEmpty`. Start
+  here when building a new timeline-shaped surface.
 - `internal/admin/transactions.go` — `buildActivityTimeline`,
   `groupActivityByDay`, `activityDayLabel`, `activityEntryFromAnnotation`,
-  `txdLastActivityTimestamp`, `TimelineRowsHandler`.
-- `internal/templates/components/pages/transaction_detail.templ` — `txdActivity`,
+  `txdLastActivityTimestamp`, `TimelineRowsHandler`. Canonical consumer of
+  the primitive layer for the txn-detail page.
+- `internal/templates/components/pages/transaction_detail.templ` — page-local
+  helpers that compose on top of the primitives: `txdActivity`,
   `txdTimelineDay`, `txdTimelineSystem`, `txdSystemSentence`, `txdSystemIcon`,
   `txdTimelineComment`, `txdTimelineCommentBubble`, `txdTimelineDeletedComment`,
-  `txdTimelineComposer`, `TimelineRows`.
+  `txdTimelineComposer`, `TimelineRows`. Sentence formatting, icon mapping,
+  and tombstone branching live here, not in the primitives.
 - `internal/service/annotations.go` — `Annotation` shape, `ListAnnotations`,
   `IsDeleted` plumbing.
 - `internal/service/annotations_enrich.go` — `EnrichAnnotations`, dedup
