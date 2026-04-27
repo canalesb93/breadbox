@@ -341,6 +341,7 @@ func (s *MCPServer) handleCategorizeTransaction(ctx context.Context, _ *mcpsdk.C
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
+	actor := service.ActorFromContext(ctx)
 	ctx = context.Background()
 	if input.TransactionID == "" {
 		return errorResult(fmt.Errorf("transaction_id is required")), nil, nil
@@ -359,7 +360,7 @@ func (s *MCPServer) handleCategorizeTransaction(ctx context.Context, _ *mcpsdk.C
 		categoryID = cat.ID
 	}
 
-	if err := s.svc.SetTransactionCategory(ctx, input.TransactionID, categoryID); err != nil {
+	if err := s.svc.SetTransactionCategory(ctx, input.TransactionID, categoryID, actor); err != nil {
 		return errorResult(err), nil, nil
 	}
 	return &mcpsdk.CallToolResult{
@@ -373,11 +374,12 @@ func (s *MCPServer) handleResetTransactionCategory(ctx context.Context, _ *mcpsd
 	if err := s.checkWritePermission(ctx); err != nil {
 		return errorResult(err), nil, nil
 	}
+	actor := service.ActorFromContext(ctx)
 	ctx = context.Background()
 	if input.TransactionID == "" {
 		return errorResult(fmt.Errorf("transaction_id is required")), nil, nil
 	}
-	if err := s.svc.ResetTransactionCategory(ctx, input.TransactionID); err != nil {
+	if err := s.svc.ResetTransactionCategory(ctx, input.TransactionID, actor); err != nil {
 		return errorResult(err), nil, nil
 	}
 	return &mcpsdk.CallToolResult{
@@ -850,6 +852,7 @@ func (s *MCPServer) handleBatchCategorize(ctx context.Context, _ *mcpsdk.CallToo
 		return errorResult(fmt.Errorf("items array is required and must not be empty")), nil, nil
 	}
 
+	actor := service.ActorFromContext(ctx)
 	items := make([]service.BatchCategorizeItem, len(input.Items))
 	for i, item := range input.Items {
 		items[i] = service.BatchCategorizeItem{
@@ -858,7 +861,7 @@ func (s *MCPServer) handleBatchCategorize(ctx context.Context, _ *mcpsdk.CallToo
 		}
 	}
 
-	result, err := s.svc.BatchSetTransactionCategory(ctx, items)
+	result, err := s.svc.BatchSetTransactionCategory(ctx, items, actor)
 	if err != nil {
 		return errorResult(err), nil, nil
 	}

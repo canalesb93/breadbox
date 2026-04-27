@@ -934,7 +934,7 @@ func TestBatchSetTransactionCategory_Success(t *testing.T) {
 	result, err := svc.BatchSetTransactionCategory(ctx, []service.BatchCategorizeItem{
 		{TransactionID: pgconv.FormatUUID(txn1.ID), CategorySlug: "food_and_drink"},
 		{TransactionID: pgconv.FormatUUID(txn2.ID), CategorySlug: "transportation"},
-	})
+	}, service.SystemActor())
 	if err != nil {
 		t.Fatalf("BatchSetTransactionCategory: %v", err)
 	}
@@ -993,7 +993,7 @@ func TestBatchSetTransactionCategory_InvalidTxnID(t *testing.T) {
 	result, err := svc.BatchSetTransactionCategory(ctx, []service.BatchCategorizeItem{
 		{TransactionID: pgconv.FormatUUID(txn1.ID), CategorySlug: "food_and_drink"},
 		{TransactionID: "00000000-0000-0000-0000-000000000099", CategorySlug: "food_and_drink"},
-	})
+	}, service.SystemActor())
 	if err != nil {
 		t.Fatalf("BatchSetTransactionCategory: %v", err)
 	}
@@ -1017,7 +1017,7 @@ func TestBatchSetTransactionCategory_MaxLimitExceeded(t *testing.T) {
 		}
 	}
 
-	_, err := svc.BatchSetTransactionCategory(ctx, items)
+	_, err := svc.BatchSetTransactionCategory(ctx, items, service.SystemActor())
 	if err == nil {
 		t.Fatal("expected error for > 500 items, got nil")
 	}

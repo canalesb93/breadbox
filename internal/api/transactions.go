@@ -399,7 +399,8 @@ func SetTransactionCategoryHandler(svc *service.Service) http.HandlerFunc {
 			mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", "category_id is required")
 			return
 		}
-		if err := svc.SetTransactionCategory(r.Context(), id, input.CategoryID); err != nil {
+		actor := service.ActorFromContext(r.Context())
+		if err := svc.SetTransactionCategory(r.Context(), id, input.CategoryID, actor); err != nil {
 			if errors.Is(err, service.ErrNotFound) {
 				mw.WriteError(w, http.StatusNotFound, "NOT_FOUND", "Transaction not found")
 				return
@@ -420,7 +421,8 @@ func SetTransactionCategoryHandler(svc *service.Service) http.HandlerFunc {
 func ResetTransactionCategoryHandler(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
-		if err := svc.ResetTransactionCategory(r.Context(), id); err != nil {
+		actor := service.ActorFromContext(r.Context())
+		if err := svc.ResetTransactionCategory(r.Context(), id, actor); err != nil {
 			writeServiceError(w, err, "Transaction not found", "Failed to reset transaction category")
 			return
 		}
@@ -438,7 +440,8 @@ func BatchCategorizeHandler(svc *service.Service) http.HandlerFunc {
 			return
 		}
 
-		result, err := svc.BatchSetTransactionCategory(r.Context(), input.Items)
+		actor := service.ActorFromContext(r.Context())
+		result, err := svc.BatchSetTransactionCategory(r.Context(), input.Items, actor)
 		if err != nil {
 			if errors.Is(err, service.ErrInvalidParameter) {
 				mw.WriteError(w, http.StatusBadRequest, "INVALID_PARAMETER", err.Error())

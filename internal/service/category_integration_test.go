@@ -629,7 +629,7 @@ func TestSetTransactionCategory_Success(t *testing.T) {
 	acctID := seedTxnFixture(t, q)
 	txn := mustCreateTransactionWithCategory(t, q, acctID, uncat.ID, "txn_manual", "Manual Txn", 500, "2025-02-01")
 
-	err := svc.SetTransactionCategory(ctx, pgconv.FormatUUID(txn.ID), target.ID)
+	err := svc.SetTransactionCategory(ctx, pgconv.FormatUUID(txn.ID), target.ID, service.SystemActor())
 	if err != nil {
 		t.Fatalf("SetTransactionCategory: %v", err)
 	}
@@ -655,7 +655,7 @@ func TestSetTransactionCategory_Success(t *testing.T) {
 func TestSetTransactionCategory_InvalidTransaction(t *testing.T) {
 	svc, _, _ := newService(t)
 	cat := mustCreateCategoryViaService(t, svc, "cat_for_invalid", "Cat", nil)
-	err := svc.SetTransactionCategory(context.Background(), "00000000-0000-0000-0000-000000000000", cat.ID)
+	err := svc.SetTransactionCategory(context.Background(), "00000000-0000-0000-0000-000000000000", cat.ID, service.SystemActor())
 	if err == nil {
 		t.Error("expected error for nonexistent transaction")
 	}
@@ -669,7 +669,7 @@ func TestSetTransactionCategory_InvalidCategory(t *testing.T) {
 	acctID := seedTxnFixture(t, q)
 	txn := mustCreateTransactionWithCategory(t, q, acctID, uncat.ID, "txn_badcat", "Bad Cat", 100, "2025-02-01")
 
-	err := svc.SetTransactionCategory(ctx, pgconv.FormatUUID(txn.ID), "00000000-0000-0000-0000-000000000000")
+	err := svc.SetTransactionCategory(ctx, pgconv.FormatUUID(txn.ID), "00000000-0000-0000-0000-000000000000", service.SystemActor())
 	if !errors.Is(err, service.ErrCategoryNotFound) {
 		t.Errorf("expected ErrCategoryNotFound, got: %v", err)
 	}
@@ -680,7 +680,7 @@ func TestSetTransactionCategory_InvalidCategory(t *testing.T) {
 
 func TestResetTransactionCategory_NotFound(t *testing.T) {
 	svc, _, _ := newService(t)
-	err := svc.ResetTransactionCategory(context.Background(), "00000000-0000-0000-0000-000000000000")
+	err := svc.ResetTransactionCategory(context.Background(), "00000000-0000-0000-0000-000000000000", service.SystemActor())
 	if err == nil {
 		t.Error("expected error for nonexistent transaction")
 	}
@@ -700,7 +700,7 @@ func TestBatchSetTransactionCategory_SetsOverrideFlag(t *testing.T) {
 
 	result, err := svc.BatchSetTransactionCategory(ctx, []service.BatchCategorizeItem{
 		{TransactionID: pgconv.FormatUUID(txn1.ID), CategorySlug: "batch_groceries"},
-	})
+	}, service.SystemActor())
 	if err != nil {
 		t.Fatalf("BatchSetTransactionCategory: %v", err)
 	}
@@ -732,7 +732,7 @@ func TestBatchSetTransactionCategory_PartialFailure(t *testing.T) {
 	result, err := svc.BatchSetTransactionCategory(ctx, []service.BatchCategorizeItem{
 		{TransactionID: pgconv.FormatUUID(txn.ID), CategorySlug: "batch_good"},
 		{TransactionID: pgconv.FormatUUID(txn.ID), CategorySlug: "nonexistent_slug"},
-	})
+	}, service.SystemActor())
 	if err != nil {
 		t.Fatalf("BatchSetTransactionCategory: %v", err)
 	}
@@ -746,7 +746,7 @@ func TestBatchSetTransactionCategory_PartialFailure(t *testing.T) {
 
 func TestBatchSetTransactionCategory_EmptyItems(t *testing.T) {
 	svc, _, _ := newService(t)
-	_, err := svc.BatchSetTransactionCategory(context.Background(), []service.BatchCategorizeItem{})
+	_, err := svc.BatchSetTransactionCategory(context.Background(), []service.BatchCategorizeItem{}, service.SystemActor())
 	if err == nil {
 		t.Error("expected error for empty items")
 	}
@@ -758,7 +758,7 @@ func TestBatchSetTransactionCategory_TooManyItems(t *testing.T) {
 	for i := range items {
 		items[i] = service.BatchCategorizeItem{TransactionID: "x", CategorySlug: "y"}
 	}
-	_, err := svc.BatchSetTransactionCategory(context.Background(), items)
+	_, err := svc.BatchSetTransactionCategory(context.Background(), items, service.SystemActor())
 	if err == nil {
 		t.Error("expected error for >500 items")
 	}
@@ -880,4 +880,136 @@ func parseUUIDForTest(s string) (pgtype.UUID, error) {
 		return pgtype.UUID{}, err
 	}
 	return u, nil
+}
+
+// --- category_set annotation regression coverage ---
+
+// TestSetTransactionCategoryWritesAnnotation verifies the manual category
+// picker (admin POST, REST PATCH, MCP categorize_transaction) emits a
+// `category_set` annotation attributed to the supplied actor with the manual
+// source qualifier. Closes the activity-timeline gap on the transaction
+// detail page.
+func TestSetTransactionCategoryWritesAnnotation(t *testing.T) {
+	svc, q, _ := newService(t)
+	ctx := context.Background()
+
+	uncat := mustSeedUncategorized(t, q)
+	target := mustCreateCategoryViaService(t, svc, "annot_groceries", "Groceries", nil)
+
+	acctID := seedTxnFixture(t, q)
+	txn := mustCreateTransactionWithCategory(t, q, acctID, uncat.ID, "txn_annot_set", "Annot Set", 500, "2025-02-01")
+
+	actor := service.Actor{Type: "user", ID: "user-1", Name: "Alice"}
+	if err := svc.SetTransactionCategory(ctx, pgconv.FormatUUID(txn.ID), target.ID, actor); err != nil {
+		t.Fatalf("SetTransactionCategory: %v", err)
+	}
+
+	// Use Raw=true so enrichment dedup doesn't fold our row away.
+	annots, err := svc.ListAnnotations(ctx, pgconv.FormatUUID(txn.ID), service.ListAnnotationsParams{Raw: true})
+	if err != nil {
+		t.Fatalf("ListAnnotations: %v", err)
+	}
+
+	var got *service.Annotation
+	for i, a := range annots {
+		if a.Kind == "category_set" {
+			got = &annots[i]
+			break
+		}
+	}
+	if got == nil {
+		t.Fatalf("expected a category_set annotation, got %d annotations: %+v", len(annots), annots)
+	}
+
+	if got.ActorType != "user" {
+		t.Errorf("ActorType = %q, want user", got.ActorType)
+	}
+	if got.ActorName != "Alice" {
+		t.Errorf("ActorName = %q, want Alice", got.ActorName)
+	}
+	if got.ActorID == nil || *got.ActorID != "user-1" {
+		t.Errorf("ActorID = %v, want user-1", got.ActorID)
+	}
+	if slug, _ := got.Payload["category_slug"].(string); slug != "annot_groceries" {
+		t.Errorf("payload.category_slug = %q, want annot_groceries", slug)
+	}
+	if src, _ := got.Payload["source"].(string); src != "manual" {
+		t.Errorf("payload.source = %q, want manual", src)
+	}
+	if _, hasAction := got.Payload["action"]; hasAction {
+		t.Errorf("payload should not include action on a non-reset write, got: %+v", got.Payload)
+	}
+	if _, hasRule := got.Payload["rule_id"]; hasRule {
+		t.Errorf("payload must not include rule_id for a manual write, got: %+v", got.Payload)
+	}
+	if _, hasRule := got.Payload["rule_name"]; hasRule {
+		t.Errorf("payload must not include rule_name for a manual write, got: %+v", got.Payload)
+	}
+	if got.RuleID != nil {
+		t.Errorf("RuleID = %v, want nil for manual write", got.RuleID)
+	}
+}
+
+// TestResetTransactionCategoryWritesAnnotation verifies the reset path emits
+// a `category_set` annotation with action=reset so the timeline can render the
+// reset event distinctly from a forward category change.
+func TestResetTransactionCategoryWritesAnnotation(t *testing.T) {
+	svc, q, _ := newService(t)
+	ctx := context.Background()
+
+	uncat := mustSeedUncategorized(t, q)
+	source := mustCreateCategoryViaService(t, svc, "annot_source", "Source", nil)
+	srcUID, _ := parseUUIDForTest(source.ID)
+
+	acctID := seedTxnFixture(t, q)
+	txn := mustCreateTransactionWithCategory(t, q, acctID, srcUID, "txn_annot_reset", "Annot Reset", 500, "2025-02-01")
+	_ = uncat // referenced by reset path via slug lookup
+
+	actor := service.Actor{Type: "user", ID: "user-2", Name: "Bob"}
+	if err := svc.ResetTransactionCategory(ctx, pgconv.FormatUUID(txn.ID), actor); err != nil {
+		t.Fatalf("ResetTransactionCategory: %v", err)
+	}
+
+	annots, err := svc.ListAnnotations(ctx, pgconv.FormatUUID(txn.ID), service.ListAnnotationsParams{Raw: true})
+	if err != nil {
+		t.Fatalf("ListAnnotations: %v", err)
+	}
+
+	var got *service.Annotation
+	for i, a := range annots {
+		if a.Kind == "category_set" {
+			got = &annots[i]
+			break
+		}
+	}
+	if got == nil {
+		t.Fatalf("expected a category_set annotation after reset, got %d annotations: %+v", len(annots), annots)
+	}
+
+	if got.ActorType != "user" || got.ActorName != "Bob" {
+		t.Errorf("actor mismatch: type=%q name=%q, want user/Bob", got.ActorType, got.ActorName)
+	}
+	if slug, _ := got.Payload["category_slug"].(string); slug != "uncategorized" {
+		t.Errorf("payload.category_slug = %q, want uncategorized", slug)
+	}
+	if src, _ := got.Payload["source"].(string); src != "manual" {
+		t.Errorf("payload.source = %q, want manual", src)
+	}
+	if action, _ := got.Payload["action"].(string); action != "reset" {
+		t.Errorf("payload.action = %q, want reset", action)
+	}
+
+	// Verify decoded payload after the JSON round trip in writeAnnotation.
+	if !strings.Contains(string(mustMarshalJSON(t, got.Payload)), `"action":"reset"`) {
+		t.Errorf("serialized payload should include action=reset, got: %s", string(mustMarshalJSON(t, got.Payload)))
+	}
+}
+
+func mustMarshalJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	return b
 }
