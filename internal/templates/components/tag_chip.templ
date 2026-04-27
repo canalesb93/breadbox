@@ -33,9 +33,12 @@ templ TagChipSm(tag TagChipData) {
 
 templ tagChipBody(class string, tag TagChipData) {
 	<span
-		class={ class }
+		class={ class, templ.KV("tooltip tooltip-top", tagChipShowTooltip(tag)) }
 		if tag.Color != nil {
 			style={ "--tag-color: " + deref(tag.Color) }
+		}
+		if tagChipShowTooltip(tag) {
+			data-tip={ tag.Slug }
 		}
 		title={ tag.Slug }
 	>
@@ -44,4 +47,12 @@ templ tagChipBody(class string, tag TagChipData) {
 		}
 		<span class="truncate">{ tag.DisplayName }</span>
 	</span>
+}
+
+// tagChipShowTooltip returns true when the chip's visible label is the
+// display name (so the tooltip reveals what slug it maps to). Tags
+// without a display name already render the slug as their label, so
+// surfacing it in a tooltip would be redundant noise.
+func tagChipShowTooltip(tag TagChipData) bool {
+	return tag.DisplayName != "" && tag.DisplayName != tag.Slug
 }

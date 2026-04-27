@@ -252,7 +252,12 @@ templ txdMain(p TransactionDetailProps) {
 				</div>
 				<div class="flex flex-wrap gap-1.5 min-h-[1.5rem] items-center">
 					<template x-for="t in tags" :key="t.slug">
-						<span class="bb-tag" :style="t.color ? ('--tag-color:' + t.color) : ''">
+						<span
+							class="bb-tag"
+							:class="t.displayName && t.displayName !== t.slug ? 'tooltip tooltip-top' : ''"
+							:data-tip="t.displayName && t.displayName !== t.slug ? t.slug : null"
+							:style="t.color ? ('--tag-color:' + t.color) : ''"
+						>
 							<template x-if="t.icon"><i :data-lucide="t.icon"></i></template>
 							<a :href="'/transactions?tags=' + t.slug" class="hover:underline" x-text="t.displayName || t.slug"></a>
 							<button
@@ -716,9 +721,14 @@ templ txdComposerCard(p TransactionDetailProps) {
 // strike-through. The chip is byte-equivalent to the original markup.
 templ txdInlineTagChip(e service.ActivityEntry) {
 	<span
-		class={ "bb-tag bb-tag-sm ml-1 align-middle", templ.KV("line-through opacity-70", e.TagAction == "removed") }
+		class={ "bb-tag bb-tag-sm ml-1 align-middle",
+			templ.KV("line-through opacity-70", e.TagAction == "removed"),
+			templ.KV("tooltip tooltip-top", txdTagChipShowTooltip(e)) }
 		if e.TagColor != nil && *e.TagColor != "" {
 			style={ "--tag-color: " + *e.TagColor }
+		}
+		if txdTagChipShowTooltip(e) {
+			data-tip={ e.TagSlug }
 		}
 		title={ e.TagSlug }
 	>
@@ -730,6 +740,12 @@ templ txdInlineTagChip(e service.ActivityEntry) {
 			}
 		</span>
 	</span>
+}
+
+// txdTagChipShowTooltip mirrors components.tagChipShowTooltip — only show
+// the slug-tooltip when the chip's visible label is the display name.
+func txdTagChipShowTooltip(e service.ActivityEntry) bool {
+	return e.TagDisplayName != "" && e.TagDisplayName != e.TagSlug
 }
 
 // ---- helpers ----

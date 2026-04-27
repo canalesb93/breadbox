@@ -340,7 +340,11 @@ templ txFilters(p TransactionsProps) {
 						<button
 							type="button"
 							class="bb-tag bb-tag-interactive"
-							:class="!isSelected(t.slug) && 'bb-tag-ghost'"
+							:class="{
+								'bb-tag-ghost': !isSelected(t.slug),
+								'tooltip tooltip-top': t.display_name && t.display_name !== t.slug,
+							}"
+							:data-tip="t.display_name && t.display_name !== t.slug ? t.slug : null"
 							:style="t.color ? ('--tag-color:' + t.color) : ''"
 							@click="toggle(t.slug)"
 						>
