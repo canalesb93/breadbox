@@ -462,7 +462,7 @@ templ txdSystemIcon(e service.ActivityEntry) {
 		</span>
 	} else if e.Type == "sync" {
 		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true">
-			<i data-lucide="refresh-cw" class="w-3 h-3 text-base-content/60"></i>
+			<i data-lucide="landmark" class="w-3 h-3 text-base-content/60"></i>
 		</span>
 	} else if e.Type == "review" {
 		<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-100", txdReviewBg(e.ReviewStatus) } aria-hidden="true">

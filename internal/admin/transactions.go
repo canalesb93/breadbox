@@ -1103,7 +1103,7 @@ func activityEntryFromAnnotation(a service.Annotation, tagDisplayFn func(string)
 
 // syncEntryType maps the raw DB kind to the ActivityEntry type. Both sync_*
 // kinds collapse to a single "sync" type in the UI — the icon is identical
-// (refresh-cw) and the Summary already differentiates the verb.
+// (landmark) and the Summary already differentiates the verb.
 func syncEntryType(dbKind string) string {
 	if dbKind == "sync_started" || dbKind == "sync_updated" {
 		return "sync"

@@ -65,7 +65,7 @@ Today's `Type` values:
 | `review`   | (legacy, retained for fallback)  | `txdTimelineSystem`     |
 
 `syncEntryType` collapses both DB-level `sync_*` kinds onto a single `sync`
-type because they share an icon (`refresh-cw`) and the differentiated verb
+type because they share an icon (`landmark`) and the differentiated verb
 already lives on the `Summary` string.
 
 `IsDeleted` is preserved on the comment entry — it gates the tombstone branch
@@ -485,7 +485,7 @@ ring colour):
 ```
 
 Pick a Lucide name that already appears in the codebase when possible —
-`refresh-cw` for sync, `zap` for rules, etc. New icons are fine but check
+`landmark` for sync, `zap` for rules, etc. New icons are fine but check
 `docs/design-system.md` -> "Icons" first.
 
 For the sentence, decide whether your kind should:
