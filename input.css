@@ -402,7 +402,11 @@
   .bb-sidebar-link .bb-nav-external-arrow,
   .bb-sidebar-link .bb-nav-external-arrow svg {
     @apply w-3.5 h-3.5 opacity-0 -translate-x-1;
-    transition: opacity 0.15s ease, transform 0.15s ease;
+    /* Tailwind v4 emits `-translate-x-1` as the CSS `translate` property,
+       not `transform` — transitioning `transform` here would no-op and
+       the arrow would snap into place, looking like a 4px jump while
+       opacity faded in. Transition `translate` so the slide is real. */
+    transition: opacity 0.15s ease, translate 0.15s ease;
   }
   .bb-sidebar-link.group:hover .bb-nav-external-arrow,
   .bb-sidebar-link.group:hover .bb-nav-external-arrow svg {
