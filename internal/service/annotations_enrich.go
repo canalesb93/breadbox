@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"breadbox/internal/ptrutil"
 )
 
 // enrichAnnotations is the *Service method that owns building tag/category
@@ -169,8 +171,8 @@ func isCommentDuplicateOfTagNote(all []Annotation, c Annotation) bool {
 // ActorID match (system actors don't have IDs); falls back to ActorName when
 // both rows lack an ID. This mirrors the original admin-handler heuristic.
 func sameActor(a, b Annotation) bool {
-	aID := derefString(a.ActorID)
-	bID := derefString(b.ActorID)
+	aID := ptrutil.Deref(a.ActorID)
+	bID := ptrutil.Deref(b.ActorID)
 	if aID != "" && bID != "" {
 		return aID == bID
 	}
@@ -178,13 +180,6 @@ func sameActor(a, b Annotation) bool {
 		return a.ActorName == b.ActorName
 	}
 	return false
-}
-
-func derefString(p *string) string {
-	if p == nil {
-		return ""
-	}
-	return *p
 }
 
 // enrichOne builds the derived fields for a single annotation. Unknown

@@ -12,6 +12,7 @@ import (
 	"breadbox/internal/app"
 	"breadbox/internal/db"
 	"breadbox/internal/pgconv"
+	"breadbox/internal/ptrutil"
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 	"breadbox/internal/templates/components/pages"
@@ -318,10 +319,10 @@ func renderTransactions(w http.ResponseWriter, r *http.Request, tr *TemplateRend
 		AllTags:           in.allTags,
 		FilterStartDate:   q.Get("start_date"),
 		FilterEndDate:     q.Get("end_date"),
-		FilterAccountID:   stringOrEmpty(in.params.AccountID),
-		FilterUserID:      stringOrEmpty(in.params.UserID),
-		FilterConnID:      stringOrEmpty(in.params.ConnectionID),
-		FilterCategory:    stringOrEmpty(in.params.CategorySlug),
+		FilterAccountID:   ptrutil.Deref(in.params.AccountID),
+		FilterUserID:      ptrutil.Deref(in.params.UserID),
+		FilterConnID:      ptrutil.Deref(in.params.ConnectionID),
+		FilterCategory:    ptrutil.Deref(in.params.CategorySlug),
 		FilterMinAmount:   q.Get("min_amount"),
 		FilterMaxAmount:   q.Get("max_amount"),
 		FilterPending:     q.Get("pending"),
@@ -1010,7 +1011,7 @@ func activityEntryFromAnnotation(a service.Annotation, tagDisplayFn func(string)
 			ActorType:   "system",
 			Summary:     summary,
 			RuleName:    a.RuleName,
-			RuleID:      derefOr(a.RuleID, ""),
+			RuleID:      ptrutil.Deref(a.RuleID),
 			RuleShortID: a.RuleShortID,
 			ActionField: field,
 			Origin:      a.Origin,
@@ -1217,14 +1218,6 @@ func activityDayLabel(dateStr, today, yesterday string, now time.Time) string {
 		return t.Format("Monday, January 2")
 	}
 	return t.Format("Monday, January 2, 2006")
-}
-
-// derefOr returns *p if non-nil, else def.
-func derefOr(p *string, def string) string {
-	if p == nil {
-		return def
-	}
-	return *p
 }
 
 // CreateTransactionCommentHandler serves POST /admin/api/transactions/{id}/comments.
