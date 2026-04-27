@@ -400,6 +400,6 @@ func oauthClientFromRow(r db.OauthClient) OAuthClientResponse {
 		ClientIDPrefix: r.ClientIDPrefix,
 		Scope:          r.Scope,
 		RevokedAt:      timestampStr(r.RevokedAt),
-		CreatedAt:      r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:      pgconv.TimestampStr(r.CreatedAt),
 	}
 }

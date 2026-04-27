@@ -9,6 +9,7 @@ import (
 	"math/big"
 
 	"breadbox/internal/db"
+	"breadbox/internal/pgconv"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -129,6 +130,6 @@ func apiKeyFromRow(r db.ApiKey) APIKeyResponse {
 		Scope:      r.Scope,
 		LastUsedAt: timestampStr(r.LastUsedAt),
 		RevokedAt:  timestampStr(r.RevokedAt),
-		CreatedAt:  r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:  pgconv.TimestampStr(r.CreatedAt),
 	}
 }

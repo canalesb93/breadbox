@@ -82,7 +82,7 @@ func (s *Service) CreateLoginAccount(ctx context.Context, params CreateLoginAcco
 		return nil, fmt.Errorf("get user: %w", err)
 	}
 
-	expiresStr := expiresAt.UTC().Format("2006-01-02T15:04:05Z07:00")
+	expiresStr := expiresAt.UTC().Format(time.RFC3339)
 	return &LoginAccountResponse{
 		ID:                  formatUUID(account.ID),
 		UserID:              formatUUID(account.UserID),
@@ -93,8 +93,8 @@ func (s *Service) CreateLoginAccount(ctx context.Context, params CreateLoginAcco
 		HasPassword:         account.HashedPassword != nil,
 		SetupToken:          token,
 		SetupTokenExpiresAt: &expiresStr,
-		CreatedAt:           account.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:           account.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:           pgconv.TimestampStr(account.CreatedAt),
+		UpdatedAt:           pgconv.TimestampStr(account.UpdatedAt),
 	}, nil
 }
 
@@ -115,13 +115,13 @@ func (s *Service) ListLoginAccounts(ctx context.Context) ([]LoginAccountResponse
 			Username:    r.Username,
 			Role:        r.Role,
 			HasPassword: r.HashedPassword != nil,
-			CreatedAt:   r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt:   r.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+			CreatedAt:   pgconv.TimestampStr(r.CreatedAt),
+			UpdatedAt:   pgconv.TimestampStr(r.UpdatedAt),
 		}
 		if r.SetupToken.Valid {
 			resp.SetupToken = r.SetupToken.String
 			if r.SetupTokenExpiresAt.Valid {
-				s := r.SetupTokenExpiresAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00")
+				s := pgconv.TimestampStr(r.SetupTokenExpiresAt)
 				resp.SetupTokenExpiresAt = &s
 			}
 		}
