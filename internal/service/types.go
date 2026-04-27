@@ -419,6 +419,19 @@ type ActivityEntry struct {
 	CategoryIcon  *string `json:"category_icon,omitempty"`
 	RuleName      string  `json:"rule_name,omitempty"`
 	RuleID       string `json:"rule_id,omitempty"`
+	// RuleShortID is the rule's 8-char short_id used to build the
+	// /rules/<short_id> link target on rule_applied timeline rows. The
+	// rule detail route accepts either UUID or short_id, but the
+	// activity timeline prefers short_id so the rendered href matches
+	// the canonical handle agents and humans use everywhere else.
+	RuleShortID string `json:"rule_short_id,omitempty"`
+	// ActionField identifies what a rule_applied row targeted ("tag",
+	// "category", or "comment"). Drives the chip-vs-text branch in the
+	// templ — when ActionField=="tag" the row renders the tag chip
+	// already populated in TagSlug/TagDisplayName/TagColor; when
+	// "category" it renders the category chip from CategoryName +
+	// CategoryColor + CategoryIcon.
+	ActionField string `json:"action_field,omitempty"`
 	CommentID    string `json:"comment_id,omitempty"`
 	TagSlug      string `json:"tag_slug,omitempty"` // for tag_added / tag_removed entries
 
