@@ -551,7 +551,9 @@
                   'bb-tagpicker-chip--mixed':          chip.state === 'mixed',
                   'bb-tagpicker-chip--pending-add':    chip.state === 'pending-add',
                   'bb-tagpicker-chip--pending-remove': chip.state === 'pending-remove',
+                  'tooltip tooltip-top':               chip.display_name && chip.display_name !== chip.slug,
                 }"
+                :data-tip="chip.display_name && chip.display_name !== chip.slug ? chip.slug : null"
                 :style="chip.color ? ('--tag-color:' + chip.color) : ''"
                 @click="cycleChip(chip)"
                 x-effect="syncChipGlyph($el, chip.state, chip.icon)"
