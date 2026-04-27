@@ -40,6 +40,7 @@ const (
 	sessionKeyAccountUsername = "account_username"  // auth_accounts.username
 	sessionKeyAccountRole     = "account_role"      // "admin", "editor", or "viewer"
 	sessionKeyUserID          = "user_id"           // linked family member UUID (NULL-linked admins have "")
+	sessionKeyUserName        = "user_name"         // linked family member display name; surfaced in sidebar footer
 	sessionKeyAvatarVersion   = "avatar_v"          // bumped on avatar change for cache busting
 )
 
@@ -118,8 +119,18 @@ func LoginHandler(sm *scs.SessionManager, queries *db.Queries, _ *TemplateRender
 		sm.Put(r.Context(), sessionKeyAccountRole, account.Role)
 		if account.UserID.Valid {
 			sm.Put(r.Context(), sessionKeyUserID, pgconv.FormatUUID(account.UserID))
+			// Cache the linked household-member display name so the
+			// sidebar footer can show "Ricardo" instead of falling back
+			// to the auth_accounts.username (often an email). Updated
+			// on profile edits via /settings/account/profile.
+			if u, err := queries.GetUser(r.Context(), account.UserID); err == nil {
+				sm.Put(r.Context(), sessionKeyUserName, u.Name)
+			} else {
+				sm.Remove(r.Context(), sessionKeyUserName)
+			}
 		} else {
 			sm.Remove(r.Context(), sessionKeyUserID)
+			sm.Remove(r.Context(), sessionKeyUserName)
 		}
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}

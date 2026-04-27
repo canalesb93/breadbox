@@ -68,7 +68,7 @@ func RevokeAPIKeyHandler(svc *service.Service) http.HandlerFunc {
 
 // --- HTML page handlers (admin dashboard) ---
 
-// AccessPageHandler serves GET /admin/access — combined API Keys + OAuth Clients page.
+// AccessPageHandler serves GET /admin/settings/api-keys — combined API Keys + OAuth Clients page.
 func AccessPageHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		keys, err := svc.ListAPIKeys(r.Context())
@@ -100,7 +100,7 @@ func AccessPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templat
 				activeClients = append(activeClients, row)
 			}
 		}
-		data := BaseTemplateData(r, sm, "access", "Access")
+		data := BaseTemplateData(r, sm, "api-keys","Access")
 		props := pages.AccessProps{
 			IsAdmin:        IsAdmin(sm, r),
 			CSRFToken:      GetCSRFToken(r),
@@ -111,15 +111,13 @@ func AccessPageHandler(svc *service.Service, sm *scs.SessionManager, tr *Templat
 			RevokedClients: revokedClients,
 			HasAnyClients:  len(clients) > 0,
 		}
-		renderAccess(w, r, tr, data, props)
+		renderAccess(w, r, sm, tr, data, props)
 	}
 }
 
-// renderAccess mirrors the renderLogs / renderRules pattern: it hands the
-// typed AccessProps to the templ component and uses RenderWithTempl to host
-// it inside base.html.
-func renderAccess(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.AccessProps) {
-	tr.RenderWithTempl(w, r, data, pages.Access(props))
+// renderAccess wraps the Access tab body in the unified Settings shell.
+func renderAccess(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, tr *TemplateRenderer, data map[string]any, props pages.AccessProps) {
+	renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabAccess, pages.Access(props))
 }
 
 // buildAccessKeyRow flattens a service.APIKeyResponse into the templ-side
@@ -166,22 +164,21 @@ func formatDateShortFromRFC3339(s string) string {
 // APIKeyNewPageHandler serves GET /admin/api-keys/new.
 func APIKeyNewPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		data := BaseTemplateData(r, sm, "access", "Create API Key")
+		data := BaseTemplateData(r, sm, "api-keys","Create API Key")
 		renderAPIKeyNew(w, r, tr, data, pages.APIKeyNewProps{
 			CSRFToken: GetCSRFToken(r),
 			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Access", Href: "/access"},
+				{Label: "API Keys", Href: "/settings/api-keys"},
 				{Label: "Create API Key"},
 			},
 		})
 	}
 }
 
-// renderAPIKeyNew mirrors the renderCSVImport / renderCategoryForm pattern:
-// hands the typed APIKeyNewProps to the templ component and uses
-// RenderWithTempl to host it inside base.html.
+// renderAPIKeyNew hosts the typed APIKeyNewProps inside the Settings
+// shell as a sub-view of the API Keys tab so the rail stays visible.
 func renderAPIKeyNew(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.APIKeyNewProps) {
-	tr.RenderWithTempl(w, r, data, pages.APIKeyNew(props))
+	renderSettingsTab(tr, w, r, tr.sm, data, pages.SettingsTabAccess, pages.APIKeyNew(props))
 }
 
 // APIKeyCreatePageHandler serves POST /admin/api-keys/new.
@@ -191,7 +188,7 @@ func APIKeyCreatePageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
 			SetFlash(r.Context(), sm, "error", "Name is required")
-			http.Redirect(w, r, "/api-keys/new", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/api-keys/new", http.StatusSeeOther)
 			return
 		}
 		scope := r.FormValue("scope")
@@ -201,13 +198,13 @@ func APIKeyCreatePageHandler(svc *service.Service, sm *scs.SessionManager, tr *T
 		result, err := svc.CreateAPIKey(r.Context(), name, scope)
 		if err != nil {
 			SetFlash(r.Context(), sm, "error", "Failed to create API key")
-			http.Redirect(w, r, "/api-keys/new", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/api-keys/new", http.StatusSeeOther)
 			return
 		}
 		// Store the plaintext key in the session so the "created" page can display it once.
 		sm.Put(r.Context(), "created_api_key", result.PlaintextKey)
 		sm.Put(r.Context(), "created_api_key_name", result.Name)
-		http.Redirect(w, r, "/api-keys/"+result.ID+"/created", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/api-keys/"+result.ID+"/created", http.StatusSeeOther)
 	}
 }
 
@@ -219,26 +216,25 @@ func APIKeyCreatedPageHandler(sm *scs.SessionManager, tr *TemplateRenderer) http
 		name := sm.PopString(r.Context(), "created_api_key_name")
 		if key == "" {
 			// Key already shown or session expired — redirect to list.
-			http.Redirect(w, r, "/access", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/api-keys", http.StatusSeeOther)
 			return
 		}
-		data := BaseTemplateData(r, sm, "access", "API Key Created")
+		data := BaseTemplateData(r, sm, "api-keys","API Key Created")
 		renderAPIKeyCreated(w, r, tr, data, pages.APIKeyCreatedProps{
 			KeyName:      name,
 			PlaintextKey: key,
 			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Access", Href: "/access"},
+				{Label: "API Keys", Href: "/settings/api-keys"},
 				{Label: "Key Created"},
 			},
 		})
 	}
 }
 
-// renderAPIKeyCreated mirrors renderAPIKeyNew: hands the typed
-// APIKeyCreatedProps to the templ component and uses RenderWithTempl
-// to host it inside base.html.
+// renderAPIKeyCreated hosts the typed APIKeyCreatedProps inside the
+// Settings shell as a sub-view of the API Keys tab.
 func renderAPIKeyCreated(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.APIKeyCreatedProps) {
-	tr.RenderWithTempl(w, r, data, pages.APIKeyCreated(props))
+	renderSettingsTab(tr, w, r, tr.sm, data, pages.SettingsTabAccess, pages.APIKeyCreated(props))
 }
 
 // APIKeyRevokePageHandler serves POST /admin/api-keys/{id}/revoke.
@@ -250,6 +246,6 @@ func APIKeyRevokePageHandler(svc *service.Service, sm *scs.SessionManager) http.
 		} else {
 			SetFlash(r.Context(), sm, "success", "API key revoked successfully")
 		}
-		http.Redirect(w, r, "/access", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/api-keys", http.StatusSeeOther)
 	}
 }

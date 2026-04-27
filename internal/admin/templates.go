@@ -206,6 +206,7 @@ func navPropsFromData(m map[string]any) components.NavProps {
 		SessionUserID:        str("SessionUserID"),
 		SessionAvatarVersion: str("SessionAvatarVersion"),
 		AdminUsername:        str("AdminUsername"),
+		UserName:             str("SessionUserName"),
 		RoleDisplay:          str("RoleDisplay"),
 		CSRFToken:            str("CSRFToken"),
 		AppVersion:           str("AppVersion"),
@@ -890,10 +891,9 @@ func (tr *TemplateRenderer) parseTemplates() error {
 		"pages/oauth_clients.html",
 		"pages/oauth_client_new.html",
 		"pages/oauth_client_created.html",
-		// pages/mcp_guide.html, pages/agent_wizard.html, and pages/mcp_settings.html
-		// are not registered as standalone base pages — their standalone routes
-		// redirect to /agents and they're only consumed as composite extras
-		// (see compositePages below).
+		// pages/agent_wizard.html is not registered as a standalone base page —
+		// its standalone route redirects to /agents and it's only consumed as a
+		// composite extra (see compositePages below).
 		// pages/prompt_builder.html removed — renders via RenderWithTempl using
 		// the _templ_shell template key (see pages.PromptBuilder).
 		// pages/session_detail.html removed — renders via RenderWithTempl using
@@ -905,9 +905,7 @@ func (tr *TemplateRenderer) parseTemplates() error {
 	// Pages that need multiple page files parsed together (for sub-template sharing).
 	compositePages := map[string][]string{
 		"pages/agents.html": {
-			"pages/mcp_guide.html",
 			"pages/agent_wizard.html",
-			"pages/mcp_settings.html",
 		},
 	}
 
@@ -1020,6 +1018,9 @@ func (tr *TemplateRenderer) Render(w http.ResponseWriter, r *http.Request, name 
 			}
 			if _, exists := m["SessionAvatarVersion"]; !exists {
 				m["SessionAvatarVersion"] = tr.sm.GetString(r.Context(), sessionKeyAvatarVersion)
+			}
+			if _, exists := m["SessionUserName"]; !exists {
+				m["SessionUserName"] = tr.sm.GetString(r.Context(), sessionKeyUserName)
 			}
 		}
 		// Cache assembled NavProps so navPropsFromData can type-assert it

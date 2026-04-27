@@ -375,6 +375,15 @@
   .bb-sidebar-link i, .bb-sidebar-link svg {
     @apply w-[1.125rem] h-[1.125rem] lg:w-4 lg:h-4 opacity-50;
     transition: opacity 0.15s ease;
+    /* Hint the browser to keep icons on their own compositing layer so
+       the sub-pixel position stays locked when the parent
+       .bb-sidebar-link triggers its `transform: scale(0.98)` :active
+       state — without this, the browser re-rounds child positions and
+       the icons visibly jiggle by 1px. `will-change` doesn't override
+       the actual transform (so .bb-nav-external-arrow's translate-x
+       animation still works). */
+    will-change: transform;
+    backface-visibility: hidden;
   }
 
   .bb-sidebar-link:hover i, .bb-sidebar-link:hover svg {
@@ -383,6 +392,21 @@
 
   .bb-sidebar-link--active i, .bb-sidebar-link--active svg {
     @apply opacity-100;
+  }
+
+  /* ── External-link arrow (Documentation / GitHub buttons) ── */
+  /* The trailing chevron-style glyph is hidden by default and slides
+     + fades in when the parent .group is hovered. Kept inside the
+     bb-sidebar-link cascade so the arrow inherits the link's icon
+     colour but overrides the size + opacity rules. */
+  .bb-sidebar-link .bb-nav-external-arrow,
+  .bb-sidebar-link .bb-nav-external-arrow svg {
+    @apply w-3.5 h-3.5 opacity-0 -translate-x-1;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  .bb-sidebar-link.group:hover .bb-nav-external-arrow,
+  .bb-sidebar-link.group:hover .bb-nav-external-arrow svg {
+    @apply opacity-60 translate-x-0;
   }
 
   /* ── Sidebar notification badges ── */

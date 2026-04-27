@@ -1,10 +1,5 @@
 {{define "agents-wizard-content"}}
 {{$stats := .Stats}}
-<div role="alert" class="alert alert-info alert-soft text-sm rounded-xl mb-6">
-  <i data-lucide="rocket" class="w-4 h-4"></i>
-  <span>New to MCP agents? Follow the <a href="/agents?tab=guide" class="link font-medium">Getting Started guide</a> to connect your first agent.</span>
-</div>
-
 <div class="space-y-8 bb-stagger">
 
   <!-- Section: Bulk Reviews -->
@@ -19,7 +14,7 @@
 
       <!-- Initial Setup -->
       <div class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 group border-l-4 border-l-primary flex items-center" x-data="{ copied: false }">
-        <a href="/agent-wizard/initial-setup" class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
+        <a href="/agent-prompts/builder/initial-setup" class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
           <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors flex-shrink-0 ml-4">
             <i data-lucide="sparkles" class="w-5 h-5 text-primary"></i>
           </div>
@@ -31,19 +26,19 @@
             <p class="text-xs text-base-content/50 leading-relaxed">Establish rules and categories after connecting your first accounts. Creates broad category mappings per provider.</p>
           </div>
         </a>
-        <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30 hover:text-primary mr-2 flex-shrink-0" @click.stop="fetch('/agent-wizard/initial-setup/copy').then(r=>r.text()).then(t=>{navigator.clipboard.writeText(t);copied=true;setTimeout(()=>copied=false,2000)})" :class="copied && '!text-success'">
+        <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30 hover:text-primary mr-2 flex-shrink-0" @click.stop="fetch('/agent-prompts/builder/initial-setup/copy').then(r=>r.text()).then(t=>{navigator.clipboard.writeText(t);copied=true;setTimeout(()=>copied=false,2000)})" :class="copied && '!text-success'">
           <i data-lucide="copy" class="w-3.5 h-3.5" x-show="!copied"></i>
           <i data-lucide="check" class="w-3.5 h-3.5" x-show="copied" x-cloak></i>
           <span class="text-xs" x-text="copied ? 'Copied' : 'Copy'"></span>
         </button>
-        <a href="/agent-wizard/initial-setup" class="flex-shrink-0 pr-4 no-underline">
+        <a href="/agent-prompts/builder/initial-setup" class="flex-shrink-0 pr-4 no-underline">
           <i data-lucide="arrow-right" class="w-4 h-4 text-base-content/20 group-hover:text-primary group-hover:translate-x-0.5 transition-all"></i>
         </a>
       </div>
 
       <!-- Bulk Review -->
       <div class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 group border-l-4 border-l-primary flex items-center" x-data="{ copied: false }">
-        <a href="/agent-wizard/bulk-review" class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
+        <a href="/agent-prompts/builder/bulk-review" class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
           <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors flex-shrink-0 ml-4">
             <i data-lucide="layers" class="w-5 h-5 text-primary"></i>
           </div>
@@ -58,19 +53,19 @@
             <p class="text-xs text-base-content/50 leading-relaxed">Review a large queue of pending transactions with careful categorization and rule creation.</p>
           </div>
         </a>
-        <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30 hover:text-primary mr-2 flex-shrink-0" @click.stop="fetch('/agent-wizard/bulk-review/copy').then(r=>r.text()).then(t=>{navigator.clipboard.writeText(t);copied=true;setTimeout(()=>copied=false,2000)})" :class="copied && '!text-success'">
+        <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30 hover:text-primary mr-2 flex-shrink-0" @click.stop="fetch('/agent-prompts/builder/bulk-review/copy').then(r=>r.text()).then(t=>{navigator.clipboard.writeText(t);copied=true;setTimeout(()=>copied=false,2000)})" :class="copied && '!text-success'">
           <i data-lucide="copy" class="w-3.5 h-3.5" x-show="!copied"></i>
           <i data-lucide="check" class="w-3.5 h-3.5" x-show="copied" x-cloak></i>
           <span class="text-xs" x-text="copied ? 'Copied' : 'Copy'"></span>
         </button>
-        <a href="/agent-wizard/bulk-review" class="flex-shrink-0 pr-4 no-underline">
+        <a href="/agent-prompts/builder/bulk-review" class="flex-shrink-0 pr-4 no-underline">
           <i data-lucide="arrow-right" class="w-4 h-4 text-base-content/20 group-hover:text-primary group-hover:translate-x-0.5 transition-all"></i>
         </a>
       </div>
 
       <!-- Quick Review -->
       <div class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 group border-l-4 border-l-primary flex items-center" x-data="{ copied: false }">
-        <a href="/agent-wizard/quick-review" class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
+        <a href="/agent-prompts/builder/quick-review" class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
           <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors flex-shrink-0 ml-4">
             <i data-lucide="zap" class="w-5 h-5 text-primary"></i>
           </div>
@@ -82,12 +77,12 @@
             <p class="text-xs text-base-content/50 leading-relaxed">Rapidly clear a large queue using batch operations. Prioritizes speed with reasonable accuracy.</p>
           </div>
         </a>
-        <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30 hover:text-primary mr-2 flex-shrink-0" @click.stop="fetch('/agent-wizard/quick-review/copy').then(r=>r.text()).then(t=>{navigator.clipboard.writeText(t);copied=true;setTimeout(()=>copied=false,2000)})" :class="copied && '!text-success'">
+        <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30 hover:text-primary mr-2 flex-shrink-0" @click.stop="fetch('/agent-prompts/builder/quick-review/copy').then(r=>r.text()).then(t=>{navigator.clipboard.writeText(t);copied=true;setTimeout(()=>copied=false,2000)})" :class="copied && '!text-success'">
           <i data-lucide="copy" class="w-3.5 h-3.5" x-show="!copied"></i>
           <i data-lucide="check" class="w-3.5 h-3.5" x-show="copied" x-cloak></i>
           <span class="text-xs" x-text="copied ? 'Copied' : 'Copy'"></span>
         </button>
-        <a href="/agent-wizard/quick-review" class="flex-shrink-0 pr-4 no-underline">
+        <a href="/agent-prompts/builder/quick-review" class="flex-shrink-0 pr-4 no-underline">
           <i data-lucide="arrow-right" class="w-4 h-4 text-base-content/20 group-hover:text-primary group-hover:translate-x-0.5 transition-all"></i>
         </a>
       </div>
@@ -104,7 +99,7 @@
 
       <!-- Routine Review -->
       <div class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 group border-l-4 border-l-success flex items-center" x-data="{ copied: false }">
-        <a href="/agent-wizard/routine-review" class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
+        <a href="/agent-prompts/builder/routine-review" class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
           <div class="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center group-hover:bg-success/15 transition-colors flex-shrink-0 ml-4">
             <i data-lucide="repeat" class="w-5 h-5 text-success"></i>
           </div>
@@ -121,19 +116,19 @@
             <p class="text-xs text-base-content/50 leading-relaxed">Review and categorize new transactions on a daily or weekly schedule. Creates rules for new patterns.</p>
           </div>
         </a>
-        <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30 hover:text-success mr-2 flex-shrink-0" @click.stop="fetch('/agent-wizard/routine-review/copy').then(r=>r.text()).then(t=>{navigator.clipboard.writeText(t);copied=true;setTimeout(()=>copied=false,2000)})" :class="copied && '!text-success'">
+        <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30 hover:text-success mr-2 flex-shrink-0" @click.stop="fetch('/agent-prompts/builder/routine-review/copy').then(r=>r.text()).then(t=>{navigator.clipboard.writeText(t);copied=true;setTimeout(()=>copied=false,2000)})" :class="copied && '!text-success'">
           <i data-lucide="copy" class="w-3.5 h-3.5" x-show="!copied"></i>
           <i data-lucide="check" class="w-3.5 h-3.5" x-show="copied" x-cloak></i>
           <span class="text-xs" x-text="copied ? 'Copied' : 'Copy'"></span>
         </button>
-        <a href="/agent-wizard/routine-review" class="flex-shrink-0 pr-4 no-underline">
+        <a href="/agent-prompts/builder/routine-review" class="flex-shrink-0 pr-4 no-underline">
           <i data-lucide="arrow-right" class="w-4 h-4 text-base-content/20 group-hover:text-success group-hover:translate-x-0.5 transition-all"></i>
         </a>
       </div>
 
       <!-- Spending Report -->
       <div class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 group border-l-4 border-l-violet-500 flex items-center" x-data="{ copied: false }">
-        <a href="/agent-wizard/spending-report" class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
+        <a href="/agent-prompts/builder/spending-report" class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
           <div class="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/15 transition-colors flex-shrink-0 ml-4">
             <i data-lucide="bar-chart-3" class="w-5 h-5 text-violet-500"></i>
           </div>
@@ -148,12 +143,12 @@
             <p class="text-xs text-base-content/50 leading-relaxed">Weekly or monthly summary of spending by category with trend analysis and anomaly callouts.</p>
           </div>
         </a>
-        <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30 hover:text-violet-500 mr-2 flex-shrink-0" @click.stop="fetch('/agent-wizard/spending-report/copy').then(r=>r.text()).then(t=>{navigator.clipboard.writeText(t);copied=true;setTimeout(()=>copied=false,2000)})" :class="copied && '!text-success'">
+        <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30 hover:text-violet-500 mr-2 flex-shrink-0" @click.stop="fetch('/agent-prompts/builder/spending-report/copy').then(r=>r.text()).then(t=>{navigator.clipboard.writeText(t);copied=true;setTimeout(()=>copied=false,2000)})" :class="copied && '!text-success'">
           <i data-lucide="copy" class="w-3.5 h-3.5" x-show="!copied"></i>
           <i data-lucide="check" class="w-3.5 h-3.5" x-show="copied" x-cloak></i>
           <span class="text-xs" x-text="copied ? 'Copied' : 'Copy'"></span>
         </button>
-        <a href="/agent-wizard/spending-report" class="flex-shrink-0 pr-4 no-underline">
+        <a href="/agent-prompts/builder/spending-report" class="flex-shrink-0 pr-4 no-underline">
           <i data-lucide="arrow-right" class="w-4 h-4 text-base-content/20 group-hover:text-violet-500 group-hover:translate-x-0.5 transition-all"></i>
         </a>
       </div>
@@ -170,7 +165,7 @@
 
       <!-- Anomaly Detection -->
       <div class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 group border-l-4 border-l-warning flex items-center" x-data="{ copied: false }">
-        <a href="/agent-wizard/anomaly-detection" class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
+        <a href="/agent-prompts/builder/anomaly-detection" class="flex items-center flex-1 min-w-0 no-underline cursor-pointer">
           <div class="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center group-hover:bg-warning/15 transition-colors flex-shrink-0 ml-4">
             <i data-lucide="shield-alert" class="w-5 h-5 text-warning"></i>
           </div>
@@ -182,18 +177,18 @@
             <p class="text-xs text-base-content/50 leading-relaxed">Watch for unusual charges, duplicate transactions, or unexpected spending spikes across all accounts.</p>
           </div>
         </a>
-        <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30 hover:text-warning mr-2 flex-shrink-0" @click.stop="fetch('/agent-wizard/anomaly-detection/copy').then(r=>r.text()).then(t=>{navigator.clipboard.writeText(t);copied=true;setTimeout(()=>copied=false,2000)})" :class="copied && '!text-success'">
+        <button class="btn btn-ghost btn-sm rounded-xl text-base-content/30 hover:text-warning mr-2 flex-shrink-0" @click.stop="fetch('/agent-prompts/builder/anomaly-detection/copy').then(r=>r.text()).then(t=>{navigator.clipboard.writeText(t);copied=true;setTimeout(()=>copied=false,2000)})" :class="copied && '!text-success'">
           <i data-lucide="copy" class="w-3.5 h-3.5" x-show="!copied"></i>
           <i data-lucide="check" class="w-3.5 h-3.5" x-show="copied" x-cloak></i>
           <span class="text-xs" x-text="copied ? 'Copied' : 'Copy'"></span>
         </button>
-        <a href="/agent-wizard/anomaly-detection" class="flex-shrink-0 pr-4 no-underline">
+        <a href="/agent-prompts/builder/anomaly-detection" class="flex-shrink-0 pr-4 no-underline">
           <i data-lucide="arrow-right" class="w-4 h-4 text-base-content/20 group-hover:text-warning group-hover:translate-x-0.5 transition-all"></i>
         </a>
       </div>
 
       <!-- Custom Agent -->
-      <a href="/agent-wizard/custom" class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group no-underline flex items-center border-l-4 border-l-base-300 border-dashed">
+      <a href="/agent-prompts/builder/custom" class="bb-card p-0 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group no-underline flex items-center border-l-4 border-l-base-300 border-dashed">
         <div class="w-12 h-12 rounded-xl bg-base-300/50 flex items-center justify-center group-hover:bg-base-300/70 transition-colors flex-shrink-0 ml-4">
           <i data-lucide="plus" class="w-5 h-5 text-base-content/40"></i>
         </div>

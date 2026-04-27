@@ -2,7 +2,7 @@ package pages
 
 import "breadbox/internal/templates/components"
 
-// CreateLogin renders /users/{id}/create-login. Hosts inside the base
+// CreateLogin renders /settings/household/{id}/create-login. Hosts inside the base
 // layout via TemplateRenderer.RenderWithTempl. Two modes:
 //
 //  - IsManage=true: manage an existing login account (role + setup link +
@@ -77,7 +77,7 @@ templ createLoginManage(p CreateLoginProps) {
 				<span x-show="saved" x-transition.opacity class="text-xs text-success inline-flex items-center gap-1 mr-2">
 					<i data-lucide="check" class="w-3.5 h-3.5"></i> Saved
 				</span>
-				<a href="/users" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
+				<a href="/settings/household" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
 				<button @click="save()" :disabled="!dirty || saving" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32">
 					<span x-show="!saving" class="inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save Changes</span>
 					<span x-show="saving" class="loading loading-spinner loading-xs"></span>
@@ -217,7 +217,7 @@ templ createLoginNew(p CreateLoginProps) {
 				</div>
 				<!-- Action row -->
 				<div class="bb-action-row">
-					<a href="/users" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
+					<a href="/settings/household" class="btn btn-sm btn-ghost rounded-xl">Cancel</a>
 					<button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32" :disabled="submitting">
 						<span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="user-plus" class="w-3.5 h-3.5"></i>Create Login</span>
 						<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
@@ -262,7 +262,7 @@ templ createLoginNew(p CreateLoginProps) {
 				</div>
 				<!-- Action row -->
 				<div class="bb-action-row">
-					<a href="/users" class="btn btn-sm btn-primary rounded-xl gap-1.5">
+					<a href="/settings/household" class="btn btn-sm btn-primary rounded-xl gap-1.5">
 						<i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
 						Back to Household
 					</a>

@@ -364,10 +364,10 @@ func OAuthClientNewPageHandler(tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data := map[string]any{
 			"PageTitle":   "Create OAuth Client",
-			"CurrentPage": "access",
+			"CurrentPage": "api-keys",
 			"CSRFToken":   GetCSRFToken(r),
 			"Breadcrumbs": []Breadcrumb{
-				{Label: "Access", Href: "/access"},
+				{Label: "API Keys", Href: "/settings/api-keys"},
 				{Label: "Create OAuth Client"},
 			},
 		}
@@ -381,7 +381,7 @@ func OAuthClientCreatePageHandler(svc *service.Service, sm *scs.SessionManager, 
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
 			SetFlash(r.Context(), sm, "error", "Name is required")
-			http.Redirect(w, r, "/oauth-clients/new", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/oauth-clients/new", http.StatusSeeOther)
 			return
 		}
 		scope := r.FormValue("scope")
@@ -391,13 +391,13 @@ func OAuthClientCreatePageHandler(svc *service.Service, sm *scs.SessionManager, 
 		result, err := svc.CreateOAuthClient(r.Context(), name, scope)
 		if err != nil {
 			SetFlash(r.Context(), sm, "error", "Failed to create OAuth client")
-			http.Redirect(w, r, "/oauth-clients/new", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/oauth-clients/new", http.StatusSeeOther)
 			return
 		}
 		sm.Put(r.Context(), "created_oauth_client_id", result.ClientID)
 		sm.Put(r.Context(), "created_oauth_client_secret", result.PlaintextClientSecret)
 		sm.Put(r.Context(), "created_oauth_client_name", result.Name)
-		http.Redirect(w, r, "/oauth-clients/"+result.ID+"/created", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/oauth-clients/"+result.ID+"/created", http.StatusSeeOther)
 	}
 }
 
@@ -408,19 +408,19 @@ func OAuthClientCreatedPageHandler(sm *scs.SessionManager, tr *TemplateRenderer)
 		clientSecret := sm.PopString(r.Context(), "created_oauth_client_secret")
 		name := sm.PopString(r.Context(), "created_oauth_client_name")
 		if clientID == "" {
-			http.Redirect(w, r, "/access", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/api-keys", http.StatusSeeOther)
 			return
 		}
 		data := map[string]any{
 			"PageTitle":    "OAuth Client Created",
-			"CurrentPage":  "access",
+			"CurrentPage":  "api-keys",
 			"ClientID":     clientID,
 			"ClientSecret": clientSecret,
 			"ClientName":   name,
 			"MCPServerURL": mcpServerURL(r),
 			"CSRFToken":    GetCSRFToken(r),
 			"Breadcrumbs": []Breadcrumb{
-				{Label: "Access", Href: "/access"},
+				{Label: "API Keys", Href: "/settings/api-keys"},
 				{Label: "Client Created"},
 			},
 		}
@@ -437,7 +437,7 @@ func OAuthClientRevokePageHandler(svc *service.Service, sm *scs.SessionManager) 
 		} else {
 			SetFlash(r.Context(), sm, "success", "OAuth client revoked successfully")
 		}
-		http.Redirect(w, r, "/access", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/api-keys", http.StatusSeeOther)
 	}
 }
 

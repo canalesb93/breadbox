@@ -18,13 +18,13 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		tab := r.URL.Query().Get("tab")
-		if tab != "webhooks" {
+		if tab != "webhooks" && tab != "sessions" {
 			tab = "syncs"
 		}
 
 		data := map[string]any{
-			"PageTitle":   "Logs",
-			"CurrentPage": "logs",
+			"PageTitle":   "Activity",
+			"CurrentPage": "activity",
 			"CSRFToken":   GetCSRFToken(r),
 			"Flash":       GetFlash(ctx, sm),
 		}
@@ -101,7 +101,7 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 				"connection_id", "status", "trigger", "date_from", "date_to",
 			})
 			pVals.Set("tab", "syncs")
-			pBase := paginationBase("/logs", pVals, "page")
+			pBase := paginationBase("/activity",pVals, "page")
 
 			// Connection filter options.
 			connOpts := make([]pages.LogsConnectionOption, 0, len(connections))
@@ -206,7 +206,7 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 			}
 			whVals := pickValues(r, []string{"wh_provider", "wh_status"})
 			whVals.Set("tab", "webhooks")
-			whPBase := paginationBase("/logs", whVals, "wh_page")
+			whPBase := paginationBase("/activity",whVals, "wh_page")
 
 			// Project webhook events into the templ view-model with
 			// pre-rendered relative + full timestamps.
@@ -238,13 +238,48 @@ func LogsPageHandler(a *app.App, svc *service.Service, sm *scs.SessionManager, t
 			props.WHFilterStatus = whFilterStatus
 		}
 
+		// Sessions tab — always fetched so the Alpine tab switcher can
+		// flip between Syncs / Webhooks / Sessions client-side without a
+		// page reload (matches the other two tabs).
+		{
+			sPage := parsePageKey(r, "s_page")
+			if sPage < 1 {
+				sPage = 1
+			}
+			sessions, total, err := svc.ListMCPSessions(ctx, sPage, 25)
+			if err != nil {
+				a.Logger.Error("list mcp sessions", "error", err)
+				sessions = nil
+			}
+			rows := make([]pages.LogsSessionRow, 0, len(sessions))
+			for _, s := range sessions {
+				rows = append(rows, pages.LogsSessionRow{
+					ShortID:           s.ShortID,
+					Purpose:           s.Purpose,
+					APIKeyName:        s.APIKeyName,
+					AgentName:         s.AgentName,
+					HasReport:         s.ReportID != nil,
+					ToolCallCount:     s.ToolCallCount,
+					CreatedAtRelative: relativeTimeFromRFC3339(s.CreatedAt),
+				})
+			}
+			totalPages := int((total + 24) / 25)
+			if totalPages < 1 {
+				totalPages = 1
+			}
+			props.Sessions = rows
+			props.SessionsTotal = total
+			props.SessionsPage = sPage
+			props.SessionsTotalPages = totalPages
+		}
+
 		renderLogs(w, r, tr, data, props)
 	}
 }
 
-// renderLogs mirrors the renderSettings / renderPromptBuilder pattern:
-// it hands the typed LogsProps to the templ component and uses
-// RenderWithTempl to host it inside base.html.
+// renderLogs hands the typed LogsProps to the templ component and uses
+// RenderWithTempl to host it inside base.html. /logs is a top-level
+// observability page in the main sidebar, not a tab inside Settings.
 func renderLogs(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.LogsProps) {
 	tr.RenderWithTempl(w, r, data, pages.Logs(props))
 }
@@ -270,6 +305,20 @@ func encodeSyncStatusQuery(status, connID, trigger, dateFrom, dateTo string) str
 		v.Set("date_to", dateTo)
 	}
 	return v.Encode()
+}
+
+// relativeTimeFromRFC3339 parses a non-pointer RFC3339 string and
+// returns a humanised "X minutes ago". Used for service responses that
+// already pre-format their timestamps as strings (e.g. MCP sessions).
+func relativeTimeFromRFC3339(s string) string {
+	if s == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return s
+	}
+	return relativeTime(t)
 }
 
 // relativeTimeFromRFC3339Ptr parses a *string RFC3339 timestamp and

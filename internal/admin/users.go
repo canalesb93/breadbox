@@ -151,7 +151,7 @@ func UsersListHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) 
 			EnrichedUsers:   enrichedUsers,
 			LoginAccountMap: loginAccountMap,
 		})
-		data := BaseTemplateData(r, sm, "users", "Household")
+		data := BaseTemplateData(r, sm, "household", "Household")
 		renderUsersList(tr, w, r, data, props)
 	}
 }
@@ -164,14 +164,16 @@ func renderUserForm(sm *scs.SessionManager, tr *TemplateRenderer, w http.Respons
 	if props.IsEdit && props.User != nil {
 		pageTitle = "Edit " + props.User.Name
 	}
-	data := BaseTemplateData(r, sm, "users", pageTitle)
-	tr.RenderWithTempl(w, r, data, pages.UserForm(props))
+	data := BaseTemplateData(r, sm, "household", pageTitle)
+	renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabHousehold, pages.UserForm(props))
 }
 
 // renderUsersList drives the household-members page through the templ
-// component. Mirrors the canonical pattern from #796 / #793.
+// component, hosted inside the unified Settings shell as the Household
+// tab.
 func renderUsersList(tr *TemplateRenderer, w http.ResponseWriter, r *http.Request, data map[string]any, props pages.UsersProps) {
-	tr.RenderWithTempl(w, r, data, pages.Users(props))
+	sm := tr.sm
+	renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabHousehold, pages.Users(props))
 }
 
 // usersListInput collects the values the handler computes for the list
@@ -267,7 +269,7 @@ func NewUserHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) ht
 		renderUserForm(sm, tr, w, r, pages.UserFormProps{
 			IsEdit: false,
 			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Household", Href: "/users"},
+				{Label: "Household", Href: "/settings/household"},
 				{Label: "Add Member"},
 			},
 		})
@@ -298,7 +300,7 @@ func EditUserHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) h
 			User:   &user,
 			UserID: idStr,
 			Breadcrumbs: []components.Breadcrumb{
-				{Label: "Household", Href: "/users"},
+				{Label: "Household", Href: "/settings/household"},
 				{Label: user.Name},
 			},
 		})
@@ -475,13 +477,13 @@ func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 				setupURL = scheme + "://" + r.Host + "/setup-account/" + loginAccount.SetupToken.String
 			}
 			breadcrumbs := []Breadcrumb{
-				{Label: "Household", Href: "/users"},
-				{Label: user.Name, Href: "/users/" + idStr + "/edit"},
+				{Label: "Household", Href: "/settings/household"},
+				{Label: user.Name, Href: "/settings/household/" + idStr + "/edit"},
 				{Label: "Login Account"},
 			}
 			data := map[string]any{
 				"PageTitle":    "Manage Login — " + user.Name,
-				"CurrentPage":  "users",
+				"CurrentPage":  "household",
 				"IsManage":     true,
 				"User":         user,
 				"UserID":       idStr,
@@ -507,13 +509,13 @@ func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 
 		// No login account — show create form.
 		breadcrumbs := []Breadcrumb{
-			{Label: "Household", Href: "/users"},
-			{Label: user.Name, Href: "/users/" + idStr + "/edit"},
+			{Label: "Household", Href: "/settings/household"},
+			{Label: user.Name, Href: "/settings/household/" + idStr + "/edit"},
 			{Label: "Create Login"},
 		}
 		data := map[string]any{
 			"PageTitle":   "Create Login — " + user.Name,
-			"CurrentPage": "users",
+			"CurrentPage": "household",
 			"IsManage":    false,
 			"User":        user,
 			"UserID":      idStr,
@@ -531,10 +533,9 @@ func CreateLoginPageHandler(a *app.App, tr *TemplateRenderer) http.HandlerFunc {
 }
 
 // renderCreateLogin hosts the typed CreateLogin templ component inside
-// base.html via RenderWithTempl. Mirrors the renderCSVImport / renderLogs
-// pattern from the rest of the templ migration.
+// the Settings shell as a sub-view of the Household tab.
 func renderCreateLogin(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.CreateLoginProps) {
-	tr.RenderWithTempl(w, r, data, pages.CreateLogin(props))
+	renderSettingsTab(tr, w, r, tr.sm, data, pages.SettingsTabHousehold, pages.CreateLogin(props))
 }
 
 // breadcrumbsToComponent converts the admin Breadcrumb slice (used by the

@@ -167,56 +167,69 @@ func WipeUserDataHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	}
 }
 
-// MyAccountHandler serves GET /my-account -- member's own account page.
-func MyAccountHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer, svc *service.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		accountIDStr := SessionAccountID(sm, r)
-		userIDStr := SessionUserID(sm, r)
+// buildMyAccountProps assembles the typed props shared by the Account
+// (password + danger zone) and Profile (avatar + name + email) tabs.
+// Both pages live under /settings/* and need the same identity + linked-
+// user data, so the fetch is centralised here.
+func buildMyAccountProps(a *app.App, sm *scs.SessionManager, r *http.Request) (pages.MyAccountProps, map[string]any) {
+	accountIDStr := SessionAccountID(sm, r)
+	userIDStr := SessionUserID(sm, r)
+	isUnlinked := userIDStr == ""
+	role := SessionRole(sm, r)
 
-		data := BaseTemplateData(r, sm, "my-account", "My Account")
-		data["AccountID"] = accountIDStr
-		data["UserID"] = userIDStr
+	data := BaseTemplateData(r, sm, "account", "My Account")
+	data["AccountID"] = accountIDStr
+	data["UserID"] = userIDStr
+	data["IsUnlinked"] = isUnlinked
 
-		// Check if this admin is unlinked (no household member).
-		isUnlinked := userIDStr == ""
-		data["IsUnlinked"] = isUnlinked
+	props := pages.MyAccountProps{
+		UserID:               userIDStr,
+		IsUnlinked:           isUnlinked,
+		CSRFToken:            GetCSRFToken(r),
+		AdminUsername:        sm.GetString(r.Context(), sessionKeyAccountUsername),
+		RoleDisplay:          RoleDisplayName(role),
+		SessionUserID:        userIDStr,
+		SessionAvatarVersion: sm.GetString(r.Context(), sessionKeyAvatarVersion),
+	}
 
-		props := pages.MyAccountProps{
-			UserID:     userIDStr,
-			IsUnlinked: isUnlinked,
-			CSRFToken:  GetCSRFToken(r),
-		}
-
-		// Load the user's connections for display.
-		if userIDStr != "" {
-			conns, err := svc.ListConnections(r.Context(), &userIDStr)
-			if err == nil {
-				for _, c := range conns {
-					inst := ""
-					if c.InstitutionName != nil {
-						inst = *c.InstitutionName
-					}
-					props.Connections = append(props.Connections, pages.MyAccountConnectionRow{
-						ID:              c.ID,
-						Provider:        c.Provider,
-						Status:          c.Status,
-						InstitutionName: inst,
-					})
-				}
+	if userIDStr != "" {
+		var userID pgtype.UUID
+		if err := userID.Scan(userIDStr); err == nil {
+			if u, err := a.Queries.GetUser(r.Context(), userID); err == nil {
+				props.UserName = u.Name
+				props.UserEmail = pgconv.TextOr(u.Email, "")
+				props.HasCustomAvatar = len(u.AvatarData) > 0
 			}
 		}
+	}
 
-		renderMyAccount(tr, w, r, data, props)
+	return props, data
+}
+
+// MyAccountHandler serves GET /settings/account -- the Account tab
+// (password + sign-out + danger zone).
+func MyAccountHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		props, data := buildMyAccountProps(a, sm, r)
+		data["PageTitle"] = "Account"
+		data["CurrentPage"] = "account"
+		renderSettingsTab(tr, w, r, tr.sm, data, pages.SettingsTabAccount, pages.MyAccount(props))
 	}
 }
 
-// renderMyAccount drives the /my-account page through the templ component.
-// Mirrors the canonical pattern from #807 (users) / #808 (access).
-func renderMyAccount(tr *TemplateRenderer, w http.ResponseWriter, r *http.Request, data map[string]any, props pages.MyAccountProps) {
-	tr.RenderWithTempl(w, r, data, pages.MyAccount(props))
+// MyProfileHandler serves GET /settings/profile -- the Profile tab
+// (avatar + name + email editor). Shares MyAccountProps with the Account
+// tab so both pages render the same identity context.
+func MyProfileHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		props, data := buildMyAccountProps(a, sm, r)
+		data["PageTitle"] = "Profile"
+		data["CurrentPage"] = "profile"
+		renderSettingsTab(tr, w, r, tr.sm, data, pages.SettingsTabProfile, pages.MyProfile(props))
+	}
 }
 
-// LinkAdminToUserHandler serves POST /my-account/link-user -- link an unlinked admin to a household member.
+// LinkAdminToUserHandler serves POST /settings/account/link-user -- link an unlinked admin to a household member.
 func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -224,7 +237,7 @@ func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc
 		// Guard: must be an unlinked account.
 		if SessionUserID(sm, r) != "" {
 			SetFlash(ctx, sm, "error", "Your account is already linked to a household member.")
-			http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 			return
 		}
 
@@ -232,7 +245,7 @@ func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc
 		accountID, err := parseUUID(accountIDStr)
 		if err != nil {
 			SetFlash(ctx, sm, "error", "Invalid session.")
-			http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 			return
 		}
 
@@ -244,13 +257,13 @@ func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc
 			name := strings.TrimSpace(r.FormValue("name"))
 			if name == "" {
 				SetFlash(ctx, sm, "error", "Name is required.")
-				http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+				http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 				return
 			}
 			user, err := a.Queries.CreateUser(ctx, db.CreateUserParams{Name: name})
 			if err != nil {
 				SetFlash(ctx, sm, "error", "Failed to create household member.")
-				http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+				http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 				return
 			}
 			userID = user.ID
@@ -259,31 +272,31 @@ func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc
 			uid := r.FormValue("user_id")
 			if uid == "" {
 				SetFlash(ctx, sm, "error", "Please select a household member.")
-				http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+				http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 				return
 			}
 			parsed, err := parseUUID(uid)
 			if err != nil {
 				SetFlash(ctx, sm, "error", "Invalid user selected.")
-				http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+				http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 				return
 			}
 			// Verify user exists and isn't already linked.
 			if _, err := a.Queries.GetUser(ctx, parsed); err != nil {
 				SetFlash(ctx, sm, "error", "Household member not found.")
-				http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+				http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 				return
 			}
 			if _, err := a.Queries.GetAuthAccountByUserID(ctx, parsed); err == nil {
 				SetFlash(ctx, sm, "error", "That household member already has a login account.")
-				http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+				http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 				return
 			}
 			userID = parsed
 
 		default:
 			SetFlash(ctx, sm, "error", "Invalid request.")
-			http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 			return
 		}
 
@@ -293,7 +306,7 @@ func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc
 			UserID: userID,
 		}); err != nil {
 			SetFlash(ctx, sm, "error", "Failed to link account.")
-			http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 			return
 		}
 
@@ -301,11 +314,11 @@ func LinkAdminToUserHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc
 		sm.Put(ctx, sessionKeyUserID, pgconv.FormatUUID(userID))
 
 		SetFlash(ctx, sm, "success", "Account linked to household member.")
-		http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 	}
 }
 
-// MyAccountChangePasswordHandler serves POST /my-account/password -- member changes their own password.
+// MyAccountChangePasswordHandler serves POST /settings/account/password -- member changes their own password.
 func MyAccountChangePasswordHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -313,15 +326,91 @@ func MyAccountChangePasswordHandler(a *app.App, sm *scs.SessionManager) http.Han
 		accountIDStr := SessionAccountID(sm, r)
 		if accountIDStr == "" {
 			SetFlash(ctx, sm, "error", "Invalid session.")
-			http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 			return
 		}
 
-		changePasswordForAccount(a, sm, w, r, accountIDStr, "/my-account")
+		changePasswordForAccount(a, sm, w, r, accountIDStr, "/settings/account")
 	}
 }
 
-// MyAccountWipeDataHandler serves POST /my-account/wipe-data -- member wipes their own data.
+// MyAccountUpdateProfileHandler serves PUT /settings/account/profile -- member
+// updates their own household profile (display name + email). Requires the
+// account to be linked to a user. JSON-shaped to match the existing
+// /-/users/{id} PUT endpoint that the shared avatarEditor factory drives.
+func MyAccountUpdateProfileHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userIDStr := SessionUserID(sm, r)
+		if userIDStr == "" {
+			writeError(w, http.StatusForbidden, "ACCOUNT_NOT_LINKED", "Your account isn't linked to a household member yet.")
+			return
+		}
+
+		var userID pgtype.UUID
+		if err := userID.Scan(userIDStr); err != nil {
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid user ID")
+			return
+		}
+
+		var req updateUserRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+
+		existing, err := a.Queries.GetUser(r.Context(), userID)
+		if err != nil {
+			a.Logger.Error("get user for self-update", "error", err)
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "User not found")
+			return
+		}
+
+		name := existing.Name
+		if req.Name != nil {
+			trimmed := strings.TrimSpace(*req.Name)
+			if trimmed == "" {
+				writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Name must not be empty")
+				return
+			}
+			name = trimmed
+		}
+
+		email := existing.Email
+		if req.Email != nil {
+			if *req.Email == "" {
+				email = pgtype.Text{}
+			} else {
+				if _, err := mail.ParseAddress(*req.Email); err != nil {
+					writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "Invalid email format")
+					return
+				}
+				email = pgconv.Text(*req.Email)
+			}
+		}
+
+		user, err := a.Queries.UpdateUser(r.Context(), db.UpdateUserParams{
+			ID:    userID,
+			Name:  name,
+			Email: email,
+		})
+		if err != nil {
+			a.Logger.Error("update self profile", "error", err)
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update profile")
+			return
+		}
+
+		// Refresh the cached display name so the sidebar footer reflects
+		// the edit on the next page render without a re-login.
+		sm.Put(r.Context(), sessionKeyUserName, user.Name)
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"id":    pgconv.FormatUUID(user.ID),
+			"name":  user.Name,
+			"email": pgconv.TextPtr(user.Email),
+		})
+	}
+}
+
+// MyAccountWipeDataHandler serves POST /settings/account/wipe-data -- member wipes their own data.
 func MyAccountWipeDataHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -329,7 +418,7 @@ func MyAccountWipeDataHandler(a *app.App, sm *scs.SessionManager) http.HandlerFu
 		userIDStr := SessionUserID(sm, r)
 		if userIDStr == "" {
 			SetFlash(ctx, sm, "error", "Invalid session.")
-			http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 			return
 		}
 
@@ -337,12 +426,12 @@ func MyAccountWipeDataHandler(a *app.App, sm *scs.SessionManager) http.HandlerFu
 		if err != nil {
 			a.Logger.Error("member wipe own data", "error", err, "user_id", userIDStr)
 			SetFlash(ctx, sm, "error", "Failed to wipe data.")
-			http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 			return
 		}
 
 		a.Logger.Info("member wiped own data", "user_id", userIDStr, "transactions_deleted", txnCount)
 		SetFlash(ctx, sm, "success", "Your data has been wiped successfully.")
-		http.Redirect(w, r, "/my-account", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/account", http.StatusSeeOther)
 	}
 }

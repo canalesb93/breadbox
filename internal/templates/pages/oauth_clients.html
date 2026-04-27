@@ -4,7 +4,7 @@
     <h1 class="bb-page-title">OAuth Clients</h1>
     <p class="text-sm text-base-content/50 mt-1">Manage OAuth clients for external connector access (e.g., Claude)</p>
   </div>
-  <a href="/oauth-clients/new" class="btn btn-primary btn-sm rounded-xl">
+  <a href="/settings/oauth-clients/new" class="btn btn-primary btn-sm rounded-xl">
     <i data-lucide="plus" class="w-4 h-4"></i>
     Create Client
   </a>
@@ -40,7 +40,7 @@
 
     {{if not .RevokedAt}}
     <div class="shrink-0">
-      <form method="POST" action="/oauth-clients/{{.ID}}/revoke" class="inline">
+      <form method="POST" action="/settings/oauth-clients/{{.ID}}/revoke" class="inline">
         <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
         <button type="button" class="btn btn-ghost btn-sm rounded-xl text-base-content/50 hover:text-error" x-show="!confirming" @click="confirming = true">
           Revoke
@@ -63,7 +63,7 @@
     </div>
     <h3 class="text-lg font-semibold mb-1">No OAuth clients yet</h3>
     <p class="text-sm text-base-content/50 mb-5 max-w-sm">Create an OAuth client to connect external services like Claude as a connector to your Breadbox MCP server.</p>
-    <a href="/oauth-clients/new" class="btn btn-primary btn-sm rounded-xl">
+    <a href="/settings/oauth-clients/new" class="btn btn-primary btn-sm rounded-xl">
       <i data-lucide="plus" class="w-4 h-4"></i>
       Create your first client
     </a>

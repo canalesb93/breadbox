@@ -155,7 +155,7 @@ func RegenerateUserAvatarHandler(a *app.App) http.HandlerFunc {
 
 // --- Self-service avatar (requires linked user) ---
 
-// UploadMyAvatarHandler serves POST /my-account/avatar.
+// UploadMyAvatarHandler serves POST /settings/account/avatar.
 func UploadMyAvatarHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := requireSessionUser(w, sm, r)
@@ -167,7 +167,7 @@ func UploadMyAvatarHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 	}
 }
 
-// DeleteMyAvatarHandler serves DELETE /my-account/avatar.
+// DeleteMyAvatarHandler serves DELETE /settings/account/avatar.
 func DeleteMyAvatarHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := requireSessionUser(w, sm, r)
@@ -184,7 +184,7 @@ func DeleteMyAvatarHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 	}
 }
 
-// RegenerateMyAvatarHandler serves POST /my-account/avatar/regenerate.
+// RegenerateMyAvatarHandler serves POST /settings/account/avatar/regenerate.
 func RegenerateMyAvatarHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := requireSessionUser(w, sm, r)

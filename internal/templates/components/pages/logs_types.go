@@ -6,7 +6,7 @@ import "breadbox/internal/service"
 // data map. Kept flat so admin/logs.go can build the props once and let
 // the templ render directly.
 type LogsProps struct {
-	// Active tab: "syncs" or "webhooks".
+	// Active tab: "syncs", "webhooks", or "sessions".
 	Tab string
 
 	// ===== Sync logs tab =====
@@ -49,6 +49,25 @@ type LogsProps struct {
 	WHPaginationBase string
 	WHFilterProvider string
 	WHFilterStatus   string
+
+	// ===== Sessions (MCP agent activity) tab =====
+	Sessions           []LogsSessionRow
+	SessionsTotal      int64
+	SessionsPage       int
+	SessionsTotalPages int
+}
+
+// LogsSessionRow is a flattened view-model around service.MCPSessionResponse
+// for the sessions list in the Activity page. Times are pre-rendered so the
+// templ stays free of helper calls.
+type LogsSessionRow struct {
+	ShortID           string
+	Purpose           string
+	APIKeyName        string
+	AgentName         string
+	HasReport         bool
+	ToolCallCount     int64
+	CreatedAtRelative string // "12 minutes ago"
 }
 
 // LogsConnectionOption represents one <option> in the connection filter

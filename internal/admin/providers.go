@@ -70,15 +70,13 @@ func ProvidersGetHandler(a *app.App, svc *service.Service, sm *scs.SessionManage
 			SyncIntervalMinutes: a.Config.SyncIntervalMinutes,
 			ProviderHealth:      providerHealth,
 		}
-		renderProviders(w, r, tr, data, props)
+		renderProviders(w, r, sm, tr, data, props)
 	}
 }
 
-// renderProviders mirrors the renderSettings / renderLogs pattern: hands
-// the typed ProvidersProps to the templ component and uses
-// RenderWithTempl to host it inside base.html.
-func renderProviders(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.ProvidersProps) {
-	tr.RenderWithTempl(w, r, data, pages.Providers(props))
+// renderProviders wraps the Providers tab body in the unified Settings shell.
+func renderProviders(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, tr *TemplateRenderer, data map[string]any, props pages.ProvidersProps) {
+	renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabProviders, pages.Providers(props))
 }
 
 // ProvidersSavePlaidHandler serves POST /admin/providers/plaid.
@@ -88,7 +86,7 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 
 		if os.Getenv("PLAID_CLIENT_ID") != "" {
 			SetFlash(ctx, sm, "error", "Plaid is configured via environment variables and cannot be changed here.")
-			http.Redirect(w, r, "/providers", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 			return
 		}
 
@@ -115,25 +113,25 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 			a.Config.WebhookURL = ""
 			_ = a.ReinitProvider("plaid")
 			SetFlash(ctx, sm, "success", "Plaid configuration cleared.")
-			http.Redirect(w, r, "/providers", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 			return
 		}
 
 		if plaidSecret == "" {
 			SetFlash(ctx, sm, "error", "Plaid secret is required.")
-			http.Redirect(w, r, "/providers", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 			return
 		}
 
 		if webhookURL != "" && !strings.HasPrefix(webhookURL, "https://") {
 			SetFlash(ctx, sm, "error", "Webhook URL must use HTTPS.")
-			http.Redirect(w, r, "/providers", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 			return
 		}
 
 		if err := plaidprovider.ValidateCredentials(ctx, plaidClientID, plaidSecret, plaidEnv); err != nil {
 			SetFlash(ctx, sm, "error", "Invalid Plaid credentials: "+err.Error())
-			http.Redirect(w, r, "/providers", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 			return
 		}
 
@@ -147,7 +145,7 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 			if err := a.Queries.SetAppConfig(ctx, entry); err != nil {
 				a.Logger.Error("save plaid config", "error", err, "key", entry.Key)
 				SetFlash(ctx, sm, "error", "Failed to save Plaid credentials.")
-				http.Redirect(w, r, "/providers", http.StatusSeeOther)
+				http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 				return
 			}
 		}
@@ -164,12 +162,12 @@ func ProvidersSavePlaidHandler(a *app.App, sm *scs.SessionManager) http.HandlerF
 		if err := a.ReinitProvider("plaid"); err != nil {
 			a.Logger.Error("reinit plaid provider", "error", err)
 			SetFlash(ctx, sm, "error", "Plaid credentials saved but provider failed to initialize: "+err.Error())
-			http.Redirect(w, r, "/providers", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 			return
 		}
 
 		SetFlash(ctx, sm, "success", "Plaid configuration saved and provider initialized.")
-		http.Redirect(w, r, "/providers", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 	}
 }
 
@@ -180,14 +178,14 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 
 		if os.Getenv("TELLER_APP_ID") != "" {
 			SetFlash(ctx, sm, "error", "Teller is configured via environment variables and cannot be changed here.")
-			http.Redirect(w, r, "/providers", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 			return
 		}
 
 		// Parse multipart form (10MB max for cert/key files).
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			SetFlash(ctx, sm, "error", "Failed to parse form data.")
-			http.Redirect(w, r, "/providers", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 			return
 		}
 
@@ -209,7 +207,7 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 			a.Config.TellerKeyPEM = nil
 			_ = a.ReinitProvider("teller")
 			SetFlash(ctx, sm, "success", "Teller configuration cleared.")
-			http.Redirect(w, r, "/providers", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 			return
 		}
 
@@ -232,7 +230,7 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 			if err := a.Queries.SetAppConfig(ctx, entry); err != nil {
 				a.Logger.Error("save teller config", "error", err, "key", entry.Key)
 				SetFlash(ctx, sm, "error", "Failed to save Teller configuration.")
-				http.Redirect(w, r, "/providers", http.StatusSeeOther)
+				http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 				return
 			}
 		}
@@ -250,7 +248,7 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 			certPEM, keyPEM, err := readTellerCertFiles(r)
 			if err != nil {
 				SetFlash(ctx, sm, "error", err.Error())
-				http.Redirect(w, r, "/providers", http.StatusSeeOther)
+				http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 				return
 			}
 
@@ -258,13 +256,13 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 				// Validate the key pair.
 				if err := tellerprovider.ValidateCredentialsPEM(certPEM, keyPEM); err != nil {
 					SetFlash(ctx, sm, "error", "Invalid certificate/key: "+err.Error())
-					http.Redirect(w, r, "/providers", http.StatusSeeOther)
+					http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 					return
 				}
 
 				if len(a.Config.EncryptionKey) == 0 {
 					SetFlash(ctx, sm, "error", "Encryption key is required to store certificates. Set ENCRYPTION_KEY environment variable.")
-					http.Redirect(w, r, "/providers", http.StatusSeeOther)
+					http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 					return
 				}
 
@@ -272,13 +270,13 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 				encCert, err := crypto.Encrypt(certPEM, a.Config.EncryptionKey)
 				if err != nil {
 					SetFlash(ctx, sm, "error", "Failed to encrypt certificate.")
-					http.Redirect(w, r, "/providers", http.StatusSeeOther)
+					http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 					return
 				}
 				encKey, err := crypto.Encrypt(keyPEM, a.Config.EncryptionKey)
 				if err != nil {
 					SetFlash(ctx, sm, "error", "Failed to encrypt private key.")
-					http.Redirect(w, r, "/providers", http.StatusSeeOther)
+					http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 					return
 				}
 
@@ -289,14 +287,14 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 					Key: "teller_cert_pem", Value: pgconv.Text(certB64),
 				}); err != nil {
 					SetFlash(ctx, sm, "error", "Failed to save certificate.")
-					http.Redirect(w, r, "/providers", http.StatusSeeOther)
+					http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 					return
 				}
 				if err := a.Queries.SetAppConfig(ctx, db.SetAppConfigParams{
 					Key: "teller_key_pem", Value: pgconv.Text(keyB64),
 				}); err != nil {
 					SetFlash(ctx, sm, "error", "Failed to save private key.")
-					http.Redirect(w, r, "/providers", http.StatusSeeOther)
+					http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 					return
 				}
 
@@ -308,12 +306,12 @@ func ProvidersSaveTellerHandler(a *app.App, sm *scs.SessionManager) http.Handler
 		if err := a.ReinitProvider("teller"); err != nil {
 			a.Logger.Error("reinit teller provider", "error", err)
 			SetFlash(ctx, sm, "error", "Teller settings saved but provider failed to initialize: "+err.Error())
-			http.Redirect(w, r, "/providers", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 			return
 		}
 
 		SetFlash(ctx, sm, "success", "Teller configuration saved.")
-		http.Redirect(w, r, "/providers", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/providers", http.StatusSeeOther)
 	}
 }
 

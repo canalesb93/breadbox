@@ -28,7 +28,7 @@ func BackupsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 				CSRFToken: GetCSRFToken(r),
 				Error:     "Backup service is not available. pg_dump may not be installed.",
 			}
-			renderBackups(w, r, tr, data, props)
+			renderBackups(w, r, sm, tr, data, props)
 			return
 		}
 
@@ -80,15 +80,13 @@ func BackupsPageHandler(a *app.App, sm *scs.SessionManager, tr *TemplateRenderer
 			})
 		}
 
-		renderBackups(w, r, tr, data, props)
+		renderBackups(w, r, sm, tr, data, props)
 	}
 }
 
-// renderBackups mirrors the renderLogs / renderCSVImport pattern: hands
-// the typed BackupsProps to the templ component and uses RenderWithTempl
-// to host it inside base.html.
-func renderBackups(w http.ResponseWriter, r *http.Request, tr *TemplateRenderer, data map[string]any, props pages.BackupsProps) {
-	tr.RenderWithTempl(w, r, data, pages.Backups(props))
+// renderBackups wraps the Backups tab body in the unified Settings shell.
+func renderBackups(w http.ResponseWriter, r *http.Request, sm *scs.SessionManager, tr *TemplateRenderer, data map[string]any, props pages.BackupsProps) {
+	renderSettingsTab(tr, w, r, sm, data, pages.SettingsTabBackups, pages.Backups(props))
 }
 
 // CreateBackupHandler serves POST /-/backups/create — triggers a manual backup.
@@ -98,7 +96,7 @@ func CreateBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 
 		if a.BackupService == nil {
 			SetFlash(ctx, sm, "error", "Backup service is not available.")
-			http.Redirect(w, r, "/backups", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 			return
 		}
 
@@ -106,12 +104,12 @@ func CreateBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		if err != nil {
 			a.Logger.Error("create backup", "error", err)
 			SetFlash(ctx, sm, "error", "Failed to create backup: "+err.Error())
-			http.Redirect(w, r, "/backups", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 			return
 		}
 
 		SetFlash(ctx, sm, "success", fmt.Sprintf("Backup created: %s", filename))
-		http.Redirect(w, r, "/backups", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 	}
 }
 
@@ -143,7 +141,7 @@ func DeleteBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 
 		if a.BackupService == nil {
 			SetFlash(ctx, sm, "error", "Backup service not available.")
-			http.Redirect(w, r, "/backups", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 			return
 		}
 
@@ -151,12 +149,12 @@ func DeleteBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 		if err := a.BackupService.DeleteBackup(filename); err != nil {
 			a.Logger.Error("delete backup", "error", err, "filename", filename)
 			SetFlash(ctx, sm, "error", "Failed to delete backup.")
-			http.Redirect(w, r, "/backups", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 			return
 		}
 
 		SetFlash(ctx, sm, "success", fmt.Sprintf("Backup deleted: %s", filename))
-		http.Redirect(w, r, "/backups", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 	}
 }
 
@@ -167,7 +165,7 @@ func RestoreBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 
 		if a.BackupService == nil {
 			SetFlash(ctx, sm, "error", "Backup service not available.")
-			http.Redirect(w, r, "/backups", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 			return
 		}
 
@@ -181,21 +179,21 @@ func RestoreBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 			file, header, err := r.FormFile("backup_file")
 			if err != nil {
 				SetFlash(ctx, sm, "error", "No backup file provided.")
-				http.Redirect(w, r, "/backups", http.StatusSeeOther)
+				http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 				return
 			}
 			defer file.Close()
 
 			if !strings.HasSuffix(header.Filename, ".sql.gz") {
 				SetFlash(ctx, sm, "error", "Invalid file type. Only .sql.gz files are supported.")
-				http.Redirect(w, r, "/backups", http.StatusSeeOther)
+				http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 				return
 			}
 
 			if err := a.BackupService.RestoreFromReader(ctx, file); err != nil {
 				a.Logger.Error("restore from upload", "error", err)
 				SetFlash(ctx, sm, "error", "Restore failed: "+err.Error())
-				http.Redirect(w, r, "/backups", http.StatusSeeOther)
+				http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 				return
 			}
 
@@ -205,14 +203,14 @@ func RestoreBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 			filename := r.FormValue("backup_filename")
 			if filename == "" {
 				SetFlash(ctx, sm, "error", "No backup file selected.")
-				http.Redirect(w, r, "/backups", http.StatusSeeOther)
+				http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 				return
 			}
 
 			if err := a.BackupService.RestoreBackup(ctx, filename); err != nil {
 				a.Logger.Error("restore from existing", "error", err, "filename", filename)
 				SetFlash(ctx, sm, "error", "Restore failed: "+err.Error())
-				http.Redirect(w, r, "/backups", http.StatusSeeOther)
+				http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 				return
 			}
 
@@ -222,7 +220,7 @@ func RestoreBackupHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc {
 			SetFlash(ctx, sm, "error", "Invalid restore source.")
 		}
 
-		http.Redirect(w, r, "/backups", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 	}
 }
 
@@ -244,7 +242,7 @@ func BackupScheduleHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 		}
 		if !validSchedules[schedule] {
 			SetFlash(ctx, sm, "error", "Invalid backup schedule.")
-			http.Redirect(w, r, "/backups", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 			return
 		}
 
@@ -252,7 +250,7 @@ func BackupScheduleHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 		retentionDays, err := strconv.Atoi(retentionStr)
 		if err != nil || retentionDays < 1 || retentionDays > 365 {
 			SetFlash(ctx, sm, "error", "Invalid retention period. Must be 1-365 days.")
-			http.Redirect(w, r, "/backups", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 			return
 		}
 
@@ -263,7 +261,7 @@ func BackupScheduleHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 		}); err != nil {
 			a.Logger.Error("save backup schedule", "error", err)
 			SetFlash(ctx, sm, "error", "Failed to save backup schedule.")
-			http.Redirect(w, r, "/backups", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 			return
 		}
 
@@ -274,7 +272,7 @@ func BackupScheduleHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 		}); err != nil {
 			a.Logger.Error("save backup retention", "error", err)
 			SetFlash(ctx, sm, "error", "Failed to save retention setting.")
-			http.Redirect(w, r, "/backups", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 			return
 		}
 
@@ -283,7 +281,7 @@ func BackupScheduleHandler(a *app.App, sm *scs.SessionManager) http.HandlerFunc 
 		} else {
 			SetFlash(ctx, sm, "success", fmt.Sprintf("Backup schedule saved. Retention: %d days.", retentionDays))
 		}
-		http.Redirect(w, r, "/backups", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 	}
 }
 
@@ -294,7 +292,7 @@ func RestoreExistingBackupHandler(a *app.App, sm *scs.SessionManager) http.Handl
 
 		if a.BackupService == nil {
 			SetFlash(ctx, sm, "error", "Backup service not available.")
-			http.Redirect(w, r, "/backups", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 			return
 		}
 
@@ -302,11 +300,11 @@ func RestoreExistingBackupHandler(a *app.App, sm *scs.SessionManager) http.Handl
 		if err := a.BackupService.RestoreBackup(ctx, filename); err != nil {
 			a.Logger.Error("restore backup", "error", err, "filename", filename)
 			SetFlash(ctx, sm, "error", "Restore failed: "+err.Error())
-			http.Redirect(w, r, "/backups", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 			return
 		}
 
 		SetFlash(ctx, sm, "success", fmt.Sprintf("Database restored from %s. You may need to restart the server.", filename))
-		http.Redirect(w, r, "/backups", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/backups", http.StatusSeeOther)
 	}
 }

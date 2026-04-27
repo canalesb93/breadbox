@@ -1,0 +1,263 @@
+package components
+
+// Generic activity-timeline primitives extracted from the transaction-detail
+// page. They render the GitHub-style chrome — a continuous left rail, day
+// separators, 24px icon tiles that thread through the rail, comment bubbles,
+// and the small empty state — without caring about the data shape that drives
+// each row. Callers compose row contents (sentences, chips, links) by
+// passing templ children:
+//
+//	@components.Timeline(components.TimelineProps{
+//	    Heading: "Activity", HeadingIcon: "activity",
+//	    EventCount: len(events), AriaLabel: "Activity timeline",
+//	}) {
+//	    @components.TimelineDay("Today", true)
+//	    @components.TimelineSystemRow(components.TimelineRowProps{
+//	        Icon: "zap", IconTone: "info", Timestamp: e.Timestamp,
+//	    }) {
+//	        <span>Rule { e.Summary } applied</span>
+//	    }
+//	}
+//
+// The rail uses an absolutely-positioned span anchored top-2 / bottom-12.
+// `bottom-12` reserves vertical room for a composer slot at the tail. If the
+// caller doesn't render a composer, that gap is harmless — the rail simply
+// stops a few rows of padding above the section's bottom edge.
+//
+// IconTone palette (mirrors txdSystemIcon's existing tints so the migration
+// is byte-for-byte identical):
+//
+//	"neutral" → bg-base-200 + text-base-content/40 (default; comments,
+//	            unknown system events, and the empty fallback)
+//	"info"    → bg-info/15 + text-info (rule applications)
+//	"success" → bg-success/15 + text-success (tag added; review approved
+//	            uses bg-success/10 — the row caller can override that
+//	            specific case via TileBg/TileColor; see below)
+//	"warning" → bg-warning/15 + text-warning (review skipped — caller
+//	            overrides the bg to bg-warning/10 for the legacy tile shade)
+//	"error"   → bg-error/15 + text-error (tag removed; review rejected
+//	            uses bg-error/10)
+//
+// Two variants of the same shade exist in the legacy code (bg-info/15 vs
+// bg-success/10 etc). To keep the visual diff at zero, the txn-detail
+// caller continues to render its own kind-specific icon tiles (txdSystemIcon)
+// inside `TimelineSystemRow` via the children slot, instead of relying on
+// the IconTone shorthand. New callers that don't need that fidelity can use
+// IconTone directly and get a sensible default.
+
+// TimelineProps is the section wrapper input.
+type TimelineProps struct {
+	Heading      string // "Activity" — section heading, optional.
+	HeadingIcon  string // Lucide icon name shown next to the heading, optional.
+	EventCount   int    // Rendered next to the heading as "N events". 0 hides the count.
+	AriaLabel    string // aria-label for the inner <ol>.
+	EmptyMessage string // Reserved for future opt-in empty rendering; ignored today.
+}
+
+// TimelineRowProps drives a single system row's chrome (icon tile + timestamp).
+// The row's sentence body is supplied via templ children so callers can mix
+// strong text, chips, links, and inline avatars without this primitive having
+// to know about any of them.
+type TimelineRowProps struct {
+	Icon      string // Lucide icon for the tile. Required when no children-icon override is rendered.
+	IconTone  string // "neutral" | "info" | "success" | "warning" | "error". "" → "neutral".
+	Timestamp string // RFC3339; rendered as a tooltip + relative-time pill. "" → omitted.
+	Origin    string // Optional italic suffix (e.g. "rule", "agent"). "" → omitted.
+}
+
+// TimelineActor is reused inside comment rows.
+type TimelineActor struct {
+	Name      string
+	AvatarURL string // When set, an <img> avatar is used. Falls back to initials/bot tile.
+	IsAgent   bool   // When true, renders the bot-tile fallback instead of initials.
+	HRef      string // Optional link target wrapping the actor name.
+}
+
+// Timeline renders the section wrapper (header + rail + ordered list). The
+// caller is responsible for emitting the row children — TimelineDay,
+// TimelineSystemRow, TimelineCommentRow, plus any composer they want at the
+// tail. Empty timelines should render `TimelineEmpty` instead.
+templ Timeline(p TimelineProps) {
+	<section
+		aria-labelledby={ timelineHeadingID(p.Heading) }
+		class="bb-card p-0 overflow-hidden"
+	>
+		if p.Heading != "" {
+			<header class="px-4 sm:px-5 pt-5 pb-4 flex items-center gap-2">
+				if p.HeadingIcon != "" {
+					<i data-lucide={ p.HeadingIcon } class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>
+				}
+				<h2 id={ timelineHeadingID(p.Heading) } class="text-sm font-semibold text-base-content/60">{ p.Heading }</h2>
+				if p.EventCount > 0 {
+					<span class="text-xs text-base-content/40 tabular-nums">{ pluralEvents(p.EventCount) }</span>
+				}
+			</header>
+		}
+		<ol class="bb-timeline relative pl-4 sm:pl-5 pr-4 sm:pr-5 pb-2" role="list" aria-label={ p.AriaLabel }>
+			<!--
+				Continuous left rail. Top/bottom anchored so it threads
+				through every 24px tile (events + day separators) and the
+				composer. left-[28px]/[32px] = container padding (16/20px)
+				+ tile half-width (12px) — keeps the rail centered under
+				every circle on the timeline.
+			-->
+			<span class="absolute left-[28px] sm:left-[32px] top-2 bottom-12 w-px bg-base-200" aria-hidden="true"></span>
+			{ children... }
+		</ol>
+	</section>
+}
+
+// TimelineDay renders a horizontal day separator with a small dot anchored
+// on the rail. The dot sits in a 24px tile so its center aligns with the
+// rail (and with every other 24px tile on the timeline). The first day's
+// separator gets a tighter top margin so the timeline doesn't open with a
+// large gap.
+templ TimelineDay(label string, first bool) {
+	<li class={ "relative flex items-center gap-3 select-none", templ.KV("pt-1 pb-3", first), templ.KV("pt-5 pb-3", !first) } role="separator" aria-label={ label }>
+		<div class="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center" aria-hidden="true">
+			<span class="w-3 h-3 rounded-full bg-base-300 ring-4 ring-base-100"></span>
+		</div>
+		<h3 class="text-xs font-semibold uppercase tracking-wider text-base-content/40">{ label }</h3>
+		<span class="flex-1 h-px bg-base-200" aria-hidden="true"></span>
+	</li>
+}
+
+// TimelineSystemRow renders a compact one-liner row: 24px icon tile on the
+// rail, sentence body in the children slot, optional origin + relative
+// timestamp on the right-hand side.
+//
+// Callers that need a custom icon tile (e.g. category color/icon, multi-tone
+// review status) can pass a sentinel IconTone of "custom" and render their
+// own tile inside the body — but the typical path is to use one of the
+// neutral/info/success/warning/error tones.
+templ TimelineSystemRow(p TimelineRowProps) {
+	<li class="relative flex items-start gap-3 py-2 group">
+		<div class="relative z-10 shrink-0 w-6 h-6 rounded-full bg-base-100">
+			if p.IconTone != "custom" {
+				<span class={ "flex items-center justify-center w-6 h-6 rounded-full ring-4 ring-base-100", timelineIconBg(p.IconTone) } aria-hidden="true">
+					if p.Icon != "" {
+						<i data-lucide={ p.Icon } class={ "w-3 h-3", timelineIconColor(p.IconTone) }></i>
+					}
+				</span>
+			}
+		</div>
+		<div class="flex-1 min-w-0 text-xs leading-6 text-base-content/75 break-words">
+			{ children... }
+			if p.Origin != "" || p.Timestamp != "" {
+				<span class="text-base-content/40 ml-1">
+					if p.Origin != "" {
+						<span class="italic">&middot; { p.Origin }</span>
+					}
+					if p.Timestamp != "" {
+						<span aria-hidden="true">&middot;</span>
+						<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(p.Timestamp) }>
+							<time datetime={ p.Timestamp } class="tabular-nums cursor-default" title={ formatTimelineTimestamp(p.Timestamp) }>{ relativeTimelineTimestamp(p.Timestamp) }</time>
+						</span>
+					}
+				</span>
+			}
+		</div>
+	</li>
+}
+
+// TimelineSystemRowCustomTile is the escape hatch for system rows whose
+// icon tile is too data-driven for the IconTone palette (e.g. a category's
+// own color + icon, or a review tile whose background tint differs from the
+// default 15% alpha). The caller renders the entire 24px tile (including the
+// outer ring-4 ring-base-100) inside the `tile` slot. This keeps the row
+// chrome (rail anchor, sentence layout, timestamp suffix) reusable while
+// letting the caller drive the iconography.
+templ TimelineSystemRowCustomTile(timestamp, origin string, tile, body templ.Component) {
+	<li class="relative flex items-start gap-3 py-2 group">
+		<div class="relative z-10 shrink-0 w-6 h-6 rounded-full bg-base-100">
+			@tile
+		</div>
+		<div class="flex-1 min-w-0 text-xs leading-6 text-base-content/75 break-words">
+			@body
+			if origin != "" || timestamp != "" {
+				<span class="text-base-content/40 ml-1">
+					if origin != "" {
+						<span class="italic">&middot; { origin }</span>
+					}
+					if timestamp != "" {
+						<span aria-hidden="true">&middot;</span>
+						<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(timestamp) }>
+							<time datetime={ timestamp } class="tabular-nums cursor-default" title={ formatTimelineTimestamp(timestamp) }>{ relativeTimelineTimestamp(timestamp) }</time>
+						</span>
+					}
+				</span>
+			}
+		</div>
+	</li>
+}
+
+// TimelineCommentRow renders a chat-bubble row: 24px avatar on the rail and
+// a header-line ("<actor> commented · <time>") above the bubble body. The
+// bubble body is the children slot so callers can render plain text,
+// markdown, action buttons inside the meta line, etc.
+templ TimelineCommentRow(actor TimelineActor, timestamp string) {
+	<li class="relative flex items-start gap-3 py-2.5 group">
+		<div class="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-base-100">
+			@timelineCommentAvatar(actor)
+		</div>
+		<div class="flex-1 min-w-0">
+			<div class="flex items-center gap-1.5 px-1 flex-wrap text-xs leading-6">
+				if actor.Name != "" {
+					if actor.HRef != "" {
+						<a href={ templ.SafeURL(actor.HRef) } class="font-semibold text-base-content hover:text-primary transition-colors">{ actor.Name }</a>
+					} else {
+						<strong class="font-semibold text-base-content">{ actor.Name }</strong>
+					}
+				}
+				<span class="text-base-content/55">commented</span>
+				if timestamp != "" {
+					<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(timestamp) }>
+						<time datetime={ timestamp } class="text-base-content/40 tabular-nums cursor-default" title={ formatTimelineTimestamp(timestamp) }>{ relativeTimelineTimestamp(timestamp) }</time>
+					</span>
+				}
+			</div>
+			{ children... }
+		</div>
+	</li>
+}
+
+// TimelineCommentRowRaw is the escape hatch for callers that need a custom
+// avatar treatment or want to inject controls (e.g. a delete button) inside
+// the meta line. The avatar slot fills the 24px tile on the rail; the body
+// slot fills the right-hand column. Use TimelineCommentRow when the default
+// "Name commented · timestamp" meta line is enough.
+templ TimelineCommentRowRaw(avatar templ.Component) {
+	<li class="relative flex items-start gap-3 py-2.5 group">
+		<div class="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-base-100">
+			@avatar
+		</div>
+		<div class="flex-1 min-w-0">
+			{ children... }
+		</div>
+	</li>
+}
+
+// TimelineEmpty renders the small "no activity yet" treatment used when a
+// timeline has zero rows. Caller wraps any composer or call-to-action above
+// the divider; this primitive renders only the icon + message.
+templ TimelineEmpty(message string) {
+	<div class="text-center">
+		<i data-lucide="clock" class="w-5 h-5 text-base-content/20 mx-auto" aria-hidden="true"></i>
+		<p class="text-xs text-base-content/40 mt-1.5">{ message }</p>
+	</div>
+}
+
+// timelineCommentAvatar renders the 24px avatar tile for a comment row.
+templ timelineCommentAvatar(actor TimelineActor) {
+	if actor.AvatarURL != "" {
+		<img src={ actor.AvatarURL } alt={ actor.Name + " avatar" } class="w-6 h-6 rounded-full object-cover ring-4 ring-base-100" title={ actor.Name }/>
+	} else if actor.IsAgent {
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 ring-4 ring-base-100" aria-hidden="true" title={ actor.Name }>
+			<i data-lucide="bot" class="w-3 h-3 text-primary"></i>
+		</span>
+	} else {
+		<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true" title={ actor.Name }>
+			<span class="text-[10px] font-semibold text-base-content/60 leading-none">{ firstChar(actor.Name) }</span>
+		</span>
+	}
+}

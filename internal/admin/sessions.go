@@ -13,7 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// SessionDetailHandler serves GET /admin/agents/sessions/{id}.
+// SessionDetailHandler serves GET /admin/activity/sessions/{id}.
 func SessionDetailHandler(svc *service.Service, sm *scs.SessionManager, tr *TemplateRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
@@ -23,7 +23,7 @@ func SessionDetailHandler(svc *service.Service, sm *scs.SessionManager, tr *Temp
 			return
 		}
 
-		data := BaseTemplateData(r, sm, "agents", "Session Detail")
+		data := BaseTemplateData(r, sm, "activity", "Session Detail")
 		props := buildSessionDetailProps(detail)
 		renderSessionDetail(w, r, tr, data, props)
 	}
@@ -83,19 +83,6 @@ func buildSessionDetailProps(detail service.MCPSessionDetailResponse) pages.Sess
 	return out
 }
 
-// relativeTimeFromRFC3339 mirrors the funcMap "relativeTime" branch
-// for an RFC3339 string. Returns the input unchanged when parsing
-// fails (matches the funcMap fallback).
-func relativeTimeFromRFC3339(s string) string {
-	if s == "" {
-		return ""
-	}
-	parsed, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return s
-	}
-	return relativeTime(parsed)
-}
 
 // formatDateTimeFromRFC3339 mirrors the funcMap "formatDateTime"
 // branch for an RFC3339 string ("Jan 2, 2006 3:04 PM" in local time).

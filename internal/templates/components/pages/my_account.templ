@@ -1,16 +1,62 @@
 package pages
 
-// MyAccount renders the member's own /my-account page. Hosts inside the
-// base layout via TemplateRenderer.RenderWithTempl — the handler builds
-// typed props in admin/members.go and the bridge drops the rendered HTML
-// into base.html's TemplContent slot. Mirrors the canonical pattern from
-// #807 (users) / #808 (access).
+// MyAccount renders the member's own /settings/account page. Hosts
+// inside the base layout via TemplateRenderer.RenderWithTempl — the
+// handler builds typed props in admin/members.go and the bridge drops
+// the rendered HTML into base.html's TemplContent slot.
+//
+// The Profile card shares its visual structure with
+// /settings/household/{id}/edit (icon-header avatar + name/email fields
+// + bb-action-row) by reusing the same `avatarEditor` Alpine factory.
+// Endpoint URLs are passed via data-* attrs so the same factory drives
+// admin scope (/-/users/{id}/*) and self scope (/settings/account/*).
 templ MyAccount(p MyAccountProps) {
-	<div class="max-w-2xl mx-auto">
+	<div class="max-w-2xl">
 		<div class="bb-page-header">
 			<div>
-				<h1 class="bb-page-title">My Account</h1>
-				<p class="text-sm text-base-content/50 mt-1">Manage your account settings and data</p>
+				<h1 class="bb-page-title">Account</h1>
+				<p class="text-sm text-base-content/50 mt-1">
+					if p.AdminUsername != "" {
+						Signed in as <span class="text-base-content/70 font-medium">{ p.AdminUsername }</span>
+						if p.RoleDisplay != "" {
+							· { p.RoleDisplay }
+						}
+					} else {
+						Password, sign out, and account data
+					}
+				</p>
+			</div>
+			<form method="POST" action="/logout" class="shrink-0">
+				if p.CSRFToken != "" {
+					<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
+				}
+				<button type="submit" class="btn btn-ghost btn-sm rounded-xl gap-2 text-base-content/60 hover:text-base-content">
+					<i data-lucide="log-out" class="w-4 h-4"></i>
+					Sign out
+				</button>
+			</form>
+		</div>
+		<div class="space-y-6">
+			@myAccountPasswordCard(p.CSRFToken)
+			@myAccountDangerZone(p.CSRFToken)
+		</div>
+	</div>
+}
+
+// MyProfile renders the Profile tab inside the Settings shell — avatar
+// editor + name + email form. Shares MyAccountProps with MyAccount and
+// reuses the same `avatarEditor` Alpine factory wired at /settings/account
+// endpoints (so updates write to the same backing data the Account tab's
+// header reads).
+templ MyProfile(p MyAccountProps) {
+	// Synchronous (no defer): the page script registers its alpine:init
+	// listener before Alpine fires the event. See user_form.js.
+	<script src="/static/js/admin/components/user_form.js"></script>
+	<div class="max-w-2xl">
+		<div class="bb-page-header">
+			<div>
+				<h1 class="bb-page-title">Profile</h1>
+				<p class="text-sm text-base-content/50 mt-1">Update your name, email, and avatar</p>
 			</div>
 		</div>
 		if p.IsUnlinked {
@@ -18,180 +64,226 @@ templ MyAccount(p MyAccountProps) {
 				<i data-lucide="user-plus" class="w-5 h-5"></i>
 				<span>
 					Your admin account isn't linked to a household member yet.
-					<a href="/users" class="link font-medium">Link it from the Household page</a>.
+					<a href="/settings/household" class="link font-medium">Link it from the Household page</a>.
 				</span>
 			</div>
 		}
 		if p.UserID != "" {
-			@myAccountAvatarCard()
+			@myAccountProfileCard(p)
 		}
-		<div class="space-y-6">
-			@myAccountPasswordCard(p.CSRFToken)
-			@myAccountConnectionsCard(p.Connections)
-			@myAccountDangerZone(p.CSRFToken)
-		</div>
 	</div>
-	if p.UserID != "" {
-		@templ.Raw(myAccountAvatarBootstrap(p))
-	}
 }
 
-// myAccountAvatarCard renders the profile-picture card. Wired to the
-// `myAvatar()` Alpine factory bootstrapped at the bottom of the page so
-// the upload / regenerate / remove flows match the prior html/template
-// version byte-for-byte.
-templ myAccountAvatarCard() {
-	<div class="bb-card mb-6" x-data="myAvatar()">
-		<div class="p-5 border-b border-base-300">
-			<h2 class="font-semibold text-base flex items-center gap-2">
-				<i data-lucide="user-circle" class="w-4 h-4 text-base-content/40"></i>
-				Profile Picture
-			</h2>
-		</div>
-		<div class="p-5">
-			<div class="flex items-center gap-5">
-				<div class="relative group">
-					<img :src="avatarSrc" alt="" class="w-20 h-20 rounded-full object-cover ring-2 ring-base-300"/>
-					<button type="button" @click="$refs.fileInput.click()" class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-						<i data-lucide="camera" class="w-5 h-5 text-white"></i>
-					</button>
-					<input type="file" x-ref="fileInput" accept="image/png,image/jpeg,image/gif" class="hidden" @change="onFileSelect"/>
-				</div>
-				<div>
-					<p class="text-xs text-base-content/45">PNG, JPG, or GIF. Max 5 MB.</p>
-					<div class="flex items-center gap-2 mt-2">
-						<button type="button" @click="$refs.fileInput.click()" class="btn btn-ghost btn-xs rounded-lg">
-							<i data-lucide="upload" class="w-3.5 h-3.5"></i>
-							Upload
+// myAccountProfileCard renders the linked household member's profile
+// editor. Mirrors userFormEdit's visual structure (icon-header + form
+// fields + bb-action-row) but routes the avatarEditor factory at
+// /settings/account endpoints via data-* attrs.
+templ myAccountProfileCard(p MyAccountProps) {
+	<div
+		x-data="avatarEditor"
+		data-user-id={ p.UserID }
+		data-has-custom-avatar={ boolStr(p.HasCustomAvatar) }
+		data-avatar-endpoint="/settings/account/avatar"
+		data-profile-endpoint="/settings/account/profile"
+		data-success-redirect="/settings/account"
+	>
+		<form @submit.prevent="submitForm()" class="bb-card p-0 overflow-hidden">
+			<div class="p-5 sm:p-6">
+				<div class="bb-icon-header">
+					<div class="relative group shrink-0">
+						<img :src="avatarSrc" alt="" class="w-10 h-10 rounded-full object-cover ring-2 ring-base-300"/>
+						<button
+							type="button"
+							@click="$refs.fileInput.click()"
+							class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+							title="Upload photo"
+						>
+							<i data-lucide="camera" class="w-4 h-4 text-white"></i>
 						</button>
-						<button type="button" @click="regenerate()" class="btn btn-ghost btn-xs rounded-lg">
-							<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-							Regenerate
-						</button>
-						<button type="button" x-show="hasCustom" @click="removeAvatar()" class="btn btn-ghost btn-xs rounded-lg text-error/70 hover:text-error">
-							<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-							Remove
-						</button>
+						<input type="file" x-ref="fileInput" accept="image/png,image/jpeg,image/gif" class="hidden" @change="onFileSelect"/>
 					</div>
-					<template x-if="error">
-						<p class="text-xs text-error mt-2" x-text="error"></p>
-					</template>
-					<template x-if="uploading">
-						<p class="text-xs text-base-content/50 mt-2">Uploading...</p>
+					<div class="bb-icon-header__text">
+						<h2 class="text-sm font-semibold truncate">Profile</h2>
+						<p class="text-xs text-base-content/45">
+							<button type="button" @click="$refs.fileInput.click()" class="link link-hover inline-flex items-center gap-1"><i data-lucide="upload" class="w-3 h-3"></i>Upload photo</button>
+							<span class="text-base-content/20">·</span>
+							<button type="button" @click="regenerate()" class="link link-hover inline-flex items-center gap-1"><i data-lucide="refresh-cw" class="w-3 h-3"></i>Regenerate</button>
+							<template x-if="hasCustomAvatar">
+								<span>
+									<span class="text-base-content/20">·</span>
+									<button type="button" @click="removeAvatar()" class="link link-hover text-error/70 hover:text-error">Remove</button>
+								</span>
+							</template>
+						</p>
+					</div>
+				</div>
+				<template x-if="avatarError">
+					<div role="alert" class="bb-form-error mb-4">
+						<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+						<span x-text="avatarError"></span>
+					</div>
+				</template>
+				<template x-if="avatarUploading">
+					<p class="text-xs text-base-content/50 mb-4 inline-flex items-center gap-1.5">
+						<span class="loading loading-spinner loading-xs"></span>
+						Uploading photo...
+					</p>
+				</template>
+				<div class="space-y-4">
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="name">
+							Name <span class="text-error">*</span>
+						</label>
+						<input
+							type="text"
+							id="name"
+							name="name"
+							class="bb-form-input"
+							required
+							maxlength="128"
+							value={ p.UserName }
+							placeholder="e.g., Alex Canales"
+						/>
+					</div>
+					<div>
+						<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="email">
+							Email <span class="text-base-content/30">(optional)</span>
+						</label>
+						<input
+							type="email"
+							id="email"
+							name="email"
+							class="bb-form-input"
+							value={ p.UserEmail }
+							placeholder="e.g., alex@example.com"
+						/>
+					</div>
+					<template x-if="formError">
+						<div role="alert" class="bb-form-error">
+							<i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+							<span x-text="formError"></span>
+						</div>
 					</template>
 				</div>
 			</div>
-		</div>
-	</div>
-}
-
-// myAccountPasswordCard renders the change-password form. POSTs to
-// /my-account/password with the CSRF shim hidden input.
-templ myAccountPasswordCard(csrfToken string) {
-	<!-- Change Password -->
-	<div class="bb-card">
-		<div class="p-5 border-b border-base-300">
-			<h2 class="font-semibold text-base flex items-center gap-2">
-				<i data-lucide="lock" class="w-4 h-4 text-base-content/40"></i>
-				Change Password
-			</h2>
-		</div>
-		<form method="POST" action="/my-account/password" class="p-5 space-y-4">
-			if csrfToken != "" {
-				<input type="hidden" name="_csrf" value={ csrfToken }/>
-			}
-			<div>
-				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="current_password">Current Password</label>
-				<input type="password" id="current_password" name="current_password" required autocomplete="current-password" class="input w-full rounded-xl text-sm bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40"/>
+			<div class="bb-action-row">
+				<button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5 min-w-32" :disabled="submitting">
+					<span x-show="!submitting" class="inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i>Save Changes</span>
+					<span x-show="submitting" class="loading loading-spinner loading-xs"></span>
+				</button>
 			</div>
-			<div>
-				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="new_password">New Password</label>
-				<input type="password" id="new_password" name="new_password" required autocomplete="new-password" minlength="8" class="input w-full rounded-xl text-sm bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40"/>
-				<p class="text-xs text-base-content/40 mt-1">Minimum 8 characters</p>
-			</div>
-			<div>
-				<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="confirm_password">Confirm New Password</label>
-				<input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password" class="input w-full rounded-xl text-sm bg-base-200/50 border-base-300 focus:bg-base-100 focus:border-primary/40"/>
-			</div>
-			<button type="submit" class="btn btn-primary btn-sm rounded-xl">Update Password</button>
 		</form>
 	</div>
 }
 
-// myAccountConnectionsCard renders the "My Connections" list — links to
-// per-connection detail pages or a muted empty state.
-templ myAccountConnectionsCard(conns []MyAccountConnectionRow) {
-	<!-- My Connections -->
-	<div class="bb-card">
-		<div class="p-5 border-b border-base-300">
-			<h2 class="font-semibold text-base flex items-center gap-2">
-				<i data-lucide="link" class="w-4 h-4 text-base-content/40"></i>
-				My Connections
-			</h2>
-		</div>
-		<div class="p-5">
-			if len(conns) > 0 {
-				<div class="space-y-3">
-					for _, c := range conns {
-						@myAccountConnectionRow(c)
-					}
+// myAccountPasswordCard renders the change-password form using the
+// shared design-system form classes (bb-icon-header, bb-form-input,
+// bb-action-row) so it visually matches myAccountProfileCard.
+templ myAccountPasswordCard(csrfToken string) {
+	<form method="POST" action="/settings/account/password" class="bb-card p-0 overflow-hidden">
+		if csrfToken != "" {
+			<input type="hidden" name="_csrf" value={ csrfToken }/>
+		}
+		<div class="p-5 sm:p-6">
+			<div class="bb-icon-header">
+				<div class="bb-icon-header__tile bg-base-200/60">
+					<i data-lucide="lock" class="w-4 h-4 text-base-content/50"></i>
 				</div>
-			} else {
-				<p class="text-sm text-base-content/40">No connections linked to your account.</p>
-			}
+				<div class="bb-icon-header__text">
+					<h2 class="text-sm font-semibold">Change password</h2>
+					<p class="text-xs text-base-content/45">Pick something at least 8 characters long</p>
+				</div>
+			</div>
+			<div class="space-y-4">
+				<div>
+					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="current_password">Current password</label>
+					<input
+						type="password"
+						id="current_password"
+						name="current_password"
+						required
+						autocomplete="current-password"
+						class="bb-form-input"
+					/>
+				</div>
+				<div>
+					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="new_password">New password</label>
+					<input
+						type="password"
+						id="new_password"
+						name="new_password"
+						required
+						autocomplete="new-password"
+						minlength="8"
+						class="bb-form-input"
+					/>
+				</div>
+				<div>
+					<label class="block text-xs font-medium text-base-content/50 mb-1.5" for="confirm_password">Confirm new password</label>
+					<input
+						type="password"
+						id="confirm_password"
+						name="confirm_password"
+						required
+						autocomplete="new-password"
+						class="bb-form-input"
+					/>
+				</div>
+			</div>
 		</div>
-	</div>
-}
-
-// myAccountConnectionRow renders a single connection link row with the
-// provider · status footer. Uses myAccountConnectionURL to keep the
-// `href={…}` slot free of inline string concatenation.
-templ myAccountConnectionRow(c MyAccountConnectionRow) {
-	<a href={ templ.SafeURL(myAccountConnectionURL(c.ID)) } class="flex items-center justify-between p-3 rounded-lg bg-base-200/30 hover:bg-base-200/50 transition-colors no-underline">
-		<div>
-			<div class="text-sm font-medium">{ myAccountInstitutionLabel(c) }</div>
-			<div class="text-xs text-base-content/40">{ c.Provider } · { c.Status }</div>
+		<div class="bb-action-row">
+			<button type="submit" class="btn btn-sm btn-primary rounded-xl gap-1.5">
+				<i data-lucide="save" class="w-3.5 h-3.5"></i>
+				Update password
+			</button>
 		</div>
-		<i data-lucide="chevron-right" class="w-4 h-4 text-base-content/30"></i>
-	</a>
+	</form>
 }
 
 // myAccountDangerZone renders the wipe-data card with the two-step
-// confirm Alpine flow. POSTs to /my-account/wipe-data on confirm.
+// confirm Alpine flow. POSTs to /settings/account/wipe-data on confirm.
 templ myAccountDangerZone(csrfToken string) {
-	<!-- Danger Zone -->
-	<div class="bb-card border-error/20">
-		<div class="p-5 border-b border-error/20">
-			<h2 class="font-semibold text-base flex items-center gap-2 text-error">
-				<i data-lucide="alert-triangle" class="w-4 h-4"></i>
-				Danger Zone
-			</h2>
-		</div>
-		<div class="p-5" x-data="{ confirmWipe: false }">
-			<p class="text-sm text-base-content/60 mb-4">
-				Permanently delete all your financial data including bank connections, accounts, and transactions.
-				This action cannot be undone.
-			</p>
+	<div class="bb-card border-error/20 p-0 overflow-hidden" x-data="{ confirmWipe: false }">
+		<div class="p-5 sm:p-6">
+			<div class="bb-icon-header">
+				<div class="bb-icon-header__tile bg-error/10">
+					<i data-lucide="alert-triangle" class="w-4 h-4 text-error"></i>
+				</div>
+				<div class="bb-icon-header__text">
+					<h2 class="text-sm font-semibold text-error">Danger zone</h2>
+					<p class="text-xs text-base-content/45">Permanent — bank connections, accounts, and transactions are deleted</p>
+				</div>
+			</div>
 			<template x-if="!confirmWipe">
-				<button @click="confirmWipe = true" class="btn btn-error btn-sm btn-outline rounded-xl">
+				<button @click="confirmWipe = true" type="button" class="btn btn-error btn-sm btn-outline rounded-xl gap-1.5">
 					<i data-lucide="trash-2" class="w-4 h-4"></i>
-					Wipe My Data
+					Wipe my data
 				</button>
 			</template>
 			<template x-if="confirmWipe">
 				<div class="space-y-3">
 					<p class="text-sm font-medium text-error">Are you sure? This will permanently delete all your data.</p>
 					<div class="flex gap-2">
-						<form method="POST" action="/my-account/wipe-data">
+						<form method="POST" action="/settings/account/wipe-data">
 							if csrfToken != "" {
 								<input type="hidden" name="_csrf" value={ csrfToken }/>
 							}
 							<button type="submit" class="btn btn-error btn-sm rounded-xl">Yes, wipe my data</button>
 						</form>
-						<button @click="confirmWipe = false" class="btn btn-ghost btn-sm rounded-xl">Cancel</button>
+						<button @click="confirmWipe = false" type="button" class="btn btn-ghost btn-sm rounded-xl">Cancel</button>
 					</div>
 				</div>
 			</template>
 		</div>
 	</div>
+}
+
+// boolStr renders a Go bool as the lowercase string "true" or "false"
+// so it can be passed through a data-* attribute that the Alpine
+// factory parses with strict equality (`=== 'true'`).
+func boolStr(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }

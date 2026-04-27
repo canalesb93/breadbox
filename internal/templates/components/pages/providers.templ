@@ -93,7 +93,7 @@ templ providersPlaidCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 							</dd>
 						</dl>
 					} else {
-						<form method="POST" action="/providers/plaid" autocomplete="off" class="space-y-4 max-w-xl" @submit="saving = true">
+						<form method="POST" action="/settings/providers/plaid" autocomplete="off" class="space-y-4 max-w-xl" @submit="saving = true">
 							<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 							<div class="form-control">
 								<label class="label label-text text-sm font-medium" for="plaid_client_id">
@@ -240,7 +240,7 @@ templ providersTellerCard(p ProvidersProps, h *service.ProviderHealthSummary) {
 							</dd>
 						</dl>
 					} else {
-						<form method="POST" action="/providers/teller" enctype="multipart/form-data" autocomplete="off" class="space-y-4 max-w-xl" @submit="saving = true">
+						<form method="POST" action="/settings/providers/teller" enctype="multipart/form-data" autocomplete="off" class="space-y-4 max-w-xl" @submit="saving = true">
 							<input type="hidden" name="_csrf" value={ p.CSRFToken }/>
 							<div class="form-control">
 								<label class="label label-text text-sm font-medium" for="teller_app_id">App ID</label>

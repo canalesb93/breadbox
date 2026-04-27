@@ -9,7 +9,7 @@
 </div>
 
 <div class="bb-card p-6 max-w-lg">
-  <form method="POST" action="/oauth-clients/new">
+  <form method="POST" action="/settings/oauth-clients/new">
     <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
     <fieldset class="fieldset mb-5">
@@ -31,7 +31,7 @@
       <button type="submit" class="btn btn-primary btn-sm rounded-xl">
         <i data-lucide="plus" class="w-4 h-4"></i> Create OAuth Client
       </button>
-      <a href="/access" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
+      <a href="/settings/api-keys" class="btn btn-ghost btn-sm rounded-xl">Cancel</a>
     </div>
   </form>
 </div>
