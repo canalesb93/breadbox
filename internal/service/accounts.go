@@ -109,8 +109,8 @@ func accountFromAllRow(r db.ListAccountsRow) AccountResponse {
 		BalanceLimit:      numericFloat(r.BalanceLimit),
 		IsoCurrencyCode:   textPtr(r.IsoCurrencyCode),
 		LastBalanceUpdate: timestampStr(r.LastBalanceUpdate),
-		CreatedAt:         r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:         r.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:         pgconv.TimestampStr(r.CreatedAt),
+		UpdatedAt:         pgconv.TimestampStr(r.UpdatedAt),
 		ConnectionStatus:  nullConnStatusPtr(r.ConnectionStatus),
 		IsDependentLinked: r.IsDependentLinked,
 	}
@@ -133,8 +133,8 @@ func accountFromUserRow(r db.ListAccountsByUserRow) AccountResponse {
 		BalanceLimit:      numericFloat(r.BalanceLimit),
 		IsoCurrencyCode:   textPtr(r.IsoCurrencyCode),
 		LastBalanceUpdate: timestampStr(r.LastBalanceUpdate),
-		CreatedAt:         r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:         r.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:         pgconv.TimestampStr(r.CreatedAt),
+		UpdatedAt:         pgconv.TimestampStr(r.UpdatedAt),
 		ConnectionStatus:  connStatusPtr(r.ConnectionStatus),
 		IsDependentLinked: r.IsDependentLinked,
 	}
@@ -157,8 +157,8 @@ func accountFromGetRow(r db.GetAccountRow) AccountResponse {
 		BalanceLimit:      numericFloat(r.BalanceLimit),
 		IsoCurrencyCode:   textPtr(r.IsoCurrencyCode),
 		LastBalanceUpdate: timestampStr(r.LastBalanceUpdate),
-		CreatedAt:         r.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt:         r.UpdatedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:         pgconv.TimestampStr(r.CreatedAt),
+		UpdatedAt:         pgconv.TimestampStr(r.UpdatedAt),
 		ConnectionStatus:  nullConnStatusPtr(r.ConnectionStatus),
 		IsDependentLinked: r.IsDependentLinked,
 	}
