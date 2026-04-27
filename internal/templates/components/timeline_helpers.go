@@ -92,17 +92,19 @@ func formatTimelineTimestamp(s string) string {
 }
 
 // relativeTimelineTimestamp renders an RFC3339 timestamp as a short relative
-// phrase ("just now", "5 minutes ago", "2 days ago").
-func relativeTimelineTimestamp(s string) string {
+// phrase ("just now", "5 minutes ago", "2 days ago") relative to the supplied
+// now anchor. Pages that mix relative-time rendering with day-bucket labels
+// share a single now via this entry point so the two paths can never disagree
+// across midnight (the day-boundary bug PR #890 fixed for the txn-detail
+// timeline). Callers that don't need a shared anchor pass the zero
+// time.Time and fall back to time.Now() at render — equivalent to the pre-fix
+// behaviour so the primitives keep working without ceremony.
+func relativeTimelineTimestamp(s string, now time.Time) string {
 	if s == "" {
 		return ""
 	}
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		t, err = time.Parse(time.RFC3339Nano, s)
-		if err != nil {
-			return s
-		}
+	if now.IsZero() {
+		now = time.Now()
 	}
-	return timefmt.Relative(t)
+	return timefmt.RelativeRFC3339At(s, now)
 }

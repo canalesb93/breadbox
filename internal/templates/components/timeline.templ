@@ -1,5 +1,7 @@
 package components
 
+import "time"
+
 // Generic activity-timeline primitives extracted from the transaction-detail
 // page. They render the GitHub-style chrome — a continuous left rail, day
 // separators, 24px icon tiles that thread through the rail, comment bubbles,
@@ -59,10 +61,11 @@ type TimelineProps struct {
 // strong text, chips, links, and inline avatars without this primitive having
 // to know about any of them.
 type TimelineRowProps struct {
-	Icon      string // Lucide icon for the tile. Required when no children-icon override is rendered.
-	IconTone  string // "neutral" | "info" | "success" | "warning" | "error". "" → "neutral".
-	Timestamp string // RFC3339; rendered as a tooltip + relative-time pill. "" → omitted.
-	Origin    string // Optional italic suffix (e.g. "rule", "agent"). "" → omitted.
+	Icon      string    // Lucide icon for the tile. Required when no children-icon override is rendered.
+	IconTone  string    // "neutral" | "info" | "success" | "warning" | "error". "" → "neutral".
+	Timestamp string    // RFC3339; rendered as a tooltip + relative-time pill. "" → omitted.
+	Origin    string    // Optional italic suffix (e.g. "rule", "agent"). "" → omitted.
+	Now       time.Time // Request-level now anchor threaded through to the relative-time helper so day-bucket labels and per-row timestamps can never disagree across midnight. Zero → render-time time.Now() fallback.
 }
 
 // TimelineActor is reused inside comment rows.
@@ -151,7 +154,7 @@ templ TimelineSystemRow(p TimelineRowProps) {
 					if p.Timestamp != "" {
 						<span aria-hidden="true">&middot;</span>
 						<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(p.Timestamp) }>
-							<time datetime={ p.Timestamp } class="tabular-nums cursor-default" title={ formatTimelineTimestamp(p.Timestamp) }>{ relativeTimelineTimestamp(p.Timestamp) }</time>
+							<time datetime={ p.Timestamp } class="tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatTimelineTimestamp(p.Timestamp) }>{ relativeTimelineTimestamp(p.Timestamp, p.Now) }</time>
 						</span>
 					}
 				</span>
@@ -167,7 +170,7 @@ templ TimelineSystemRow(p TimelineRowProps) {
 // outer ring-4 ring-base-100) inside the `tile` slot. This keeps the row
 // chrome (rail anchor, sentence layout, timestamp suffix) reusable while
 // letting the caller drive the iconography.
-templ TimelineSystemRowCustomTile(timestamp, origin string, tile, body templ.Component) {
+templ TimelineSystemRowCustomTile(timestamp, origin string, now time.Time, tile, body templ.Component) {
 	<li class="relative flex items-start gap-3 py-2 group">
 		<div class="relative z-10 shrink-0 w-6 h-6 rounded-full bg-base-100">
 			@tile
@@ -182,7 +185,7 @@ templ TimelineSystemRowCustomTile(timestamp, origin string, tile, body templ.Com
 					if timestamp != "" {
 						<span aria-hidden="true">&middot;</span>
 						<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(timestamp) }>
-							<time datetime={ timestamp } class="tabular-nums cursor-default" title={ formatTimelineTimestamp(timestamp) }>{ relativeTimelineTimestamp(timestamp) }</time>
+							<time datetime={ timestamp } class="tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatTimelineTimestamp(timestamp) }>{ relativeTimelineTimestamp(timestamp, now) }</time>
 						</span>
 					}
 				</span>
@@ -195,7 +198,7 @@ templ TimelineSystemRowCustomTile(timestamp, origin string, tile, body templ.Com
 // a header-line ("<actor> commented · <time>") above the bubble body. The
 // bubble body is the children slot so callers can render plain text,
 // markdown, action buttons inside the meta line, etc.
-templ TimelineCommentRow(actor TimelineActor, timestamp string) {
+templ TimelineCommentRow(actor TimelineActor, timestamp string, now time.Time) {
 	<li class="relative flex items-start gap-3 py-2.5 group">
 		<div class="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-base-100">
 			@timelineCommentAvatar(actor)
@@ -212,7 +215,7 @@ templ TimelineCommentRow(actor TimelineActor, timestamp string) {
 				<span class="text-base-content/55">commented</span>
 				if timestamp != "" {
 					<span class="tooltip tooltip-top" data-tip={ formatTimelineTimestamp(timestamp) }>
-						<time datetime={ timestamp } class="text-base-content/40 tabular-nums cursor-default" title={ formatTimelineTimestamp(timestamp) }>{ relativeTimelineTimestamp(timestamp) }</time>
+						<time datetime={ timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatTimelineTimestamp(timestamp) }>{ relativeTimelineTimestamp(timestamp, now) }</time>
 					</span>
 				}
 			</div>
