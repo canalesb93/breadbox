@@ -34,6 +34,12 @@ type Annotation struct {
 	RuleID        *string                `json:"rule_id,omitempty"`
 	CreatedAt     string                 `json:"created_at"`
 
+	// IsDeleted flags a soft-deleted (tombstoned) annotation. Today only
+	// comments can be soft-deleted via DeleteComment; the row stays on the
+	// timeline with actor + timestamp intact while the UI renders a muted
+	// "<Actor> deleted a comment" line in place of the comment bubble.
+	IsDeleted bool `json:"is_deleted,omitempty"`
+
 	// ---- Derived fields (populated by ListAnnotations enrichment) ----
 
 	// Action is the normalized verb for the event:
@@ -259,6 +265,10 @@ func annotationFromRow(a db.Annotation) Annotation {
 		}
 	}
 
+	if a.DeletedAt.Valid {
+		ann.IsDeleted = true
+	}
+
 	return ann
 }
 
@@ -298,6 +308,10 @@ func annotationFromActorRow(a db.ListAnnotationsWithActorByTransactionRow) Annot
 
 	if a.ActorUpdatedAt.Valid {
 		ann.ActorAvatarVersion = strconv.FormatInt(a.ActorUpdatedAt.Time.Unix(), 10)
+	}
+
+	if a.DeletedAt.Valid {
+		ann.IsDeleted = true
 	}
 
 	return ann
