@@ -910,12 +910,12 @@ type TimelineRowsProps struct {
 }
 
 // TimelineRows renders activity rows for the partial-render endpoint
-// (GET /-/transactions/{id}/timeline/rows). Reuses txdTimelineDay /
+// (GET /-/transactions/{id}/timeline/rows). Reuses components.TimelineDay /
 // txdTimelineSystem / txdTimelineComment so the row markup matches the
 // main page exactly — no client-side templating, no risk of drift.
 templ TimelineRows(p TimelineRowsProps) {
 	if p.DaySeparatorLabel != "" {
-		@txdTimelineDay(p.DaySeparatorLabel, false)
+		@components.TimelineDay(p.DaySeparatorLabel, false)
 	}
 	for _, e := range p.Entries {
 		if e.Type == "comment" {
