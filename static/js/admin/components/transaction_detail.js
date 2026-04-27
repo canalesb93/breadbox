@@ -56,6 +56,24 @@
 // separator ahead of the new rows when the new rows fall on a different
 // calendar day than the most recent existing row (see TimelineRowsHandler
 // in internal/admin/transactions.go).
+//
+// ---- Cross-factory needs-review sync (Option B: $dispatch event) ----
+//
+// The composer's "Toggle Needs Review" affordance is bound to
+// `pinReview` and gated by `hasPendingReview` inside txdCommentManager,
+// while the timeline's tag chips (add via picker, remove via inline ✕)
+// live in txdTagManager. They are sibling Alpine factories with no
+// shared store, so a successful timeline-driven mutation of the
+// `needs-review` slug used to leave the composer's toggle stuck on its
+// old state — e.g. removing the chip from the timeline kept the
+// composer reading "Needs review tagged" until a full reload.
+//
+// Fix: when a timeline-driven add/remove of the `needs-review` slug
+// confirms server-side, dispatch a `bb-needs-review-changed` window
+// event with `{ isOn: bool }`. txdCommentManager's init() listens and
+// flips `hasPendingReview` (and clears `pinReview` when the tag is
+// already present) so the composer re-renders against the new truth.
+// Slug-scoped — other tag mutations don't touch the composer.
 
 // --- Module-level globals consumed by tx_row + base.html ---
 
@@ -223,6 +241,15 @@ function fetchTimelineRows(txId, replaceCommentIDs) {
       }
       return inserted;
     });
+}
+
+// notifyNeedsReviewChanged dispatches the cross-factory sync event when a
+// successful timeline-driven add/remove of the `needs-review` slug lands.
+// txdCommentManager listens and updates its bound state so the composer's
+// "Toggle Needs Review" affordance reflects the new truth without a reload.
+// Caller is responsible for slug-scoping; this just fires the event.
+function notifyNeedsReviewChanged(isOn) {
+  window.dispatchEvent(new CustomEvent('bb-needs-review-changed', { detail: { isOn: !!isOn } }));
 }
 
 // Seed window.__bbCategories and window.__bbAllTags as early as possible
@@ -493,7 +520,14 @@ document.addEventListener('alpine:init', function () {
             }
             return fetchTimelineRows(self.txId);
           })
-          .then(function () { showToast('Tags updated.', 'success'); })
+          .then(function () {
+            // Slug-scoped: only dispatch when the diff touched needs-review.
+            // The composer toggle's hasPendingReview/pinReview state only
+            // cares about that one slug.
+            if (adds.indexOf('needs-review') !== -1) notifyNeedsReviewChanged(true);
+            else if (removes.indexOf('needs-review') !== -1) notifyNeedsReviewChanged(false);
+            showToast('Tags updated.', 'success');
+          })
           .catch(function (e) {
             self.tags = prevTags;
             restorePageState();
@@ -519,7 +553,11 @@ document.addEventListener('alpine:init', function () {
             }
             return fetchTimelineRows(self.txId);
           })
-          .then(function () { showToast('Tag removed.', 'success'); })
+          .then(function () {
+            // Slug-scoped sync to the composer toggle (see header comment).
+            if (tag.slug === 'needs-review') notifyNeedsReviewChanged(false);
+            showToast('Tag removed.', 'success');
+          })
           .catch(function (e) {
             self.tags = prevTags;
             restorePageState();
@@ -549,6 +587,20 @@ document.addEventListener('alpine:init', function () {
         var parsed = parseInt(ds.maxCommentLength, 10);
         if (!isNaN(parsed) && parsed > 0) this.maxLength = parsed;
         this.hasPendingReview = ds.hasPendingReview === 'true';
+
+        // Cross-factory sync (Option B). When the timeline tag manager
+        // adds or removes the needs-review slug, mirror the change on the
+        // composer's bound state so the "Toggle Needs Review" affordance
+        // hides/shows correctly without a page reload. Idempotent — bail
+        // when the state already matches so the composer's own toggle
+        // path doesn't fight itself.
+        var self = this;
+        window.addEventListener('bb-needs-review-changed', function (e) {
+          var next = !!(e && e.detail && e.detail.isOn);
+          if (self.hasPendingReview === next) return;
+          self.hasPendingReview = next;
+          if (next) self.pinReview = false;
+        });
       },
 
       canSubmit: function () {
