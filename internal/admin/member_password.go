@@ -18,15 +18,13 @@ func changePasswordForAccount(a *app.App, sm *scs.SessionManager, w http.Respons
 
 	var accountID pgtype.UUID
 	if err := accountID.Scan(accountIDStr); err != nil {
-		SetFlash(ctx, sm, "error", "Invalid session.")
-		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
+		FlashRedirect(w, r, sm, "error", "Invalid session.", redirectPath)
 		return
 	}
 
 	account, err := a.Queries.GetAuthAccountByID(ctx, accountID)
 	if err != nil {
-		SetFlash(ctx, sm, "error", "Account not found.")
-		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
+		FlashRedirect(w, r, sm, "error", "Account not found.", redirectPath)
 		return
 	}
 
@@ -35,32 +33,27 @@ func changePasswordForAccount(a *app.App, sm *scs.SessionManager, w http.Respons
 	confirmPassword := r.FormValue("confirm_password")
 
 	if account.HashedPassword == nil {
-		SetFlash(ctx, sm, "error", "No password set. Please contact your administrator.")
-		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
+		FlashRedirect(w, r, sm, "error", "No password set. Please contact your administrator.", redirectPath)
 		return
 	}
 	if err := bcrypt.CompareHashAndPassword(account.HashedPassword, []byte(currentPassword)); err != nil {
-		SetFlash(ctx, sm, "error", "Current password is incorrect.")
-		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
+		FlashRedirect(w, r, sm, "error", "Current password is incorrect.", redirectPath)
 		return
 	}
 
 	if len(newPassword) < 8 {
-		SetFlash(ctx, sm, "error", "New password must be at least 8 characters.")
-		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
+		FlashRedirect(w, r, sm, "error", "New password must be at least 8 characters.", redirectPath)
 		return
 	}
 
 	if newPassword != confirmPassword {
-		SetFlash(ctx, sm, "error", "New passwords do not match.")
-		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
+		FlashRedirect(w, r, sm, "error", "New passwords do not match.", redirectPath)
 		return
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), 12)
 	if err != nil {
-		SetFlash(ctx, sm, "error", "Failed to hash password.")
-		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
+		FlashRedirect(w, r, sm, "error", "Failed to hash password.", redirectPath)
 		return
 	}
 
@@ -69,8 +62,7 @@ func changePasswordForAccount(a *app.App, sm *scs.SessionManager, w http.Respons
 		HashedPassword: hashedPassword,
 	}); err != nil {
 		a.Logger.Error("update account password", "error", err)
-		SetFlash(ctx, sm, "error", "Failed to update password.")
-		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
+		FlashRedirect(w, r, sm, "error", "Failed to update password.", redirectPath)
 		return
 	}
 

@@ -218,8 +218,7 @@ func SetupAccountHandler(sm *scs.SessionManager, queries *db.Queries, _ *Templat
 
 		// If password is already set, redirect to login.
 		if account.HashedPassword != nil {
-			SetFlash(r.Context(), sm, "info", "Your account is already set up. Please sign in.")
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			FlashRedirect(w, r, sm, "info", "Your account is already set up. Please sign in.", "/login")
 			return
 		}
 
