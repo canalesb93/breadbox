@@ -1,6 +1,8 @@
 package pages
 
 import (
+	"time"
+
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
 )
@@ -39,6 +41,14 @@ type TransactionDetailProps struct {
 	// Activity timeline.
 	Activity     []service.ActivityEntry
 	ActivityDays []ActivityDayGroup
+
+	// Now is the single time anchor captured by the handler at the top
+	// of buildActivityTimeline. The per-row relative-time helpers
+	// (relativeTimeStrAt) read this so they share the exact same clock
+	// reference as the day-bucket labels in ActivityDays — preventing
+	// the "Today" / "yesterday" mismatch that occurs when each path
+	// calls time.Now() independently across midnight.
+	Now time.Time
 
 	// Has the transaction got a needs-review tag attached?
 	HasPendingReview bool

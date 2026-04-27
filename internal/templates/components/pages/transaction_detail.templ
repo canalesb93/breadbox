@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"breadbox/internal/service"
 	"breadbox/internal/templates/components"
@@ -317,9 +318,9 @@ templ txdActivity(p TransactionDetailProps) {
 					@txdTimelineDay(day.Label, di == 0)
 					for _, event := range day.Events {
 						if event.Type == "comment" {
-							@txdTimelineComment(event)
+							@txdTimelineComment(event, p.Now)
 						} else {
-							@txdTimelineSystem(event)
+							@txdTimelineSystem(event, p.Now)
 						}
 					}
 				}
@@ -351,7 +352,7 @@ templ txdTimelineDay(label string, first bool) {
 // right of the rail. Both the 24px icon tile and the first text line share
 // a 24px line-box so their centers align horizontally — no per-element
 // margin tweaks needed.
-templ txdTimelineSystem(e service.ActivityEntry) {
+templ txdTimelineSystem(e service.ActivityEntry, now time.Time) {
 	<li class="relative flex items-start gap-3 py-2 group">
 		<div class="relative z-10 shrink-0 w-6 h-6 rounded-full bg-base-100">
 			@txdSystemIcon(e)
@@ -365,7 +366,7 @@ templ txdTimelineSystem(e service.ActivityEntry) {
 				if e.Timestamp != "" {
 					<span aria-hidden="true">&middot;</span>
 					<span class="tooltip tooltip-top" data-tip={ formatDateTimeStr(e.Timestamp) }>
-						<time datetime={ e.Timestamp } class="tabular-nums cursor-default" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStr(e.Timestamp) }</time>
+						<time datetime={ e.Timestamp } class="tabular-nums cursor-default" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStrAt(e.Timestamp, now) }</time>
 					</span>
 				}
 			</span>
@@ -506,7 +507,7 @@ templ txdCategoryIcon(e service.ActivityEntry) {
 // flattened so it visually points at the avatar on the rail. App-wide
 // bubble consolidation will hoist this style into a shared bb-bubble class
 // when the matching pattern lands on transactions and reviews.
-templ txdTimelineComment(e service.ActivityEntry) {
+templ txdTimelineComment(e service.ActivityEntry, now time.Time) {
 	<li class="relative flex items-start gap-3 py-2.5 group">
 		<div class="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-base-100">
 			@txdCommentAvatar(e)
@@ -525,7 +526,7 @@ templ txdTimelineComment(e service.ActivityEntry) {
 				<span class="text-base-content/55">commented</span>
 				if e.Timestamp != "" {
 					<span class="tooltip tooltip-top" data-tip={ formatDateTimeStr(e.Timestamp) }>
-						<time datetime={ e.Timestamp } class="text-base-content/40 tabular-nums cursor-default" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStr(e.Timestamp) }</time>
+						<time datetime={ e.Timestamp } class="text-base-content/40 tabular-nums cursor-default" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStrAt(e.Timestamp, now) }</time>
 					</span>
 				}
 				if e.CommentID != "" {
@@ -775,6 +776,16 @@ func clockTimeStr(s string) string {
 // button aria-labels so screen readers get a stable description.
 func relativeTimeStr(s string) string {
 	return timefmt.RelativeRFC3339(s)
+}
+
+// relativeTimeStrAt is relativeTimeStr with an explicit now anchor so the
+// activity-timeline rows render against the same clock that the day-bucket
+// labels were computed with. Without a shared anchor a row at 23:55 can
+// land under "Today" while its relative timestamp says "yesterday" (or
+// vice-versa) — see internal/admin/transactions.go buildActivityTimeline
+// for where now is captured.
+func relativeTimeStrAt(s string, now time.Time) string {
+	return timefmt.RelativeRFC3339At(s, now)
 }
 
 // avatarURLStr mirrors the admin "avatarURL" funcMap for the (user_id,
