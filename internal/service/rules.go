@@ -922,7 +922,7 @@ func (s *Service) ListTransactionRules(ctx context.Context, params TransactionRu
 		if err != nil {
 			return nil, ErrInvalidCursor
 		}
-		cursorUUID, err := parseUUID(cursorIDStr)
+		cursorUUID, err := pgconv.ParseUUID(cursorIDStr)
 		if err != nil {
 			return nil, ErrInvalidCursor
 		}
@@ -1084,7 +1084,7 @@ func (s *Service) UpdateTransactionRule(ctx context.Context, id string, params U
 		return nil, fmt.Errorf("marshal actions: %w", err)
 	}
 
-	ruleID, _ := parseUUID(id) // already validated by GetTransactionRule above
+	ruleID, _ := pgconv.ParseUUID(id) // already validated by GetTransactionRule above
 
 	query := `UPDATE transaction_rules
 		SET name = $2, conditions = $3, actions = $4, trigger = $5, priority = $6, enabled = $7, expires_at = $8, updated_at = NOW()
@@ -1264,7 +1264,7 @@ func (s *Service) ApplyRuleRetroactively(ctx context.Context, ruleID string) (in
 		return 0, fmt.Errorf("%w: rule has no applicable actions", ErrInvalidParameter)
 	}
 
-	ruleUUID, _ := parseUUID(ruleID)
+	ruleUUID, _ := pgconv.ParseUUID(ruleID)
 	ruleShortID, ruleName := s.ruleIdentityForAudit(ctx, ruleUUID)
 
 	var totalMatched int64
@@ -1447,7 +1447,7 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 		if err != nil {
 			continue
 		}
-		uuid, _ := parseUUID(r.ID)
+		uuid, _ := pgconv.ParseUUID(r.ID)
 		compiled = append(compiled, compiledRule{
 			id:       r.ID,
 			uuid:     uuid,
@@ -1665,7 +1665,7 @@ func (s *Service) ApplyAllRulesRetroactively(ctx context.Context) (map[string]in
 
 	// Update hit counts for all matched rules.
 	for ruleID, count := range hitCounts {
-		id, err := parseUUID(ruleID)
+		id, err := pgconv.ParseUUID(ruleID)
 		if err != nil {
 			continue
 		}
@@ -1832,7 +1832,7 @@ func (s *Service) previewRuleInternal(ctx context.Context, excludeRuleID *pgtype
 // BatchIncrementHitCounts updates hit counts for rules that matched.
 func (s *Service) BatchIncrementHitCounts(ctx context.Context, hits map[string]int) error {
 	for ruleID, count := range hits {
-		id, err := parseUUID(ruleID)
+		id, err := pgconv.ParseUUID(ruleID)
 		if err != nil {
 			continue
 		}
@@ -2107,7 +2107,7 @@ func (s *Service) categorySlugToUUID(ctx context.Context, slug string) (pgtype.U
 	if err != nil {
 		return pgtype.UUID{}, fmt.Errorf("%w: category slug %q not found", ErrInvalidParameter, slug)
 	}
-	return parseUUID(cat.ID)
+	return pgconv.ParseUUID(cat.ID)
 }
 
 // parseDuration parses a duration string like "30d", "24h", "1w".
@@ -2334,7 +2334,7 @@ func (s *Service) ListRuleApplications(ctx context.Context, ruleID string, limit
 		if err != nil {
 			return nil, false, ErrInvalidCursor
 		}
-		cursorUUID, err := parseUUID(cursorIDStr)
+		cursorUUID, err := pgconv.ParseUUID(cursorIDStr)
 		if err != nil {
 			return nil, false, ErrInvalidCursor
 		}

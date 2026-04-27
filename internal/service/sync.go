@@ -54,7 +54,7 @@ func (s *Service) TriggerSync(ctx context.Context, connectionID *string) error {
 
 // GetSyncLog returns a single sync log with connection info.
 func (s *Service) GetSyncLog(ctx context.Context, syncLogID string) (*SyncLogRow, error) {
-	uid, err := parseUUID(syncLogID)
+	uid, err := pgconv.ParseUUID(syncLogID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid sync log id: %w", err)
 	}
@@ -242,7 +242,7 @@ func (s *Service) ListSyncLogsPaginated(ctx context.Context, params SyncLogListP
 	if len(logs) > 0 {
 		syncLogIDs := make([]pgtype.UUID, 0, len(logs))
 		for _, l := range logs {
-			uid, err := parseUUID(l.ID)
+			uid, err := pgconv.ParseUUID(l.ID)
 			if err == nil {
 				syncLogIDs = append(syncLogIDs, uid)
 			}
@@ -436,7 +436,7 @@ func (s *Service) GetSyncHealthSummary(ctx context.Context) (*SyncHealthSummary,
 
 // ListSyncLogAccounts returns the per-account breakdown for a specific sync log.
 func (s *Service) ListSyncLogAccounts(ctx context.Context, syncLogID string) ([]SyncLogAccountRow, error) {
-	uid, err := parseUUID(syncLogID)
+	uid, err := pgconv.ParseUUID(syncLogID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid sync log id: %w", err)
 	}
@@ -490,7 +490,7 @@ func (s *Service) parseRuleHits(ctx context.Context, ruleHitsJSON []byte) ([]Rul
 	}
 	ruleInfoMap := make(map[string]ruleInfo, len(hitMap))
 	for ruleID := range hitMap {
-		uid, err := parseUUID(ruleID)
+		uid, err := pgconv.ParseUUID(ruleID)
 		if err != nil {
 			continue
 		}
@@ -626,7 +626,7 @@ func (s *Service) buildSyncLogWhereClause(params SyncLogListParams) (string, []a
 	argN := 1
 
 	if params.ConnectionID != nil {
-		uid, err := parseUUID(*params.ConnectionID)
+		uid, err := pgconv.ParseUUID(*params.ConnectionID)
 		if err != nil {
 			return "", nil, 0, fmt.Errorf("invalid connection id: %w", err)
 		}

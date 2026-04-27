@@ -109,7 +109,7 @@ func (s *Service) GetTag(ctx context.Context, idOrSlug string) (*TagResponse, er
 	}
 
 	// Try UUID
-	if uid, err := parseUUID(idOrSlug); err == nil {
+	if uid, err := pgconv.ParseUUID(idOrSlug); err == nil {
 		tag, err := s.Queries.GetTagByID(ctx, uid)
 		if err == nil {
 			resp := tagFromRow(tag)
@@ -186,7 +186,7 @@ func (s *Service) UpdateTag(ctx context.Context, id string, params UpdateTagPara
 		lifecycle = v
 	}
 
-	existingUID, _ := parseUUID(existing.ID)
+	existingUID, _ := pgconv.ParseUUID(existing.ID)
 	tag, err := s.Queries.UpdateTag(ctx, db.UpdateTagParams{
 		ID:          existingUID,
 		DisplayName: displayName,
@@ -212,7 +212,7 @@ func (s *Service) DeleteTag(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	uid, err := parseUUID(existing.ID)
+	uid, err := pgconv.ParseUUID(existing.ID)
 	if err != nil {
 		return ErrNotFound
 	}

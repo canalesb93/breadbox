@@ -137,7 +137,7 @@ func (s *Service) CountUnreadAgentReports(ctx context.Context) (int64, error) {
 
 // GetAgentReport returns a single report by ID.
 func (s *Service) GetAgentReport(ctx context.Context, reportID string) (AgentReportResponse, error) {
-	uid, err := parseUUID(reportID)
+	uid, err := pgconv.ParseUUID(reportID)
 	if err != nil {
 		return AgentReportResponse{}, fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
 	}
@@ -150,7 +150,7 @@ func (s *Service) GetAgentReport(ctx context.Context, reportID string) (AgentRep
 
 // MarkAgentReportRead marks a single report as read.
 func (s *Service) MarkAgentReportRead(ctx context.Context, reportID string) error {
-	uid, err := parseUUID(reportID)
+	uid, err := pgconv.ParseUUID(reportID)
 	if err != nil {
 		return fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
 	}
@@ -159,7 +159,7 @@ func (s *Service) MarkAgentReportRead(ctx context.Context, reportID string) erro
 
 // MarkAgentReportUnread clears read_at on a single report, returning it to the unread queue.
 func (s *Service) MarkAgentReportUnread(ctx context.Context, reportID string) error {
-	uid, err := parseUUID(reportID)
+	uid, err := pgconv.ParseUUID(reportID)
 	if err != nil {
 		return fmt.Errorf("%w: invalid report ID", ErrInvalidParameter)
 	}

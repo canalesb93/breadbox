@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"breadbox/internal/pgconv"
 	"breadbox/internal/shortid"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -24,7 +25,7 @@ func (s *Service) resolveID(ctx context.Context, idOrShort string, lookup shortI
 		}
 		return uid, nil
 	}
-	uid, err := parseUUID(idOrShort)
+	uid, err := pgconv.ParseUUID(idOrShort)
 	if err != nil {
 		return pgtype.UUID{}, fmt.Errorf("invalid id: %w", err)
 	}

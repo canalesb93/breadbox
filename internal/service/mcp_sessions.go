@@ -98,7 +98,7 @@ func (s *Service) GetMCPSession(ctx context.Context, idOrShort string) (MCPSessi
 		}
 		return mcpSessionFromRow(row), nil
 	}
-	uid, err := parseUUID(idOrShort)
+	uid, err := pgconv.ParseUUID(idOrShort)
 	if err != nil {
 		return MCPSessionResponse{}, fmt.Errorf("%w: invalid session ID", ErrInvalidParameter)
 	}
@@ -118,7 +118,7 @@ func (s *Service) LogToolCall(ctx context.Context, input ToolCallLogInput) {
 			if err == nil {
 				sessionID = row.ID
 			}
-		} else if uid, err := parseUUID(input.SessionID); err == nil {
+		} else if uid, err := pgconv.ParseUUID(input.SessionID); err == nil {
 			sessionID = uid
 		}
 	}
@@ -196,7 +196,7 @@ func (s *Service) GetMCPSessionDetail(ctx context.Context, idOrShort string) (MC
 		return MCPSessionDetailResponse{}, err
 	}
 
-	uid, _ := parseUUID(session.ID)
+	uid, _ := pgconv.ParseUUID(session.ID)
 	rows, err := s.Queries.ListToolCallsBySession(ctx, uid)
 	if err != nil {
 		return MCPSessionDetailResponse{}, fmt.Errorf("list tool calls: %w", err)
@@ -279,7 +279,7 @@ func (s *Service) ResolveSessionUUID(ctx context.Context, idOrShort string) (pgt
 		}
 		return row.ID, nil
 	}
-	uid, err := parseUUID(idOrShort)
+	uid, err := pgconv.ParseUUID(idOrShort)
 	if err != nil {
 		return pgtype.UUID{}, fmt.Errorf("%w: invalid session_id", ErrInvalidParameter)
 	}

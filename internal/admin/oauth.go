@@ -14,7 +14,6 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // OAuthMetadataHandler returns the OAuth 2.0 Authorization Server Metadata (RFC 8414).
@@ -209,7 +208,7 @@ func OAuthAuthorizeSubmitHandler(svc *service.Service, sm *scs.SessionManager) h
 		}
 
 		// Parse admin UUID.
-		adminUUID, err := parseUUID(adminID)
+		adminUUID, err := pgconv.ParseUUID(adminID)
 		if err != nil {
 			oauthError(w, http.StatusInternalServerError, "server_error", "Invalid session")
 			return
@@ -530,6 +529,3 @@ func isForwardedHTTPS(r *http.Request) bool {
 	return r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
-func parseUUID(s string) (pgtype.UUID, error) {
-	return pgconv.ParseUUID(s)
-}
