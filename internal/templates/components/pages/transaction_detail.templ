@@ -317,11 +317,7 @@ templ txdActivity(p TransactionDetailProps) {
 				for di, day := range p.ActivityDays {
 					@components.TimelineDay(day.Label, di == 0)
 					for _, event := range day.Events {
-						if event.Type == "comment" {
-							@txdTimelineComment(event, p.Now)
-						} else {
-							@txdTimelineSystem(event, p.Now)
-						}
+						@txdTimelineRow(event, p.Now)
 					}
 				}
 				@txdTimelineComposer(p)
@@ -338,31 +334,63 @@ templ txdActivity(p TransactionDetailProps) {
 	</div>
 }
 
-// txdTimelineSystem renders a compact one-liner row for tag / category /
-// rule / review events. Icon tile sits on the rail; sentence flows to the
-// right of the rail. Both the 24px icon tile and the first text line share
-// a 24px line-box so their centers align horizontally — no per-element
-// margin tweaks needed.
-templ txdTimelineSystem(e service.ActivityEntry, now time.Time) {
-	<li class="relative flex items-start gap-3 py-2 group">
-		<div class="relative z-10 shrink-0 w-6 h-6 rounded-full bg-base-100">
-			@txdSystemIcon(e)
-		</div>
-		<div class="flex-1 min-w-0 text-xs leading-6 text-base-content/75 break-words">
-			@txdSystemSentence(e)
-			<span class="text-base-content/40 ml-1">
-				if e.Origin != "" {
-					<span class="italic">&middot; { e.Origin }</span>
-				}
-				if e.Timestamp != "" {
-					<span aria-hidden="true">&middot;</span>
-					<span class="tooltip tooltip-top" data-tip={ formatDateTimeStr(e.Timestamp) }>
-						<time datetime={ e.Timestamp } class="tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStrAt(e.Timestamp, now) }</time>
-					</span>
-				}
-			</span>
-		</div>
-	</li>
+// txdTimelineRow dispatches an activity entry to the right primitive call.
+// Comments split on IsDeleted to either a chat bubble (live) or a single-line
+// tombstone (deleted). System events (tag/category/rule/sync/review) use the
+// custom-tile primitive so the page-local txdSystemIcon palette continues to
+// drive the 24px tile while the primitive owns the rail anchor, leading-6
+// text container, and timestamp/origin suffix.
+templ txdTimelineRow(e service.ActivityEntry, now time.Time) {
+	if e.Type == "comment" {
+		if e.IsDeleted {
+			@components.TimelineSystemRowCustomTile(
+				e.Timestamp,
+				e.Origin,
+				now,
+				txdDeletedCommentTile(),
+				txdDeletedCommentBody(e),
+				templ.Attributes{"data-comment-id": e.CommentID},
+			)
+		} else {
+			@components.TimelineCommentRowRaw(txdCommentAvatar(e), templ.Attributes{"data-comment-id": e.CommentID}) {
+				@txdCommentBubbleBody(e, now)
+			}
+		}
+	} else {
+		@components.TimelineSystemRowCustomTile(
+			e.Timestamp,
+			e.Origin,
+			now,
+			txdSystemIcon(e),
+			txdSystemSentence(e),
+			nil,
+		)
+	}
+}
+
+// txdDeletedCommentTile renders the 24px trash icon tile used on the rail
+// for tombstoned comments. Mirrors the legacy txdTimelineDeletedComment tile
+// markup so the migration is byte-equivalent.
+templ txdDeletedCommentTile() {
+	<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true">
+		<i data-lucide="trash-2" class="w-3 h-3 text-base-content/40"></i>
+	</span>
+}
+
+// txdDeletedCommentBody renders the muted single-line tombstone body inside
+// the system-row primitive's leading-6 text container. Wraps the visible
+// text in an inner <span> whose color overrides the primitive's default
+// text-base-content/75 with the tombstone's text-base-content/55, plus the
+// italic + actor highlight pattern from the legacy template.
+templ txdDeletedCommentBody(e service.ActivityEntry) {
+	<span class="text-base-content/55 italic">
+		if e.ActorName != "" {
+			<span class="font-medium text-base-content/70 not-italic">{ e.ActorName } </span>
+			<span>deleted a comment</span>
+		} else {
+			<span>Comment deleted</span>
+		}
+	</span>
 }
 
 // txdSystemSentence assembles the actor-verb-object phrase shown next to a
@@ -497,90 +525,36 @@ templ txdCategoryIcon(e service.ActivityEntry) {
 	}
 }
 
-// txdTimelineComment renders a comment as a chat-bubble: small author/time
-// meta-line above a rounded message blob. The bubble's top-left corner is
-// flattened so it visually points at the avatar on the rail. App-wide
-// bubble consolidation will hoist this style into a shared bb-bubble class
-// when the matching pattern lands on transactions and reviews.
-//
-// Tombstoned comments (IsDeleted=true) skip the bubble entirely and route to
-// txdTimelineDeletedComment, which mirrors the system-row layout so a
-// deleted comment reads as a single muted line preserving actor + timestamp.
-templ txdTimelineComment(e service.ActivityEntry, now time.Time) {
-	if e.IsDeleted {
-		@txdTimelineDeletedComment(e, now)
-	} else {
-		@txdTimelineCommentBubble(e, now)
-	}
-}
-
-// txdTimelineCommentBubble renders the chat-bubble variant — the historical
-// shape pulled out so the entry-point templ above can branch cleanly on
-// IsDeleted without duplicating either path.
-templ txdTimelineCommentBubble(e service.ActivityEntry, now time.Time) {
-	<li class="relative flex items-start gap-3 py-2.5 group" data-comment-id={ e.CommentID }>
-		<div class="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-base-100">
-			@txdCommentAvatar(e)
-		</div>
-		<div class="flex-1 min-w-0">
-			<!--
-				Meta line shares a 24px line-box with the avatar so the actor
-				baseline sits dead-center on the rail circle. Keeping every
-				label at text-xs / leading-6 also matches the system-event
-				rows above for a uniform actor + timestamp treatment.
-			-->
-			<div class="flex items-center gap-1.5 px-1 flex-wrap text-xs leading-6">
-				if e.ActorName != "" {
-					<strong class="font-semibold text-base-content">{ e.ActorName }</strong>
-				}
-				<span class="text-base-content/55">commented</span>
-				if e.Timestamp != "" {
-					<span class="tooltip tooltip-top" data-tip={ formatDateTimeStr(e.Timestamp) }>
-						<time datetime={ e.Timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStrAt(e.Timestamp, now) }</time>
-					</span>
-				}
-				if e.CommentID != "" {
-					<button class="ml-auto rounded-md p-1 -m-1 text-base-content/30 hover:text-error hover:bg-error/5 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition" @click={ "deleteComment('" + e.CommentID + "')" } aria-label={ "Delete comment by " + e.ActorName } title="Delete comment">
-						<i data-lucide="trash-2" class="w-3.5 h-3.5" aria-hidden="true"></i>
-					</button>
-				}
-			</div>
-			if e.Detail != "" {
-				<div class="bb-comment-bubble mt-1">{ e.Detail }</div>
-			}
-		</div>
-	</li>
-}
-
-// txdTimelineDeletedComment renders a tombstoned comment as a muted
-// single-line system-style row using the same rail/icon scaffolding as
-// txdTimelineSystem. The comment body is gone — only "<Actor> deleted a
-// comment · <relative-time>" remains, preserving audit value (we still
-// know who removed what and when) without re-displaying retired content.
-templ txdTimelineDeletedComment(e service.ActivityEntry, now time.Time) {
-	<li class="relative flex items-start gap-3 py-2 group" data-comment-id={ e.CommentID }>
-		<div class="relative z-10 shrink-0 w-6 h-6 rounded-full bg-base-100">
-			<span class="flex items-center justify-center w-6 h-6 rounded-full bg-base-200 ring-4 ring-base-100" aria-hidden="true">
-				<i data-lucide="trash-2" class="w-3 h-3 text-base-content/40"></i>
+// txdCommentBubbleBody renders the body slot for a live comment row — the
+// meta line (actor / "commented" / timestamp / delete button) above the
+// rounded message bubble. Wrapped by components.TimelineCommentRowRaw which
+// owns the row's <li>, rail anchor, and avatar tile.
+templ txdCommentBubbleBody(e service.ActivityEntry, now time.Time) {
+	<!--
+		Meta line shares a 24px line-box with the avatar so the actor
+		baseline sits dead-center on the rail circle. Keeping every
+		label at text-xs / leading-6 also matches the system-event
+		rows above for a uniform actor + timestamp treatment.
+	-->
+	<div class="flex items-center gap-1.5 px-1 flex-wrap text-xs leading-6">
+		if e.ActorName != "" {
+			<strong class="font-semibold text-base-content">{ e.ActorName }</strong>
+		}
+		<span class="text-base-content/55">commented</span>
+		if e.Timestamp != "" {
+			<span class="tooltip tooltip-top" data-tip={ formatDateTimeStr(e.Timestamp) }>
+				<time datetime={ e.Timestamp } class="text-base-content/40 tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStrAt(e.Timestamp, now) }</time>
 			</span>
-		</div>
-		<div class="flex-1 min-w-0 text-xs leading-6 text-base-content/55 italic break-words">
-			if e.ActorName != "" {
-				<span class="font-medium text-base-content/70 not-italic">{ e.ActorName }</span>
-				<span>deleted a comment</span>
-			} else {
-				<span>Comment deleted</span>
-			}
-			if e.Timestamp != "" {
-				<span class="text-base-content/40 ml-1 not-italic">
-					<span aria-hidden="true">&middot;</span>
-					<span class="tooltip tooltip-top" data-tip={ formatDateTimeStr(e.Timestamp) }>
-						<time datetime={ e.Timestamp } class="tabular-nums cursor-default hover:underline underline-offset-2 decoration-base-content/30" title={ formatDateTimeStr(e.Timestamp) }>{ relativeTimeStrAt(e.Timestamp, now) }</time>
-					</span>
-				</span>
-			}
-		</div>
-	</li>
+		}
+		if e.CommentID != "" {
+			<button class="ml-auto rounded-md p-1 -m-1 text-base-content/30 hover:text-error hover:bg-error/5 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition" @click={ "deleteComment('" + e.CommentID + "')" } aria-label={ "Delete comment by " + e.ActorName } title="Delete comment">
+				<i data-lucide="trash-2" class="w-3.5 h-3.5" aria-hidden="true"></i>
+			</button>
+		}
+	</div>
+	if e.Detail != "" {
+		<div class="bb-comment-bubble mt-1">{ e.Detail }</div>
+	}
 }
 
 // txdCommentAvatar renders the 24px avatar for a comment. User actors get
@@ -993,18 +967,14 @@ type TimelineRowsProps struct {
 }
 
 // TimelineRows renders activity rows for the partial-render endpoint
-// (GET /-/transactions/{id}/timeline/rows). Reuses components.TimelineDay /
-// txdTimelineSystem / txdTimelineComment so the row markup matches the
-// main page exactly — no client-side templating, no risk of drift.
+// (GET /-/transactions/{id}/timeline/rows). Reuses components.TimelineDay
+// + the same txdTimelineRow dispatch as the main page so the row markup
+// matches exactly — no client-side templating, no risk of drift.
 templ TimelineRows(p TimelineRowsProps) {
 	if p.DaySeparatorLabel != "" {
 		@components.TimelineDay(p.DaySeparatorLabel, false)
 	}
 	for _, e := range p.Entries {
-		if e.Type == "comment" {
-			@txdTimelineComment(e, p.Now)
-		} else {
-			@txdTimelineSystem(e, p.Now)
-		}
+		@txdTimelineRow(e, p.Now)
 	}
 }

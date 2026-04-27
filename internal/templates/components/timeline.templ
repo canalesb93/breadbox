@@ -170,8 +170,12 @@ templ TimelineSystemRow(p TimelineRowProps) {
 // outer ring-4 ring-base-100) inside the `tile` slot. This keeps the row
 // chrome (rail anchor, sentence layout, timestamp suffix) reusable while
 // letting the caller drive the iconography.
-templ TimelineSystemRowCustomTile(timestamp, origin string, now time.Time, tile, body templ.Component) {
-	<li class="relative flex items-start gap-3 py-2 group">
+//
+// `attrs` is spread onto the outer <li> so callers can attach JS coordination
+// attributes (e.g. `data-comment-id` on a tombstone row that mirrors a comment
+// bubble's row marker). Pass `nil` when no extras are needed.
+templ TimelineSystemRowCustomTile(timestamp, origin string, now time.Time, tile, body templ.Component, attrs templ.Attributes) {
+	<li class="relative flex items-start gap-3 py-2 group" { attrs... }>
 		<div class="relative z-10 shrink-0 w-6 h-6 rounded-full bg-base-100">
 			@tile
 		</div>
@@ -229,8 +233,13 @@ templ TimelineCommentRow(actor TimelineActor, timestamp string, now time.Time) {
 // the meta line. The avatar slot fills the 24px tile on the rail; the body
 // slot fills the right-hand column. Use TimelineCommentRow when the default
 // "Name commented · timestamp" meta line is enough.
-templ TimelineCommentRowRaw(avatar templ.Component) {
-	<li class="relative flex items-start gap-3 py-2.5 group">
+//
+// `attrs` is spread onto the outer <li> so callers can attach JS coordination
+// attributes — e.g. the transaction-detail page sets `data-comment-id` on
+// every comment row so its optimistic-update flow can swap a bubble for a
+// tombstone in place. Pass `nil` when no extras are needed.
+templ TimelineCommentRowRaw(avatar templ.Component, attrs templ.Attributes) {
+	<li class="relative flex items-start gap-3 py-2.5 group" { attrs... }>
 		<div class="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-base-100">
 			@avatar
 		</div>
